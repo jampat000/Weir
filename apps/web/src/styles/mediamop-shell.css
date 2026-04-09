@@ -74,7 +74,7 @@ body.mm-body {
   box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
-  padding: 12px 0 14px;
+  padding: 8px 0 14px;
   overflow-y: auto;
   position: relative;
   z-index: 2;
@@ -83,11 +83,11 @@ body.mm-body {
 .mm-sidebar-brand {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 0 8px 6px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 0 16px 4px;
   border-bottom: 1px solid var(--mm-border);
-  margin: 0 10px 5px;
+  margin: 0 10px 3px;
   text-decoration: none;
   color: inherit;
   transition: opacity 0.15s ease;
@@ -98,10 +98,15 @@ body.mm-body {
 }
 
 .mm-sidebar-brand-logo {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  max-width: min(100%, 240px);
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  align-self: flex-start;
+}
+
+.mm-sidebar-brand-logo .mm-logo {
+  width: auto;
+  max-width: 100%;
 }
 
 .mm-logo {
@@ -125,8 +130,8 @@ body.mm-body {
 }
 
 .mm-sidebar-tagline {
-  margin: 3px 0 0;
-  padding: 0 2px;
+  margin: 2px 0 0;
+  padding: 0;
   font-size: 10px;
   line-height: 1.35;
   font-weight: 500;
@@ -135,15 +140,14 @@ body.mm-body {
   text-transform: none;
   color: var(--mm-text3);
   max-width: 100%;
-  text-align: center;
-  text-wrap: balance;
+  text-align: left;
 }
 
 .mm-sidebar-nav {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 4px 10px 0;
+  padding: 2px 10px 0;
   gap: 4px;
 }
 

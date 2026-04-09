@@ -9,7 +9,7 @@ export function BrandHeaderLink({ to = "/app" }: Props) {
       <div className="mm-sidebar-brand-logo">
         <MediaMopLogo variant="sidebar" />
       </div>
-      <p className="mm-sidebar-tagline">Keep your library clean, organized, and under control.</p>
+      <p className="mm-sidebar-tagline">Keep your library clean and under control.</p>
     </Link>
   );
 }

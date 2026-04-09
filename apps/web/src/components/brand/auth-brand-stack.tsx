@@ -7,7 +7,7 @@ export function AuthBrandStack() {
       <div className="mm-auth-brand-logo">
         <MediaMopLogo variant="auth" />
       </div>
-      <p className="mm-auth-brand-tagline">Keep your library clean, organized, and under control.</p>
+      <p className="mm-auth-brand-tagline">Keep your library clean and under control.</p>
     </div>
   );
 }
