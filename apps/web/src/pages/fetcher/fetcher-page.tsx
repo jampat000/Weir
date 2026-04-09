@@ -1,6 +1,7 @@
 import { PageLoading } from "../../components/shared/page-loading";
-import { useDashboardStatusQuery } from "../../lib/dashboard/queries";
+import { useFetcherOperationalOverviewQuery } from "../../lib/fetcher/queries";
 import { isHttpErrorFromApi, isLikelyNetworkFailure } from "../../lib/api/error-guards";
+import type { ActivityEventItem } from "../../lib/api/types";
 
 function FetcherStatusRow({ label, value }: { label: string; value: string }) {
   return (
@@ -12,14 +13,14 @@ function FetcherStatusRow({ label, value }: { label: string; value: string }) {
 }
 
 export function FetcherPage() {
-  const dash = useDashboardStatusQuery();
+  const overview = useFetcherOperationalOverviewQuery();
 
-  if (dash.isPending) {
+  if (overview.isPending) {
     return <PageLoading label="Loading Fetcher status" />;
   }
 
-  if (dash.isError) {
-    const err = dash.error;
+  if (overview.isError) {
+    const err = overview.error;
     return (
       <div className="mm-page">
         <header className="mm-page__intro">
@@ -40,7 +41,8 @@ export function FetcherPage() {
     );
   }
 
-  const { fetcher } = dash.data;
+  const { connection, status_label, status_detail, latest_probe_event, recent_probe_events } = overview.data;
+  const lastProbeText = latest_probe_event ? formatEventTime(latest_probe_event) : "No probe event recorded yet";
 
   return (
     <div className="mm-page">
@@ -48,11 +50,11 @@ export function FetcherPage() {
         <p className="mm-page__eyebrow">Suite</p>
         <h1 className="mm-page__title">Fetcher</h1>
         <p className="mm-page__subtitle">
-          Read-only bridge to the standalone Fetcher app. MediaMop only performs a configured{" "}
-          <code className="mm-dash-code">/healthz</code> probe — no jobs, queues, or settings from here.
+          Read-only view of Fetcher connectivity and recent probe signals.
         </p>
         <p className="mm-page__lead">
-          Intentionally read-only: no scheduler controls, history, or configuration surface on this page yet.
+          MediaMop probes <code className="mm-dash-code">/healthz</code> only. No scheduler, queue/history, or
+          settings controls from this page.
         </p>
       </header>
 
@@ -68,29 +70,68 @@ export function FetcherPage() {
           to <code className="mm-dash-code">/healthz</code> on that origin.
         </p>
         <dl className="mm-dash-kv">
-          <FetcherStatusRow label="Integration" value={fetcher.configured ? "URL configured" : "Not configured"} />
-          {fetcher.target_display ? <FetcherStatusRow label="Target" value={fetcher.target_display} /> : null}
-          {fetcher.configured ? (
+          <FetcherStatusRow label="Integration" value={connection.configured ? "URL configured" : "Not configured"} />
+          {connection.target_display ? <FetcherStatusRow label="Target" value={connection.target_display} /> : null}
+          {connection.configured ? (
             <FetcherStatusRow
               label="Reachable"
               value={
-                fetcher.reachable === true ? "Yes" : fetcher.reachable === false ? "No" : "—"
+                connection.reachable === true ? "Yes" : connection.reachable === false ? "No" : "—"
               }
             />
           ) : null}
-          {fetcher.http_status != null ? (
-            <FetcherStatusRow label="HTTP status" value={String(fetcher.http_status)} />
+          {connection.http_status != null ? (
+            <FetcherStatusRow label="HTTP status" value={String(connection.http_status)} />
           ) : null}
-          {fetcher.latency_ms != null ? (
-            <FetcherStatusRow label="Probe latency" value={`${fetcher.latency_ms} ms`} />
+          {connection.latency_ms != null ? (
+            <FetcherStatusRow label="Probe latency" value={`${connection.latency_ms} ms`} />
           ) : null}
-          {fetcher.fetcher_app ? <FetcherStatusRow label="Fetcher app" value={fetcher.fetcher_app} /> : null}
-          {fetcher.fetcher_version ? (
-            <FetcherStatusRow label="Fetcher version" value={fetcher.fetcher_version} />
+          {connection.fetcher_app ? <FetcherStatusRow label="Fetcher app" value={connection.fetcher_app} /> : null}
+          {connection.fetcher_version ? (
+            <FetcherStatusRow label="Fetcher version" value={connection.fetcher_version} />
           ) : null}
-          {fetcher.detail ? <FetcherStatusRow label="Note" value={fetcher.detail} /> : null}
+          {connection.detail ? <FetcherStatusRow label="Note" value={connection.detail} /> : null}
         </dl>
+      </section>
+
+      <section
+        className="mm-card mm-dash-card mm-fetcher-module-surface mt-4"
+        aria-labelledby="mm-fetcher-operational-heading"
+      >
+        <h2 id="mm-fetcher-operational-heading" className="mm-card__title">
+          Operational signal
+        </h2>
+        <p className="mm-card__body mm-card__body--tight">
+          <strong>{status_label}</strong>: {status_detail}
+        </p>
+        <dl className="mm-dash-kv">
+          <FetcherStatusRow label="Latest probe event" value={lastProbeText} />
+          <FetcherStatusRow label="Recent probe events" value={String(recent_probe_events.length)} />
+        </dl>
+        {recent_probe_events.length > 0 ? (
+          <ul className="mt-3 space-y-2 text-sm">
+            {recent_probe_events.map((event) => (
+              <li key={event.id} className="rounded-md border border-[var(--mm-border)] p-2">
+                <p className="font-medium text-[var(--mm-text1)]">{event.title}</p>
+                <p className="text-[var(--mm-text2)]">
+                  {event.event_type} - {formatEventTime(event)}
+                </p>
+                {event.detail ? <p className="text-[var(--mm-text3)]">{event.detail}</p> : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-3 text-sm text-[var(--mm-text3)]">No persisted probe events yet.</p>
+        )}
       </section>
     </div>
   );
+}
+
+function formatEventTime(item: ActivityEventItem): string {
+  const d = new Date(item.created_at);
+  if (Number.isNaN(d.valueOf())) {
+    return item.created_at;
+  }
+  return d.toLocaleString();
 }

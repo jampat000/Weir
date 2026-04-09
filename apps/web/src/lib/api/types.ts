@@ -48,6 +48,14 @@ export type DashboardStatus = {
   activity_summary: DashboardActivitySummary;
 };
 
+export type FetcherOperationalOverview = {
+  status_label: string;
+  status_detail: string;
+  connection: DashboardFetcherStatus;
+  latest_probe_event: ActivityEventItem | null;
+  recent_probe_events: ActivityEventItem[];
+};
+
 export type ActivityRecentResponse = {
   items: ActivityEventItem[];
 };

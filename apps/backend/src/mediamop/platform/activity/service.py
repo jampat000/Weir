@@ -148,6 +148,21 @@ def get_latest_fetcher_probe_event(db: Session) -> ActivityEvent | None:
     ).first()
 
 
+def list_recent_fetcher_probe_events(db: Session, *, limit: int = 8) -> list[ActivityEvent]:
+    lim = max(1, min(limit, 20))
+    return list(
+        db.scalars(
+            select(ActivityEvent)
+            .where(
+                ActivityEvent.module == "fetcher",
+                ActivityEvent.event_type.in_((C.FETCHER_PROBE_SUCCEEDED, C.FETCHER_PROBE_FAILED)),
+            )
+            .order_by(desc(ActivityEvent.created_at))
+            .limit(lim),
+        ).all()
+    )
+
+
 def list_recent_activity_events(db: Session, *, limit: int = RECENT_DEFAULT_LIMIT) -> list[ActivityEvent]:
     lim = max(1, min(limit, 100))
     stmt = select(ActivityEvent).order_by(desc(ActivityEvent.created_at)).limit(lim)

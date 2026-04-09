@@ -14,6 +14,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from mediamop.modules.dashboard.router import router as dashboard_router
+from mediamop.modules.fetcher.router import router as fetcher_router
 from mediamop.platform.activity.router import router as activity_router
 from mediamop.platform.auth.router import router as auth_router
 
@@ -25,5 +26,6 @@ def build_v1_router() -> APIRouter:
     router = APIRouter(prefix=API_V1_PREFIX)
     router.include_router(auth_router)
     router.include_router(dashboard_router)
+    router.include_router(fetcher_router)
     router.include_router(activity_router)
     return router
