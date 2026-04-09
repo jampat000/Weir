@@ -1,7 +1,8 @@
 import { PageLoading } from "../../components/shared/page-loading";
+import { useActivityStreamInvalidation } from "../../lib/activity/use-activity-stream-invalidation";
 import type { ActivityEventItem } from "../../lib/api/types";
 import { useMeQuery } from "../../lib/auth/queries";
-import { useDashboardStatusQuery } from "../../lib/dashboard/queries";
+import { dashboardStatusKey, useDashboardStatusQuery } from "../../lib/dashboard/queries";
 import { isHttpErrorFromApi, isLikelyNetworkFailure } from "../../lib/api/error-guards";
 
 function formatEventTs(iso: string): string {
@@ -32,6 +33,7 @@ function StatusRow({ label, value }: { label: string; value: string }) {
 }
 
 export function DashboardPage() {
+  useActivityStreamInvalidation(dashboardStatusKey);
   const me = useMeQuery();
   const dash = useDashboardStatusQuery();
 

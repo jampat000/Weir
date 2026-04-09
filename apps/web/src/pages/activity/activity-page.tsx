@@ -1,5 +1,6 @@
 import { PageLoading } from "../../components/shared/page-loading";
-import { useActivityRecentQuery } from "../../lib/activity/queries";
+import { activityRecentKey, useActivityRecentQuery } from "../../lib/activity/queries";
+import { useActivityStreamInvalidation } from "../../lib/activity/use-activity-stream-invalidation";
 import { isHttpErrorFromApi, isLikelyNetworkFailure } from "../../lib/api/error-guards";
 
 function formatEventTime(iso: string): string {
@@ -15,6 +16,7 @@ function formatEventTime(iso: string): string {
 }
 
 export function ActivityPage() {
+  useActivityStreamInvalidation(activityRecentKey);
   const recent = useActivityRecentQuery();
 
   if (recent.isPending) {
@@ -51,7 +53,7 @@ export function ActivityPage() {
         <p className="mm-page__eyebrow">Overview</p>
         <h1 className="mm-page__title">Activity</h1>
         <p className="mm-page__subtitle">
-          Persisted platform events, newest first. Snapshot only — refresh or revisit to update.
+          Persisted platform events, newest first. Snapshot-backed view with live freshness updates.
         </p>
         <p className="mm-page__lead">
           Read-only: no filters, export, or actions. Records sign-in outcomes, setup, sign-out, failed bootstrap

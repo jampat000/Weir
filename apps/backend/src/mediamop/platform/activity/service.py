@@ -129,6 +129,13 @@ def get_latest_activity_event(db: Session) -> ActivityEvent | None:
     return db.scalars(select(ActivityEvent).order_by(desc(ActivityEvent.created_at)).limit(1)).first()
 
 
+def get_latest_activity_event_id(db: Session) -> int | None:
+    """Cheap freshness probe for SSE invalidation: max persisted activity id."""
+
+    v = db.scalar(select(func.max(ActivityEvent.id)))
+    return int(v) if v is not None else None
+
+
 def get_latest_fetcher_probe_event(db: Session) -> ActivityEvent | None:
     return db.scalars(
         select(ActivityEvent)
