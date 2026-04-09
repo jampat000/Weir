@@ -22,24 +22,24 @@ Write-Host "Opening API + web in new windows. This does not verify migrations or
 $issues = 0
 $envFile = Join-Path $backendDir ".env"
 if (-not (Test-Path -LiteralPath $envFile)) {
-    Write-Host "MISSING: apps/backend/.env — copy .env.example; shell-only env is still possible." -ForegroundColor Yellow
+    Write-Host "MISSING: apps/backend/.env - copy .env.example; shell-only env is still possible." -ForegroundColor Yellow
     $issues++
 }
 
 Import-MediaMopBackendDotEnv -BackendDir $backendDir
 
 if (-not ($env:MEDIAMOP_DATABASE_URL -and $env:MEDIAMOP_DATABASE_URL.Trim())) {
-    Write-Host "MISSING: MEDIAMOP_DATABASE_URL — API will serve /health but /api/v1 will 503 until set." -ForegroundColor Yellow
+    Write-Host "MISSING: MEDIAMOP_DATABASE_URL - API will serve /health but /api/v1 will 503 until set." -ForegroundColor Yellow
     $issues++
 }
 if (-not ($env:MEDIAMOP_SESSION_SECRET -and $env:MEDIAMOP_SESSION_SECRET.Trim())) {
-    Write-Host "MISSING: MEDIAMOP_SESSION_SECRET — auth/CSRF will not work until set." -ForegroundColor Yellow
+    Write-Host "MISSING: MEDIAMOP_SESSION_SECRET - auth/CSRF will not work until set." -ForegroundColor Yellow
     $issues++
 }
 
 if ($issues -gt 0) {
     Write-Host ""
-    Write-Host "Preflight: $issues issue(s) above — app is not fully ready until resolved. Run .\scripts\verify-local.ps1 when API is up." -ForegroundColor Yellow
+    Write-Host ('Preflight: {0} issue(s) above - app is not fully ready until resolved. Run .\scripts\verify-local.ps1 when API is up.' -f $issues) -ForegroundColor Yellow
 } else {
     Write-Host "Preflight: .env, DATABASE_URL, and SESSION_SECRET present (values not verified here)." -ForegroundColor Green
 }
@@ -57,7 +57,7 @@ $portsPath = Join-Path $PSScriptRoot "dev-ports.json"
 $ports = Get-Content $portsPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $d = $ports.development
 Write-Host ""
-Write-Host "Started API and web dev in new windows (launcher only — not a full stack guarantee)." -ForegroundColor Gray
+Write-Host "Started API and web dev in new windows (launcher only - not a full stack guarantee)." -ForegroundColor Gray
 Write-Host ("  API: http://{0}:{1}" -f $d.apiHost, $d.apiPort)
 Write-Host ("  Web: http://{0}:{1}" -f $d.webHost, $d.webPort)
 Write-Host "First-time: PostgreSQL running, then .\scripts\dev-migrate.ps1, then use this launcher." -ForegroundColor DarkGray
