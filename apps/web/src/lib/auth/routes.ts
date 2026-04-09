@@ -1,5 +1,11 @@
 import type { UserPublic } from "../api/types";
 
+/**
+ * Authenticated product shell is mounted at `/app` with child routes such as
+ * `/app/activity`, suite tools (`/app/fetcher`, …), and `/app/settings`.
+ * Entry routing only needs the shell root; individual paths live in the app router.
+ */
+
 export type EntryDecision =
   | { kind: "wait" }
   | { kind: "redirect"; to: "/app" | "/setup" | "/login" };

@@ -1,8 +1,20 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { BrandHeaderLink } from "../components/brand/brand-header-link";
-import { NavIconDashboard, NavIconSettings } from "../components/shell/nav-icons";
+import {
+  NavIconActivity,
+  NavIconDashboard,
+  NavIconFetcher,
+  NavIconRefiner,
+  NavIconSettings,
+  NavIconSubtitles,
+  NavIconTrimmer,
+} from "../components/shell/nav-icons";
 import { WEB_APP_VERSION } from "../lib/app-meta";
 import { useLogoutMutation } from "../lib/auth/queries";
+
+function sidebarNavClass({ isActive }: { isActive: boolean }) {
+  return isActive ? "mm-sidebar-link active" : "mm-sidebar-link";
+}
 
 export function AppShell() {
   const navigate = useNavigate();
@@ -13,21 +25,49 @@ export function AppShell() {
       <aside className="mm-sidebar" aria-label="Product">
         <BrandHeaderLink to="/app" />
         <nav className="mm-sidebar-nav" aria-label="Primary">
-          <NavLink
-            to="/app"
-            end
-            className={({ isActive }) => (isActive ? "mm-sidebar-link active" : "mm-sidebar-link")}
-          >
+          <p className="mm-sidebar-section-label">Overview</p>
+          <NavLink to="/app" end className={sidebarNavClass}>
             <span className="mm-sidebar-link-icon" aria-hidden="true">
               <NavIconDashboard />
             </span>
             <span className="mm-sidebar-link-label">Dashboard</span>
           </NavLink>
-          <div className="mm-sidebar-divider" aria-hidden="true" />
-          <NavLink
-            to="/app/settings"
-            className={({ isActive }) => (isActive ? "mm-sidebar-link active" : "mm-sidebar-link")}
-          >
+          <NavLink to="/app/activity" className={sidebarNavClass}>
+            <span className="mm-sidebar-link-icon" aria-hidden="true">
+              <NavIconActivity />
+            </span>
+            <span className="mm-sidebar-link-label">Activity</span>
+          </NavLink>
+
+          <p className="mm-sidebar-section-label">Suite</p>
+          <NavLink to="/app/fetcher" className={sidebarNavClass}>
+            <span className="mm-sidebar-link-icon" aria-hidden="true">
+              <NavIconFetcher />
+            </span>
+            <span className="mm-sidebar-link-label">Fetcher</span>
+          </NavLink>
+          <NavLink to="/app/refiner" className={sidebarNavClass}>
+            <span className="mm-sidebar-link-icon" aria-hidden="true">
+              <NavIconRefiner />
+            </span>
+            <span className="mm-sidebar-link-label">Refiner</span>
+          </NavLink>
+          <NavLink to="/app/trimmer" className={sidebarNavClass}>
+            <span className="mm-sidebar-link-icon" aria-hidden="true">
+              <NavIconTrimmer />
+            </span>
+            <span className="mm-sidebar-link-label">Trimmer</span>
+          </NavLink>
+          {/* TODO: Nav label "Subtitles" is temporary until the module name is finalized. */}
+          <NavLink to="/app/subtitles" className={sidebarNavClass}>
+            <span className="mm-sidebar-link-icon" aria-hidden="true">
+              <NavIconSubtitles />
+            </span>
+            <span className="mm-sidebar-link-label">Subtitles</span>
+          </NavLink>
+
+          <p className="mm-sidebar-section-label">System</p>
+          <NavLink to="/app/settings" className={sidebarNavClass}>
             <span className="mm-sidebar-link-icon" aria-hidden="true">
               <NavIconSettings />
             </span>
