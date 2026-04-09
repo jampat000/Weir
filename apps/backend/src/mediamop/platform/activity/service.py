@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
-from sqlalchemy import desc, select
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
+from mediamop.platform.activity import constants as C
 from mediamop.platform.activity.models import ActivityEvent
 
 RECENT_DEFAULT_LIMIT = 50
+
+_FETCHER_PROBE_SUPPRESS_MINUTES = 15
+_LOGIN_FAILED_SUPPRESS_MINUTES = 2
+_BOOTSTRAP_DENIED_SUPPRESS_SECONDS = 60
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def record_activity_event(
@@ -27,6 +38,107 @@ def record_activity_event(
     db.add(row)
     db.flush()
     return row
+
+
+def maybe_record_login_failed(db: Session, *, username: str) -> None:
+    """One failed-login event per username per short window to limit brute-force noise."""
+
+    cutoff = _utcnow() - timedelta(minutes=_LOGIN_FAILED_SUPPRESS_MINUTES)
+    exists = db.scalars(
+        select(ActivityEvent)
+        .where(
+            ActivityEvent.event_type == C.AUTH_LOGIN_FAILED,
+            ActivityEvent.detail == username,
+            ActivityEvent.created_at >= cutoff,
+        )
+        .limit(1),
+    ).first()
+    if exists is not None:
+        return
+    record_activity_event(
+        db,
+        event_type=C.AUTH_LOGIN_FAILED,
+        module="auth",
+        title="Sign-in failed",
+        detail=username,
+    )
+
+
+def maybe_record_bootstrap_denied(db: Session) -> None:
+    """At most one bootstrap-denied row per minute (clustered abuse)."""
+
+    cutoff = _utcnow() - timedelta(seconds=_BOOTSTRAP_DENIED_SUPPRESS_SECONDS)
+    exists = db.scalars(
+        select(ActivityEvent)
+        .where(
+            ActivityEvent.event_type == C.AUTH_BOOTSTRAP_DENIED,
+            ActivityEvent.created_at >= cutoff,
+        )
+        .limit(1),
+    ).first()
+    if exists is not None:
+        return
+    record_activity_event(
+        db,
+        event_type=C.AUTH_BOOTSTRAP_DENIED,
+        module="auth",
+        title="Bootstrap not allowed",
+        detail="An admin account already exists.",
+    )
+
+
+def maybe_record_fetcher_probe_result(
+    db: Session,
+    *,
+    target_display: str,
+    probe_succeeded: bool,
+) -> None:
+    """Record Fetcher health probe outcome; suppress duplicate same outcome+target within window."""
+
+    event_type = C.FETCHER_PROBE_SUCCEEDED if probe_succeeded else C.FETCHER_PROBE_FAILED
+    title = "Fetcher health check OK" if probe_succeeded else "Fetcher health check failed"
+    cutoff = _utcnow() - timedelta(minutes=_FETCHER_PROBE_SUPPRESS_MINUTES)
+    last = db.scalars(
+        select(ActivityEvent)
+        .where(
+            ActivityEvent.module == "fetcher",
+            ActivityEvent.event_type.in_((C.FETCHER_PROBE_SUCCEEDED, C.FETCHER_PROBE_FAILED)),
+            ActivityEvent.created_at >= cutoff,
+        )
+        .order_by(desc(ActivityEvent.created_at))
+        .limit(1),
+    ).first()
+    if last is not None:
+        if last.event_type == event_type and (last.detail or "") == target_display:
+            return
+    record_activity_event(
+        db,
+        event_type=event_type,
+        module="fetcher",
+        title=title,
+        detail=target_display,
+    )
+
+
+def count_activity_events_since(db: Session, *, since: datetime) -> int:
+    n = db.scalar(select(func.count()).select_from(ActivityEvent).where(ActivityEvent.created_at >= since))
+    return int(n or 0)
+
+
+def get_latest_activity_event(db: Session) -> ActivityEvent | None:
+    return db.scalars(select(ActivityEvent).order_by(desc(ActivityEvent.created_at)).limit(1)).first()
+
+
+def get_latest_fetcher_probe_event(db: Session) -> ActivityEvent | None:
+    return db.scalars(
+        select(ActivityEvent)
+        .where(
+            ActivityEvent.module == "fetcher",
+            ActivityEvent.event_type.in_((C.FETCHER_PROBE_SUCCEEDED, C.FETCHER_PROBE_FAILED)),
+        )
+        .order_by(desc(ActivityEvent.created_at))
+        .limit(1),
+    ).first()
 
 
 def list_recent_activity_events(db: Session, *, limit: int = RECENT_DEFAULT_LIMIT) -> list[ActivityEvent]:

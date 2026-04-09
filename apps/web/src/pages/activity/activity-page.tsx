@@ -54,7 +54,8 @@ export function ActivityPage() {
           Persisted platform events, newest first. Snapshot only — refresh or revisit to update.
         </p>
         <p className="mm-page__lead">
-          Read-only: no filters, export, or actions. Only sign-in, sign-out, and initial setup are recorded today.
+          Read-only: no filters, export, or actions. Records sign-in outcomes, setup, sign-out, failed bootstrap
+          attempts, and throttled Fetcher health checks — not every page load.
         </p>
       </header>
 

@@ -76,6 +76,8 @@ def post_login(
     )
     if result is None:
         logger.warning("auth event: login failed (username=%s)", uname)
+        activity_service.maybe_record_login_failed(db, username=uname)
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password.",
@@ -153,6 +155,8 @@ def post_bootstrap(
         ) from exc
     if not bootstrap_service.bootstrap_allowed(db):
         logger.warning("auth event: bootstrap denied (admin already exists)")
+        activity_service.maybe_record_bootstrap_denied(db)
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Bootstrap is not available: an admin user already exists.",

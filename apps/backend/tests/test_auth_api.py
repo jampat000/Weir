@@ -5,15 +5,18 @@ from __future__ import annotations
 import os
 
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 
 from mediamop.api.factory import create_app
 from mediamop.core.config import MediaMopSettings
 from mediamop.core.db import create_db_engine, create_session_factory
-from mediamop.platform.auth.models import User, UserSession, UserRole
+from mediamop.platform.activity import constants as activity_constants
+from mediamop.platform.activity.models import ActivityEvent
+from mediamop.platform.auth.models import User, UserRole
 from mediamop.platform.auth.password import hash_password
+from tests.integration_helpers import auth_post, csrf as fetch_csrf, reset_user_tables
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("MEDIAMOP_DATABASE_URL"),
@@ -21,100 +24,9 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(autouse=True)
-def ensure_session_secret(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(
-        "MEDIAMOP_SESSION_SECRET",
-        os.environ.get("MEDIAMOP_SESSION_SECRET", "pytest-session-secret-32-chars-min!!"),
-    )
-
-
-def _reset_tables() -> None:
-    settings = MediaMopSettings.load()
-    eng = create_db_engine(settings)
-    fac = create_session_factory(eng)
-    with fac() as db:
-        assert isinstance(db, Session)
-        db.execute(delete(UserSession))
-        db.execute(delete(User))
-        db.commit()
-
-
-@pytest.fixture
-def client_with_admin() -> TestClient:
-    _reset_tables()
-    settings = MediaMopSettings.load()
-    eng = create_db_engine(settings)
-    fac = create_session_factory(eng)
-    with fac() as db:
-        db.add(
-            User(
-                username="alice",
-                password_hash=hash_password("test-password-strong"),
-                role="admin",
-                is_active=True,
-            )
-        )
-        db.commit()
-    app = create_app()
-    with TestClient(app) as c:
-        yield c
-
-
-@pytest.fixture
-def client_with_viewer() -> TestClient:
-    _reset_tables()
-    settings = MediaMopSettings.load()
-    eng = create_db_engine(settings)
-    fac = create_session_factory(eng)
-    with fac() as db:
-        db.add(
-            User(
-                username="bob",
-                password_hash=hash_password("viewer-password-here"),
-                role=UserRole.viewer.value,
-                is_active=True,
-            )
-        )
-        db.commit()
-    app = create_app()
-    with TestClient(app) as c:
-        yield c
-
-
-def _csrf(client: TestClient) -> str:
-    r = client.get("/api/v1/auth/csrf")
-    assert r.status_code == 200, r.text
-    return r.json()["csrf_token"]
-
-
-def _trusted_browser_origin_headers() -> dict[str, str]:
-    """Unsafe auth POSTs require Origin/Referer when trusted origins are configured (typical .env)."""
-
-    settings = MediaMopSettings.load()
-    trusted = settings.trusted_browser_origins
-    if not trusted:
-        return {}
-    return {"Origin": trusted[0].rstrip("/")}
-
-
-def _auth_post(
-    client: TestClient,
-    path: str,
-    *,
-    json: dict | None = None,
-    headers: dict[str, str] | None = None,
-):
-    merged = {**_trusted_browser_origin_headers(), **(headers or {})}
-    kw: dict[str, object] = {"headers": merged}
-    if json is not None:
-        kw["json"] = json
-    return client.post(path, **kw)
-
-
 def test_login_me_logout_flow(client_with_admin: TestClient) -> None:
-    csrf = _csrf(client_with_admin)
-    r_login = _auth_post(
+    csrf = fetch_csrf(client_with_admin)
+    r_login = auth_post(
         client_with_admin,
         "/api/v1/auth/login",
         json={
@@ -133,8 +45,8 @@ def test_login_me_logout_flow(client_with_admin: TestClient) -> None:
     assert r_me.status_code == 200
     assert r_me.json()["user"]["username"] == "alice"
 
-    csrf2 = _csrf(client_with_admin)
-    r_out = _auth_post(
+    csrf2 = fetch_csrf(client_with_admin)
+    r_out = auth_post(
         client_with_admin,
         "/api/v1/auth/logout",
         headers={"X-CSRF-Token": csrf2},
@@ -146,8 +58,8 @@ def test_login_me_logout_flow(client_with_admin: TestClient) -> None:
 
 
 def test_login_invalid_password(client_with_admin: TestClient) -> None:
-    csrf = _csrf(client_with_admin)
-    r = _auth_post(
+    csrf = fetch_csrf(client_with_admin)
+    r = auth_post(
         client_with_admin,
         "/api/v1/auth/login",
         json={
@@ -159,8 +71,49 @@ def test_login_invalid_password(client_with_admin: TestClient) -> None:
     assert r.status_code == 401
 
 
+def test_login_failed_persisted_throttled_per_username(client_with_admin: TestClient) -> None:
+    settings = MediaMopSettings.load()
+    eng = create_db_engine(settings)
+    fac = create_session_factory(eng)
+    with fac() as db:
+        db.execute(
+            delete(ActivityEvent).where(
+                ActivityEvent.event_type == activity_constants.AUTH_LOGIN_FAILED,
+                ActivityEvent.detail == "alice",
+            ),
+        )
+        db.commit()
+    with fac() as db:
+        before = db.scalar(
+            select(func.count()).select_from(ActivityEvent).where(
+                ActivityEvent.event_type == activity_constants.AUTH_LOGIN_FAILED,
+                ActivityEvent.detail == "alice",
+            ),
+        )
+    for _ in range(3):
+        tok = fetch_csrf(client_with_admin)
+        r = auth_post(
+            client_with_admin,
+            "/api/v1/auth/login",
+            json={
+                "username": "alice",
+                "password": "wrong-password",
+                "csrf_token": tok,
+            },
+        )
+        assert r.status_code == 401
+    with fac() as db:
+        after = db.scalar(
+            select(func.count()).select_from(ActivityEvent).where(
+                ActivityEvent.event_type == activity_constants.AUTH_LOGIN_FAILED,
+                ActivityEvent.detail == "alice",
+            ),
+        )
+    assert int(after or 0) - int(before or 0) == 1
+
+
 def test_login_invalid_csrf(client_with_admin: TestClient) -> None:
-    r = _auth_post(
+    r = auth_post(
         client_with_admin,
         "/api/v1/auth/login",
         json={
@@ -173,8 +126,8 @@ def test_login_invalid_csrf(client_with_admin: TestClient) -> None:
 
 
 def test_logout_rejects_missing_csrf(client_with_admin: TestClient) -> None:
-    csrf = _csrf(client_with_admin)
-    _auth_post(
+    csrf = fetch_csrf(client_with_admin)
+    auth_post(
         client_with_admin,
         "/api/v1/auth/login",
         json={
@@ -183,13 +136,13 @@ def test_logout_rejects_missing_csrf(client_with_admin: TestClient) -> None:
             "csrf_token": csrf,
         },
     )
-    r = _auth_post(client_with_admin, "/api/v1/auth/logout")
+    r = auth_post(client_with_admin, "/api/v1/auth/logout")
     assert r.status_code == 400
 
 
 def test_session_rotation_replaces_old_cookie(client_with_admin: TestClient) -> None:
-    csrf1 = _csrf(client_with_admin)
-    _auth_post(
+    csrf1 = fetch_csrf(client_with_admin)
+    auth_post(
         client_with_admin,
         "/api/v1/auth/login",
         json={
@@ -200,8 +153,8 @@ def test_session_rotation_replaces_old_cookie(client_with_admin: TestClient) -> 
     )
     cookie_name = MediaMopSettings.load().session_cookie_name
     old_cookie = client_with_admin.cookies.get(cookie_name)
-    csrf2 = _csrf(client_with_admin)
-    _auth_post(
+    csrf2 = fetch_csrf(client_with_admin)
+    auth_post(
         client_with_admin,
         "/api/v1/auth/login",
         json={
@@ -217,8 +170,8 @@ def test_session_rotation_replaces_old_cookie(client_with_admin: TestClient) -> 
 
 
 def test_admin_ping_requires_admin(client_with_admin: TestClient) -> None:
-    csrf = _csrf(client_with_admin)
-    _auth_post(
+    csrf = fetch_csrf(client_with_admin)
+    auth_post(
         client_with_admin,
         "/api/v1/auth/login",
         json={
@@ -233,8 +186,8 @@ def test_admin_ping_requires_admin(client_with_admin: TestClient) -> None:
 
 
 def test_admin_ping_forbidden_for_viewer(client_with_viewer: TestClient) -> None:
-    csrf = _csrf(client_with_viewer)
-    _auth_post(
+    csrf = fetch_csrf(client_with_viewer)
+    auth_post(
         client_with_viewer,
         "/api/v1/auth/login",
         json={
@@ -250,14 +203,14 @@ def test_admin_ping_forbidden_for_viewer(client_with_viewer: TestClient) -> None
 def test_bootstrap_allowed_when_no_admin(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MEDIAMOP_BOOTSTRAP_RATE_MAX_ATTEMPTS", "100")
     monkeypatch.setenv("MEDIAMOP_BOOTSTRAP_RATE_WINDOW_SECONDS", "60")
-    _reset_tables()
+    reset_user_tables()
     app = create_app()
     with TestClient(app) as client:
         r_s = client.get("/api/v1/auth/bootstrap/status")
         assert r_s.status_code == 200
         assert r_s.json()["bootstrap_allowed"] is True
-        csrf = _csrf(client)
-        r_b = _auth_post(
+        csrf = fetch_csrf(client)
+        r_b = auth_post(
             client,
             "/api/v1/auth/bootstrap",
             json={
@@ -270,8 +223,8 @@ def test_bootstrap_allowed_when_no_admin(monkeypatch: pytest.MonkeyPatch) -> Non
         assert r_b.json()["username"] == "owner1"
         r_s2 = client.get("/api/v1/auth/bootstrap/status")
         assert r_s2.json()["bootstrap_allowed"] is False
-        csrf2 = _csrf(client)
-        r_login = _auth_post(
+        csrf2 = fetch_csrf(client)
+        r_login = auth_post(
             client,
             "/api/v1/auth/login",
             json={
@@ -289,7 +242,7 @@ def test_bootstrap_allowed_when_no_admin(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 def test_bootstrap_username_conflict_returns_409() -> None:
-    _reset_tables()
+    reset_user_tables()
     settings = MediaMopSettings.load()
     eng = create_db_engine(settings)
     fac = create_session_factory(eng)
@@ -306,8 +259,8 @@ def test_bootstrap_username_conflict_returns_409() -> None:
     app = create_app()
     with TestClient(app) as client:
         assert client.get("/api/v1/auth/bootstrap/status").json()["bootstrap_allowed"] is True
-        csrf = _csrf(client)
-        r = _auth_post(
+        csrf = fetch_csrf(client)
+        r = auth_post(
             client,
             "/api/v1/auth/bootstrap",
             json={
@@ -322,8 +275,8 @@ def test_bootstrap_username_conflict_returns_409() -> None:
 def test_bootstrap_blocked_after_admin_exists(client_with_admin: TestClient) -> None:
     r_s = client_with_admin.get("/api/v1/auth/bootstrap/status")
     assert r_s.json()["bootstrap_allowed"] is False
-    csrf = _csrf(client_with_admin)
-    r_b = _auth_post(
+    csrf = fetch_csrf(client_with_admin)
+    r_b = auth_post(
         client_with_admin,
         "/api/v1/auth/bootstrap",
         json={
@@ -335,10 +288,58 @@ def test_bootstrap_blocked_after_admin_exists(client_with_admin: TestClient) -> 
     assert r_b.status_code == 403
 
 
+def test_bootstrap_denied_persisted_throttled(client_with_admin: TestClient) -> None:
+    settings = MediaMopSettings.load()
+    eng = create_db_engine(settings)
+    fac = create_session_factory(eng)
+    with fac() as db:
+        db.execute(
+            delete(ActivityEvent).where(
+                ActivityEvent.event_type == activity_constants.AUTH_BOOTSTRAP_DENIED,
+            ),
+        )
+        db.commit()
+    with fac() as db:
+        before = db.scalar(
+            select(func.count()).select_from(ActivityEvent).where(
+                ActivityEvent.event_type == activity_constants.AUTH_BOOTSTRAP_DENIED,
+            ),
+        )
+    tok = fetch_csrf(client_with_admin)
+    r1 = auth_post(
+        client_with_admin,
+        "/api/v1/auth/bootstrap",
+        json={
+            "username": "intruder",
+            "password": "some-long-password-here",
+            "csrf_token": tok,
+        },
+    )
+    assert r1.status_code == 403
+    tok2 = fetch_csrf(client_with_admin)
+    r2 = auth_post(
+        client_with_admin,
+        "/api/v1/auth/bootstrap",
+        json={
+            "username": "intruder2",
+            "password": "other-long-password-here",
+            "csrf_token": tok2,
+        },
+    )
+    assert r2.status_code == 403
+    with fac() as db:
+        after = db.scalar(
+            select(func.count()).select_from(ActivityEvent).where(
+                ActivityEvent.event_type == activity_constants.AUTH_BOOTSTRAP_DENIED,
+            ),
+        )
+    assert int(after or 0) - int(before or 0) == 1
+
+
 def test_login_rate_limited(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MEDIAMOP_AUTH_LOGIN_RATE_MAX_ATTEMPTS", "3")
     monkeypatch.setenv("MEDIAMOP_AUTH_LOGIN_RATE_WINDOW_SECONDS", "120")
-    _reset_tables()
+    reset_user_tables()
     settings = MediaMopSettings.load()
     eng = create_db_engine(settings)
     fac = create_session_factory(eng)
@@ -355,8 +356,8 @@ def test_login_rate_limited(monkeypatch: pytest.MonkeyPatch) -> None:
     app = create_app()
     with TestClient(app) as client:
         for i in range(3):
-            csrf = _csrf(client)
-            r = _auth_post(
+            csrf = fetch_csrf(client)
+            r = auth_post(
                 client,
                 "/api/v1/auth/login",
                 json={
@@ -366,8 +367,8 @@ def test_login_rate_limited(monkeypatch: pytest.MonkeyPatch) -> None:
                 },
             )
             assert r.status_code == 401, r.text
-        csrf_last = _csrf(client)
-        r_limit = _auth_post(
+        csrf_last = fetch_csrf(client)
+        r_limit = auth_post(
             client,
             "/api/v1/auth/login",
             json={
@@ -386,8 +387,8 @@ def test_activity_recent_requires_authentication(client_with_admin: TestClient) 
 
 
 def test_activity_recent_includes_login_event(client_with_admin: TestClient) -> None:
-    csrf = _csrf(client_with_admin)
-    r_login = _auth_post(
+    csrf = fetch_csrf(client_with_admin)
+    r_login = auth_post(
         client_with_admin,
         "/api/v1/auth/login",
         json={
@@ -406,8 +407,8 @@ def test_activity_recent_includes_login_event(client_with_admin: TestClient) -> 
 
 
 def test_activity_recent_includes_logout_event(client_with_admin: TestClient) -> None:
-    csrf = _csrf(client_with_admin)
-    _auth_post(
+    csrf = fetch_csrf(client_with_admin)
+    auth_post(
         client_with_admin,
         "/api/v1/auth/login",
         json={
@@ -416,15 +417,15 @@ def test_activity_recent_includes_logout_event(client_with_admin: TestClient) ->
             "csrf_token": csrf,
         },
     )
-    csrf2 = _csrf(client_with_admin)
-    r_out = _auth_post(
+    csrf2 = fetch_csrf(client_with_admin)
+    r_out = auth_post(
         client_with_admin,
         "/api/v1/auth/logout",
         headers={"X-CSRF-Token": csrf2},
     )
     assert r_out.status_code == 204, r_out.text
-    csrf3 = _csrf(client_with_admin)
-    _auth_post(
+    csrf3 = fetch_csrf(client_with_admin)
+    auth_post(
         client_with_admin,
         "/api/v1/auth/login",
         json={
@@ -443,7 +444,7 @@ def test_activity_recent_includes_logout_event(client_with_admin: TestClient) ->
 
 def test_security_headers_on_health_and_auth(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MEDIAMOP_SECURITY_ENABLE_HSTS", "1")
-    _reset_tables()
+    reset_user_tables()
     app = create_app()
     with TestClient(app) as client:
         r_h = client.get("/health")

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from mediamop.platform.activity.schemas import ActivityEventItemOut
+
 
 class SystemStatusOut(BaseModel):
     api_version: str = Field(..., description="MediaMop API package version.")
@@ -37,6 +39,17 @@ class FetcherIntegrationOut(BaseModel):
     )
 
 
+class ActivitySummaryOut(BaseModel):
+    """Derived from persisted ``activity_events`` only — snapshot at request time."""
+
+    events_last_24h: int = Field(..., ge=0, description="Count of rows with created_at in the last 24 hours.")
+    latest: ActivityEventItemOut | None = Field(None, description="Newest event of any type, if any.")
+    last_fetcher_probe: ActivityEventItemOut | None = Field(
+        None,
+        description="Most recent fetcher.probe_* event, if any.",
+    )
+
+
 class DashboardStatusOut(BaseModel):
     scope_note: str = Field(
         default="Read-only overview. No jobs or settings are changed from this view.",
@@ -44,3 +57,4 @@ class DashboardStatusOut(BaseModel):
     )
     system: SystemStatusOut
     fetcher: FetcherIntegrationOut
+    activity_summary: ActivitySummaryOut

@@ -26,12 +26,6 @@ export type DashboardFetcherStatus = {
   detail: string | null;
 };
 
-export type DashboardStatus = {
-  scope_note: string;
-  system: DashboardSystemStatus;
-  fetcher: DashboardFetcherStatus;
-};
-
 export type ActivityEventItem = {
   id: number;
   created_at: string;
@@ -39,6 +33,19 @@ export type ActivityEventItem = {
   module: string;
   title: string;
   detail: string | null;
+};
+
+export type DashboardActivitySummary = {
+  events_last_24h: number;
+  latest: ActivityEventItem | null;
+  last_fetcher_probe: ActivityEventItem | null;
+};
+
+export type DashboardStatus = {
+  scope_note: string;
+  system: DashboardSystemStatus;
+  fetcher: DashboardFetcherStatus;
+  activity_summary: DashboardActivitySummary;
 };
 
 export type ActivityRecentResponse = {

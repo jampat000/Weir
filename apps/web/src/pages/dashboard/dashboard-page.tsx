@@ -1,7 +1,26 @@
 import { PageLoading } from "../../components/shared/page-loading";
+import type { ActivityEventItem } from "../../lib/api/types";
 import { useMeQuery } from "../../lib/auth/queries";
 import { useDashboardStatusQuery } from "../../lib/dashboard/queries";
 import { isHttpErrorFromApi, isLikelyNetworkFailure } from "../../lib/api/error-guards";
+
+function formatEventTs(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) {
+      return iso;
+    }
+    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(d);
+  } catch {
+    return iso;
+  }
+}
+
+function eventOneLine(ev: ActivityEventItem): string {
+  const t = formatEventTs(ev.created_at);
+  const tail = ev.detail ? ` · ${ev.detail}` : "";
+  return `${ev.title}${tail} (${t})`;
+}
 
 function StatusRow({ label, value }: { label: string; value: string }) {
   return (
@@ -42,7 +61,7 @@ export function DashboardPage() {
     );
   }
 
-  const { system, fetcher, scope_note } = dash.data;
+  const { system, fetcher, scope_note, activity_summary } = dash.data;
 
   return (
     <div className="mm-page">
@@ -110,6 +129,33 @@ export function DashboardPage() {
             {fetcher.fetcher_app ? <StatusRow label="Fetcher app" value={fetcher.fetcher_app} /> : null}
             {fetcher.fetcher_version ? <StatusRow label="Fetcher version" value={fetcher.fetcher_version} /> : null}
             {fetcher.detail ? <StatusRow label="Note" value={fetcher.detail} /> : null}
+          </dl>
+        </section>
+
+        <section
+          className="mm-card mm-dash-card mm-dash-activity-summary"
+          aria-labelledby="mm-dash-activity-summary-heading"
+        >
+          <h2 id="mm-dash-activity-summary-heading" className="mm-card__title">
+            Recent activity
+          </h2>
+          <p className="mm-card__body mm-card__body--tight">
+            From persisted events (last 24 hours and latest probe). Open Activity for the full list.
+          </p>
+          <dl className="mm-dash-kv">
+            <StatusRow label="Events (24h)" value={String(activity_summary.events_last_24h)} />
+            <StatusRow
+              label="Latest"
+              value={activity_summary.latest ? eventOneLine(activity_summary.latest) : "—"}
+            />
+            <StatusRow
+              label="Last Fetcher check"
+              value={
+                activity_summary.last_fetcher_probe
+                  ? eventOneLine(activity_summary.last_fetcher_probe)
+                  : "—"
+              }
+            />
           </dl>
         </section>
       </div>
