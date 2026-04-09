@@ -6,6 +6,7 @@ import {
   postLogin,
   postLogout,
 } from "../api/auth-api";
+import { activityRecentKey } from "../activity/queries";
 
 export const qk = {
   me: ["auth", "me"] as const,
@@ -36,6 +37,7 @@ export function useLoginMutation() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.me });
       void qc.invalidateQueries({ queryKey: qk.bootstrap });
+      void qc.invalidateQueries({ queryKey: activityRecentKey });
     },
   });
 }
@@ -47,6 +49,7 @@ export function useLogoutMutation() {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: qk.me });
       void qc.invalidateQueries({ queryKey: qk.bootstrap });
+      void qc.invalidateQueries({ queryKey: activityRecentKey });
     },
   });
 }
@@ -58,6 +61,7 @@ export function useBootstrapMutation() {
       postBootstrap(username, password),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.bootstrap });
+      void qc.invalidateQueries({ queryKey: activityRecentKey });
     },
   });
 }

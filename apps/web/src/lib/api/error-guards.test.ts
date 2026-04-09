@@ -20,6 +20,7 @@ describe("error-guards", () => {
     expect(isHttpErrorFromApi(new Error("me: 401"))).toBe(true);
     expect(isHttpErrorFromApi(new Error("CSRF: 403"))).toBe(true);
     expect(isHttpErrorFromApi(new Error("dashboard status: 502"))).toBe(true);
+    expect(isHttpErrorFromApi(new Error("activity recent: 403"))).toBe(true);
     expect(isHttpErrorFromApi(new Error("random"))).toBe(false);
   });
 
@@ -28,6 +29,7 @@ describe("error-guards", () => {
     expect(httpStatusFromApiError(new Error("me: 422"))).toBe(422);
     expect(httpStatusFromApiError(new Error("CSRF: 400"))).toBe(400);
     expect(httpStatusFromApiError(new Error("dashboard status: 401"))).toBe(401);
+    expect(httpStatusFromApiError(new Error("activity recent: 500"))).toBe(500);
     expect(httpStatusFromApiError(new Error("nope"))).toBe(null);
   });
 });

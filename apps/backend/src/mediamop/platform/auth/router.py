@@ -23,6 +23,8 @@ from mediamop.platform.auth.csrf import (
     validate_browser_post_origin,
     verify_csrf_token,
 )
+from mediamop.platform.activity import constants as activity_constants
+from mediamop.platform.activity import service as activity_service
 from mediamop.platform.auth.deps_auth import UserPublicDep
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -80,6 +82,13 @@ def post_login(
         )
     user, raw = result
     logger.info("auth event: login succeeded (user_id=%s username=%s)", user.id, user.username)
+    activity_service.record_activity_event(
+        db,
+        event_type=activity_constants.AUTH_LOGIN_SUCCEEDED,
+        module="auth",
+        title="Signed in",
+        detail=user.username,
+    )
 
     response.set_cookie(
         key=settings.session_cookie_name,
@@ -165,6 +174,13 @@ def post_bootstrap(
         user.id,
         user.username,
     )
+    activity_service.record_activity_event(
+        db,
+        event_type=activity_constants.AUTH_BOOTSTRAP_SUCCEEDED,
+        module="auth",
+        title="Initial admin created",
+        detail=user.username,
+    )
     return schemas.BootstrapOut(
         message="Bootstrap complete. Sign in with POST /api/v1/auth/login.",
         username=user.username,
@@ -191,6 +207,16 @@ def post_logout(
 
     raw = (request.cookies.get(settings.session_cookie_name) or "").strip() or None
     if raw:
+        pair = auth_service.load_valid_session_for_request(db, raw, settings)
+        if pair:
+            _srow, user = pair
+            activity_service.record_activity_event(
+                db,
+                event_type=activity_constants.AUTH_LOGOUT,
+                module="auth",
+                title="Signed out",
+                detail=user.username,
+            )
         revoked = auth_service.logout_by_cookie(db, raw, settings)
         if revoked:
             logger.info("auth event: logout (session revoked)")

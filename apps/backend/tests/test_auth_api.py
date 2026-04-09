@@ -270,6 +270,22 @@ def test_bootstrap_allowed_when_no_admin(monkeypatch: pytest.MonkeyPatch) -> Non
         assert r_b.json()["username"] == "owner1"
         r_s2 = client.get("/api/v1/auth/bootstrap/status")
         assert r_s2.json()["bootstrap_allowed"] is False
+        csrf2 = _csrf(client)
+        r_login = _auth_post(
+            client,
+            "/api/v1/auth/login",
+            json={
+                "username": "owner1",
+                "password": "first-owner-pass-min8",
+                "csrf_token": csrf2,
+            },
+        )
+        assert r_login.status_code == 200, r_login.text
+        r_act = client.get("/api/v1/activity/recent")
+        assert r_act.status_code == 200, r_act.text
+        et = {x["event_type"] for x in r_act.json()["items"]}
+        assert "auth.bootstrap_succeeded" in et
+        assert "auth.login_succeeded" in et
 
 
 def test_bootstrap_username_conflict_returns_409() -> None:
@@ -362,6 +378,67 @@ def test_login_rate_limited(monkeypatch: pytest.MonkeyPatch) -> None:
         )
         assert r_limit.status_code == 429
         assert "Retry-After" in r_limit.headers
+
+
+def test_activity_recent_requires_authentication(client_with_admin: TestClient) -> None:
+    r = client_with_admin.get("/api/v1/activity/recent")
+    assert r.status_code == 401
+
+
+def test_activity_recent_includes_login_event(client_with_admin: TestClient) -> None:
+    csrf = _csrf(client_with_admin)
+    r_login = _auth_post(
+        client_with_admin,
+        "/api/v1/auth/login",
+        json={
+            "username": "alice",
+            "password": "test-password-strong",
+            "csrf_token": csrf,
+        },
+    )
+    assert r_login.status_code == 200, r_login.text
+    r_act = client_with_admin.get("/api/v1/activity/recent")
+    assert r_act.status_code == 200, r_act.text
+    items = r_act.json()["items"]
+    assert any(
+        x.get("event_type") == "auth.login_succeeded" and x.get("detail") == "alice" for x in items
+    )
+
+
+def test_activity_recent_includes_logout_event(client_with_admin: TestClient) -> None:
+    csrf = _csrf(client_with_admin)
+    _auth_post(
+        client_with_admin,
+        "/api/v1/auth/login",
+        json={
+            "username": "alice",
+            "password": "test-password-strong",
+            "csrf_token": csrf,
+        },
+    )
+    csrf2 = _csrf(client_with_admin)
+    r_out = _auth_post(
+        client_with_admin,
+        "/api/v1/auth/logout",
+        headers={"X-CSRF-Token": csrf2},
+    )
+    assert r_out.status_code == 204, r_out.text
+    csrf3 = _csrf(client_with_admin)
+    _auth_post(
+        client_with_admin,
+        "/api/v1/auth/login",
+        json={
+            "username": "alice",
+            "password": "test-password-strong",
+            "csrf_token": csrf3,
+        },
+    )
+    r_act = client_with_admin.get("/api/v1/activity/recent")
+    assert r_act.status_code == 200
+    items = r_act.json()["items"]
+    types_in_order = [x["event_type"] for x in items[:3]]
+    assert "auth.login_succeeded" in types_in_order
+    assert "auth.logout" in types_in_order
 
 
 def test_security_headers_on_health_and_auth(monkeypatch: pytest.MonkeyPatch) -> None:

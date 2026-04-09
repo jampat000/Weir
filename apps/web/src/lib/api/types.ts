@@ -31,3 +31,16 @@ export type DashboardStatus = {
   system: DashboardSystemStatus;
   fetcher: DashboardFetcherStatus;
 };
+
+export type ActivityEventItem = {
+  id: number;
+  created_at: string;
+  event_type: string;
+  module: string;
+  title: string;
+  detail: string | null;
+};
+
+export type ActivityRecentResponse = {
+  items: ActivityEventItem[];
+};
