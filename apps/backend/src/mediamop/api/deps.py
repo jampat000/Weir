@@ -38,6 +38,11 @@ def get_db_session(request: Request) -> Generator[Session, None, None]:
     try:
         yield session
         session.commit()
+    except HTTPException:
+        # Routes often raise HTTPException after intentional work (e.g. audit commit before 401).
+        # Do not rollback here: after a successful in-route commit, rollback can upset the pool;
+        # uncommitted work is cleared when the session is closed.
+        raise
     except Exception:
         session.rollback()
         raise
