@@ -54,7 +54,9 @@ export function LoginPage() {
         <div className="mm-auth-card">
           <p className="mm-auth-eyebrow">MediaMop</p>
           <h1 className="mm-auth-title">Sign in</h1>
-          <p className="mm-auth-lead">Session authentication — your account stays on the server.</p>
+          <p className="mm-auth-lead">
+            Server-side session sign-in — MediaMop keeps your sign-in on the backend, not browser storage.
+          </p>
 
           {fromSetup ? (
             <p className="mm-auth-banner mm-auth-banner--ok" role="status">

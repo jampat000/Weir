@@ -555,7 +555,7 @@ body.mm-body {
 
 .mm-activity-panel {
   margin: 0;
-  max-width: 40rem;
+  max-width: 100%;
   padding: 1rem 1.15rem;
   border-radius: var(--mm-radius-sm);
   border: 1px solid rgba(231, 231, 234, 0.07);
@@ -575,7 +575,7 @@ body.mm-body {
   margin: 0;
   padding: 0;
   list-style: none;
-  max-width: 42rem;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   gap: 0;
