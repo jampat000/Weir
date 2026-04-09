@@ -81,10 +81,13 @@ body.mm-body {
 }
 
 .mm-sidebar-brand {
-  display: block;
-  padding: 0 10px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0 8px 10px;
   border-bottom: 1px solid var(--mm-border);
-  margin: 0 10px 10px;
+  margin: 0 10px 8px;
   text-decoration: none;
   color: inherit;
   transition: opacity 0.15s ease;
@@ -95,9 +98,10 @@ body.mm-body {
 }
 
 .mm-sidebar-brand-logo {
-  display: block;
+  display: flex;
+  justify-content: center;
   width: 100%;
-  max-width: min(100%, 232px);
+  max-width: min(100%, 240px);
 }
 
 .mm-logo {
@@ -109,7 +113,7 @@ body.mm-body {
 }
 
 .mm-logo--sidebar {
-  max-height: 96px;
+  max-height: 118px;
 }
 
 .mm-logo--auth {
@@ -121,17 +125,18 @@ body.mm-body {
 }
 
 .mm-sidebar-tagline {
-  margin: 8px 0 0;
-  padding: 6px 0 0 10px;
+  margin: 5px 0 0;
+  padding: 0 2px;
   font-size: 10px;
-  line-height: 1.4;
+  line-height: 1.35;
   font-weight: 500;
   font-style: normal;
   letter-spacing: 0.02em;
   text-transform: none;
   color: var(--mm-text3);
   max-width: 100%;
-  border-left: 2px solid rgba(212, 175, 55, 0.45);
+  text-align: center;
+  text-wrap: balance;
 }
 
 .mm-sidebar-nav {
