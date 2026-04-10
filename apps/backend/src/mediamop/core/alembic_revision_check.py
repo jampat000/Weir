@@ -1,13 +1,13 @@
-"""Fail fast when the SQLite database is not at this build's Alembic head.
+"""Enforce SQLite schema revision: auto-upgrade known-behind DBs; fail clearly otherwise.
 
-Local installs must not run with silent schema drift (missing tables, wrong revision).
-Verification logic is shared with ``scripts/verify_local_db.py``.
+Shared by API startup and ``scripts/verify_local_db.py``.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
+from alembic import command
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
@@ -16,7 +16,7 @@ from sqlalchemy.engine import Engine
 
 
 class DatabaseSchemaMismatch(RuntimeError):
-    """Recorded Alembic revision does not match this application."""
+    """Recorded Alembic revision does not match this application (or upgrade failed)."""
 
     def __init__(self, message: str, *, kind: str) -> None:
         super().__init__(message)
@@ -27,7 +27,7 @@ def _backend_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
-def _script_and_head() -> tuple[ScriptDirectory, str]:
+def _alembic_config() -> Config:
     backend = _backend_root()
     ini = backend / "alembic.ini"
     if not ini.is_file():
@@ -35,15 +35,25 @@ def _script_and_head() -> tuple[ScriptDirectory, str]:
         raise RuntimeError(msg)
 
     cfg = Config(str(ini))
-    # ``alembic.ini`` uses a relative ``script_location``; resolve against backend root so
-    # checks work regardless of process cwd (API startup, verify script from repo root).
     cfg.set_main_option("script_location", str(backend / "alembic"))
+    return cfg
+
+
+def _script_and_head() -> tuple[ScriptDirectory, str]:
+    cfg = _alembic_config()
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
     if len(heads) != 1:
         msg = f"Expected a single Alembic head, got {heads!r}."
         raise RuntimeError(msg)
     return script, heads[0]
+
+
+def _current_revision(engine: Engine) -> str | None:
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+        ctx = MigrationContext.configure(conn)
+        return ctx.get_current_revision()
 
 
 def _strictly_behind_head(script: ScriptDirectory, *, head: str, current: str) -> bool:
@@ -64,26 +74,39 @@ def _strictly_behind_head(script: ScriptDirectory, *, head: str, current: str) -
     return False
 
 
-def require_database_at_application_head(engine: Engine) -> None:
-    """Raise :class:`DatabaseSchemaMismatch` or ``RuntimeError`` if the DB is not migration-ready.
+def _run_alembic_upgrade_head() -> None:
+    """Run ``alembic upgrade head`` (uses ``env.py`` + ``MediaMopSettings.load()`` for URL)."""
 
-    Call after the SQLAlchemy engine exists and before serving API traffic.
+    cfg = _alembic_config()
+    try:
+        command.upgrade(cfg, "head")
+    except Exception as exc:
+        raise DatabaseSchemaMismatch(
+            f"Alembic upgrade to head failed: {exc}. "
+            "Fix the error above, or restore a database backup. "
+            "Manual retry: .\\scripts\\dev-migrate.ps1 or "
+            "`alembic upgrade head` from apps/backend with PYTHONPATH=src.",
+            kind="upgrade_failed",
+        ) from exc
+
+
+def ensure_database_at_application_head(engine: Engine) -> None:
+    """Bring the DB to this build's Alembic head when safe; otherwise raise.
+
+    - At head: no-op.
+    - Known strict ancestor of head: run ``alembic upgrade head``, dispose *engine* pool, verify head.
+    - Unversioned / unknown / incompatible: raise :class:`DatabaseSchemaMismatch` (no mutation).
     """
 
     script, head = _script_and_head()
-
-    with engine.connect() as conn:
-        conn.execute(text("SELECT 1"))
-        ctx = MigrationContext.configure(conn)
-        current = ctx.get_current_revision()
-
-    if current == head:
-        return
-
     migrate_hint = (
         "Run .\\scripts\\dev-migrate.ps1 or, from apps/backend with PYTHONPATH=src, "
         "`alembic upgrade head`."
     )
+
+    current = _current_revision(engine)
+    if current == head:
+        return
 
     if current is None:
         raise DatabaseSchemaMismatch(
@@ -104,11 +127,15 @@ def require_database_at_application_head(engine: Engine) -> None:
         ) from exc
 
     if _strictly_behind_head(script, head=head, current=current):
-        raise DatabaseSchemaMismatch(
-            f"Database schema is behind this build (at {current!r}, required {head!r}). "
-            + migrate_hint,
-            kind="behind",
-        )
+        _run_alembic_upgrade_head()
+        engine.dispose()
+        after = _current_revision(engine)
+        if after != head:
+            raise DatabaseSchemaMismatch(
+                f"After upgrade, database revision is {after!r}, expected {head!r}. {migrate_hint}",
+                kind="upgrade_failed",
+            )
+        return
 
     raise DatabaseSchemaMismatch(
         f"Database revision {current!r} does not match this build ({head!r}). "

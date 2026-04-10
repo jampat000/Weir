@@ -1,4 +1,4 @@
-"""Alembic head enforcement at API startup (schema drift safety)."""
+"""Alembic head enforcement and safe auto-upgrade at API startup."""
 
 from __future__ import annotations
 
@@ -7,18 +7,19 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
 from starlette.testclient import TestClient
 
 from mediamop.api.factory import create_app
-from mediamop.core.alembic_revision_check import DatabaseSchemaMismatch, require_database_at_application_head
+from mediamop.core.alembic_revision_check import DatabaseSchemaMismatch, ensure_database_at_application_head
 from mediamop.core.config import MediaMopSettings
 from mediamop.core.db import create_db_engine
 
 
-def test_require_database_at_application_head_ok_on_migrated_db() -> None:
+def test_ensure_database_at_application_head_ok_on_migrated_db() -> None:
     settings = MediaMopSettings.load()
     engine = create_db_engine(settings)
-    require_database_at_application_head(engine)
+    ensure_database_at_application_head(engine)
 
 
 def test_api_startup_fails_without_migrations(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -34,7 +35,7 @@ def test_api_startup_fails_without_migrations(monkeypatch: pytest.MonkeyPatch, t
     assert excinfo.value.kind == "unversioned"
 
 
-def test_api_startup_fails_when_revision_behind_head(
+def test_api_startup_auto_upgrades_known_behind_revision_to_head(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -49,7 +50,11 @@ def test_api_startup_fails_when_revision_behind_head(
     monkeypatch.chdir(backend)
     command.upgrade(cfg, "0001_initial_auth")
 
-    with pytest.raises(DatabaseSchemaMismatch) as excinfo:
-        with TestClient(create_app()):
-            pass
-    assert excinfo.value.kind == "behind"
+    with TestClient(create_app()) as client:
+        assert client.get("/health").status_code == 200
+
+    settings = MediaMopSettings.load()
+    engine = create_db_engine(settings)
+    with engine.connect() as conn:
+        ctx = MigrationContext.configure(conn)
+        assert ctx.get_current_revision() == "0002_activity_events"

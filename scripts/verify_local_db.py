@@ -19,7 +19,7 @@ def main() -> int:
         from sqlalchemy import create_engine
 
         from mediamop.core.alembic_revision_check import DatabaseSchemaMismatch
-        from mediamop.core.alembic_revision_check import require_database_at_application_head
+        from mediamop.core.alembic_revision_check import ensure_database_at_application_head
         from mediamop.core.config import MediaMopSettings
     except ImportError as exc:
         print(f"FAIL: missing dependency ({exc}). Install apps/backend with pip install -e .", file=sys.stderr)
@@ -33,7 +33,7 @@ def main() -> int:
     try:
         url = MediaMopSettings.load().sqlalchemy_database_url
         eng = create_engine(url)
-        require_database_at_application_head(eng)
+        ensure_database_at_application_head(eng)
     except DatabaseSchemaMismatch as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 4
@@ -44,7 +44,7 @@ def main() -> int:
         print(f"FAIL: database connection or migration context: {exc}", file=sys.stderr)
         return 3
 
-    print("OK: database reachable and revision matches Alembic head.")
+    print("OK: database reachable and at Alembic head (upgraded when safely behind).")
     return 0
 
 
