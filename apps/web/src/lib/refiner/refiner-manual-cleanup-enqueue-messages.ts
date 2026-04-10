@@ -6,5 +6,5 @@ export function manualCleanupEnqueueResultMessage(out: ManualCleanupDriveEnqueue
   if (out.enqueue_outcome === "created") {
     return "Enqueued now — a durable job row was created.";
   }
-  return "Already queued — an existing cleanup-drive row was reused (same dedupe key).";
+  return "Already queued — the existing cleanup-drive job entry was reused (no duplicate row).";
 }

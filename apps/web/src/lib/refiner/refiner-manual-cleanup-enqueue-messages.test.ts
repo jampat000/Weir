@@ -13,5 +13,6 @@ describe("manualCleanupEnqueueResultMessage", () => {
     const dup: ManualCleanupDriveEnqueueOut = { ...created, enqueue_outcome: "already_present" };
     expect(manualCleanupEnqueueResultMessage(created)).toContain("Enqueued now");
     expect(manualCleanupEnqueueResultMessage(dup)).toContain("Already queued");
+    expect(manualCleanupEnqueueResultMessage(dup)).toContain("no duplicate row");
   });
 });
