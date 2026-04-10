@@ -56,6 +56,12 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _clamp_refiner_cleanup_drive_schedule_interval_seconds(n: int) -> int:
+    """Bound periodic enqueue interval (60s .. 7d) for SQLite / operator sanity."""
+
+    return max(60, min(n, 7 * 24 * 3600))
+
+
 @dataclass(frozen=True, slots=True)
 class MediaMopSettings:
     """Runtime configuration loaded at process start."""
@@ -88,6 +94,10 @@ class MediaMopSettings:
     refiner_radarr_api_key: str | None
     refiner_sonarr_base_url: str | None
     refiner_sonarr_api_key: str | None
+    refiner_radarr_cleanup_drive_schedule_enabled: bool
+    refiner_radarr_cleanup_drive_schedule_interval_seconds: int
+    refiner_sonarr_cleanup_drive_schedule_enabled: bool
+    refiner_sonarr_cleanup_drive_schedule_interval_seconds: int
 
     @property
     def trusted_browser_origins(self) -> tuple[str, ...]:
@@ -162,6 +172,14 @@ class MediaMopSettings:
         if sonarr_base and not sonarr_base.startswith(("http://", "https://")):
             sonarr_base = ""
         sonarr_key = (os.environ.get("MEDIAMOP_REFINER_SONARR_API_KEY") or "").strip()
+        radarr_sched_on = _env_bool("MEDIAMOP_REFINER_RADARR_CLEANUP_DRIVE_SCHEDULE_ENABLED", False)
+        radarr_sched_iv = _clamp_refiner_cleanup_drive_schedule_interval_seconds(
+            _env_int("MEDIAMOP_REFINER_RADARR_CLEANUP_DRIVE_SCHEDULE_INTERVAL_SECONDS", 3600),
+        )
+        sonarr_sched_on = _env_bool("MEDIAMOP_REFINER_SONARR_CLEANUP_DRIVE_SCHEDULE_ENABLED", False)
+        sonarr_sched_iv = _clamp_refiner_cleanup_drive_schedule_interval_seconds(
+            _env_int("MEDIAMOP_REFINER_SONARR_CLEANUP_DRIVE_SCHEDULE_INTERVAL_SECONDS", 3600),
+        )
 
         return cls(
             env=env,
@@ -192,4 +210,8 @@ class MediaMopSettings:
             refiner_radarr_api_key=radarr_key or None,
             refiner_sonarr_base_url=sonarr_base or None,
             refiner_sonarr_api_key=sonarr_key or None,
+            refiner_radarr_cleanup_drive_schedule_enabled=radarr_sched_on,
+            refiner_radarr_cleanup_drive_schedule_interval_seconds=radarr_sched_iv,
+            refiner_sonarr_cleanup_drive_schedule_enabled=sonarr_sched_on,
+            refiner_sonarr_cleanup_drive_schedule_interval_seconds=sonarr_sched_iv,
         )

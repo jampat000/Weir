@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 
@@ -15,6 +16,10 @@ from mediamop.core.db import (
     dispose_engine,
 )
 from mediamop.core.logging import configure_logging
+from mediamop.modules.refiner.periodic_cleanup_drive_enqueue import (
+    start_refiner_cleanup_drive_enqueue_schedule_tasks,
+    stop_refiner_cleanup_drive_enqueue_schedule_tasks,
+)
 from mediamop.modules.refiner.worker_loop import (
     start_refiner_worker_background_tasks,
     stop_refiner_worker_background_tasks,
@@ -40,10 +45,22 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.engine = engine
     session_factory = create_session_factory(engine)
     app.state.session_factory = session_factory
-    refiner_stop, refiner_tasks = start_refiner_worker_background_tasks(session_factory, settings)
+    refiner_stop = asyncio.Event()
+    refiner_schedule_tasks = start_refiner_cleanup_drive_enqueue_schedule_tasks(
+        session_factory,
+        settings,
+        stop_event=refiner_stop,
+    )
+    refiner_stop, refiner_tasks = start_refiner_worker_background_tasks(
+        session_factory,
+        settings,
+        stop_event=refiner_stop,
+    )
     try:
         yield
     finally:
+        refiner_stop.set()
+        await stop_refiner_cleanup_drive_enqueue_schedule_tasks(refiner_schedule_tasks)
         await stop_refiner_worker_background_tasks(refiner_stop, refiner_tasks)
         dispose_engine(app.state.engine)
         app.state.engine = None

@@ -53,6 +53,10 @@ def _csrf_settings(**overrides: object) -> MediaMopSettings:
         refiner_radarr_api_key=None,
         refiner_sonarr_base_url=None,
         refiner_sonarr_api_key=None,
+        refiner_radarr_cleanup_drive_schedule_enabled=False,
+        refiner_radarr_cleanup_drive_schedule_interval_seconds=3600,
+        refiner_sonarr_cleanup_drive_schedule_enabled=False,
+        refiner_sonarr_cleanup_drive_schedule_interval_seconds=3600,
     )
     base.update(overrides)
     return MediaMopSettings(**base)  # type: ignore[arg-type]

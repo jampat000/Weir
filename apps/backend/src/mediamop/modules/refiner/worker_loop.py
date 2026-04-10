@@ -185,6 +185,7 @@ def start_refiner_worker_background_tasks(
     settings: MediaMopSettings,
     *,
     job_handlers: Mapping[str, Callable[[RefinerJobWorkContext], None]] | None = None,
+    stop_event: asyncio.Event | None = None,
 ) -> tuple[asyncio.Event, list[asyncio.Task[None]]]:
     """Create one asyncio task per configured Refiner worker (count clamped at load time)."""
 
@@ -196,7 +197,7 @@ def start_refiner_worker_background_tasks(
 
         handlers = build_production_refiner_job_handlers(settings)
 
-    stop = asyncio.Event()
+    stop = stop_event if stop_event is not None else asyncio.Event()
     tasks: list[asyncio.Task[None]] = []
     for i in range(settings.refiner_worker_count):
         t = asyncio.create_task(
