@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Body, Header, HTTPException, Request, Response, status
-from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from mediamop.api.deps import DbSessionDep, SettingsDep
 from mediamop.platform.auth import schemas
@@ -16,7 +16,10 @@ from mediamop.platform.auth.abuse import (
 )
 from mediamop.platform.auth.authorization import RequireAdminDep
 from mediamop.platform.auth import bootstrap as bootstrap_service
-from mediamop.platform.auth.bootstrap_status_db import raise_http_for_bootstrap_status_db
+from mediamop.platform.auth.bootstrap_status_db import (
+    raise_http_for_bootstrap_status_db,
+    raise_http_for_bootstrap_status_sqlalchemy,
+)
 from mediamop.platform.auth.csrf import (
     issue_csrf_token,
     require_session_secret,
@@ -111,8 +114,9 @@ def get_bootstrap_status(db: DbSessionDep) -> schemas.BootstrapStatusOut:
 
     try:
         allowed = bootstrap_service.bootstrap_allowed(db)
-    except (OperationalError, ProgrammingError) as exc:
-        raise_http_for_bootstrap_status_db(exc)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise_http_for_bootstrap_status_sqlalchemy(exc)
     if allowed:
         return schemas.BootstrapStatusOut(
             bootstrap_allowed=True,

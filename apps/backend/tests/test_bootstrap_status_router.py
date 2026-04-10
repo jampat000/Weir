@@ -33,7 +33,7 @@ def client_bootstrap_status(monkeypatch: pytest.MonkeyPatch) -> TestClient:
 
     app.dependency_overrides[get_db_session] = _override_db
     try:
-        # Unexpected DB errors are re-raised from the router; return HTTP 500 instead of failing the client.
+        # DB errors map to HTTP 503 on this endpoint (never surprise 500 from SQLAlchemy).
         with TestClient(app, raise_server_exceptions=False) as c:
             yield c
     finally:
@@ -69,7 +69,7 @@ def test_bootstrap_status_missing_table_returns_503(
     assert "schema" in r.json()["detail"].lower()
 
 
-def test_bootstrap_status_unexpected_programming_returns_500(
+def test_bootstrap_status_unexpected_programming_returns_503(
     client_bootstrap_status: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -78,4 +78,4 @@ def test_bootstrap_status_unexpected_programming_returns_500(
 
     monkeypatch.setattr(bootstrap_service, "bootstrap_allowed", boom)
     r = client_bootstrap_status.get("/api/v1/auth/bootstrap/status")
-    assert r.status_code == 500
+    assert r.status_code == 503

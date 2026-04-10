@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy.exc import OperationalError, ProgrammingError
+from sqlalchemy.exc import InvalidRequestError, OperationalError, ProgrammingError
 
-from mediamop.platform.auth.bootstrap_status_db import raise_http_for_bootstrap_status_db
+from mediamop.platform.auth.bootstrap_status_db import (
+    raise_http_for_bootstrap_status_db,
+    raise_http_for_bootstrap_status_sqlalchemy,
+)
 
 
 def test_operational_error_becomes_503() -> None:
@@ -16,6 +19,18 @@ def test_operational_error_becomes_503() -> None:
         )
     assert ei.value.status_code == 503
     assert "unavailable" in ei.value.detail.lower()
+
+
+def test_operational_error_no_such_table_becomes_schema_503() -> None:
+    exc = OperationalError(
+        "SELECT count(*) FROM users",
+        {},
+        Exception("no such table: users"),
+    )
+    with pytest.raises(HTTPException) as ei:
+        raise_http_for_bootstrap_status_db(exc)
+    assert ei.value.status_code == 503
+    assert "schema" in ei.value.detail.lower()
 
 
 def test_programming_error_undefined_table_pgcode_becomes_503() -> None:
@@ -50,8 +65,15 @@ def test_programming_error_no_such_table_sqlite_message_becomes_503() -> None:
     assert ei.value.status_code == 503
 
 
-def test_programming_error_unexpected_reraises() -> None:
+def test_programming_error_unexpected_becomes_503() -> None:
     exc = ProgrammingError("statement", {}, Exception("invalid syntax near foo"))
-    with pytest.raises(ProgrammingError) as ei:
+    with pytest.raises(HTTPException) as ei:
         raise_http_for_bootstrap_status_db(exc)
-    assert ei.value is exc
+    assert ei.value.status_code == 503
+    assert "bootstrap" in ei.value.detail.lower() or "database" in ei.value.detail.lower()
+
+
+def test_other_sqlalchemy_error_becomes_503() -> None:
+    with pytest.raises(HTTPException) as ei:
+        raise_http_for_bootstrap_status_sqlalchemy(InvalidRequestError("orm state"))
+    assert ei.value.status_code == 503
