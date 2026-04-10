@@ -9,6 +9,7 @@ Radarr and Sonarr wired verticals (settings → plan → execute), separate modu
 Pass 12: Radarr-only live queue fetch + cleanup drive (no shared *arr live driver).
 Pass 12.5: Sonarr-only live queue fetch + cleanup drive (parallel isolation).
 Pass 13: Refiner-local ``refiner_jobs`` table + atomic claim/lease/complete/fail (SQLite).
+Pass 14: env worker count (default 1) + Refiner-only asyncio worker loop + handler dispatch seam.
 """
 
 from __future__ import annotations

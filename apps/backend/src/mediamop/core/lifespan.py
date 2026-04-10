@@ -15,6 +15,10 @@ from mediamop.core.db import (
     dispose_engine,
 )
 from mediamop.core.logging import configure_logging
+from mediamop.modules.refiner.worker_loop import (
+    start_refiner_worker_background_tasks,
+    stop_refiner_worker_background_tasks,
+)
 from mediamop.platform.auth.rate_limit import SlidingWindowLimiter
 
 
@@ -34,10 +38,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     engine = create_db_engine(settings)
     ensure_database_at_application_head(engine)
     app.state.engine = engine
-    app.state.session_factory = create_session_factory(engine)
+    session_factory = create_session_factory(engine)
+    app.state.session_factory = session_factory
+    refiner_stop, refiner_tasks = start_refiner_worker_background_tasks(session_factory, settings)
     try:
         yield
     finally:
+        await stop_refiner_worker_background_tasks(refiner_stop, refiner_tasks)
         dispose_engine(app.state.engine)
         app.state.engine = None
         app.state.session_factory = None

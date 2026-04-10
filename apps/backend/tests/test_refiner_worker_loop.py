@@ -1,0 +1,209 @@
+"""Refiner Pass 14: worker-count settings and in-process job loop (Refiner-local)."""
+
+from __future__ import annotations
+
+import asyncio
+from dataclasses import replace
+from datetime import datetime, timezone
+
+import pytest
+from sqlalchemy.orm import Session, sessionmaker
+
+from mediamop.core.config import MediaMopSettings
+from mediamop.modules.refiner.jobs_model import RefinerJob, RefinerJobStatus
+from mediamop.modules.refiner.jobs_ops import refiner_enqueue_or_get_job
+from mediamop.modules.refiner.worker_limits import clamp_refiner_worker_count
+from mediamop.modules.refiner.worker_loop import (
+    process_one_refiner_job,
+    refiner_worker_run_forever,
+    start_refiner_worker_background_tasks,
+    stop_refiner_worker_background_tasks,
+)
+
+import mediamop.modules.refiner.jobs_model  # noqa: F401
+import mediamop.platform.activity.models  # noqa: F401
+import mediamop.platform.auth.models  # noqa: F401
+from mediamop.core.db import Base
+
+
+@pytest.fixture
+def jobs_engine(tmp_path):
+    from sqlalchemy import create_engine
+
+    url = f"sqlite:///{tmp_path / 'worker.sqlite'}"
+    engine = create_engine(
+        url,
+        connect_args={"check_same_thread": False, "timeout": 30.0},
+        future=True,
+    )
+    Base.metadata.create_all(engine)
+    return engine
+
+
+@pytest.fixture
+def session_factory(jobs_engine):
+    return sessionmaker(
+        bind=jobs_engine,
+        class_=Session,
+        autoflush=False,
+        autocommit=False,
+        expire_on_commit=False,
+        future=True,
+    )
+
+
+def test_refiner_worker_count_defaults_to_one(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("MEDIAMOP_REFINER_WORKER_COUNT", raising=False)
+    s = MediaMopSettings.load()
+    assert s.refiner_worker_count == 1
+
+
+def test_refiner_worker_count_clamps_low_and_high(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MEDIAMOP_REFINER_WORKER_COUNT", "0")
+    assert MediaMopSettings.load().refiner_worker_count == 1
+    monkeypatch.setenv("MEDIAMOP_REFINER_WORKER_COUNT", "99")
+    assert MediaMopSettings.load().refiner_worker_count == 8
+
+
+def test_clamp_refiner_worker_count_unit() -> None:
+    assert clamp_refiner_worker_count(0) == 1
+    assert clamp_refiner_worker_count(1) == 1
+    assert clamp_refiner_worker_count(8) == 8
+    assert clamp_refiner_worker_count(9) == 8
+
+
+def test_process_one_idle_when_no_jobs(session_factory) -> None:
+    out = process_one_refiner_job(
+        session_factory,
+        lease_owner="test-owner",
+        job_handlers={},
+    )
+    assert out == "idle"
+
+
+def test_process_one_completes_with_success_handler(session_factory) -> None:
+    t0 = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
+    with session_factory() as s:
+        refiner_enqueue_or_get_job(s, dedupe_key="d1", job_kind="ok.kind", max_attempts=3)
+        s.commit()
+
+    def _ok(ctx) -> None:
+        assert ctx.job_kind == "ok.kind"
+
+    out = process_one_refiner_job(
+        session_factory,
+        lease_owner="w",
+        job_handlers={"ok.kind": _ok},
+        now=t0,
+        lease_seconds=3600,
+    )
+    assert out == "processed"
+    with session_factory() as s:
+        row = s.get(RefinerJob, 1)
+        assert row.status == RefinerJobStatus.COMPLETED.value
+
+
+def test_process_one_fail_path_on_handler_error(session_factory) -> None:
+    t0 = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
+    with session_factory() as s:
+        refiner_enqueue_or_get_job(
+            s,
+            dedupe_key="d2",
+            job_kind="bad.kind",
+            max_attempts=1,
+        )
+        s.commit()
+
+    def _bad(_ctx) -> None:
+        raise RuntimeError("boom")
+
+    out = process_one_refiner_job(
+        session_factory,
+        lease_owner="w",
+        job_handlers={"bad.kind": _bad},
+        now=t0,
+        lease_seconds=3600,
+    )
+    assert out == "processed"
+    with session_factory() as s:
+        row = s.get(RefinerJob, 1)
+        assert row.status == RefinerJobStatus.FAILED.value
+        assert "boom" in (row.last_error or "")
+
+
+def test_process_one_missing_handler_fails_claimed_job(session_factory) -> None:
+    t0 = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
+    with session_factory() as s:
+        refiner_enqueue_or_get_job(s, dedupe_key="d3", job_kind="unknown.kind")
+        s.commit()
+
+    out = process_one_refiner_job(
+        session_factory,
+        lease_owner="w",
+        job_handlers={},
+        now=t0,
+        lease_seconds=3600,
+    )
+    assert out == "processed"
+    with session_factory() as s:
+        row = s.get(RefinerJob, 1)
+        assert row.status == RefinerJobStatus.PENDING.value
+        assert "unknown.kind" in (row.last_error or "")
+
+
+def test_spawn_worker_task_count_matches_settings(session_factory, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "mediamop.modules.refiner.worker_loop.REFINER_WORKER_IDLE_SLEEP_SECONDS",
+        0.05,
+    )
+    base = MediaMopSettings.load()
+    settings = replace(base, refiner_worker_count=2)
+
+    async def _run() -> None:
+        stop, tasks = start_refiner_worker_background_tasks(session_factory, settings)
+        assert len(tasks) == 2
+        stop.set()
+        await stop_refiner_worker_background_tasks(stop, tasks)
+
+    asyncio.run(_run())
+
+
+def test_refiner_worker_loop_processes_one_job_then_stops(session_factory, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "mediamop.modules.refiner.worker_loop.REFINER_WORKER_IDLE_SLEEP_SECONDS",
+        0.05,
+    )
+    t0 = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
+    with session_factory() as s:
+        refiner_enqueue_or_get_job(s, dedupe_key="loop1", job_kind="loop.ok")
+        s.commit()
+
+    seen: list[str] = []
+
+    def _h(ctx) -> None:
+        seen.append(ctx.job_kind)
+
+    async def _run() -> None:
+        stop = asyncio.Event()
+        task = asyncio.create_task(
+            refiner_worker_run_forever(
+                session_factory,
+                worker_index=0,
+                stop_event=stop,
+                job_handlers={"loop.ok": _h},
+                idle_sleep_seconds=0.05,
+                lease_seconds=3600,
+            ),
+        )
+        for _ in range(200):
+            if seen:
+                break
+            await asyncio.sleep(0.01)
+        stop.set()
+        await asyncio.wait_for(task, timeout=5.0)
+
+    asyncio.run(_run())
+    assert seen == ["loop.ok"]
+    with session_factory() as s:
+        row = s.get(RefinerJob, 1)
+        assert row.status == RefinerJobStatus.COMPLETED.value

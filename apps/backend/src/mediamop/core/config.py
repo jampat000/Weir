@@ -17,6 +17,7 @@ from mediamop.modules.refiner.failed_import_cleanup_settings import (
     RefinerFailedImportCleanupSettingsBundle,
     load_refiner_failed_import_cleanup_settings_bundle,
 )
+from mediamop.modules.refiner.worker_limits import clamp_refiner_worker_count
 
 
 def _load_backend_dotenv_if_present() -> None:
@@ -82,6 +83,7 @@ class MediaMopSettings:
     sqlalchemy_database_url: str
     fetcher_base_url: str | None
     refiner_failed_import_cleanup: RefinerFailedImportCleanupSettingsBundle
+    refiner_worker_count: int
 
     @property
     def trusted_browser_origins(self) -> tuple[str, ...]:
@@ -145,6 +147,9 @@ class MediaMopSettings:
         assert_sqlite_db_location_usable(db_p)
         db_url = sqlalchemy_sqlite_url(db_p)
         refiner_cleanup = load_refiner_failed_import_cleanup_settings_bundle()
+        refiner_workers = clamp_refiner_worker_count(
+            _env_int("MEDIAMOP_REFINER_WORKER_COUNT", 1),
+        )
 
         return cls(
             env=env,
@@ -170,4 +175,5 @@ class MediaMopSettings:
             sqlalchemy_database_url=db_url,
             fetcher_base_url=fetcher_url,
             refiner_failed_import_cleanup=refiner_cleanup,
+            refiner_worker_count=refiner_workers,
         )
