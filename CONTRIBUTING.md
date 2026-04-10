@@ -15,8 +15,11 @@ cd apps/backend
 $env:PYTHONPATH = "src"
 $env:MEDIAMOP_SESSION_SECRET = "local-dev-secret-at-least-32-characters-long"
 python -m pip install -e ".[dev]"
+alembic upgrade head
 pytest -q
 ```
+
+CI runs **`alembic upgrade head`** before **`pytest`** in **`apps/backend`**; include it locally if migrations are ahead of your SQLite file.
 
 **Web** (from repo root; `package-lock.json` is committed — prefer reproducible installs):
 

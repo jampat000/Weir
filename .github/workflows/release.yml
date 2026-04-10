@@ -1,5 +1,6 @@
-# Tag-driven release: same validation as ci.yml, then GitHub Release + web dist zip.
-# Keep job steps in sync with .github/workflows/ci.yml (Test / mediamop).
+# Tag-driven release: push tag v* → same validation as ci.yml, then GitHub Release + mediamop-web-dist.zip.
+# Top-level permissions stay read-only; only tagged-release escalates to contents:write for the release + upload.
+# Keep step sequence aligned with .github/workflows/ci.yml (Test / mediamop).
 name: Release
 
 on:
@@ -17,6 +18,7 @@ permissions:
 jobs:
   tagged-release:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: write
     steps:

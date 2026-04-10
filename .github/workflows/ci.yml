@@ -1,5 +1,6 @@
-# MediaMop — backend tests, web build/tests, optional E2E (Playwright + live API).
-# Keep validation steps aligned with .github/workflows/release.yml (tag releases).
+# MediaMop — backend tests, web build/tests, E2E smoke (Playwright + live API).
+# Triggers: push to any branch, pull_request, workflow_dispatch. GitHub shows the job as "Test / mediamop".
+# Keep step sequence aligned with .github/workflows/release.yml (tag-driven release re-runs the same checks).
 name: Test
 
 on:
@@ -18,6 +19,7 @@ permissions:
 jobs:
   mediamop:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
 

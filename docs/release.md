@@ -36,9 +36,17 @@ MediaMop ships as a **tested source release**: a **git tag** on `main` that pass
 
 ## CI alignment
 
-- Day-to-day merges: **`.github/workflows/ci.yml`** (`Test`).
-- Tag validation + release artifact: **`.github/workflows/release.yml`** (`Release`) — **keep validation steps aligned** with `ci.yml` when either changes.
+- Day-to-day: **`.github/workflows/ci.yml`** — workflow name **`Test`**, job id **`mediamop`** (GitHub UI: **`Test / mediamop`**).
+- **`Test`** triggers on **push** to **any** branch, on **`pull_request`**, and on **`workflow_dispatch`** (manual run from the Actions tab).
+- Tag releases: **`.github/workflows/release.yml`** — workflow name **`Release`**, job **`tagged-release`**. It **re-runs the same validation steps** as **`Test`**, then publishes the GitHub Release and attaches **`mediamop-web-dist.zip`**. **Keep the two workflow step blocks aligned** when you change checks.
+
+## Branch protection (GitHub Settings — manual)
+
+Nothing in this repository turns on branch rules for you. Repo admins configure **rulesets** or **classic branch protection** for **`main`** (or your default branch) in GitHub. Typical expectation here:
+
+- Require the **`Test / mediamop`** status check before merge (exact label can vary slightly by UI; it is the **`mediamop`** job from workflow **`Test`**).
+- Whether PRs are required, who can push, and linear-history rules are **team policy** — not encoded in workflow files.
 
 ## Permissions note
 
-The **`Release`** workflow uses **`contents: write`** only on the release job, to create the GitHub Release and upload the zip. It does **not** push branches or open PRs.
+The **`Release`** workflow sets workflow-wide **`contents: read`** and grants **`contents: write`** **only** on the **`tagged-release`** job, so the release action can create the GitHub Release and upload the zip. It does **not** push branches or open PRs.
