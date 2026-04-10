@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class RefinerRuntimeVisibilityOut(BaseModel):
-    """Settings-derived Refiner **intent** — not proof that runners or timed passes are active."""
+    """Settings-derived Refiner intent — not proof that runners or timed passes are active."""
 
     refiner_worker_count: int = Field(ge=0, le=8, description="Configured Refiner background runner count (0 means none).")
     in_process_workers_disabled: bool = Field(

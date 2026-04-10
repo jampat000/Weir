@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class RefinerJobInspectionRow(BaseModel):
-    """One persisted **task** row for operators — ``status`` is the stored string (e.g. ``handler_ok_finalize_failed``)."""
+    """One persisted task row for operators — ``status`` is the stored string (e.g. ``handler_ok_finalize_failed``)."""
 
     model_config = ConfigDict(from_attributes=True)
 

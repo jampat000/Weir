@@ -43,7 +43,7 @@ def get_refiner_runtime_visibility(
     _user: UserPublicDep,
     settings: SettingsDep,
 ) -> RefinerRuntimeVisibilityOut:
-    """Read-only Refiner **settings**: background runners plus per-library schedules for Radarr/Sonarr **download-queue failed-import** passes.
+    """Read-only Refiner settings: background runners plus per-library schedules for Radarr/Sonarr download-queue failed-import passes.
 
     Does not report live runner health, timed pass execution, or whether library apps are reachable.
     """
@@ -67,7 +67,7 @@ def get_refiner_jobs_inspection(
         ),
     ] = None,
 ) -> RefinerJobsInspectionOut:
-    """Read-only persisted **task** rows — ``handler_ok_finalize_failed`` stays explicit (never folded into ``failed``)."""
+    """Read-only persisted task rows — ``handler_ok_finalize_failed`` stays explicit (never folded into ``failed``)."""
 
     if statuses:
         try:
@@ -102,7 +102,7 @@ def post_manual_enqueue_radarr_cleanup_drive(
     db: DbSessionDep,
     settings: SettingsDep,
 ) -> ManualCleanupDriveEnqueueOut:
-    """Enqueue the durable **movies (Radarr) download-queue failed-import** pass row (deduped). Does not run processing here."""
+    """Enqueue the durable movies (Radarr) download-queue failed-import pass row (deduped). Does not run processing here."""
 
     validate_browser_post_origin(request, settings)
     secret = require_session_secret(settings)
@@ -132,7 +132,7 @@ def post_manual_enqueue_sonarr_cleanup_drive(
     db: DbSessionDep,
     settings: SettingsDep,
 ) -> ManualCleanupDriveEnqueueOut:
-    """Enqueue the durable **TV (Sonarr) download-queue failed-import** pass row (deduped). Does not run processing here."""
+    """Enqueue the durable TV (Sonarr) download-queue failed-import pass row (deduped). Does not run processing here."""
 
     validate_browser_post_origin(request, settings)
     secret = require_session_secret(settings)
