@@ -15,8 +15,16 @@ from mediamop.modules.refiner.inspection_service import (
 )
 from mediamop.modules.refiner.jobs_model import RefinerJobStatus
 from mediamop.modules.refiner.jobs_ops import recover_handler_ok_finalize_failed_to_completed
+from mediamop.modules.refiner.manual_cleanup_drive_enqueue import (
+    manual_enqueue_radarr_cleanup_drive,
+    manual_enqueue_sonarr_cleanup_drive,
+)
 from mediamop.modules.refiner.runtime_visibility import refiner_runtime_visibility_from_settings
 from mediamop.modules.refiner.schemas_inspection import RefinerJobsInspectionOut
+from mediamop.modules.refiner.schemas_manual_cleanup_enqueue import (
+    ManualCleanupDriveEnqueueIn,
+    ManualCleanupDriveEnqueueOut,
+)
 from mediamop.modules.refiner.schemas_recovery import RecoverFinalizeFailureIn, RecoverFinalizeFailureOut
 from mediamop.modules.refiner.schemas_runtime_visibility import RefinerRuntimeVisibilityOut
 from mediamop.platform.auth.authorization import RequireOperatorDep
@@ -80,6 +88,66 @@ def get_refiner_jobs_inspection(
         limit=limit,
         statuses=DEFAULT_TERMINAL_STATUSES,
         default_terminal_only=True,
+    )
+
+
+@router.post(
+    "/refiner/cleanup-drive/radarr/enqueue",
+    response_model=ManualCleanupDriveEnqueueOut,
+)
+def post_manual_enqueue_radarr_cleanup_drive(
+    body: ManualCleanupDriveEnqueueIn,
+    request: Request,
+    _user: RequireOperatorDep,
+    db: DbSessionDep,
+    settings: SettingsDep,
+) -> ManualCleanupDriveEnqueueOut:
+    """Enqueue the durable Radarr cleanup-drive job row (deduped). Does not run the handler."""
+
+    validate_browser_post_origin(request, settings)
+    secret = require_session_secret(settings)
+    if not verify_csrf_token(secret, body.csrf_token):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired CSRF token.",
+        )
+
+    job, outcome = manual_enqueue_radarr_cleanup_drive(db)
+    return ManualCleanupDriveEnqueueOut(
+        job_id=job.id,
+        dedupe_key=job.dedupe_key,
+        job_kind=job.job_kind,
+        enqueue_outcome=outcome,
+    )
+
+
+@router.post(
+    "/refiner/cleanup-drive/sonarr/enqueue",
+    response_model=ManualCleanupDriveEnqueueOut,
+)
+def post_manual_enqueue_sonarr_cleanup_drive(
+    body: ManualCleanupDriveEnqueueIn,
+    request: Request,
+    _user: RequireOperatorDep,
+    db: DbSessionDep,
+    settings: SettingsDep,
+) -> ManualCleanupDriveEnqueueOut:
+    """Enqueue the durable Sonarr cleanup-drive job row (deduped). Does not run the handler."""
+
+    validate_browser_post_origin(request, settings)
+    secret = require_session_secret(settings)
+    if not verify_csrf_token(secret, body.csrf_token):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired CSRF token.",
+        )
+
+    job, outcome = manual_enqueue_sonarr_cleanup_drive(db)
+    return ManualCleanupDriveEnqueueOut(
+        job_id=job.id,
+        dedupe_key=job.dedupe_key,
+        job_kind=job.job_kind,
+        enqueue_outcome=outcome,
     )
 
 

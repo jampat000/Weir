@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { REFINER_STATUS_HANDLER_OK_FINALIZE_FAILED } from "./refiner-job-status-labels";
-import { showRecoverFinalizeFailureControl } from "./refiner-recover-eligibility";
+import {
+  showManualCleanupDriveEnqueueControl,
+  showRecoverFinalizeFailureControl,
+} from "./refiner-recover-eligibility";
+
+describe("showManualCleanupDriveEnqueueControl", () => {
+  it("allows admin and operator only", () => {
+    expect(showManualCleanupDriveEnqueueControl("admin")).toBe(true);
+    expect(showManualCleanupDriveEnqueueControl("operator")).toBe(true);
+    expect(showManualCleanupDriveEnqueueControl("viewer")).toBe(false);
+    expect(showManualCleanupDriveEnqueueControl(undefined)).toBe(false);
+  });
+});
 
 describe("showRecoverFinalizeFailureControl", () => {
   it("shows only for handler_ok_finalize_failed and admin/operator", () => {

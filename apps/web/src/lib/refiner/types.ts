@@ -22,6 +22,15 @@ export type RefinerJobsInspectionOut = {
 
 /** ``GET /api/v1/refiner/runtime/visibility`` (Pass 22) — settings intent, not liveness. */
 
+/** ``POST /api/v1/refiner/cleanup-drive/{radarr|sonarr}/enqueue`` (Pass 23). */
+
+export type ManualCleanupDriveEnqueueOut = {
+  job_id: number;
+  dedupe_key: string;
+  job_kind: string;
+  enqueue_outcome: "created" | "already_present";
+};
+
 export type RefinerRuntimeVisibilityOut = {
   refiner_worker_count: number;
   in_process_workers_disabled: boolean;

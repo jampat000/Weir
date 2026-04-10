@@ -9,13 +9,19 @@ import {
 } from "../../lib/refiner/refiner-job-status-labels";
 import type { RefinerInspectionFilter } from "../../lib/refiner/queries";
 import type { RefinerRuntimeVisibilityOut } from "../../lib/refiner/types";
+import { manualCleanupEnqueueResultMessage } from "../../lib/refiner/refiner-manual-cleanup-enqueue-messages";
 import { formatScheduleIntervalSeconds } from "../../lib/refiner/refiner-runtime-format";
 import {
+  useManualEnqueueRadarrCleanupDriveMutation,
+  useManualEnqueueSonarrCleanupDriveMutation,
   useRecoverFinalizeFailureMutation,
   useRefinerJobsInspectionQuery,
   useRefinerRuntimeVisibilityQuery,
 } from "../../lib/refiner/queries";
-import { showRecoverFinalizeFailureControl } from "../../lib/refiner/refiner-recover-eligibility";
+import {
+  showManualCleanupDriveEnqueueControl,
+  showRecoverFinalizeFailureControl,
+} from "../../lib/refiner/refiner-recover-eligibility";
 import type { RecoverFinalizeFailureResult } from "../../lib/refiner/refiner-recover-api";
 import type { RefinerJobInspectionRow } from "../../lib/refiner/types";
 
@@ -31,10 +37,77 @@ function formatUpdated(iso: string): string {
   }
 }
 
+function RefinerManualCleanupEnqueuePanel({ enabled }: { enabled: boolean }) {
+  const mRad = useManualEnqueueRadarrCleanupDriveMutation();
+  const mSon = useManualEnqueueSonarrCleanupDriveMutation();
+
+  if (!enabled) {
+    return null;
+  }
+
+  const btnClass =
+    "rounded border border-[var(--mm-border)] bg-[var(--mm-slate)] px-3 py-1.5 text-sm font-medium text-[var(--mm-text)] hover:bg-[var(--mm-card-bg)] disabled:opacity-50";
+
+  return (
+    <div
+      className="border-t border-[var(--mm-border)] pt-4 mt-4"
+      data-testid="refiner-manual-cleanup-enqueue"
+    >
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Manual enqueue</h3>
+      <p className="mt-1 text-xs text-[var(--mm-text3)]">
+        Queues the existing deduplicated cleanup-drive job row only. Does not run the handler in this request, does not
+        prove a worker is running, and does not mean the job has completed.
+      </p>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <button
+          type="button"
+          className={btnClass}
+          data-testid="refiner-manual-enqueue-radarr"
+          disabled={mRad.isPending || mSon.isPending}
+          onClick={() => mRad.mutate()}
+        >
+          {mRad.isPending ? "Enqueuing…" : "Enqueue Radarr cleanup drive"}
+        </button>
+        <button
+          type="button"
+          className={btnClass}
+          data-testid="refiner-manual-enqueue-sonarr"
+          disabled={mRad.isPending || mSon.isPending}
+          onClick={() => mSon.mutate()}
+        >
+          {mSon.isPending ? "Enqueuing…" : "Enqueue Sonarr cleanup drive"}
+        </button>
+      </div>
+      {mRad.isError ? (
+        <p className="mt-2 text-sm text-red-400" role="alert">
+          {mRad.error instanceof Error ? mRad.error.message : "Radarr enqueue failed."}
+        </p>
+      ) : null}
+      {mSon.isError ? (
+        <p className="mt-2 text-sm text-red-400" role="alert">
+          {mSon.error instanceof Error ? mSon.error.message : "Sonarr enqueue failed."}
+        </p>
+      ) : null}
+      {mRad.isSuccess && mRad.data ? (
+        <p className="mt-2 text-sm text-[var(--mm-text2)]" data-testid="refiner-manual-enqueue-radarr-result">
+          Radarr: {manualCleanupEnqueueResultMessage(mRad.data)}
+        </p>
+      ) : null}
+      {mSon.isSuccess && mSon.data ? (
+        <p className="mt-2 text-sm text-[var(--mm-text2)]" data-testid="refiner-manual-enqueue-sonarr-result">
+          Sonarr: {manualCleanupEnqueueResultMessage(mSon.data)}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function RefinerRuntimeVisibilitySection({
   rv,
+  role,
 }: {
   rv: UseQueryResult<RefinerRuntimeVisibilityOut, Error>;
+  role: string | undefined;
 }) {
   return (
     <section
@@ -113,6 +186,7 @@ function RefinerRuntimeVisibilitySection({
           <p className="border-t border-[var(--mm-border)] pt-3 text-xs text-[var(--mm-text3)]">
             {rv.data.visibility_note}
           </p>
+          <RefinerManualCleanupEnqueuePanel enabled={showManualCleanupDriveEnqueueControl(role)} />
         </div>
       ) : null}
     </section>
@@ -219,7 +293,7 @@ export function RefinerPage() {
             the handler.
           </p>
         </header>
-        <RefinerRuntimeVisibilitySection rv={rv} />
+        <RefinerRuntimeVisibilitySection rv={rv} role={me.data?.role} />
         <PageLoading label="Loading Refiner jobs" />
       </div>
     );
@@ -240,7 +314,7 @@ export function RefinerPage() {
                 : "Could not load Refiner job inspection."}
           </p>
         </header>
-        <RefinerRuntimeVisibilitySection rv={rv} />
+        <RefinerRuntimeVisibilitySection rv={rv} role={me.data?.role} />
         {err instanceof Error ? (
           <p className="mm-page__lead font-mono text-sm text-[var(--mm-text3)]">{err.message}</p>
         ) : null}
@@ -267,7 +341,7 @@ export function RefinerPage() {
         </p>
       </header>
 
-      <RefinerRuntimeVisibilitySection rv={rv} />
+      <RefinerRuntimeVisibilitySection rv={rv} role={me.data?.role} />
 
       <section className="mm-card mm-dash-card mb-6" aria-labelledby="mm-refiner-filter-heading">
         <h2 id="mm-refiner-filter-heading" className="mm-card__title">

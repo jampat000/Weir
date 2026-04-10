@@ -1,5 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchRefinerJobsInspection } from "./refiner-inspection-api";
+import {
+  postManualEnqueueRadarrCleanupDrive,
+  postManualEnqueueSonarrCleanupDrive,
+} from "./refiner-manual-cleanup-enqueue-api";
 import { fetchRefinerRuntimeVisibility } from "./refiner-runtime-visibility-api";
 import { postRecoverFinalizeFailure } from "./refiner-recover-api";
 
@@ -38,6 +42,28 @@ export function useRecoverFinalizeFailureMutation() {
     mutationFn: (jobId: number) => postRecoverFinalizeFailure(jobId),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ["refiner", "jobs-inspection"] });
+    },
+  });
+}
+
+export function useManualEnqueueRadarrCleanupDriveMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => postManualEnqueueRadarrCleanupDrive(),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["refiner", "jobs-inspection"] });
+      void qc.invalidateQueries({ queryKey: ["refiner", "runtime-visibility"] });
+    },
+  });
+}
+
+export function useManualEnqueueSonarrCleanupDriveMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => postManualEnqueueSonarrCleanupDrive(),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["refiner", "jobs-inspection"] });
+      void qc.invalidateQueries({ queryKey: ["refiner", "runtime-visibility"] });
     },
   });
 }
