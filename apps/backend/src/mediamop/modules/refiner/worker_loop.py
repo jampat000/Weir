@@ -2,7 +2,7 @@
 
 Claims rows from ``refiner_jobs``, dispatches by ``job_kind``, then completes or fails via
 :class:`mediamop.modules.refiner.jobs_ops`. Production handlers are built from
-:class:`~mediamop.core.config.MediaMopSettings` (Pass 15: Radarr live cleanup drive).
+:class:`~mediamop.core.config.MediaMopSettings` (Pass 15–15.5: Radarr + Sonarr live cleanup drives).
 """
 
 from __future__ import annotations

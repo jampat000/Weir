@@ -11,6 +11,7 @@ Pass 12.5: Sonarr-only live queue fetch + cleanup drive (parallel isolation).
 Pass 13: Refiner-local ``refiner_jobs`` table + atomic claim/lease/complete/fail (SQLite).
 Pass 14: env worker count (default 1) + Refiner-only asyncio worker loop + handler dispatch seam.
 Pass 15: Radarr live cleanup drive as first real ``refiner_jobs`` kind (producer + handler; Sonarr later).
+Pass 15.5: Sonarr live cleanup drive as second ``refiner_jobs`` kind (parallel isolation to Radarr).
 """
 
 from __future__ import annotations

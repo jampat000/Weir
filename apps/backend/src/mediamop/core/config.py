@@ -86,6 +86,8 @@ class MediaMopSettings:
     refiner_worker_count: int
     refiner_radarr_base_url: str | None
     refiner_radarr_api_key: str | None
+    refiner_sonarr_base_url: str | None
+    refiner_sonarr_api_key: str | None
 
     @property
     def trusted_browser_origins(self) -> tuple[str, ...]:
@@ -156,6 +158,10 @@ class MediaMopSettings:
         if radarr_base and not radarr_base.startswith(("http://", "https://")):
             radarr_base = ""
         radarr_key = (os.environ.get("MEDIAMOP_REFINER_RADARR_API_KEY") or "").strip()
+        sonarr_base = (os.environ.get("MEDIAMOP_REFINER_SONARR_BASE_URL") or "").strip()
+        if sonarr_base and not sonarr_base.startswith(("http://", "https://")):
+            sonarr_base = ""
+        sonarr_key = (os.environ.get("MEDIAMOP_REFINER_SONARR_API_KEY") or "").strip()
 
         return cls(
             env=env,
@@ -184,4 +190,6 @@ class MediaMopSettings:
             refiner_worker_count=refiner_workers,
             refiner_radarr_base_url=radarr_base or None,
             refiner_radarr_api_key=radarr_key or None,
+            refiner_sonarr_base_url=sonarr_base or None,
+            refiner_sonarr_api_key=sonarr_key or None,
         )
