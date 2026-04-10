@@ -1,10 +1,10 @@
 import type { ManualCleanupDriveEnqueueOut } from "./types";
 
-/** User-facing result line for manual cleanup-drive enqueue. */
+/** User-facing result line after queueing an import-cleanup check (movies or TV app). */
 
 export function manualCleanupEnqueueResultMessage(out: ManualCleanupDriveEnqueueOut): string {
   if (out.enqueue_outcome === "created") {
-    return "Enqueued now — a new cleanup-drive job entry was recorded.";
+    return "Queued now — a new import-cleanup check was recorded.";
   }
-  return "Already queued — the existing cleanup-drive job entry was reused (no duplicate row).";
+  return "Already queued — the existing import-cleanup check was reused (no duplicate queue row).";
 }

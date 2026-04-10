@@ -1,4 +1,4 @@
-/** Shapes for Refiner operator APIs: job inspection, runtime visibility, manual cleanup-drive enqueue. */
+/** Shapes for Refiner operator APIs: job inspection, loaded settings, manual import-cleanup queue. */
 
 export type RefinerJobInspectionRow = {
   id: number;
@@ -33,7 +33,7 @@ export type RefinerRuntimeVisibilityOut = {
   visibility_note: string;
 };
 
-/** Response body for operator ``POST …/cleanup-drive/{radarr|sonarr}/enqueue``. */
+/** Response body for operator POST enqueue (movies / TV library paths — URLs unchanged). */
 export type ManualCleanupDriveEnqueueOut = {
   job_id: number;
   dedupe_key: string;

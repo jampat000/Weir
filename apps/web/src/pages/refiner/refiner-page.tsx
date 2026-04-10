@@ -13,6 +13,25 @@ import type { RefinerRuntimeVisibilityOut } from "../../lib/refiner/types";
 import { manualCleanupEnqueueResultMessage } from "../../lib/refiner/refiner-manual-cleanup-enqueue-messages";
 import { formatScheduleIntervalSeconds } from "../../lib/refiner/refiner-runtime-format";
 import {
+  REFINER_MANUAL_QUEUE_BTN_MOVIES,
+  REFINER_MANUAL_QUEUE_BTN_TV,
+  REFINER_MANUAL_QUEUE_ERR_MOVIES,
+  REFINER_MANUAL_QUEUE_ERR_TV,
+  REFINER_MANUAL_QUEUE_PENDING,
+  REFINER_MANUAL_QUEUE_RESULT_MOVIES_PREFIX,
+  REFINER_MANUAL_QUEUE_RESULT_TV_PREFIX,
+  REFINER_MANUAL_QUEUE_SECTION_BODY,
+  REFINER_MANUAL_QUEUE_SECTION_TITLE,
+  REFINER_PAGE_ERR_LOAD_JOBS,
+  REFINER_PAGE_FRAMING_PRIMARY,
+  REFINER_JOBS_SECTION_TITLE,
+  REFINER_PAGE_LOADING_JOBS,
+  REFINER_RUNTIME_CARD_SUBTITLE,
+  REFINER_RUNTIME_CARD_TITLE,
+  REFINER_SCHEDULE_MOVIES_HEADING,
+  REFINER_SCHEDULE_TV_HEADING,
+} from "../../lib/refiner/refiner-user-copy";
+import {
   useManualEnqueueRadarrCleanupDriveMutation,
   useManualEnqueueSonarrCleanupDriveMutation,
   useRecoverFinalizeFailureMutation,
@@ -45,7 +64,8 @@ function yesNo(value: boolean): string {
 function RefinerPageIntroSubtitle() {
   return (
     <p className="mm-page__subtitle">
-      <span className="block">
+      <span className="block">{REFINER_PAGE_FRAMING_PRIMARY}</span>
+      <span className="mt-2 block">
         By default this page lists <strong className="font-semibold text-[var(--mm-text)]">finished</strong> jobs:
         completed, stopped after errors, or{" "}
         <strong className="font-semibold text-[var(--mm-text)]">needs manual finish</strong> — the work ran, but
@@ -80,11 +100,10 @@ function RefinerManualCleanupEnqueuePanel({ enabled }: { enabled: boolean }) {
       className="border-t border-[var(--mm-border)] pt-4 mt-4"
       data-testid="refiner-manual-cleanup-enqueue"
     >
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Queue cleanup drive</h3>
-      <p className="mt-1 text-xs text-[var(--mm-text3)]">
-        Adds or reuses one cleanup-drive queue entry per app. Nothing runs in this browser request, this does not show
-        whether a worker picked the job up, and it does not mean the run finished.
-      </p>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
+        {REFINER_MANUAL_QUEUE_SECTION_TITLE}
+      </h3>
+      <p className="mt-1 text-xs text-[var(--mm-text3)]">{REFINER_MANUAL_QUEUE_SECTION_BODY}</p>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <button
           type="button"
@@ -93,7 +112,7 @@ function RefinerManualCleanupEnqueuePanel({ enabled }: { enabled: boolean }) {
           disabled={mRad.isPending || mSon.isPending}
           onClick={() => mRad.mutate()}
         >
-          {mRad.isPending ? "Adding to queue…" : "Queue Radarr cleanup drive"}
+          {mRad.isPending ? REFINER_MANUAL_QUEUE_PENDING : REFINER_MANUAL_QUEUE_BTN_MOVIES}
         </button>
         <button
           type="button"
@@ -102,27 +121,27 @@ function RefinerManualCleanupEnqueuePanel({ enabled }: { enabled: boolean }) {
           disabled={mRad.isPending || mSon.isPending}
           onClick={() => mSon.mutate()}
         >
-          {mSon.isPending ? "Adding to queue…" : "Queue Sonarr cleanup drive"}
+          {mSon.isPending ? REFINER_MANUAL_QUEUE_PENDING : REFINER_MANUAL_QUEUE_BTN_TV}
         </button>
       </div>
       {mRad.isError ? (
         <p className="mt-2 text-sm text-red-400" role="alert">
-          {mRad.error instanceof Error ? mRad.error.message : "Radarr enqueue failed."}
+          {mRad.error instanceof Error ? mRad.error.message : REFINER_MANUAL_QUEUE_ERR_MOVIES}
         </p>
       ) : null}
       {mSon.isError ? (
         <p className="mt-2 text-sm text-red-400" role="alert">
-          {mSon.error instanceof Error ? mSon.error.message : "Sonarr enqueue failed."}
+          {mSon.error instanceof Error ? mSon.error.message : REFINER_MANUAL_QUEUE_ERR_TV}
         </p>
       ) : null}
       {mRad.isSuccess && mRad.data ? (
         <p className="mt-2 text-sm text-[var(--mm-text2)]" data-testid="refiner-manual-enqueue-radarr-result">
-          Radarr: {manualCleanupEnqueueResultMessage(mRad.data)}
+          {REFINER_MANUAL_QUEUE_RESULT_MOVIES_PREFIX} {manualCleanupEnqueueResultMessage(mRad.data)}
         </p>
       ) : null}
       {mSon.isSuccess && mSon.data ? (
         <p className="mt-2 text-sm text-[var(--mm-text2)]" data-testid="refiner-manual-enqueue-sonarr-result">
-          Sonarr: {manualCleanupEnqueueResultMessage(mSon.data)}
+          {REFINER_MANUAL_QUEUE_RESULT_TV_PREFIX} {manualCleanupEnqueueResultMessage(mSon.data)}
         </p>
       ) : null}
     </div>
@@ -143,10 +162,10 @@ function RefinerRuntimeVisibilitySection({
       data-testid="refiner-runtime-visibility"
     >
       <h2 id="mm-refiner-runtime-heading" className="mm-card__title">
-        Loaded settings (read-only)
+        {REFINER_RUNTIME_CARD_TITLE}
       </h2>
       <p className="mm-card__body mm-card__body--tight text-sm text-[var(--mm-text3)]">
-        From saved configuration when this loaded — not proof that background work is running.
+        {REFINER_RUNTIME_CARD_SUBTITLE}
       </p>
       {rv.isPending ? (
         <p className="mm-card__body text-sm text-[var(--mm-text3)]" data-testid="refiner-runtime-visibility-loading">
@@ -175,7 +194,7 @@ function RefinerRuntimeVisibilitySection({
             data-testid="refiner-runtime-radarr-schedule"
           >
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
-              Radarr cleanup-drive schedule
+              {REFINER_SCHEDULE_MOVIES_HEADING}
             </h3>
             <p className="mt-1">
               Scheduled:{" "}
@@ -195,7 +214,7 @@ function RefinerRuntimeVisibilitySection({
             data-testid="refiner-runtime-sonarr-schedule"
           >
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
-              Sonarr cleanup-drive schedule
+              {REFINER_SCHEDULE_TV_HEADING}
             </h3>
             <p className="mt-1">
               Scheduled:{" "}
@@ -304,7 +323,7 @@ export function RefinerPage() {
           <RefinerPageIntroSubtitle />
         </header>
         <RefinerRuntimeVisibilitySection rv={rv} role={me.data?.role} />
-        <PageLoading label="Loading Refiner jobs" />
+        <PageLoading label={REFINER_PAGE_LOADING_JOBS} />
       </div>
     );
   }
@@ -321,7 +340,7 @@ export function RefinerPage() {
               ? "Could not reach the MediaMop API. Check that the backend is running."
               : isHttpErrorFromApi(err)
                 ? "The server refused this request. Sign in again or check API logs."
-                : "Could not load Refiner job inspection."}
+                : REFINER_PAGE_ERR_LOAD_JOBS}
           </p>
         </header>
         <RefinerRuntimeVisibilitySection rv={rv} role={me.data?.role} />
@@ -377,7 +396,7 @@ export function RefinerPage() {
 
       <section className="mm-card mm-dash-card overflow-x-auto" aria-labelledby="mm-refiner-jobs-heading">
         <h2 id="mm-refiner-jobs-heading" className="mm-card__title">
-          Jobs
+          {REFINER_JOBS_SECTION_TITLE}
         </h2>
         {recoverMutation.isError ? (
           <p className="mm-card__body text-sm text-red-400" role="alert">

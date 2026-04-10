@@ -1,4 +1,4 @@
-"""Authenticated Refiner operator routes: runtime visibility, job inspection, manual cleanup-drive enqueue, finalize recovery."""
+"""Authenticated Refiner operator routes: loaded settings, job inspection, manual import-cleanup enqueue, recovery."""
 
 from __future__ import annotations
 
@@ -43,9 +43,9 @@ def get_refiner_runtime_visibility(
     _user: UserPublicDep,
     settings: SettingsDep,
 ) -> RefinerRuntimeVisibilityOut:
-    """Read-only Refiner runtime **configuration** (workers + cleanup-drive schedules).
+    """Read-only Refiner **settings** (workers + per-library import-cleanup schedules for movies and TV).
 
-    Does not report asyncio task liveness or external connectivity.
+    Does not report live task health or whether library apps are reachable.
     """
 
     return refiner_runtime_visibility_from_settings(settings)
@@ -102,7 +102,7 @@ def post_manual_enqueue_radarr_cleanup_drive(
     db: DbSessionDep,
     settings: SettingsDep,
 ) -> ManualCleanupDriveEnqueueOut:
-    """Enqueue the durable Radarr cleanup-drive job row (deduped). Does not run the handler."""
+    """Enqueue the durable **movies (Radarr)** failed-import cleanup job row (deduped). Does not run processing here."""
 
     validate_browser_post_origin(request, settings)
     secret = require_session_secret(settings)
@@ -132,7 +132,7 @@ def post_manual_enqueue_sonarr_cleanup_drive(
     db: DbSessionDep,
     settings: SettingsDep,
 ) -> ManualCleanupDriveEnqueueOut:
-    """Enqueue the durable Sonarr cleanup-drive job row (deduped). Does not run the handler."""
+    """Enqueue the durable **TV (Sonarr)** failed-import cleanup job row (deduped). Does not run processing here."""
 
     validate_browser_post_origin(request, settings)
     secret = require_session_secret(settings)

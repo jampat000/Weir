@@ -9,8 +9,8 @@ from mediamop.core.config import MediaMopSettings
 from mediamop.modules.refiner.schemas_runtime_visibility import RefinerRuntimeVisibilityOut
 
 _VISIBILITY_NOTE = (
-    "Taken from saved settings when this was loaded. This is not proof that background workers or "
-    "timed schedules are running, or that Radarr or Sonarr are reachable."
+    "Taken from saved settings when this was loaded. This is not proof that background workers, "
+    "timed schedules, or connections to your movie and TV apps are running or reachable."
 )
 
 

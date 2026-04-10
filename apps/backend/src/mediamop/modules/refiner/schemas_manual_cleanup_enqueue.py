@@ -1,4 +1,4 @@
-"""Pydantic for operator-triggered cleanup-drive enqueue (Radarr/Sonarr POST bodies and responses)."""
+"""Pydantic for operator-triggered import-cleanup enqueue (movies / TV POST bodies and responses)."""
 
 from __future__ import annotations
 

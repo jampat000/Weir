@@ -23,5 +23,5 @@ class RefinerRuntimeVisibilityOut(BaseModel):
     refiner_sonarr_cleanup_drive_schedule_enabled: bool
     refiner_sonarr_cleanup_drive_schedule_interval_seconds: int = Field(ge=60)
     visibility_note: str = Field(
-        description="Caveat that values are from settings, not proof of live workers or *arr connectivity.",
+        description="Caveat that values are from settings, not proof of live workers or movie/TV app connectivity.",
     )
