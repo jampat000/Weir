@@ -10,7 +10,7 @@ prior rows for that user or device policy.
 **Invalidation / logout:** Set ``revoked_at`` (or delete the row).
 
 **Idle timeout:** Enforce ``now > last_seen_at + idle_window``; bump ``last_seen_at`` on
-authenticated requests that pass other checks.
+authenticated requests that pass other checks (throttled to limit SQLite write churn).
 
 **Absolute timeout:** Enforce ``now >= absolute_expires_at`` regardless of idle sliding.
 """

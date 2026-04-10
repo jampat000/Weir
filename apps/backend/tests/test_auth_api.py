@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
+
 import pytest
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -12,9 +15,11 @@ from mediamop.core.config import MediaMopSettings
 from mediamop.core.db import create_db_engine, create_session_factory
 from mediamop.platform.activity import constants as activity_constants
 from mediamop.platform.activity.models import ActivityEvent
-from mediamop.platform.auth.models import User, UserRole
+from mediamop.platform.auth import service as auth_service
+from mediamop.platform.auth.models import User, UserRole, UserSession
 from mediamop.platform.auth.password import hash_password
-from tests.integration_helpers import auth_post, csrf as fetch_csrf, reset_user_tables
+from mediamop.core.datetime_util import as_utc
+from tests.integration_helpers import auth_post, csrf as fetch_csrf, reset_user_tables, seed_admin_user
 
 
 def test_login_me_logout_flow(client_with_admin: TestClient) -> None:
@@ -433,6 +438,52 @@ def test_activity_recent_includes_logout_event(client_with_admin: TestClient) ->
     types_in_order = [x["event_type"] for x in items[:3]]
     assert "auth.login_succeeded" in types_in_order
     assert "auth.logout" in types_in_order
+
+
+def test_load_valid_session_throttles_last_seen_persistence() -> None:
+    """Avoid persisting last_seen on every authenticated read (SQLite write pressure)."""
+
+    seed_admin_user()
+    settings = MediaMopSettings.load()
+    eng = create_db_engine(settings)
+    fac = create_session_factory(eng)
+    base = datetime(2026, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
+    sid: int
+    raw: str
+    with patch("mediamop.platform.auth.service.utcnow", return_value=base):
+        with fac() as db:
+            user = db.scalars(select(User).where(User.username == "alice")).one()
+            row, raw = auth_service.create_user_session(db, user, settings=settings)
+            sid = row.id
+            db.commit()
+
+    def read_last_seen() -> datetime:
+        with fac() as db:
+            r = db.get(UserSession, sid)
+            assert r is not None
+            return as_utc(r.last_seen_at)
+
+    assert read_last_seen() == base
+
+    with patch(
+        "mediamop.platform.auth.service.utcnow",
+        return_value=base + timedelta(seconds=30),
+    ):
+        with fac() as db:
+            pair = auth_service.load_valid_session_for_request(db, raw, settings)
+            assert pair is not None
+            db.commit()
+
+    assert read_last_seen() == base
+
+    later = base + timedelta(seconds=61)
+    with patch("mediamop.platform.auth.service.utcnow", return_value=later):
+        with fac() as db:
+            pair = auth_service.load_valid_session_for_request(db, raw, settings)
+            assert pair is not None
+            db.commit()
+
+    assert read_last_seen() == later
 
 
 def test_security_headers_on_health_and_auth(monkeypatch: pytest.MonkeyPatch) -> None:

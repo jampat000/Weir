@@ -11,6 +11,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from mediamop.core.config import MediaMopSettings
+from mediamop.core.datetime_util import as_utc
 from mediamop.platform.auth.models import User, UserSession
 from mediamop.platform.auth.password import verify_password
 from mediamop.platform.auth.sessions import (
@@ -85,12 +86,24 @@ def login_user(
     return user, raw
 
 
+def _session_last_seen_touch_gap(idle: timedelta) -> timedelta:
+    """Minimum wall time between persisting ``last_seen_at`` updates.
+
+    Bounded by 60s to limit SQLite write pressure on read-heavy paths, and by
+    half the idle window so the sliding idle timeout cannot be undermined.
+    """
+
+    half_idle = idle / 2
+    cap = timedelta(seconds=60)
+    return min(cap, half_idle)
+
+
 def load_valid_session_for_request(
     db: Session,
     raw_cookie_token: str | None,
     settings: MediaMopSettings,
 ) -> tuple[UserSession, User] | None:
-    """Lookup by token hash, enforce idle/absolute/revocation, bump last_seen."""
+    """Lookup by token hash, enforce idle/absolute/revocation, bump last_seen (throttled)."""
 
     if not raw_cookie_token:
         return None
@@ -99,12 +112,15 @@ def load_valid_session_for_request(
     if row is None:
         return None
     idle = timedelta(minutes=settings.session_idle_minutes)
-    if not session_is_valid(row, idle=idle):
+    now = utcnow()
+    if not session_is_valid(row, idle=idle, now=now):
         return None
     user = db.get(User, row.user_id)
     if user is None or not user.is_active:
         return None
-    touch_last_seen(row)
+    touch_gap = _session_last_seen_touch_gap(idle)
+    if now - as_utc(row.last_seen_at) >= touch_gap:
+        touch_last_seen(row, at=now)
     return row, user
 
 
