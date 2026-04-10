@@ -1,4 +1,4 @@
-"""Pydantic shapes for read-only Refiner job inspection API responses."""
+"""Pydantic shapes for read-only persisted work-row listings (Fetcher failed-imports inspection, internal tools)."""
 
 from __future__ import annotations
 
@@ -8,14 +8,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class RefinerJobInspectionRow(BaseModel):
-    """One persisted task row for operators — ``status`` is the stored string (e.g. ``handler_ok_finalize_failed``)."""
+    """One persisted row of queued work — ``status`` is the stored value (e.g. ``handler_ok_finalize_failed``)."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     dedupe_key: str
     job_kind: str
-    status: str = Field(description="Persisted status string for this task row.")
+    status: str = Field(description="Persisted status value for this row.")
     attempt_count: int
     max_attempts: int
     lease_owner: str | None
@@ -27,7 +27,7 @@ class RefinerJobInspectionRow(BaseModel):
 
 
 class RefinerJobsInspectionOut(BaseModel):
-    """Bounded task list ordered by ``updated_at`` descending."""
+    """Bounded list of persisted work rows, newest activity first."""
 
     jobs: list[RefinerJobInspectionRow]
     default_terminal_only: bool = Field(

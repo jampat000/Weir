@@ -1,4 +1,4 @@
-"""Refiner Pass 12: Radarr live queue fetch + cleanup drive (Radarr-only)."""
+"""Radarr live queue fetch + cleanup drive (Radarr-only)."""
 
 from __future__ import annotations
 

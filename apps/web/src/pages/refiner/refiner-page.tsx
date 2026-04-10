@@ -1,8 +1,7 @@
 import { Link } from "react-router-dom";
 
 /**
- * Refiner product surface: movies/TV refinement (agnostic tooling).
- * Radarr/Sonarr download-queue failed-import review/removal is owned by Fetcher — see `/app/fetcher`.
+ * Refiner module overview. Queue-driven *arr failed-import tools live under Fetcher (`/app/fetcher`).
  */
 export function RefinerPage() {
   return (
@@ -11,20 +10,18 @@ export function RefinerPage() {
         <p className="mm-page__eyebrow">MediaMop</p>
         <h1 className="mm-page__title">Refiner</h1>
         <p className="mm-page__subtitle">
-          Refiner is where MediaMop focuses on refining movies and TV — structural and editorial cleanup of media
-          metadata and files. It stays app-agnostic: not defined by a specific downloader stack.
+          Refiner is MediaMop’s module for refining movies and TV: structure and quality of metadata and media files,
+          without tying the product to one downloader or indexer stack. A separate lane of work —{" "}
+          <strong>Refiner cleanup</strong> — will mean stale files left on disk after importing and processing are done;
+          that is not the same as walking Radarr/Sonarr download queues.
         </p>
         <p className="mm-page__lead">
-          <strong>Radarr</strong> and <strong>Sonarr</strong> <strong>download-queue</strong> failed-import review and
-          removal (the queue-driven workflow you can inspect in the UI) is a{" "}
+          This page is the module home today. Radarr/Sonarr <strong>download-queue</strong> failed-import review,
+          schedules, and manual actions live under{" "}
           <Link to="/app/fetcher" className="text-[var(--mm-accent)] underline-offset-2 hover:underline">
             Fetcher
           </Link>{" "}
-          concern — not Refiner’s product identity.
-        </p>
-        <p className="mt-3 text-sm text-[var(--mm-text3)]">
-          Future Refiner-native work can include stale-file cleanup on disk after importing is finished. That is
-          different from walking *arr download queues; this page does not host the queue workflow.
+          because MediaMop treats that workflow as Fetcher-owned surface area.
         </p>
       </header>
     </div>

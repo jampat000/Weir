@@ -1,4 +1,4 @@
-"""Unit: ``refiner_runtime_visibility_from_settings`` maps settings to the visibility DTO."""
+"""Unit tests for ``refiner_runtime_visibility_from_settings`` (settings-derived snapshot DTO)."""
 
 from __future__ import annotations
 

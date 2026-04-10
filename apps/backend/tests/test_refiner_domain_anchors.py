@@ -1,4 +1,4 @@
-"""Refiner Pass 2: anchor extraction and title/year ownership — contract tests (not Fetcher-style prefix rules)."""
+"""Anchor extraction and title/year ownership — contract tests."""
 
 from __future__ import annotations
 

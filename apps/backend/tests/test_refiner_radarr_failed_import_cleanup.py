@@ -1,4 +1,4 @@
-"""Refiner Pass 7: Radarr failed import cleanup planning seam (Radarr-only, no executor)."""
+"""Radarr failed import cleanup planning seam (Radarr-only, no executor)."""
 
 from __future__ import annotations
 

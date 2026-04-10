@@ -1,4 +1,4 @@
-"""Persisted activity events for the read-only Activity feed (Stage 8)."""
+"""Persisted activity events for the read-only Activity feed."""
 
 from __future__ import annotations
 

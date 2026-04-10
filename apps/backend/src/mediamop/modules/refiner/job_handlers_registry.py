@@ -1,4 +1,4 @@
-"""Production Refiner job handler map — one entry per job kind (Pass 15–15.5: *arr cleanup drives)."""
+"""Production Refiner job handler registry — one callable per persisted job kind (*arr cleanup drives)."""
 
 from __future__ import annotations
 

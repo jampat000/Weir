@@ -1,4 +1,4 @@
-"""Refiner failed import cleanup policy loaded from environment (Pass 9).
+"""Refiner failed import cleanup policy loaded from environment.
 
 Radarr and Sonarr each have their own toggle set so defaults and future persistence
 can diverge without a shared blob.

@@ -21,5 +21,7 @@ class ManualCleanupDriveEnqueueOut(BaseModel):
     dedupe_key: str
     job_kind: str
     enqueue_outcome: Literal["created", "already_present"] = Field(
-        description="``created`` = new task row inserted; ``already_present`` = same dedupe key already had a row.",
+        description=(
+            "``created`` = new persisted row inserted; ``already_present`` = same dedupe key already had a row."
+        ),
     )

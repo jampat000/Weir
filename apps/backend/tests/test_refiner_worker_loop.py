@@ -1,4 +1,4 @@
-"""Refiner Pass 14: worker-count settings and in-process job loop (Refiner-local)."""
+"""In-process worker loop and worker-count settings (Refiner-local)."""
 
 from __future__ import annotations
 

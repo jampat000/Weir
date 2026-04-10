@@ -1,6 +1,6 @@
 import type { FailedImportInspectionFilter } from "./queries";
 
-/** Filter options for Fetcher failed-import task inspection. */
+/** Filter options for the recorded-work list in Fetcher failed-imports. */
 export const FAILED_IMPORT_INSPECTION_FILTER_OPTIONS: { value: FailedImportInspectionFilter; label: string }[] = [
   {
     value: "terminal",

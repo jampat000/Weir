@@ -1,4 +1,4 @@
-"""Refiner Pass 10.5: Sonarr failed import cleanup execution (plan → client, Sonarr-only)."""
+"""Sonarr failed import cleanup execution (plan → client, Sonarr-only)."""
 
 from __future__ import annotations
 

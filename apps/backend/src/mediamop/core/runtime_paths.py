@@ -1,4 +1,4 @@
-"""SQLite-first runtime directories under ``MEDIAMOP_HOME`` (Stage 10).
+"""SQLite-first runtime directories under ``MEDIAMOP_HOME``.
 
 Default layout (when overrides are unset):
 

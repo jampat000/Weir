@@ -26,6 +26,7 @@ import type { FailedImportFetcherSettingsOut, FailedImportTaskRow } from "../../
 import {
   FETCHER_FI_FILTER_DEFAULT_HELP,
   FETCHER_FI_FILTER_SINGLE_STATUS_HELP,
+  FETCHER_FI_LIST_EMPTY,
   FETCHER_FI_MANUAL_BTN_MOVIES,
   FETCHER_FI_MANUAL_BTN_TV,
   FETCHER_FI_MANUAL_ERR_MOVIES,
@@ -36,18 +37,18 @@ import {
   FETCHER_FI_MANUAL_SECTION_BODY,
   FETCHER_FI_MANUAL_SECTION_TITLE,
   FETCHER_FI_PAGE_ERR_LOAD_TASKS,
-  FETCHER_FI_PAGE_FRAMING_PRIMARY,
-  FETCHER_FI_PAGE_FRAMING_SCOPE,
   FETCHER_FI_PAGE_LOADING_TASKS,
   FETCHER_FI_RUNTIME_CARD_SUBTITLE,
   FETCHER_FI_RUNTIME_CARD_TITLE,
-  FETCHER_FI_RUNTIME_RUNNER_COUNT_LABEL,
-  FETCHER_FI_RUNTIME_RUNNERS_HEADING,
+  FETCHER_FI_RUNTIME_WORKER_COUNT_LABEL,
+  FETCHER_FI_RUNTIME_WORKERS_HEADING,
   FETCHER_FI_SCHEDULE_MOVIES_HEADING,
   FETCHER_FI_SCHEDULE_TV_HEADING,
+  FETCHER_FI_SECTION_INTRO_PRIMARY,
+  FETCHER_FI_SECTION_INTRO_SCOPE,
   FETCHER_FI_TASKS_SECTION_TITLE,
-  FETCHER_FI_TABLE_COL_TASK_KIND,
-  FETCHER_FI_TABLE_COL_UNIQUENESS_KEY,
+  FETCHER_FI_TABLE_COL_STABLE_KEY,
+  FETCHER_FI_TABLE_COL_WORK_TYPE,
 } from "../../lib/fetcher/failed-imports/user-copy";
 import type { FailedImportRecoverFinalizeResult } from "../../lib/fetcher/failed-imports/recover-api";
 
@@ -70,20 +71,20 @@ function yesNo(value: boolean): string {
 function FetcherFailedImportsIntroSubtitle() {
   return (
     <p className="mm-page__subtitle">
-      <span className="block">{FETCHER_FI_PAGE_FRAMING_PRIMARY}</span>
-      <span className="mt-2 block text-sm text-[var(--mm-text3)]">{FETCHER_FI_PAGE_FRAMING_SCOPE}</span>
+      <span className="block">{FETCHER_FI_SECTION_INTRO_PRIMARY}</span>
+      <span className="mt-2 block text-sm text-[var(--mm-text3)]">{FETCHER_FI_SECTION_INTRO_SCOPE}</span>
       <span className="mt-2 block">
-        By default this section lists <strong className="font-semibold text-[var(--mm-text)]">finished</strong> tasks:
+        By default this list shows <strong className="font-semibold text-[var(--mm-text)]">finished</strong> outcomes:
         completed, stopped after errors, or{" "}
         <strong className="font-semibold text-[var(--mm-text)]">needs manual finish</strong> — the work ran, but the
-        app could not mark the row completed (not the same as a hard failure). Each row still shows the exact stored
-        status under the plain label.
+        app could not mark the download-queue row completed (not the same as a hard failure). Each row still shows the
+        exact stored status under the plain label.
       </span>
       <span className="mt-2 block text-sm text-[var(--mm-text3)]">
         Admins and operators can use{" "}
         <strong className="font-semibold text-[var(--mm-text)]">Mark completed (manual)</strong> only on{" "}
-        <strong>needs manual finish</strong> tasks. It records an audit line and sets the row to completed without
-        running that task again. Technical codes for reference:{" "}
+        <strong>needs manual finish</strong> rows. It records an audit line and marks the row completed without
+        re-running that pass. Technical codes for reference:{" "}
         <code className="mm-dash-code">handler_ok_finalize_failed</code>,{" "}
         <code className="mm-dash-code">completed</code>, <code className="mm-dash-code">failed</code>.
       </span>
@@ -186,10 +187,10 @@ function FetcherFailedImportsSettingsSection({
         <div className="mm-card__body mm-card__body--tight space-y-4 text-sm text-[var(--mm-text2)]">
           <div data-testid="fetcher-failed-imports-runners">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
-              {FETCHER_FI_RUNTIME_RUNNERS_HEADING}
+              {FETCHER_FI_RUNTIME_WORKERS_HEADING}
             </h3>
             <p className="mt-1">
-              <span className="text-[var(--mm-text3)]">{FETCHER_FI_RUNTIME_RUNNER_COUNT_LABEL}</span>{" "}
+              <span className="text-[var(--mm-text3)]">{FETCHER_FI_RUNTIME_WORKER_COUNT_LABEL}</span>{" "}
               <code className="mm-dash-code" data-testid="fetcher-failed-imports-worker-count">
                 {rv.data.refiner_worker_count}
               </code>
@@ -304,7 +305,7 @@ function TaskRow({
   );
 }
 
-/** Radarr/Sonarr download-queue failed-import task list, settings, and manual actions (Fetcher product surface). */
+/** Fetcher page section: Radarr/Sonarr download-queue failed-import list, settings snapshot, and manual starts. */
 export function FetcherFailedImportsWorkspace() {
   const [filter, setFilter] = useState<FailedImportInspectionFilter>("terminal");
   const me = useMeQuery();
@@ -322,7 +323,7 @@ export function FetcherFailedImportsWorkspace() {
     return (
       <div data-testid="fetcher-failed-imports-workspace">
         <header className="mm-page__intro">
-          <h2 className="mm-page__title text-xl sm:text-2xl">Download-queue failed imports</h2>
+          <h2 className="mm-page__title text-xl sm:text-2xl">Radarr / Sonarr failed-import queues</h2>
           <FetcherFailedImportsIntroSubtitle />
         </header>
         <FetcherFailedImportsSettingsSection rv={rv} role={me.data?.role} />
@@ -336,7 +337,7 @@ export function FetcherFailedImportsWorkspace() {
     return (
       <div data-testid="fetcher-failed-imports-workspace">
         <header className="mm-page__intro">
-          <h2 className="mm-page__title text-xl sm:text-2xl">Download-queue failed imports</h2>
+          <h2 className="mm-page__title text-xl sm:text-2xl">Radarr / Sonarr failed-import queues</h2>
           <FetcherFailedImportsIntroSubtitle />
           <p className="mm-page__lead">
             {isLikelyNetworkFailure(err)
@@ -360,7 +361,7 @@ export function FetcherFailedImportsWorkspace() {
   return (
     <div data-testid="fetcher-failed-imports-workspace">
       <header className="mm-page__intro">
-        <h2 className="mm-page__title text-xl sm:text-2xl">Download-queue failed imports</h2>
+        <h2 className="mm-page__title text-xl sm:text-2xl">Radarr / Sonarr failed-import queues</h2>
         <FetcherFailedImportsIntroSubtitle />
       </header>
 
@@ -415,7 +416,7 @@ export function FetcherFailedImportsWorkspace() {
         ) : null}
         {isEmpty ? (
           <p className="mm-card__body" data-testid="fetcher-failed-imports-inspection-empty">
-            No tasks match this view.
+            {FETCHER_FI_LIST_EMPTY}
           </p>
         ) : (
           <div className="mm-card__body mm-card__body--tight">
@@ -423,8 +424,8 @@ export function FetcherFailedImportsWorkspace() {
               <thead>
                 <tr className="border-b border-[var(--mm-border)] text-xs uppercase tracking-wide text-[var(--mm-text3)]">
                   <th className="pb-2 pr-3 font-semibold">Status</th>
-                  <th className="pb-2 pr-3 font-semibold">{FETCHER_FI_TABLE_COL_TASK_KIND}</th>
-                  <th className="pb-2 pr-3 font-semibold">{FETCHER_FI_TABLE_COL_UNIQUENESS_KEY}</th>
+                  <th className="pb-2 pr-3 font-semibold">{FETCHER_FI_TABLE_COL_WORK_TYPE}</th>
+                  <th className="pb-2 pr-3 font-semibold">{FETCHER_FI_TABLE_COL_STABLE_KEY}</th>
                   <th className="pb-2 pr-3 font-semibold">Attempts</th>
                   <th className="pb-2 pr-3 font-semibold">Updated</th>
                   <th className="pb-2 pr-3 font-semibold">Last error</th>

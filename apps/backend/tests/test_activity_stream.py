@@ -1,4 +1,4 @@
-"""Activity SSE stream tests (Stage 8 Pass 3) — SQLite (session ``MEDIAMOP_HOME``)."""
+"""Activity SSE stream tests — SQLite (session ``MEDIAMOP_HOME``)."""
 
 from __future__ import annotations
 

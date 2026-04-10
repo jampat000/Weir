@@ -1,4 +1,4 @@
-"""Refiner Pass 16: independent Radarr/Sonarr periodic cleanup-drive enqueue schedules."""
+"""Independent Radarr/Sonarr periodic cleanup-drive enqueue schedules."""
 
 from __future__ import annotations
 

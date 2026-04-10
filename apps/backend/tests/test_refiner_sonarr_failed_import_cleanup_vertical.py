@@ -1,4 +1,4 @@
-"""Refiner Pass 11.5: Sonarr wired vertical — settings → plan → execute (Sonarr-only)."""
+"""Sonarr wired vertical — settings → plan → execute (Sonarr-only)."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Refiner Pass 9: failed import cleanup policy settings (env + MediaMopSettings seam)."""
+"""Failed import cleanup policy settings (env + MediaMopSettings seam)."""
 
 from __future__ import annotations
 

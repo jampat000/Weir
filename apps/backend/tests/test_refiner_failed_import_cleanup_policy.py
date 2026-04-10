@@ -1,4 +1,4 @@
-"""Refiner Pass 5: failed import cleanup policy 1:1 with classifier outcomes."""
+"""Failed import cleanup policy 1:1 with classifier outcomes."""
 
 from __future__ import annotations
 

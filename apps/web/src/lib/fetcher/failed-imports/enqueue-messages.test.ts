@@ -10,7 +10,7 @@ describe("failedImportEnqueueResultMessage", () => {
         job_kind: "x",
         enqueue_outcome: "created",
       }),
-    ).toMatch(/queued now/i);
+    ).toMatch(/recorded — a new/i);
     expect(
       failedImportEnqueueResultMessage({
         job_id: 1,
@@ -18,6 +18,6 @@ describe("failedImportEnqueueResultMessage", () => {
         job_kind: "x",
         enqueue_outcome: "already_present",
       }),
-    ).toMatch(/already queued/i);
+    ).toMatch(/already recorded/i);
   });
 });

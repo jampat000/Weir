@@ -1,4 +1,4 @@
-"""Refiner Pass 15: Radarr live cleanup drive refiner_jobs producer + handler."""
+"""Radarr live cleanup drive refiner_jobs producer + handler."""
 
 from __future__ import annotations
 

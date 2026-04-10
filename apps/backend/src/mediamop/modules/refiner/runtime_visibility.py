@@ -1,6 +1,7 @@
-"""Map :class:`~mediamop.core.config.MediaMopSettings` to a bounded Refiner runtime visibility DTO.
+"""Map :class:`~mediamop.core.config.MediaMopSettings` to a bounded, read-only settings snapshot.
 
-No asyncio introspection — **configured intent** only, not proved task liveness.
+Used by Fetcher failed-import settings and other operator surfaces. **Configured intent only** — not live
+runner health, timed-pass execution, or *arr connectivity.
 """
 
 from __future__ import annotations
@@ -9,28 +10,28 @@ from mediamop.core.config import MediaMopSettings
 from mediamop.modules.refiner.schemas_runtime_visibility import RefinerRuntimeVisibilityOut
 
 _VISIBILITY_NOTE = (
-    "Taken from saved settings when this was loaded. This is not proof that background runners, "
+    "Taken from saved settings when this was loaded. This is not proof that in-process workers, "
     "timed download-queue passes, or connections to your movie and TV apps are running or reachable."
 )
 
 
 def refiner_runtime_visibility_from_settings(settings: MediaMopSettings) -> RefinerRuntimeVisibilityOut:
-    """Map loaded settings to a bounded inspection DTO (Refiner-local; no DB)."""
+    """Map loaded settings to a bounded DTO (no DB reads; no liveness)."""
 
     n = settings.refiner_worker_count
     disabled = n == 0
     if disabled:
         summary = (
-            "Refiner background runners are off (configured count is 0). "
-            "Queued tasks will not start automatically."
+            "In-process background workers are off (configured count is 0). "
+            "Recorded work will not start automatically."
         )
     elif n == 1:
         summary = (
-            "One background runner is enabled — the usual default for a single SQLite database."
+            "One in-process background worker is enabled — the usual default for a single SQLite database."
         )
     else:
         summary = (
-            f"Multiple background runners are enabled (count {n}). "
+            f"Multiple in-process background workers are enabled (count {n}). "
             "On SQLite this is a guarded setup and not the recommended default — "
             "confirm behavior before relying on it in production."
         )

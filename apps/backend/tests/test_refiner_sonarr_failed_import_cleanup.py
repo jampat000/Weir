@@ -1,4 +1,4 @@
-"""Refiner Pass 7.5: Sonarr failed import cleanup planning seam (Sonarr-only, no executor)."""
+"""Sonarr failed import cleanup planning seam (Sonarr-only, no executor)."""
 
 from __future__ import annotations
 

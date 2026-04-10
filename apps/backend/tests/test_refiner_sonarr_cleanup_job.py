@@ -1,4 +1,4 @@
-"""Refiner Pass 15.5: Sonarr live cleanup drive refiner_jobs producer + handler."""
+"""Sonarr live cleanup drive refiner_jobs producer + handler."""
 
 from __future__ import annotations
 

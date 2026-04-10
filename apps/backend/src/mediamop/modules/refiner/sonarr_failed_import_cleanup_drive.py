@@ -1,4 +1,4 @@
-"""Sonarr-only live queue fetch + failed-import cleanup drive (Pass 12.5).
+"""Sonarr-only live queue fetch + failed-import cleanup drive.
 
 Fetches raw Sonarr v3 queue rows through a narrow Protocol, builds a single
 ``status_message_blob`` string per row for the existing planner, and invokes

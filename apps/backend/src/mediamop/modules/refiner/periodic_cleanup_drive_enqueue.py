@@ -1,4 +1,4 @@
-"""Refiner-local periodic enqueue for *arr live cleanup drive jobs (Pass 16).
+"""Refiner-local periodic enqueue for *arr live cleanup drive jobs.
 
 Each :func:`run_periodic_refiner_cleanup_drive_enqueue` coroutine is a **separate** asyncio task
 with its own interval — not a global Refiner scheduler gate. Lifespan starts one task per

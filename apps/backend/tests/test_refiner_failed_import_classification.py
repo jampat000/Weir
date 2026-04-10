@@ -1,4 +1,4 @@
-"""Refiner Pass 4: failed import message taxonomy and terminal-over-pending precedence."""
+"""Failed import message taxonomy and terminal-over-pending precedence."""
 
 from __future__ import annotations
 

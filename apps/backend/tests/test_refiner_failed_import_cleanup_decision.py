@@ -1,4 +1,4 @@
-"""Refiner Pass 6: pure failed-import cleanup eligibility decision (no execution)."""
+"""Pure failed-import cleanup eligibility decision (no execution)."""
 
 from __future__ import annotations
 

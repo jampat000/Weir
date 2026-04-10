@@ -1,4 +1,4 @@
-"""Read-only listing of persisted ``refiner_jobs`` rows for operator inspection."""
+"""Read-only listing of persisted ``refiner_jobs`` rows (Fetcher failed-imports inspection and internal tools)."""
 
 from __future__ import annotations
 

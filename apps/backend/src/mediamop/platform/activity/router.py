@@ -32,7 +32,7 @@ def get_activity_recent(
     _user: UserPublicDep,
     db: DbSessionDep,
 ) -> ActivityRecentOut:
-    """Recent persisted events, newest first — snapshot only (no live transport in Stage 8 Pass 1)."""
+    """Recent persisted events, newest first — snapshot only (pagination-style read; not a control plane)."""
 
     rows = list_recent_activity_events(db)
     return ActivityRecentOut(

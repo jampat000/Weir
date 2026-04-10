@@ -1,4 +1,4 @@
-"""Refiner Pass 8: failed import cleanup planning orchestration (dispatch only)."""
+"""Failed import cleanup planning orchestration (dispatch only)."""
 
 from __future__ import annotations
 

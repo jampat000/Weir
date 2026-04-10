@@ -1,4 +1,4 @@
-"""Refiner Pass 11: Radarr wired vertical — settings → plan → execute (Radarr-only)."""
+"""Radarr wired vertical — settings → plan → execute (Radarr-only)."""
 
 from __future__ import annotations
 

@@ -23,24 +23,25 @@ export function FetcherPage() {
         <p className="mm-page__eyebrow">MediaMop</p>
         <h1 className="mm-page__title">Fetcher</h1>
         <p className="mm-page__subtitle">
-          Fetcher covers MediaMop’s integration with your separate Fetcher app (live{" "}
-          <code className="mm-dash-code">/healthz</code> probe and persisted probe history), and it owns Radarr/Sonarr{" "}
-          <strong>download-queue</strong> failed-import review and removal — task list, schedules, and manual queue
-          actions below.
+          Fetcher is MediaMop’s module for two related jobs: checking reachability of your separate Fetcher application
+          (HTTP probe and persisted history), and owning Radarr/Sonarr <strong>download-queue</strong> failed-import
+          review and removal inside MediaMop — inspection, schedules, manual starts, and recovery when something
+          stalls.
         </p>
         <p className="mm-page__lead text-sm text-[var(--mm-text3)]">
-          Refiner stays focused on refining movies/TV and future disk-level stale-file cleanup — not this queue
+          Refiner is separate: movies/TV refinement and, later, stale files on disk after importing — not the *arr queue
           workflow.{" "}
           <Link to="/app/refiner" className="text-[var(--mm-accent)] underline-offset-2 hover:underline">
-            Refiner overview
+            Open Refiner
           </Link>
+          .
         </p>
       </header>
 
       <FetcherFailedImportsWorkspace />
 
       {overview.isPending ? (
-        <PageLoading label="Loading Fetcher probe status" />
+        <PageLoading label="Loading external Fetcher probe status" />
       ) : overview.isError ? (
         <FetcherOverviewError err={overview.error} />
       ) : (
@@ -58,7 +59,7 @@ function FetcherOverviewError({ err }: { err: unknown }) {
           ? "Could not reach the MediaMop API. Check that the backend is running."
           : isHttpErrorFromApi(err)
             ? "The server refused this request. Sign in again or check API logs."
-            : "Could not load Fetcher probe status."}
+            : "Could not load external Fetcher probe status."}
       </p>
       {err instanceof Error ? (
         <p className="mm-page__lead font-mono text-sm text-[var(--mm-text3)]">{err.message}</p>
@@ -87,16 +88,25 @@ function FetcherOperationalOverviewSections({
 
   return (
     <>
+      <header className="mm-page__intro mt-10 border-t border-[var(--mm-border)] pt-8">
+        <h2 className="mm-page__title text-xl sm:text-2xl">External Fetcher application</h2>
+        <p className="mm-page__subtitle">
+          This block is only about the separate Fetcher service MediaMop reaches at{" "}
+          <code className="mm-dash-code">MEDIAMOP_FETCHER_BASE_URL</code>: last probe outcome and recently persisted
+          probe rows. It does not describe Radarr/Sonarr queue work above.
+        </p>
+      </header>
+
       <section
-        className="mm-card mm-dash-card mm-fetcher-module-surface mt-8"
+        className="mm-card mm-dash-card mm-fetcher-module-surface mt-4"
         aria-labelledby="mm-fetcher-status-heading"
       >
         <h2 id="mm-fetcher-status-heading" className="mm-card__title">
-          Fetcher app — connection
+          Connection
         </h2>
         <p className="mm-card__body mm-card__body--tight">
-          Values below come from <code className="mm-dash-code">MEDIAMOP_FETCHER_BASE_URL</code> and a single GET to{" "}
-          <code className="mm-dash-code">/healthz</code> on that origin.
+          Values come from one GET to <code className="mm-dash-code">/healthz</code> on the configured origin when this
+          loaded.
         </p>
         <dl className="mm-dash-kv">
           <FetcherStatusRow label="MediaMop API" value={mediamop_version} />

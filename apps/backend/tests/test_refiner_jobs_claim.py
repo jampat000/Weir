@@ -1,4 +1,4 @@
-"""Refiner Pass 13: refiner_jobs table — enqueue dedupe, atomic claim, lease, complete, fail."""
+"""Persisted refiner_jobs queue — enqueue dedupe, atomic claim, lease, complete, fail."""
 
 from __future__ import annotations
 

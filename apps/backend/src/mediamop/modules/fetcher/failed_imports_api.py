@@ -47,9 +47,9 @@ def get_fetcher_failed_imports_settings(
     _user: UserPublicDep,
     settings: SettingsDep,
 ) -> RefinerRuntimeVisibilityOut:
-    """Fetcher: read-only settings for background runners and Radarr/Sonarr timed download-queue failed-import passes.
+    """Fetcher: read-only settings for in-process workers and Radarr/Sonarr timed failed-import passes.
 
-    Does not report live runner health, pass execution, or app connectivity.
+    Does not report live worker health, pass execution, or app connectivity.
     """
 
     return refiner_runtime_visibility_from_settings(settings)
@@ -71,7 +71,7 @@ def get_fetcher_failed_imports_inspection(
         ),
     ] = None,
 ) -> RefinerJobsInspectionOut:
-    """Fetcher: read-only persisted task rows for the failed-import queue workflow."""
+    """Fetcher: read-only persisted rows for the failed-import queue workflow."""
 
     if statuses:
         try:

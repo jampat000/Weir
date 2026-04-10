@@ -1,4 +1,4 @@
-"""Refiner-local persisted job queue — coordination for future workers (Pass 13).
+"""Refiner-local persisted job queue — coordination for in-process workers.
 
 Not a cross-module framework: only Refiner enqueue/claim/complete paths use this table.
 """

@@ -1,4 +1,4 @@
-"""Refiner Pass 10: Radarr failed import cleanup execution (plan → client, Radarr-only)."""
+"""Radarr failed import cleanup execution (plan → client, Radarr-only)."""
 
 from __future__ import annotations
 

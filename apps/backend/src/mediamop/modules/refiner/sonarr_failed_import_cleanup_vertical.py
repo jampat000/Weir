@@ -1,4 +1,4 @@
-"""Sonarr-only wired vertical: settings → plan → execute (Pass 11.5).
+"""Sonarr-only wired vertical: settings → plan → execute.
 
 Uses :meth:`sonarr_failed_import_cleanup_policy` on the injected settings source so
 ``MediaMopSettings`` works without importing it here (avoids config↔refiner cycles).

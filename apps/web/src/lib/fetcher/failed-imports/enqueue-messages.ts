@@ -1,10 +1,10 @@
 import type { FailedImportEnqueueOut } from "./types";
 
-/** After queueing a Radarr/Sonarr download-queue failed-import pass. */
+/** After recording a manual Radarr/Sonarr failed-import pass request. */
 
 export function failedImportEnqueueResultMessage(out: FailedImportEnqueueOut): string {
   if (out.enqueue_outcome === "created") {
-    return "Queued now — a new failed-import pass was recorded.";
+    return "Recorded — a new failed-import pass row was added.";
   }
-  return "Already queued — the existing failed-import pass was reused (no duplicate).";
+  return "Already recorded — the existing failed-import pass row was reused (no duplicate).";
 }

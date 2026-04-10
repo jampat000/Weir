@@ -1,4 +1,4 @@
-"""Sonarr-only refiner_jobs producer + worker handler for the live failed-import cleanup drive (Pass 15.5).
+"""Sonarr-only refiner_jobs producer + worker handler for the live failed-import cleanup drive.
 
 Enqueue uses a stable dedupe key so only one sweep row exists at a time. The handler reuses
 :func:`~mediamop.modules.refiner.sonarr_failed_import_cleanup_drive.drive_sonarr_failed_import_cleanup_from_live_queue`.

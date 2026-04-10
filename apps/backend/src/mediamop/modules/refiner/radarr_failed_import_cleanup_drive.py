@@ -1,4 +1,4 @@
-"""Radarr-only live queue fetch + failed-import cleanup drive (Pass 12).
+"""Radarr-only live queue fetch + failed-import cleanup drive.
 
 Fetches raw Radarr v3 queue rows through a narrow Protocol, builds a single
 ``status_message_blob`` string per row for the existing planner, and invokes

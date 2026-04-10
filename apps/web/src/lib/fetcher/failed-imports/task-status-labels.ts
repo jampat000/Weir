@@ -1,6 +1,6 @@
 /**
- * Plain labels for persisted task status strings (Fetcher failed-import queue workflow).
- * handler_ok_finalize_failed must stay distinct from ordinary failed.
+ * Plain labels for persisted status values (Fetcher failed-import workflow).
+ * ``handler_ok_finalize_failed`` must stay distinct from ordinary ``failed``.
  */
 
 export const FAILED_IMPORT_STATUS_HANDLER_OK_FINALIZE_FAILED = "handler_ok_finalize_failed";

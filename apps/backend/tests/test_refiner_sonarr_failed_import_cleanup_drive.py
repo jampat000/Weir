@@ -1,4 +1,4 @@
-"""Refiner Pass 12.5: Sonarr live queue fetch + cleanup drive (Sonarr-only)."""
+"""Sonarr live queue fetch + cleanup drive (Sonarr-only)."""
 
 from __future__ import annotations
 

@@ -66,7 +66,7 @@ describe("FetcherPage (failed-import ownership)", () => {
     render(wrap(<FetcherPage />, qc));
 
     expect(screen.getByTestId("fetcher-failed-imports-workspace")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /download-queue failed imports/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /radarr.*sonarr failed-import queues/i })).toBeInTheDocument();
   });
 
   it("frames Radarr/Sonarr queue work in the Fetcher page header", () => {
