@@ -1,8 +1,8 @@
 """Refiner module — domain and future product surface.
 
-Pass 1–2: ownership/blocking and anchors. Pass 3: *arr queue adapters (Radarr/Sonarr
-entry points + shared plumbing). Pass 4: failed import classification. No HTTP
-clients or orchestration here.
+Pass 1–2: ownership/blocking and anchors. Pass 3: *arr queue adapters. Pass 4–6: failed
+import classification, cleanup policy, and pure cleanup eligibility decisions. No HTTP
+clients or destructive execution here.
 """
 
 from __future__ import annotations
@@ -12,6 +12,11 @@ from mediamop.modules.refiner.failed_import_classification import (
     FailedImportOutcome,
     classify_failed_import_message,
     normalize_failed_import_blob,
+)
+from mediamop.modules.refiner.failed_import_cleanup_decision import (
+    FailedImportCleanupEligibilityDecision,
+    FailedImportCleanupEligibilityReason,
+    decide_failed_import_cleanup_eligibility,
 )
 from mediamop.modules.refiner.failed_import_cleanup_policy import (
     FailedImportCleanupPolicy,
@@ -38,6 +43,9 @@ from mediamop.modules.refiner.radarr_queue_adapter import map_radarr_queue_row_t
 from mediamop.modules.refiner.sonarr_queue_adapter import map_sonarr_queue_row_to_refiner_view
 
 __all__ = [
+    "FailedImportCleanupEligibilityDecision",
+    "FailedImportCleanupEligibilityReason",
+    "decide_failed_import_cleanup_eligibility",
     "FailedImportCleanupPolicy",
     "FailedImportCleanupPolicyKey",
     "cleanup_policy_key_for_outcome",
