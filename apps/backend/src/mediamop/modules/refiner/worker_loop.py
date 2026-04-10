@@ -237,7 +237,23 @@ def start_refiner_worker_background_tasks(
     job_handlers: Mapping[str, Callable[[RefinerJobWorkContext], None]] | None = None,
     stop_event: asyncio.Event | None = None,
 ) -> tuple[asyncio.Event, list[asyncio.Task[None]]]:
-    """Create one asyncio task per configured Refiner worker (count clamped at load time)."""
+    """Create one asyncio task per configured Refiner worker (``refiner_worker_count`` from settings).
+
+    Modes:
+
+    - **0** — Returns an empty task list (workers intentionally off; lifespan still stops cleanly).
+    - **1** — Supported default.
+    - **>1** — Guarded only: concurrent tasks compete under SQLite single-writer rules; this is
+      **not** documented as the normal rollout target (see Pass 21 tests and logs).
+    """
+
+    if settings.refiner_worker_count > 1:
+        logger.warning(
+            "Refiner refiner_worker_count=%s: multi-worker is a guarded capability under SQLite "
+            "(single-writer database). Default remains 1; validate behavior before treating "
+            ">1 as normal rollout.",
+            settings.refiner_worker_count,
+        )
 
     handlers: Mapping[str, Callable[[RefinerJobWorkContext], None]]
     if job_handlers is not None:

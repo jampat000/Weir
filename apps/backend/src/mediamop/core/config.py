@@ -89,6 +89,7 @@ class MediaMopSettings:
     sqlalchemy_database_url: str
     fetcher_base_url: str | None
     refiner_failed_import_cleanup: RefinerFailedImportCleanupSettingsBundle
+    # 0 = no in-process Refiner workers; 1 = default; >1 = guarded (see refiner.worker_limits).
     refiner_worker_count: int
     refiner_radarr_base_url: str | None
     refiner_radarr_api_key: str | None
