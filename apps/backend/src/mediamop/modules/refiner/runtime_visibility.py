@@ -10,8 +10,7 @@ from mediamop.core.config import MediaMopSettings
 from mediamop.modules.refiner.schemas_runtime_visibility import RefinerRuntimeVisibilityOut
 
 _VISIBILITY_NOTE = (
-    "Taken from saved settings when this was loaded. This is not proof that in-process workers, "
-    "timed download-queue passes, or connections to your movie and TV apps are running or reachable."
+    "Saved preferences when this loaded. Not a live status panel for your apps or for sweeps that may be running."
 )
 
 
@@ -21,19 +20,13 @@ def refiner_runtime_visibility_from_settings(settings: MediaMopSettings) -> Refi
     n = settings.refiner_worker_count
     disabled = n == 0
     if disabled:
-        summary = (
-            "In-process background workers are off (configured count is 0). "
-            "Recorded work will not start automatically."
-        )
+        summary = "Background automation is off — scheduled failed-import sweeps will not start by themselves."
     elif n == 1:
-        summary = (
-            "One in-process background worker is enabled — the usual default for a single SQLite database."
-        )
+        summary = "One background automation slot is enabled (typical for a single-server setup)."
     else:
         summary = (
-            f"Multiple in-process background workers are enabled (count {n}). "
-            "On SQLite this is a guarded setup and not the recommended default — "
-            "confirm behavior before relying on it in production."
+            f"Several background automation slots are enabled ({n}). On one database this is unusual — "
+            "confirm it is what you want before relying on it."
         )
 
     return RefinerRuntimeVisibilityOut(

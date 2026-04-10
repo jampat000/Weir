@@ -25,7 +25,7 @@ def test_worker_count_zero_disabled_summary(base_settings: MediaMopSettings) -> 
     assert out.in_process_workers_disabled is True
     assert out.in_process_workers_enabled is False
     assert "off" in out.worker_mode_summary.lower()
-    assert "0" in out.worker_mode_summary
+    assert "automation" in out.worker_mode_summary.lower()
 
 
 def test_worker_count_one_default_summary(base_settings: MediaMopSettings) -> None:
@@ -34,20 +34,16 @@ def test_worker_count_one_default_summary(base_settings: MediaMopSettings) -> No
     assert out.refiner_worker_count == 1
     assert out.in_process_workers_disabled is False
     assert out.in_process_workers_enabled is True
-    assert (
-        "one" in out.worker_mode_summary.lower()
-        or "single" in out.worker_mode_summary.lower()
-        or "default" in out.worker_mode_summary.lower()
-    )
+    assert "one" in out.worker_mode_summary.lower() or "typical" in out.worker_mode_summary.lower()
     assert "guarded" not in out.worker_mode_summary.lower()
 
 
-def test_worker_count_multi_guarded_wording(base_settings: MediaMopSettings) -> None:
+def test_worker_count_multi_cautions_operator(base_settings: MediaMopSettings) -> None:
     s = replace(base_settings, refiner_worker_count=3)
     out = refiner_runtime_visibility_from_settings(s)
     assert out.refiner_worker_count == 3
-    assert "guarded" in out.worker_mode_summary.lower()
-    assert "not the normal" in out.worker_mode_summary.lower() or "recommended" in out.worker_mode_summary.lower()
+    assert "3" in out.worker_mode_summary
+    assert "unusual" in out.worker_mode_summary.lower() or "confirm" in out.worker_mode_summary.lower()
 
 
 def test_radarr_and_sonarr_schedules_independent(base_settings: MediaMopSettings) -> None:
@@ -68,5 +64,5 @@ def test_radarr_and_sonarr_schedules_independent(base_settings: MediaMopSettings
 def test_visibility_note_present(base_settings: MediaMopSettings) -> None:
     out = refiner_runtime_visibility_from_settings(base_settings)
     note = out.visibility_note.lower()
-    assert "settings" in note
-    assert "proof" in note or "reachable" in note
+    assert "saved" in note
+    assert "live" in note

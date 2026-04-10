@@ -14,7 +14,7 @@ describe("FAILED_IMPORT_INSPECTION_FILTER_OPTIONS", () => {
     expect(f).toBeDefined();
     expect(h).not.toBe(f);
     expect(h!.toLowerCase()).toContain("handler_ok_finalize_failed");
-    expect(f!.toLowerCase()).toContain("failed");
+    expect(f!.toLowerCase()).toMatch(/error|fail|stopped/);
     expect(f!.toLowerCase()).not.toContain("handler_ok_finalize_failed");
   });
 
@@ -22,7 +22,7 @@ describe("FAILED_IMPORT_INSPECTION_FILTER_OPTIONS", () => {
     const t = labelFor("terminal");
     expect(t!.toLowerCase()).toContain("finished");
     expect(t!.toLowerCase()).toContain("default");
-    expect(t!.toLowerCase()).toContain("manual finish");
+    expect(t!.toLowerCase()).toMatch(/ok|manual|finish/);
   });
 
   it("lists every filter value exactly once", () => {

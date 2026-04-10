@@ -49,6 +49,7 @@ import {
   FETCHER_FI_TASKS_SECTION_TITLE,
   FETCHER_FI_TABLE_COL_STABLE_KEY,
   FETCHER_FI_TABLE_COL_WORK_TYPE,
+  FETCHER_FI_TECHNICAL_SUMMARY_LABEL,
 } from "../../lib/fetcher/failed-imports/user-copy";
 import type { FailedImportRecoverFinalizeResult } from "../../lib/fetcher/failed-imports/recover-api";
 
@@ -70,25 +71,24 @@ function yesNo(value: boolean): string {
 
 function FetcherFailedImportsIntroSubtitle() {
   return (
-    <p className="mm-page__subtitle">
-      <span className="block">{FETCHER_FI_SECTION_INTRO_PRIMARY}</span>
-      <span className="mt-2 block text-sm text-[var(--mm-text3)]">{FETCHER_FI_SECTION_INTRO_SCOPE}</span>
-      <span className="mt-2 block">
-        By default this list shows <strong className="font-semibold text-[var(--mm-text)]">finished</strong> outcomes:
-        completed, stopped after errors, or{" "}
-        <strong className="font-semibold text-[var(--mm-text)]">needs manual finish</strong> — the work ran, but the
-        app could not mark the download-queue row completed (not the same as a hard failure). Each row still shows the
-        exact stored status under the plain label.
-      </span>
-      <span className="mt-2 block text-sm text-[var(--mm-text3)]">
-        Admins and operators can use{" "}
-        <strong className="font-semibold text-[var(--mm-text)]">Mark completed (manual)</strong> only on{" "}
-        <strong>needs manual finish</strong> rows. It records an audit line and marks the row completed without
-        re-running that pass. Technical codes for reference:{" "}
-        <code className="mm-dash-code">handler_ok_finalize_failed</code>,{" "}
-        <code className="mm-dash-code">completed</code>, <code className="mm-dash-code">failed</code>.
-      </span>
-    </p>
+    <div className="mm-page__subtitle space-y-3">
+      <p>{FETCHER_FI_SECTION_INTRO_PRIMARY}</p>
+      <p className="text-sm text-[var(--mm-text3)]">{FETCHER_FI_SECTION_INTRO_SCOPE}</p>
+      <details className="text-sm text-[var(--mm-text3)]">
+        <summary className="cursor-pointer text-[var(--mm-text2)] select-none">
+          {FETCHER_FI_TECHNICAL_SUMMARY_LABEL}
+        </summary>
+        <p className="mt-2">
+          The default table view is <strong>finished</strong> outcomes: completed, stopped with errors, or{" "}
+          <strong>needs manual finish</strong> (Radarr/Sonarr ran the step but could not mark the list row done).
+          Operators may use <strong>Mark completed (manual)</strong> only on needs-manual-finish rows; it does not rerun
+          the sweep.
+        </p>
+        <p className="mt-2 font-mono text-xs text-[var(--mm-text3)]">
+          Storage values: handler_ok_finalize_failed · completed · failed
+        </p>
+      </details>
+    </div>
   );
 }
 
@@ -181,7 +181,7 @@ function FetcherFailedImportsSettingsSection({
         </p>
       ) : rv.isError ? (
         <p className="mm-card__body text-sm text-red-400" data-testid="fetcher-failed-imports-settings-error" role="alert">
-          {rv.error instanceof Error ? rv.error.message : "Could not load Fetcher failed-import settings."}
+          {rv.error instanceof Error ? rv.error.message : "Could not load automation settings."}
         </p>
       ) : rv.data ? (
         <div className="mm-card__body mm-card__body--tight space-y-4 text-sm text-[var(--mm-text2)]">
@@ -323,7 +323,7 @@ export function FetcherFailedImportsWorkspace() {
     return (
       <div data-testid="fetcher-failed-imports-workspace">
         <header className="mm-page__intro">
-          <h2 className="mm-page__title text-xl sm:text-2xl">Radarr / Sonarr failed-import queues</h2>
+          <h2 className="mm-page__title text-xl sm:text-2xl">Failed imports</h2>
           <FetcherFailedImportsIntroSubtitle />
         </header>
         <FetcherFailedImportsSettingsSection rv={rv} role={me.data?.role} />
@@ -337,7 +337,7 @@ export function FetcherFailedImportsWorkspace() {
     return (
       <div data-testid="fetcher-failed-imports-workspace">
         <header className="mm-page__intro">
-          <h2 className="mm-page__title text-xl sm:text-2xl">Radarr / Sonarr failed-import queues</h2>
+          <h2 className="mm-page__title text-xl sm:text-2xl">Failed imports</h2>
           <FetcherFailedImportsIntroSubtitle />
           <p className="mm-page__lead">
             {isLikelyNetworkFailure(err)
@@ -361,7 +361,7 @@ export function FetcherFailedImportsWorkspace() {
   return (
     <div data-testid="fetcher-failed-imports-workspace">
       <header className="mm-page__intro">
-        <h2 className="mm-page__title text-xl sm:text-2xl">Radarr / Sonarr failed-import queues</h2>
+        <h2 className="mm-page__title text-xl sm:text-2xl">Failed imports</h2>
         <FetcherFailedImportsIntroSubtitle />
       </header>
 
@@ -372,7 +372,7 @@ export function FetcherFailedImportsWorkspace() {
         aria-labelledby="mm-fetcher-fi-filter-heading"
       >
         <h2 id="mm-fetcher-fi-filter-heading" className="mm-card__title">
-          Filter
+          View
         </h2>
         <label className="mm-card__body mm-card__body--tight block">
           <span className="sr-only">Status filter</span>
@@ -426,9 +426,9 @@ export function FetcherFailedImportsWorkspace() {
                   <th className="pb-2 pr-3 font-semibold">Status</th>
                   <th className="pb-2 pr-3 font-semibold">{FETCHER_FI_TABLE_COL_WORK_TYPE}</th>
                   <th className="pb-2 pr-3 font-semibold">{FETCHER_FI_TABLE_COL_STABLE_KEY}</th>
-                  <th className="pb-2 pr-3 font-semibold">Attempts</th>
-                  <th className="pb-2 pr-3 font-semibold">Updated</th>
-                  <th className="pb-2 pr-3 font-semibold">Last error</th>
+                  <th className="pb-2 pr-3 font-semibold">Retries</th>
+                  <th className="pb-2 pr-3 font-semibold">Last change</th>
+                  <th className="pb-2 pr-3 font-semibold">Details</th>
                   <th className="pb-2 font-semibold">Actions</th>
                 </tr>
               </thead>

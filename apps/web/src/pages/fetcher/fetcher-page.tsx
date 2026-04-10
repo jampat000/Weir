@@ -23,25 +23,16 @@ export function FetcherPage() {
         <p className="mm-page__eyebrow">MediaMop</p>
         <h1 className="mm-page__title">Fetcher</h1>
         <p className="mm-page__subtitle">
-          Fetcher is MediaMop’s module for two related jobs: checking reachability of your separate Fetcher application
-          (HTTP probe and persisted history), and owning Radarr/Sonarr <strong>download-queue</strong> failed-import
-          review and removal inside MediaMop — inspection, schedules, manual starts, and recovery when something
-          stalls.
-        </p>
-        <p className="mm-page__lead text-sm text-[var(--mm-text3)]">
-          Refiner is separate: movies/TV refinement and, later, stale files on disk after importing — not the *arr queue
-          workflow.{" "}
-          <Link to="/app/refiner" className="text-[var(--mm-accent)] underline-offset-2 hover:underline">
-            Open Refiner
-          </Link>
-          .
+          Fetcher is your download pipeline in MediaMop: failed imports in <strong>Radarr</strong> and{" "}
+          <strong>Sonarr</strong>, plus a simple read on whether the separate Fetcher service MediaMop calls is
+          answering.
         </p>
       </header>
 
       <FetcherFailedImportsWorkspace />
 
       {overview.isPending ? (
-        <PageLoading label="Loading external Fetcher probe status" />
+        <PageLoading label="Loading Fetcher reachability" />
       ) : overview.isError ? (
         <FetcherOverviewError err={overview.error} />
       ) : (
@@ -59,7 +50,7 @@ function FetcherOverviewError({ err }: { err: unknown }) {
           ? "Could not reach the MediaMop API. Check that the backend is running."
           : isHttpErrorFromApi(err)
             ? "The server refused this request. Sign in again or check API logs."
-            : "Could not load external Fetcher probe status."}
+            : "Could not load Fetcher reachability."}
       </p>
       {err instanceof Error ? (
         <p className="mm-page__lead font-mono text-sm text-[var(--mm-text3)]">{err.message}</p>
@@ -89,11 +80,13 @@ function FetcherOperationalOverviewSections({
   return (
     <>
       <header className="mm-page__intro mt-10 border-t border-[var(--mm-border)] pt-8">
-        <h2 className="mm-page__title text-xl sm:text-2xl">External Fetcher application</h2>
+        <h2 className="mm-page__title text-xl sm:text-2xl">Fetcher service reachability</h2>
         <p className="mm-page__subtitle">
-          This block is only about the separate Fetcher service MediaMop reaches at{" "}
-          <code className="mm-dash-code">MEDIAMOP_FETCHER_BASE_URL</code>: last probe outcome and recently persisted
-          probe rows. It does not describe Radarr/Sonarr queue work above.
+          Whether the Fetcher endpoint answered on the last check MediaMop stored, and a short recent history.{" "}
+          <Link to="/app/activity" className="text-[var(--mm-accent)] underline-offset-2 hover:underline">
+            Activity
+          </Link>{" "}
+          has the full log.
         </p>
       </header>
 
@@ -102,11 +95,10 @@ function FetcherOperationalOverviewSections({
         aria-labelledby="mm-fetcher-status-heading"
       >
         <h2 id="mm-fetcher-status-heading" className="mm-card__title">
-          Connection
+          Last check
         </h2>
-        <p className="mm-card__body mm-card__body--tight">
-          Values come from one GET to <code className="mm-dash-code">/healthz</code> on the configured origin when this
-          loaded.
+        <p className="mm-card__body mm-card__body--tight text-sm text-[var(--mm-text3)]">
+          Target URL is set on the MediaMop server, not in the browser.
         </p>
         <dl className="mm-dash-kv">
           <FetcherStatusRow label="MediaMop API" value={mediamop_version} />
@@ -124,7 +116,7 @@ function FetcherOperationalOverviewSections({
             <FetcherStatusRow label="HTTP status" value={String(connection.http_status)} />
           ) : null}
           {connection.latency_ms != null ? (
-            <FetcherStatusRow label="Probe latency" value={`${connection.latency_ms} ms`} />
+            <FetcherStatusRow label="Round-trip time" value={`${connection.latency_ms} ms`} />
           ) : null}
           {connection.fetcher_app ? <FetcherStatusRow label="Service name" value={connection.fetcher_app} /> : null}
           {connection.fetcher_version ? (
@@ -139,16 +131,15 @@ function FetcherOperationalOverviewSections({
         aria-labelledby="mm-fetcher-log-snapshot-heading"
       >
         <h2 id="mm-fetcher-log-snapshot-heading" className="mm-card__title">
-          24-hour log snapshot
+          Checks in the last day
         </h2>
-        <p className="mm-card__body mm-card__body--tight">
-          Counts are <strong>persisted</strong> probe rows in MediaMop only (15-minute throttle can under-count actual{" "}
-          <code className="mm-dash-code">/healthz</code> checks).
+        <p className="mm-card__body mm-card__body--tight text-sm text-[var(--mm-text3)]">
+          Counts are what MediaMop saved (the server may merge rapid repeats).
         </p>
         <dl className="mm-dash-kv">
           <FetcherStatusRow label="Window" value={`Last ${probe_persisted_24h.window_hours} hours`} />
-          <FetcherStatusRow label="OK rows" value={String(probe_persisted_24h.persisted_ok)} />
-          <FetcherStatusRow label="Failed rows" value={String(probe_persisted_24h.persisted_failed)} />
+          <FetcherStatusRow label="OK" value={String(probe_persisted_24h.persisted_ok)} />
+          <FetcherStatusRow label="Failed" value={String(probe_persisted_24h.persisted_failed)} />
         </dl>
       </section>
 
@@ -157,12 +148,11 @@ function FetcherOperationalOverviewSections({
         aria-labelledby="mm-fetcher-failures-heading"
       >
         <h2 id="mm-fetcher-failures-heading" className="mm-card__title">
-          Recent health check failures
+          Recent failed checks
         </h2>
-        <p className="mm-card__body mm-card__body--tight">
-          Up to five persisted <code className="mm-dash-code">fetcher.probe_failed</code> rows from the last{" "}
-          {probe_failure_window_days} days (newest first). Same throttle rules as other probe history; not every failed
-          reachability attempt is guaranteed to appear.
+        <p className="mm-card__body mm-card__body--tight text-sm text-[var(--mm-text3)]">
+          Up to five saved failures from the last {probe_failure_window_days} days, newest first. Not every miss is
+          listed.
         </p>
         {recent_probe_failures.length > 0 ? (
           <ul className="mt-3 space-y-2 text-sm">
@@ -180,14 +170,8 @@ function FetcherOperationalOverviewSections({
             ))}
           </ul>
         ) : (
-          <p className="mt-3 text-sm text-[var(--mm-text3)]">No persisted failures in this window.</p>
+          <p className="mt-3 text-sm text-[var(--mm-text3)]">None in this window.</p>
         )}
-        <p className="mm-card__body mm-card__body--tight mt-3">
-          <Link to="/app/activity" className="text-[var(--mm-accent)] underline-offset-2 hover:underline">
-            Open Activity
-          </Link>{" "}
-          for the full persisted event list.
-        </p>
       </section>
 
       <section
@@ -195,15 +179,14 @@ function FetcherOperationalOverviewSections({
         aria-labelledby="mm-fetcher-operational-heading"
       >
         <h2 id="mm-fetcher-operational-heading" className="mm-card__title">
-          Operational signal
+          Summary
         </h2>
         <p className="mm-card__body mm-card__body--tight">
-          Persisted probe rows (same target + outcome within 15 minutes are collapsed).{" "}
           <strong>{status_label}</strong>: {status_detail}
         </p>
         <dl className="mm-dash-kv">
-          <FetcherStatusRow label="Latest probe event" value={lastProbeText} />
-          <FetcherStatusRow label="Recent probe events" value={String(recent_probe_events.length)} />
+          <FetcherStatusRow label="Latest event" value={lastProbeText} />
+          <FetcherStatusRow label="Events shown" value={String(recent_probe_events.length)} />
         </dl>
         {recent_probe_events.length > 0 ? (
           <ul className="mt-3 space-y-2 text-sm">
@@ -218,7 +201,7 @@ function FetcherOperationalOverviewSections({
             ))}
           </ul>
         ) : (
-          <p className="mt-3 text-sm text-[var(--mm-text3)]">No persisted probe events yet.</p>
+          <p className="mt-3 text-sm text-[var(--mm-text3)]">No recent events yet.</p>
         )}
       </section>
     </>

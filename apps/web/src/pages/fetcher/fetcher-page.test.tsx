@@ -55,8 +55,8 @@ const minimalFiSettings = {
   visibility_note: "note",
 };
 
-describe("FetcherPage (failed-import ownership)", () => {
-  it("renders download-queue failed-import workspace under Fetcher", () => {
+describe("FetcherPage (product surface)", () => {
+  it("places failed-import workspace under Fetcher with a plain section title", () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     qc.setQueryData(qk.me, minimalMe);
     qc.setQueryData(fetcherOverviewKey, minimalOverview);
@@ -66,10 +66,10 @@ describe("FetcherPage (failed-import ownership)", () => {
     render(wrap(<FetcherPage />, qc));
 
     expect(screen.getByTestId("fetcher-failed-imports-workspace")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /radarr.*sonarr failed-import queues/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Failed imports" })).toBeInTheDocument();
   });
 
-  it("frames Radarr/Sonarr queue work in the Fetcher page header", () => {
+  it("opens with Fetcher as a download-pipeline module (Radarr/Sonarr) without Refiner cross-talk", () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     qc.setQueryData(qk.me, minimalMe);
     qc.setQueryData(fetcherOverviewKey, minimalOverview);
@@ -79,10 +79,24 @@ describe("FetcherPage (failed-import ownership)", () => {
     render(wrap(<FetcherPage />, qc));
 
     const h1 = screen.getByRole("heading", { level: 1, name: "Fetcher" });
-    expect(h1).toBeInTheDocument();
     const intro = h1.closest("header");
     expect(intro?.textContent).toMatch(/Radarr/i);
     expect(intro?.textContent).toMatch(/Sonarr/i);
-    expect(intro?.textContent).toMatch(/download-queue/i);
+    expect(intro?.textContent).toMatch(/failed import/i);
+    expect(intro?.textContent).not.toMatch(/Refiner/i);
+  });
+
+  it("uses product language for the reachability block, not external-application architecture", () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(qk.me, minimalMe);
+    qc.setQueryData(fetcherOverviewKey, minimalOverview);
+    qc.setQueryData(failedImportSettingsQueryKey, minimalFiSettings);
+    qc.setQueryData(failedImportInspectionQueryKey("terminal"), { jobs: [], default_terminal_only: true });
+
+    render(wrap(<FetcherPage />, qc));
+
+    expect(screen.getByRole("heading", { name: "Fetcher service reachability" })).toBeInTheDocument();
+    expect(screen.queryByText(/External Fetcher application/i)).toBeNull();
+    expect(screen.queryByText(/MEDIAMOP_FETCHER_BASE_URL/i)).toBeNull();
   });
 });

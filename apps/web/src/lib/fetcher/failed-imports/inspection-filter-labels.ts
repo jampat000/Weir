@@ -1,17 +1,17 @@
 import type { FailedImportInspectionFilter } from "./queries";
 
-/** Filter options for the recorded-work list in Fetcher failed-imports. */
+/** Filter labels for the history table — plain language first, storage value only where it disambiguates. */
 export const FAILED_IMPORT_INSPECTION_FILTER_OPTIONS: { value: FailedImportInspectionFilter; label: string }[] = [
   {
     value: "terminal",
-    label: "Finished (default): completed, stopped after errors, needs manual finish",
+    label: "Finished (default): done, stopped with errors, or needs your OK to close",
   },
   {
     value: "handler_ok_finalize_failed",
-    label: "Only needs manual finish (handler_ok_finalize_failed)",
+    label: "Only: needs your OK to close (storage: handler_ok_finalize_failed)",
   },
-  { value: "failed", label: "Only: stopped after errors (failed)" },
+  { value: "failed", label: "Only: stopped with errors" },
   { value: "completed", label: "Only: completed" },
-  { value: "pending", label: "Only: queued, waiting (pending)" },
-  { value: "leased", label: "Only: in progress (leased)" },
+  { value: "pending", label: "Only: waiting to start" },
+  { value: "leased", label: "Only: running now" },
 ];
