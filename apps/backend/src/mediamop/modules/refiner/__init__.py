@@ -1,8 +1,8 @@
 """Refiner module — domain and future product surface.
 
 Pass 1–2: ownership/blocking and anchors. Pass 3: *arr queue adapters. Pass 4–6: failed
-import classification, cleanup policy, and pure cleanup eligibility decisions. No HTTP
-clients or destructive execution here.
+import classification, policy, eligibility. Pass 7: Radarr-only cleanup planning seam.
+No HTTP clients or destructive execution here.
 """
 
 from __future__ import annotations
@@ -39,6 +39,11 @@ from mediamop.modules.refiner.domain import (
     title_year_anchors_match,
     tokenize_normalized,
 )
+from mediamop.modules.refiner.radarr_failed_import_cleanup import (
+    RadarrFailedImportCleanupAction,
+    RadarrFailedImportCleanupPlan,
+    plan_radarr_failed_import_cleanup,
+)
 from mediamop.modules.refiner.radarr_queue_adapter import map_radarr_queue_row_to_refiner_view
 from mediamop.modules.refiner.sonarr_queue_adapter import map_sonarr_queue_row_to_refiner_view
 
@@ -55,6 +60,9 @@ __all__ = [
     "classify_failed_import_message",
     "normalize_failed_import_blob",
     "FileAnchorCandidate",
+    "RadarrFailedImportCleanupAction",
+    "RadarrFailedImportCleanupPlan",
+    "plan_radarr_failed_import_cleanup",
     "map_radarr_queue_row_to_refiner_view",
     "map_sonarr_queue_row_to_refiner_view",
     "normalize_storage_path",
