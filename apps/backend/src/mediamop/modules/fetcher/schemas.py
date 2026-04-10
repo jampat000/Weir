@@ -21,6 +21,7 @@ class FetcherConnectionOut(BaseModel):
 class FetcherOperationalOverviewOut(BaseModel):
     """Read-mostly operational slice from current probe + persisted probe events."""
 
+    mediamop_version: str = Field(..., description="MediaMop API package version for this shell.")
     status_label: str = Field(..., description="One-line operational status for current Fetcher connectivity.")
     status_detail: str = Field(..., description="Short operator-facing explanation of current status.")
     connection: FetcherConnectionOut

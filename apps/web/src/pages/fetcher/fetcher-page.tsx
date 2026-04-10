@@ -24,7 +24,7 @@ export function FetcherPage() {
     return (
       <div className="mm-page">
         <header className="mm-page__intro">
-          <p className="mm-page__eyebrow">Suite</p>
+          <p className="mm-page__eyebrow">MediaMop</p>
           <h1 className="mm-page__title">Fetcher</h1>
           <p className="mm-page__lead">
             {isLikelyNetworkFailure(err)
@@ -41,20 +41,21 @@ export function FetcherPage() {
     );
   }
 
-  const { connection, status_label, status_detail, latest_probe_event, recent_probe_events } = overview.data;
+  const { mediamop_version, connection, status_label, status_detail, latest_probe_event, recent_probe_events } =
+    overview.data;
   const lastProbeText = latest_probe_event ? formatEventTime(latest_probe_event) : "No probe event recorded yet";
 
   return (
     <div className="mm-page">
       <header className="mm-page__intro">
-        <p className="mm-page__eyebrow">Suite</p>
+        <p className="mm-page__eyebrow">MediaMop</p>
         <h1 className="mm-page__title">Fetcher</h1>
         <p className="mm-page__subtitle">
-          Read-only view of Fetcher connectivity and recent probe signals.
+          Read-only operational view: live <code className="mm-dash-code">/healthz</code> probe plus throttled
+          history in the activity log when you open this page.
         </p>
         <p className="mm-page__lead">
-          MediaMop probes <code className="mm-dash-code">/healthz</code> only. No scheduler, queue/history, or
-          settings controls from this page.
+          No scheduler, queue browser, or settings controls here — only status for the separate Fetcher app.
         </p>
       </header>
 
@@ -70,6 +71,7 @@ export function FetcherPage() {
           to <code className="mm-dash-code">/healthz</code> on that origin.
         </p>
         <dl className="mm-dash-kv">
+          <FetcherStatusRow label="MediaMop API" value={mediamop_version} />
           <FetcherStatusRow label="Integration" value={connection.configured ? "URL configured" : "Not configured"} />
           {connection.target_display ? <FetcherStatusRow label="Target" value={connection.target_display} /> : null}
           {connection.configured ? (
@@ -86,7 +88,7 @@ export function FetcherPage() {
           {connection.latency_ms != null ? (
             <FetcherStatusRow label="Probe latency" value={`${connection.latency_ms} ms`} />
           ) : null}
-          {connection.fetcher_app ? <FetcherStatusRow label="Fetcher app" value={connection.fetcher_app} /> : null}
+          {connection.fetcher_app ? <FetcherStatusRow label="Service name" value={connection.fetcher_app} /> : null}
           {connection.fetcher_version ? (
             <FetcherStatusRow label="Fetcher version" value={connection.fetcher_version} />
           ) : null}
@@ -102,6 +104,7 @@ export function FetcherPage() {
           Operational signal
         </h2>
         <p className="mm-card__body mm-card__body--tight">
+          Persisted probe rows (same target + outcome within 15 minutes are collapsed).{" "}
           <strong>{status_label}</strong>: {status_detail}
         </p>
         <dl className="mm-dash-kv">

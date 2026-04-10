@@ -49,6 +49,7 @@ export type DashboardStatus = {
 };
 
 export type FetcherOperationalOverview = {
+  mediamop_version: string;
   status_label: string;
   status_detail: string;
   connection: DashboardFetcherStatus;

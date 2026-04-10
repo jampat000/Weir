@@ -34,6 +34,7 @@ def test_build_fetcher_overview_not_configured() -> None:
         db.commit()
     assert out.connection.configured is False
     assert out.status_label == "Not configured"
+    assert out.mediamop_version
     assert out.recent_probe_events == []
 
 
@@ -58,12 +59,13 @@ def test_build_fetcher_overview_failed_probe(mock_probe: MagicMock) -> None:
     assert out.connection.configured is True
     assert out.connection.reachable is False
     assert out.status_label == "Needs attention"
-    assert out.latest_probe_event is None
-    assert out.recent_probe_events == []
+    assert out.latest_probe_event is not None
+    assert out.latest_probe_event.event_type == activity_constants.FETCHER_PROBE_FAILED
+    assert out.recent_probe_events
 
 
 @patch("mediamop.modules.fetcher.service.probe_fetcher_healthz")
-def test_build_fetcher_overview_stale_signal(mock_probe: MagicMock) -> None:
+def test_build_fetcher_overview_records_probe_when_reachable(mock_probe: MagicMock) -> None:
     mock_probe.return_value = FetcherHealthProbe(
         reachable=True,
         http_status=200,
@@ -83,7 +85,7 @@ def test_build_fetcher_overview_stale_signal(mock_probe: MagicMock) -> None:
                 event_type=activity_constants.FETCHER_PROBE_SUCCEEDED,
                 module="fetcher",
                 title="Fetcher probe succeeded",
-                detail="Target: http://127.0.0.1:8789",
+                detail="http://127.0.0.1:8789",
             )
         )
         db.commit()
@@ -91,7 +93,7 @@ def test_build_fetcher_overview_stale_signal(mock_probe: MagicMock) -> None:
         out = build_fetcher_operational_overview(db, settings)
         db.commit()
     assert out.connection.reachable is True
-    assert out.status_label == "Stale signal"
+    assert out.status_label == "Connected"
     assert out.latest_probe_event is not None
     assert out.latest_probe_event.event_type == activity_constants.FETCHER_PROBE_SUCCEEDED
 
@@ -115,3 +117,4 @@ def test_get_fetcher_overview_authenticated(client_with_admin: TestClient) -> No
     assert "status_detail" in body
     assert "connection" in body
     assert "recent_probe_events" in body
+    assert body.get("mediamop_version")

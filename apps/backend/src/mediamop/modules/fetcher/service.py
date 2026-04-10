@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
+from mediamop import __version__
 from mediamop.core.config import MediaMopSettings
 from mediamop.core.datetime_util import as_utc
 from mediamop.modules.fetcher.probe import probe_fetcher_healthz
@@ -42,8 +43,8 @@ def _status_lines(
         )
     if latest_probe_event is None:
         return (
-            "Checking",
-            "No persisted Fetcher probe events yet. Keep this page open while checks run.",
+            "Live OK",
+            "Fetcher responded on this request, but the activity log has no probe row yet or the last write was throttled.",
         )
     created = as_utc(latest_probe_event.created_at)
     if datetime.now(timezone.utc) - created >= timedelta(minutes=_STALE_MINUTES):
@@ -69,6 +70,7 @@ def build_fetcher_operational_overview(
         )
         label, detail = _status_lines(configured=False, reachable=None, latest_probe_event=None)
         return FetcherOperationalOverviewOut(
+            mediamop_version=__version__,
             status_label=label,
             status_detail=detail,
             connection=connection,
@@ -78,6 +80,11 @@ def build_fetcher_operational_overview(
 
     probe = probe_fetcher_healthz(raw_fetcher)
     display = _fetcher_target_display(raw_fetcher)
+    activity_service.maybe_record_fetcher_probe_result(
+        db,
+        target_display=display,
+        probe_succeeded=probe.reachable is True,
+    )
     latest_row = activity_service.get_latest_fetcher_probe_event(db)
     recent_rows = activity_service.list_recent_fetcher_probe_events(db, limit=8)
     latest = ActivityEventItemOut.model_validate(latest_row) if latest_row else None
@@ -99,6 +106,7 @@ def build_fetcher_operational_overview(
         latest_probe_event=latest,
     )
     return FetcherOperationalOverviewOut(
+        mediamop_version=__version__,
         status_label=label,
         status_detail=detail,
         connection=connection,
