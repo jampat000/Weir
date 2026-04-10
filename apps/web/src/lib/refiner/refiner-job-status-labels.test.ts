@@ -14,10 +14,10 @@ describe("refinerJobStatusPrimaryLabel", () => {
     expect(failed.toLowerCase()).not.toContain("finish");
   });
 
-  it("labels completed, queued, and running", () => {
+  it("labels completed, waiting, and in progress", () => {
     expect(refinerJobStatusPrimaryLabel("completed")).toBe("Completed");
-    expect(refinerJobStatusPrimaryLabel("leased")).toContain("Running");
-    expect(refinerJobStatusPrimaryLabel("pending")).toContain("Queued");
+    expect(refinerJobStatusPrimaryLabel("leased")).toContain("progress");
+    expect(refinerJobStatusPrimaryLabel("pending")).toContain("Waiting");
   });
 });
 

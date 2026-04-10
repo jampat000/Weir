@@ -1,4 +1,4 @@
-"""Pydantic for operator-triggered import-cleanup enqueue (movies / TV POST bodies and responses)."""
+"""Pydantic for operator-triggered failed-import download-queue pass enqueue (movies / TV POST bodies)."""
 
 from __future__ import annotations
 
@@ -15,11 +15,11 @@ class ManualCleanupDriveEnqueueIn(BaseModel):
 
 
 class ManualCleanupDriveEnqueueOut(BaseModel):
-    """Enqueue result only — not job execution, completion, or worker liveness."""
+    """Enqueue result only — not pass execution, completion, or runner liveness."""
 
     job_id: int
     dedupe_key: str
     job_kind: str
     enqueue_outcome: Literal["created", "already_present"] = Field(
-        description="``created`` = new row inserted; ``already_present`` = dedupe key already had a row.",
+        description="``created`` = new task row inserted; ``already_present`` = same dedupe key already had a row.",
     )

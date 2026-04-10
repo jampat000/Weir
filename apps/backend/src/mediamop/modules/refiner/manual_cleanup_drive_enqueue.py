@@ -1,6 +1,6 @@
-"""Operator-triggered enqueue for Radarr/Sonarr cleanup-drive jobs.
+"""Operator-triggered enqueue for Radarr/Sonarr failed-import download-queue pass jobs.
 
-Calls the existing enqueue helpers only — no handler execution in-request and no worker-loop changes.
+Calls the existing enqueue helpers only — no handler execution in-request and no runner-loop changes.
 """
 
 from __future__ import annotations

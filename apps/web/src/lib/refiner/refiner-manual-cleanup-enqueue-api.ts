@@ -23,7 +23,7 @@ async function postManualCleanupDriveEnqueue(path: string): Promise<ManualCleanu
     } catch {
       /* ignore */
     }
-    throw new Error(detail || `Could not queue import cleanup check (${r.status})`);
+    throw new Error(detail || `Could not queue failed-import pass (${r.status})`);
   }
   return readJson<ManualCleanupDriveEnqueueOut>(r);
 }

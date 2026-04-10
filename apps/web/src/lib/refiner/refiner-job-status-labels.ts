@@ -14,9 +14,9 @@ export function refinerJobStatusPrimaryLabel(status: string): string {
     case "completed":
       return "Completed";
     case "pending":
-      return "Queued — waiting to start";
+      return "Waiting to start";
     case "leased":
-      return "Running — picked up by a worker";
+      return "In progress";
     default:
       return status;
   }

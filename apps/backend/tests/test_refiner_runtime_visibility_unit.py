@@ -24,7 +24,7 @@ def test_worker_count_zero_disabled_summary(base_settings: MediaMopSettings) -> 
     assert out.refiner_worker_count == 0
     assert out.in_process_workers_disabled is True
     assert out.in_process_workers_enabled is False
-    assert "disabled" in out.worker_mode_summary.lower()
+    assert "off" in out.worker_mode_summary.lower()
     assert "0" in out.worker_mode_summary
 
 
@@ -34,7 +34,11 @@ def test_worker_count_one_default_summary(base_settings: MediaMopSettings) -> No
     assert out.refiner_worker_count == 1
     assert out.in_process_workers_disabled is False
     assert out.in_process_workers_enabled is True
-    assert "single" in out.worker_mode_summary.lower() or "default" in out.worker_mode_summary.lower()
+    assert (
+        "one" in out.worker_mode_summary.lower()
+        or "single" in out.worker_mode_summary.lower()
+        or "default" in out.worker_mode_summary.lower()
+    )
     assert "guarded" not in out.worker_mode_summary.lower()
 
 

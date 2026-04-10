@@ -1,6 +1,6 @@
 import type { RefinerInspectionFilter } from "./queries";
 
-/** Select options for the Refiner jobs inspection filter (plain labels; raw status in parentheses where needed). */
+/** Select options for the Refiner task inspection filter (plain labels; raw status in parentheses where needed). */
 export const REFINER_INSPECTION_FILTER_OPTIONS: { value: RefinerInspectionFilter; label: string }[] = [
   {
     value: "terminal",
@@ -13,5 +13,5 @@ export const REFINER_INSPECTION_FILTER_OPTIONS: { value: RefinerInspectionFilter
   { value: "failed", label: "Only: stopped after errors (failed)" },
   { value: "completed", label: "Only: completed" },
   { value: "pending", label: "Only: queued, waiting (pending)" },
-  { value: "leased", label: "Only: running, picked up (leased)" },
+  { value: "leased", label: "Only: in progress (leased)" },
 ];

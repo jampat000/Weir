@@ -1,4 +1,4 @@
-"""Pydantic for operator manual recovery from ``handler_ok_finalize_failed``."""
+"""Pydantic for operator manual recovery when a task finished work but could not be marked completed."""
 
 from __future__ import annotations
 
@@ -16,4 +16,4 @@ class RecoverFinalizeFailureIn(BaseModel):
 
 class RecoverFinalizeFailureOut(BaseModel):
     job_id: int
-    status: str = Field(description="Persisted status after recovery (always ``completed`` on success).")
+    status: str = Field(description="Persisted task status after recovery (always ``completed`` on success).")

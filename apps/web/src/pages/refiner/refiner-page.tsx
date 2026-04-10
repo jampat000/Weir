@@ -13,6 +13,9 @@ import type { RefinerRuntimeVisibilityOut } from "../../lib/refiner/types";
 import { manualCleanupEnqueueResultMessage } from "../../lib/refiner/refiner-manual-cleanup-enqueue-messages";
 import { formatScheduleIntervalSeconds } from "../../lib/refiner/refiner-runtime-format";
 import {
+  REFINER_FILTER_DEFAULT_HELP,
+  REFINER_FILTER_SINGLE_STATUS_HELP,
+  REFINER_JOBS_SECTION_TITLE,
   REFINER_MANUAL_QUEUE_BTN_MOVIES,
   REFINER_MANUAL_QUEUE_BTN_TV,
   REFINER_MANUAL_QUEUE_ERR_MOVIES,
@@ -24,12 +27,16 @@ import {
   REFINER_MANUAL_QUEUE_SECTION_TITLE,
   REFINER_PAGE_ERR_LOAD_JOBS,
   REFINER_PAGE_FRAMING_PRIMARY,
-  REFINER_JOBS_SECTION_TITLE,
+  REFINER_PAGE_FRAMING_SCOPE,
   REFINER_PAGE_LOADING_JOBS,
   REFINER_RUNTIME_CARD_SUBTITLE,
   REFINER_RUNTIME_CARD_TITLE,
+  REFINER_RUNTIME_RUNNER_COUNT_LABEL,
+  REFINER_RUNTIME_RUNNERS_HEADING,
   REFINER_SCHEDULE_MOVIES_HEADING,
   REFINER_SCHEDULE_TV_HEADING,
+  REFINER_TABLE_COL_TASK_KIND,
+  REFINER_TABLE_COL_UNIQUENESS_KEY,
 } from "../../lib/refiner/refiner-user-copy";
 import {
   useManualEnqueueRadarrCleanupDriveMutation,
@@ -65,8 +72,9 @@ function RefinerPageIntroSubtitle() {
   return (
     <p className="mm-page__subtitle">
       <span className="block">{REFINER_PAGE_FRAMING_PRIMARY}</span>
+      <span className="mt-2 block text-sm text-[var(--mm-text3)]">{REFINER_PAGE_FRAMING_SCOPE}</span>
       <span className="mt-2 block">
-        By default this page lists <strong className="font-semibold text-[var(--mm-text)]">finished</strong> jobs:
+        By default this page lists <strong className="font-semibold text-[var(--mm-text)]">finished</strong> tasks:
         completed, stopped after errors, or{" "}
         <strong className="font-semibold text-[var(--mm-text)]">needs manual finish</strong> — the work ran, but
         the app could not mark the row completed (not the same as a hard failure). Each row still shows the exact
@@ -75,8 +83,8 @@ function RefinerPageIntroSubtitle() {
       <span className="mt-2 block text-sm text-[var(--mm-text3)]">
         Admins and operators can use{" "}
         <strong className="font-semibold text-[var(--mm-text)]">Mark completed (manual)</strong> only on{" "}
-        <strong>needs manual finish</strong> rows. It records an audit line and sets the row to completed without
-        running the job again. Technical codes for reference:{" "}
+        <strong>needs manual finish</strong> tasks. It records an audit line and sets the row to completed without
+        running that task again. Technical codes for reference:{" "}
         <code className="mm-dash-code">handler_ok_finalize_failed</code>,{" "}
         <code className="mm-dash-code">completed</code>, <code className="mm-dash-code">failed</code>.
       </span>
@@ -178,9 +186,11 @@ function RefinerRuntimeVisibilitySection({
       ) : rv.data ? (
         <div className="mm-card__body mm-card__body--tight space-y-4 text-sm text-[var(--mm-text2)]">
           <div data-testid="refiner-runtime-worker-section">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Workers</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
+              {REFINER_RUNTIME_RUNNERS_HEADING}
+            </h3>
             <p className="mt-1">
-              <span className="text-[var(--mm-text3)]">Worker slots (configured):</span>{" "}
+              <span className="text-[var(--mm-text3)]">{REFINER_RUNTIME_RUNNER_COUNT_LABEL}</span>{" "}
               <code className="mm-dash-code" data-testid="refiner-runtime-worker-count">
                 {rv.data.refiner_worker_count}
               </code>
@@ -385,11 +395,11 @@ export function RefinerPage() {
         </label>
         {default_terminal_only ? (
           <p className="mm-card__body mm-card__body--tight text-sm text-[var(--mm-text3)]">
-            Showing the server default: finished jobs only.
+            {REFINER_FILTER_DEFAULT_HELP}
           </p>
         ) : (
           <p className="mm-card__body mm-card__body--tight text-sm text-[var(--mm-text3)]">
-            Filtered to a single stored status — see the Status column for the exact value.
+            {REFINER_FILTER_SINGLE_STATUS_HELP}
           </p>
         )}
       </section>
@@ -407,7 +417,7 @@ export function RefinerPage() {
         ) : null}
         {isEmpty ? (
           <p className="mm-card__body" data-testid="refiner-inspection-empty">
-            No rows match this view.
+            No tasks match this view.
           </p>
         ) : (
           <div className="mm-card__body mm-card__body--tight">
@@ -415,8 +425,8 @@ export function RefinerPage() {
               <thead>
                 <tr className="border-b border-[var(--mm-border)] text-xs uppercase tracking-wide text-[var(--mm-text3)]">
                   <th className="pb-2 pr-3 font-semibold">Status</th>
-                  <th className="pb-2 pr-3 font-semibold">Job type</th>
-                  <th className="pb-2 pr-3 font-semibold">Identity key</th>
+                  <th className="pb-2 pr-3 font-semibold">{REFINER_TABLE_COL_TASK_KIND}</th>
+                  <th className="pb-2 pr-3 font-semibold">{REFINER_TABLE_COL_UNIQUENESS_KEY}</th>
                   <th className="pb-2 pr-3 font-semibold">Attempts</th>
                   <th className="pb-2 pr-3 font-semibold">Updated</th>
                   <th className="pb-2 pr-3 font-semibold">Last error</th>

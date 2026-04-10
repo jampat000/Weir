@@ -1,4 +1,4 @@
-/** Shapes for Refiner operator APIs: job inspection, loaded settings, manual import-cleanup queue. */
+/** Shapes for Refiner operator APIs: task inspection, loaded settings, manual failed-import pass enqueue. */
 
 export type RefinerJobInspectionRow = {
   id: number;

@@ -6,22 +6,22 @@ from pydantic import BaseModel, Field
 
 
 class RefinerRuntimeVisibilityOut(BaseModel):
-    """Settings-derived Refiner runtime **intent** — not proof that workers or schedules are running."""
+    """Settings-derived Refiner **intent** — not proof that runners or timed passes are active."""
 
-    refiner_worker_count: int = Field(ge=0, le=8, description="Configured background Refiner worker tasks (0 means workers off).")
+    refiner_worker_count: int = Field(ge=0, le=8, description="Configured Refiner background runner count (0 means none).")
     in_process_workers_disabled: bool = Field(
-        description="True when worker count is 0 (no automatic pickup of queued jobs).",
+        description="True when runner count is 0 (queued tasks will not start automatically).",
     )
     in_process_workers_enabled: bool = Field(
-        description="True when worker count is at least 1 (workers are intended to run).",
+        description="True when at least one runner is configured to process queued tasks.",
     )
     worker_mode_summary: str = Field(
-        description="Plain-language description of worker_count semantics (0 / 1 / >1).",
+        description="Plain-language summary of runner count semantics (0 / 1 / >1).",
     )
     refiner_radarr_cleanup_drive_schedule_enabled: bool
     refiner_radarr_cleanup_drive_schedule_interval_seconds: int = Field(ge=60)
     refiner_sonarr_cleanup_drive_schedule_enabled: bool
     refiner_sonarr_cleanup_drive_schedule_interval_seconds: int = Field(ge=60)
     visibility_note: str = Field(
-        description="Caveat that values are from settings, not proof of live workers or movie/TV app connectivity.",
+        description="Caveat: from settings only — not proof of live runners, timed passes, or app connectivity.",
     )

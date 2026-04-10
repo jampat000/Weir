@@ -1,4 +1,4 @@
-"""Authenticated Refiner operator routes: loaded settings, job inspection, manual import-cleanup enqueue, recovery."""
+"""Authenticated Refiner operator routes: loaded settings, task inspection, manual failed-import pass enqueue, recovery."""
 
 from __future__ import annotations
 
@@ -43,9 +43,9 @@ def get_refiner_runtime_visibility(
     _user: UserPublicDep,
     settings: SettingsDep,
 ) -> RefinerRuntimeVisibilityOut:
-    """Read-only Refiner **settings** (workers + per-library import-cleanup schedules for movies and TV).
+    """Read-only Refiner **settings**: background runners plus per-library schedules for Radarr/Sonarr **download-queue failed-import** passes.
 
-    Does not report live task health or whether library apps are reachable.
+    Does not report live runner health, timed pass execution, or whether library apps are reachable.
     """
 
     return refiner_runtime_visibility_from_settings(settings)
@@ -67,7 +67,7 @@ def get_refiner_jobs_inspection(
         ),
     ] = None,
 ) -> RefinerJobsInspectionOut:
-    """Read-only job rows for operator inspection — ``handler_ok_finalize_failed`` is explicit, not folded into ``failed``."""
+    """Read-only persisted **task** rows — ``handler_ok_finalize_failed`` stays explicit (never folded into ``failed``)."""
 
     if statuses:
         try:
@@ -102,7 +102,7 @@ def post_manual_enqueue_radarr_cleanup_drive(
     db: DbSessionDep,
     settings: SettingsDep,
 ) -> ManualCleanupDriveEnqueueOut:
-    """Enqueue the durable **movies (Radarr)** failed-import cleanup job row (deduped). Does not run processing here."""
+    """Enqueue the durable **movies (Radarr) download-queue failed-import** pass row (deduped). Does not run processing here."""
 
     validate_browser_post_origin(request, settings)
     secret = require_session_secret(settings)
@@ -132,7 +132,7 @@ def post_manual_enqueue_sonarr_cleanup_drive(
     db: DbSessionDep,
     settings: SettingsDep,
 ) -> ManualCleanupDriveEnqueueOut:
-    """Enqueue the durable **TV (Sonarr)** failed-import cleanup job row (deduped). Does not run processing here."""
+    """Enqueue the durable **TV (Sonarr) download-queue failed-import** pass row (deduped). Does not run processing here."""
 
     validate_browser_post_origin(request, settings)
     secret = require_session_secret(settings)
@@ -163,7 +163,7 @@ def post_recover_finalize_failure(
     db: DbSessionDep,
     settings: SettingsDep,
 ) -> RecoverFinalizeFailureOut:
-    """Manual recovery: ``handler_ok_finalize_failed`` → ``completed`` without re-running the handler."""
+    """Manual recovery: ``handler_ok_finalize_failed`` → ``completed`` without re-running the task handler."""
 
     validate_browser_post_origin(request, settings)
     secret = require_session_secret(settings)
@@ -180,11 +180,11 @@ def post_recover_finalize_failure(
         recovered_by_label=label,
     )
     if outcome == "not_found":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Refiner job not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Refiner task not found.")
     if outcome == "wrong_status":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Job is not in handler_ok_finalize_failed state.",
+            detail="Task is not in handler_ok_finalize_failed state (needs manual finish only).",
         )
     return RecoverFinalizeFailureOut(
         job_id=job_id,
