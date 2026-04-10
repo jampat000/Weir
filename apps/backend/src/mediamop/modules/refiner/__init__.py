@@ -6,6 +6,7 @@ planning seams (separate modules). Pass 8: orchestration dispatch. Pass 9: env-b
 ``MediaMopSettings`` (Radarr vs Sonarr separated). Pass 10/10.5: Radarr and Sonarr
 cleanup execution seams (separate modules; optional stdlib HTTP clients). Pass 11/11.5:
 Radarr and Sonarr wired verticals (settings → plan → execute), separate modules.
+Pass 12: Radarr-only live queue fetch + cleanup drive (no shared *arr live driver).
 """
 
 from __future__ import annotations
@@ -65,6 +66,13 @@ from mediamop.modules.refiner.radarr_failed_import_cleanup import (
     RadarrFailedImportCleanupPlan,
     plan_radarr_failed_import_cleanup,
 )
+from mediamop.modules.refiner.radarr_failed_import_cleanup_drive import (
+    RadarrFailedImportCleanupDriveItemResult,
+    RadarrQueueFetchOperations,
+    RadarrQueueHttpFetchClient,
+    drive_radarr_failed_import_cleanup_from_live_queue,
+    radarr_queue_item_status_message_blob,
+)
 from mediamop.modules.refiner.radarr_failed_import_cleanup_vertical import (
     RadarrFailedImportCleanupSettingsSource,
     run_radarr_failed_import_cleanup_vertical,
@@ -114,6 +122,11 @@ __all__ = [
     "RadarrQueueHttpClient",
     "RadarrQueueOperations",
     "execute_radarr_failed_import_cleanup_plan",
+    "RadarrFailedImportCleanupDriveItemResult",
+    "RadarrQueueFetchOperations",
+    "RadarrQueueHttpFetchClient",
+    "drive_radarr_failed_import_cleanup_from_live_queue",
+    "radarr_queue_item_status_message_blob",
     "RadarrFailedImportCleanupSettingsSource",
     "run_radarr_failed_import_cleanup_vertical",
     "plan_radarr_failed_import_cleanup",
