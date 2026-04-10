@@ -2,8 +2,9 @@
 
 Pass 1–2: ownership/blocking and anchors. Pass 3: *arr queue adapters. Pass 4–6: failed
 import classification, policy, eligibility. Pass 7/7.5: Radarr and Sonarr cleanup
-planning seams (separate modules). Pass 8: thin orchestration dispatch by app. No HTTP
-clients or destructive execution here.
+planning seams (separate modules). Pass 8: orchestration dispatch. Pass 9: env-backed Refiner cleanup policy settings on
+``MediaMopSettings`` (Radarr vs Sonarr separated). No HTTP clients or destructive
+execution here.
 """
 
 from __future__ import annotations
@@ -18,6 +19,12 @@ from mediamop.modules.refiner.failed_import_cleanup_decision import (
     FailedImportCleanupEligibilityDecision,
     FailedImportCleanupEligibilityReason,
     decide_failed_import_cleanup_eligibility,
+)
+from mediamop.modules.refiner.failed_import_cleanup_settings import (
+    AppFailedImportCleanupPolicySettings,
+    RefinerFailedImportCleanupSettingsBundle,
+    default_refiner_failed_import_cleanup_settings_bundle,
+    load_refiner_failed_import_cleanup_settings_bundle,
 )
 from mediamop.modules.refiner.failed_import_cleanup_orchestration import (
     FailedImportCleanupPlanningResult,
@@ -64,6 +71,10 @@ __all__ = [
     "FailedImportCleanupEligibilityReason",
     "decide_failed_import_cleanup_eligibility",
     "FailedImportCleanupPlanningResult",
+    "AppFailedImportCleanupPolicySettings",
+    "RefinerFailedImportCleanupSettingsBundle",
+    "default_refiner_failed_import_cleanup_settings_bundle",
+    "load_refiner_failed_import_cleanup_settings_bundle",
     "RefinerArrApp",
     "parse_refiner_arr_app",
     "plan_failed_import_cleanup",

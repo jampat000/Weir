@@ -12,6 +12,11 @@ from mediamop.core.runtime_paths import (
     resolve_all_runtime_paths,
     sqlalchemy_sqlite_url,
 )
+from mediamop.modules.refiner.failed_import_cleanup_policy import FailedImportCleanupPolicy
+from mediamop.modules.refiner.failed_import_cleanup_settings import (
+    RefinerFailedImportCleanupSettingsBundle,
+    load_refiner_failed_import_cleanup_settings_bundle,
+)
 
 
 def _load_backend_dotenv_if_present() -> None:
@@ -76,6 +81,7 @@ class MediaMopSettings:
     temp_dir: str
     sqlalchemy_database_url: str
     fetcher_base_url: str | None
+    refiner_failed_import_cleanup: RefinerFailedImportCleanupSettingsBundle
 
     @property
     def trusted_browser_origins(self) -> tuple[str, ...]:
@@ -84,6 +90,16 @@ class MediaMopSettings:
         if self.trusted_browser_origins_override:
             return self.trusted_browser_origins_override
         return self.cors_origins
+
+    def radarr_failed_import_cleanup_policy(self) -> FailedImportCleanupPolicy:
+        """Resolved Radarr cleanup toggles (from env at load time)."""
+
+        return self.refiner_failed_import_cleanup.radarr_policy()
+
+    def sonarr_failed_import_cleanup_policy(self) -> FailedImportCleanupPolicy:
+        """Resolved Sonarr cleanup toggles (from env at load time)."""
+
+        return self.refiner_failed_import_cleanup.sonarr_policy()
 
     @classmethod
     def load(cls) -> MediaMopSettings:
@@ -128,6 +144,7 @@ class MediaMopSettings:
         )
         assert_sqlite_db_location_usable(db_p)
         db_url = sqlalchemy_sqlite_url(db_p)
+        refiner_cleanup = load_refiner_failed_import_cleanup_settings_bundle()
 
         return cls(
             env=env,
@@ -152,4 +169,5 @@ class MediaMopSettings:
             temp_dir=str(temp_p),
             sqlalchemy_database_url=db_url,
             fetcher_base_url=fetcher_url,
+            refiner_failed_import_cleanup=refiner_cleanup,
         )

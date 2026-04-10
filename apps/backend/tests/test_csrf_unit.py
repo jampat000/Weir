@@ -11,6 +11,9 @@ from starlette.testclient import TestClient
 
 from mediamop.api.factory import create_app
 from mediamop.core.config import MediaMopSettings
+from mediamop.modules.refiner.failed_import_cleanup_settings import (
+    default_refiner_failed_import_cleanup_settings_bundle,
+)
 from mediamop.platform.auth.csrf import (
     issue_csrf_token,
     validate_browser_post_origin,
@@ -44,6 +47,7 @@ def _csrf_settings(**overrides: object) -> MediaMopSettings:
         temp_dir=str(home / "temp"),
         sqlalchemy_database_url="sqlite:///" + db.as_posix(),
         fetcher_base_url=None,
+        refiner_failed_import_cleanup=default_refiner_failed_import_cleanup_settings_bundle(),
     )
     base.update(overrides)
     return MediaMopSettings(**base)  # type: ignore[arg-type]
