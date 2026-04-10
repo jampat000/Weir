@@ -27,7 +27,7 @@ class SonarrQueueOperations(Protocol):
 
 
 class SonarrFailedImportCleanupExecutionOutcome(str, Enum):
-    """Result of attempting to apply a plan — no Radarr outcomes here."""
+    """Outcome of applying a Sonarr failed-import cleanup plan via a queue client."""
 
     NO_OP = "no_op"
     REMOVED_QUEUE_ITEM = "removed_queue_item"
