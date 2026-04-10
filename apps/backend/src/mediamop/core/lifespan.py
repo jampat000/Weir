@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator
 
 from fastapi import FastAPI
 
+from mediamop.core.alembic_revision_check import require_database_at_application_head
 from mediamop.core.config import MediaMopSettings
 from mediamop.core.db import (
     create_db_engine,
@@ -31,6 +32,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     configure_logging(settings)
     engine = create_db_engine(settings)
+    require_database_at_application_head(engine)
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
     try:
