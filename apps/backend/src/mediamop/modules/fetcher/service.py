@@ -11,11 +11,16 @@ from mediamop import __version__
 from mediamop.core.config import MediaMopSettings
 from mediamop.core.datetime_util import as_utc
 from mediamop.modules.fetcher.probe import probe_fetcher_healthz
-from mediamop.modules.fetcher.schemas import FetcherConnectionOut, FetcherOperationalOverviewOut
+from mediamop.modules.fetcher.schemas import (
+    FetcherConnectionOut,
+    FetcherOperationalOverviewOut,
+    FetcherProbePersistedWindowOut,
+)
 from mediamop.platform.activity import service as activity_service
 from mediamop.platform.activity.schemas import ActivityEventItemOut
 
 _STALE_MINUTES = 30
+_PROBE_LOG_WINDOW_HOURS = 24
 
 
 def _fetcher_target_display(base_url: str) -> str:
@@ -64,6 +69,13 @@ def build_fetcher_operational_overview(
 ) -> FetcherOperationalOverviewOut:
     raw_fetcher = (settings.fetcher_base_url or "").strip() or None
     if not raw_fetcher:
+        since_24h = datetime.now(timezone.utc) - timedelta(hours=_PROBE_LOG_WINDOW_HOURS)
+        ok_24h, failed_24h = activity_service.count_fetcher_probe_outcomes_since(db, since=since_24h)
+        probe_window = FetcherProbePersistedWindowOut(
+            window_hours=_PROBE_LOG_WINDOW_HOURS,
+            persisted_ok=ok_24h,
+            persisted_failed=failed_24h,
+        )
         connection = FetcherConnectionOut(
             configured=False,
             detail="Fetcher URL is not configured. Set MEDIAMOP_FETCHER_BASE_URL to probe a running Fetcher instance.",
@@ -74,6 +86,7 @@ def build_fetcher_operational_overview(
             status_label=label,
             status_detail=detail,
             connection=connection,
+            probe_persisted_24h=probe_window,
             latest_probe_event=None,
             recent_probe_events=[],
         )
@@ -84,6 +97,13 @@ def build_fetcher_operational_overview(
         db,
         target_display=display,
         probe_succeeded=probe.reachable is True,
+    )
+    since_24h = datetime.now(timezone.utc) - timedelta(hours=_PROBE_LOG_WINDOW_HOURS)
+    ok_24h, failed_24h = activity_service.count_fetcher_probe_outcomes_since(db, since=since_24h)
+    probe_window = FetcherProbePersistedWindowOut(
+        window_hours=_PROBE_LOG_WINDOW_HOURS,
+        persisted_ok=ok_24h,
+        persisted_failed=failed_24h,
     )
     latest_row = activity_service.get_latest_fetcher_probe_event(db)
     recent_rows = activity_service.list_recent_fetcher_probe_events(db, limit=8)
@@ -110,6 +130,7 @@ def build_fetcher_operational_overview(
         status_label=label,
         status_detail=detail,
         connection=connection,
+        probe_persisted_24h=probe_window,
         latest_probe_event=latest,
         recent_probe_events=recent,
     )

@@ -41,8 +41,15 @@ export function FetcherPage() {
     );
   }
 
-  const { mediamop_version, connection, status_label, status_detail, latest_probe_event, recent_probe_events } =
-    overview.data;
+  const {
+    mediamop_version,
+    connection,
+    status_label,
+    status_detail,
+    probe_persisted_24h,
+    latest_probe_event,
+    recent_probe_events,
+  } = overview.data;
   const lastProbeText = latest_probe_event ? formatEventTime(latest_probe_event) : "No probe event recorded yet";
 
   return (
@@ -93,6 +100,27 @@ export function FetcherPage() {
             <FetcherStatusRow label="Fetcher version" value={connection.fetcher_version} />
           ) : null}
           {connection.detail ? <FetcherStatusRow label="Note" value={connection.detail} /> : null}
+        </dl>
+      </section>
+
+      <section
+        className="mm-card mm-dash-card mm-fetcher-module-surface mt-4"
+        aria-labelledby="mm-fetcher-log-snapshot-heading"
+      >
+        <h2 id="mm-fetcher-log-snapshot-heading" className="mm-card__title">
+          24-hour log snapshot
+        </h2>
+        <p className="mm-card__body mm-card__body--tight">
+          Counts are <strong>persisted</strong> probe rows in MediaMop only (15-minute throttle can under-count
+          actual <code className="mm-dash-code">/healthz</code> checks).
+        </p>
+        <dl className="mm-dash-kv">
+          <FetcherStatusRow
+            label="Window"
+            value={`Last ${probe_persisted_24h.window_hours} hours`}
+          />
+          <FetcherStatusRow label="OK rows" value={String(probe_persisted_24h.persisted_ok)} />
+          <FetcherStatusRow label="Failed rows" value={String(probe_persisted_24h.persisted_failed)} />
         </dl>
       </section>
 

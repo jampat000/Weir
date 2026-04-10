@@ -7,6 +7,14 @@ from pydantic import BaseModel, Field
 from mediamop.platform.activity.schemas import ActivityEventItemOut
 
 
+class FetcherProbePersistedWindowOut(BaseModel):
+    """Aggregates over persisted probe rows only (throttled writes, not raw /healthz attempts)."""
+
+    window_hours: int = Field(24, description="Rolling window width for the snapshot.")
+    persisted_ok: int = Field(..., ge=0, description="Rows with fetcher.probe_succeeded in the window.")
+    persisted_failed: int = Field(..., ge=0, description="Rows with fetcher.probe_failed in the window.")
+
+
 class FetcherConnectionOut(BaseModel):
     configured: bool
     target_display: str | None = None
@@ -25,5 +33,6 @@ class FetcherOperationalOverviewOut(BaseModel):
     status_label: str = Field(..., description="One-line operational status for current Fetcher connectivity.")
     status_detail: str = Field(..., description="Short operator-facing explanation of current status.")
     connection: FetcherConnectionOut
+    probe_persisted_24h: FetcherProbePersistedWindowOut
     latest_probe_event: ActivityEventItemOut | None = None
     recent_probe_events: list[ActivityEventItemOut] = Field(default_factory=list)

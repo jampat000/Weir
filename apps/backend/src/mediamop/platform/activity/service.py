@@ -155,6 +155,28 @@ def get_latest_fetcher_probe_event(db: Session) -> ActivityEvent | None:
     ).first()
 
 
+def count_fetcher_probe_outcomes_since(db: Session, *, since: datetime) -> tuple[int, int]:
+    """Count persisted Fetcher probe rows from ``since`` onward, split by outcome."""
+
+    rows = db.execute(
+        select(ActivityEvent.event_type, func.count())
+        .where(
+            ActivityEvent.module == "fetcher",
+            ActivityEvent.event_type.in_((C.FETCHER_PROBE_SUCCEEDED, C.FETCHER_PROBE_FAILED)),
+            ActivityEvent.created_at >= since,
+        )
+        .group_by(ActivityEvent.event_type),
+    ).all()
+    ok = 0
+    failed = 0
+    for event_type, n in rows:
+        if event_type == C.FETCHER_PROBE_SUCCEEDED:
+            ok = int(n)
+        elif event_type == C.FETCHER_PROBE_FAILED:
+            failed = int(n)
+    return ok, failed
+
+
 def list_recent_fetcher_probe_events(db: Session, *, limit: int = 8) -> list[ActivityEvent]:
     lim = max(1, min(limit, 20))
     return list(

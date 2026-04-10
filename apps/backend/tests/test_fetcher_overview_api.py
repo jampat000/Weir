@@ -36,6 +36,51 @@ def test_build_fetcher_overview_not_configured() -> None:
     assert out.status_label == "Not configured"
     assert out.mediamop_version
     assert out.recent_probe_events == []
+    assert out.probe_persisted_24h.window_hours == 24
+    assert out.probe_persisted_24h.persisted_ok == 0
+    assert out.probe_persisted_24h.persisted_failed == 0
+
+
+def test_build_fetcher_overview_probe_persisted_24h_counts() -> None:
+    settings, fac = _session_factory()
+    settings = replace(settings, fetcher_base_url=None)
+    now = datetime.now(timezone.utc)
+    with fac() as db:
+        db.execute(delete(ActivityEvent))
+        for _ in range(2):
+            db.add(
+                ActivityEvent(
+                    created_at=now - timedelta(hours=2),
+                    event_type=activity_constants.FETCHER_PROBE_SUCCEEDED,
+                    module="fetcher",
+                    title="Fetcher health check OK",
+                    detail="http://example.test",
+                )
+            )
+        db.add(
+            ActivityEvent(
+                created_at=now - timedelta(hours=3),
+                event_type=activity_constants.FETCHER_PROBE_FAILED,
+                module="fetcher",
+                title="Fetcher health check failed",
+                detail="http://example.test",
+            )
+        )
+        db.add(
+            ActivityEvent(
+                created_at=now - timedelta(hours=25),
+                event_type=activity_constants.FETCHER_PROBE_SUCCEEDED,
+                module="fetcher",
+                title="Fetcher health check OK",
+                detail="http://old.test",
+            )
+        )
+        db.commit()
+    with fac() as db:
+        out = build_fetcher_operational_overview(db, settings)
+        db.commit()
+    assert out.probe_persisted_24h.persisted_ok == 2
+    assert out.probe_persisted_24h.persisted_failed == 1
 
 
 @patch("mediamop.modules.fetcher.service.probe_fetcher_healthz")
@@ -62,6 +107,8 @@ def test_build_fetcher_overview_failed_probe(mock_probe: MagicMock) -> None:
     assert out.latest_probe_event is not None
     assert out.latest_probe_event.event_type == activity_constants.FETCHER_PROBE_FAILED
     assert out.recent_probe_events
+    assert out.probe_persisted_24h.window_hours == 24
+    assert out.probe_persisted_24h.persisted_failed >= 1
 
 
 @patch("mediamop.modules.fetcher.service.probe_fetcher_healthz")
@@ -96,6 +143,7 @@ def test_build_fetcher_overview_records_probe_when_reachable(mock_probe: MagicMo
     assert out.status_label == "Connected"
     assert out.latest_probe_event is not None
     assert out.latest_probe_event.event_type == activity_constants.FETCHER_PROBE_SUCCEEDED
+    assert out.probe_persisted_24h.persisted_ok >= 1
 
 
 def test_get_fetcher_overview_authenticated(client_with_admin: TestClient) -> None:
@@ -118,3 +166,8 @@ def test_get_fetcher_overview_authenticated(client_with_admin: TestClient) -> No
     assert "connection" in body
     assert "recent_probe_events" in body
     assert body.get("mediamop_version")
+    snap = body.get("probe_persisted_24h")
+    assert isinstance(snap, dict)
+    assert snap.get("window_hours") == 24
+    assert "persisted_ok" in snap
+    assert "persisted_failed" in snap

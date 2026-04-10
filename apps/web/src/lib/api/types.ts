@@ -48,11 +48,18 @@ export type DashboardStatus = {
   activity_summary: DashboardActivitySummary;
 };
 
+export type FetcherProbePersistedWindow = {
+  window_hours: number;
+  persisted_ok: number;
+  persisted_failed: number;
+};
+
 export type FetcherOperationalOverview = {
   mediamop_version: string;
   status_label: string;
   status_detail: string;
   connection: DashboardFetcherStatus;
+  probe_persisted_24h: FetcherProbePersistedWindow;
   latest_probe_event: ActivityEventItem | null;
   recent_probe_events: ActivityEventItem[];
 };
