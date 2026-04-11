@@ -10,3 +10,10 @@ AUTH_BOOTSTRAP_DENIED = "auth.bootstrap_denied"
 # Fetcher bridge (throttled in service — not per-request spam)
 FETCHER_PROBE_SUCCEEDED = "fetcher.probe_succeeded"
 FETCHER_PROBE_FAILED = "fetcher.probe_failed"
+
+# Fetcher failed-import download-queue passes (one summary or failure row per run)
+FETCHER_FAILED_IMPORT_RUN_STARTED = "fetcher.failed_import_run_started"
+FETCHER_FAILED_IMPORT_PASS_QUEUED = "fetcher.failed_import_pass_queued"
+FETCHER_FAILED_IMPORT_RUN_SUMMARY = "fetcher.failed_import_run_summary"
+FETCHER_FAILED_IMPORT_RUN_FAILED = "fetcher.failed_import_run_failed"
+FETCHER_FAILED_IMPORT_RECOVERED = "fetcher.failed_import_recovered"

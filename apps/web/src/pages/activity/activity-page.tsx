@@ -57,7 +57,8 @@ export function ActivityPage() {
         </p>
         <p className="mm-page__lead">
           Read-only: no filters, export, or actions. Records sign-in outcomes, setup, sign-out, failed bootstrap
-          attempts, and throttled Fetcher health checks — not every page load.
+          attempts, throttled Fetcher health checks, and Fetcher failed-import queue/run activity (queued passes,
+          run start, outcomes) — not every page load.
         </p>
       </header>
 

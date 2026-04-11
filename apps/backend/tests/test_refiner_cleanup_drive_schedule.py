@@ -26,6 +26,8 @@ from mediamop.modules.refiner.sonarr_failed_import_cleanup_job import (
     REFINER_JOB_KIND_SONARR_FAILED_IMPORT_CLEANUP_DRIVE,
     enqueue_sonarr_failed_import_cleanup_drive_job,
 )
+from mediamop.platform.activity import constants as act_c
+from mediamop.platform.activity.models import ActivityEvent
 
 import mediamop.modules.refiner.jobs_model  # noqa: F401
 import mediamop.platform.activity.models  # noqa: F401
@@ -155,6 +157,36 @@ def test_periodic_radarr_enqueue_dedupes_across_ticks(session_factory) -> None:
             ),
         )
     assert n == 1
+
+
+def test_periodic_radarr_production_label_one_fetcher_pass_queued_across_ticks(session_factory) -> None:
+    """Production log_label: emit timed pass-queued activity only when the dedupe job row is first created."""
+
+    async def _run() -> None:
+        stop = asyncio.Event()
+        t0 = asyncio.create_task(
+            run_periodic_refiner_cleanup_drive_enqueue(
+                session_factory,
+                stop_event=stop,
+                interval_seconds=0.06,
+                log_label="radarr_failed_import_cleanup_drive",
+                enqueue_fn=enqueue_radarr_failed_import_cleanup_drive_job,
+            ),
+        )
+        await asyncio.sleep(0.2)
+        stop.set()
+        await t0
+
+    asyncio.run(_run())
+
+    with session_factory() as s:
+        n_pass = s.scalar(
+            select(func.count()).select_from(ActivityEvent).where(
+                ActivityEvent.module == "fetcher",
+                ActivityEvent.event_type == act_c.FETCHER_FAILED_IMPORT_PASS_QUEUED,
+            ),
+        )
+        assert n_pass == 1
 
 
 def test_periodic_sonarr_enqueue_runs_independently(session_factory) -> None:

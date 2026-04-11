@@ -8,6 +8,7 @@ import {
   showFailedImportManualEnqueueControl,
   showFailedImportRecoverControl,
 } from "../../lib/fetcher/failed-imports/eligibility";
+import { FetcherFailedImportsCleanupPolicySection } from "./fetcher-failed-imports-cleanup-policy";
 import { FAILED_IMPORT_INSPECTION_FILTER_OPTIONS } from "../../lib/fetcher/failed-imports/inspection-filter-labels";
 import type { FailedImportInspectionFilter } from "../../lib/fetcher/failed-imports/queries";
 import {
@@ -324,6 +325,7 @@ export function FetcherFailedImportsWorkspace() {
           <FetcherFailedImportsIntroSubtitle />
         </header>
         <FetcherFailedImportsSettingsSection rv={rv} role={me.data?.role} />
+        <FetcherFailedImportsCleanupPolicySection role={me.data?.role} />
         <PageLoading label={FETCHER_FI_PAGE_LOADING_TASKS} />
       </div>
     );
@@ -345,6 +347,7 @@ export function FetcherFailedImportsWorkspace() {
           </p>
         </header>
         <FetcherFailedImportsSettingsSection rv={rv} role={me.data?.role} />
+        <FetcherFailedImportsCleanupPolicySection role={me.data?.role} />
         {err instanceof Error ? (
           <p className="mm-page__lead font-mono text-sm text-[var(--mm-text3)]">{err.message}</p>
         ) : null}
@@ -363,6 +366,8 @@ export function FetcherFailedImportsWorkspace() {
       </header>
 
       <FetcherFailedImportsSettingsSection rv={rv} role={me.data?.role} />
+
+      <FetcherFailedImportsCleanupPolicySection role={me.data?.role} />
 
       <section
         className="mm-card mm-dash-card mm-fetcher-module-surface mb-6"

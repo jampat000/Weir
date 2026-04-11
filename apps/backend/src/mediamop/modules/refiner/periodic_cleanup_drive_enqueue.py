@@ -11,14 +11,18 @@ import asyncio
 import logging
 from collections.abc import Callable
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from mediamop.core.config import MediaMopSettings
+from mediamop.modules.fetcher import failed_import_activity
 from mediamop.modules.refiner.jobs_model import RefinerJob
 from mediamop.modules.refiner.radarr_failed_import_cleanup_job import (
+    RADARR_FAILED_IMPORT_CLEANUP_DRIVE_DEDUPE_KEY,
     enqueue_radarr_failed_import_cleanup_drive_job,
 )
 from mediamop.modules.refiner.sonarr_failed_import_cleanup_job import (
+    SONARR_FAILED_IMPORT_CLEANUP_DRIVE_DEDUPE_KEY,
     enqueue_sonarr_failed_import_cleanup_drive_job,
 )
 
@@ -27,6 +31,12 @@ logger = logging.getLogger(__name__)
 REFINER_SCHEDULE_ENQUEUE_FAILURE_COOLDOWN_SECONDS = 2.0
 
 ScheduleSpec = tuple[str, float, Callable[[Session], RefinerJob]]
+
+# Production schedule labels only — tests may use other labels without emitting Fetcher activity.
+_SCHEDULE_PASS_QUEUED_META: dict[str, tuple[str, bool]] = {
+    "radarr_failed_import_cleanup_drive": (RADARR_FAILED_IMPORT_CLEANUP_DRIVE_DEDUPE_KEY, True),
+    "sonarr_failed_import_cleanup_drive": (SONARR_FAILED_IMPORT_CLEANUP_DRIVE_DEDUPE_KEY, False),
+}
 
 
 def refiner_cleanup_drive_enqueue_schedule_specs(
@@ -94,7 +104,24 @@ async def run_periodic_refiner_cleanup_drive_enqueue(
 
         def _enqueue_once() -> None:
             with session_factory() as session:
+                meta = _SCHEDULE_PASS_QUEUED_META.get(log_label)
+                existed_before = False
+                if meta is not None:
+                    dedupe_key, _movies = meta
+                    existed_before = (
+                        session.scalars(
+                            select(RefinerJob.id).where(RefinerJob.dedupe_key == dedupe_key).limit(1),
+                        ).first()
+                        is not None
+                    )
                 enqueue_fn(session)
+                if meta is not None and not existed_before:
+                    _, movies = meta
+                    failed_import_activity.record_fetcher_failed_import_pass_queued(
+                        session,
+                        movies=movies,
+                        source="timed_schedule",
+                    )
                 session.commit()
 
         try:

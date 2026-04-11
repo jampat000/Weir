@@ -261,7 +261,7 @@ def start_refiner_worker_background_tasks(
     else:
         from mediamop.modules.refiner.job_handlers_registry import build_production_refiner_job_handlers
 
-        handlers = build_production_refiner_job_handlers(settings)
+        handlers = build_production_refiner_job_handlers(settings, session_factory)
 
     stop = stop_event if stop_event is not None else asyncio.Event()
     tasks: list[asyncio.Task[None]] = []

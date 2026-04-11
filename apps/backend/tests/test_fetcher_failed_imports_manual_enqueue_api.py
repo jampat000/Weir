@@ -8,6 +8,8 @@ from starlette.testclient import TestClient
 from mediamop.core.config import MediaMopSettings
 from mediamop.core.db import create_db_engine, create_session_factory
 from mediamop.modules.refiner.jobs_model import RefinerJob
+from mediamop.platform.activity import constants as act_c
+from mediamop.platform.activity.models import ActivityEvent
 from mediamop.modules.refiner.radarr_failed_import_cleanup_job import (
     RADARR_FAILED_IMPORT_CLEANUP_DRIVE_DEDUPE_KEY,
 )
@@ -34,6 +36,13 @@ def _clear_refiner_jobs() -> None:
         db.commit()
 
 
+def _max_activity_id() -> int:
+    fac = _fac()
+    with fac() as db:
+        v = db.scalar(select(func.max(ActivityEvent.id)))
+        return int(v or 0)
+
+
 def _login_admin(client: TestClient) -> None:
     tok = fetch_csrf(client)
     r = auth_post(
@@ -57,6 +66,7 @@ def _login_viewer(client: TestClient) -> None:
 def test_fetcher_failed_imports_enqueue_radarr_admin_created_then_already_present(
     client_with_admin: TestClient,
 ) -> None:
+    before_act = _max_activity_id()
     _clear_refiner_jobs()
     _login_admin(client_with_admin)
     tok = fetch_csrf(client_with_admin)
@@ -86,6 +96,18 @@ def test_fetcher_failed_imports_enqueue_radarr_admin_created_then_already_presen
     with fac() as db:
         n = db.scalar(select(func.count()).select_from(RefinerJob)) or 0
         assert n == 1
+        q_rows = db.scalars(
+            select(ActivityEvent)
+            .where(
+                ActivityEvent.id > before_act,
+                ActivityEvent.module == "fetcher",
+                ActivityEvent.event_type == act_c.FETCHER_FAILED_IMPORT_PASS_QUEUED,
+            )
+            .order_by(ActivityEvent.id.asc()),
+        ).all()
+        assert len(q_rows) == 2
+        assert "queued" in q_rows[0].title.lower()
+        assert "already" in q_rows[1].title.lower() or "pending" in q_rows[1].title.lower()
 
 
 def test_fetcher_failed_imports_enqueue_sonarr_admin_created_then_already_present(

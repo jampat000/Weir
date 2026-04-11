@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from starlette.testclient import TestClient
 
 from mediamop.core.config import MediaMopSettings
@@ -16,6 +16,8 @@ from mediamop.modules.refiner.jobs_ops import (
     fail_leased_refiner_job_after_complete_failure,
     refiner_enqueue_or_get_job,
 )
+from mediamop.platform.activity import constants as act_c
+from mediamop.platform.activity.models import ActivityEvent
 from tests.integration_helpers import auth_post, csrf as fetch_csrf
 
 import mediamop.modules.refiner.jobs_model  # noqa: F401
@@ -90,6 +92,13 @@ def test_fetcher_failed_imports_recover_finalize_success(client_with_admin: Test
         row = db.get(RefinerJob, jid)
         assert row is not None
         assert row.status == RefinerJobStatus.COMPLETED.value
+        ev = db.scalars(
+            select(ActivityEvent).where(ActivityEvent.event_type == act_c.FETCHER_FAILED_IMPORT_RECOVERED),
+        ).first()
+        assert ev is not None
+        assert ev.module == "fetcher"
+        assert "recovery" in ev.title.lower()
+        assert str(jid) in (ev.detail or "")
 
 
 def test_fetcher_failed_imports_recover_finalize_409_when_not_finalize_failed(client_with_admin: TestClient) -> None:

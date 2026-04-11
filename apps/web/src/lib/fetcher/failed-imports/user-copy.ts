@@ -39,3 +39,20 @@ export const FETCHER_FI_TABLE_COL_STABLE_KEY = "Internal id";
 export const FETCHER_FI_LIST_EMPTY = "Nothing matches this filter.";
 
 export const FETCHER_FI_TECHNICAL_SUMMARY_LABEL = "Technical detail";
+
+export const FETCHER_FI_POLICY_CARD_TITLE = "Removal rules (download queue)";
+export const FETCHER_FI_POLICY_CARD_LEAD =
+  "When a rule is on, a failed-import pass may remove matching Radarr or Sonarr download-queue rows. Saving does not run a pass.";
+export const FETCHER_FI_POLICY_STORAGE_NOTE =
+  "Stored in the MediaMop database. The first read creates that row from the server's environment defaults if needed; after that, only this saved row is used.";
+export const FETCHER_FI_POLICY_VIEWER_NOTE = "Sign in as an operator to change removal rules.";
+export const FETCHER_FI_POLICY_SAVE = "Save rules";
+export const FETCHER_FI_POLICY_SAVING = "Saving…";
+export const FETCHER_FI_POLICY_SAVED_HINT = "Rules apply on the next failed-import pass; nothing runs immediately.";
+export const FETCHER_FI_POLICY_MOVIES_HEADING = "Movies (Radarr)";
+export const FETCHER_FI_POLICY_TV_HEADING = "TV (Sonarr)";
+export const FETCHER_FI_POLICY_TOGGLE_QUALITY = "Remove quality rejections";
+export const FETCHER_FI_POLICY_TOGGLE_UNMATCHED = "Remove unmatched or manual-import rejections";
+export const FETCHER_FI_POLICY_TOGGLE_CORRUPT = "Remove corrupt imports";
+export const FETCHER_FI_POLICY_TOGGLE_DOWNLOAD_FAILED = "Remove failed downloads";
+export const FETCHER_FI_POLICY_TOGGLE_IMPORT_FAILED = "Remove failed imports";

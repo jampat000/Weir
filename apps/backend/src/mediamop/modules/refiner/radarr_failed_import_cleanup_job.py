@@ -8,9 +8,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from mediamop.core.config import MediaMopSettings
+from mediamop.modules.fetcher import failed_import_activity
+from mediamop.modules.fetcher.cleanup_policy_service import (
+    FailedImportDrivePolicySource,
+    load_fetcher_failed_import_cleanup_bundle,
+)
 from mediamop.modules.refiner.jobs_model import RefinerJob
 from mediamop.modules.refiner.jobs_ops import refiner_enqueue_or_get_job
 from mediamop.modules.refiner.radarr_cleanup_execution import RadarrQueueHttpClient
@@ -38,25 +43,55 @@ def enqueue_radarr_failed_import_cleanup_drive_job(session: Session) -> RefinerJ
 
 def make_radarr_failed_import_cleanup_drive_handler(
     settings: MediaMopSettings,
+    session_factory: sessionmaker[Session],
 ) -> Callable[[RefinerJobWorkContext], None]:
     """Build a worker handler that runs the existing Radarr live drive (HTTP clients from settings)."""
 
     def _run(_ctx: RefinerJobWorkContext) -> None:
-        base = settings.refiner_radarr_base_url
-        key = settings.refiner_radarr_api_key
-        if not base or not key:
-            msg = (
-                "Radarr live cleanup drive requires MEDIAMOP_REFINER_RADARR_BASE_URL and "
-                "MEDIAMOP_REFINER_RADARR_API_KEY"
-            )
-            raise RuntimeError(msg)
+        try:
+            base = settings.refiner_radarr_base_url
+            key = settings.refiner_radarr_api_key
+            if not base or not key:
+                msg = (
+                    "Radarr live cleanup drive requires MEDIAMOP_REFINER_RADARR_BASE_URL and "
+                    "MEDIAMOP_REFINER_RADARR_API_KEY"
+                )
+                raise RuntimeError(msg)
 
-        fetch_client = RadarrQueueHttpFetchClient(base, key)
-        queue_ops = RadarrQueueHttpClient(base, key)
-        drive_radarr_failed_import_cleanup_from_live_queue(
-            settings,
-            queue_fetch_client=fetch_client,
-            queue_operations=queue_ops,
-        )
+            with session_factory() as session:
+                with session.begin():
+                    bundle, _ = load_fetcher_failed_import_cleanup_bundle(
+                        session,
+                        settings.refiner_failed_import_cleanup,
+                    )
+            policy_source = FailedImportDrivePolicySource(bundle)
+
+            fetch_client = RadarrQueueHttpFetchClient(base, key)
+            queue_ops = RadarrQueueHttpClient(base, key)
+            with session_factory() as session:
+                with session.begin():
+                    failed_import_activity.record_fetcher_failed_import_run_started(session, movies=True)
+            results = drive_radarr_failed_import_cleanup_from_live_queue(
+                policy_source,
+                queue_fetch_client=fetch_client,
+                queue_operations=queue_ops,
+            )
+            outcome_values = tuple(r.outcome.value for r in results)
+            with session_factory() as session:
+                with session.begin():
+                    failed_import_activity.record_fetcher_failed_import_drive_finished(
+                        session,
+                        movies=True,
+                        outcome_values=outcome_values,
+                    )
+        except Exception as exc:
+            with session_factory() as session:
+                with session.begin():
+                    failed_import_activity.record_fetcher_failed_import_drive_failed(
+                        session,
+                        movies=True,
+                        exc=exc,
+                    )
+            raise
 
     return _run

@@ -1,7 +1,9 @@
 """Persist and list activity events — no writes from Activity API routes in this pass.
 
 Fetcher probe rows may be written only from the Fetcher operational overview service
-(not from dashboard read paths).
+(not from dashboard read paths). Fetcher failed-import activity is written from manual enqueue,
+timed enqueue (when a new work row appears), refiner job handlers (run start + outcome), and
+the Fetcher recovery route.
 """
 
 from __future__ import annotations

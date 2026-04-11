@@ -1,5 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchFailedImportAutomationSummary } from "./automation-summary-api";
+import {
+  fetchFailedImportCleanupPolicy,
+  putFailedImportCleanupPolicy,
+} from "./cleanup-policy-api";
 import { fetchFailedImportTasksInspection } from "./inspection-api";
 import { postFailedImportRadarrEnqueue, postFailedImportSonarrEnqueue } from "./manual-enqueue-api";
 import { fetchFailedImportFetcherSettings } from "./settings-api";
@@ -21,11 +25,31 @@ export const failedImportSettingsQueryKey = ["fetcher", "failed-imports", "setti
 
 export const failedImportAutomationSummaryQueryKey = ["fetcher", "failed-imports", "automation-summary"] as const;
 
+export const failedImportCleanupPolicyQueryKey = ["fetcher", "failed-imports", "cleanup-policy"] as const;
+
 export function useFailedImportAutomationSummaryQuery() {
   return useQuery({
     queryKey: failedImportAutomationSummaryQueryKey,
     queryFn: () => fetchFailedImportAutomationSummary(),
     staleTime: 15_000,
+  });
+}
+
+export function useFailedImportCleanupPolicyQuery() {
+  return useQuery({
+    queryKey: failedImportCleanupPolicyQueryKey,
+    queryFn: () => fetchFailedImportCleanupPolicy(),
+    staleTime: 30_000,
+  });
+}
+
+export function useFailedImportCleanupPolicySaveMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: putFailedImportCleanupPolicy,
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: failedImportCleanupPolicyQueryKey });
+    },
   });
 }
 

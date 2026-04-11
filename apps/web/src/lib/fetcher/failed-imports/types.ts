@@ -53,3 +53,23 @@ export type FetcherFailedImportAutomationSummary = {
   movies: FetcherFailedImportAxisSummary;
   tv_shows: FetcherFailedImportAxisSummary;
 };
+
+export type FailedImportCleanupPolicyAxis = {
+  remove_quality_rejections: boolean;
+  remove_unmatched_manual_import_rejections: boolean;
+  remove_corrupt_imports: boolean;
+  remove_failed_downloads: boolean;
+  remove_failed_imports: boolean;
+};
+
+export type FetcherFailedImportCleanupPolicyOut = {
+  movies: FailedImportCleanupPolicyAxis;
+  tv_shows: FailedImportCleanupPolicyAxis;
+  updated_at: string;
+};
+
+/** PUT body (CSRF added by putFailedImportCleanupPolicy). */
+export type FetcherFailedImportCleanupPolicyPutBody = {
+  movies: FailedImportCleanupPolicyAxis;
+  tv_shows: FailedImportCleanupPolicyAxis;
+};

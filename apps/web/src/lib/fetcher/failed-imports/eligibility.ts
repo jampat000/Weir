@@ -1,5 +1,13 @@
 import { FAILED_IMPORT_STATUS_HANDLER_OK_FINALIZE_FAILED } from "./task-status-labels";
 
+/** Admin/operator — edit failed-import removal rules (download queue). */
+export function showFailedImportCleanupPolicyEditor(role: string | undefined): boolean {
+  if (!role) {
+    return false;
+  }
+  return role === "admin" || role === "operator";
+}
+
 /** Admin/operator — show manual enqueue for Radarr/Sonarr failed-import passes. */
 export function showFailedImportManualEnqueueControl(role: string | undefined): boolean {
   if (!role) {
