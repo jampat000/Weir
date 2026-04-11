@@ -45,7 +45,6 @@ import {
   FETCHER_FI_SCHEDULE_MOVIES_HEADING,
   FETCHER_FI_SCHEDULE_TV_HEADING,
   FETCHER_FI_SECTION_INTRO_PRIMARY,
-  FETCHER_FI_SECTION_INTRO_SCOPE,
   FETCHER_FI_TASKS_SECTION_TITLE,
   FETCHER_FI_TABLE_COL_STABLE_KEY,
   FETCHER_FI_TABLE_COL_WORK_TYPE,
@@ -71,21 +70,19 @@ function yesNo(value: boolean): string {
 
 function FetcherFailedImportsIntroSubtitle() {
   return (
-    <div className="mm-page__subtitle space-y-3">
+    <div className="mm-page__subtitle space-y-2">
       <p>{FETCHER_FI_SECTION_INTRO_PRIMARY}</p>
-      <p className="text-sm text-[var(--mm-text3)]">{FETCHER_FI_SECTION_INTRO_SCOPE}</p>
       <details className="text-sm text-[var(--mm-text3)]">
         <summary className="cursor-pointer text-[var(--mm-text2)] select-none">
           {FETCHER_FI_TECHNICAL_SUMMARY_LABEL}
         </summary>
         <p className="mt-2">
-          The default table view is <strong>finished</strong> outcomes: completed, stopped with errors, or{" "}
-          <strong>needs manual finish</strong> (Radarr/Sonarr ran the step but could not mark the list row done).
-          Operators may use <strong>Mark completed (manual)</strong> only on needs-manual-finish rows; it does not rerun
-          the sweep.
+          Default view: <strong>finished</strong> outcomes—completed, stopped with errors, or{" "}
+          <strong>needs manual finish</strong>. <strong>Mark completed (manual)</strong> only on the last; it does not
+          rerun the sweep.
         </p>
         <p className="mt-2 font-mono text-xs text-[var(--mm-text3)]">
-          Storage values: handler_ok_finalize_failed · completed · failed
+          handler_ok_finalize_failed · completed · failed
         </p>
       </details>
     </div>

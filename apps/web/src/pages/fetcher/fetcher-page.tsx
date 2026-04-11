@@ -23,9 +23,8 @@ export function FetcherPage() {
         <p className="mm-page__eyebrow">MediaMop</p>
         <h1 className="mm-page__title">Fetcher</h1>
         <p className="mm-page__subtitle">
-          Fetcher is your download pipeline in MediaMop: failed imports in <strong>Radarr</strong> and{" "}
-          <strong>Sonarr</strong>, plus a simple read on whether the separate Fetcher service MediaMop calls is
-          answering.
+          Fetcher handles failed imports in <strong>Radarr</strong> and <strong>Sonarr</strong> and shows whether your
+          Fetcher service answered on recent checks.
         </p>
       </header>
 
@@ -80,13 +79,13 @@ function FetcherOperationalOverviewSections({
   return (
     <>
       <header className="mm-page__intro mt-10 border-t border-[var(--mm-border)] pt-8">
-        <h2 className="mm-page__title text-xl sm:text-2xl">Fetcher service reachability</h2>
+        <h2 className="mm-page__title text-xl sm:text-2xl">Service checks</h2>
         <p className="mm-page__subtitle">
-          Whether the Fetcher endpoint answered on the last check MediaMop stored, and a short recent history.{" "}
+          Recent answers from your Fetcher service.{" "}
           <Link to="/app/activity" className="text-[var(--mm-accent)] underline-offset-2 hover:underline">
             Activity
           </Link>{" "}
-          has the full log.
+          for more.
         </p>
       </header>
 

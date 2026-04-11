@@ -5,31 +5,22 @@ import {
   FETCHER_FI_SCHEDULE_MOVIES_HEADING,
   FETCHER_FI_SCHEDULE_TV_HEADING,
   FETCHER_FI_SECTION_INTRO_PRIMARY,
-  FETCHER_FI_SECTION_INTRO_SCOPE,
   FETCHER_FI_TASKS_SECTION_TITLE,
 } from "./user-copy";
 
-describe("fetcher failed-import user-copy (product voice)", () => {
-  it("names Radarr and Sonarr without an essay on other modules", () => {
+describe("fetcher failed-import user-copy (compressed)", () => {
+  it("section intro is one line with Radarr/Sonarr, no cross-module essay", () => {
     const t = FETCHER_FI_SECTION_INTRO_PRIMARY.toLowerCase();
     expect(t).toContain("radarr");
     expect(t).toContain("sonarr");
+    expect(t).toContain("failed import");
     expect(t).not.toContain("refiner");
+    expect(FETCHER_FI_SECTION_INTRO_PRIMARY.length).toBeLessThan(200);
   });
 
-  it("describes failed imports in operator language", () => {
-    const s = FETCHER_FI_SECTION_INTRO_SCOPE.toLowerCase();
-    expect(s).toMatch(/download|queue|list/);
-    expect(s).toContain("media");
-    expect(s).not.toContain("refiner");
-  });
-
-  it("keeps manual action plain", () => {
-    const title = FETCHER_FI_MANUAL_SECTION_TITLE.toLowerCase();
-    const body = FETCHER_FI_MANUAL_SECTION_BODY.toLowerCase();
-    expect(title).not.toContain("cleanup drive");
-    expect(body).not.toContain("worker");
-    expect(body).not.toContain("in-process");
+  it("keeps manual action short", () => {
+    expect(FETCHER_FI_MANUAL_SECTION_TITLE.length).toBeLessThan(40);
+    expect(FETCHER_FI_MANUAL_SECTION_BODY.length).toBeLessThan(120);
   });
 
   it("keeps Radarr/Sonarr on schedule headings", () => {
@@ -37,9 +28,7 @@ describe("fetcher failed-import user-copy (product voice)", () => {
     expect(FETCHER_FI_SCHEDULE_TV_HEADING).toContain("Sonarr");
   });
 
-  it("uses a non-internal section title for the table", () => {
-    const t = FETCHER_FI_TASKS_SECTION_TITLE.toLowerCase();
-    expect(t).toBe("history");
-    expect(t).not.toContain("job");
+  it("uses plain history title", () => {
+    expect(FETCHER_FI_TASKS_SECTION_TITLE.toLowerCase()).toBe("history");
   });
 });

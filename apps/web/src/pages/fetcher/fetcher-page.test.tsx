@@ -55,47 +55,38 @@ const minimalFiSettings = {
   visibility_note: "note",
 };
 
-describe("FetcherPage (product surface)", () => {
-  it("places failed-import workspace under Fetcher with a plain section title", () => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    qc.setQueryData(qk.me, minimalMe);
-    qc.setQueryData(fetcherOverviewKey, minimalOverview);
-    qc.setQueryData(failedImportSettingsQueryKey, minimalFiSettings);
-    qc.setQueryData(failedImportInspectionQueryKey("terminal"), { jobs: [], default_terminal_only: true });
+function renderFetcherPage() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  qc.setQueryData(qk.me, minimalMe);
+  qc.setQueryData(fetcherOverviewKey, minimalOverview);
+  qc.setQueryData(failedImportSettingsQueryKey, minimalFiSettings);
+  qc.setQueryData(failedImportInspectionQueryKey("terminal"), { jobs: [], default_terminal_only: true });
+  return render(wrap(<FetcherPage />, qc));
+}
 
-    render(wrap(<FetcherPage />, qc));
-
+describe("FetcherPage (hero compression)", () => {
+  it("places failed-import workspace with a plain section title", () => {
+    renderFetcherPage();
     expect(screen.getByTestId("fetcher-failed-imports-workspace")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Failed imports" })).toBeInTheDocument();
   });
 
-  it("opens with Fetcher as a download-pipeline module (Radarr/Sonarr) without Refiner cross-talk", () => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    qc.setQueryData(qk.me, minimalMe);
-    qc.setQueryData(fetcherOverviewKey, minimalOverview);
-    qc.setQueryData(failedImportSettingsQueryKey, minimalFiSettings);
-    qc.setQueryData(failedImportInspectionQueryKey("terminal"), { jobs: [], default_terminal_only: true });
-
-    render(wrap(<FetcherPage />, qc));
-
-    const h1 = screen.getByRole("heading", { level: 1, name: "Fetcher" });
-    const intro = h1.closest("header");
-    expect(intro?.textContent).toMatch(/Radarr/i);
-    expect(intro?.textContent).toMatch(/Sonarr/i);
-    expect(intro?.textContent).toMatch(/failed import/i);
-    expect(intro?.textContent).not.toMatch(/Refiner/i);
+  it("hero frames the whole module: failed imports plus service checks, not a subsection alone", () => {
+    const { container } = renderFetcherPage();
+    const hero = container.querySelector(".mm-page__intro");
+    expect(hero).toBeTruthy();
+    const t = hero!.textContent ?? "";
+    expect(t).toMatch(/Fetcher/i);
+    expect(t).toMatch(/Radarr/i);
+    expect(t).toMatch(/Sonarr/i);
+    expect(t).toMatch(/failed import/i);
+    expect(t).toMatch(/service|answered|checks/i);
+    expect(t).not.toMatch(/Refiner/i);
   });
 
-  it("uses product language for the reachability block, not external-application architecture", () => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    qc.setQueryData(qk.me, minimalMe);
-    qc.setQueryData(fetcherOverviewKey, minimalOverview);
-    qc.setQueryData(failedImportSettingsQueryKey, minimalFiSettings);
-    qc.setQueryData(failedImportInspectionQueryKey("terminal"), { jobs: [], default_terminal_only: true });
-
-    render(wrap(<FetcherPage />, qc));
-
-    expect(screen.getByRole("heading", { name: "Fetcher service reachability" })).toBeInTheDocument();
+  it("second block is compressed service checks, not architecture titles", () => {
+    renderFetcherPage();
+    expect(screen.getByRole("heading", { name: "Service checks" })).toBeInTheDocument();
     expect(screen.queryByText(/External Fetcher application/i)).toBeNull();
     expect(screen.queryByText(/MEDIAMOP_FETCHER_BASE_URL/i)).toBeNull();
   });
