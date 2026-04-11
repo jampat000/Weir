@@ -29,61 +29,76 @@ _MIGRATION_LEASE_NOTE = (
 
 
 def upgrade() -> None:
-    op.create_table(
-        "fetcher_jobs",
-        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column("dedupe_key", sa.String(length=512), nullable=False),
-        sa.Column("job_kind", sa.String(length=64), nullable=False),
-        sa.Column("payload_json", sa.Text(), nullable=True),
-        sa.Column(
-            "status",
-            sa.String(length=32),
-            server_default=sa.text("'pending'"),
-            nullable=False,
-        ),
-        sa.Column("lease_owner", sa.String(length=200), nullable=True),
-        sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column(
-            "attempt_count",
-            sa.Integer(),
-            server_default=sa.text("0"),
-            nullable=False,
-        ),
-        sa.Column(
-            "max_attempts",
-            sa.Integer(),
-            server_default=sa.text("3"),
-            nullable=False,
-        ),
-        sa.Column("last_error", sa.Text(), nullable=True),
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.text("(CURRENT_TIMESTAMP)"),
-            nullable=False,
-        ),
-        sa.Column(
-            "updated_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.text("(CURRENT_TIMESTAMP)"),
-            nullable=False,
-        ),
-        sa.PrimaryKeyConstraint("id", name="pk_fetcher_jobs"),
-        sa.UniqueConstraint("dedupe_key", name="uq_fetcher_jobs_dedupe_key"),
-    )
-    op.create_index(
-        "ix_fetcher_jobs_status_id",
-        "fetcher_jobs",
-        ["status", "id"],
-        unique=False,
-    )
-
     bind = op.get_bind()
+    insp = sa.inspect(bind)
+
+    # Idempotent: dev DBs sometimes had ``fetcher_jobs`` created outside Alembic (e.g. ORM
+    # ``create_all``) while ``alembic_version`` still pointed at 0005 — re-running CREATE fails.
+    if not insp.has_table("fetcher_jobs"):
+        op.create_table(
+            "fetcher_jobs",
+            sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+            sa.Column("dedupe_key", sa.String(length=512), nullable=False),
+            sa.Column("job_kind", sa.String(length=64), nullable=False),
+            sa.Column("payload_json", sa.Text(), nullable=True),
+            sa.Column(
+                "status",
+                sa.String(length=32),
+                server_default=sa.text("'pending'"),
+                nullable=False,
+            ),
+            sa.Column("lease_owner", sa.String(length=200), nullable=True),
+            sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
+            sa.Column(
+                "attempt_count",
+                sa.Integer(),
+                server_default=sa.text("0"),
+                nullable=False,
+            ),
+            sa.Column(
+                "max_attempts",
+                sa.Integer(),
+                server_default=sa.text("3"),
+                nullable=False,
+            ),
+            sa.Column("last_error", sa.Text(), nullable=True),
+            sa.Column(
+                "created_at",
+                sa.DateTime(timezone=True),
+                server_default=sa.text("(CURRENT_TIMESTAMP)"),
+                nullable=False,
+            ),
+            sa.Column(
+                "updated_at",
+                sa.DateTime(timezone=True),
+                server_default=sa.text("(CURRENT_TIMESTAMP)"),
+                nullable=False,
+            ),
+            sa.PrimaryKeyConstraint("id", name="pk_fetcher_jobs"),
+            sa.UniqueConstraint("dedupe_key", name="uq_fetcher_jobs_dedupe_key"),
+        )
+        op.create_index(
+            "ix_fetcher_jobs_status_id",
+            "fetcher_jobs",
+            ["status", "id"],
+            unique=False,
+        )
+    else:
+        idx_names = {ix["name"] for ix in insp.get_indexes("fetcher_jobs")}
+        if "ix_fetcher_jobs_status_id" not in idx_names:
+            op.create_index(
+                "ix_fetcher_jobs_status_id",
+                "fetcher_jobs",
+                ["status", "id"],
+                unique=False,
+            )
+
     kinds_list = ",".join(f"'{k}'" for k in _FAILED_IMPORT_JOB_KINDS)
     # Copy rows; in-flight leased work becomes pending + cleared lease + audit note (retriable).
+    # INSERT OR IGNORE: safe if rows were already copied but revision was not stamped.
     bind.execute(
         sa.text(f"""
-        INSERT INTO fetcher_jobs (
+        INSERT OR IGNORE INTO fetcher_jobs (
             id, dedupe_key, job_kind, payload_json, status, lease_owner, lease_expires_at,
             attempt_count, max_attempts, last_error, created_at, updated_at
         )

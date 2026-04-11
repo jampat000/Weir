@@ -21,6 +21,11 @@ from mediamop.modules.fetcher.failed_import_cleanup_drive_schedule_specs import 
 )
 from mediamop.modules.fetcher.failed_import_queue_job_handlers import build_failed_import_queue_job_handlers
 from mediamop.modules.fetcher.failed_import_queue_worker_runtime import build_failed_import_queue_worker_runtime_bundle
+from mediamop.modules.fetcher.fetcher_arr_search_handlers import merge_fetcher_failed_import_and_search_handlers
+from mediamop.modules.fetcher.fetcher_arr_search_periodic_enqueue import (
+    start_fetcher_arr_search_enqueue_tasks,
+    stop_fetcher_arr_search_enqueue_tasks,
+)
 from mediamop.modules.fetcher.fetcher_worker_loop import (
     start_fetcher_worker_background_tasks,
     stop_fetcher_worker_background_tasks,
@@ -69,11 +74,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         session_factory,
         failed_import_runtime=failed_import_queue_worker_runtime,
     )
+    fetcher_job_handlers = merge_fetcher_failed_import_and_search_handlers(
+        failed_import_job_handlers,
+        settings,
+        session_factory,
+    )
+    fetcher_arr_search_tasks = start_fetcher_arr_search_enqueue_tasks(
+        session_factory,
+        stop_event=stop,
+        settings=settings,
+    )
     fetcher_stop, fetcher_worker_tasks = start_fetcher_worker_background_tasks(
         session_factory,
         settings,
         stop_event=stop,
-        job_handlers=failed_import_job_handlers,
+        job_handlers=fetcher_job_handlers,
     )
     refiner_handlers = default_refiner_job_handler_registry()
     refiner_stop, refiner_worker_tasks = start_refiner_worker_background_tasks(
@@ -86,6 +101,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         stop.set()
+        await stop_fetcher_arr_search_enqueue_tasks(fetcher_arr_search_tasks)
         await stop_fetcher_failed_import_cleanup_drive_enqueue_tasks(fetcher_schedule_tasks)
         await stop_fetcher_worker_background_tasks(fetcher_stop, fetcher_worker_tasks)
         await stop_refiner_worker_background_tasks(refiner_stop, refiner_worker_tasks)

@@ -103,6 +103,42 @@ class MediaMopSettings:
     failed_import_radarr_cleanup_drive_schedule_interval_seconds: int
     failed_import_sonarr_cleanup_drive_schedule_enabled: bool
     failed_import_sonarr_cleanup_drive_schedule_interval_seconds: int
+    # Fetcher Arr search (missing / upgrade) — env ``MEDIAMOP_FETCHER_*`` (not Refiner).
+    fetcher_sonarr_search_missing_enabled: bool
+    fetcher_sonarr_search_upgrade_enabled: bool
+    fetcher_radarr_search_missing_enabled: bool
+    fetcher_radarr_search_upgrade_enabled: bool
+    # Four independent lanes: ``missing_search.{sonarr,radarr}.*`` and ``upgrade_search.{sonarr,radarr}.*``.
+    # Each has its own batch limit, retry/cooldown minutes, and schedule window (no cross-lane coupling).
+    fetcher_sonarr_missing_search_max_items_per_run: int
+    fetcher_sonarr_missing_search_retry_delay_minutes: int
+    fetcher_sonarr_missing_search_schedule_enabled: bool
+    fetcher_sonarr_missing_search_schedule_days: str
+    fetcher_sonarr_missing_search_schedule_start: str
+    fetcher_sonarr_missing_search_schedule_end: str
+    fetcher_sonarr_upgrade_search_max_items_per_run: int
+    fetcher_sonarr_upgrade_search_retry_delay_minutes: int
+    fetcher_sonarr_upgrade_search_schedule_enabled: bool
+    fetcher_sonarr_upgrade_search_schedule_days: str
+    fetcher_sonarr_upgrade_search_schedule_start: str
+    fetcher_sonarr_upgrade_search_schedule_end: str
+    fetcher_radarr_missing_search_max_items_per_run: int
+    fetcher_radarr_missing_search_retry_delay_minutes: int
+    fetcher_radarr_missing_search_schedule_enabled: bool
+    fetcher_radarr_missing_search_schedule_days: str
+    fetcher_radarr_missing_search_schedule_start: str
+    fetcher_radarr_missing_search_schedule_end: str
+    fetcher_radarr_upgrade_search_max_items_per_run: int
+    fetcher_radarr_upgrade_search_retry_delay_minutes: int
+    fetcher_radarr_upgrade_search_schedule_enabled: bool
+    fetcher_radarr_upgrade_search_schedule_days: str
+    fetcher_radarr_upgrade_search_schedule_start: str
+    fetcher_radarr_upgrade_search_schedule_end: str
+    fetcher_arr_search_schedule_timezone: str
+    fetcher_sonarr_missing_search_schedule_interval_seconds: int
+    fetcher_sonarr_upgrade_search_schedule_interval_seconds: int
+    fetcher_radarr_missing_search_schedule_interval_seconds: int
+    fetcher_radarr_upgrade_search_schedule_interval_seconds: int
 
     @property
     def trusted_browser_origins(self) -> tuple[str, ...]:
@@ -185,6 +221,134 @@ class MediaMopSettings:
             _env_int("MEDIAMOP_FAILED_IMPORT_SONARR_CLEANUP_DRIVE_SCHEDULE_INTERVAL_SECONDS", 3600),
         )
 
+        def _clamp_search_iv(n: int) -> int:
+            return _clamp_failed_import_cleanup_drive_schedule_interval_seconds(n)
+
+        son_miss_on = _env_bool("MEDIAMOP_FETCHER_SONARR_SEARCH_MISSING_ENABLED", True)
+        son_up_on = _env_bool("MEDIAMOP_FETCHER_SONARR_SEARCH_UPGRADE_ENABLED", True)
+        rad_miss_on = _env_bool("MEDIAMOP_FETCHER_RADARR_SEARCH_MISSING_ENABLED", True)
+        rad_up_on = _env_bool("MEDIAMOP_FETCHER_RADARR_SEARCH_UPGRADE_ENABLED", True)
+
+        _retry_cap = 365 * 24 * 60
+        _items_cap = 1000
+
+        def _lane_max(primary: str, legacy: str, default: int) -> int:
+            if (os.environ.get(primary) or "").strip():
+                return max(1, min(_env_int(primary, default), _items_cap))
+            return max(1, min(_env_int(legacy, default), _items_cap))
+
+        def _lane_retry(primary: str, legacy: str, default: int) -> int:
+            if (os.environ.get(primary) or "").strip():
+                return max(1, min(_env_int(primary, default), _retry_cap))
+            return max(1, min(_env_int(legacy, default), _retry_cap))
+
+        def _lane_sched_on(primary: str, legacy_key: str, legacy_default: bool) -> bool:
+            if (os.environ.get(primary) or "").strip() != "":
+                return _env_bool(primary, legacy_default)
+            return _env_bool(legacy_key, legacy_default)
+
+        def _lane_sched_str(primary: str, legacy: str, default: str) -> str:
+            if primary in os.environ:
+                return (os.environ.get(primary) or "").strip()
+            return (os.environ.get(legacy) or default).strip()
+
+        son_max_legacy = "MEDIAMOP_FETCHER_SONARR_SEARCH_MAX_ITEMS_PER_RUN"
+        rad_max_legacy = "MEDIAMOP_FETCHER_RADARR_SEARCH_MAX_ITEMS_PER_RUN"
+        son_retry_legacy = "MEDIAMOP_FETCHER_SONARR_SEARCH_RETRY_DELAY_MINUTES"
+        rad_retry_legacy = "MEDIAMOP_FETCHER_RADARR_SEARCH_RETRY_DELAY_MINUTES"
+        son_sched_on_legacy = "MEDIAMOP_FETCHER_SONARR_SEARCH_SCHEDULE_ENABLED"
+        son_days_legacy = "MEDIAMOP_FETCHER_SONARR_SEARCH_SCHEDULE_DAYS"
+        son_start_legacy = "MEDIAMOP_FETCHER_SONARR_SEARCH_SCHEDULE_START"
+        son_end_legacy = "MEDIAMOP_FETCHER_SONARR_SEARCH_SCHEDULE_END"
+        rad_sched_on_legacy = "MEDIAMOP_FETCHER_RADARR_SEARCH_SCHEDULE_ENABLED"
+        rad_days_legacy = "MEDIAMOP_FETCHER_RADARR_SEARCH_SCHEDULE_DAYS"
+        rad_start_legacy = "MEDIAMOP_FETCHER_RADARR_SEARCH_SCHEDULE_START"
+        rad_end_legacy = "MEDIAMOP_FETCHER_RADARR_SEARCH_SCHEDULE_END"
+
+        son_miss_max = _lane_max("MEDIAMOP_FETCHER_SONARR_MISSING_SEARCH_MAX_ITEMS_PER_RUN", son_max_legacy, 50)
+        son_up_max = _lane_max("MEDIAMOP_FETCHER_SONARR_UPGRADE_SEARCH_MAX_ITEMS_PER_RUN", son_max_legacy, 50)
+        rad_miss_max = _lane_max("MEDIAMOP_FETCHER_RADARR_MISSING_SEARCH_MAX_ITEMS_PER_RUN", rad_max_legacy, 50)
+        rad_up_max = _lane_max("MEDIAMOP_FETCHER_RADARR_UPGRADE_SEARCH_MAX_ITEMS_PER_RUN", rad_max_legacy, 50)
+
+        son_miss_retry = _lane_retry("MEDIAMOP_FETCHER_SONARR_MISSING_SEARCH_RETRY_DELAY_MINUTES", son_retry_legacy, 1440)
+        son_up_retry = _lane_retry("MEDIAMOP_FETCHER_SONARR_UPGRADE_SEARCH_RETRY_DELAY_MINUTES", son_retry_legacy, 1440)
+        rad_miss_retry = _lane_retry("MEDIAMOP_FETCHER_RADARR_MISSING_SEARCH_RETRY_DELAY_MINUTES", rad_retry_legacy, 1440)
+        rad_up_retry = _lane_retry("MEDIAMOP_FETCHER_RADARR_UPGRADE_SEARCH_RETRY_DELAY_MINUTES", rad_retry_legacy, 1440)
+
+        son_miss_win_on = _lane_sched_on(
+            "MEDIAMOP_FETCHER_SONARR_MISSING_SEARCH_SCHEDULE_ENABLED",
+            son_sched_on_legacy,
+            False,
+        )
+        son_up_win_on = _lane_sched_on(
+            "MEDIAMOP_FETCHER_SONARR_UPGRADE_SEARCH_SCHEDULE_ENABLED",
+            son_sched_on_legacy,
+            False,
+        )
+        rad_miss_win_on = _lane_sched_on(
+            "MEDIAMOP_FETCHER_RADARR_MISSING_SEARCH_SCHEDULE_ENABLED",
+            rad_sched_on_legacy,
+            False,
+        )
+        rad_up_win_on = _lane_sched_on(
+            "MEDIAMOP_FETCHER_RADARR_UPGRADE_SEARCH_SCHEDULE_ENABLED",
+            rad_sched_on_legacy,
+            False,
+        )
+
+        son_miss_days = _lane_sched_str("MEDIAMOP_FETCHER_SONARR_MISSING_SEARCH_SCHEDULE_DAYS", son_days_legacy, "")
+        son_up_days = _lane_sched_str("MEDIAMOP_FETCHER_SONARR_UPGRADE_SEARCH_SCHEDULE_DAYS", son_days_legacy, "")
+        rad_miss_days = _lane_sched_str("MEDIAMOP_FETCHER_RADARR_MISSING_SEARCH_SCHEDULE_DAYS", rad_days_legacy, "")
+        rad_up_days = _lane_sched_str("MEDIAMOP_FETCHER_RADARR_UPGRADE_SEARCH_SCHEDULE_DAYS", rad_days_legacy, "")
+
+        son_miss_start = _lane_sched_str(
+            "MEDIAMOP_FETCHER_SONARR_MISSING_SEARCH_SCHEDULE_START",
+            son_start_legacy,
+            "00:00",
+        )
+        son_up_start = _lane_sched_str(
+            "MEDIAMOP_FETCHER_SONARR_UPGRADE_SEARCH_SCHEDULE_START",
+            son_start_legacy,
+            "00:00",
+        )
+        rad_miss_start = _lane_sched_str(
+            "MEDIAMOP_FETCHER_RADARR_MISSING_SEARCH_SCHEDULE_START",
+            rad_start_legacy,
+            "00:00",
+        )
+        rad_up_start = _lane_sched_str(
+            "MEDIAMOP_FETCHER_RADARR_UPGRADE_SEARCH_SCHEDULE_START",
+            rad_start_legacy,
+            "00:00",
+        )
+
+        son_miss_end = _lane_sched_str(
+            "MEDIAMOP_FETCHER_SONARR_MISSING_SEARCH_SCHEDULE_END",
+            son_end_legacy,
+            "23:59",
+        )
+        son_up_end = _lane_sched_str(
+            "MEDIAMOP_FETCHER_SONARR_UPGRADE_SEARCH_SCHEDULE_END",
+            son_end_legacy,
+            "23:59",
+        )
+        rad_miss_end = _lane_sched_str(
+            "MEDIAMOP_FETCHER_RADARR_MISSING_SEARCH_SCHEDULE_END",
+            rad_end_legacy,
+            "23:59",
+        )
+        rad_up_end = _lane_sched_str(
+            "MEDIAMOP_FETCHER_RADARR_UPGRADE_SEARCH_SCHEDULE_END",
+            rad_end_legacy,
+            "23:59",
+        )
+
+        arr_tz = (os.environ.get("MEDIAMOP_FETCHER_ARR_SEARCH_SCHEDULE_TIMEZONE") or "UTC").strip() or "UTC"
+        son_miss_iv = _clamp_search_iv(_env_int("MEDIAMOP_FETCHER_SONARR_MISSING_SEARCH_SCHEDULE_INTERVAL_SECONDS", 3600))
+        son_up_iv = _clamp_search_iv(_env_int("MEDIAMOP_FETCHER_SONARR_UPGRADE_SEARCH_SCHEDULE_INTERVAL_SECONDS", 3600))
+        rad_miss_iv = _clamp_search_iv(_env_int("MEDIAMOP_FETCHER_RADARR_MISSING_SEARCH_SCHEDULE_INTERVAL_SECONDS", 3600))
+        rad_up_iv = _clamp_search_iv(_env_int("MEDIAMOP_FETCHER_RADARR_UPGRADE_SEARCH_SCHEDULE_INTERVAL_SECONDS", 3600))
+
         return cls(
             env=env,
             log_level=level,
@@ -219,4 +383,37 @@ class MediaMopSettings:
             failed_import_radarr_cleanup_drive_schedule_interval_seconds=radarr_sched_iv,
             failed_import_sonarr_cleanup_drive_schedule_enabled=sonarr_sched_on,
             failed_import_sonarr_cleanup_drive_schedule_interval_seconds=sonarr_sched_iv,
+            fetcher_sonarr_search_missing_enabled=son_miss_on,
+            fetcher_sonarr_search_upgrade_enabled=son_up_on,
+            fetcher_radarr_search_missing_enabled=rad_miss_on,
+            fetcher_radarr_search_upgrade_enabled=rad_up_on,
+            fetcher_sonarr_missing_search_max_items_per_run=son_miss_max,
+            fetcher_sonarr_missing_search_retry_delay_minutes=son_miss_retry,
+            fetcher_sonarr_missing_search_schedule_enabled=son_miss_win_on,
+            fetcher_sonarr_missing_search_schedule_days=son_miss_days,
+            fetcher_sonarr_missing_search_schedule_start=son_miss_start,
+            fetcher_sonarr_missing_search_schedule_end=son_miss_end,
+            fetcher_sonarr_upgrade_search_max_items_per_run=son_up_max,
+            fetcher_sonarr_upgrade_search_retry_delay_minutes=son_up_retry,
+            fetcher_sonarr_upgrade_search_schedule_enabled=son_up_win_on,
+            fetcher_sonarr_upgrade_search_schedule_days=son_up_days,
+            fetcher_sonarr_upgrade_search_schedule_start=son_up_start,
+            fetcher_sonarr_upgrade_search_schedule_end=son_up_end,
+            fetcher_radarr_missing_search_max_items_per_run=rad_miss_max,
+            fetcher_radarr_missing_search_retry_delay_minutes=rad_miss_retry,
+            fetcher_radarr_missing_search_schedule_enabled=rad_miss_win_on,
+            fetcher_radarr_missing_search_schedule_days=rad_miss_days,
+            fetcher_radarr_missing_search_schedule_start=rad_miss_start,
+            fetcher_radarr_missing_search_schedule_end=rad_miss_end,
+            fetcher_radarr_upgrade_search_max_items_per_run=rad_up_max,
+            fetcher_radarr_upgrade_search_retry_delay_minutes=rad_up_retry,
+            fetcher_radarr_upgrade_search_schedule_enabled=rad_up_win_on,
+            fetcher_radarr_upgrade_search_schedule_days=rad_up_days,
+            fetcher_radarr_upgrade_search_schedule_start=rad_up_start,
+            fetcher_radarr_upgrade_search_schedule_end=rad_up_end,
+            fetcher_arr_search_schedule_timezone=arr_tz,
+            fetcher_sonarr_missing_search_schedule_interval_seconds=son_miss_iv,
+            fetcher_sonarr_upgrade_search_schedule_interval_seconds=son_up_iv,
+            fetcher_radarr_missing_search_schedule_interval_seconds=rad_miss_iv,
+            fetcher_radarr_upgrade_search_schedule_interval_seconds=rad_up_iv,
         )

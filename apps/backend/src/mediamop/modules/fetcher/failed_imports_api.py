@@ -33,6 +33,7 @@ from mediamop.modules.fetcher.fetcher_jobs_inspection_service import (
 )
 from mediamop.modules.fetcher.fetcher_jobs_model import FetcherJob, FetcherJobStatus
 from mediamop.modules.fetcher.fetcher_jobs_ops import recover_handler_ok_finalize_failed_to_completed
+from mediamop.modules.fetcher.fetcher_arr_search_enqueue import enqueue_manual_arr_search_job
 from mediamop.modules.fetcher.manual_cleanup_drive_enqueue import (
     manual_enqueue_radarr_cleanup_drive,
     manual_enqueue_sonarr_cleanup_drive,
@@ -47,6 +48,10 @@ from mediamop.modules.fetcher.schemas_fetcher_jobs_inspection import FetcherJobs
 from mediamop.modules.fetcher.schemas_manual_cleanup_enqueue import (
     ManualCleanupDriveEnqueueIn,
     ManualCleanupDriveEnqueueOut,
+)
+from mediamop.modules.fetcher.schemas_arr_search_manual import (
+    FetcherArrSearchManualEnqueueIn,
+    FetcherArrSearchManualEnqueueOut,
 )
 from mediamop.modules.arr_failed_import.env_settings import AppFailedImportCleanupPolicySettings
 from mediamop.modules.fetcher.failed_import_runtime_visibility import (
@@ -195,6 +200,35 @@ def get_fetcher_failed_imports_inspection(
         limit=limit,
         statuses=DEFAULT_TERMINAL_STATUSES,
         default_terminal_only=True,
+    )
+
+
+@router.post(
+    "/fetcher/arr-search/enqueue",
+    response_model=FetcherArrSearchManualEnqueueOut,
+)
+def post_fetcher_arr_search_enqueue(
+    body: FetcherArrSearchManualEnqueueIn,
+    request: Request,
+    _user: RequireOperatorDep,
+    db: DbSessionDep,
+    settings: SettingsDep,
+) -> FetcherArrSearchManualEnqueueOut:
+    """Fetcher: enqueue one manual Sonarr/Radarr missing or upgrade search job (``fetcher_jobs`` only)."""
+
+    validate_browser_post_origin(request, settings)
+    secret = require_session_secret(settings)
+    if not verify_csrf_token(secret, body.csrf_token):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired CSRF token.",
+        )
+
+    job = enqueue_manual_arr_search_job(db, scope=body.scope)
+    return FetcherArrSearchManualEnqueueOut(
+        job_id=job.id,
+        dedupe_key=job.dedupe_key,
+        job_kind=job.job_kind,
     )
 
 

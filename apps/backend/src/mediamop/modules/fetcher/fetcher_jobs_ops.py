@@ -43,6 +43,69 @@ RETURNING id
 """
 
 
+_TERMINAL_FETCHER_JOB_STATUSES: frozenset[str] = frozenset(
+    {
+        FetcherJobStatus.COMPLETED.value,
+        FetcherJobStatus.FAILED.value,
+        FetcherJobStatus.HANDLER_OK_FINALIZE_FAILED.value,
+    },
+)
+
+
+def fetcher_enqueue_or_requeue_schedule_job(
+    session: Session,
+    *,
+    dedupe_key: str,
+    job_kind: str,
+    payload_json: str | None = None,
+    max_attempts: int = 3,
+) -> FetcherJob:
+    """Insert or return a row; if an existing row is terminal, reset it to ``pending`` for the next tick.
+
+    Recurring scheduled Arr search jobs reuse one ``dedupe_key`` per family so operators see one
+    durable row per lane slice; this is distinct from ``fetcher_enqueue_or_get_job``, which never
+    revives completed rows.
+    """
+
+    validate_fetcher_enqueue_job_kind(job_kind)
+    existing = session.scalar(select(FetcherJob).where(FetcherJob.dedupe_key == dedupe_key))
+    if existing is not None:
+        if existing.status in _TERMINAL_FETCHER_JOB_STATUSES:
+            existing.status = FetcherJobStatus.PENDING.value
+            existing.lease_owner = None
+            existing.lease_expires_at = None
+            existing.attempt_count = 0
+            existing.last_error = None
+            existing.job_kind = job_kind
+            if payload_json is not None:
+                existing.payload_json = payload_json
+            existing.max_attempts = max(1, max_attempts)
+            session.flush()
+        return existing
+
+    row = FetcherJob(
+        dedupe_key=dedupe_key,
+        job_kind=job_kind,
+        payload_json=payload_json,
+        status=FetcherJobStatus.PENDING.value,
+        max_attempts=max(1, max_attempts),
+    )
+    with session.begin_nested():
+        session.add(row)
+        try:
+            session.flush()
+        except IntegrityError:
+            pass
+        else:
+            return row
+
+    found = session.scalar(select(FetcherJob).where(FetcherJob.dedupe_key == dedupe_key))
+    if found is None:
+        msg = "fetcher schedule job dedupe race: row missing after IntegrityError"
+        raise RuntimeError(msg)
+    return found
+
+
 def fetcher_enqueue_or_get_job(
     session: Session,
     *,

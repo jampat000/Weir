@@ -27,6 +27,9 @@ from mediamop.core.db import Base
 from mediamop.platform.activity import models as _activity_orm  # noqa: F401
 from mediamop.platform.auth import models as _auth_orm  # noqa: F401
 from mediamop.modules.fetcher import cleanup_policy_model as _fetcher_cleanup_policy_orm  # noqa: F401
+from mediamop.modules.fetcher import fetcher_arr_action_log_model as _fetcher_arr_action_log_orm  # noqa: F401
+from mediamop.modules.fetcher import fetcher_jobs_model as _fetcher_jobs_orm  # noqa: F401
+from mediamop.modules.fetcher import fetcher_search_schedule_state_model as _fetcher_search_state_orm  # noqa: F401
 from mediamop.modules.refiner import jobs_model as _refiner_jobs_orm  # noqa: F401
 
 # this is the Alembic Config object, which provides access to the values within alembic.ini

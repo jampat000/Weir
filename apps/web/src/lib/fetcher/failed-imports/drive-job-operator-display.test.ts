@@ -4,6 +4,10 @@ import {
   FAILED_IMPORT_DRIVE_DEDUPE_KEY_SONARR,
   FAILED_IMPORT_JOB_KIND_RADARR_CLEANUP_DRIVE,
   FAILED_IMPORT_JOB_KIND_SONARR_CLEANUP_DRIVE,
+  FETCHER_ARR_SEARCH_DEDUPE_SCHEDULED_RADARR_MISSING,
+  FETCHER_ARR_SEARCH_DEDUPE_SCHEDULED_SONARR_UPGRADE,
+  FETCHER_ARR_SEARCH_JOB_KIND_RADARR_MISSING,
+  FETCHER_ARR_SEARCH_JOB_KIND_SONARR_UPGRADE,
   FETCHER_FAILED_IMPORT_DRIVE_JOB_KINDS,
   failedImportDriveJobKindOperatorLabel,
   failedImportDriveStableKeyOperatorLabel,
@@ -17,6 +21,15 @@ describe("failedImportDriveJobKindOperatorLabel", () => {
 
   it("falls back to the raw kind for unknown values", () => {
     expect(failedImportDriveJobKindOperatorLabel("unknown.kind.v1")).toBe("unknown.kind.v1");
+  });
+
+  it("maps Arr search job kinds to operator labels", () => {
+    expect(failedImportDriveJobKindOperatorLabel(FETCHER_ARR_SEARCH_JOB_KIND_SONARR_UPGRADE)).toBe(
+      "Sonarr upgrade search",
+    );
+    expect(failedImportDriveJobKindOperatorLabel(FETCHER_ARR_SEARCH_JOB_KIND_RADARR_MISSING)).toBe(
+      "Radarr missing search",
+    );
   });
 });
 
@@ -42,5 +55,14 @@ describe("failedImportDriveStableKeyOperatorLabel", () => {
 
   it("falls back to the job-kind label when the dedupe key is unknown", () => {
     expect(failedImportDriveStableKeyOperatorLabel("insp-pending", "k.manual")).toBe("k.manual");
+  });
+
+  it("maps scheduled Arr search dedupe keys to operator labels", () => {
+    expect(
+      failedImportDriveStableKeyOperatorLabel(FETCHER_ARR_SEARCH_DEDUPE_SCHEDULED_RADARR_MISSING, "ignored"),
+    ).toBe("Radarr missing search");
+    expect(
+      failedImportDriveStableKeyOperatorLabel(FETCHER_ARR_SEARCH_DEDUPE_SCHEDULED_SONARR_UPGRADE, "ignored"),
+    ).toBe("Sonarr upgrade search");
   });
 });
