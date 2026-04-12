@@ -3,6 +3,7 @@
 Radarr/Sonarr download-queue failed-import cleanup and related Fetcher operator APIs live under
 ``mediamop.modules.fetcher`` (e.g. ``failed_imports_api`` for policy/runtime/drives, ``fetcher_jobs_api`` for persisted
 ``fetcher_jobs`` inspection and manual finalize recovery, ``fetcher_arr_search_api`` for manual Arr search enqueue).
+Refiner persisted-queue inspection lives here: ``refiner_jobs_inspection_api`` (``GET …/refiner/jobs/inspection``).
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from mediamop.modules.refiner.refiner_candidate_gate_api import router as refiner_candidate_gate_router
+from mediamop.modules.refiner.refiner_jobs_inspection_api import router as refiner_jobs_inspection_router
 from mediamop.modules.refiner.refiner_file_remux_pass_api import router as refiner_file_remux_pass_router
 from mediamop.modules.refiner.refiner_path_settings_api import router as refiner_path_settings_router
 from mediamop.modules.refiner.refiner_runtime_settings_api import router as refiner_runtime_settings_router
@@ -21,6 +23,7 @@ from mediamop.modules.refiner.refiner_watched_folder_remux_scan_dispatch_api imp
 )
 
 router = APIRouter(tags=["refiner"])
+router.include_router(refiner_jobs_inspection_router)
 router.include_router(refiner_path_settings_router)
 router.include_router(refiner_runtime_settings_router)
 router.include_router(refiner_supplied_payload_evaluation_router)

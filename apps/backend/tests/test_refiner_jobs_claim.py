@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from mediamop.core.db import Base
 from mediamop.modules.refiner.jobs_model import RefinerJob, RefinerJobStatus
 from mediamop.modules.refiner.jobs_ops import (
+    cancel_pending_refiner_job,
     claim_next_eligible_refiner_job,
     complete_claimed_refiner_job,
     fail_claimed_refiner_job,
@@ -464,3 +465,27 @@ def test_two_workers_claim_different_jobs(session_factory):
     t2.join()
     ids = {x for x in claimed if x is not None}
     assert len(ids) == 2
+
+
+def test_cancel_pending_tombstones_dedupe_so_fresh_enqueue_reuses_key(session_factory):
+    fac = session_factory
+    with fac() as s:
+        j = refiner_enqueue_or_get_job(s, dedupe_key="reuse-me", job_kind="refiner.test.harness.v1")
+        jid = j.id
+        s.commit()
+
+    with fac() as s:
+        assert cancel_pending_refiner_job(s, job_id=jid) == "ok"
+        s.commit()
+
+    with fac() as s:
+        old = s.get(RefinerJob, jid)
+        assert old is not None
+        assert old.status == RefinerJobStatus.CANCELLED.value
+        assert ":cancelled:" in old.dedupe_key
+        j2 = refiner_enqueue_or_get_job(s, dedupe_key="reuse-me", job_kind="refiner.test.harness.v1")
+        s.commit()
+
+    assert j2.id != jid
+    assert j2.dedupe_key == "reuse-me"
+    assert j2.status == RefinerJobStatus.PENDING.value

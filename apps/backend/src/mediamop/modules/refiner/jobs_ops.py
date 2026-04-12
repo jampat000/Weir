@@ -9,6 +9,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Literal
 
+_REFINER_JOB_DEDUPE_KEY_MAX_LEN = 512
+
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -41,6 +43,37 @@ WHERE id = (
 )
 RETURNING id
 """
+
+
+def _tombstone_cancelled_dedupe_key(*, original: str, job_id: int) -> str:
+    """Rewrite ``dedupe_key`` so the original key can be reused for a new enqueue."""
+
+    suffix = f":cancelled:{job_id}"
+    base = (original or "")[: max(0, _REFINER_JOB_DEDUPE_KEY_MAX_LEN - len(suffix))]
+    out = f"{base}{suffix}"
+    return out[:_REFINER_JOB_DEDUPE_KEY_MAX_LEN]
+
+
+def cancel_pending_refiner_job(session: Session, *, job_id: int) -> Literal["ok", "not_found", "wrong_status"]:
+    """Operator abandon: only ``pending`` rows; refuses leased/completed/failed/cancelled.
+
+    Rewrites ``dedupe_key`` to a tombstone so a later enqueue may reuse the operator-facing
+    dedupe string. Does not touch Activity (no job had run yet for typical cancel use).
+    """
+
+    job = session.scalars(select(RefinerJob).where(RefinerJob.id == job_id)).one_or_none()
+    if job is None:
+        return "not_found"
+    if job.status != RefinerJobStatus.PENDING.value:
+        return "wrong_status"
+
+    job.dedupe_key = _tombstone_cancelled_dedupe_key(original=job.dedupe_key, job_id=job.id)
+    job.status = RefinerJobStatus.CANCELLED.value
+    job.lease_owner = None
+    job.lease_expires_at = None
+    job.last_error = "Cancelled by operator before a worker claimed this job."
+    session.flush()
+    return "ok"
 
 
 def refiner_enqueue_or_get_job(

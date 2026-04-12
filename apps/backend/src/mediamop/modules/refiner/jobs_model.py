@@ -20,6 +20,8 @@ class RefinerJobStatus(str, enum.Enum):
     ``failed`` means the handler (or missing-handler path) failed or exhausted retries.
     ``handler_ok_finalize_failed`` means the handler ran without error but persisting
     ``completed`` (finalize) failed — distinct from ordinary failure, not re-runnable.
+    ``cancelled`` means the operator removed a still-``pending`` row from the queue before
+    workers claimed it; not claimable and not a handler failure.
     """
 
     PENDING = "pending"
@@ -27,6 +29,7 @@ class RefinerJobStatus(str, enum.Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     HANDLER_OK_FINALIZE_FAILED = "handler_ok_finalize_failed"
+    CANCELLED = "cancelled"
 
 
 class RefinerJob(Base):

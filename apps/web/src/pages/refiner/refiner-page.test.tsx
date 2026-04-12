@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import type { UserPublic } from "../../lib/api/types";
 import { qk } from "../../lib/auth/queries";
+import { refinerJobsInspectionQueryKey } from "../../lib/refiner/jobs-inspection/queries";
 import { refinerPathSettingsQueryKey, refinerRuntimeSettingsQueryKey } from "../../lib/refiner/queries";
 import type { RefinerPathSettingsOut, RefinerRuntimeSettingsOut } from "../../lib/refiner/types";
 import { RefinerPage } from "./refiner-page";
@@ -42,6 +43,7 @@ function renderRefinerPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   qc.setQueryData(refinerRuntimeSettingsQueryKey, minimalRefinerRuntimeSettings);
   qc.setQueryData(refinerPathSettingsQueryKey, minimalRefinerPathSettings);
+  qc.setQueryData(refinerJobsInspectionQueryKey("recent"), { jobs: [], default_recent_slice: true });
   qc.setQueryData(qk.me, operatorMe);
   return render(wrap(<RefinerPage />, qc));
 }
@@ -98,6 +100,13 @@ describe("RefinerPage (hero compression)", () => {
     expect(text).toMatch(/Radarr/i);
     expect(text).toMatch(/Sonarr/i);
     expect(text).toMatch(/download queue/i);
+  });
+
+  it("shows Refiner jobs inspection with honest split from Activity", () => {
+    renderRefinerPage();
+    const block = screen.getByTestId("refiner-jobs-inspection-section");
+    expect(block.textContent).toMatch(/refiner_jobs/i);
+    expect(block.textContent).toMatch(/Activity/i);
   });
 
   it("documents watched-folder remux scan dispatch as manual scan without implying a background watcher", () => {

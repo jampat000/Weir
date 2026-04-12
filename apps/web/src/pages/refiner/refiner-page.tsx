@@ -1,5 +1,6 @@
 import { RefinerPathSettingsSection } from "./refiner-path-settings-section";
 import { RefinerRuntimeSettingsSection } from "./refiner-runtime-settings-section";
+import { RefinerJobsInspectionSection } from "./refiner-jobs-inspection-section";
 import { RefinerWatchedFolderScanSection } from "./refiner-watched-folder-scan-section";
 
 /** Refiner module home — honest scope for shipped durable ``refiner_jobs`` families. */
@@ -29,6 +30,8 @@ export function RefinerPage() {
 
       <RefinerWatchedFolderScanSection />
 
+      <RefinerJobsInspectionSection />
+
       <section
         className="mt-4 max-w-2xl space-y-3 text-sm leading-relaxed text-[var(--mm-text2)]"
         aria-labelledby="refiner-shipped-families-heading"
@@ -36,6 +39,11 @@ export function RefinerPage() {
         <h2 id="refiner-shipped-families-heading" className="text-base font-semibold text-[var(--mm-text)]">
           Shipped durable job kinds
         </h2>
+        <p className="text-[var(--mm-text3)]">
+          Rows for these kinds (and any future <code className="font-mono text-[0.85em]">refiner.*</code> work on this
+          lane) also show in <strong className="text-[var(--mm-text)]">Refiner jobs (queue)</strong> above for
+          lifecycle fields only — finished outcomes stay on Activity.
+        </p>
         <ul className="list-disc space-y-3 pl-5">
           <li data-testid="refiner-family-supplied-payload-evaluation">
             <strong>
