@@ -65,8 +65,10 @@ export function RefinerWatchedFolderScanSection() {
         worker walks the <strong className="text-[var(--mm-text)]">saved watched folder</strong> for supported media
         files, applies the same Refiner ownership and upstream blocking rules as the candidate gate (Radarr and Sonarr
         download queues combined), then writes one Activity summary: scanned, skipped (non-media), waiting on upstream,
-        and enqueued or skipped remux. There is <strong className="text-[var(--mm-text)]">no</strong> periodic schedule
-        for this family in the first version — only this manual trigger.
+        and enqueued or skipped remux.         Optional periodic enqueue uses separate Refiner-only env keys (see{" "}
+        <strong className="text-[var(--mm-text)]">In-process Refiner workers</strong> below for the snapshot); when
+        enabled, the API process enqueues the same job kind on an interval if no scan is already pending or leased.
+        That is still <strong className="text-[var(--mm-text)]">not</strong> a filesystem watcher.
       </p>
       <p className="mt-2 text-[var(--mm-text3)]">
         By default the scan only classifies files. Optional checkboxes enqueue{" "}

@@ -21,6 +21,16 @@ _CONFIGURATION_NOTE = (
     "2–8 = several concurrent workers for this lane only), then restart the MediaMop API."
 )
 
+_WATCHED_FOLDER_SCAN_PERIODIC_NOTE = (
+    "Optional periodic enqueue for refiner.watched_folder.remux_scan_dispatch.v1 uses "
+    "MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_ENABLED and "
+    "MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_INTERVAL_SECONDS in apps/backend/.env "
+    "(Refiner-only; not shared with Fetcher schedules). Remux options for periodic ticks: "
+    "MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_PERIODIC_ENQUEUE_REMUX_JOBS and "
+    "MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_PERIODIC_REMUX_DRY_RUN. "
+    "Restart the API after changing any of these — values are read at process start only."
+)
+
 
 def refiner_runtime_settings_from_settings(settings: MediaMopSettings) -> RefinerRuntimeSettingsOut:
     """Map loaded settings to a DTO (no DB reads; Refiner-owned semantics)."""
@@ -51,4 +61,17 @@ def refiner_runtime_settings_from_settings(settings: MediaMopSettings) -> Refine
         sqlite_throughput_note=_SQLITE_THROUGHPUT_NOTE,
         configuration_note=_CONFIGURATION_NOTE,
         visibility_note=_VISIBILITY_NOTE,
+        refiner_watched_folder_remux_scan_dispatch_schedule_enabled=(
+            settings.refiner_watched_folder_remux_scan_dispatch_schedule_enabled
+        ),
+        refiner_watched_folder_remux_scan_dispatch_schedule_interval_seconds=(
+            settings.refiner_watched_folder_remux_scan_dispatch_schedule_interval_seconds
+        ),
+        refiner_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs=(
+            settings.refiner_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs
+        ),
+        refiner_watched_folder_remux_scan_dispatch_periodic_remux_dry_run=(
+            settings.refiner_watched_folder_remux_scan_dispatch_periodic_remux_dry_run
+        ),
+        watched_folder_scan_periodic_configuration_note=_WATCHED_FOLDER_SCAN_PERIODIC_NOTE,
     )

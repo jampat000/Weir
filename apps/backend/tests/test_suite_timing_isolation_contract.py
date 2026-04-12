@@ -43,3 +43,13 @@ def test_refiner_supplied_payload_evaluation_has_distinct_schedule_surface_on_se
     names = _field_names()
     assert "refiner_supplied_payload_evaluation_schedule_enabled" in names
     assert "refiner_supplied_payload_evaluation_schedule_interval_seconds" in names
+
+
+def test_refiner_watched_folder_scan_dispatch_has_distinct_schedule_surface_on_settings() -> None:
+    """Watched-folder scan periodic enqueue must not reuse supplied-payload schedule fields."""
+
+    names = _field_names()
+    assert "refiner_watched_folder_remux_scan_dispatch_schedule_enabled" in names
+    assert "refiner_watched_folder_remux_scan_dispatch_schedule_interval_seconds" in names
+    assert "refiner_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs" in names
+    assert "refiner_watched_folder_remux_scan_dispatch_periodic_remux_dry_run" in names

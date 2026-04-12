@@ -25,6 +25,11 @@ export type RefinerRuntimeSettingsOut = {
   sqlite_throughput_note: string;
   configuration_note: string;
   visibility_note: string;
+  refiner_watched_folder_remux_scan_dispatch_schedule_enabled: boolean;
+  refiner_watched_folder_remux_scan_dispatch_schedule_interval_seconds: number;
+  refiner_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs: boolean;
+  refiner_watched_folder_remux_scan_dispatch_periodic_remux_dry_run: boolean;
+  watched_folder_scan_periodic_configuration_note: string;
 };
 
 /** POST /api/v1/refiner/jobs/watched-folder-remux-scan-dispatch/enqueue */

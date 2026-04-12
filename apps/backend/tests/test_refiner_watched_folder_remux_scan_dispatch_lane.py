@@ -139,3 +139,4 @@ def test_scan_handler_enqueues_remux_when_requested(
         detail = json.loads(ev.detail or "{}")
         assert detail.get("verdict_proceed") == 1
         assert detail.get("remux_jobs_enqueued") == 1
+        assert detail.get("scan_trigger") == "manual"

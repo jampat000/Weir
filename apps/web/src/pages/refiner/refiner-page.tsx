@@ -76,7 +76,10 @@ export function RefinerPage() {
             — manual job: scans the saved <strong>Refiner watched folder</strong> for media candidates, applies the same
             ownership and upstream blocking rules as the candidate gate, optionally enqueues per-file{" "}
             <code className="rounded bg-black/25 px-1 font-mono text-[0.8em]">refiner.file.remux_pass.v1</code> work, and
-            writes one Activity summary (scanned, skipped, waiting, enqueued). Not a background watch service.
+            writes one Activity summary (scanned, skipped, waiting, enqueued) with{" "}
+            <code className="rounded bg-black/25 px-1 font-mono text-[0.8em]">scan_trigger</code> set to{" "}
+            <code className="font-mono text-[0.8em]">manual</code> or <code className="font-mono text-[0.8em]">periodic</code>.
+            Optional Refiner-only periodic enqueue is env-driven (interval + enable), not a filesystem watcher.
           </li>
           <li data-testid="refiner-family-file-remux-pass">
             <strong>

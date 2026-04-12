@@ -29,6 +29,11 @@ const minimalRefinerRuntimeSettings: RefinerRuntimeSettingsOut = {
   sqlite_throughput_note: "SQLite note for tests.",
   configuration_note: "Change MEDIAMOP_REFINER_WORKER_COUNT in apps/backend/.env, then restart.",
   visibility_note: "Snapshot note for tests.",
+  refiner_watched_folder_remux_scan_dispatch_schedule_enabled: false,
+  refiner_watched_folder_remux_scan_dispatch_schedule_interval_seconds: 3600,
+  refiner_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs: false,
+  refiner_watched_folder_remux_scan_dispatch_periodic_remux_dry_run: true,
+  watched_folder_scan_periodic_configuration_note: "Periodic scan env is read at API startup only.",
 };
 
 function wrap(ui: ReactNode, client: QueryClient) {
@@ -114,9 +119,9 @@ describe("RefinerPage (hero compression)", () => {
     const li = screen.getByTestId("refiner-family-watched-folder-remux-scan-dispatch");
     const text = li.textContent ?? "";
     expect(text).toMatch(/manual job/i);
-    expect(text).toMatch(/Not a background watch service/i);
+    expect(text).toMatch(/not a filesystem watcher/i);
     const section = screen.getByTestId("refiner-watched-folder-scan-section");
-    expect(section.textContent).toMatch(/no periodic schedule/i);
+    expect(section.textContent).toMatch(/Optional periodic enqueue/i);
   });
 
   it("has no Fetcher link on the page", () => {

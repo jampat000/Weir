@@ -50,6 +50,9 @@ def make_refiner_watched_folder_remux_scan_dispatch_handler(
         body = _parse_job_payload(ctx.payload_json)
         enqueue_remux_jobs = bool(body.get("enqueue_remux_jobs", False))
         remux_dry_run = bool(body.get("remux_dry_run", True))
+        scan_trigger = body.get("scan_trigger", "manual")
+        if scan_trigger not in ("manual", "periodic"):
+            scan_trigger = "manual"
         need_live_paths = enqueue_remux_jobs and not remux_dry_run
 
         with session_factory() as session:
@@ -70,6 +73,7 @@ def make_refiner_watched_folder_remux_scan_dispatch_handler(
         sample_paths: list[str] = []
         summary: dict[str, Any] = {
             "job_id": ctx.id,
+            "scan_trigger": scan_trigger,
             "watched_folder_resolved": watched_root,
             "enqueue_remux_jobs": enqueue_remux_jobs,
             "remux_dry_run": remux_dry_run,

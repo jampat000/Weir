@@ -31,3 +31,19 @@ class RefinerRuntimeSettingsOut(BaseModel):
     visibility_note: str = Field(
         description="Caveat: from settings loaded at startup — not a live probe of worker threads.",
     )
+    refiner_watched_folder_remux_scan_dispatch_schedule_enabled: bool = Field(
+        description="``MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_ENABLED`` at process start.",
+    )
+    refiner_watched_folder_remux_scan_dispatch_schedule_interval_seconds: int = Field(
+        ge=60,
+        description="Seconds between periodic enqueue attempts (clamped 60..7d); restart required to change.",
+    )
+    refiner_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs: bool = Field(
+        description="When true, periodic scans may enqueue ``refiner.file.remux_pass.v1`` (still subject to dry_run).",
+    )
+    refiner_watched_folder_remux_scan_dispatch_periodic_remux_dry_run: bool = Field(
+        description="Forwarded as ``dry_run`` on enqueued remux passes when periodic enqueue_remux is on.",
+    )
+    watched_folder_scan_periodic_configuration_note: str = Field(
+        description="How operators change periodic scan env (restart required).",
+    )

@@ -104,6 +104,12 @@ class MediaMopSettings:
     # Refiner supplied payload evaluation (``refiner.supplied_payload_evaluation.v1``) — Refiner-only schedule.
     refiner_supplied_payload_evaluation_schedule_enabled: bool
     refiner_supplied_payload_evaluation_schedule_interval_seconds: int
+    # Refiner watched-folder remux scan dispatch (``refiner.watched_folder.remux_scan_dispatch.v1``) — Refiner-only
+    # periodic enqueue (optional). Separate enable/interval from supplied payload evaluation (ADR-0009).
+    refiner_watched_folder_remux_scan_dispatch_schedule_enabled: bool
+    refiner_watched_folder_remux_scan_dispatch_schedule_interval_seconds: int
+    refiner_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs: bool
+    refiner_watched_folder_remux_scan_dispatch_periodic_remux_dry_run: bool
     # Legacy env read for compatibility only; remux path resolution uses saved Refiner path settings (SQLite).
     refiner_remux_media_root: str | None
     # Radarr/Sonarr HTTP for Fetcher-owned live failed-import cleanup drives (env: MEDIAMOP_FETCHER_*).
@@ -270,6 +276,21 @@ class MediaMopSettings:
 
         refiner_payload_eval_on = _refiner_supplied_payload_eval_schedule_enabled()
         refiner_payload_eval_iv = _refiner_supplied_payload_eval_schedule_interval_seconds()
+        refiner_wf_scan_dispatch_on = _env_bool(
+            "MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_ENABLED",
+            False,
+        )
+        refiner_wf_scan_dispatch_iv = clamp_refiner_schedule_interval_seconds(
+            _env_int("MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_INTERVAL_SECONDS", 3600),
+        )
+        refiner_wf_scan_periodic_remux_enq = _env_bool(
+            "MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_PERIODIC_ENQUEUE_REMUX_JOBS",
+            False,
+        )
+        refiner_wf_scan_periodic_remux_dry = _env_bool(
+            "MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_PERIODIC_REMUX_DRY_RUN",
+            True,
+        )
         refiner_remux_root = (os.environ.get("MEDIAMOP_REFINER_REMUX_MEDIA_ROOT") or "").strip()
         refiner_remux_media_root = str(Path(refiner_remux_root).expanduser()) if refiner_remux_root else None
         radarr_base = (os.environ.get("MEDIAMOP_FETCHER_RADARR_BASE_URL") or "").strip()
@@ -480,6 +501,10 @@ class MediaMopSettings:
             subber_worker_count=subber_workers,
             refiner_supplied_payload_evaluation_schedule_enabled=refiner_payload_eval_on,
             refiner_supplied_payload_evaluation_schedule_interval_seconds=refiner_payload_eval_iv,
+            refiner_watched_folder_remux_scan_dispatch_schedule_enabled=refiner_wf_scan_dispatch_on,
+            refiner_watched_folder_remux_scan_dispatch_schedule_interval_seconds=refiner_wf_scan_dispatch_iv,
+            refiner_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs=refiner_wf_scan_periodic_remux_enq,
+            refiner_watched_folder_remux_scan_dispatch_periodic_remux_dry_run=refiner_wf_scan_periodic_remux_dry,
             refiner_remux_media_root=refiner_remux_media_root,
             fetcher_radarr_base_url=radarr_base or None,
             fetcher_radarr_api_key=radarr_key or None,
