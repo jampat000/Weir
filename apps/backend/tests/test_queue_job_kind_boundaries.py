@@ -24,6 +24,7 @@ from mediamop.modules.queue_worker.job_kind_boundaries import (
     job_kind_is_fetcher_failed_import_namespace,
     validate_fetcher_worker_handler_registry_keys,
     validate_refiner_worker_handler_registry,
+    validate_trimmer_worker_handler_registry,
 )
 from mediamop.modules.refiner.jobs_model import RefinerJob, RefinerJobStatus
 from mediamop.modules.refiner.jobs_ops import refiner_enqueue_or_get_job
@@ -31,9 +32,14 @@ from mediamop.modules.refiner.worker_loop import (
     default_refiner_job_handler_registry,
     process_one_refiner_job,
 )
+from mediamop.modules.trimmer.trimmer_jobs_model import TrimmerJob, TrimmerJobStatus
+from mediamop.modules.trimmer.trimmer_jobs_ops import trimmer_enqueue_or_get_job
+from mediamop.modules.trimmer.trimmer_job_handlers import build_trimmer_job_handlers
+from mediamop.modules.trimmer.worker_loop import process_one_trimmer_job
 
 import mediamop.modules.fetcher.fetcher_jobs_model  # noqa: F401
 import mediamop.modules.refiner.jobs_model  # noqa: F401
+import mediamop.modules.trimmer.trimmer_jobs_model  # noqa: F401
 import mediamop.platform.activity.models  # noqa: F401
 import mediamop.platform.auth.models  # noqa: F401
 from mediamop.core.db import Base
@@ -205,6 +211,72 @@ def test_process_one_refiner_job_rejects_unprefixed_job_kind_row(session_factory
         assert row.status == RefinerJobStatus.PENDING.value
         assert row.last_error is not None
         assert "refiner.* prefix" in row.last_error
+
+
+def test_trimmer_enqueue_rejects_refiner_and_fetcher_namespaces(session_factory) -> None:
+    with session_factory() as s:
+        with pytest.raises(ValueError, match="trimmer_enqueue_or_get_job refuses"):
+            trimmer_enqueue_or_get_job(s, dedupe_key="x", job_kind="refiner.compact.v1")
+    with session_factory() as s:
+        with pytest.raises(ValueError, match="trimmer_enqueue_or_get_job refuses"):
+            trimmer_enqueue_or_get_job(
+                s,
+                dedupe_key="y",
+                job_kind=FAILED_IMPORT_JOB_KIND_RADARR_CLEANUP_DRIVE,
+            )
+
+
+def test_trimmer_enqueue_rejects_unprefixed_job_kind(session_factory) -> None:
+    with session_factory() as s:
+        with pytest.raises(ValueError, match="trimmer_enqueue_or_get_job requires job_kind"):
+            trimmer_enqueue_or_get_job(s, dedupe_key="u", job_kind="bare.kind")
+
+
+def test_validate_trimmer_worker_handler_registry_rejects_foreign_lane_keys() -> None:
+    with pytest.raises(ValueError, match="Trimmer worker handler registry"):
+        validate_trimmer_worker_handler_registry(
+            {FAILED_IMPORT_JOB_KIND_RADARR_CLEANUP_DRIVE: lambda _c: None},
+        )
+    with pytest.raises(ValueError, match="Trimmer worker handler registry"):
+        validate_trimmer_worker_handler_registry({"refiner.x.v1": lambda _c: None})
+
+
+def test_validate_trimmer_worker_handler_registry_rejects_unprefixed_keys() -> None:
+    with pytest.raises(ValueError, match="Trimmer worker handler registry"):
+        validate_trimmer_worker_handler_registry({"bare.kind": lambda _c: None})
+
+
+def test_process_one_trimmer_job_fails_claimed_row_with_foreign_lane_job_kind(
+    session_factory,
+) -> None:
+    """Mis-placed ``trimmer_jobs`` rows stamped with another module's prefix must not execute."""
+
+    t0 = datetime(2026, 4, 11, 12, 0, 0, tzinfo=timezone.utc)
+    with session_factory() as s:
+        s.add(
+            TrimmerJob(
+                dedupe_key="legacy-trimmer",
+                job_kind="refiner.leaked_on_trimmer.v1",
+                status=TrimmerJobStatus.PENDING.value,
+            ),
+        )
+        s.commit()
+
+    handlers = build_trimmer_job_handlers(session_factory)
+    out = process_one_trimmer_job(
+        session_factory,
+        lease_owner="t",
+        job_handlers=handlers,
+        now=t0,
+        lease_seconds=3600,
+    )
+    assert out == "processed"
+    with session_factory() as s:
+        row = s.scalars(select(TrimmerJob)).first()
+        assert row is not None
+        assert row.status == TrimmerJobStatus.PENDING.value
+        assert row.last_error is not None
+        assert "trimmer worker refused" in row.last_error
 
 
 def test_process_one_fetcher_job_fails_claimed_row_with_refiner_prefix(

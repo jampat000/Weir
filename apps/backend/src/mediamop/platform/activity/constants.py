@@ -27,4 +27,6 @@ FETCHER_ARR_SEARCH_UPGRADE_ZERO_MANUAL = "fetcher.arr_search_upgrade_zero_manual
 
 # Refiner durable families (refiner_jobs)
 REFINER_SUPPLIED_PAYLOAD_EVALUATION_COMPLETED = "refiner.supplied_payload_evaluation_completed"
+
+TRIMMER_TRIM_PLAN_CONSTRAINTS_CHECK_COMPLETED = "trimmer.trim_plan_constraints_check_completed"
 REFINER_CANDIDATE_GATE_COMPLETED = "refiner.candidate_gate_completed"

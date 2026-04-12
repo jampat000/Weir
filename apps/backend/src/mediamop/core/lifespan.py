@@ -35,6 +35,7 @@ from mediamop.modules.fetcher.periodic_failed_import_cleanup_enqueue import (
     stop_fetcher_failed_import_cleanup_drive_enqueue_tasks,
 )
 from mediamop.modules.refiner.refiner_job_handlers import build_refiner_job_handlers
+from mediamop.modules.trimmer.trimmer_job_handlers import build_trimmer_job_handlers
 from mediamop.modules.refiner.refiner_supplied_payload_evaluation_periodic_enqueue import (
     start_refiner_supplied_payload_evaluation_enqueue_tasks,
     stop_refiner_supplied_payload_evaluation_enqueue_tasks,
@@ -42,6 +43,10 @@ from mediamop.modules.refiner.refiner_supplied_payload_evaluation_periodic_enque
 from mediamop.modules.refiner.worker_loop import (
     start_refiner_worker_background_tasks,
     stop_refiner_worker_background_tasks,
+)
+from mediamop.modules.trimmer.worker_loop import (
+    start_trimmer_worker_background_tasks,
+    stop_trimmer_worker_background_tasks,
 )
 from mediamop.platform.auth.rate_limit import SlidingWindowLimiter
 
@@ -106,6 +111,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         stop_event=stop,
         job_handlers=refiner_handlers,
     )
+    trimmer_handlers = build_trimmer_job_handlers(session_factory)
+    trimmer_stop, trimmer_worker_tasks = start_trimmer_worker_background_tasks(
+        session_factory,
+        settings,
+        stop_event=stop,
+        job_handlers=trimmer_handlers,
+    )
     try:
         yield
     finally:
@@ -114,6 +126,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await stop_refiner_supplied_payload_evaluation_enqueue_tasks(refiner_supplied_payload_eval_tasks)
         await stop_fetcher_failed_import_cleanup_drive_enqueue_tasks(fetcher_schedule_tasks)
         await stop_fetcher_worker_background_tasks(fetcher_stop, fetcher_worker_tasks)
+        await stop_trimmer_worker_background_tasks(trimmer_stop, trimmer_worker_tasks)
         await stop_refiner_worker_background_tasks(refiner_stop, refiner_worker_tasks)
         dispose_engine(app.state.engine)
         app.state.engine = None

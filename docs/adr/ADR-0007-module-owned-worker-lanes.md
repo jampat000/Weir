@@ -69,7 +69,7 @@ MediaMop is **SQLite-first**: one writer per database. Durable background work m
 
 ---
 
-## Trimmer lane (stub — implement when first durable job exists)
+## Trimmer lane (implemented)
 
 | Artifact | Exact name |
 |----------|------------|
@@ -80,11 +80,13 @@ MediaMop is **SQLite-first**: one writer per database. Durable background work m
 | Claim | `claim_next_eligible_trimmer_job` |
 | Worker starter | `start_trimmer_worker_background_tasks` |
 | Worker count env | **`MEDIAMOP_TRIMMER_WORKER_COUNT`** |
-| `job_kind` prefix | **`trimmer.`** (e.g. `trimmer.transcode.batch.v1`) |
+| `job_kind` prefix | **`trimmer.`** |
 
-**Package directory:** `apps/backend/src/mediamop/modules/trimmer/` (mirror Fetcher layout: `trimmer_jobs_model.py`, `trimmer_jobs_ops.py`, `trimmer_worker_loop.py`, …).
+**Shipped durable family (P3):** `trimmer.trim_plan.constraints_check.v1` — manual enqueue only; validates supplied trim segment timing JSON (no transcode, no media file I/O, no *arr). HTTP: `POST /api/v1/trimmer/jobs/trim-plan-constraints-check/enqueue`.
 
-**Lifespan:** start Trimmer periodic tasks (if any) and `start_trimmer_worker_background_tasks` **independently** of Refiner/Fetcher counts.
+**Package directory:** `apps/backend/src/mediamop/modules/trimmer/` (`trimmer_jobs_model.py`, `trimmer_jobs_ops.py`, `worker_loop.py`, `trimmer_job_handlers.py`, …).
+
+**Lifespan:** `start_trimmer_worker_background_tasks` runs **independently** of Refiner/Fetcher worker counts (no shared timing tables).
 
 ---
 
