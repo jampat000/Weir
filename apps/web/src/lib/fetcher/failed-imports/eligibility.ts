@@ -16,8 +16,8 @@ export function showFailedImportManualQueuePassControl(role: string | undefined)
   return role === "admin" || role === "operator";
 }
 
-/** Admin/operator — manual recover for needs-manual-finish tasks only. */
-export function showFailedImportRecoverControl(role: string | undefined, jobStatus: string): boolean {
+/** Admin/operator — manual recover for ``fetcher_jobs`` stuck in ``handler_ok_finalize_failed`` (any job kind). */
+export function showFetcherJobRecoverFinalizeControl(role: string | undefined, jobStatus: string): boolean {
   if (jobStatus !== FAILED_IMPORT_STATUS_HANDLER_OK_FINALIZE_FAILED) {
     return false;
   }

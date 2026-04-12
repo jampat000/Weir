@@ -130,6 +130,20 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """**Not a safe general inverse** after the Fetcher lane has grown beyond this migration's scope.
+
+    This revision originally moved **only** the two failed-import cleanup drive ``job_kind`` values from
+    ``refiner_jobs`` into ``fetcher_jobs``. Downgrade copies those rows back, deletes them from
+    ``fetcher_jobs``, then **drops the entire ``fetcher_jobs`` table**.
+
+    After Alembic revision **0007_fetcher_arr_search** (and any later work), ``fetcher_jobs`` may contain Arr search and other
+    kinds. Running this downgrade on such a database **permanently destroys** those rows — it is not an honest
+    rollback of later features. Only use downgrade on databases that still contain **exclusively** the two
+    failed-import drive kinds in ``fetcher_jobs`` (or accept total loss of other rows).
+
+    The ``INSERT INTO refiner_jobs`` step is also **not idempotent** on its own: a second downgrade attempt can
+    violate primary-key uniqueness on ``refiner_jobs``.
+    """
     bind = op.get_bind()
     kinds_list = ",".join(f"'{k}'" for k in _FAILED_IMPORT_JOB_KINDS)
     bind.execute(

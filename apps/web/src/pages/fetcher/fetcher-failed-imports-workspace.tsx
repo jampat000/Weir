@@ -6,7 +6,7 @@ import { useMeQuery } from "../../lib/auth/queries";
 import { failedImportManualQueuePassResultMessage } from "../../lib/fetcher/failed-imports/enqueue-messages";
 import {
   showFailedImportManualQueuePassControl,
-  showFailedImportRecoverControl,
+  showFetcherJobRecoverFinalizeControl,
 } from "../../lib/fetcher/failed-imports/eligibility";
 import { FetcherFailedImportsCleanupPolicySection } from "./fetcher-failed-imports-cleanup-policy";
 import {
@@ -19,7 +19,7 @@ import { useFetcherJobsInspectionQuery } from "../../lib/fetcher/jobs-inspection
 import {
   useFailedImportFetcherSettingsQuery,
   useFailedImportRadarrEnqueueMutation,
-  useFailedImportRecoverMutation,
+  useFetcherJobRecoverFinalizeMutation,
   useFailedImportSonarrEnqueueMutation,
 } from "../../lib/fetcher/failed-imports/queries";
 import { formatScheduleIntervalSeconds } from "../../lib/fetcher/failed-imports/schedule-format";
@@ -56,7 +56,7 @@ import {
   FETCHER_FI_TABLE_COL_WORK_TYPE,
   FETCHER_FI_TECHNICAL_SUMMARY_LABEL,
 } from "../../lib/fetcher/failed-imports/user-copy";
-import type { FailedImportRecoverFinalizeResult } from "../../lib/fetcher/failed-imports/recover-api";
+import type { FetcherJobRecoverFinalizeResult } from "../../lib/fetcher/failed-imports/recover-api";
 
 function formatUpdated(iso: string): string {
   try {
@@ -253,10 +253,10 @@ function TaskRow({
 }: {
   job: FetcherJobInspectionRow;
   role: string | undefined;
-  recoverMutation: UseMutationResult<FailedImportRecoverFinalizeResult, Error, number, unknown>;
+  recoverMutation: UseMutationResult<FetcherJobRecoverFinalizeResult, Error, number, unknown>;
 }) {
   const emphasizeFinalize = isHandlerOkFinalizeFailedStatus(job.status);
-  const showRecover = showFailedImportRecoverControl(role, job.status);
+  const showRecover = showFetcherJobRecoverFinalizeControl(role, job.status);
   return (
     <tr
       data-testid="fetcher-jobs-inspection-row"
@@ -320,7 +320,7 @@ export function FetcherFailedImportsWorkspace() {
   const me = useMeQuery();
   const rv = useFailedImportFetcherSettingsQuery();
   const q = useFetcherJobsInspectionQuery(filter);
-  const recoverMutation = useFailedImportRecoverMutation();
+  const recoverMutation = useFetcherJobRecoverFinalizeMutation();
 
   useEffect(() => {
     recoverMutation.reset();

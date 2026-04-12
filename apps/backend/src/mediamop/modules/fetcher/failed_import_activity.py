@@ -152,31 +152,3 @@ def record_fetcher_failed_import_drive_failed(
         detail=msg[:4000],
     )
 
-
-def record_fetcher_failed_import_recovered(
-    db: Session,
-    *,
-    job_id: int,
-    job_kind: str,
-) -> None:
-    from mediamop.modules.fetcher.radarr_failed_import_cleanup_job import (
-        FAILED_IMPORT_JOB_KIND_RADARR_CLEANUP_DRIVE,
-    )
-    from mediamop.modules.fetcher.sonarr_failed_import_cleanup_job import (
-        FAILED_IMPORT_JOB_KIND_SONARR_CLEANUP_DRIVE,
-    )
-
-    if job_kind == FAILED_IMPORT_JOB_KIND_RADARR_CLEANUP_DRIVE:
-        scope = "movies (Radarr)"
-    elif job_kind == FAILED_IMPORT_JOB_KIND_SONARR_CLEANUP_DRIVE:
-        scope = "TV (Sonarr)"
-    else:
-        scope = "download queue pass"
-
-    record_activity_event(
-        db,
-        event_type=C.FETCHER_FAILED_IMPORT_RECOVERED,
-        module="fetcher",
-        title="Fetcher recovery marked a failed-import task completed (the download pass was not re-run).",
-        detail=f"Task {job_id} — {scope}.",
-    )

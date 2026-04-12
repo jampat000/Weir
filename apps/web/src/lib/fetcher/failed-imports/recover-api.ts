@@ -1,15 +1,16 @@
 import { fetchCsrfToken } from "../../api/auth-api";
 import { apiFetch, readJson } from "../../api/client";
 
-export type FailedImportRecoverFinalizeResult = {
+export type FetcherJobRecoverFinalizeResult = {
   job_id: number;
   status: string;
 };
 
-export async function postFailedImportRecoverFinalize(jobId: number): Promise<FailedImportRecoverFinalizeResult> {
+/** Manual ``handler_ok_finalize_failed`` → ``completed`` for any ``fetcher_jobs`` row (Fetcher lane). */
+export async function postFetcherJobRecoverFinalize(jobId: number): Promise<FetcherJobRecoverFinalizeResult> {
   const csrf_token = await fetchCsrfToken();
   const r = await apiFetch(
-    `/api/v1/fetcher/failed-imports/tasks/${jobId}/recover-finalize-failure`,
+    `/api/v1/fetcher/jobs/${jobId}/recover-finalize-failure`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -28,5 +29,5 @@ export async function postFailedImportRecoverFinalize(jobId: number): Promise<Fa
     }
     throw new Error(detail || `Could not apply manual completion (${r.status})`);
   }
-  return readJson<FailedImportRecoverFinalizeResult>(r);
+  return readJson<FetcherJobRecoverFinalizeResult>(r);
 }

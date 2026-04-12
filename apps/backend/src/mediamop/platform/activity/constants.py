@@ -17,6 +17,7 @@ FETCHER_FAILED_IMPORT_PASS_QUEUED = "fetcher.failed_import_pass_queued"
 FETCHER_FAILED_IMPORT_RUN_SUMMARY = "fetcher.failed_import_run_summary"
 FETCHER_FAILED_IMPORT_RUN_FAILED = "fetcher.failed_import_run_failed"
 FETCHER_FAILED_IMPORT_RECOVERED = "fetcher.failed_import_recovered"
+FETCHER_JOB_RECOVERED_HANDLER_OK_FINALIZE = "fetcher.job_recovered_handler_ok_finalize"
 
 # Fetcher Arr search (missing / upgrade) — summaries mirror audited Fetcher wording where practical.
 FETCHER_ARR_SEARCH_MISSING_DISPATCHED = "fetcher.arr_search_missing_dispatched"

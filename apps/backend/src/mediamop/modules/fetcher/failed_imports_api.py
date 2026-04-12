@@ -1,8 +1,8 @@
-"""Fetcher HTTP for Radarr/Sonarr download-queue failed-import workflow (policy, runtime, drives, recovery).
+"""Fetcher HTTP for Radarr/Sonarr download-queue failed-import workflow (policy, runtime, drives).
 
-Arr search manual enqueue lives in ``fetcher_arr_search_api``; persisted ``fetcher_jobs`` inspection lives in
-``fetcher_jobs_api``. Shared classification/policy for the download queue remains in
-``mediamop.modules.arr_failed_import``.
+Manual ``handler_ok_finalize_failed`` → ``completed`` recovery for any ``fetcher_jobs`` row lives on
+``fetcher_jobs_api``. Arr search manual enqueue lives in ``fetcher_arr_search_api``; persisted job inspection in
+``fetcher_jobs_api``. Shared classification/policy for the download queue remains in ``mediamop.modules.arr_failed_import``.
 """
 
 from __future__ import annotations
@@ -20,12 +20,7 @@ from mediamop.modules.fetcher.cleanup_policy_service import (
     load_fetcher_failed_import_cleanup_bundle,
     upsert_fetcher_failed_import_cleanup_policy,
 )
-from mediamop.modules.fetcher.failed_import_activity import (
-    record_fetcher_failed_import_pass_queued,
-    record_fetcher_failed_import_recovered,
-)
-from mediamop.modules.fetcher.fetcher_jobs_model import FetcherJob, FetcherJobStatus
-from mediamop.modules.fetcher.fetcher_jobs_ops import recover_handler_ok_finalize_failed_to_completed
+from mediamop.modules.fetcher.failed_import_activity import record_fetcher_failed_import_pass_queued
 from mediamop.modules.fetcher.manual_cleanup_drive_enqueue import (
     manual_enqueue_radarr_cleanup_drive,
     manual_enqueue_sonarr_cleanup_drive,
@@ -45,7 +40,6 @@ from mediamop.modules.fetcher.failed_import_runtime_visibility import (
     failed_import_runtime_visibility_from_settings,
 )
 from mediamop.modules.fetcher.schemas_failed_import_runtime_visibility import FailedImportRuntimeVisibilityOut
-from mediamop.modules.fetcher.schemas_recover_finalize import RecoverFinalizeFailureIn, RecoverFinalizeFailureOut
 from mediamop.platform.auth.authorization import RequireOperatorDep
 from mediamop.platform.auth.csrf import (
     require_session_secret,
@@ -222,45 +216,3 @@ def post_fetcher_failed_imports_sonarr_enqueue(
     )
 
 
-@router.post(
-    "/fetcher/failed-imports/tasks/{job_id}/recover-finalize-failure",
-    response_model=RecoverFinalizeFailureOut,
-)
-def post_fetcher_failed_imports_recover_finalize_failure(
-    job_id: int,
-    body: RecoverFinalizeFailureIn,
-    request: Request,
-    user: RequireOperatorDep,
-    db: DbSessionDep,
-    settings: SettingsDep,
-) -> RecoverFinalizeFailureOut:
-    """Fetcher: manual recovery handler_ok_finalize_failed → completed without re-running the handler."""
-
-    validate_browser_post_origin(request, settings)
-    secret = require_session_secret(settings)
-    if not verify_csrf_token(secret, body.csrf_token):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired CSRF token.",
-        )
-
-    label = f"username={user.username} role={user.role}"
-    outcome = recover_handler_ok_finalize_failed_to_completed(
-        db,
-        job_id=job_id,
-        recovered_by_label=label,
-    )
-    if outcome == "not_found":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fetcher task not found.")
-    if outcome == "wrong_status":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Task is not in handler_ok_finalize_failed state (needs manual finish only).",
-        )
-    job_row = db.get(FetcherJob, job_id)
-    if job_row is not None:
-        record_fetcher_failed_import_recovered(db, job_id=job_id, job_kind=job_row.job_kind)
-    return RecoverFinalizeFailureOut(
-        job_id=job_id,
-        status=FetcherJobStatus.COMPLETED.value,
-    )

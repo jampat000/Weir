@@ -51,3 +51,23 @@ def test_fetcher_arr_search_lane_enable_legacy_search_missing_env_still_honored(
     monkeypatch.setenv("MEDIAMOP_FETCHER_SONARR_SEARCH_MISSING_ENABLED", "0")
     s = MediaMopSettings.load()
     assert s.fetcher_sonarr_missing_search_enabled is False
+
+
+def test_fetcher_sonarr_missing_search_enable_canonical_wins_when_legacy_conflicts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Canonical ``MEDIAMOP_FETCHER_SONARR_MISSING_SEARCH_ENABLED`` must override legacy when both are set."""
+
+    monkeypatch.setenv("MEDIAMOP_FETCHER_SONARR_MISSING_SEARCH_ENABLED", "0")
+    monkeypatch.setenv("MEDIAMOP_FETCHER_SONARR_SEARCH_MISSING_ENABLED", "1")
+    s = MediaMopSettings.load()
+    assert s.fetcher_sonarr_missing_search_enabled is False
+
+
+def test_fetcher_sonarr_missing_search_enable_canonical_true_wins_over_legacy_false(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MEDIAMOP_FETCHER_SONARR_MISSING_SEARCH_ENABLED", "1")
+    monkeypatch.setenv("MEDIAMOP_FETCHER_SONARR_SEARCH_MISSING_ENABLED", "0")
+    s = MediaMopSettings.load()
+    assert s.fetcher_sonarr_missing_search_enabled is True

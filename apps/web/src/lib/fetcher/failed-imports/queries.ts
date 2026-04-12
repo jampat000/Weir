@@ -6,7 +6,7 @@ import {
 } from "./cleanup-policy-api";
 import { postFailedImportRadarrEnqueue, postFailedImportSonarrEnqueue } from "./manual-enqueue-api";
 import { fetchFailedImportFetcherSettings } from "./settings-api";
-import { postFailedImportRecoverFinalize } from "./recover-api";
+import { postFetcherJobRecoverFinalize } from "./recover-api";
 
 export const failedImportSettingsQueryKey = ["fetcher", "failed-imports", "settings"] as const;
 
@@ -48,10 +48,10 @@ export function useFailedImportFetcherSettingsQuery() {
   });
 }
 
-export function useFailedImportRecoverMutation() {
+export function useFetcherJobRecoverFinalizeMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (jobId: number) => postFailedImportRecoverFinalize(jobId),
+    mutationFn: (jobId: number) => postFetcherJobRecoverFinalize(jobId),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ["fetcher", "jobs", "inspection"] });
       void qc.invalidateQueries({ queryKey: failedImportAutomationSummaryQueryKey });

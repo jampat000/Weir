@@ -1,4 +1,4 @@
-"""``POST /api/v1/fetcher/failed-imports/tasks/{id}/recover-finalize-failure`` finalize recovery."""
+"""``POST /api/v1/fetcher/jobs/{id}/recover-finalize-failure`` — manual ``handler_ok_finalize_failed`` recovery."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from starlette.testclient import TestClient
 
 from mediamop.core.config import MediaMopSettings
 from mediamop.core.db import create_db_engine, create_session_factory
+from mediamop.modules.fetcher.failed_import_drive_job_kinds import FAILED_IMPORT_JOB_KIND_RADARR_CLEANUP_DRIVE
 from mediamop.modules.fetcher.fetcher_jobs_model import FetcherJob, FetcherJobStatus
 from mediamop.modules.fetcher.fetcher_jobs_ops import (
     claim_next_eligible_fetcher_job,
@@ -45,14 +46,19 @@ def _login_admin(client: TestClient) -> None:
     assert r.status_code == 200, r.text
 
 
-def _seed_finalize_failed_job() -> int:
+def _recover_url(job_id: int) -> str:
+    return f"/api/v1/fetcher/jobs/{job_id}/recover-finalize-failure"
+
+
+def _seed_finalize_failed_job(*, job_kind: str, dedupe_key: str) -> int:
     t0 = _t0()
     fac = _fac()
     with fac() as db:
+        db.execute(delete(ActivityEvent))
         db.execute(delete(FetcherJob))
         db.commit()
     with fac() as db:
-        fetcher_enqueue_or_get_job(db, dedupe_key="recover-api", job_kind="k.recover")
+        fetcher_enqueue_or_get_job(db, dedupe_key=dedupe_key, job_kind=job_kind)
         db.commit()
     with fac() as db:
         j = claim_next_eligible_fetcher_job(
@@ -74,13 +80,13 @@ def _seed_finalize_failed_job() -> int:
     return jid
 
 
-def test_fetcher_failed_imports_recover_finalize_success(client_with_admin: TestClient) -> None:
-    jid = _seed_finalize_failed_job()
+def test_fetcher_jobs_recover_finalize_success_non_failed_import_kind(client_with_admin: TestClient) -> None:
+    jid = _seed_finalize_failed_job(job_kind="k.recover", dedupe_key="recover-api")
     _login_admin(client_with_admin)
     tok = fetch_csrf(client_with_admin)
     r = auth_post(
         client_with_admin,
-        f"/api/v1/fetcher/failed-imports/tasks/{jid}/recover-finalize-failure",
+        _recover_url(jid),
         json={"confirm": True, "csrf_token": tok},
     )
     assert r.status_code == 200, r.text
@@ -93,15 +99,38 @@ def test_fetcher_failed_imports_recover_finalize_success(client_with_admin: Test
         assert row is not None
         assert row.status == FetcherJobStatus.COMPLETED.value
         ev = db.scalars(
-            select(ActivityEvent).where(ActivityEvent.event_type == act_c.FETCHER_FAILED_IMPORT_RECOVERED),
+            select(ActivityEvent).where(ActivityEvent.event_type == act_c.FETCHER_JOB_RECOVERED_HANDLER_OK_FINALIZE),
         ).first()
         assert ev is not None
         assert ev.module == "fetcher"
-        assert "recovery" in ev.title.lower()
+        assert "handler_ok_finalize_failed" in ev.title.lower()
+        assert "k.recover" in (ev.detail or "")
+
+
+def test_fetcher_jobs_recover_finalize_success_failed_import_drive_kind(client_with_admin: TestClient) -> None:
+    jid = _seed_finalize_failed_job(
+        job_kind=FAILED_IMPORT_JOB_KIND_RADARR_CLEANUP_DRIVE,
+        dedupe_key="recover-fi-radarr",
+    )
+    _login_admin(client_with_admin)
+    tok = fetch_csrf(client_with_admin)
+    r = auth_post(
+        client_with_admin,
+        _recover_url(jid),
+        json={"confirm": True, "csrf_token": tok},
+    )
+    assert r.status_code == 200, r.text
+    fac = _fac()
+    with fac() as db:
+        ev = db.scalars(
+            select(ActivityEvent).where(ActivityEvent.event_type == act_c.FETCHER_FAILED_IMPORT_RECOVERED),
+        ).first()
+        assert ev is not None
+        assert "failed-import" in ev.title.lower()
         assert str(jid) in (ev.detail or "")
 
 
-def test_fetcher_failed_imports_recover_finalize_409_when_not_finalize_failed(client_with_admin: TestClient) -> None:
+def test_fetcher_jobs_recover_finalize_409_when_not_finalize_failed(client_with_admin: TestClient) -> None:
     t0 = _t0()
     fac = _fac()
     with fac() as db:
@@ -130,18 +159,32 @@ def test_fetcher_failed_imports_recover_finalize_409_when_not_finalize_failed(cl
     tok = fetch_csrf(client_with_admin)
     r = auth_post(
         client_with_admin,
-        f"/api/v1/fetcher/failed-imports/tasks/{jid}/recover-finalize-failure",
+        _recover_url(jid),
         json={"confirm": True, "csrf_token": tok},
     )
     assert r.status_code == 409
 
 
-def test_fetcher_failed_imports_recover_finalize_404_unknown_id(client_with_admin: TestClient) -> None:
+def test_fetcher_jobs_recover_finalize_404_unknown_id(client_with_admin: TestClient) -> None:
     _login_admin(client_with_admin)
     tok = fetch_csrf(client_with_admin)
     r = auth_post(
         client_with_admin,
-        "/api/v1/fetcher/failed-imports/tasks/999999/recover-finalize-failure",
+        _recover_url(999_999),
+        json={"confirm": True, "csrf_token": tok},
+    )
+    assert r.status_code == 404
+
+
+def test_fetcher_failed_imports_recover_legacy_route_returns_404(client_with_admin: TestClient) -> None:
+    """Old failed-import-scoped URL must not answer after the neutral Fetcher jobs move."""
+
+    jid = _seed_finalize_failed_job(job_kind="k.legacy", dedupe_key="recover-legacy-url")
+    _login_admin(client_with_admin)
+    tok = fetch_csrf(client_with_admin)
+    r = auth_post(
+        client_with_admin,
+        f"/api/v1/fetcher/failed-imports/tasks/{jid}/recover-finalize-failure",
         json={"confirm": True, "csrf_token": tok},
     )
     assert r.status_code == 404
