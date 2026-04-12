@@ -87,18 +87,32 @@ def validate_refiner_enqueue_job_kind(job_kind: str) -> None:
             f"(got {job_kind!r}); use that module's table + enqueue function"
         )
         raise ValueError(msg)
+    if not job_kind.startswith(REFINER_QUEUE_JOB_KIND_PREFIX):
+        msg = (
+            "refiner_enqueue_or_get_job requires job_kind to start with "
+            f"{REFINER_QUEUE_JOB_KIND_PREFIX!r} (got {job_kind!r}); production durable Refiner "
+            "families use refiner.* kinds on refiner_jobs only"
+        )
+        raise ValueError(msg)
 
 
 def validate_refiner_worker_handler_registry(
     job_handlers: Mapping[str, object],
 ) -> None:
-    """Refiner workers must not register handlers for another module's ``job_kind`` prefixes."""
+    """Refiner workers must register handlers only under the ``refiner.*`` namespace."""
 
-    bad = [k for k in job_handlers if job_kind_forbidden_on_refiner_lane(k)]
+    bad = sorted(
+        {
+            k
+            for k in job_handlers
+            if job_kind_forbidden_on_refiner_lane(k) or not k.startswith(REFINER_QUEUE_JOB_KIND_PREFIX)
+        },
+    )
     if bad:
         msg = (
-            "Refiner worker handler registry must not include non-Refiner lane job_kind keys "
-            f"(offending keys: {bad!r})"
+            "Refiner worker handler registry keys must start with "
+            f"{REFINER_QUEUE_JOB_KIND_PREFIX!r} and must not use another module's reserved "
+            f"prefixes (offending keys: {bad!r})"
         )
         raise ValueError(msg)
 

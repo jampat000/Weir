@@ -9,4 +9,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from mediamop.modules.refiner.refiner_library_audit_pass_api import (
+    router as refiner_library_audit_pass_router,
+)
+
 router = APIRouter(tags=["refiner"])
+router.include_router(refiner_library_audit_pass_router)

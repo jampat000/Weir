@@ -24,3 +24,6 @@ FETCHER_ARR_SEARCH_MISSING_DISPATCHED = "fetcher.arr_search_missing_dispatched"
 FETCHER_ARR_SEARCH_MISSING_ZERO_MANUAL = "fetcher.arr_search_missing_zero_manual"
 FETCHER_ARR_SEARCH_UPGRADE_DISPATCHED = "fetcher.arr_search_upgrade_dispatched"
 FETCHER_ARR_SEARCH_UPGRADE_ZERO_MANUAL = "fetcher.arr_search_upgrade_zero_manual"
+
+# Refiner durable families (refiner_jobs)
+REFINER_LIBRARY_AUDIT_PASS_COMPLETED = "refiner.library_audit_pass_completed"

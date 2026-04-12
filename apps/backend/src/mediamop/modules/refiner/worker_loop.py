@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from mediamop.core.config import MediaMopSettings
 from mediamop.modules.queue_worker.job_kind_boundaries import (
+    REFINER_QUEUE_JOB_KIND_PREFIX,
     job_kind_forbidden_on_refiner_lane,
     validate_refiner_worker_handler_registry,
 )
@@ -114,6 +115,28 @@ def process_one_refiner_job(
         except Exception:
             logger.exception(
                 "Refiner fail_claimed after cross-lane job_kind guard job_id=%s",
+                ctx.id,
+            )
+        return "processed"
+
+    if not ctx.job_kind.startswith(REFINER_QUEUE_JOB_KIND_PREFIX):
+        err_text = (
+            "refiner worker refused job_kind missing required refiner.* prefix: "
+            f"{ctx.job_kind!r} (row id={ctx.id}); enqueue only refiner-owned kinds"
+        )[:10_000]
+        try:
+            with session_factory() as session:
+                with session.begin():
+                    fail_claimed_refiner_job(
+                        session,
+                        job_id=ctx.id,
+                        lease_owner=ctx.lease_owner,
+                        error_message=err_text,
+                        now=when,
+                    )
+        except Exception:
+            logger.exception(
+                "Refiner fail_claimed after refiner.* prefix guard job_id=%s",
                 ctx.id,
             )
         return "processed"

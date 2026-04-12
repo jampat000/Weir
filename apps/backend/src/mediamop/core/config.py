@@ -18,6 +18,7 @@ from mediamop.modules.arr_failed_import.env_settings import (
 )
 from mediamop.modules.arr_failed_import.policy import FailedImportCleanupPolicy
 from mediamop.modules.fetcher.fetcher_worker_limits import clamp_fetcher_worker_count
+from mediamop.modules.refiner.refiner_family_intervals import clamp_refiner_schedule_interval_seconds
 from mediamop.modules.refiner.worker_limits import clamp_refiner_worker_count
 
 
@@ -94,6 +95,9 @@ class MediaMopSettings:
     fetcher_worker_count: int
     # 0 = no in-process Refiner workers (Refiner-owned refiner_jobs only); >0 when Refiner queues durable work.
     refiner_worker_count: int
+    # Refiner library audit pass (``refiner.library.audit_pass.v1``) — Refiner-only schedule (not Fetcher).
+    refiner_library_audit_pass_schedule_enabled: bool
+    refiner_library_audit_pass_schedule_interval_seconds: int
     # Radarr/Sonarr HTTP for Fetcher-owned live failed-import cleanup drives (env: MEDIAMOP_FETCHER_*).
     fetcher_radarr_base_url: str | None
     fetcher_radarr_api_key: str | None
@@ -204,6 +208,10 @@ class MediaMopSettings:
         failed_import_cleanup = load_failed_import_cleanup_settings_bundle()
         fetcher_workers = clamp_fetcher_worker_count(_env_int("MEDIAMOP_FETCHER_WORKER_COUNT", 1))
         refiner_workers = clamp_refiner_worker_count(_env_int("MEDIAMOP_REFINER_WORKER_COUNT", 0))
+        refiner_lib_audit_on = _env_bool("MEDIAMOP_REFINER_LIBRARY_AUDIT_PASS_SCHEDULE_ENABLED", False)
+        refiner_lib_audit_iv = clamp_refiner_schedule_interval_seconds(
+            _env_int("MEDIAMOP_REFINER_LIBRARY_AUDIT_PASS_SCHEDULE_INTERVAL_SECONDS", 3600),
+        )
         radarr_base = (os.environ.get("MEDIAMOP_FETCHER_RADARR_BASE_URL") or "").strip()
         if radarr_base and not radarr_base.startswith(("http://", "https://")):
             radarr_base = ""
@@ -400,6 +408,8 @@ class MediaMopSettings:
             failed_import_cleanup_env=failed_import_cleanup,
             fetcher_worker_count=fetcher_workers,
             refiner_worker_count=refiner_workers,
+            refiner_library_audit_pass_schedule_enabled=refiner_lib_audit_on,
+            refiner_library_audit_pass_schedule_interval_seconds=refiner_lib_audit_iv,
             fetcher_radarr_base_url=radarr_base or None,
             fetcher_radarr_api_key=radarr_key or None,
             fetcher_sonarr_base_url=sonarr_base or None,

@@ -164,7 +164,7 @@ def test_concurrent_process_one_only_one_handler_runs_for_single_job(session_fac
             invocations.append(ctx.id)
 
     with session_factory() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="pass21-one-exec", job_kind="pass21.kind")
+        refiner_enqueue_or_get_job(s, dedupe_key="pass21-one-exec", job_kind="refiner.test.pass21.kind.v1")
         s.commit()
 
     barrier = threading.Barrier(2)
@@ -174,7 +174,7 @@ def test_concurrent_process_one_only_one_handler_runs_for_single_job(session_fac
         process_one_refiner_job(
             session_factory,
             lease_owner=owner,
-            job_handlers={"pass21.kind": _h},
+            job_handlers={"refiner.test.pass21.kind.v1": _h},
             now=t0,
             lease_seconds=3600,
         )
@@ -207,7 +207,7 @@ def test_concurrent_enqueue_same_dedupe_with_racing_process_one_leaves_one_compl
                 refiner_enqueue_or_get_job(
                     s,
                     dedupe_key="pass21-dedupe-race",
-                    job_kind="pass21.d",
+                    job_kind="refiner.test.pass21.d.v1",
                 )
                 s.commit()
         except BaseException as e:
@@ -231,7 +231,7 @@ def test_concurrent_enqueue_same_dedupe_with_racing_process_one_leaves_one_compl
             process_one_refiner_job(
                 session_factory,
                 lease_owner=owner,
-                job_handlers={"pass21.d": _h},
+                job_handlers={"refiner.test.pass21.d.v1": _h},
                 now=t0,
                 lease_seconds=3600,
             )
@@ -379,8 +379,8 @@ def test_parallel_claim_next_skips_handler_ok_finalize_failed_prefers_pending(
 ) -> None:
     t0 = _t0()
     with session_factory() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="pass21-fin", job_kind="z")
-        refiner_enqueue_or_get_job(s, dedupe_key="pass21-pend", job_kind="z")
+        refiner_enqueue_or_get_job(s, dedupe_key="pass21-fin", job_kind="refiner.test.z.v1")
+        refiner_enqueue_or_get_job(s, dedupe_key="pass21-pend", job_kind="refiner.test.z.v1")
         s.commit()
     with session_factory() as s:
         j = claim_next_eligible_refiner_job(

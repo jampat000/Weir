@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
@@ -66,6 +68,7 @@ def session_factory(jobs_engine):
 def test_default_refiner_handler_registry_has_no_foreign_lane_keys() -> None:
     reg = default_refiner_job_handler_registry()
     assert not any(job_kind_forbidden_on_refiner_lane(k) for k in reg)
+    assert all(str(k).startswith("refiner.") for k in reg)
 
 
 def test_refiner_enqueue_rejects_fetcher_and_trimmer_namespaces(session_factory) -> None:
@@ -79,6 +82,12 @@ def test_refiner_enqueue_rejects_fetcher_and_trimmer_namespaces(session_factory)
     with session_factory() as s:
         with pytest.raises(ValueError, match="refiner_enqueue_or_get_job refuses"):
             refiner_enqueue_or_get_job(s, dedupe_key="t", job_kind="trimmer.probe.v1")
+
+
+def test_refiner_enqueue_rejects_unprefixed_job_kind(session_factory) -> None:
+    with session_factory() as s:
+        with pytest.raises(ValueError, match="refiner_enqueue_or_get_job requires job_kind"):
+            refiner_enqueue_or_get_job(s, dedupe_key="u", job_kind="bare.kind")
 
 
 def test_fetcher_enqueue_rejects_refiner_trimmer_subber_prefix(session_factory) -> None:
@@ -97,6 +106,15 @@ def test_validate_refiner_worker_handler_registry_rejects_foreign_lane_keys() ->
         )
     with pytest.raises(ValueError, match="Refiner worker handler registry"):
         validate_refiner_worker_handler_registry({"trimmer.x": lambda _c: None})
+
+
+def test_validate_refiner_worker_handler_registry_rejects_unprefixed_keys() -> None:
+    with pytest.raises(ValueError, match="Refiner worker handler registry"):
+        validate_refiner_worker_handler_registry({"bare.kind": lambda _c: None})
+
+
+def test_validate_refiner_worker_handler_registry_accepts_refiner_prefixed_keys() -> None:
+    validate_refiner_worker_handler_registry({"refiner.test.mechanics.v1": lambda _c: None})
 
 
 def test_validate_fetcher_worker_registry_accepts_declared_fetcher_prefixes() -> None:
@@ -148,7 +166,7 @@ def test_process_one_refiner_job_fails_claimed_row_in_foreign_lane_without_handl
     out = process_one_refiner_job(
         session_factory,
         lease_owner="t",
-        job_handlers={"other.kind": lambda _c: None},
+        job_handlers={"refiner.test.other.v1": lambda _c: None},
     )
     assert out == "processed"
     with session_factory() as s:
@@ -157,6 +175,36 @@ def test_process_one_refiner_job_fails_claimed_row_in_foreign_lane_without_handl
         assert row.status == RefinerJobStatus.PENDING.value
         assert row.last_error is not None
         assert "refiner worker refused" in row.last_error
+
+
+def test_process_one_refiner_job_rejects_unprefixed_job_kind_row(session_factory) -> None:
+    """Direct-insert legacy rows without ``refiner.*`` must fail safe on the Refiner worker."""
+
+    t0 = datetime(2026, 4, 11, 12, 0, 0, tzinfo=timezone.utc)
+    with session_factory() as s:
+        s.add(
+            RefinerJob(
+                dedupe_key="legacy-unprefixed",
+                job_kind="legacy.unprefixed",
+                status=RefinerJobStatus.PENDING.value,
+            ),
+        )
+        s.commit()
+
+    out = process_one_refiner_job(
+        session_factory,
+        lease_owner="t",
+        job_handlers={"refiner.test.other.v1": lambda _c: None},
+        now=t0,
+        lease_seconds=3600,
+    )
+    assert out == "processed"
+    with session_factory() as s:
+        row = s.scalars(select(RefinerJob)).first()
+        assert row is not None
+        assert row.status == RefinerJobStatus.PENDING.value
+        assert row.last_error is not None
+        assert "refiner.* prefix" in row.last_error
 
 
 def test_process_one_fetcher_job_fails_claimed_row_with_refiner_prefix(

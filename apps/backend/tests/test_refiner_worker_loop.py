@@ -87,16 +87,16 @@ def test_process_one_idle_when_no_jobs(session_factory) -> None:
 def test_process_one_completes_with_success_handler(session_factory) -> None:
     t0 = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
     with session_factory() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="d1", job_kind="ok.kind", max_attempts=3)
+        refiner_enqueue_or_get_job(s, dedupe_key="d1", job_kind="refiner.test.ok.v1", max_attempts=3)
         s.commit()
 
     def _ok(ctx) -> None:
-        assert ctx.job_kind == "ok.kind"
+        assert ctx.job_kind == "refiner.test.ok.v1"
 
     out = process_one_refiner_job(
         session_factory,
         lease_owner="w",
-        job_handlers={"ok.kind": _ok},
+        job_handlers={"refiner.test.ok.v1": _ok},
         now=t0,
         lease_seconds=3600,
     )
@@ -112,7 +112,7 @@ def test_process_one_fail_path_on_handler_error(session_factory) -> None:
         refiner_enqueue_or_get_job(
             s,
             dedupe_key="d2",
-            job_kind="bad.kind",
+            job_kind="refiner.test.bad.v1",
             max_attempts=1,
         )
         s.commit()
@@ -123,7 +123,7 @@ def test_process_one_fail_path_on_handler_error(session_factory) -> None:
     out = process_one_refiner_job(
         session_factory,
         lease_owner="w",
-        job_handlers={"bad.kind": _bad},
+        job_handlers={"refiner.test.bad.v1": _bad},
         now=t0,
         lease_seconds=3600,
     )
@@ -137,7 +137,7 @@ def test_process_one_fail_path_on_handler_error(session_factory) -> None:
 def test_process_one_missing_handler_fails_claimed_job(session_factory) -> None:
     t0 = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
     with session_factory() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="d3", job_kind="unknown.kind")
+        refiner_enqueue_or_get_job(s, dedupe_key="d3", job_kind="refiner.test.unknown.v1")
         s.commit()
 
     out = process_one_refiner_job(
@@ -151,7 +151,7 @@ def test_process_one_missing_handler_fails_claimed_job(session_factory) -> None:
     with session_factory() as s:
         row = s.get(RefinerJob, 1)
         assert row.status == RefinerJobStatus.PENDING.value
-        assert "unknown.kind" in (row.last_error or "")
+        assert "refiner.test.unknown.v1" in (row.last_error or "")
 
 
 def test_refiner_worker_loop_processes_one_job_then_stops(session_factory, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -161,7 +161,7 @@ def test_refiner_worker_loop_processes_one_job_then_stops(session_factory, monke
     )
     t0 = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
     with session_factory() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="loop1", job_kind="loop.ok")
+        refiner_enqueue_or_get_job(s, dedupe_key="loop1", job_kind="refiner.test.loop_ok.v1")
         s.commit()
 
     seen: list[str] = []
@@ -176,7 +176,7 @@ def test_refiner_worker_loop_processes_one_job_then_stops(session_factory, monke
                 session_factory,
                 worker_index=0,
                 stop_event=stop,
-                job_handlers={"loop.ok": _h},
+                job_handlers={"refiner.test.loop_ok.v1": _h},
                 idle_sleep_seconds=0.05,
                 lease_seconds=3600,
             ),
@@ -189,7 +189,7 @@ def test_refiner_worker_loop_processes_one_job_then_stops(session_factory, monke
         await asyncio.wait_for(task, timeout=5.0)
 
     asyncio.run(_run())
-    assert seen == ["loop.ok"]
+    assert seen == ["refiner.test.loop_ok.v1"]
     with session_factory() as s:
         row = s.get(RefinerJob, 1)
         assert row.status == RefinerJobStatus.COMPLETED.value
@@ -248,7 +248,7 @@ def test_worker_survives_tick_exception_then_processes_idle(
 def test_process_one_survives_complete_claim_raises(session_factory) -> None:
     t0 = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
     with session_factory() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="d-complete-raise", job_kind="ok.kind", max_attempts=3)
+        refiner_enqueue_or_get_job(s, dedupe_key="d-complete-raise", job_kind="refiner.test.ok.v1", max_attempts=3)
         s.commit()
 
     def _ok(_ctx) -> None:
@@ -262,7 +262,7 @@ def test_process_one_survives_complete_claim_raises(session_factory) -> None:
         out = process_one_refiner_job(
             session_factory,
             lease_owner="w",
-            job_handlers={"ok.kind": _ok},
+            job_handlers={"refiner.test.ok.v1": _ok},
             now=t0,
             lease_seconds=3600,
         )
@@ -279,7 +279,7 @@ def test_process_one_survives_complete_claim_raises(session_factory) -> None:
 def test_process_one_complete_refused_triggers_terminalization(session_factory) -> None:
     t0 = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
     with session_factory() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="d-complete-false", job_kind="ok.kind", max_attempts=3)
+        refiner_enqueue_or_get_job(s, dedupe_key="d-complete-false", job_kind="refiner.test.ok.v1", max_attempts=3)
         s.commit()
 
     def _ok(_ctx) -> None:
@@ -293,7 +293,7 @@ def test_process_one_complete_refused_triggers_terminalization(session_factory) 
         out = process_one_refiner_job(
             session_factory,
             lease_owner="w",
-            job_handlers={"ok.kind": _ok},
+            job_handlers={"refiner.test.ok.v1": _ok},
             now=t0,
             lease_seconds=3600,
         )
@@ -308,8 +308,8 @@ def test_process_one_complete_refused_triggers_terminalization(session_factory) 
 def test_terminalization_of_first_job_does_not_block_second_job_completion(session_factory) -> None:
     t0 = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
     with session_factory() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="seq-a", job_kind="ok.kind", max_attempts=3)
-        refiner_enqueue_or_get_job(s, dedupe_key="seq-b", job_kind="ok.kind", max_attempts=3)
+        refiner_enqueue_or_get_job(s, dedupe_key="seq-a", job_kind="refiner.test.ok.v1", max_attempts=3)
+        refiner_enqueue_or_get_job(s, dedupe_key="seq-b", job_kind="refiner.test.ok.v1", max_attempts=3)
         s.commit()
 
     def _ok(_ctx) -> None:
@@ -335,7 +335,7 @@ def test_terminalization_of_first_job_does_not_block_second_job_completion(sessi
             process_one_refiner_job(
                 session_factory,
                 lease_owner="w",
-                job_handlers={"ok.kind": _ok},
+                job_handlers={"refiner.test.ok.v1": _ok},
                 now=t0,
                 lease_seconds=3600,
             )
@@ -345,7 +345,7 @@ def test_terminalization_of_first_job_does_not_block_second_job_completion(sessi
             process_one_refiner_job(
                 session_factory,
                 lease_owner="w",
-                job_handlers={"ok.kind": _ok},
+                job_handlers={"refiner.test.ok.v1": _ok},
                 now=t0,
                 lease_seconds=3600,
             )
@@ -370,7 +370,7 @@ def test_worker_stays_alive_after_complete_failure_terminalization(
     )
     t0 = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
     with session_factory() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="w-term", job_kind="term.kind", max_attempts=3)
+        refiner_enqueue_or_get_job(s, dedupe_key="w-term", job_kind="refiner.test.term.v1", max_attempts=3)
         s.commit()
 
     def _ok(_ctx) -> None:
@@ -388,7 +388,7 @@ def test_worker_stays_alive_after_complete_failure_terminalization(
                     session_factory,
                     worker_index=0,
                     stop_event=stop,
-                    job_handlers={"term.kind": _ok},
+                    job_handlers={"refiner.test.term.v1": _ok},
                     idle_sleep_seconds=0.05,
                     lease_seconds=3600,
                 ),

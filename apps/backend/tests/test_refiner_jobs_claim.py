@@ -57,11 +57,11 @@ def _t0() -> datetime:
 def test_enqueue_duplicate_dedupe_key_returns_same_row(session_factory):
     fac = session_factory
     with fac() as s:
-        a = refiner_enqueue_or_get_job(s, dedupe_key="k1", job_kind="test")
+        a = refiner_enqueue_or_get_job(s, dedupe_key="k1", job_kind="refiner.test.harness.v1")
         s.commit()
         aid = a.id
     with fac() as s:
-        b = refiner_enqueue_or_get_job(s, dedupe_key="k1", job_kind="test")
+        b = refiner_enqueue_or_get_job(s, dedupe_key="k1", job_kind="refiner.test.harness.v1")
         s.commit()
     assert b.id == aid
 
@@ -76,7 +76,7 @@ def test_concurrent_enqueue_same_dedupe_key_single_row(session_factory):
         try:
             barrier.wait()
             with fac() as s:
-                j = refiner_enqueue_or_get_job(s, dedupe_key="race", job_kind="test")
+                j = refiner_enqueue_or_get_job(s, dedupe_key="race", job_kind="refiner.test.harness.v1")
                 s.commit()
                 ids.append(j.id)
         except BaseException as e:
@@ -96,7 +96,7 @@ def test_second_claim_does_not_return_same_job_when_first_holds_lease(session_fa
     fac = session_factory
     t0 = _t0()
     with fac() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="solo", job_kind="test")
+        refiner_enqueue_or_get_job(s, dedupe_key="solo", job_kind="refiner.test.harness.v1")
         s.commit()
     with fac() as s:
         j1 = claim_next_eligible_refiner_job(
@@ -122,7 +122,7 @@ def test_expired_lease_can_be_reclaimed(session_factory):
     fac = session_factory
     t0 = _t0()
     with fac() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="reclaim", job_kind="test")
+        refiner_enqueue_or_get_job(s, dedupe_key="reclaim", job_kind="refiner.test.harness.v1")
         s.commit()
     with fac() as s:
         j = claim_next_eligible_refiner_job(
@@ -153,7 +153,7 @@ def test_complete_only_succeeds_for_owning_lease(session_factory):
     fac = session_factory
     t0 = _t0()
     with fac() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="done", job_kind="test")
+        refiner_enqueue_or_get_job(s, dedupe_key="done", job_kind="refiner.test.harness.v1")
         s.commit()
     with fac() as s:
         j = claim_next_eligible_refiner_job(
@@ -189,7 +189,7 @@ def test_complete_fails_when_lease_expired(session_factory):
     fac = session_factory
     t0 = _t0()
     with fac() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="late", job_kind="test")
+        refiner_enqueue_or_get_job(s, dedupe_key="late", job_kind="refiner.test.harness.v1")
         s.commit()
     with fac() as s:
         j = claim_next_eligible_refiner_job(
@@ -217,7 +217,7 @@ def test_fail_requeues_until_max_attempts_then_failed(session_factory):
         refiner_enqueue_or_get_job(
             s,
             dedupe_key="retry",
-            job_kind="test",
+            job_kind="refiner.test.harness.v1",
             max_attempts=2,
         )
         s.commit()
@@ -260,7 +260,7 @@ def test_fail_leased_after_complete_failure_sets_handler_ok_finalize_failed(sess
     fac = session_factory
     t0 = _t0()
     with fac() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="term-fail", job_kind="test")
+        refiner_enqueue_or_get_job(s, dedupe_key="term-fail", job_kind="refiner.test.harness.v1")
         s.commit()
     with fac() as s:
         j = claim_next_eligible_refiner_job(
@@ -304,7 +304,7 @@ def test_handler_ok_finalize_failed_row_is_not_claimable(session_factory):
     fac = session_factory
     t0 = _t0()
     with fac() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="finalize-stuck", job_kind="test")
+        refiner_enqueue_or_get_job(s, dedupe_key="finalize-stuck", job_kind="refiner.test.harness.v1")
         s.commit()
     with fac() as s:
         row = s.get(RefinerJob, 1)
@@ -329,7 +329,7 @@ def test_fail_leased_after_complete_failure_rejects_wrong_owner(session_factory)
     fac = session_factory
     t0 = _t0()
     with fac() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="term-owner", job_kind="test")
+        refiner_enqueue_or_get_job(s, dedupe_key="term-owner", job_kind="refiner.test.harness.v1")
         s.commit()
     with fac() as s:
         j = claim_next_eligible_refiner_job(
@@ -355,7 +355,7 @@ def test_recover_handler_ok_finalize_failed_to_completed(session_factory):
     fac = session_factory
     t0 = _t0()
     with fac() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="recover-ok", job_kind="test")
+        refiner_enqueue_or_get_job(s, dedupe_key="recover-ok", job_kind="refiner.test.harness.v1")
         s.commit()
     with fac() as s:
         j = claim_next_eligible_refiner_job(
@@ -396,7 +396,7 @@ def test_recover_finalize_rejects_wrong_status(session_factory):
     fac = session_factory
     t0 = _t0()
     with fac() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="recover-wrong", job_kind="test")
+        refiner_enqueue_or_get_job(s, dedupe_key="recover-wrong", job_kind="refiner.test.harness.v1")
         s.commit()
     with fac() as s:
         j = claim_next_eligible_refiner_job(
@@ -437,8 +437,8 @@ def test_two_workers_claim_different_jobs(session_factory):
     fac = session_factory
     t0 = _t0()
     with fac() as s:
-        refiner_enqueue_or_get_job(s, dedupe_key="a", job_kind="test")
-        refiner_enqueue_or_get_job(s, dedupe_key="b", job_kind="test")
+        refiner_enqueue_or_get_job(s, dedupe_key="a", job_kind="refiner.test.harness.v1")
+        refiner_enqueue_or_get_job(s, dedupe_key="b", job_kind="refiner.test.harness.v1")
         s.commit()
 
     barrier = threading.Barrier(2)
