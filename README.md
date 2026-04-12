@@ -45,7 +45,7 @@ Runtime file layout is anchored by **`MEDIAMOP_HOME`** (optional). Defaults are 
 
 ## Architecture
 
-Locked decisions live under [`docs/adr/`](docs/adr/).
+Locked decisions live under [`docs/adr/`](docs/adr/). Repo-local shipped vs next work: [`docs/TASKS.md`](docs/TASKS.md).
 
 ## Transitional Jinja app
 

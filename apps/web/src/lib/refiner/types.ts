@@ -26,3 +26,17 @@ export type RefinerRuntimeSettingsOut = {
   configuration_note: string;
   visibility_note: string;
 };
+
+/** POST /api/v1/refiner/jobs/watched-folder-remux-scan-dispatch/enqueue */
+
+export type RefinerWatchedFolderRemuxScanDispatchEnqueueBody = {
+  enqueue_remux_jobs: boolean;
+  remux_dry_run: boolean;
+};
+
+export type RefinerWatchedFolderRemuxScanDispatchEnqueueOut = {
+  ok: boolean;
+  job_id: number;
+  dedupe_key: string;
+  job_kind: string;
+};

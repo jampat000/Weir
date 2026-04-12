@@ -1,5 +1,6 @@
 import { RefinerPathSettingsSection } from "./refiner-path-settings-section";
 import { RefinerRuntimeSettingsSection } from "./refiner-runtime-settings-section";
+import { RefinerWatchedFolderScanSection } from "./refiner-watched-folder-scan-section";
 
 /** Refiner module home — honest scope for shipped durable ``refiner_jobs`` families. */
 export function RefinerPage() {
@@ -18,13 +19,15 @@ export function RefinerPage() {
             fetcher_jobs
           </code>
           . Shipped families below apply Refiner domain rules where relevant; they are not a full watched-folder
-          service.
+          service. The manual watched-folder scan section is explicit and Refiner-local only (no background watcher).
         </p>
       </header>
 
       <RefinerRuntimeSettingsSection />
 
       <RefinerPathSettingsSection />
+
+      <RefinerWatchedFolderScanSection />
 
       <section
         className="mt-4 max-w-2xl space-y-3 text-sm leading-relaxed text-[var(--mm-text2)]"
@@ -55,6 +58,17 @@ export function RefinerPage() {
             </strong>{" "}
             — manual jobs that fetch the live <strong>Radarr</strong> or <strong>Sonarr</strong> download queue from
             your configured service, then evaluate domain rules for a specific release named in the payload.
+          </li>
+          <li data-testid="refiner-family-watched-folder-remux-scan-dispatch">
+            <strong>
+              <code className="rounded bg-black/25 px-1 py-0.5 font-mono text-[0.85em] text-[var(--mm-text)]">
+                refiner.watched_folder.remux_scan_dispatch.v1
+              </code>
+            </strong>{" "}
+            — manual job: scans the saved <strong>Refiner watched folder</strong> for media candidates, applies the same
+            ownership and upstream blocking rules as the candidate gate, optionally enqueues per-file{" "}
+            <code className="rounded bg-black/25 px-1 font-mono text-[0.8em]">refiner.file.remux_pass.v1</code> work, and
+            writes one Activity summary (scanned, skipped, waiting, enqueued). Not a background watch service.
           </li>
           <li data-testid="refiner-family-file-remux-pass">
             <strong>

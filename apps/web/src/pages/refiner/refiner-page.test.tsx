@@ -67,6 +67,7 @@ describe("RefinerPage (hero compression)", () => {
     expect(t).toMatch(/refiner\.supplied_payload_evaluation\.v1/);
     expect(t).toMatch(/refiner\.candidate_gate\.v1/);
     expect(t).toMatch(/refiner\.file\.remux_pass\.v1/);
+    expect(t).toMatch(/refiner\.watched_folder\.remux_scan_dispatch\.v1/);
   });
 
   it("documents supplied payload evaluation without overstating library or disk work", () => {
@@ -97,6 +98,16 @@ describe("RefinerPage (hero compression)", () => {
     expect(text).toMatch(/Radarr/i);
     expect(text).toMatch(/Sonarr/i);
     expect(text).toMatch(/download queue/i);
+  });
+
+  it("documents watched-folder remux scan dispatch as manual scan without implying a background watcher", () => {
+    renderRefinerPage();
+    const li = screen.getByTestId("refiner-family-watched-folder-remux-scan-dispatch");
+    const text = li.textContent ?? "";
+    expect(text).toMatch(/manual job/i);
+    expect(text).toMatch(/Not a background watch service/i);
+    const section = screen.getByTestId("refiner-watched-folder-scan-section");
+    expect(section.textContent).toMatch(/no periodic schedule/i);
   });
 
   it("has no Fetcher link on the page", () => {

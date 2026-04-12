@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchRefinerPathSettings, putRefinerPathSettings } from "./path-settings-api";
 import { fetchRefinerRuntimeSettings } from "./runtime-settings-api";
-import type { RefinerPathSettingsPutBody } from "./types";
+import { postRefinerWatchedFolderRemuxScanDispatchEnqueue } from "./watched-folder-scan-api";
+import type { RefinerPathSettingsPutBody, RefinerWatchedFolderRemuxScanDispatchEnqueueBody } from "./types";
 
 export const refinerPathSettingsQueryKey = ["refiner", "path-settings"] as const;
 
@@ -30,5 +31,12 @@ export function useRefinerRuntimeSettingsQuery() {
     queryKey: refinerRuntimeSettingsQueryKey,
     queryFn: () => fetchRefinerRuntimeSettings(),
     staleTime: 30_000,
+  });
+}
+
+export function useRefinerWatchedFolderRemuxScanDispatchEnqueueMutation() {
+  return useMutation({
+    mutationFn: (body: RefinerWatchedFolderRemuxScanDispatchEnqueueBody) =>
+      postRefinerWatchedFolderRemuxScanDispatchEnqueue(body),
   });
 }

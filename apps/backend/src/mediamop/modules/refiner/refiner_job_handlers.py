@@ -18,6 +18,12 @@ from mediamop.modules.refiner.refiner_supplied_payload_evaluation_handlers impor
 from mediamop.modules.refiner.refiner_supplied_payload_evaluation_job_kinds import (
     REFINER_SUPPLIED_PAYLOAD_EVALUATION_JOB_KIND,
 )
+from mediamop.modules.refiner.refiner_watched_folder_remux_scan_dispatch_handlers import (
+    make_refiner_watched_folder_remux_scan_dispatch_handler,
+)
+from mediamop.modules.refiner.refiner_watched_folder_remux_scan_dispatch_job_kinds import (
+    REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_JOB_KIND,
+)
 from mediamop.modules.refiner.worker_loop import RefinerJobWorkContext
 
 
@@ -33,6 +39,10 @@ def build_refiner_job_handlers(
         ),
         REFINER_CANDIDATE_GATE_JOB_KIND: make_refiner_candidate_gate_handler(settings, session_factory),
         REFINER_FILE_REMUX_PASS_JOB_KIND: make_refiner_file_remux_pass_handler(settings, session_factory),
+        REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_JOB_KIND: make_refiner_watched_folder_remux_scan_dispatch_handler(
+            settings,
+            session_factory,
+        ),
     }
     validate_refiner_worker_handler_registry(reg)
     return reg

@@ -62,7 +62,8 @@ export function ActivityPage() {
         <p className="mm-page__lead">
           Read-only: no filters, export, or actions.           Records sign-in outcomes, setup, sign-out, failed bootstrap
           attempts, throttled Fetcher health checks, Fetcher failed-import queue/run activity (queued passes,
-          run start, outcomes), and Refiner file remux pass results when you run them — not every page load.
+          run start, outcomes), Refiner file remux pass results, and Refiner watched-folder scan summaries when you run
+          them — not every page load.
         </p>
       </header>
 
