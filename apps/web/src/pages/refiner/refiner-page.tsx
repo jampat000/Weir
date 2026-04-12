@@ -1,3 +1,5 @@
+import { RefinerRuntimeSettingsSection } from "./refiner-runtime-settings-section";
+
 /** Refiner module home — honest scope for shipped durable ``refiner_jobs`` families. */
 export function RefinerPage() {
   return (
@@ -18,6 +20,8 @@ export function RefinerPage() {
           service.
         </p>
       </header>
+
+      <RefinerRuntimeSettingsSection />
 
       <section
         className="mt-4 max-w-2xl space-y-3 text-sm leading-relaxed text-[var(--mm-text2)]"

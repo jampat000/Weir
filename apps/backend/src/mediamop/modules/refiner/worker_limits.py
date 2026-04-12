@@ -10,7 +10,7 @@ Worker count rollout semantics:
 
 
 def clamp_refiner_worker_count(raw: int) -> int:
-    """Enforce 0..8 workers (0 = disabled; default from env is 1)."""
+    """Enforce 0..8 workers (0 = disabled; default from env is typically 0 until operators enable Refiner)."""
 
     if raw < 0:
         return 1
