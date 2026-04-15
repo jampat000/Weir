@@ -24,7 +24,7 @@ export function AppShell() {
   const productTitle = (suite.data?.product_display_name ?? "MediaMop").trim() || "MediaMop";
 
   return (
-    <div className="mm-app-layout">
+    <div className="mm-app-layout" data-testid="shell-ready">
       <aside className="mm-sidebar" aria-label="Product">
         <BrandHeaderLink to="/app" productTitle={productTitle} />
         <nav className="mm-sidebar-nav" aria-label="Primary">
