@@ -44,6 +44,10 @@ class RefinerRuntimeSettingsOut(BaseModel):
     refiner_watched_folder_remux_scan_dispatch_periodic_remux_dry_run: bool = Field(
         description="Forwarded as ``dry_run`` on enqueued remux passes when periodic enqueue_remux is on.",
     )
+    refiner_watched_folder_min_file_age_seconds: int = Field(
+        ge=0,
+        description="Minimum file age before watched-folder scan or one-file pass touches media.",
+    )
     watched_folder_scan_periodic_configuration_note: str = Field(
         description="How operators change periodic scan env (restart required).",
     )

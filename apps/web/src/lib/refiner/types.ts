@@ -6,6 +6,11 @@ export type RefinerPathSettingsOut = {
   refiner_output_folder: string;
   resolved_default_work_folder: string;
   effective_work_folder: string;
+  refiner_tv_watched_folder: string | null;
+  refiner_tv_work_folder: string | null;
+  refiner_tv_output_folder: string | null;
+  resolved_default_tv_work_folder: string;
+  effective_tv_work_folder: string;
   updated_at: string;
 };
 
@@ -13,6 +18,11 @@ export type RefinerPathSettingsPutBody = {
   refiner_watched_folder: string | null;
   refiner_work_folder: string | null;
   refiner_output_folder: string;
+  /** When true, TV path fields are written (send empty strings to clear TV paths). */
+  refiner_tv_paths_included: boolean;
+  refiner_tv_watched_folder: string | null;
+  refiner_tv_work_folder: string | null;
+  refiner_tv_output_folder: string | null;
 };
 
 /** GET /api/v1/refiner/runtime-settings — read-only Refiner in-process worker snapshot. */
@@ -29,7 +39,17 @@ export type RefinerRuntimeSettingsOut = {
   refiner_watched_folder_remux_scan_dispatch_schedule_interval_seconds: number;
   refiner_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs: boolean;
   refiner_watched_folder_remux_scan_dispatch_periodic_remux_dry_run: boolean;
+  refiner_watched_folder_min_file_age_seconds: number;
   watched_folder_scan_periodic_configuration_note: string;
+};
+
+export type RefinerOverviewStatsOut = {
+  window_days: number;
+  files_processed: number;
+  success_rate_percent: number;
+  space_saved_gb: number | null;
+  space_saved_available: boolean;
+  space_saved_note: string;
 };
 
 /** POST /api/v1/refiner/jobs/watched-folder-remux-scan-dispatch/enqueue */
@@ -37,9 +57,43 @@ export type RefinerRuntimeSettingsOut = {
 export type RefinerWatchedFolderRemuxScanDispatchEnqueueBody = {
   enqueue_remux_jobs: boolean;
   remux_dry_run: boolean;
+  media_scope: "movie" | "tv";
 };
 
 export type RefinerWatchedFolderRemuxScanDispatchEnqueueOut = {
+  ok: boolean;
+  job_id: number;
+  dedupe_key: string;
+  job_kind: string;
+};
+
+/** GET/PUT /api/v1/refiner/remux-rules-settings */
+
+export type RefinerRemuxRulesSettingsOut = {
+  primary_audio_lang: string;
+  secondary_audio_lang: string;
+  tertiary_audio_lang: string;
+  default_audio_slot: "primary" | "secondary";
+  remove_commentary: boolean;
+  subtitle_mode: "remove_all" | "keep_selected";
+  subtitle_langs_csv: string;
+  preserve_forced_subs: boolean;
+  preserve_default_subs: boolean;
+  audio_preference_mode: "preferred_langs_quality" | "preferred_langs_strict" | "quality_all_languages";
+  updated_at: string;
+};
+
+export type RefinerRemuxRulesSettingsPutBody = Omit<RefinerRemuxRulesSettingsOut, "updated_at">;
+
+/** POST /api/v1/refiner/jobs/file-remux-pass/enqueue */
+
+export type RefinerFileRemuxPassManualEnqueueBody = {
+  relative_media_path: string;
+  dry_run: boolean;
+  media_scope: "movie" | "tv";
+};
+
+export type RefinerFileRemuxPassManualEnqueueOut = {
   ok: boolean;
   job_id: number;
   dedupe_key: string;

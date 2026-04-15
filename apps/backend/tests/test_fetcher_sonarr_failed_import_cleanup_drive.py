@@ -10,6 +10,7 @@ from mediamop.modules.arr_failed_import.env_settings import (
     AppFailedImportCleanupPolicySettings,
     FailedImportCleanupSettingsBundle,
 )
+from mediamop.modules.arr_failed_import.queue_action import FailedImportQueueHandlingAction
 from mediamop.modules.fetcher.sonarr_cleanup_execution import SonarrFailedImportCleanupExecutionOutcome
 from mediamop.modules.fetcher.sonarr_failed_import_cleanup_drive import (
     drive_sonarr_failed_import_cleanup_from_live_queue,
@@ -30,13 +31,13 @@ class _FakeFetch:
 
 @dataclass
 class _RecordingSonarrClient:
-    calls: list[int]
+    calls: list[tuple[int, bool, bool]]
 
     def __init__(self) -> None:
         self.calls = []
 
-    def remove_queue_item(self, queue_item_id: int) -> None:
-        self.calls.append(queue_item_id)
+    def remove_queue_item(self, queue_item_id: int, *, remove_from_client: bool, blocklist: bool) -> None:
+        self.calls.append((queue_item_id, remove_from_client, blocklist))
 
 
 def _settings_with_sonarr_policy(sonarr: AppFailedImportCleanupPolicySettings) -> MediaMopSettings:
@@ -68,7 +69,9 @@ def _row_waiting(*, qid: int) -> dict:
 
 def test_drive_terminal_message_and_enabled_toggle_removes_queue_item() -> None:
     settings = _settings_with_sonarr_policy(
-        AppFailedImportCleanupPolicySettings(remove_failed_imports=True),
+        AppFailedImportCleanupPolicySettings(
+            handling_failed_import=FailedImportQueueHandlingAction.REMOVE_ONLY,
+        ),
     )
     client = _RecordingSonarrClient()
     fetch = _FakeFetch([_row_import_failed(qid=88)])
@@ -78,10 +81,10 @@ def test_drive_terminal_message_and_enabled_toggle_removes_queue_item() -> None:
         queue_operations=client,
     )
     assert len(results) == 1
-    assert results[0].outcome is SonarrFailedImportCleanupExecutionOutcome.REMOVED_QUEUE_ITEM
+    assert results[0].outcome is SonarrFailedImportCleanupExecutionOutcome.REMOVED_REMOVE_ONLY
     assert results[0].sonarr_queue_item_id == 88
     assert "Import failed" in results[0].status_message_blob
-    assert client.calls == [88]
+    assert client.calls == [(88, True, False)]
 
 
 def test_drive_waiting_only_message_no_op_no_client_call() -> None:
@@ -99,7 +102,9 @@ def test_drive_waiting_only_message_no_op_no_client_call() -> None:
 
 def test_drive_missing_queue_id_uses_vertical_skip_path() -> None:
     settings = _settings_with_sonarr_policy(
-        AppFailedImportCleanupPolicySettings(remove_quality_rejections=True),
+        AppFailedImportCleanupPolicySettings(
+            handling_quality_rejection=FailedImportQueueHandlingAction.REMOVE_ONLY,
+        ),
     )
     client = _RecordingSonarrClient()
     row = {

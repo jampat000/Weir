@@ -18,6 +18,18 @@ class SuiteSettingsOut(BaseModel):
         max_length=4000,
         description="Optional short message on the home dashboard for signed-in users.",
     )
+    application_logs_enabled: bool = Field(
+        description="Whether MediaMop records new rows in the Activity timeline.",
+    )
+    app_timezone: str = Field(
+        max_length=120,
+        description="Suite-wide timezone label used for date/time displays that follow app timezone.",
+    )
+    log_retention_days: int = Field(
+        ge=1,
+        le=3650,
+        description="How long Activity rows are kept before automatic cleanup.",
+    )
     updated_at: datetime
 
 
@@ -27,6 +39,9 @@ class SuiteSettingsPutIn(BaseModel):
     csrf_token: str = Field(..., min_length=1)
     product_display_name: str = Field(..., min_length=1, max_length=120)
     signed_in_home_notice: str | None = Field(default=None, max_length=4000)
+    application_logs_enabled: bool
+    app_timezone: str = Field(..., min_length=1, max_length=120)
+    log_retention_days: int = Field(ge=1, le=3650)
 
 
 class SuiteSecurityOverviewOut(BaseModel):

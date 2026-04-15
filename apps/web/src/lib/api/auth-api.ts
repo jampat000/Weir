@@ -1,4 +1,4 @@
-import { apiFetch, readJson } from "./client";
+import { apiFetch, apiErrorDetailToString, readJson } from "./client";
 import type { BootstrapStatus, UserPublic } from "./types";
 
 export async function fetchCsrfToken(): Promise<string> {
@@ -42,9 +42,12 @@ export async function postLogin(username: string, password: string): Promise<Log
   if (!r.ok) {
     let detail = r.statusText;
     try {
-      const body = await readJson<{ detail?: string | string[] }>(r);
-      if (typeof body.detail === "string") {
-        detail = body.detail;
+      const body = await readJson<{ detail?: unknown }>(r);
+      if (body.detail !== undefined && body.detail !== null) {
+        const s = apiErrorDetailToString(body.detail);
+        if (s) {
+          detail = s;
+        }
       }
     } catch {
       /* ignore */
@@ -82,14 +85,49 @@ export async function postBootstrap(
   if (!r.ok) {
     let detail = r.statusText;
     try {
-      const body = await readJson<{ detail?: string }>(r);
-      if (body.detail) {
-        detail = body.detail;
+      const body = await readJson<{ detail?: unknown }>(r);
+      if (body.detail !== undefined && body.detail !== null) {
+        const s = apiErrorDetailToString(body.detail);
+        if (s) {
+          detail = s;
+        }
       }
     } catch {
       /* ignore */
     }
     throw new Error(detail || `bootstrap: ${r.status}`);
+  }
+  return readJson(r);
+}
+
+export async function postChangePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ message: string }> {
+  const csrf_token = await fetchCsrfToken();
+  const r = await apiFetch("/api/v1/auth/change-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      csrf_token,
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+  });
+  if (!r.ok) {
+    let detail = r.statusText;
+    try {
+      const body = await readJson<{ detail?: unknown }>(r);
+      if (body.detail !== undefined && body.detail !== null) {
+        const s = apiErrorDetailToString(body.detail);
+        if (s) {
+          detail = s;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail || `change password: ${r.status}`);
   }
   return readJson(r);
 }

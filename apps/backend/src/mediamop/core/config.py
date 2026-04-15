@@ -18,7 +18,10 @@ from mediamop.modules.arr_failed_import.env_settings import (
 )
 from mediamop.modules.arr_failed_import.policy import FailedImportCleanupPolicy
 from mediamop.modules.fetcher.fetcher_worker_limits import clamp_fetcher_worker_count
-from mediamop.modules.refiner.refiner_family_intervals import clamp_refiner_schedule_interval_seconds
+from mediamop.modules.refiner.refiner_family_intervals import (
+    clamp_refiner_min_file_age_seconds,
+    clamp_refiner_schedule_interval_seconds,
+)
 from mediamop.modules.refiner.worker_limits import clamp_refiner_worker_count
 from mediamop.modules.subber.worker_limits import clamp_subber_worker_count
 from mediamop.modules.trimmer.worker_limits import clamp_trimmer_worker_count
@@ -63,7 +66,13 @@ def _env_int(name: str, default: int) -> int:
 def _clamp_failed_import_cleanup_drive_schedule_interval_seconds(n: int) -> int:
     """Bound failed-import periodic enqueue interval (60s .. 7d) for SQLite / operator sanity."""
 
-    return max(60, min(n, 7 * 24 * 3600))
+    return clamp_failed_import_cleanup_drive_schedule_interval_seconds(n)
+
+
+def clamp_failed_import_cleanup_drive_schedule_interval_seconds(n: int) -> int:
+    """Public clamp for persisted failed-import cleanup drive intervals (API + SQLite policy row)."""
+
+    return max(60, min(int(n), 7 * 24 * 3600))
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,6 +119,7 @@ class MediaMopSettings:
     refiner_watched_folder_remux_scan_dispatch_schedule_interval_seconds: int
     refiner_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs: bool
     refiner_watched_folder_remux_scan_dispatch_periodic_remux_dry_run: bool
+    refiner_watched_folder_min_file_age_seconds: int
     # Legacy env read for compatibility only; remux path resolution uses saved Refiner path settings (SQLite).
     refiner_remux_media_root: str | None
     # Radarr/Sonarr HTTP for Fetcher-owned live failed-import cleanup drives (env: MEDIAMOP_FETCHER_*).
@@ -290,6 +300,9 @@ class MediaMopSettings:
         refiner_wf_scan_periodic_remux_dry = _env_bool(
             "MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_PERIODIC_REMUX_DRY_RUN",
             True,
+        )
+        refiner_min_file_age = clamp_refiner_min_file_age_seconds(
+            _env_int("MEDIAMOP_REFINER_WATCHED_FOLDER_MIN_FILE_AGE_SECONDS", 300),
         )
         refiner_remux_root = (os.environ.get("MEDIAMOP_REFINER_REMUX_MEDIA_ROOT") or "").strip()
         refiner_remux_media_root = str(Path(refiner_remux_root).expanduser()) if refiner_remux_root else None
@@ -505,6 +518,7 @@ class MediaMopSettings:
             refiner_watched_folder_remux_scan_dispatch_schedule_interval_seconds=refiner_wf_scan_dispatch_iv,
             refiner_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs=refiner_wf_scan_periodic_remux_enq,
             refiner_watched_folder_remux_scan_dispatch_periodic_remux_dry_run=refiner_wf_scan_periodic_remux_dry,
+            refiner_watched_folder_min_file_age_seconds=refiner_min_file_age,
             refiner_remux_media_root=refiner_remux_media_root,
             fetcher_radarr_base_url=radarr_base or None,
             fetcher_radarr_api_key=radarr_key or None,

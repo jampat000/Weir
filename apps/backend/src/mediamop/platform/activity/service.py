@@ -10,11 +10,12 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import delete, desc, func, select
 from sqlalchemy.orm import Session
 
 from mediamop.platform.activity import constants as C
 from mediamop.platform.activity.models import ActivityEvent
+from mediamop.platform.suite_settings.service import ensure_suite_settings_row
 
 RECENT_DEFAULT_LIMIT = 50
 
@@ -35,15 +36,22 @@ def record_activity_event(
     title: str,
     detail: str | None = None,
 ) -> ActivityEvent:
+    suite = ensure_suite_settings_row(db)
+    _maybe_prune_activity_rows_by_retention(db, keep_days=max(1, min(int(suite.log_retention_days), 3650)))
     row = ActivityEvent(
         event_type=event_type,
         module=module,
         title=title,
-        detail=detail,
+        detail=detail if bool(suite.application_logs_enabled) else None,
     )
     db.add(row)
     db.flush()
     return row
+
+
+def _maybe_prune_activity_rows_by_retention(db: Session, *, keep_days: int) -> None:
+    cutoff = _utcnow() - timedelta(days=keep_days)
+    db.execute(delete(ActivityEvent).where(ActivityEvent.created_at < cutoff))
 
 
 def maybe_record_login_failed(db: Session, *, username: str) -> None:

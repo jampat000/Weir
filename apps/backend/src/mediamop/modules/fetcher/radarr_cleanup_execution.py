@@ -1,69 +1,94 @@
-"""Radarr-only failed import cleanup execution — consumes :class:`RadarrFailedImportCleanupPlan`.
+"""Radarr-only failed import queue execution — consumes :class:`RadarrFailedImportQueueDeletePlan`.
 
-Does not reclassify or re-evaluate policy; only interprets ``plan.action`` and
-``plan.radarr_queue_item_id``. Inject a :class:`RadarrQueueOperations` implementation
-(HTTP or mock) at the boundary.
+Does not reclassify or re-evaluate policy; only interprets the plan and ``radarr_queue_item_id``.
+Inject a :class:`RadarrQueueOperations` implementation (HTTP or mock) at the boundary.
+
+HTTP contract: ``DELETE {base}/api/v3/queue/{id}`` with explicit ``removeFromClient`` and
+``blocklist`` — Radarr ``Api.V3/Queue/QueueController.RemoveAction`` (ADR-0011).
 """
 
 from __future__ import annotations
 
 import urllib.error
+import urllib.parse
 import urllib.request
 from enum import Enum
 from typing import Protocol
 
 from mediamop.modules.fetcher.radarr_failed_import_cleanup import (
-    RadarrFailedImportCleanupAction,
-    RadarrFailedImportCleanupPlan,
+    RadarrFailedImportQueueDeletePlan,
+    radarr_plan_requests_queue_delete,
 )
 
 
 class RadarrQueueOperations(Protocol):
     """Narrow Radarr queue API surface for cleanup execution (easy to fake in tests)."""
 
-    def remove_queue_item(self, queue_item_id: int) -> None:
-        """Delete one queue row (Radarr v3 ``DELETE /api/v3/queue/{id}``)."""
+    def remove_queue_item(
+        self,
+        queue_item_id: int,
+        *,
+        remove_from_client: bool,
+        blocklist: bool,
+    ) -> None:
+        """Delete one queue row (Radarr v3 ``DELETE /api/v3/queue/{id}`` with explicit flags)."""
         ...
 
 
 class RadarrFailedImportCleanupExecutionOutcome(str, Enum):
-    """Outcome of applying a Radarr failed-import cleanup plan via a queue client."""
+    """Outcome of applying a Radarr failed-import queue plan via a queue client."""
 
     NO_OP = "no_op"
-    REMOVED_QUEUE_ITEM = "removed_queue_item"
+    REMOVED_REMOVE_ONLY = "removed_remove_only"
+    REMOVED_BLOCKLIST_ONLY = "removed_blocklist_only"
+    REMOVED_REMOVE_AND_BLOCKLIST = "removed_remove_and_blocklist"
     SKIPPED_MISSING_QUEUE_ITEM_ID = "skipped_missing_queue_item_id"
 
 
 def execute_radarr_failed_import_cleanup_plan(
-    plan: RadarrFailedImportCleanupPlan,
+    plan: RadarrFailedImportQueueDeletePlan,
     queue_client: RadarrQueueOperations,
 ) -> RadarrFailedImportCleanupExecutionOutcome:
-    """Apply ``plan`` using ``queue_client`` when a remove is planned and an id exists.
+    """Apply ``plan`` using ``queue_client`` when a queue DELETE is intended and an id exists."""
 
-    - :attr:`RadarrFailedImportCleanupAction.NONE` → :attr:`RadarrFailedImportCleanupExecutionOutcome.NO_OP` (no client call).
-    - Planned remove without ``radarr_queue_item_id`` → :attr:`RadarrFailedImportCleanupExecutionOutcome.SKIPPED_MISSING_QUEUE_ITEM_ID`.
-    - Planned remove with id → ``queue_client.remove_queue_item(id)`` then :attr:`RadarrFailedImportCleanupExecutionOutcome.REMOVED_QUEUE_ITEM`.
-    """
-    if plan.action is RadarrFailedImportCleanupAction.NONE:
+    if not radarr_plan_requests_queue_delete(plan):
         return RadarrFailedImportCleanupExecutionOutcome.NO_OP
-    if plan.action is not RadarrFailedImportCleanupAction.PLANNED_REMOVE_FROM_DOWNLOAD_QUEUE:
-        raise AssertionError(f"unhandled RadarrFailedImportCleanupAction: {plan.action!r}")
     if plan.radarr_queue_item_id is None:
         return RadarrFailedImportCleanupExecutionOutcome.SKIPPED_MISSING_QUEUE_ITEM_ID
-    queue_client.remove_queue_item(plan.radarr_queue_item_id)
-    return RadarrFailedImportCleanupExecutionOutcome.REMOVED_QUEUE_ITEM
+    queue_client.remove_queue_item(
+        plan.radarr_queue_item_id,
+        remove_from_client=plan.remove_from_client,
+        blocklist=plan.blocklist,
+    )
+    if plan.remove_from_client and plan.blocklist:
+        return RadarrFailedImportCleanupExecutionOutcome.REMOVED_REMOVE_AND_BLOCKLIST
+    if plan.blocklist:
+        return RadarrFailedImportCleanupExecutionOutcome.REMOVED_BLOCKLIST_ONLY
+    return RadarrFailedImportCleanupExecutionOutcome.REMOVED_REMOVE_ONLY
 
 
 class RadarrQueueHttpClient:
-    """Minimal stdlib HTTP client: ``DELETE {base}/api/v3/queue/{id}`` with ``X-Api-Key``."""
+    """Stdlib HTTP client: ``DELETE {base}/api/v3/queue/{id}?removeFromClient=&blocklist=``."""
 
     def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 30.0) -> None:
         self._base = base_url.rstrip("/")
         self._api_key = api_key
         self._timeout = timeout_seconds
 
-    def remove_queue_item(self, queue_item_id: int) -> None:
-        url = f"{self._base}/api/v3/queue/{queue_item_id}"
+    def remove_queue_item(
+        self,
+        queue_item_id: int,
+        *,
+        remove_from_client: bool,
+        blocklist: bool,
+    ) -> None:
+        qs = urllib.parse.urlencode(
+            {
+                "removeFromClient": str(remove_from_client).lower(),
+                "blocklist": str(blocklist).lower(),
+            },
+        )
+        url = f"{self._base}/api/v3/queue/{queue_item_id}?{qs}"
         req = urllib.request.Request(
             url,
             method="DELETE",

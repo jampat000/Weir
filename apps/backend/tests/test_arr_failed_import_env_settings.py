@@ -8,13 +8,14 @@ import pytest
 
 from mediamop.core.config import MediaMopSettings
 from mediamop.modules.arr_failed_import.decision import decide_failed_import_cleanup_eligibility
-from mediamop.modules.arr_failed_import.policy import default_failed_import_cleanup_policy
 from mediamop.modules.arr_failed_import.env_settings import (
     AppFailedImportCleanupPolicySettings,
     FailedImportCleanupSettingsBundle,
     default_failed_import_cleanup_settings_bundle,
     load_failed_import_cleanup_settings_bundle,
 )
+from mediamop.modules.arr_failed_import.policy import default_failed_import_cleanup_policy
+from mediamop.modules.arr_failed_import.queue_action import FailedImportQueueHandlingAction
 
 from tests.legacy_refiner_failed_import_env_poison import (
     LEGACY_REFINER_FAILED_IMPORT_CLEANUP_POLICY_ENV_KEYS,
@@ -37,6 +38,18 @@ def _clear_failed_import_cleanup_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "MEDIAMOP_FAILED_IMPORT_SONARR_CLEANUP_CORRUPT",
         "MEDIAMOP_FAILED_IMPORT_SONARR_CLEANUP_DOWNLOAD_FAILED",
         "MEDIAMOP_FAILED_IMPORT_SONARR_CLEANUP_IMPORT_FAILED",
+        "MEDIAMOP_FAILED_IMPORT_RADARR_ACTION_QUALITY",
+        "MEDIAMOP_FAILED_IMPORT_RADARR_ACTION_UNMATCHED",
+        "MEDIAMOP_FAILED_IMPORT_RADARR_ACTION_SAMPLE",
+        "MEDIAMOP_FAILED_IMPORT_RADARR_ACTION_CORRUPT",
+        "MEDIAMOP_FAILED_IMPORT_RADARR_ACTION_DOWNLOAD_FAILED",
+        "MEDIAMOP_FAILED_IMPORT_RADARR_ACTION_IMPORT_FAILED",
+        "MEDIAMOP_FAILED_IMPORT_SONARR_ACTION_QUALITY",
+        "MEDIAMOP_FAILED_IMPORT_SONARR_ACTION_UNMATCHED",
+        "MEDIAMOP_FAILED_IMPORT_SONARR_ACTION_SAMPLE",
+        "MEDIAMOP_FAILED_IMPORT_SONARR_ACTION_CORRUPT",
+        "MEDIAMOP_FAILED_IMPORT_SONARR_ACTION_DOWNLOAD_FAILED",
+        "MEDIAMOP_FAILED_IMPORT_SONARR_ACTION_IMPORT_FAILED",
         *LEGACY_REFINER_FAILED_IMPORT_CLEANUP_POLICY_ENV_KEYS,
     )
     for k in keys:
@@ -56,10 +69,10 @@ def test_load_bundle_reads_primary_failed_import_env(monkeypatch: pytest.MonkeyP
     b = load_failed_import_cleanup_settings_bundle()
     rp = b.radarr_policy()
     sp = b.sonarr_policy()
-    assert rp.remove_corrupt_imports is True
-    assert rp.remove_failed_imports is False
-    assert sp.remove_failed_imports is True
-    assert sp.remove_corrupt_imports is False
+    assert rp.handling_corrupt_import is FailedImportQueueHandlingAction.REMOVE_ONLY
+    assert rp.handling_failed_import is FailedImportQueueHandlingAction.LEAVE_ALONE
+    assert sp.handling_failed_import is FailedImportQueueHandlingAction.REMOVE_ONLY
+    assert sp.handling_corrupt_import is FailedImportQueueHandlingAction.LEAVE_ALONE
 
 
 def test_legacy_refiner_cleanup_env_vars_are_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -67,28 +80,35 @@ def test_legacy_refiner_cleanup_env_vars_are_ignored(monkeypatch: pytest.MonkeyP
     monkeypatch.setenv(LEGACY_REFINER_RADARR_CLEANUP_CORRUPT, "1")
     monkeypatch.setenv(LEGACY_REFINER_SONARR_CLEANUP_IMPORT_FAILED, "true")
     b = load_failed_import_cleanup_settings_bundle()
-    assert b.radarr_policy().remove_corrupt_imports is False
-    assert b.sonarr_policy().remove_failed_imports is False
+    assert b.radarr_policy().handling_corrupt_import is FailedImportQueueHandlingAction.LEAVE_ALONE
+    assert b.sonarr_policy().handling_failed_import is FailedImportQueueHandlingAction.LEAVE_ALONE
 
 
 def test_pending_unknown_remain_non_destructive_via_resolved_radarr_policy() -> None:
     b = default_failed_import_cleanup_settings_bundle()
     p = b.radarr_policy()
-    assert decide_failed_import_cleanup_eligibility("Downloaded - Waiting to Import", p).cleanup_eligible is False
-    assert decide_failed_import_cleanup_eligibility("no known phrases", p).cleanup_eligible is False
+    assert (
+        decide_failed_import_cleanup_eligibility("Downloaded - Waiting to Import", p, movies=True).cleanup_eligible
+        is False
+    )
+    assert decide_failed_import_cleanup_eligibility("no known phrases", p, movies=True).cleanup_eligible is False
 
 
 def test_failed_import_cleanup_policies_delegate_through_media_mop_settings() -> None:
     base = MediaMopSettings.load()
     bundle = FailedImportCleanupSettingsBundle(
-        radarr=AppFailedImportCleanupPolicySettings(remove_quality_rejections=True),
-        sonarr=AppFailedImportCleanupPolicySettings(remove_failed_downloads=True),
+        radarr=AppFailedImportCleanupPolicySettings(
+            handling_quality_rejection=FailedImportQueueHandlingAction.REMOVE_ONLY,
+        ),
+        sonarr=AppFailedImportCleanupPolicySettings(
+            handling_failed_download=FailedImportQueueHandlingAction.REMOVE_ONLY,
+        ),
     )
     s = replace(base, failed_import_cleanup_env=bundle)
-    assert s.radarr_failed_import_cleanup_policy().remove_quality_rejections is True
-    assert s.radarr_failed_import_cleanup_policy().remove_failed_downloads is False
-    assert s.sonarr_failed_import_cleanup_policy().remove_failed_downloads is True
-    assert s.sonarr_failed_import_cleanup_policy().remove_quality_rejections is False
+    assert s.radarr_failed_import_cleanup_policy().handling_quality_rejection is FailedImportQueueHandlingAction.REMOVE_ONLY
+    assert s.radarr_failed_import_cleanup_policy().handling_failed_download is FailedImportQueueHandlingAction.LEAVE_ALONE
+    assert s.sonarr_failed_import_cleanup_policy().handling_failed_download is FailedImportQueueHandlingAction.REMOVE_ONLY
+    assert s.sonarr_failed_import_cleanup_policy().handling_quality_rejection is FailedImportQueueHandlingAction.LEAVE_ALONE
 
 
 def test_media_mop_settings_failed_import_schedule_ignores_legacy_refiner_env(

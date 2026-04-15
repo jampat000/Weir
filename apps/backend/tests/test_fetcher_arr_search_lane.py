@@ -15,6 +15,7 @@ from mediamop.modules.fetcher.fetcher_arr_search_enqueue import (
     enqueue_scheduled_radarr_missing_search_job,
     enqueue_scheduled_sonarr_missing_search_job,
 )
+from mediamop.modules.fetcher.fetcher_arr_operator_settings_prefs import load_fetcher_arr_search_operator_prefs
 from mediamop.modules.fetcher.fetcher_arr_search_handlers import (
     build_fetcher_arr_search_job_handlers,
     merge_fetcher_failed_import_and_search_handlers,
@@ -41,6 +42,7 @@ from mediamop.modules.refiner.jobs_ops import refiner_enqueue_or_get_job
 from mediamop.platform.activity import constants as act_c
 from mediamop.platform.activity.models import ActivityEvent
 
+import mediamop.modules.fetcher.fetcher_arr_operator_settings_model  # noqa: F401
 import mediamop.modules.fetcher.fetcher_jobs_model  # noqa: F401
 import mediamop.modules.fetcher.fetcher_search_schedule_state_model  # noqa: F401
 import mediamop.modules.refiner.jobs_model  # noqa: F401
@@ -60,6 +62,54 @@ def lane_engine(tmp_path):
 @pytest.fixture
 def lane_sf(lane_engine):
     return sessionmaker(bind=lane_engine, class_=Session, autoflush=False, autocommit=False, expire_on_commit=False, future=True)
+
+
+def _lane_test_settings_to_db_row(session: Session, settings: MediaMopSettings) -> None:
+    """Mirror per-lane search fields from ``replace(MediaMopSettings, …)`` onto the operator settings row."""
+
+    from mediamop.modules.fetcher.fetcher_arr_operator_settings_prefs import ensure_fetcher_arr_operator_settings_row
+
+    row = ensure_fetcher_arr_operator_settings_row(session)
+    row.sonarr_missing_search_enabled = bool(settings.fetcher_sonarr_missing_search_enabled)
+    row.sonarr_missing_search_max_items_per_run = int(settings.fetcher_sonarr_missing_search_max_items_per_run)
+    row.sonarr_missing_search_retry_delay_minutes = int(settings.fetcher_sonarr_missing_search_retry_delay_minutes)
+    row.sonarr_missing_search_schedule_enabled = bool(settings.fetcher_sonarr_missing_search_schedule_enabled)
+    row.sonarr_missing_search_schedule_days = settings.fetcher_sonarr_missing_search_schedule_days
+    row.sonarr_missing_search_schedule_start = settings.fetcher_sonarr_missing_search_schedule_start
+    row.sonarr_missing_search_schedule_end = settings.fetcher_sonarr_missing_search_schedule_end
+    row.sonarr_missing_search_schedule_interval_seconds = int(
+        settings.fetcher_sonarr_missing_search_schedule_interval_seconds,
+    )
+    row.sonarr_upgrade_search_enabled = bool(settings.fetcher_sonarr_upgrade_search_enabled)
+    row.sonarr_upgrade_search_max_items_per_run = int(settings.fetcher_sonarr_upgrade_search_max_items_per_run)
+    row.sonarr_upgrade_search_retry_delay_minutes = int(settings.fetcher_sonarr_upgrade_search_retry_delay_minutes)
+    row.sonarr_upgrade_search_schedule_enabled = bool(settings.fetcher_sonarr_upgrade_search_schedule_enabled)
+    row.sonarr_upgrade_search_schedule_days = settings.fetcher_sonarr_upgrade_search_schedule_days
+    row.sonarr_upgrade_search_schedule_start = settings.fetcher_sonarr_upgrade_search_schedule_start
+    row.sonarr_upgrade_search_schedule_end = settings.fetcher_sonarr_upgrade_search_schedule_end
+    row.sonarr_upgrade_search_schedule_interval_seconds = int(
+        settings.fetcher_sonarr_upgrade_search_schedule_interval_seconds,
+    )
+    row.radarr_missing_search_enabled = bool(settings.fetcher_radarr_missing_search_enabled)
+    row.radarr_missing_search_max_items_per_run = int(settings.fetcher_radarr_missing_search_max_items_per_run)
+    row.radarr_missing_search_retry_delay_minutes = int(settings.fetcher_radarr_missing_search_retry_delay_minutes)
+    row.radarr_missing_search_schedule_enabled = bool(settings.fetcher_radarr_missing_search_schedule_enabled)
+    row.radarr_missing_search_schedule_days = settings.fetcher_radarr_missing_search_schedule_days
+    row.radarr_missing_search_schedule_start = settings.fetcher_radarr_missing_search_schedule_start
+    row.radarr_missing_search_schedule_end = settings.fetcher_radarr_missing_search_schedule_end
+    row.radarr_missing_search_schedule_interval_seconds = int(
+        settings.fetcher_radarr_missing_search_schedule_interval_seconds,
+    )
+    row.radarr_upgrade_search_enabled = bool(settings.fetcher_radarr_upgrade_search_enabled)
+    row.radarr_upgrade_search_max_items_per_run = int(settings.fetcher_radarr_upgrade_search_max_items_per_run)
+    row.radarr_upgrade_search_retry_delay_minutes = int(settings.fetcher_radarr_upgrade_search_retry_delay_minutes)
+    row.radarr_upgrade_search_schedule_enabled = bool(settings.fetcher_radarr_upgrade_search_schedule_enabled)
+    row.radarr_upgrade_search_schedule_days = settings.fetcher_radarr_upgrade_search_schedule_days
+    row.radarr_upgrade_search_schedule_start = settings.fetcher_radarr_upgrade_search_schedule_start
+    row.radarr_upgrade_search_schedule_end = settings.fetcher_radarr_upgrade_search_schedule_end
+    row.radarr_upgrade_search_schedule_interval_seconds = int(
+        settings.fetcher_radarr_upgrade_search_schedule_interval_seconds,
+    )
 
 
 def test_scheduled_search_enqueue_only_fetcher_jobs(lane_sf) -> None:
@@ -253,6 +303,10 @@ def test_enqueue_scheduled_allowed_when_worker_would_skip_outside_window(lane_sf
         job_id = s.scalar(select(FetcherJob.id).where(FetcherJob.dedupe_key == DEDUPE_SCHEDULED_SONARR_MISSING))
         assert job_id is not None
 
+    with lane_sf() as s:
+        _lane_test_settings_to_db_row(s, settings)
+        s.commit()
+
     handlers = build_fetcher_arr_search_job_handlers(settings, lane_sf)
     ctx = FetcherJobWorkContext(
         id=int(job_id),
@@ -313,6 +367,10 @@ def test_scheduled_missing_zero_pool_no_activity_row(lane_sf, monkeypatch: pytes
         s.commit()
         jid = int(s.scalar(select(FetcherJob.id)) or 0)
 
+    with lane_sf() as s:
+        _lane_test_settings_to_db_row(s, settings)
+        s.commit()
+
     handlers = build_fetcher_arr_search_job_handlers(settings, lane_sf)
     with lane_sf() as s0:
         before_max = s0.scalar(select(func.max(ActivityEvent.id)))
@@ -365,6 +423,10 @@ def test_manual_missing_zero_emits_zero_manual_activity(lane_sf, monkeypatch: py
         )
         s.commit()
         jid = int(s.scalar(select(FetcherJob.id)) or 0)
+
+    with lane_sf() as s:
+        _lane_test_settings_to_db_row(s, settings)
+        s.commit()
 
     handlers = build_fetcher_arr_search_job_handlers(settings, lane_sf)
     handlers[JOB_KIND_MISSING_SEARCH_SONARR_MONITORED_EPISODES_V1](
@@ -446,6 +508,10 @@ def test_sonarr_missing_handler_dispatches_episode_search_command(lane_sf, monke
         s.commit()
         jid = int(s.scalar(select(FetcherJob.id)) or 0)
 
+    with lane_sf() as s:
+        _lane_test_settings_to_db_row(s, settings)
+        s.commit()
+
     handlers = build_fetcher_arr_search_job_handlers(settings, lane_sf)
     handlers[JOB_KIND_MISSING_SEARCH_SONARR_MONITORED_EPISODES_V1](
         FetcherJobWorkContext(
@@ -507,6 +573,10 @@ def test_process_one_fetcher_runs_search_handler(
                 payload_json='{"manual": true}',
             ),
         )
+        s.commit()
+
+    with lane_sf() as s:
+        _lane_test_settings_to_db_row(s, settings)
         s.commit()
 
     merged = merge_fetcher_failed_import_and_search_handlers(
@@ -576,6 +646,10 @@ def test_upgrade_handler_uses_wanted_cutoff_pagination(lane_sf, monkeypatch: pyt
         s.commit()
         jid = int(s.scalar(select(FetcherJob.id)) or 0)
 
+    with lane_sf() as s:
+        _lane_test_settings_to_db_row(s, settings)
+        s.commit()
+
     h = build_fetcher_arr_search_job_handlers(settings, lane_sf)
     h[JOB_KIND_UPGRADE_SEARCH_RADARR_CUTOFF_UNMET_V1](
         FetcherJobWorkContext(
@@ -624,7 +698,9 @@ def test_prune_fetcher_arr_action_log_uses_per_lane_retry_windows(lane_sf) -> No
                 ],
             )
         with s.begin():
-            prune_fetcher_arr_action_log(s, settings=settings, now=now)
+            _lane_test_settings_to_db_row(s, settings)
+            prefs = load_fetcher_arr_search_operator_prefs(s)
+            prune_fetcher_arr_action_log(s, prefs=prefs, now=now)
         miss = s.scalars(
             select(FetcherArrActionLog).where(
                 FetcherArrActionLog.app == "sonarr",

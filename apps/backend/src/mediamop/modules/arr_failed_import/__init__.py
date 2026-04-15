@@ -10,6 +10,7 @@ from __future__ import annotations
 from mediamop.modules.arr_failed_import.classification import (
     FailedImportOutcome,
     classify_failed_import_message,
+    classify_failed_import_message_for_media,
     normalize_failed_import_blob,
 )
 from mediamop.modules.arr_failed_import.decision import (
@@ -27,8 +28,13 @@ from mediamop.modules.arr_failed_import.policy import (
     FailedImportCleanupPolicy,
     FailedImportCleanupPolicyKey,
     cleanup_policy_key_for_outcome,
+    configured_action_for_terminal_outcome,
     default_failed_import_cleanup_policy,
-    is_failed_import_cleanup_enabled,
+    is_queue_delete_configured_for_outcome,
+)
+from mediamop.modules.arr_failed_import.queue_action import (
+    FailedImportQueueHandlingAction,
+    queue_delete_flags_for_action,
 )
 
 __all__ = [
@@ -39,12 +45,16 @@ __all__ = [
     "FailedImportCleanupPolicyKey",
     "FailedImportCleanupSettingsBundle",
     "FailedImportOutcome",
+    "FailedImportQueueHandlingAction",
     "classify_failed_import_message",
+    "classify_failed_import_message_for_media",
     "cleanup_policy_key_for_outcome",
+    "configured_action_for_terminal_outcome",
     "decide_failed_import_cleanup_eligibility",
     "default_failed_import_cleanup_policy",
     "default_failed_import_cleanup_settings_bundle",
-    "is_failed_import_cleanup_enabled",
+    "is_queue_delete_configured_for_outcome",
     "load_failed_import_cleanup_settings_bundle",
     "normalize_failed_import_blob",
+    "queue_delete_flags_for_action",
 ]

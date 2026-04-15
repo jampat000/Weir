@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from mediamop.core.config import MediaMopSettings
 from mediamop.core.datetime_util import as_utc
 from mediamop.platform.auth.models import User, UserSession
-from mediamop.platform.auth.password import verify_password
+from mediamop.platform.auth.password import hash_password, verify_password
 from mediamop.platform.auth.sessions import (
     compute_absolute_expiry,
     generate_raw_session_token,
@@ -141,3 +141,24 @@ def logout_by_cookie(
 
 def user_public(user: User) -> dict:
     return {"id": user.id, "username": user.username, "role": user.role}
+
+
+def change_password_for_user(
+    db: Session,
+    *,
+    user_id: int,
+    current_password: str,
+    new_password: str,
+) -> None:
+    """Rotate password hash after verifying current password; revoke all active sessions."""
+
+    user = db.get(User, user_id)
+    if user is None or not user.is_active:
+        raise ValueError("Account is not available.")
+    if not verify_password(current_password, user.password_hash):
+        raise ValueError("Current password is incorrect.")
+    if current_password == new_password:
+        raise ValueError("New password must be different from the current password.")
+    user.password_hash = hash_password(new_password)
+    revoke_active_sessions_for_user(db, user.id)
+    db.flush()

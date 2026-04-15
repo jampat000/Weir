@@ -12,6 +12,7 @@ from mediamop.core.db import create_db_engine, create_session_factory
 from mediamop.modules.fetcher.automation_summary_service import (
     build_fetcher_failed_import_automation_summary,
 )
+from mediamop.modules.fetcher.cleanup_policy_model import FetcherFailedImportCleanupPolicyRow
 from mediamop.modules.fetcher.fetcher_jobs_model import FetcherJob, FetcherJobStatus
 from mediamop.modules.fetcher.radarr_failed_import_cleanup_job import (
     RADARR_FAILED_IMPORT_CLEANUP_DRIVE_DEDUPE_KEY,
@@ -38,6 +39,7 @@ def test_schedule_off_no_secondary_caveat() -> None:
         fetcher_worker_count=1,
     )
     with _session() as db:
+        db.execute(delete(FetcherFailedImportCleanupPolicyRow))
         db.execute(delete(FetcherJob).where(FetcherJob.dedupe_key == RADARR_FAILED_IMPORT_CLEANUP_DRIVE_DEDUPE_KEY))
         db.commit()
         out = build_fetcher_failed_import_automation_summary(db, s)
@@ -54,6 +56,7 @@ def test_schedule_on_interval_and_caveat() -> None:
         fetcher_worker_count=1,
     )
     with _session() as db:
+        db.execute(delete(FetcherFailedImportCleanupPolicyRow))
         db.execute(delete(FetcherJob).where(FetcherJob.dedupe_key == RADARR_FAILED_IMPORT_CLEANUP_DRIVE_DEDUPE_KEY))
         db.commit()
         out = build_fetcher_failed_import_automation_summary(db, s)

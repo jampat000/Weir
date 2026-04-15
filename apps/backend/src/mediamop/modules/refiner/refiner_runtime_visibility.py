@@ -18,14 +18,17 @@ _SQLITE_THROUGHPUT_NOTE = (
 
 _CONFIGURATION_NOTE = (
     "Change MEDIAMOP_REFINER_WORKER_COUNT in apps/backend/.env (integer 0–8: 0 = off, 1 = one worker, "
-    "2–8 = several concurrent workers for this lane only), then restart the MediaMop API."
+    "2–8 = several concurrent workers for this Refiner lane only), then restart the MediaMop API."
 )
 
 _WATCHED_FOLDER_SCAN_PERIODIC_NOTE = (
     "Optional periodic enqueue for refiner.watched_folder.remux_scan_dispatch.v1 uses "
     "MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_ENABLED and "
     "MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_INTERVAL_SECONDS in apps/backend/.env "
-    "(Refiner-only; not shared with Fetcher schedules). Remux options for periodic ticks: "
+    "(Refiner-only; not shared with Fetcher schedules). Each tick evaluates Movies and TV "
+    "independently: when a scope has no pending/leased scan for that scope and its watched folder is saved, "
+    "one periodic scan job is enqueued for that scope (still not a filesystem watcher). "
+    "File-pass options for periodic ticks: "
     "MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_PERIODIC_ENQUEUE_REMUX_JOBS and "
     "MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_PERIODIC_REMUX_DRY_RUN. "
     "Restart the API after changing any of these — values are read at process start only."
@@ -73,5 +76,6 @@ def refiner_runtime_settings_from_settings(settings: MediaMopSettings) -> Refine
         refiner_watched_folder_remux_scan_dispatch_periodic_remux_dry_run=(
             settings.refiner_watched_folder_remux_scan_dispatch_periodic_remux_dry_run
         ),
+        refiner_watched_folder_min_file_age_seconds=settings.refiner_watched_folder_min_file_age_seconds,
         watched_folder_scan_periodic_configuration_note=_WATCHED_FOLDER_SCAN_PERIODIC_NOTE,
     )

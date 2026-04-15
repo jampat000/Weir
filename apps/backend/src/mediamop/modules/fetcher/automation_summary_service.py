@@ -5,7 +5,8 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from mediamop.core.config import MediaMopSettings
+from mediamop.core.config import MediaMopSettings, clamp_failed_import_cleanup_drive_schedule_interval_seconds
+from mediamop.modules.fetcher.cleanup_policy_service import load_fetcher_failed_import_cleanup_bundle
 from mediamop.modules.fetcher.fetcher_jobs_inspection_service import DEFAULT_TERMINAL_STATUSES
 from mediamop.modules.fetcher.fetcher_jobs_model import FetcherJob, FetcherJobStatus
 from mediamop.modules.fetcher.radarr_failed_import_cleanup_job import (
@@ -104,17 +105,33 @@ def build_fetcher_failed_import_automation_summary(
 
     slots_note = _SLOTS_OFF_NOTE if settings.fetcher_worker_count == 0 else None
 
+    schedule_seed = (
+        settings.failed_import_radarr_cleanup_drive_schedule_enabled,
+        clamp_failed_import_cleanup_drive_schedule_interval_seconds(
+            settings.failed_import_radarr_cleanup_drive_schedule_interval_seconds,
+        ),
+        settings.failed_import_sonarr_cleanup_drive_schedule_enabled,
+        clamp_failed_import_cleanup_drive_schedule_interval_seconds(
+            settings.failed_import_sonarr_cleanup_drive_schedule_interval_seconds,
+        ),
+    )
+    _, policy_row = load_fetcher_failed_import_cleanup_bundle(
+        session,
+        settings.failed_import_cleanup_env,
+        schedule_seed=schedule_seed,
+    )
+
     movies = _axis_from_settings(
         empty_history_label="No finished movie pass recorded yet.",
         job=rad,
-        schedule_enabled=settings.failed_import_radarr_cleanup_drive_schedule_enabled,
-        interval_seconds=settings.failed_import_radarr_cleanup_drive_schedule_interval_seconds,
+        schedule_enabled=policy_row.radarr_cleanup_drive_schedule_enabled,
+        interval_seconds=policy_row.radarr_cleanup_drive_schedule_interval_seconds,
     )
     tv = _axis_from_settings(
         empty_history_label="No finished TV pass recorded yet.",
         job=son,
-        schedule_enabled=settings.failed_import_sonarr_cleanup_drive_schedule_enabled,
-        interval_seconds=settings.failed_import_sonarr_cleanup_drive_schedule_interval_seconds,
+        schedule_enabled=policy_row.sonarr_cleanup_drive_schedule_enabled,
+        interval_seconds=policy_row.sonarr_cleanup_drive_schedule_interval_seconds,
     )
 
     return FetcherFailedImportAutomationSummaryOut(

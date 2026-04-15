@@ -34,12 +34,34 @@ export type FetcherFailedImportAutomationSummary = {
   tv_shows: FetcherFailedImportAxisSummary;
 };
 
+/** GET /api/v1/fetcher/failed-imports/queue-attention-snapshot — live queue scan per app. */
+export type FetcherFailedImportQueueAttentionAxis = {
+  needs_attention_count: number | null;
+  last_checked_at: string | null;
+};
+
+export type FetcherFailedImportQueueAttentionSnapshot = {
+  tv_shows: FetcherFailedImportQueueAttentionAxis;
+  movies: FetcherFailedImportQueueAttentionAxis;
+};
+
+/** Per-class Sonarr/Radarr queue handling (matches ``FailedImportQueueHandlingAction`` API strings). */
+export type FailedImportQueueHandlingAction =
+  | "leave_alone"
+  | "remove_only"
+  | "blocklist_only"
+  | "remove_and_blocklist";
+
+/** Six persisted fields = six terminal classifier outcomes (QUALITY … IMPORT_FAILED). PENDING_WAITING / UNKNOWN have no field. */
 export type FailedImportCleanupPolicyAxis = {
-  remove_quality_rejections: boolean;
-  remove_unmatched_manual_import_rejections: boolean;
-  remove_corrupt_imports: boolean;
-  remove_failed_downloads: boolean;
-  remove_failed_imports: boolean;
+  handling_quality_rejection: FailedImportQueueHandlingAction;
+  handling_unmatched_manual_import: FailedImportQueueHandlingAction;
+  handling_sample_release: FailedImportQueueHandlingAction;
+  handling_corrupt_import: FailedImportQueueHandlingAction;
+  handling_failed_download: FailedImportQueueHandlingAction;
+  handling_failed_import: FailedImportQueueHandlingAction;
+  cleanup_drive_schedule_enabled: boolean;
+  cleanup_drive_schedule_interval_seconds: number;
 };
 
 export type FetcherFailedImportCleanupPolicyOut = {

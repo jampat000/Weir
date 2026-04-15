@@ -21,7 +21,7 @@ from typing import Any
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from mediamop.core.config import MediaMopSettings
+from mediamop.modules.fetcher.fetcher_arr_operator_settings_prefs import FetcherArrSearchOperatorPrefs
 from mediamop.modules.fetcher.fetcher_arr_action_log_model import FetcherArrActionLog
 from mediamop.modules.fetcher.fetcher_arr_v3_http import FetcherArrV3Client
 
@@ -71,16 +71,16 @@ def _take_records_and_ids(
 def prune_fetcher_arr_action_log(
     session: Session,
     *,
-    settings: MediaMopSettings,
+    prefs: FetcherArrSearchOperatorPrefs,
     now: datetime,
 ) -> None:
     """Drop stale cooldown rows per lane using that lane's retry minutes (no cross-lane window)."""
 
     lanes: list[tuple[str, str, int]] = [
-        ("sonarr", "missing", int(settings.fetcher_sonarr_missing_search_retry_delay_minutes)),
-        ("sonarr", "upgrade", int(settings.fetcher_sonarr_upgrade_search_retry_delay_minutes)),
-        ("radarr", "missing", int(settings.fetcher_radarr_missing_search_retry_delay_minutes)),
-        ("radarr", "upgrade", int(settings.fetcher_radarr_upgrade_search_retry_delay_minutes)),
+        ("sonarr", "missing", int(prefs.sonarr_missing.retry_delay_minutes)),
+        ("sonarr", "upgrade", int(prefs.sonarr_upgrade.retry_delay_minutes)),
+        ("radarr", "missing", int(prefs.radarr_missing.retry_delay_minutes)),
+        ("radarr", "upgrade", int(prefs.radarr_upgrade.retry_delay_minutes)),
     ]
     for app, action, minutes in lanes:
         window_minutes = max(1, min(minutes, 365 * 24 * 60)) * 2

@@ -13,6 +13,7 @@ from mediamop.modules.refiner.refiner_path_settings_model import RefinerPathSett
 from mediamop.modules.refiner.refiner_path_settings_service import (
     ensure_refiner_path_settings_row,
     resolve_refiner_path_runtime_for_remux,
+    resolved_default_refiner_tv_work_folder,
     resolved_default_refiner_work_folder,
 )
 
@@ -56,9 +57,17 @@ def test_refiner_path_settings_get_shape(client_with_admin: TestClient) -> None:
     assert "refiner_output_folder" in body
     assert "resolved_default_work_folder" in body
     assert "effective_work_folder" in body
+    assert "refiner_tv_watched_folder" in body
+    assert "refiner_tv_work_folder" in body
+    assert "refiner_tv_output_folder" in body
+    assert "resolved_default_tv_work_folder" in body
+    assert "effective_tv_work_folder" in body
     assert "updated_at" in body
     settings = MediaMopSettings.load()
     assert body["resolved_default_work_folder"] == resolved_default_refiner_work_folder(
+        mediamop_home=settings.mediamop_home,
+    )
+    assert body["resolved_default_tv_work_folder"] == resolved_default_refiner_tv_work_folder(
         mediamop_home=settings.mediamop_home,
     )
 

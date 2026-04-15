@@ -3,12 +3,18 @@
 export type SuiteSettingsOut = {
   product_display_name: string;
   signed_in_home_notice: string | null;
+  application_logs_enabled: boolean;
+  app_timezone: string;
+  log_retention_days: number;
   updated_at: string;
 };
 
 export type SuiteSettingsPutBody = {
   product_display_name: string;
   signed_in_home_notice: string | null;
+  application_logs_enabled: boolean;
+  app_timezone: string;
+  log_retention_days: number;
 };
 
 /** GET /api/v1/suite/security-overview — read-only snapshot from server startup configuration. */

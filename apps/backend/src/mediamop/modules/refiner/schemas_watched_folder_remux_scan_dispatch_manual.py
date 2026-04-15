@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -24,6 +26,10 @@ class RefinerWatchedFolderRemuxScanDispatchManualEnqueueIn(BaseModel):
             "Forwarded to each enqueued ``refiner.file.remux_pass.v1`` payload as ``dry_run``. "
             "Ignored when enqueue_remux_jobs is false. When false, a saved output folder is required."
         ),
+    )
+    media_scope: Literal["movie", "tv"] = Field(
+        default="movie",
+        description="Which saved watched/output tree this scan uses (Movies vs TV path settings).",
     )
 
 

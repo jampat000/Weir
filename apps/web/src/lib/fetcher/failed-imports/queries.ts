@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchFailedImportQueueAttentionSnapshot } from "./attention-snapshot-api";
 import { fetchFailedImportAutomationSummary } from "./automation-summary-api";
 import {
   fetchFailedImportCleanupPolicy,
-  putFailedImportCleanupPolicy,
+  putFailedImportCleanupPolicyMovies,
+  putFailedImportCleanupPolicyTvShows,
 } from "./cleanup-policy-api";
+import type { FailedImportCleanupPolicyAxis } from "./types";
 import { postFailedImportRadarrEnqueue, postFailedImportSonarrEnqueue } from "./manual-enqueue-api";
 import { fetchFailedImportFetcherSettings } from "./settings-api";
 import { postFetcherJobRecoverFinalize } from "./recover-api";
@@ -12,7 +15,21 @@ export const failedImportSettingsQueryKey = ["fetcher", "failed-imports", "setti
 
 export const failedImportAutomationSummaryQueryKey = ["fetcher", "failed-imports", "automation-summary"] as const;
 
+export const failedImportQueueAttentionSnapshotQueryKey = [
+  "fetcher",
+  "failed-imports",
+  "queue-attention-snapshot",
+] as const;
+
 export const failedImportCleanupPolicyQueryKey = ["fetcher", "failed-imports", "cleanup-policy"] as const;
+
+export function useFailedImportQueueAttentionSnapshotQuery() {
+  return useQuery({
+    queryKey: failedImportQueueAttentionSnapshotQueryKey,
+    queryFn: () => fetchFailedImportQueueAttentionSnapshot(),
+    staleTime: 15_000,
+  });
+}
 
 export function useFailedImportAutomationSummaryQuery() {
   return useQuery({
@@ -30,12 +47,26 @@ export function useFailedImportCleanupPolicyQuery() {
   });
 }
 
-export function useFailedImportCleanupPolicySaveMutation() {
+export function useFailedImportCleanupPolicySaveTvMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: putFailedImportCleanupPolicy,
+    mutationFn: (axis: FailedImportCleanupPolicyAxis) => putFailedImportCleanupPolicyTvShows(axis),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: failedImportCleanupPolicyQueryKey });
+      void qc.invalidateQueries({ queryKey: failedImportSettingsQueryKey });
+      void qc.invalidateQueries({ queryKey: failedImportAutomationSummaryQueryKey });
+    },
+  });
+}
+
+export function useFailedImportCleanupPolicySaveMoviesMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (axis: FailedImportCleanupPolicyAxis) => putFailedImportCleanupPolicyMovies(axis),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: failedImportCleanupPolicyQueryKey });
+      void qc.invalidateQueries({ queryKey: failedImportSettingsQueryKey });
+      void qc.invalidateQueries({ queryKey: failedImportAutomationSummaryQueryKey });
     },
   });
 }
@@ -55,6 +86,7 @@ export function useFetcherJobRecoverFinalizeMutation() {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ["fetcher", "jobs", "inspection"] });
       void qc.invalidateQueries({ queryKey: failedImportAutomationSummaryQueryKey });
+      void qc.invalidateQueries({ queryKey: failedImportQueueAttentionSnapshotQueryKey });
     },
   });
 }
@@ -67,6 +99,7 @@ export function useFailedImportRadarrEnqueueMutation() {
       void qc.invalidateQueries({ queryKey: ["fetcher", "jobs", "inspection"] });
       void qc.invalidateQueries({ queryKey: ["fetcher", "failed-imports", "settings"] });
       void qc.invalidateQueries({ queryKey: failedImportAutomationSummaryQueryKey });
+      void qc.invalidateQueries({ queryKey: failedImportQueueAttentionSnapshotQueryKey });
     },
   });
 }
@@ -79,6 +112,7 @@ export function useFailedImportSonarrEnqueueMutation() {
       void qc.invalidateQueries({ queryKey: ["fetcher", "jobs", "inspection"] });
       void qc.invalidateQueries({ queryKey: ["fetcher", "failed-imports", "settings"] });
       void qc.invalidateQueries({ queryKey: failedImportAutomationSummaryQueryKey });
+      void qc.invalidateQueries({ queryKey: failedImportQueueAttentionSnapshotQueryKey });
     },
   });
 }

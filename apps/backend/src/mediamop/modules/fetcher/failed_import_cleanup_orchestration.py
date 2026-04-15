@@ -10,11 +10,11 @@ from enum import Enum
 
 from mediamop.modules.arr_failed_import.policy import FailedImportCleanupPolicy
 from mediamop.modules.fetcher.radarr_failed_import_cleanup import (
-    RadarrFailedImportCleanupPlan,
+    RadarrFailedImportQueueDeletePlan,
     plan_radarr_failed_import_cleanup,
 )
 from mediamop.modules.fetcher.sonarr_failed_import_cleanup import (
-    SonarrFailedImportCleanupPlan,
+    SonarrFailedImportQueueDeletePlan,
     plan_sonarr_failed_import_cleanup,
 )
 
@@ -26,7 +26,7 @@ class FailedImportArrApp(str, Enum):
     SONARR = "sonarr"
 
 
-FailedImportCleanupPlanningResult = RadarrFailedImportCleanupPlan | SonarrFailedImportCleanupPlan
+FailedImportCleanupPlanningResult = RadarrFailedImportQueueDeletePlan | SonarrFailedImportQueueDeletePlan
 
 
 def parse_failed_import_arr_app(raw: str) -> FailedImportArrApp:

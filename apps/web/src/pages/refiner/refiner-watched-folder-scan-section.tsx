@@ -6,23 +6,30 @@ import {
   useRefinerPathSettingsQuery,
   useRefinerWatchedFolderRemuxScanDispatchEnqueueMutation,
 } from "../../lib/refiner/queries";
+import type { RefinerWatchedFolderRemuxScanDispatchEnqueueBody } from "../../lib/refiner/types";
+import { mmActionButtonClass, mmCheckboxControlClass } from "../../lib/ui/mm-control-roles";
 
 function canTriggerRefinerJobs(role: string | undefined): boolean {
   return role === "operator" || role === "admin";
 }
 
-/** Manual watched-folder scan on ``refiner_jobs`` (classify; optional remux enqueue). */
+/** Manual watched-folder scan on ``refiner_jobs`` (classify; optional per-file pass enqueue). */
 export function RefinerWatchedFolderScanSection() {
   const me = useMeQuery();
   const paths = useRefinerPathSettingsQuery();
   const enqueueScan = useRefinerWatchedFolderRemuxScanDispatchEnqueueMutation();
 
+  const [mediaScope, setMediaScope] = useState<RefinerWatchedFolderRemuxScanDispatchEnqueueBody["media_scope"]>("movie");
   const [alsoEnqueueRemux, setAlsoEnqueueRemux] = useState(false);
   const [remuxDryRun, setRemuxDryRun] = useState(true);
 
   const canTrigger = canTriggerRefinerJobs(me.data?.role);
-  const watchedSet = Boolean((paths.data?.refiner_watched_folder ?? "").trim());
-  const outputSet = Boolean((paths.data?.refiner_output_folder ?? "").trim());
+  const movieWatchedSet = Boolean((paths.data?.refiner_watched_folder ?? "").trim());
+  const tvWatchedSet = Boolean((paths.data?.refiner_tv_watched_folder ?? "").trim());
+  const movieOutputSet = Boolean((paths.data?.refiner_output_folder ?? "").trim());
+  const tvOutputSet = Boolean((paths.data?.refiner_tv_output_folder ?? "").trim());
+  const watchedSet = mediaScope === "movie" ? movieWatchedSet : tvWatchedSet;
+  const outputSet = mediaScope === "movie" ? movieOutputSet : tvOutputSet;
   const liveRemuxRequested = alsoEnqueueRemux && !remuxDryRun;
   const missingLivePrereq = liveRemuxRequested && !outputSet;
 
@@ -32,7 +39,7 @@ export function RefinerWatchedFolderScanSection() {
   if (paths.isError) {
     return (
       <div
-        className="mt-6 max-w-2xl rounded border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-200"
+        className="mm-fetcher-module-surface w-full min-w-0 rounded border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-200"
         data-testid="refiner-watched-folder-scan-path-error"
         role="alert"
       >
@@ -50,71 +57,90 @@ export function RefinerWatchedFolderScanSection() {
 
   return (
     <section
-      className="mt-6 max-w-2xl rounded border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-4 text-sm leading-relaxed text-[var(--mm-text2)]"
+      className="mm-fetcher-module-surface w-full min-w-0 rounded border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5 text-sm leading-relaxed text-[var(--mm-text2)] sm:p-6"
       aria-labelledby="refiner-watched-folder-scan-heading"
       data-testid="refiner-watched-folder-scan-section"
     >
       <h2 id="refiner-watched-folder-scan-heading" className="text-base font-semibold text-[var(--mm-text)]">
-        Watched-folder remux scan (manual)
+        Library check (manual)
       </h2>
       <p className="mt-2">
-        Queues one <code className="rounded bg-black/25 px-1 py-0.5 font-mono text-[0.85em]">
-          refiner.watched_folder.remux_scan_dispatch.v1
-        </code>{" "}
-        job on <code className="rounded bg-black/25 px-1 py-0.5 font-mono text-[0.85em]">refiner_jobs</code>. The
-        worker walks the <strong className="text-[var(--mm-text)]">saved watched folder</strong> for supported media
-        files, applies the same Refiner ownership and upstream blocking rules as the candidate gate (Radarr and Sonarr
-        download queues combined), then writes one Activity summary: scanned, skipped (non-media), waiting on upstream,
-        and enqueued or skipped remux.         Optional periodic enqueue uses separate Refiner-only env keys (see{" "}
-        <strong className="text-[var(--mm-text)]">In-process Refiner workers</strong> below for the snapshot); when
-        enabled, the API process enqueues the same job kind on an interval if no scan is already pending or leased.
-        That is still <strong className="text-[var(--mm-text)]">not</strong> a filesystem watcher.
+        Queues one walk of the <strong className="text-[var(--mm-text)]">saved watched folder</strong> for the scope you
+        pick. The worker classifies supported media, runs ownership checks, then writes one{" "}
+        <strong className="text-[var(--mm-text)]">Activity</strong> summary. This is{" "}
+        <strong className="text-[var(--mm-text)]">not</strong> a filesystem watcher.
       </p>
-      <p className="mt-2 text-[var(--mm-text3)]">
-        By default the scan only classifies files. Optional checkboxes enqueue{" "}
-        <code className="rounded bg-black/25 px-1 font-mono text-[0.8em]">refiner.file.remux_pass.v1</code> rows for
-        files that may proceed; remux defaults stay dry-run unless you explicitly choose live remux (requires a saved
-        output folder). Files that already have a pending or in-flight remux pass for the same relative path are not
-        enqueued again from the same scan.
-      </p>
+      <details className="mt-3 rounded-md border border-[var(--mm-border)] bg-black/10 px-3 py-2.5 text-xs text-[var(--mm-text3)]">
+        <summary className="cursor-pointer font-medium text-[var(--mm-text2)]">Timing, optional passes, and dedupe</summary>
+        <p className="mt-2">
+          Interval scans (when enabled) enqueue Movies and TV separately once those watched folders are saved—configure
+          on <strong className="text-[var(--mm-text)]">Workers</strong>. You can optionally queue per-file passes for
+          eligible media; they follow your saved <strong className="text-[var(--mm-text)]">Audio & subtitles</strong> and stay
+          dry run until you clear that checkbox. Live passes need a saved output folder for that scope. Duplicate
+          guards use scope plus relative path.
+        </p>
+      </details>
 
       {!canTrigger ? (
         <p className="mt-3 text-xs text-[var(--mm-text3)]">Operators and admins can queue this scan.</p>
       ) : null}
 
+      <fieldset className="mt-4 space-y-2">
+        <legend className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Scan scope</legend>
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="radio"
+            name="refiner-scan-scope"
+            checked={mediaScope === "movie"}
+            disabled={!canTrigger || enqueueScan.isPending}
+            onChange={() => setMediaScope("movie")}
+          />
+          <span>Movies paths</span>
+        </label>
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="radio"
+            name="refiner-scan-scope"
+            checked={mediaScope === "tv"}
+            disabled={!canTrigger || enqueueScan.isPending}
+            onChange={() => setMediaScope("tv")}
+          />
+          <span>TV paths</span>
+        </label>
+      </fieldset>
+
       {!watchedSet ? (
         <p className="mt-3 text-sm text-amber-200/90" role="status">
-          Save a <strong className="text-[var(--mm-text)]">watched folder</strong> in Refiner path settings before
-          queuing a scan.
+          Save a <strong className="text-[var(--mm-text)]">{mediaScope === "movie" ? "Movies" : "TV"} watched folder</strong>{" "}
+          under Saved folders before queuing this scan.
         </p>
       ) : null}
 
-      <div className="mt-4 space-y-2">
-        <label className="flex cursor-pointer items-start gap-2">
+      <div className="mt-5 space-y-3">
+        <label className="flex cursor-pointer items-start gap-3">
           <input
             type="checkbox"
-            className="mt-1"
+            className={mmCheckboxControlClass}
             checked={alsoEnqueueRemux}
             disabled={!canTrigger || enqueueScan.isPending || !watchedSet}
             onChange={(e) => setAlsoEnqueueRemux(e.target.checked)}
           />
-          <span>
-            Also enqueue <code className="font-mono text-[0.85em]">refiner.file.remux_pass.v1</code> for eligible files
-            (ownership OK, not blocked by active upstream work).
+          <span className="text-sm text-[var(--mm-text2)]">
+            Also queue file passes for eligible media (ownership OK, not blocked by active upstream work).
           </span>
         </label>
         {alsoEnqueueRemux ? (
-          <label className="ml-6 flex cursor-pointer items-start gap-2">
+          <label className="ml-1 flex cursor-pointer items-start gap-3 border-l border-[var(--mm-border)] pl-4">
             <input
               type="checkbox"
-              className="mt-1"
+              className={mmCheckboxControlClass}
               checked={remuxDryRun}
               disabled={!canTrigger || enqueueScan.isPending || !watchedSet}
               onChange={(e) => setRemuxDryRun(e.target.checked)}
             />
-            <span>
-              Remux passes are <strong className="text-[var(--mm-text)]">dry run</strong> (uncheck for live remux —
-              requires saved output folder; same deletion and replacement rules as manual remux).
+            <span className="text-sm text-[var(--mm-text2)]">
+              File passes are <strong className="text-[var(--mm-text)]">dry run</strong>. Uncheck for a live pass—needs
+              a saved output folder for this scope; same file-handling rules as the Audio & subtitles tab.
             </span>
           </label>
         ) : null}
@@ -122,8 +148,8 @@ export function RefinerWatchedFolderScanSection() {
 
       {missingLivePrereq ? (
         <p className="mt-3 text-sm text-amber-200/90" role="status">
-          Live remux enqueue needs a saved <strong className="text-[var(--mm-text)]">output folder</strong> in path
-          settings.
+          Live file-pass enqueue needs a saved <strong className="text-[var(--mm-text)]">output folder</strong> for{" "}
+          {mediaScope === "movie" ? "Movies" : "TV"} in path settings.
         </p>
       ) : null}
 
@@ -135,28 +161,27 @@ export function RefinerWatchedFolderScanSection() {
 
       {enqueueScan.isSuccess ? (
         <p className="mt-3 text-xs text-[var(--mm-text3)]" data-testid="refiner-watched-folder-scan-enqueued-hint">
-          Queued scan job #{enqueueScan.data.job_id}. When workers run, check Overview → Activity for the summary.
+          Queued scan job #{enqueueScan.data.job_id}. When workers run, check Activity (sidebar) for the summary.
         </p>
       ) : null}
 
-      <div className="mt-4">
+      <div className="mt-6">
         <button
           type="button"
-          className="rounded bg-[var(--mm-accent)] px-3 py-1.5 text-sm font-medium text-[var(--mm-accent-contrast)] disabled:opacity-50"
-          disabled={
-            !canTrigger ||
-            !watchedSet ||
-            enqueueScan.isPending ||
-            missingLivePrereq
-          }
+          className={mmActionButtonClass({
+            variant: "secondary",
+            disabled: !canTrigger || !watchedSet || enqueueScan.isPending || missingLivePrereq,
+          })}
+          disabled={!canTrigger || !watchedSet || enqueueScan.isPending || missingLivePrereq}
           onClick={() =>
             enqueueScan.mutate({
               enqueue_remux_jobs: alsoEnqueueRemux,
               remux_dry_run: remuxDryRun,
+              media_scope: mediaScope,
             })
           }
         >
-          {enqueueScan.isPending ? "Queuing…" : "Queue watched-folder scan"}
+          {enqueueScan.isPending ? "Queuing…" : "Queue folder scan"}
         </button>
       </div>
     </section>

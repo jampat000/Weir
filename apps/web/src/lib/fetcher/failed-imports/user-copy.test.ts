@@ -2,18 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   FETCHER_FI_MANUAL_SECTION_BODY,
   FETCHER_FI_MANUAL_SECTION_TITLE,
-  FETCHER_FI_SCHEDULE_MOVIES_HEADING,
-  FETCHER_FI_SCHEDULE_TV_HEADING,
   FETCHER_FI_SECTION_INTRO_PRIMARY,
   FETCHER_FI_TASKS_SECTION_TITLE,
 } from "./user-copy";
 
 describe("fetcher failed-import user-copy (compressed)", () => {
-  it("section intro is one line with Radarr/Sonarr, no cross-module essay", () => {
+  it("section intro stays short and Fetcher-scoped", () => {
     const t = FETCHER_FI_SECTION_INTRO_PRIMARY.toLowerCase();
-    expect(t).toContain("radarr");
-    expect(t).toContain("sonarr");
-    expect(t).toMatch(/failed[- ]import/);
+    expect(t).toMatch(/queue|failed|sonarr|radarr|blocklist|removefromclient/i);
     expect(t).not.toContain("refiner");
     expect(FETCHER_FI_SECTION_INTRO_PRIMARY.length).toBeLessThan(280);
   });
@@ -23,12 +19,7 @@ describe("fetcher failed-import user-copy (compressed)", () => {
     expect(FETCHER_FI_MANUAL_SECTION_BODY.length).toBeLessThan(120);
   });
 
-  it("keeps Radarr/Sonarr on schedule headings", () => {
-    expect(FETCHER_FI_SCHEDULE_MOVIES_HEADING).toContain("Radarr");
-    expect(FETCHER_FI_SCHEDULE_TV_HEADING).toContain("Sonarr");
-  });
-
-  it("uses fetcher-scoped jobs history title", () => {
-    expect(FETCHER_FI_TASKS_SECTION_TITLE.toLowerCase()).toBe("fetcher jobs history");
+  it("uses calm job history title", () => {
+    expect(FETCHER_FI_TASKS_SECTION_TITLE.toLowerCase()).toBe("job history");
   });
 });

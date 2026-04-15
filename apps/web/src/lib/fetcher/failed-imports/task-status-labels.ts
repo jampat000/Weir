@@ -8,7 +8,7 @@ export const FAILED_IMPORT_STATUS_HANDLER_OK_FINALIZE_FAILED = "handler_ok_final
 export function failedImportTaskStatusPrimaryLabel(status: string): string {
   switch (status) {
     case FAILED_IMPORT_STATUS_HANDLER_OK_FINALIZE_FAILED:
-      return "Needs manual finish — work ran; completion not saved";
+      return "Needs follow-up";
     case "failed":
       return "Stopped after errors";
     case "completed":

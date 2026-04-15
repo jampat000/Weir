@@ -69,6 +69,66 @@ def test_login_invalid_password(client_with_admin: TestClient) -> None:
     assert r.status_code == 401
 
 
+def test_change_password_requires_current_and_forces_new_login(client_with_admin: TestClient) -> None:
+    csrf = fetch_csrf(client_with_admin)
+    r_login = auth_post(
+        client_with_admin,
+        "/api/v1/auth/login",
+        json={"username": "alice", "password": "test-password-strong", "csrf_token": csrf},
+    )
+    assert r_login.status_code == 200, r_login.text
+    csrf2 = fetch_csrf(client_with_admin)
+    r_change = auth_post(
+        client_with_admin,
+        "/api/v1/auth/change-password",
+        json={
+            "csrf_token": csrf2,
+            "current_password": "test-password-strong",
+            "new_password": "new-password-stronger-123",
+        },
+    )
+    assert r_change.status_code == 200, r_change.text
+    assert "sign in again" in r_change.json()["message"].lower()
+    r_me = client_with_admin.get("/api/v1/auth/me")
+    assert r_me.status_code == 401
+    csrf3 = fetch_csrf(client_with_admin)
+    r_old = auth_post(
+        client_with_admin,
+        "/api/v1/auth/login",
+        json={"username": "alice", "password": "test-password-strong", "csrf_token": csrf3},
+    )
+    assert r_old.status_code == 401
+    csrf4 = fetch_csrf(client_with_admin)
+    r_new = auth_post(
+        client_with_admin,
+        "/api/v1/auth/login",
+        json={"username": "alice", "password": "new-password-stronger-123", "csrf_token": csrf4},
+    )
+    assert r_new.status_code == 200, r_new.text
+
+
+def test_change_password_rejects_wrong_current_password(client_with_admin: TestClient) -> None:
+    csrf = fetch_csrf(client_with_admin)
+    r_login = auth_post(
+        client_with_admin,
+        "/api/v1/auth/login",
+        json={"username": "alice", "password": "test-password-strong", "csrf_token": csrf},
+    )
+    assert r_login.status_code == 200, r_login.text
+    csrf2 = fetch_csrf(client_with_admin)
+    r_change = auth_post(
+        client_with_admin,
+        "/api/v1/auth/change-password",
+        json={
+            "csrf_token": csrf2,
+            "current_password": "wrong-current-password",
+            "new_password": "new-password-stronger-123",
+        },
+    )
+    assert r_change.status_code == 400
+    assert "current password" in (r_change.json().get("detail") or "").lower()
+
+
 def test_login_failed_persisted_throttled_per_username(client_with_admin: TestClient) -> None:
     settings = MediaMopSettings.load()
     eng = create_db_engine(settings)

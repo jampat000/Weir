@@ -1,7 +1,8 @@
-"""Pydantic shapes for read-only failed-import automation settings (from config, not liveness).
+"""Pydantic shapes for read-only failed-import automation settings (not liveness).
 
 Exposed on ``GET /api/v1/fetcher/failed-imports/settings``. ``background_job_worker_count`` mirrors
-``MEDIAMOP_FETCHER_WORKER_COUNT`` — the in-process pool that processes ``fetcher_jobs`` (failed-import drives).
+``MEDIAMOP_FETCHER_WORKER_COUNT``. Timed cleanup enable/interval for each app mirrors the persisted
+``fetcher_failed_import_cleanup_policy`` row (not Arr search schedules).
 """
 
 from __future__ import annotations

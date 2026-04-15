@@ -6,7 +6,13 @@ import json
 from pathlib import Path
 from typing import Any, Literal, Mapping, Sequence
 
+from sqlalchemy.orm import Session
+
 from mediamop.core.config import MediaMopSettings
+from mediamop.modules.fetcher.fetcher_arr_http_resolve import (
+    resolve_radarr_http_credentials,
+    resolve_sonarr_http_credentials,
+)
 from mediamop.modules.refiner.domain import (
     FileAnchorCandidate,
     RefinerQueueRowView,
@@ -53,6 +59,7 @@ def verdict_for_watched_scan_file(views: Sequence[RefinerQueueRowView], *, candi
 
 
 def fetch_radarr_and_sonarr_queue_rows_for_scan(
+    session: Session,
     settings: MediaMopSettings,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None, str | None]:
     """Return ``(radarr_rows, sonarr_rows, radarr_error, sonarr_error)``.
@@ -65,7 +72,7 @@ def fetch_radarr_and_sonarr_queue_rows_for_scan(
     rad_rows: list[dict[str, Any]] = []
     son_rows: list[dict[str, Any]] = []
 
-    r_base, r_key = settings.arr_http_radarr_credentials()
+    r_base, r_key = resolve_radarr_http_credentials(session, settings)
     if r_base and r_key:
         try:
             rad_rows = fetch_arr_v3_queue_rows(base_url=r_base, api_key=r_key, app="radarr")
@@ -74,7 +81,7 @@ def fetch_radarr_and_sonarr_queue_rows_for_scan(
     else:
         rad_err = "Radarr URL/API key not configured (no queue rows loaded)."
 
-    s_base, s_key = settings.arr_http_sonarr_credentials()
+    s_base, s_key = resolve_sonarr_http_credentials(session, settings)
     if s_base and s_key:
         try:
             son_rows = fetch_arr_v3_queue_rows(base_url=s_base, api_key=s_key, app="sonarr")

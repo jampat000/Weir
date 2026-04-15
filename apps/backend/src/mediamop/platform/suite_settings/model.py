@@ -1,17 +1,17 @@
-"""Singleton row for names and notices shown across the signed-in app (not Sonarr/Radarr)."""
+"""Singleton row for suite-level Settings fields shown across the signed-in app."""
 
 from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, Integer, Text, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Integer, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from mediamop.core.db import Base
 
 
 class SuiteSettingsRow(Base):
-    """One row (``id = 1``) — product name and optional home notice for operators."""
+    """One row (``id = 1``) — suite-owned global settings only."""
 
     __tablename__ = "suite_settings"
     __table_args__ = (CheckConstraint("id = 1", name="ck_suite_settings_singleton"),)
@@ -19,6 +19,9 @@ class SuiteSettingsRow(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     product_display_name: Mapped[str] = mapped_column(Text, nullable=False, server_default="MediaMop")
     signed_in_home_notice: Mapped[str | None] = mapped_column(Text, nullable=True)
+    application_logs_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1")
+    app_timezone: Mapped[str] = mapped_column(Text, nullable=False, server_default="UTC")
+    log_retention_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default="30")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

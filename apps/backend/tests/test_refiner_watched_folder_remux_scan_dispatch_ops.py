@@ -49,7 +49,9 @@ def test_active_remux_detects_pending_payload_relative(tmp_path) -> None:
             RefinerJob(
                 dedupe_key="x",
                 job_kind=REFINER_FILE_REMUX_PASS_JOB_KIND,
-                payload_json=json.dumps({"relative_media_path": "movies/a.mkv", "dry_run": True}),
+                payload_json=json.dumps(
+                    {"relative_media_path": "movies/a.mkv", "dry_run": True, "media_scope": "movie"},
+                ),
                 status=RefinerJobStatus.PENDING.value,
                 max_attempts=3,
             ),
@@ -58,3 +60,11 @@ def test_active_remux_detects_pending_payload_relative(tmp_path) -> None:
     with fac() as s:
         assert refiner_active_remux_pass_exists_for_relative_path(s, relative_posix="movies/a.mkv") is True
         assert refiner_active_remux_pass_exists_for_relative_path(s, relative_posix="other.mkv") is False
+        assert (
+            refiner_active_remux_pass_exists_for_relative_path(
+                s,
+                relative_posix="movies/a.mkv",
+                media_scope="tv",
+            )
+            is False
+        )

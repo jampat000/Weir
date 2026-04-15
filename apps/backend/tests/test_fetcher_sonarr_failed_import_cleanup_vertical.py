@@ -9,6 +9,7 @@ from mediamop.modules.arr_failed_import.env_settings import (
     AppFailedImportCleanupPolicySettings,
     FailedImportCleanupSettingsBundle,
 )
+from mediamop.modules.arr_failed_import.queue_action import FailedImportQueueHandlingAction
 from mediamop.modules.fetcher.sonarr_cleanup_execution import SonarrFailedImportCleanupExecutionOutcome
 from mediamop.modules.fetcher.sonarr_failed_import_cleanup_vertical import (
     run_sonarr_failed_import_cleanup_vertical,
@@ -17,13 +18,13 @@ from mediamop.modules.fetcher.sonarr_failed_import_cleanup_vertical import (
 
 @dataclass
 class _RecordingSonarrClient:
-    calls: list[int]
+    calls: list[tuple[int, bool, bool]]
 
     def __init__(self) -> None:
         self.calls = []
 
-    def remove_queue_item(self, queue_item_id: int) -> None:
-        self.calls.append(queue_item_id)
+    def remove_queue_item(self, queue_item_id: int, *, remove_from_client: bool, blocklist: bool) -> None:
+        self.calls.append((queue_item_id, remove_from_client, blocklist))
 
 
 def _settings_with_sonarr_policy(sonarr: AppFailedImportCleanupPolicySettings) -> MediaMopSettings:
@@ -36,7 +37,9 @@ def _settings_with_sonarr_policy(sonarr: AppFailedImportCleanupPolicySettings) -
 
 
 def test_sonarr_vertical_resolves_policy_plans_and_executes_when_eligible() -> None:
-    sonarr = AppFailedImportCleanupPolicySettings(remove_failed_imports=True)
+    sonarr = AppFailedImportCleanupPolicySettings(
+        handling_failed_import=FailedImportQueueHandlingAction.REMOVE_ONLY,
+    )
     settings = _settings_with_sonarr_policy(sonarr)
     client = _RecordingSonarrClient()
     out = run_sonarr_failed_import_cleanup_vertical(
@@ -45,8 +48,8 @@ def test_sonarr_vertical_resolves_policy_plans_and_executes_when_eligible() -> N
         sonarr_queue_item_id=602,
         queue_client=client,
     )
-    assert out is SonarrFailedImportCleanupExecutionOutcome.REMOVED_QUEUE_ITEM
-    assert client.calls == [602]
+    assert out is SonarrFailedImportCleanupExecutionOutcome.REMOVED_REMOVE_ONLY
+    assert client.calls == [(602, True, False)]
 
 
 def test_sonarr_vertical_no_op_path_no_client_call() -> None:
@@ -63,7 +66,9 @@ def test_sonarr_vertical_no_op_path_no_client_call() -> None:
 
 
 def test_sonarr_vertical_planned_remove_without_queue_id_skips_client() -> None:
-    sonarr = AppFailedImportCleanupPolicySettings(remove_corrupt_imports=True)
+    sonarr = AppFailedImportCleanupPolicySettings(
+        handling_corrupt_import=FailedImportQueueHandlingAction.REMOVE_ONLY,
+    )
     settings = _settings_with_sonarr_policy(sonarr)
     client = _RecordingSonarrClient()
     out = run_sonarr_failed_import_cleanup_vertical(

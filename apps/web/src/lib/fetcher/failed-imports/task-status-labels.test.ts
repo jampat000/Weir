@@ -5,10 +5,10 @@ import {
 } from "./task-status-labels";
 
 describe("failedImportTaskStatusPrimaryLabel", () => {
-  it("keeps needs-manual-finish distinct from ordinary failed", () => {
+  it("keeps needs-follow-up distinct from ordinary failed", () => {
     const finalize = failedImportTaskStatusPrimaryLabel(FAILED_IMPORT_STATUS_HANDLER_OK_FINALIZE_FAILED);
     const failed = failedImportTaskStatusPrimaryLabel("failed");
-    expect(finalize.toLowerCase()).toContain("manual");
+    expect(finalize.toLowerCase()).toContain("follow-up");
     expect(failed.toLowerCase()).toContain("error");
     expect(finalize).not.toBe(failed);
   });

@@ -48,11 +48,16 @@ def post_refiner_file_remux_pass_enqueue(
         )
 
     row = ensure_refiner_path_settings_row(db)
-    if not (row.refiner_watched_folder or "").strip():
+    scope = body.media_scope
+    watched_ok = (
+        (row.refiner_tv_watched_folder or "").strip() if scope == "tv" else (row.refiner_watched_folder or "").strip()
+    )
+    if not watched_ok:
+        label = "TV Refiner" if scope == "tv" else "Movies Refiner"
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                "Refiner watched folder is not set in saved path settings. "
+                f"{label} watched folder is not set in saved path settings. "
                 "Manual refiner.file.remux_pass.v1 jobs require it to resolve relative_media_path and for bounded source cleanup. "
                 "Saving Refiner path settings does not require a watched folder, but you must configure it before enqueueing this job kind."
             ),
@@ -61,6 +66,7 @@ def post_refiner_file_remux_pass_enqueue(
     payload = {
         "relative_media_path": body.relative_media_path.strip(),
         "dry_run": body.dry_run,
+        "media_scope": scope,
     }
     dedupe_key = f"{REFINER_FILE_REMUX_PASS_JOB_KIND}:{uuid4().hex}"
     job = refiner_enqueue_or_get_job(

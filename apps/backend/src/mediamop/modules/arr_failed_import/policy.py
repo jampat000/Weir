@@ -1,8 +1,10 @@
-"""Cleanup toggle contract for :class:`~mediamop.modules.arr_failed_import.classification.FailedImportOutcome`.
+"""Per-class queue handling for policy-backed terminal failed-import outcomes.
 
-Each terminal classifier outcome maps to exactly one policy field. There is no shared
-“cleanup everything” bucket. :attr:`FailedImportOutcome.PENDING_WAITING` and
-:attr:`FailedImportOutcome.UNKNOWN` never select a cleanup policy key by default.
+Six :class:`~mediamop.modules.arr_failed_import.classification.FailedImportOutcome` values
+(``QUALITY`` … ``IMPORT_FAILED``) map 1:1 to ``FailedImportCleanupPolicyKey`` / SQLite fields.
+
+Classifier outcomes ``PENDING_WAITING`` and ``UNKNOWN`` exist on the same enum but **never**
+select a policy key — they are not operator-configurable. See ADR-0010.
 """
 
 from __future__ import annotations
@@ -12,69 +14,83 @@ from enum import Enum
 from typing import Final
 
 from mediamop.modules.arr_failed_import.classification import FailedImportOutcome
+from mediamop.modules.arr_failed_import.queue_action import FailedImportQueueHandlingAction
 
 
 class FailedImportCleanupPolicyKey(str, Enum):
-    """Stable keys for persisted or API-facing toggles — 1:1 with terminal outcomes only."""
+    """Stable keys for persisted / API handling fields — 1:1 with the six policy-backed terminal outcomes only."""
 
-    REMOVE_QUALITY_REJECTIONS = "remove_quality_rejections"
-    REMOVE_UNMATCHED_MANUAL_IMPORT_REJECTIONS = "remove_unmatched_manual_import_rejections"
-    REMOVE_CORRUPT_IMPORTS = "remove_corrupt_imports"
-    REMOVE_FAILED_DOWNLOADS = "remove_failed_downloads"
-    REMOVE_FAILED_IMPORTS = "remove_failed_imports"
+    HANDLING_QUALITY_REJECTION = "handling_quality_rejection"
+    HANDLING_UNMATCHED_MANUAL_IMPORT = "handling_unmatched_manual_import"
+    HANDLING_SAMPLE_RELEASE = "handling_sample_release"
+    HANDLING_CORRUPT_IMPORT = "handling_corrupt_import"
+    HANDLING_FAILED_DOWNLOAD = "handling_failed_download"
+    HANDLING_FAILED_IMPORT = "handling_failed_import"
 
 
 _TERMINAL_OUTCOME_TO_KEY: Final[dict[FailedImportOutcome, FailedImportCleanupPolicyKey]] = {
-    FailedImportOutcome.QUALITY: FailedImportCleanupPolicyKey.REMOVE_QUALITY_REJECTIONS,
-    FailedImportOutcome.UNMATCHED: FailedImportCleanupPolicyKey.REMOVE_UNMATCHED_MANUAL_IMPORT_REJECTIONS,
-    FailedImportOutcome.CORRUPT: FailedImportCleanupPolicyKey.REMOVE_CORRUPT_IMPORTS,
-    FailedImportOutcome.DOWNLOAD_FAILED: FailedImportCleanupPolicyKey.REMOVE_FAILED_DOWNLOADS,
-    FailedImportOutcome.IMPORT_FAILED: FailedImportCleanupPolicyKey.REMOVE_FAILED_IMPORTS,
+    FailedImportOutcome.QUALITY: FailedImportCleanupPolicyKey.HANDLING_QUALITY_REJECTION,
+    FailedImportOutcome.UNMATCHED: FailedImportCleanupPolicyKey.HANDLING_UNMATCHED_MANUAL_IMPORT,
+    FailedImportOutcome.SAMPLE_RELEASE: FailedImportCleanupPolicyKey.HANDLING_SAMPLE_RELEASE,
+    FailedImportOutcome.CORRUPT: FailedImportCleanupPolicyKey.HANDLING_CORRUPT_IMPORT,
+    FailedImportOutcome.DOWNLOAD_FAILED: FailedImportCleanupPolicyKey.HANDLING_FAILED_DOWNLOAD,
+    FailedImportOutcome.IMPORT_FAILED: FailedImportCleanupPolicyKey.HANDLING_FAILED_IMPORT,
 }
 
 
 @dataclass(frozen=True, slots=True)
 class FailedImportCleanupPolicy:
-    """Per-outcome cleanup opt-in. Defaults are conservative (no destructive cleanup)."""
+    """Per-outcome queue handling. Defaults keep every class in ``leave_alone``."""
 
-    remove_quality_rejections: bool = False
-    remove_unmatched_manual_import_rejections: bool = False
-    remove_corrupt_imports: bool = False
-    remove_failed_downloads: bool = False
-    remove_failed_imports: bool = False
+    handling_quality_rejection: FailedImportQueueHandlingAction = FailedImportQueueHandlingAction.LEAVE_ALONE
+    handling_unmatched_manual_import: FailedImportQueueHandlingAction = FailedImportQueueHandlingAction.LEAVE_ALONE
+    handling_sample_release: FailedImportQueueHandlingAction = FailedImportQueueHandlingAction.LEAVE_ALONE
+    handling_corrupt_import: FailedImportQueueHandlingAction = FailedImportQueueHandlingAction.LEAVE_ALONE
+    handling_failed_download: FailedImportQueueHandlingAction = FailedImportQueueHandlingAction.LEAVE_ALONE
+    handling_failed_import: FailedImportQueueHandlingAction = FailedImportQueueHandlingAction.LEAVE_ALONE
 
-    def value_for_key(self, key: FailedImportCleanupPolicyKey) -> bool:
-        if key is FailedImportCleanupPolicyKey.REMOVE_QUALITY_REJECTIONS:
-            return self.remove_quality_rejections
-        if key is FailedImportCleanupPolicyKey.REMOVE_UNMATCHED_MANUAL_IMPORT_REJECTIONS:
-            return self.remove_unmatched_manual_import_rejections
-        if key is FailedImportCleanupPolicyKey.REMOVE_CORRUPT_IMPORTS:
-            return self.remove_corrupt_imports
-        if key is FailedImportCleanupPolicyKey.REMOVE_FAILED_DOWNLOADS:
-            return self.remove_failed_downloads
-        return self.remove_failed_imports
+    def action_for_key(self, key: FailedImportCleanupPolicyKey) -> FailedImportQueueHandlingAction:
+        if key is FailedImportCleanupPolicyKey.HANDLING_QUALITY_REJECTION:
+            return self.handling_quality_rejection
+        if key is FailedImportCleanupPolicyKey.HANDLING_UNMATCHED_MANUAL_IMPORT:
+            return self.handling_unmatched_manual_import
+        if key is FailedImportCleanupPolicyKey.HANDLING_SAMPLE_RELEASE:
+            return self.handling_sample_release
+        if key is FailedImportCleanupPolicyKey.HANDLING_CORRUPT_IMPORT:
+            return self.handling_corrupt_import
+        if key is FailedImportCleanupPolicyKey.HANDLING_FAILED_DOWNLOAD:
+            return self.handling_failed_download
+        return self.handling_failed_import
 
 
 def default_failed_import_cleanup_policy() -> FailedImportCleanupPolicy:
-    """All cleanup toggles off until explicitly enabled."""
+    """All classes default to ``leave_alone`` until explicitly changed."""
+
     return FailedImportCleanupPolicy()
 
 
 def cleanup_policy_key_for_outcome(outcome: FailedImportOutcome) -> FailedImportCleanupPolicyKey | None:
-    """Map a classifier outcome to its cleanup toggle key, or None if not a terminal cleanup case."""
+    """Map a classifier outcome to its policy field key, or None if not a terminal cleanup case."""
+
     return _TERMINAL_OUTCOME_TO_KEY.get(outcome)
 
 
-def is_failed_import_cleanup_enabled(
+def configured_action_for_terminal_outcome(
     outcome: FailedImportOutcome,
     policy: FailedImportCleanupPolicy,
-) -> bool:
-    """True only when the outcome has a dedicated policy slot and that toggle is on.
+) -> FailedImportQueueHandlingAction | None:
+    """Return the configured handling action for a terminal outcome, or None if not applicable."""
 
-    :attr:`FailedImportOutcome.PENDING_WAITING` and :attr:`FailedImportOutcome.UNKNOWN`
-    always yield False here (not destructive cleanup targets by default).
-    """
     key = cleanup_policy_key_for_outcome(outcome)
     if key is None:
+        return None
+    return policy.action_for_key(key)
+
+
+def is_queue_delete_configured_for_outcome(outcome: FailedImportOutcome, policy: FailedImportCleanupPolicy) -> bool:
+    """True when the operator chose a non-``leave_alone`` action for this terminal outcome."""
+
+    action = configured_action_for_terminal_outcome(outcome, policy)
+    if action is None:
         return False
-    return policy.value_for_key(key)
+    return action is not FailedImportQueueHandlingAction.LEAVE_ALONE

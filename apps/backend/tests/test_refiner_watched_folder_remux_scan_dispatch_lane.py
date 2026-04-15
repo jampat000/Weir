@@ -76,7 +76,7 @@ def test_scan_handler_enqueues_remux_when_requested(
         },
     ]
 
-    def _fake_fetch(_settings: MediaMopSettings):
+    def _fake_fetch(_session: Session, _settings: MediaMopSettings):
         return fake_rad, [], None, None
 
     t0 = datetime(2026, 4, 12, 12, 0, 0, tzinfo=timezone.utc)

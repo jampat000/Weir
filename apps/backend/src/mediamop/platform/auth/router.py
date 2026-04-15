@@ -6,6 +6,7 @@ import logging
 
 from fastapi import APIRouter, Body, Header, HTTPException, Request, Response, status
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from mediamop.api.deps import DbSessionDep, SettingsDep
 from mediamop.platform.auth import schemas
@@ -108,24 +109,75 @@ def post_login(
     return schemas.LoginOut(user=schemas.UserPublic(**auth_service.user_public(user)))
 
 
-@router.get("/bootstrap/status", response_model=schemas.BootstrapStatusOut)
-def get_bootstrap_status(db: DbSessionDep) -> schemas.BootstrapStatusOut:
-    """Report whether the initial ``admin`` account may still be created (Phase 6)."""
+def _bootstrap_status_session_cleanup(db: Session | None) -> None:
+    """Never raise — a failing ``rollback``/``close`` here would turn a good read into HTTP 500."""
 
+    if db is None:
+        return
     try:
-        allowed = bootstrap_service.bootstrap_allowed(db)
-    except SQLAlchemyError as exc:
         db.rollback()
-        raise_http_for_bootstrap_status_sqlalchemy(exc)
-    if allowed:
-        return schemas.BootstrapStatusOut(
-            bootstrap_allowed=True,
-            reason="no_admin_user",
+    except Exception:
+        logger.debug("bootstrap status: session rollback failed (ignored)", exc_info=True)
+    try:
+        db.close()
+    except Exception:
+        logger.debug("bootstrap status: session close failed (ignored)", exc_info=True)
+
+
+@router.get("/bootstrap/status", response_model=schemas.BootstrapStatusOut)
+def get_bootstrap_status(request: Request) -> schemas.BootstrapStatusOut:
+    """Report whether the initial ``admin`` account may still be created (Phase 6).
+
+    Guest-first endpoint: never return **500**. DB/session failures map to **503** with copy
+    operators can act on. Uses a dedicated session + rollback (no ``get_db_session`` post-``commit``
+    churn on SQLite read-only paths).
+    """
+
+    factory = getattr(request.app.state, "session_factory", None)
+    if factory is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database session factory not initialized (app lifespan did not start cleanly).",
         )
-    return schemas.BootstrapStatusOut(
-        bootstrap_allowed=False,
-        reason="admin_already_exists",
-    )
+    db: Session | None = None
+    try:
+        try:
+            db = factory()
+        except Exception as exc:
+            logger.exception("bootstrap status: could not open database session")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    "Could not connect to the database for bootstrap status. "
+                    "Check MEDIAMOP_HOME / MEDIAMOP_DB_PATH and backend logs."
+                ),
+            ) from exc
+        try:
+            allowed = bootstrap_service.bootstrap_allowed(db)
+        except SQLAlchemyError as exc:
+            raise_http_for_bootstrap_status_sqlalchemy(exc)
+        if allowed:
+            return schemas.BootstrapStatusOut(
+                bootstrap_allowed=True,
+                reason="no_admin_user",
+            )
+        return schemas.BootstrapStatusOut(
+            bootstrap_allowed=False,
+            reason="admin_already_exists",
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("bootstrap status: unexpected failure")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Could not read bootstrap status. Check backend logs, run database migrations "
+                "(alembic upgrade head), and verify MEDIAMOP_HOME / MEDIAMOP_DB_PATH."
+            ),
+        ) from exc
+    finally:
+        _bootstrap_status_session_cleanup(db)
 
 
 @router.post("/bootstrap", response_model=schemas.BootstrapOut)
@@ -248,3 +300,40 @@ def admin_ping(_admin: RequireAdminDep) -> dict[str, bool]:
     """Minimal authenticated probe for the admin-only dependency (Phase 6 tests + ops)."""
 
     return {"ok": True}
+
+
+@router.post("/change-password", response_model=schemas.ChangePasswordOut)
+def post_change_password(
+    request: Request,
+    body: schemas.ChangePasswordIn,
+    db: DbSessionDep,
+    settings: SettingsDep,
+    user: UserPublicDep,
+) -> schemas.ChangePasswordOut:
+    """Change the signed-in user's password and revoke active sessions (requires new sign-in)."""
+
+    secret = require_session_secret(settings)
+    validate_browser_post_origin(request, settings)
+    if not verify_csrf_token(secret, body.csrf_token):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired CSRF token.",
+        )
+    try:
+        auth_service.change_password_for_user(
+            db,
+            user_id=user.id,
+            current_password=body.current_password,
+            new_password=body.new_password,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    logger.info("auth event: password changed (user_id=%s username=%s)", user.id, user.username)
+    activity_service.record_activity_event(
+        db,
+        event_type=activity_constants.AUTH_PASSWORD_CHANGED,
+        module="auth",
+        title="Password changed",
+        detail=user.username,
+    )
+    return schemas.ChangePasswordOut(message="Password changed. Sign in again with your new password.")

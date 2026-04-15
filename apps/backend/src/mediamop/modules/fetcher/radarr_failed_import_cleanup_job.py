@@ -7,6 +7,7 @@ from collections.abc import Callable
 from sqlalchemy.orm import Session, sessionmaker
 
 from mediamop.core.config import MediaMopSettings
+from mediamop.modules.fetcher.fetcher_arr_http_resolve import resolve_radarr_http_credentials
 from mediamop.modules.fetcher.fetcher_jobs_model import FetcherJob
 from mediamop.modules.fetcher.fetcher_jobs_ops import fetcher_enqueue_or_get_job
 from mediamop.modules.fetcher.fetcher_worker_loop import FetcherJobWorkContext
@@ -44,16 +45,15 @@ def make_radarr_failed_import_cleanup_drive_handler(
 
     def _run(_ctx: FetcherJobWorkContext) -> None:
         try:
-            base, key = settings.arr_http_radarr_credentials()
-            if not base or not key:
-                msg = (
-                    "Radarr live cleanup drive requires Radarr URL and API key "
-                    "(MEDIAMOP_ARR_RADARR_* or legacy MEDIAMOP_FETCHER_RADARR_*)"
-                )
-                raise RuntimeError(msg)
-
             with session_factory() as session:
                 with session.begin():
+                    base, key = resolve_radarr_http_credentials(session, settings)
+                    if not base or not key:
+                        msg = (
+                            "Radarr live cleanup drive requires Radarr URL and API key "
+                            "(MEDIAMOP_ARR_RADARR_* or legacy MEDIAMOP_FETCHER_RADARR_*)"
+                        )
+                        raise RuntimeError(msg)
                     policy_source = fetcher_runtime.load_radarr_drive_policy_source(session, settings)
 
             fetch_client = RadarrQueueHttpFetchClient(base, key)

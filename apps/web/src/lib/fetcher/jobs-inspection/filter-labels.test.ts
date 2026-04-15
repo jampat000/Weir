@@ -10,22 +10,22 @@ function labelFor(value: FetcherJobsInspectionFilter): string | undefined {
 }
 
 describe("FETCHER_JOBS_INSPECTION_FILTER_OPTIONS", () => {
-  it("keeps needs-manual-finish filter distinct and names the stored status for honesty", () => {
+  it("keeps needs-manual-finish filter distinct from failed", () => {
     const h = labelFor(FAILED_IMPORT_STATUS_HANDLER_OK_FINALIZE_FAILED);
     const f = labelFor("failed");
     expect(h).toBeDefined();
     expect(f).toBeDefined();
     expect(h).not.toBe(f);
-    expect(h!.toLowerCase()).toContain("handler_ok_finalize_failed");
-    expect(f!.toLowerCase()).toMatch(/error|fail|stopped/);
-    expect(f!.toLowerCase()).not.toContain("handler_ok_finalize_failed");
+    expect(h).toBe("Needs follow-up");
+    expect(f).toBe("Stopped with errors");
   });
 
-  it("uses plain default finished wording for the terminal bucket", () => {
+  it("uses plain Finished wording for the terminal bucket without default or storage jargon", () => {
     const t = labelFor("terminal");
-    expect(t!.toLowerCase()).toContain("finished");
-    expect(t!.toLowerCase()).toContain("default");
-    expect(t!.toLowerCase()).toMatch(/ok|manual|finish/);
+    expect(t).toBe("Finished");
+    expect(t!.toLowerCase()).not.toContain("default");
+    expect(t!.toLowerCase()).not.toContain("handler_ok");
+    expect(t!.toLowerCase()).not.toContain("storage");
   });
 
   it("lists every filter value exactly once", () => {

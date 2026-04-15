@@ -1,105 +1,94 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { fetcherSectionTabClass } from "../fetcher/fetcher-menu-button";
+import { RefinerJobsInspectionSection } from "./refiner-jobs-inspection-section";
+import { RefinerOverviewTab, type RefinerOverviewOpenTab } from "./refiner-overview-tab";
 import { RefinerPathSettingsSection } from "./refiner-path-settings-section";
 import { RefinerRuntimeSettingsSection } from "./refiner-runtime-settings-section";
-import { RefinerJobsInspectionSection } from "./refiner-jobs-inspection-section";
 import { RefinerWatchedFolderScanSection } from "./refiner-watched-folder-scan-section";
+import { RefinerRemuxSection } from "./refiner-remux-section";
 
-/** Refiner module home — honest scope for shipped durable ``refiner_jobs`` families. */
+type RefinerPageTabId = "overview" | "libraries" | "audio-subtitles" | "jobs" | "workers";
+
 export function RefinerPage() {
+  const [tab, setTab] = useState<RefinerPageTabId>("overview");
+
+  const tabs: { id: RefinerPageTabId; label: string }[] = [
+    { id: "overview", label: "Overview" },
+    { id: "libraries", label: "Libraries" },
+    { id: "audio-subtitles", label: "Audio & subtitles" },
+    { id: "jobs", label: "Jobs" },
+    { id: "workers", label: "Workers" },
+  ];
+
+  const openFromOverview = (target: RefinerOverviewOpenTab) => {
+    const map: Record<RefinerOverviewOpenTab, RefinerPageTabId> = {
+      libraries: "libraries",
+      "audio-subtitles": "audio-subtitles",
+      jobs: "jobs",
+      workers: "workers",
+    };
+    setTab(map[target]);
+  };
+
   return (
-    <div className="mm-page" data-testid="refiner-scope-page">
-      <header className="mm-page__intro">
+    <div className="mm-page w-full min-w-0" data-testid="refiner-scope-page">
+      <header className="mm-page__intro !mb-0">
         <p className="mm-page__eyebrow">MediaMop</p>
         <h1 className="mm-page__title">Refiner</h1>
         <p className="mm-page__subtitle">
-          Refiner is the in-app place for durable <strong>Refiner</strong> work stored on{" "}
-          <code className="rounded bg-black/25 px-1 py-0.5 font-mono text-[0.85em] text-[var(--mm-text)]">
-            refiner_jobs
-          </code>{" "}
-          — separate from automated download-queue and Arr-search jobs, which persist on{" "}
-          <code className="rounded bg-black/25 px-1 py-0.5 font-mono text-[0.85em] text-[var(--mm-text)]">
-            fetcher_jobs
-          </code>
-          . Shipped families below apply Refiner domain rules where relevant; they are not a full watched-folder
-          service. The manual watched-folder scan section is explicit and Refiner-local only (no background watcher).
+          Refiner safely remuxes your existing <strong className="text-[var(--mm-text)]">Movies</strong> and{" "}
+          <strong className="text-[var(--mm-text)]">TV</strong> files into your preferred audio and subtitle layout,
+          then tracks each run from queued to complete on{" "}
+          <Link
+            className="font-semibold text-[var(--mm-text)] underline-offset-2 hover:underline"
+            to="/app/activity"
+          >
+            Activity
+          </Link>
+          .
         </p>
       </header>
 
-      <RefinerRuntimeSettingsSection />
-
-      <RefinerPathSettingsSection />
-
-      <RefinerWatchedFolderScanSection />
-
-      <RefinerJobsInspectionSection />
-
-      <section
-        className="mt-4 max-w-2xl space-y-3 text-sm leading-relaxed text-[var(--mm-text2)]"
-        aria-labelledby="refiner-shipped-families-heading"
+      <nav
+        className="mt-3 flex flex-wrap gap-2.5 border-b border-[var(--mm-border)] pb-3.5 sm:mt-4"
+        aria-label="Refiner sections"
+        data-testid="refiner-section-tabs"
       >
-        <h2 id="refiner-shipped-families-heading" className="text-base font-semibold text-[var(--mm-text)]">
-          Shipped durable job kinds
-        </h2>
-        <p className="text-[var(--mm-text3)]">
-          Rows for these kinds (and any future <code className="font-mono text-[0.85em]">refiner.*</code> work on this
-          lane) also show in <strong className="text-[var(--mm-text)]">Refiner jobs (queue)</strong> above for
-          lifecycle fields only — finished outcomes stay on Activity.
-        </p>
-        <ul className="list-disc space-y-3 pl-5">
-          <li data-testid="refiner-family-supplied-payload-evaluation">
-            <strong>
-              <code className="rounded bg-black/25 px-1 py-0.5 font-mono text-[0.85em] text-[var(--mm-text)]">
-                refiner.supplied_payload_evaluation.v1
-              </code>
-            </strong>{" "}
-            — reads an optional JSON payload on the job (
-            <code className="rounded bg-black/25 px-1 font-mono text-[0.8em]">rows</code> plus optional{" "}
-            <code className="rounded bg-black/25 px-1 font-mono text-[0.8em]">file</code> title/year) and evaluates
-            those values only. It does <strong>not</strong> call Radarr or Sonarr, and it does <strong>not</strong>{" "}
-            perform a library-wide audit or filesystem sweep. Optional periodic enqueue uses Refiner-only schedule
-            settings in the backend configuration.
-          </li>
-          <li data-testid="refiner-family-candidate-gate">
-            <strong>
-              <code className="rounded bg-black/25 px-1 py-0.5 font-mono text-[0.85em] text-[var(--mm-text)]">
-                refiner.candidate_gate.v1
-              </code>
-            </strong>{" "}
-            — manual jobs that fetch the live <strong>Radarr</strong> or <strong>Sonarr</strong> download queue from
-            your configured service, then evaluate domain rules for a specific release named in the payload.
-          </li>
-          <li data-testid="refiner-family-watched-folder-remux-scan-dispatch">
-            <strong>
-              <code className="rounded bg-black/25 px-1 py-0.5 font-mono text-[0.85em] text-[var(--mm-text)]">
-                refiner.watched_folder.remux_scan_dispatch.v1
-              </code>
-            </strong>{" "}
-            — manual job: scans the saved <strong>Refiner watched folder</strong> for media candidates, applies the same
-            ownership and upstream blocking rules as the candidate gate, optionally enqueues per-file{" "}
-            <code className="rounded bg-black/25 px-1 font-mono text-[0.8em]">refiner.file.remux_pass.v1</code> work, and
-            writes one Activity summary (scanned, skipped, waiting, enqueued) with{" "}
-            <code className="rounded bg-black/25 px-1 font-mono text-[0.8em]">scan_trigger</code> set to{" "}
-            <code className="font-mono text-[0.8em]">manual</code> or <code className="font-mono text-[0.8em]">periodic</code>.
-            Optional Refiner-only periodic enqueue is env-driven (interval + enable), not a filesystem watcher.
-          </li>
-          <li data-testid="refiner-family-file-remux-pass">
-            <strong>
-              <code className="rounded bg-black/25 px-1 py-0.5 font-mono text-[0.85em] text-[var(--mm-text)]">
-                refiner.file.remux_pass.v1
-              </code>
-            </strong>{" "}
-            — one file path relative to the saved <strong>Refiner watched folder</strong>: <strong>ffprobe</strong>{" "}
-            plus remux <strong>planning</strong> (audio/subtitle selection). Path settings may be saved without a watched
-            folder, but <strong>enqueue is rejected</strong> until a watched folder is configured (same requirement at
-            worker run if a job were queued by other means). Manual enqueue defaults to <strong>dry run</strong> (no
-            ffmpeg output, no source deletion). Live remux requires{" "}
-            <code className="font-mono text-[0.85em]">dry_run: false</code>, a saved output folder, ffmpeg/ffprobe
-            available, remux temp on the saved work/temp folder, and final output
-            under the saved output folder with relative folders preserved. Finished passes write a structured summary to
-            the Activity feed (Overview → Activity), including when an existing output file was replaced and whether the
-            source file under the watched folder was removed after success.
-          </li>
-        </ul>
-      </section>
+        {tabs.map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            className={fetcherSectionTabClass(tab === id)}
+            onClick={() => setTab(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      <div
+        className="mt-6 w-full min-w-0 sm:mt-7"
+        role="tabpanel"
+        aria-label={tabs.find((t) => t.id === tab)?.label}
+      >
+        {tab === "overview" ? <RefinerOverviewTab onOpenTab={openFromOverview} /> : null}
+
+        {tab === "libraries" ? (
+          <div className="flex w-full min-w-0 flex-col gap-6">
+            <RefinerPathSettingsSection />
+            <RefinerWatchedFolderScanSection />
+          </div>
+        ) : null}
+
+        {tab === "audio-subtitles" ? <RefinerRemuxSection /> : null}
+
+        {tab === "jobs" ? <RefinerJobsInspectionSection /> : null}
+
+        {tab === "workers" ? <RefinerRuntimeSettingsSection /> : null}
+      </div>
     </div>
   );
 }

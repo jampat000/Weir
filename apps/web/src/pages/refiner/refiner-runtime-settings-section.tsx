@@ -6,7 +6,7 @@ export function RefinerRuntimeSettingsSection() {
   const q = useRefinerRuntimeSettingsQuery();
 
   if (q.isPending) {
-    return <PageLoading label="Loading Refiner worker settings" />;
+    return <PageLoading label="Loading workers" />;
   }
   if (q.isError) {
     return <RefinerRuntimeSettingsError err={q.error} />;
@@ -14,57 +14,58 @@ export function RefinerRuntimeSettingsSection() {
   const d = q.data;
   return (
     <section
-      className="mt-6 max-w-2xl rounded border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-4 text-sm leading-relaxed text-[var(--mm-text2)]"
+      className="mm-fetcher-module-surface w-full min-w-0 rounded border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5 text-sm leading-relaxed text-[var(--mm-text2)] sm:p-6"
       aria-labelledby="refiner-runtime-settings-heading"
       data-testid="refiner-runtime-settings"
     >
       <h2 id="refiner-runtime-settings-heading" className="text-base font-semibold text-[var(--mm-text)]">
-        In-process Refiner workers
+        Workers
       </h2>
       <p className="mt-2">
-        This API process starts{" "}
-        <strong className="text-[var(--mm-text)]">{d.in_process_refiner_worker_count}</strong> in-process Refiner
-        worker task{d.in_process_refiner_worker_count === 1 ? "" : "s"} for{" "}
-        <code className="rounded bg-black/25 px-1 py-0.5 font-mono text-[0.85em] text-[var(--mm-text)]">
-          refiner_jobs
-        </code>{" "}
-        only. Other module lanes use separate worker counts.
+        Workers are the background runners that pick up Refiner jobs. This server currently has{" "}
+        <strong className="text-[var(--mm-text)]">{d.in_process_refiner_worker_count}</strong> Refiner worker
+        {d.in_process_refiner_worker_count === 1 ? "" : "s"}.
       </p>
-      <p className="mt-2">{d.worker_mode_summary}</p>
-      <p className="mt-2 text-[var(--mm-text3)]">{d.sqlite_throughput_note}</p>
-      <p className="mt-2 text-[var(--mm-text3)]">{d.configuration_note}</p>
-      <p className="mt-2 text-xs text-[var(--mm-text3)]">{d.visibility_note}</p>
-
-      <h3 className="mt-6 text-sm font-semibold text-[var(--mm-text)]">Watched-folder scan periodic enqueue</h3>
-      <p className="mt-2 text-[var(--mm-text3)]">{d.watched_folder_scan_periodic_configuration_note}</p>
-      <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-[var(--mm-text2)]">
-        <li>
-          Schedule enabled (env at startup):{" "}
-          <span className="font-mono">{String(d.refiner_watched_folder_remux_scan_dispatch_schedule_enabled)}</span>
-        </li>
-        <li>
-          Interval seconds:{" "}
-          <span className="font-mono">{d.refiner_watched_folder_remux_scan_dispatch_schedule_interval_seconds}</span>
-        </li>
-        <li>
-          Periodic enqueue remux jobs:{" "}
-          <span className="font-mono">
-            {String(d.refiner_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs)}
-          </span>
-        </li>
-        <li>
-          Periodic remux dry run:{" "}
-          <span className="font-mono">
-            {String(d.refiner_watched_folder_remux_scan_dispatch_periodic_remux_dry_run)}
-          </span>
-        </li>
-      </ul>
+      <p className="mt-2 text-[var(--mm-text3)]">{d.worker_mode_summary}</p>
       <p className="mt-2 text-xs text-[var(--mm-text3)]">
-        This is an asyncio interval that enqueues <code className="font-mono text-[0.85em]">refiner.watched_folder.remux_scan_dispatch.v1</code>{" "}
-        when idle — not a filesystem watcher. Activity summaries include{" "}
-        <code className="font-mono text-[0.85em]">scan_trigger</code> (<code className="font-mono">manual</code> vs{" "}
-        <code className="font-mono">periodic</code>).
+        This is read-only status in MediaMop today. If you need to change worker count, change backend config and
+        restart the API.
       </p>
+      <p className="mt-2 text-xs text-[var(--mm-text3)]">{d.sqlite_throughput_note}</p>
+
+      <details className="mt-5 rounded-md border border-[var(--mm-border)] bg-black/10 p-3">
+        <summary className="cursor-pointer text-sm font-medium text-[var(--mm-text1)]">Advanced worker notes</summary>
+        <p className="mt-2 text-xs text-[var(--mm-text3)]">{d.configuration_note}</p>
+        <p className="mt-2 text-xs text-[var(--mm-text3)]">{d.visibility_note}</p>
+      </details>
+
+      <h3 className="mt-7 text-sm font-semibold text-[var(--mm-text)]">Timed folder scans</h3>
+      <p className="mt-2 text-[var(--mm-text3)]">
+        Refiner can check Movies and TV watched folders on a timer. Each scope is evaluated independently and this is
+        not live filesystem watching.
+      </p>
+      <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[var(--mm-text2)]">
+        <li>Enabled: {d.refiner_watched_folder_remux_scan_dispatch_schedule_enabled ? "Yes" : "No"}</li>
+        <li>Check interval: every {d.refiner_watched_folder_remux_scan_dispatch_schedule_interval_seconds} seconds</li>
+        <li>Periodic file passes: {d.refiner_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs ? "Yes" : "No"}</li>
+        <li>Periodic pass mode: {d.refiner_watched_folder_remux_scan_dispatch_periodic_remux_dry_run ? "Dry run" : "Live"}</li>
+        <li>File readiness guardrail: skip files newer than {d.refiner_watched_folder_min_file_age_seconds} seconds</li>
+      </ul>
+
+      <details className="mt-4 rounded-md border border-[var(--mm-border)] bg-black/10 p-3">
+        <summary className="cursor-pointer text-sm font-medium text-[var(--mm-text1)]">Advanced timer configuration</summary>
+        <p className="mt-2 text-xs text-[var(--mm-text3)]">{d.watched_folder_scan_periodic_configuration_note}</p>
+      </details>
+
+      <details className="mt-4 rounded-md border border-[var(--mm-border)] bg-black/10 p-3">
+        <summary className="cursor-pointer text-sm font-medium text-[var(--mm-text1)]">What each Refiner job does</summary>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-[var(--mm-text2)]">
+          <li>Payload check: evaluates supplied queue payload data only.</li>
+          <li>Download queue check: checks one release against live Radarr/Sonarr queue rows.</li>
+          <li>Library check: scans watched folders and can queue eligible file runs.</li>
+          <li>Run one file: probes/plans/remuxes one file under a watched folder path.</li>
+        </ul>
+      </details>
     </section>
   );
 }
@@ -72,11 +73,11 @@ export function RefinerRuntimeSettingsSection() {
 function RefinerRuntimeSettingsError({ err }: { err: unknown }) {
   return (
     <div
-      className="mt-6 max-w-2xl rounded border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-200"
+      className="mm-fetcher-module-surface w-full min-w-0 rounded border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-200"
       data-testid="refiner-runtime-settings-error"
       role="alert"
     >
-      <p className="font-semibold">Could not load Refiner worker settings</p>
+      <p className="font-semibold">Could not load worker settings</p>
       <p className="mt-1">
         {isLikelyNetworkFailure(err)
           ? "Check that the MediaMop API is running."

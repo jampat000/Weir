@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { PageLoading } from "../../components/shared/page-loading";
 import { isHttpErrorFromApi, isLikelyNetworkFailure } from "../../lib/api/error-guards";
 import { useMeQuery } from "../../lib/auth/queries";
@@ -8,6 +8,8 @@ import {
   useRefinerJobsInspectionQuery,
 } from "../../lib/refiner/jobs-inspection/queries";
 import type { RefinerJobInspectionRow } from "../../lib/refiner/jobs-inspection/types";
+import { MmListboxPicker } from "../../components/ui/mm-listbox-picker";
+import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 
 function canCancelRefinerJobs(role: string | undefined): boolean {
   return role === "operator" || role === "admin";
@@ -20,9 +22,21 @@ function statusLabel(status: string): string {
   return status;
 }
 
+const REFINER_JOBS_INSPECTION_FILTER_OPTIONS: { value: RefinerJobsInspectionFilter; label: string }[] = [
+  { value: "recent", label: "Recent (all statuses, newest first)" },
+  { value: "pending", label: "Pending only" },
+  { value: "leased", label: "Leased only" },
+  { value: "terminal", label: "Terminal (completed, failed, finalize-failed)" },
+  { value: "cancelled", label: "Cancelled only" },
+  { value: "completed", label: "Completed only" },
+  { value: "failed", label: "Failed only" },
+  { value: "handler_ok_finalize_failed", label: "Finalize-failed only" },
+];
+
 /** Read ``refiner_jobs`` lifecycle here; finished outcomes stay on Activity. */
 export function RefinerJobsInspectionSection() {
   const me = useMeQuery();
+  const filterLabelId = useId();
   const [filter, setFilter] = useState<RefinerJobsInspectionFilter>("recent");
   const q = useRefinerJobsInspectionQuery(filter);
   const cancel = useRefinerJobCancelPendingMutation();
@@ -34,7 +48,7 @@ export function RefinerJobsInspectionSection() {
   if (q.isError) {
     return (
       <div
-        className="mt-6 max-w-4xl rounded border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-200"
+        className="mm-fetcher-module-surface w-full min-w-0 rounded border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-200"
         data-testid="refiner-jobs-inspection-error"
         role="alert"
       >
@@ -54,41 +68,37 @@ export function RefinerJobsInspectionSection() {
 
   return (
     <section
-      className="mt-6 max-w-4xl rounded border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-4 text-sm leading-relaxed text-[var(--mm-text2)]"
+      className="mm-fetcher-module-surface w-full min-w-0 rounded border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5 text-sm leading-relaxed text-[var(--mm-text2)] sm:p-6"
       aria-labelledby="refiner-jobs-inspection-heading"
       data-testid="refiner-jobs-inspection-section"
     >
       <h2 id="refiner-jobs-inspection-heading" className="text-base font-semibold text-[var(--mm-text)]">
-        Refiner jobs (queue)
+        Jobs
       </h2>
-      <p className="mt-2">
-        This table reads the <strong className="text-[var(--mm-text)]">refiner_jobs</strong> table only: status,
-        lease, attempts, and errors. It answers “what is queued or running?” — not full remux probe lines or scan
-        summaries. For finished work, use <strong className="text-[var(--mm-text)]">Overview → Activity</strong> (and
-        per-family controls above).
+      <p className="mt-2 max-w-3xl">
+        Use this queue view to see what Refiner is waiting on, processing now, or recently finished on this server. Open{" "}
+        <strong className="text-[var(--mm-text)]">Activity</strong> for full run detail once a job completes.
       </p>
-      <p className="mt-2 text-[var(--mm-text3)]">
-        Operators and admins may <strong className="text-[var(--mm-text)]">cancel pending</strong> rows only (never
-        leased, never already finished). Cancelling frees the original dedupe key so you can enqueue again.
+      <p className="mt-2 text-xs text-[var(--mm-text3)]">
+        Operators and admins: <strong className="text-[var(--mm-text)]">Cancel pending</strong> only (not leased or
+        terminal rows).
       </p>
 
-      <div className="mt-4">
-        <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Filter</label>
-        <select
-          className="mt-1 w-full max-w-md rounded border border-[var(--mm-border)] bg-[var(--mm-input-bg)] px-2 py-1.5 text-sm text-[var(--mm-text)]"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value as RefinerJobsInspectionFilter)}
-          data-testid="refiner-jobs-inspection-filter"
-        >
-          <option value="recent">Recent (all statuses, newest first)</option>
-          <option value="pending">Pending only</option>
-          <option value="leased">Leased only</option>
-          <option value="terminal">Terminal (completed, failed, finalize-failed)</option>
-          <option value="cancelled">Cancelled only</option>
-          <option value="completed">Completed only</option>
-          <option value="failed">Failed only</option>
-          <option value="handler_ok_finalize_failed">Finalize-failed only</option>
-        </select>
+      <div className="mt-5">
+        <label className="block">
+          <span id={filterLabelId} className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
+            Filter
+          </span>
+          <MmListboxPicker
+            className="max-w-md"
+            data-testid="refiner-jobs-inspection-filter"
+            ariaLabelledBy={filterLabelId}
+            placeholder="Select filter"
+            options={REFINER_JOBS_INSPECTION_FILTER_OPTIONS}
+            value={filter}
+            onChange={(v) => setFilter(v as RefinerJobsInspectionFilter)}
+          />
+        </label>
       </div>
 
       {cancel.isError ? (
@@ -102,7 +112,7 @@ export function RefinerJobsInspectionSection() {
           No rows for this filter.
         </p>
       ) : (
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4 w-full min-w-0 overflow-x-auto">
           <table className="w-full min-w-[44rem] border-collapse text-left text-xs">
             <thead>
               <tr className="border-b border-[var(--mm-border)] text-[var(--mm-text3)]">
@@ -160,7 +170,10 @@ function RefinerJobRow({
         {showCancel ? (
           <button
             type="button"
-            className="rounded border border-[var(--mm-border)] px-2 py-1 text-xs text-[var(--mm-text)] hover:bg-black/20 disabled:opacity-50"
+            className={mmActionButtonClass({
+              variant: "tertiary",
+              disabled: cancelMutation.isPending,
+            })}
             disabled={cancelMutation.isPending}
             data-testid={`refiner-jobs-cancel-${job.id}`}
             onClick={() => cancelMutation.mutate(job.id)}

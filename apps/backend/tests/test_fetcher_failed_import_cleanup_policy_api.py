@@ -11,6 +11,32 @@ from mediamop.modules.fetcher.cleanup_policy_model import FetcherFailedImportCle
 
 from tests.integration_helpers import auth_post, csrf as fetch_csrf, trusted_browser_origin_headers
 
+_LA = "leave_alone"
+_RO = "remove_only"
+
+
+def _axis(
+    *,
+    quality: str = _LA,
+    unmatched: str = _LA,
+    sample: str = _LA,
+    corrupt: str = _LA,
+    download: str = _LA,
+    import_: str = _LA,
+    cleanup_drive_schedule_enabled: bool = False,
+    cleanup_drive_schedule_interval_seconds: int = 3600,
+) -> dict[str, object]:
+    return {
+        "handling_quality_rejection": quality,
+        "handling_unmatched_manual_import": unmatched,
+        "handling_sample_release": sample,
+        "handling_corrupt_import": corrupt,
+        "handling_failed_download": download,
+        "handling_failed_import": import_,
+        "cleanup_drive_schedule_enabled": cleanup_drive_schedule_enabled,
+        "cleanup_drive_schedule_interval_seconds": cleanup_drive_schedule_interval_seconds,
+    }
+
 
 def _clear_policy_row() -> None:
     settings = MediaMopSettings.load()
@@ -45,11 +71,14 @@ def test_fetcher_cleanup_policy_get_seeds_row_and_returns_db_payload(client_with
     assert body["updated_at"] is not None
     for axis in ("movies", "tv_shows"):
         d = body[axis]
-        assert "remove_quality_rejections" in d
-        assert "remove_unmatched_manual_import_rejections" in d
-        assert "remove_corrupt_imports" in d
-        assert "remove_failed_downloads" in d
-        assert "remove_failed_imports" in d
+        assert "handling_quality_rejection" in d
+        assert "handling_unmatched_manual_import" in d
+        assert "handling_sample_release" in d
+        assert "handling_corrupt_import" in d
+        assert "handling_failed_download" in d
+        assert "handling_failed_import" in d
+        assert "cleanup_drive_schedule_enabled" in d
+        assert "cleanup_drive_schedule_interval_seconds" in d
 
 
 def test_fetcher_cleanup_policy_put_then_get_database_source(client_with_admin: TestClient) -> None:
@@ -57,20 +86,8 @@ def test_fetcher_cleanup_policy_put_then_get_database_source(client_with_admin: 
     tok = fetch_csrf(client_with_admin)
     payload = {
         "csrf_token": tok,
-        "movies": {
-            "remove_quality_rejections": True,
-            "remove_unmatched_manual_import_rejections": False,
-            "remove_corrupt_imports": False,
-            "remove_failed_downloads": False,
-            "remove_failed_imports": True,
-        },
-        "tv_shows": {
-            "remove_quality_rejections": False,
-            "remove_unmatched_manual_import_rejections": False,
-            "remove_corrupt_imports": True,
-            "remove_failed_downloads": False,
-            "remove_failed_imports": False,
-        },
+        "movies": _axis(quality=_RO, import_=_RO, cleanup_drive_schedule_enabled=False),
+        "tv_shows": _axis(corrupt=_RO, cleanup_drive_schedule_enabled=True, cleanup_drive_schedule_interval_seconds=1800),
     }
     r = client_with_admin.put(
         "/api/v1/fetcher/failed-imports/cleanup-policy",
@@ -81,14 +98,17 @@ def test_fetcher_cleanup_policy_put_then_get_database_source(client_with_admin: 
     out = r.json()
     assert "source" not in out
     assert out["updated_at"] is not None
-    assert out["movies"]["remove_quality_rejections"] is True
-    assert out["movies"]["remove_failed_imports"] is True
-    assert out["tv_shows"]["remove_corrupt_imports"] is True
+    assert out["movies"]["handling_quality_rejection"] == _RO
+    assert out["movies"]["handling_failed_import"] == _RO
+    assert out["tv_shows"]["handling_corrupt_import"] == _RO
+    assert out["movies"]["cleanup_drive_schedule_enabled"] is False
+    assert out["tv_shows"]["cleanup_drive_schedule_enabled"] is True
+    assert out["tv_shows"]["cleanup_drive_schedule_interval_seconds"] == 1800
 
     r2 = client_with_admin.get("/api/v1/fetcher/failed-imports/cleanup-policy")
     assert r2.status_code == 200
     assert "source" not in r2.json()
-    assert r2.json()["movies"]["remove_quality_rejections"] is True
+    assert r2.json()["movies"]["handling_quality_rejection"] == _RO
 
 
 def test_fetcher_cleanup_policy_put_viewer_403(client_with_viewer: TestClient) -> None:
@@ -102,20 +122,8 @@ def test_fetcher_cleanup_policy_put_viewer_403(client_with_viewer: TestClient) -
     tok2 = fetch_csrf(client_with_viewer)
     payload = {
         "csrf_token": tok2,
-        "movies": {
-            "remove_quality_rejections": True,
-            "remove_unmatched_manual_import_rejections": False,
-            "remove_corrupt_imports": False,
-            "remove_failed_downloads": False,
-            "remove_failed_imports": False,
-        },
-        "tv_shows": {
-            "remove_quality_rejections": False,
-            "remove_unmatched_manual_import_rejections": False,
-            "remove_corrupt_imports": False,
-            "remove_failed_downloads": False,
-            "remove_failed_imports": False,
-        },
+        "movies": _axis(),
+        "tv_shows": _axis(),
     }
     r = client_with_viewer.put(
         "/api/v1/fetcher/failed-imports/cleanup-policy",
@@ -129,20 +137,8 @@ def test_fetcher_cleanup_policy_put_invalid_csrf(client_with_admin: TestClient) 
     _login_admin(client_with_admin)
     payload = {
         "csrf_token": "bad",
-        "movies": {
-            "remove_quality_rejections": False,
-            "remove_unmatched_manual_import_rejections": False,
-            "remove_corrupt_imports": False,
-            "remove_failed_downloads": False,
-            "remove_failed_imports": False,
-        },
-        "tv_shows": {
-            "remove_quality_rejections": False,
-            "remove_unmatched_manual_import_rejections": False,
-            "remove_corrupt_imports": False,
-            "remove_failed_downloads": False,
-            "remove_failed_imports": False,
-        },
+        "movies": _axis(),
+        "tv_shows": _axis(),
     }
     r = client_with_admin.put(
         "/api/v1/fetcher/failed-imports/cleanup-policy",
@@ -151,3 +147,64 @@ def test_fetcher_cleanup_policy_put_invalid_csrf(client_with_admin: TestClient) 
     )
     assert r.status_code == 400
 
+
+def test_fetcher_cleanup_policy_put_axis_tv_shows_only_preserves_movies(client_with_admin: TestClient) -> None:
+    _login_admin(client_with_admin)
+    tok = fetch_csrf(client_with_admin)
+    seed = {
+        "csrf_token": tok,
+        "movies": _axis(quality=_RO),
+        "tv_shows": _axis(),
+    }
+    r0 = client_with_admin.put(
+        "/api/v1/fetcher/failed-imports/cleanup-policy",
+        json=seed,
+        headers={**trusted_browser_origin_headers(), "Content-Type": "application/json"},
+    )
+    assert r0.status_code == 200, r0.text
+    movies_before = r0.json()["movies"]
+
+    tok2 = fetch_csrf(client_with_admin)
+    tv_next = {**r0.json()["tv_shows"], "handling_corrupt_import": _RO, "csrf_token": tok2}
+    r_axis = client_with_admin.put(
+        "/api/v1/fetcher/failed-imports/cleanup-policy/tv-shows",
+        json=tv_next,
+        headers={**trusted_browser_origin_headers(), "Content-Type": "application/json"},
+    )
+    assert r_axis.status_code == 200, r_axis.text
+    out = r_axis.json()
+    assert out["movies"] == movies_before
+    assert out["tv_shows"]["handling_corrupt_import"] == _RO
+
+
+def test_fetcher_cleanup_policy_put_axis_movies_only_preserves_tv_shows(client_with_admin: TestClient) -> None:
+    _login_admin(client_with_admin)
+    tok = fetch_csrf(client_with_admin)
+    seed = {
+        "csrf_token": tok,
+        "movies": _axis(
+            unmatched=_RO,
+            cleanup_drive_schedule_enabled=True,
+            cleanup_drive_schedule_interval_seconds=7200,
+        ),
+        "tv_shows": _axis(quality=_RO),
+    }
+    r0 = client_with_admin.put(
+        "/api/v1/fetcher/failed-imports/cleanup-policy",
+        json=seed,
+        headers={**trusted_browser_origin_headers(), "Content-Type": "application/json"},
+    )
+    assert r0.status_code == 200, r0.text
+    tv_before = r0.json()["tv_shows"]
+
+    tok2 = fetch_csrf(client_with_admin)
+    mov_next = {**r0.json()["movies"], "handling_failed_import": _RO, "csrf_token": tok2}
+    r_axis = client_with_admin.put(
+        "/api/v1/fetcher/failed-imports/cleanup-policy/movies",
+        json=mov_next,
+        headers={**trusted_browser_origin_headers(), "Content-Type": "application/json"},
+    )
+    assert r_axis.status_code == 200, r_axis.text
+    out = r_axis.json()
+    assert out["tv_shows"] == tv_before
+    assert out["movies"]["handling_failed_import"] == _RO

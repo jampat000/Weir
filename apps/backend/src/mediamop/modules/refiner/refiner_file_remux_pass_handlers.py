@@ -12,6 +12,7 @@ from mediamop.core.config import MediaMopSettings
 from mediamop.modules.refiner.refiner_file_remux_pass_activity import record_refiner_file_remux_pass_completed
 from mediamop.modules.refiner.refiner_file_remux_pass_run import run_refiner_file_remux_pass
 from mediamop.modules.refiner.refiner_path_settings_service import resolve_refiner_path_runtime_for_remux
+from mediamop.modules.refiner.refiner_remux_rules_settings_service import load_refiner_remux_rules_config
 from mediamop.modules.refiner.refiner_file_remux_pass_visibility import (
     REMUX_PASS_OUTCOME_FAILED_BEFORE_EXECUTION,
     remux_pass_activity_title,
@@ -101,11 +102,17 @@ def make_refiner_file_remux_pass_handler(
             )
             return
 
+        media_scope = data.get("media_scope", "movie")
+        if not isinstance(media_scope, str) or media_scope not in ("movie", "tv"):
+            media_scope = "movie"
+
         with session_factory() as session:
+            rules_cfg = load_refiner_remux_rules_config(session)
             path_runtime, path_err = resolve_refiner_path_runtime_for_remux(
                 session,
                 settings,
                 dry_run=bool(dry_run),
+                media_scope=media_scope,
             )
         if path_err is not None:
             _record(
@@ -125,6 +132,7 @@ def make_refiner_file_remux_pass_handler(
             path_runtime=path_runtime,
             relative_media_path=rel.strip(),
             dry_run=bool(dry_run),
+            rules_config=rules_cfg,
         )
         result["job_id"] = ctx.id
         _record(session_factory, payload=result)

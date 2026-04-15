@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -15,6 +15,9 @@ const viewerMe: UserPublic = { id: 2, username: "bob", role: "viewer" };
 const minimalSuiteSettings: SuiteSettingsOut = {
   product_display_name: "MediaMop",
   signed_in_home_notice: null,
+  application_logs_enabled: true,
+  app_timezone: "UTC",
+  log_retention_days: 30,
   updated_at: "2026-04-11T00:00:00Z",
 };
 
@@ -61,5 +64,66 @@ describe("SettingsPage (suite settings)", () => {
   it("hides save for viewers", () => {
     renderSettings(viewerMe);
     expect(screen.getByTestId("suite-settings-save")).toBeDisabled();
+  });
+
+  it("keeps Global focused and removes product/logs controls", () => {
+    renderSettings(operatorMe);
+    expect(screen.queryByText("Product name")).not.toBeInTheDocument();
+    expect(screen.queryByText("Application logs")).not.toBeInTheDocument();
+    expect(screen.getByText("Timezone")).toBeInTheDocument();
+    expect(screen.getByText("Log retention (days)")).toBeInTheDocument();
+    expect(screen.queryByText("Optional home dashboard notice")).not.toBeInTheDocument();
+  });
+
+  it("shows change password only on Security tab", () => {
+    renderSettings(operatorMe);
+    fireEvent.click(screen.getByRole("tab", { name: "Security" }));
+    expect(screen.getByRole("heading", { name: "Change password" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Security posture" })).not.toBeInTheDocument();
+  });
+
+  it("change password fields use Show/Hide and reset visibility when cleared", () => {
+    renderSettings(operatorMe);
+    fireEvent.click(screen.getByRole("tab", { name: "Security" }));
+    const current = screen.getByPlaceholderText("Enter current password");
+    expect(current).toHaveAttribute("type", "password");
+    fireEvent.change(current, { target: { value: "current-secret" } });
+    const showButtons = screen.getAllByRole("button", { name: "Show" });
+    expect(showButtons.length).toBe(3);
+    fireEvent.click(showButtons[0]!);
+    expect(current).toHaveAttribute("type", "text");
+    fireEvent.change(current, { target: { value: "" } });
+    expect(current).toHaveAttribute("type", "password");
+  });
+
+  it("closes timezone dropdown and shows selected timezone", () => {
+    renderSettings(operatorMe);
+    const trigger = screen.getByRole("button", { name: /Timezone/ });
+    expect(trigger).toHaveTextContent("Select timezone");
+    fireEvent.click(trigger);
+    const firstOption = screen.getAllByRole("option")[0];
+    const chosenLabel = firstOption.textContent ?? "";
+    fireEvent.mouseDown(firstOption);
+    fireEvent.click(firstOption);
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Timezone/ })).toHaveTextContent(chosenLabel);
+  });
+
+  it("closes timezone dropdown on outside click", () => {
+    renderSettings(operatorMe);
+    const trigger = screen.getByRole("button", { name: /Timezone/ });
+    fireEvent.click(trigger);
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  it("closes timezone dropdown on Escape", () => {
+    renderSettings(operatorMe);
+    const trigger = screen.getByRole("button", { name: /Timezone/ });
+    fireEvent.click(trigger);
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 });

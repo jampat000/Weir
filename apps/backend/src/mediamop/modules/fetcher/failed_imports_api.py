@@ -7,16 +7,23 @@ Manual ``handler_ok_finalize_failed`` → ``completed`` recovery for any ``fetch
 
 from __future__ import annotations
 
+from enum import Enum
+
 from fastapi import APIRouter, HTTPException, Request
 from starlette import status
 from sqlalchemy.orm import Session
 
 from mediamop.api.deps import DbSessionDep, SettingsDep
-from mediamop.core.config import MediaMopSettings
+from mediamop.core.config import MediaMopSettings, clamp_failed_import_cleanup_drive_schedule_interval_seconds
 from mediamop.modules.fetcher.automation_summary_service import (
     build_fetcher_failed_import_automation_summary,
 )
+from mediamop.modules.fetcher.failed_import_queue_attention_service import (
+    build_failed_import_queue_attention_snapshot,
+)
+from mediamop.modules.fetcher.cleanup_policy_model import FetcherFailedImportCleanupPolicyRow
 from mediamop.modules.fetcher.cleanup_policy_service import (
+    apply_fetcher_failed_import_cleanup_policy_axis_put,
     load_fetcher_failed_import_cleanup_bundle,
     upsert_fetcher_failed_import_cleanup_policy,
 )
@@ -28,6 +35,7 @@ from mediamop.modules.fetcher.manual_cleanup_drive_enqueue import (
 from mediamop.modules.fetcher.schemas_automation_summary import FetcherFailedImportAutomationSummaryOut
 from mediamop.modules.fetcher.schemas_cleanup_policy import (
     FailedImportCleanupPolicyAxisOut,
+    FetcherFailedImportCleanupPolicyAxisPutIn,
     FetcherFailedImportCleanupPolicyOut,
     FetcherFailedImportCleanupPolicyPutIn,
 )
@@ -35,9 +43,11 @@ from mediamop.modules.fetcher.schemas_manual_cleanup_enqueue import (
     ManualCleanupDriveEnqueueIn,
     ManualCleanupDriveEnqueueOut,
 )
-from mediamop.modules.arr_failed_import.env_settings import AppFailedImportCleanupPolicySettings
 from mediamop.modules.fetcher.failed_import_runtime_visibility import (
-    failed_import_runtime_visibility_from_settings,
+    failed_import_runtime_visibility_from_db,
+)
+from mediamop.modules.fetcher.schemas_failed_import_queue_attention import (
+    FetcherFailedImportQueueAttentionSnapshotOut,
 )
 from mediamop.modules.fetcher.schemas_failed_import_runtime_visibility import FailedImportRuntimeVisibilityOut
 from mediamop.platform.auth.authorization import RequireOperatorDep
@@ -51,13 +61,49 @@ from mediamop.platform.auth.deps_auth import UserPublicDep
 router = APIRouter(tags=["fetcher"])
 
 
-def _axis_out(app: AppFailedImportCleanupPolicySettings) -> FailedImportCleanupPolicyAxisOut:
+class FailedImportCleanupAxisPath(str, Enum):
+    """URL segment for single-axis cleanup policy saves."""
+
+    tv_shows = "tv-shows"
+    movies = "movies"
+
+
+def _axis_out_movies(row: FetcherFailedImportCleanupPolicyRow) -> FailedImportCleanupPolicyAxisOut:
     return FailedImportCleanupPolicyAxisOut(
-        remove_quality_rejections=app.remove_quality_rejections,
-        remove_unmatched_manual_import_rejections=app.remove_unmatched_manual_import_rejections,
-        remove_corrupt_imports=app.remove_corrupt_imports,
-        remove_failed_downloads=app.remove_failed_downloads,
-        remove_failed_imports=app.remove_failed_imports,
+        handling_quality_rejection=row.radarr_handling_quality_rejection,  # type: ignore[arg-type]
+        handling_unmatched_manual_import=row.radarr_handling_unmatched_manual_import,  # type: ignore[arg-type]
+        handling_sample_release=row.radarr_handling_sample_release,  # type: ignore[arg-type]
+        handling_corrupt_import=row.radarr_handling_corrupt_import,  # type: ignore[arg-type]
+        handling_failed_download=row.radarr_handling_failed_download,  # type: ignore[arg-type]
+        handling_failed_import=row.radarr_handling_failed_import,  # type: ignore[arg-type]
+        cleanup_drive_schedule_enabled=row.radarr_cleanup_drive_schedule_enabled,
+        cleanup_drive_schedule_interval_seconds=row.radarr_cleanup_drive_schedule_interval_seconds,
+    )
+
+
+def _axis_out_tv_shows(row: FetcherFailedImportCleanupPolicyRow) -> FailedImportCleanupPolicyAxisOut:
+    return FailedImportCleanupPolicyAxisOut(
+        handling_quality_rejection=row.sonarr_handling_quality_rejection,  # type: ignore[arg-type]
+        handling_unmatched_manual_import=row.sonarr_handling_unmatched_manual_import,  # type: ignore[arg-type]
+        handling_sample_release=row.sonarr_handling_sample_release,  # type: ignore[arg-type]
+        handling_corrupt_import=row.sonarr_handling_corrupt_import,  # type: ignore[arg-type]
+        handling_failed_download=row.sonarr_handling_failed_download,  # type: ignore[arg-type]
+        handling_failed_import=row.sonarr_handling_failed_import,  # type: ignore[arg-type]
+        cleanup_drive_schedule_enabled=row.sonarr_cleanup_drive_schedule_enabled,
+        cleanup_drive_schedule_interval_seconds=row.sonarr_cleanup_drive_schedule_interval_seconds,
+    )
+
+
+def _cleanup_policy_schedule_seed(settings: MediaMopSettings) -> tuple[bool, int, bool, int]:
+    return (
+        settings.failed_import_radarr_cleanup_drive_schedule_enabled,
+        clamp_failed_import_cleanup_drive_schedule_interval_seconds(
+            settings.failed_import_radarr_cleanup_drive_schedule_interval_seconds,
+        ),
+        settings.failed_import_sonarr_cleanup_drive_schedule_enabled,
+        clamp_failed_import_cleanup_drive_schedule_interval_seconds(
+            settings.failed_import_sonarr_cleanup_drive_schedule_interval_seconds,
+        ),
     )
 
 
@@ -65,10 +111,14 @@ def _cleanup_policy_response(
     db: Session,
     settings: MediaMopSettings,
 ) -> FetcherFailedImportCleanupPolicyOut:
-    effective, row = load_fetcher_failed_import_cleanup_bundle(db, settings.failed_import_cleanup_env)
+    _effective, row = load_fetcher_failed_import_cleanup_bundle(
+        db,
+        settings.failed_import_cleanup_env,
+        schedule_seed=_cleanup_policy_schedule_seed(settings),
+    )
     return FetcherFailedImportCleanupPolicyOut(
-        movies=_axis_out(effective.radarr),
-        tv_shows=_axis_out(effective.sonarr),
+        movies=_axis_out_movies(row),
+        tv_shows=_axis_out_tv_shows(row),
         updated_at=row.updated_at,
     )
 
@@ -100,19 +150,54 @@ def put_fetcher_failed_imports_cleanup_policy(
 ) -> FetcherFailedImportCleanupPolicyOut:
     """Fetcher: persist removal rules (movies and TV are independent)."""
 
-    validate_browser_post_origin(request, settings)
-    secret = require_session_secret(settings)
-    if not verify_csrf_token(secret, body.csrf_token):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired CSRF token.",
-        )
+    _verify_cleanup_put_csrf(request, settings, body.csrf_token)
 
     upsert_fetcher_failed_import_cleanup_policy(
         db,
         env_bundle=settings.failed_import_cleanup_env,
         radarr=body.movies.to_app_settings(),
         sonarr=body.tv_shows.to_app_settings(),
+        radarr_cleanup_drive_schedule_enabled=body.movies.cleanup_drive_schedule_enabled,
+        radarr_cleanup_drive_schedule_interval_seconds=body.movies.cleanup_drive_schedule_interval_seconds,
+        sonarr_cleanup_drive_schedule_enabled=body.tv_shows.cleanup_drive_schedule_enabled,
+        sonarr_cleanup_drive_schedule_interval_seconds=body.tv_shows.cleanup_drive_schedule_interval_seconds,
+    )
+    return _cleanup_policy_response(db, settings)
+
+
+def _verify_cleanup_put_csrf(request: Request, settings: MediaMopSettings, token: str) -> None:
+    validate_browser_post_origin(request, settings)
+    secret = require_session_secret(settings)
+    if not verify_csrf_token(secret, token):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired CSRF token.",
+        )
+
+
+@router.put(
+    "/fetcher/failed-imports/cleanup-policy/{axis}",
+    response_model=FetcherFailedImportCleanupPolicyOut,
+)
+def put_fetcher_failed_imports_cleanup_policy_axis(
+    axis: FailedImportCleanupAxisPath,
+    body: FetcherFailedImportCleanupPolicyAxisPutIn,
+    request: Request,
+    _user: RequireOperatorDep,
+    db: DbSessionDep,
+    settings: SettingsDep,
+) -> FetcherFailedImportCleanupPolicyOut:
+    """Fetcher: persist Sonarr (TV) or Radarr (movies) cleanup rules only — the other app is unchanged."""
+
+    _verify_cleanup_put_csrf(request, settings, body.csrf_token)
+    internal = "tv_shows" if axis == FailedImportCleanupAxisPath.tv_shows else "movies"
+    apply_fetcher_failed_import_cleanup_policy_axis_put(
+        db,
+        env_bundle=settings.failed_import_cleanup_env,
+        axis=internal,
+        policy=body.to_app_settings(),
+        cleanup_drive_schedule_enabled=body.cleanup_drive_schedule_enabled,
+        cleanup_drive_schedule_interval_seconds=body.cleanup_drive_schedule_interval_seconds,
     )
     return _cleanup_policy_response(db, settings)
 
@@ -131,9 +216,25 @@ def get_fetcher_failed_imports_automation_summary(
     return build_fetcher_failed_import_automation_summary(db, settings)
 
 
+@router.get(
+    "/fetcher/failed-imports/queue-attention-snapshot",
+    response_model=FetcherFailedImportQueueAttentionSnapshotOut,
+)
+def get_fetcher_failed_imports_queue_attention_snapshot(
+    _user: UserPublicDep,
+    db: DbSessionDep,
+    settings: SettingsDep,
+) -> FetcherFailedImportQueueAttentionSnapshotOut:
+    """Fetcher: live Sonarr/Radarr queue scan — counts rows that match a terminal failed-import class
+    **and** have a non-``leave_alone`` handling action configured for that axis."""
+
+    return build_failed_import_queue_attention_snapshot(db, settings)
+
+
 @router.get("/fetcher/failed-imports/settings", response_model=FailedImportRuntimeVisibilityOut)
 def get_fetcher_failed_imports_settings(
     _user: UserPublicDep,
+    db: DbSessionDep,
     settings: SettingsDep,
 ) -> FailedImportRuntimeVisibilityOut:
     """Fetcher: read-only settings for in-process workers and Radarr/Sonarr timed failed-import passes.
@@ -141,7 +242,7 @@ def get_fetcher_failed_imports_settings(
     Does not report live worker health, pass execution, or app connectivity.
     """
 
-    return failed_import_runtime_visibility_from_settings(settings)
+    return failed_import_runtime_visibility_from_db(db, settings)
 
 
 @router.post(

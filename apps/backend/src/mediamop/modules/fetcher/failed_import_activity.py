@@ -13,14 +13,25 @@ from sqlalchemy.orm import Session
 from mediamop.platform.activity import constants as C
 from mediamop.platform.activity.service import record_activity_event
 
+_REMOVED_OUTCOMES = frozenset(
+    {
+        "removed_remove_only",
+        "removed_blocklist_only",
+        "removed_remove_and_blocklist",
+    },
+)
+
 
 def _drive_summary_title_detail(*, movies: bool, outcome_values: Sequence[str]) -> tuple[str, str | None]:
-    """Build plain title/detail from per-row execution outcome values (``no_op``, etc.)."""
+    """Build plain title/detail from per-row execution outcome values."""
 
     app = "Radarr" if movies else "Sonarr"
     media = "movie" if movies else "TV show"
     n = len(outcome_values)
-    removed = sum(1 for v in outcome_values if v == "removed_queue_item")
+    removed = sum(1 for v in outcome_values if v in _REMOVED_OUTCOMES)
+    remove_only = sum(1 for v in outcome_values if v == "removed_remove_only")
+    blocklist_only = sum(1 for v in outcome_values if v == "removed_blocklist_only")
+    both = sum(1 for v in outcome_values if v == "removed_remove_and_blocklist")
     skipped_rules = sum(1 for v in outcome_values if v == "no_op")
     skipped_id = sum(1 for v in outcome_values if v == "skipped_missing_queue_item_id")
 
@@ -32,36 +43,47 @@ def _drive_summary_title_detail(*, movies: bool, outcome_values: Sequence[str]) 
 
     if removed > 0:
         item_word = "item" if removed == 1 else "items"
-        title = f"Fetcher checked {media} failed imports and removed {removed} eligible queue {item_word}."
+        title = (
+            f"Fetcher checked {media} failed imports and ran Sonarr/Radarr queue actions for "
+            f"{removed} eligible queue {item_word} (remove / blocklist per your settings)."
+        )
         parts: list[str] = []
         if n > removed:
             parts.append(f"Reviewed {n} queue row(s).")
+        if remove_only or blocklist_only or both:
+            bits: list[str] = []
+            if remove_only:
+                bits.append(f"{remove_only} remove-only")
+            if blocklist_only:
+                bits.append(f"{blocklist_only} blocklist-only")
+            if both:
+                bits.append(f"{both} remove+blocklist")
+            parts.append("Actions: " + ", ".join(bits) + ".")
         if skipped_rules:
             w = "row was" if skipped_rules == 1 else "rows were"
             parts.append(
-                f"{skipped_rules} queue {w} not eligible to remove under the current cleanup rules.",
+                f"{skipped_rules} queue {w} left unchanged (leave-alone or non-matching class).",
             )
         if skipped_id:
             w = "row was" if skipped_id == 1 else "rows were"
-            parts.append(f"{skipped_id} queue {w} marked for removal but had no queue id.")
+            parts.append(f"{skipped_id} queue {w} matched your rules but had no queue id.")
         return title, " ".join(parts) if parts else None
 
-    # Reviewed at least one row; nothing removed.
     if skipped_id == n and skipped_rules == 0:
         w = "row" if n == 1 else "rows"
         return (
-            f"Fetcher checked {media} failed imports but could not remove {n} queue {w} "
+            f"Fetcher checked {media} failed imports but could not act on {n} queue {w} "
             "because queue identifiers were missing.",
             None,
         )
 
     title = (
         f"Fetcher checked {media} failed imports, reviewed {n} queue row(s), "
-        "and did not remove anything eligible under the current cleanup rules."
+        "and did not run any queue actions under the current per-class settings."
     )
     if skipped_id:
         w = "row was" if skipped_id == 1 else "rows were"
-        detail = f"{skipped_id} queue {w} marked for removal but had no queue id."
+        detail = f"{skipped_id} queue {w} matched your rules but had no queue id."
         return title, detail
     return title, None
 
@@ -151,4 +173,3 @@ def record_fetcher_failed_import_drive_failed(
         title=f"Fetcher {media} failed-import run stopped because of an error.",
         detail=msg[:4000],
     )
-

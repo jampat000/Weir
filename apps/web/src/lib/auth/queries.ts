@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchBootstrapStatus,
+  postChangePassword,
   fetchMe,
   postBootstrap,
   postLogin,
@@ -67,6 +68,19 @@ export function useBootstrapMutation() {
       postBootstrap(username, password),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.bootstrap });
+      void qc.invalidateQueries({ queryKey: activityRecentKey });
+      void qc.invalidateQueries({ queryKey: dashboardStatusKey });
+    },
+  });
+}
+
+export function useChangePasswordMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) =>
+      postChangePassword(currentPassword, newPassword),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.me });
       void qc.invalidateQueries({ queryKey: activityRecentKey });
       void qc.invalidateQueries({ queryKey: dashboardStatusKey });
     },

@@ -64,7 +64,7 @@ def test_radarr_drive_removal_summary_activity(
         fetcher_radarr_api_key="k",
     )
     fake_results = (
-        RadarrFailedImportCleanupDriveItemResult(1, "m", RadarrFailedImportCleanupExecutionOutcome.REMOVED_QUEUE_ITEM),
+        RadarrFailedImportCleanupDriveItemResult(1, "m", RadarrFailedImportCleanupExecutionOutcome.REMOVED_REMOVE_ONLY),
         RadarrFailedImportCleanupDriveItemResult(2, "m2", RadarrFailedImportCleanupExecutionOutcome.NO_OP),
     )
     with session_factory() as s:
@@ -97,9 +97,9 @@ def test_radarr_drive_removal_summary_activity(
         assert act_c.FETCHER_FAILED_IMPORT_RUN_SUMMARY in types
         summary_ev = next(r for r in rows if r.event_type == act_c.FETCHER_FAILED_IMPORT_RUN_SUMMARY)
         assert summary_ev.module == "fetcher"
-        assert "removed 1 eligible" in summary_ev.title.lower()
+        assert "ran sonarr/radarr queue actions" in summary_ev.title.lower()
         assert summary_ev.detail is not None
-        assert "not eligible" in summary_ev.detail.lower()
+        assert "left unchanged" in summary_ev.detail.lower()
 
 
 def test_radarr_drive_all_policy_skips_activity(
@@ -144,4 +144,4 @@ def test_radarr_drive_all_policy_skips_activity(
         summary_ev = next(r for r in rows if r.event_type == act_c.FETCHER_FAILED_IMPORT_RUN_SUMMARY)
         assert summary_ev.module == "fetcher"
         assert "reviewed 3" in summary_ev.title.lower()
-        assert "did not remove" in summary_ev.title.lower()
+        assert "did not run any queue actions" in summary_ev.title.lower()

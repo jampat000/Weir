@@ -8,93 +8,100 @@ from mediamop.modules.arr_failed_import.policy import (
     FailedImportCleanupPolicyKey,
     default_failed_import_cleanup_policy,
 )
+from mediamop.modules.arr_failed_import.queue_action import FailedImportQueueHandlingAction
 from mediamop.modules.fetcher.sonarr_failed_import_cleanup import (
-    SonarrFailedImportCleanupAction,
-    SonarrFailedImportCleanupPlan,
+    SonarrFailedImportQueueDeletePlan,
     plan_sonarr_failed_import_cleanup,
+    sonarr_plan_requests_queue_delete,
 )
 
 
-def _policy_only(key: FailedImportCleanupPolicyKey, on: bool) -> FailedImportCleanupPolicy:
-    return FailedImportCleanupPolicy(
-        remove_quality_rejections=(key is FailedImportCleanupPolicyKey.REMOVE_QUALITY_REJECTIONS and on),
-        remove_unmatched_manual_import_rejections=(
-            key is FailedImportCleanupPolicyKey.REMOVE_UNMATCHED_MANUAL_IMPORT_REJECTIONS and on
-        ),
-        remove_corrupt_imports=(key is FailedImportCleanupPolicyKey.REMOVE_CORRUPT_IMPORTS and on),
-        remove_failed_downloads=(key is FailedImportCleanupPolicyKey.REMOVE_FAILED_DOWNLOADS and on),
-        remove_failed_imports=(key is FailedImportCleanupPolicyKey.REMOVE_FAILED_IMPORTS and on),
-    )
+def _policy_only(key: FailedImportCleanupPolicyKey, action: FailedImportQueueHandlingAction) -> FailedImportCleanupPolicy:
+    if key is FailedImportCleanupPolicyKey.HANDLING_QUALITY_REJECTION:
+        return FailedImportCleanupPolicy(handling_quality_rejection=action)
+    if key is FailedImportCleanupPolicyKey.HANDLING_UNMATCHED_MANUAL_IMPORT:
+        return FailedImportCleanupPolicy(handling_unmatched_manual_import=action)
+    if key is FailedImportCleanupPolicyKey.HANDLING_SAMPLE_RELEASE:
+        return FailedImportCleanupPolicy(handling_sample_release=action)
+    if key is FailedImportCleanupPolicyKey.HANDLING_CORRUPT_IMPORT:
+        return FailedImportCleanupPolicy(handling_corrupt_import=action)
+    if key is FailedImportCleanupPolicyKey.HANDLING_FAILED_DOWNLOAD:
+        return FailedImportCleanupPolicy(handling_failed_download=action)
+    return FailedImportCleanupPolicy(handling_failed_import=action)
 
 
-def test_sonarr_terminal_failure_toggle_off_plans_no_action() -> None:
-    policy = _policy_only(FailedImportCleanupPolicyKey.REMOVE_FAILED_IMPORTS, on=False)
+def test_sonarr_terminal_failure_leave_alone_plans_no_delete() -> None:
+    policy = _policy_only(FailedImportCleanupPolicyKey.HANDLING_FAILED_IMPORT, FailedImportQueueHandlingAction.LEAVE_ALONE)
     plan = plan_sonarr_failed_import_cleanup(
         status_message_blob="Import failed",
         policy=policy,
         sonarr_queue_item_id=202,
     )
-    assert plan.action == SonarrFailedImportCleanupAction.NONE
+    assert sonarr_plan_requests_queue_delete(plan) is False
     assert plan.decision.cleanup_eligible is False
     assert plan.sonarr_queue_item_id == 202
 
 
-def test_sonarr_terminal_failure_matching_toggle_on_plans_queue_removal() -> None:
-    policy = _policy_only(FailedImportCleanupPolicyKey.REMOVE_FAILED_IMPORTS, on=True)
+def test_sonarr_terminal_failure_remove_only_plans_queue_delete() -> None:
+    policy = _policy_only(FailedImportCleanupPolicyKey.HANDLING_FAILED_IMPORT, FailedImportQueueHandlingAction.REMOVE_ONLY)
     plan = plan_sonarr_failed_import_cleanup(
         status_message_blob="Import failed",
         policy=policy,
     )
-    assert plan.action == SonarrFailedImportCleanupAction.PLANNED_REMOVE_FROM_DOWNLOAD_QUEUE
+    assert sonarr_plan_requests_queue_delete(plan) is True
+    assert plan.remove_from_client is True and plan.blocklist is False
     assert plan.decision.cleanup_eligible is True
 
 
-def test_sonarr_pending_waiting_never_plans_removal() -> None:
+def test_sonarr_pending_waiting_never_plans_delete() -> None:
     policy = FailedImportCleanupPolicy(
-        remove_quality_rejections=True,
-        remove_unmatched_manual_import_rejections=True,
-        remove_corrupt_imports=True,
-        remove_failed_downloads=True,
-        remove_failed_imports=True,
+        handling_quality_rejection=FailedImportQueueHandlingAction.REMOVE_ONLY,
+        handling_unmatched_manual_import=FailedImportQueueHandlingAction.REMOVE_ONLY,
+        handling_sample_release=FailedImportQueueHandlingAction.REMOVE_ONLY,
+        handling_corrupt_import=FailedImportQueueHandlingAction.REMOVE_ONLY,
+        handling_failed_download=FailedImportQueueHandlingAction.REMOVE_ONLY,
+        handling_failed_import=FailedImportQueueHandlingAction.REMOVE_ONLY,
     )
     plan = plan_sonarr_failed_import_cleanup(
         status_message_blob="Downloaded - Waiting to Import",
         policy=policy,
     )
-    assert plan.action == SonarrFailedImportCleanupAction.NONE
+    assert sonarr_plan_requests_queue_delete(plan) is False
     assert plan.decision.cleanup_eligible is False
 
 
-def test_sonarr_unknown_never_plans_removal() -> None:
+def test_sonarr_unknown_never_plans_delete() -> None:
     plan = plan_sonarr_failed_import_cleanup(
         status_message_blob="Something odd from Sonarr.",
-        policy=_policy_only(FailedImportCleanupPolicyKey.REMOVE_CORRUPT_IMPORTS, on=True),
+        policy=_policy_only(FailedImportCleanupPolicyKey.HANDLING_CORRUPT_IMPORT, FailedImportQueueHandlingAction.REMOVE_ONLY),
     )
-    assert plan.action == SonarrFailedImportCleanupAction.NONE
+    assert sonarr_plan_requests_queue_delete(plan) is False
 
 
 def test_sonarr_blob_waiting_plus_terminal_precedence_then_policy() -> None:
     blob = "Downloaded - Waiting to Import. Manual Import required."
     plan_off = plan_sonarr_failed_import_cleanup(status_message_blob=blob, policy=default_failed_import_cleanup_policy())
     assert plan_off.decision.cleanup_eligible is False
-    assert plan_off.action == SonarrFailedImportCleanupAction.NONE
+    assert sonarr_plan_requests_queue_delete(plan_off) is False
 
     plan_on = plan_sonarr_failed_import_cleanup(
         status_message_blob=blob,
-        policy=_policy_only(FailedImportCleanupPolicyKey.REMOVE_UNMATCHED_MANUAL_IMPORT_REJECTIONS, on=True),
+        policy=_policy_only(
+            FailedImportCleanupPolicyKey.HANDLING_UNMATCHED_MANUAL_IMPORT,
+            FailedImportQueueHandlingAction.REMOVE_ONLY,
+        ),
     )
     assert plan_on.decision.cleanup_eligible is True
-    assert plan_on.action == SonarrFailedImportCleanupAction.PLANNED_REMOVE_FROM_DOWNLOAD_QUEUE
+    assert sonarr_plan_requests_queue_delete(plan_on) is True
 
 
 def test_sonarr_plan_decision_matches_pure_decision_seam() -> None:
-    blob = "Not an upgrade for existing movie file"
-    policy = _policy_only(FailedImportCleanupPolicyKey.REMOVE_QUALITY_REJECTIONS, on=True)
-    expected = decide_failed_import_cleanup_eligibility(blob, policy)
+    blob = "Not an upgrade for existing episode file"
+    policy = _policy_only(FailedImportCleanupPolicyKey.HANDLING_QUALITY_REJECTION, FailedImportQueueHandlingAction.REMOVE_ONLY)
+    expected = decide_failed_import_cleanup_eligibility(blob, policy, movies=False)
     plan = plan_sonarr_failed_import_cleanup(status_message_blob=blob, policy=policy)
     assert plan.decision == expected
 
 
 def test_sonarr_failed_import_cleanup_types_are_sonarr_named_not_shared_executor() -> None:
-    assert "Sonarr" in SonarrFailedImportCleanupPlan.__name__
-    assert "Sonarr" in SonarrFailedImportCleanupAction.__name__
+    assert "Sonarr" in SonarrFailedImportQueueDeletePlan.__name__

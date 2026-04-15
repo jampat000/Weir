@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from mediamop.api.deps import DbSessionDep, SettingsDep
 from mediamop.modules.fetcher.failed_imports_api import router as fetcher_failed_imports_router
+from mediamop.modules.fetcher.fetcher_arr_operator_settings_api import router as fetcher_arr_operator_settings_router
 from mediamop.modules.fetcher.fetcher_arr_search_api import router as fetcher_arr_search_router
 from mediamop.modules.fetcher.fetcher_jobs_api import router as fetcher_jobs_router
 from mediamop.modules.fetcher.schemas import FetcherOperationalOverviewOut
@@ -15,6 +16,7 @@ from mediamop.platform.auth.deps_auth import UserPublicDep
 router = APIRouter(tags=["fetcher"])
 router.include_router(fetcher_jobs_router)
 router.include_router(fetcher_arr_search_router)
+router.include_router(fetcher_arr_operator_settings_router)
 router.include_router(fetcher_failed_imports_router)
 
 

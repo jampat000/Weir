@@ -26,6 +26,11 @@ from mediamop.modules.fetcher.fetcher_arr_search_execution import (
     trigger_radarr_movies_search,
     trigger_sonarr_episode_search,
 )
+from mediamop.modules.fetcher.fetcher_arr_http_resolve import (
+    resolve_radarr_http_credentials,
+    resolve_sonarr_http_credentials,
+)
+from mediamop.modules.fetcher.fetcher_arr_operator_settings_prefs import load_fetcher_arr_search_operator_prefs
 from mediamop.modules.fetcher.fetcher_arr_search_selection import (
     drain_monitored_missing_with_cooldown,
     iter_radarr_monitored_missing_movies,
@@ -73,20 +78,23 @@ def build_fetcher_arr_search_job_handlers(
     """Handlers keyed by :data:`FETCHER_ARR_SEARCH_JOB_KINDS`."""
 
     def _missing_sonarr(ctx: FetcherJobWorkContext) -> None:
-        if not settings.fetcher_sonarr_missing_search_enabled:
-            return
         manual = _parse_manual(ctx.payload_json)
         now = utc_now()
+        with session_factory() as pref_session:
+            prefs = load_fetcher_arr_search_operator_prefs(pref_session)
+        if not prefs.sonarr_missing.enabled:
+            return
         if not manual and not fetcher_arr_search_schedule_in_window(
-            schedule_enabled=settings.fetcher_sonarr_missing_search_schedule_enabled,
-            schedule_days=settings.fetcher_sonarr_missing_search_schedule_days,
-            schedule_start=settings.fetcher_sonarr_missing_search_schedule_start,
-            schedule_end=settings.fetcher_sonarr_missing_search_schedule_end,
+            schedule_enabled=prefs.sonarr_missing.schedule_enabled,
+            schedule_days=prefs.sonarr_missing.schedule_days,
+            schedule_start=prefs.sonarr_missing.schedule_start,
+            schedule_end=prefs.sonarr_missing.schedule_end,
             timezone_name=settings.fetcher_arr_search_schedule_timezone,
             now=now,
         ):
             return
-        base, key = settings.arr_http_sonarr_credentials()
+        with session_factory() as cred_session:
+            base, key = resolve_sonarr_http_credentials(cred_session, settings)
         if not base or not key:
             raise RuntimeError(
                 "Sonarr missing search requires Sonarr URL and API key "
@@ -94,15 +102,15 @@ def build_fetcher_arr_search_job_handlers(
             )
         client = FetcherArrV3Client(base, key)
         client.health_ok()
-        limit = max(1, int(settings.fetcher_sonarr_missing_search_max_items_per_run))
-        delay = max(1, min(int(settings.fetcher_sonarr_missing_search_retry_delay_minutes), 365 * 24 * 60))
+        limit = max(1, int(prefs.sonarr_missing.max_items_per_run))
+        delay = max(1, min(int(prefs.sonarr_missing.retry_delay_minutes), 365 * 24 * 60))
         warnings: list[str] = []
         allowed_ids: list[int] = []
         allowed_recs: list[dict[str, Any]] = []
         pool = 0
         with session_factory() as session:
             with session.begin():
-                prune_fetcher_arr_action_log(session, settings=settings, now=now)
+                prune_fetcher_arr_action_log(session, prefs=prefs, now=now)
                 allowed_ids, allowed_recs, pool = drain_monitored_missing_with_cooldown(
                     client,
                     session,
@@ -139,20 +147,23 @@ def build_fetcher_arr_search_job_handlers(
             logger.warning("%s", " | ".join(warnings))
 
     def _missing_radarr(ctx: FetcherJobWorkContext) -> None:
-        if not settings.fetcher_radarr_missing_search_enabled:
-            return
         manual = _parse_manual(ctx.payload_json)
         now = utc_now()
+        with session_factory() as pref_session:
+            prefs = load_fetcher_arr_search_operator_prefs(pref_session)
+        if not prefs.radarr_missing.enabled:
+            return
         if not manual and not fetcher_arr_search_schedule_in_window(
-            schedule_enabled=settings.fetcher_radarr_missing_search_schedule_enabled,
-            schedule_days=settings.fetcher_radarr_missing_search_schedule_days,
-            schedule_start=settings.fetcher_radarr_missing_search_schedule_start,
-            schedule_end=settings.fetcher_radarr_missing_search_schedule_end,
+            schedule_enabled=prefs.radarr_missing.schedule_enabled,
+            schedule_days=prefs.radarr_missing.schedule_days,
+            schedule_start=prefs.radarr_missing.schedule_start,
+            schedule_end=prefs.radarr_missing.schedule_end,
             timezone_name=settings.fetcher_arr_search_schedule_timezone,
             now=now,
         ):
             return
-        base, key = settings.arr_http_radarr_credentials()
+        with session_factory() as cred_session:
+            base, key = resolve_radarr_http_credentials(cred_session, settings)
         if not base or not key:
             raise RuntimeError(
                 "Radarr missing search requires Radarr URL and API key "
@@ -160,15 +171,15 @@ def build_fetcher_arr_search_job_handlers(
             )
         client = FetcherArrV3Client(base, key)
         client.health_ok()
-        limit = max(1, int(settings.fetcher_radarr_missing_search_max_items_per_run))
-        delay = max(1, min(int(settings.fetcher_radarr_missing_search_retry_delay_minutes), 365 * 24 * 60))
+        limit = max(1, int(prefs.radarr_missing.max_items_per_run))
+        delay = max(1, min(int(prefs.radarr_missing.retry_delay_minutes), 365 * 24 * 60))
         warnings: list[str] = []
         allowed_ids: list[int] = []
         allowed_recs: list[dict[str, Any]] = []
         pool = 0
         with session_factory() as session:
             with session.begin():
-                prune_fetcher_arr_action_log(session, settings=settings, now=now)
+                prune_fetcher_arr_action_log(session, prefs=prefs, now=now)
                 allowed_ids, allowed_recs, pool = drain_monitored_missing_with_cooldown(
                     client,
                     session,
@@ -205,20 +216,23 @@ def build_fetcher_arr_search_job_handlers(
             logger.warning("%s", " | ".join(warnings))
 
     def _upgrade_sonarr(ctx: FetcherJobWorkContext) -> None:
-        if not settings.fetcher_sonarr_upgrade_search_enabled:
-            return
         manual = _parse_manual(ctx.payload_json)
         now = utc_now()
+        with session_factory() as pref_session:
+            prefs = load_fetcher_arr_search_operator_prefs(pref_session)
+        if not prefs.sonarr_upgrade.enabled:
+            return
         if not manual and not fetcher_arr_search_schedule_in_window(
-            schedule_enabled=settings.fetcher_sonarr_upgrade_search_schedule_enabled,
-            schedule_days=settings.fetcher_sonarr_upgrade_search_schedule_days,
-            schedule_start=settings.fetcher_sonarr_upgrade_search_schedule_start,
-            schedule_end=settings.fetcher_sonarr_upgrade_search_schedule_end,
+            schedule_enabled=prefs.sonarr_upgrade.schedule_enabled,
+            schedule_days=prefs.sonarr_upgrade.schedule_days,
+            schedule_start=prefs.sonarr_upgrade.schedule_start,
+            schedule_end=prefs.sonarr_upgrade.schedule_end,
             timezone_name=settings.fetcher_arr_search_schedule_timezone,
             now=now,
         ):
             return
-        base, key = settings.arr_http_sonarr_credentials()
+        with session_factory() as cred_session:
+            base, key = resolve_sonarr_http_credentials(cred_session, settings)
         if not base or not key:
             raise RuntimeError(
                 "Sonarr upgrade search requires Sonarr URL and API key "
@@ -226,15 +240,15 @@ def build_fetcher_arr_search_job_handlers(
             )
         client = FetcherArrV3Client(base, key)
         client.health_ok()
-        limit = max(1, int(settings.fetcher_sonarr_upgrade_search_max_items_per_run))
-        delay = max(1, min(int(settings.fetcher_sonarr_upgrade_search_retry_delay_minutes), 365 * 24 * 60))
+        limit = max(1, int(prefs.sonarr_upgrade.max_items_per_run))
+        delay = max(1, min(int(prefs.sonarr_upgrade.retry_delay_minutes), 365 * 24 * 60))
         warnings: list[str] = []
         allowed_ids: list[int] = []
         allowed_recs: list[dict[str, Any]] = []
         cutoff_total = 0
         with session_factory() as session:
             with session.begin():
-                prune_fetcher_arr_action_log(session, settings=settings, now=now)
+                prune_fetcher_arr_action_log(session, prefs=prefs, now=now)
                 allowed_ids, allowed_recs, cutoff_total = paginate_wanted_cutoff(
                     client,
                     session,
@@ -270,20 +284,23 @@ def build_fetcher_arr_search_job_handlers(
             logger.warning("%s", " | ".join(warnings))
 
     def _upgrade_radarr(ctx: FetcherJobWorkContext) -> None:
-        if not settings.fetcher_radarr_upgrade_search_enabled:
-            return
         manual = _parse_manual(ctx.payload_json)
         now = utc_now()
+        with session_factory() as pref_session:
+            prefs = load_fetcher_arr_search_operator_prefs(pref_session)
+        if not prefs.radarr_upgrade.enabled:
+            return
         if not manual and not fetcher_arr_search_schedule_in_window(
-            schedule_enabled=settings.fetcher_radarr_upgrade_search_schedule_enabled,
-            schedule_days=settings.fetcher_radarr_upgrade_search_schedule_days,
-            schedule_start=settings.fetcher_radarr_upgrade_search_schedule_start,
-            schedule_end=settings.fetcher_radarr_upgrade_search_schedule_end,
+            schedule_enabled=prefs.radarr_upgrade.schedule_enabled,
+            schedule_days=prefs.radarr_upgrade.schedule_days,
+            schedule_start=prefs.radarr_upgrade.schedule_start,
+            schedule_end=prefs.radarr_upgrade.schedule_end,
             timezone_name=settings.fetcher_arr_search_schedule_timezone,
             now=now,
         ):
             return
-        base, key = settings.arr_http_radarr_credentials()
+        with session_factory() as cred_session:
+            base, key = resolve_radarr_http_credentials(cred_session, settings)
         if not base or not key:
             raise RuntimeError(
                 "Radarr upgrade search requires Radarr URL and API key "
@@ -291,15 +308,15 @@ def build_fetcher_arr_search_job_handlers(
             )
         client = FetcherArrV3Client(base, key)
         client.health_ok()
-        limit = max(1, int(settings.fetcher_radarr_upgrade_search_max_items_per_run))
-        delay = max(1, min(int(settings.fetcher_radarr_upgrade_search_retry_delay_minutes), 365 * 24 * 60))
+        limit = max(1, int(prefs.radarr_upgrade.max_items_per_run))
+        delay = max(1, min(int(prefs.radarr_upgrade.retry_delay_minutes), 365 * 24 * 60))
         warnings: list[str] = []
         allowed_ids: list[int] = []
         allowed_recs: list[dict[str, Any]] = []
         cutoff_total = 0
         with session_factory() as session:
             with session.begin():
-                prune_fetcher_arr_action_log(session, settings=settings, now=now)
+                prune_fetcher_arr_action_log(session, prefs=prefs, now=now)
                 allowed_ids, allowed_recs, cutoff_total = paginate_wanted_cutoff(
                     client,
                     session,

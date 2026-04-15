@@ -79,3 +79,18 @@ def test_bootstrap_status_unexpected_programming_returns_503(
     monkeypatch.setattr(bootstrap_service, "bootstrap_allowed", boom)
     r = client_bootstrap_status.get("/api/v1/auth/bootstrap/status")
     assert r.status_code == 503
+
+
+def test_bootstrap_status_non_sqlalchemy_error_returns_503(
+    client_bootstrap_status: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: never HTTP 500 on this guest-first path (map unknown failures to 503)."""
+
+    def boom(_db: object) -> bool:
+        raise RuntimeError("unexpected ORM state")
+
+    monkeypatch.setattr(bootstrap_service, "bootstrap_allowed", boom)
+    r = client_bootstrap_status.get("/api/v1/auth/bootstrap/status")
+    assert r.status_code == 503
+    assert isinstance(r.json().get("detail"), str) and len(r.json()["detail"]) > 10

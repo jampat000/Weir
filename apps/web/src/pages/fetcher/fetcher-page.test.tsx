@@ -1,17 +1,29 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { qk } from "../../lib/auth/queries";
-import type { FetcherOperationalOverview, UserPublic } from "../../lib/api/types";
-import type { FetcherFailedImportAutomationSummary } from "../../lib/fetcher/failed-imports/types";
+import type { UserPublic } from "../../lib/api/types";
+import type {
+  FetcherFailedImportAutomationSummary,
+  FetcherFailedImportQueueAttentionSnapshot,
+} from "../../lib/fetcher/failed-imports/types";
 import {
   failedImportAutomationSummaryQueryKey,
+  failedImportCleanupPolicyQueryKey,
+  failedImportQueueAttentionSnapshotQueryKey,
   failedImportSettingsQueryKey,
 } from "../../lib/fetcher/failed-imports/queries";
+import type { FetcherFailedImportCleanupPolicyOut } from "../../lib/fetcher/failed-imports/types";
+import { fetcherArrOperatorSettingsQueryKey } from "../../lib/fetcher/arr-operator-settings/queries";
+import type {
+  FetcherArrConnectionPanel,
+  FetcherArrOperatorSettingsOut,
+} from "../../lib/fetcher/arr-operator-settings/types";
 import { fetcherJobsInspectionQueryKey } from "../../lib/fetcher/jobs-inspection/queries";
-import { fetcherOverviewKey } from "../../lib/fetcher/queries";
+import { FETCHER_TAB_RADARR_LABEL, FETCHER_TAB_SONARR_LABEL } from "./fetcher-display-names";
+import { FETCHER_OVERVIEW_FI_NEEDS_ATTENTION_SUBTEXT } from "./fetcher-overview-tab";
 import { FetcherPage } from "./fetcher-page";
 
 function wrap(ui: ReactNode, client: QueryClient) {
@@ -24,27 +36,6 @@ function wrap(ui: ReactNode, client: QueryClient) {
 
 const minimalMe: UserPublic = { id: 1, username: "alice", role: "viewer" };
 
-const minimalOverview: FetcherOperationalOverview = {
-  mediamop_version: "test",
-  status_label: "ok",
-  status_detail: "fine",
-  connection: {
-    configured: false,
-    target_display: null,
-    reachable: null,
-    http_status: null,
-    latency_ms: null,
-    fetcher_app: null,
-    fetcher_version: null,
-    detail: null,
-  },
-  probe_persisted_24h: { window_hours: 24, persisted_ok: 0, persisted_failed: 0 },
-  probe_failure_window_days: 7,
-  recent_probe_failures: [],
-  latest_probe_event: null,
-  recent_probe_events: [],
-};
-
 const minimalFiSettings = {
   background_job_worker_count: 0,
   in_process_workers_disabled: true,
@@ -55,6 +46,68 @@ const minimalFiSettings = {
   failed_import_sonarr_cleanup_drive_schedule_enabled: false,
   failed_import_sonarr_cleanup_drive_schedule_interval_seconds: 3600,
   visibility_note: "note",
+};
+
+const lane = (enabled: boolean) => ({
+  enabled,
+  max_items_per_run: 50,
+  retry_delay_minutes: 1440,
+  schedule_enabled: false,
+  schedule_days: "",
+  schedule_start: "00:00",
+  schedule_end: "23:59",
+  schedule_interval_seconds: 3600,
+});
+
+const minimalConnectionPanel = (overrides: Partial<FetcherArrConnectionPanel> = {}): FetcherArrConnectionPanel => ({
+  enabled: false,
+  base_url: "",
+  api_key_is_saved: false,
+  last_test_ok: null,
+  last_test_at: null,
+  last_test_detail: null,
+  status_headline: "Connection status: Not checked yet",
+  effective_base_url: null,
+  ...overrides,
+});
+
+const minimalArrOperatorSettings: FetcherArrOperatorSettingsOut = {
+  sonarr_missing: lane(false),
+  sonarr_upgrade: lane(false),
+  radarr_missing: lane(false),
+  radarr_upgrade: lane(false),
+  sonarr_connection: minimalConnectionPanel(),
+  radarr_connection: minimalConnectionPanel(),
+  schedule_timezone: "UTC",
+  connection_note: "Addresses come from the server file.",
+  interval_restart_note: "Restart note.",
+  sonarr_server_configured: false,
+  radarr_server_configured: false,
+  sonarr_server_url: null,
+  radarr_server_url: null,
+  updated_at: "2026-04-11T12:00:00Z",
+};
+
+const minimalQueueAttention: FetcherFailedImportQueueAttentionSnapshot = {
+  tv_shows: { needs_attention_count: 0, last_checked_at: null },
+  movies: { needs_attention_count: 0, last_checked_at: null },
+};
+
+const axisCleanupAllOff = {
+  handling_quality_rejection: "leave_alone" as const,
+  handling_unmatched_manual_import: "leave_alone" as const,
+  handling_sample_release: "leave_alone" as const,
+  handling_corrupt_import: "leave_alone" as const,
+  handling_failed_download: "leave_alone" as const,
+  handling_failed_import: "leave_alone" as const,
+  cleanup_drive_schedule_enabled: false,
+  cleanup_drive_schedule_interval_seconds: 3600,
+};
+
+const minimalCleanupPolicy: FetcherFailedImportCleanupPolicyOut = {
+  movies: { ...axisCleanupAllOff },
+  tv_shows: { ...axisCleanupAllOff },
+  updated_at: "2026-04-11T12:00:00Z",
 };
 
 const minimalAutomationSummary: FetcherFailedImportAutomationSummary = {
@@ -77,50 +130,388 @@ const minimalAutomationSummary: FetcherFailedImportAutomationSummary = {
 function renderFetcherPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   qc.setQueryData(qk.me, minimalMe);
-  qc.setQueryData(fetcherOverviewKey, minimalOverview);
   qc.setQueryData(failedImportSettingsQueryKey, minimalFiSettings);
   qc.setQueryData(failedImportAutomationSummaryQueryKey, minimalAutomationSummary);
+  qc.setQueryData(failedImportQueueAttentionSnapshotQueryKey, minimalQueueAttention);
+  qc.setQueryData(failedImportCleanupPolicyQueryKey, minimalCleanupPolicy);
   qc.setQueryData(fetcherJobsInspectionQueryKey("terminal"), { jobs: [], default_terminal_only: true });
-  return render(wrap(<FetcherPage />, qc));
+  qc.setQueryData(fetcherArrOperatorSettingsQueryKey, minimalArrOperatorSettings);
+  return { qc, ...render(wrap(<FetcherPage />, qc)) };
 }
 
-describe("FetcherPage (hero compression)", () => {
-  it("places failed-import workspace with a plain section title", () => {
+function overviewSectionOrders(panel: HTMLElement): string[] {
+  return Array.from(panel.querySelectorAll("[data-overview-order]")).map((el) => el.getAttribute("data-overview-order") ?? "");
+}
+
+describe("FetcherPage (tabbed IA)", () => {
+  it("defaults to Overview with the four-section landing path, not the failed-import workspace", () => {
     renderFetcherPage();
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByTestId("fetcher-failed-imports-workspace")).not.toBeInTheDocument();
+    const panel = screen.getByTestId("fetcher-overview-panel");
+    expect(overviewSectionOrders(panel)).toEqual(["1", "2", "3", "4"]);
+    expect(screen.getByTestId("fetcher-overview-at-a-glance")).toBeInTheDocument();
+    expect(screen.getByTestId("fetcher-overview-needs-attention")).toBeInTheDocument();
+    expect(screen.getByTestId("fetcher-automation-summary")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Current search setup" })).toBeInTheDocument();
+    expect(screen.getByTestId("fetcher-overview-fi-needs-attention")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Failed imports that need attention" })).toBeInTheDocument();
+    expect(screen.getByText(FETCHER_OVERVIEW_FI_NEEDS_ATTENTION_SUBTEXT)).toBeInTheDocument();
+    const fiOverview = screen.getByTestId("fetcher-overview-fi-needs-attention");
+    expect(fiOverview.textContent?.toLowerCase() ?? "").not.toContain("last finished");
+    expect(fiOverview.textContent?.toLowerCase() ?? "").not.toContain("last outcome");
+    expect(fiOverview.textContent ?? "").toMatch(/Classes with an action/i);
+    expect(fiOverview.textContent ?? "").toContain("Status");
+    expect(screen.queryByTestId("fetcher-overview-fi-preview")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("fetcher-overview-connections-service")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Download queue preview" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Connections & optional service link" })).not.toBeInTheDocument();
+  });
+
+  it("orders At a glance inner cards: Connections, Sonarr, Radarr, Failed imports", () => {
+    renderFetcherPage();
+    const glance = screen.getByTestId("fetcher-overview-at-a-glance");
+    const order = Array.from(glance.querySelectorAll("[data-at-glance-order]")).map(
+      (el) => el.getAttribute("data-at-glance-order") ?? "",
+    );
+    expect(order).toEqual(["1", "2", "3", "4"]);
+    const h3 = within(glance).getAllByRole("heading", { level: 3 });
+    expect(h3.map((h) => h.textContent)).toEqual(["Connections", "Sonarr", "Radarr", "Failed imports"]);
+  });
+
+  it("summarizes At a glance failed imports from saved cleanup policy (not queue attention)", () => {
+    renderFetcherPage();
+    const glance = screen.getByTestId("fetcher-overview-at-a-glance");
+    const t = glance.textContent ?? "";
+    expect(t).toMatch(/Sonarr \(TV\):/i);
+    expect(t).toMatch(/Radarr \(Movies\):/i);
+    expect(t).toMatch(/All leave alone/i);
+  });
+
+  it("lists Sonarr (TV) before Radarr (Movies) in Current search setup and in Failed imports that need attention", () => {
+    renderFetcherPage();
+    const auto = screen.getByTestId("fetcher-automation-summary");
+    const h3auto = within(auto).getAllByRole("heading", { level: 3 });
+    expect(h3auto.map((h) => h.textContent)).toEqual([FETCHER_TAB_SONARR_LABEL, FETCHER_TAB_RADARR_LABEL]);
+
+    const fiSection = screen.getByTestId("fetcher-overview-fi-needs-attention");
+    const h3fi = within(fiSection).getAllByRole("heading", { level: 3 });
+    expect(h3fi.map((h) => h.textContent)).toEqual([FETCHER_TAB_SONARR_LABEL, FETCHER_TAB_RADARR_LABEL]);
+  });
+
+  it("routes Needs attention to Sonarr and Radarr tabs when apps are connected but searches are off", () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(qk.me, minimalMe);
+    qc.setQueryData(failedImportSettingsQueryKey, minimalFiSettings);
+    qc.setQueryData(failedImportAutomationSummaryQueryKey, minimalAutomationSummary);
+    qc.setQueryData(failedImportQueueAttentionSnapshotQueryKey, minimalQueueAttention);
+    qc.setQueryData(failedImportCleanupPolicyQueryKey, minimalCleanupPolicy);
+    qc.setQueryData(fetcherJobsInspectionQueryKey("terminal"), { jobs: [], default_terminal_only: true });
+    qc.setQueryData(fetcherArrOperatorSettingsQueryKey, {
+      ...minimalArrOperatorSettings,
+      sonarr_server_configured: true,
+      radarr_server_configured: true,
+    });
+    render(wrap(<FetcherPage />, qc));
+    expect(screen.getByText("Turn on TV searches or upgrades for Sonarr")).toBeInTheDocument();
+    expect(screen.getByText("Turn on movie searches or upgrades for Radarr")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: `Open ${FETCHER_TAB_SONARR_LABEL}` }));
+    expect(screen.getByRole("tab", { name: FETCHER_TAB_SONARR_LABEL })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "Overview" }));
+    fireEvent.click(screen.getByRole("button", { name: `Open ${FETCHER_TAB_RADARR_LABEL}` }));
+    expect(screen.getByRole("tab", { name: FETCHER_TAB_RADARR_LABEL })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("does not embed the full failed-import workspace or the old long service-check dump on Overview", () => {
+    renderFetcherPage();
+    expect(screen.queryByTestId("fetcher-failed-imports-workspace")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Service checks" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Latest link check" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "How this page is organized" })).not.toBeInTheDocument();
+  });
+
+  it("shows failed-import workspace on the Failed imports tab", () => {
+    renderFetcherPage();
+    fireEvent.click(screen.getByRole("tab", { name: "Failed imports" }));
     expect(screen.getByTestId("fetcher-failed-imports-workspace")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Failed imports" })).toBeInTheDocument();
   });
 
-  it("hero frames the whole module: failed imports plus service checks, not a subsection alone", () => {
+  it("exposes Connections, Sonarr, Radarr, and Failed imports tabs in locked order after Overview", () => {
+    renderFetcherPage();
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs.map((b) => b.textContent)).toEqual([
+      "Overview",
+      "Connections",
+      FETCHER_TAB_SONARR_LABEL,
+      FETCHER_TAB_RADARR_LABEL,
+      "Failed imports",
+    ]);
+  });
+
+  it("shows library search settings after opening the Sonarr tab", () => {
+    renderFetcherPage();
+    fireEvent.click(screen.getByRole("tab", { name: FETCHER_TAB_SONARR_LABEL }));
+    expect(screen.getByTestId("fetcher-arr-operator-settings")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: FETCHER_TAB_SONARR_LABEL })).toBeInTheDocument();
+    const arrPanel = screen.getByTestId("fetcher-arr-operator-settings");
+    expect(arrPanel.textContent).toMatch(/Configure Fetcher search behavior for Sonarr \(TV\)/i);
+    expect(within(arrPanel).getByRole("link", { name: "Activity" })).toBeInTheDocument();
+  });
+
+  it("shows the full suite timezone label in search schedule preamble", () => {
+    const { qc } = renderFetcherPage();
+    act(() => {
+      qc.setQueryData(fetcherArrOperatorSettingsQueryKey, {
+        ...minimalArrOperatorSettings,
+        schedule_timezone: "America/New_York",
+      });
+    });
+    fireEvent.click(screen.getByRole("tab", { name: FETCHER_TAB_SONARR_LABEL }));
+    expect(screen.getByTestId("fetcher-tv-preamble")).toHaveTextContent("United States — New York");
+  });
+
+  it("keeps unsaved lane draft edits after another lane refetch", () => {
+    const { qc } = renderFetcherPage();
+    fireEvent.click(screen.getByRole("tab", { name: FETCHER_TAB_SONARR_LABEL }));
+    const upgradeLane = screen.getByTestId("fetcher-tv-lane-upgrade");
+    const upgradeSpinboxes = within(upgradeLane).getAllByRole("spinbutton");
+    fireEvent.change(upgradeSpinboxes[1], { target: { value: "123" } });
+    expect((upgradeSpinboxes[1] as HTMLInputElement).value).toBe("123");
+
+    const refreshed = {
+      ...minimalArrOperatorSettings,
+      sonarr_missing: {
+        ...minimalArrOperatorSettings.sonarr_missing,
+        max_items_per_run: 88,
+      },
+    };
+    act(() => {
+      qc.setQueryData(fetcherArrOperatorSettingsQueryKey, refreshed);
+    });
+
+    const upgradeSpinboxesAfter = within(screen.getByTestId("fetcher-tv-lane-upgrade")).getAllByRole("spinbutton");
+    expect((upgradeSpinboxesAfter[1] as HTMLInputElement).value).toBe("123");
+  });
+
+  it("shows side-by-side TV and movie library connection panels on Connections", () => {
+    renderFetcherPage();
+    fireEvent.click(screen.getByRole("tab", { name: "Connections" }));
+    expect(screen.getByTestId("fetcher-connections-panels")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Connections" })).toBeInTheDocument();
+    expect(screen.getByText(/Manage Sonarr and Radarr connection state/i)).toBeInTheDocument();
+    expect(screen.getByText(/Search timing and limits stay on the/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Library link is active/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Library link is paused/i)).not.toBeInTheDocument();
+    const grid = screen.getByTestId("fetcher-connection-panels-grid");
+    expect(grid).toBeTruthy();
+    const panels = grid.querySelectorAll("[data-testid^=\"fetcher-connection-panel-\"]");
+    expect(panels.length).toBe(2);
+    expect(panels[0].getAttribute("data-testid")).toBe("fetcher-connection-panel-sonarr");
+    expect(panels[1].getAttribute("data-testid")).toBe("fetcher-connection-panel-radarr");
+    expect(within(panels[0] as HTMLElement).getByRole("heading", { name: "Sonarr" })).toBeInTheDocument();
+    expect(within(panels[1] as HTMLElement).getByRole("heading", { name: "Radarr" })).toBeInTheDocument();
+    expect(within(panels[0] as HTMLElement).getByRole("button", { name: "Save Sonarr" })).toBeInTheDocument();
+    expect(within(panels[0] as HTMLElement).getByRole("button", { name: "Test Sonarr" })).toBeInTheDocument();
+    expect(within(panels[1] as HTMLElement).getByRole("button", { name: "Save Radarr" })).toBeInTheDocument();
+    expect(within(panels[1] as HTMLElement).getByRole("button", { name: "Test Radarr" })).toBeInTheDocument();
+    const sonPanel = panels[0] as HTMLElement;
+    const sonHtml = sonPanel.innerHTML;
+    const enableIdx = sonHtml.indexOf("Enable / Disable");
+    const urlIdx = sonHtml.indexOf("Base URL");
+    const keyIdx = sonHtml.indexOf("API key");
+    const saveIdx = sonHtml.indexOf("Save Sonarr");
+    const testIdx = sonHtml.indexOf("Test Sonarr");
+    const statusIdx = sonHtml.indexOf("Connection status:");
+    expect(enableIdx).toBeGreaterThanOrEqual(0);
+    expect(urlIdx).toBeGreaterThan(enableIdx);
+    expect(keyIdx).toBeGreaterThan(urlIdx);
+    expect(saveIdx).toBeGreaterThan(keyIdx);
+    expect(testIdx).toBeGreaterThan(saveIdx);
+    expect(statusIdx).toBeGreaterThan(testIdx);
+    expect(screen.getByTestId("fetcher-connection-status-sonarr")).toHaveTextContent(/Connection status: Not checked yet/i);
+    expect(within(sonPanel).getByText(/Off:/i)).toBeInTheDocument();
+  });
+
+  it("toggles API key visibility on Connections", () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(qk.me, { ...minimalMe, role: "operator" });
+    qc.setQueryData(failedImportSettingsQueryKey, minimalFiSettings);
+    qc.setQueryData(failedImportAutomationSummaryQueryKey, minimalAutomationSummary);
+    qc.setQueryData(failedImportQueueAttentionSnapshotQueryKey, minimalQueueAttention);
+    qc.setQueryData(failedImportCleanupPolicyQueryKey, minimalCleanupPolicy);
+    qc.setQueryData(fetcherJobsInspectionQueryKey("terminal"), { jobs: [], default_terminal_only: true });
+    qc.setQueryData(fetcherArrOperatorSettingsQueryKey, minimalArrOperatorSettings);
+    render(wrap(<FetcherPage />, qc));
+    fireEvent.click(screen.getByRole("tab", { name: "Connections" }));
+    const sonPanel = screen.getByTestId("fetcher-connection-panel-sonarr");
+    const keyInput = sonPanel.querySelector("#fetcher-conn-key-sonarr");
+    expect(keyInput).toBeTruthy();
+    expect(keyInput).toHaveAttribute("type", "password");
+    fireEvent.click(within(sonPanel).getByRole("button", { name: "Show" }));
+    expect(keyInput).toHaveAttribute("type", "text");
+    fireEvent.click(within(sonPanel).getByRole("button", { name: "Hide" }));
+    expect(keyInput).toHaveAttribute("type", "password");
+  });
+
+  it("uses an empty API key field with a bullet placeholder when a key is saved server-side", () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(qk.me, { ...minimalMe, role: "operator" });
+    qc.setQueryData(failedImportSettingsQueryKey, minimalFiSettings);
+    qc.setQueryData(failedImportAutomationSummaryQueryKey, minimalAutomationSummary);
+    qc.setQueryData(failedImportQueueAttentionSnapshotQueryKey, minimalQueueAttention);
+    qc.setQueryData(failedImportCleanupPolicyQueryKey, minimalCleanupPolicy);
+    qc.setQueryData(fetcherJobsInspectionQueryKey("terminal"), { jobs: [], default_terminal_only: true });
+    qc.setQueryData(fetcherArrOperatorSettingsQueryKey, {
+      ...minimalArrOperatorSettings,
+      sonarr_connection: minimalConnectionPanel({ api_key_is_saved: true }),
+    });
+    render(wrap(<FetcherPage />, qc));
+    fireEvent.click(screen.getByRole("tab", { name: "Connections" }));
+    const sonPanel = screen.getByTestId("fetcher-connection-panel-sonarr");
+    const keyInput = sonPanel.querySelector("#fetcher-conn-key-sonarr") as HTMLInputElement;
+    expect(keyInput.value).toBe("");
+    const ph = keyInput.getAttribute("placeholder");
+    expect(ph).toMatch(/^\u2022+$/);
+    expect(within(sonPanel).getByRole("button", { name: "Show" })).not.toBeDisabled();
+    expect(within(sonPanel).getByText(/Leave blank to keep your saved key/i)).toBeInTheDocument();
+  });
+
+  it("hero frames Fetcher as a landing-first flow", () => {
     const { container } = renderFetcherPage();
     const hero = container.querySelector(".mm-page__intro");
     expect(hero).toBeTruthy();
     const t = hero!.textContent ?? "";
     expect(t).toMatch(/Fetcher/i);
-    expect(t).toMatch(/Radarr/i);
-    expect(t).toMatch(/Sonarr/i);
-    expect(t).toMatch(/failed-import|failed import/i);
-    expect(t).toMatch(/Arr|search/i);
-    expect(t).toMatch(/service|answered|checks/i);
+    expect(t).toMatch(/missing TV shows and movies/i);
     expect(t).not.toMatch(/Refiner/i);
   });
 
-  it("second block is compressed service checks, not architecture titles", () => {
+  it("shows Current search setup as saved search preferences, not failed-import pass history", () => {
     renderFetcherPage();
-    expect(screen.getByRole("heading", { name: "Service checks" })).toBeInTheDocument();
-    expect(screen.queryByText(/External Fetcher application/i)).toBeNull();
-    expect(screen.queryByText(/MEDIAMOP_FETCHER_BASE_URL/i)).toBeNull();
+    const summary = screen.getByTestId("fetcher-automation-summary");
+    const t = summary.textContent ?? "";
+    expect(t).toMatch(/This shows your current TV and movie search settings/i);
+    expect(t).toMatch(/Missing searches/i);
+    expect(t).toMatch(/Upgrades/i);
+    expect(t).toMatch(/Run interval/i);
+    expect(t.toLowerCase()).not.toContain("last finished");
+    expect(t.toLowerCase()).not.toContain("last outcome");
   });
 
-  it("shows read-only automation summary for movies and TV with no fake liveness copy", () => {
-    const { container } = renderFetcherPage();
-    expect(screen.getByTestId("fetcher-automation-summary")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Failed-import automation summary" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Movies" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "TV shows" })).toBeInTheDocument();
-    const t = container.textContent ?? "";
-    expect(t.toLowerCase()).not.toContain("healthy");
-    expect(t.toLowerCase()).not.toContain("live ok");
-    expect(t.toLowerCase()).not.toContain("reachable");
+  it("shows the server connection note on Connections when the API sends one", () => {
+    renderFetcherPage();
+    fireEvent.click(screen.getByRole("tab", { name: "Connections" }));
+    expect(screen.getByTestId("fetcher-connections-note")).toHaveTextContent("Addresses come from the server file.");
+  });
+
+  it("uses per-lane save labels on TV and Movies tabs when the operator can edit", () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(qk.me, { ...minimalMe, role: "operator" });
+    qc.setQueryData(failedImportSettingsQueryKey, minimalFiSettings);
+    qc.setQueryData(failedImportAutomationSummaryQueryKey, minimalAutomationSummary);
+    qc.setQueryData(failedImportQueueAttentionSnapshotQueryKey, minimalQueueAttention);
+    qc.setQueryData(failedImportCleanupPolicyQueryKey, minimalCleanupPolicy);
+    qc.setQueryData(fetcherJobsInspectionQueryKey("terminal"), { jobs: [], default_terminal_only: true });
+    qc.setQueryData(fetcherArrOperatorSettingsQueryKey, minimalArrOperatorSettings);
+    render(wrap(<FetcherPage />, qc));
+    fireEvent.click(screen.getByRole("tab", { name: FETCHER_TAB_SONARR_LABEL }));
+    expect(screen.getByRole("button", { name: "Save missing TV show searches" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save TV upgrades" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: FETCHER_TAB_RADARR_LABEL }));
+    expect(screen.getByRole("button", { name: "Save missing movie searches" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save movie upgrades" })).toBeInTheDocument();
+  });
+
+  it("structures TV (Sonarr) with two bubbles, locked copy, helpers, and control order inside each bubble", () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(qk.me, { ...minimalMe, role: "operator" });
+    qc.setQueryData(failedImportSettingsQueryKey, minimalFiSettings);
+    qc.setQueryData(failedImportAutomationSummaryQueryKey, minimalAutomationSummary);
+    qc.setQueryData(failedImportQueueAttentionSnapshotQueryKey, minimalQueueAttention);
+    qc.setQueryData(failedImportCleanupPolicyQueryKey, minimalCleanupPolicy);
+    qc.setQueryData(fetcherJobsInspectionQueryKey("terminal"), { jobs: [], default_terminal_only: true });
+    qc.setQueryData(fetcherArrOperatorSettingsQueryKey, minimalArrOperatorSettings);
+    render(wrap(<FetcherPage />, qc));
+    fireEvent.click(screen.getByRole("tab", { name: FETCHER_TAB_SONARR_LABEL }));
+    const tvGrid = screen.getByTestId("fetcher-tv-lanes-grid");
+    expect(within(tvGrid).getByTestId("fetcher-tv-preamble")).toBeInTheDocument();
+    expect(within(tvGrid).getByTestId("fetcher-tv-lane-missing")).toBeInTheDocument();
+    expect(within(tvGrid).getByTestId("fetcher-tv-lane-upgrade")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Missing TV shows" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "TV upgrades" })).toBeInTheDocument();
+    expect(screen.getByText("Set up searches for missing TV shows.")).toBeInTheDocument();
+    expect(screen.getByText("Set up searches for better quality TV episodes.")).toBeInTheDocument();
+    expect(screen.getAllByText("Choose how often this search runs.").length).toBe(2);
+    expect(screen.getAllByText("This search will only run during this schedule.").length).toBe(2);
+    expect(screen.getAllByText("Choose how many items this search can look for each time it runs.").length).toBe(2);
+    expect(screen.getAllByText("Choose how long to wait before the same item can be searched again.").length).toBe(2);
+    const missing = screen.getByTestId("fetcher-tv-lane-missing");
+    const h = missing.innerHTML;
+    const idx = (s: string) => h.indexOf(s);
+    expect(idx("Enable / Disable")).toBeLessThan(idx("Run interval"));
+    expect(idx("Run interval")).toBeLessThan(idx("Schedule"));
+    expect(idx("Schedule")).toBeLessThan(idx("Search limit"));
+    expect(idx("Search limit")).toBeLessThan(idx("Retry cooldown"));
+    expect(idx("Retry cooldown")).toBeLessThan(idx("Save missing TV show searches"));
+  });
+
+  it("mirrors TV structure on Movies (Radarr) with two bubbles and the same helper pattern", () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(qk.me, { ...minimalMe, role: "operator" });
+    qc.setQueryData(failedImportSettingsQueryKey, minimalFiSettings);
+    qc.setQueryData(failedImportAutomationSummaryQueryKey, minimalAutomationSummary);
+    qc.setQueryData(failedImportQueueAttentionSnapshotQueryKey, minimalQueueAttention);
+    qc.setQueryData(failedImportCleanupPolicyQueryKey, minimalCleanupPolicy);
+    qc.setQueryData(fetcherJobsInspectionQueryKey("terminal"), { jobs: [], default_terminal_only: true });
+    qc.setQueryData(fetcherArrOperatorSettingsQueryKey, minimalArrOperatorSettings);
+    render(wrap(<FetcherPage />, qc));
+    fireEvent.click(screen.getByRole("tab", { name: FETCHER_TAB_RADARR_LABEL }));
+    const moviesGrid = screen.getByTestId("fetcher-movies-lanes-grid");
+    expect(within(moviesGrid).getByTestId("fetcher-movies-preamble")).toBeInTheDocument();
+    expect(within(moviesGrid).getByTestId("fetcher-movies-lane-missing")).toBeInTheDocument();
+    expect(within(moviesGrid).getByTestId("fetcher-movies-lane-upgrade")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Missing movies" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Movie upgrades" })).toBeInTheDocument();
+    expect(screen.getByText("Set up searches for missing movies.")).toBeInTheDocument();
+    expect(screen.getByText("Set up searches for better quality movies.")).toBeInTheDocument();
+    expect(screen.getByTestId("fetcher-arr-operator-settings").textContent).toMatch(
+      /Configure Fetcher search behavior for Radarr \(Movies\)/i,
+    );
+    const missing = screen.getByTestId("fetcher-movies-lane-missing");
+    const h = missing.innerHTML;
+    const idx = (s: string) => h.indexOf(s);
+    expect(idx("Enable / Disable")).toBeLessThan(idx("Run interval"));
+    expect(idx("Run interval")).toBeLessThan(idx("Schedule"));
+    expect(idx("Schedule")).toBeLessThan(idx("Search limit"));
+    expect(idx("Search limit")).toBeLessThan(idx("Retry cooldown"));
+    expect(idx("Retry cooldown")).toBeLessThan(idx("Save missing movie searches"));
+  });
+
+  it("describes each library tab as its own search-behavior surface", () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(qk.me, { ...minimalMe, role: "operator" });
+    qc.setQueryData(failedImportSettingsQueryKey, minimalFiSettings);
+    qc.setQueryData(failedImportAutomationSummaryQueryKey, minimalAutomationSummary);
+    qc.setQueryData(failedImportQueueAttentionSnapshotQueryKey, minimalQueueAttention);
+    qc.setQueryData(failedImportCleanupPolicyQueryKey, minimalCleanupPolicy);
+    qc.setQueryData(fetcherJobsInspectionQueryKey("terminal"), { jobs: [], default_terminal_only: true });
+    qc.setQueryData(fetcherArrOperatorSettingsQueryKey, minimalArrOperatorSettings);
+    render(wrap(<FetcherPage />, qc));
+    fireEvent.click(screen.getByRole("tab", { name: FETCHER_TAB_SONARR_LABEL }));
+    expect(screen.getByTestId("fetcher-arr-operator-settings").textContent).toMatch(
+      /Configure Fetcher search behavior for Sonarr \(TV\)/i,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: FETCHER_TAB_RADARR_LABEL }));
+    expect(screen.getByTestId("fetcher-arr-operator-settings").textContent).toMatch(
+      /Configure Fetcher search behavior for Radarr \(Movies\)/i,
+    );
+  });
+
+  it("opens the Failed imports tab from the main tab row", () => {
+    renderFetcherPage();
+    fireEvent.click(screen.getByRole("tab", { name: "Failed imports" }));
+    expect(screen.getByTestId("fetcher-failed-imports-workspace")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Failed imports" })).toHaveAttribute("aria-selected", "true");
   });
 });

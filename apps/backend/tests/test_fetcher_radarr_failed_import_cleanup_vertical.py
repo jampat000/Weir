@@ -9,6 +9,7 @@ from mediamop.modules.arr_failed_import.env_settings import (
     AppFailedImportCleanupPolicySettings,
     FailedImportCleanupSettingsBundle,
 )
+from mediamop.modules.arr_failed_import.queue_action import FailedImportQueueHandlingAction
 from mediamop.modules.fetcher.radarr_cleanup_execution import RadarrFailedImportCleanupExecutionOutcome
 from mediamop.modules.fetcher.radarr_failed_import_cleanup_vertical import (
     run_radarr_failed_import_cleanup_vertical,
@@ -17,13 +18,13 @@ from mediamop.modules.fetcher.radarr_failed_import_cleanup_vertical import (
 
 @dataclass
 class _RecordingRadarrClient:
-    calls: list[int]
+    calls: list[tuple[int, bool, bool]]
 
     def __init__(self) -> None:
         self.calls = []
 
-    def remove_queue_item(self, queue_item_id: int) -> None:
-        self.calls.append(queue_item_id)
+    def remove_queue_item(self, queue_item_id: int, *, remove_from_client: bool, blocklist: bool) -> None:
+        self.calls.append((queue_item_id, remove_from_client, blocklist))
 
 
 def _settings_with_radarr_policy(radarr: AppFailedImportCleanupPolicySettings) -> MediaMopSettings:
@@ -37,7 +38,7 @@ def _settings_with_radarr_policy(radarr: AppFailedImportCleanupPolicySettings) -
 
 def test_vertical_resolves_policy_plans_and_executes_when_eligible() -> None:
     radarr = AppFailedImportCleanupPolicySettings(
-        remove_failed_imports=True,
+        handling_failed_import=FailedImportQueueHandlingAction.REMOVE_ONLY,
     )
     settings = _settings_with_radarr_policy(radarr)
     client = _RecordingRadarrClient()
@@ -47,8 +48,8 @@ def test_vertical_resolves_policy_plans_and_executes_when_eligible() -> None:
         radarr_queue_item_id=501,
         queue_client=client,
     )
-    assert out is RadarrFailedImportCleanupExecutionOutcome.REMOVED_QUEUE_ITEM
-    assert client.calls == [501]
+    assert out is RadarrFailedImportCleanupExecutionOutcome.REMOVED_REMOVE_ONLY
+    assert client.calls == [(501, True, False)]
 
 
 def test_vertical_no_op_path_no_client_call() -> None:
@@ -66,7 +67,7 @@ def test_vertical_no_op_path_no_client_call() -> None:
 
 def test_vertical_planned_remove_without_queue_id_skips_client() -> None:
     radarr = AppFailedImportCleanupPolicySettings(
-        remove_quality_rejections=True,
+        handling_quality_rejection=FailedImportQueueHandlingAction.REMOVE_ONLY,
     )
     settings = _settings_with_radarr_policy(radarr)
     client = _RecordingRadarrClient()

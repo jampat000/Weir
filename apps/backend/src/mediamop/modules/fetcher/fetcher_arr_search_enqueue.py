@@ -6,9 +6,14 @@ import json
 import uuid
 from collections.abc import Callable
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from mediamop.core.config import MediaMopSettings
+from mediamop.modules.fetcher.fetcher_arr_http_resolve import (
+    resolve_radarr_http_credentials,
+    resolve_sonarr_http_credentials,
+)
+from mediamop.modules.fetcher.fetcher_arr_operator_settings_prefs import load_fetcher_arr_search_operator_prefs
 from mediamop.modules.fetcher.fetcher_jobs_model import FetcherJob
 from mediamop.modules.fetcher.fetcher_jobs_ops import fetcher_enqueue_or_get_job, fetcher_enqueue_or_requeue_schedule_job
 from mediamop.modules.fetcher.fetcher_search_job_kinds import (
@@ -78,44 +83,37 @@ def enqueue_manual_arr_search_job(session: Session, *, scope: ArrSearchManualSco
     )
 
 
-def arr_search_schedule_specs(settings: MediaMopSettings) -> list[tuple[str, float, Callable[[Session], None]]]:
-    """Periodic asyncio specs: (label, interval_seconds, enqueue_fn). Empty when disabled or missing URL/key."""
+def arr_search_schedule_specs(
+    settings: MediaMopSettings,
+    session_factory: sessionmaker[Session],
+) -> list[tuple[str, Callable[[Session], None], Callable[[], float]]]:
+    """Periodic asyncio specs: (label, enqueue_fn, interval_seconds_getter).
 
-    out: list[tuple[str, float, Callable[[Session], None]]] = []
-    son_b, son_k = settings.arr_http_sonarr_credentials()
-    rad_b, rad_k = settings.arr_http_radarr_credentials()
+    Lane enable flags and intervals come from the Fetcher SQLite singleton (not env).
+    """
+
+    with session_factory() as session:
+        prefs = load_fetcher_arr_search_operator_prefs(session)
+        son_b, son_k = resolve_sonarr_http_credentials(session, settings)
+        rad_b, rad_k = resolve_radarr_http_credentials(session, settings)
+
+    def _iv_getter(lane_attr: str) -> Callable[[], float]:
+        def _read() -> float:
+            with session_factory() as s:
+                p = load_fetcher_arr_search_operator_prefs(s)
+            return float(getattr(p, lane_attr).schedule_interval_seconds)
+
+        return _read
+
+    out: list[tuple[str, Callable[[Session], None], Callable[[], float]]] = []
     son_ok = bool(son_b and son_k)
     rad_ok = bool(rad_b and rad_k)
-    if son_ok and settings.fetcher_sonarr_missing_search_enabled:
-        out.append(
-            (
-                "sonarr_missing_search",
-                float(settings.fetcher_sonarr_missing_search_schedule_interval_seconds),
-                enqueue_scheduled_sonarr_missing_search_job,
-            ),
-        )
-    if son_ok and settings.fetcher_sonarr_upgrade_search_enabled:
-        out.append(
-            (
-                "sonarr_upgrade_search",
-                float(settings.fetcher_sonarr_upgrade_search_schedule_interval_seconds),
-                enqueue_scheduled_sonarr_upgrade_search_job,
-            ),
-        )
-    if rad_ok and settings.fetcher_radarr_missing_search_enabled:
-        out.append(
-            (
-                "radarr_missing_search",
-                float(settings.fetcher_radarr_missing_search_schedule_interval_seconds),
-                enqueue_scheduled_radarr_missing_search_job,
-            ),
-        )
-    if rad_ok and settings.fetcher_radarr_upgrade_search_enabled:
-        out.append(
-            (
-                "radarr_upgrade_search",
-                float(settings.fetcher_radarr_upgrade_search_schedule_interval_seconds),
-                enqueue_scheduled_radarr_upgrade_search_job,
-            ),
-        )
+    if son_ok and prefs.sonarr_missing.enabled:
+        out.append(("sonarr_missing_search", enqueue_scheduled_sonarr_missing_search_job, _iv_getter("sonarr_missing")))
+    if son_ok and prefs.sonarr_upgrade.enabled:
+        out.append(("sonarr_upgrade_search", enqueue_scheduled_sonarr_upgrade_search_job, _iv_getter("sonarr_upgrade")))
+    if rad_ok and prefs.radarr_missing.enabled:
+        out.append(("radarr_missing_search", enqueue_scheduled_radarr_missing_search_job, _iv_getter("radarr_missing")))
+    if rad_ok and prefs.radarr_upgrade.enabled:
+        out.append(("radarr_upgrade_search", enqueue_scheduled_radarr_upgrade_search_job, _iv_getter("radarr_upgrade")))
     return out

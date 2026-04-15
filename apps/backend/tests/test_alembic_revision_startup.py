@@ -24,6 +24,16 @@ def test_ensure_database_at_application_head_ok_on_migrated_db() -> None:
     ensure_database_at_application_head(engine)
 
 
+def test_head_schema_includes_refiner_remux_rules_settings_table() -> None:
+    settings = MediaMopSettings.load()
+    engine = create_db_engine(settings)
+    insp = sa.inspect(engine)
+    assert insp.has_table("refiner_remux_rules_settings")
+    names = {c["name"] for c in insp.get_columns("refiner_remux_rules_settings")}
+    assert "primary_audio_lang" in names
+    assert "subtitle_mode" in names
+
+
 def test_head_schema_includes_refiner_path_settings_table() -> None:
     settings = MediaMopSettings.load()
     engine = create_db_engine(settings)
@@ -33,6 +43,9 @@ def test_head_schema_includes_refiner_path_settings_table() -> None:
     assert "refiner_watched_folder" in names
     assert "refiner_work_folder" in names
     assert "refiner_output_folder" in names
+    assert "refiner_tv_watched_folder" in names
+    assert "refiner_tv_work_folder" in names
+    assert "refiner_tv_output_folder" in names
 
 
 def test_head_schema_includes_suite_settings_table() -> None:
@@ -43,6 +56,16 @@ def test_head_schema_includes_suite_settings_table() -> None:
     names = {c["name"] for c in insp.get_columns("suite_settings")}
     assert "product_display_name" in names
     assert "signed_in_home_notice" in names
+
+
+def test_head_schema_includes_fetcher_arr_operator_settings_table() -> None:
+    settings = MediaMopSettings.load()
+    engine = create_db_engine(settings)
+    insp = sa.inspect(engine)
+    assert insp.has_table("fetcher_arr_operator_settings")
+    names = {c["name"] for c in insp.get_columns("fetcher_arr_operator_settings")}
+    assert "sonarr_missing_search_enabled" in names
+    assert "radarr_upgrade_search_schedule_interval_seconds" in names
 
 
 def test_api_startup_fails_without_migrations(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

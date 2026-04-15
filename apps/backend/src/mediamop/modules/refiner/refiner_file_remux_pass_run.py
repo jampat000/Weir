@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+import time
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,7 @@ from mediamop.modules.refiner.refiner_remux_mux import (
 )
 from mediamop.modules.refiner.refiner_remux_rules import (
     RefinerRulesConfig,
+    default_refiner_remux_rules_config,
     is_refiner_media_candidate,
     is_remux_required,
     plan_remux,
@@ -37,23 +39,6 @@ from mediamop.modules.refiner.refiner_remux_track_display import (
     subtitle_after_line_from_plan,
     subtitle_before_line_from_probe,
 )
-
-
-def default_refiner_remux_rules_config() -> RefinerRulesConfig:
-    """Sane defaults when MediaMop has no per-operator Refiner rules DB yet (aligned with Fetcher movie defaults)."""
-
-    return RefinerRulesConfig(
-        primary_audio_lang="eng",
-        secondary_audio_lang="jpn",
-        tertiary_audio_lang="",
-        default_audio_slot="primary",
-        remove_commentary=True,
-        subtitle_mode="remove_all",
-        subtitle_langs=(),
-        preserve_forced_subs=True,
-        preserve_default_subs=True,
-        audio_preference_mode="preferred_langs_quality",
-    )
 
 
 def _fail_before(
@@ -102,6 +87,7 @@ def run_refiner_file_remux_pass(
     path_runtime: RefinerPathRuntime,
     relative_media_path: str,
     dry_run: bool,
+    rules_config: RefinerRulesConfig | None = None,
 ) -> dict[str, Any]:
     """Run one pass: probe, plan, operator lines, optional remux.
 
@@ -122,6 +108,21 @@ def run_refiner_file_remux_pass(
             reason="file is not a supported Refiner media candidate for this pass",
             inspected_source_path=inspected,
         )
+    min_age = max(0, int(settings.refiner_watched_folder_min_file_age_seconds))
+    if min_age > 0:
+        try:
+            age_s = time.time() - float(src.stat().st_mtime)
+        except OSError:
+            age_s = -1
+        if age_s < min_age:
+            return _fail_before(
+                relative_media_path=relative_media_path,
+                reason=(
+                    "file was modified too recently for Refiner safety guardrails "
+                    f"(minimum age {min_age}s, current age {max(0, int(age_s))}s)"
+                ),
+                inspected_source_path=inspected,
+            )
 
     try:
         probe = ffprobe_json(src, mediamop_home=settings.mediamop_home)
@@ -133,7 +134,7 @@ def run_refiner_file_remux_pass(
         )
 
     video, audio, subs = split_streams(probe)
-    config = default_refiner_remux_rules_config()
+    config = rules_config if rules_config is not None else default_refiner_remux_rules_config()
     plan = plan_remux(video=video, audio=audio, subtitles=subs, config=config)
     if plan is None:
         return _fail_before(
@@ -257,7 +258,6 @@ def run_refiner_file_remux_pass(
 
 
 __all__ = [
-    "default_refiner_remux_rules_config",
     "remux_pass_result_to_activity_detail",
     "run_refiner_file_remux_pass",
 ]

@@ -69,8 +69,7 @@ def normalize_audio_preference_mode(raw: str | None) -> AudioSelectionPolicy:
 
 _MEDIA_EXTENSIONS = frozenset({".mkv", ".mp4", ".m4v", ".webm", ".avi"})
 
-# Historical allowlist marker kept for candidate classification docs/tests; cleanup behavior
-# now removes all direct-child files in the processed source folder after successful live runs.
+# Historical allowlist marker kept for candidate classification docs/tests.
 REFINER_SOURCE_SIDECAR_CLEANUP_SUFFIXES: frozenset[str] = frozenset(
     {".par2", ".sfv", ".nzb", ".nfo"}
 )
@@ -82,9 +81,12 @@ def is_refiner_media_candidate(path: Path) -> bool:
     Paths under the watched tree that are *not* candidates—including Usenet/repair
     sidecars (``.par2``, ``.sfv``, ``.nzb``, ``.nfo``), subtitles, and other
     non-allowlisted files—are ignored for processing: no activity rows, readiness,
-    ffprobe, or output copies. After a **successful** live job, remaining direct-child
-    files in the same source folder are removed, then empty watched subfolders may be
-    removed; failed jobs do not run that source-folder file cleanup.
+    ffprobe, or output copies from this pass.
+
+    Live ``refiner.file.remux_pass.v1`` runs may delete **only** the resolved source
+    media file after success when it still sits under the configured watched folder
+    (see ``_maybe_delete_source_after_success``); dry runs and failures do not delete
+    sources. This helper does not itself perform directory or sidecar cleanup.
     """
     try:
         return path.is_file() and path.suffix.lower() in _MEDIA_EXTENSIONS
@@ -559,3 +561,20 @@ def parse_path_lines(raw: str) -> list[str]:
         if s:
             lines.append(s)
     return lines
+
+
+def default_refiner_remux_rules_config() -> RefinerRulesConfig:
+    """Sane defaults for remux planning (aligned with historical Fetcher movie defaults)."""
+
+    return RefinerRulesConfig(
+        primary_audio_lang="eng",
+        secondary_audio_lang="jpn",
+        tertiary_audio_lang="",
+        default_audio_slot="primary",
+        remove_commentary=True,
+        subtitle_mode="remove_all",
+        subtitle_langs=(),
+        preserve_forced_subs=True,
+        preserve_default_subs=True,
+        audio_preference_mode="preferred_langs_quality",
+    )

@@ -49,13 +49,16 @@ def post_refiner_watched_folder_remux_scan_dispatch_enqueue(
         db,
         enqueue_remux_jobs=body.enqueue_remux_jobs,
         remux_dry_run=body.remux_dry_run,
+        media_scope=body.media_scope,
     )
     if not ok:
         if err == "no_saved_watched_folder":
+            scope = body.media_scope
+            label = "TV Refiner" if scope == "tv" else "Movies Refiner"
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
-                    "Refiner watched folder is not set in saved path settings. "
+                    f"{label} watched folder is not set in saved path settings. "
                     "This scan reads media files under that folder — configure it first."
                 ),
             )
@@ -63,8 +66,8 @@ def post_refiner_watched_folder_remux_scan_dispatch_enqueue(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
-                    "enqueue_remux_jobs with remux_dry_run false requires a saved Refiner output folder "
-                    "(live remux passes need it)."
+                    "enqueue_remux_jobs with remux_dry_run false requires a saved output folder "
+                    "for this media scope (live remux passes need it)."
                 ),
             )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid scan prerequisites.")
@@ -74,6 +77,7 @@ def post_refiner_watched_folder_remux_scan_dispatch_enqueue(
         enqueue_remux_jobs=body.enqueue_remux_jobs,
         remux_dry_run=body.remux_dry_run,
         scan_trigger="manual",
+        media_scope=body.media_scope,
     )
     db.commit()
     return RefinerWatchedFolderRemuxScanDispatchManualEnqueueOut(

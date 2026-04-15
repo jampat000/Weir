@@ -36,3 +36,40 @@ export async function readJson<T>(r: Response): Promise<T> {
   }
   return JSON.parse(text) as T;
 }
+
+/**
+ * FastAPI ``detail`` may be a string, a validation error array, or (rarely) a nested object.
+ * Never pass ``detail`` straight into ``new Error()`` — non-strings become ``"[object Object]"``.
+ */
+export function apiErrorDetailToString(detail: unknown): string {
+  if (detail === undefined || detail === null) {
+    return "";
+  }
+  if (typeof detail === "string") {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    const parts = detail.map((item) => {
+      if (typeof item === "object" && item !== null && "msg" in item) {
+        const m = (item as { msg?: unknown }).msg;
+        if (typeof m === "string") {
+          return m;
+        }
+      }
+      try {
+        return JSON.stringify(item);
+      } catch {
+        return String(item);
+      }
+    });
+    return parts.filter((s) => s.length > 0).join(" ");
+  }
+  if (typeof detail === "object") {
+    try {
+      return JSON.stringify(detail);
+    } catch {
+      return "Request failed.";
+    }
+  }
+  return String(detail);
+}

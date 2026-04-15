@@ -54,6 +54,9 @@ def put_suite_settings(
             db,
             product_display_name=body.product_display_name,
             signed_in_home_notice=body.signed_in_home_notice,
+            application_logs_enabled=body.application_logs_enabled,
+            app_timezone=body.app_timezone,
+            log_retention_days=body.log_retention_days,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

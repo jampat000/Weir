@@ -1,9 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { PageLoading } from "../../components/shared/page-loading";
 import { isHttpErrorFromApi, isLikelyNetworkFailure } from "../../lib/api/error-guards";
+import { useChangePasswordMutation } from "../../lib/auth/queries";
 import { useMeQuery } from "../../lib/auth/queries";
 import {
-  useSuiteSecurityOverviewQuery,
+  CURATED_TIMEZONE_ID_SET,
+  curatedTimezoneOptionsSorted,
+} from "../../lib/suite/timezone-options";
+import { MmListboxPicker } from "../../components/ui/mm-listbox-picker";
+import { mmActionButtonClass, mmEditableTextFieldClass } from "../../lib/ui/mm-control-roles";
+import {
   useSuiteSettingsQuery,
   useSuiteSettingsSaveMutation,
 } from "../../lib/suite/queries";
@@ -13,6 +20,19 @@ function canEditSuiteGlobal(role: string | undefined): boolean {
 }
 
 type TabId = "global" | "security";
+
+const SUITE_PASSWORD_FIELD_CLASS =
+  "mm-input w-full min-w-0 flex-1 text-sm tracking-normal text-[var(--mm-text)]";
+
+function formatChangePasswordMutationError(err: unknown): string {
+  if (err instanceof Error) {
+    return err.message;
+  }
+  if (typeof err === "string") {
+    return err;
+  }
+  return "Could not change password.";
+}
 
 function tabButtonClass(active: boolean): string {
   return [
@@ -25,38 +45,51 @@ function tabButtonClass(active: boolean): string {
 
 /** Central suite settings: Global (saved in-app) and Security (read-only startup snapshot). */
 export function SettingsPage() {
+  const navigate = useNavigate();
   const me = useMeQuery();
+  const changePassword = useChangePasswordMutation();
   const settingsQ = useSuiteSettingsQuery();
-  const securityQ = useSuiteSecurityOverviewQuery();
   const save = useSuiteSettingsSaveMutation();
 
   const [tab, setTab] = useState<TabId>("global");
-  const [productName, setProductName] = useState("");
-  const [homeNotice, setHomeNotice] = useState("");
+  const [appTimezone, setAppTimezone] = useState<string | null>(null);
+  const [logRetentionDaysDraft, setLogRetentionDaysDraft] = useState<string | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [changePasswordStatus, setChangePasswordStatus] = useState<string | null>(null);
+  const timezoneLabelId = useId();
 
   useEffect(() => {
     if (!settingsQ.data) {
       return;
     }
-    setProductName(settingsQ.data.product_display_name ?? "");
-    setHomeNotice(settingsQ.data.signed_in_home_notice ?? "");
+    const fromServer = settingsQ.data.app_timezone || "";
+    setAppTimezone(CURATED_TIMEZONE_ID_SET.has(fromServer) ? fromServer : null);
+    setLogRetentionDaysDraft(null);
   }, [settingsQ.data]);
+
+  const serverCuratedTimezone =
+    settingsQ.data && CURATED_TIMEZONE_ID_SET.has(settingsQ.data.app_timezone || "") ? settingsQ.data.app_timezone : null;
 
   const editable = canEditSuiteGlobal(me.data?.role);
 
   const dirty =
     settingsQ.data !== undefined &&
-    (productName !== (settingsQ.data.product_display_name ?? "") ||
-      homeNotice !== (settingsQ.data.signed_in_home_notice ?? ""));
+    (appTimezone !== serverCuratedTimezone ||
+      (logRetentionDaysDraft !== null && logRetentionDaysDraft !== String(settingsQ.data.log_retention_days)));
 
-  const loadingAny = settingsQ.isPending || securityQ.isPending || me.isPending;
+  const loadingAny = settingsQ.isPending || me.isPending;
 
   if (loadingAny) {
     return <PageLoading label="Loading settings" />;
   }
 
-  if (settingsQ.isError || securityQ.isError) {
-    const err = settingsQ.isError ? settingsQ.error : securityQ.error;
+  if (settingsQ.isError) {
+    const err = settingsQ.error;
     return (
       <div className="mm-page" data-testid="suite-settings-page">
         <header className="mm-page__intro">
@@ -74,11 +107,26 @@ export function SettingsPage() {
     );
   }
 
-  if (!settingsQ.data || !securityQ.data) {
+  if (!settingsQ.data) {
     return null;
   }
 
-  const sec = securityQ.data;
+  const timezoneOptions = curatedTimezoneOptionsSorted();
+  const normalizedLogRetentionDraft =
+    logRetentionDaysDraft !== null ? logRetentionDaysDraft : String(settingsQ.data.log_retention_days);
+  const finalizeLogRetentionDays = (): number => {
+    const raw = normalizedLogRetentionDraft.trim();
+    if (raw === "") {
+      return 30;
+    }
+    const n = Number(raw);
+    if (!Number.isFinite(n)) {
+      return settingsQ.data.log_retention_days;
+    }
+    return Math.min(Math.max(Math.trunc(n), 1), 3650);
+  };
+
+  const changePasswordBusy = changePassword.isPending;
 
   return (
     <div className="mm-page" data-testid="suite-settings-page">
@@ -91,7 +139,7 @@ export function SettingsPage() {
         </p>
       </header>
 
-      <div className="mm-page__body">
+      <div className="mm-page__body max-w-none">
         <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Settings sections">
           <button
             type="button"
@@ -115,7 +163,7 @@ export function SettingsPage() {
 
         {tab === "global" ? (
           <section
-            className="mm-card max-w-2xl"
+            className="mm-card w-full"
             aria-labelledby="suite-global-heading"
             data-testid="suite-settings-global"
           >
@@ -123,8 +171,8 @@ export function SettingsPage() {
               Global
             </h2>
             <p className="mm-card__body">
-              These values are stored in the app database. Saving applies right away for everyone who is signed in. You
-              do <strong className="text-[var(--mm-text)]">not</strong> need to restart the server for these fields.
+              Suite-wide settings only. Saving applies right away. Module controls for Fetcher, Refiner, Trimmer, and
+              Subber stay on their module pages.
             </p>
             {!editable ? (
               <p className="mm-card__body text-sm text-[var(--mm-text3)]">Operators and admins can edit these fields.</p>
@@ -132,37 +180,41 @@ export function SettingsPage() {
 
             <div className="mm-card__body space-y-4">
               <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
-                  Product name
+                <span id={timezoneLabelId} className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
+                  Timezone
                 </span>
-                <input
-                  className="mt-1 w-full rounded border border-[var(--mm-border)] bg-[var(--mm-input-bg)] px-2 py-1.5 text-sm text-[var(--mm-text)]"
-                  value={productName}
-                  disabled={!editable}
-                  onChange={(e) => setProductName(e.target.value)}
-                  maxLength={120}
-                  autoComplete="off"
-                  aria-describedby="suite-product-name-hint"
+                <MmListboxPicker
+                  ariaLabelledBy={timezoneLabelId}
+                  ariaDescribedBy="suite-timezone-hint"
+                  placeholder="Select timezone"
+                  disabled={!editable || save.isPending}
+                  options={timezoneOptions.map((tz) => ({ value: tz.id, label: tz.label }))}
+                  value={appTimezone ?? ""}
+                  onChange={(v) => setAppTimezone(v)}
                 />
-                <p id="suite-product-name-hint" className="mt-1 text-xs text-[var(--mm-text3)]">
-                  Shown in the sidebar and a few other places (up to 120 characters).
+                <p id="suite-timezone-hint" className="mt-1 text-xs text-[var(--mm-text3)]">
+                  Main-country timezones for suite-level time displays.
                 </p>
               </label>
 
               <label className="block">
                 <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
-                  Optional home dashboard notice
+                  Log retention (days)
                 </span>
-                <textarea
-                  className="mt-1 min-h-[120px] w-full rounded border border-[var(--mm-border)] bg-[var(--mm-input-bg)] px-2 py-1.5 text-sm text-[var(--mm-text)]"
-                  value={homeNotice}
-                  disabled={!editable}
-                  onChange={(e) => setHomeNotice(e.target.value)}
-                  maxLength={4000}
-                  aria-describedby="suite-home-notice-hint"
+                <input
+                  type="number"
+                  min={1}
+                  max={3650}
+                  className={`${mmEditableTextFieldClass} mt-1`}
+                  value={normalizedLogRetentionDraft}
+                  disabled={!editable || save.isPending}
+                  onFocus={() => setLogRetentionDaysDraft(String(settingsQ.data.log_retention_days))}
+                  onChange={(e) => setLogRetentionDaysDraft(e.target.value)}
+                  onBlur={() => setLogRetentionDaysDraft(String(finalizeLogRetentionDays()))}
+                  aria-describedby="suite-log-retention-hint"
                 />
-                <p id="suite-home-notice-hint" className="mt-1 text-xs text-[var(--mm-text3)]">
-                  Short message at the top of the home dashboard for signed-in people (leave blank for none).
+                <p id="suite-log-retention-hint" className="mt-1 text-xs text-[var(--mm-text3)]">
+                  Number of days to keep Activity timeline rows before automatic cleanup.
                 </p>
               </label>
 
@@ -180,14 +232,20 @@ export function SettingsPage() {
 
               <button
                 type="button"
-                className="rounded-md bg-[var(--mm-accent)] px-3 py-2 text-sm font-semibold text-black disabled:opacity-50"
+                className={mmActionButtonClass({
+                  variant: "primary",
+                  disabled: !editable || !dirty || save.isPending,
+                })}
                 disabled={!editable || !dirty || save.isPending}
                 data-testid="suite-settings-save"
                 onClick={() => {
                   save.reset();
                   void save.mutateAsync({
-                    product_display_name: productName,
-                    signed_in_home_notice: homeNotice.trim() === "" ? null : homeNotice,
+                    product_display_name: settingsQ.data.product_display_name,
+                    signed_in_home_notice: settingsQ.data.signed_in_home_notice,
+                    application_logs_enabled: settingsQ.data.application_logs_enabled,
+                    app_timezone: appTimezone ?? settingsQ.data.app_timezone,
+                    log_retention_days: finalizeLogRetentionDays(),
                   });
                 }}
               >
@@ -196,47 +254,161 @@ export function SettingsPage() {
             </div>
           </section>
         ) : (
-          <section
-            className="mm-card max-w-2xl"
-            aria-labelledby="suite-security-heading"
-            data-testid="suite-settings-security"
-          >
-            <h2 id="suite-security-heading" className="mm-card__title">
-              Security
-            </h2>
-            <p className="mm-card__body">{sec.restart_required_note}</p>
-            <p className="mm-card__body rounded-md border border-amber-900/40 bg-amber-950/25 p-3 text-sm text-amber-100">
-              Nothing on this tab can be edited in the browser. If something needs to change, update the server
-              configuration file and restart the app.
-            </p>
-
-            <dl className="mm-card__body mm-dash-kv">
-              <dt className="mm-dash-kv-label">Sign-in session protection</dt>
-              <dd className="mm-dash-kv-value">{sec.session_signing_configured ? "On" : "Off"}</dd>
-
-              <dt className="mm-dash-kv-label">Sign-in cookie: HTTPS only</dt>
-              <dd className="mm-dash-kv-value">{sec.sign_in_cookie_https_only ? "Yes" : "No"}</dd>
-
-              <dt className="mm-dash-kv-label">Sign-in cookie: cross-site rule</dt>
-              <dd className="mm-dash-kv-value">{sec.sign_in_cookie_same_site}</dd>
-
-              <dt className="mm-dash-kv-label">Extra HTTPS hardening for browsers</dt>
-              <dd className="mm-dash-kv-value">{sec.extra_https_hardening_enabled ? "On" : "Off"}</dd>
-
-              <dt className="mm-dash-kv-label">Failed sign-in tries before cool-down</dt>
-              <dd className="mm-dash-kv-value">
-                {sec.sign_in_attempt_limit} per {sec.sign_in_attempt_window_plain}
-              </dd>
-
-              <dt className="mm-dash-kv-label">First-time setup tries before cool-down</dt>
-              <dd className="mm-dash-kv-value">
-                {sec.first_time_setup_attempt_limit} per {sec.first_time_setup_attempt_window_plain}
-              </dd>
-
-              <dt className="mm-dash-kv-label">Browser addresses allowed to call this app</dt>
-              <dd className="mm-dash-kv-value">{sec.allowed_browser_origins_count}</dd>
-            </dl>
-          </section>
+          <div className="w-full space-y-4" data-testid="suite-settings-security">
+            <section className="mm-card w-full" aria-labelledby="suite-security-change-password-heading">
+              <h2 id="suite-security-change-password-heading" className="mm-card__title">
+                Change password
+              </h2>
+              <p className="mm-card__body text-sm text-[var(--mm-text2)]">
+                Update your sign-in password. After saving, MediaMop requires a fresh sign-in.
+              </p>
+              <div className="mm-card__body space-y-3">
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Current password</span>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <input
+                      type={showCurrentPassword ? "text" : "password"}
+                      className={SUITE_PASSWORD_FIELD_CLASS}
+                      placeholder="Enter current password"
+                      value={currentPassword}
+                      disabled={changePasswordBusy}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setCurrentPassword(v);
+                        if (v.trim() === "") {
+                          setShowCurrentPassword(false);
+                        }
+                      }}
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      className={mmActionButtonClass({ variant: "tertiary", disabled: changePasswordBusy })}
+                      disabled={changePasswordBusy}
+                      onClick={() => setShowCurrentPassword((prev) => !prev)}
+                    >
+                      {showCurrentPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">New password</span>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <input
+                      type={showNewPassword ? "text" : "password"}
+                      className={SUITE_PASSWORD_FIELD_CLASS}
+                      placeholder="Enter new password"
+                      value={newPassword}
+                      disabled={changePasswordBusy}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setNewPassword(v);
+                        if (v.trim() === "") {
+                          setShowNewPassword(false);
+                        }
+                      }}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      className={mmActionButtonClass({ variant: "tertiary", disabled: changePasswordBusy })}
+                      disabled={changePasswordBusy}
+                      onClick={() => setShowNewPassword((prev) => !prev)}
+                    >
+                      {showNewPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
+                    Confirm new password
+                  </span>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      className={SUITE_PASSWORD_FIELD_CLASS}
+                      placeholder="Re-enter new password"
+                      value={confirmPassword}
+                      disabled={changePasswordBusy}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setConfirmPassword(v);
+                        if (v.trim() === "") {
+                          setShowConfirmPassword(false);
+                        }
+                      }}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      className={mmActionButtonClass({ variant: "tertiary", disabled: changePasswordBusy })}
+                      disabled={changePasswordBusy}
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    >
+                      {showConfirmPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </label>
+                {changePassword.isError ? (
+                  <p className="text-sm text-red-300" role="alert">
+                    {formatChangePasswordMutationError(changePassword.error)}
+                  </p>
+                ) : null}
+                {changePasswordStatus ? (
+                  <p className="text-sm text-[var(--mm-text2)]" role="status">
+                    {typeof changePasswordStatus === "string"
+                      ? changePasswordStatus
+                      : "Password change finished."}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  className={mmActionButtonClass({
+                    variant: "primary",
+                    disabled:
+                      changePasswordBusy ||
+                      currentPassword.trim() === "" ||
+                      newPassword.trim() === "" ||
+                      confirmPassword.trim() === "",
+                  })}
+                  disabled={
+                    changePasswordBusy ||
+                    currentPassword.trim() === "" ||
+                    newPassword.trim() === "" ||
+                    confirmPassword.trim() === ""
+                  }
+                  onClick={async () => {
+                    setChangePasswordStatus(null);
+                    if (newPassword !== confirmPassword) {
+                      setChangePasswordStatus("New passwords do not match.");
+                      return;
+                    }
+                    try {
+                      await changePassword.mutateAsync({
+                        currentPassword,
+                        newPassword,
+                      });
+                      setCurrentPassword("");
+                      setNewPassword("");
+                      setConfirmPassword("");
+                      setShowCurrentPassword(false);
+                      setShowNewPassword(false);
+                      setShowConfirmPassword(false);
+                      setChangePasswordStatus("Password changed. Sign in again with your new password.");
+                      navigate("/login", { replace: true });
+                    } catch {
+                      setShowCurrentPassword(false);
+                      setShowNewPassword(false);
+                      setShowConfirmPassword(false);
+                      /* surfaced above */
+                    }
+                  }}
+                >
+                  {changePassword.isPending ? "Saving…" : "Change password"}
+                </button>
+              </div>
+            </section>
+          </div>
         )}
       </div>
     </div>

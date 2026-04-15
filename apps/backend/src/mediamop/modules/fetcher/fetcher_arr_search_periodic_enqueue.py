@@ -7,6 +7,8 @@ import logging
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from collections.abc import Callable
+
 from mediamop.core.config import MediaMopSettings
 from mediamop.modules.fetcher.fetcher_arr_search_enqueue import arr_search_schedule_specs
 
@@ -21,15 +23,15 @@ def start_fetcher_arr_search_enqueue_tasks(
     stop_event: asyncio.Event,
     settings: MediaMopSettings,
 ) -> list[asyncio.Task[None]]:
-    specs = arr_search_schedule_specs(settings)
+    specs = arr_search_schedule_specs(settings, session_factory)
     tasks: list[asyncio.Task[None]] = []
-    for label, interval_seconds, enqueue_fn in specs:
+    for label, enqueue_fn, interval_seconds_getter in specs:
         tasks.append(
             asyncio.create_task(
                 _run_periodic_arr_search_enqueue(
                     session_factory,
                     stop_event=stop_event,
-                    interval_seconds=interval_seconds,
+                    interval_seconds_getter=interval_seconds_getter,
                     log_label=label,
                     enqueue_fn=enqueue_fn,
                 ),
@@ -43,7 +45,7 @@ async def _run_periodic_arr_search_enqueue(
     session_factory: sessionmaker[Session],
     *,
     stop_event: asyncio.Event,
-    interval_seconds: float,
+    interval_seconds_getter: Callable[[], float],
     log_label: str,
     enqueue_fn,
 ) -> None:
@@ -73,6 +75,7 @@ async def _run_periodic_arr_search_enqueue(
 
         if stop_event.is_set():
             break
+        interval_seconds = max(60.0, float(interval_seconds_getter()))
         deadline = loop.time() + interval_seconds
         while loop.time() < deadline and not stop_event.is_set():
             remaining = deadline - loop.time()

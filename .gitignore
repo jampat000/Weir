@@ -31,3 +31,6 @@ Thumbs.db
 
 # Local-only working files (never commit)
 .local/
+
+# Script-generated UI captures (run scripts/capture-fetcher-ui-zip.ps1)
+artifacts/

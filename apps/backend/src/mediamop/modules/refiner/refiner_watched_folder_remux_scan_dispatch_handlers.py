@@ -54,29 +54,38 @@ def make_refiner_watched_folder_remux_scan_dispatch_handler(
         if scan_trigger not in ("manual", "periodic"):
             scan_trigger = "manual"
         need_live_paths = enqueue_remux_jobs and not remux_dry_run
+        media_scope_raw = body.get("media_scope", "movie")
+        media_scope = media_scope_raw if media_scope_raw in ("movie", "tv") else "movie"
 
         with session_factory() as session:
             rt, path_err = resolve_refiner_path_runtime_for_remux(
                 session,
                 settings,
                 dry_run=not need_live_paths,
+                media_scope=media_scope,
             )
         if path_err is not None or rt is None:
             raise ValueError(path_err or "Refiner path settings are incomplete for this scan.")
 
         watched_root = rt.watched_folder
-        rad_rows, son_rows, rad_err, son_err = fetch_radarr_and_sonarr_queue_rows_for_scan(settings)
+        with session_factory() as arr_session:
+            rad_rows, son_rows, rad_err, son_err = fetch_radarr_and_sonarr_queue_rows_for_scan(arr_session, settings)
 
         watched_path = Path(watched_root)
-        files = iter_watched_folder_media_candidate_files(watched_path)
+        files = iter_watched_folder_media_candidate_files(
+            watched_path,
+            min_file_age_seconds=settings.refiner_watched_folder_min_file_age_seconds,
+        )
 
         sample_paths: list[str] = []
         summary: dict[str, Any] = {
             "job_id": ctx.id,
             "scan_trigger": scan_trigger,
+            "media_scope": media_scope,
             "watched_folder_resolved": watched_root,
             "enqueue_remux_jobs": enqueue_remux_jobs,
             "remux_dry_run": remux_dry_run,
+            "min_file_age_seconds": settings.refiner_watched_folder_min_file_age_seconds,
             "radarr_queue_row_count": len(rad_rows),
             "sonarr_queue_row_count": len(son_rows),
             "radarr_queue_fetch_error": rad_err,
@@ -118,12 +127,20 @@ def make_refiner_watched_folder_remux_scan_dispatch_handler(
                         continue
                     rel_this_run.add(rel)
 
-                    if refiner_active_remux_pass_exists_for_relative_path(session, relative_posix=rel):
+                    if refiner_active_remux_pass_exists_for_relative_path(
+                        session,
+                        relative_posix=rel,
+                        media_scope=media_scope,
+                    ):
                         summary["skipped_duplicate_active_queue"] += 1
                         continue
 
                     payload = json.dumps(
-                        {"relative_media_path": rel, "dry_run": remux_dry_run},
+                        {
+                            "relative_media_path": rel,
+                            "dry_run": remux_dry_run,
+                            "media_scope": media_scope,
+                        },
                         separators=(",", ":"),
                     )
                     dedupe = f"{REFINER_FILE_REMUX_PASS_JOB_KIND}:scan:{uuid.uuid4().hex}"

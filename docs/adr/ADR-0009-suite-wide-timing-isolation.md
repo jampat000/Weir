@@ -87,7 +87,7 @@ Trimmer and Subber packages point to ADR-0007 for lane ownership; **this ADR** i
 | Fetcher failed-import Radarr vs Sonarr | Yes | Separate `MEDIAMOP_FAILED_IMPORT_*` intervals, separate periodic tasks, separate dedupe keys. |
 | Fetcher Arr search four lanes | Yes | Per-lane settings in `MediaMopSettings`, per-lane `(app, action, …)` cooldown log, per-lane prune in `prune_fetcher_arr_action_log`, four last-run columns, four periodic enqueue tasks. |
 | Refiner durable families (supplied payload evaluation, candidate gate, file remux pass, watched-folder remux scan dispatch) | Yes | Separate job kinds, handlers, and enqueue paths; supplied payload evaluation has its own optional schedule env + interval only for that family; watched-folder remux scan dispatch has its **own** optional schedule env + interval (and periodic remux flags), independent of supplied payload evaluation; candidate gate and file remux pass remain manual POST enqueue only. No shared last-run or cooldown row across those families. |
-| Trimmer durable families (trim plan constraint check + supplied trim plan JSON file write) | Yes (manual-only) | Both families: operator POST enqueue only — no Trimmer periodic task shares timing state with other modules. |
+| Trimmer durable families (trim plan constraint check + supplied trim plan JSON file write) | Yes (manual-only) | All shipped families: operator POST enqueue only — no Trimmer periodic task shares timing state with other modules. |
 | Subber durable families (cue timeline constraint check) | Yes (manual-only) | Single shipped family; operator POST enqueue only — no Subber periodic task shares timing state with other modules. |
 
 ### Soft spot (configuration, not runtime coupling)

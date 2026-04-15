@@ -5,6 +5,7 @@ from __future__ import annotations
 from mediamop.modules.arr_failed_import.classification import (
     FailedImportOutcome,
     classify_failed_import_message,
+    classify_failed_import_message_for_media,
     normalize_failed_import_blob,
 )
 
@@ -101,3 +102,19 @@ def test_unknown_when_no_signal() -> None:
 
 def test_normalize_failed_import_blob_contract() -> None:
     assert normalize_failed_import_blob("  A  B\nC  ") == "a b c"
+
+
+def test_radarr_default_classifier_does_not_match_sonarr_episode_quality_phrase() -> None:
+    blob = "Not an upgrade for existing episode file"
+    assert classify_failed_import_message(blob) == FailedImportOutcome.UNKNOWN
+
+
+def test_sonarr_classifier_matches_episode_quality() -> None:
+    blob = "Not an upgrade for existing episode file"
+    assert classify_failed_import_message_for_media(blob, movies=False) == FailedImportOutcome.QUALITY
+
+
+def test_sample_release_needle_matches() -> None:
+    assert classify_failed_import_message_for_media("release is a sample", movies=True) == (
+        FailedImportOutcome.SAMPLE_RELEASE
+    )

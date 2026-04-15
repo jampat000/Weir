@@ -8,12 +8,10 @@ shared *arr live driver.
 
 from __future__ import annotations
 
-import json
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from typing import Any, Mapping, Protocol, Sequence
 
+from mediamop.modules.fetcher.arr_queue_v3_paged_fetch import fetch_all_v3_queue_records
 from mediamop.modules.fetcher.radarr_cleanup_execution import (
     RadarrFailedImportCleanupExecutionOutcome,
     RadarrQueueOperations,
@@ -105,7 +103,7 @@ def drive_radarr_failed_import_cleanup_from_live_queue(
 
 
 class RadarrQueueHttpFetchClient:
-    """Minimal stdlib HTTP client: ``GET {base}/api/v3/queue`` with ``X-Api-Key``."""
+    """Stdlib HTTP client: paged ``GET {base}/api/v3/queue`` with ``X-Api-Key``."""
 
     def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 30.0) -> None:
         self._base = base_url.rstrip("/")
@@ -113,22 +111,9 @@ class RadarrQueueHttpFetchClient:
         self._timeout = timeout_seconds
 
     def fetch_radarr_queue_items(self) -> list[dict[str, Any]]:
-        url = f"{self._base}/api/v3/queue?pageSize=1000"
-        req = urllib.request.Request(
-            url,
-            method="GET",
-            headers={"X-Api-Key": self._api_key, "Accept": "application/json"},
+        return fetch_all_v3_queue_records(
+            base_url=self._base,
+            api_key=self._api_key,
+            app_label="Radarr",
+            timeout_seconds=self._timeout,
         )
-        try:
-            with urllib.request.urlopen(req, timeout=self._timeout) as resp:
-                raw = resp.read().decode("utf-8")
-        except urllib.error.HTTPError as e:
-            raise RuntimeError(f"Radarr queue fetch failed: HTTP {e.code} for {url!r}") from e
-        data = json.loads(raw)
-        if isinstance(data, list):
-            return [x for x in data if isinstance(x, dict)]
-        if isinstance(data, dict):
-            rec = data.get("records")
-            if isinstance(rec, list):
-                return [x for x in rec if isinstance(x, dict)]
-        return []

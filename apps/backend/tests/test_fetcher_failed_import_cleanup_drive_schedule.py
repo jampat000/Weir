@@ -1,18 +1,19 @@
-"""Independent Radarr/Sonarr periodic cleanup-drive enqueue schedules."""
+"""Independent Radarr/Sonarr periodic cleanup-drive enqueue schedules (DB-backed per-app loops)."""
 
 from __future__ import annotations
 
 import asyncio
-from dataclasses import replace
 
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from mediamop.core.config import MediaMopSettings
-from mediamop.modules.fetcher.failed_import_cleanup_drive_schedule_specs import (
-    failed_import_cleanup_drive_schedule_specs,
+from mediamop.modules.arr_failed_import.env_settings import (
+    AppFailedImportCleanupPolicySettings,
+    default_failed_import_cleanup_settings_bundle,
 )
+from mediamop.modules.fetcher.cleanup_policy_service import upsert_fetcher_failed_import_cleanup_policy
 from mediamop.modules.fetcher.fetcher_jobs_model import FetcherJob
 from mediamop.modules.fetcher import periodic_failed_import_cleanup_enqueue as periodic_enqueue_mod
 from mediamop.modules.fetcher.radarr_failed_import_cleanup_job import (
@@ -26,7 +27,7 @@ from mediamop.modules.fetcher.sonarr_failed_import_cleanup_job import (
 from mediamop.modules.fetcher.failed_import_worker_ports import NoOpFailedImportTimedSchedulePassQueuedPort
 from mediamop.modules.fetcher.periodic_failed_import_cleanup_enqueue import (
     run_periodic_fetcher_failed_import_cleanup_enqueue,
-    start_fetcher_failed_import_cleanup_drive_enqueue_tasks,
+    start_fetcher_failed_import_cleanup_drive_enqueue_tasks_from_cleanup_policy_db,
     stop_fetcher_failed_import_cleanup_drive_enqueue_tasks,
 )
 from mediamop.platform.activity import constants as act_c
@@ -67,73 +68,6 @@ def session_factory(jobs_engine):
 
 def _base_settings() -> MediaMopSettings:
     return MediaMopSettings.load()
-
-
-def test_schedule_specs_radarr_only_when_radarr_enabled() -> None:
-    base = _base_settings()
-    s = replace(
-        base,
-        failed_import_radarr_cleanup_drive_schedule_enabled=True,
-        failed_import_radarr_cleanup_drive_schedule_interval_seconds=120,
-        failed_import_sonarr_cleanup_drive_schedule_enabled=False,
-    )
-    specs = failed_import_cleanup_drive_schedule_specs(s)
-    assert len(specs) == 1
-    assert specs[0][0] == "radarr_failed_import_cleanup_drive"
-    assert specs[0][1] == 120.0
-    assert specs[0][2] is enqueue_radarr_failed_import_cleanup_drive_job
-
-
-def test_schedule_specs_sonarr_only_when_sonarr_enabled() -> None:
-    base = _base_settings()
-    s = replace(
-        base,
-        failed_import_radarr_cleanup_drive_schedule_enabled=False,
-        failed_import_sonarr_cleanup_drive_schedule_enabled=True,
-        failed_import_sonarr_cleanup_drive_schedule_interval_seconds=90,
-    )
-    specs = failed_import_cleanup_drive_schedule_specs(s)
-    assert len(specs) == 1
-    assert specs[0][0] == "sonarr_failed_import_cleanup_drive"
-    assert specs[0][1] == 90.0
-    assert specs[0][2] is enqueue_sonarr_failed_import_cleanup_drive_job
-
-
-def test_schedule_specs_both_independent_when_both_enabled() -> None:
-    base = _base_settings()
-    s = replace(
-        base,
-        failed_import_radarr_cleanup_drive_schedule_enabled=True,
-        failed_import_radarr_cleanup_drive_schedule_interval_seconds=100,
-        failed_import_sonarr_cleanup_drive_schedule_enabled=True,
-        failed_import_sonarr_cleanup_drive_schedule_interval_seconds=200,
-    )
-    specs = failed_import_cleanup_drive_schedule_specs(s)
-    assert len(specs) == 2
-    assert specs[0][1] != specs[1][1]
-
-
-def test_schedule_specs_empty_when_both_disabled() -> None:
-    base = _base_settings()
-    s = replace(
-        base,
-        failed_import_radarr_cleanup_drive_schedule_enabled=False,
-        failed_import_sonarr_cleanup_drive_schedule_enabled=False,
-    )
-    assert failed_import_cleanup_drive_schedule_specs(s) == []
-
-
-def test_disabling_radarr_does_not_imply_sonarr_spec() -> None:
-    base = _base_settings()
-    s = replace(
-        base,
-        failed_import_radarr_cleanup_drive_schedule_enabled=False,
-        failed_import_sonarr_cleanup_drive_schedule_enabled=True,
-        failed_import_sonarr_cleanup_drive_schedule_interval_seconds=60,
-    )
-    specs = failed_import_cleanup_drive_schedule_specs(s)
-    assert len(specs) == 1
-    assert specs[0][2] is enqueue_sonarr_failed_import_cleanup_drive_job
 
 
 def test_periodic_radarr_enqueue_dedupes_across_ticks(session_factory) -> None:
@@ -224,27 +158,60 @@ def test_periodic_sonarr_enqueue_runs_independently(session_factory) -> None:
     assert n == 1
 
 
-def test_start_schedule_tasks_respects_settings_independence(session_factory) -> None:
+def test_start_db_schedule_tasks_radarr_on_enqueues_sonarr_off_polls_only(session_factory) -> None:
+    """Lifespan-style start always runs two loops; each loop reads only its app's columns from SQLite."""
+
+    from dataclasses import replace
+
+    env = default_failed_import_cleanup_settings_bundle()
+    with session_factory() as s:
+        upsert_fetcher_failed_import_cleanup_policy(
+            s,
+            env_bundle=env,
+            radarr=AppFailedImportCleanupPolicySettings(),
+            sonarr=AppFailedImportCleanupPolicySettings(),
+            radarr_cleanup_drive_schedule_enabled=True,
+            radarr_cleanup_drive_schedule_interval_seconds=60,
+            sonarr_cleanup_drive_schedule_enabled=False,
+            sonarr_cleanup_drive_schedule_interval_seconds=3600,
+        )
+        s.commit()
+
     async def _run() -> None:
-        base = _base_settings()
         settings = replace(
-            base,
-            failed_import_radarr_cleanup_drive_schedule_enabled=True,
+            _base_settings(),
+            failed_import_radarr_cleanup_drive_schedule_enabled=False,
             failed_import_radarr_cleanup_drive_schedule_interval_seconds=3600,
             failed_import_sonarr_cleanup_drive_schedule_enabled=False,
+            failed_import_sonarr_cleanup_drive_schedule_interval_seconds=3600,
         )
         stop = asyncio.Event()
-        tasks = start_fetcher_failed_import_cleanup_drive_enqueue_tasks(
+        tasks = start_fetcher_failed_import_cleanup_drive_enqueue_tasks_from_cleanup_policy_db(
             session_factory,
             stop_event=stop,
             timed_failed_import_pass_queued=NoOpFailedImportTimedSchedulePassQueuedPort(),
-            schedule_specs=failed_import_cleanup_drive_schedule_specs(settings),
+            settings=settings,
         )
-        assert len(tasks) == 1
+        assert len(tasks) == 2
+        await asyncio.sleep(0.15)
         stop.set()
         await stop_fetcher_failed_import_cleanup_drive_enqueue_tasks(tasks)
 
     asyncio.run(_run())
+
+    with session_factory() as s:
+        r = s.scalar(
+            select(func.count()).select_from(FetcherJob).where(
+                FetcherJob.job_kind == FAILED_IMPORT_JOB_KIND_RADARR_CLEANUP_DRIVE,
+            ),
+        )
+        so = s.scalar(
+            select(func.count()).select_from(FetcherJob).where(
+                FetcherJob.job_kind == FAILED_IMPORT_JOB_KIND_SONARR_CLEANUP_DRIVE,
+            ),
+        )
+    assert r == 1
+    assert so == 0
 
 
 def test_periodic_enqueue_failure_then_recovery_still_one_row(

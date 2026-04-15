@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -25,6 +27,10 @@ class RefinerFileRemuxPassManualEnqueueIn(BaseModel):
             "When true (default), runs ffprobe + planning only — no ffmpeg output file, no source deletion, "
             "and no requirement for a saved output folder."
         ),
+    )
+    media_scope: Literal["movie", "tv"] = Field(
+        default="movie",
+        description="Which saved watched/output tree resolves ``relative_media_path``.",
     )
 
 

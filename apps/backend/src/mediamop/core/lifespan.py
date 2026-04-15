@@ -16,9 +16,6 @@ from mediamop.core.db import (
     dispose_engine,
 )
 from mediamop.core.logging import configure_logging
-from mediamop.modules.fetcher.failed_import_cleanup_drive_schedule_specs import (
-    failed_import_cleanup_drive_schedule_specs,
-)
 from mediamop.modules.fetcher.failed_import_queue_job_handlers import build_failed_import_queue_job_handlers
 from mediamop.modules.fetcher.failed_import_queue_worker_runtime import build_failed_import_queue_worker_runtime_bundle
 from mediamop.modules.fetcher.fetcher_arr_search_handlers import merge_fetcher_failed_import_and_search_handlers
@@ -31,7 +28,7 @@ from mediamop.modules.fetcher.fetcher_worker_loop import (
     stop_fetcher_worker_background_tasks,
 )
 from mediamop.modules.fetcher.periodic_failed_import_cleanup_enqueue import (
-    start_fetcher_failed_import_cleanup_drive_enqueue_tasks,
+    start_fetcher_failed_import_cleanup_drive_enqueue_tasks_from_cleanup_policy_db,
     stop_fetcher_failed_import_cleanup_drive_enqueue_tasks,
 )
 from mediamop.modules.refiner.refiner_job_handlers import build_refiner_job_handlers
@@ -80,12 +77,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.session_factory = session_factory
     stop = asyncio.Event()
     failed_import_queue_worker_runtime = build_failed_import_queue_worker_runtime_bundle()
-    schedule_specs = failed_import_cleanup_drive_schedule_specs(settings)
-    fetcher_schedule_tasks = start_fetcher_failed_import_cleanup_drive_enqueue_tasks(
+    fetcher_schedule_tasks = start_fetcher_failed_import_cleanup_drive_enqueue_tasks_from_cleanup_policy_db(
         session_factory,
         stop_event=stop,
         timed_failed_import_pass_queued=failed_import_queue_worker_runtime.timed_schedule_pass_queued,
-        schedule_specs=schedule_specs,
+        settings=settings,
     )
     failed_import_job_handlers = build_failed_import_queue_job_handlers(
         settings,
