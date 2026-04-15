@@ -52,6 +52,10 @@ export function useLogoutMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: postLogout,
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: qk.me });
+      qc.setQueryData(qk.me, null);
+    },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: qk.me });
       void qc.invalidateQueries({ queryKey: qk.bootstrap });
