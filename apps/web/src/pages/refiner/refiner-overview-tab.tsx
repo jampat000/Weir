@@ -9,7 +9,7 @@ import {
   useRefinerRuntimeSettingsQuery,
 } from "../../lib/refiner/queries";
 import { refinerStreamLanguageLabel } from "../../lib/refiner/stream-language-options";
-import type { RefinerRemuxRulesSettingsOut, RefinerRuntimeSettingsOut } from "../../lib/refiner/types";
+import type { RefinerRemuxRulesScopeSettings, RefinerRuntimeSettingsOut } from "../../lib/refiner/types";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 
 export type RefinerOverviewOpenTab = "libraries" | "audio-subtitles" | "jobs" | "workers";
@@ -34,7 +34,7 @@ function workersOverviewCopy(rt: RefinerRuntimeSettingsOut): { headline: string;
   };
 }
 
-function remuxDefaultsGlanceBody(rem: RefinerRemuxRulesSettingsOut): ReactNode {
+function remuxDefaultsGlanceBody(rem: RefinerRemuxRulesScopeSettings): ReactNode {
   const pri = refinerStreamLanguageLabel(rem.primary_audio_lang);
   const sec = (rem.secondary_audio_lang ?? "").trim()
     ? refinerStreamLanguageLabel(rem.secondary_audio_lang)
@@ -293,7 +293,16 @@ export function RefinerOverviewTab({
     ) : remuxRules.isError ? (
       <p className="text-[var(--mm-text3)]">Could not load file rules.</p>
     ) : remuxRules.data ? (
-      remuxDefaultsGlanceBody(remuxRules.data)
+      <div className="space-y-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Movies</p>
+          {remuxDefaultsGlanceBody(remuxRules.data.movie)}
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">TV</p>
+          {remuxDefaultsGlanceBody(remuxRules.data.tv)}
+        </div>
+      </div>
     ) : (
       <p className="text-[var(--mm-text3)]">—</p>
     );
@@ -301,18 +310,22 @@ export function RefinerOverviewTab({
     overviewStats.isPending || overviewStats.isError || !overviewStats.data ? (
       <p className="text-[var(--mm-text3)]">Loading…</p>
     ) : (
-      <div className="space-y-1.5">
+      <div className="space-y-3">
         <p>
-          <span className="text-[var(--mm-text3)]">Files processed:</span>{" "}
-          <span className="font-medium text-[var(--mm-text1)]">{overviewStats.data.files_processed}</span>
+          <span className="text-xs uppercase tracking-wide text-[var(--mm-text3)]">Files processed</span>
+          <span className="mt-0.5 block text-xl font-semibold leading-tight text-[var(--mm-text1)]">
+            {overviewStats.data.files_processed}
+          </span>
         </p>
         <p>
-          <span className="text-[var(--mm-text3)]">Success rate:</span>{" "}
-          <span className="font-medium text-[var(--mm-text1)]">{overviewStats.data.success_rate_percent}%</span>
+          <span className="text-xs uppercase tracking-wide text-[var(--mm-text3)]">Success rate</span>
+          <span className="mt-0.5 block text-base font-semibold leading-tight text-[var(--mm-text1)]">
+            {overviewStats.data.success_rate_percent}%
+          </span>
         </p>
         <p>
-          <span className="text-[var(--mm-text3)]">Space saved:</span>{" "}
-          <span className="font-medium text-[var(--mm-text1)]">
+          <span className="text-xs uppercase tracking-wide text-[var(--mm-text3)]">Space saved</span>
+          <span className="mt-0.5 block text-base font-semibold leading-tight text-[var(--mm-text1)]">
             {overviewStats.data.space_saved_available && overviewStats.data.space_saved_gb !== null
               ? `${overviewStats.data.space_saved_gb.toFixed(1)} GB`
               : "Not available yet"}
@@ -338,7 +351,7 @@ export function RefinerOverviewTab({
           At a glance
         </h2>
         <div className="mm-card__body mt-5 grid gap-4 sm:grid-cols-2 sm:gap-x-5 sm:gap-y-5 lg:grid-cols-3 lg:gap-x-5 lg:gap-y-5">
-          <AtGlanceCard order="1" title="Last 30 days" body={statsBody} />
+          <AtGlanceCard order="1" title="Last 30 days" body={statsBody} data-testid="refiner-overview-last-30-days" />
           <AtGlanceCard order="2" title="Libraries" body={foldersBody} />
           <AtGlanceCard order="3" title="Job queue" body={queueBody} />
           <AtGlanceCard order="4" title="Workers" body={workerBody} />
@@ -418,11 +431,11 @@ function AtGlanceCard({
 }) {
   return (
     <div
-      className="flex h-full flex-col gap-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5 text-sm"
+      className="flex h-full flex-col gap-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)]/70 p-5 text-sm"
       data-at-glance-order={order}
       data-testid={dataTestId}
     >
-      <h3 className="text-sm font-semibold text-[var(--mm-text1)]">{title}</h3>
+      <h3 className="text-sm font-semibold tracking-wide text-[var(--mm-text1)]">{title}</h3>
       <div className="min-h-0 flex-1 text-[var(--mm-text2)]">{body}</div>
       {footer ? <div className="mt-auto border-t border-[var(--mm-border)] pt-3">{footer}</div> : null}
     </div>

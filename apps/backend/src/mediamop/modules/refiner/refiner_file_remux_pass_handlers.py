@@ -107,7 +107,7 @@ def make_refiner_file_remux_pass_handler(
             media_scope = "movie"
 
         with session_factory() as session:
-            rules_cfg = load_refiner_remux_rules_config(session)
+            rules_cfg = load_refiner_remux_rules_config(session, media_scope=media_scope)
             path_runtime, path_err = resolve_refiner_path_runtime_for_remux(
                 session,
                 settings,

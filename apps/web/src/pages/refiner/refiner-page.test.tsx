@@ -32,16 +32,30 @@ const minimalRefinerPathSettings: RefinerPathSettingsOut = {
 };
 
 const minimalRefinerRemuxRules: RefinerRemuxRulesSettingsOut = {
-  primary_audio_lang: "eng",
-  secondary_audio_lang: "jpn",
-  tertiary_audio_lang: "",
-  default_audio_slot: "primary",
-  remove_commentary: true,
-  subtitle_mode: "remove_all",
-  subtitle_langs_csv: "",
-  preserve_forced_subs: true,
-  preserve_default_subs: true,
-  audio_preference_mode: "preferred_langs_quality",
+  movie: {
+    primary_audio_lang: "eng",
+    secondary_audio_lang: "jpn",
+    tertiary_audio_lang: "",
+    default_audio_slot: "primary",
+    remove_commentary: true,
+    subtitle_mode: "remove_all",
+    subtitle_langs_csv: "",
+    preserve_forced_subs: true,
+    preserve_default_subs: true,
+    audio_preference_mode: "preferred_langs_quality",
+  },
+  tv: {
+    primary_audio_lang: "eng",
+    secondary_audio_lang: "jpn",
+    tertiary_audio_lang: "",
+    default_audio_slot: "primary",
+    remove_commentary: true,
+    subtitle_mode: "remove_all",
+    subtitle_langs_csv: "",
+    preserve_forced_subs: true,
+    preserve_default_subs: true,
+    audio_preference_mode: "preferred_langs_quality",
+  },
   updated_at: "2026-04-11T00:00:00Z",
 };
 
@@ -131,8 +145,10 @@ describe("RefinerPage", () => {
     renderRefinerPage();
     const panel = screen.getByTestId("refiner-overview-at-a-glance");
     expect(panel.textContent).toMatch(/Last 30 days/i);
-    expect(panel.textContent).toMatch(/Files processed:\s*42/i);
-    expect(panel.textContent).toMatch(/Success rate:\s*88.5%/i);
+    expect(panel.textContent).toMatch(/Files processed/i);
+    expect(panel.textContent).toMatch(/42/i);
+    expect(panel.textContent).toMatch(/Success rate/i);
+    expect(panel.textContent).toMatch(/88.5%/i);
   });
 
   it("Jobs tab shows Refiner jobs inspection with honest split from Activity", () => {

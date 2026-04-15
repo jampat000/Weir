@@ -70,6 +70,12 @@ export type RefinerWatchedFolderRemuxScanDispatchEnqueueOut = {
 /** GET/PUT /api/v1/refiner/remux-rules-settings */
 
 export type RefinerRemuxRulesSettingsOut = {
+  movie: RefinerRemuxRulesScopeSettings;
+  tv: RefinerRemuxRulesScopeSettings;
+  updated_at: string;
+};
+
+export type RefinerRemuxRulesScopeSettings = {
   primary_audio_lang: string;
   secondary_audio_lang: string;
   tertiary_audio_lang: string;
@@ -80,10 +86,11 @@ export type RefinerRemuxRulesSettingsOut = {
   preserve_forced_subs: boolean;
   preserve_default_subs: boolean;
   audio_preference_mode: "preferred_langs_quality" | "preferred_langs_strict" | "quality_all_languages";
-  updated_at: string;
 };
 
-export type RefinerRemuxRulesSettingsPutBody = Omit<RefinerRemuxRulesSettingsOut, "updated_at">;
+export type RefinerRemuxRulesSettingsPutBody = RefinerRemuxRulesScopeSettings & {
+  media_scope: "movie" | "tv";
+};
 
 /** POST /api/v1/refiner/jobs/file-remux-pass/enqueue */
 

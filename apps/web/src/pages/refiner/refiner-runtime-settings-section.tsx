@@ -21,17 +21,19 @@ export function RefinerRuntimeSettingsSection() {
       <h2 id="refiner-runtime-settings-heading" className="text-base font-semibold text-[var(--mm-text)]">
         Workers
       </h2>
-      <p className="mt-2">
-        Workers are the background runners that pick up Refiner jobs. This server currently has{" "}
-        <strong className="text-[var(--mm-text)]">{d.in_process_refiner_worker_count}</strong> Refiner worker
-        {d.in_process_refiner_worker_count === 1 ? "" : "s"}.
-      </p>
-      <p className="mt-2 text-[var(--mm-text3)]">{d.worker_mode_summary}</p>
-      <p className="mt-2 text-xs text-[var(--mm-text3)]">
+      <p className="mt-2 text-[var(--mm-text3)]">Workers pick up queued Refiner jobs in the background.</p>
+      <div className="mt-4 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)]/65 px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Current state</p>
+        <p className="mt-1 text-base font-semibold text-[var(--mm-text1)]">
+          {d.in_process_refiner_worker_count} worker{d.in_process_refiner_worker_count === 1 ? "" : "s"}
+        </p>
+        <p className="mt-1 text-sm text-[var(--mm-text2)]">{d.worker_mode_summary}</p>
+      </div>
+      <p className="mt-3 text-xs text-[var(--mm-text3)]">
         This is read-only status in MediaMop today. If you need to change worker count, change backend config and
         restart the API.
       </p>
-      <p className="mt-2 text-xs text-[var(--mm-text3)]">{d.sqlite_throughput_note}</p>
+      <p className="mt-1 text-xs text-[var(--mm-text3)]">{d.sqlite_throughput_note}</p>
 
       <details className="mt-5 rounded-md border border-[var(--mm-border)] bg-black/10 p-3">
         <summary className="cursor-pointer text-sm font-medium text-[var(--mm-text1)]">Advanced worker notes</summary>
@@ -40,7 +42,7 @@ export function RefinerRuntimeSettingsSection() {
       </details>
 
       <h3 className="mt-7 text-sm font-semibold text-[var(--mm-text)]">Timed folder scans</h3>
-      <p className="mt-2 text-[var(--mm-text3)]">
+      <p className="mt-1 text-[var(--mm-text3)]">
         Refiner can check Movies and TV watched folders on a timer. Each scope is evaluated independently and this is
         not live filesystem watching.
       </p>

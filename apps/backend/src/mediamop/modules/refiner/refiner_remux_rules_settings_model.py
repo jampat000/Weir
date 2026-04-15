@@ -25,6 +25,16 @@ class RefinerRemuxRulesSettingsRow(Base):
     preserve_forced_subs: Mapped[int] = mapped_column(Integer, nullable=False)
     preserve_default_subs: Mapped[int] = mapped_column(Integer, nullable=False)
     audio_preference_mode: Mapped[str] = mapped_column(Text, nullable=False)
+    tv_primary_audio_lang: Mapped[str] = mapped_column(Text, nullable=False)
+    tv_secondary_audio_lang: Mapped[str] = mapped_column(Text, nullable=False)
+    tv_tertiary_audio_lang: Mapped[str] = mapped_column(Text, nullable=False)
+    tv_default_audio_slot: Mapped[str] = mapped_column(Text, nullable=False)
+    tv_remove_commentary: Mapped[int] = mapped_column(Integer, nullable=False)
+    tv_subtitle_mode: Mapped[str] = mapped_column(Text, nullable=False)
+    tv_subtitle_langs_csv: Mapped[str] = mapped_column(Text, nullable=False)
+    tv_preserve_forced_subs: Mapped[int] = mapped_column(Integer, nullable=False)
+    tv_preserve_default_subs: Mapped[int] = mapped_column(Integer, nullable=False)
+    tv_audio_preference_mode: Mapped[str] = mapped_column(Text, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

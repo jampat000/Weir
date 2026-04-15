@@ -22,9 +22,11 @@ def test_refiner_remux_rules_settings_get_shape(client_with_admin: TestClient) -
     r = client_with_admin.get("/api/v1/refiner/remux-rules-settings")
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["primary_audio_lang"] == "eng"
-    assert body["subtitle_mode"] in ("remove_all", "keep_selected")
-    assert "audio_preference_mode" in body
+    assert body["movie"]["primary_audio_lang"] == "eng"
+    assert body["movie"]["subtitle_mode"] in ("remove_all", "keep_selected")
+    assert "audio_preference_mode" in body["movie"]
+    assert body["tv"]["primary_audio_lang"] == "eng"
+    assert body["tv"]["subtitle_mode"] in ("remove_all", "keep_selected")
     assert "updated_at" in body
 
 
@@ -35,6 +37,7 @@ def test_refiner_remux_rules_settings_put_updates(client_with_admin: TestClient)
         "/api/v1/refiner/remux-rules-settings",
         json={
             "csrf_token": tok,
+            "media_scope": "movie",
             "primary_audio_lang": "fre",
             "secondary_audio_lang": "eng",
             "tertiary_audio_lang": "",
@@ -50,10 +53,11 @@ def test_refiner_remux_rules_settings_put_updates(client_with_admin: TestClient)
     )
     assert r.status_code == 200, r.text
     out = r.json()
-    assert out["primary_audio_lang"] == "fre"
-    assert out["subtitle_mode"] == "keep_selected"
-    assert out["subtitle_langs_csv"] == "eng,fre"
-    assert out["audio_preference_mode"] == "quality_all_languages"
+    assert out["movie"]["primary_audio_lang"] == "fre"
+    assert out["movie"]["subtitle_mode"] == "keep_selected"
+    assert out["movie"]["subtitle_langs_csv"] == "eng,fre"
+    assert out["movie"]["audio_preference_mode"] == "quality_all_languages"
+    assert out["tv"]["primary_audio_lang"] == "eng"
 
 
 def test_refiner_remux_rules_settings_put_rejects_keep_selected_without_langs(
@@ -65,6 +69,7 @@ def test_refiner_remux_rules_settings_put_rejects_keep_selected_without_langs(
         "/api/v1/refiner/remux-rules-settings",
         json={
             "csrf_token": tok,
+            "media_scope": "tv",
             "subtitle_mode": "keep_selected",
             "subtitle_langs_csv": "   ",
         },

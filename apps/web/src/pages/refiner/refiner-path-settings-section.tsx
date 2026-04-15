@@ -86,16 +86,14 @@ export function RefinerPathSettingsSection() {
       <h2 id="refiner-path-settings-heading" className="text-base font-semibold text-[var(--mm-text)]">
         Saved folders
       </h2>
-      <p className="mt-2">
-        <strong className="text-[var(--mm-text)]">Movies</strong> and{" "}
-        <strong className="text-[var(--mm-text)]">TV</strong> each get their own watched, work, and output roots. Pick
-        the scope when you queue work—paths never cross between the two.
+      <p className="mt-2 text-[var(--mm-text3)]">
+        Movies and TV each keep separate watched, work, and output roots.
       </p>
-      <p className="mt-2 text-xs text-[var(--mm-text3)]">
+      <p className="mt-1 text-xs text-[var(--mm-text3)]">
         Save rules: Movies output is always required. TV output is required whenever TV watched is set. Movies and TV
         paths cannot overlap.
       </p>
-      <p className="mt-3 rounded-md border border-[var(--mm-border)]/80 bg-[var(--mm-accent-soft)]/10 px-3 py-2 text-xs text-[var(--mm-text3)]">
+      <p className="mt-3 rounded-md border border-[var(--mm-border)] bg-black/10 px-3 py-2 text-xs text-[var(--mm-text3)]">
         After a successful <strong className="text-[var(--mm-text)]">live</strong> file pass, MediaMop may delete only
         the watched-folder <strong className="text-[var(--mm-text)]">source media file</strong> that was remuxed. Dry
         runs and failures never delete sources. Refiner does not sweep sidecars or remove empty folders.
@@ -106,12 +104,15 @@ export function RefinerPathSettingsSection() {
       ) : null}
 
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
-        <div className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)]/60 p-4">
-          <h3 className="text-sm font-semibold text-[var(--mm-text1)]">TV library</h3>
-          <p className="mt-1 text-xs text-[var(--mm-text3)]">
+        <div className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)]/70 p-5">
+          <div className="border-b border-[var(--mm-border)] pb-3">
+            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-[var(--mm-text3)]">Library</p>
+            <h3 className="mt-1 text-sm font-semibold text-[var(--mm-text1)]">TV</h3>
+          </div>
+          <p className="mt-3 text-xs text-[var(--mm-text3)]">
             Default work when blank: <span className={mmTechnicalMonoSmallClass}>{d.resolved_default_tv_work_folder}</span>
           </p>
-          <div className="mt-3 space-y-3">
+          <div className="mt-4 space-y-4">
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Watched folder</span>
               <input
@@ -152,7 +153,7 @@ export function RefinerPathSettingsSection() {
                 Add a TV output folder before saving while TV watched folder is set.
               </p>
             ) : null}
-            <div className="pt-2">
+            <div className="rounded-md border border-[var(--mm-border)] bg-black/10 px-3 py-3">
               <button
                 type="button"
                 className={mmActionButtonClass({
@@ -182,12 +183,15 @@ export function RefinerPathSettingsSection() {
           </div>
         </div>
 
-        <div className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)]/60 p-4">
-          <h3 className="text-sm font-semibold text-[var(--mm-text1)]">Movies library</h3>
-          <p className="mt-1 text-xs text-[var(--mm-text3)]">
+        <div className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)]/70 p-5">
+          <div className="border-b border-[var(--mm-border)] pb-3">
+            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-[var(--mm-text3)]">Library</p>
+            <h3 className="mt-1 text-sm font-semibold text-[var(--mm-text1)]">Movies</h3>
+          </div>
+          <p className="mt-3 text-xs text-[var(--mm-text3)]">
             Default work when blank: <span className={mmTechnicalMonoSmallClass}>{d.resolved_default_work_folder}</span>
           </p>
-          <div className="mt-3 space-y-3">
+          <div className="mt-4 space-y-4">
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Watched folder</span>
               <input
@@ -224,7 +228,7 @@ export function RefinerPathSettingsSection() {
                 required
               />
             </label>
-            <div className="pt-2">
+            <div className="rounded-md border border-[var(--mm-border)] bg-black/10 px-3 py-3">
               <button
                 type="button"
                 className={mmActionButtonClass({

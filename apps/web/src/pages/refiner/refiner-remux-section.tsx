@@ -1,16 +1,16 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
+import { MmListboxPicker, type MmListboxOption } from "../../components/ui/mm-listbox-picker";
+import { MmMultiListboxPicker } from "../../components/ui/mm-multi-listbox-picker";
 import { PageLoading } from "../../components/shared/page-loading";
-import { isHttpErrorFromApi, isLikelyNetworkFailure } from "../../lib/api/error-guards";
 import { useMeQuery } from "../../lib/auth/queries";
+import { isHttpErrorFromApi, isLikelyNetworkFailure } from "../../lib/api/error-guards";
 import {
   useRefinerFileRemuxPassEnqueueMutation,
   useRefinerRemuxRulesSettingsQuery,
   useRefinerRemuxRulesSettingsSaveMutation,
 } from "../../lib/refiner/queries";
 import { REFINER_STREAM_LANGUAGE_OPTIONS } from "../../lib/refiner/stream-language-options";
-import type { RefinerRemuxRulesSettingsPutBody } from "../../lib/refiner/types";
-import { MmListboxPicker, type MmListboxOption } from "../../components/ui/mm-listbox-picker";
-import { MmMultiListboxPicker } from "../../components/ui/mm-multi-listbox-picker";
+import type { RefinerRemuxRulesScopeSettings, RefinerRemuxRulesSettingsPutBody } from "../../lib/refiner/types";
 import { mmActionButtonClass, mmCheckboxControlClass, mmEditableTextFieldClass } from "../../lib/ui/mm-control-roles";
 
 function canEditRefiner(role: string | undefined): boolean {
@@ -55,7 +55,7 @@ const AUDIO_PREFERENCE_OPTIONS: MmListboxOption[] = [
 ];
 
 const SUBTITLE_MODE_OPTIONS: MmListboxOption[] = [
-  { value: "remove_all", label: "Remove all subtitles in output" },
+  { value: "remove_all", label: "Remove all subtitles" },
   { value: "keep_selected", label: "Keep selected languages only" },
 ];
 
@@ -78,22 +78,187 @@ function parseCsvCodes(raw: string): string[] {
   return out;
 }
 
+type ScopeCardProps = {
+  title: "Movies" | "TV";
+  draft: RefinerRemuxRulesScopeSettings;
+  setDraft: (next: RefinerRemuxRulesScopeSettings) => void;
+  editable: boolean;
+  isPending: boolean;
+  dirty: boolean;
+  isError: boolean;
+  error: unknown;
+  isSuccess: boolean;
+  onSave: () => void;
+  pickerTestId: string;
+  saveLabel: string;
+};
+
+function ScopeCard({
+  title,
+  draft,
+  setDraft,
+  editable,
+  isPending,
+  dirty,
+  isError,
+  error,
+  isSuccess,
+  onSave,
+  pickerTestId,
+  saveLabel,
+}: ScopeCardProps) {
+  const disabled = !editable || isPending;
+  const subtitleCodes = parseCsvCodes(draft.subtitle_langs_csv);
+  return (
+    <section className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)]/70 p-5">
+      <div className="border-b border-[var(--mm-border)] pb-3">
+        <p className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-[var(--mm-text3)]">Scope</p>
+        <h3 className="mt-1 text-sm font-semibold text-[var(--mm-text1)]">{title}</h3>
+      </div>
+      <div className="mt-4 space-y-5">
+        <section>
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Audio</h4>
+          <div className="mt-3 grid gap-x-5 gap-y-4 sm:grid-cols-2">
+            <div className="sm:col-span-1">
+              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Primary language</span>
+              <MmListboxPicker
+                disabled={disabled}
+                placeholder="Choose a language…"
+                options={primaryLanguageOptions(draft.primary_audio_lang)}
+                value={draft.primary_audio_lang}
+                onChange={(v) => setDraft({ ...draft, primary_audio_lang: v })}
+              />
+            </div>
+            <div className="sm:col-span-1">
+              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Secondary language</span>
+              <MmListboxPicker
+                disabled={disabled}
+                placeholder="None"
+                options={secondaryLanguageOptions(draft.secondary_audio_lang)}
+                value={draft.secondary_audio_lang}
+                onChange={(v) => setDraft({ ...draft, secondary_audio_lang: v })}
+              />
+            </div>
+            <div className="sm:col-span-1">
+              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Tertiary language</span>
+              <MmListboxPicker
+                disabled={disabled}
+                placeholder="None"
+                options={secondaryLanguageOptions(draft.tertiary_audio_lang)}
+                value={draft.tertiary_audio_lang}
+                onChange={(v) => setDraft({ ...draft, tertiary_audio_lang: v })}
+              />
+            </div>
+            <div className="sm:col-span-1">
+              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Default audio slot</span>
+              <MmListboxPicker
+                disabled={disabled}
+                options={DEFAULT_AUDIO_SLOT_OPTIONS}
+                value={draft.default_audio_slot}
+                onChange={(v) => setDraft({ ...draft, default_audio_slot: v as RefinerRemuxRulesScopeSettings["default_audio_slot"] })}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Audio selection policy</span>
+              <MmListboxPicker
+                disabled={disabled}
+                options={AUDIO_PREFERENCE_OPTIONS}
+                value={draft.audio_preference_mode}
+                onChange={(v) =>
+                  setDraft({ ...draft, audio_preference_mode: v as RefinerRemuxRulesScopeSettings["audio_preference_mode"] })
+                }
+              />
+            </div>
+            <label className="flex cursor-pointer items-start gap-3 sm:col-span-2">
+              <input
+                type="checkbox"
+                className={mmCheckboxControlClass}
+                checked={draft.remove_commentary}
+                disabled={disabled}
+                onChange={(e) => setDraft({ ...draft, remove_commentary: e.target.checked })}
+              />
+              <span className="text-sm text-[var(--mm-text2)]">Remove commentary tracks</span>
+            </label>
+          </div>
+        </section>
+        <section>
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Subtitles</h4>
+          <div className="mt-3 grid gap-x-5 gap-y-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <MmListboxPicker
+                disabled={disabled}
+                options={SUBTITLE_MODE_OPTIONS}
+                value={draft.subtitle_mode}
+                onChange={(v) => setDraft({ ...draft, subtitle_mode: v as RefinerRemuxRulesScopeSettings["subtitle_mode"] })}
+              />
+            </div>
+            <label className="block sm:col-span-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Subtitle languages</span>
+              <MmMultiListboxPicker
+                options={SUBTITLE_LANGUAGE_OPTIONS}
+                values={subtitleCodes}
+                disabled={disabled}
+                onChange={(next) => setDraft({ ...draft, subtitle_langs_csv: next.join(",") })}
+                placeholder="Select subtitle languages"
+                data-testid={pickerTestId}
+              />
+            </label>
+            <label className="flex cursor-pointer items-start gap-3 sm:col-span-1">
+              <input
+                type="checkbox"
+                className={mmCheckboxControlClass}
+                checked={draft.preserve_forced_subs}
+                disabled={disabled || draft.subtitle_mode === "remove_all"}
+                onChange={(e) => setDraft({ ...draft, preserve_forced_subs: e.target.checked })}
+              />
+              <span className="text-sm text-[var(--mm-text2)]">Keep forced subtitles</span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-3 sm:col-span-1">
+              <input
+                type="checkbox"
+                className={mmCheckboxControlClass}
+                checked={draft.preserve_default_subs}
+                disabled={disabled || draft.subtitle_mode === "remove_all"}
+                onChange={(e) => setDraft({ ...draft, preserve_default_subs: e.target.checked })}
+              />
+              <span className="text-sm text-[var(--mm-text2)]">Keep default subtitles</span>
+            </label>
+          </div>
+        </section>
+      </div>
+      {isError ? (
+        <p className="mt-3 text-sm text-red-300" role="alert">
+          {error instanceof Error ? error.message : "Save failed."}
+        </p>
+      ) : null}
+      {isSuccess && !dirty ? <p className="mt-3 text-xs text-[var(--mm-text3)]">Saved.</p> : null}
+      <div className="mt-5 rounded-md border border-[var(--mm-border)] bg-black/10 px-3 py-3">
+        <button
+          type="button"
+          className={mmActionButtonClass({
+            variant: "primary",
+            disabled: !editable || !dirty || isPending,
+          })}
+          disabled={!editable || !dirty || isPending}
+          onClick={onSave}
+        >
+          {isPending ? "Saving…" : saveLabel}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 /** Audio & subtitles tab: saved remux defaults + one-off file run. */
 export function RefinerRemuxSection() {
   const me = useMeQuery();
   const q = useRefinerRemuxRulesSettingsQuery();
-  const save = useRefinerRemuxRulesSettingsSaveMutation();
+  const saveMovie = useRefinerRemuxRulesSettingsSaveMutation();
+  const saveTv = useRefinerRemuxRulesSettingsSaveMutation();
   const enqueue = useRefinerFileRemuxPassEnqueueMutation();
 
-  const primaryLangLabelId = useId();
-  const secondaryLangLabelId = useId();
-  const tertiaryLangLabelId = useId();
-  const defaultSlotLabelId = useId();
-  const audioPolicyLabelId = useId();
-  const subtitleModeLabelId = useId();
-  const subtitleLanguagesLabelId = useId();
-
-  const [draft, setDraft] = useState<RefinerRemuxRulesSettingsPutBody | null>(null);
+  const [movieDraft, setMovieDraft] = useState<RefinerRemuxRulesScopeSettings | null>(null);
+  const [tvDraft, setTvDraft] = useState<RefinerRemuxRulesScopeSettings | null>(null);
   const [relPath, setRelPath] = useState("");
   const [enqueueDryRun, setEnqueueDryRun] = useState(true);
   const [enqueueMediaScope, setEnqueueMediaScope] = useState<"movie" | "tv">("movie");
@@ -102,25 +267,16 @@ export function RefinerRemuxSection() {
     if (!q.data) {
       return;
     }
-    const { updated_at: _u, ...rest } = q.data;
-    setDraft(rest);
+    setMovieDraft(q.data.movie);
+    setTvDraft(q.data.tv);
   }, [q.data]);
 
   const editable = canEditRefiner(me.data?.role);
-
-  const dirty =
-    draft !== null &&
+  const movieDirty =
+    movieDraft !== null &&
     q.data !== undefined &&
-    (draft.primary_audio_lang !== q.data.primary_audio_lang ||
-      draft.secondary_audio_lang !== q.data.secondary_audio_lang ||
-      draft.tertiary_audio_lang !== q.data.tertiary_audio_lang ||
-      draft.default_audio_slot !== q.data.default_audio_slot ||
-      draft.remove_commentary !== q.data.remove_commentary ||
-      draft.subtitle_mode !== q.data.subtitle_mode ||
-      draft.subtitle_langs_csv !== q.data.subtitle_langs_csv ||
-      draft.preserve_forced_subs !== q.data.preserve_forced_subs ||
-      draft.preserve_default_subs !== q.data.preserve_default_subs ||
-      draft.audio_preference_mode !== q.data.audio_preference_mode);
+    JSON.stringify(movieDraft) !== JSON.stringify(q.data.movie);
+  const tvDirty = tvDraft !== null && q.data !== undefined && JSON.stringify(tvDraft) !== JSON.stringify(q.data.tv);
 
   if (q.isPending || me.isPending) {
     return <PageLoading label="Loading audio and subtitle settings" />;
@@ -143,14 +299,12 @@ export function RefinerRemuxSection() {
       </div>
     );
   }
-
-  if (!draft || !q.data) {
+  if (!movieDraft || !tvDraft) {
     return null;
   }
 
-  const d = draft;
-  const fieldDisabled = !editable || save.isPending;
-  const selectedSubtitleCodes = parseCsvCodes(d.subtitle_langs_csv);
+  const saveMovieBody: RefinerRemuxRulesSettingsPutBody = { media_scope: "movie", ...movieDraft };
+  const saveTvBody: RefinerRemuxRulesSettingsPutBody = { media_scope: "tv", ...tvDraft };
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-10" data-testid="refiner-remux-section">
@@ -163,184 +317,42 @@ export function RefinerRemuxSection() {
           Saved audio and subtitle defaults
         </h2>
         <p className="mt-2 text-[var(--mm-text3)]">
-          Default audio and subtitles for <strong className="text-[var(--mm-text)]">Movies</strong> and{" "}
-          <strong className="text-[var(--mm-text)]">TV</strong> file passes. They stay saved until you change them.
+          Movies and TV keep separate defaults. Saving one scope never changes the other.
         </p>
-
-        <div
-          className="mt-4 rounded-md border border-[var(--mm-border)] bg-[var(--mm-accent-soft)]/10 px-3 py-2.5 text-xs text-[var(--mm-text3)]"
-          role="note"
-        >
-          <p className="font-medium text-[var(--mm-text2)]">Live passes and your files</p>
-          <p className="mt-1">
-            After a successful <strong className="text-[var(--mm-text)]">live</strong> pass, MediaMop may delete only the
-            watched-folder <strong className="text-[var(--mm-text)]">source media file</strong> that was remuxed. Dry
-            runs and failures never delete sources. Refiner does not remove sidecars, siblings, or empty folders.
-          </p>
+        <div className="mt-4 rounded-md border border-[var(--mm-border)] bg-black/10 px-3 py-2.5 text-xs text-[var(--mm-text3)]" role="note">
+          After a successful <strong className="text-[var(--mm-text)]">live</strong> pass, MediaMop may delete only the
+          watched-folder <strong className="text-[var(--mm-text)]">source media file</strong> that was remuxed.
         </div>
-
-        {!editable ? (
-          <p className="mt-3 text-xs text-[var(--mm-text3)]">Operators and admins can edit these rules.</p>
-        ) : null}
-
-        <div className="mt-5 grid gap-x-5 gap-y-5 sm:grid-cols-2">
-          <div className="block sm:col-span-1">
-            <span id={primaryLangLabelId} className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
-              Primary language
-            </span>
-            <MmListboxPicker
-              ariaLabelledBy={primaryLangLabelId}
-              disabled={fieldDisabled}
-              placeholder="Choose a language…"
-              options={primaryLanguageOptions(d.primary_audio_lang)}
-              value={d.primary_audio_lang}
-              onChange={(v) => setDraft({ ...d, primary_audio_lang: v })}
-            />
-          </div>
-          <div className="block sm:col-span-1">
-            <span id={secondaryLangLabelId} className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
-              Secondary language
-            </span>
-            <MmListboxPicker
-              ariaLabelledBy={secondaryLangLabelId}
-              disabled={fieldDisabled}
-              placeholder="None"
-              options={secondaryLanguageOptions(d.secondary_audio_lang)}
-              value={d.secondary_audio_lang}
-              onChange={(v) => setDraft({ ...d, secondary_audio_lang: v })}
-            />
-          </div>
-          <div className="block sm:col-span-1">
-            <span id={tertiaryLangLabelId} className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
-              Tertiary language
-            </span>
-            <MmListboxPicker
-              ariaLabelledBy={tertiaryLangLabelId}
-              disabled={fieldDisabled}
-              placeholder="None"
-              options={secondaryLanguageOptions(d.tertiary_audio_lang)}
-              value={d.tertiary_audio_lang}
-              onChange={(v) => setDraft({ ...d, tertiary_audio_lang: v })}
-            />
-          </div>
-          <div className="block sm:col-span-1">
-            <span id={defaultSlotLabelId} className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
-              Default audio slot
-            </span>
-            <MmListboxPicker
-              ariaLabelledBy={defaultSlotLabelId}
-              disabled={fieldDisabled}
-              options={DEFAULT_AUDIO_SLOT_OPTIONS}
-              value={d.default_audio_slot}
-              onChange={(v) =>
-                setDraft({ ...d, default_audio_slot: v as RefinerRemuxRulesSettingsPutBody["default_audio_slot"] })
-              }
-            />
-          </div>
-          <div className="block sm:col-span-2">
-            <span id={audioPolicyLabelId} className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
-              Audio selection policy
-            </span>
-            <MmListboxPicker
-              ariaLabelledBy={audioPolicyLabelId}
-              disabled={fieldDisabled}
-              options={AUDIO_PREFERENCE_OPTIONS}
-              value={d.audio_preference_mode}
-              onChange={(v) =>
-                setDraft({
-                  ...d,
-                  audio_preference_mode: v as RefinerRemuxRulesSettingsPutBody["audio_preference_mode"],
-                })
-              }
-            />
-          </div>
-          <label className="flex cursor-pointer items-start gap-3 sm:col-span-1">
-            <input
-              type="checkbox"
-              className={mmCheckboxControlClass}
-              checked={d.remove_commentary}
-              disabled={fieldDisabled}
-              onChange={(e) => setDraft({ ...d, remove_commentary: e.target.checked })}
-            />
-            <span className="text-sm text-[var(--mm-text2)]">Strip commentary when planning</span>
-          </label>
-          <div className="block sm:col-span-2">
-            <span id={subtitleModeLabelId} className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
-              Subtitles
-            </span>
-            <MmListboxPicker
-              ariaLabelledBy={subtitleModeLabelId}
-              disabled={fieldDisabled}
-              options={SUBTITLE_MODE_OPTIONS}
-              value={d.subtitle_mode}
-              onChange={(v) =>
-                setDraft({ ...d, subtitle_mode: v as RefinerRemuxRulesSettingsPutBody["subtitle_mode"] })
-              }
-            />
-          </div>
-          <label className="block sm:col-span-2">
-            <span id={subtitleLanguagesLabelId} className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
-              Subtitle languages
-            </span>
-            <MmMultiListboxPicker
-              ariaLabelledBy={subtitleLanguagesLabelId}
-              options={SUBTITLE_LANGUAGE_OPTIONS}
-              values={selectedSubtitleCodes}
-              disabled={fieldDisabled || d.subtitle_mode === "remove_all"}
-              onChange={(next) => setDraft({ ...d, subtitle_langs_csv: next.join(",") })}
-              placeholder="Select subtitle languages"
-              data-testid="refiner-subtitle-language-picker"
-            />
-            <p className="mt-1 text-xs text-[var(--mm-text3)]">
-              Pick one or more subtitle languages to keep when subtitle mode is set to keep selected.
-            </p>
-          </label>
-          <label className="flex cursor-pointer items-start gap-3 sm:col-span-1">
-            <input
-              type="checkbox"
-              className={mmCheckboxControlClass}
-              checked={d.preserve_forced_subs}
-              disabled={fieldDisabled || d.subtitle_mode === "remove_all"}
-              onChange={(e) => setDraft({ ...d, preserve_forced_subs: e.target.checked })}
-            />
-            <span className="text-sm text-[var(--mm-text2)]">Keep forced subtitles when keeping subtitles</span>
-          </label>
-          <label className="flex cursor-pointer items-start gap-3 sm:col-span-1">
-            <input
-              type="checkbox"
-              className={mmCheckboxControlClass}
-              checked={d.preserve_default_subs}
-              disabled={fieldDisabled || d.subtitle_mode === "remove_all"}
-              onChange={(e) => setDraft({ ...d, preserve_default_subs: e.target.checked })}
-            />
-            <span className="text-sm text-[var(--mm-text2)]">Keep default subtitles when keeping subtitles</span>
-          </label>
-        </div>
-
-        {save.isError ? (
-          <p className="mt-3 text-sm text-red-300" role="alert" data-testid="refiner-remux-save-error">
-            {save.error instanceof Error ? save.error.message : "Save failed."}
-          </p>
-        ) : null}
-
-        {save.isSuccess && !dirty ? (
-          <p className="mt-3 text-xs text-[var(--mm-text3)]" data-testid="refiner-remux-saved-hint">
-            Saved.
-          </p>
-        ) : null}
-
-        <div className="mt-6">
-          <button
-            type="button"
-            className={mmActionButtonClass({
-              variant: "primary",
-              disabled: !editable || !dirty || save.isPending,
-            })}
-            disabled={!editable || !dirty || save.isPending}
-            onClick={() => save.mutate(d)}
-          >
-            {save.isPending ? "Saving…" : "Save audio/subtitle defaults"}
-          </button>
+        {!editable ? <p className="mt-3 text-xs text-[var(--mm-text3)]">Operators and admins can edit these rules.</p> : null}
+        <div className="mt-6 grid gap-5 lg:grid-cols-2">
+          <ScopeCard
+            title="Movies"
+            draft={movieDraft}
+            setDraft={setMovieDraft}
+            editable={editable}
+            isPending={saveMovie.isPending}
+            dirty={movieDirty}
+            isError={saveMovie.isError}
+            error={saveMovie.error}
+            isSuccess={saveMovie.isSuccess}
+            onSave={() => saveMovie.mutate(saveMovieBody)}
+            pickerTestId="refiner-subtitle-language-picker-movie"
+            saveLabel="Save Movies audio/subtitle defaults"
+          />
+          <ScopeCard
+            title="TV"
+            draft={tvDraft}
+            setDraft={setTvDraft}
+            editable={editable}
+            isPending={saveTv.isPending}
+            dirty={tvDirty}
+            isError={saveTv.isError}
+            error={saveTv.error}
+            isSuccess={saveTv.isSuccess}
+            onSave={() => saveTv.mutate(saveTvBody)}
+            pickerTestId="refiner-subtitle-language-picker-tv"
+            saveLabel="Save TV audio/subtitle defaults"
+          />
         </div>
       </section>
 
@@ -355,13 +367,9 @@ export function RefinerRemuxSection() {
         <p className="mt-2 text-[var(--mm-text3)]">
           Use this when you want to test one file before scanning a full library. Enter a path under the saved{" "}
           <strong className="text-[var(--mm-text)]">Movies</strong> or <strong className="text-[var(--mm-text)]">TV</strong>{" "}
-          watched folder. Dry run only probes/plans. Live writes output and may remove the source file after success.
+          watched folder.
         </p>
-
-        {!editable ? (
-          <p className="mt-3 text-xs text-[var(--mm-text3)]">Operators and admins can queue passes.</p>
-        ) : null}
-
+        {!editable ? <p className="mt-3 text-xs text-[var(--mm-text3)]">Operators and admins can queue passes.</p> : null}
         <div className="mt-5 space-y-4">
           <fieldset className="space-y-2">
             <legend className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Path scope</legend>
@@ -387,9 +395,7 @@ export function RefinerRemuxSection() {
             </label>
           </fieldset>
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
-              Relative media path
-            </span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Relative media path</span>
             <input
               className={`${mmEditableTextFieldClass} mt-1`}
               value={relPath}
@@ -409,19 +415,16 @@ export function RefinerRemuxSection() {
             <span className="text-sm text-[var(--mm-text2)]">Dry run (recommended)</span>
           </label>
         </div>
-
         {enqueue.isError ? (
           <p className="mt-3 text-sm text-red-300" role="alert" data-testid="refiner-remux-enqueue-error">
             {enqueue.error instanceof Error ? enqueue.error.message : "Enqueue failed."}
           </p>
         ) : null}
-
         {enqueue.isSuccess ? (
           <p className="mt-3 text-xs text-[var(--mm-text3)]" data-testid="refiner-remux-enqueued-hint">
             Queued job #{enqueue.data.job_id}. When workers run, check Activity for the result.
           </p>
         ) : null}
-
         <div className="mt-6">
           <button
             type="button"

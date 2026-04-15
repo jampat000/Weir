@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class RefinerRemuxRulesSettingsOut(BaseModel):
+class RefinerRemuxRulesScopeOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     primary_audio_lang: str
@@ -27,6 +27,11 @@ class RefinerRemuxRulesSettingsOut(BaseModel):
         "preferred_langs_strict",
         "quality_all_languages",
     ]
+class RefinerRemuxRulesSettingsOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    movie: RefinerRemuxRulesScopeOut
+    tv: RefinerRemuxRulesScopeOut
     updated_at: str
 
 
@@ -34,6 +39,7 @@ class RefinerRemuxRulesSettingsPutIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     csrf_token: str = Field(..., min_length=1)
+    media_scope: Literal["movie", "tv"] = "movie"
     primary_audio_lang: str = Field(default="eng", max_length=24)
     secondary_audio_lang: str = Field(default="jpn", max_length=24)
     tertiary_audio_lang: str = Field(default="", max_length=24)

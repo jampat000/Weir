@@ -75,7 +75,7 @@ export function RefinerJobsInspectionSection() {
       <h2 id="refiner-jobs-inspection-heading" className="text-base font-semibold text-[var(--mm-text)]">
         Jobs
       </h2>
-      <p className="mt-2 max-w-3xl">
+      <p className="mt-2 max-w-3xl text-[var(--mm-text3)]">
         Use this queue view to see what Refiner is waiting on, processing now, or recently finished on this server. Open{" "}
         <strong className="text-[var(--mm-text)]">Activity</strong> for full run detail once a job completes.
       </p>
@@ -84,13 +84,13 @@ export function RefinerJobsInspectionSection() {
         terminal rows).
       </p>
 
-      <div className="mt-5">
+      <div className="mt-5 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)]/60 px-4 py-3">
         <label className="block">
           <span id={filterLabelId} className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
             Filter
           </span>
           <MmListboxPicker
-            className="max-w-md"
+            className="mt-2 max-w-md"
             data-testid="refiner-jobs-inspection-filter"
             ariaLabelledBy={filterLabelId}
             placeholder="Select filter"
@@ -108,11 +108,15 @@ export function RefinerJobsInspectionSection() {
       ) : null}
 
       {jobs.length === 0 ? (
-        <p className="mt-4 text-[var(--mm-text3)]" data-testid="refiner-jobs-inspection-empty">
-          No rows for this filter.
-        </p>
+        <div
+          className="mt-4 rounded-md border border-[var(--mm-border)] bg-black/10 px-4 py-5 text-sm text-[var(--mm-text3)]"
+          data-testid="refiner-jobs-inspection-empty"
+        >
+          <p className="font-medium text-[var(--mm-text2)]">No rows for this filter.</p>
+          <p className="mt-1 text-xs">Try a broader filter to review queue activity.</p>
+        </div>
       ) : (
-        <div className="mt-4 w-full min-w-0 overflow-x-auto">
+        <div className="mt-4 w-full min-w-0 overflow-x-auto rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)]/50 p-2">
           <table className="w-full min-w-[44rem] border-collapse text-left text-xs">
             <thead>
               <tr className="border-b border-[var(--mm-border)] text-[var(--mm-text3)]">
