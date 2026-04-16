@@ -1,0 +1,312 @@
+"""HTTP integration: ``/api/v1/pruner/instances`` (Phase 2A instance-primary surface)."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import select
+from starlette.testclient import TestClient
+
+from mediamop.api.factory import create_app
+from mediamop.core.config import MediaMopSettings
+from mediamop.core.db import create_db_engine, create_session_factory
+from mediamop.modules.pruner.pruner_constants import MEDIA_SCOPE_MOVIES, MEDIA_SCOPE_TV
+from mediamop.modules.pruner.pruner_job_kinds import (
+    PRUNER_CANDIDATE_REMOVAL_PREVIEW_JOB_KIND,
+    PRUNER_SERVER_CONNECTION_TEST_JOB_KIND,
+)
+from mediamop.modules.pruner.pruner_jobs_model import PrunerJob
+from mediamop.modules.pruner.pruner_scope_settings_model import PrunerScopeSettings
+from mediamop.modules.pruner.pruner_server_instance_model import PrunerServerInstance
+from tests.integration_helpers import auth_post, csrf as fetch_csrf, seed_admin_user, seed_viewer_user
+
+import mediamop.modules.pruner.pruner_jobs_model  # noqa: F401
+import mediamop.modules.pruner.pruner_preview_run_model  # noqa: F401
+import mediamop.modules.pruner.pruner_scope_settings_model  # noqa: F401
+import mediamop.modules.pruner.pruner_server_instance_model  # noqa: F401
+import mediamop.platform.activity.models  # noqa: F401
+import mediamop.platform.auth.models  # noqa: F401
+
+
+@pytest.fixture(autouse=True)
+def _isolated_pruner_instances_api_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home = tmp_path / "mmhome_pruner_api"
+    home.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("MEDIAMOP_HOME", str(home))
+    monkeypatch.setenv("MEDIAMOP_FETCHER_WORKER_COUNT", "0")
+    monkeypatch.setenv("MEDIAMOP_REFINER_WORKER_COUNT", "0")
+    monkeypatch.setenv("MEDIAMOP_PRUNER_WORKER_COUNT", "0")
+    monkeypatch.setenv("MEDIAMOP_SUBBER_WORKER_COUNT", "0")
+    monkeypatch.setenv("MEDIAMOP_REFINER_SUPPLIED_PAYLOAD_EVALUATION_SCHEDULE_ENABLED", "0")
+    monkeypatch.setenv("MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_ENABLED", "0")
+    monkeypatch.setenv("MEDIAMOP_REFINER_WORK_TEMP_STALE_SWEEP_MOVIE_SCHEDULE_ENABLED", "0")
+    monkeypatch.setenv("MEDIAMOP_REFINER_WORK_TEMP_STALE_SWEEP_TV_SCHEDULE_ENABLED", "0")
+    monkeypatch.setenv("MEDIAMOP_REFINER_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED", "0")
+    monkeypatch.setenv("MEDIAMOP_REFINER_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED", "0")
+    monkeypatch.setenv("MEDIAMOP_FAILED_IMPORT_RADARR_CLEANUP_DRIVE_SCHEDULE_ENABLED", "0")
+    monkeypatch.setenv("MEDIAMOP_FAILED_IMPORT_SONARR_CLEANUP_DRIVE_SCHEDULE_ENABLED", "0")
+    monkeypatch.setenv("MEDIAMOP_FETCHER_SONARR_MISSING_SEARCH_SCHEDULE_ENABLED", "0")
+    monkeypatch.setenv("MEDIAMOP_FETCHER_SONARR_UPGRADE_SEARCH_SCHEDULE_ENABLED", "0")
+    monkeypatch.setenv("MEDIAMOP_FETCHER_RADARR_MISSING_SEARCH_SCHEDULE_ENABLED", "0")
+    monkeypatch.setenv("MEDIAMOP_FETCHER_RADARR_UPGRADE_SEARCH_SCHEDULE_ENABLED", "0")
+
+    backend = Path(__file__).resolve().parents[1]
+    cfg = Config(str(backend / "alembic.ini"))
+    command.upgrade(cfg, "head")
+
+
+@pytest.fixture
+def client_with_admin() -> TestClient:
+    seed_admin_user()
+    app = create_app()
+    with TestClient(app) as c:
+        yield c
+
+
+@pytest.fixture
+def client_with_viewer() -> TestClient:
+    seed_viewer_user()
+    app = create_app()
+    with TestClient(app) as c:
+        yield c
+
+
+def _fac():
+    settings = MediaMopSettings.load()
+    eng = create_db_engine(settings)
+    return create_session_factory(eng)
+
+
+def _login_admin(client: TestClient) -> None:
+    tok = fetch_csrf(client)
+    r = auth_post(
+        client,
+        "/api/v1/auth/login",
+        json={"username": "alice", "password": "test-password-strong", "csrf_token": tok},
+    )
+    assert r.status_code == 200, r.text
+
+
+def _login_viewer(client: TestClient) -> None:
+    tok = fetch_csrf(client)
+    r = auth_post(
+        client,
+        "/api/v1/auth/login",
+        json={"username": "bob", "password": "viewer-password-here", "csrf_token": tok},
+    )
+    assert r.status_code == 200, r.text
+
+
+def test_get_pruner_instances_requires_auth(client_with_admin: TestClient) -> None:
+    r = client_with_admin.get("/api/v1/pruner/instances")
+    assert r.status_code == 401
+
+
+def test_post_pruner_instances_requires_operator(client_with_viewer: TestClient) -> None:
+    _login_viewer(client_with_viewer)
+    tok = fetch_csrf(client_with_viewer)
+    r = auth_post(
+        client_with_viewer,
+        "/api/v1/pruner/instances",
+        json={
+            "provider": "emby",
+            "display_name": "X",
+            "base_url": "http://x.test",
+            "credentials": {"api_key": "k"},
+            "csrf_token": tok,
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    assert r.status_code == 403, r.text
+
+
+def test_post_pruner_instances_creates_row_seeds_scopes_and_hides_secrets(client_with_admin: TestClient) -> None:
+    """``POST /api/v1/pruner/instances`` — instance-primary JSON; no credential material in response."""
+
+    _login_admin(client_with_admin)
+    tok = fetch_csrf(client_with_admin)
+    secret_key = "super-secret-api-key-99"
+    r = auth_post(
+        client_with_admin,
+        "/api/v1/pruner/instances",
+        json={
+            "provider": "emby",
+            "display_name": "Home Emby",
+            "base_url": "http://emby-instance.test",
+            "credentials": {"api_key": secret_key},
+            "csrf_token": tok,
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["display_name"] == "Home Emby"
+    assert body["provider"] == "emby"
+    assert body["base_url"] == "http://emby-instance.test"
+    assert "id" in body and isinstance(body["id"], int)
+    assert "scopes" in body and isinstance(body["scopes"], list)
+    assert len(body["scopes"]) == 2
+    scopes_sorted = sorted(body["scopes"], key=lambda s: s["media_scope"])
+    assert [s["media_scope"] for s in scopes_sorted] == [MEDIA_SCOPE_MOVIES, MEDIA_SCOPE_TV]
+    for s in body["scopes"]:
+        assert s["preview_max_items"] == 500
+        assert s["missing_primary_media_reported_enabled"] is True
+
+    raw = json.dumps(body)
+    assert secret_key not in raw
+    assert "api_key" not in raw
+    assert "credentials" not in raw
+    assert "ciphertext" not in raw.lower()
+
+    iid = int(body["id"])
+    fac = _fac()
+    with fac() as db:
+        inst = db.scalars(select(PrunerServerInstance).where(PrunerServerInstance.id == iid)).one()
+        assert "secret" not in inst.credentials_ciphertext
+        rows = db.scalars(
+            select(PrunerScopeSettings).where(PrunerScopeSettings.server_instance_id == iid),
+        ).all()
+        assert len(rows) == 2
+        assert {r.media_scope for r in rows} == {MEDIA_SCOPE_TV, MEDIA_SCOPE_MOVIES}
+
+
+def test_post_pruner_preview_enqueue_payload_is_per_instance_and_scope(client_with_admin: TestClient) -> None:
+    _login_admin(client_with_admin)
+    tok = fetch_csrf(client_with_admin)
+    r0 = auth_post(
+        client_with_admin,
+        "/api/v1/pruner/instances",
+        json={
+            "provider": "jellyfin",
+            "display_name": "JF-A",
+            "base_url": "http://jf-a.test",
+            "credentials": {"api_key": "a"},
+            "csrf_token": tok,
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    assert r0.status_code == 200, r0.text
+    iid_a = int(r0.json()["id"])
+    tok = fetch_csrf(client_with_admin)
+    r1 = auth_post(
+        client_with_admin,
+        "/api/v1/pruner/instances",
+        json={
+            "provider": "jellyfin",
+            "display_name": "JF-B",
+            "base_url": "http://jf-b.test",
+            "credentials": {"api_key": "b"},
+            "csrf_token": tok,
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    assert r1.status_code == 200, r1.text
+    iid_b = int(r1.json()["id"])
+
+    tok = fetch_csrf(client_with_admin)
+    rp = auth_post(
+        client_with_admin,
+        f"/api/v1/pruner/instances/{iid_a}/previews",
+        json={"media_scope": "tv", "csrf_token": tok},
+        headers={"Content-Type": "application/json"},
+    )
+    assert rp.status_code == 200, rp.text
+    assert "pruner_job_id" in rp.json()
+
+    tok = fetch_csrf(client_with_admin)
+    rp2 = auth_post(
+        client_with_admin,
+        f"/api/v1/pruner/instances/{iid_b}/previews",
+        json={"media_scope": "movies", "csrf_token": tok},
+        headers={"Content-Type": "application/json"},
+    )
+    assert rp2.status_code == 200, rp2.text
+
+    fac = _fac()
+    with fac() as db:
+        jobs = db.scalars(select(PrunerJob).order_by(PrunerJob.id.asc())).all()
+        preview_jobs = [j for j in jobs if j.job_kind == PRUNER_CANDIDATE_REMOVAL_PREVIEW_JOB_KIND]
+        assert len(preview_jobs) == 2
+        p0 = json.loads(preview_jobs[0].payload_json or "{}")
+        p1 = json.loads(preview_jobs[1].payload_json or "{}")
+        by_id = {p["server_instance_id"]: p for p in (p0, p1)}
+        assert by_id[iid_a]["media_scope"] == "tv"
+        assert by_id[iid_b]["media_scope"] == "movies"
+        assert "media_scope" in by_id[iid_a] and len(by_id[iid_a]) == 2
+        assert set(by_id[iid_a]) == {"server_instance_id", "media_scope"}
+
+
+def test_post_pruner_connection_test_enqueue_job_kind_and_instance_payload(client_with_admin: TestClient) -> None:
+    _login_admin(client_with_admin)
+    tok = fetch_csrf(client_with_admin)
+    r0 = auth_post(
+        client_with_admin,
+        "/api/v1/pruner/instances",
+        json={
+            "provider": "emby",
+            "display_name": "E-conn",
+            "base_url": "http://e-conn.test",
+            "credentials": {"api_key": "k"},
+            "csrf_token": tok,
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    assert r0.status_code == 200, r0.text
+    iid = int(r0.json()["id"])
+
+    tok = fetch_csrf(client_with_admin)
+    rc = auth_post(
+        client_with_admin,
+        f"/api/v1/pruner/instances/{iid}/connection-test",
+        json={"csrf_token": tok},
+        headers={"Content-Type": "application/json"},
+    )
+    assert rc.status_code == 200, rc.text
+
+    fac = _fac()
+    with fac() as db:
+        job = db.scalars(
+            select(PrunerJob).where(PrunerJob.job_kind == PRUNER_SERVER_CONNECTION_TEST_JOB_KIND),
+        ).one()
+        assert job.job_kind == PRUNER_SERVER_CONNECTION_TEST_JOB_KIND
+        payload = json.loads(job.payload_json or "{}")
+        assert payload == {"server_instance_id": iid}
+        assert "media_scope" not in payload
+
+
+def test_get_pruner_instances_lists_two_emby_without_shared_state(client_with_admin: TestClient) -> None:
+    """Two same-provider instances remain distinct rows (no collapsed global server)."""
+
+    _login_admin(client_with_admin)
+    for name, base in (("Emby-1", "http://emby-1.test"), ("Emby-2", "http://emby-2.test")):
+        tok = fetch_csrf(client_with_admin)
+        r = auth_post(
+            client_with_admin,
+            "/api/v1/pruner/instances",
+            json={
+                "provider": "emby",
+                "display_name": name,
+                "base_url": base,
+                "credentials": {"api_key": f"key-{name}"},
+                "csrf_token": tok,
+            },
+            headers={"Content-Type": "application/json"},
+        )
+        assert r.status_code == 200, r.text
+
+    rlist = client_with_admin.get("/api/v1/pruner/instances")
+    assert rlist.status_code == 200, rlist.text
+    arr = rlist.json()
+    assert len(arr) == 2
+    bases = {x["base_url"] for x in arr}
+    assert bases == {"http://emby-1.test", "http://emby-2.test"}
+    for x in arr:
+        assert len(x["scopes"]) == 2
+        assert x["last_connection_test_detail"] is None
+        for s in x["scopes"]:
+            assert s["last_preview_outcome"] is None
+            assert s["last_preview_run_uuid"] is None

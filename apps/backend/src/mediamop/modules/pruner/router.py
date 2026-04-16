@@ -4,4 +4,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from mediamop.modules.pruner.pruner_instances_api import router as pruner_instances_router
+from mediamop.modules.pruner.pruner_jobs_inspection_api import router as pruner_jobs_inspection_router
+
 router = APIRouter(tags=["pruner"])
+router.include_router(pruner_jobs_inspection_router)
+router.include_router(pruner_instances_router)

@@ -208,8 +208,11 @@ def test_refiner_job_cancel_pending_ok(client_with_admin: TestClient) -> None:
     fac = _fac()
     with fac() as db:
         db.execute(delete(RefinerJob))
+        db.commit()
+    dedupe = f"to-cancel-{__import__('uuid').uuid4().hex}"
+    with fac() as db:
         row = RefinerJob(
-            dedupe_key="to-cancel",
+            dedupe_key=dedupe,
             job_kind="refiner.candidate_gate.v1",
             status=RefinerJobStatus.PENDING.value,
         )

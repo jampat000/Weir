@@ -39,3 +39,10 @@ REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_COMPLETED = "refiner.watched_folder_r
 REFINER_FILE_REMUX_PASS_COMPLETED = "refiner.file_remux_pass_completed"
 REFINER_WORK_TEMP_STALE_SWEEP_COMPLETED = "refiner.work_temp_stale_sweep_completed"
 REFINER_FAILURE_CLEANUP_SWEEP_COMPLETED = "refiner.failure_cleanup_sweep_completed"
+
+# Pruner (pruner_jobs + server instances)
+PRUNER_CONNECTION_TEST_SUCCEEDED = "pruner.connection_test_succeeded"
+PRUNER_CONNECTION_TEST_FAILED = "pruner.connection_test_failed"
+PRUNER_PREVIEW_SUCCEEDED = "pruner.preview_succeeded"
+PRUNER_PREVIEW_UNSUPPORTED = "pruner.preview_unsupported"
+PRUNER_PREVIEW_FAILED = "pruner.preview_failed"

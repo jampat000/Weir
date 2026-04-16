@@ -1,0 +1,43 @@
+"""Pruner media server instance — one row per connected server (Emby / Jellyfin / Plex)."""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, func, text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from mediamop.core.db import Base
+
+
+class PrunerServerInstance(Base):
+    """Operator-registered server; credentials stored as encrypted JSON (see ``pruner_credentials``)."""
+
+    __tablename__ = "pruner_server_instances"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    provider: Mapped[str] = mapped_column(String(16), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    base_url: Mapped[str] = mapped_column(String(512), nullable=False)
+    credentials_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("1"))
+    last_connection_test_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_connection_test_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    last_connection_test_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    scope_settings: Mapped[list["PrunerScopeSettings"]] = relationship(
+        "PrunerScopeSettings",
+        back_populates="server_instance",
+        cascade="all, delete-orphan",
+    )

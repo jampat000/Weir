@@ -35,6 +35,10 @@ from mediamop.modules.refiner import jobs_model as _refiner_jobs_orm  # noqa: F4
 from mediamop.modules.refiner import refiner_operator_settings_model as _refiner_operator_settings_orm  # noqa: F401
 from mediamop.modules.refiner import refiner_path_settings_model as _refiner_path_settings_orm  # noqa: F401
 from mediamop.modules.refiner import refiner_remux_rules_settings_model as _refiner_remux_rules_settings_orm  # noqa: F401
+from mediamop.modules.pruner import pruner_jobs_model as _pruner_jobs_orm  # noqa: F401
+from mediamop.modules.pruner import pruner_preview_run_model as _pruner_preview_run_orm  # noqa: F401
+from mediamop.modules.pruner import pruner_scope_settings_model as _pruner_scope_settings_orm  # noqa: F401
+from mediamop.modules.pruner import pruner_server_instance_model as _pruner_server_instance_orm  # noqa: F401
 from mediamop.platform.suite_settings import model as _suite_settings_orm  # noqa: F401
 
 # this is the Alembic Config object, which provides access to the values within alembic.ini

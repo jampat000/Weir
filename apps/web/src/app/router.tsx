@@ -9,7 +9,11 @@ import { RootEntry } from "../pages/root-entry";
 import { SettingsPage } from "../pages/settings/settings-page";
 import { SetupPage } from "../pages/setup/setup-page";
 import { SubberPage } from "../pages/subber/subber-page";
-import { PrunerPage } from "../pages/pruner/pruner-page";
+import { PrunerConnectionTab } from "../pages/pruner/pruner-connection-tab";
+import { PrunerInstanceOverviewTab } from "../pages/pruner/pruner-instance-overview-tab";
+import { PrunerInstanceShell } from "../pages/pruner/pruner-instance-shell";
+import { PrunerInstancesListPage } from "../pages/pruner/pruner-instances-list-page";
+import { PrunerScopeTab } from "../pages/pruner/pruner-scope-tab";
 import { RequireAuth } from "./require-auth";
 
 const router = createBrowserRouter([
@@ -27,7 +31,23 @@ const router = createBrowserRouter([
           { path: "activity", element: <ActivityPage /> },
           { path: "fetcher", element: <FetcherPage /> },
           { path: "refiner", element: <RefinerPage /> },
-          { path: "pruner", element: <PrunerPage /> },
+          {
+            path: "pruner",
+            children: [
+              { index: true, element: <PrunerInstancesListPage /> },
+              {
+                path: "instances/:instanceId",
+                element: <PrunerInstanceShell />,
+                children: [
+                  { index: true, element: <Navigate to="overview" replace /> },
+                  { path: "overview", element: <PrunerInstanceOverviewTab /> },
+                  { path: "tv", element: <PrunerScopeTab scope="tv" /> },
+                  { path: "movies", element: <PrunerScopeTab scope="movies" /> },
+                  { path: "connection", element: <PrunerConnectionTab /> },
+                ],
+              },
+            ],
+          },
           { path: "subber", element: <SubberPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],
