@@ -19,6 +19,9 @@ def _login_admin(client: TestClient) -> None:
 
 def test_refiner_operator_settings_get_shape(client_with_admin: TestClient) -> None:
     _login_admin(client_with_admin)
+    suite_r = client_with_admin.get("/api/v1/suite/settings")
+    assert suite_r.status_code == 200, suite_r.text
+    expected_schedule_tz = suite_r.json()["app_timezone"]
     r = client_with_admin.get("/api/v1/refiner/operator-settings")
     assert r.status_code == 200, r.text
     body = r.json()
@@ -36,7 +39,7 @@ def test_refiner_operator_settings_get_shape(client_with_admin: TestClient) -> N
     assert body["tv_schedule_days"] == ""
     assert body["tv_schedule_start"] == "00:00"
     assert body["tv_schedule_end"] == "23:59"
-    assert body["schedule_timezone"] == "UTC"
+    assert body["schedule_timezone"] == expected_schedule_tz
 
 
 def test_refiner_operator_settings_put_updates(client_with_admin: TestClient) -> None:
