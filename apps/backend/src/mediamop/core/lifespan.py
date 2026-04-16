@@ -33,6 +33,10 @@ from mediamop.modules.fetcher.periodic_failed_import_cleanup_enqueue import (
 )
 from mediamop.modules.refiner.refiner_job_handlers import build_refiner_job_handlers
 from mediamop.modules.refiner.refiner_operator_settings_service import ensure_refiner_operator_settings_row
+from mediamop.modules.refiner.refiner_failure_cleanup_periodic_enqueue import (
+    start_refiner_failure_cleanup_enqueue_tasks,
+    stop_refiner_failure_cleanup_enqueue_tasks,
+)
 from mediamop.modules.subber.subber_job_handlers import build_subber_job_handlers
 from mediamop.modules.trimmer.trimmer_job_handlers import build_trimmer_job_handlers
 from mediamop.modules.refiner.refiner_supplied_payload_evaluation_periodic_enqueue import (
@@ -118,6 +122,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         stop_event=stop,
         settings=settings,
     )
+    refiner_failure_cleanup_tasks = start_refiner_failure_cleanup_enqueue_tasks(
+        session_factory,
+        stop_event=stop,
+        settings=settings,
+    )
     fetcher_stop, fetcher_worker_tasks = start_fetcher_worker_background_tasks(
         session_factory,
         settings,
@@ -159,6 +168,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await stop_refiner_supplied_payload_evaluation_enqueue_tasks(refiner_supplied_payload_eval_tasks)
         await stop_refiner_watched_folder_remux_scan_dispatch_enqueue_tasks(refiner_watched_folder_scan_dispatch_tasks)
         await stop_refiner_work_temp_stale_sweep_enqueue_tasks(refiner_work_temp_stale_sweep_tasks)
+        await stop_refiner_failure_cleanup_enqueue_tasks(refiner_failure_cleanup_tasks)
         await stop_fetcher_failed_import_cleanup_drive_enqueue_tasks(fetcher_schedule_tasks)
         await stop_subber_worker_background_tasks(subber_stop, subber_worker_tasks)
         await stop_trimmer_worker_background_tasks(trimmer_stop, trimmer_worker_tasks)

@@ -175,7 +175,10 @@ export function RefinerPathSettingsSection() {
             <span className="font-semibold text-[var(--mm-text2)]">If a pass fails.</span> Refiner does not delete the
             source. Output is usually unchanged, unless an existing destination was already removed and the move then
             failed. Temp files are removed when ffmpeg or the post-ffmpeg check fails; that is not true for every failure
-            that happens after that.
+            that happens after that. Separately from this one-file flow, Refiner can run periodic failed-job cleanup for
+            terminal failed remux jobs after a per-scope grace period. That later sweep may remove failed source/output
+            leftovers and matching Refiner temp files only when safety gates pass. If Radarr/Sonarr is unavailable or still
+            shows the file/season in queue, Refiner skips cleanup. Dry-run failed jobs never delete anything.
           </p>
         </div>
       </details>

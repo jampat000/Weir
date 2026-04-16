@@ -49,6 +49,17 @@ _TV_OUTPUT_CLEANUP_NOTE = (
     "still maps under that season output folder. Restart the API after changing this value."
 )
 
+_FAILURE_CLEANUP_NOTE = (
+    "Refiner Pass 4 failed-remux cleanup sweep uses separate Movies and TV timers and grace periods in apps/backend/.env: "
+    "MEDIAMOP_REFINER_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED / "
+    "MEDIAMOP_REFINER_MOVIE_FAILURE_CLEANUP_SCHEDULE_INTERVAL_SECONDS / "
+    "MEDIAMOP_REFINER_MOVIE_FAILURE_CLEANUP_GRACE_PERIOD_SECONDS and "
+    "MEDIAMOP_REFINER_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED / "
+    "MEDIAMOP_REFINER_TV_FAILURE_CLEANUP_SCHEDULE_INTERVAL_SECONDS / "
+    "MEDIAMOP_REFINER_TV_FAILURE_CLEANUP_GRACE_PERIOD_SECONDS. "
+    "Only terminal failed remux rows are eligible, and failure age uses refiner_jobs.updated_at. Restart required."
+)
+
 _WATCHED_FOLDER_SCAN_PERIODIC_NOTE = (
     "Optional periodic enqueue for refiner.watched_folder.remux_scan_dispatch.v1 uses "
     "MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_ENABLED and "
@@ -119,5 +130,12 @@ def refiner_runtime_settings_from_settings(settings: MediaMopSettings) -> Refine
             settings.refiner_work_temp_stale_sweep_tv_schedule_interval_seconds
         ),
         refiner_work_temp_stale_sweep_min_stale_age_seconds=settings.refiner_work_temp_stale_sweep_min_stale_age_seconds,
+        refiner_movie_failure_cleanup_schedule_enabled=settings.refiner_movie_failure_cleanup_schedule_enabled,
+        refiner_movie_failure_cleanup_schedule_interval_seconds=settings.refiner_movie_failure_cleanup_schedule_interval_seconds,
+        refiner_tv_failure_cleanup_schedule_enabled=settings.refiner_tv_failure_cleanup_schedule_enabled,
+        refiner_tv_failure_cleanup_schedule_interval_seconds=settings.refiner_tv_failure_cleanup_schedule_interval_seconds,
+        refiner_movie_failure_cleanup_grace_period_seconds=settings.refiner_movie_failure_cleanup_grace_period_seconds,
+        refiner_tv_failure_cleanup_grace_period_seconds=settings.refiner_tv_failure_cleanup_grace_period_seconds,
+        failure_cleanup_configuration_note=_FAILURE_CLEANUP_NOTE,
         work_temp_stale_sweep_periodic_configuration_note=_WORK_TEMP_STALE_SWEEP_PERIODIC_NOTE,
     )

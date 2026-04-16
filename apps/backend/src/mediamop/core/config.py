@@ -131,6 +131,13 @@ class MediaMopSettings:
     refiner_work_temp_stale_sweep_tv_schedule_interval_seconds: int
     # Narrow exception: same minimum age applies to both scopes (same temp filename semantics).
     refiner_work_temp_stale_sweep_min_stale_age_seconds: int
+    # Refiner Pass 4 — terminal failed remux cleanup sweep (Movies/TV independent schedule + grace).
+    refiner_movie_failure_cleanup_schedule_enabled: bool
+    refiner_movie_failure_cleanup_schedule_interval_seconds: int
+    refiner_tv_failure_cleanup_schedule_enabled: bool
+    refiner_tv_failure_cleanup_schedule_interval_seconds: int
+    refiner_movie_failure_cleanup_grace_period_seconds: int
+    refiner_tv_failure_cleanup_grace_period_seconds: int
     # Legacy env read for compatibility only; remux path resolution uses saved Refiner path settings (SQLite).
     refiner_remux_media_root: str | None
     # Radarr/Sonarr HTTP for Fetcher-owned live failed-import cleanup drives (env: MEDIAMOP_FETCHER_*).
@@ -366,6 +373,28 @@ class MediaMopSettings:
             60,
             min(30 * 24 * 3600, _env_int("MEDIAMOP_REFINER_WORK_TEMP_STALE_SWEEP_MIN_STALE_AGE_SECONDS", 86_400)),
         )
+        refiner_movie_failure_cleanup_schedule_enabled = _env_bool(
+            "MEDIAMOP_REFINER_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED",
+            False,
+        )
+        refiner_movie_failure_cleanup_schedule_interval_seconds = clamp_refiner_schedule_interval_seconds(
+            _env_int("MEDIAMOP_REFINER_MOVIE_FAILURE_CLEANUP_SCHEDULE_INTERVAL_SECONDS", 3600),
+        )
+        refiner_tv_failure_cleanup_schedule_enabled = _env_bool(
+            "MEDIAMOP_REFINER_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED",
+            False,
+        )
+        refiner_tv_failure_cleanup_schedule_interval_seconds = clamp_refiner_schedule_interval_seconds(
+            _env_int("MEDIAMOP_REFINER_TV_FAILURE_CLEANUP_SCHEDULE_INTERVAL_SECONDS", 3600),
+        )
+        refiner_movie_failure_cleanup_grace_period_seconds = max(
+            300,
+            min(604800, _env_int("MEDIAMOP_REFINER_MOVIE_FAILURE_CLEANUP_GRACE_PERIOD_SECONDS", 1800)),
+        )
+        refiner_tv_failure_cleanup_grace_period_seconds = max(
+            300,
+            min(604800, _env_int("MEDIAMOP_REFINER_TV_FAILURE_CLEANUP_GRACE_PERIOD_SECONDS", 1800)),
+        )
         refiner_remux_root = (os.environ.get("MEDIAMOP_REFINER_REMUX_MEDIA_ROOT") or "").strip()
         refiner_remux_media_root = str(Path(refiner_remux_root).expanduser()) if refiner_remux_root else None
         radarr_base = (os.environ.get("MEDIAMOP_FETCHER_RADARR_BASE_URL") or "").strip()
@@ -588,6 +617,12 @@ class MediaMopSettings:
             refiner_work_temp_stale_sweep_tv_schedule_enabled=refiner_temp_sweep_tv_on,
             refiner_work_temp_stale_sweep_tv_schedule_interval_seconds=refiner_temp_sweep_tv_iv,
             refiner_work_temp_stale_sweep_min_stale_age_seconds=refiner_temp_sweep_min_stale,
+            refiner_movie_failure_cleanup_schedule_enabled=refiner_movie_failure_cleanup_schedule_enabled,
+            refiner_movie_failure_cleanup_schedule_interval_seconds=refiner_movie_failure_cleanup_schedule_interval_seconds,
+            refiner_tv_failure_cleanup_schedule_enabled=refiner_tv_failure_cleanup_schedule_enabled,
+            refiner_tv_failure_cleanup_schedule_interval_seconds=refiner_tv_failure_cleanup_schedule_interval_seconds,
+            refiner_movie_failure_cleanup_grace_period_seconds=refiner_movie_failure_cleanup_grace_period_seconds,
+            refiner_tv_failure_cleanup_grace_period_seconds=refiner_tv_failure_cleanup_grace_period_seconds,
             refiner_remux_media_root=refiner_remux_media_root,
             fetcher_radarr_base_url=radarr_base or None,
             fetcher_radarr_api_key=radarr_key or None,

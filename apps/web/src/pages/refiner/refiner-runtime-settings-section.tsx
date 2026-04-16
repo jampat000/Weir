@@ -121,6 +121,30 @@ export function RefinerRuntimeSettingsSection() {
         <p className="mt-2 text-xs text-[var(--mm-text3)]">{d.work_temp_stale_sweep_periodic_configuration_note}</p>
       </details>
 
+      <h3 className="mt-7 text-sm font-semibold text-[var(--mm-text)]">Failed remux cleanup sweep</h3>
+      <p className="mt-1 text-[var(--mm-text3)]">
+        Periodic Refiner cleanup for terminal failed remux jobs only. Movies and TV are independent schedules and each
+        uses its own grace period before a failed job is eligible.
+      </p>
+      <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[var(--mm-text2)]">
+        <li>
+          Movies failed-job sweep: {d.refiner_movie_failure_cleanup_schedule_enabled ? "Enabled" : "Disabled"} — every{" "}
+          {d.refiner_movie_failure_cleanup_schedule_interval_seconds} seconds
+        </li>
+        <li>Movies failed-job grace period: {d.refiner_movie_failure_cleanup_grace_period_seconds} seconds</li>
+        <li>
+          TV failed-job sweep: {d.refiner_tv_failure_cleanup_schedule_enabled ? "Enabled" : "Disabled"} — every{" "}
+          {d.refiner_tv_failure_cleanup_schedule_interval_seconds} seconds
+        </li>
+        <li>TV failed-job grace period: {d.refiner_tv_failure_cleanup_grace_period_seconds} seconds</li>
+      </ul>
+      <details className="mt-4 rounded-md border border-[var(--mm-border)] bg-black/10 p-3">
+        <summary className="cursor-pointer text-sm font-medium text-[var(--mm-text1)]">
+          Advanced failed-job cleanup configuration
+        </summary>
+        <p className="mt-2 text-xs text-[var(--mm-text3)]">{d.failure_cleanup_configuration_note}</p>
+      </details>
+
       <details className="mt-4 rounded-md border border-[var(--mm-border)] bg-black/10 p-3">
         <summary className="cursor-pointer text-sm font-medium text-[var(--mm-text1)]">What each Refiner job does</summary>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-[var(--mm-text2)]">
@@ -139,6 +163,10 @@ export function RefinerRuntimeSettingsSection() {
           <li>
             TV output folder cleanup: after a TV remux, may remove the per-season output folder when Sonarr episode file
             paths, direct-child episode age, and active TV remux gates allow it (never Movies).
+          </li>
+          <li>
+            Failed remux cleanup sweep: periodically checks terminal failed remux jobs per scope after a grace period and
+            may remove failed leftovers when ARR queue and safety bounds allow it.
           </li>
         </ul>
       </details>

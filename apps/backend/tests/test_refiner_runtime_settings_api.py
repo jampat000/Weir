@@ -48,6 +48,13 @@ def test_refiner_runtime_settings_operator_shape(client_with_admin: TestClient) 
     assert "refiner_work_temp_stale_sweep_tv_schedule_enabled" in body
     assert "refiner_work_temp_stale_sweep_tv_schedule_interval_seconds" in body
     assert "refiner_work_temp_stale_sweep_min_stale_age_seconds" in body
+    assert "refiner_movie_failure_cleanup_schedule_enabled" in body
+    assert "refiner_movie_failure_cleanup_schedule_interval_seconds" in body
+    assert "refiner_tv_failure_cleanup_schedule_enabled" in body
+    assert "refiner_tv_failure_cleanup_schedule_interval_seconds" in body
+    assert "refiner_movie_failure_cleanup_grace_period_seconds" in body
+    assert "refiner_tv_failure_cleanup_grace_period_seconds" in body
+    assert "failure_cleanup_configuration_note" in body
     assert "work_temp_stale_sweep_periodic_configuration_note" in body
     assert "watched_folder_scan_periodic_configuration_note" in body
 

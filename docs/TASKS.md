@@ -13,6 +13,7 @@ Single canonical backlog for shipped milestones and the next honest slice of wor
 - [x] Refiner work/temp stale sweep (Pass 2 + 13b): per-scope periodic ``refiner.work_temp_stale_sweep.v1`` (Movies vs TV independent gates, dedupe, schedule, reporting; shared-root fail-safe; shared min-stale-age only as documented exception).
 - [x] Refiner Pass 3a (Movies output-folder cleanup): after successful Movies remux, optional full per-title output folder delete when Radarr library has no ``movieFile`` path inside that folder, age + active Movies remux gates pass; cascade bounded to output root; ``refiner_movie_output_cleanup.py``.
 - [x] Refiner Pass 3b (TV output-folder cleanup): after successful TV remux, optional full season output folder delete when Sonarr episode-file library paths, age (direct-child episode media only), and active TV remux gates pass; show-folder cascade bounded to TV output root; ``refiner_tv_output_cleanup.py``.
+- [x] Refiner Pass 4 (failure cleanup sweep): periodic per-scope cleanup for terminal failed Refiner remux jobs after grace period (Movies/TV independent), ARR queue boundary checks, dry-run skip, bounded source/output/temp cleanup, lock-safe behavior, plain activity truth.
 - [x] Refiner watched-folder scanning family shipped: `refiner.watched_folder.remux_scan_dispatch.v1` (manual trigger, media scan, gate-equivalent ownership/blocking, optional remux enqueue, duplicate guard, activity summary, Refiner page UI + POST enqueue API).
 - [x] Refiner jobs inspection / operator control surface: `GET …/refiner/jobs/inspection`, Refiner page queue table, `POST …/refiner/jobs/{id}/cancel-pending` (pending-only; operators); finished outcomes remain on Activity.
 - [x] Refiner watched-folder periodic scanning: optional Refiner-only asyncio enqueue loop for `refiner.watched_folder.remux_scan_dispatch.v1` (separate env enable/interval + periodic remux flags from supplied payload evaluation); scan-level idle guard; `scan_trigger` in activity summary; runtime settings snapshot + UI honesty (restart required).
@@ -242,6 +243,28 @@ Single canonical backlog for shipped milestones and the next honest slice of wor
 ### 15 — status
 
 - [x] **Pass 3b shipped** — ``refiner_tv_output_cleanup.py`` (Sonarr ``GET /api/v3/episodefile`` truth gate, min-age env on direct-child episode media, same-season-output active **TV** remux gate, remux dry-run early exit, output-root-bounded cascade), ``refiner_file_remux_pass_run.py`` post-success hook after Pass 3a, ``MediaMopSettings`` + runtime snapshot + web Workers copy, ``test_refiner_tv_output_cleanup.py``.
+
+## Roadmap item 16 — Refiner Pass 4 (failure cleanup sweep, per scope)
+
+**Scope (explicit):** Terminal **failed** Refiner remux jobs only (``job_kind=refiner.file.remux_pass.v1``, ``status=failed``). Periodic sweep per scope (Movies vs TV independent) may remove stale failed leftovers under watched/output/work roots when ARR queue truth and scope safety gates allow it. **No** success cleanup behavior changes for Pass 1/1b/2/3a/3b.
+
+**Completion criteria (must all be true to tick):**
+
+1. **Query scope:** Includes only failed remux rows (exclude ``cancelled`` and ``handler_ok_finalize_failed``).
+2. **Failure age:** Uses ``updated_at`` as the failure-age timestamp and per-scope grace periods before eligibility.
+3. **Per-scope grace settings:** ``MEDIAMOP_REFINER_MOVIE_FAILURE_CLEANUP_GRACE_PERIOD_SECONDS`` and ``MEDIAMOP_REFINER_TV_FAILURE_CLEANUP_GRACE_PERIOD_SECONDS`` (defaults 1800s, clamp 300..604800).
+4. **Dry-run jobs:** Failed remux payloads with ``dry_run=true`` are skipped entirely (no filesystem mutation).
+5. **ARR boundary:** Movies uses Radarr queue; TV uses Sonarr queue on direct-child episode set; ARR unreachable = skip fail-safe.
+6. **TV season-clear rule:** Only remove watched/output season folders when direct-child episode media set is clear (none in Sonarr queue and none pending/leased TV remux for that season target).
+7. **Bounds + locks:** Never delete watched/output roots or paths outside resolved roots; lock failures are non-fatal and logged.
+8. **Work/temp:** Removes only Refiner-owned temp artifacts attributable to failed jobs in that scope’s work folder.
+9. **Invocation shape:** Separate periodic durable cleanup units per scope (independent timing and enqueue state; no shared sweep job).
+10. **Activity/result truth:** Per-scope ``*_failure_cleanup_*`` fields in plain language for ran/skip/deleted/queue-check/dry-run/cascade/temp results.
+11. **Tests:** Cover eligible cleanup, queue blocks, ARR down skip, dry-run skip, bounds, lock behavior, per-scope grace handling, missing path-settings skip, and Movies/TV independence.
+
+### 16 — status
+
+- [x] **Pass 4 shipped** — dedicated failure sweep job families (`refiner.movie_failure_cleanup_sweep.v1` / `refiner.tv_failure_cleanup_sweep.v1`), per-scope periodic enqueue + grace knobs, failed-row query on `status=failed` + `updated_at` age gate, ARR queue fail-safe boundary checks, dry-run skip, bounded watched/output/temp cleanup with lock-safe behavior, runtime visibility + tests.
 
 ## Active / next (ordered)
 

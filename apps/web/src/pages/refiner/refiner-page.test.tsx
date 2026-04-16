@@ -87,6 +87,13 @@ const minimalRefinerRuntimeSettings: RefinerRuntimeSettingsOut = {
   refiner_work_temp_stale_sweep_tv_schedule_enabled: false,
   refiner_work_temp_stale_sweep_tv_schedule_interval_seconds: 3600,
   refiner_work_temp_stale_sweep_min_stale_age_seconds: 86_400,
+  refiner_movie_failure_cleanup_schedule_enabled: false,
+  refiner_movie_failure_cleanup_schedule_interval_seconds: 3600,
+  refiner_tv_failure_cleanup_schedule_enabled: false,
+  refiner_tv_failure_cleanup_schedule_interval_seconds: 3600,
+  refiner_movie_failure_cleanup_grace_period_seconds: 1800,
+  refiner_tv_failure_cleanup_grace_period_seconds: 1800,
+  failure_cleanup_configuration_note: "MEDIAMOP_REFINER_*_FAILURE_CLEANUP_* note for tests.",
   work_temp_stale_sweep_periodic_configuration_note: "MEDIAMOP_REFINER_WORK_TEMP_STALE_SWEEP_* env note for tests.",
 };
 

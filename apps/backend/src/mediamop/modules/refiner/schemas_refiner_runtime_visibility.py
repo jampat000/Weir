@@ -84,6 +84,33 @@ class RefinerRuntimeSettingsOut(BaseModel):
         description="Minimum file age before Refiner removes its own stale temp work files (60s..30d). "
         "Shared for both scopes (narrow exception: same temp filename semantics).",
     )
+    refiner_movie_failure_cleanup_schedule_enabled: bool = Field(
+        description="``MEDIAMOP_REFINER_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED`` at process start.",
+    )
+    refiner_movie_failure_cleanup_schedule_interval_seconds: int = Field(
+        ge=60,
+        description="Seconds between Movies-only periodic failed-remux cleanup enqueue ticks.",
+    )
+    refiner_tv_failure_cleanup_schedule_enabled: bool = Field(
+        description="``MEDIAMOP_REFINER_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED`` at process start.",
+    )
+    refiner_tv_failure_cleanup_schedule_interval_seconds: int = Field(
+        ge=60,
+        description="Seconds between TV-only periodic failed-remux cleanup enqueue ticks.",
+    )
+    refiner_movie_failure_cleanup_grace_period_seconds: int = Field(
+        ge=300,
+        le=604800,
+        description="Failed remux age gate for Movies failure cleanup (uses refiner_jobs.updated_at).",
+    )
+    refiner_tv_failure_cleanup_grace_period_seconds: int = Field(
+        ge=300,
+        le=604800,
+        description="Failed remux age gate for TV failure cleanup (uses refiner_jobs.updated_at).",
+    )
+    failure_cleanup_configuration_note: str = Field(
+        description="How operators change Pass 4 failure-cleanup timers/grace (restart required).",
+    )
     work_temp_stale_sweep_periodic_configuration_note: str = Field(
         description="How operators change work/temp stale sweep env (restart required).",
     )
