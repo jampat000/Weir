@@ -81,6 +81,7 @@ def _scope_row_out(session: Session, row: PrunerScopeSettings) -> PrunerScopeSum
         missing_primary_media_reported_enabled=bool(row.missing_primary_media_reported_enabled),
         never_played_stale_reported_enabled=bool(row.never_played_stale_reported_enabled),
         never_played_min_age_days=int(row.never_played_min_age_days),
+        watched_tv_reported_enabled=bool(row.watched_tv_reported_enabled),
         preview_max_items=int(row.preview_max_items),
         scheduled_preview_enabled=bool(row.scheduled_preview_enabled),
         scheduled_preview_interval_seconds=clamp_pruner_scheduled_preview_interval_seconds(
@@ -259,6 +260,8 @@ def patch_pruner_scope(
         sc.never_played_stale_reported_enabled = bool(body.never_played_stale_reported_enabled)
     if body.never_played_min_age_days is not None:
         sc.never_played_min_age_days = clamp_never_played_min_age_days(int(body.never_played_min_age_days))
+    if body.watched_tv_reported_enabled is not None:
+        sc.watched_tv_reported_enabled = bool(body.watched_tv_reported_enabled)
     if body.preview_max_items is not None:
         sc.preview_max_items = int(body.preview_max_items)
     if body.scheduled_preview_enabled is not None:

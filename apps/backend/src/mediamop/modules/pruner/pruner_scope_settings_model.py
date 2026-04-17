@@ -37,6 +37,11 @@ class PrunerScopeSettings(Base):
         nullable=False,
         server_default=text("90"),
     )
+    watched_tv_reported_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("0"),
+    )
     preview_max_items: Mapped[int] = mapped_column(
         Integer,
         nullable=False,

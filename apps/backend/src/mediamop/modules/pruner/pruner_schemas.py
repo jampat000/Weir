@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from mediamop.modules.pruner.pruner_constants import MEDIA_SCOPE_TV, RULE_FAMILY_WATCHED_TV_REPORTED
+
 PrunerProviderWire = Literal["emby", "jellyfin", "plex"]
 
 
@@ -15,6 +17,7 @@ class PrunerScopeSummaryOut(BaseModel):
     missing_primary_media_reported_enabled: bool
     never_played_stale_reported_enabled: bool = False
     never_played_min_age_days: int = 90
+    watched_tv_reported_enabled: bool = False
     preview_max_items: int
     scheduled_preview_enabled: bool = False
     scheduled_preview_interval_seconds: int = 3600
@@ -59,6 +62,7 @@ class PrunerScopePatchIn(BaseModel):
     missing_primary_media_reported_enabled: bool | None = None
     never_played_stale_reported_enabled: bool | None = None
     never_played_min_age_days: int | None = Field(None, ge=7, le=3650)
+    watched_tv_reported_enabled: bool | None = None
     preview_max_items: int | None = Field(None, ge=1, le=5000)
     scheduled_preview_enabled: bool | None = None
     scheduled_preview_interval_seconds: int | None = Field(None, ge=60, le=86_400)
@@ -68,13 +72,24 @@ class PrunerEnqueueOut(BaseModel):
     pruner_job_id: int
 
 
-PrunerPreviewRuleFamilyWire = Literal["missing_primary_media_reported", "never_played_stale_reported"]
+PrunerPreviewRuleFamilyWire = Literal[
+    "missing_primary_media_reported",
+    "never_played_stale_reported",
+    "watched_tv_reported",
+]
 
 
 class PrunerPreviewEnqueueIn(BaseModel):
     media_scope: Literal["tv", "movies"]
     rule_family_id: PrunerPreviewRuleFamilyWire = "missing_primary_media_reported"
     csrf_token: str = Field(..., min_length=1)
+
+    @model_validator(mode="after")
+    def _watched_tv_tv_tab_only(self) -> PrunerPreviewEnqueueIn:
+        if self.rule_family_id == RULE_FAMILY_WATCHED_TV_REPORTED and self.media_scope != MEDIA_SCOPE_TV:
+            msg = "watched_tv_reported preview is only available for the TV tab (media_scope must be tv)."
+            raise ValueError(msg)
+        return self
 
 
 class PrunerConnectionTestIn(BaseModel):
@@ -110,13 +125,14 @@ class PrunerScopePatchHttpIn(PrunerScopePatchIn):
             self.missing_primary_media_reported_enabled is None
             and self.never_played_stale_reported_enabled is None
             and self.never_played_min_age_days is None
+            and self.watched_tv_reported_enabled is None
             and self.preview_max_items is None
             and self.scheduled_preview_enabled is None
             and self.scheduled_preview_interval_seconds is None
         ):
             msg = (
                 "At least one of missing_primary_media_reported_enabled, never_played_stale_reported_enabled, "
-                "never_played_min_age_days, preview_max_items, scheduled_preview_enabled, "
+                "never_played_min_age_days, watched_tv_reported_enabled, preview_max_items, scheduled_preview_enabled, "
                 "or scheduled_preview_interval_seconds must be provided."
             )
             raise ValueError(msg)

@@ -29,8 +29,14 @@ export function PrunerInstanceOverviewTab() {
             <div className="font-medium capitalize text-[var(--mm-text)]">{s.media_scope}</div>
             <div className="text-xs text-[var(--mm-text2)]">
               Missing primary art rule: {s.missing_primary_media_reported_enabled ? "on" : "off"} · stale never-played
-              rule: {s.never_played_stale_reported_enabled ? "on" : "off"} (min age {s.never_played_min_age_days} days) ·
-              per-scope item cap {s.preview_max_items}{" "}
+              rule: {s.never_played_stale_reported_enabled ? "on" : "off"} (min age {s.never_played_min_age_days} days)
+              {s.media_scope === "tv" ? (
+                <>
+                  {" "}
+                  · watched TV (episodes) rule: {s.watched_tv_reported_enabled ? "on" : "off"}
+                </>
+              ) : null}{" "}
+              · per-scope item cap {s.preview_max_items}{" "}
               <span className="text-[var(--mm-text3)]">
                 (Jellyfin/Emby: preview list max. Plex: same number caps live removals together with the env absolute
                 ceiling.)

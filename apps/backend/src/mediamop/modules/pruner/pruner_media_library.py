@@ -12,6 +12,7 @@ from mediamop.modules.pruner.pruner_constants import (
     MEDIA_SCOPE_TV,
     RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
     RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED,
+    RULE_FAMILY_WATCHED_TV_REPORTED,
 )
 from mediamop.modules.pruner.pruner_http import http_get_json, http_get_text, join_base_path
 
@@ -225,6 +226,104 @@ def _item_unplayed_by_userdata(item: dict[str, Any]) -> bool:
     return True
 
 
+def _item_watched_by_userdata(item: dict[str, Any]) -> bool:
+    """Watched for the authenticated library user (API token), per Jellyfin/Emby ``UserData``."""
+
+    ud = item.get("UserData")
+    if isinstance(ud, dict):
+        if ud.get("Played") is True:
+            return True
+        pc = ud.get("PlayCount")
+        if isinstance(pc, int) and pc > 0:
+            return True
+    return False
+
+
+def list_watched_tv_episode_candidates(
+    *,
+    base_url: str,
+    api_key: str,
+    media_scope: str,
+    max_items: int,
+) -> tuple[list[dict[str, Any]], bool]:
+    """Episodes the server reports as watched for this API user (``UserData`` / optional ``IsPlayed`` filter).
+
+    **TV scope only** — callers must pass ``media_scope=tv``.
+    """
+
+    if media_scope != MEDIA_SCOPE_TV:
+        msg = f"watched_tv_reported requires media_scope={MEDIA_SCOPE_TV!r}, got {media_scope!r}"
+        raise ValueError(msg)
+
+    include_types = "Episode"
+    candidates: list[dict[str, Any]] = []
+    start = 0
+    page = min(100, max(1, max_items * 3))
+    use_is_played_filter = True
+    total_hits: int | None = None
+    truncated = False
+
+    while len(candidates) < max_items:
+        params: dict[str, str] = {
+            "Recursive": "true",
+            "IncludeItemTypes": include_types,
+            "StartIndex": str(start),
+            "Limit": str(page),
+        }
+        if use_is_played_filter:
+            params["IsPlayed"] = "true"
+        try:
+            data = _items_query(base_url=base_url, api_key=api_key, params=params)
+        except urllib.error.HTTPError as e:
+            if e.code == 400 and use_is_played_filter:
+                use_is_played_filter = False
+                start = 0
+                candidates.clear()
+                total_hits = None
+                continue
+            raise
+        assert data is not None
+        items = data.get("Items")
+        if not isinstance(items, list):
+            break
+        if "TotalRecordCount" in data and isinstance(data["TotalRecordCount"], int):
+            total_hits = int(data["TotalRecordCount"])
+
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            if not use_is_played_filter and not _item_watched_by_userdata(it):
+                continue
+            iid = str(it.get("Id", "")).strip()
+            if not iid:
+                continue
+            candidates.append(
+                {
+                    "granularity": "episode",
+                    "item_id": iid,
+                    "series_name": it.get("SeriesName") or it.get("Album") or "",
+                    "season_number": it.get("ParentIndexNumber"),
+                    "episode_number": it.get("IndexNumber"),
+                    "episode_title": it.get("Name") or "",
+                },
+            )
+            if len(candidates) >= max_items:
+                break
+
+        fetched = len(items)
+        start += fetched
+        if fetched == 0:
+            break
+        if len(candidates) >= max_items:
+            if total_hits is not None and start < total_hits:
+                truncated = True
+            elif fetched >= page:
+                truncated = True
+            break
+
+    return candidates[:max_items], truncated
+
+
 def list_never_played_stale_candidates(
     *,
     base_url: str,
@@ -349,6 +448,13 @@ def plex_never_played_preview_unsupported_detail() -> str:
     )
 
 
+def plex_watched_tv_preview_unsupported_detail() -> str:
+    return (
+        "Plex: watched TV preview is not implemented on MediaMop in this release (Jellyfin/Emby only). "
+        "Use Connection for a Plex ping."
+    )
+
+
 def preview_payload_json(
     *,
     provider: str,
@@ -362,12 +468,29 @@ def preview_payload_json(
     """Returns ``(outcome, unsupported_detail_or_empty, candidates, truncated)``."""
 
     if provider == "plex":
+        if rule_family_id == RULE_FAMILY_WATCHED_TV_REPORTED:
+            return "unsupported", plex_watched_tv_preview_unsupported_detail(), [], False
         if rule_family_id == RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED:
             return "unsupported", plex_never_played_preview_unsupported_detail(), [], False
         return "unsupported", plex_preview_unsupported_detail(), [], False
     api_key = secrets.get("api_key", "")
     if rule_family_id == RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED:
         cands, trunc = list_missing_primary_candidates(
+            base_url=base_url,
+            api_key=api_key,
+            media_scope=media_scope,
+            max_items=max_items,
+        )
+        return "success", "", cands, trunc
+    if rule_family_id == RULE_FAMILY_WATCHED_TV_REPORTED:
+        if media_scope != MEDIA_SCOPE_TV:
+            return (
+                "unsupported",
+                "watched_tv_reported applies to the TV tab only (Movies is out of scope for this rule pass).",
+                [],
+                False,
+            )
+        cands, trunc = list_watched_tv_episode_candidates(
             base_url=base_url,
             api_key=api_key,
             media_scope=media_scope,

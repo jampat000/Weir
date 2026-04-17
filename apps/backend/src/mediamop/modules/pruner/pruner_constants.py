@@ -7,9 +7,11 @@ MEDIA_SCOPE_MOVIES = "movies"
 
 RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED = "missing_primary_media_reported"
 RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED = "never_played_stale_reported"
+RULE_FAMILY_WATCHED_TV_REPORTED = "watched_tv_reported"
 
 PRUNER_APPLY_LABEL_MISSING_PRIMARY = "Remove broken library entries"
 PRUNER_APPLY_LABEL_NEVER_PLAYED_STALE = "Remove stale never-played library entries"
+PRUNER_APPLY_LABEL_WATCHED_TV = "Remove watched TV entries"
 
 PRUNER_DEFAULT_NEVER_PLAYED_MIN_AGE_DAYS = 90
 PRUNER_NEVER_PLAYED_MIN_AGE_DAYS_MIN = 7
@@ -35,6 +37,8 @@ def clamp_never_played_min_age_days(raw: int) -> int:
 def pruner_apply_operator_label(rule_family_id: str) -> str:
     """Operator-facing apply button / activity action label for a preview snapshot rule."""
 
+    if rule_family_id == RULE_FAMILY_WATCHED_TV_REPORTED:
+        return PRUNER_APPLY_LABEL_WATCHED_TV
     if rule_family_id == RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED:
         return PRUNER_APPLY_LABEL_NEVER_PLAYED_STALE
     return PRUNER_APPLY_LABEL_MISSING_PRIMARY
@@ -43,7 +47,13 @@ def pruner_apply_operator_label(rule_family_id: str) -> str:
 def pruner_preview_rule_families_jf_emby() -> frozenset[str]:
     """Rule families that use Jellyfin/Emby Items API preview in this product slice."""
 
-    return frozenset({RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED, RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED})
+    return frozenset(
+        {
+            RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
+            RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED,
+            RULE_FAMILY_WATCHED_TV_REPORTED,
+        },
+    )
 
 
 def clamp_pruner_scheduled_preview_interval_seconds(raw: int) -> int:

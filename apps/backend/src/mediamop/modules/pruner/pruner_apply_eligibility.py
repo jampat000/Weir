@@ -7,8 +7,10 @@ from sqlalchemy.orm import Session
 
 from mediamop.core.config import MediaMopSettings
 from mediamop.modules.pruner.pruner_constants import (
+    MEDIA_SCOPE_TV,
     RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
     RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED,
+    RULE_FAMILY_WATCHED_TV_REPORTED,
     pruner_apply_operator_label,
 )
 from mediamop.modules.pruner.pruner_instances_service import get_scope_settings, get_server_instance
@@ -19,6 +21,7 @@ _APPLY_SUPPORTED_RULES = frozenset(
     {
         RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
         RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED,
+        RULE_FAMILY_WATCHED_TV_REPORTED,
     },
 )
 
@@ -91,6 +94,9 @@ def compute_apply_eligibility(
     if str(run.media_scope) != media_scope:
         reasons.append("This preview snapshot belongs to a different TV/Movies tab than the current URL.")
 
+    if rid == RULE_FAMILY_WATCHED_TV_REPORTED and str(run.media_scope) != MEDIA_SCOPE_TV:
+        reasons.append("Watched TV apply is only defined for TV (episodes) preview snapshots.")
+
     if rid not in _APPLY_SUPPORTED_RULES:
         reasons.append("This preview snapshot's rule family is not supported for apply in this release.")
     else:
@@ -104,6 +110,10 @@ def compute_apply_eligibility(
         elif rid == RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED and not bool(sc.never_played_stale_reported_enabled):
             reasons.append(
                 f"{apply_label} is not enabled for this scope (never-played stale rule toggle).",
+            )
+        elif rid == RULE_FAMILY_WATCHED_TV_REPORTED and not bool(sc.watched_tv_reported_enabled):
+            reasons.append(
+                f"{apply_label} is not enabled for this scope (watched TV rule toggle).",
             )
 
     if str(run.outcome) != "success":

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchCsrfToken } from "../../lib/api/auth-api";
@@ -7,6 +7,7 @@ import {
   PRUNER_REMOVE_BROKEN_LIBRARY_ENTRIES_LABEL,
   RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
   RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED,
+  RULE_FAMILY_WATCHED_TV_REPORTED,
   fetchPrunerApplyEligibility,
   fetchPrunerPlexLiveEligibility,
   fetchPrunerPreviewRun,
@@ -41,6 +42,8 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
   const [staleNeverEnabled, setStaleNeverEnabled] = useState(false);
   const [staleNeverDays, setStaleNeverDays] = useState(90);
   const [staleNeverMsg, setStaleNeverMsg] = useState<string | null>(null);
+  const [watchedTvEnabled, setWatchedTvEnabled] = useState(false);
+  const [watchedTvMsg, setWatchedTvMsg] = useState<string | null>(null);
   const canOperate = me.data?.role === "admin" || me.data?.role === "operator";
 
   const scopeRow = instance?.scopes.find((s) => s.media_scope === props.scope);
@@ -49,6 +52,7 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
   const canApplyJfEmbyFromSnapshot = instance?.provider === "jellyfin" || instance?.provider === "emby";
 
   function ruleFamilyColumnLabel(id: string): string {
+    if (id === RULE_FAMILY_WATCHED_TV_REPORTED) return "Watched TV (episodes)";
     if (id === RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED) return "Stale never-played";
     if (id === RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED) return "Missing primary art";
     return id;
@@ -84,11 +88,13 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
     setSchedInterval(scopeRow.scheduled_preview_interval_seconds);
     setStaleNeverEnabled(scopeRow.never_played_stale_reported_enabled);
     setStaleNeverDays(scopeRow.never_played_min_age_days);
+    setWatchedTvEnabled(scopeRow.watched_tv_reported_enabled);
   }, [
     scopeRow?.scheduled_preview_enabled,
     scopeRow?.scheduled_preview_interval_seconds,
     scopeRow?.never_played_stale_reported_enabled,
     scopeRow?.never_played_min_age_days,
+    scopeRow?.watched_tv_reported_enabled,
     scopeRow?.media_scope,
     instanceId,
   ]);
@@ -135,6 +141,25 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
     }
   }
 
+  async function saveWatchedTvSettings() {
+    setWatchedTvMsg(null);
+    setErr(null);
+    setBusy(true);
+    try {
+      const csrf_token = await fetchCsrfToken();
+      await patchPrunerScope(instanceId, props.scope, {
+        watched_tv_reported_enabled: watchedTvEnabled,
+        csrf_token,
+      });
+      await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
+      setWatchedTvMsg("Saved watched TV rule for this TV tab and server instance only.");
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function runPreview() {
     setErr(null);
     setBusy(true);
@@ -165,6 +190,26 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
       await qc.invalidateQueries({ queryKey: previewRunsQueryKey });
       setPreview(
         `Queued never-played stale preview job #${pruner_job_id}. When the worker finishes, the table below updates (this scope only).`,
+      );
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runWatchedTvPreview() {
+    setErr(null);
+    setBusy(true);
+    setPreview(null);
+    try {
+      const { pruner_job_id } = await postPrunerPreview(instanceId, props.scope, {
+        rule_family_id: RULE_FAMILY_WATCHED_TV_REPORTED,
+      });
+      await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
+      await qc.invalidateQueries({ queryKey: previewRunsQueryKey });
+      setPreview(
+        `Queued watched TV preview job #${pruner_job_id}. When the worker finishes, the table below updates (this TV tab and instance only).`,
       );
     } catch (e) {
       setErr((e as Error).message);
@@ -355,6 +400,7 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
         </div>
       ) : null}
       {!isPlex ? (
+        <Fragment>
         <div
           className="space-y-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text)]"
           data-testid="pruner-never-played-stale-panel"
@@ -425,6 +471,60 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
             </p>
           )}
         </div>
+        {props.scope === "tv" ? (
+          <div
+            className="space-y-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text)]"
+            data-testid="pruner-watched-tv-panel"
+          >
+            <p className="text-sm font-semibold text-[var(--mm-text)]">Watched TV (Jellyfin / Emby, TV tab only)</p>
+            <p className="text-xs text-[var(--mm-text2)]">
+              Candidates are <strong>episodes</strong> the server reports as <strong>watched</strong> for the MediaMop
+              library user (same API token as other Pruner rules). Movies are not in this pass — use the Movies tab for
+              other rules. This server instance only.
+            </p>
+            <p className="text-xs text-[var(--mm-text2)]">
+              Preview is the dry run; apply uses the frozen list only. Removal goes through the provider library API —
+              MediaMop does not claim whether media files on disk are removed.
+            </p>
+            {canOperate ? (
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={watchedTvEnabled}
+                    disabled={busy}
+                    onChange={(e) => setWatchedTvEnabled(e.target.checked)}
+                  />
+                  Enable watched TV rule for this TV tab
+                </label>
+                <button
+                  type="button"
+                  className="rounded-md border border-[var(--mm-border)] px-3 py-1 text-sm font-medium text-[var(--mm-text)] disabled:opacity-50"
+                  disabled={busy}
+                  onClick={() => void saveWatchedTvSettings()}
+                >
+                  Save watched TV rule
+                </button>
+                {watchedTvMsg ? <p className="text-xs text-green-600">{watchedTvMsg}</p> : null}
+                <button
+                  type="button"
+                  className="rounded-md bg-[var(--mm-surface2)] px-3 py-1.5 text-sm font-medium text-[var(--mm-text)] ring-1 ring-[var(--mm-border)] disabled:opacity-50"
+                  disabled={busy || !watchedTvEnabled}
+                  title={!watchedTvEnabled ? "Enable the rule and save before queueing a preview for it." : undefined}
+                  onClick={() => void runWatchedTvPreview()}
+                >
+                  Queue preview (watched TV)
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-[var(--mm-text2)]">
+                Watched TV rule is <strong>{scopeRow?.watched_tv_reported_enabled ? "on" : "off"}</strong> for this tab.
+                Sign in as an operator to change it.
+              </p>
+            )}
+          </div>
+        ) : null}
+        </Fragment>
       ) : null}
       {scopeRow ? (
         <div className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text2)]">

@@ -13,6 +13,7 @@ from mediamop.core.config import MediaMopSettings
 from mediamop.modules.pruner.pruner_constants import (
     RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
     RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED,
+    RULE_FAMILY_WATCHED_TV_REPORTED,
     clamp_never_played_min_age_days,
     pruner_preview_rule_families_jf_emby,
 )
@@ -78,6 +79,10 @@ def make_pruner_candidate_removal_preview_handler(
                 if not bool(sc.never_played_stale_reported_enabled):
                     msg = "never_played_stale_reported_enabled is false for this scope"
                     raise ValueError(msg)
+            elif rule_family_id == RULE_FAMILY_WATCHED_TV_REPORTED:
+                if not bool(sc.watched_tv_reported_enabled):
+                    msg = "watched_tv_reported_enabled is false for this scope"
+                    raise ValueError(msg)
             max_items = max(1, min(int(sc.preview_max_items), 5000))
             age_days = clamp_never_played_min_age_days(int(sc.never_played_min_age_days))
             env = decrypt_and_parse_envelope(settings, inst.credentials_ciphertext)
@@ -111,7 +116,14 @@ def make_pruner_candidate_removal_preview_handler(
 
         run_uuid = str(uuid.uuid4())
         label_scope = "TV (episodes)" if scope == "tv" else "Movies (one row per movie item)"
-        rule_tag = "missing primary" if rule_family_id == RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED else "never-played stale"
+        if rule_family_id == RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED:
+            rule_tag = "missing primary"
+        elif rule_family_id == RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED:
+            rule_tag = "never-played stale"
+        elif rule_family_id == RULE_FAMILY_WATCHED_TV_REPORTED:
+            rule_tag = "watched TV"
+        else:
+            rule_tag = str(rule_family_id)
         title = (
             f"Scheduled Pruner preview ({rule_tag}): {display_name} ({provider}) — {label_scope}"
             if is_scheduled
@@ -135,6 +147,7 @@ def make_pruner_candidate_removal_preview_handler(
                     error_message=err,
                 )
                 detail_obj: dict[str, object] = {
+                    "phase": "preview",
                     "preview_run_id": run_uuid,
                     "outcome": outcome,
                     "candidate_count": len(cands),

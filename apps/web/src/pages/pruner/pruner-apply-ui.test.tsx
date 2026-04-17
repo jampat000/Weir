@@ -9,6 +9,8 @@ import type { PrunerPreviewRunSummary, PrunerServerInstance } from "../../lib/pr
 import {
   PRUNER_REMOVE_BROKEN_LIBRARY_ENTRIES_LABEL,
   PRUNER_REMOVE_STALE_NEVER_PLAYED_LIBRARY_ENTRIES_LABEL,
+  PRUNER_REMOVE_WATCHED_TV_ENTRIES_LABEL,
+  RULE_FAMILY_WATCHED_TV_REPORTED,
 } from "../../lib/pruner/api";
 import { PrunerInstanceShell } from "./pruner-instance-shell";
 import { PrunerScopeTab } from "./pruner-scope-tab";
@@ -32,6 +34,7 @@ const jellyfinInstance: PrunerServerInstance = {
       missing_primary_media_reported_enabled: true,
       never_played_stale_reported_enabled: false,
       never_played_min_age_days: 90,
+      watched_tv_reported_enabled: false,
       preview_max_items: 500,
       scheduled_preview_enabled: false,
       scheduled_preview_interval_seconds: 3600,
@@ -47,6 +50,7 @@ const jellyfinInstance: PrunerServerInstance = {
       missing_primary_media_reported_enabled: true,
       never_played_stale_reported_enabled: false,
       never_played_min_age_days: 90,
+      watched_tv_reported_enabled: false,
       preview_max_items: 500,
       scheduled_preview_enabled: false,
       scheduled_preview_interval_seconds: 3600,
@@ -281,6 +285,79 @@ describe("PrunerScopeTab apply (Jellyfin + Emby preview → apply)", () => {
     }
   });
 
+  it("uses Remove watched TV entries for watched TV preview rows", async () => {
+    const watchedRunId = "33333333-3333-4333-8333-333333333333";
+    const spyElig = vi.spyOn(prunerApi, "fetchPrunerApplyEligibility").mockResolvedValue({
+      eligible: true,
+      reasons: [],
+      apply_feature_enabled: true,
+      preview_run_id: watchedRunId,
+      server_instance_id: 2,
+      media_scope: "tv",
+      provider: "jellyfin",
+      display_name: "JF Home",
+      preview_created_at: previewRun.created_at,
+      candidate_count: 1,
+      preview_outcome: "success",
+      rule_family_id: RULE_FAMILY_WATCHED_TV_REPORTED,
+      apply_operator_label: PRUNER_REMOVE_WATCHED_TV_ENTRIES_LABEL,
+    });
+    try {
+      const qc = new QueryClient({
+        defaultOptions: { queries: { retry: false, staleTime: 60_000, refetchOnMount: false } },
+      });
+      qc.setQueryData(qk.me, operator);
+      await qc.prefetchQuery({
+        queryKey: ["pruner", "instances", 2],
+        queryFn: async () => jellyfinInstance,
+      });
+      await qc.prefetchQuery({
+        queryKey: ["pruner", "preview-runs", 2, "tv"],
+        queryFn: async () => [
+          previewRun,
+          {
+            ...previewRun,
+            preview_run_id: watchedRunId,
+            rule_family_id: RULE_FAMILY_WATCHED_TV_REPORTED,
+            candidate_count: 1,
+          },
+        ],
+      });
+
+      const router = createMemoryRouter(
+        [
+          {
+            path: "/instances/:instanceId",
+            element: <PrunerInstanceShell />,
+            children: [{ path: "tv", element: <PrunerScopeTab scope="tv" /> }],
+          },
+        ],
+        { initialEntries: ["/instances/2/tv"] },
+      );
+
+      render(
+        <QueryClientProvider client={qc}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId(`pruner-apply-open-${watchedRunId}`)).toBeInTheDocument();
+      });
+      const openBtn = screen.getByTestId(`pruner-apply-open-${watchedRunId}`);
+      expect(openBtn.textContent).toBe(PRUNER_REMOVE_WATCHED_TV_ENTRIES_LABEL);
+      fireEvent.click(openBtn);
+      const modal = await screen.findByTestId("pruner-apply-modal");
+      await waitFor(() => {
+        expect(within(modal).getByRole("heading", { level: 3 })).toHaveTextContent(
+          PRUNER_REMOVE_WATCHED_TV_ENTRIES_LABEL,
+        );
+      });
+    } finally {
+      spyElig.mockRestore();
+    }
+  });
+
   it("does not show apply on Plex preview rows", async () => {
     const plexInstance: PrunerServerInstance = {
       id: 4,
@@ -297,6 +374,7 @@ describe("PrunerScopeTab apply (Jellyfin + Emby preview → apply)", () => {
           missing_primary_media_reported_enabled: true,
           never_played_stale_reported_enabled: false,
           never_played_min_age_days: 90,
+          watched_tv_reported_enabled: false,
           preview_max_items: 500,
           scheduled_preview_enabled: false,
           scheduled_preview_interval_seconds: 3600,
@@ -312,6 +390,7 @@ describe("PrunerScopeTab apply (Jellyfin + Emby preview → apply)", () => {
           missing_primary_media_reported_enabled: true,
           never_played_stale_reported_enabled: false,
           never_played_min_age_days: 90,
+          watched_tv_reported_enabled: false,
           preview_max_items: 500,
           scheduled_preview_enabled: false,
           scheduled_preview_interval_seconds: 3600,
