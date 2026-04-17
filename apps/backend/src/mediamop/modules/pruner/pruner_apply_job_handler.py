@@ -1,4 +1,4 @@
-"""Handler for ``pruner.candidate_removal.apply.v1`` — Jellyfin + Emby, snapshot-bound."""
+"""Handler for ``pruner.candidate_removal.apply.v1`` — Jellyfin, Emby, and Plex (snapshot-bound)."""
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from mediamop.modules.pruner.pruner_credentials_envelope import decrypt_and_pars
 from mediamop.modules.pruner.pruner_instances_service import get_server_instance
 from mediamop.modules.pruner.pruner_emby_library_delete import emby_delete_library_item
 from mediamop.modules.pruner.pruner_jellyfin_library_delete import jellyfin_delete_library_item
+from mediamop.modules.pruner.pruner_plex_library_delete import plex_delete_library_metadata
 from mediamop.modules.pruner.pruner_preview_run_model import PrunerPreviewRun
 from mediamop.modules.pruner.worker_loop import PrunerJobWorkContext
 from mediamop.platform.activity import constants as C
@@ -84,8 +85,8 @@ def make_pruner_candidate_removal_apply_handler(
                 msg = f"unknown server_instance_id={sid}"
                 raise ValueError(msg)
             prov = str(inst.provider)
-            if prov not in ("jellyfin", "emby"):
-                msg = "apply is supported for Jellyfin and Emby instances only in this release"
+            if prov not in ("jellyfin", "emby", "plex"):
+                msg = "apply is supported for Jellyfin, Emby, and Plex instances only in this release"
                 raise ValueError(msg)
             run = session.scalars(
                 select(PrunerPreviewRun).where(
@@ -133,7 +134,9 @@ def make_pruner_candidate_removal_apply_handler(
             if env is None:
                 msg = "cannot decrypt credentials (session secret missing or ciphertext invalid)"
                 raise RuntimeError(msg)
-            api_key = str((env.get("secrets") or {}).get("api_key", ""))
+            secrets = env.get("secrets") or {}
+            api_key = str(secrets.get("api_key", ""))
+            plex_token = str(secrets.get("auth_token") or secrets.get("plex_token") or "")
             provider_for_delete = prov
 
         if not candidates:
@@ -155,6 +158,15 @@ def make_pruner_candidate_removal_apply_handler(
                     base_url=base_url,
                     api_key=api_key,
                     item_id=item_id,
+                )
+            elif provider_for_delete == "plex":
+                if not plex_token.strip():
+                    failed += 1
+                    continue
+                status, _err_body = plex_delete_library_metadata(
+                    base_url=base_url,
+                    auth_token=plex_token,
+                    rating_key=item_id,
                 )
             else:
                 status, _err_body = jellyfin_delete_library_item(

@@ -11,9 +11,9 @@ export function PrunerInstancesListPage() {
         <h1 className="mm-page__title">Pruner</h1>
         <p className="mm-page__lede max-w-3xl text-[var(--mm-text2)]">
           Rule-based library cleanup — one server instance per row, with separate TV and Movies scopes.{" "}
-          <strong>Jellyfin and Emby:</strong> preview then apply for missing primary art (TV = episodes, Movies = one row
-          per movie item). <strong>Plex:</strong> the same rule family is <strong>live-only</strong> (no preview/dry run)
-          on this screen; paths differ by design.
+          <strong>Jellyfin, Emby, and Plex:</strong> preview then apply for missing primary art (TV = episodes, Movies =
+          one row per movie item). Plex uses its own discovery signal for that rule; other Plex rule families may still
+          show as unsupported until implemented.
         </p>
       </header>
 
@@ -59,9 +59,8 @@ export function PrunerInstancesListPage() {
       <p className="mt-6 max-w-3xl text-xs text-[var(--mm-text2)]">
         Durable work uses <code className="text-[0.85em]">pruner_jobs</code> (see{" "}
         <code className="text-[0.85em]">MEDIAMOP_PRUNER_WORKER_COUNT</code>). Connection tests and preview jobs enqueue
-        rows; <code className="text-[0.85em]">pruner_preview_runs</code> stores Jellyfin/Emby preview candidate snapshots
-        (and Plex &quot;unsupported&quot; outcomes where preview does not apply). Plex live removal does not use that
-        table.
+        rows; <code className="text-[0.85em]">pruner_preview_runs</code> stores preview candidate snapshots (Jellyfin,
+        Emby, and Plex for missing primary art) and explicit unsupported outcomes where a rule has no Plex preview yet.
       </p>
     </div>
   );

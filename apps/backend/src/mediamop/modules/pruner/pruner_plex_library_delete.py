@@ -1,4 +1,4 @@
-"""Plex library metadata removal used by Pruner Plex **live-only** slice (no preview snapshot).
+"""Plex library metadata removal for Pruner **apply-from-preview** (and legacy job kind wiring).
 
 Operator-facing product language: **Remove broken library entries**. Implementation uses Plex
 Media Server's REST API; disk behavior is **not** part of that label.
@@ -12,8 +12,9 @@ Verified wire contract (local PMS; ``X-Plex-Token`` auth):
   version, library type, and server settings**; MediaMop does **not** guarantee metadata-only
   removal and does **not** promise or deny file deletion — operators must rely on Plex's behavior
   for their server.
-* **What we do not claim:** No equivalence to Emby/Jellyfin ``HasPrimaryImage`` / primary-art
-  preview semantics; no preview/dry-run for this Plex path.
+* **Preview vs apply:** Apply uses **only** ``ratingKey`` values frozen in a preview snapshot; it
+  does not re-run missing-thumb discovery. Preview uses Plex leaf metadata (empty/missing ``thumb``),
+  which is **not** the same signal as Jellyfin/Emby primary-image probes.
 
 Return values are for Pruner accounting only, not end-user legal guarantees.
 """

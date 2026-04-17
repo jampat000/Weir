@@ -17,8 +17,6 @@ from mediamop.modules.pruner.pruner_apply_eligibility import compute_apply_eligi
 from mediamop.modules.pruner.pruner_constants import (
     MEDIA_SCOPE_MOVIES,
     MEDIA_SCOPE_TV,
-    PRUNER_PLEX_LIVE_CONFIRMATION_PHRASE,
-    RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
     clamp_never_played_min_age_days,
     clamp_pruner_scheduled_preview_interval_seconds,
 )
@@ -34,7 +32,6 @@ from mediamop.modules.pruner.pruner_instances_service import (
 )
 from mediamop.modules.pruner.pruner_job_kinds import (
     PRUNER_CANDIDATE_REMOVAL_APPLY_JOB_KIND,
-    PRUNER_CANDIDATE_REMOVAL_PLEX_LIVE_JOB_KIND,
     PRUNER_CANDIDATE_REMOVAL_PREVIEW_JOB_KIND,
     PRUNER_SERVER_CONNECTION_TEST_JOB_KIND,
 )
@@ -217,8 +214,8 @@ def patch_pruner_instance(
     summary="Per-scope Pruner settings (TV episodes vs movie items)",
     description=(
         "Jellyfin/Emby: TV scope uses **episode-level** candidates for missing primary art in previews; Movies uses **one "
-        "row per movie library item**. Plex does not ship preview for this rule — use the Plex live removal API/UI when "
-        "enabled."
+        "row per movie library item**. Plex uses the same preview snapshot model for missing primary art (Plex-specific "
+        "thumb/leaf discovery — not identical to Jellyfin/Emby primary-image probes)."
     ),
 )
 def get_pruner_scope(
@@ -330,10 +327,10 @@ def get_pruner_preview_run(
 @router.get(
     "/pruner/instances/{instance_id}/scopes/{media_scope}/preview-runs/{preview_run_uuid}/apply-eligibility",
     response_model=PrunerApplyEligibilityOut,
-    summary="Whether live apply from this preview snapshot can be enqueued (Jellyfin/Emby)",
+    summary="Whether live apply from this preview snapshot can be enqueued (Jellyfin, Emby, Plex)",
     description=(
-        "Read-only gate check for the Jellyfin/Emby apply slice. This is **not** a preview/dry run — "
-        "it only reports whether the snapshot is eligible given instance, scope, outcome, and feature flag."
+        "Read-only gate check for apply-from-preview. This is **not** a preview/dry run — it only reports whether the "
+        "snapshot is eligible given instance, scope, outcome, and feature flag."
     ),
 )
 def get_pruner_apply_eligibility(
@@ -360,7 +357,7 @@ def get_pruner_apply_eligibility(
 @router.post(
     "/pruner/instances/{instance_id}/scopes/{media_scope}/preview-runs/{preview_run_uuid}/apply",
     response_model=PrunerEnqueueOut,
-    summary="Enqueue live library removal from one Jellyfin/Emby preview snapshot (rule family from snapshot)",
+    summary="Enqueue live library removal from one preview snapshot (rule family from snapshot; Jellyfin, Emby, Plex)",
 )
 def post_pruner_apply_from_preview(
     instance_id: Annotated[int, Path(ge=1)],
@@ -411,7 +408,7 @@ def post_pruner_apply_from_preview(
 @router.get(
     "/pruner/instances/{instance_id}/scopes/{media_scope}/plex-live-removal-eligibility",
     response_model=PrunerPlexLiveEligibilityOut,
-    summary="Plex-only: whether live Remove broken library entries can be enqueued (no preview)",
+    summary="Plex-only (retired): explains why live removal without a snapshot is not available",
 )
 def get_pruner_plex_live_removal_eligibility(
     instance_id: Annotated[int, Path(ge=1)],
@@ -435,7 +432,7 @@ def get_pruner_plex_live_removal_eligibility(
 @router.post(
     "/pruner/instances/{instance_id}/scopes/{media_scope}/plex-live-removal",
     response_model=PrunerEnqueueOut,
-    summary="Plex-only: enqueue live Remove broken library entries (no preview snapshot)",
+    summary="Plex-only (retired): live removal without a preview snapshot is not supported",
 )
 def post_pruner_plex_live_removal(
     instance_id: Annotated[int, Path(ge=1)],
@@ -452,37 +449,24 @@ def post_pruner_plex_live_removal(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid CSRF token.")
     if media_scope not in (MEDIA_SCOPE_TV, MEDIA_SCOPE_MOVIES):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="media_scope must be tv or movies.")
-    if get_server_instance(db, instance_id) is None:
+    inst = get_server_instance(db, instance_id)
+    if inst is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Instance not found.")
-    if body.live_removal_confirmation.strip() != PRUNER_PLEX_LIVE_CONFIRMATION_PHRASE:
+    if str(inst.provider) != "plex":
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"reasons": ["Typed confirmation phrase does not match the required phrase for Plex live removal."]},
+            detail={"reasons": ["This endpoint is defined for Plex server instances only."]},
         )
-    elig = compute_plex_live_eligibility(
-        db,
-        settings,
-        instance_id=instance_id,
-        media_scope=media_scope,
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        detail={
+            "reasons": [
+                "Plex live removal (scan-and-delete without a preview snapshot) is retired for Remove broken library "
+                "entries. Queue a missing-primary preview for this scope, inspect pruner_preview_runs, then call "
+                "POST /pruner/instances/{instance_id}/scopes/{media_scope}/preview-runs/{preview_run_uuid}/apply.",
+            ],
+        },
     )
-    if not elig.eligible:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"reasons": elig.reasons},
-        )
-    payload = {
-        "server_instance_id": instance_id,
-        "media_scope": media_scope,
-        "rule_family_id": RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
-    }
-    dedupe = f"pruner:plex-live:v1:{instance_id}:{media_scope}:{uuid.uuid4()}"
-    jid = _enqueue(
-        db,
-        dedupe_key=dedupe,
-        job_kind=PRUNER_CANDIDATE_REMOVAL_PLEX_LIVE_JOB_KIND,
-        payload=payload,
-    )
-    return PrunerEnqueueOut(pruner_job_id=jid)
 
 
 def _enqueue(

@@ -1,9 +1,9 @@
-"""Live Plex candidate discovery for the Plex-only removal path (no preview dependency).
+"""Plex candidate discovery for ``missing_primary_media_reported`` (preview + legacy wiring).
 
 **Provider-specific semantics (Plex):** candidates are **episode** (TV scope) or **movie** (Movies
 scope) leaf ``Video`` rows where the Plex JSON object has **no non-empty ``thumb``** attribute on
 that leaf. This is **not** the same signal as Jellyfin/Emby ``HasPrimaryImage=false`` + primary tag
-checks used in preview; operator copy must not equate them.
+checks; operator copy must not equate them.
 
 Read-only calls: ``GET /library/sections`` and paged ``GET /library/sections/{key}/allLeaves``.
 """
@@ -76,15 +76,19 @@ def list_plex_missing_thumb_candidates(
     auth_token: str,
     media_scope: str,
     max_items: int,
-) -> list[dict[str, Any]]:
-    """Return up to ``max_items`` Plex leaf metadata dicts (``ratingKey`` + display fields)."""
+) -> tuple[list[dict[str, Any]], bool]:
+    """Return up to ``max_items`` Plex leaf metadata dicts (``ratingKey`` as ``item_id``) plus ``truncated``.
+
+    ``truncated`` is True when more matching leaves likely exist beyond the returned rows (same cap semantics as
+    Jellyfin/Emby preview listers).
+    """
 
     if media_scope not in (MEDIA_SCOPE_TV, MEDIA_SCOPE_MOVIES):
         msg = f"unsupported media_scope: {media_scope!r}"
         raise ValueError(msg)
     cap = max(0, int(max_items))
     if cap == 0:
-        return []
+        return [], False
 
     sections_url = join_base_path(base_url, "library/sections")
     status, data = http_get_json(sections_url, headers=_plex_headers(auth_token))
@@ -108,8 +112,9 @@ def list_plex_missing_thumb_candidates(
             section_keys.pop()
 
     out: list[dict[str, Any]] = []
+    truncated = False
     page_size = min(200, max(1, cap))
-    for sec_key in section_keys:
+    for sec_idx, sec_key in enumerate(section_keys):
         if len(out) >= cap:
             break
         start = 0
@@ -127,7 +132,8 @@ def list_plex_missing_thumb_candidates(
             metas = _as_list(mc.get("Metadata"))
             if not metas:
                 break
-            for m in metas:
+            stop_after_page = False
+            for meta_idx, m in enumerate(metas):
                 if not isinstance(m, dict):
                     continue
                 if not _leaf_type_matches(m, media_scope):
@@ -158,6 +164,9 @@ def list_plex_missing_thumb_candidates(
                         },
                     )
                 if len(out) >= cap:
+                    if meta_idx < len(metas) - 1:
+                        truncated = True
+                    stop_after_page = True
                     break
             total = mc.get("totalSize")
             try:
@@ -165,7 +174,13 @@ def list_plex_missing_thumb_candidates(
             except (TypeError, ValueError):
                 total_i = start + len(metas)
             start += len(metas)
+            if stop_after_page:
+                if start < total_i:
+                    truncated = True
+                elif sec_idx < len(section_keys) - 1:
+                    truncated = True
+                break
             if start >= total_i or len(metas) == 0:
                 break
 
-    return out[:cap]
+    return out[:cap], truncated

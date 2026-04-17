@@ -86,7 +86,7 @@ const embyInstance: PrunerServerInstance = {
   base_url: "http://em:8096",
 };
 
-describe("PrunerScopeTab apply (Jellyfin + Emby preview → apply)", () => {
+describe("PrunerScopeTab apply (preview → apply)", () => {
   it("exposes Remove broken library entries only on preview history for Jellyfin success rows", async () => {
     const spyElig = vi.spyOn(prunerApi, "fetchPrunerApplyEligibility").mockResolvedValue({
       eligible: true,
@@ -358,7 +358,7 @@ describe("PrunerScopeTab apply (Jellyfin + Emby preview → apply)", () => {
     }
   });
 
-  it("does not show apply on Plex preview rows", async () => {
+  it("does not show apply on Plex rows for unsupported rule families", async () => {
     const plexInstance: PrunerServerInstance = {
       id: 4,
       provider: "plex",
@@ -413,7 +413,16 @@ describe("PrunerScopeTab apply (Jellyfin + Emby preview → apply)", () => {
     });
     await qc.prefetchQuery({
       queryKey: ["pruner", "preview-runs", 4, "tv"],
-      queryFn: async () => [{ ...previewRun, server_instance_id: 4 }],
+      queryFn: async () => [
+        {
+          ...previewRun,
+          server_instance_id: 4,
+          rule_family_id: "never_played_stale_reported",
+          outcome: "unsupported",
+          candidate_count: 0,
+          unsupported_detail: "Plex: never-played preview is not implemented.",
+        },
+      ],
     });
 
     const router = createMemoryRouter(

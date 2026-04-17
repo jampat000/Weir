@@ -195,7 +195,7 @@ class PrunerApplyHttpIn(BaseModel):
 
 
 class PrunerPlexLiveEligibilityOut(BaseModel):
-    """Read-only: whether Plex live removal can be enqueued for this instance + scope (no preview)."""
+    """Read-only: retired Plex live-removal path; always ineligible with explanatory reasons."""
 
     eligible: bool
     reasons: list[str] = Field(default_factory=list)

@@ -113,9 +113,10 @@ class MediaMopSettings:
     pruner_preview_schedule_scan_interval_seconds: int
     # Jellyfin + Emby Phase 3 apply: enqueue ``pruner.candidate_removal.apply.v1`` (default off).
     pruner_apply_enabled: bool
-    # Plex-only live removal: enqueue ``pruner.candidate_removal.plex_live.v1`` (default off; also requires apply gate).
+    # Deprecated: legacy ``MEDIAMOP_PRUNER_PLEX_LIVE_REMOVAL_ENABLED`` (Plex used to enqueue ``plex_live.v1``). Plex
+    # missing-primary removal now uses preview snapshots + apply only; this flag is loaded for API visibility only.
     pruner_plex_live_removal_enabled: bool
-    # Hard ceiling per Plex live run (min with scope ``preview_max_items``).
+    # Legacy ceiling field retained for eligibility JSON shape; not used to widen any apply path.
     pruner_plex_live_abs_max_items: int
     # 0 = no in-process Subber workers (Subber-owned subber_jobs only); >0 when Subber queues durable work.
     subber_worker_count: int

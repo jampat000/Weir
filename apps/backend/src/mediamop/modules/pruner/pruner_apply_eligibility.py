@@ -1,4 +1,4 @@
-"""Shared rules for Pruner apply-from-preview (Jellyfin + Emby snapshot-bound slice)."""
+"""Shared rules for Pruner apply-from-preview (Jellyfin, Emby, and Plex snapshot-bound)."""
 
 from __future__ import annotations
 
@@ -59,9 +59,9 @@ def compute_apply_eligibility(
         )
 
     prov = str(inst.provider)
-    if prov not in ("jellyfin", "emby"):
+    if prov not in ("jellyfin", "emby", "plex"):
         reasons.append(
-            "Applying from preview snapshots is available for Jellyfin and Emby instances only in this release.",
+            "Applying from preview snapshots is available for Jellyfin, Emby, and Plex instances only in this release.",
         )
 
     run = db.scalars(

@@ -1,4 +1,11 @@
-"""Eligibility for Plex-only live ``Remove broken library entries`` (no preview snapshot)."""
+"""Eligibility for the retired Plex-only live ``Remove broken library entries`` HTTP path.
+
+``missing_primary_media_reported`` on Plex now uses preview snapshots and apply-from-preview (same product flow as
+Jellyfin/Emby). This module remains so ``GET .../plex-live-removal-eligibility`` returns a stable, explicit explanation.
+
+``MEDIAMOP_PRUNER_PLEX_LIVE_REMOVAL_ENABLED`` is **deprecated**: it is still loaded from the environment for backward
+compatibility and exposed read-only in API responses, but it does **not** enable any operator action.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +21,8 @@ from mediamop.modules.pruner.pruner_schemas import PrunerPlexLiveEligibilityOut
 
 
 def effective_plex_live_cap(settings: MediaMopSettings, scope_preview_max_items: int) -> int:
+    """Legacy helper retained for tests and API field shape; not used for any live removal path."""
+
     return max(0, min(int(scope_preview_max_items), int(settings.pruner_plex_live_abs_max_items)))
 
 
@@ -28,12 +37,15 @@ def compute_plex_live_eligibility(
     apply_on = bool(settings.pruner_apply_enabled)
     plex_live_on = bool(settings.pruner_plex_live_removal_enabled)
 
-    if not apply_on:
-        reasons.append("Pruner live destructive actions are disabled (MEDIAMOP_PRUNER_APPLY_ENABLED=0).")
-    if not plex_live_on:
-        reasons.append(
-            "Plex live removal for this rule family is disabled (MEDIAMOP_PRUNER_PLEX_LIVE_REMOVAL_ENABLED=0).",
-        )
+    reasons.append(
+        "Plex live removal (scan-and-delete without a preview snapshot) is retired for Remove broken library entries. "
+        "Use missing-primary preview, inspect the snapshot in pruner_preview_runs, then apply-from-preview for this "
+        "instance and TV/Movies tab.",
+    )
+    reasons.append(
+        "MEDIAMOP_PRUNER_PLEX_LIVE_REMOVAL_ENABLED is deprecated and ignored; it is exposed below only for "
+        "operator visibility in old configs.",
+    )
 
     inst = get_server_instance(db, instance_id)
     if inst is None:
@@ -55,7 +67,7 @@ def compute_plex_live_eligibility(
 
     prov = str(inst.provider)
     if prov != "plex":
-        reasons.append("This live-only path is for Plex instances only (use preview → apply for Jellyfin/Emby).")
+        reasons.append("This HTTP path applies to Plex instances only.")
 
     sc = get_scope_settings(db, server_instance_id=instance_id, media_scope=media_scope)
     if sc is None:
@@ -67,18 +79,13 @@ def compute_plex_live_eligibility(
         preview_max = int(sc.preview_max_items)
         if not rule_enabled:
             reasons.append(
-                "The missing-primary rule is disabled for this scope — enable it before queuing live removal.",
+                "The missing-primary rule is disabled for this scope — enable it before preview/apply.",
             )
 
     cap = effective_plex_live_cap(settings, preview_max) if sc is not None else 0
-    if sc is not None and cap < 1:
-        reasons.append(
-            "Effective live cap is zero (check per-scope item cap and MEDIAMOP_PRUNER_PLEX_LIVE_ABS_MAX_ITEMS).",
-        )
 
-    eligible = len(reasons) == 0
     return PrunerPlexLiveEligibilityOut(
-        eligible=eligible,
+        eligible=False,
         reasons=reasons,
         apply_feature_enabled=apply_on,
         plex_live_feature_enabled=plex_live_on,

@@ -14,6 +14,7 @@ from mediamop.modules.pruner.pruner_constants import (
     RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED,
     RULE_FAMILY_WATCHED_TV_REPORTED,
 )
+from mediamop.modules.pruner.pruner_plex_live_candidates import list_plex_missing_thumb_candidates
 from mediamop.modules.pruner.pruner_http import http_get_json, http_get_text, join_base_path
 
 
@@ -435,9 +436,8 @@ def list_never_played_stale_candidates(
 
 def plex_preview_unsupported_detail() -> str:
     return (
-        "Plex: this rule family has no candidate preview on MediaMop — removal is live-only when enabled in the UI "
-        "(scheduled preview jobs still record this outcome; use Connection for a real Plex ping). "
-        "TV scope remains episode-level elsewhere (Jellyfin/Emby)."
+        "Plex: this rule family has no candidate preview on MediaMop in this release (use Connection for a Plex ping). "
+        "Remove broken library entries uses preview → apply for Plex; other Plex rules remain unsupported here."
     )
 
 
@@ -472,6 +472,18 @@ def preview_payload_json(
             return "unsupported", plex_watched_tv_preview_unsupported_detail(), [], False
         if rule_family_id == RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED:
             return "unsupported", plex_never_played_preview_unsupported_detail(), [], False
+        if rule_family_id == RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED:
+            token = str(secrets.get("auth_token") or secrets.get("plex_token") or "").strip()
+            if not token:
+                msg = "plex auth token missing in credentials envelope"
+                raise ValueError(msg)
+            cands, trunc = list_plex_missing_thumb_candidates(
+                base_url=base_url,
+                auth_token=token,
+                media_scope=media_scope,
+                max_items=max_items,
+            )
+            return "success", "", cands, trunc
         return "unsupported", plex_preview_unsupported_detail(), [], False
     api_key = secrets.get("api_key", "")
     if rule_family_id == RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED:

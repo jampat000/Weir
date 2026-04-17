@@ -23,6 +23,7 @@ from mediamop.modules.pruner.pruner_instances_service import create_server_insta
 from mediamop.modules.pruner.pruner_job_handlers import build_pruner_job_handlers
 from mediamop.modules.pruner.pruner_job_kinds import PRUNER_CANDIDATE_REMOVAL_PREVIEW_JOB_KIND
 from mediamop.modules.pruner.pruner_jobs_model import PrunerJob, PrunerJobStatus
+from mediamop.modules.pruner.pruner_preview_run_model import PrunerPreviewRun
 from mediamop.modules.pruner.worker_loop import PrunerJobWorkContext
 from mediamop.platform.activity import constants as C
 from mediamop.platform.activity.models import ActivityEvent
@@ -47,7 +48,10 @@ def session_factory(_isolated) -> sessionmaker[Session]:
     return create_session_factory(create_db_engine(settings))
 
 
-def test_plex_preview_writes_unsupported_activity_not_succeeded(session_factory: sessionmaker[Session]) -> None:
+def test_plex_preview_missing_primary_records_success_activity(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     settings = MediaMopSettings.load()
     with session_factory() as s:
         with s.begin():
@@ -60,6 +64,11 @@ def test_plex_preview_writes_unsupported_activity_not_succeeded(session_factory:
                 credentials_secrets={"auth_token": "t"},
             )
             sid = int(inst.id)
+
+    monkeypatch.setattr(
+        "mediamop.modules.pruner.pruner_media_library.list_plex_missing_thumb_candidates",
+        lambda **_kw: ([{"item_id": "42", "granularity": "episode", "episode_title": "Pilot"}], False),
+    )
 
     with session_factory() as s:
         with s.begin():
@@ -90,13 +99,22 @@ def test_plex_preview_writes_unsupported_activity_not_succeeded(session_factory:
             .order_by(ActivityEvent.id.desc()),
         ).first()
         assert evt is not None
-        assert evt.event_type == C.PRUNER_PREVIEW_UNSUPPORTED
-        assert "unsupported" in (evt.detail or "").lower()
+        assert evt.event_type == C.PRUNER_PREVIEW_SUCCEEDED
         detail = json.loads(evt.detail or "{}")
         assert detail.get("trigger") == "manual"
+        assert detail.get("candidate_count") == 1
+
+        row = s.scalars(select(PrunerPreviewRun).where(PrunerPreviewRun.server_instance_id == sid)).first()
+        assert row is not None
+        assert row.outcome == "success"
+        assert row.candidate_count == 1
+        assert "42" in (row.candidates_json or "")
 
 
-def test_scheduled_preview_activity_title_and_detail_trigger(session_factory: sessionmaker[Session]) -> None:
+def test_scheduled_preview_activity_title_and_detail_trigger(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     settings = MediaMopSettings.load()
     with session_factory() as s:
         with s.begin():
@@ -109,6 +127,11 @@ def test_scheduled_preview_activity_title_and_detail_trigger(session_factory: se
                 credentials_secrets={"auth_token": "t"},
             )
             sid = int(inst.id)
+
+    monkeypatch.setattr(
+        "mediamop.modules.pruner.pruner_media_library.list_plex_missing_thumb_candidates",
+        lambda **_kw: ([], False),
+    )
 
     with session_factory() as s:
         with s.begin():

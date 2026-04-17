@@ -17,7 +17,7 @@ PRUNER_DEFAULT_NEVER_PLAYED_MIN_AGE_DAYS = 90
 PRUNER_NEVER_PLAYED_MIN_AGE_DAYS_MIN = 7
 PRUNER_NEVER_PLAYED_MIN_AGE_DAYS_MAX = 3650
 
-# Plex-only live removal: operator must POST this exact phrase (case-sensitive, no surrounding spaces).
+# Legacy confirmation phrase for the retired Plex live-removal POST body (still returned read-only by eligibility).
 PRUNER_PLEX_LIVE_CONFIRMATION_PHRASE = "PLEX BROKEN LIBRARY LIVE CONFIRM"
 
 # Scheduled preview interval (seconds) — per ``pruner_scope_settings`` row, clamped on write.

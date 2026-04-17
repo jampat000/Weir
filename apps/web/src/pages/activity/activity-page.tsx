@@ -63,8 +63,8 @@ export function ActivityPage() {
           Read-only: no filters, export, or actions. Records sign-in outcomes, setup, sign-out, failed bootstrap
           attempts, throttled Fetcher health checks, Fetcher failed-import queue/run activity (queued passes, run start,
           outcomes), Refiner file remux pass results, Refiner watched-folder scan summaries when you run them, and Pruner
-          connection tests, preview outcomes, Jellyfin/Emby apply-from-preview completions, and Plex live removal
-          summaries — not every page load.
+          connection tests, preview outcomes, and Pruner apply-from-preview completions (Jellyfin, Emby, Plex) —
+          not every page load.
         </p>
       </header>
 

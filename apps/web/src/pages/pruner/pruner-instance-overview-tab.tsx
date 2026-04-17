@@ -38,8 +38,7 @@ export function PrunerInstanceOverviewTab() {
               ) : null}{" "}
               · per-scope item cap {s.preview_max_items}{" "}
               <span className="text-[var(--mm-text3)]">
-                (Jellyfin/Emby: preview list max. Plex: same number caps live removals together with the env absolute
-                ceiling.)
+                (Jellyfin/Emby/Plex: preview candidate cap per scope. Legacy Plex-only env ceilings are deprecated.)
               </span>
             </div>
             <div className="mt-1 text-xs text-[var(--mm-text2)]">
