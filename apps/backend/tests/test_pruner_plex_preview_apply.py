@@ -89,7 +89,7 @@ def test_plex_apply_does_not_call_candidate_collector(
         raise AssertionError("apply must not rediscover Plex candidates")
 
     monkeypatch.setattr(
-        "mediamop.modules.pruner.pruner_plex_live_candidates.list_plex_missing_thumb_candidates",
+        "mediamop.modules.pruner.pruner_plex_missing_thumb_candidates.list_plex_missing_thumb_candidates",
         _boom,
     )
     monkeypatch.setattr(

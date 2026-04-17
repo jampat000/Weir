@@ -28,7 +28,8 @@ def plex_missing_primary_effective_max_items(settings: MediaMopSettings, scope_p
 
     This intentionally matches the retired ``pruner.candidate_removal.plex_live.v1`` contract:
     ``min(per-scope preview_max_items, MEDIAMOP_PRUNER_PLEX_LIVE_ABS_MAX_ITEMS)``, with the same 5k scope clamp used
-    for all preview kinds. Detection itself is ``list_plex_missing_thumb_candidates`` (unchanged from the live path).
+    for all preview kinds. Detection is ``list_plex_missing_thumb_candidates`` in
+    ``pruner_plex_missing_thumb_candidates`` (preview-only HTTP; no apply here).
     """
 
     return max(

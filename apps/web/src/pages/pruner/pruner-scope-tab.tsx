@@ -391,6 +391,16 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
               ? "Plex: genre filters apply to missing-primary previews and use Genre tags on each leaf from your server."
               : "Jellyfin / Emby: uses each item’s Genres field from the Items API for every preview rule on this tab."}
           </p>
+          {isPlex ? (
+            <p
+              className="text-xs text-amber-100/90"
+              data-testid="pruner-plex-genre-empty-preview-note"
+            >
+              If a preview finishes successfully with <strong>zero rows</strong> while filters are set, that usually
+              means nothing in this pass matched the rule under those genres — not that Plex reports nothing to clean.
+              Matching uses Genre tags on each <code className="text-[0.85em]">allLeaves</code> leaf only.
+            </p>
+          ) : null}
           {canOperate ? (
             <div className="space-y-2">
               <input

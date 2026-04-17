@@ -174,6 +174,20 @@ def make_pruner_candidate_removal_preview_handler(
                 }
                 if preview_genres:
                     detail_obj["preview_include_genres"] = list(preview_genres)
+                if outcome == "success" and preview_genres and len(cands) == 0:
+                    if provider == "plex" and rule_family_id == RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED:
+                        detail_obj["preview_genre_filter_zero_candidates_note"] = (
+                            "Zero preview rows with genre filters active: filters narrowed this preview. "
+                            "That does not mean the library is clean — widen genres or raise the per-tab cap if you "
+                            "expected matches. Plex missing-primary uses Genre tags on each allLeaves leaf; leaves "
+                            "without a matching tag are skipped."
+                        )
+                    else:
+                        detail_obj["preview_genre_filter_zero_candidates_note"] = (
+                            "Zero preview rows with genre filters active: filters narrowed this preview. "
+                            "That does not mean the library is clean — widen genres or raise the per-tab cap if you "
+                            "expected matches."
+                        )
                 if provider == "plex" and rule_family_id == RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED:
                     detail_obj["plex_missing_primary_item_cap"] = max_items
                     detail_obj["plex_missing_primary_cap_note"] = (

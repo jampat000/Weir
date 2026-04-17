@@ -94,6 +94,8 @@ describe("PrunerScopeTab (Plex)", () => {
         expect(screen.getByTestId("pruner-plex-other-rules-note")).toBeInTheDocument();
       });
       expect(screen.queryByTestId("pruner-plex-live-surface")).not.toBeInTheDocument();
+      expect(screen.getByTestId("pruner-plex-genre-empty-preview-note")).toBeInTheDocument();
+      expect(screen.getByTestId("pruner-plex-genre-empty-preview-note").textContent).toMatch(/zero rows/i);
       expect(screen.getByTestId("pruner-plex-other-rules-note").textContent).toMatch(/never-played|watched/i);
       const btn = screen.getByRole("button", { name: /queue preview \(missing primary art\)/i });
       expect(btn).not.toBeDisabled();

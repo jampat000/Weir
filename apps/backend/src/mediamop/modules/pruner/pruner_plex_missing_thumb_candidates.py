@@ -1,9 +1,12 @@
-"""Plex candidate discovery for ``missing_primary_media_reported`` (preview + legacy wiring).
+"""Plex **preview-only** candidate collection for ``missing_primary_media_reported`` (no apply, no live removal).
 
-**Provider-specific semantics (Plex):** candidates are **episode** (TV scope) or **movie** (Movies
-scope) leaf ``Video`` rows where the Plex JSON object has **no non-empty ``thumb``** attribute on
-that leaf. This is **not** the same signal as Jellyfin/Emby ``HasPrimaryImage=false`` + primary tag
-checks; operator copy must not equate them.
+This module is **not** a live-removal or apply path: it only performs read-only HTTP calls to build the candidate list
+stored in ``pruner_preview_runs``. Apply uses ``pruner_plex_library_delete`` against frozen ``ratingKey`` values from
+that snapshot.
+
+**Provider-specific semantics (Plex):** candidates are **episode** (TV scope) or **movie** (Movies scope) leaf
+``Video`` rows where the Plex JSON object has **no non-empty ``thumb``** on that leaf. This is **not** the same
+signal as Jellyfin/Emby ``HasPrimaryImage=false`` + primary tag checks; operator copy must not equate them.
 
 Read-only calls: ``GET /library/sections`` and paged ``GET /library/sections/{key}/allLeaves``.
 """

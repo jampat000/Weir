@@ -26,7 +26,14 @@ class PrunerScopeSummaryOut(BaseModel):
     watched_tv_reported_enabled: bool = False
     watched_movies_reported_enabled: bool = False
     preview_max_items: int
-    preview_include_genres: list[str] = Field(default_factory=list)
+    preview_include_genres: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Optional genre names (per tab) that narrow preview collection only. Empty means no filter. "
+            "A successful preview with zero candidates can mean no items matched the rule plus filters — "
+            "not necessarily a clean library."
+        ),
+    )
     scheduled_preview_enabled: bool = False
     scheduled_preview_interval_seconds: int = 3600
     last_scheduled_preview_enqueued_at: datetime | None = None
@@ -73,7 +80,10 @@ class PrunerScopePatchIn(BaseModel):
     watched_tv_reported_enabled: bool | None = None
     watched_movies_reported_enabled: bool | None = None
     preview_max_items: int | None = Field(None, ge=1, le=5000)
-    preview_include_genres: list[str] | None = None
+    preview_include_genres: list[str] | None = Field(
+        default=None,
+        description="Replace per-tab genre include list; omit field to leave unchanged.",
+    )
     scheduled_preview_enabled: bool | None = None
     scheduled_preview_interval_seconds: int | None = Field(None, ge=60, le=86_400)
 
@@ -227,7 +237,13 @@ class PrunerPlexLiveEligibilityOut(BaseModel):
     eligible: bool
     reasons: list[str] = Field(default_factory=list)
     apply_feature_enabled: bool
-    plex_live_feature_enabled: bool
+    plex_live_feature_enabled: bool = Field(
+        ...,
+        description=(
+            "Legacy name: mirrors deprecated env MEDIAMOP_PRUNER_PLEX_LIVE_REMOVAL_ENABLED only for operator "
+            "visibility. Plex removal always uses preview → apply-from-preview; this flag does not re-enable live scan."
+        ),
+    )
     server_instance_id: int
     media_scope: str
     provider: str

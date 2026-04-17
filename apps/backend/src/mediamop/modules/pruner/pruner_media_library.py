@@ -20,7 +20,7 @@ from mediamop.modules.pruner.pruner_genre_filters import (
     item_matches_genre_include_filter,
     jellyfin_emby_item_genres,
 )
-from mediamop.modules.pruner.pruner_plex_live_candidates import list_plex_missing_thumb_candidates
+from mediamop.modules.pruner.pruner_plex_missing_thumb_candidates import list_plex_missing_thumb_candidates
 from mediamop.modules.pruner.pruner_http import http_get_json, http_get_text, join_base_path
 
 
@@ -593,8 +593,8 @@ def preview_payload_json(
             if not token:
                 msg = "plex auth token missing in credentials envelope"
                 raise ValueError(msg)
-            # Detector parity: same ``list_plex_missing_thumb_candidates`` implementation the retired
-            # ``pruner.candidate_removal.plex_live.v1`` job called (empty/missing ``thumb`` on episode/movie leaves).
+            # Same read-only Plex leaf probe as ``pruner_plex_missing_thumb_candidates.list_plex_missing_thumb_candidates``
+            # (empty/missing ``thumb`` on episode/movie leaves). Preview-only — never performs apply or live removal.
             # Item cap is enforced in ``pruner_preview_job_handler`` via ``plex_missing_primary_effective_max_items``.
             cands, trunc = list_plex_missing_thumb_candidates(
                 base_url=base_url,

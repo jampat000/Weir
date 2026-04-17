@@ -19,11 +19,13 @@ import mediamop.platform.activity.models  # noqa: F401
 import mediamop.platform.auth.models  # noqa: F401
 from mediamop.core.config import MediaMopSettings
 from mediamop.core.db import create_db_engine, create_session_factory
+from mediamop.modules.pruner.pruner_genre_filters import preview_genre_filters_to_db_column
 from mediamop.modules.pruner.pruner_instances_service import create_server_instance
 from mediamop.modules.pruner.pruner_job_handlers import build_pruner_job_handlers
 from mediamop.modules.pruner.pruner_job_kinds import PRUNER_CANDIDATE_REMOVAL_PREVIEW_JOB_KIND
 from mediamop.modules.pruner.pruner_jobs_model import PrunerJob, PrunerJobStatus
 from mediamop.modules.pruner.pruner_preview_run_model import PrunerPreviewRun
+from mediamop.modules.pruner.pruner_scope_settings_model import PrunerScopeSettings
 from mediamop.modules.pruner.worker_loop import PrunerJobWorkContext
 from mediamop.platform.activity import constants as C
 from mediamop.platform.activity.models import ActivityEvent
@@ -169,3 +171,70 @@ def test_scheduled_preview_activity_title_and_detail_trigger(
         assert evt.title.startswith("Scheduled Pruner preview (missing primary):")
         detail = json.loads(evt.detail or "{}")
         assert detail.get("trigger") == "scheduled"
+
+
+def test_plex_preview_zero_candidates_with_genres_records_operator_note(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = MediaMopSettings.load()
+    with session_factory() as s:
+        with s.begin():
+            inst = create_server_instance(
+                s,
+                settings,
+                provider="plex",
+                display_name="Plex",
+                base_url="http://plex.test:32400",
+                credentials_secrets={"auth_token": "t"},
+            )
+            sid = int(inst.id)
+            row = s.scalars(
+                select(PrunerScopeSettings).where(
+                    PrunerScopeSettings.server_instance_id == sid,
+                    PrunerScopeSettings.media_scope == "tv",
+                ),
+            ).one()
+            row.preview_include_genres_json = preview_genre_filters_to_db_column(["Drama"])
+
+    monkeypatch.setattr(
+        "mediamop.modules.pruner.pruner_media_library.list_plex_missing_thumb_candidates",
+        lambda **_kw: ([], False),
+    )
+
+    with session_factory() as s:
+        with s.begin():
+            job_row = PrunerJob(
+                dedupe_key="preview-activity-genre-zero",
+                job_kind=PRUNER_CANDIDATE_REMOVAL_PREVIEW_JOB_KIND,
+                status=PrunerJobStatus.COMPLETED.value,
+            )
+            s.add(job_row)
+            s.flush()
+            job_id = int(job_row.id)
+
+    handlers = build_pruner_job_handlers(settings, session_factory)
+    fn = handlers[PRUNER_CANDIDATE_REMOVAL_PREVIEW_JOB_KIND]
+    fn(
+        PrunerJobWorkContext(
+            id=job_id,
+            job_kind=PRUNER_CANDIDATE_REMOVAL_PREVIEW_JOB_KIND,
+            payload_json=json.dumps({"server_instance_id": sid, "media_scope": "tv"}),
+            lease_owner="pytest",
+        ),
+    )
+
+    with session_factory() as s:
+        evt = s.scalars(
+            select(ActivityEvent)
+            .where(ActivityEvent.module == "pruner")
+            .order_by(ActivityEvent.id.desc()),
+        ).first()
+        assert evt is not None
+        assert evt.event_type == C.PRUNER_PREVIEW_SUCCEEDED
+        detail = json.loads(evt.detail or "{}")
+        assert detail.get("candidate_count") == 0
+        assert detail.get("preview_include_genres") == ["Drama"]
+        note = str(detail.get("preview_genre_filter_zero_candidates_note") or "")
+        assert "Zero preview rows" in note
+        assert "allLeaves" in note
