@@ -26,7 +26,8 @@ export function PrunerInstanceShell() {
           <>
             <h1 className="mm-page__title">Pruner — {q.data.display_name}</h1>
             <p className="mm-page__subtitle max-w-3xl">
-              This workspace is for <strong className="text-[var(--mm-text)]">one</strong>{" "}
+              Pruner is a provider tool for Emby, Jellyfin, and Plex. This workspace is for{" "}
+              <strong className="text-[var(--mm-text)]">one</strong>{" "}
               <strong className="text-[var(--mm-text)]">{q.data.provider}</strong> server (
               <span className="font-mono text-[0.9em]">{q.data.base_url}</span>). Use{" "}
               <strong className="text-[var(--mm-text)]">Movies</strong> and <strong className="text-[var(--mm-text)]">TV</strong>{" "}

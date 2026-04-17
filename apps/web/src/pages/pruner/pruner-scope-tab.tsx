@@ -648,6 +648,15 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
           &quot;truncated&quot;, Plex had more matches than that cap — the snapshot is never silently widened.
         </p>
       ) : null}
+      <div className="mt-1">
+        <h3 className="text-sm font-semibold text-[var(--mm-text)]" data-testid="pruner-filters-section-heading">
+          Preview narrowing filters
+        </h3>
+        <p className="text-xs text-[var(--mm-text2)]">
+          These filters narrow preview collection for this {props.scope === "tv" ? "TV" : "Movies"} tab only. Apply
+          still uses only the selected preview snapshot.
+        </p>
+      </div>
       {scopeRow ? (
         <div
           className="space-y-2 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text)]"
@@ -1073,6 +1082,15 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
           <code className="text-[0.85em]">addedAt</code> age, not <code className="text-[0.85em]">DateCreated</code>.
         </p>
       ) : null}
+      <div className="mt-1">
+        <h3 className="text-sm font-semibold text-[var(--mm-text)]" data-testid="pruner-rules-section-heading">
+          Rule families
+        </h3>
+        <p className="text-xs text-[var(--mm-text2)]">
+          Enable and save each rule family before queueing previews. Unsupported provider/rule combinations return
+          explicit unsupported outcomes in preview history.
+        </p>
+      </div>
       {props.scope === "movies" ? (
           <>
             <div
@@ -1335,6 +1353,15 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
           </dl>
         </div>
       ) : null}
+      <div className="mt-1">
+        <h3 className="text-sm font-semibold text-[var(--mm-text)]" data-testid="pruner-actions-history-heading">
+          Preview and apply actions
+        </h3>
+        <p className="text-xs text-[var(--mm-text2)]">
+          Queue previews, inspect rows/JSON, then apply from one selected snapshot. The history table explains no
+          candidates, filtered-out runs, and unsupported outcomes.
+        </p>
+      </div>
       {canOperate ? (
         <div className="flex flex-wrap gap-2">
           <button
