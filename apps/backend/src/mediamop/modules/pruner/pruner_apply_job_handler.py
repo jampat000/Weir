@@ -1,4 +1,4 @@
-"""Handler for ``pruner.candidate_removal.apply.v1`` — Jellyfin only, snapshot-bound."""
+"""Handler for ``pruner.candidate_removal.apply.v1`` — Jellyfin + Emby, snapshot-bound."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from mediamop.core.config import MediaMopSettings
 from mediamop.modules.pruner.pruner_constants import RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED
 from mediamop.modules.pruner.pruner_credentials_envelope import decrypt_and_parse_envelope
 from mediamop.modules.pruner.pruner_instances_service import get_server_instance
+from mediamop.modules.pruner.pruner_emby_library_delete import emby_delete_library_item
 from mediamop.modules.pruner.pruner_jellyfin_library_delete import jellyfin_delete_library_item
 from mediamop.modules.pruner.pruner_preview_run_model import PrunerPreviewRun
 from mediamop.modules.pruner.worker_loop import PrunerJobWorkContext
@@ -69,8 +70,9 @@ def make_pruner_candidate_removal_apply_handler(
             if inst is None:
                 msg = f"unknown server_instance_id={sid}"
                 raise ValueError(msg)
-            if str(inst.provider) != "jellyfin":
-                msg = "apply is supported for Jellyfin instances only in this release"
+            prov = str(inst.provider)
+            if prov not in ("jellyfin", "emby"):
+                msg = "apply is supported for Jellyfin and Emby instances only in this release"
                 raise ValueError(msg)
             run = session.scalars(
                 select(PrunerPreviewRun).where(
@@ -112,6 +114,7 @@ def make_pruner_candidate_removal_apply_handler(
                 msg = "cannot decrypt credentials (session secret missing or ciphertext invalid)"
                 raise RuntimeError(msg)
             api_key = str((env.get("secrets") or {}).get("api_key", ""))
+            provider_for_delete = prov
 
         if not candidates:
             msg = "no candidates in preview snapshot"
@@ -125,11 +128,18 @@ def make_pruner_candidate_removal_apply_handler(
             if not item_id:
                 failed += 1
                 continue
-            status, _err_body = jellyfin_delete_library_item(
-                base_url=base_url,
-                api_key=api_key,
-                item_id=item_id,
-            )
+            if provider_for_delete == "emby":
+                status, _err_body = emby_delete_library_item(
+                    base_url=base_url,
+                    api_key=api_key,
+                    item_id=item_id,
+                )
+            else:
+                status, _err_body = jellyfin_delete_library_item(
+                    base_url=base_url,
+                    api_key=api_key,
+                    item_id=item_id,
+                )
             if status in (200, 204):
                 removed += 1
             elif status == 404:
@@ -138,12 +148,12 @@ def make_pruner_candidate_removal_apply_handler(
                 failed += 1
 
         label = _scope_label(scope)
-        title = f"{_APPLY_TITLE_PREFIX}: {display_name} (jellyfin) — {label} — from preview snapshot"
+        title = f"{_APPLY_TITLE_PREFIX}: {display_name} ({provider_for_delete}) — {label} — from preview snapshot"
         detail_obj: dict[str, object] = {
             "action": _APPLY_TITLE_PREFIX,
             "preview_run_id": preview_run_uuid,
             "server_instance_id": sid,
-            "provider": "jellyfin",
+            "provider": provider_for_delete,
             "media_scope": scope,
             "rule_family_id": RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
             "removed": removed,

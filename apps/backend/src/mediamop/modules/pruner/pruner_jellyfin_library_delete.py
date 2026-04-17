@@ -13,7 +13,8 @@ Verified contract (Jellyfin 10.8+ style REST, same header family as our preview 
   does **not** promise file deletion — operators must rely on Jellyfin's own behavior for their
   server configuration.
 * **What we do not do here:** No separate "delete only from DB" API path in this slice; no Plex
-  or Emby calls.
+  calls. Emby apply uses :mod:`mediamop.modules.pruner.pruner_emby_library_delete` (same wire
+  shape; separate operator-facing documentation).
 
 Return values are for Pruner accounting only, not end-user legal guarantees.
 """

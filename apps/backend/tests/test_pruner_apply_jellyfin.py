@@ -137,7 +137,7 @@ def test_apply_post_ok_when_enabled(session_factory: sessionmaker[Session], monk
         assert "pruner_job_id" in r.json()
 
 
-def test_apply_rejects_emby_instance(session_factory: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch) -> None:
+def test_apply_post_ok_emby_when_enabled(session_factory: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MEDIAMOP_PRUNER_APPLY_ENABLED", "1")
     settings = MediaMopSettings.load()
     run_uuid = str(uuid.uuid4())
@@ -160,7 +160,51 @@ def test_apply_rejects_emby_instance(session_factory: sessionmaker[Session], mon
                 rule_family_id=RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
                 pruner_job_id=None,
                 candidate_count=1,
-                candidates_json="[{\"item_id\":\"x\"}]",
+                candidates_json='[{"item_id":"x"}]',
+                truncated=False,
+                outcome="success",
+                unsupported_detail=None,
+                error_message=None,
+            )
+    seed_admin_user()
+    app = create_app()
+    with TestClient(app) as client:
+        _login(client)
+        tok = fetch_csrf(client)
+        r = auth_post(
+            client,
+            f"/api/v1/pruner/instances/{sid}/scopes/tv/preview-runs/{run_uuid}/apply",
+            json={"csrf_token": tok},
+            headers={"Content-Type": "application/json"},
+        )
+        assert r.status_code == 200, r.text
+        assert "pruner_job_id" in r.json()
+
+
+def test_apply_rejects_plex_instance(session_factory: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MEDIAMOP_PRUNER_APPLY_ENABLED", "1")
+    settings = MediaMopSettings.load()
+    run_uuid = str(uuid.uuid4())
+    with session_factory() as s:
+        with s.begin():
+            inst = create_server_instance(
+                s,
+                settings,
+                provider="plex",
+                display_name="P",
+                base_url="http://plex.test:32400",
+                credentials_secrets={"auth_token": "t"},
+            )
+            sid = int(inst.id)
+            insert_preview_run(
+                s,
+                preview_run_uuid=run_uuid,
+                server_instance_id=sid,
+                media_scope=MEDIA_SCOPE_TV,
+                rule_family_id=RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
+                pruner_job_id=None,
+                candidate_count=1,
+                candidates_json='[{"item_id":"x"}]',
                 truncated=False,
                 outcome="success",
                 unsupported_detail=None,
@@ -338,6 +382,204 @@ def test_apply_activity_title_uses_operator_label(
         assert evt is not None
         assert "Remove broken library entries" in (evt.title or "")
         assert "preview snapshot" in (evt.title or "").lower()
+        assert "(jellyfin)" in (evt.title or "").lower()
+        assert json.loads(evt.detail or "{}").get("provider") == "jellyfin"
+
+
+def test_apply_activity_title_emby_names_provider(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MEDIAMOP_PRUNER_APPLY_ENABLED", "1")
+    settings = MediaMopSettings.load()
+    run_uuid = str(uuid.uuid4())
+
+    monkeypatch.setattr(
+        "mediamop.modules.pruner.pruner_apply_job_handler.emby_delete_library_item",
+        lambda **kw: (404, None),
+    )
+
+    with session_factory() as s:
+        with s.begin():
+            inst = create_server_instance(
+                s,
+                settings,
+                provider="emby",
+                display_name="Emby Lab",
+                base_url="http://emby.test",
+                credentials_secrets={"api_key": "k"},
+            )
+            sid = int(inst.id)
+            insert_preview_run(
+                s,
+                preview_run_uuid=run_uuid,
+                server_instance_id=sid,
+                media_scope=MEDIA_SCOPE_TV,
+                rule_family_id=RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
+                pruner_job_id=None,
+                candidate_count=1,
+                candidates_json='[{"item_id":"gone"}]',
+                truncated=False,
+                outcome="success",
+                unsupported_detail=None,
+                error_message=None,
+            )
+
+    with session_factory() as s:
+        with s.begin():
+            job_row = PrunerJob(
+                dedupe_key="apply-title-emby-test",
+                job_kind=PRUNER_CANDIDATE_REMOVAL_APPLY_JOB_KIND,
+                status=PrunerJobStatus.COMPLETED.value,
+            )
+            s.add(job_row)
+            s.flush()
+            job_id = int(job_row.id)
+
+    handlers = build_pruner_job_handlers(settings, session_factory)
+    handlers[PRUNER_CANDIDATE_REMOVAL_APPLY_JOB_KIND](
+        PrunerJobWorkContext(
+            id=job_id,
+            job_kind=PRUNER_CANDIDATE_REMOVAL_APPLY_JOB_KIND,
+            payload_json=json.dumps(
+                {
+                    "preview_run_uuid": run_uuid,
+                    "server_instance_id": sid,
+                    "media_scope": MEDIA_SCOPE_TV,
+                    "rule_family_id": RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
+                },
+            ),
+            lease_owner="pytest",
+        ),
+    )
+
+    with session_factory() as s:
+        evt = s.scalars(select(ActivityEvent).order_by(ActivityEvent.id.desc())).first()
+        assert evt is not None
+        assert "(emby)" in (evt.title or "").lower()
+        detail = json.loads(evt.detail or "{}")
+        assert detail.get("provider") == "emby"
+
+
+def test_apply_handler_emby_calls_emby_delete_not_jellyfin(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MEDIAMOP_PRUNER_APPLY_ENABLED", "1")
+    settings = MediaMopSettings.load()
+    run_uuid = str(uuid.uuid4())
+    emby_calls: list[str] = []
+    jellyfin_calls: list[str] = []
+
+    def fake_emby(**kw: object) -> tuple[int, str | None]:
+        emby_calls.append(str(kw.get("item_id", "")))
+        return 200, None
+
+    def fake_jellyfin(**kw: object) -> tuple[int, str | None]:
+        jellyfin_calls.append(str(kw.get("item_id", "")))
+        return 200, None
+
+    monkeypatch.setattr("mediamop.modules.pruner.pruner_apply_job_handler.emby_delete_library_item", fake_emby)
+    monkeypatch.setattr("mediamop.modules.pruner.pruner_apply_job_handler.jellyfin_delete_library_item", fake_jellyfin)
+
+    with session_factory() as s:
+        with s.begin():
+            inst = create_server_instance(
+                s,
+                settings,
+                provider="emby",
+                display_name="E",
+                base_url="http://e.test",
+                credentials_secrets={"api_key": "k"},
+            )
+            sid = int(inst.id)
+            insert_preview_run(
+                s,
+                preview_run_uuid=run_uuid,
+                server_instance_id=sid,
+                media_scope=MEDIA_SCOPE_TV,
+                rule_family_id=RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
+                pruner_job_id=None,
+                candidate_count=1,
+                candidates_json='[{"item_id":"e1"}]',
+                truncated=False,
+                outcome="success",
+                unsupported_detail=None,
+                error_message=None,
+            )
+
+    with session_factory() as s:
+        with s.begin():
+            job_row = PrunerJob(
+                dedupe_key="apply-emby-dispatch-test",
+                job_kind=PRUNER_CANDIDATE_REMOVAL_APPLY_JOB_KIND,
+                status=PrunerJobStatus.COMPLETED.value,
+            )
+            s.add(job_row)
+            s.flush()
+            job_id = int(job_row.id)
+
+    handlers = build_pruner_job_handlers(settings, session_factory)
+    handlers[PRUNER_CANDIDATE_REMOVAL_APPLY_JOB_KIND](
+        PrunerJobWorkContext(
+            id=job_id,
+            job_kind=PRUNER_CANDIDATE_REMOVAL_APPLY_JOB_KIND,
+            payload_json=json.dumps(
+                {
+                    "preview_run_uuid": run_uuid,
+                    "server_instance_id": sid,
+                    "media_scope": MEDIA_SCOPE_TV,
+                    "rule_family_id": RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
+                },
+            ),
+            lease_owner="pytest",
+        ),
+    )
+    assert emby_calls == ["e1"]
+    assert jellyfin_calls == []
+
+
+def test_get_apply_eligibility_eligible_for_emby_when_enabled(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MEDIAMOP_PRUNER_APPLY_ENABLED", "1")
+    settings = MediaMopSettings.load()
+    run_uuid = str(uuid.uuid4())
+    with session_factory() as s:
+        with s.begin():
+            inst = create_server_instance(
+                s,
+                settings,
+                provider="emby",
+                display_name="E",
+                base_url="http://em.test",
+                credentials_secrets={"api_key": "k"},
+            )
+            sid = int(inst.id)
+            insert_preview_run(
+                s,
+                preview_run_uuid=run_uuid,
+                server_instance_id=sid,
+                media_scope=MEDIA_SCOPE_TV,
+                rule_family_id=RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
+                pruner_job_id=None,
+                candidate_count=1,
+                candidates_json='[{"item_id":"a"}]',
+                truncated=False,
+                outcome="success",
+                unsupported_detail=None,
+                error_message=None,
+            )
+    seed_admin_user()
+    app = create_app()
+    with TestClient(app) as client:
+        _login(client)
+        r = client.get(f"/api/v1/pruner/instances/{sid}/scopes/tv/preview-runs/{run_uuid}/apply-eligibility")
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert data["eligible"] is True
+        assert data["provider"] == "emby"
 
 
 def test_get_apply_eligibility_includes_feature_flag(

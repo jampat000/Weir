@@ -111,7 +111,7 @@ class MediaMopSettings:
     # Pruner per-scope scheduled preview enqueue loop (reads ``pruner_scope_settings``; independent of worker count).
     pruner_preview_schedule_enqueue_enabled: bool
     pruner_preview_schedule_scan_interval_seconds: int
-    # Jellyfin-only Phase 3: enqueue ``pruner.candidate_removal.apply.v1`` (default off).
+    # Jellyfin + Emby Phase 3 apply: enqueue ``pruner.candidate_removal.apply.v1`` (default off).
     pruner_apply_enabled: bool
     # 0 = no in-process Subber workers (Subber-owned subber_jobs only); >0 when Subber queues durable work.
     subber_worker_count: int

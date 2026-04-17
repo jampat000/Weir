@@ -1,4 +1,4 @@
-"""Shared rules for Pruner apply-from-preview (Jellyfin Phase 3 slice)."""
+"""Shared rules for Pruner apply-from-preview (Jellyfin + Emby snapshot-bound slice)."""
 
 from __future__ import annotations
 
@@ -44,8 +44,10 @@ def compute_apply_eligibility(
         )
 
     prov = str(inst.provider)
-    if prov != "jellyfin":
-        reasons.append("Remove broken library entries is available for Jellyfin instances only in this release.")
+    if prov not in ("jellyfin", "emby"):
+        reasons.append(
+            "Remove broken library entries is available for Jellyfin and Emby instances only in this release.",
+        )
 
     run = db.scalars(
         select(PrunerPreviewRun).where(

@@ -34,7 +34,8 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
   const scopeRow = instance?.scopes.find((s) => s.media_scope === props.scope);
   const label = props.scope === "tv" ? "TV (episodes)" : "Movies (one row per movie item)";
   const isPlex = instance?.provider === "plex";
-  const isJellyfin = instance?.provider === "jellyfin";
+  const canApplyMissingPrimaryFromSnapshot =
+    instance?.provider === "jellyfin" || instance?.provider === "emby";
 
   const previewRunsQueryKey = ["pruner", "preview-runs", instanceId, props.scope] as const;
   const runsQuery = useQuery({
@@ -311,7 +312,7 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
                       >
                         JSON
                       </button>
-                      {canOperate && isJellyfin && row.outcome === "success" && row.candidate_count > 0 ? (
+                      {canOperate && canApplyMissingPrimaryFromSnapshot && row.outcome === "success" && row.candidate_count > 0 ? (
                         <div>
                           <button
                             type="button"

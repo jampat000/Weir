@@ -316,7 +316,7 @@ def get_pruner_preview_run(
     response_model=PrunerApplyEligibilityOut,
     summary="Whether Remove broken library entries can be enqueued for this preview snapshot",
     description=(
-        "Read-only gate check for the Jellyfin-only apply slice. This is **not** a preview/dry run — "
+        "Read-only gate check for the Jellyfin/Emby apply slice. This is **not** a preview/dry run — "
         "it only reports whether the snapshot is eligible given instance, scope, outcome, and feature flag."
     ),
 )
@@ -344,7 +344,7 @@ def get_pruner_apply_eligibility(
 @router.post(
     "/pruner/instances/{instance_id}/scopes/{media_scope}/preview-runs/{preview_run_uuid}/apply",
     response_model=PrunerEnqueueOut,
-    summary="Enqueue Remove broken library entries from one preview snapshot (Jellyfin only)",
+    summary="Enqueue Remove broken library entries from one preview snapshot (Jellyfin or Emby)",
 )
 def post_pruner_apply_from_preview(
     instance_id: Annotated[int, Path(ge=1)],
