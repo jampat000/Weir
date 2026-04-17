@@ -13,7 +13,7 @@ import { usePrunerInstancesQuery, usePrunerJobsInspectionQuery } from "../../lib
 import { PrunerProviderPeopleCard, PrunerProviderRulesCard } from "./pruner-provider-operator-workspace";
 import { formatPrunerDateTime, prunerJobKindOperatorLabel } from "./pruner-ui-utils";
 
-type TopTab = "overview" | "emby" | "jellyfin" | "plex" | "schedules" | "jobs";
+type TopTab = "overview" | "emby" | "jellyfin" | "plex" | "jobs";
 type ProviderTab = "emby" | "jellyfin" | "plex";
 
 function providerLabel(p: ProviderTab): string {
@@ -458,7 +458,7 @@ function PrunerProviderRulesPeopleConnectionLine({
   );
 }
 
-type ProviderWorkspaceSection = "connection" | "rules" | "people";
+type ProviderWorkspaceSection = "connection" | "rules" | "people" | "schedule";
 
 function ProviderConfigurationWorkspace({ provider, allInstances }: { provider: ProviderTab; allInstances: PrunerServerInstance[] }) {
   const providerName = providerLabel(provider);
@@ -514,6 +514,7 @@ function ProviderConfigurationWorkspace({ provider, allInstances }: { provider: 
             ["connection", "Connection"],
             ["rules", "Rules"],
             ["people", "People"],
+            ["schedule", "Schedule"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -563,6 +564,18 @@ function ProviderConfigurationWorkspace({ provider, allInstances }: { provider: 
               ) : (
                 <PrunerProviderPeopleCard provider={provider} instanceId={0} instance={disabledCtx.instance} disabled />
               )}
+            </div>
+          </div>
+        ) : null}
+
+        {providerSection === "schedule" ? (
+          <div className="space-y-4" data-testid="pruner-provider-schedule-wrap">
+            <p className="text-xs text-[var(--mm-text3)]" data-testid="pruner-provider-schedule-hint">
+              Add a server under Connection to enable automatic scans.
+            </p>
+            <div className={`grid gap-4 md:grid-cols-2 ${!hasInstance ? "opacity-40" : ""}`}>
+              <PrunerGlobalScheduleRow provider={provider} scope="tv" instance={selectedInstance} />
+              <PrunerGlobalScheduleRow provider={provider} scope="movies" instance={selectedInstance} />
             </div>
           </div>
         ) : null}
@@ -732,14 +745,12 @@ function PrunerGlobalScheduleRow({
   const locked = missing || !canOperate;
   const testId = `pruner-schedule-row-${provider}-${scope}`;
 
-  const scopeHeading = scope === "tv" ? "TV shows" : "Movies";
-  const saveScheduleLabel = `Save ${pLabel} ${scopeHeading} schedule`;
+  const cardTitle = scope === "tv" ? "TV" : "Movies";
+  const saveScheduleLabel = scope === "tv" ? "Save TV schedule" : "Save Movies schedule";
 
   return (
     <section className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-6" data-testid={testId}>
-      <h3 className="text-sm font-semibold text-[var(--mm-text1)]">
-        {pLabel} · {scopeHeading}
-      </h3>
+      <h3 className="text-sm font-semibold text-[var(--mm-text1)]">{cardTitle}</h3>
       {instance ? (
         <p className="mt-1 text-xs text-[var(--mm-text3)]">{instance.display_name}</p>
       ) : (
@@ -805,55 +816,6 @@ function PrunerGlobalScheduleRow({
             {err}
           </p>
         ) : null}
-      </div>
-    </section>
-  );
-}
-
-function TopLevelSchedules({ instances }: { instances: PrunerServerInstance[] }) {
-  const noInstances = instances.length === 0;
-  return (
-    <section className="space-y-5" data-testid="pruner-top-schedules-tab">
-      <header className="max-w-3xl">
-        <h2 className="text-base font-semibold text-[var(--mm-text1)]">Schedules</h2>
-        <p className="mt-1 text-sm text-[var(--mm-text2)]">
-          Turn on timed library checks per provider and library type. Each card saves on its own.
-        </p>
-      </header>
-      {noInstances ? (
-        <p
-          className="rounded-md border border-dashed border-[var(--mm-border)] bg-[var(--mm-surface2)]/35 px-4 py-3 text-sm text-[var(--mm-text2)]"
-          data-testid="pruner-schedules-empty-state"
-        >
-          Add a server under each provider tab to enable automatic scans.
-        </p>
-      ) : null}
-      <div className="space-y-8">
-        <div>
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--mm-text2)]">Emby</h3>
-          <div className="grid gap-4 md:grid-cols-2">
-            <PrunerGlobalScheduleRow provider="emby" scope="tv" instance={instances.find((i) => i.provider === "emby")} />
-            <PrunerGlobalScheduleRow provider="emby" scope="movies" instance={instances.find((i) => i.provider === "emby")} />
-          </div>
-        </div>
-        <div>
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--mm-text2)]">Jellyfin</h3>
-          <div className="grid gap-4 md:grid-cols-2">
-            <PrunerGlobalScheduleRow provider="jellyfin" scope="tv" instance={instances.find((i) => i.provider === "jellyfin")} />
-            <PrunerGlobalScheduleRow
-              provider="jellyfin"
-              scope="movies"
-              instance={instances.find((i) => i.provider === "jellyfin")}
-            />
-          </div>
-        </div>
-        <div>
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--mm-text2)]">Plex</h3>
-          <div className="grid gap-4 md:grid-cols-2">
-            <PrunerGlobalScheduleRow provider="plex" scope="tv" instance={instances.find((i) => i.provider === "plex")} />
-            <PrunerGlobalScheduleRow provider="plex" scope="movies" instance={instances.find((i) => i.provider === "plex")} />
-          </div>
-        </div>
       </div>
     </section>
   );
@@ -930,8 +892,8 @@ export function PrunerInstancesListPage() {
         <p className="mm-page__subtitle max-w-3xl">
           Library cleanup for <strong className="text-[var(--mm-text)]">Emby</strong>,{" "}
           <strong className="text-[var(--mm-text)]">Jellyfin</strong>, and{" "}
-          <strong className="text-[var(--mm-text)]">Plex</strong>. Each provider tab has Connection, Rules, and People
-          for that server.
+          <strong className="text-[var(--mm-text)]">Plex</strong>. Each provider tab has Connection, Rules, People, and
+          Schedule for that server.
         </p>
       </header>
 
@@ -945,7 +907,6 @@ export function PrunerInstancesListPage() {
           ["emby", "Emby"],
           ["jellyfin", "Jellyfin"],
           ["plex", "Plex"],
-          ["schedules", "Schedules"],
           ["jobs", "Jobs"],
         ] as const).map(([id, label]) => (
           <button
@@ -968,7 +929,6 @@ export function PrunerInstancesListPage() {
             emby: "Emby",
             jellyfin: "Jellyfin",
             plex: "Plex",
-            schedules: "Schedules",
             jobs: "Jobs",
           } as const
         )[topTab]
@@ -978,8 +938,6 @@ export function PrunerInstancesListPage() {
         {!q.isLoading && !q.isError ? (
           topTab === "overview" ? (
             <TopLevelOverview instances={instances} />
-          ) : topTab === "schedules" ? (
-            <TopLevelSchedules instances={instances} />
           ) : topTab === "jobs" ? (
             <TopLevelJobs instances={instances} />
           ) : (

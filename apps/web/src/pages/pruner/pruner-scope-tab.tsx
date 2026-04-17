@@ -28,6 +28,7 @@ import {
   PrunerPeopleRoleCheckboxes,
   normalizePeopleRolesFromApi,
   peopleRolesForPlexPersist,
+  peopleRolesForPlexUiState,
   type PrunerPeopleRoleId,
 } from "./pruner-people-roles";
 import { formatPrunerDateTime, previewRunRowCaption } from "./pruner-ui-utils";
@@ -156,7 +157,9 @@ export function PrunerScopeTab(props: {
     setUnwatchedStaleDays(scopeRow.unwatched_movie_stale_min_age_days);
     setGenreSelection(prunerGenresFromApi(scopeRow.preview_include_genres));
     setPeopleText((scopeRow.preview_include_people ?? []).join(", "));
-    setPeopleRoles(normalizePeopleRolesFromApi(scopeRow.preview_include_people_roles));
+    setPeopleRoles(
+      isPlex ? peopleRolesForPlexUiState(scopeRow.preview_include_people_roles) : normalizePeopleRolesFromApi(scopeRow.preview_include_people_roles),
+    );
     setYearMinStr(scopeRow.preview_year_min != null ? String(scopeRow.preview_year_min) : "");
     setYearMaxStr(scopeRow.preview_year_max != null ? String(scopeRow.preview_year_max) : "");
     setStudioText((scopeRow.preview_include_studios ?? []).join(", "));

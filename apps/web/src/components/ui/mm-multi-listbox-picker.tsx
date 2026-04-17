@@ -41,6 +41,8 @@ type MmMultiListboxPickerProps = {
   onChange: (next: string[]) => void;
   disabled?: boolean;
   placeholder?: string;
+  /** When set, shown on the closed trigger instead of joined option labels or the placeholder. */
+  summaryText?: string;
   "data-testid"?: string;
   ariaLabelledBy?: string;
   ariaDescribedBy?: string;
@@ -53,6 +55,7 @@ export function MmMultiListboxPicker({
   onChange,
   disabled = false,
   placeholder = "Select one or more…",
+  summaryText,
   "data-testid": dataTestId,
   ariaLabelledBy,
   ariaDescribedBy,
@@ -66,7 +69,8 @@ export function MmMultiListboxPicker({
 
   const selectedSet = new Set(values);
   const selectedLabels = options.filter((o) => selectedSet.has(o.value)).map((o) => o.label);
-  const triggerLabel = selectedLabels.length > 0 ? selectedLabels.join(", ") : placeholder;
+  const triggerLabel =
+    summaryText !== undefined ? summaryText : selectedLabels.length > 0 ? selectedLabels.join(", ") : placeholder;
   const triggerSurface = [
     mmPickerTriggerClass,
     "flex min-h-[2.5rem] items-center justify-between gap-2",

@@ -20,6 +20,7 @@ import {
   PrunerPeopleRoleCheckboxes,
   normalizePeopleRolesFromApi,
   peopleRolesForPlexPersist,
+  peopleRolesForPlexUiState,
   type PrunerPeopleRoleId,
 } from "./pruner-people-roles";
 import {
@@ -824,12 +825,14 @@ export function PrunerProviderPeopleCard({ provider, instanceId, instance, disab
   }, [movies?.preview_include_people]);
 
   useEffect(() => {
-    setTvRoles(normalizePeopleRolesFromApi(tv?.preview_include_people_roles));
-  }, [tv?.preview_include_people_roles]);
+    setTvRoles(isPlex ? peopleRolesForPlexUiState(tv?.preview_include_people_roles) : normalizePeopleRolesFromApi(tv?.preview_include_people_roles));
+  }, [isPlex, tv?.preview_include_people_roles]);
 
   useEffect(() => {
-    setMoviesRoles(normalizePeopleRolesFromApi(movies?.preview_include_people_roles));
-  }, [movies?.preview_include_people_roles]);
+    setMoviesRoles(
+      isPlex ? peopleRolesForPlexUiState(movies?.preview_include_people_roles) : normalizePeopleRolesFromApi(movies?.preview_include_people_roles),
+    );
+  }, [isPlex, movies?.preview_include_people_roles]);
 
   async function persistTvPeople(): Promise<void> {
     if (!tv) return;
