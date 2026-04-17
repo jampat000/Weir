@@ -431,9 +431,14 @@ function ConnectionsTabPanel({ allInstances }: { allInstances: PrunerServerInsta
           Credentials only. Configure cleanup rules on each provider tab (Emby, Jellyfin, Plex).
         </p>
       </header>
-      <div className="mm-dash-grid gap-x-5 gap-y-6" data-testid="pruner-connection-panels-grid">
+      <div
+        className="grid min-w-0 grid-cols-1 gap-5 gap-y-6 min-[1100px]:grid-cols-3 min-[1100px]:gap-x-5"
+        data-testid="pruner-connection-panels-grid"
+      >
         {providers.map((p) => (
-          <PrunerConnectionCredentialPanel key={p} provider={p} allInstances={allInstances} />
+          <div key={p} className="min-w-0">
+            <PrunerConnectionCredentialPanel provider={p} allInstances={allInstances} />
+          </div>
         ))}
       </div>
     </section>
