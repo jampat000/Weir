@@ -14,6 +14,9 @@ class PrunerScopeSummaryOut(BaseModel):
     media_scope: str
     missing_primary_media_reported_enabled: bool
     preview_max_items: int
+    scheduled_preview_enabled: bool = False
+    scheduled_preview_interval_seconds: int = 3600
+    last_scheduled_preview_enqueued_at: datetime | None = None
     last_preview_run_uuid: str | None = None
     last_preview_at: datetime | None = None
     last_preview_candidate_count: int | None = None
@@ -53,6 +56,8 @@ class PrunerServerInstancePatchIn(BaseModel):
 class PrunerScopePatchIn(BaseModel):
     missing_primary_media_reported_enabled: bool | None = None
     preview_max_items: int | None = Field(None, ge=1, le=5000)
+    scheduled_preview_enabled: bool | None = None
+    scheduled_preview_interval_seconds: int | None = Field(None, ge=60, le=86_400)
 
 
 class PrunerEnqueueOut(BaseModel):
@@ -93,8 +98,16 @@ class PrunerScopePatchHttpIn(PrunerScopePatchIn):
 
     @model_validator(mode="after")
     def _at_least_one_scope_field(self) -> PrunerScopePatchHttpIn:
-        if self.missing_primary_media_reported_enabled is None and self.preview_max_items is None:
-            msg = "At least one of missing_primary_media_reported_enabled or preview_max_items must be provided."
+        if (
+            self.missing_primary_media_reported_enabled is None
+            and self.preview_max_items is None
+            and self.scheduled_preview_enabled is None
+            and self.scheduled_preview_interval_seconds is None
+        ):
+            msg = (
+                "At least one of missing_primary_media_reported_enabled, preview_max_items, "
+                "scheduled_preview_enabled, or scheduled_preview_interval_seconds must be provided."
+            )
             raise ValueError(msg)
         return self
 

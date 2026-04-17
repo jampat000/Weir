@@ -13,7 +13,11 @@ from starlette import status
 from starlette.requests import Request
 
 from mediamop.api.deps import DbSessionDep, SettingsDep
-from mediamop.modules.pruner.pruner_constants import MEDIA_SCOPE_MOVIES, MEDIA_SCOPE_TV
+from mediamop.modules.pruner.pruner_constants import (
+    MEDIA_SCOPE_MOVIES,
+    MEDIA_SCOPE_TV,
+    clamp_pruner_scheduled_preview_interval_seconds,
+)
 from mediamop.modules.pruner.pruner_credentials_envelope import (
     PrunerProvider,
     encrypt_envelope,
@@ -65,6 +69,11 @@ def _scope_row_out(session: Session, row: PrunerScopeSettings) -> PrunerScopeSum
         media_scope=row.media_scope,
         missing_primary_media_reported_enabled=bool(row.missing_primary_media_reported_enabled),
         preview_max_items=int(row.preview_max_items),
+        scheduled_preview_enabled=bool(row.scheduled_preview_enabled),
+        scheduled_preview_interval_seconds=clamp_pruner_scheduled_preview_interval_seconds(
+            int(row.scheduled_preview_interval_seconds),
+        ),
+        last_scheduled_preview_enqueued_at=row.last_scheduled_preview_enqueued_at,
         last_preview_run_uuid=str(run_uuid) if run_uuid else None,
         last_preview_at=row.last_preview_at,
         last_preview_candidate_count=row.last_preview_candidate_count,
@@ -234,6 +243,12 @@ def patch_pruner_scope(
         sc.missing_primary_media_reported_enabled = bool(body.missing_primary_media_reported_enabled)
     if body.preview_max_items is not None:
         sc.preview_max_items = int(body.preview_max_items)
+    if body.scheduled_preview_enabled is not None:
+        sc.scheduled_preview_enabled = bool(body.scheduled_preview_enabled)
+    if body.scheduled_preview_interval_seconds is not None:
+        sc.scheduled_preview_interval_seconds = clamp_pruner_scheduled_preview_interval_seconds(
+            int(body.scheduled_preview_interval_seconds),
+        )
     db.flush()
     return _scope_row_out(db, sc)
 

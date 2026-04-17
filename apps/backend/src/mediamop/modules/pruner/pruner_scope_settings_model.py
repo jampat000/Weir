@@ -41,6 +41,20 @@ class PrunerScopeSettings(Base):
     last_preview_candidate_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_preview_outcome: Mapped[str | None] = mapped_column(String(32), nullable=True)
     last_preview_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    scheduled_preview_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("0"),
+    )
+    scheduled_preview_interval_seconds: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("3600"),
+    )
+    last_scheduled_preview_enqueued_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

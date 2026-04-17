@@ -1,8 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchCsrfToken } from "../../lib/api/auth-api";
 import { useMeQuery } from "../../lib/auth/queries";
-import { fetchPrunerPreviewRun, fetchPrunerPreviewRuns, postPrunerPreview } from "../../lib/pruner/api";
+import {
+  fetchPrunerPreviewRun,
+  fetchPrunerPreviewRuns,
+  patchPrunerScope,
+  postPrunerPreview,
+} from "../../lib/pruner/api";
 import type { PrunerServerInstance } from "../../lib/pruner/api";
 
 type Ctx = { instanceId: number; instance: PrunerServerInstance | undefined };
@@ -15,6 +21,9 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
   const [err, setErr] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [jsonPreview, setJsonPreview] = useState<string | null>(null);
+  const [schedEnabled, setSchedEnabled] = useState(false);
+  const [schedInterval, setSchedInterval] = useState(3600);
+  const [schedMsg, setSchedMsg] = useState<string | null>(null);
   const canOperate = me.data?.role === "admin" || me.data?.role === "operator";
 
   const scopeRow = instance?.scopes.find((s) => s.media_scope === props.scope);
@@ -27,6 +36,38 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
     queryFn: () => fetchPrunerPreviewRuns(instanceId, { media_scope: props.scope, limit: 25 }),
     enabled: Boolean(instanceId),
   });
+
+  useEffect(() => {
+    if (!scopeRow) return;
+    setSchedEnabled(scopeRow.scheduled_preview_enabled);
+    setSchedInterval(scopeRow.scheduled_preview_interval_seconds);
+  }, [
+    scopeRow?.scheduled_preview_enabled,
+    scopeRow?.scheduled_preview_interval_seconds,
+    scopeRow?.media_scope,
+    instanceId,
+  ]);
+
+  async function saveSchedule() {
+    setSchedMsg(null);
+    setErr(null);
+    setBusy(true);
+    try {
+      const csrf_token = await fetchCsrfToken();
+      const iv = Math.max(60, Math.min(86400, Number(schedInterval) || 3600));
+      await patchPrunerScope(instanceId, props.scope, {
+        scheduled_preview_enabled: schedEnabled,
+        scheduled_preview_interval_seconds: iv,
+        csrf_token,
+      });
+      await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
+      setSchedMsg("Saved. This schedule applies only to this server and this tab (TV or Movies).");
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function runPreview() {
     setErr(null);
@@ -115,6 +156,70 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
       ) : (
         <p className="text-sm text-[var(--mm-text2)]">Sign in as an operator to queue previews.</p>
       )}
+      <div
+        className="space-y-2 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3"
+        data-testid="pruner-scope-scheduled-preview"
+      >
+        <h3 className="text-sm font-semibold text-[var(--mm-text)]">Scheduled preview ({props.scope})</h3>
+        <p className="text-xs text-[var(--mm-text2)]">
+          Each server instance has separate TV and Movies schedules. Interval: 60 seconds to 24 hours. The timestamp
+          below updates only when the background scheduler queues a job for this tab — not when you use &quot;Queue
+          preview job&quot;.
+        </p>
+        {canOperate ? (
+          <>
+            <label className="flex items-center gap-2 text-sm text-[var(--mm-text)]">
+              <input
+                type="checkbox"
+                checked={schedEnabled}
+                disabled={busy}
+                onChange={(e) => setSchedEnabled(e.target.checked)}
+              />
+              Enable scheduled previews for this tab
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="text-sm text-[var(--mm-text2)]">
+                Every{" "}
+                <input
+                  type="number"
+                  min={60}
+                  max={86400}
+                  className="w-28 rounded border border-[var(--mm-border)] bg-[var(--mm-surface2)] px-2 py-1 text-sm text-[var(--mm-text)]"
+                  value={schedInterval}
+                  disabled={busy}
+                  onChange={(e) => setSchedInterval(parseInt(e.target.value, 10) || 3600)}
+                />{" "}
+                seconds
+              </label>
+              <button
+                type="button"
+                className="rounded-md bg-[var(--mm-accent)] px-3 py-1 text-sm font-medium text-white disabled:opacity-50"
+                disabled={busy}
+                onClick={() => void saveSchedule()}
+              >
+                Save schedule
+              </button>
+            </div>
+            {schedMsg ? <p className="text-xs text-green-600">{schedMsg}</p> : null}
+          </>
+        ) : (
+          <p className="text-sm text-[var(--mm-text2)]">
+            Scheduled preview is <strong>{scopeRow?.scheduled_preview_enabled ? "on" : "off"}</strong>
+            {scopeRow ? (
+              <>
+                {" "}
+                (every {scopeRow.scheduled_preview_interval_seconds}s). Sign in as an operator to change it.
+              </>
+            ) : null}
+          </p>
+        )}
+        <p className="text-xs text-[var(--mm-text2)]">
+          Last scheduled enqueue:{" "}
+          {scopeRow?.last_scheduled_preview_enqueued_at
+            ? new Date(scopeRow.last_scheduled_preview_enqueued_at).toLocaleString()
+            : "—"}
+        </p>
+      </div>
       <div className="space-y-2" data-testid="pruner-preview-runs-history">
         <h3 className="text-sm font-semibold text-[var(--mm-text)]">Recent preview runs ({props.scope})</h3>
         {runsQuery.isLoading ? (

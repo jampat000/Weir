@@ -92,3 +92,55 @@ def test_plex_preview_writes_unsupported_activity_not_succeeded(session_factory:
         assert evt is not None
         assert evt.event_type == C.PRUNER_PREVIEW_UNSUPPORTED
         assert "unsupported" in (evt.detail or "").lower()
+        detail = json.loads(evt.detail or "{}")
+        assert detail.get("trigger") == "manual"
+
+
+def test_scheduled_preview_activity_title_and_detail_trigger(session_factory: sessionmaker[Session]) -> None:
+    settings = MediaMopSettings.load()
+    with session_factory() as s:
+        with s.begin():
+            inst = create_server_instance(
+                s,
+                settings,
+                provider="plex",
+                display_name="Plex Sched",
+                base_url="http://plex-sched.test:32400",
+                credentials_secrets={"auth_token": "t"},
+            )
+            sid = int(inst.id)
+
+    with session_factory() as s:
+        with s.begin():
+            job_row = PrunerJob(
+                dedupe_key="preview-activity-scheduled-job",
+                job_kind=PRUNER_CANDIDATE_REMOVAL_PREVIEW_JOB_KIND,
+                status=PrunerJobStatus.COMPLETED.value,
+            )
+            s.add(job_row)
+            s.flush()
+            job_id = int(job_row.id)
+
+    handlers = build_pruner_job_handlers(settings, session_factory)
+    fn = handlers[PRUNER_CANDIDATE_REMOVAL_PREVIEW_JOB_KIND]
+    fn(
+        PrunerJobWorkContext(
+            id=job_id,
+            job_kind=PRUNER_CANDIDATE_REMOVAL_PREVIEW_JOB_KIND,
+            payload_json=json.dumps(
+                {"server_instance_id": sid, "media_scope": "tv", "trigger": "scheduled"},
+            ),
+            lease_owner="pytest",
+        ),
+    )
+
+    with session_factory() as s:
+        evt = s.scalars(
+            select(ActivityEvent)
+            .where(ActivityEvent.module == "pruner")
+            .order_by(ActivityEvent.id.desc()),
+        ).first()
+        assert evt is not None
+        assert evt.title.startswith("Scheduled Pruner preview:")
+        detail = json.loads(evt.detail or "{}")
+        assert detail.get("trigger") == "scheduled"

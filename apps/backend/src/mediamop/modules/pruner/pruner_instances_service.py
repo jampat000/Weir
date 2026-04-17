@@ -56,6 +56,7 @@ def create_server_instance(
     session.add(row)
     session.flush()
     ensure_scope_rows_for_instance(session, int(row.id))
+    session.flush()
     return row
 
 

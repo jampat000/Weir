@@ -5,6 +5,9 @@ export type PrunerScopeSummary = {
   media_scope: string;
   missing_primary_media_reported_enabled: boolean;
   preview_max_items: number;
+  scheduled_preview_enabled: boolean;
+  scheduled_preview_interval_seconds: number;
+  last_scheduled_preview_enqueued_at: string | null;
   last_preview_run_uuid: string | null;
   last_preview_at: string | null;
   last_preview_candidate_count: number | null;
@@ -114,6 +117,29 @@ export async function postPrunerConnectionTest(instanceId: number): Promise<{ pr
     throw new Error(apiErrorDetailToString(body.detail) || `connection test: ${r.status}`);
   }
   return readJson<{ pruner_job_id: number }>(r);
+}
+
+export async function patchPrunerScope(
+  instanceId: number,
+  media_scope: "tv" | "movies",
+  body: {
+    missing_primary_media_reported_enabled?: boolean;
+    preview_max_items?: number;
+    scheduled_preview_enabled?: boolean;
+    scheduled_preview_interval_seconds?: number;
+    csrf_token: string;
+  },
+): Promise<PrunerScopeSummary> {
+  const r = await apiFetch(`/api/v1/pruner/instances/${instanceId}/scopes/${media_scope}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const errBody = (await readJson<{ detail?: unknown }>(r).catch(() => ({}))) as { detail?: unknown };
+    throw new Error(apiErrorDetailToString(errBody.detail) || `Pruner scope: ${r.status}`);
+  }
+  return readJson<PrunerScopeSummary>(r);
 }
 
 export async function postPrunerPreview(

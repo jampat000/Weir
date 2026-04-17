@@ -25,6 +25,9 @@ const plexInstance: PrunerServerInstance = {
       media_scope: "tv",
       missing_primary_media_reported_enabled: true,
       preview_max_items: 500,
+      scheduled_preview_enabled: false,
+      scheduled_preview_interval_seconds: 3600,
+      last_scheduled_preview_enqueued_at: null,
       last_preview_run_uuid: null,
       last_preview_at: null,
       last_preview_candidate_count: null,
@@ -35,6 +38,9 @@ const plexInstance: PrunerServerInstance = {
       media_scope: "movies",
       missing_primary_media_reported_enabled: true,
       preview_max_items: 500,
+      scheduled_preview_enabled: false,
+      scheduled_preview_interval_seconds: 3600,
+      last_scheduled_preview_enqueued_at: null,
       last_preview_run_uuid: null,
       last_preview_at: null,
       last_preview_candidate_count: null,
@@ -47,6 +53,7 @@ const plexInstance: PrunerServerInstance = {
 describe("PrunerScopeTab (Plex)", () => {
   it("shows explicit unsupported messaging and disables preview queue", async () => {
     const spy = vi.spyOn(prunerApi, "fetchPrunerPreviewRuns").mockResolvedValue([]);
+    const spyInst = vi.spyOn(prunerApi, "fetchPrunerInstance").mockResolvedValue(plexInstance);
     try {
       const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
       qc.setQueryData(qk.me, operator);
@@ -77,6 +84,7 @@ describe("PrunerScopeTab (Plex)", () => {
       expect(btn).toBeDisabled();
     } finally {
       spy.mockRestore();
+      spyInst.mockRestore();
     }
   });
 });

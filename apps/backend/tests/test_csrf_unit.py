@@ -51,6 +51,8 @@ def _csrf_settings(**overrides: object) -> MediaMopSettings:
         fetcher_worker_count=1,
         refiner_worker_count=0,
         pruner_worker_count=0,
+        pruner_preview_schedule_enqueue_enabled=False,
+        pruner_preview_schedule_scan_interval_seconds=45,
         subber_worker_count=0,
         fetcher_radarr_base_url=None,
         fetcher_radarr_api_key=None,

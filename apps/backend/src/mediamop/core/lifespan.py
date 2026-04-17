@@ -59,6 +59,10 @@ from mediamop.modules.subber.worker_loop import (
     start_subber_worker_background_tasks,
     stop_subber_worker_background_tasks,
 )
+from mediamop.modules.pruner.pruner_preview_schedule_enqueue import (
+    start_pruner_preview_schedule_enqueue_tasks,
+    stop_pruner_preview_schedule_enqueue_tasks,
+)
 from mediamop.modules.pruner.worker_loop import (
     start_pruner_worker_background_tasks,
     stop_pruner_worker_background_tasks,
@@ -147,6 +151,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         max_concurrent_files_getter=_refiner_max_concurrent_files,
     )
     pruner_handlers = build_pruner_job_handlers(settings, session_factory)
+    pruner_preview_schedule_tasks = start_pruner_preview_schedule_enqueue_tasks(
+        session_factory,
+        stop_event=stop,
+        settings=settings,
+    )
     pruner_stop, pruner_worker_tasks = start_pruner_worker_background_tasks(
         session_factory,
         settings,
@@ -171,6 +180,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await stop_refiner_failure_cleanup_enqueue_tasks(refiner_failure_cleanup_tasks)
         await stop_fetcher_failed_import_cleanup_drive_enqueue_tasks(fetcher_schedule_tasks)
         await stop_subber_worker_background_tasks(subber_stop, subber_worker_tasks)
+        await stop_pruner_preview_schedule_enqueue_tasks(pruner_preview_schedule_tasks)
         await stop_pruner_worker_background_tasks(pruner_stop, pruner_worker_tasks)
         await stop_refiner_worker_background_tasks(refiner_stop, refiner_worker_tasks)
         await stop_fetcher_worker_background_tasks(fetcher_stop, fetcher_worker_tasks)

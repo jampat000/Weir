@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,7 @@ from mediamop.modules.pruner.pruner_job_kinds import (
     PRUNER_SERVER_CONNECTION_TEST_JOB_KIND,
 )
 from mediamop.modules.pruner.pruner_jobs_model import PrunerJob
+from mediamop.modules.pruner.pruner_instances_service import get_scope_settings
 from mediamop.modules.pruner.pruner_scope_settings_model import PrunerScopeSettings
 from mediamop.modules.pruner.pruner_preview_service import insert_preview_run
 from mediamop.modules.pruner.pruner_server_instance_model import PrunerServerInstance
@@ -33,7 +35,13 @@ from tests.integration_app_runtime_quiesce import (
     integration_test_quiesce_periodic_enqueue,
     integration_test_set_home,
 )
-from tests.integration_helpers import auth_post, csrf as fetch_csrf, seed_admin_user, seed_viewer_user
+from tests.integration_helpers import (
+    auth_patch,
+    auth_post,
+    csrf as fetch_csrf,
+    seed_admin_user,
+    seed_viewer_user,
+)
 
 import mediamop.modules.pruner.pruner_jobs_model  # noqa: F401
 import mediamop.modules.pruner.pruner_preview_run_model  # noqa: F401
@@ -381,3 +389,104 @@ def test_get_pruner_preview_runs_list_scoped_and_omits_candidates_json(client_wi
 
     r_404 = client_with_admin.get("/api/v1/pruner/instances/99999/preview-runs")
     assert r_404.status_code == 404
+
+
+def test_post_pruner_preview_does_not_touch_last_scheduled_preview_enqueued_at(
+    client_with_admin: TestClient,
+) -> None:
+    """Manual enqueue must not overwrite scheduler-owned ``last_scheduled_preview_enqueued_at``."""
+
+    _login_admin(client_with_admin)
+    tok = fetch_csrf(client_with_admin)
+    r0 = auth_post(
+        client_with_admin,
+        "/api/v1/pruner/instances",
+        json={
+            "provider": "emby",
+            "display_name": "Sched-Sticky",
+            "base_url": "http://sched-sticky.test",
+            "credentials": {"api_key": "k"},
+            "csrf_token": tok,
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    assert r0.status_code == 200, r0.text
+    iid = int(r0.json()["id"])
+    t0 = datetime(2026, 4, 10, 8, 0, 0, tzinfo=timezone.utc)
+    fac = _fac()
+    with fac() as db:
+        sc = get_scope_settings(db, server_instance_id=iid, media_scope=MEDIA_SCOPE_TV)
+        assert sc is not None
+        sc.scheduled_preview_enabled = True
+        sc.last_scheduled_preview_enqueued_at = t0
+        db.commit()
+
+    tok = fetch_csrf(client_with_admin)
+    rp = auth_post(
+        client_with_admin,
+        f"/api/v1/pruner/instances/{iid}/previews",
+        json={"media_scope": MEDIA_SCOPE_TV, "csrf_token": tok},
+        headers={"Content-Type": "application/json"},
+    )
+    assert rp.status_code == 200, rp.text
+
+    with fac() as db:
+        sc2 = get_scope_settings(db, server_instance_id=iid, media_scope=MEDIA_SCOPE_TV)
+        assert sc2 is not None
+        last = sc2.last_scheduled_preview_enqueued_at
+        assert last is not None
+        last_utc = last if last.tzinfo else last.replace(tzinfo=timezone.utc)
+        assert last_utc == t0
+
+
+def test_patch_pruner_scope_scheduled_fields_are_per_scope(client_with_admin: TestClient) -> None:
+    _login_admin(client_with_admin)
+    tok = fetch_csrf(client_with_admin)
+    r0 = auth_post(
+        client_with_admin,
+        "/api/v1/pruner/instances",
+        json={
+            "provider": "jellyfin",
+            "display_name": "Scope-Sched",
+            "base_url": "http://scope-sched.test",
+            "credentials": {"api_key": "k"},
+            "csrf_token": tok,
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    assert r0.status_code == 200, r0.text
+    iid = int(r0.json()["id"])
+
+    tok = fetch_csrf(client_with_admin)
+    r_tv = auth_patch(
+        client_with_admin,
+        f"/api/v1/pruner/instances/{iid}/scopes/tv",
+        json={
+            "scheduled_preview_enabled": True,
+            "scheduled_preview_interval_seconds": 120,
+            "csrf_token": tok,
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    assert r_tv.status_code == 200, r_tv.text
+    tv_body = r_tv.json()
+    assert tv_body["scheduled_preview_enabled"] is True
+    assert tv_body["scheduled_preview_interval_seconds"] == 120
+
+    tok = fetch_csrf(client_with_admin)
+    r_m = auth_patch(
+        client_with_admin,
+        f"/api/v1/pruner/instances/{iid}/scopes/movies",
+        json={
+            "scheduled_preview_enabled": True,
+            "scheduled_preview_interval_seconds": 600,
+            "csrf_token": tok,
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    assert r_m.status_code == 200, r_m.text
+    assert r_m.json()["scheduled_preview_interval_seconds"] == 600
+
+    r_get_tv = client_with_admin.get(f"/api/v1/pruner/instances/{iid}/scopes/tv")
+    assert r_get_tv.status_code == 200, r_get_tv.text
+    assert r_get_tv.json()["scheduled_preview_interval_seconds"] == 120

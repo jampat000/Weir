@@ -108,6 +108,9 @@ class MediaMopSettings:
     refiner_worker_count: int
     # 0 = no in-process Pruner workers (Pruner-owned pruner_jobs only); >0 when Pruner queues durable work.
     pruner_worker_count: int
+    # Pruner per-scope scheduled preview enqueue loop (reads ``pruner_scope_settings``; independent of worker count).
+    pruner_preview_schedule_enqueue_enabled: bool
+    pruner_preview_schedule_scan_interval_seconds: int
     # 0 = no in-process Subber workers (Subber-owned subber_jobs only); >0 when Subber queues durable work.
     subber_worker_count: int
     # Refiner supplied payload evaluation (``refiner.supplied_payload_evaluation.v1``) — Refiner-only schedule.
@@ -282,6 +285,11 @@ class MediaMopSettings:
         fetcher_workers = clamp_fetcher_worker_count(_env_int("MEDIAMOP_FETCHER_WORKER_COUNT", 1))
         refiner_workers = clamp_refiner_worker_count(_env_int("MEDIAMOP_REFINER_WORKER_COUNT", 0))
         pruner_workers = clamp_pruner_worker_count(_env_int("MEDIAMOP_PRUNER_WORKER_COUNT", 0))
+        pruner_preview_sched_enq = _env_bool("MEDIAMOP_PRUNER_PREVIEW_SCHEDULE_ENQUEUE_ENABLED", True)
+        pruner_preview_sched_scan_iv = max(
+            10,
+            min(300, _env_int("MEDIAMOP_PRUNER_PREVIEW_SCHEDULE_SCAN_INTERVAL_SECONDS", 45)),
+        )
         subber_workers = clamp_subber_worker_count(_env_int("MEDIAMOP_SUBBER_WORKER_COUNT", 0))
         def _refiner_supplied_payload_eval_schedule_enabled() -> bool:
             new_k = "MEDIAMOP_REFINER_SUPPLIED_PAYLOAD_EVALUATION_SCHEDULE_ENABLED"
@@ -597,6 +605,8 @@ class MediaMopSettings:
             fetcher_worker_count=fetcher_workers,
             refiner_worker_count=refiner_workers,
             pruner_worker_count=pruner_workers,
+            pruner_preview_schedule_enqueue_enabled=pruner_preview_sched_enq,
+            pruner_preview_schedule_scan_interval_seconds=pruner_preview_sched_scan_iv,
             subber_worker_count=subber_workers,
             refiner_supplied_payload_evaluation_schedule_enabled=refiner_payload_eval_on,
             refiner_supplied_payload_evaluation_schedule_interval_seconds=refiner_payload_eval_iv,

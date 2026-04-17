@@ -39,6 +39,8 @@ def make_pruner_candidate_removal_preview_handler(
         body = _parse_payload(ctx.payload_json)
         sid = body.get("server_instance_id")
         scope = body.get("media_scope")
+        trigger_raw = body.get("trigger")
+        is_scheduled = trigger_raw == "scheduled"
         if not isinstance(sid, int):
             msg = "payload.server_instance_id must be an integer"
             raise ValueError(msg)
@@ -85,7 +87,11 @@ def make_pruner_candidate_removal_preview_handler(
 
         run_uuid = str(uuid.uuid4())
         label_scope = "TV (episodes)" if scope == "tv" else "Movies (one row per movie item)"
-        title = f"Pruner preview: {display_name} ({provider}) — {label_scope}"
+        title = (
+            f"Scheduled Pruner preview: {display_name} ({provider}) — {label_scope}"
+            if is_scheduled
+            else f"Pruner preview: {display_name} ({provider}) — {label_scope}"
+        )
 
         with session_factory() as session:
             with session.begin():
@@ -109,6 +115,7 @@ def make_pruner_candidate_removal_preview_handler(
                     "candidate_count": len(cands),
                     "truncated": trunc,
                     "rule_family_id": RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED,
+                    "trigger": "scheduled" if is_scheduled else "manual",
                 }
                 if outcome == "unsupported" and unsup:
                     detail_obj["unsupported_detail"] = unsup[:2000]
