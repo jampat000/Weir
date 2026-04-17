@@ -2,18 +2,18 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
+import * as authApi from "../../lib/api/auth-api";
 import { qk } from "../../lib/auth/queries";
 import * as prunerApi from "../../lib/pruner/api";
 import type { UserPublic } from "../../lib/api/types";
 import type { PrunerServerInstance } from "../../lib/pruner/api";
-import { RULE_FAMILY_WATCHED_MOVIES_REPORTED } from "../../lib/pruner/api";
 import { PrunerInstanceShell } from "./pruner-instance-shell";
 import { PrunerScopeTab } from "./pruner-scope-tab";
 
 const operator: UserPublic = { id: 1, username: "alice", role: "admin" };
 
-const jellyfinMovies: PrunerServerInstance = {
-  id: 22,
+const jf: PrunerServerInstance = {
+  id: 51,
   provider: "jellyfin",
   display_name: "JF",
   base_url: "http://jf:8096",
@@ -30,7 +30,7 @@ const jellyfinMovies: PrunerServerInstance = {
       watched_tv_reported_enabled: false,
       watched_movies_reported_enabled: false,
       preview_max_items: 500,
-      preview_include_genres: [],
+      preview_include_genres: ["Drama"],
       scheduled_preview_enabled: false,
       scheduled_preview_interval_seconds: 3600,
       last_scheduled_preview_enqueued_at: null,
@@ -46,7 +46,7 @@ const jellyfinMovies: PrunerServerInstance = {
       never_played_stale_reported_enabled: false,
       never_played_min_age_days: 90,
       watched_tv_reported_enabled: false,
-      watched_movies_reported_enabled: true,
+      watched_movies_reported_enabled: false,
       preview_max_items: 500,
       preview_include_genres: [],
       scheduled_preview_enabled: false,
@@ -61,25 +61,29 @@ const jellyfinMovies: PrunerServerInstance = {
   ],
 };
 
-describe("PrunerScopeTab Movies / watched movies", () => {
-  it("shows Jellyfin/Emby watched-movies panel and queues preview with watched_movies_reported", async () => {
+describe("PrunerScopeTab genre filters", () => {
+  it("saves preview_include_genres via scope PATCH", async () => {
+    const csrfSpy = vi.spyOn(authApi, "fetchCsrfToken").mockResolvedValue("csrf-test");
     const spyRuns = vi.spyOn(prunerApi, "fetchPrunerPreviewRuns").mockResolvedValue([]);
-    const spyInst = vi.spyOn(prunerApi, "fetchPrunerInstance").mockResolvedValue(jellyfinMovies);
-    const spyPreview = vi.spyOn(prunerApi, "postPrunerPreview").mockResolvedValue({ pruner_job_id: 901 });
+    const spyInst = vi.spyOn(prunerApi, "fetchPrunerInstance").mockResolvedValue(jf);
+    const spyPatch = vi.spyOn(prunerApi, "patchPrunerScope").mockResolvedValue({
+      ...jf.scopes[0],
+      preview_include_genres: ["Drama", "Noir"],
+    });
     try {
       const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
       qc.setQueryData(qk.me, operator);
-      qc.setQueryData(["pruner", "instances", 22], jellyfinMovies);
+      qc.setQueryData(["pruner", "instances", 51], jf);
 
       const router = createMemoryRouter(
         [
           {
             path: "/instances/:instanceId",
             element: <PrunerInstanceShell />,
-            children: [{ path: "movies", element: <PrunerScopeTab scope="movies" /> }],
+            children: [{ path: "tv", element: <PrunerScopeTab scope="tv" /> }],
           },
         ],
-        { initialEntries: ["/instances/22/movies"] },
+        { initialEntries: ["/instances/51/tv"] },
       );
 
       render(
@@ -88,17 +92,22 @@ describe("PrunerScopeTab Movies / watched movies", () => {
         </QueryClientProvider>,
       );
 
-      await waitFor(() => expect(screen.getByTestId("pruner-watched-movies-panel")).toBeInTheDocument());
-      fireEvent.click(screen.getByRole("button", { name: /queue preview \(watched movies\)/i }));
+      await waitFor(() => expect(screen.getByTestId("pruner-genre-filters-panel")).toBeInTheDocument());
+      const input = screen.getByPlaceholderText(/e\.g\. drama/i);
+      fireEvent.change(input, { target: { value: "Drama, Noir" } });
+      fireEvent.click(screen.getByRole("button", { name: /save genre filters/i }));
       await waitFor(() => {
-        expect(spyPreview).toHaveBeenCalledWith(22, "movies", {
-          rule_family_id: RULE_FAMILY_WATCHED_MOVIES_REPORTED,
-        });
+        expect(spyPatch).toHaveBeenCalledWith(
+          51,
+          "tv",
+          expect.objectContaining({ preview_include_genres: ["Drama", "Noir"] }),
+        );
       });
     } finally {
+      csrfSpy.mockRestore();
       spyRuns.mockRestore();
       spyInst.mockRestore();
-      spyPreview.mockRestore();
+      spyPatch.mockRestore();
     }
   });
 });

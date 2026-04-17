@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from mediamop.modules.pruner.pruner_constants import (
     MEDIA_SCOPE_MOVIES,
@@ -13,6 +13,7 @@ from mediamop.modules.pruner.pruner_constants import (
     RULE_FAMILY_WATCHED_MOVIES_REPORTED,
     RULE_FAMILY_WATCHED_TV_REPORTED,
 )
+from mediamop.modules.pruner.pruner_genre_filters import normalized_genre_filter_tokens
 
 PrunerProviderWire = Literal["emby", "jellyfin", "plex"]
 
@@ -25,6 +26,7 @@ class PrunerScopeSummaryOut(BaseModel):
     watched_tv_reported_enabled: bool = False
     watched_movies_reported_enabled: bool = False
     preview_max_items: int
+    preview_include_genres: list[str] = Field(default_factory=list)
     scheduled_preview_enabled: bool = False
     scheduled_preview_interval_seconds: int = 3600
     last_scheduled_preview_enqueued_at: datetime | None = None
@@ -71,8 +73,19 @@ class PrunerScopePatchIn(BaseModel):
     watched_tv_reported_enabled: bool | None = None
     watched_movies_reported_enabled: bool | None = None
     preview_max_items: int | None = Field(None, ge=1, le=5000)
+    preview_include_genres: list[str] | None = None
     scheduled_preview_enabled: bool | None = None
     scheduled_preview_interval_seconds: int | None = Field(None, ge=60, le=86_400)
+
+    @field_validator("preview_include_genres", mode="before")
+    @classmethod
+    def _validate_preview_genres(cls, v: object) -> list[str] | None:
+        if v is None:
+            return None
+        if not isinstance(v, list):
+            msg = "preview_include_genres must be a list of strings or null"
+            raise ValueError(msg)
+        return normalized_genre_filter_tokens([str(x) for x in v if x is not None])
 
 
 class PrunerEnqueueOut(BaseModel):
@@ -139,13 +152,15 @@ class PrunerScopePatchHttpIn(PrunerScopePatchIn):
             and self.watched_tv_reported_enabled is None
             and self.watched_movies_reported_enabled is None
             and self.preview_max_items is None
+            and self.preview_include_genres is None
             and self.scheduled_preview_enabled is None
             and self.scheduled_preview_interval_seconds is None
         ):
             msg = (
                 "At least one of missing_primary_media_reported_enabled, never_played_stale_reported_enabled, "
                 "never_played_min_age_days, watched_tv_reported_enabled, watched_movies_reported_enabled, "
-                "preview_max_items, scheduled_preview_enabled, or scheduled_preview_interval_seconds must be provided."
+                "preview_max_items, preview_include_genres, scheduled_preview_enabled, "
+                "or scheduled_preview_interval_seconds must be provided."
             )
             raise ValueError(msg)
         return self

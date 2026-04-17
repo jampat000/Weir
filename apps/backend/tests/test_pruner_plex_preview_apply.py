@@ -353,7 +353,6 @@ def test_candidates_json_cap_does_not_widen_apply_set(
 
 
 def test_plex_missing_primary_effective_max_items_matches_retired_live_contract(
-    _session_factory: sessionmaker[Session],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("MEDIAMOP_PRUNER_PLEX_LIVE_ABS_MAX_ITEMS", "7")

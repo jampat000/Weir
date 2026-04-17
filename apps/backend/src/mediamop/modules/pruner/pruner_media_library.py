@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import urllib.error
 from datetime import datetime, timedelta, timezone
+from collections.abc import Sequence
 from typing import Any
 
 from mediamop.modules.pruner.pruner_constants import (
@@ -14,6 +15,10 @@ from mediamop.modules.pruner.pruner_constants import (
     RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED,
     RULE_FAMILY_WATCHED_MOVIES_REPORTED,
     RULE_FAMILY_WATCHED_TV_REPORTED,
+)
+from mediamop.modules.pruner.pruner_genre_filters import (
+    item_matches_genre_include_filter,
+    jellyfin_emby_item_genres,
 )
 from mediamop.modules.pruner.pruner_plex_live_candidates import list_plex_missing_thumb_candidates
 from mediamop.modules.pruner.pruner_http import http_get_json, http_get_text, join_base_path
@@ -111,6 +116,7 @@ def list_missing_primary_candidates(
     api_key: str,
     media_scope: str,
     max_items: int,
+    preview_include_genres: Sequence[str] | None = None,
 ) -> tuple[list[dict[str, Any]], bool]:
     """Return candidate dicts for TV (episodes) or Movies (movie items), newest-first pages.
 
@@ -130,6 +136,7 @@ def list_missing_primary_candidates(
     start = 0
     page = min(100, max(1, max_items))
     total_hits: int | None = None
+    gf = list(preview_include_genres or [])
 
     while len(candidates) < max_items:
         try:
@@ -160,6 +167,8 @@ def list_missing_primary_candidates(
             if not isinstance(it, dict):
                 continue
             if not use_filter and not _item_missing_primary(it):
+                continue
+            if not item_matches_genre_include_filter(jellyfin_emby_item_genres(it), gf):
                 continue
             if media_scope == MEDIA_SCOPE_TV:
                 candidates.append(
@@ -247,6 +256,7 @@ def list_watched_tv_episode_candidates(
     api_key: str,
     media_scope: str,
     max_items: int,
+    preview_include_genres: Sequence[str] | None = None,
 ) -> tuple[list[dict[str, Any]], bool]:
     """Episodes the server reports as watched for this API user (``UserData`` / optional ``IsPlayed`` filter).
 
@@ -264,6 +274,7 @@ def list_watched_tv_episode_candidates(
     use_is_played_filter = True
     total_hits: int | None = None
     truncated = False
+    gf = list(preview_include_genres or [])
 
     while len(candidates) < max_items:
         params: dict[str, str] = {
@@ -295,6 +306,8 @@ def list_watched_tv_episode_candidates(
             if not isinstance(it, dict):
                 continue
             if not use_is_played_filter and not _item_watched_by_userdata(it):
+                continue
+            if not item_matches_genre_include_filter(jellyfin_emby_item_genres(it), gf):
                 continue
             iid = str(it.get("Id", "")).strip()
             if not iid:
@@ -332,6 +345,7 @@ def list_watched_movie_candidates(
     api_key: str,
     media_scope: str,
     max_items: int,
+    preview_include_genres: Sequence[str] | None = None,
 ) -> tuple[list[dict[str, Any]], bool]:
     """Movie library items the server reports as watched for this API user (``UserData`` / optional ``IsPlayed`` filter).
 
@@ -349,6 +363,7 @@ def list_watched_movie_candidates(
     use_is_played_filter = True
     total_hits: int | None = None
     truncated = False
+    gf = list(preview_include_genres or [])
 
     while len(candidates) < max_items:
         params: dict[str, str] = {
@@ -380,6 +395,8 @@ def list_watched_movie_candidates(
             if not isinstance(it, dict):
                 continue
             if not use_is_played_filter and not _item_watched_by_userdata(it):
+                continue
+            if not item_matches_genre_include_filter(jellyfin_emby_item_genres(it), gf):
                 continue
             iid = str(it.get("Id", "")).strip()
             if not iid:
@@ -416,6 +433,7 @@ def list_never_played_stale_candidates(
     media_scope: str,
     max_items: int,
     min_age_days: int,
+    preview_include_genres: Sequence[str] | None = None,
 ) -> tuple[list[dict[str, Any]], bool]:
     """Unplayed episodes or movies whose library ``DateCreated`` is older than ``min_age_days`` (UTC).
 
@@ -439,6 +457,7 @@ def list_never_played_stale_candidates(
     use_is_played_filter = True
     total_hits: int | None = None
     truncated = False
+    gf = list(preview_include_genres or [])
 
     while len(candidates) < max_items:
         params: dict[str, str] = {
@@ -470,6 +489,8 @@ def list_never_played_stale_candidates(
             if not isinstance(it, dict):
                 continue
             if not _item_unplayed_by_userdata(it):
+                continue
+            if not item_matches_genre_include_filter(jellyfin_emby_item_genres(it), gf):
                 continue
             created = _parse_item_date_created(it.get("DateCreated"))
             if created is None or created > cutoff:
@@ -556,6 +577,7 @@ def preview_payload_json(
     max_items: int,
     rule_family_id: str,
     never_played_min_age_days: int | None = None,
+    preview_include_genres: Sequence[str] | None = None,
 ) -> tuple[str, str, list[dict[str, Any]], bool]:
     """Returns ``(outcome, unsupported_detail_or_empty, candidates, truncated)``."""
 
@@ -579,6 +601,7 @@ def preview_payload_json(
                 auth_token=token,
                 media_scope=media_scope,
                 max_items=max_items,
+                preview_include_genres=preview_include_genres,
             )
             return "success", "", cands, trunc
         return "unsupported", plex_preview_unsupported_detail(), [], False
@@ -589,6 +612,7 @@ def preview_payload_json(
             api_key=api_key,
             media_scope=media_scope,
             max_items=max_items,
+            preview_include_genres=preview_include_genres,
         )
         return "success", "", cands, trunc
     if rule_family_id == RULE_FAMILY_WATCHED_TV_REPORTED:
@@ -604,6 +628,7 @@ def preview_payload_json(
             api_key=api_key,
             media_scope=media_scope,
             max_items=max_items,
+            preview_include_genres=preview_include_genres,
         )
         return "success", "", cands, trunc
     if rule_family_id == RULE_FAMILY_WATCHED_MOVIES_REPORTED:
@@ -619,6 +644,7 @@ def preview_payload_json(
             api_key=api_key,
             media_scope=media_scope,
             max_items=max_items,
+            preview_include_genres=preview_include_genres,
         )
         return "success", "", cands, trunc
     if rule_family_id == RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED:
@@ -631,6 +657,7 @@ def preview_payload_json(
             media_scope=media_scope,
             max_items=max_items,
             min_age_days=int(never_played_min_age_days),
+            preview_include_genres=preview_include_genres,
         )
         return "success", "", cands, trunc
     msg = f"unsupported rule_family_id for preview: {rule_family_id!r}"

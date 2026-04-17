@@ -20,6 +20,10 @@ from mediamop.modules.pruner.pruner_constants import (
     clamp_never_played_min_age_days,
     clamp_pruner_scheduled_preview_interval_seconds,
 )
+from mediamop.modules.pruner.pruner_genre_filters import (
+    preview_genre_filters_from_db_column,
+    preview_genre_filters_to_db_column,
+)
 from mediamop.modules.pruner.pruner_credentials_envelope import (
     PrunerProvider,
     encrypt_envelope,
@@ -80,6 +84,7 @@ def _scope_row_out(session: Session, row: PrunerScopeSettings) -> PrunerScopeSum
         watched_tv_reported_enabled=bool(row.watched_tv_reported_enabled),
         watched_movies_reported_enabled=bool(row.watched_movies_reported_enabled),
         preview_max_items=int(row.preview_max_items),
+        preview_include_genres=preview_genre_filters_from_db_column(str(row.preview_include_genres_json)),
         scheduled_preview_enabled=bool(row.scheduled_preview_enabled),
         scheduled_preview_interval_seconds=clamp_pruner_scheduled_preview_interval_seconds(
             int(row.scheduled_preview_interval_seconds),
@@ -263,6 +268,8 @@ def patch_pruner_scope(
         sc.watched_movies_reported_enabled = bool(body.watched_movies_reported_enabled)
     if body.preview_max_items is not None:
         sc.preview_max_items = int(body.preview_max_items)
+    if body.preview_include_genres is not None:
+        sc.preview_include_genres_json = preview_genre_filters_to_db_column(body.preview_include_genres)
     if body.scheduled_preview_enabled is not None:
         sc.scheduled_preview_enabled = bool(body.scheduled_preview_enabled)
     if body.scheduled_preview_interval_seconds is not None:

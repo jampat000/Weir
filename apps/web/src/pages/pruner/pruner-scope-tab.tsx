@@ -49,6 +49,8 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
   const [watchedTvMsg, setWatchedTvMsg] = useState<string | null>(null);
   const [watchedMoviesEnabled, setWatchedMoviesEnabled] = useState(false);
   const [watchedMoviesMsg, setWatchedMoviesMsg] = useState<string | null>(null);
+  const [genreText, setGenreText] = useState("");
+  const [genreMsg, setGenreMsg] = useState<string | null>(null);
   const canOperate = me.data?.role === "admin" || me.data?.role === "operator";
 
   const scopeRow = instance?.scopes.find((s) => s.media_scope === props.scope);
@@ -89,6 +91,7 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
     setStaleNeverDays(scopeRow.never_played_min_age_days);
     setWatchedTvEnabled(scopeRow.watched_tv_reported_enabled);
     setWatchedMoviesEnabled(scopeRow.watched_movies_reported_enabled);
+    setGenreText((scopeRow.preview_include_genres ?? []).join(", "));
   }, [
     scopeRow?.scheduled_preview_enabled,
     scopeRow?.scheduled_preview_interval_seconds,
@@ -96,6 +99,7 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
     scopeRow?.never_played_min_age_days,
     scopeRow?.watched_tv_reported_enabled,
     scopeRow?.watched_movies_reported_enabled,
+    scopeRow?.preview_include_genres,
     scopeRow?.media_scope,
     instanceId,
   ]);
@@ -135,6 +139,33 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       setStaleNeverMsg("Saved never-played rule settings for this tab only.");
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveGenreFilters() {
+    setGenreMsg(null);
+    setErr(null);
+    setBusy(true);
+    try {
+      const csrf_token = await fetchCsrfToken();
+      const tokens = genreText
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      await patchPrunerScope(instanceId, props.scope, {
+        preview_include_genres: tokens,
+        csrf_token,
+      });
+      await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
+      setGenreMsg(
+        tokens.length
+          ? "Saved genre include list for this tab only (previews use it; apply still uses the frozen snapshot only)."
+          : "Cleared genre filters for this tab.",
+      );
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -343,6 +374,51 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
           <code className="text-[0.85em]">plex_missing_primary_item_cap</code> and a short cap note. When a run shows
           &quot;truncated&quot;, Plex had more matches than that cap — the snapshot is never silently widened.
         </p>
+      ) : null}
+      {scopeRow ? (
+        <div
+          className="space-y-2 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text)]"
+          data-testid="pruner-genre-filters-panel"
+        >
+          <p className="text-sm font-semibold text-[var(--mm-text)]">Optional preview genre include (this tab only)</p>
+          <p className="text-xs text-[var(--mm-text2)]">
+            Comma-separated names. When set, preview jobs on this tab only return items whose server-reported genres
+            include a case-insensitive match for at least one listed name. This narrows preview collection only — apply
+            still deletes exactly the IDs in the saved snapshot.
+          </p>
+          <p className="text-xs text-[var(--mm-text2)]">
+            {isPlex
+              ? "Plex: genre filters apply to missing-primary previews and use Genre tags on each leaf from your server."
+              : "Jellyfin / Emby: uses each item’s Genres field from the Items API for every preview rule on this tab."}
+          </p>
+          {canOperate ? (
+            <div className="space-y-2">
+              <input
+                type="text"
+                className="w-full rounded border border-[var(--mm-border)] bg-[var(--mm-surface2)] px-2 py-1 text-sm text-[var(--mm-text)]"
+                placeholder="e.g. Drama, Science Fiction"
+                value={genreText}
+                disabled={busy}
+                onChange={(e) => setGenreText(e.target.value)}
+              />
+              <button
+                type="button"
+                className="rounded-md border border-[var(--mm-border)] px-3 py-1 text-sm font-medium text-[var(--mm-text)] disabled:opacity-50"
+                disabled={busy}
+                onClick={() => void saveGenreFilters()}
+              >
+                Save genre filters
+              </button>
+              {genreMsg ? <p className="text-xs text-green-600">{genreMsg}</p> : null}
+            </div>
+          ) : (
+            <p className="text-xs text-[var(--mm-text2)]">
+              Current filters:{" "}
+              <strong>{(scopeRow.preview_include_genres ?? []).length ? scopeRow.preview_include_genres.join(", ") : "none"}</strong>
+              . Sign in as an operator to edit.
+            </p>
+          )}
+        </div>
       ) : null}
       {isPlex ? (
         <div

@@ -10,9 +10,11 @@ Read-only calls: ``GET /library/sections`` and paged ``GET /library/sections/{ke
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from mediamop.modules.pruner.pruner_constants import MEDIA_SCOPE_MOVIES, MEDIA_SCOPE_TV
+from mediamop.modules.pruner.pruner_genre_filters import item_matches_genre_include_filter, plex_leaf_genre_tags
 from mediamop.modules.pruner.pruner_http import http_get_json, join_base_path
 
 
@@ -76,6 +78,7 @@ def list_plex_missing_thumb_candidates(
     auth_token: str,
     media_scope: str,
     max_items: int,
+    preview_include_genres: Sequence[str] | None = None,
 ) -> tuple[list[dict[str, Any]], bool]:
     """Return up to ``max_items`` Plex leaf metadata dicts (``ratingKey`` as ``item_id``) plus ``truncated``.
 
@@ -89,6 +92,8 @@ def list_plex_missing_thumb_candidates(
     cap = max(0, int(max_items))
     if cap == 0:
         return [], False
+
+    gf = list(preview_include_genres or [])
 
     sections_url = join_base_path(base_url, "library/sections")
     status, data = http_get_json(sections_url, headers=_plex_headers(auth_token))
@@ -113,6 +118,7 @@ def list_plex_missing_thumb_candidates(
 
     out: list[dict[str, Any]] = []
     truncated = False
+    any_skipped_thumb_ok_for_genre = False
     page_size = min(200, max(1, cap))
     for sec_idx, sec_key in enumerate(section_keys):
         if len(out) >= cap:
@@ -133,12 +139,17 @@ def list_plex_missing_thumb_candidates(
             if not metas:
                 break
             stop_after_page = False
+            page_skipped_thumb_ok_for_genre = False
             for meta_idx, m in enumerate(metas):
                 if not isinstance(m, dict):
                     continue
                 if not _leaf_type_matches(m, media_scope):
                     continue
                 if not _plex_leaf_missing_thumb(m):
+                    continue
+                if gf and not item_matches_genre_include_filter(plex_leaf_genre_tags(m), gf):
+                    page_skipped_thumb_ok_for_genre = True
+                    any_skipped_thumb_ok_for_genre = True
                     continue
                 rk = _rating_key(m)
                 if not rk:
@@ -164,7 +175,7 @@ def list_plex_missing_thumb_candidates(
                         },
                     )
                 if len(out) >= cap:
-                    if meta_idx < len(metas) - 1:
+                    if meta_idx < len(metas) - 1 or page_skipped_thumb_ok_for_genre:
                         truncated = True
                     stop_after_page = True
                     break
@@ -178,6 +189,8 @@ def list_plex_missing_thumb_candidates(
                 if start < total_i:
                     truncated = True
                 elif sec_idx < len(section_keys) - 1:
+                    truncated = True
+                elif any_skipped_thumb_ok_for_genre:
                     truncated = True
                 break
             if start >= total_i or len(metas) == 0:

@@ -163,6 +163,7 @@ def test_post_pruner_instances_creates_row_seeds_scopes_and_hides_secrets(client
         assert s["never_played_min_age_days"] == 90
         assert s["watched_tv_reported_enabled"] is False
         assert s["watched_movies_reported_enabled"] is False
+        assert s["preview_include_genres"] == []
 
     raw = json.dumps(body)
     assert secret_key not in raw

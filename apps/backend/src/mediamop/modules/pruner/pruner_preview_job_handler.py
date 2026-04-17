@@ -20,6 +20,7 @@ from mediamop.modules.pruner.pruner_constants import (
     pruner_preview_rule_families_jf_emby,
 )
 from mediamop.modules.pruner.pruner_credentials_envelope import decrypt_and_parse_envelope
+from mediamop.modules.pruner.pruner_genre_filters import preview_genre_filters_from_db_column
 from mediamop.modules.pruner.pruner_instances_service import get_scope_settings, get_server_instance
 from mediamop.modules.pruner.pruner_plex_live_eligibility import plex_missing_primary_effective_max_items
 from mediamop.modules.pruner.pruner_media_library import preview_payload_json, serialize_candidates
@@ -105,6 +106,7 @@ def make_pruner_candidate_removal_preview_handler(
             display_name = inst.display_name
             if provider == "plex" and rule_family_id == RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED:
                 max_items = plex_missing_primary_effective_max_items(settings, int(sc.preview_max_items))
+            preview_genres = preview_genre_filters_from_db_column(str(sc.preview_include_genres_json))
 
         try:
             outcome, unsup, cands, trunc = preview_payload_json(
@@ -115,6 +117,7 @@ def make_pruner_candidate_removal_preview_handler(
                 max_items=max_items,
                 rule_family_id=rule_family_id,
                 never_played_min_age_days=age_days if rule_family_id == RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED else None,
+                preview_include_genres=preview_genres,
             )
             cand_json = serialize_candidates(cands)
             err: str | None = None
@@ -169,6 +172,8 @@ def make_pruner_candidate_removal_preview_handler(
                     "rule_family_id": rule_family_id,
                     "trigger": "scheduled" if is_scheduled else "manual",
                 }
+                if preview_genres:
+                    detail_obj["preview_include_genres"] = list(preview_genres)
                 if provider == "plex" and rule_family_id == RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED:
                     detail_obj["plex_missing_primary_item_cap"] = max_items
                     detail_obj["plex_missing_primary_cap_note"] = (
