@@ -632,6 +632,13 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies"; contextOverride?
       <h2 id="pruner-scope-heading" className="text-base font-semibold text-[var(--mm-text)]">
         {label}
       </h2>
+      <div
+        className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-surface2)]/30 px-3 py-2 text-xs text-[var(--mm-text2)]"
+        data-testid={`pruner-scope-legacy-grouping-${props.scope}`}
+      >
+        <strong className="text-[var(--mm-text1)]">Legacy Trimmer pattern on this scope:</strong> Schedule & limits,
+        rule families, and people/genre filtering are grouped below on one flat page section.
+      </div>
       {props.disabledMode ? (
         <p className="rounded-md border border-dashed border-[var(--mm-border)] bg-[var(--mm-surface2)]/35 px-3 py-2 text-xs text-[var(--mm-text2)]">
           Save this provider connection first. These are the real deletion/removal controls and become active after
@@ -1023,7 +1030,11 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies"; contextOverride?
           className="space-y-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text)]"
           data-testid="pruner-never-played-stale-panel"
         >
-          <p className="text-sm font-semibold text-[var(--mm-text)]">Stale never-played (Jellyfin / Emby)</p>
+          <p className="text-sm font-semibold text-[var(--mm-text)]">
+            {props.scope === "tv"
+              ? "Unwatched TV older than N days (Jellyfin / Emby)"
+              : "Unwatched entries older than N days (Jellyfin / Emby)"}
+          </p>
           <p className="text-xs text-[var(--mm-text2)]">
             Candidates are library items with <strong>no play state</strong> for the MediaMop server user (Jellyfin /
             Emby user data) and a <strong>DateCreated</strong> older than the minimum age below. This tab (TV or
@@ -1042,7 +1053,9 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies"; contextOverride?
                   disabled={busy}
                   onChange={(e) => setStaleNeverEnabled(e.target.checked)}
                 />
-                Enable stale never-played rule for this tab
+                {props.scope === "tv"
+                  ? "Enable unwatched TV older-than rule for this tab"
+                  : "Enable unwatched older-than rule for this tab"}
               </label>
               <div className="flex flex-wrap items-center gap-2">
                 <label className="text-sm text-[var(--mm-text2)]">
@@ -1074,7 +1087,7 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies"; contextOverride?
                 title={!staleNeverEnabled ? "Enable the rule and save before queueing a preview for it." : undefined}
                 onClick={() => void runStaleNeverPreview()}
               >
-                Queue preview (stale never-played)
+                {props.scope === "tv" ? "Queue preview (unwatched TV older than N days)" : "Queue preview (unwatched older than N days)"}
               </button>
             </div>
           ) : (

@@ -270,6 +270,13 @@ function ProviderWorkspace({ provider, allInstances }: { provider: ProviderTab; 
       </section>
       <section className="space-y-3" data-testid={`pruner-provider-configuration-${provider}`}>
         <h3 className="text-sm font-semibold text-[var(--mm-text)]">Configuration</h3>
+        <div
+          className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-surface2)]/30 px-3 py-2 text-xs text-[var(--mm-text2)]"
+          data-testid={`pruner-provider-config-menu-${provider}`}
+        >
+          Legacy Trimmer grouping mirrored here: <strong>Schedule & limits</strong>, <strong>TV & movie rules</strong>,
+          and <strong>People rules</strong> are all present below in each scope section.
+        </div>
         {!selectedInstance ? (
           <p className="text-xs text-[var(--mm-text2)]">
             Configuration controls are shown below but inactive until this provider connection is saved.
