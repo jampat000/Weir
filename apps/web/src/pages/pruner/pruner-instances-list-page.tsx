@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -9,7 +10,7 @@ import { usePrunerInstancesQuery, usePrunerJobsInspectionQuery } from "../../lib
 import { PrunerScopeTab } from "./pruner-scope-tab";
 import { formatPrunerDateTime } from "./pruner-ui-utils";
 
-type TopTab = "overview" | "emby" | "jellyfin" | "plex" | "schedules" | "jobs";
+type TopTab = "overview" | "connections" | "emby" | "jellyfin" | "plex" | "schedules" | "jobs";
 type ProviderTab = "emby" | "jellyfin" | "plex";
 
 function providerLabel(p: ProviderTab): string {
@@ -89,7 +90,33 @@ function providerDisabledInstance(provider: ProviderTab): PrunerServerInstance {
   };
 }
 
-function ProviderWorkspace({ provider, allInstances }: { provider: ProviderTab; allInstances: PrunerServerInstance[] }) {
+function PrunerAtGlanceCard({
+  title,
+  body,
+  glanceOrder,
+}: {
+  title: string;
+  body: ReactNode;
+  glanceOrder: "1" | "2" | "3";
+}) {
+  return (
+    <div
+      className="flex h-full flex-col gap-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5 text-sm"
+      data-at-glance-order={glanceOrder}
+    >
+      <h3 className="text-sm font-semibold text-[var(--mm-text1)]">{title}</h3>
+      <div className="min-h-0 flex-1 text-[var(--mm-text2)]">{body}</div>
+    </div>
+  );
+}
+
+function PrunerConnectionCredentialPanel({
+  provider,
+  allInstances,
+}: {
+  provider: ProviderTab;
+  allInstances: PrunerServerInstance[];
+}) {
   const me = useMeQuery();
   const q = useQueryClient();
   const canOperate = me.data?.role === "admin" || me.data?.role === "operator";
@@ -98,7 +125,6 @@ function ProviderWorkspace({ provider, allInstances }: { provider: ProviderTab; 
   const [selectedInstanceId, setSelectedInstanceId] = useState<number | null>(providerInstances[0]?.id ?? null);
   const selectedInstance = providerInstances.find((x) => x.id === selectedInstanceId) ?? providerInstances[0];
   const hasInstance = Boolean(selectedInstance);
-  const [displayNameDraft, setDisplayNameDraft] = useState(providerName);
   const [baseUrlDraft, setBaseUrlDraft] = useState("");
   const [credentialDraft, setCredentialDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -110,19 +136,17 @@ function ProviderWorkspace({ provider, allInstances }: { provider: ProviderTab; 
   }, [providerInstances.length, provider]);
 
   useEffect(() => {
-    setDisplayNameDraft(selectedInstance?.display_name ?? providerName);
     setBaseUrlDraft(selectedInstance?.base_url ?? "");
     setCredentialDraft("");
-  }, [selectedInstance?.id, selectedInstance?.display_name, selectedInstance?.base_url, providerName]);
+  }, [selectedInstance?.id, selectedInstance?.base_url]);
 
   async function saveConnection() {
     setBusy(true);
     setErr(null);
     setMsg(null);
     try {
-      const trimmedName = displayNameDraft.trim() || providerName;
       const trimmedUrl = baseUrlDraft.trim();
-      if (!trimmedUrl) throw new Error("Server URL is required.");
+      if (!trimmedUrl) throw new Error("Base URL is required.");
       if (!hasInstance && !credentialDraft.trim()) {
         throw new Error(`${providerCredentialLabel(provider)} is required to create a new ${providerName} connection.`);
       }
@@ -130,20 +154,19 @@ function ProviderWorkspace({ provider, allInstances }: { provider: ProviderTab; 
       const credentials = credentialDraft.trim() ? { [credentialKey]: credentialDraft.trim() } : undefined;
       if (selectedInstance) {
         await patchPrunerInstance(selectedInstance.id, {
-          display_name: trimmedName,
           base_url: trimmedUrl,
           ...(credentials ? { credentials } : {}),
         });
       } else {
         await postPrunerInstance({
           provider,
-          display_name: trimmedName,
+          display_name: providerName,
           base_url: trimmedUrl,
           credentials: credentials ?? {},
         });
       }
       await q.invalidateQueries({ queryKey: ["pruner", "instances"] });
-      setMsg(hasInstance ? "Connection details saved." : `${providerName} connection saved. Configuration is now active.`);
+      setMsg(hasInstance ? "Saved." : `${providerName} connection saved.`);
       setCredentialDraft("");
     } catch (e) {
       setErr((e as Error).message);
@@ -169,100 +192,144 @@ function ProviderWorkspace({ provider, allInstances }: { provider: ProviderTab; 
   }
 
   return (
-    <section className="space-y-4" data-testid={`pruner-provider-tab-${provider}`}>
-      <h2 className="text-base font-semibold text-[var(--mm-text1)]">{providerName}</h2>
-      <section className="space-y-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-4" data-testid={`pruner-provider-connection-${provider}`}>
-        <h3 className="text-base font-semibold text-[var(--mm-text)]">Connection</h3>
-        <p className="text-xs text-[var(--mm-text2)]">
-          {provider === "plex"
-            ? "Use a Plex token."
-            : `Use a ${providerName} API key.`}
-        </p>
-        {providerInstances.length > 1 ? (
-          <label className="text-xs text-[var(--mm-text2)]">
-            Instance
-            <select
-              className="mt-1 w-full rounded border border-[var(--mm-border)] bg-[var(--mm-surface2)] px-2 py-1 text-sm text-[var(--mm-text)]"
-              value={selectedInstance?.id ?? ""}
-              onChange={(e) => setSelectedInstanceId(Number(e.target.value))}
-              disabled={busy}
-            >
-              {providerInstances.map((inst) => (
-                <option key={inst.id} value={inst.id}>
-                  {inst.display_name}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
-        <div className="grid gap-3 md:grid-cols-2">
-          <label className="text-xs text-[var(--mm-text2)]">
-            Display name
-            <input
-              type="text"
-              value={displayNameDraft}
-              onChange={(e) => setDisplayNameDraft(e.target.value)}
-              disabled={busy || !canOperate}
-              className="mt-1 w-full rounded border border-[var(--mm-border)] bg-[var(--mm-surface2)] px-2 py-1 text-sm text-[var(--mm-text)]"
-            />
-          </label>
-          <label className="text-xs text-[var(--mm-text2)]">
-            Server URL
-            <input
-              type="url"
-              value={baseUrlDraft}
-              onChange={(e) => setBaseUrlDraft(e.target.value)}
-              disabled={busy || !canOperate}
-              placeholder="http://server:8096"
-              className="mt-1 w-full rounded border border-[var(--mm-border)] bg-[var(--mm-surface2)] px-2 py-1 text-sm text-[var(--mm-text)]"
-            />
-          </label>
-        </div>
-        <label className="block text-xs text-[var(--mm-text2)]">
-          {providerCredentialLabel(provider)}
-          <input
-            type="password"
-            value={credentialDraft}
-            onChange={(e) => setCredentialDraft(e.target.value)}
-            disabled={busy || !canOperate}
-            placeholder={provider === "plex" ? "Plex token" : `${providerName} API key`}
+    <section
+      className="space-y-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-4"
+      data-testid={`pruner-connection-panel-${provider}`}
+    >
+      <h3 className="text-base font-semibold text-[var(--mm-text1)]">{providerName}</h3>
+      <p className="text-xs text-[var(--mm-text2)]">
+        {provider === "plex" ? "Plex server URL and token." : `${providerName} server URL and API key.`}
+      </p>
+      {providerInstances.length > 1 ? (
+        <label className="text-xs text-[var(--mm-text2)]">
+          Instance
+          <select
             className="mt-1 w-full rounded border border-[var(--mm-border)] bg-[var(--mm-surface2)] px-2 py-1 text-sm text-[var(--mm-text)]"
-          />
+            value={selectedInstance?.id ?? ""}
+            onChange={(e) => setSelectedInstanceId(Number(e.target.value))}
+            disabled={busy}
+          >
+            {providerInstances.map((inst) => (
+              <option key={inst.id} value={inst.id}>
+                {inst.display_name}
+              </option>
+            ))}
+          </select>
         </label>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="rounded-md bg-[var(--mm-accent)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-            disabled={busy || !canOperate}
-            onClick={() => void saveConnection()}
+      ) : null}
+      <label className="block text-xs text-[var(--mm-text2)]">
+        Base URL
+        <input
+          type="url"
+          value={baseUrlDraft}
+          onChange={(e) => setBaseUrlDraft(e.target.value)}
+          disabled={busy || !canOperate}
+          placeholder="http://server:8096"
+          className="mt-1 w-full rounded border border-[var(--mm-border)] bg-[var(--mm-surface2)] px-2 py-1 text-sm text-[var(--mm-text)]"
+        />
+      </label>
+      <label className="block text-xs text-[var(--mm-text2)]">
+        {providerCredentialLabel(provider)}
+        <input
+          type="password"
+          value={credentialDraft}
+          onChange={(e) => setCredentialDraft(e.target.value)}
+          disabled={busy || !canOperate}
+          placeholder={provider === "plex" ? "Plex token" : `${providerName} API key`}
+          className="mt-1 w-full rounded border border-[var(--mm-border)] bg-[var(--mm-surface2)] px-2 py-1 text-sm text-[var(--mm-text)]"
+        />
+      </label>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="rounded-md bg-[var(--mm-accent)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+          disabled={busy || !canOperate}
+          onClick={() => void saveConnection()}
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          className="rounded-md border border-[var(--mm-border)] px-3 py-1.5 text-sm font-medium text-[var(--mm-text)] disabled:opacity-50"
+          disabled={busy || !canOperate || !selectedInstance}
+          onClick={() => void runConnectionTest()}
+        >
+          Test connection
+        </button>
+      </div>
+      <div className="rounded border border-[var(--mm-border)] bg-[var(--mm-surface2)]/40 px-3 py-2 text-xs text-[var(--mm-text2)]">
+        <p>
+          Last test:{" "}
+          <strong className="text-[var(--mm-text1)]">{formatPrunerDateTime(selectedInstance?.last_connection_test_at ?? null)}</strong>
+        </p>
+        <p>
+          Status:{" "}
+          <strong className="text-[var(--mm-text1)]">
+            {selectedInstance?.last_connection_test_ok == null ? "No result yet" : selectedInstance.last_connection_test_ok ? "OK" : "Failed"}
+          </strong>
+        </p>
+        <p>Detail: {selectedInstance?.last_connection_test_detail ?? "Save and run a test to populate status."}</p>
+      </div>
+      {err ? <p className="text-sm text-red-600">{err}</p> : null}
+      {msg ? <p className="text-sm text-[var(--mm-text)]">{msg}</p> : null}
+    </section>
+  );
+}
+
+function ConnectionsTabPanel({ allInstances }: { allInstances: PrunerServerInstance[] }) {
+  const providers: ProviderTab[] = ["emby", "jellyfin", "plex"];
+  return (
+    <section className="space-y-4" data-testid="pruner-connections-tab">
+      <div>
+        <h2 className="text-base font-semibold text-[var(--mm-text1)]">Connections</h2>
+        <p className="mt-1 max-w-3xl text-sm text-[var(--mm-text2)]">
+          Credentials only. Configure cleanup rules on each provider tab (Emby, Jellyfin, Plex).
+        </p>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-3">
+        {providers.map((p) => (
+          <PrunerConnectionCredentialPanel key={p} provider={p} allInstances={allInstances} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ProviderConfigurationWorkspace({ provider, allInstances }: { provider: ProviderTab; allInstances: PrunerServerInstance[] }) {
+  const providerName = providerLabel(provider);
+  const providerInstances = useMemo(() => allInstances.filter((x) => x.provider === provider), [allInstances, provider]);
+  const [selectedInstanceId, setSelectedInstanceId] = useState<number | null>(providerInstances[0]?.id ?? null);
+  const selectedInstance = providerInstances.find((x) => x.id === selectedInstanceId) ?? providerInstances[0];
+
+  useEffect(() => {
+    setSelectedInstanceId(providerInstances[0]?.id ?? null);
+  }, [providerInstances.length, provider]);
+
+  return (
+    <section className="space-y-4" data-testid={`pruner-provider-tab-${provider}`}>
+      <div>
+        <h2 className="text-base font-semibold text-[var(--mm-text1)]">{providerName}</h2>
+        <p className="mt-1 max-w-3xl text-xs text-[var(--mm-text2)]">
+          TV and Movies on one page — no nested tabs. Save credentials under{" "}
+          <strong className="text-[var(--mm-text)]">Connections</strong>.
+        </p>
+      </div>
+      {providerInstances.length > 1 ? (
+        <label className="text-xs text-[var(--mm-text2)]">
+          Instance
+          <select
+            className="mt-1 w-full max-w-md rounded border border-[var(--mm-border)] bg-[var(--mm-surface2)] px-2 py-1 text-sm text-[var(--mm-text)]"
+            value={selectedInstance?.id ?? ""}
+            onChange={(e) => setSelectedInstanceId(Number(e.target.value))}
           >
-            Save connection
-          </button>
-          <button
-            type="button"
-            className="rounded-md border border-[var(--mm-border)] px-3 py-1.5 text-sm font-medium text-[var(--mm-text)] disabled:opacity-50"
-            disabled={busy || !canOperate || !selectedInstance}
-            onClick={() => void runConnectionTest()}
-          >
-            Test connection
-          </button>
-        </div>
-        <div className="rounded border border-[var(--mm-border)] bg-[var(--mm-surface2)]/40 px-3 py-2 text-xs text-[var(--mm-text2)]">
-          <p>
-            Last test:{" "}
-            <strong className="text-[var(--mm-text1)]">{formatPrunerDateTime(selectedInstance?.last_connection_test_at ?? null)}</strong>
-          </p>
-          <p>
-            Status:{" "}
-            <strong className="text-[var(--mm-text1)]">
-              {selectedInstance?.last_connection_test_ok == null ? "No result yet" : selectedInstance.last_connection_test_ok ? "OK" : "Failed"}
-            </strong>
-          </p>
-          <p>Detail: {selectedInstance?.last_connection_test_detail ?? "Save connection and run a test to populate status."}</p>
-        </div>
-        {err ? <p className="text-sm text-red-600">{err}</p> : null}
-        {msg ? <p className="text-sm text-[var(--mm-text)]">{msg}</p> : null}
-      </section>
+            {providerInstances.map((inst) => (
+              <option key={inst.id} value={inst.id}>
+                {inst.display_name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       <div className="space-y-6" data-testid={`pruner-provider-sections-${provider}`}>
         {!selectedInstance ? (
           <p className="text-xs text-[var(--mm-text2)]" data-testid="pruner-provider-config-disabled-hint">
@@ -334,79 +401,74 @@ function TopLevelOverview({ instances }: { instances: PrunerServerInstance[] }) 
       const sid = parseServerInstanceId(j);
       return sid != null && rows.some((row) => row.id === sid);
     });
-    return { provider, rows, first, activeRules, latestPreview, latestJob: providerJobs?.[0] };
+    const latestApplyLike = providerJobs?.find((j) => String(j.job_kind).toLowerCase().includes("apply")) ?? providerJobs?.[0];
+    return { provider, rows, first, activeRules, latestPreview, latestJob: latestApplyLike };
   });
+
   return (
-    <section className="space-y-4" data-testid="pruner-top-overview-tab">
-      <div className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-4 text-sm text-[var(--mm-text2)]">
+    <section className="space-y-6" data-testid="pruner-top-overview-tab">
+      <header className="max-w-3xl">
         <h2 className="text-base font-semibold text-[var(--mm-text1)]">Overview</h2>
-        <p className="mt-1">
-          Pruner is a provider tool for <strong className="text-[var(--mm-text)]">Emby</strong>,{" "}
-          <strong className="text-[var(--mm-text)]">Jellyfin</strong>, and{" "}
-          <strong className="text-[var(--mm-text)]">Plex</strong>. Provider tabs hold flat workspaces with connection,
-          TV config, and Movies config on one page.
+        <p className="mt-1 text-sm text-[var(--mm-text2)]">
+          Use <strong className="text-[var(--mm-text)]">Connections</strong> for credentials and each provider tab for
+          TV and Movies cleanup rules.
         </p>
-        <ul className="mt-2 list-inside list-disc space-y-1 text-xs sm:text-sm">
-          <li>At-a-glance cards below report live provider status only; no fake parity values.</li>
-          <li>Use Schedules at top level for cross-provider operational cadence visibility.</li>
-          <li>Use Jobs at top level for queue/worker state visibility without blurring provider ownership.</li>
-        </ul>
-      </div>
-      <div className="grid gap-4 lg:grid-cols-3">
-        {providerCards.map((card) => (
-          <article
-            key={card.provider}
-            className="space-y-2 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3"
-            data-testid={`pruner-overview-provider-${card.provider}`}
-          >
-            <h3 className="text-sm font-semibold text-[var(--mm-text1)]">{providerLabel(card.provider)}</h3>
-            {card.first ? (
-              <>
-                <p className="text-xs text-[var(--mm-text2)]">
-                  Connection status:{" "}
-                  <strong className="text-[var(--mm-text1)]">
-                    {card.first.last_connection_test_ok == null ? "Unknown" : card.first.last_connection_test_ok ? "OK" : "Failed"}
-                  </strong>
+      </header>
+
+      <section
+        className="mm-card mm-dash-card rounded-lg border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-5 sm:px-5"
+        aria-labelledby="pruner-overview-at-a-glance-heading"
+        data-testid="pruner-overview-at-a-glance"
+      >
+        <h2 id="pruner-overview-at-a-glance-heading" className="text-lg font-semibold text-[var(--mm-text1)]">
+          At a glance
+        </h2>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 sm:gap-x-5 sm:gap-y-5 xl:grid-cols-3 xl:gap-x-5 xl:gap-y-5">
+          {providerCards.map((card, i) => {
+            const order = String(i + 1) as "1" | "2" | "3";
+            const body = card.first ? (
+              <div className="space-y-1.5">
+                <p>
+                  <span className="text-[var(--mm-text3)]">Connection test:</span>{" "}
+                  <span className="font-medium text-[var(--mm-text1)]">
+                    {card.first.last_connection_test_ok == null ? "Not run yet" : card.first.last_connection_test_ok ? "OK" : "Failed"}
+                  </span>
                 </p>
-                <p className="text-xs text-[var(--mm-text2)]">
-                  Active rules: <strong className="text-[var(--mm-text1)]">{card.activeRules}</strong>
+                <p>
+                  <span className="text-[var(--mm-text3)]">Active rules:</span>{" "}
+                  <span className="font-medium text-[var(--mm-text1)]">{card.activeRules}</span>
                 </p>
-                <p className="text-xs text-[var(--mm-text2)]">
-                  Last preview:{" "}
-                  <strong className="text-[var(--mm-text1)]">
+                <p>
+                  <span className="text-[var(--mm-text3)]">Last preview:</span>{" "}
+                  <span className="font-medium text-[var(--mm-text1)]">
                     {card.latestPreview
-                      ? `${card.latestPreview.media_scope.toUpperCase()} / ${card.latestPreview.last_preview_outcome ?? "—"}`
-                      : "No preview yet"}
-                  </strong>
+                      ? `${card.latestPreview.media_scope.toUpperCase()} · ${card.latestPreview.last_preview_outcome ?? "—"}`
+                      : "—"}
+                  </span>
                 </p>
-                <p className="text-xs text-[var(--mm-text2)]">
-                  Last apply/job signal:{" "}
-                  <strong className="text-[var(--mm-text1)]">
-                    {card.latestJob ? `${card.latestJob.job_kind} (${card.latestJob.status})` : "No jobs yet"}
-                  </strong>
+                <p>
+                  <span className="text-[var(--mm-text3)]">Last apply / job:</span>{" "}
+                  <span className="font-medium text-[var(--mm-text1)]">
+                    {card.latestJob ? `${card.latestJob.job_kind} (${card.latestJob.status})` : "—"}
+                  </span>
                 </p>
-              </>
+              </div>
             ) : (
-              <p className="text-xs text-[var(--mm-text2)]">
-                No {providerLabel(card.provider)} instance yet. Connection, TV, and Movies controls are ready on the provider tab.
-              </p>
-            )}
-          </article>
-        ))}
-      </div>
+              <p className="text-[var(--mm-text2)]">No instance registered. Add credentials under Connections.</p>
+            );
+            return <PrunerAtGlanceCard key={card.provider} glanceOrder={order} title={providerLabel(card.provider)} body={body} />;
+          })}
+        </div>
+      </section>
+
       {instances.length === 0 ? (
         <div
           className="rounded-md border border-dashed border-[var(--mm-border)] bg-[var(--mm-surface2)]/35 px-4 py-4 text-sm text-[var(--mm-text2)]"
           data-testid="pruner-empty-state"
         >
           <p className="font-semibold text-[var(--mm-text1)]">No Emby, Jellyfin, or Plex instances registered yet.</p>
-          <p className="mt-1">
-            Provider pages still show live connection forms and disabled configuration sections from first load.
-            Save a connection to activate TV and Movies controls.
-          </p>
-          <p className="mt-2 text-xs">
-            Nothing is shared across providers or across instance rows.
-          </p>
+          <p className="mt-1">Open the Connections tab to add a server URL and API key or token.</p>
+          <p className="mt-2 text-xs">Nothing is shared across providers or across instance rows.</p>
         </div>
       ) : null}
     </section>
@@ -418,11 +480,11 @@ function TopLevelSchedules({ instances }: { instances: PrunerServerInstance[] })
     <section className="space-y-3" data-testid="pruner-top-schedules-tab">
       <h2 className="text-base font-semibold text-[var(--mm-text1)]">Schedules</h2>
       <p className="text-sm text-[var(--mm-text2)]">
-        Top-level operational view across providers. Each row maps to one provider instance and one scope.
+        Automatic preview schedules across providers. Each row is one instance and one scope (TV or Movies).
       </p>
       {instances.length === 0 ? (
         <p className="rounded-md border border-dashed border-[var(--mm-border)] bg-[var(--mm-surface2)]/35 px-4 py-3 text-sm text-[var(--mm-text2)]">
-          Register provider instances first; schedule rows populate per instance and per scope.
+          No instances yet — no schedules to show.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-md border border-[var(--mm-border)]">
@@ -465,7 +527,7 @@ function TopLevelJobs({ instances }: { instances: PrunerServerInstance[] }) {
     <section className="space-y-3" data-testid="pruner-top-jobs-tab">
       <h2 className="text-base font-semibold text-[var(--mm-text1)]">Jobs</h2>
       <p className="text-sm text-[var(--mm-text2)]">
-        Top-level queue visibility across Pruner. Provider/instance linkage is derived from job payload where available.
+        Recent Pruner jobs across providers. Provider linkage uses job payload when present.
       </p>
       {jobsQ.isLoading ? <p className="text-sm text-[var(--mm-text2)]">Loading jobs…</p> : null}
       {jobsQ.isError ? <p className="text-sm text-red-600">{(jobsQ.error as Error).message}</p> : null}
@@ -501,12 +563,12 @@ function TopLevelJobs({ instances }: { instances: PrunerServerInstance[] }) {
           </table>
         </div>
       ) : jobsQ.data ? (
-        <p className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text2)]">
+        <p className="rounded-md border border-dashed border-[var(--mm-border)] bg-[var(--mm-surface2)]/35 px-4 py-3 text-sm text-[var(--mm-text2)]">
           No recent Pruner jobs.
         </p>
       ) : null}
       <p className="text-xs text-[var(--mm-text2)]">
-        Apply removed/skipped/failed details are still tracked in{" "}
+        Apply removed/skipped/failed details are in{" "}
         <Link to="/app/activity" className="font-semibold text-[var(--mm-accent)] underline-offset-2 hover:underline">
           Activity
         </Link>
@@ -526,10 +588,11 @@ export function PrunerInstancesListPage() {
         <p className="mm-page__eyebrow">MediaMop</p>
         <h1 className="mm-page__title">Pruner</h1>
         <p className="mm-page__subtitle max-w-3xl">
-          Provider-first cleanup workspace for <strong className="text-[var(--mm-text)]">Emby</strong>,{" "}
+          Library cleanup for <strong className="text-[var(--mm-text)]">Emby</strong>,{" "}
           <strong className="text-[var(--mm-text)]">Jellyfin</strong>, and{" "}
-          <strong className="text-[var(--mm-text)]">Plex</strong>. Flat provider pages keep connection, TV, and Movies on
-          one tab per provider.
+          <strong className="text-[var(--mm-text)]">Plex</strong>. Use{" "}
+          <strong className="text-[var(--mm-text)]">Connections</strong> for sign-in, then each provider tab for TV and
+          Movies rules.
         </p>
       </header>
 
@@ -540,6 +603,7 @@ export function PrunerInstancesListPage() {
       >
         {([
           ["overview", "Overview"],
+          ["connections", "Connections"],
           ["emby", "Emby"],
           ["jellyfin", "Jellyfin"],
           ["plex", "Plex"],
@@ -549,6 +613,8 @@ export function PrunerInstancesListPage() {
           <button
             key={id}
             type="button"
+            role="tab"
+            aria-selected={topTab === id}
             className={fetcherSectionTabClass(topTab === id)}
             onClick={() => setTopTab(id)}
           >
@@ -557,18 +623,32 @@ export function PrunerInstancesListPage() {
         ))}
       </nav>
 
-      <div className="mt-6 sm:mt-7">
+      <div className="mt-6 sm:mt-7" role="tabpanel" aria-label={
+        (
+          {
+            overview: "Overview",
+            connections: "Connections",
+            emby: "Emby",
+            jellyfin: "Jellyfin",
+            plex: "Plex",
+            schedules: "Schedules",
+            jobs: "Jobs",
+          } as const
+        )[topTab]
+      }>
         {q.isLoading ? <p className="text-sm text-[var(--mm-text2)]">Loading provider instances…</p> : null}
         {q.isError ? <p className="text-sm text-red-600">{(q.error as Error).message}</p> : null}
         {!q.isLoading && !q.isError ? (
           topTab === "overview" ? (
             <TopLevelOverview instances={instances} />
+          ) : topTab === "connections" ? (
+            <ConnectionsTabPanel allInstances={instances} />
           ) : topTab === "schedules" ? (
             <TopLevelSchedules instances={instances} />
           ) : topTab === "jobs" ? (
             <TopLevelJobs instances={instances} />
           ) : (
-            <ProviderWorkspace provider={topTab} allInstances={instances} />
+            <ProviderConfigurationWorkspace provider={topTab} allInstances={instances} />
           )
         ) : null}
       </div>

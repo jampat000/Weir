@@ -749,7 +749,7 @@ export function PrunerScopeTab(props: {
             <p className="text-sm font-semibold text-amber-100">Watched TV removal</p>
             <label className="flex cursor-not-allowed items-center gap-2 text-sm text-[var(--mm-text2)]">
               <input type="checkbox" disabled checked={false} readOnly className="opacity-60" />
-              Unsupported on Plex — no candidate preview for this rule.
+              Not supported for Plex.
             </label>
           </div>
           <div
@@ -759,7 +759,7 @@ export function PrunerScopeTab(props: {
             <p className="text-sm font-semibold text-amber-100">Never-played TV older than N days</p>
             <label className="flex cursor-not-allowed items-center gap-2 text-sm text-[var(--mm-text2)]">
               <input type="checkbox" disabled checked={false} readOnly className="opacity-60" />
-              Unsupported on Plex — no candidate preview for this rule.
+              Not supported for Plex.
             </label>
             <label className="block text-xs text-[var(--mm-text2)]">
               Minimum age (days)
@@ -781,6 +781,12 @@ export function PrunerScopeTab(props: {
         <p className="text-xs text-[var(--mm-text2)]">
           Filters affect preview collection in this {sectionWord} only.
         </p>
+        {isPlex && props.scope === "tv" && isProvider ? (
+          <p className="mt-1 text-xs text-amber-100/90" data-testid="pruner-plex-tv-filters-scope-note" role="status">
+            On Plex TV, genre, people, year, and studio filters apply to the <strong>missing primary art</strong> preview
+            rule only.
+          </p>
+        ) : null}
       </div>
       {scopeRow ? (
         <div
@@ -839,7 +845,7 @@ export function PrunerScopeTab(props: {
             Optional preview people include (this {sectionWord} only)
           </p>
           <p className="text-xs text-[var(--mm-text2)]">Comma-separated full names.</p>
-          {isPlex && !isProvider ? (
+          {isPlex && props.scope === "tv" && isProvider ? null : isPlex && !isProvider ? (
             <p className="text-xs text-[var(--mm-text2)]" data-testid="pruner-people-plex-note">
               Plex: applies to previews that read <code className="text-[0.85em]">allLeaves</code> on this scope (missing
               primary art, watched movies, low-rating, unwatched stale). Names come from <strong>Role</strong>,{" "}
@@ -884,7 +890,7 @@ export function PrunerScopeTab(props: {
           )}
         </div>
       ) : null}
-      {scopeRow && !(props.scope === "tv" && isProvider) ? (
+      {scopeRow ? (
         <div
           className="space-y-2 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text)]"
           data-testid="pruner-year-filters-panel"
@@ -938,7 +944,7 @@ export function PrunerScopeTab(props: {
           )}
         </div>
       ) : null}
-      {scopeRow && !(props.scope === "tv" && isProvider) ? (
+      {scopeRow ? (
         <div
           className="space-y-2 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text)]"
           data-testid="pruner-studio-preview-panel"
@@ -1249,8 +1255,8 @@ export function PrunerScopeTab(props: {
                   </label>
                   <label className="flex flex-wrap items-center gap-2 text-sm text-[var(--mm-text2)]">
                     {isPlex
-                      ? "Max audienceRating ceiling — Plex movie leaves (0–10 inclusive)"
-                      : "Max CommunityRating ceiling — Jellyfin/Emby Items (0–10 inclusive)"}
+                      ? "Plex audienceRating — max ceiling (0–10 inclusive)"
+                      : "Jellyfin/Emby CommunityRating — max ceiling (0–10 inclusive)"}
                     <input
                       type="number"
                       min={0}
