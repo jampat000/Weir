@@ -36,10 +36,16 @@ from mediamop.modules.pruner.pruner_media_library import preview_payload_json
 from mediamop.modules.pruner.pruner_people_filters import (
     item_matches_people_include_filter,
     jellyfin_emby_item_people_names,
+    jellyfin_emby_people_names_for_roles,
     plex_leaf_person_tags,
+    plex_leaf_person_tags_for_roles,
     preview_people_filters_from_db_column,
     preview_people_filters_to_db_column,
+    preview_people_roles_from_db_column,
+    preview_people_roles_to_db_column,
+    validate_preview_people_roles_list,
 )
+from mediamop.modules.pruner.pruner_preview_item_filters import jf_emby_item_passes_preview_filters
 from mediamop.modules.pruner.pruner_scope_settings_model import PrunerScopeSettings
 from mediamop.modules.pruner.worker_loop import PrunerJobWorkContext
 from tests.integration_app_runtime_quiesce import (
@@ -82,6 +88,71 @@ def test_plex_leaf_person_tags_reads_role_writer_director() -> None:
     assert "Actor One" in tags
     assert "Writer Two" in tags
     assert "Sole Director" in tags
+
+
+def test_plex_leaf_person_tags_for_roles_cast_only() -> None:
+    meta = {
+        "Role": [{"tag": "Actor One"}],
+        "Writer": [{"Tag": "Writer Two"}],
+        "Director": "Sole Director",
+    }
+    tags = plex_leaf_person_tags_for_roles(meta, ["cast"])
+    assert "Actor One" in tags
+    assert "Writer Two" not in tags
+    assert "Sole Director" not in tags
+
+
+def test_plex_leaf_person_tags_for_roles_writer_and_director() -> None:
+    meta = {"Role": [{"tag": "A"}], "Writer": [{"tag": "W"}], "Director": [{"tag": "D"}]}
+    assert set(plex_leaf_person_tags_for_roles(meta, ["writer", "director"])) == {"W", "D"}
+
+
+def test_jellyfin_emby_people_names_for_roles_filters_by_type() -> None:
+    item = {
+        "People": [
+            {"Name": "Pat", "Type": "Actor"},
+            {"Name": "Pat", "Type": "Director"},
+            {"Name": "Sam", "Type": "Writer"},
+        ],
+    }
+    assert jellyfin_emby_people_names_for_roles(item, ["cast"]) == ["Pat"]
+    assert set(jellyfin_emby_people_names_for_roles(item, ["cast", "director"])) == {"Pat"}
+
+
+def test_jf_emby_preview_people_roles_cast_vs_director() -> None:
+    item = {"Genres": [], "People": [{"Name": "Pat", "Type": "Director"}], "ProductionYear": None, "Studios": []}
+    assert jf_emby_item_passes_preview_filters(
+        item,
+        preview_include_genres=[],
+        preview_include_people=["pat"],
+        preview_include_people_roles=["cast"],
+        preview_year_min=None,
+        preview_year_max=None,
+        preview_include_studios=[],
+    ) is False
+    assert jf_emby_item_passes_preview_filters(
+        item,
+        preview_include_genres=[],
+        preview_include_people=["pat"],
+        preview_include_people_roles=["director"],
+        preview_year_min=None,
+        preview_year_max=None,
+        preview_include_studios=[],
+    ) is True
+
+
+def test_preview_people_roles_roundtrip() -> None:
+    col = preview_people_roles_to_db_column(["writer", "cast"])
+    assert preview_people_roles_from_db_column(col) == ["cast", "writer"]
+
+
+def test_preview_people_roles_from_db_column_malformed() -> None:
+    assert preview_people_roles_from_db_column("not-json") == ["cast"]
+
+
+def test_validate_preview_people_roles_list_rejects_invalid() -> None:
+    with pytest.raises(ValueError, match="Invalid"):
+        validate_preview_people_roles_list(["cast", "nope"])
 
 
 def test_preview_payload_jellyfin_missing_primary_respects_people_filter() -> None:
@@ -271,6 +342,61 @@ def test_patch_scope_preview_include_people(client_with_admin: TestClient) -> No
     assert rpatch.status_code == 200, rpatch.text
     body = rpatch.json()
     assert body["preview_include_people"] == ["Quincy", "Ada"]
+
+
+def test_patch_scope_preview_include_people_roles(client_with_admin: TestClient) -> None:
+    _login_admin(client_with_admin)
+    tok = fetch_csrf(client_with_admin)
+    r0 = auth_post(
+        client_with_admin,
+        "/api/v1/pruner/instances",
+        json={
+            "provider": "jellyfin",
+            "display_name": "RolesPatch",
+            "base_url": "http://jf-roles.test",
+            "credentials": {"api_key": "k"},
+            "csrf_token": tok,
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    assert r0.status_code == 200, r0.text
+    iid = int(r0.json()["id"])
+    tok2 = fetch_csrf(client_with_admin)
+    rpatch = auth_patch(
+        client_with_admin,
+        f"/api/v1/pruner/instances/{iid}/scopes/tv",
+        json={"preview_include_people_roles": ["writer", "cast"], "csrf_token": tok2},
+        headers={"Content-Type": "application/json"},
+    )
+    assert rpatch.status_code == 200, rpatch.text
+    assert rpatch.json()["preview_include_people_roles"] == ["cast", "writer"]
+
+
+def test_patch_scope_preview_include_people_roles_invalid(client_with_admin: TestClient) -> None:
+    _login_admin(client_with_admin)
+    tok = fetch_csrf(client_with_admin)
+    r0 = auth_post(
+        client_with_admin,
+        "/api/v1/pruner/instances",
+        json={
+            "provider": "jellyfin",
+            "display_name": "RolesBad",
+            "base_url": "http://jf-bad.test",
+            "credentials": {"api_key": "k"},
+            "csrf_token": tok,
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    assert r0.status_code == 200, r0.text
+    iid = int(r0.json()["id"])
+    tok2 = fetch_csrf(client_with_admin)
+    rpatch = auth_patch(
+        client_with_admin,
+        f"/api/v1/pruner/instances/{iid}/scopes/tv",
+        json={"preview_include_people_roles": ["cast", "not_a_valid_role"], "csrf_token": tok2},
+        headers={"Content-Type": "application/json"},
+    )
+    assert rpatch.status_code == 422
 
 
 def test_plex_apply_does_not_call_candidate_collector_with_people_filters_on_scope(

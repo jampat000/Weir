@@ -31,7 +31,11 @@ from mediamop.modules.pruner.pruner_genre_filters import (
     plex_leaf_studio_tags,
 )
 from mediamop.modules.pruner.pruner_http import http_get_json, join_base_path
-from mediamop.modules.pruner.pruner_people_filters import item_matches_people_include_filter, plex_leaf_person_tags
+from mediamop.modules.pruner.pruner_people_filters import (
+    DEFAULT_PREVIEW_PEOPLE_ROLES,
+    item_matches_people_include_filter,
+    plex_leaf_person_tags_for_roles,
+)
 from mediamop.modules.pruner.pruner_preview_year_filters import item_matches_preview_year_filter, plex_leaf_release_year_int
 from mediamop.modules.pruner.pruner_plex_missing_thumb_candidates import (
     _as_list,
@@ -112,6 +116,7 @@ def _plex_movie_passes_preview_narrowing(
     *,
     gf: list[str],
     pf: list[str],
+    pr: list[str],
     preview_year_min: int | None,
     preview_year_max: int | None,
     sf: list[str],
@@ -119,7 +124,7 @@ def _plex_movie_passes_preview_narrowing(
 ) -> bool:
     if gf and not item_matches_genre_include_filter(plex_leaf_genre_tags(m), gf):
         return False
-    if pf and not item_matches_people_include_filter(plex_leaf_person_tags(m), pf):
+    if pf and not item_matches_people_include_filter(plex_leaf_person_tags_for_roles(m, pr), pf):
         return False
     if not item_matches_preview_year_filter(
         plex_leaf_release_year_int(m),
@@ -143,6 +148,7 @@ def _plex_collect_movie_rows(
     build_row: Callable[[dict[str, Any], str], dict[str, Any]],
     preview_include_genres: Sequence[str] | None,
     preview_include_people: Sequence[str] | None,
+    preview_include_people_roles: Sequence[str] | None,
     preview_year_min: int | None,
     preview_year_max: int | None,
     preview_include_studios: Sequence[str] | None,
@@ -152,6 +158,7 @@ def _plex_collect_movie_rows(
         return [], False
     gf = list(preview_include_genres or [])
     pf = list(preview_include_people or [])
+    pr = list(preview_include_people_roles) if preview_include_people_roles is not None else list(DEFAULT_PREVIEW_PEOPLE_ROLES)
     sf = list(preview_include_studios or [])
     cf = list(preview_include_collections or [])
     cap = max(0, int(max_items))
@@ -214,6 +221,7 @@ def _plex_collect_movie_rows(
                     m,
                     gf=gf,
                     pf=pf,
+                    pr=pr,
                     preview_year_min=preview_year_min,
                     preview_year_max=preview_year_max,
                     sf=sf,
@@ -257,6 +265,7 @@ def list_plex_watched_movie_candidates(
     max_items: int,
     preview_include_genres: Sequence[str] | None = None,
     preview_include_people: Sequence[str] | None = None,
+    preview_include_people_roles: Sequence[str] | None = None,
     preview_year_min: int | None = None,
     preview_year_max: int | None = None,
     preview_include_studios: Sequence[str] | None = None,
@@ -278,6 +287,7 @@ def list_plex_watched_movie_candidates(
         build_row=build,
         preview_include_genres=preview_include_genres,
         preview_include_people=preview_include_people,
+        preview_include_people_roles=preview_include_people_roles,
         preview_year_min=preview_year_min,
         preview_year_max=preview_year_max,
         preview_include_studios=preview_include_studios,
@@ -293,6 +303,7 @@ def list_plex_watched_movie_low_rating_candidates(
     audience_rating_max_inclusive: float,
     preview_include_genres: Sequence[str] | None = None,
     preview_include_people: Sequence[str] | None = None,
+    preview_include_people_roles: Sequence[str] | None = None,
     preview_year_min: int | None = None,
     preview_year_max: int | None = None,
     preview_include_studios: Sequence[str] | None = None,
@@ -327,6 +338,7 @@ def list_plex_watched_movie_low_rating_candidates(
         build_row=build,
         preview_include_genres=preview_include_genres,
         preview_include_people=preview_include_people,
+        preview_include_people_roles=preview_include_people_roles,
         preview_year_min=preview_year_min,
         preview_year_max=preview_year_max,
         preview_include_studios=preview_include_studios,
@@ -342,6 +354,7 @@ def list_plex_unwatched_movie_stale_candidates(
     min_age_days: int,
     preview_include_genres: Sequence[str] | None = None,
     preview_include_people: Sequence[str] | None = None,
+    preview_include_people_roles: Sequence[str] | None = None,
     preview_year_min: int | None = None,
     preview_year_max: int | None = None,
     preview_include_studios: Sequence[str] | None = None,
@@ -376,6 +389,7 @@ def list_plex_unwatched_movie_stale_candidates(
         build_row=build,
         preview_include_genres=preview_include_genres,
         preview_include_people=preview_include_people,
+        preview_include_people_roles=preview_include_people_roles,
         preview_year_min=preview_year_min,
         preview_year_max=preview_year_max,
         preview_include_studios=preview_include_studios,

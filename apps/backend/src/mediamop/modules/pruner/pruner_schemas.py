@@ -18,7 +18,11 @@ from mediamop.modules.pruner.pruner_constants import (
     RULE_FAMILY_WATCHED_TV_REPORTED,
 )
 from mediamop.modules.pruner.pruner_genre_filters import normalized_genre_filter_tokens
-from mediamop.modules.pruner.pruner_people_filters import normalized_people_filter_tokens
+from mediamop.modules.pruner.pruner_people_filters import (
+    DEFAULT_PREVIEW_PEOPLE_ROLES,
+    normalized_people_filter_tokens,
+    validate_preview_people_roles_list,
+)
 
 PrunerProviderWire = Literal["emby", "jellyfin", "plex"]
 
@@ -50,6 +54,15 @@ class PrunerScopeSummaryOut(BaseModel):
             "Optional person display names (per tab) that narrow preview collection only — full-name tokens, "
             "case-insensitive exact match against provider-reported names. Empty means no filter. "
             "Apply still uses only the frozen snapshot; it does not re-apply people filters."
+        ),
+    )
+    preview_include_people_roles: list[str] = Field(
+        default_factory=lambda: list(DEFAULT_PREVIEW_PEOPLE_ROLES),
+        description=(
+            "Which credit roles count toward people-name matching for preview narrowing on this tab. "
+            "Jellyfin/Emby match ``People[].Name`` when ``People[].Type`` maps to a selected role. "
+            "Plex uses Role / Director / Writer tags on allLeaves; producer and guest_star are ignored on Plex. "
+            "Defaults to cast-only when empty or unset in storage."
         ),
     )
     preview_year_min: int | None = Field(
@@ -142,6 +155,10 @@ class PrunerScopePatchIn(BaseModel):
         default=None,
         description="Replace per-tab people-name include list; omit field to leave unchanged.",
     )
+    preview_include_people_roles: list[str] | None = Field(
+        default=None,
+        description="Replace per-tab people credit roles for preview narrowing; omit field to leave unchanged.",
+    )
     preview_year_min: int | None = Field(
         default=None,
         ge=PRUNER_PREVIEW_YEAR_FILTER_MIN,
@@ -182,6 +199,16 @@ class PrunerScopePatchIn(BaseModel):
             msg = "preview_include_people must be a list of strings or null"
             raise ValueError(msg)
         return normalized_people_filter_tokens([str(x) for x in v if x is not None])
+
+    @field_validator("preview_include_people_roles", mode="before")
+    @classmethod
+    def _validate_preview_people_roles(cls, v: object) -> list[str] | None:
+        if v is None:
+            return None
+        if not isinstance(v, list):
+            msg = "preview_include_people_roles must be a list of strings or null"
+            raise ValueError(msg)
+        return validate_preview_people_roles_list(v)
 
     @field_validator("preview_include_studios", mode="before")
     @classmethod
@@ -297,6 +324,7 @@ class PrunerScopePatchHttpIn(PrunerScopePatchIn):
             and self.preview_max_items is None
             and self.preview_include_genres is None
             and self.preview_include_people is None
+            and self.preview_include_people_roles is None
             and self.preview_year_min is None
             and self.preview_year_max is None
             and self.preview_include_studios is None
@@ -310,7 +338,8 @@ class PrunerScopePatchHttpIn(PrunerScopePatchIn):
                 "watched_movie_low_rating_reported_enabled, watched_movie_low_rating_max_jellyfin_emby_community_rating, "
                 "watched_movie_low_rating_max_plex_audience_rating, "
                 "unwatched_movie_stale_reported_enabled, unwatched_movie_stale_min_age_days, "
-                "preview_max_items, preview_include_genres, preview_include_people, preview_year_min, "
+                "preview_max_items, preview_include_genres, preview_include_people, preview_include_people_roles, "
+                "preview_year_min, "
                 "preview_year_max, preview_include_studios, preview_include_collections, scheduled_preview_enabled, "
                 "or scheduled_preview_interval_seconds must be provided."
             )

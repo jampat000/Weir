@@ -141,7 +141,6 @@ describe("PrunerInstancesListPage", () => {
     expect(within(rulesCard).getAllByText(/^Movies$/).length).toBeGreaterThanOrEqual(1);
     expect(rulesCard).toBeInTheDocument();
     expect(within(rulesCard).queryByRole("tab")).toBeNull();
-    expect(within(rulesCard).queryByRole("checkbox")).toBeNull();
     expect(screen.queryByRole("button", { name: /Save watched TV rule/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save TV rules" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save Movies rules" })).toBeInTheDocument();

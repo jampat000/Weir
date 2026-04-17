@@ -155,6 +155,7 @@ def list_missing_primary_candidates(
     max_items: int,
     preview_include_genres: Sequence[str] | None = None,
     preview_include_people: Sequence[str] | None = None,
+    preview_include_people_roles: Sequence[str] | None = None,
     preview_year_min: int | None = None,
     preview_year_max: int | None = None,
     preview_include_studios: Sequence[str] | None = None,
@@ -179,6 +180,7 @@ def list_missing_primary_candidates(
     total_hits: int | None = None
     gf = list(preview_include_genres or [])
     pf = list(preview_include_people or [])
+    pr = list(preview_include_people_roles) if preview_include_people_roles is not None else None
     sf = list(preview_include_studios or [])
 
     while len(candidates) < max_items:
@@ -215,6 +217,7 @@ def list_missing_primary_candidates(
                 it,
                 preview_include_genres=gf,
                 preview_include_people=pf,
+                preview_include_people_roles=pr,
                 preview_year_min=preview_year_min,
                 preview_year_max=preview_year_max,
                 preview_include_studios=sf,
@@ -319,6 +322,7 @@ def list_watched_tv_episode_candidates(
     max_items: int,
     preview_include_genres: Sequence[str] | None = None,
     preview_include_people: Sequence[str] | None = None,
+    preview_include_people_roles: Sequence[str] | None = None,
     preview_year_min: int | None = None,
     preview_year_max: int | None = None,
     preview_include_studios: Sequence[str] | None = None,
@@ -341,6 +345,7 @@ def list_watched_tv_episode_candidates(
     truncated = False
     gf = list(preview_include_genres or [])
     pf = list(preview_include_people or [])
+    pr = list(preview_include_people_roles) if preview_include_people_roles is not None else None
     sf = list(preview_include_studios or [])
 
     while len(candidates) < max_items:
@@ -379,6 +384,7 @@ def list_watched_tv_episode_candidates(
                 it,
                 preview_include_genres=gf,
                 preview_include_people=pf,
+                preview_include_people_roles=pr,
                 preview_year_min=preview_year_min,
                 preview_year_max=preview_year_max,
                 preview_include_studios=sf,
@@ -422,6 +428,7 @@ def list_watched_movie_candidates(
     max_items: int,
     preview_include_genres: Sequence[str] | None = None,
     preview_include_people: Sequence[str] | None = None,
+    preview_include_people_roles: Sequence[str] | None = None,
     preview_year_min: int | None = None,
     preview_year_max: int | None = None,
     preview_include_studios: Sequence[str] | None = None,
@@ -444,6 +451,7 @@ def list_watched_movie_candidates(
     truncated = False
     gf = list(preview_include_genres or [])
     pf = list(preview_include_people or [])
+    pr = list(preview_include_people_roles) if preview_include_people_roles is not None else None
     sf = list(preview_include_studios or [])
 
     while len(candidates) < max_items:
@@ -482,6 +490,7 @@ def list_watched_movie_candidates(
                 it,
                 preview_include_genres=gf,
                 preview_include_people=pf,
+                preview_include_people_roles=pr,
                 preview_year_min=preview_year_min,
                 preview_year_max=preview_year_max,
                 preview_include_studios=sf,
@@ -524,6 +533,7 @@ def list_watched_movie_low_rating_candidates(
     community_rating_max_inclusive: float,
     preview_include_genres: Sequence[str] | None = None,
     preview_include_people: Sequence[str] | None = None,
+    preview_include_people_roles: Sequence[str] | None = None,
     preview_year_min: int | None = None,
     preview_year_max: int | None = None,
     preview_include_studios: Sequence[str] | None = None,
@@ -551,6 +561,7 @@ def list_watched_movie_low_rating_candidates(
     truncated = False
     gf = list(preview_include_genres or [])
     pf = list(preview_include_people or [])
+    pr = list(preview_include_people_roles) if preview_include_people_roles is not None else None
     sf = list(preview_include_studios or [])
 
     while len(candidates) < max_items:
@@ -589,6 +600,7 @@ def list_watched_movie_low_rating_candidates(
                 it,
                 preview_include_genres=gf,
                 preview_include_people=pf,
+                preview_include_people_roles=pr,
                 preview_year_min=preview_year_min,
                 preview_year_max=preview_year_max,
                 preview_include_studios=sf,
@@ -636,6 +648,7 @@ def list_unwatched_movie_stale_candidates(
     min_age_days: int,
     preview_include_genres: Sequence[str] | None = None,
     preview_include_people: Sequence[str] | None = None,
+    preview_include_people_roles: Sequence[str] | None = None,
     preview_year_min: int | None = None,
     preview_year_max: int | None = None,
     preview_include_studios: Sequence[str] | None = None,
@@ -662,6 +675,7 @@ def list_unwatched_movie_stale_candidates(
     truncated = False
     gf = list(preview_include_genres or [])
     pf = list(preview_include_people or [])
+    pr = list(preview_include_people_roles) if preview_include_people_roles is not None else None
     sf = list(preview_include_studios or [])
 
     while len(candidates) < max_items:
@@ -700,6 +714,7 @@ def list_unwatched_movie_stale_candidates(
                 it,
                 preview_include_genres=gf,
                 preview_include_people=pf,
+                preview_include_people_roles=pr,
                 preview_year_min=preview_year_min,
                 preview_year_max=preview_year_max,
                 preview_include_studios=sf,
@@ -747,6 +762,7 @@ def list_never_played_stale_candidates(
     min_age_days: int,
     preview_include_genres: Sequence[str] | None = None,
     preview_include_people: Sequence[str] | None = None,
+    preview_include_people_roles: Sequence[str] | None = None,
     preview_year_min: int | None = None,
     preview_year_max: int | None = None,
     preview_include_studios: Sequence[str] | None = None,
@@ -775,6 +791,7 @@ def list_never_played_stale_candidates(
     truncated = False
     gf = list(preview_include_genres or [])
     pf = list(preview_include_people or [])
+    pr = list(preview_include_people_roles) if preview_include_people_roles is not None else None
     sf = list(preview_include_studios or [])
 
     while len(candidates) < max_items:
@@ -813,6 +830,7 @@ def list_never_played_stale_candidates(
                 it,
                 preview_include_genres=gf,
                 preview_include_people=pf,
+                preview_include_people_roles=pr,
                 preview_year_min=preview_year_min,
                 preview_year_max=preview_year_max,
                 preview_include_studios=sf,
@@ -899,6 +917,7 @@ def preview_payload_json(
     never_played_min_age_days: int | None = None,
     preview_include_genres: Sequence[str] | None = None,
     preview_include_people: Sequence[str] | None = None,
+    preview_include_people_roles: Sequence[str] | None = None,
     watched_movie_low_rating_max_jellyfin_emby_community_rating: float | None = None,
     watched_movie_low_rating_max_plex_audience_rating: float | None = None,
     unwatched_movie_stale_min_age_days: int | None = None,
@@ -937,6 +956,7 @@ def preview_payload_json(
                 max_items=max_items,
                 preview_include_genres=preview_include_genres,
                 preview_include_people=preview_include_people,
+                preview_include_people_roles=preview_include_people_roles,
                 preview_year_min=preview_year_min,
                 preview_year_max=preview_year_max,
                 preview_include_studios=preview_include_studios,
@@ -964,6 +984,7 @@ def preview_payload_json(
                 audience_rating_max_inclusive=float(watched_movie_low_rating_max_plex_audience_rating),
                 preview_include_genres=preview_include_genres,
                 preview_include_people=preview_include_people,
+                preview_include_people_roles=preview_include_people_roles,
                 preview_year_min=preview_year_min,
                 preview_year_max=preview_year_max,
                 preview_include_studios=preview_include_studios,
@@ -988,6 +1009,7 @@ def preview_payload_json(
                 min_age_days=int(unwatched_movie_stale_min_age_days),
                 preview_include_genres=preview_include_genres,
                 preview_include_people=preview_include_people,
+                preview_include_people_roles=preview_include_people_roles,
                 preview_year_min=preview_year_min,
                 preview_year_max=preview_year_max,
                 preview_include_studios=preview_include_studios,
@@ -1008,6 +1030,7 @@ def preview_payload_json(
                 max_items=max_items,
                 preview_include_genres=preview_include_genres,
                 preview_include_people=preview_include_people,
+                preview_include_people_roles=preview_include_people_roles,
                 preview_year_min=preview_year_min,
                 preview_year_max=preview_year_max,
                 preview_include_studios=preview_include_studios,
@@ -1024,6 +1047,7 @@ def preview_payload_json(
             max_items=max_items,
             preview_include_genres=preview_include_genres,
             preview_include_people=preview_include_people,
+            preview_include_people_roles=preview_include_people_roles,
             preview_year_min=preview_year_min,
             preview_year_max=preview_year_max,
             preview_include_studios=preview_include_studios,
@@ -1044,6 +1068,7 @@ def preview_payload_json(
             max_items=max_items,
             preview_include_genres=preview_include_genres,
             preview_include_people=preview_include_people,
+            preview_include_people_roles=preview_include_people_roles,
             preview_year_min=preview_year_min,
             preview_year_max=preview_year_max,
             preview_include_studios=preview_include_studios,
@@ -1064,6 +1089,7 @@ def preview_payload_json(
             max_items=max_items,
             preview_include_genres=preview_include_genres,
             preview_include_people=preview_include_people,
+            preview_include_people_roles=preview_include_people_roles,
             preview_year_min=preview_year_min,
             preview_year_max=preview_year_max,
             preview_include_studios=preview_include_studios,
@@ -1081,6 +1107,7 @@ def preview_payload_json(
             min_age_days=int(never_played_min_age_days),
             preview_include_genres=preview_include_genres,
             preview_include_people=preview_include_people,
+            preview_include_people_roles=preview_include_people_roles,
             preview_year_min=preview_year_min,
             preview_year_max=preview_year_max,
             preview_include_studios=preview_include_studios,
@@ -1108,6 +1135,7 @@ def preview_payload_json(
             community_rating_max_inclusive=float(watched_movie_low_rating_max_jellyfin_emby_community_rating),
             preview_include_genres=preview_include_genres,
             preview_include_people=preview_include_people,
+            preview_include_people_roles=preview_include_people_roles,
             preview_year_min=preview_year_min,
             preview_year_max=preview_year_max,
             preview_include_studios=preview_include_studios,
@@ -1132,6 +1160,7 @@ def preview_payload_json(
             min_age_days=int(unwatched_movie_stale_min_age_days),
             preview_include_genres=preview_include_genres,
             preview_include_people=preview_include_people,
+            preview_include_people_roles=preview_include_people_roles,
             preview_year_min=preview_year_min,
             preview_year_max=preview_year_max,
             preview_include_studios=preview_include_studios,

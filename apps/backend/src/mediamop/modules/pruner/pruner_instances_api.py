@@ -36,6 +36,8 @@ from mediamop.modules.pruner.pruner_studio_collection_filters import (
 from mediamop.modules.pruner.pruner_people_filters import (
     preview_people_filters_from_db_column,
     preview_people_filters_to_db_column,
+    preview_people_roles_from_db_column,
+    preview_people_roles_to_db_column,
 )
 from mediamop.modules.pruner.pruner_credentials_envelope import (
     PrunerProvider,
@@ -108,6 +110,7 @@ def _scope_row_out(session: Session, row: PrunerScopeSettings) -> PrunerScopeSum
         preview_max_items=int(row.preview_max_items),
         preview_include_genres=preview_genre_filters_from_db_column(str(row.preview_include_genres_json)),
         preview_include_people=preview_people_filters_from_db_column(str(row.preview_include_people_json)),
+        preview_include_people_roles=preview_people_roles_from_db_column(str(row.preview_include_people_roles_json)),
         preview_year_min=clamp_preview_year_bound(row.preview_year_min),
         preview_year_max=clamp_preview_year_bound(row.preview_year_max),
         preview_include_studios=preview_studio_filters_from_db_column(str(row.preview_include_studios_json)),
@@ -315,6 +318,8 @@ def patch_pruner_scope(
         sc.preview_include_genres_json = preview_genre_filters_to_db_column(body.preview_include_genres)
     if body.preview_include_people is not None:
         sc.preview_include_people_json = preview_people_filters_to_db_column(body.preview_include_people)
+    if body.preview_include_people_roles is not None:
+        sc.preview_include_people_roles_json = preview_people_roles_to_db_column(body.preview_include_people_roles)
     if "preview_year_min" in body.model_fields_set:
         sc.preview_year_min = clamp_preview_year_bound(body.preview_year_min)
     if "preview_year_max" in body.model_fields_set:

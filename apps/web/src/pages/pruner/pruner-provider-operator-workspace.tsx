@@ -16,6 +16,13 @@ import { MmOnOffSwitch } from "../../components/ui/mm-on-off-switch";
 import { fetcherMenuButtonClass } from "../fetcher/fetcher-menu-button";
 import { PrunerGenreMultiSelect, prunerGenresFromApi } from "./pruner-genre-multi-select";
 import {
+  DEFAULT_PRUNER_PEOPLE_ROLES,
+  PrunerPeopleRoleCheckboxes,
+  normalizePeopleRolesFromApi,
+  peopleRolesForPlexPersist,
+  type PrunerPeopleRoleId,
+} from "./pruner-people-roles";
+import {
   PRUNER_SCAN_POLL_MS,
   PRUNER_SCAN_TIMEOUT_MS,
   displayRowsForCandidates,
@@ -795,10 +802,15 @@ export function PrunerProviderPeopleCard({ provider, instanceId, instance, disab
   const qc = useQueryClient();
   const me = useMeQuery();
   const canOperate = me.data?.role === "admin" || me.data?.role === "operator";
+  const isPlex = provider === "plex";
   const tv = scopeRow(instance, "tv");
   const movies = scopeRow(instance, "movies");
   const [tvPeople, setTvPeople] = useState("");
   const [moviesPeople, setMoviesPeople] = useState("");
+  const [tvRoles, setTvRoles] = useState<PrunerPeopleRoleId[]>([...DEFAULT_PRUNER_PEOPLE_ROLES]);
+  const [moviesRoles, setMoviesRoles] = useState<PrunerPeopleRoleId[]>([...DEFAULT_PRUNER_PEOPLE_ROLES]);
+  const [tvRolesCoerceMsg, setTvRolesCoerceMsg] = useState<string | null>(null);
+  const [moviesRolesCoerceMsg, setMoviesRolesCoerceMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -811,11 +823,21 @@ export function PrunerProviderPeopleCard({ provider, instanceId, instance, disab
     setMoviesPeople(((movies?.preview_include_people ?? []) as string[]).join("\n"));
   }, [movies?.preview_include_people]);
 
+  useEffect(() => {
+    setTvRoles(normalizePeopleRolesFromApi(tv?.preview_include_people_roles));
+  }, [tv?.preview_include_people_roles]);
+
+  useEffect(() => {
+    setMoviesRoles(normalizePeopleRolesFromApi(movies?.preview_include_people_roles));
+  }, [movies?.preview_include_people_roles]);
+
   async function persistTvPeople(): Promise<void> {
     if (!tv) return;
     const csrf_token = await fetchCsrfToken();
+    const rolesPersist = isPlex ? peopleRolesForPlexPersist(tvRoles) : [...tvRoles];
     await patchPrunerScope(instanceId, "tv", {
       preview_include_people: parsePeopleLines(tvPeople),
+      preview_include_people_roles: rolesPersist,
       csrf_token,
     });
     await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
@@ -824,8 +846,10 @@ export function PrunerProviderPeopleCard({ provider, instanceId, instance, disab
   async function persistMoviesPeople(): Promise<void> {
     if (!movies) return;
     const csrf_token = await fetchCsrfToken();
+    const rolesPersist = isPlex ? peopleRolesForPlexPersist(moviesRoles) : [...moviesRoles];
     await patchPrunerScope(instanceId, "movies", {
       preview_include_people: parsePeopleLines(moviesPeople),
+      preview_include_people_roles: rolesPersist,
       csrf_token,
     });
     await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
@@ -838,6 +862,7 @@ export function PrunerProviderPeopleCard({ provider, instanceId, instance, disab
     setMsg(null);
     try {
       await persistTvPeople();
+      setTvRolesCoerceMsg(null);
       setMsg("Saved TV people.");
     } catch (e) {
       setErr((e as Error).message);
@@ -853,6 +878,7 @@ export function PrunerProviderPeopleCard({ provider, instanceId, instance, disab
     setMsg(null);
     try {
       await persistMoviesPeople();
+      setMoviesRolesCoerceMsg(null);
       setMsg("Saved Movies people.");
     } catch (e) {
       setErr((e as Error).message);
@@ -892,6 +918,18 @@ export function PrunerProviderPeopleCard({ provider, instanceId, instance, disab
               />
             </label>
             <p className="text-xs text-[var(--mm-text3)]">Leave blank to use no name filter.</p>
+            <PrunerPeopleRoleCheckboxes
+              value={tvRoles}
+              onChange={setTvRoles}
+              disabled={fieldDisabled || disabled}
+              variant={isPlex ? "plex" : "emby-jellyfin"}
+              coerceCastMsg={tvRolesCoerceMsg}
+              onClearCoerceMsg={() => setTvRolesCoerceMsg(null)}
+              onCoercedToCast={() =>
+                setTvRolesCoerceMsg("At least one role must be selected — defaulting to cast.")
+              }
+              testId={`pruner-provider-tv-people-roles-${provider}`}
+            />
             {canOperate ? (
               <button
                 type="button"
@@ -921,6 +959,18 @@ export function PrunerProviderPeopleCard({ provider, instanceId, instance, disab
               />
             </label>
             <p className="text-xs text-[var(--mm-text3)]">Leave blank to use no name filter.</p>
+            <PrunerPeopleRoleCheckboxes
+              value={moviesRoles}
+              onChange={setMoviesRoles}
+              disabled={fieldDisabled || disabled}
+              variant={isPlex ? "plex" : "emby-jellyfin"}
+              coerceCastMsg={moviesRolesCoerceMsg}
+              onClearCoerceMsg={() => setMoviesRolesCoerceMsg(null)}
+              onCoercedToCast={() =>
+                setMoviesRolesCoerceMsg("At least one role must be selected — defaulting to cast.")
+              }
+              testId={`pruner-provider-movies-people-roles-${provider}`}
+            />
             {canOperate ? (
               <button
                 type="button"

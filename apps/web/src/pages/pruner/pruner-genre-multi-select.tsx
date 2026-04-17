@@ -68,32 +68,34 @@ export function PrunerGenreMultiSelect({
         Leave none selected to include every genre. Pick one or more to limit scans to those genres only.
       </p>
       <div
-        className="max-h-36 overflow-y-auto rounded-md border border-[var(--mm-border)] bg-[var(--mm-surface2)]/30 p-1.5"
+        className="max-h-36 overflow-y-auto rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-1"
         role="listbox"
         aria-multiselectable
         aria-label="Genres"
       >
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-1">
           {PRUNER_RULE_GENRE_OPTIONS.map((g) => {
             const selected = value.some((x) => x.toLowerCase() === g.toLowerCase());
             return (
-              <button
+              <label
                 key={g}
-                type="button"
-                role="option"
-                aria-selected={selected}
-                disabled={disabled}
-                onClick={() => toggle(g)}
                 className={[
-                  "rounded px-2 py-1.5 text-left text-sm transition-colors",
+                  "flex cursor-pointer items-center gap-2.5 rounded-md border px-2.5 py-2 text-left text-sm transition-colors",
                   selected
-                    ? "bg-[var(--mm-accent-soft)] font-medium text-[var(--mm-text1)] ring-1 ring-[var(--mm-accent-ring)]/40"
-                    : "text-[var(--mm-text2)] hover:bg-[var(--mm-card-bg)]/80",
-                  disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+                    ? "border-[var(--mm-accent)]/55 bg-[var(--mm-accent-soft)]/40 font-medium text-[var(--mm-text1)] shadow-sm"
+                    : "border-transparent bg-[var(--mm-surface2)]/25 text-[var(--mm-text2)] hover:border-[var(--mm-border)] hover:bg-[var(--mm-surface2)]/50",
+                  disabled ? "cursor-not-allowed opacity-50" : "",
                 ].join(" ")}
               >
-                {g}
-              </button>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 shrink-0 accent-[var(--mm-accent)]"
+                  checked={selected}
+                  disabled={disabled}
+                  onChange={() => toggle(g)}
+                />
+                <span className="select-none">{g}</span>
+              </label>
             );
           })}
         </div>

@@ -115,7 +115,7 @@ describe("PrunerScopeTab genre filters", () => {
 
       await waitFor(() => expect(screen.getByTestId("pruner-genre-filters-panel")).toBeInTheDocument());
       const multi = screen.getByTestId("pruner-genre-multiselect-51-tv");
-      fireEvent.click(within(multi).getByRole("option", { name: "Comedy" }));
+      fireEvent.click(within(multi).getByRole("checkbox", { name: "Comedy" }));
       fireEvent.click(screen.getByRole("button", { name: /save genre filters/i }));
       await waitFor(() => {
         expect(spyPatch).toHaveBeenCalledWith(

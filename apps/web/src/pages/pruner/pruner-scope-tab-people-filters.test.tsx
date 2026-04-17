@@ -115,14 +115,17 @@ describe("PrunerScopeTab people filters", () => {
       await waitFor(() => expect(screen.getByTestId("pruner-people-filters-panel")).toBeInTheDocument());
       expect(screen.getByTestId("pruner-people-jf-emby-note")).toBeInTheDocument();
       expect(screen.queryByTestId("pruner-people-plex-note")).not.toBeInTheDocument();
-      const input = screen.getByPlaceholderText(/jane doe/i);
+      const input = screen.getByPlaceholderText(/Alex Carter/i);
       fireEvent.change(input, { target: { value: "Ada Lovelace, Grace Hopper" } });
       fireEvent.click(screen.getByRole("button", { name: /save people filters/i }));
       await waitFor(() => {
         expect(spyPatch).toHaveBeenCalledWith(
           61,
           "tv",
-          expect.objectContaining({ preview_include_people: ["Ada Lovelace", "Grace Hopper"] }),
+          expect.objectContaining({
+            preview_include_people: ["Ada Lovelace", "Grace Hopper"],
+            preview_include_people_roles: ["cast"],
+          }),
         );
       });
     } finally {

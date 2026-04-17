@@ -10,8 +10,9 @@ from mediamop.modules.pruner.pruner_genre_filters import (
     jellyfin_emby_item_genres,
 )
 from mediamop.modules.pruner.pruner_people_filters import (
+    DEFAULT_PREVIEW_PEOPLE_ROLES,
     item_matches_people_include_filter,
-    jellyfin_emby_item_people_names,
+    jellyfin_emby_people_names_for_roles,
 )
 from mediamop.modules.pruner.pruner_preview_year_filters import (
     item_matches_preview_year_filter,
@@ -25,6 +26,7 @@ def jf_emby_item_passes_preview_filters(
     *,
     preview_include_genres: Sequence[str],
     preview_include_people: Sequence[str],
+    preview_include_people_roles: Sequence[str] | None = None,
     preview_year_min: int | None,
     preview_year_max: int | None,
     preview_include_studios: Sequence[str],
@@ -33,8 +35,12 @@ def jf_emby_item_passes_preview_filters(
 
     if not item_matches_genre_include_filter(jellyfin_emby_item_genres(it), preview_include_genres):
         return False
-    if not item_matches_people_include_filter(jellyfin_emby_item_people_names(it), preview_include_people):
-        return False
+    pf = list(preview_include_people or [])
+    if pf:
+        roles = list(preview_include_people_roles) if preview_include_people_roles else list(DEFAULT_PREVIEW_PEOPLE_ROLES)
+        names = jellyfin_emby_people_names_for_roles(it, roles)
+        if not item_matches_people_include_filter(names, pf):
+            return False
     if not item_matches_preview_year_filter(
         jellyfin_emby_item_production_year_int(it),
         preview_year_min,

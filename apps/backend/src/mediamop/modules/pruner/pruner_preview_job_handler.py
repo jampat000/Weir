@@ -26,7 +26,10 @@ from mediamop.modules.pruner.pruner_constants import (
 )
 from mediamop.modules.pruner.pruner_credentials_envelope import decrypt_and_parse_envelope
 from mediamop.modules.pruner.pruner_genre_filters import preview_genre_filters_from_db_column
-from mediamop.modules.pruner.pruner_people_filters import preview_people_filters_from_db_column
+from mediamop.modules.pruner.pruner_people_filters import (
+    preview_people_filters_from_db_column,
+    preview_people_roles_from_db_column,
+)
 from mediamop.modules.pruner.pruner_studio_collection_filters import (
     preview_collection_filters_from_db_column,
     preview_studio_filters_from_db_column,
@@ -139,6 +142,7 @@ def make_pruner_candidate_removal_preview_handler(
                 max_items = plex_missing_primary_effective_max_items(settings, int(sc.preview_max_items))
             preview_genres = preview_genre_filters_from_db_column(str(sc.preview_include_genres_json))
             preview_people = preview_people_filters_from_db_column(str(sc.preview_include_people_json))
+            preview_people_roles = preview_people_roles_from_db_column(str(sc.preview_include_people_roles_json))
             preview_studios = preview_studio_filters_from_db_column(str(sc.preview_include_studios_json))
             preview_collections = preview_collection_filters_from_db_column(str(sc.preview_include_collections_json))
             preview_year_min = clamp_preview_year_bound(sc.preview_year_min)
@@ -159,6 +163,7 @@ def make_pruner_candidate_removal_preview_handler(
                 never_played_min_age_days=age_days if rule_family_id == RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED else None,
                 preview_include_genres=preview_genres,
                 preview_include_people=preview_people,
+                preview_include_people_roles=preview_people_roles,
                 watched_movie_low_rating_max_jellyfin_emby_community_rating=low_rating_jf
                 if rule_family_id == RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED
                 else None,

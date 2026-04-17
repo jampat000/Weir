@@ -28,8 +28,9 @@ from mediamop.modules.pruner.pruner_genre_filters import (
 )
 from mediamop.modules.pruner.pruner_preview_year_filters import item_matches_preview_year_filter, plex_leaf_release_year_int
 from mediamop.modules.pruner.pruner_people_filters import (
+    DEFAULT_PREVIEW_PEOPLE_ROLES,
     item_matches_people_include_filter,
-    plex_leaf_person_tags,
+    plex_leaf_person_tags_for_roles,
 )
 from mediamop.modules.pruner.pruner_http import http_get_json, join_base_path
 
@@ -96,6 +97,7 @@ def list_plex_missing_thumb_candidates(
     max_items: int,
     preview_include_genres: Sequence[str] | None = None,
     preview_include_people: Sequence[str] | None = None,
+    preview_include_people_roles: Sequence[str] | None = None,
     preview_year_min: int | None = None,
     preview_year_max: int | None = None,
     preview_include_studios: Sequence[str] | None = None,
@@ -116,6 +118,7 @@ def list_plex_missing_thumb_candidates(
 
     gf = list(preview_include_genres or [])
     pf = list(preview_include_people or [])
+    pr = list(preview_include_people_roles) if preview_include_people_roles is not None else list(DEFAULT_PREVIEW_PEOPLE_ROLES)
     sf = list(preview_include_studios or [])
     cf = list(preview_include_collections or [])
 
@@ -175,7 +178,7 @@ def list_plex_missing_thumb_candidates(
                     page_skipped_thumb_ok_for_genre = True
                     any_skipped_thumb_ok_for_genre = True
                     continue
-                if pf and not item_matches_people_include_filter(plex_leaf_person_tags(m), pf):
+                if pf and not item_matches_people_include_filter(plex_leaf_person_tags_for_roles(m, pr), pf):
                     page_skipped_thumb_ok_for_genre = True
                     any_skipped_thumb_ok_for_genre = True
                     continue

@@ -23,6 +23,13 @@ import type { PrunerServerInstance } from "../../lib/pruner/api";
 import { FetcherEnableSwitch } from "../fetcher/fetcher-enable-switch";
 import { fetcherMenuButtonClass } from "../fetcher/fetcher-menu-button";
 import { PrunerGenreMultiSelect, prunerGenresFromApi } from "./pruner-genre-multi-select";
+import {
+  DEFAULT_PRUNER_PEOPLE_ROLES,
+  PrunerPeopleRoleCheckboxes,
+  normalizePeopleRolesFromApi,
+  peopleRolesForPlexPersist,
+  type PrunerPeopleRoleId,
+} from "./pruner-people-roles";
 import { formatPrunerDateTime, previewRunRowCaption } from "./pruner-ui-utils";
 
 type Ctx = { instanceId: number; instance: PrunerServerInstance | undefined };
@@ -74,6 +81,8 @@ export function PrunerScopeTab(props: {
   const [genreSelection, setGenreSelection] = useState<string[]>([]);
   const [genreMsg, setGenreMsg] = useState<string | null>(null);
   const [peopleText, setPeopleText] = useState("");
+  const [peopleRoles, setPeopleRoles] = useState<PrunerPeopleRoleId[]>([...DEFAULT_PRUNER_PEOPLE_ROLES]);
+  const [peopleRolesCoerceMsg, setPeopleRolesCoerceMsg] = useState<string | null>(null);
   const [peopleMsg, setPeopleMsg] = useState<string | null>(null);
   const [yearMinStr, setYearMinStr] = useState("");
   const [yearMaxStr, setYearMaxStr] = useState("");
@@ -147,6 +156,7 @@ export function PrunerScopeTab(props: {
     setUnwatchedStaleDays(scopeRow.unwatched_movie_stale_min_age_days);
     setGenreSelection(prunerGenresFromApi(scopeRow.preview_include_genres));
     setPeopleText((scopeRow.preview_include_people ?? []).join(", "));
+    setPeopleRoles(normalizePeopleRolesFromApi(scopeRow.preview_include_people_roles));
     setYearMinStr(scopeRow.preview_year_min != null ? String(scopeRow.preview_year_min) : "");
     setYearMaxStr(scopeRow.preview_year_max != null ? String(scopeRow.preview_year_max) : "");
     setStudioText((scopeRow.preview_include_studios ?? []).join(", "));
@@ -186,6 +196,7 @@ export function PrunerScopeTab(props: {
     scopeRow?.unwatched_movie_stale_min_age_days,
     scopeRow?.preview_include_genres,
     scopeRow?.preview_include_people,
+    scopeRow?.preview_include_people_roles,
     scopeRow?.preview_year_min,
     scopeRow?.preview_year_max,
     scopeRow?.preview_include_studios,
@@ -294,6 +305,7 @@ export function PrunerScopeTab(props: {
         .filter(Boolean);
       await patchPrunerScope(instanceId, props.scope, {
         preview_include_people: tokens,
+        preview_include_people_roles: isPlex ? peopleRolesForPlexPersist(peopleRoles) : [...peopleRoles],
         csrf_token,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
@@ -770,6 +782,7 @@ export function PrunerScopeTab(props: {
         .filter(Boolean);
       await patchPrunerScope(instanceId, props.scope, {
         preview_include_people: lines,
+        preview_include_people_roles: isPlex ? peopleRolesForPlexPersist(peopleRoles) : [...peopleRoles],
         csrf_token,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
@@ -1037,6 +1050,24 @@ export function PrunerScopeTab(props: {
           </p>
         )}
         <p className="text-xs text-[var(--mm-text3)]">Leave blank to use no name filter.</p>
+        {showInteractiveControls ? (
+          <PrunerPeopleRoleCheckboxes
+            value={peopleRoles}
+            onChange={setPeopleRoles}
+            disabled={busy}
+            variant={isPlex ? "plex" : "emby-jellyfin"}
+            coerceCastMsg={peopleRolesCoerceMsg}
+            onClearCoerceMsg={() => setPeopleRolesCoerceMsg(null)}
+            onCoercedToCast={() =>
+              setPeopleRolesCoerceMsg("At least one role must be selected — defaulting to cast.")
+            }
+            testId={`pruner-provider-inline-people-roles-${instanceId}-${props.scope}`}
+          />
+        ) : (
+          <p className="text-xs text-[var(--mm-text2)]">
+            Roles: <strong>{(scopeRow?.preview_include_people_roles ?? ["cast"]).join(", ")}</strong>
+          </p>
+        )}
       </div>
     );
   }
@@ -1340,14 +1371,27 @@ export function PrunerScopeTab(props: {
             </p>
           ) : null}
           {showInteractiveControls ? (
-            <div className="space-y-2">
-              <input
-                type="text"
-                className="w-full rounded border border-[var(--mm-border)] bg-[var(--mm-surface2)] px-2 py-1 text-sm text-[var(--mm-text)]"
-                placeholder="e.g. Jane Doe, Alan Smithee"
+            <div className="space-y-3">
+              <textarea
+                rows={5}
+                className="mm-input min-h-[7rem] w-full resize-y font-sans text-sm"
+                placeholder="e.g. Alex Carter, Jordan Lee (comma or one per line)"
                 value={peopleText}
                 disabled={busy}
                 onChange={(e) => setPeopleText(e.target.value)}
+              />
+              <p className="text-xs text-[var(--mm-text3)]">Leave blank to use no name filter.</p>
+              <PrunerPeopleRoleCheckboxes
+                value={peopleRoles}
+                onChange={setPeopleRoles}
+                disabled={busy}
+                variant={isPlex ? "plex" : "emby-jellyfin"}
+                coerceCastMsg={peopleRolesCoerceMsg}
+                onClearCoerceMsg={() => setPeopleRolesCoerceMsg(null)}
+                onCoercedToCast={() =>
+                  setPeopleRolesCoerceMsg("At least one role must be selected — defaulting to cast.")
+                }
+                testId={`pruner-people-filters-roles-${instanceId}-${props.scope}`}
               />
               <button
                 type="button"

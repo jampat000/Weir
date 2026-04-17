@@ -16,6 +16,8 @@ export type PrunerScopeSummary = {
   preview_max_items: number;
   preview_include_genres: string[];
   preview_include_people: string[];
+  /** Credit roles used with name filters for preview narrowing; defaults to cast when absent in older clients. */
+  preview_include_people_roles?: string[];
   preview_year_min: number | null;
   preview_year_max: number | null;
   preview_include_studios: string[];
@@ -277,6 +279,7 @@ export async function patchPrunerScope(
     preview_max_items?: number;
     preview_include_genres?: string[];
     preview_include_people?: string[];
+    preview_include_people_roles?: string[];
     preview_year_min?: number | null;
     preview_year_max?: number | null;
     preview_include_studios?: string[];

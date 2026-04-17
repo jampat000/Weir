@@ -62,6 +62,11 @@ class PrunerScopeSettings(Base):
         nullable=False,
         server_default=text("'[]'"),
     )
+    preview_include_people_roles_json: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default=text("'[\"cast\"]'"),
+    )
     preview_year_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
     preview_year_max: Mapped[int | None] = mapped_column(Integer, nullable=True)
     preview_include_studios_json: Mapped[str] = mapped_column(
