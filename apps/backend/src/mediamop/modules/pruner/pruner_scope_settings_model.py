@@ -79,7 +79,12 @@ class PrunerScopeSettings(Base):
         nullable=False,
         server_default=text("0"),
     )
-    watched_movie_low_rating_max_community_rating: Mapped[float] = mapped_column(
+    watched_movie_low_rating_max_jellyfin_emby_community_rating: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        server_default=text("4.0"),
+    )
+    watched_movie_low_rating_max_plex_audience_rating: Mapped[float] = mapped_column(
         Float,
         nullable=False,
         server_default=text("4.0"),

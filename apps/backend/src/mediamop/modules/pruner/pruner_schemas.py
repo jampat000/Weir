@@ -31,7 +31,8 @@ class PrunerScopeSummaryOut(BaseModel):
     watched_tv_reported_enabled: bool = False
     watched_movies_reported_enabled: bool = False
     watched_movie_low_rating_reported_enabled: bool = False
-    watched_movie_low_rating_max_community_rating: float = 4.0
+    watched_movie_low_rating_max_jellyfin_emby_community_rating: float = 4.0
+    watched_movie_low_rating_max_plex_audience_rating: float = 4.0
     unwatched_movie_stale_reported_enabled: bool = False
     unwatched_movie_stale_min_age_days: int = 90
     preview_max_items: int
@@ -128,7 +129,8 @@ class PrunerScopePatchIn(BaseModel):
     watched_tv_reported_enabled: bool | None = None
     watched_movies_reported_enabled: bool | None = None
     watched_movie_low_rating_reported_enabled: bool | None = None
-    watched_movie_low_rating_max_community_rating: float | None = Field(None, ge=0, le=10)
+    watched_movie_low_rating_max_jellyfin_emby_community_rating: float | None = Field(None, ge=0, le=10)
+    watched_movie_low_rating_max_plex_audience_rating: float | None = Field(None, ge=0, le=10)
     unwatched_movie_stale_reported_enabled: bool | None = None
     unwatched_movie_stale_min_age_days: int | None = Field(None, ge=7, le=3650)
     preview_max_items: int | None = Field(None, ge=1, le=5000)
@@ -288,7 +290,8 @@ class PrunerScopePatchHttpIn(PrunerScopePatchIn):
             and self.watched_tv_reported_enabled is None
             and self.watched_movies_reported_enabled is None
             and self.watched_movie_low_rating_reported_enabled is None
-            and self.watched_movie_low_rating_max_community_rating is None
+            and self.watched_movie_low_rating_max_jellyfin_emby_community_rating is None
+            and self.watched_movie_low_rating_max_plex_audience_rating is None
             and self.unwatched_movie_stale_reported_enabled is None
             and self.unwatched_movie_stale_min_age_days is None
             and self.preview_max_items is None
@@ -304,7 +307,8 @@ class PrunerScopePatchHttpIn(PrunerScopePatchIn):
             msg = (
                 "At least one of missing_primary_media_reported_enabled, never_played_stale_reported_enabled, "
                 "never_played_min_age_days, watched_tv_reported_enabled, watched_movies_reported_enabled, "
-                "watched_movie_low_rating_reported_enabled, watched_movie_low_rating_max_community_rating, "
+                "watched_movie_low_rating_reported_enabled, watched_movie_low_rating_max_jellyfin_emby_community_rating, "
+                "watched_movie_low_rating_max_plex_audience_rating, "
                 "unwatched_movie_stale_reported_enabled, unwatched_movie_stale_min_age_days, "
                 "preview_max_items, preview_include_genres, preview_include_people, preview_year_min, "
                 "preview_year_max, preview_include_studios, preview_include_collections, scheduled_preview_enabled, "

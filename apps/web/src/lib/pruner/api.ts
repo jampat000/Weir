@@ -9,7 +9,8 @@ export type PrunerScopeSummary = {
   watched_tv_reported_enabled: boolean;
   watched_movies_reported_enabled: boolean;
   watched_movie_low_rating_reported_enabled: boolean;
-  watched_movie_low_rating_max_community_rating: number;
+  watched_movie_low_rating_max_jellyfin_emby_community_rating: number;
+  watched_movie_low_rating_max_plex_audience_rating: number;
   unwatched_movie_stale_reported_enabled: boolean;
   unwatched_movie_stale_min_age_days: number;
   preview_max_items: number;
@@ -212,7 +213,8 @@ export async function patchPrunerScope(
     watched_tv_reported_enabled?: boolean;
     watched_movies_reported_enabled?: boolean;
     watched_movie_low_rating_reported_enabled?: boolean;
-    watched_movie_low_rating_max_community_rating?: number;
+    watched_movie_low_rating_max_jellyfin_emby_community_rating?: number;
+    watched_movie_low_rating_max_plex_audience_rating?: number;
     unwatched_movie_stale_reported_enabled?: boolean;
     unwatched_movie_stale_min_age_days?: number;
     preview_max_items?: number;

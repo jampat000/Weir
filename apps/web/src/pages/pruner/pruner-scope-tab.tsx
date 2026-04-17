@@ -111,7 +111,13 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
     setWatchedTvEnabled(scopeRow.watched_tv_reported_enabled);
     setWatchedMoviesEnabled(scopeRow.watched_movies_reported_enabled);
     setLowRatingEnabled(scopeRow.watched_movie_low_rating_reported_enabled);
-    setLowRatingMax(String(scopeRow.watched_movie_low_rating_max_community_rating));
+    setLowRatingMax(
+      String(
+        isPlex
+          ? scopeRow.watched_movie_low_rating_max_plex_audience_rating
+          : scopeRow.watched_movie_low_rating_max_jellyfin_emby_community_rating,
+      ),
+    );
     setUnwatchedStaleEnabled(scopeRow.unwatched_movie_stale_reported_enabled);
     setUnwatchedStaleDays(scopeRow.unwatched_movie_stale_min_age_days);
     setGenreText((scopeRow.preview_include_genres ?? []).join(", "));
@@ -128,7 +134,9 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
     scopeRow?.watched_tv_reported_enabled,
     scopeRow?.watched_movies_reported_enabled,
     scopeRow?.watched_movie_low_rating_reported_enabled,
-    scopeRow?.watched_movie_low_rating_max_community_rating,
+    scopeRow?.watched_movie_low_rating_max_jellyfin_emby_community_rating,
+    scopeRow?.watched_movie_low_rating_max_plex_audience_rating,
+    isPlex,
     scopeRow?.unwatched_movie_stale_reported_enabled,
     scopeRow?.unwatched_movie_stale_min_age_days,
     scopeRow?.preview_include_genres,
@@ -358,14 +366,16 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
       const cap = Math.max(0, Math.min(10, Number.parseFloat(lowRatingMax) || 4));
       await patchPrunerScope(instanceId, props.scope, {
         watched_movie_low_rating_reported_enabled: lowRatingEnabled,
-        watched_movie_low_rating_max_community_rating: cap,
+        ...(instance?.provider === "plex"
+          ? { watched_movie_low_rating_max_plex_audience_rating: cap }
+          : { watched_movie_low_rating_max_jellyfin_emby_community_rating: cap }),
         csrf_token,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       setLowRatingMsg(
         instance?.provider === "plex"
-          ? "Saved watched low-rating movies rule for this Movies tab (Plex: leaf audienceRating vs the same 0–10 ceiling)."
-          : "Saved watched low-rating movies rule for this Movies tab (Jellyfin/Emby CommunityRating 0–10 ceiling).",
+          ? "Saved watched low-rating movies rule for this Movies tab (Plex leaf audienceRating vs your saved Plex audienceRating ceiling, 0–10)."
+          : "Saved watched low-rating movies rule for this Movies tab (Jellyfin/Emby Items CommunityRating vs your saved CommunityRating ceiling, 0–10).",
       );
     } catch (e) {
       setErr((e as Error).message);
@@ -1046,8 +1056,8 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
           Watched / low-rating / unwatched stale movie previews on Plex use the same{" "}
           <code className="text-[0.85em]">allLeaves</code> token-scoped metadata as other Plex previews: watched means{" "}
           <code className="text-[0.85em]">viewCount</code> ≥ 1 or a positive <code className="text-[0.85em]">lastViewedAt</code>
-          ; low-rating compares your ceiling to leaf <code className="text-[0.85em]">audienceRating</code> (not
-          Jellyfin/Emby <code className="text-[0.85em]">CommunityRating</code>); stale unwatched uses library{" "}
+          ; low-rating compares your saved Plex audienceRating ceiling to leaf <code className="text-[0.85em]">audienceRating</code>{" "}
+          (not Jellyfin/Emby <code className="text-[0.85em]">CommunityRating</code>); stale unwatched uses library{" "}
           <code className="text-[0.85em]">addedAt</code> age, not <code className="text-[0.85em]">DateCreated</code>.
         </p>
       ) : null}
@@ -1132,17 +1142,17 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
                 {isPlex ? (
                   <>
                     Candidates are <strong>watched</strong> movie leaves (same watched test as watched movies above)
-                    whose Plex <strong>audienceRating</strong> is at or below your numeric ceiling. The ceiling field name
-                    matches Jellyfin/Emby settings, but Plex uses <code className="text-[0.85em]">audienceRating</code> on
-                    the leaf — <strong>not</strong> <code className="text-[0.85em]">CommunityRating</code>. Items with no
-                    numeric audience rating are skipped.
+                    whose Plex <strong>audienceRating</strong> is at or below the numeric ceiling you save for this server
+                    (stored as <code className="text-[0.85em]">watched_movie_low_rating_max_plex_audience_rating</code> — separate
+                    from the Jellyfin/Emby CommunityRating ceiling). Items with no numeric audience rating are skipped.
                   </>
                 ) : (
                   <>
                     Candidates are <strong>watched</strong> movie library items whose Jellyfin/Emby{" "}
-                    <strong>CommunityRating</strong> is at or below your ceiling. The server exposes that field on a{" "}
-                    <strong>0–10</strong> scale for this slice — MediaMop does not remap it to stars or another scale. Items
-                    with no rating are skipped. Genre and people filters narrow previews only (AND when both are set).
+                    <strong>CommunityRating</strong> is at or below the ceiling you save for this server (
+                    <code className="text-[0.85em]">watched_movie_low_rating_max_jellyfin_emby_community_rating</code>, 0–10 on
+                    that field). MediaMop does not remap it to stars or another scale. Items with no rating are skipped.
+                    Genre and people filters narrow previews only (AND when both are set).
                   </>
                 )}
               </p>
@@ -1159,8 +1169,8 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
                   </label>
                   <label className="flex flex-wrap items-center gap-2 text-sm text-[var(--mm-text2)]">
                     {isPlex
-                      ? "Max audienceRating ceiling (0–10 inclusive; Plex leaf field)"
-                      : "Max CommunityRating (0–10 inclusive)"}
+                      ? "Max audienceRating ceiling — Plex movie leaves (0–10 inclusive)"
+                      : "Max CommunityRating ceiling — Jellyfin/Emby Items (0–10 inclusive)"}
                     <input
                       type="number"
                       min={0}
@@ -1197,7 +1207,10 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
                 <p className="text-xs text-[var(--mm-text2)]">
                   Watched low-rating rule is{" "}
                   <strong>{scopeRow?.watched_movie_low_rating_reported_enabled ? "on" : "off"}</strong> (ceiling{" "}
-                  {scopeRow?.watched_movie_low_rating_max_community_rating}). Sign in as an operator to change it.
+                  {isPlex
+                    ? `${scopeRow?.watched_movie_low_rating_max_plex_audience_rating} audienceRating`
+                    : `${scopeRow?.watched_movie_low_rating_max_jellyfin_emby_community_rating} CommunityRating`}
+                  ). Sign in as an operator to change it.
                 </p>
               )}
             </div>

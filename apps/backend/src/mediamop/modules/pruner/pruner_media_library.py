@@ -607,7 +607,7 @@ def list_watched_movie_low_rating_candidates(
                     "title": it.get("Name") or "",
                     "year": it.get("ProductionYear"),
                     "community_rating": rating,
-                    "watched_movie_low_rating_max_community_rating": cap,
+                    "watched_movie_low_rating_max_jellyfin_emby_community_rating": cap,
                 },
             )
             if len(candidates) >= max_items:
@@ -899,7 +899,8 @@ def preview_payload_json(
     never_played_min_age_days: int | None = None,
     preview_include_genres: Sequence[str] | None = None,
     preview_include_people: Sequence[str] | None = None,
-    watched_movie_low_rating_max_community_rating: float | None = None,
+    watched_movie_low_rating_max_jellyfin_emby_community_rating: float | None = None,
+    watched_movie_low_rating_max_plex_audience_rating: float | None = None,
     unwatched_movie_stale_min_age_days: int | None = None,
     preview_year_min: int | None = None,
     preview_year_max: int | None = None,
@@ -950,14 +951,17 @@ def preview_payload_json(
                     [],
                     False,
                 )
-            if watched_movie_low_rating_max_community_rating is None:
-                msg = "watched_movie_low_rating_max_community_rating is required for watched_movie_low_rating_reported preview"
+            if watched_movie_low_rating_max_plex_audience_rating is None:
+                msg = (
+                    "watched_movie_low_rating_max_plex_audience_rating is required for "
+                    "watched_movie_low_rating_reported preview on Plex"
+                )
                 raise ValueError(msg)
             cands, trunc = list_plex_watched_movie_low_rating_candidates(
                 base_url=base_url,
                 auth_token=_require_plex_token(),
                 max_items=max_items,
-                audience_rating_max_inclusive=float(watched_movie_low_rating_max_community_rating),
+                audience_rating_max_inclusive=float(watched_movie_low_rating_max_plex_audience_rating),
                 preview_include_genres=preview_include_genres,
                 preview_include_people=preview_include_people,
                 preview_year_min=preview_year_min,
@@ -1090,15 +1094,18 @@ def preview_payload_json(
                 [],
                 False,
             )
-        if watched_movie_low_rating_max_community_rating is None:
-            msg = "watched_movie_low_rating_max_community_rating is required for watched_movie_low_rating_reported preview"
+        if watched_movie_low_rating_max_jellyfin_emby_community_rating is None:
+            msg = (
+                "watched_movie_low_rating_max_jellyfin_emby_community_rating is required for "
+                "watched_movie_low_rating_reported preview on Jellyfin/Emby"
+            )
             raise ValueError(msg)
         cands, trunc = list_watched_movie_low_rating_candidates(
             base_url=base_url,
             api_key=api_key,
             media_scope=media_scope,
             max_items=max_items,
-            community_rating_max_inclusive=float(watched_movie_low_rating_max_community_rating),
+            community_rating_max_inclusive=float(watched_movie_low_rating_max_jellyfin_emby_community_rating),
             preview_include_genres=preview_include_genres,
             preview_include_people=preview_include_people,
             preview_year_min=preview_year_min,

@@ -20,7 +20,8 @@ from mediamop.modules.pruner.pruner_constants import (
     RULE_FAMILY_WATCHED_TV_REPORTED,
     clamp_never_played_min_age_days,
     clamp_preview_year_bound,
-    clamp_watched_movie_low_rating_max_community_rating,
+    clamp_watched_movie_low_rating_max_jellyfin_emby_community_rating,
+    clamp_watched_movie_low_rating_max_plex_audience_rating,
     pruner_preview_rule_families_jf_emby,
 )
 from mediamop.modules.pruner.pruner_credentials_envelope import decrypt_and_parse_envelope
@@ -120,8 +121,11 @@ def make_pruner_candidate_removal_preview_handler(
             max_items = max(1, min(int(sc.preview_max_items), 5000))
             age_days = clamp_never_played_min_age_days(int(sc.never_played_min_age_days))
             unwatched_stale_days = clamp_never_played_min_age_days(int(sc.unwatched_movie_stale_min_age_days))
-            low_rating_max = clamp_watched_movie_low_rating_max_community_rating(
-                float(sc.watched_movie_low_rating_max_community_rating),
+            low_rating_jf = clamp_watched_movie_low_rating_max_jellyfin_emby_community_rating(
+                float(sc.watched_movie_low_rating_max_jellyfin_emby_community_rating),
+            )
+            low_rating_plex = clamp_watched_movie_low_rating_max_plex_audience_rating(
+                float(sc.watched_movie_low_rating_max_plex_audience_rating),
             )
             env = decrypt_and_parse_envelope(settings, inst.credentials_ciphertext)
             if env is None:
@@ -155,7 +159,10 @@ def make_pruner_candidate_removal_preview_handler(
                 never_played_min_age_days=age_days if rule_family_id == RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED else None,
                 preview_include_genres=preview_genres,
                 preview_include_people=preview_people,
-                watched_movie_low_rating_max_community_rating=low_rating_max
+                watched_movie_low_rating_max_jellyfin_emby_community_rating=low_rating_jf
+                if rule_family_id == RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED
+                else None,
+                watched_movie_low_rating_max_plex_audience_rating=low_rating_plex
                 if rule_family_id == RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED
                 else None,
                 unwatched_movie_stale_min_age_days=unwatched_stale_days

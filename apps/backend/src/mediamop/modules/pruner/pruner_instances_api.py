@@ -20,7 +20,8 @@ from mediamop.modules.pruner.pruner_constants import (
     clamp_never_played_min_age_days,
     clamp_preview_year_bound,
     clamp_pruner_scheduled_preview_interval_seconds,
-    clamp_watched_movie_low_rating_max_community_rating,
+    clamp_watched_movie_low_rating_max_jellyfin_emby_community_rating,
+    clamp_watched_movie_low_rating_max_plex_audience_rating,
 )
 from mediamop.modules.pruner.pruner_genre_filters import (
     preview_genre_filters_from_db_column,
@@ -96,8 +97,11 @@ def _scope_row_out(session: Session, row: PrunerScopeSettings) -> PrunerScopeSum
         watched_tv_reported_enabled=bool(row.watched_tv_reported_enabled),
         watched_movies_reported_enabled=bool(row.watched_movies_reported_enabled),
         watched_movie_low_rating_reported_enabled=bool(row.watched_movie_low_rating_reported_enabled),
-        watched_movie_low_rating_max_community_rating=clamp_watched_movie_low_rating_max_community_rating(
-            float(row.watched_movie_low_rating_max_community_rating),
+        watched_movie_low_rating_max_jellyfin_emby_community_rating=clamp_watched_movie_low_rating_max_jellyfin_emby_community_rating(
+            float(row.watched_movie_low_rating_max_jellyfin_emby_community_rating),
+        ),
+        watched_movie_low_rating_max_plex_audience_rating=clamp_watched_movie_low_rating_max_plex_audience_rating(
+            float(row.watched_movie_low_rating_max_plex_audience_rating),
         ),
         unwatched_movie_stale_reported_enabled=bool(row.unwatched_movie_stale_reported_enabled),
         unwatched_movie_stale_min_age_days=clamp_never_played_min_age_days(int(row.unwatched_movie_stale_min_age_days)),
@@ -291,9 +295,15 @@ def patch_pruner_scope(
         sc.watched_movies_reported_enabled = bool(body.watched_movies_reported_enabled)
     if body.watched_movie_low_rating_reported_enabled is not None:
         sc.watched_movie_low_rating_reported_enabled = bool(body.watched_movie_low_rating_reported_enabled)
-    if body.watched_movie_low_rating_max_community_rating is not None:
-        sc.watched_movie_low_rating_max_community_rating = clamp_watched_movie_low_rating_max_community_rating(
-            float(body.watched_movie_low_rating_max_community_rating),
+    if body.watched_movie_low_rating_max_jellyfin_emby_community_rating is not None:
+        sc.watched_movie_low_rating_max_jellyfin_emby_community_rating = (
+            clamp_watched_movie_low_rating_max_jellyfin_emby_community_rating(
+                float(body.watched_movie_low_rating_max_jellyfin_emby_community_rating),
+            )
+        )
+    if body.watched_movie_low_rating_max_plex_audience_rating is not None:
+        sc.watched_movie_low_rating_max_plex_audience_rating = clamp_watched_movie_low_rating_max_plex_audience_rating(
+            float(body.watched_movie_low_rating_max_plex_audience_rating),
         )
     if body.unwatched_movie_stale_reported_enabled is not None:
         sc.unwatched_movie_stale_reported_enabled = bool(body.unwatched_movie_stale_reported_enabled)

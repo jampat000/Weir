@@ -19,7 +19,7 @@ This document compares **current MediaMop Pruner** (this repo, `apps/backend/src
 | Per-server URL + secret | Emby URL + API key | Instance `base_url` + encrypted credentials envelope |
 | User-scoped play state | `UserData.Played` / rating on Items | Jellyfin/Emby: `UserData` / `IsPlayed`; Plex (movies): `viewCount` / `lastViewedAt` on `allLeaves` |
 | Watched movies removal | Candidate movies | `watched_movies_reported` preview → snapshot apply |
-| Low rating on watched movies | `UserData.Rating` vs threshold | JF/Emby: `CommunityRating`; Plex: `audienceRating` (same numeric ceiling field, **different** metadata) |
+| Low rating on watched movies | `UserData.Rating` vs threshold | JF/Emby: `CommunityRating` vs `watched_movie_low_rating_max_jellyfin_emby_community_rating`; Plex: `audienceRating` vs `watched_movie_low_rating_max_plex_audience_rating` (separate persisted ceilings) |
 | Unwatched + age | Unwatched + `days_since` from several date fields | JF/Emby: `DateCreated` + unplayed; Plex: `addedAt` + unwatched test on leaf |
 | Genre narrowing | Selected genre set | Per-scope `preview_include_genres` (exact token match; JF/Emby/Plex where implemented) |
 | People narrowing | Phrases + credit types, substring | Pruner: **full-name exact** match; JF/Emby `People`; Plex Role/Writer/Director tags |
@@ -43,7 +43,7 @@ This document compares **current MediaMop Pruner** (this repo, `apps/backend/src
 
 1. **Substring people matching** — too loose for safe library deletion; conflicts with Pruner’s explicit filter story.
 2. **Apply-from-live-rescan** — violates snapshot-only apply and skip-if-gone semantics.
-3. **Pretending Plex `audienceRating` is `CommunityRating`** — numeric ceiling reuse is OK for settings UX; labeling them the same field would be false.
+3. **Pretending Plex `audienceRating` is `CommunityRating`** — separate persisted ceilings and API fields keep the distinction honest.
 
 ## Where Pruner **supersedes** legacy behavior
 

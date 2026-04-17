@@ -7,8 +7,8 @@ Supported rule families (Movies scope only):
 
 * ``watched_movies_reported`` — ``viewCount`` >= 1 **or** positive ``lastViewedAt`` on the leaf (token-scoped).
 * ``watched_movie_low_rating_reported`` — same watched test, plus numeric ``audienceRating`` on the leaf at or below
-  the per-scope ceiling. **This is not** Jellyfin/Emby ``CommunityRating``; the same numeric setting is compared to
-  Plex ``audienceRating`` only. Leaves with no numeric ``audienceRating`` are skipped.
+  the per-scope ``watched_movie_low_rating_max_plex_audience_rating`` ceiling (persisted separately from the
+  Jellyfin/Emby ``CommunityRating`` ceiling). Leaves with no numeric ``audienceRating`` are skipped.
 * ``unwatched_movie_stale_reported`` — not watched by the watched test above, plus ``addedAt`` library age at or
   above the configured minimum. ``addedAt`` is interpreted as Unix epoch seconds; values above 10 billion are treated
   as milliseconds.
@@ -316,7 +316,7 @@ def list_plex_watched_movie_low_rating_candidates(
             "title": m.get("title") or "",
             "year": m.get("year"),
             "plex_audience_rating": ar,
-            "watched_movie_low_rating_max_community_rating": cap,
+            "watched_movie_low_rating_max_plex_audience_rating": cap,
         }
 
     return _plex_collect_movie_rows(

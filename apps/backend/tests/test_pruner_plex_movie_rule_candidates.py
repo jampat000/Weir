@@ -206,7 +206,8 @@ def test_preview_payload_plex_low_rating_rejects_tv_scope() -> None:
         secrets={"auth_token": "t"},
         max_items=10,
         rule_family_id=RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED,
-        watched_movie_low_rating_max_community_rating=4.0,
+        watched_movie_low_rating_max_jellyfin_emby_community_rating=4.0,
+        watched_movie_low_rating_max_plex_audience_rating=4.0,
     )
     assert out == "unsupported"
     assert "movies tab" in detail.lower()

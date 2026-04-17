@@ -128,7 +128,8 @@ def test_preview_payload_jellyfin_low_rating_requests_union_fields_and_filters()
             secrets={"api_key": "k"},
             max_items=50,
             rule_family_id=RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED,
-            watched_movie_low_rating_max_community_rating=4.0,
+            watched_movie_low_rating_max_jellyfin_emby_community_rating=4.0,
+            watched_movie_low_rating_max_plex_audience_rating=4.0,
             preview_include_genres=["drama"],
             preview_include_people=["pat"],
         )
@@ -137,6 +138,7 @@ def test_preview_payload_jellyfin_low_rating_requests_union_fields_and_filters()
     assert len(cands) == 1
     assert cands[0]["item_id"] == "m-low"
     assert cands[0]["community_rating"] == 3.0
+    assert cands[0]["watched_movie_low_rating_max_jellyfin_emby_community_rating"] == 4.0
 
 
 def test_preview_payload_jellyfin_unwatched_stale_uses_date_created() -> None:
@@ -182,6 +184,34 @@ def test_preview_payload_jellyfin_unwatched_stale_uses_date_created() -> None:
     assert cands[0]["item_id"] == "m-old"
 
 
+def test_preview_payload_jellyfin_low_rating_requires_jf_ceiling_param() -> None:
+    with pytest.raises(ValueError, match="watched_movie_low_rating_max_jellyfin_emby_community_rating"):
+        preview_payload_json(
+            provider="jellyfin",
+            base_url="http://jf.test",
+            media_scope=MEDIA_SCOPE_MOVIES,
+            secrets={"api_key": "k"},
+            max_items=10,
+            rule_family_id=RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED,
+            watched_movie_low_rating_max_jellyfin_emby_community_rating=None,
+            watched_movie_low_rating_max_plex_audience_rating=4.0,
+        )
+
+
+def test_preview_payload_plex_low_rating_requires_plex_ceiling_param() -> None:
+    with pytest.raises(ValueError, match="watched_movie_low_rating_max_plex_audience_rating"):
+        preview_payload_json(
+            provider="plex",
+            base_url="http://plex.test",
+            media_scope=MEDIA_SCOPE_MOVIES,
+            secrets={"auth_token": "t"},
+            max_items=10,
+            rule_family_id=RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED,
+            watched_movie_low_rating_max_jellyfin_emby_community_rating=4.0,
+            watched_movie_low_rating_max_plex_audience_rating=None,
+        )
+
+
 def test_preview_payload_tv_scope_low_rating_unsupported() -> None:
     out, detail, cands, trunc = preview_payload_json(
         provider="jellyfin",
@@ -190,7 +220,8 @@ def test_preview_payload_tv_scope_low_rating_unsupported() -> None:
         secrets={"api_key": "k"},
         max_items=10,
         rule_family_id=RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED,
-        watched_movie_low_rating_max_community_rating=5.0,
+        watched_movie_low_rating_max_jellyfin_emby_community_rating=5.0,
+        watched_movie_low_rating_max_plex_audience_rating=5.0,
     )
     assert out == "unsupported"
     assert "movies tab" in detail.lower()
@@ -229,11 +260,13 @@ def test_preview_payload_plex_low_rating_uses_audience_rating() -> None:
             secrets={"auth_token": "t"},
             max_items=10,
             rule_family_id=RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED,
-            watched_movie_low_rating_max_community_rating=4.0,
+            watched_movie_low_rating_max_jellyfin_emby_community_rating=4.0,
+            watched_movie_low_rating_max_plex_audience_rating=4.0,
         )
     assert out == "success" and detail == ""
     assert len(cands) == 1 and cands[0]["item_id"] == "z"
     assert cands[0]["plex_audience_rating"] == 3.0
+    assert cands[0]["watched_movie_low_rating_max_plex_audience_rating"] == 4.0
     assert not trunc
 
 
@@ -296,7 +329,7 @@ def test_patch_pruner_scope_persists_low_rating_and_unwatched_stale_fields(
         f"/api/v1/pruner/instances/{iid}/scopes/movies",
         json={
             "watched_movie_low_rating_reported_enabled": True,
-            "watched_movie_low_rating_max_community_rating": 3.5,
+            "watched_movie_low_rating_max_jellyfin_emby_community_rating": 3.5,
             "unwatched_movie_stale_reported_enabled": True,
             "unwatched_movie_stale_min_age_days": 120,
             "csrf_token": tok,
@@ -306,9 +339,25 @@ def test_patch_pruner_scope_persists_low_rating_and_unwatched_stale_fields(
     assert r1.status_code == 200, r1.text
     body = r1.json()
     assert body["watched_movie_low_rating_reported_enabled"] is True
-    assert body["watched_movie_low_rating_max_community_rating"] == 3.5
+    assert body["watched_movie_low_rating_max_jellyfin_emby_community_rating"] == 3.5
+    assert body["watched_movie_low_rating_max_plex_audience_rating"] == 4.0
     assert body["unwatched_movie_stale_reported_enabled"] is True
     assert body["unwatched_movie_stale_min_age_days"] == 120
+
+    tok = fetch_csrf(client_with_admin)
+    r2 = auth_patch(
+        client_with_admin,
+        f"/api/v1/pruner/instances/{iid}/scopes/movies",
+        json={
+            "watched_movie_low_rating_max_plex_audience_rating": 2.25,
+            "csrf_token": tok,
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    assert r2.status_code == 200, r2.text
+    body2 = r2.json()
+    assert body2["watched_movie_low_rating_max_jellyfin_emby_community_rating"] == 3.5
+    assert body2["watched_movie_low_rating_max_plex_audience_rating"] == 2.25
 
 
 def test_apply_jellyfin_low_rating_movies_skips_404(

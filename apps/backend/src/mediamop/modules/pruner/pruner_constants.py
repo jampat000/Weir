@@ -26,7 +26,8 @@ PRUNER_NEVER_PLAYED_MIN_AGE_DAYS_MAX = 3650
 # Jellyfin/Emby ``CommunityRating`` on library Items (0–10 inclusive on that field for this product slice).
 PRUNER_WATCHED_MOVIE_LOW_RATING_COMMUNITY_MIN = 0.0
 PRUNER_WATCHED_MOVIE_LOW_RATING_COMMUNITY_MAX = 10.0
-PRUNER_DEFAULT_WATCHED_MOVIE_LOW_RATING_MAX_COMMUNITY = 4.0
+PRUNER_DEFAULT_WATCHED_MOVIE_LOW_RATING_MAX_JF_EMBY_COMMUNITY = 4.0
+PRUNER_DEFAULT_WATCHED_MOVIE_LOW_RATING_MAX_PLEX_AUDIENCE = 4.0
 
 # Legacy confirmation phrase for the retired Plex live-removal POST body (still returned read-only by eligibility).
 PRUNER_PLEX_LIVE_CONFIRMATION_PHRASE = "PLEX BROKEN LIBRARY LIVE CONFIRM"
@@ -60,13 +61,23 @@ def clamp_never_played_min_age_days(raw: int) -> int:
     )
 
 
-def clamp_watched_movie_low_rating_max_community_rating(raw: float) -> float:
-    """Clamp per-scope ceiling for ``CommunityRating`` (Jellyfin/Emby Items, 0–10 on that field)."""
-
+def _clamp_watched_movie_low_rating_numeric_ceiling_0_10(raw: float) -> float:
     return max(
         PRUNER_WATCHED_MOVIE_LOW_RATING_COMMUNITY_MIN,
         min(PRUNER_WATCHED_MOVIE_LOW_RATING_COMMUNITY_MAX, float(raw)),
     )
+
+
+def clamp_watched_movie_low_rating_max_jellyfin_emby_community_rating(raw: float) -> float:
+    """Clamp per-scope ceiling for Jellyfin/Emby Items ``CommunityRating`` (0–10 on that field)."""
+
+    return _clamp_watched_movie_low_rating_numeric_ceiling_0_10(raw)
+
+
+def clamp_watched_movie_low_rating_max_plex_audience_rating(raw: float) -> float:
+    """Clamp per-scope ceiling for Plex movie leaf ``audienceRating`` (0–10 numeric in this slice)."""
+
+    return _clamp_watched_movie_low_rating_numeric_ceiling_0_10(raw)
 
 
 def pruner_apply_operator_label(rule_family_id: str) -> str:
