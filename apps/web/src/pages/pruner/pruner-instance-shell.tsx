@@ -10,7 +10,7 @@ export function PrunerInstanceShell() {
   if (!Number.isFinite(id) || id <= 0) {
     return (
       <div className="mm-page">
-        <p className="text-sm text-red-600">Invalid instance id.</p>
+        <p className="text-sm text-red-600">This server link is not valid.</p>
       </div>
     );
   }
@@ -26,12 +26,12 @@ export function PrunerInstanceShell() {
           <>
             <h1 className="mm-page__title">Pruner — {q.data.display_name}</h1>
             <p className="mm-page__subtitle max-w-3xl">
-              Pruner is a provider tool for Emby, Jellyfin, and Plex. This workspace is for{" "}
+              Pruner helps clean up Emby, Jellyfin, and Plex libraries. This page is for{" "}
               <strong className="text-[var(--mm-text)]">one</strong>{" "}
               <strong className="text-[var(--mm-text)]">{q.data.provider}</strong> server (
-              <span className="font-mono text-[0.9em]">{q.data.base_url}</span>). Use{" "}
+              <span className="font-mono text-[0.9em]">{q.data.base_url}</span>). Use the{" "}
               <strong className="text-[var(--mm-text)]">Movies</strong> and <strong className="text-[var(--mm-text)]">TV</strong>{" "}
-              tabs for per-scope rules, previews, and apply — settings do not cross instances or providers.
+              tabs for rules, scans, and deletes — nothing is shared between servers or between providers.
             </p>
           </>
         ) : null}
@@ -44,7 +44,7 @@ export function PrunerInstanceShell() {
 
       <nav
         className="mt-3 flex flex-wrap gap-2.5 border-b border-[var(--mm-border)] pb-3.5 sm:mt-4"
-        aria-label="Pruner instance sections"
+        aria-label="Pruner server sections"
         data-testid="pruner-instance-section-tabs"
       >
         <NavLink to={`${base}/overview`} className={({ isActive }) => fetcherSectionTabClass(isActive)} end>

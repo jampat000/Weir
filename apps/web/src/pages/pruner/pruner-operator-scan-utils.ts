@@ -21,19 +21,19 @@ function sleep(ms: number): Promise<void> {
 export function ruleFamilyOperatorLabel(ruleFamilyId: string): string {
   switch (ruleFamilyId) {
     case RULE_FAMILY_WATCHED_TV_REPORTED:
-      return "Watched TV removal";
+      return "Delete TV episodes you have already watched";
     case RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED:
-      return "Never-played stale";
+      return "Delete TV or movies that have never been played and are older than the age you set";
     case RULE_FAMILY_WATCHED_MOVIES_REPORTED:
-      return "Watched movies removal";
+      return "Delete movies you have already watched";
     case RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED:
-      return "Low-rating watched movies";
+      return "Delete watched movies rated below your chosen score";
     case RULE_FAMILY_UNWATCHED_MOVIE_STALE_REPORTED:
-      return "Unwatched stale movies";
+      return "Delete movies you have not watched that are older than the age you set";
     case RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED:
-      return "Missing primary artwork";
+      return "Delete items missing a main poster or episode image";
     default:
-      return ruleFamilyId;
+      return "This cleanup type";
   }
 }
 

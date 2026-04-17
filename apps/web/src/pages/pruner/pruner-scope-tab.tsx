@@ -22,6 +22,7 @@ import {
 import type { PrunerServerInstance } from "../../lib/pruner/api";
 import { FetcherEnableSwitch } from "../fetcher/fetcher-enable-switch";
 import { fetcherMenuButtonClass } from "../fetcher/fetcher-menu-button";
+import { PrunerGenreMultiSelect, prunerGenresFromApi } from "./pruner-genre-multi-select";
 import { formatPrunerDateTime, previewRunRowCaption } from "./pruner-ui-utils";
 
 type Ctx = { instanceId: number; instance: PrunerServerInstance | undefined };
@@ -70,7 +71,7 @@ export function PrunerScopeTab(props: {
   const [unwatchedStaleEnabled, setUnwatchedStaleEnabled] = useState(false);
   const [unwatchedStaleDays, setUnwatchedStaleDays] = useState(90);
   const [unwatchedStaleMsg, setUnwatchedStaleMsg] = useState<string | null>(null);
-  const [genreText, setGenreText] = useState("");
+  const [genreSelection, setGenreSelection] = useState<string[]>([]);
   const [genreMsg, setGenreMsg] = useState<string | null>(null);
   const [peopleText, setPeopleText] = useState("");
   const [peopleMsg, setPeopleMsg] = useState<string | null>(null);
@@ -94,18 +95,18 @@ export function PrunerScopeTab(props: {
   const showInteractiveControls = canOperate || Boolean(props.disabledMode);
 
   const scopeRow = instance?.scopes.find((s) => s.media_scope === props.scope);
-  const label = props.scope === "tv" ? "TV (episodes)" : "Movies (one row per movie item)";
+  const label = props.scope === "tv" ? "TV shows" : "Movies";
   const isPlex = instance?.provider === "plex";
-  const sectionWord = isProvider ? "scope" : "tab";
+  const libraryTabPhrase = props.scope === "tv" ? "TV tab" : "Movies tab";
 
   function ruleFamilyColumnLabel(id: string): string {
-    if (id === RULE_FAMILY_WATCHED_TV_REPORTED) return "Watched TV (episodes)";
-    if (id === RULE_FAMILY_WATCHED_MOVIES_REPORTED) return "Watched movies";
-    if (id === RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED) return "Watched low-rating movies";
-    if (id === RULE_FAMILY_UNWATCHED_MOVIE_STALE_REPORTED) return "Unwatched stale movies";
-    if (id === RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED) return "Stale never-played";
-    if (id === RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED) return "Missing primary art";
-    return id;
+    if (id === RULE_FAMILY_WATCHED_TV_REPORTED) return "Delete watched TV episodes";
+    if (id === RULE_FAMILY_WATCHED_MOVIES_REPORTED) return "Delete watched movies";
+    if (id === RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED) return "Delete watched movies below your score";
+    if (id === RULE_FAMILY_UNWATCHED_MOVIE_STALE_REPORTED) return "Delete unwatched movies older than your age setting";
+    if (id === RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED) return "Delete never-started TV or movies older than your age setting";
+    if (id === RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED) return "Delete items missing a main poster or episode image";
+    return "This cleanup type";
   }
 
   const previewRunsQueryKey = ["pruner", "preview-runs", instanceId, props.scope] as const;
@@ -144,7 +145,7 @@ export function PrunerScopeTab(props: {
     );
     setUnwatchedStaleEnabled(scopeRow.unwatched_movie_stale_reported_enabled);
     setUnwatchedStaleDays(scopeRow.unwatched_movie_stale_min_age_days);
-    setGenreText((scopeRow.preview_include_genres ?? []).join(", "));
+    setGenreSelection(prunerGenresFromApi(scopeRow.preview_include_genres));
     setPeopleText((scopeRow.preview_include_people ?? []).join(", "));
     setYearMinStr(scopeRow.preview_year_min != null ? String(scopeRow.preview_year_min) : "");
     setYearMaxStr(scopeRow.preview_year_max != null ? String(scopeRow.preview_year_max) : "");
@@ -208,9 +209,7 @@ export function PrunerScopeTab(props: {
         csrf_token,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
-      setSchedMsg(
-        `Saved. This schedule applies only to this server and this ${sectionWord} (TV or Movies).`,
-      );
+      setSchedMsg(`Saved. Automatic scans use this server’s ${libraryTabPhrase} only.`);
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -230,7 +229,7 @@ export function PrunerScopeTab(props: {
         csrf_token,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
-      setPreviewMaxItemsMsg("Saved preview cap for this scope.");
+      setPreviewMaxItemsMsg("Saved how many items each scan may check on this tab.");
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -251,7 +250,7 @@ export function PrunerScopeTab(props: {
         csrf_token,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
-      setStaleNeverMsg("Saved never-played rule settings for this scope.");
+      setStaleNeverMsg("Saved never-watched TV and movie age settings for this tab.");
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -265,10 +264,7 @@ export function PrunerScopeTab(props: {
     setBusy(true);
     try {
       const csrf_token = await fetchCsrfToken();
-      const tokens = genreText
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const tokens = [...genreSelection];
       await patchPrunerScope(instanceId, props.scope, {
         preview_include_genres: tokens,
         csrf_token,
@@ -276,8 +272,8 @@ export function PrunerScopeTab(props: {
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       setGenreMsg(
         tokens.length
-          ? "Saved genre filters for this scope."
-          : "Cleared genre filters for this scope.",
+          ? "Saved your genre picks for this tab."
+          : "Cleared genre picks — all genres will be included in scans.",
       );
     } catch (e) {
       setErr((e as Error).message);
@@ -303,8 +299,8 @@ export function PrunerScopeTab(props: {
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       setPeopleMsg(
         tokens.length
-          ? "Saved people filters for this scope."
-          : "Cleared people filters for this scope.",
+          ? "Saved name filters for this tab."
+          : "Cleared name filters for this tab.",
       );
     } catch (e) {
       setErr((e as Error).message);
@@ -342,9 +338,7 @@ export function PrunerScopeTab(props: {
         csrf_token,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
-      setYearMsg(
-        "Saved preview year bounds for this scope.",
-      );
+      setYearMsg("Saved release year limits for this tab.");
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -369,8 +363,8 @@ export function PrunerScopeTab(props: {
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       setStudioMsg(
         tokens.length
-          ? "Saved studio filters for this scope."
-          : "Cleared studio filters for this scope.",
+          ? "Saved studio filters for this tab."
+          : "Cleared studio filters for this tab.",
       );
     } catch (e) {
       setErr((e as Error).message);
@@ -396,8 +390,8 @@ export function PrunerScopeTab(props: {
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       setCollectionMsg(
         tokens.length
-          ? "Saved collection filters for this scope."
-          : "Cleared collection filters for this scope.",
+          ? "Saved collection filters for this tab."
+          : "Cleared collection filters for this tab.",
       );
     } catch (e) {
       setErr((e as Error).message);
@@ -417,7 +411,7 @@ export function PrunerScopeTab(props: {
         csrf_token,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
-      setWatchedMoviesMsg("Saved watched movies rule for this scope.");
+      setWatchedMoviesMsg("Saved watched-movie cleanup setting for this tab.");
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -442,8 +436,8 @@ export function PrunerScopeTab(props: {
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       setLowRatingMsg(
         instance?.provider === "plex"
-          ? "Saved watched low-rating rule (Plex audienceRating ceiling)."
-          : "Saved watched low-rating rule (CommunityRating ceiling).",
+          ? "Saved low-score watched-movie setting (Plex audience rating)."
+          : "Saved low-score watched-movie setting (server community rating).",
       );
     } catch (e) {
       setErr((e as Error).message);
@@ -467,8 +461,8 @@ export function PrunerScopeTab(props: {
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       setUnwatchedStaleMsg(
         instance?.provider === "plex"
-          ? "Saved unwatched stale movies rule for this scope (Plex addedAt age)."
-          : "Saved unwatched stale movies rule for this scope (DateCreated age).",
+          ? "Saved old unwatched movie setting (uses when Plex says the title was added)."
+          : "Saved old unwatched movie setting (uses when the server says the title was created).",
       );
     } catch (e) {
       setErr((e as Error).message);
@@ -488,7 +482,7 @@ export function PrunerScopeTab(props: {
         csrf_token,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
-      setWatchedTvMsg("Saved watched TV rule for this scope.");
+      setWatchedTvMsg("Saved watched-TV cleanup setting for this tab.");
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -501,12 +495,10 @@ export function PrunerScopeTab(props: {
     setBusy(true);
     setPreview(null);
     try {
-      const { pruner_job_id } = await postPrunerPreview(instanceId, props.scope);
+      await postPrunerPreview(instanceId, props.scope);
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       await qc.invalidateQueries({ queryKey: previewRunsQueryKey });
-      setPreview(
-        `Queued missing-primary preview job #${pruner_job_id}. When the worker finishes, the summary above and the recent-run table update automatically (this scope only).`,
-      );
+      setPreview("Scan for broken posters and images started. The table below updates when results are ready.");
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -519,14 +511,12 @@ export function PrunerScopeTab(props: {
     setBusy(true);
     setPreview(null);
     try {
-      const { pruner_job_id } = await postPrunerPreview(instanceId, props.scope, {
+      await postPrunerPreview(instanceId, props.scope, {
         rule_family_id: RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       await qc.invalidateQueries({ queryKey: previewRunsQueryKey });
-      setPreview(
-        `Queued never-played stale preview job #${pruner_job_id}. When the worker finishes, the table below updates (this scope only).`,
-      );
+      setPreview("Scan for unwatched TV or movies older than your setting started. The table below updates when ready.");
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -539,14 +529,12 @@ export function PrunerScopeTab(props: {
     setBusy(true);
     setPreview(null);
     try {
-      const { pruner_job_id } = await postPrunerPreview(instanceId, props.scope, {
+      await postPrunerPreview(instanceId, props.scope, {
         rule_family_id: RULE_FAMILY_WATCHED_MOVIES_REPORTED,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       await qc.invalidateQueries({ queryKey: previewRunsQueryKey });
-      setPreview(
-        `Queued watched movies preview job #${pruner_job_id}. When the worker finishes, the table below updates (this Movies tab and instance only).`,
-      );
+      setPreview("Scan for watched movies started. The table below updates when ready.");
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -559,14 +547,12 @@ export function PrunerScopeTab(props: {
     setBusy(true);
     setPreview(null);
     try {
-      const { pruner_job_id } = await postPrunerPreview(instanceId, props.scope, {
+      await postPrunerPreview(instanceId, props.scope, {
         rule_family_id: RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       await qc.invalidateQueries({ queryKey: previewRunsQueryKey });
-      setPreview(
-        `Queued watched low-rating movies preview job #${pruner_job_id}. When the worker finishes, the table below updates (this Movies tab and instance only).`,
-      );
+      setPreview("Scan for low-score watched movies started. The table below updates when ready.");
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -579,14 +565,12 @@ export function PrunerScopeTab(props: {
     setBusy(true);
     setPreview(null);
     try {
-      const { pruner_job_id } = await postPrunerPreview(instanceId, props.scope, {
+      await postPrunerPreview(instanceId, props.scope, {
         rule_family_id: RULE_FAMILY_UNWATCHED_MOVIE_STALE_REPORTED,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       await qc.invalidateQueries({ queryKey: previewRunsQueryKey });
-      setPreview(
-        `Queued unwatched stale movies preview job #${pruner_job_id}. When the worker finishes, the table below updates (this Movies tab and instance only).`,
-      );
+      setPreview("Scan for old unwatched movies started. The table below updates when ready.");
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -599,14 +583,12 @@ export function PrunerScopeTab(props: {
     setBusy(true);
     setPreview(null);
     try {
-      const { pruner_job_id } = await postPrunerPreview(instanceId, props.scope, {
+      await postPrunerPreview(instanceId, props.scope, {
         rule_family_id: RULE_FAMILY_WATCHED_TV_REPORTED,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       await qc.invalidateQueries({ queryKey: previewRunsQueryKey });
-      setPreview(
-        `Queued watched TV preview job #${pruner_job_id}. When the worker finishes, the table below updates (this TV tab and instance only).`,
-      );
+      setPreview("Scan for watched TV shows started. The table below updates when ready.");
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -634,13 +616,11 @@ export function PrunerScopeTab(props: {
     setErr(null);
     setBusy(true);
     try {
-      const { pruner_job_id } = await postPrunerApplyFromPreview(instanceId, props.scope, runId);
+      await postPrunerApplyFromPreview(instanceId, props.scope, runId);
       await qc.invalidateQueries({ queryKey: previewRunsQueryKey });
       await qc.invalidateQueries({ queryKey: ["activity"] });
       closeApplyModal();
-      setPreview(
-        `Queued ${opLabel.toLowerCase()} job #${pruner_job_id} for preview snapshot ${runId.slice(0, 8)}… (this preview only; worker runs separately).`,
-      );
+      setPreview(`Deletion started (${opLabel}). Check Activity for removed, skipped, and failed counts.`);
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -651,7 +631,7 @@ export function PrunerScopeTab(props: {
   async function loadJsonFor(runUuid?: string | null) {
     const uuid = runUuid ?? scopeRow?.last_preview_run_uuid;
     if (!uuid) {
-      setErr("No preview run selected.");
+      setErr("Pick a finished scan from the history table first.");
       return;
     }
     setErr(null);
@@ -733,10 +713,7 @@ export function PrunerScopeTab(props: {
     setBusy(true);
     try {
       const csrf_token = await fetchCsrfToken();
-      const genreTokens = genreText
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const genreTokens = [...genreSelection];
       const peopleTokens = scopeRow?.preview_include_people ?? [];
       const studioTokens = studioText
         .split(",")
@@ -963,22 +940,20 @@ export function PrunerScopeTab(props: {
           </p>
         ) : null}
         <div className="space-y-2" data-testid="pruner-genre-filters-panel">
-          <p className="text-sm font-medium text-[var(--mm-text1)]">Genre</p>
+          <p className="text-sm font-medium text-[var(--mm-text1)]">Genres</p>
           {showInteractiveControls ? (
-            <input
-              type="text"
-              className="mm-input w-full"
-              placeholder="e.g. Drama, Science Fiction"
-              value={genreText}
+            <PrunerGenreMultiSelect
+              value={genreSelection}
+              onChange={setGenreSelection}
               disabled={busy}
-              onChange={(e) => setGenreText(e.target.value)}
+              testId={`pruner-genre-multiselect-provider-${instanceId}-${props.scope}`}
             />
           ) : (
             <p className="text-xs text-[var(--mm-text2)]">
               {(scopeRow?.preview_include_genres ?? []).join(", ") || "—"}
             </p>
           )}
-          <p className="text-xs text-[var(--mm-text3)]">Leave blank to include all genres.</p>
+          <p className="text-xs text-[var(--mm-text3)]">Leave none selected to include every genre.</p>
         </div>
         <div className="space-y-2" data-testid="pruner-year-filters-panel">
           <p className="text-sm font-medium text-[var(--mm-text1)]">Year range</p>
@@ -1157,8 +1132,8 @@ export function PrunerScopeTab(props: {
 
   if (isProvider && !provSub) {
     return (
-      <p className="text-sm text-red-600" role="alert" data-testid="pruner-provider-subsection-missing">
-        Provider configuration is missing an internal subsection id.
+        <p className="text-sm text-red-600" role="alert" data-testid="pruner-provider-subsection-missing">
+        Something is misconfigured. Try reloading the page or opening the provider tab again.
       </p>
     );
   }
@@ -1180,22 +1155,22 @@ export function PrunerScopeTab(props: {
       )}
       {props.disabledMode && !isProvider ? (
         <p className="rounded-md border border-dashed border-[var(--mm-border)] bg-[var(--mm-surface2)]/35 px-3 py-2 text-xs text-[var(--mm-text2)]">
-          Save this provider connection first to activate these controls.
+          Save this server on the Connection tab first to turn on these controls.
         </p>
       ) : null}
       <div
         className="space-y-2 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text)]"
         data-testid="pruner-run-limits-panel"
       >
-        <p className="text-sm font-semibold text-[var(--mm-text)]">Run limits</p>
+        <p className="text-sm font-semibold text-[var(--mm-text)]">How many items each scan may check</p>
         <p className="text-xs text-[var(--mm-text2)]" data-testid="pruner-delete-cap-note">
-          Preview cap is configurable. Per-scope apply/delete cap is not exposed in the Pruner API — apply uses the frozen
-          snapshot only.
+          This limit only affects how many rows MediaMop lists for you to review. Deleting still uses exactly the list you
+          confirmed, not a fresh scan.
         </p>
         {showInteractiveControls ? (
           <div className="flex flex-wrap items-center gap-2">
             <label className="text-xs text-[var(--mm-text2)]">
-              Preview cap per run (1–5000)
+              Max items per scan (1–5000)
               <input
                 type="number"
                 min={1}
@@ -1218,7 +1193,7 @@ export function PrunerScopeTab(props: {
           </div>
         ) : (
           <p className="text-xs text-[var(--mm-text2)]">
-            Preview cap: <strong>{scopeRow?.preview_max_items ?? "—"}</strong>. Sign in as an operator to edit.
+            Max items per scan: <strong>{scopeRow?.preview_max_items ?? "—"}</strong>. Sign in as an operator to edit.
           </p>
         )}
       </div>
@@ -1226,45 +1201,31 @@ export function PrunerScopeTab(props: {
         className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-surface2)]/40 px-4 py-3 text-xs text-[var(--mm-text2)] sm:text-sm"
         data-testid="pruner-scope-trust-banner"
       >
-        <p>
-          Preview saves a snapshot. Apply uses the selected snapshot only.
-        </p>
+        <p>Each scan saves a fixed list you can review. Deleting uses only that saved list, not a new pass over the library.</p>
       </div>
       {!isProvider && !isPlex ? (
         <p className="text-sm text-[var(--mm-text2)]">
           {props.scope === "tv"
-            ? "Previews list episodes missing a primary image (episode-level rows only), or episodes that are unplayed for the MediaMop token and older than your age threshold by library DateCreated — each rule has its own preview queue."
-            : "Previews list movie items missing a primary image (one row per movie), movies the server marks watched for the MediaMop token, or movies that are unplayed and older than your age threshold by library DateCreated — each rule has its own preview queue."}
+            ? "Scans can list episodes missing a main image, or episodes never played for your MediaMop user that are older than the age you set. Each cleanup type has its own button above."
+            : "Scans can list movies missing a main poster, movies marked watched for your MediaMop user, or movies never watched and older than the age you set. Each cleanup type has its own button above."}
         </p>
       ) : !isProvider ? (
         <p className="text-sm text-[var(--mm-text2)]">
-          For <strong>Remove broken library entries</strong>, Plex uses the same{" "}
-          <strong>preview → inspect JSON → apply</strong> flow as Jellyfin and Emby on this tab. Missing-primary preview
-          lists movie or episode leaves where the item JSON has an empty or missing <code className="text-[0.85em]">thumb</code>{" "}
-          — that is <strong>not</strong> the same signal as Jellyfin/Emby primary-image probes. On the{" "}
-          <strong>Movies</strong> tab, Plex also supports watched movies, watched low-rating movies (leaf{" "}
-          <code className="text-[0.85em]">audienceRating</code>), and unwatched stale movies (leaf{" "}
-          <code className="text-[0.85em]">addedAt</code> age), all via the same <code className="text-[0.85em]">allLeaves</code>{" "}
-          read with your token — no separate account API. Apply only touches the frozen{" "}
-          <code className="text-[0.85em]">ratingKey</code> values from the snapshot; if an entry is already gone, the job
-          counts it as skipped. MediaMop does not claim whether Plex removes only metadata or also media files — that
-          depends on your Plex server.
+          On Plex, scans read the same on-server details as Jellyfin and Emby: broken posters look for missing episode or
+          movie art. Movie scans can also find watched titles, low audience scores, and old unwatched titles. Deleting
+          only touches the exact titles from the list you reviewed; items already gone are counted as skipped. Whether
+          Plex removes files or only metadata depends on your Plex server.
         </p>
       ) : null}
       {isProvider ? (
         <p className="text-xs text-[var(--mm-text2)]">
-          Queue preview, inspect JSON, then apply from the latest snapshot.
+          Run a scan, review the list or raw details, then delete from that list if you choose.
         </p>
       ) : null}
       {isPlex && scopeRow && !isProvider ? (
         <p className="text-xs text-[var(--mm-text2)]" data-testid="pruner-plex-preview-cap-note">
-          Missing-primary Plex previews collect at most{" "}
-          <strong>
-            min(per-tab item cap {scopeRow.preview_max_items}, MEDIAMOP_PRUNER_PLEX_LIVE_ABS_MAX_ITEMS)
-          </strong>{" "}
-          matching leaves per run (also clamped to 5000 like other preview kinds). Successful preview activity includes{" "}
-          <code className="text-[0.85em]">plex_missing_primary_item_cap</code> and a short cap note. When a run shows
-          &quot;truncated&quot;, Plex had more matches than that cap — the snapshot is never silently widened.
+          Plex stops each scan at the smaller of your per-tab item limit and a built-in safety cap. If a scan says the
+          list was shortened, there were more matches than MediaMop showed this time.
         </p>
       ) : null}
       {isPlex && props.scope === "tv" && isProvider ? (
@@ -1303,15 +1264,14 @@ export function PrunerScopeTab(props: {
       ) : null}
       <div>
         <h3 className="text-base font-semibold text-[var(--mm-text)]" data-testid="pruner-filters-section-heading">
-          Preview narrowing filters
+          Optional filters for scans
         </h3>
         <p className="text-xs text-[var(--mm-text2)]">
-          Filters affect preview collection in this {sectionWord} only.
+          Filters affect scan results on this {libraryTabPhrase} only.
         </p>
         {isPlex && props.scope === "tv" && isProvider ? (
           <p className="mt-1 text-xs text-amber-100/90" data-testid="pruner-plex-tv-filters-scope-note" role="status">
-            On Plex TV, genre, people, year, and studio filters apply to the <strong>missing primary art</strong> preview
-            rule only.
+            On Plex TV, genre, people, year, and studio filters only affect scans for broken posters and images.
           </p>
         ) : null}
       </div>
@@ -1321,28 +1281,25 @@ export function PrunerScopeTab(props: {
           data-testid="pruner-genre-filters-panel"
         >
           <p className="text-sm font-semibold text-[var(--mm-text)]">
-            Optional preview genre include (this {sectionWord} only)
+            Optional genres (this {libraryTabPhrase} only)
           </p>
-          <p className="text-xs text-[var(--mm-text2)]">Comma-separated genres.</p>
+          <p className="text-xs text-[var(--mm-text2)]">Pick from the list below; leave none selected to include every genre.</p>
           {isPlex && !isProvider ? (
             <p
               className="text-xs text-amber-100/90"
               data-testid="pruner-plex-genre-empty-preview-note"
             >
-              If a preview finishes successfully with <strong>zero rows</strong> while filters are set, that usually
-              means nothing in this pass matched the rule under those genres — not that Plex reports nothing to clean.
-              Matching uses Genre tags on each <code className="text-[0.85em]">allLeaves</code> leaf only.
+              If a scan finishes with <strong>nothing listed</strong> while genres are selected, nothing in this pass
+              matched both the rule and those genres — it does not prove your library is already clean.
             </p>
           ) : null}
           {showInteractiveControls ? (
             <div className="space-y-2">
-              <input
-                type="text"
-                className="w-full rounded border border-[var(--mm-border)] bg-[var(--mm-surface2)] px-2 py-1 text-sm text-[var(--mm-text)]"
-                placeholder="e.g. Drama, Science Fiction"
-                value={genreText}
+              <PrunerGenreMultiSelect
+                value={genreSelection}
+                onChange={setGenreSelection}
                 disabled={busy}
-                onChange={(e) => setGenreText(e.target.value)}
+                testId={`pruner-genre-multiselect-${instanceId}-${props.scope}`}
               />
               <button
                 type="button"
@@ -1369,19 +1326,17 @@ export function PrunerScopeTab(props: {
           data-testid="pruner-people-filters-panel"
         >
           <p className="text-sm font-semibold text-[var(--mm-text)]">
-            Optional preview people include (this {sectionWord} only)
+            Optional cast and crew names (this {libraryTabPhrase} only)
           </p>
           <p className="text-xs text-[var(--mm-text2)]">Comma-separated full names.</p>
           {isPlex && props.scope === "tv" && isProvider ? null : isPlex && !isProvider ? (
             <p className="text-xs text-[var(--mm-text2)]" data-testid="pruner-people-plex-note">
-              Plex: applies to previews that read <code className="text-[0.85em]">allLeaves</code> on this scope (missing
-              primary art, watched movies, low-rating, unwatched stale). Names come from <strong>Role</strong>,{" "}
-              <strong>Writer</strong>, and <strong>Director</strong> tag strings on each leaf (no separate metadata fetch).
+              Plex: names apply to broken-poster scans plus the movie scans above. They come from cast, writer, and
+              director lines on each title.
             </p>
           ) : !isProvider ? (
             <p className="text-xs text-[var(--mm-text2)]" data-testid="pruner-people-jf-emby-note">
-              Jellyfin / Emby: uses each item&apos;s <strong>People</strong> list from the Items API when filters are
-              saved (MediaMop requests explicit Fields). Applies to every preview rule on this scope.
+              Jellyfin / Emby: names come from each item’s People list on the server and apply to every scan on this tab.
             </p>
           ) : null}
           {showInteractiveControls ? (
@@ -1422,7 +1377,7 @@ export function PrunerScopeTab(props: {
           className="space-y-2 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text)]"
           data-testid="pruner-year-filters-panel"
         >
-          <p className="text-sm font-semibold text-[var(--mm-text)]">Optional preview year range (this {sectionWord} only)</p>
+          <p className="text-sm font-semibold text-[var(--mm-text)]">Optional release years (this {libraryTabPhrase} only)</p>
           <p className="text-xs text-[var(--mm-text2)]">Inclusive 1900-2100. Blank means open-ended.</p>
           {showInteractiveControls ? (
             <div className="flex flex-wrap items-end gap-2">
@@ -1476,7 +1431,7 @@ export function PrunerScopeTab(props: {
           className="space-y-2 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text)]"
           data-testid="pruner-studio-preview-panel"
         >
-          <p className="text-sm font-semibold text-[var(--mm-text)]">Optional preview studio include (this {sectionWord} only)</p>
+          <p className="text-sm font-semibold text-[var(--mm-text)]">Optional studios (this {libraryTabPhrase} only)</p>
           <p className="text-xs text-[var(--mm-text2)]">Comma-separated studio names.</p>
           {showInteractiveControls ? (
             <div className="space-y-2">
@@ -1516,9 +1471,7 @@ export function PrunerScopeTab(props: {
           className="space-y-2 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text)]"
           data-testid="pruner-collection-preview-panel"
         >
-          <p className="text-sm font-semibold text-[var(--mm-text)]">
-            Optional preview collection include (Plex allLeaves movie previews)
-          </p>
+          <p className="text-sm font-semibold text-[var(--mm-text)]">Optional Plex movie collections</p>
           <p className="text-xs text-[var(--mm-text2)]">Comma-separated collection names.</p>
           {showInteractiveControls ? (
             <div className="space-y-2">
@@ -1561,8 +1514,8 @@ export function PrunerScopeTab(props: {
         >
           <p className="font-medium text-amber-100">
             {props.scope === "movies"
-              ? "Plex: watched TV and never-played stale are unsupported."
-              : "Plex: watched TV and never-played stale are unsupported in this scope."}
+              ? "Plex does not support watched-TV or never-started cleanup on the Movies tab."
+              : "Plex does not support watched-TV or never-started TV cleanup on the TV tab."}
           </p>
         </div>
       ) : null}
@@ -1574,10 +1527,10 @@ export function PrunerScopeTab(props: {
         >
           <p className="text-sm font-semibold text-[var(--mm-text)]">
             {props.scope === "tv"
-              ? "Never-played TV older than N days (Jellyfin / Emby)"
-              : "Never-played entries older than N days (Jellyfin / Emby)"}
+              ? "Delete TV shows not watched in the last N days (never started) — Jellyfin / Emby"
+              : "Delete TV or movies never started and older than N days — Jellyfin / Emby"}
           </p>
-          <p className="text-xs text-[var(--mm-text2)]">Never played and older than this age.</p>
+          <p className="text-xs text-[var(--mm-text2)]">Only titles with no play time and older than this age.</p>
           {showInteractiveControls ? (
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-sm">
@@ -1588,8 +1541,8 @@ export function PrunerScopeTab(props: {
                   onChange={(e) => setStaleNeverEnabled(e.target.checked)}
                 />
                 {props.scope === "tv"
-                  ? "Enable never-played TV older-than rule for this scope"
-                  : "Enable never-played older-than rule for this scope"}
+                  ? "Turn on never-watched TV older than this age"
+                  : "Turn on never-watched TV or movies older than this age"}
               </label>
               <div className="flex flex-wrap items-center gap-2">
                 <label className="text-sm text-[var(--mm-text2)]">
@@ -1610,7 +1563,7 @@ export function PrunerScopeTab(props: {
                   disabled={busy}
                   onClick={() => void saveStaleNeverSettings()}
                 >
-                  Save never-played rule
+                  Save never-watched age rule
                 </button>
               </div>
               {staleNeverMsg ? <p className="text-xs text-green-600">{staleNeverMsg}</p> : null}
@@ -1618,12 +1571,12 @@ export function PrunerScopeTab(props: {
                 type="button"
                 className="rounded-md bg-[var(--mm-surface2)] px-3 py-1.5 text-sm font-medium text-[var(--mm-text)] ring-1 ring-[var(--mm-border)] disabled:opacity-50"
                 disabled={busy || !staleNeverEnabled}
-                title={!staleNeverEnabled ? "Enable the rule and save before queueing a preview for it." : undefined}
+                title={!staleNeverEnabled ? "Turn the rule on and save before running this scan." : undefined}
                 onClick={() => void runStaleNeverPreview()}
               >
                 {props.scope === "tv"
-                  ? "Queue preview (never-played TV older than N days)"
-                  : "Queue preview (never-played older than N days)"}
+                  ? "Scan for unwatched TV shows older than your setting"
+                  : "Scan for unwatched TV or movies older than your setting"}
               </button>
             </div>
           ) : (
@@ -1643,10 +1596,8 @@ export function PrunerScopeTab(props: {
             className="space-y-2 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text)]"
             data-testid="pruner-watched-tv-panel"
           >
-            <p className="text-sm font-semibold text-[var(--mm-text)]">
-              Watched TV (Jellyfin / Emby, TV scope only)
-            </p>
-            <p className="text-xs text-[var(--mm-text2)]">Delete items marked watched for this provider user.</p>
+            <p className="text-sm font-semibold text-[var(--mm-text)]">Delete watched TV episodes — Jellyfin / Emby</p>
+            <p className="text-xs text-[var(--mm-text2)]">Uses the watched flag for your MediaMop user on this server.</p>
             {showInteractiveControls ? (
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm">
@@ -1656,7 +1607,7 @@ export function PrunerScopeTab(props: {
                     disabled={busy}
                     onChange={(e) => setWatchedTvEnabled(e.target.checked)}
                   />
-                  Enable watched TV rule for this TV scope
+                  Turn on watched-TV cleanup
                 </label>
                 <button
                   type="button"
@@ -1671,16 +1622,16 @@ export function PrunerScopeTab(props: {
                   type="button"
                   className="rounded-md bg-[var(--mm-surface2)] px-3 py-1.5 text-sm font-medium text-[var(--mm-text)] ring-1 ring-[var(--mm-border)] disabled:opacity-50"
                   disabled={busy || !watchedTvEnabled}
-                  title={!watchedTvEnabled ? "Enable the rule and save before queueing a preview for it." : undefined}
+                  title={!watchedTvEnabled ? "Turn the rule on and save before running this scan." : undefined}
                   onClick={() => void runWatchedTvPreview()}
                 >
-                  Queue preview (watched TV)
+                  Scan for watched TV shows
                 </button>
               </div>
             ) : (
               <p className="text-xs text-[var(--mm-text2)]">
                 Watched TV rule is <strong>{scopeRow?.watched_tv_reported_enabled ? "on" : "off"}</strong> for this{" "}
-                {sectionWord}.
+                {libraryTabPhrase}.
                 Sign in as an operator to change it.
               </p>
             )}
@@ -1690,19 +1641,16 @@ export function PrunerScopeTab(props: {
       ) : null}
       {!isPlex ? null : props.scope === "movies" && !isProvider ? (
         <p className="text-xs text-[var(--mm-text2)]">
-          Watched / low-rating / unwatched stale movie previews on Plex use the same{" "}
-          <code className="text-[0.85em]">allLeaves</code> token-scoped metadata as other Plex previews: watched means{" "}
-          <code className="text-[0.85em]">viewCount</code> ≥ 1 or a positive <code className="text-[0.85em]">lastViewedAt</code>
-          ; low-rating compares your saved Plex audienceRating ceiling to leaf <code className="text-[0.85em]">audienceRating</code>{" "}
-          (not Jellyfin/Emby <code className="text-[0.85em]">CommunityRating</code>); stale unwatched uses library{" "}
-          <code className="text-[0.85em]">addedAt</code> age, not <code className="text-[0.85em]">DateCreated</code>.
+          On Plex, watched movies, low-score movies, and old unwatched movies all use the same on-server details MediaMop
+          already reads for other scans — watched means the server shows you played it; low score uses Plex audience
+          rating; old unwatched uses when Plex says the title was added to the library.
         </p>
       ) : null}
       <div>
         <h3 className="text-base font-semibold text-[var(--mm-text)]" data-testid="pruner-rules-section-heading">
           Cleanup rules
         </h3>
-        <p className="text-xs text-[var(--mm-text2)]">Enable, save, then queue preview.</p>
+        <p className="text-xs text-[var(--mm-text2)]">Turn a rule on, save, then run its scan when you are ready.</p>
       </div>
       {props.scope === "movies" ? (
           <>
@@ -1711,12 +1659,10 @@ export function PrunerScopeTab(props: {
               data-testid="pruner-watched-movies-panel"
             >
               <p className="text-sm font-semibold text-[var(--mm-text)]">
-                {isPlex
-                  ? "Watched movies (Plex, Movies scope only)"
-                  : "Watched movies (Jellyfin / Emby, Movies scope only)"}
+                {isPlex ? "Delete watched movies — Plex" : "Delete watched movies — Jellyfin / Emby"}
               </p>
               <p className="text-xs text-[var(--mm-text2)]">
-                {isPlex ? "Uses Plex watched state from allLeaves." : "Uses provider watched state for movie items."}
+                {isPlex ? "Uses Plex watched flags for your MediaMop user." : "Uses the server watched flag for each movie."}
               </p>
               {showInteractiveControls ? (
                 <div className="space-y-2">
@@ -1727,7 +1673,7 @@ export function PrunerScopeTab(props: {
                       disabled={busy}
                       onChange={(e) => setWatchedMoviesEnabled(e.target.checked)}
                     />
-                    Enable watched movies rule for this Movies scope
+                    Turn on watched-movie cleanup
                   </label>
                   <button
                     type="button"
@@ -1743,11 +1689,11 @@ export function PrunerScopeTab(props: {
                     className="rounded-md bg-[var(--mm-surface2)] px-3 py-1.5 text-sm font-medium text-[var(--mm-text)] ring-1 ring-[var(--mm-border)] disabled:opacity-50"
                     disabled={busy || !watchedMoviesEnabled}
                     title={
-                      !watchedMoviesEnabled ? "Enable the rule and save before queueing a preview for it." : undefined
+                      !watchedMoviesEnabled ? "Turn the rule on and save before running this scan." : undefined
                     }
                     onClick={() => void runWatchedMoviesPreview()}
                   >
-                    Queue preview (watched movies)
+                    Scan for watched movies
                   </button>
                 </div>
               ) : (
@@ -1762,12 +1708,10 @@ export function PrunerScopeTab(props: {
               data-testid="pruner-watched-low-rating-panel"
             >
               <p className="text-sm font-semibold text-[var(--mm-text)]">
-                {isPlex
-                  ? "Watched low-rating movies (Plex, Movies scope only)"
-                  : "Watched low-rating movies (Jellyfin / Emby, Movies scope only)"}
+                {isPlex ? "Delete low-score watched movies — Plex" : "Delete low-score watched movies — Jellyfin / Emby"}
               </p>
               <p className="text-xs text-[var(--mm-text2)]">
-                {isPlex ? "Uses Plex audienceRating." : "Uses Jellyfin/Emby CommunityRating."}
+                {isPlex ? "Uses Plex audience rating." : "Uses your server’s community rating."}
               </p>
               {showInteractiveControls ? (
                 <div className="space-y-2">
@@ -1778,12 +1722,12 @@ export function PrunerScopeTab(props: {
                       disabled={busy}
                       onChange={(e) => setLowRatingEnabled(e.target.checked)}
                     />
-                    Enable watched low-rating movies rule for this Movies scope
+                    Turn on low-score watched-movie cleanup
                   </label>
                   <label className="flex flex-wrap items-center gap-2 text-sm text-[var(--mm-text2)]">
                     {isPlex
-                      ? "Plex audienceRating — max ceiling (0–10 inclusive)"
-                      : "Jellyfin/Emby CommunityRating — max ceiling (0–10 inclusive)"}
+                      ? "Highest Plex audience rating to keep (0–10)"
+                      : "Highest community rating to keep (0–10)"}
                     <input
                       type="number"
                       min={0}
@@ -1809,21 +1753,27 @@ export function PrunerScopeTab(props: {
                     className="rounded-md bg-[var(--mm-surface2)] px-3 py-1.5 text-sm font-medium text-[var(--mm-text)] ring-1 ring-[var(--mm-border)] disabled:opacity-50"
                     disabled={busy || !lowRatingEnabled}
                     title={
-                      !lowRatingEnabled ? "Enable the rule and save before queueing a preview for it." : undefined
+                      !lowRatingEnabled ? "Turn the rule on and save before running this scan." : undefined
                     }
                     onClick={() => void runLowRatingMoviesPreview()}
                   >
-                    Queue preview (watched low-rating movies)
+                    Scan for low-score watched movies
                   </button>
                 </div>
               ) : (
                 <p className="text-xs text-[var(--mm-text2)]">
-                  Watched low-rating rule is{" "}
-                  <strong>{scopeRow?.watched_movie_low_rating_reported_enabled ? "on" : "off"}</strong> (ceiling{" "}
-                  {isPlex
-                    ? `${scopeRow?.watched_movie_low_rating_max_plex_audience_rating} audienceRating`
-                    : `${scopeRow?.watched_movie_low_rating_max_jellyfin_emby_community_rating} CommunityRating`}
-                  ). Sign in as an operator to change it.
+                  Low-score rule is <strong>{scopeRow?.watched_movie_low_rating_reported_enabled ? "on" : "off"}</strong>
+                  {scopeRow?.watched_movie_low_rating_reported_enabled ? (
+                    <>
+                      {" "}
+                      (delete watched movies rated below{" "}
+                      {isPlex
+                        ? scopeRow.watched_movie_low_rating_max_plex_audience_rating
+                        : scopeRow.watched_movie_low_rating_max_jellyfin_emby_community_rating}
+                      ).
+                    </>
+                  ) : null}{" "}
+                  Sign in as an operator to change it.
                 </p>
               )}
             </div>
@@ -1832,12 +1782,10 @@ export function PrunerScopeTab(props: {
               data-testid="pruner-unwatched-stale-panel"
             >
               <p className="text-sm font-semibold text-[var(--mm-text)]">
-                {isPlex
-                  ? "Unwatched stale movies (Plex, Movies scope only)"
-                  : "Unwatched stale movies (Jellyfin / Emby, Movies scope only)"}
+                {isPlex ? "Delete old unwatched movies — Plex" : "Delete old unwatched movies — Jellyfin / Emby"}
               </p>
               <p className="text-xs text-[var(--mm-text2)]">
-                {isPlex ? "Unwatched + addedAt age." : "Never-played + DateCreated age."}
+                {isPlex ? "Never watched, using when Plex added the title." : "Never watched, using when the server created the title."}
               </p>
               {showInteractiveControls ? (
                 <div className="space-y-2">
@@ -1848,7 +1796,7 @@ export function PrunerScopeTab(props: {
                       disabled={busy}
                       onChange={(e) => setUnwatchedStaleEnabled(e.target.checked)}
                     />
-                    Enable unwatched stale movies rule for this Movies scope
+                    Turn on old unwatched movie cleanup
                   </label>
                   <label className="flex flex-wrap items-center gap-2 text-sm text-[var(--mm-text2)]">
                     Minimum age (days, 7–3650)
@@ -1876,11 +1824,11 @@ export function PrunerScopeTab(props: {
                     className="rounded-md bg-[var(--mm-surface2)] px-3 py-1.5 text-sm font-medium text-[var(--mm-text)] ring-1 ring-[var(--mm-border)] disabled:opacity-50"
                     disabled={busy || !unwatchedStaleEnabled}
                     title={
-                      !unwatchedStaleEnabled ? "Enable the rule and save before queueing a preview for it." : undefined
+                      !unwatchedStaleEnabled ? "Turn the rule on and save before running this scan." : undefined
                     }
                     onClick={() => void runUnwatchedStaleMoviesPreview()}
                   >
-                    Queue preview (unwatched stale movies)
+                    Scan for old unwatched movies
                   </button>
                 </div>
               ) : (
@@ -1897,9 +1845,9 @@ export function PrunerScopeTab(props: {
           className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text2)]"
           data-testid="pruner-scope-latest-preview-summary"
         >
-          <h3 className="text-sm font-semibold text-[var(--mm-text)]">Latest preview job (this {sectionWord})</h3>
+          <h3 className="text-sm font-semibold text-[var(--mm-text)]">Latest automatic scan (this {libraryTabPhrase})</h3>
           <p className="mt-1 text-xs text-[var(--mm-text2)]">
-            Denormalized from the last finished preview for quick orientation — see the history table for older runs.
+            Quick readout from the last finished scan — use the history table for older runs.
           </p>
           <dl className="mt-2 space-y-1 text-xs sm:text-sm">
             <div>
@@ -1913,11 +1861,11 @@ export function PrunerScopeTab(props: {
               <dd className="inline font-medium text-[var(--mm-text1)]">{scopeRow.last_preview_outcome ?? "—"}</dd>
             </div>
             <div>
-              <dt className="inline text-[var(--mm-text3)]">Candidates</dt>{" "}
+              <dt className="inline text-[var(--mm-text3)]">Items matched</dt>{" "}
               <dd className="inline font-medium text-[var(--mm-text1)]">{scopeRow.last_preview_candidate_count ?? "—"}</dd>
             </div>
             <div>
-              <dt className="inline text-[var(--mm-text3)]">Error detail</dt>{" "}
+              <dt className="inline text-[var(--mm-text3)]">Problem detail</dt>{" "}
               <dd className="inline text-[var(--mm-text1)]">{scopeRow.last_preview_error ?? "—"}</dd>
             </div>
           </dl>
@@ -1925,12 +1873,12 @@ export function PrunerScopeTab(props: {
       ) : null}
       <div>
         <h3 className="text-base font-semibold text-[var(--mm-text)]" data-testid="pruner-actions-history-heading">
-          {isProvider ? "Preview actions" : "Preview and apply actions"}
+          {isProvider ? "Scan actions" : "Scan and delete actions"}
         </h3>
         {isProvider ? null : (
           <p className="text-xs text-[var(--mm-text2)]">
-            Queue previews, inspect rows/JSON, then apply from one selected snapshot. The history table explains no
-            candidates, filtered-out runs, and unsupported outcomes.
+            Run scans, review the table, then delete from one chosen list if you want. The table explains empty results and
+            types your server does not support.
           </p>
         )}
       </div>
@@ -1942,7 +1890,7 @@ export function PrunerScopeTab(props: {
             disabled={busy}
             onClick={() => void runPreview()}
           >
-            Queue preview (missing primary art)
+            Scan for broken posters
           </button>
           <button
             type="button"
@@ -1950,7 +1898,7 @@ export function PrunerScopeTab(props: {
             disabled={busy || !scopeRow?.last_preview_run_uuid}
             onClick={() => void loadJsonFor(scopeRow?.last_preview_run_uuid)}
           >
-            Load latest snapshot JSON
+            View last scan results
           </button>
           {isProvider && scopeRow?.last_preview_run_uuid ? (
             <button
@@ -1959,23 +1907,24 @@ export function PrunerScopeTab(props: {
               disabled={busy}
               onClick={() => openApplyModal(scopeRow.last_preview_run_uuid!)}
             >
-              Apply latest snapshot
+              Delete from last scan
             </button>
           ) : null}
         </div>
       ) : (
-        <p className="text-sm text-[var(--mm-text2)]">Sign in as an operator to queue previews.</p>
+        <p className="text-sm text-[var(--mm-text2)]">Sign in as an operator to run scans.</p>
       )}
       <div
         className="space-y-2 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3"
         data-testid="pruner-scope-scheduled-preview"
       >
-        <h3 className="text-sm font-semibold text-[var(--mm-text)]">Scheduled preview ({props.scope})</h3>
+        <h3 className="text-sm font-semibold text-[var(--mm-text)]">
+          Automatic scans ({props.scope === "tv" ? "TV shows" : "Movies"})
+        </h3>
         <p className="text-xs text-[var(--mm-text2)]">
-          Each server instance has separate TV and Movies schedules. Interval: 60 seconds to 24 hours. The timestamp
-          below updates only when the background scheduler queues a job for this {sectionWord} — not when you use the
-          manual preview buttons. Scheduled runs use the <strong>missing primary art</strong> rule only; stale
-          never-played previews are on-demand.
+          Each saved server keeps separate TV and movie timers. Wait time can be 60 seconds to 24 hours. The time below
+          changes only when the timer runs a scan for this {libraryTabPhrase}, not when you press the manual scan buttons.
+          Timed runs only check broken posters and images; other cleanup types stay manual.
         </p>
         {showInteractiveControls ? (
           <>
@@ -1986,7 +1935,7 @@ export function PrunerScopeTab(props: {
                 disabled={busy}
                 onChange={(e) => setSchedEnabled(e.target.checked)}
               />
-              Enable scheduled previews for this {sectionWord}
+              Enable automatic scans for this {libraryTabPhrase}
             </label>
             <div className="flex flex-wrap items-center gap-2">
               <label className="text-sm text-[var(--mm-text2)]">
@@ -2015,25 +1964,27 @@ export function PrunerScopeTab(props: {
           </>
         ) : (
           <p className="text-sm text-[var(--mm-text2)]">
-            Scheduled preview is <strong>{scopeRow?.scheduled_preview_enabled ? "on" : "off"}</strong>
+            Automatic scans are <strong>{scopeRow?.scheduled_preview_enabled ? "on" : "off"}</strong>
             {scopeRow ? (
               <>
                 {" "}
-                (every {scopeRow.scheduled_preview_interval_seconds}s). Sign in as an operator to change it.
+                (every {scopeRow.scheduled_preview_interval_seconds} seconds). Sign in as an operator to change it.
               </>
             ) : null}
           </p>
         )}
         <p className="text-xs text-[var(--mm-text2)]">
-          Last scheduled enqueue:{" "}
+          Last automatic scan:{" "}
           {scopeRow?.last_scheduled_preview_enqueued_at
             ? new Date(scopeRow.last_scheduled_preview_enqueued_at).toLocaleString()
-            : "—"}
+            : "Never run"}
         </p>
       </div>
       {!isProvider ? (
       <div className="space-y-2" data-testid="pruner-preview-runs-history">
-        <h3 className="text-sm font-semibold text-[var(--mm-text)]">Recent preview runs ({props.scope})</h3>
+        <h3 className="text-sm font-semibold text-[var(--mm-text)]">
+          Recent scans ({props.scope === "tv" ? "TV shows" : "Movies"})
+        </h3>
         {runsQuery.isLoading ? (
           <p className="text-sm text-[var(--mm-text2)]">Loading history…</p>
         ) : runsQuery.isError ? (
@@ -2045,19 +1996,19 @@ export function PrunerScopeTab(props: {
             <table className="w-full min-w-[32rem] border-collapse text-left text-sm text-[var(--mm-text)]">
               <thead className="border-b border-[var(--mm-border)] bg-[var(--mm-surface2)] text-xs uppercase text-[var(--mm-text2)]">
                 <tr>
-                  <th className="px-2 py-2">Run</th>
-                  <th className="px-2 py-2">Rule</th>
+                  <th className="px-2 py-2">#</th>
+                  <th className="px-2 py-2">Cleanup type</th>
                   <th className="px-2 py-2">When</th>
-                  <th className="px-2 py-2">Outcome</th>
+                  <th className="px-2 py-2">Result</th>
                   <th className="px-2 py-2">What it means</th>
-                  <th className="px-2 py-2">Candidates</th>
+                  <th className="px-2 py-2">Items</th>
                   <th className="px-2 py-2"> </th>
                 </tr>
               </thead>
               <tbody>
-                {runsQuery.data.map((row) => (
+                {runsQuery.data.map((row, idx) => (
                   <tr key={row.preview_run_id} className="border-b border-[var(--mm-border)] align-top">
-                    <td className="px-2 py-2 font-mono text-xs">{row.preview_run_id.slice(0, 8)}…</td>
+                    <td className="px-2 py-2 text-xs text-[var(--mm-text2)]">{idx + 1}</td>
                     <td className="px-2 py-2 text-xs text-[var(--mm-text2)]">{ruleFamilyColumnLabel(row.rule_family_id)}</td>
                     <td className="px-2 py-2 text-xs text-[var(--mm-text2)]">
                       {new Date(row.created_at).toLocaleString()}
@@ -2079,7 +2030,7 @@ export function PrunerScopeTab(props: {
                     </td>
                     <td className="px-2 py-2 text-xs">
                       {row.candidate_count}
-                      {row.truncated ? " (truncated)" : ""}
+                      {row.truncated ? " (list stopped at limit)" : ""}
                     </td>
                     <td className="px-2 py-2 space-y-1">
                       <button
@@ -2088,7 +2039,7 @@ export function PrunerScopeTab(props: {
                         disabled={busy}
                         onClick={() => void loadJsonFor(row.preview_run_id)}
                       >
-                        JSON
+                        Raw
                       </button>
                       {canOperate && canApplyFromPreviewSnapshot(instance?.provider, row) ? (
                         <div>
@@ -2111,8 +2062,8 @@ export function PrunerScopeTab(props: {
           </div>
         ) : (
           <p className="text-sm text-[var(--mm-text2)]" data-testid="pruner-preview-runs-empty">
-            No preview runs for this tab yet. Queue a preview from a rule panel above; when the worker finishes, rows
-            appear here with outcome, candidate count, and a short explanation (including unsupported rules on Plex).
+            No scans yet for this tab. Run a scan from a rule panel above; when it finishes, rows appear here with the
+            result, how many items matched, and a short explanation (including rules Plex does not support).
           </p>
         )}
       </div>
@@ -2127,15 +2078,15 @@ export function PrunerScopeTab(props: {
         >
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-4 shadow-xl">
             <h3 id="pruner-apply-modal-title" className="text-base font-semibold text-[var(--mm-text)]">
-              {applySnapshotOperatorLabel ?? "Apply from preview snapshot"}
+              {applySnapshotOperatorLabel ?? "Delete from last scan"}
             </h3>
             <p className="mt-2 text-sm text-[var(--mm-text2)]">
-              This live action uses <strong>only</strong> the frozen candidate list from one preview snapshot. It does
-              not re-run preview and does not widen the candidate set. Entries already removed at the provider are
-              typically counted as skipped; successful removals follow the provider library API.
+              This deletes <strong>only</strong> the titles from the saved list you opened — MediaMop does not run a new
+              scan or add titles. Items already removed on the server are usually counted as skipped; full counts appear
+              in Activity when the job finishes.
             </p>
             {applyEligQuery.isLoading ? (
-              <p className="mt-3 text-sm text-[var(--mm-text2)]">Checking eligibility…</p>
+              <p className="mt-3 text-sm text-[var(--mm-text2)]">Checking whether deletion is allowed…</p>
             ) : applyEligQuery.isError ? (
               <p className="mt-3 text-sm text-red-600" role="alert">
                 {(applyEligQuery.error as Error).message}
@@ -2146,19 +2097,16 @@ export function PrunerScopeTab(props: {
                   Server: <strong>{applyEligQuery.data.display_name}</strong> ({applyEligQuery.data.provider})
                 </li>
                 <li>
-                  Scope: <strong>{applyEligQuery.data.media_scope === "tv" ? "TV" : "Movies"}</strong>
+                  Library type: <strong>{applyEligQuery.data.media_scope === "tv" ? "TV shows" : "Movies"}</strong>
                 </li>
                 <li>
-                  Preview time:{" "}
+                  Scan time:{" "}
                   {applyEligQuery.data.preview_created_at
                     ? new Date(applyEligQuery.data.preview_created_at).toLocaleString()
                     : "—"}
                 </li>
                 <li>
-                  Snapshot id: <span className="font-mono text-xs">{applyEligQuery.data.preview_run_id}</span>
-                </li>
-                <li>
-                  Candidates in snapshot: <strong>{applyEligQuery.data.candidate_count}</strong>
+                  Items in this list: <strong>{applyEligQuery.data.candidate_count}</strong>
                 </li>
               </ul>
             ) : null}
@@ -2166,7 +2114,7 @@ export function PrunerScopeTab(props: {
               <p className="mt-3 text-sm text-amber-700" role="status">
                 {applyEligQuery.data.reasons.length
                   ? applyEligQuery.data.reasons.join(" ")
-                  : "This snapshot cannot be applied right now."}
+                  : "These items cannot be deleted right now."}
               </p>
             ) : null}
             {applyEligQuery.data?.eligible ? (
@@ -2178,8 +2126,8 @@ export function PrunerScopeTab(props: {
                   onChange={(e) => setApplySnapshotConfirmed(e.target.checked)}
                 />
                 <span>
-                  I confirm <strong>{applySnapshotOperatorLabel}</strong> for this exact preview snapshot only (
-                  {applyModalRunId.slice(0, 8)}…), with at most {applyEligQuery.data.candidate_count} library entries.
+                  I confirm <strong>{applySnapshotOperatorLabel}</strong> for this saved list of up to{" "}
+                  {applyEligQuery.data.candidate_count} titles.
                 </span>
               </label>
             ) : null}
@@ -2204,7 +2152,7 @@ export function PrunerScopeTab(props: {
                 }
                 onClick={() => void confirmApplyFromSnapshot()}
               >
-                {applySnapshotOperatorLabel ?? "Confirm apply"}
+                {applySnapshotOperatorLabel ?? "Confirm delete"}
               </button>
             </div>
           </div>

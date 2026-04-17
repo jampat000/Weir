@@ -12,23 +12,33 @@ export function formatPrunerDateTime(iso: string | null | undefined): string {
 export function previewRunRowCaption(row: PrunerPreviewRunSummary): string {
   if (row.outcome === "unsupported") {
     return row.unsupported_detail?.trim()
-      ? `Unsupported for this server: ${row.unsupported_detail.trim()}`
-      : "Unsupported for this server on this rule.";
+      ? `Not available on this server: ${row.unsupported_detail.trim()}`
+      : "This cleanup type is not available on this server.";
   }
   if (row.outcome === "failed") {
     return row.error_message?.trim()
-      ? `Preview job failed: ${row.error_message.trim()}`
-      : "Preview job failed; see error above if shown.";
+      ? `Scan failed: ${row.error_message.trim()}`
+      : "Scan failed; see the message above if one is shown.";
   }
   if (row.outcome === "success" && row.candidate_count === 0) {
-    return "Preview finished successfully with zero rows. Often means nothing matched the rule, or preview-only filters removed every candidate — not necessarily a “clean” library.";
+    return "Scan finished and nothing matched your rules or filters — your library may still have other items outside this check.";
   }
   if (row.outcome === "success" && row.candidate_count > 0) {
     return row.truncated
-      ? `Matched at least ${row.candidate_count} candidate(s); run was truncated at the configured preview cap.`
-      : `${row.candidate_count} candidate(s) in the saved snapshot for this run.`;
+      ? `Found at least ${row.candidate_count} item(s); the list stops at your per-run limit so there may be more on the server.`
+      : `Found ${row.candidate_count} item(s) ready to review from this scan.`;
   }
   return "";
+}
+
+/** Maps internal job kind strings to short operator-facing labels (never shows raw API identifiers). */
+export function prunerJobKindOperatorLabel(jobKind: string | null | undefined): string {
+  if (!jobKind?.trim()) return "—";
+  const k = jobKind.toLowerCase();
+  if (k.includes("apply")) return "Delete run";
+  if (k.includes("preview")) return "Library scan";
+  if (k.includes("connection")) return "Connection test";
+  return "Background task";
 }
 
 export type PrunerScopeMedia = "tv" | "movies";
@@ -36,7 +46,7 @@ export type PrunerScopeMedia = "tv" | "movies";
 /** Rule families that have no honest preview on Plex for the given scope (operator-facing). */
 export function plexUnsupportedRuleFamilies(scope: PrunerScopeMedia): string[] {
   if (scope === "tv") {
-    return ["Stale never-played library items", "Watched TV (episodes)"];
+    return ["TV shows never started, older than your age setting", "Watched TV episodes"];
   }
   return [];
 }

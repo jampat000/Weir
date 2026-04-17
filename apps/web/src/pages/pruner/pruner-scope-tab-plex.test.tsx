@@ -117,7 +117,7 @@ describe("PrunerScopeTab (Plex)", () => {
       expect(screen.getByTestId("pruner-scope-trust-banner")).toBeInTheDocument();
       expect(screen.getByTestId("pruner-watched-low-rating-panel")).toBeInTheDocument();
       expect(screen.getByTestId("pruner-unwatched-stale-panel")).toBeInTheDocument();
-      expect(screen.getByTestId("pruner-watched-low-rating-panel").textContent ?? "").toMatch(/audienceRating/i);
+      expect(screen.getByTestId("pruner-watched-low-rating-panel").textContent ?? "").toMatch(/audience rating/i);
     } finally {
       spy.mockRestore();
       spyInst.mockRestore();
@@ -154,11 +154,9 @@ describe("PrunerScopeTab (Plex)", () => {
       });
       expect(screen.queryByTestId("pruner-plex-live-surface")).not.toBeInTheDocument();
       expect(screen.getByTestId("pruner-plex-genre-empty-preview-note")).toBeInTheDocument();
-      expect(screen.getByTestId("pruner-plex-genre-empty-preview-note").textContent).toMatch(/zero rows/i);
-      expect(screen.getByTestId("pruner-plex-other-rules-note").textContent).toMatch(
-        /never-played|watched|low-rating|unwatched stale/i,
-      );
-      const btn = screen.getByRole("button", { name: /queue preview \(missing primary art\)/i });
+      expect(screen.getByTestId("pruner-plex-genre-empty-preview-note").textContent).toMatch(/nothing listed/i);
+      expect(screen.getByTestId("pruner-plex-other-rules-note").textContent).toMatch(/Plex does not support/i);
+      const btn = screen.getByRole("button", { name: /Scan for broken posters/i });
       expect(btn).not.toBeDisabled();
     } finally {
       spy.mockRestore();
@@ -269,8 +267,8 @@ describe("PrunerScopeTab (Plex)", () => {
         </QueryClientProvider>,
       );
 
-      await waitFor(() => expect(screen.getByText("Stale never-played")).toBeInTheDocument());
-      await waitFor(() => expect(screen.getByText("Watched TV (episodes)")).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText(/Delete never-started TV or movies/i)).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText(/Delete watched TV episodes/i)).toBeInTheDocument());
       expect(
         screen.getAllByText(/never-played stale library candidacy is not implemented/i).length,
       ).toBeGreaterThanOrEqual(1);
@@ -310,9 +308,8 @@ describe("PrunerScopeTab (Plex)", () => {
 
       await waitFor(() => expect(screen.getByTestId("pruner-plex-preview-cap-note")).toBeInTheDocument());
       const note = screen.getByTestId("pruner-plex-preview-cap-note").textContent ?? "";
-      expect(note).toMatch(/MEDIAMOP_PRUNER_PLEX_LIVE_ABS_MAX_ITEMS/);
-      expect(note).toMatch(/500/);
-      expect(note).toMatch(/truncated/i);
+      expect(note).toMatch(/per-tab item limit/i);
+      expect(note).toMatch(/built-in safety cap/i);
     } finally {
       spy.mockRestore();
       spyInst.mockRestore();

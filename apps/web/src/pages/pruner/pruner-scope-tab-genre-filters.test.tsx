@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import * as authApi from "../../lib/api/auth-api";
@@ -114,14 +114,14 @@ describe("PrunerScopeTab genre filters", () => {
       );
 
       await waitFor(() => expect(screen.getByTestId("pruner-genre-filters-panel")).toBeInTheDocument());
-      const input = screen.getByPlaceholderText(/e\.g\. drama/i);
-      fireEvent.change(input, { target: { value: "Drama, Noir" } });
+      const multi = screen.getByTestId("pruner-genre-multiselect-51-tv");
+      fireEvent.click(within(multi).getByRole("option", { name: "Comedy" }));
       fireEvent.click(screen.getByRole("button", { name: /save genre filters/i }));
       await waitFor(() => {
         expect(spyPatch).toHaveBeenCalledWith(
           51,
           "tv",
-          expect.objectContaining({ preview_include_genres: ["Drama", "Noir"] }),
+          expect.objectContaining({ preview_include_genres: ["Drama", "Comedy"] }),
         );
       });
     } finally {

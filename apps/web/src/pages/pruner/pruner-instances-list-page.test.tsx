@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { UserPublic } from "../../lib/api/types";
+import * as authApi from "../../lib/api/auth-api";
 import { qk } from "../../lib/auth/queries";
 import * as prunerApi from "../../lib/pruner/api";
 import { PrunerInstancesListPage } from "./pruner-instances-list-page";
@@ -282,7 +283,7 @@ describe("PrunerInstancesListPage", () => {
     expect(screen.queryByText(/Save a connection first to enable these settings/i)).not.toBeInTheDocument();
     const disabledFieldsets = screen.getByTestId("pruner-provider-configuration-emby").querySelectorAll("fieldset[disabled]");
     expect(disabledFieldsets.length).toBe(2);
-    expect(screen.getByText(/Watched TV removal/i)).toBeInTheDocument();
+    expect(screen.getByText(/Delete TV episodes you have already watched/i)).toBeInTheDocument();
   });
 
   it("Plex Rules tab shows only supported controls: TV missing-primary + filters + names; Movies without missing-primary toggle", async () => {
@@ -365,16 +366,18 @@ describe("PrunerInstancesListPage", () => {
     await waitFor(() => expect(screen.getByTestId("pruner-provider-tab-plex")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "Rules" }));
     await waitFor(() => expect(screen.getByTestId("pruner-provider-configuration-plex")).toBeInTheDocument());
-    expect(screen.getByTestId("pruner-plex-tv-rules-scope-note")).toHaveTextContent(/Plex TV supports missing primary art only/i);
+    expect(screen.getByTestId("pruner-plex-tv-rules-scope-note")).toHaveTextContent(
+      /broken posters and episode images/i,
+    );
     expect(screen.queryByTestId("pruner-provider-plex-tv-unsupported-rules")).not.toBeInTheDocument();
     expect(screen.queryByTestId("pruner-plex-tv-filters-scope-note")).not.toBeInTheDocument();
     expect(screen.queryByTestId("pruner-plex-other-rules-note")).not.toBeInTheDocument();
     const tvSection = screen.getByTestId("pruner-provider-tv-config-plex");
-    expect(within(tvSection).queryByText(/Watched TV removal/i)).not.toBeInTheDocument();
+    expect(within(tvSection).queryByText(/Delete TV episodes you have already watched/i)).not.toBeInTheDocument();
     expect(within(tvSection).getByTestId("pruner-plex-rules-tv-names")).toBeInTheDocument();
     const moviesSection = screen.getByTestId("pruner-provider-movies-config-plex");
-    expect(within(moviesSection).getByText("Plex audienceRating max (0–10)")).toBeInTheDocument();
-    expect(within(moviesSection).queryByText(/Remove items missing primary artwork/i)).not.toBeInTheDocument();
+    expect(within(moviesSection).getByText(/Plex audience rating/i)).toBeInTheDocument();
+    expect(within(moviesSection).queryByText(/Delete movies missing a main poster/i)).not.toBeInTheDocument();
   });
 
   it("Emby movies section shows Jellyfin/Emby CommunityRating label when instance exists", async () => {
@@ -459,7 +462,7 @@ describe("PrunerInstancesListPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Rules" }));
     await waitFor(() => expect(screen.getByTestId("pruner-provider-movies-config-emby")).toBeInTheDocument());
     const movies = screen.getByTestId("pruner-provider-movies-config-emby");
-    expect(within(movies).getByText(/Jellyfin\/Emby CommunityRating/i)).toBeInTheDocument();
+    expect(within(movies).getByText(/community rating/i)).toBeInTheDocument();
     expect(within(movies).queryByText(/Plex audienceRating/i)).not.toBeInTheDocument();
   });
 
@@ -474,7 +477,9 @@ describe("PrunerInstancesListPage", () => {
     await waitFor(() => expect(screen.getByTestId("pruner-top-level-tabs")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("tab", { name: "Schedules" }));
     await waitFor(() => expect(screen.getByTestId("pruner-schedules-empty-state")).toBeInTheDocument());
-    expect(screen.getByText(/Register a provider \(Emby, Jellyfin, or Plex tab → Connection\) to enable schedules/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Add a server under each provider tab to set up automatic scans/i),
+    ).toBeInTheDocument();
   });
 
   it("Schedules tab renders six schedule rows grouped by provider when instances exist", async () => {
@@ -555,6 +560,104 @@ describe("PrunerInstancesListPage", () => {
     expect(screen.getByTestId("pruner-schedule-row-jellyfin-movies")).toBeInTheDocument();
     expect(screen.getByTestId("pruner-schedule-row-plex-tv")).toBeInTheDocument();
     expect(screen.getByTestId("pruner-schedule-row-plex-movies")).toBeInTheDocument();
+  });
+
+  it("Schedules tab save PATCHes scheduled_preview_enabled and scheduled_preview_interval_seconds", async () => {
+    const csrfSpy = vi.spyOn(authApi, "fetchCsrfToken").mockResolvedValue("csrf-test");
+    const patchSpy = vi.spyOn(prunerApi, "patchPrunerScope").mockResolvedValue({} as never);
+    const client = new QueryClient();
+    client.setQueryData(qk.me, adminUser);
+    const scope = (media_scope: "tv" | "movies") => ({
+      media_scope,
+      missing_primary_media_reported_enabled: true,
+      never_played_stale_reported_enabled: false,
+      never_played_min_age_days: 90,
+      watched_tv_reported_enabled: false,
+      watched_movies_reported_enabled: false,
+      watched_movie_low_rating_reported_enabled: false,
+      watched_movie_low_rating_max_jellyfin_emby_community_rating: 4,
+      watched_movie_low_rating_max_plex_audience_rating: 4,
+      unwatched_movie_stale_reported_enabled: false,
+      unwatched_movie_stale_min_age_days: 90,
+      preview_max_items: 500,
+      preview_include_genres: [],
+      preview_include_people: [],
+      preview_year_min: null,
+      preview_year_max: null,
+      preview_include_studios: [],
+      preview_include_collections: [],
+      scheduled_preview_enabled: false,
+      scheduled_preview_interval_seconds: 3600,
+      last_scheduled_preview_enqueued_at: null,
+      last_preview_run_uuid: null,
+      last_preview_at: null,
+      last_preview_candidate_count: null,
+      last_preview_outcome: null,
+      last_preview_error: null,
+    });
+    vi.spyOn(prunerApi, "fetchPrunerInstances").mockResolvedValue([
+      {
+        id: 1,
+        provider: "emby",
+        display_name: "Emby Home",
+        base_url: "http://emby",
+        enabled: true,
+        last_connection_test_at: null,
+        last_connection_test_ok: null,
+        last_connection_test_detail: null,
+        scopes: [scope("tv"), scope("movies")],
+      },
+      {
+        id: 2,
+        provider: "jellyfin",
+        display_name: "JF Home",
+        base_url: "http://jf",
+        enabled: true,
+        last_connection_test_at: null,
+        last_connection_test_ok: null,
+        last_connection_test_detail: null,
+        scopes: [scope("tv"), scope("movies")],
+      },
+      {
+        id: 3,
+        provider: "plex",
+        display_name: "Plex Home",
+        base_url: "http://plex",
+        enabled: true,
+        last_connection_test_at: null,
+        last_connection_test_ok: null,
+        last_connection_test_detail: null,
+        scopes: [scope("tv"), scope("movies")],
+      },
+    ]);
+    vi.spyOn(prunerApi, "fetchPrunerJobsInspection").mockResolvedValue({ jobs: [], default_recent_slice: true });
+
+    render(wrap(<PrunerInstancesListPage />, client));
+
+    await waitFor(() => expect(screen.getByTestId("pruner-top-level-tabs")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("tab", { name: "Schedules" }));
+    await waitFor(() => expect(screen.getByTestId("pruner-schedule-row-emby-tv")).toBeInTheDocument());
+
+    const embyTv = screen.getByTestId("pruner-schedule-row-emby-tv");
+    fireEvent.click(within(embyTv).getByRole("radio", { name: "On" }));
+    fireEvent.change(within(embyTv).getByLabelText("Run every seconds"), { target: { value: "120" } });
+    fireEvent.click(within(embyTv).getByRole("button", { name: /Save Emby TV shows schedule/i }));
+
+    await waitFor(() => {
+      expect(patchSpy).toHaveBeenCalledWith(
+        1,
+        "tv",
+        expect.objectContaining({
+          scheduled_preview_enabled: true,
+          scheduled_preview_interval_seconds: 120,
+          preview_max_items: 500,
+          csrf_token: "csrf-test",
+        }),
+      );
+    });
+
+    csrfSpy.mockRestore();
+    patchSpy.mockRestore();
   });
 
   it("Overview shows At a glance cards without connection forms", async () => {

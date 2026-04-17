@@ -117,13 +117,13 @@ describe("PrunerInstanceOverviewTab", () => {
     await waitFor(() => expect(screen.getByTestId("pruner-instance-overview")).toBeInTheDocument());
     expect(screen.getByTestId("pruner-overview-scope-tv")).toBeInTheDocument();
     expect(screen.getByTestId("pruner-overview-scope-movies")).toBeInTheDocument();
-    expect(screen.getByText(/Watched TV — on/)).toBeInTheDocument();
-    expect(screen.getAllByText(/Genre include tokens:/).length).toBe(2);
+    expect(screen.getByText(/Delete watched TV episodes/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Genres narrowed to:/).length).toBe(2);
     const tvCard = screen.getByTestId("pruner-overview-scope-tv");
     expect(tvCard.textContent).toMatch(/success/);
     expect(tvCard.textContent).toMatch(/2026/);
     expect(screen.getByRole("link", { name: /open activity/i })).toHaveAttribute("href", "/app/activity");
-    expect(screen.getByText(/This overview does not yet mirror those outcomes/i)).toBeInTheDocument();
+    expect(screen.getByText(/does not yet repeat those counts/i)).toBeInTheDocument();
   });
 
   it("shows Plex-only unsupported callouts on the TV scope card", async () => {
@@ -148,6 +148,6 @@ describe("PrunerInstanceOverviewTab", () => {
     await waitFor(() => expect(screen.getByTestId("pruner-overview-scope-tv")).toBeInTheDocument());
     const tvCard = screen.getByTestId("pruner-overview-scope-tv");
     expect(tvCard.textContent).toMatch(/Not available on Plex for this tab/i);
-    expect(tvCard.textContent).toMatch(/Watched TV \(episodes\)/i);
+    expect(tvCard.textContent).toMatch(/Watched TV episodes/i);
   });
 });

@@ -80,12 +80,13 @@ export const RULE_FAMILY_WATCHED_MOVIES_REPORTED = "watched_movies_reported";
 export const RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED = "watched_movie_low_rating_reported";
 export const RULE_FAMILY_UNWATCHED_MOVIE_STALE_REPORTED = "unwatched_movie_stale_reported";
 
-export const PRUNER_REMOVE_BROKEN_LIBRARY_ENTRIES_LABEL = "Remove broken library entries";
-export const PRUNER_REMOVE_STALE_NEVER_PLAYED_LIBRARY_ENTRIES_LABEL = "Remove stale never-played library entries";
-export const PRUNER_REMOVE_WATCHED_TV_ENTRIES_LABEL = "Remove watched TV entries";
-export const PRUNER_REMOVE_WATCHED_MOVIES_ENTRIES_LABEL = "Remove watched movie entries";
-export const PRUNER_REMOVE_WATCHED_LOW_RATING_MOVIE_ENTRIES_LABEL = "Remove watched low-rated movie entries";
-export const PRUNER_REMOVE_UNWATCHED_STALE_MOVIE_ENTRIES_LABEL = "Remove stale unwatched movie entries";
+export const PRUNER_REMOVE_BROKEN_LIBRARY_ENTRIES_LABEL = "Delete items missing a main poster or episode image";
+export const PRUNER_REMOVE_STALE_NEVER_PLAYED_LIBRARY_ENTRIES_LABEL =
+  "Delete never-started TV or movies older than your age setting";
+export const PRUNER_REMOVE_WATCHED_TV_ENTRIES_LABEL = "Delete watched TV episodes";
+export const PRUNER_REMOVE_WATCHED_MOVIES_ENTRIES_LABEL = "Delete watched movies";
+export const PRUNER_REMOVE_WATCHED_LOW_RATING_MOVIE_ENTRIES_LABEL = "Delete watched movies below your score";
+export const PRUNER_REMOVE_UNWATCHED_STALE_MOVIE_ENTRIES_LABEL = "Delete unwatched movies older than your age setting";
 
 export function prunerApplyLabelForRuleFamily(ruleFamilyId: string): string {
   if (ruleFamilyId === RULE_FAMILY_WATCHED_TV_REPORTED) {

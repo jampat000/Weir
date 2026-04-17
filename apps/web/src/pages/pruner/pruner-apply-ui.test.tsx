@@ -178,8 +178,8 @@ describe("PrunerScopeTab apply (preview → apply)", () => {
 
       const titles = screen.getAllByText(PRUNER_REMOVE_BROKEN_LIBRARY_ENTRIES_LABEL);
       expect(titles.length).toBeGreaterThanOrEqual(2);
-      expect(modal.textContent).toMatch(/frozen candidate list/i);
-      expect(modal.textContent).toMatch(/this exact preview snapshot only/i);
+      expect(modal.textContent).toMatch(/saved list/i);
+      expect(modal.textContent).toMatch(/saved list of up to/i);
     } finally {
       spyElig.mockRestore();
     }
@@ -232,10 +232,10 @@ describe("PrunerScopeTab apply (preview → apply)", () => {
 
     await waitFor(() => expect(screen.getByTestId("pruner-preview-runs-history")).toBeInTheDocument());
     expect(screen.getByTestId(`pruner-preview-run-caption-${unsupportedRun.preview_run_id}`).textContent).toMatch(
-      /Unsupported for this server/i,
+      /Not available on this server/i,
     );
     expect(screen.getByTestId(`pruner-preview-run-caption-${emptyOk.preview_run_id}`).textContent).toMatch(
-      /zero rows/i,
+      /nothing matched/i,
     );
   });
 

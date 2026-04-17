@@ -4,52 +4,52 @@ import { formatPrunerDateTime, plexUnsupportedRuleFamilies } from "./pruner-ui-u
 
 type Ctx = { instanceId: number; instance: PrunerServerInstance | undefined };
 
-function scopeLabel(media: string): string {
-  return media === "tv" ? "TV (episodes)" : "Movies (one row per movie)";
+function scopeHeading(media: string): string {
+  return media === "tv" ? "TV shows" : "Movies";
 }
 
 function activeRuleLines(scope: PrunerScopeSummary, provider: string): string[] {
   const lines: string[] = [];
   if (scope.missing_primary_media_reported_enabled) {
-    lines.push("Missing primary art — preview and apply when supported for this provider");
+    lines.push("Delete items missing a main poster or episode image — when your server supports it");
   }
   if (scope.never_played_stale_reported_enabled) {
-    lines.push(`Stale never-played — on (min age ${scope.never_played_min_age_days} days)`);
+    lines.push(`Delete never-started titles older than ${scope.never_played_min_age_days} days`);
   }
   if (scope.media_scope === "tv" && scope.watched_tv_reported_enabled) {
-    lines.push("Watched TV — on");
+    lines.push("Delete watched TV episodes");
   }
   if (scope.media_scope === "movies") {
-    if (scope.watched_movies_reported_enabled) lines.push("Watched movies — on");
+    if (scope.watched_movies_reported_enabled) lines.push("Delete watched movies");
     if (scope.watched_movie_low_rating_reported_enabled) {
       const cap =
         provider === "plex"
-          ? `Plex audienceRating ceiling ${scope.watched_movie_low_rating_max_plex_audience_rating} (0–10)`
-          : `Jellyfin/Emby CommunityRating ceiling ${scope.watched_movie_low_rating_max_jellyfin_emby_community_rating} (0–10)`;
-      lines.push(`Watched low-rating movies — on (${cap})`);
+          ? `Delete watched Plex movies rated below ${scope.watched_movie_low_rating_max_plex_audience_rating} (0–10 audience score)`
+          : `Delete watched movies rated below ${scope.watched_movie_low_rating_max_jellyfin_emby_community_rating} (0–10 community score)`;
+      lines.push(cap);
     }
     if (scope.unwatched_movie_stale_reported_enabled) {
-      lines.push(`Unwatched stale movies — on (min age ${scope.unwatched_movie_stale_min_age_days} days)`);
+      lines.push(`Delete unwatched movies older than ${scope.unwatched_movie_stale_min_age_days} days`);
     }
   }
   if (lines.length === 0) {
-    lines.push("No removal rules enabled for this tab yet.");
+    lines.push("No cleanup rules are turned on for this tab yet.");
   }
   return lines;
 }
 
 function filterCountSummary(scope: PrunerScopeSummary): { label: string; count: number }[] {
   return [
-    { label: "Genre include tokens", count: (scope.preview_include_genres ?? []).length },
-    { label: "People include tokens", count: (scope.preview_include_people ?? []).length },
-    { label: "Studio include tokens", count: (scope.preview_include_studios ?? []).length },
-    { label: "Collection include tokens (Plex movie previews only)", count: (scope.preview_include_collections ?? []).length },
+    { label: "Genres narrowed to", count: (scope.preview_include_genres ?? []).length },
+    { label: "Names narrowed to", count: (scope.preview_include_people ?? []).length },
+    { label: "Studios narrowed to", count: (scope.preview_include_studios ?? []).length },
+    { label: "Plex collections narrowed to (movies only)", count: (scope.preview_include_collections ?? []).length },
   ];
 }
 
 function yearSummary(scope: PrunerScopeSummary): string {
-  if (scope.preview_year_min == null && scope.preview_year_max == null) return "Year filter: none";
-  return `Year filter: ${scope.preview_year_min ?? "—"}–${scope.preview_year_max ?? "—"} (inclusive)`;
+  if (scope.preview_year_min == null && scope.preview_year_max == null) return "Release years: any";
+  return `Release years: ${scope.preview_year_min ?? "—"}–${scope.preview_year_max ?? "—"} (inclusive)`;
 }
 
 function ScopeWorkspaceCard({
@@ -71,7 +71,7 @@ function ScopeWorkspaceCard({
       data-testid={`pruner-overview-scope-${scope.media_scope}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h3 className="text-sm font-semibold text-[var(--mm-text1)]">{scopeLabel(scope.media_scope)}</h3>
+        <h3 className="text-sm font-semibold text-[var(--mm-text1)]">{scopeHeading(scope.media_scope)}</h3>
         <Link
           to={`/app/pruner/instances/${instanceId}/${toTab}`}
           className="text-xs font-semibold text-[var(--mm-accent)] underline-offset-2 hover:underline"
@@ -81,7 +81,7 @@ function ScopeWorkspaceCard({
       </div>
 
       <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-[var(--mm-text3)]">Active rules</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-[var(--mm-text3)]">Rules turned on</p>
         <ul className="mt-1 list-inside list-disc space-y-0.5 text-[var(--mm-text2)]">
           {activeRuleLines(scope, provider).map((line) => (
             <li key={line}>{line}</li>
@@ -90,9 +90,9 @@ function ScopeWorkspaceCard({
       </div>
 
       <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-[var(--mm-text3)]">Preview narrowing</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-[var(--mm-text3)]">Optional scan filters</p>
         <p className="mt-1 text-xs text-[var(--mm-text2)]">
-          Filters below apply to <strong>preview collection only</strong>; apply still uses the frozen snapshot only.
+          These limits only change what shows up in a scan list — they do not change which saved list a delete run uses.
         </p>
         <ul className="mt-1 space-y-0.5 text-xs text-[var(--mm-text2)]">
           {filterCountSummary(scope).map((row) => (
@@ -108,18 +108,18 @@ function ScopeWorkspaceCard({
       </div>
 
       <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-[var(--mm-text3)]">Last preview (this tab)</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-[var(--mm-text3)]">Last library scan (this tab)</p>
         <p className="mt-1 text-xs text-[var(--mm-text2)]">
           <span className="text-[var(--mm-text3)]">When:</span>{" "}
           <span className="font-medium text-[var(--mm-text1)]">{formatPrunerDateTime(scope.last_preview_at)}</span>
         </p>
         <p className="text-xs text-[var(--mm-text2)]">
-          <span className="text-[var(--mm-text3)]">Outcome:</span>{" "}
+          <span className="text-[var(--mm-text3)]">Result:</span>{" "}
           <span className="font-medium text-[var(--mm-text1)]">{scope.last_preview_outcome ?? "—"}</span>
           {scope.last_preview_candidate_count != null ? (
             <>
               {" "}
-              · <span className="text-[var(--mm-text3)]">Candidates:</span>{" "}
+              · <span className="text-[var(--mm-text3)]">Items matched:</span>{" "}
               <span className="font-medium text-[var(--mm-text1)]">{scope.last_preview_candidate_count}</span>
             </>
           ) : null}
@@ -139,13 +139,13 @@ function ScopeWorkspaceCard({
               <li key={u}>{u}</li>
             ))}
           </ul>
-          <p className="mt-1 text-[var(--mm-text3)]">Queueing those previews returns an explicit unsupported outcome.</p>
+          <p className="mt-1 text-[var(--mm-text3)]">Running those scans on Plex returns a clear “not supported” result.</p>
         </div>
       ) : null}
 
       <p className="text-xs text-[var(--mm-text3)]">
-        Per-tab preview cap: <span className="font-medium text-[var(--mm-text1)]">{scope.preview_max_items}</span>{" "}
-        candidates (before truncation signals).
+        Max titles per manual scan on this tab:{" "}
+        <span className="font-medium text-[var(--mm-text1)]">{scope.preview_max_items}</span>
       </p>
     </div>
   );
@@ -168,9 +168,9 @@ export function PrunerInstanceOverviewTab(props: { contextOverride?: Ctx }) {
         <p className="mm-page__eyebrow">This server</p>
         <h2 className="mm-page__title text-xl sm:text-2xl">Overview</h2>
         <p className="mm-page__subtitle max-w-3xl">
-          One <strong className="text-[var(--mm-text)]">{instance.provider}</strong> library connection. TV and Movies
-          are separate tabs under this instance. Previews write candidate snapshots; apply uses{" "}
-          <strong className="text-[var(--mm-text)]">only</strong> the snapshot you confirm, not a fresh scan.
+          One <strong className="text-[var(--mm-text)]">{instance.provider}</strong> library connection. TV shows and
+          movies are separate tabs under this server. Each scan saves a list you can review; deleting uses{" "}
+          <strong className="text-[var(--mm-text)]">only</strong> the list you confirm, not a new scan.
         </p>
       </header>
 
@@ -192,12 +192,12 @@ export function PrunerInstanceOverviewTab(props: { contextOverride?: Ctx }) {
         aria-labelledby="pruner-overview-apply-note"
       >
         <h3 id="pruner-overview-apply-note" className="text-sm font-semibold text-[var(--mm-text)]">
-          After you apply
+          After you delete
         </h3>
         <p className="mt-1 text-xs sm:text-sm">
-          Per-preview <strong className="text-[var(--mm-text)]">removed / skipped / failed</strong> counts are written
-          to <strong className="text-[var(--mm-text)]">Activity</strong> when the apply job finishes. This overview does
-          not yet mirror those outcomes from the instance API.
+          Removed, skipped, and failed counts for each delete run are written to{" "}
+          <strong className="text-[var(--mm-text)]">Activity</strong> when the job finishes. This overview does not yet
+          repeat those counts from the server API.
         </p>
         <p className="mt-2">
           <Link

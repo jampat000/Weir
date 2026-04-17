@@ -14,6 +14,7 @@ import {
 import type { PrunerServerInstance } from "../../lib/pruner/api";
 import { MmOnOffSwitch } from "../../components/ui/mm-on-off-switch";
 import { fetcherMenuButtonClass } from "../fetcher/fetcher-menu-button";
+import { PrunerGenreMultiSelect, prunerGenresFromApi } from "./pruner-genre-multi-select";
 import {
   PRUNER_SCAN_POLL_MS,
   PRUNER_SCAN_TIMEOUT_MS,
@@ -88,7 +89,7 @@ function PrunerDryRunControls(props: DryRunControlsProps) {
         reasons[s.previewRunId] = r.reasons;
       } catch {
         elig[s.previewRunId] = false;
-        reasons[s.previewRunId] = ["Could not verify delete eligibility."];
+        reasons[s.previewRunId] = ["Could not confirm whether these items can be deleted safely."];
       }
     }
     setDeleteEligible(elig);
@@ -109,7 +110,7 @@ function PrunerDryRunControls(props: DryRunControlsProps) {
       const tv = scopeRow(fresh, "tv");
       const movies = scopeRow(fresh, "movies");
       if (!tv || !movies) {
-        throw new Error("Scope settings missing.");
+        throw new Error("TV and movie settings for this server are missing. Try reloading the page.");
       }
       const families =
         mediaScope === "tv"
@@ -234,7 +235,7 @@ function PrunerDryRunControls(props: DryRunControlsProps) {
           data-testid={`${testIdPrefix}-dry-run-${mediaScope}-btn`}
           onClick={() => void runScan()}
         >
-          {phase === "scanning" ? "Scanning your library…" : `Dry run ${label}`}
+          {phase === "scanning" ? "Scanning your library…" : `Scan ${label} library (no deletions yet)`}
         </button>
       </div>
       {err ? (
@@ -248,7 +249,7 @@ function PrunerDryRunControls(props: DryRunControlsProps) {
             <p className="text-sm font-medium text-[var(--mm-text1)]">Deleting…</p>
           ) : null}
           {snapshots.length === 0 && phase === "results" && !err ? (
-            <p className="text-sm text-[var(--mm-text2)]">No enabled rules to scan for this library tab.</p>
+            <p className="text-sm text-[var(--mm-text2)]">No cleanup rules are turned on for this tab, so there is nothing to scan.</p>
           ) : null}
           {snapshots.map((s) => (
             <div key={s.previewRunId} className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-surface2)]/30 p-3">
@@ -266,16 +267,16 @@ function PrunerDryRunControls(props: DryRunControlsProps) {
               ) : null}
               {s.outcome === "success" ? (
                 <p className="mt-1 text-xs text-[var(--mm-text2)]">
-                  {s.rows.length} match{s.rows.length === 1 ? "" : "es"}
-                  {s.truncated ? " (list capped — more items matched on the server)" : ""}
+                  {s.rows.length} item{s.rows.length === 1 ? "" : "s"} matched
+                  {s.truncated ? " (list stopped at your scan limit — more may exist on the server)" : ""}
                 </p>
               ) : null}
             </div>
           ))}
           {totalCount > 0 ? (
             <p className="text-sm text-[var(--mm-text1)]">
-              <span className="font-semibold">{totalCount}</span> item{totalCount === 1 ? "" : "s"} matched across
-              enabled rules.
+              <span className="font-semibold">{totalCount}</span> item{totalCount === 1 ? "" : "s"} matched across the
+              rules you ran.
             </p>
           ) : null}
           {totalCount > 0 ? (
@@ -343,7 +344,7 @@ export function PrunerProviderRulesCard({ provider, instanceId, instance, disabl
   const [missingPrimaryTv, setMissingPrimaryTv] = useState(true);
   const [watchedTv, setWatchedTv] = useState(false);
   const [neverTvDays, setNeverTvDays] = useState("0");
-  const [genreTv, setGenreTv] = useState("");
+  const [genreTv, setGenreTv] = useState<string[]>([]);
   const [yearMinTv, setYearMinTv] = useState("");
   const [yearMaxTv, setYearMaxTv] = useState("");
   const [studioTv, setStudioTv] = useState("");
@@ -354,7 +355,7 @@ export function PrunerProviderRulesCard({ provider, instanceId, instance, disabl
   const [watchedMovies, setWatchedMovies] = useState(false);
   const [lowRatingMovies, setLowRatingMovies] = useState("0");
   const [unwatchedDays, setUnwatchedDays] = useState("0");
-  const [genreMovies, setGenreMovies] = useState("");
+  const [genreMovies, setGenreMovies] = useState<string[]>([]);
   const [yearMinMovies, setYearMinMovies] = useState("");
   const [yearMaxMovies, setYearMaxMovies] = useState("");
   const [studioMovies, setStudioMovies] = useState("");
@@ -368,7 +369,7 @@ export function PrunerProviderRulesCard({ provider, instanceId, instance, disabl
     setMissingPrimaryTv(tv.missing_primary_media_reported_enabled);
     setWatchedTv(tv.watched_tv_reported_enabled);
     setNeverTvDays(!tv.never_played_stale_reported_enabled ? "0" : String(tv.never_played_min_age_days));
-    setGenreTv((tv.preview_include_genres ?? []).join(", "));
+    setGenreTv(prunerGenresFromApi(tv.preview_include_genres));
     setYearMinTv(tv.preview_year_min != null ? String(tv.preview_year_min) : "");
     setYearMaxTv(tv.preview_year_max != null ? String(tv.preview_year_max) : "");
     setStudioTv((tv.preview_include_studios ?? []).join(", "));
@@ -391,7 +392,7 @@ export function PrunerProviderRulesCard({ provider, instanceId, instance, disabl
           ),
     );
     setUnwatchedDays(!movies.unwatched_movie_stale_reported_enabled ? "0" : String(movies.unwatched_movie_stale_min_age_days));
-    setGenreMovies((movies.preview_include_genres ?? []).join(", "));
+    setGenreMovies(prunerGenresFromApi(movies.preview_include_genres));
     setYearMinMovies(movies.preview_year_min != null ? String(movies.preview_year_min) : "");
     setYearMaxMovies(movies.preview_year_max != null ? String(movies.preview_year_max) : "");
     setStudioMovies((movies.preview_include_studios ?? []).join(", "));
@@ -399,7 +400,7 @@ export function PrunerProviderRulesCard({ provider, instanceId, instance, disabl
 
   function buildFilterPatch(
     scope: "tv" | "movies",
-    genreText: string,
+    genres: string[],
     yMinStr: string,
     yMaxStrStr: string,
     studioText: string,
@@ -413,7 +414,7 @@ export function PrunerProviderRulesCard({ provider, instanceId, instance, disabl
       throw new Error("Minimum year must be less than or equal to maximum year.");
     }
     return {
-      preview_include_genres: parseCommaTokens(genreText),
+      preview_include_genres: [...genres],
       preview_year_min: yMinStr.trim() ? yMin : null,
       preview_year_max: yMaxStrStr.trim() ? yMax : null,
       preview_include_studios: parseCommaTokens(studioText),
@@ -472,7 +473,7 @@ export function PrunerProviderRulesCard({ provider, instanceId, instance, disabl
     setBusy(true);
     try {
       await persistTv();
-      setMsg("Saved TV rules.");
+      setMsg("Saved TV cleanup settings.");
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -487,7 +488,7 @@ export function PrunerProviderRulesCard({ provider, instanceId, instance, disabl
     setBusy(true);
     try {
       await persistMovies();
-      setMsg("Saved Movies rules.");
+      setMsg("Saved movie cleanup settings.");
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -515,7 +516,7 @@ export function PrunerProviderRulesCard({ provider, instanceId, instance, disabl
               <span className="text-sm font-semibold uppercase tracking-wide text-[var(--mm-text1)]">TV</span>
               {isPlex ? (
                 <p className="text-xs text-[var(--mm-text3)]" data-testid="pruner-plex-tv-rules-scope-note">
-                  Plex TV supports missing primary art only
+                  On Plex TV you can only find broken posters and episode images here.
                 </p>
               ) : null}
             </div>
@@ -523,13 +524,15 @@ export function PrunerProviderRulesCard({ provider, instanceId, instance, disabl
               <>
                 <MmOnOffSwitch
                   id={`pruner-op-tv-watched-${provider}`}
-                  label="Watched TV removal — Delete items marked watched for this user"
+                  label="Delete TV episodes you have already watched"
                   enabled={watchedTv}
                   disabled={fieldDisabled || disabled}
                   onChange={setWatchedTv}
                 />
                 <label className="block text-sm text-[var(--mm-text1)]">
-                  <span className="mb-1 block text-xs text-[var(--mm-text3)]">Never-played TV older than N days</span>
+                  <span className="mb-1 block text-xs text-[var(--mm-text3)]">
+                    Delete TV shows not watched in the last N days (never started)
+                  </span>
                   <input
                     type="number"
                     min={0}
@@ -540,24 +543,25 @@ export function PrunerProviderRulesCard({ provider, instanceId, instance, disabl
                     disabled={fieldDisabled || disabled}
                   />
                 </label>
-                <p className="text-xs text-[var(--mm-text3)]">Set 0 to disable.</p>
+                <p className="text-xs text-[var(--mm-text3)]">Use 0 to turn this off.</p>
               </>
             ) : null}
             <MmOnOffSwitch
               id={`pruner-op-tv-missing-${provider}`}
-              label="Remove items missing primary artwork — Broken or missing poster / episode image"
+              label="Delete TV items missing a main poster or episode image"
               enabled={missingPrimaryTv}
               disabled={fieldDisabled || disabled}
               onChange={setMissingPrimaryTv}
             />
-            <CommaField
-              label="Genre"
-              placeholder="e.g. Drama, Science Fiction"
-              helper="Leave blank for all genres"
-              value={genreTv}
-              onChange={setGenreTv}
-              disabled={fieldDisabled || disabled}
-            />
+            <div className="space-y-1">
+              <span className="mb-1 block text-xs font-medium text-[var(--mm-text3)]">Genres</span>
+              <PrunerGenreMultiSelect
+                value={genreTv}
+                onChange={setGenreTv}
+                disabled={fieldDisabled || disabled}
+                testId={`pruner-rules-genre-tv-${provider}`}
+              />
+            </div>
             <YearRange min={yearMinTv} max={yearMaxTv} onMin={setYearMinTv} onMax={setYearMaxTv} disabled={fieldDisabled || disabled} />
             <CommaField
               label="Studio"
@@ -601,14 +605,16 @@ export function PrunerProviderRulesCard({ provider, instanceId, instance, disabl
             </div>
             <MmOnOffSwitch
               id={`pruner-op-mov-watched-${provider}`}
-              label="Watched movies removal — Delete items marked watched for this user"
+              label="Delete movies you have already watched"
               enabled={watchedMovies}
               disabled={fieldDisabled || disabled}
               onChange={setWatchedMovies}
             />
             <label className="block text-sm text-[var(--mm-text1)]" htmlFor={`pruner-op-mov-lowrating-${provider}`}>
               <span className="mb-1 block text-xs text-[var(--mm-text3)]">
-                {isPlex ? "Plex audienceRating max (0–10)" : "Jellyfin/Emby CommunityRating max (0–10)"}
+                {isPlex
+                  ? "Delete watched movies rated below this score (0–10) — uses Plex audience rating"
+                  : "Delete watched movies rated below this score (0–10) — uses your server’s community rating"}
               </span>
               <input
                 id={`pruner-op-mov-lowrating-${provider}`}
@@ -622,9 +628,11 @@ export function PrunerProviderRulesCard({ provider, instanceId, instance, disabl
                 disabled={fieldDisabled || disabled}
               />
             </label>
-            <p className="text-xs text-[var(--mm-text3)]">Set 0 to disable low-rating removal.</p>
+            <p className="text-xs text-[var(--mm-text3)]">Use 0 to turn off low-score cleanup.</p>
             <label className="block text-sm text-[var(--mm-text2)]">
-              <span className="mb-1 block text-xs text-[var(--mm-text3)]">Unwatched movies older than N days</span>
+              <span className="mb-1 block text-xs text-[var(--mm-text3)]">
+                Delete movies you have not watched that are older than N days
+              </span>
               <input
                 type="number"
                 min={0}
@@ -635,24 +643,25 @@ export function PrunerProviderRulesCard({ provider, instanceId, instance, disabl
                 disabled={fieldDisabled || disabled}
               />
             </label>
-            <p className="text-xs text-[var(--mm-text3)]">Set 0 to disable.</p>
+            <p className="text-xs text-[var(--mm-text3)]">Use 0 to turn this off.</p>
             {!isPlex ? (
               <MmOnOffSwitch
                 id={`pruner-op-mov-missing-${provider}`}
-                label="Remove items missing primary artwork — Broken or missing movie poster"
+                label="Delete movies missing a main poster"
                 enabled={missingPrimaryMovies}
                 disabled={fieldDisabled || disabled}
                 onChange={setMissingPrimaryMovies}
               />
             ) : null}
-            <CommaField
-              label="Genre"
-              placeholder="e.g. Drama, Science Fiction"
-              helper="Leave blank for all genres"
-              value={genreMovies}
-              onChange={setGenreMovies}
-              disabled={fieldDisabled || disabled}
-            />
+            <div className="space-y-1">
+              <span className="mb-1 block text-xs font-medium text-[var(--mm-text3)]">Genres</span>
+              <PrunerGenreMultiSelect
+                value={genreMovies}
+                onChange={setGenreMovies}
+                disabled={fieldDisabled || disabled}
+                testId={`pruner-rules-genre-movies-${provider}`}
+              />
+            </div>
             <YearRange
               min={yearMinMovies}
               max={yearMaxMovies}

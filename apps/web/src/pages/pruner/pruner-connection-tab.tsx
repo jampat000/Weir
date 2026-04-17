@@ -25,7 +25,9 @@ export function PrunerConnectionTab(props: { contextOverride?: Ctx }) {
     try {
       const { pruner_job_id } = await postPrunerConnectionTest(instanceId);
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
-      setMsg(`Queued connection test job #${pruner_job_id}. When it completes, this panel and Activity update for this instance only.`);
+      setMsg(
+        `Connection test started. When it finishes, this panel and Activity update for this server only (task #${pruner_job_id}).`,
+      );
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -39,9 +41,8 @@ export function PrunerConnectionTab(props: { contextOverride?: Ctx }) {
         <p className="mm-page__eyebrow">This server</p>
         <h2 className="mm-page__title text-xl sm:text-2xl">Connection</h2>
         <p className="mm-page__subtitle max-w-3xl">
-          Verify reachability for <strong className="text-[var(--mm-text)]">this</strong> Pruner instance only. Jellyfin
-          and Emby use a lightweight public info ping; Plex uses <code className="text-[0.85em]">GET /identity</code> with
-          your stored token when present.
+          Check that MediaMop can reach <strong className="text-[var(--mm-text)]">this</strong> server only. Jellyfin and
+          Emby use a small public info check; Plex checks identity with your saved token when you have one.
         </p>
       </header>
 
@@ -72,7 +73,7 @@ export function PrunerConnectionTab(props: { contextOverride?: Ctx }) {
             </div>
           </dl>
         ) : (
-          <p className="mt-2 text-xs text-[var(--mm-text2)]">Loading instance…</p>
+          <p className="mt-2 text-xs text-[var(--mm-text2)]">Loading server…</p>
         )}
       </section>
 
@@ -83,7 +84,7 @@ export function PrunerConnectionTab(props: { contextOverride?: Ctx }) {
           disabled={busy}
           onClick={() => void runTest()}
         >
-          Queue connection test
+          Run connection test
         </button>
       ) : (
         <p className="text-sm text-[var(--mm-text2)]">Sign in as an operator to run connection tests.</p>

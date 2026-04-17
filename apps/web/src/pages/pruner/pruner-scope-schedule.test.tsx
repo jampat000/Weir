@@ -83,7 +83,7 @@ describe("PrunerScopeTab scheduled preview", () => {
         expect(screen.getByTestId("pruner-scope-scheduled-preview")).toBeInTheDocument();
       });
       const block = screen.getByTestId("pruner-scope-scheduled-preview");
-      expect(block.textContent).toMatch(/this tab/i);
+      expect(block.textContent).toMatch(/TV tab/i);
       expect(block.textContent).not.toMatch(/both scopes/i);
       expect(screen.getByRole("button", { name: /save schedule/i })).toBeInTheDocument();
     } finally {

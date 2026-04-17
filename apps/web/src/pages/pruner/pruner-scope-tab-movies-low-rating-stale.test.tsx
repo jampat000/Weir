@@ -113,13 +113,13 @@ describe("PrunerScopeTab Movies / low-rating and unwatched stale", () => {
       );
 
       await waitFor(() => expect(screen.getByTestId("pruner-watched-low-rating-panel")).toBeInTheDocument());
-      fireEvent.click(screen.getByRole("button", { name: /queue preview \(watched low-rating movies\)/i }));
+      fireEvent.click(screen.getByRole("button", { name: /Scan for low-score watched movies/i }));
       await waitFor(() => {
         expect(spyPreview).toHaveBeenCalledWith(44, "movies", {
           rule_family_id: RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED,
         });
       });
-      fireEvent.click(screen.getByRole("button", { name: /queue preview \(unwatched stale movies\)/i }));
+      fireEvent.click(screen.getByRole("button", { name: /Scan for old unwatched movies/i }));
       await waitFor(() => {
         expect(spyPreview).toHaveBeenCalledWith(44, "movies", {
           rule_family_id: RULE_FAMILY_UNWATCHED_MOVIE_STALE_REPORTED,

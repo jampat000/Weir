@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { FetcherEnableSwitch } from "../fetcher/fetcher-enable-switch";
+import { MmOnOffSwitch } from "../../components/ui/mm-on-off-switch";
 import { fetcherMenuButtonClass, fetcherSectionTabClass } from "../fetcher/fetcher-menu-button";
 import { fetchCsrfToken } from "../../lib/api/auth-api";
 import type { PrunerJobsInspectionRow, PrunerServerInstance } from "../../lib/pruner/api";
@@ -10,7 +10,7 @@ import { patchPrunerInstance, patchPrunerScope, postPrunerConnectionTest, postPr
 import { useMeQuery } from "../../lib/auth/queries";
 import { usePrunerInstancesQuery, usePrunerJobsInspectionQuery } from "../../lib/pruner/queries";
 import { PrunerProviderPeopleCard, PrunerProviderRulesCard } from "./pruner-provider-operator-workspace";
-import { formatPrunerDateTime } from "./pruner-ui-utils";
+import { formatPrunerDateTime, prunerJobKindOperatorLabel } from "./pruner-ui-utils";
 
 type TopTab = "overview" | "emby" | "jellyfin" | "plex" | "schedules" | "jobs";
 type ProviderTab = "emby" | "jellyfin" | "plex";
@@ -282,7 +282,7 @@ function PrunerConnectionCredentialPanel({
     >
       {!controlled && providerInstances.length > 1 ? (
         <label className="block text-sm text-[var(--mm-text2)]">
-          <span className="mb-1 block text-xs text-[var(--mm-text3)]">Instance</span>
+          <span className="mb-1 block text-xs text-[var(--mm-text3)]">Server</span>
           <select
             className="mm-input mt-1 w-full"
             value={selectedInstance?.id ?? ""}
@@ -367,7 +367,7 @@ function PrunerConnectionCredentialPanel({
           role="status"
           data-testid={`pruner-connection-test-ok-${provider}`}
         >
-          Test queued — results appear below when the job finishes.
+          Test started — results appear here when it finishes.
         </p>
       ) : null}
 
@@ -487,7 +487,7 @@ function ProviderConfigurationWorkspace({ provider, allInstances }: { provider: 
     <section className="space-y-5" data-testid={`pruner-provider-tab-${provider}`}>
       {providerInstances.length > 1 ? (
         <label className="block max-w-md text-sm text-[var(--mm-text2)]">
-          <span className="mb-1 block text-xs text-[var(--mm-text3)]">Instance</span>
+          <span className="mb-1 block text-xs text-[var(--mm-text3)]">Server</span>
           <select
             className="mm-input mt-1 w-full"
             value={selectedInstance?.id ?? ""}
@@ -569,6 +569,15 @@ function ProviderConfigurationWorkspace({ provider, allInstances }: { provider: 
   );
 }
 
+function scanOutcomeReadable(o: string | null | undefined): string {
+  if (!o) return "—";
+  const u = o.toLowerCase();
+  if (u === "success") return "Finished OK";
+  if (u === "failed") return "Failed";
+  if (u === "unsupported") return "Not available";
+  return o;
+}
+
 function TopLevelOverview({ instances }: { instances: PrunerServerInstance[] }) {
   const jobsQ = usePrunerJobsInspectionQuery(50);
   const providers: ProviderTab[] = ["emby", "jellyfin", "plex"];
@@ -594,7 +603,7 @@ function TopLevelOverview({ instances }: { instances: PrunerServerInstance[] }) 
       <header className="max-w-3xl">
         <h2 className="text-base font-semibold text-[var(--mm-text1)]">Overview</h2>
         <p className="mt-1 text-sm text-[var(--mm-text2)]">
-          Open each provider tab for credentials (Connection sub-tab), TV and Movies rules, and people filters.
+          Open Emby, Jellyfin, or Plex for connection details, TV and movie cleanup rules, and optional name filters.
         </p>
       </header>
 
@@ -618,26 +627,28 @@ function TopLevelOverview({ instances }: { instances: PrunerServerInstance[] }) 
                   </span>
                 </p>
                 <p>
-                  <span className="text-[var(--mm-text3)]">Active rules:</span>{" "}
+                  <span className="text-[var(--mm-text3)]">Cleanup rules on:</span>{" "}
                   <span className="font-medium text-[var(--mm-text1)]">{card.activeRules}</span>
                 </p>
                 <p>
-                  <span className="text-[var(--mm-text3)]">Last preview:</span>{" "}
+                  <span className="text-[var(--mm-text3)]">Last library scan:</span>{" "}
                   <span className="font-medium text-[var(--mm-text1)]">
                     {card.latestPreview
-                      ? `${card.latestPreview.media_scope.toUpperCase()} · ${card.latestPreview.last_preview_outcome ?? "—"}`
+                      ? `${card.latestPreview.media_scope === "tv" ? "TV" : "Movies"} · ${scanOutcomeReadable(card.latestPreview.last_preview_outcome)}`
                       : "—"}
                   </span>
                 </p>
                 <p>
-                  <span className="text-[var(--mm-text3)]">Last apply / job:</span>{" "}
+                  <span className="text-[var(--mm-text3)]">Recent task:</span>{" "}
                   <span className="font-medium text-[var(--mm-text1)]">
-                    {card.latestJob ? `${card.latestJob.job_kind} (${card.latestJob.status})` : "—"}
+                    {card.latestJob
+                      ? `${prunerJobKindOperatorLabel(card.latestJob.job_kind)} (${card.latestJob.status})`
+                      : "—"}
                   </span>
                 </p>
               </div>
             ) : (
-              <p className="text-[var(--mm-text2)]">No instance registered. Add credentials on that provider’s Connection sub-tab.</p>
+              <p className="text-[var(--mm-text2)]">No server saved yet. Add the address and key on that provider’s Connection tab.</p>
             );
             return <PrunerAtGlanceCard key={card.provider} glanceOrder={order} title={providerLabel(card.provider)} body={body} />;
           })}
@@ -649,9 +660,9 @@ function TopLevelOverview({ instances }: { instances: PrunerServerInstance[] }) 
           className="rounded-md border border-dashed border-[var(--mm-border)] bg-[var(--mm-surface2)]/35 px-4 py-4 text-sm text-[var(--mm-text2)]"
           data-testid="pruner-empty-state"
         >
-          <p className="font-semibold text-[var(--mm-text1)]">No Emby, Jellyfin, or Plex instances registered yet.</p>
-          <p className="mt-1">Open Emby, Jellyfin, or Plex and use the Connection sub-tab to add a server URL and API key or token.</p>
-          <p className="mt-2 text-xs">Nothing is shared across providers or across instance rows.</p>
+          <p className="font-semibold text-[var(--mm-text1)]">No Emby, Jellyfin, or Plex servers saved yet.</p>
+          <p className="mt-1">Open Emby, Jellyfin, or Plex and use the Connection tab to add a server address and API key or token.</p>
+          <p className="mt-2 text-xs">Nothing is shared between providers or between separate saved servers.</p>
         </div>
       ) : null}
     </section>
@@ -715,69 +726,66 @@ function PrunerGlobalScheduleRow({
   }
 
   const pLabel = providerLabel(provider);
-  const scopeLabel = scope === "tv" ? "TV" : "Movies";
   const missing = !instance;
   const testId = `pruner-schedule-row-${provider}-${scope}`;
 
+  const scopeHeading = scope === "tv" ? "TV shows" : "Movies";
+  const saveScheduleLabel = `Save ${pLabel} ${scopeHeading} schedule`;
+
   return (
-    <div
-      className="mm-card mm-dash-card border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-4 sm:p-5"
-      data-testid={testId}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--mm-border)] pb-3">
-        <div>
-          <p className="text-sm font-semibold text-[var(--mm-text1)]">
-            {pLabel} {scopeLabel}
-          </p>
-          {instance ? (
-            <p className="mt-0.5 text-xs text-[var(--mm-text3)]">{instance.display_name}</p>
-          ) : (
-            <p className="mt-0.5 text-xs text-[var(--mm-text3)]">No {pLabel} instance registered.</p>
-          )}
-        </div>
-      </div>
-      <div className={`mt-4 space-y-4 ${missing || !canOperate ? "pointer-events-none opacity-45" : ""}`}>
+    <section className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-6" data-testid={testId}>
+      <h3 className="text-sm font-semibold text-[var(--mm-text1)]">
+        {pLabel} · {scopeHeading}
+      </h3>
+      {instance ? (
+        <p className="mt-1 text-xs text-[var(--mm-text3)]">{instance.display_name}</p>
+      ) : (
+        <p className="mt-1 text-xs text-[var(--mm-text3)]">No {pLabel} server saved yet.</p>
+      )}
+      <div className={`mt-5 space-y-6 ${missing || !canOperate ? "pointer-events-none opacity-45" : ""}`}>
         {scopeRow && instance ? (
           <>
-            <FetcherEnableSwitch
+            <MmOnOffSwitch
               id={`pruner-sched-${provider}-${scope}-en`}
-              label="Enable scheduled previews"
+              label="Enable automatic scans"
               enabled={schedEnabled}
               disabled={busy || missing || !canOperate}
               onChange={setSchedEnabled}
             />
-            <div className="flex flex-wrap items-end gap-4">
-              <label className="block text-sm text-[var(--mm-text2)]">
-                <span className="mb-1 block text-xs text-[var(--mm-text3)]">Interval (seconds)</span>
-                <input
-                  type="number"
-                  min={60}
-                  max={86400}
-                  className="mm-input w-32"
-                  value={schedInterval}
-                  disabled={busy || missing || !canOperate}
-                  onChange={(e) => setSchedInterval(parseInt(e.target.value, 10) || 3600)}
-                />
-              </label>
-              <label className="block text-sm text-[var(--mm-text2)]">
-                <span className="mb-1 block text-xs text-[var(--mm-text3)]">Preview cap (1–5000)</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={5000}
-                  className="mm-input w-32"
-                  value={previewCap}
-                  disabled={busy || missing || !canOperate}
-                  onChange={(e) => setPreviewCap(Math.max(1, Math.min(5000, Number(e.target.value) || 500)))}
-                />
-              </label>
+            <div>
+              <span className="text-sm font-medium text-[var(--mm-text1)]">Run every (seconds)</span>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--mm-text3)]">Between 60 seconds and 24 hours</p>
+              <input
+                type="number"
+                min={60}
+                max={86400}
+                className="mm-input mt-2 w-full max-w-xs"
+                value={schedInterval}
+                disabled={busy || missing || !canOperate}
+                onChange={(e) => setSchedInterval(parseInt(e.target.value, 10) || 3600)}
+                aria-label="Run every seconds"
+              />
             </div>
-            <p className="text-xs text-[var(--mm-text3)]">
-              Last scheduled enqueue:{" "}
-              <span className="text-[var(--mm-text2)]">
+            <div>
+              <span className="text-sm font-medium text-[var(--mm-text1)]">Items to scan per run</span>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--mm-text3)]">Maximum items checked each automatic scan</p>
+              <input
+                type="number"
+                min={1}
+                max={5000}
+                className="mm-input mt-2 w-full max-w-xs"
+                value={previewCap}
+                disabled={busy || missing || !canOperate}
+                onChange={(e) => setPreviewCap(Math.max(1, Math.min(5000, Number(e.target.value) || 500)))}
+                aria-label="Items to scan per run"
+              />
+            </div>
+            <p className="text-xs text-[var(--mm-text2)]">
+              <span className="text-[var(--mm-text3)]">Last automatic scan:</span>{" "}
+              <span className="font-medium text-[var(--mm-text1)]">
                 {scopeRow.last_scheduled_preview_enqueued_at
                   ? formatPrunerDateTime(scopeRow.last_scheduled_preview_enqueued_at)
-                  : "—"}
+                  : "Never run"}
               </span>
             </p>
             {canOperate ? (
@@ -787,12 +795,12 @@ function PrunerGlobalScheduleRow({
                 disabled={busy}
                 onClick={() => void saveRow()}
               >
-                {busy ? "Saving…" : "Save"}
+                {busy ? "Saving…" : saveScheduleLabel}
               </button>
             ) : null}
           </>
         ) : (
-          <p className="text-xs text-[var(--mm-text3)]">Connect this provider to edit this schedule.</p>
+          <p className="text-xs text-[var(--mm-text3)]">Save a {pLabel} server on that provider’s Connection tab to edit this schedule.</p>
         )}
         {msg ? <p className="text-xs text-green-600">{msg}</p> : null}
         {err ? (
@@ -801,7 +809,7 @@ function PrunerGlobalScheduleRow({
           </p>
         ) : null}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -811,7 +819,7 @@ function TopLevelSchedules({ instances }: { instances: PrunerServerInstance[] })
       <header className="max-w-3xl">
         <h2 className="text-base font-semibold text-[var(--mm-text1)]">Schedules</h2>
         <p className="mt-1 text-sm text-[var(--mm-text2)]">
-          Scheduled missing-primary previews per provider and scope. Each row saves independently.
+          Turn on timed library checks per provider and library type. Each card saves on its own.
         </p>
       </header>
       {instances.length === 0 ? (
@@ -819,7 +827,7 @@ function TopLevelSchedules({ instances }: { instances: PrunerServerInstance[] })
           className="rounded-md border border-dashed border-[var(--mm-border)] bg-[var(--mm-surface2)]/35 px-4 py-3 text-sm text-[var(--mm-text2)]"
           data-testid="pruner-schedules-empty-state"
         >
-          Register a provider (Emby, Jellyfin, or Plex tab → Connection) to enable schedules.
+          Add a server under each provider tab to set up automatic scans.
         </p>
       ) : (
         <div className="space-y-8">
@@ -881,7 +889,8 @@ function TopLevelJobs({ instances }: { instances: PrunerServerInstance[] }) {
     <section className="space-y-3" data-testid="pruner-top-jobs-tab">
       <h2 className="text-base font-semibold text-[var(--mm-text1)]">Jobs</h2>
       <p className="text-sm text-[var(--mm-text2)]">
-        Recent Pruner jobs across providers. Provider linkage uses job payload when present.
+        Recent cleanup and connection tasks. When MediaMop knows which server a task belonged to, it is shown in the
+        table.
       </p>
       {jobsQ.isLoading ? <p className="text-sm text-[var(--mm-text2)]">Loading jobs…</p> : null}
       {jobsQ.isError ? <p className="text-sm text-red-600">{(jobsQ.error as Error).message}</p> : null}
@@ -890,10 +899,10 @@ function TopLevelJobs({ instances }: { instances: PrunerServerInstance[] }) {
           <table className="w-full min-w-[42rem] border-collapse text-left text-sm">
             <thead className="bg-[var(--mm-surface2)] text-xs uppercase text-[var(--mm-text2)]">
               <tr>
-                <th className="px-2 py-2">Job</th>
-                <th className="px-2 py-2">Kind</th>
+                <th className="px-2 py-2">Id</th>
+                <th className="px-2 py-2">What ran</th>
                 <th className="px-2 py-2">Status</th>
-                <th className="px-2 py-2">Provider / instance</th>
+                <th className="px-2 py-2">Provider / server</th>
                 <th className="px-2 py-2">Updated</th>
               </tr>
             </thead>
@@ -904,10 +913,10 @@ function TopLevelJobs({ instances }: { instances: PrunerServerInstance[] }) {
                 return (
                   <tr key={job.id} className="border-t border-[var(--mm-border)]">
                     <td className="px-2 py-2 font-mono text-xs">#{job.id}</td>
-                    <td className="px-2 py-2 text-xs">{job.job_kind}</td>
+                    <td className="px-2 py-2 text-xs">{prunerJobKindOperatorLabel(job.job_kind)}</td>
                     <td className="px-2 py-2">{job.status}</td>
                     <td className="px-2 py-2 text-xs">
-                      {inst ? `${inst.provider} / ${inst.display_name}` : sid ? `instance #${sid}` : "n/a"}
+                      {inst ? `${inst.provider} / ${inst.display_name}` : sid ? `Server #${sid}` : "—"}
                     </td>
                     <td className="px-2 py-2 text-xs">{job.updated_at}</td>
                   </tr>
