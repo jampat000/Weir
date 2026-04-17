@@ -5,6 +5,36 @@ import { ApiEntryError } from "../../components/shared/api-entry-error";
 import { PageLoading } from "../../components/shared/page-loading";
 import { useBootstrapStatusQuery, useLoginMutation, useMeQuery } from "../../lib/auth/queries";
 
+function EyeIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M10.73 5.08A10.4 10.4 0 0 1 12 5c7 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68M6.61 6.61A13.5 13.5 0 0 0 2 12s4 7 10 7c1.38 0 2.65-.21 3.78-.6M9.88 9.88a3 3 0 1 0 4.24 4.24"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="m2 2 20 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -16,6 +46,7 @@ export function LoginPage() {
   const login = useLoginMutation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   if (me.isPending || boot.isPending) {
     return <PageLoading />;
@@ -91,17 +122,33 @@ export function LoginPage() {
             <label className="mm-auth-label" htmlFor="login-pass">
               Password
             </label>
-            <input
-              id="login-pass"
-              data-testid="login-password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              className="mm-auth-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <div className="mm-auth-password-field">
+              <input
+                id="login-pass"
+                data-testid="login-password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                className="mm-auth-input mm-auth-input--password-toggle"
+                value={password}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setPassword(next);
+                  if (next === "") setShowPassword(false);
+                }}
+                required
+              />
+              <button
+                type="button"
+                className="mm-auth-password-toggle"
+                data-testid="login-password-toggle"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                title={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((v) => !v)}
+              >
+                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+            </div>
             {login.isError ? (
               <p className="mm-auth-banner" role="alert">
                 {login.error instanceof Error ? login.error.message : "Sign-in failed."}

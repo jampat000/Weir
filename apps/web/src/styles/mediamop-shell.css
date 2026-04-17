@@ -1029,6 +1029,48 @@ select.mm-input::-ms-expand {
   box-shadow: 0 0 0 2px var(--mm-input-focus-ring);
 }
 
+.mm-auth-password-field {
+  position: relative;
+  width: 100%;
+}
+
+.mm-auth-input.mm-auth-input--password-toggle {
+  box-sizing: border-box;
+  width: 100%;
+  padding-right: 2.65rem;
+}
+
+.mm-auth-password-toggle {
+  position: absolute;
+  right: 0.2rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--mm-radius-sm);
+  background: transparent;
+  color: var(--mm-text3);
+  cursor: pointer;
+  transition:
+    color 0.14s ease,
+    background-color 0.14s ease;
+}
+
+.mm-auth-password-toggle:hover {
+  color: var(--mm-text1);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.mm-auth-password-toggle:focus-visible {
+  outline: 2px solid var(--mm-input-focus-ring);
+  outline-offset: 1px;
+}
+
 .mm-auth-submit {
   margin-top: 0.35rem;
   font: inherit;
