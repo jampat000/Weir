@@ -267,7 +267,7 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       setYearMsg(
-        "Saved preview year bounds for this tab (Jellyfin/Emby: ProductionYear; Plex missing-primary: leaf year when present).",
+        "Saved preview year bounds for this tab (Jellyfin/Emby: ProductionYear; Plex allLeaves movie rows: leaf year when present).",
       );
     } catch (e) {
       setErr((e as Error).message);
@@ -320,7 +320,7 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       setCollectionMsg(
         tokens.length
-          ? "Saved collection include list (Plex missing-primary previews only in this release)."
+          ? "Saved collection include list (Plex allLeaves movie previews on this tab)."
           : "Cleared collection preview filters for this tab.",
       );
     } catch (e) {
@@ -363,7 +363,9 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       setLowRatingMsg(
-        "Saved watched low-rating movies rule for this Movies tab (Jellyfin/Emby CommunityRating 0–10 ceiling).",
+        instance?.provider === "plex"
+          ? "Saved watched low-rating movies rule for this Movies tab (Plex: leaf audienceRating vs the same 0–10 ceiling)."
+          : "Saved watched low-rating movies rule for this Movies tab (Jellyfin/Emby CommunityRating 0–10 ceiling).",
       );
     } catch (e) {
       setErr((e as Error).message);
@@ -385,7 +387,11 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
         csrf_token,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
-      setUnwatchedStaleMsg("Saved unwatched stale movies rule for this Movies tab (library DateCreated age).");
+      setUnwatchedStaleMsg(
+        instance?.provider === "plex"
+          ? "Saved unwatched stale movies rule for this Movies tab (Plex: unwatched leaves by viewCount/lastViewedAt plus addedAt age)."
+          : "Saved unwatched stale movies rule for this Movies tab (library DateCreated age).",
+      );
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -597,9 +603,13 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
       ) : (
         <p className="text-sm text-[var(--mm-text2)]">
           For <strong>Remove broken library entries</strong>, Plex uses the same{" "}
-          <strong>preview → inspect JSON → apply</strong> flow as Jellyfin and Emby on this tab. Plex preview lists leaf
-          items where the item JSON has an empty or missing <code className="text-[0.85em]">thumb</code> — that is{" "}
-          <strong>not</strong> the same signal as Jellyfin/Emby primary-image probes. Apply only touches the frozen{" "}
+          <strong>preview → inspect JSON → apply</strong> flow as Jellyfin and Emby on this tab. Missing-primary preview
+          lists movie or episode leaves where the item JSON has an empty or missing <code className="text-[0.85em]">thumb</code>{" "}
+          — that is <strong>not</strong> the same signal as Jellyfin/Emby primary-image probes. On the{" "}
+          <strong>Movies</strong> tab, Plex also supports watched movies, watched low-rating movies (leaf{" "}
+          <code className="text-[0.85em]">audienceRating</code>), and unwatched stale movies (leaf{" "}
+          <code className="text-[0.85em]">addedAt</code> age), all via the same <code className="text-[0.85em]">allLeaves</code>{" "}
+          read with your token — no separate account API. Apply only touches the frozen{" "}
           <code className="text-[0.85em]">ratingKey</code> values from the snapshot; if an entry is already gone, the job
           counts it as skipped. MediaMop does not claim whether Plex removes only metadata or also media files — that
           depends on your Plex server.
@@ -629,7 +639,7 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
           </p>
           <p className="text-xs text-[var(--mm-text2)]">
             {isPlex
-              ? "Plex: genre filters apply to missing-primary previews and use Genre tags on each leaf from your server."
+              ? "Plex: genre filters apply to every preview on this tab that reads allLeaves (missing-primary, watched movies, low-rating, unwatched stale) using Genre tags on each leaf."
               : "Jellyfin / Emby: uses each item’s Genres field from the Items API for every preview rule on this tab."}
           </p>
           {isPlex ? (
@@ -684,9 +694,9 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
           </p>
           {isPlex ? (
             <p className="text-xs text-[var(--mm-text2)]" data-testid="pruner-people-plex-note">
-              Plex: applies only to <strong>missing primary art</strong> previews on this tab. Names come from{" "}
-              <strong>Role</strong>, <strong>Writer</strong>, and <strong>Director</strong> tag strings on each{" "}
-              <code className="text-[0.85em]">allLeaves</code> leaf (no separate metadata fetch).
+              Plex: applies to previews that read <code className="text-[0.85em]">allLeaves</code> on this tab (missing
+              primary art, watched movies, low-rating, unwatched stale). Names come from <strong>Role</strong>,{" "}
+              <strong>Writer</strong>, and <strong>Director</strong> tag strings on each leaf (no separate metadata fetch).
             </p>
           ) : (
             <p className="text-xs text-[var(--mm-text2)]" data-testid="pruner-people-jf-emby-note">
@@ -736,8 +746,9 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
           <p className="text-xs text-[var(--mm-text2)]">
             Leave a box empty to leave that side open. When either bound is set, items with <strong>no</strong>{" "}
             provider-reported year never match. Jellyfin/Emby use <code className="text-[0.85em]">ProductionYear</code>{" "}
-            on Items; Plex applies only to <strong>missing-primary</strong> previews and uses each leaf&apos;s{" "}
-            <code className="text-[0.85em]">year</code> when the server sends it. Inclusive {1900}–{2100}.
+            on Items; Plex uses each movie leaf&apos;s <code className="text-[0.85em]">year</code> when the server sends
+            it on <code className="text-[0.85em]">allLeaves</code> rows (missing-primary and movie rules on the Movies
+            tab). Inclusive {1900}–{2100}.
           </p>
           {canOperate ? (
             <div className="flex flex-wrap items-end gap-2">
@@ -794,9 +805,10 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
           <p className="text-sm font-semibold text-[var(--mm-text)]">Optional preview studio include (this tab only)</p>
           <p className="text-xs text-[var(--mm-text2)]">
             Comma-separated studio names — exact case-insensitive match against Jellyfin/Emby{" "}
-            <code className="text-[0.85em]">Studios</code> or Plex <code className="text-[0.85em]">Studio</code> tags on
-            missing-primary leaves. This is <strong>not</strong> a separate “network” filter; only provider-native studio
-            tags are used.
+            <code className="text-[0.85em]">Studios</code> or Plex <code className="text-[0.85em]">Studio</code> tags (and
+            top-level <code className="text-[0.85em]">studio</code> string when present) on Plex <code className="text-[0.85em]">allLeaves</code>{" "}
+            movie rows. This is <strong>not</strong> a separate “network” filter; only provider-native studio fields are
+            used.
           </p>
           {canOperate ? (
             <div className="space-y-2">
@@ -837,12 +849,13 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
           data-testid="pruner-collection-preview-panel"
         >
           <p className="text-sm font-semibold text-[var(--mm-text)]">
-            Optional preview collection include (Plex missing-primary only)
+            Optional preview collection include (Plex allLeaves movie previews)
           </p>
           <p className="text-xs text-[var(--mm-text2)]">
             Comma-separated collection names — exact match against <code className="text-[0.85em]">Collection</code>{" "}
-            tags on each <code className="text-[0.85em]">allLeaves</code> row. Jellyfin/Emby previews do{" "}
-            <strong>not</strong> apply this list (no honest per-item collection field on the Items path used here).
+            tags on each <code className="text-[0.85em]">allLeaves</code> movie row (missing-primary and movie rules on
+            this tab). Jellyfin/Emby previews do <strong>not</strong> apply this list (no honest per-item collection field
+            on the Items path used here).
           </p>
           {canOperate ? (
             <div className="space-y-2">
@@ -885,10 +898,19 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
         >
           <p className="font-medium text-amber-100">Other Pruner rules on Plex (this tab)</p>
           <p className="mt-1 text-xs text-[var(--mm-text2)]">
-            Stale never-played, watched-TV, watched-movies, watched low-rating movies, and unwatched stale movies
-            previews are <strong>not</strong> implemented for Plex here — those controls stay on Jellyfin/Emby instances
-            only. Queueing unsupported rule previews on Plex still records an explicit unsupported outcome for
-            traceability.
+            {props.scope === "movies" ? (
+              <>
+                Stale never-played and watched-TV previews are <strong>not</strong> implemented for Plex. Movie-tab
+                rules for watched movies, watched low-rating movies (<code className="text-[0.85em]">audienceRating</code>
+                ), and unwatched stale movies (<code className="text-[0.85em]">addedAt</code>) use{" "}
+                <code className="text-[0.85em]">allLeaves</code> with your token — see the panels below.
+              </>
+            ) : (
+              <>
+                Stale never-played and watched-TV previews are <strong>not</strong> implemented for Plex here. Queueing
+                those rule previews still records an explicit unsupported outcome for traceability.
+              </>
+            )}
           </p>
         </div>
       ) : null}
@@ -1017,19 +1039,42 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
             )}
           </div>
         ) : null}
-        {props.scope === "movies" ? (
+        </Fragment>
+      ) : null}
+      {!isPlex ? null : props.scope === "movies" ? (
+        <p className="text-xs text-[var(--mm-text2)]">
+          Watched / low-rating / unwatched stale movie previews on Plex use the same{" "}
+          <code className="text-[0.85em]">allLeaves</code> token-scoped metadata as other Plex previews: watched means{" "}
+          <code className="text-[0.85em]">viewCount</code> ≥ 1 or a positive <code className="text-[0.85em]">lastViewedAt</code>
+          ; low-rating compares your ceiling to leaf <code className="text-[0.85em]">audienceRating</code> (not
+          Jellyfin/Emby <code className="text-[0.85em]">CommunityRating</code>); stale unwatched uses library{" "}
+          <code className="text-[0.85em]">addedAt</code> age, not <code className="text-[0.85em]">DateCreated</code>.
+        </p>
+      ) : null}
+      {props.scope === "movies" ? (
           <>
             <div
               className="space-y-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text)]"
               data-testid="pruner-watched-movies-panel"
             >
               <p className="text-sm font-semibold text-[var(--mm-text)]">
-                Watched movies (Jellyfin / Emby, Movies tab only)
+                {isPlex ? "Watched movies (Plex, Movies tab only)" : "Watched movies (Jellyfin / Emby, Movies tab only)"}
               </p>
               <p className="text-xs text-[var(--mm-text2)]">
-                Candidates are <strong>movie library items</strong> the server reports as <strong>watched</strong> for the
-                MediaMop library user (same API token as other Pruner rules). TV episodes are not in this pass — use the
-                TV tab for watched TV. This server instance only.
+                {isPlex ? (
+                  <>
+                    Candidates are <strong>movie</strong> leaves from <code className="text-[0.85em]">allLeaves</code>{" "}
+                    where Plex reports <code className="text-[0.85em]">viewCount</code> ≥ 1 or a positive{" "}
+                    <code className="text-[0.85em]">lastViewedAt</code> for the same <code className="text-[0.85em]">X-Plex-Token</code>{" "}
+                    as other Pruner Plex reads (no separate account API).
+                  </>
+                ) : (
+                  <>
+                    Candidates are <strong>movie library items</strong> the server reports as <strong>watched</strong> for
+                    the MediaMop library user (same API token as other Pruner rules). TV episodes are not in this pass —
+                    use the TV tab for watched TV. This server instance only.
+                  </>
+                )}
               </p>
               <p className="text-xs text-[var(--mm-text2)]">
                 Preview is the dry run; apply uses the frozen list only. Removal goes through the provider library API —
@@ -1079,13 +1124,27 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
               data-testid="pruner-watched-low-rating-panel"
             >
               <p className="text-sm font-semibold text-[var(--mm-text)]">
-                Watched low-rating movies (Jellyfin / Emby, Movies tab only)
+                {isPlex
+                  ? "Watched low-rating movies (Plex, Movies tab only)"
+                  : "Watched low-rating movies (Jellyfin / Emby, Movies tab only)"}
               </p>
               <p className="text-xs text-[var(--mm-text2)]">
-                Candidates are <strong>watched</strong> movie library items whose Jellyfin/Emby{" "}
-                <strong>CommunityRating</strong> is at or below your ceiling. The server exposes that field on a{" "}
-                <strong>0–10</strong> scale for this slice — MediaMop does not remap it to stars or another scale. Items
-                with no rating are skipped. Genre and people filters narrow previews only (AND when both are set).
+                {isPlex ? (
+                  <>
+                    Candidates are <strong>watched</strong> movie leaves (same watched test as watched movies above)
+                    whose Plex <strong>audienceRating</strong> is at or below your numeric ceiling. The ceiling field name
+                    matches Jellyfin/Emby settings, but Plex uses <code className="text-[0.85em]">audienceRating</code> on
+                    the leaf — <strong>not</strong> <code className="text-[0.85em]">CommunityRating</code>. Items with no
+                    numeric audience rating are skipped.
+                  </>
+                ) : (
+                  <>
+                    Candidates are <strong>watched</strong> movie library items whose Jellyfin/Emby{" "}
+                    <strong>CommunityRating</strong> is at or below your ceiling. The server exposes that field on a{" "}
+                    <strong>0–10</strong> scale for this slice — MediaMop does not remap it to stars or another scale. Items
+                    with no rating are skipped. Genre and people filters narrow previews only (AND when both are set).
+                  </>
+                )}
               </p>
               {canOperate ? (
                 <div className="space-y-2">
@@ -1099,7 +1158,9 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
                     Enable watched low-rating movies rule for this Movies tab
                   </label>
                   <label className="flex flex-wrap items-center gap-2 text-sm text-[var(--mm-text2)]">
-                    Max CommunityRating (0–10 inclusive)
+                    {isPlex
+                      ? "Max audienceRating ceiling (0–10 inclusive; Plex leaf field)"
+                      : "Max CommunityRating (0–10 inclusive)"}
                     <input
                       type="number"
                       min={0}
@@ -1145,12 +1206,25 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
               data-testid="pruner-unwatched-stale-panel"
             >
               <p className="text-sm font-semibold text-[var(--mm-text)]">
-                Unwatched stale movies (Jellyfin / Emby, Movies tab only)
+                {isPlex
+                  ? "Unwatched stale movies (Plex, Movies tab only)"
+                  : "Unwatched stale movies (Jellyfin / Emby, Movies tab only)"}
               </p>
               <p className="text-xs text-[var(--mm-text2)]">
-                Candidates are <strong>unwatched</strong> movie items (user play state for this API token) whose library{" "}
-                <strong>DateCreated</strong> is older than the minimum age. This is not “not recently watched” — only
-                items with no watched/play state. Genre and people filters narrow previews only.
+                {isPlex ? (
+                  <>
+                    Candidates are <strong>unwatched</strong> movie leaves (no positive play signal from{" "}
+                    <code className="text-[0.85em]">viewCount</code>/<code className="text-[0.85em]">lastViewedAt</code>
+                    ) whose library <strong>addedAt</strong> timestamp is older than the minimum age. This is{" "}
+                    <strong>not</strong> Jellyfin/Emby <code className="text-[0.85em]">DateCreated</code> semantics.
+                  </>
+                ) : (
+                  <>
+                    Candidates are <strong>unwatched</strong> movie items (user play state for this API token) whose library{" "}
+                    <strong>DateCreated</strong> is older than the minimum age. This is not “not recently watched” — only
+                    items with no watched/play state. Genre and people filters narrow previews only.
+                  </>
+                )}
               </p>
               {canOperate ? (
                 <div className="space-y-2">
@@ -1205,8 +1279,6 @@ export function PrunerScopeTab(props: { scope: "tv" | "movies" }) {
             </div>
           </>
         ) : null}
-        </Fragment>
-      ) : null}
       {scopeRow ? (
         <div className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3 text-sm text-[var(--mm-text2)]">
           <div>Last outcome: {scopeRow.last_preview_outcome ?? "—"}</div>

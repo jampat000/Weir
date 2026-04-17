@@ -110,19 +110,37 @@ def test_preview_payload_jellyfin_watched_movies_lists_watched_movies() -> None:
     assert cands[0]["granularity"] == "movie_item"
 
 
-def test_preview_payload_plex_watched_movies_unsupported() -> None:
-    out, detail, cands, trunc = preview_payload_json(
-        provider="plex",
-        base_url="http://plex:32400",
-        media_scope=MEDIA_SCOPE_MOVIES,
-        secrets={"auth_token": "t"},
-        max_items=50,
-        rule_family_id=RULE_FAMILY_WATCHED_MOVIES_REPORTED,
-        never_played_min_age_days=None,
-    )
-    assert out == "unsupported"
-    assert "plex" in detail.lower() and "watched" in detail.lower()
-    assert cands == [] and trunc is False
+def test_preview_payload_plex_watched_movies_uses_all_leaves() -> None:
+    from unittest.mock import patch
+
+    def fake_get_json(url: str, headers: dict[str, str]) -> tuple[int, dict]:  # noqa: ARG001
+        if "allLeaves" not in url:
+            return 200, {"MediaContainer": {"Directory": [{"type": "movie", "key": "1"}]}}
+        return (
+            200,
+            {
+                "MediaContainer": {
+                    "Metadata": [
+                        {"type": "movie", "ratingKey": "55", "title": "Plex Watched", "viewCount": 1},
+                    ],
+                    "totalSize": 1,
+                },
+            },
+        )
+
+    with patch("mediamop.modules.pruner.pruner_plex_movie_rule_candidates.http_get_json", fake_get_json):
+        out, detail, cands, trunc = preview_payload_json(
+            provider="plex",
+            base_url="http://plex:32400",
+            media_scope=MEDIA_SCOPE_MOVIES,
+            secrets={"auth_token": "t"},
+            max_items=50,
+            rule_family_id=RULE_FAMILY_WATCHED_MOVIES_REPORTED,
+            never_played_min_age_days=None,
+        )
+    assert out == "success" and detail == ""
+    assert len(cands) == 1 and cands[0]["item_id"] == "55"
+    assert not trunc
 
 
 def test_preview_payload_tv_scope_watched_movies_unsupported() -> None:

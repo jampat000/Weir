@@ -20,6 +20,11 @@ from mediamop.modules.pruner.pruner_constants import (
 )
 from mediamop.modules.pruner.pruner_preview_item_filters import jf_emby_item_passes_preview_filters
 from mediamop.modules.pruner.pruner_plex_missing_thumb_candidates import list_plex_missing_thumb_candidates
+from mediamop.modules.pruner.pruner_plex_movie_rule_candidates import (
+    list_plex_unwatched_movie_stale_candidates,
+    list_plex_watched_movie_candidates,
+    list_plex_watched_movie_low_rating_candidates,
+)
 from mediamop.modules.pruner.pruner_http import http_get_json, http_get_text, join_base_path
 
 def jf_emby_pruner_preview_items_fields_csv() -> str:
@@ -863,7 +868,9 @@ def list_never_played_stale_candidates(
 def plex_preview_unsupported_detail() -> str:
     return (
         "Plex: this rule family has no candidate preview on MediaMop in this release (use Connection for a Plex ping). "
-        "Remove broken library entries uses preview → apply for Plex; other Plex rules remain unsupported here."
+        "Plex supports preview → apply for missing primary art, watched movies, watched low-rating movies (leaf "
+        "audienceRating), and unwatched stale movies (leaf addedAt) via allLeaves with your token; stale never-played "
+        "and watched TV previews are not implemented for Plex here."
     )
 
 
@@ -878,28 +885,6 @@ def plex_watched_tv_preview_unsupported_detail() -> str:
     return (
         "Plex: watched TV preview is not implemented on MediaMop in this release (Jellyfin/Emby only). "
         "Use Connection for a Plex ping."
-    )
-
-
-def plex_watched_movies_preview_unsupported_detail() -> str:
-    return (
-        "Plex: watched-movie preview is not implemented on MediaMop in this release. "
-        "Jellyfin/Emby use the Items API with UserData for the configured library token; "
-        "Plex does not expose an equivalent user-scoped watched-movie signal in this product slice."
-    )
-
-
-def plex_watched_movie_low_rating_preview_unsupported_detail() -> str:
-    return (
-        "Plex: watched low-rating movie preview is not implemented on MediaMop in this release. "
-        "Jellyfin/Emby use Items ``UserData`` for watched state and ``CommunityRating`` (0–10 on that field only)."
-    )
-
-
-def plex_unwatched_movie_stale_preview_unsupported_detail() -> str:
-    return (
-        "Plex: unwatched stale movie preview is not implemented on MediaMop in this release. "
-        "Jellyfin/Emby use the same user-scoped unplayed checks and library ``DateCreated`` as other Pruner movie rules."
     )
 
 
@@ -926,16 +911,86 @@ def preview_payload_json(
     if provider == "plex":
         if rule_family_id == RULE_FAMILY_WATCHED_TV_REPORTED:
             return "unsupported", plex_watched_tv_preview_unsupported_detail(), [], False
-        if rule_family_id == RULE_FAMILY_WATCHED_MOVIES_REPORTED:
-            return "unsupported", plex_watched_movies_preview_unsupported_detail(), [], False
-        if rule_family_id == RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED:
-            return "unsupported", plex_watched_movie_low_rating_preview_unsupported_detail(), [], False
-        if rule_family_id == RULE_FAMILY_UNWATCHED_MOVIE_STALE_REPORTED:
-            return "unsupported", plex_unwatched_movie_stale_preview_unsupported_detail(), [], False
         if rule_family_id == RULE_FAMILY_NEVER_PLAYED_STALE_REPORTED:
             return "unsupported", plex_never_played_preview_unsupported_detail(), [], False
+
+        token = str(secrets.get("auth_token") or secrets.get("plex_token") or "").strip()
+
+        def _require_plex_token() -> str:
+            if not token:
+                msg = "plex auth token missing in credentials envelope"
+                raise ValueError(msg)
+            return token
+
+        if rule_family_id == RULE_FAMILY_WATCHED_MOVIES_REPORTED:
+            if media_scope != MEDIA_SCOPE_MOVIES:
+                return (
+                    "unsupported",
+                    "watched_movies_reported applies to the Movies tab only (TV is out of scope for this rule pass).",
+                    [],
+                    False,
+                )
+            cands, trunc = list_plex_watched_movie_candidates(
+                base_url=base_url,
+                auth_token=_require_plex_token(),
+                max_items=max_items,
+                preview_include_genres=preview_include_genres,
+                preview_include_people=preview_include_people,
+                preview_year_min=preview_year_min,
+                preview_year_max=preview_year_max,
+                preview_include_studios=preview_include_studios,
+                preview_include_collections=preview_include_collections,
+            )
+            return "success", "", cands, trunc
+        if rule_family_id == RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED:
+            if media_scope != MEDIA_SCOPE_MOVIES:
+                return (
+                    "unsupported",
+                    "watched_movie_low_rating_reported applies to the Movies tab only (TV is out of scope for this rule pass).",
+                    [],
+                    False,
+                )
+            if watched_movie_low_rating_max_community_rating is None:
+                msg = "watched_movie_low_rating_max_community_rating is required for watched_movie_low_rating_reported preview"
+                raise ValueError(msg)
+            cands, trunc = list_plex_watched_movie_low_rating_candidates(
+                base_url=base_url,
+                auth_token=_require_plex_token(),
+                max_items=max_items,
+                audience_rating_max_inclusive=float(watched_movie_low_rating_max_community_rating),
+                preview_include_genres=preview_include_genres,
+                preview_include_people=preview_include_people,
+                preview_year_min=preview_year_min,
+                preview_year_max=preview_year_max,
+                preview_include_studios=preview_include_studios,
+                preview_include_collections=preview_include_collections,
+            )
+            return "success", "", cands, trunc
+        if rule_family_id == RULE_FAMILY_UNWATCHED_MOVIE_STALE_REPORTED:
+            if media_scope != MEDIA_SCOPE_MOVIES:
+                return (
+                    "unsupported",
+                    "unwatched_movie_stale_reported applies to the Movies tab only (TV is out of scope for this rule pass).",
+                    [],
+                    False,
+                )
+            if unwatched_movie_stale_min_age_days is None:
+                msg = "unwatched_movie_stale_min_age_days is required for unwatched_movie_stale_reported preview"
+                raise ValueError(msg)
+            cands, trunc = list_plex_unwatched_movie_stale_candidates(
+                base_url=base_url,
+                auth_token=_require_plex_token(),
+                max_items=max_items,
+                min_age_days=int(unwatched_movie_stale_min_age_days),
+                preview_include_genres=preview_include_genres,
+                preview_include_people=preview_include_people,
+                preview_year_min=preview_year_min,
+                preview_year_max=preview_year_max,
+                preview_include_studios=preview_include_studios,
+                preview_include_collections=preview_include_collections,
+            )
+            return "success", "", cands, trunc
         if rule_family_id == RULE_FAMILY_MISSING_PRIMARY_MEDIA_REPORTED:
-            token = str(secrets.get("auth_token") or secrets.get("plex_token") or "").strip()
             if not token:
                 msg = "plex auth token missing in credentials envelope"
                 raise ValueError(msg)

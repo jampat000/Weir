@@ -83,6 +83,43 @@ const plexInstance: PrunerServerInstance = {
 };
 
 describe("PrunerScopeTab (Plex)", () => {
+  it("Movies tab: shows watched / low-rating / unwatched stale panels for Plex (allLeaves-backed)", async () => {
+    const spy = vi.spyOn(prunerApi, "fetchPrunerPreviewRuns").mockResolvedValue([]);
+    const spyInst = vi.spyOn(prunerApi, "fetchPrunerInstance").mockResolvedValue(plexInstance);
+    try {
+      const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      qc.setQueryData(qk.me, operator);
+      qc.setQueryData(["pruner", "instances", 9], plexInstance);
+
+      const router = createMemoryRouter(
+        [
+          {
+            path: "/instances/:instanceId",
+            element: <PrunerInstanceShell />,
+            children: [{ path: "movies", element: <PrunerScopeTab scope="movies" /> }],
+          },
+        ],
+        { initialEntries: ["/instances/9/movies"] },
+      );
+
+      render(
+        <QueryClientProvider client={qc}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("pruner-watched-movies-panel")).toBeInTheDocument();
+      });
+      expect(screen.getByTestId("pruner-watched-low-rating-panel")).toBeInTheDocument();
+      expect(screen.getByTestId("pruner-unwatched-stale-panel")).toBeInTheDocument();
+      expect(screen.getByTestId("pruner-watched-low-rating-panel").textContent ?? "").toMatch(/audienceRating/i);
+    } finally {
+      spy.mockRestore();
+      spyInst.mockRestore();
+    }
+  });
+
   it("uses preview-first flow for missing primary: queue enabled, no live-only surface, other rules called out", async () => {
     const spy = vi.spyOn(prunerApi, "fetchPrunerPreviewRuns").mockResolvedValue([]);
     const spyInst = vi.spyOn(prunerApi, "fetchPrunerInstance").mockResolvedValue(plexInstance);

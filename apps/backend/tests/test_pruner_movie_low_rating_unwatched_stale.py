@@ -197,19 +197,44 @@ def test_preview_payload_tv_scope_low_rating_unsupported() -> None:
     assert cands == [] and trunc is False
 
 
-def test_preview_payload_plex_low_rating_unsupported() -> None:
-    out, detail, cands, trunc = preview_payload_json(
-        provider="plex",
-        base_url="http://plex:32400",
-        media_scope=MEDIA_SCOPE_MOVIES,
-        secrets={"auth_token": "t"},
-        max_items=10,
-        rule_family_id=RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED,
-        watched_movie_low_rating_max_community_rating=4.0,
-    )
-    assert out == "unsupported"
-    assert cands == [] and trunc is False
-    assert "plex" in detail.lower()
+def test_preview_payload_plex_low_rating_uses_audience_rating() -> None:
+    from unittest.mock import patch
+
+    def fake_get_json(url: str, headers: dict[str, str]) -> tuple[int, dict]:  # noqa: ARG001
+        if "allLeaves" not in url:
+            return 200, {"MediaContainer": {"Directory": [{"type": "movie", "key": "1"}]}}
+        return (
+            200,
+            {
+                "MediaContainer": {
+                    "Metadata": [
+                        {
+                            "type": "movie",
+                            "ratingKey": "z",
+                            "title": "Low",
+                            "viewCount": 1,
+                            "audienceRating": 3.0,
+                        },
+                    ],
+                    "totalSize": 1,
+                },
+            },
+        )
+
+    with patch("mediamop.modules.pruner.pruner_plex_movie_rule_candidates.http_get_json", fake_get_json):
+        out, detail, cands, trunc = preview_payload_json(
+            provider="plex",
+            base_url="http://plex:32400",
+            media_scope=MEDIA_SCOPE_MOVIES,
+            secrets={"auth_token": "t"},
+            max_items=10,
+            rule_family_id=RULE_FAMILY_WATCHED_MOVIE_LOW_RATING_REPORTED,
+            watched_movie_low_rating_max_community_rating=4.0,
+        )
+    assert out == "success" and detail == ""
+    assert len(cands) == 1 and cands[0]["item_id"] == "z"
+    assert cands[0]["plex_audience_rating"] == 3.0
+    assert not trunc
 
 
 def _login_admin(client: TestClient) -> None:

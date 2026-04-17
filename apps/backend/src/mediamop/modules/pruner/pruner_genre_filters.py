@@ -100,9 +100,20 @@ def plex_leaf_genre_tags(meta: dict[str, Any]) -> list[str]:
 
 
 def plex_leaf_studio_tags(meta: dict[str, Any]) -> list[str]:
-    """Studio tags from Plex leaf ``Metadata`` ``Studio`` list (same tag shape as ``Genre``)."""
+    """Studio tags from Plex leaf ``Metadata`` ``Studio`` list (same tag shape as ``Genre``).
 
-    return plex_leaf_named_tag_list(meta, "Studio")
+    Movie rows may also expose a top-level ``studio`` string attribute (Plex ``Video`` metadata); include it when
+    present so studio include filters match the same provider-native fields on the ``allLeaves`` row.
+    """
+
+    tags = list(plex_leaf_named_tag_list(meta, "Studio"))
+    raw = meta.get("studio")
+    if isinstance(raw, str):
+        s = raw.strip()
+        seen = {t.casefold() for t in tags}
+        if s and s.casefold() not in seen:
+            tags.append(s)
+    return tags
 
 
 def plex_leaf_collection_tags(meta: dict[str, Any]) -> list[str]:
