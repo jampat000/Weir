@@ -111,7 +111,7 @@ describe("PrunerScopeTab Movies / watched movies", () => {
       await waitFor(() => expect(screen.getByTestId("pruner-watched-movies-panel")).toBeInTheDocument());
       expect(screen.getByTestId("pruner-scope-trust-banner")).toBeInTheDocument();
       expect(screen.getByTestId("pruner-filters-section-heading").textContent ?? "").toMatch(/preview narrowing filters/i);
-      expect(screen.getByTestId("pruner-rules-section-heading").textContent ?? "").toMatch(/rule families/i);
+      expect(screen.getByTestId("pruner-rules-section-heading").textContent ?? "").toMatch(/cleanup rules/i);
       expect(screen.getByTestId("pruner-actions-history-heading").textContent ?? "").toMatch(/preview and apply actions/i);
       fireEvent.click(screen.getByRole("button", { name: /queue preview \(watched movies\)/i }));
       await waitFor(() => {

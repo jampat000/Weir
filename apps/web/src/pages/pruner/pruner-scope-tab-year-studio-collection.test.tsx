@@ -173,7 +173,7 @@ describe("PrunerScopeTab year / studio / collection preview filters", () => {
       await waitFor(() => {
         expect(screen.getByTestId("pruner-collection-preview-panel")).toBeInTheDocument();
       });
-      expect(screen.getByText(/Jellyfin\/Emby previews do/i)).toBeInTheDocument();
+      expect(screen.getByText(/Comma-separated collection names/i)).toBeInTheDocument();
 
       fireEvent.change(screen.getByPlaceholderText(/marvel cinematic/i), { target: { value: "MCU" } });
       fireEvent.click(screen.getByRole("button", { name: /save collection filters/i }));

@@ -172,16 +172,13 @@ function ProviderWorkspace({ provider, allInstances }: { provider: ProviderTab; 
     <section className="space-y-4" data-testid={`pruner-provider-tab-${provider}`}>
       <header className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-3">
         <h2 className="text-base font-semibold text-[var(--mm-text1)]">{providerName}</h2>
-        <p className="mt-1 text-sm text-[var(--mm-text2)]">
-          Flat provider workspace: connection and both media scopes on one page, no nested tabs.
-        </p>
       </header>
       <section className="space-y-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-4" data-testid={`pruner-provider-connection-${provider}`}>
         <h3 className="text-sm font-semibold text-[var(--mm-text)]">Connection</h3>
         <p className="text-xs text-[var(--mm-text2)]">
           {provider === "plex"
-            ? "Plex requires a token. Save it here, then run connection tests and activate configuration below."
-            : `${providerName} requires an API key. Save it here, then run connection tests and activate configuration below.`}
+            ? "Use a Plex token."
+            : `Use a ${providerName} API key.`}
         </p>
         {providerInstances.length > 1 ? (
           <label className="text-xs text-[var(--mm-text2)]">
@@ -272,7 +269,7 @@ function ProviderWorkspace({ provider, allInstances }: { provider: ProviderTab; 
         <h3 className="text-sm font-semibold text-[var(--mm-text)]">Configuration</h3>
         {!selectedInstance ? (
           <p className="text-xs text-[var(--mm-text2)]">
-            Configuration controls are shown below but inactive until this provider connection is saved.
+            Controls stay visible but disabled until a connection is saved.
           </p>
         ) : null}
         {provider === "plex" ? (
