@@ -3,8 +3,12 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { UserPublic } from "../../lib/api/types";
+import { qk } from "../../lib/auth/queries";
 import * as prunerApi from "../../lib/pruner/api";
 import { PrunerInstancesListPage } from "./pruner-instances-list-page";
+
+const adminUser: UserPublic = { id: 1, username: "admin", role: "admin" };
 
 function wrap(ui: ReactNode, client: QueryClient) {
   return (
@@ -95,13 +99,14 @@ describe("PrunerInstancesListPage", () => {
     expect(screen.getByTestId("pruner-provider-subnav-emby")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rules" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Filters" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Schedule & limits" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "People" })).toBeInTheDocument();
     const rulesCard = screen.getByTestId("pruner-provider-configuration-emby");
     expect(within(rulesCard).getByRole("heading", { level: 3, name: /^Rules$/i })).toBeInTheDocument();
     expect(within(rulesCard).getAllByText(/^TV$/).length).toBeGreaterThanOrEqual(1);
     expect(within(rulesCard).getAllByText(/^Movies$/).length).toBeGreaterThanOrEqual(1);
     expect(rulesCard).toBeInTheDocument();
     expect(within(rulesCard).queryByRole("tab")).toBeNull();
+    expect(within(rulesCard).queryByRole("checkbox")).toBeNull();
     expect(screen.queryByRole("button", { name: /Save watched TV rule/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save TV rules" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save Movies rules" })).toBeInTheDocument();
@@ -119,7 +124,7 @@ describe("PrunerInstancesListPage", () => {
     expect(screen.getByText(/Save a connection first to enable these settings/i)).toBeInTheDocument();
     const disabledFieldsets = screen.getByTestId("pruner-provider-configuration-emby").querySelectorAll("fieldset[disabled]");
     expect(disabledFieldsets.length).toBe(2);
-    expect(screen.getByText(/Enable watched TV rule/i)).toBeInTheDocument();
+    expect(screen.getByText(/Watched TV removal/i)).toBeInTheDocument();
   });
 
   it("Plex provider tab shows TV and Movies sections with unsupported rules and missing-primary filter scope note", async () => {
@@ -292,6 +297,100 @@ describe("PrunerInstancesListPage", () => {
     const movies = screen.getByTestId("pruner-provider-movies-config-emby");
     expect(within(movies).getByText(/Jellyfin\/Emby CommunityRating/i)).toBeInTheDocument();
     expect(within(movies).queryByText(/Plex audienceRating/i)).not.toBeInTheDocument();
+  });
+
+  it("Schedules tab shows empty state when no instances exist", async () => {
+    const client = new QueryClient();
+    client.setQueryData(qk.me, adminUser);
+    vi.spyOn(prunerApi, "fetchPrunerInstances").mockResolvedValue([]);
+    vi.spyOn(prunerApi, "fetchPrunerJobsInspection").mockResolvedValue({ jobs: [], default_recent_slice: true });
+
+    render(wrap(<PrunerInstancesListPage />, client));
+
+    await waitFor(() => expect(screen.getByTestId("pruner-top-level-tabs")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("tab", { name: "Schedules" }));
+    await waitFor(() => expect(screen.getByTestId("pruner-schedules-empty-state")).toBeInTheDocument());
+    expect(screen.getByText(/Register a provider under Connections to enable schedules/i)).toBeInTheDocument();
+  });
+
+  it("Schedules tab renders six schedule rows grouped by provider when instances exist", async () => {
+    const client = new QueryClient();
+    client.setQueryData(qk.me, adminUser);
+    const scope = (media_scope: "tv" | "movies") => ({
+      media_scope,
+      missing_primary_media_reported_enabled: true,
+      never_played_stale_reported_enabled: false,
+      never_played_min_age_days: 90,
+      watched_tv_reported_enabled: false,
+      watched_movies_reported_enabled: false,
+      watched_movie_low_rating_reported_enabled: false,
+      watched_movie_low_rating_max_jellyfin_emby_community_rating: 4,
+      watched_movie_low_rating_max_plex_audience_rating: 4,
+      unwatched_movie_stale_reported_enabled: false,
+      unwatched_movie_stale_min_age_days: 90,
+      preview_max_items: 500,
+      preview_include_genres: [],
+      preview_include_people: [],
+      preview_year_min: null,
+      preview_year_max: null,
+      preview_include_studios: [],
+      preview_include_collections: [],
+      scheduled_preview_enabled: false,
+      scheduled_preview_interval_seconds: 3600,
+      last_scheduled_preview_enqueued_at: null,
+      last_preview_run_uuid: null,
+      last_preview_at: null,
+      last_preview_candidate_count: null,
+      last_preview_outcome: null,
+      last_preview_error: null,
+    });
+    vi.spyOn(prunerApi, "fetchPrunerInstances").mockResolvedValue([
+      {
+        id: 1,
+        provider: "emby",
+        display_name: "Emby Home",
+        base_url: "http://emby",
+        enabled: true,
+        last_connection_test_at: null,
+        last_connection_test_ok: null,
+        last_connection_test_detail: null,
+        scopes: [scope("tv"), scope("movies")],
+      },
+      {
+        id: 2,
+        provider: "jellyfin",
+        display_name: "JF Home",
+        base_url: "http://jf",
+        enabled: true,
+        last_connection_test_at: null,
+        last_connection_test_ok: null,
+        last_connection_test_detail: null,
+        scopes: [scope("tv"), scope("movies")],
+      },
+      {
+        id: 3,
+        provider: "plex",
+        display_name: "Plex Home",
+        base_url: "http://plex",
+        enabled: true,
+        last_connection_test_at: null,
+        last_connection_test_ok: null,
+        last_connection_test_detail: null,
+        scopes: [scope("tv"), scope("movies")],
+      },
+    ]);
+    vi.spyOn(prunerApi, "fetchPrunerJobsInspection").mockResolvedValue({ jobs: [], default_recent_slice: true });
+
+    render(wrap(<PrunerInstancesListPage />, client));
+
+    await waitFor(() => expect(screen.getByTestId("pruner-top-level-tabs")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("tab", { name: "Schedules" }));
+    await waitFor(() => expect(screen.getByTestId("pruner-schedule-row-emby-tv")).toBeInTheDocument());
+    expect(screen.getByTestId("pruner-schedule-row-emby-movies")).toBeInTheDocument();
+    expect(screen.getByTestId("pruner-schedule-row-jellyfin-tv")).toBeInTheDocument();
+    expect(screen.getByTestId("pruner-schedule-row-jellyfin-movies")).toBeInTheDocument();
+    expect(screen.getByTestId("pruner-schedule-row-plex-tv")).toBeInTheDocument();
+    expect(screen.getByTestId("pruner-schedule-row-plex-movies")).toBeInTheDocument();
   });
 
   it("Overview shows At a glance cards without connection forms", async () => {

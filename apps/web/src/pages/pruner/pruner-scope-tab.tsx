@@ -20,6 +20,7 @@ import {
   prunerApplyLabelForRuleFamily,
 } from "../../lib/pruner/api";
 import type { PrunerServerInstance } from "../../lib/pruner/api";
+import { FetcherEnableSwitch } from "../fetcher/fetcher-enable-switch";
 import { fetcherMenuButtonClass } from "../fetcher/fetcher-menu-button";
 import { formatPrunerDateTime, previewRunRowCaption } from "./pruner-ui-utils";
 
@@ -40,8 +41,8 @@ export function PrunerScopeTab(props: {
   disabledMode?: boolean;
   /** Flat provider workspace: full-width, schedule on-page, no preview history table. */
   variant?: "default" | "provider";
-  /** When variant is provider, selects one subsection (Rules / Filters / Schedule). */
-  providerSubSection?: "rules" | "filters" | "schedule";
+  /** When variant is provider, selects one subsection (Rules / Filters / People). */
+  providerSubSection?: "rules" | "filters" | "people";
 }) {
   const outletCtx = useOutletContext<Ctx>();
   const { instanceId, instance } = props.contextOverride ?? outletCtx;
@@ -83,6 +84,10 @@ export function PrunerScopeTab(props: {
   const [previewMaxItems, setPreviewMaxItems] = useState(500);
   const [previewMaxItemsMsg, setPreviewMaxItemsMsg] = useState<string | null>(null);
   const [bundleMsg, setBundleMsg] = useState<string | null>(null);
+  /** Provider Rules: single inputs (0 = off) mapped to never-played / low-rating / unwatched stale. */
+  const [rulesTvOlderDaysStr, setRulesTvOlderDaysStr] = useState("0");
+  const [rulesMoviesLowRatingStr, setRulesMoviesLowRatingStr] = useState("0");
+  const [rulesMoviesUnwatchedDaysStr, setRulesMoviesUnwatchedDaysStr] = useState("0");
   const isProvider = props.variant === "provider";
   const provSub = props.providerSubSection;
   const canOperate = me.data?.role === "admin" || me.data?.role === "operator";
@@ -146,6 +151,25 @@ export function PrunerScopeTab(props: {
     setStudioText((scopeRow.preview_include_studios ?? []).join(", "));
     setCollectionText((scopeRow.preview_include_collections ?? []).join(", "));
     setPreviewMaxItems(scopeRow.preview_max_items);
+    if (props.scope === "tv") {
+      setRulesTvOlderDaysStr(
+        !scopeRow.never_played_stale_reported_enabled ? "0" : String(scopeRow.never_played_min_age_days),
+      );
+    }
+    if (props.scope === "movies") {
+      setRulesMoviesLowRatingStr(
+        !scopeRow.watched_movie_low_rating_reported_enabled
+          ? "0"
+          : String(
+              isPlex
+                ? scopeRow.watched_movie_low_rating_max_plex_audience_rating
+                : scopeRow.watched_movie_low_rating_max_jellyfin_emby_community_rating,
+            ),
+      );
+      setRulesMoviesUnwatchedDaysStr(
+        !scopeRow.unwatched_movie_stale_reported_enabled ? "0" : String(scopeRow.unwatched_movie_stale_min_age_days),
+      );
+    }
   }, [
     scopeRow?.scheduled_preview_enabled,
     scopeRow?.scheduled_preview_interval_seconds,
@@ -168,6 +192,7 @@ export function PrunerScopeTab(props: {
     scopeRow?.preview_max_items,
     scopeRow?.media_scope,
     instanceId,
+    props.scope,
   ]);
 
   async function saveSchedule() {
@@ -652,11 +677,13 @@ export function PrunerScopeTab(props: {
         return;
       }
       const csrf_token = await fetchCsrfToken();
-      const d = Math.max(7, Math.min(3650, Number(staleNeverDays) || 90));
+      const raw = parseInt(rulesTvOlderDaysStr.trim(), 10);
+      const tvStaleOn = Number.isFinite(raw) && raw >= 7;
+      const tvStaleDays = tvStaleOn ? Math.max(7, Math.min(3650, raw)) : 90;
       await patchPrunerScope(instanceId, "tv", {
-        never_played_stale_reported_enabled: staleNeverEnabled,
-        never_played_min_age_days: d,
         watched_tv_reported_enabled: watchedTvEnabled,
+        never_played_stale_reported_enabled: tvStaleOn,
+        never_played_min_age_days: tvStaleDays,
         csrf_token,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
@@ -675,16 +702,20 @@ export function PrunerScopeTab(props: {
     setBusy(true);
     try {
       const csrf_token = await fetchCsrfToken();
-      const cap = Math.max(0, Math.min(10, Number.parseFloat(lowRatingMax) || 4));
-      const d = Math.max(7, Math.min(3650, Number(unwatchedStaleDays) || 90));
+      const lowRaw = Number.parseFloat(rulesMoviesLowRatingStr.trim());
+      const lowOn = Number.isFinite(lowRaw) && lowRaw > 0;
+      const cap = lowOn ? Math.max(0, Math.min(10, lowRaw)) : 4;
+      const uwRaw = parseInt(rulesMoviesUnwatchedDaysStr.trim(), 10);
+      const uwOn = Number.isFinite(uwRaw) && uwRaw >= 7;
+      const uwDays = uwOn ? Math.max(7, Math.min(3650, uwRaw)) : 90;
       await patchPrunerScope(instanceId, "movies", {
         watched_movies_reported_enabled: watchedMoviesEnabled,
-        watched_movie_low_rating_reported_enabled: lowRatingEnabled,
+        watched_movie_low_rating_reported_enabled: lowOn,
         ...(instance?.provider === "plex"
           ? { watched_movie_low_rating_max_plex_audience_rating: cap }
           : { watched_movie_low_rating_max_jellyfin_emby_community_rating: cap }),
-        unwatched_movie_stale_reported_enabled: unwatchedStaleEnabled,
-        unwatched_movie_stale_min_age_days: d,
+        unwatched_movie_stale_reported_enabled: uwOn,
+        unwatched_movie_stale_min_age_days: uwDays,
         csrf_token,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
@@ -706,10 +737,7 @@ export function PrunerScopeTab(props: {
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
-      const peopleTokens = peopleText
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const peopleTokens = scopeRow?.preview_include_people ?? [];
       const studioTokens = studioText
         .split(",")
         .map((s) => s.trim())
@@ -731,26 +759,19 @@ export function PrunerScopeTab(props: {
         setErr("Minimum year must be less than or equal to maximum year.");
         return;
       }
-      const basePayload = {
+      const collectionsPreserve = isPlex && props.scope === "movies" ? (scopeRow?.preview_include_collections ?? []) : [];
+      const payload = {
         preview_include_genres: genreTokens,
         preview_include_people: peopleTokens,
         preview_year_min: yearMinStr.trim() ? yMin : null,
         preview_year_max: yearMaxStr.trim() ? yMax : null,
         preview_include_studios: studioTokens,
+        ...(isPlex && props.scope === "movies"
+          ? { preview_include_collections: collectionsPreserve }
+          : {}),
         csrf_token,
       };
-      if (isPlex && props.scope === "movies") {
-        const collTokens = collectionText
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-        await patchPrunerScope(instanceId, props.scope, {
-          ...basePayload,
-          preview_include_collections: collTokens,
-        });
-      } else {
-        await patchPrunerScope(instanceId, props.scope, basePayload);
-      }
+      await patchPrunerScope(instanceId, props.scope, payload);
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
       setBundleMsg(props.scope === "tv" ? "Saved TV filters." : "Saved Movies filters.");
     } catch (e) {
@@ -760,26 +781,22 @@ export function PrunerScopeTab(props: {
     }
   }
 
-  async function saveProviderScheduleBundle() {
+  async function saveProviderPeopleBundle() {
     setBundleMsg(null);
-    setSchedMsg(null);
-    setPreviewMaxItemsMsg(null);
     setErr(null);
     setBusy(true);
     try {
       const csrf_token = await fetchCsrfToken();
-      const iv = Math.max(60, Math.min(86400, Number(schedInterval) || 3600));
-      const cap = Math.max(1, Math.min(5000, Number(previewMaxItems) || 500));
+      const lines = peopleText
+        .split(/[\n,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
       await patchPrunerScope(instanceId, props.scope, {
-        preview_max_items: cap,
-        scheduled_preview_enabled: schedEnabled,
-        scheduled_preview_interval_seconds: iv,
+        preview_include_people: lines,
         csrf_token,
       });
       await qc.invalidateQueries({ queryKey: ["pruner", "instances", instanceId] });
-      setBundleMsg(
-        props.scope === "tv" ? "Saved TV schedule and limits." : "Saved Movies schedule and limits.",
-      );
+      setBundleMsg(props.scope === "tv" ? "Saved TV people." : "Saved Movies people.");
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -791,176 +808,142 @@ export function PrunerScopeTab(props: {
     if (props.scope === "tv") {
       if (isPlex) {
         return (
-          <div className="space-y-6" data-testid="pruner-provider-plex-tv-unsupported-rules">
+          <div className="space-y-5" data-testid="pruner-provider-plex-tv-unsupported-rules">
             <div className="space-y-1.5">
               <p className="text-sm font-medium text-[var(--mm-text1)]">Watched TV removal</p>
               <p className="text-xs leading-relaxed text-[var(--mm-text3)]">Not supported for Plex.</p>
             </div>
             <div className="space-y-1.5">
-              <p className="text-sm font-medium text-[var(--mm-text1)]">Never-played TV older than N days</p>
+              <p className="text-sm font-medium text-[var(--mm-text1)]">Unwatched TV older than N days</p>
               <p className="text-xs leading-relaxed text-[var(--mm-text3)]">Not supported for Plex.</p>
             </div>
           </div>
         );
       }
       return (
-        <div className="space-y-8">
-          <div className="space-y-2" data-testid="pruner-never-played-stale-panel">
-            <p className="text-sm font-medium text-[var(--mm-text1)]">Never-played TV older than N days</p>
-            <p className="text-xs leading-relaxed text-[var(--mm-text3)]">Never played and older than this age.</p>
+        <div className="space-y-5">
+          <div data-testid="pruner-watched-tv-panel">
             {showInteractiveControls ? (
-              <div className="space-y-3">
-                <label className="flex items-center gap-2 text-sm text-[var(--mm-text)]">
-                  <input
-                    type="checkbox"
-                    checked={staleNeverEnabled}
-                    disabled={busy}
-                    onChange={(e) => setStaleNeverEnabled(e.target.checked)}
-                  />
-                  Enable never-played TV older-than rule
-                </label>
-                <label className="block text-sm text-[var(--mm-text2)]">
-                  <span className="mb-1 block text-xs text-[var(--mm-text3)]">Minimum age (days, 7–3650)</span>
-                  <input
-                    type="number"
-                    min={7}
-                    max={3650}
-                    className="mm-input w-28"
-                    value={staleNeverDays}
-                    disabled={busy}
-                    onChange={(e) => setStaleNeverDays(parseInt(e.target.value, 10) || 90)}
-                  />
-                </label>
-              </div>
+              <FetcherEnableSwitch
+                id={`pruner-provider-tv-watched-${instanceId}`}
+                label="Watched TV removal"
+                enabled={watchedTvEnabled}
+                disabled={busy}
+                onChange={setWatchedTvEnabled}
+              />
             ) : (
               <p className="text-xs text-[var(--mm-text2)]">
-                Rule is <strong>{scopeRow?.never_played_stale_reported_enabled ? "on" : "off"}</strong>
-                {scopeRow ? <> (minimum age {scopeRow.never_played_min_age_days} days).</> : null}
+                Watched TV removal: <strong>{scopeRow?.watched_tv_reported_enabled ? "On" : "Off"}</strong>
               </p>
             )}
-          </div>
-          <div className="space-y-2" data-testid="pruner-watched-tv-panel">
-            <p className="text-sm font-medium text-[var(--mm-text1)]">Watched TV removal</p>
-            <p className="text-xs leading-relaxed text-[var(--mm-text3)]">
+            <p className="mt-2 text-xs leading-relaxed text-[var(--mm-text3)]">
               Delete items marked watched for this provider user.
             </p>
+          </div>
+          <div data-testid="pruner-never-played-stale-panel">
+            <p className="text-sm font-medium text-[var(--mm-text1)]">Unwatched TV older than N days</p>
             {showInteractiveControls ? (
-              <label className="flex items-center gap-2 text-sm text-[var(--mm-text)]">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <input
-                  type="checkbox"
-                  checked={watchedTvEnabled}
+                  type="number"
+                  min={0}
+                  max={3650}
+                  className="mm-input w-24"
+                  value={rulesTvOlderDaysStr}
                   disabled={busy}
-                  onChange={(e) => setWatchedTvEnabled(e.target.checked)}
+                  onChange={(e) => setRulesTvOlderDaysStr(e.target.value)}
                 />
-                Enable watched TV rule
-              </label>
+                <span className="text-sm text-[var(--mm-text2)]">days</span>
+              </div>
             ) : (
-              <p className="text-xs text-[var(--mm-text2)]">
-                Watched TV rule is <strong>{scopeRow?.watched_tv_reported_enabled ? "on" : "off"}</strong>.
+              <p className="mt-2 text-xs text-[var(--mm-text2)]">
+                Days:{" "}
+                <strong>
+                  {!scopeRow?.never_played_stale_reported_enabled ? "0 (off)" : scopeRow.never_played_min_age_days}
+                </strong>
               </p>
             )}
+            <p className="mt-1 text-xs leading-relaxed text-[var(--mm-text3)]">
+              Set 0 to disable. Minimum 7 days when active.
+            </p>
           </div>
         </div>
       );
     }
     return (
-      <div className="space-y-8">
-        <div className="space-y-2" data-testid="pruner-watched-movies-panel">
-          <p className="text-sm font-medium text-[var(--mm-text1)]">Watched movies removal</p>
-          <p className="text-xs leading-relaxed text-[var(--mm-text3)]">
+      <div className="space-y-5">
+        <div data-testid="pruner-watched-movies-panel">
+          {showInteractiveControls ? (
+            <FetcherEnableSwitch
+              id={`pruner-provider-movies-watched-${instanceId}`}
+              label="Watched movies removal"
+              enabled={watchedMoviesEnabled}
+              disabled={busy}
+              onChange={setWatchedMoviesEnabled}
+            />
+          ) : (
+            <p className="text-xs text-[var(--mm-text2)]">
+              Watched movies removal: <strong>{scopeRow?.watched_movies_reported_enabled ? "On" : "Off"}</strong>
+            </p>
+          )}
+          <p className="mt-2 text-xs leading-relaxed text-[var(--mm-text3)]">
             {isPlex ? "Uses Plex watched state from allLeaves." : "Uses provider watched state for movie items."}
           </p>
-          {showInteractiveControls ? (
-            <label className="flex items-center gap-2 text-sm text-[var(--mm-text)]">
-              <input
-                type="checkbox"
-                checked={watchedMoviesEnabled}
-                disabled={busy}
-                onChange={(e) => setWatchedMoviesEnabled(e.target.checked)}
-              />
-              Enable watched movies rule
-            </label>
-          ) : (
-            <p className="text-xs text-[var(--mm-text2)]">
-              Watched movies rule is <strong>{scopeRow?.watched_movies_reported_enabled ? "on" : "off"}</strong>.
-            </p>
-          )}
         </div>
-        <div className="space-y-2" data-testid="pruner-watched-low-rating-panel">
+        <div data-testid="pruner-watched-low-rating-panel">
           <p className="text-sm font-medium text-[var(--mm-text1)]">Low-rating watched movies</p>
-          <p className="text-xs leading-relaxed text-[var(--mm-text3)]">
-            {isPlex
-              ? "Uses Plex audienceRating; set a maximum rating ceiling."
-              : "Uses Jellyfin/Emby CommunityRating; set a maximum rating ceiling."}
+          <p className="mt-1 text-xs text-[var(--mm-text3)]">
+            {isPlex ? "Plex audienceRating max (0–10)" : "Jellyfin/Emby CommunityRating max (0–10)"}
           </p>
           {showInteractiveControls ? (
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 text-sm text-[var(--mm-text)]">
-                <input
-                  type="checkbox"
-                  checked={lowRatingEnabled}
-                  disabled={busy}
-                  onChange={(e) => setLowRatingEnabled(e.target.checked)}
-                />
-                Enable low-rating watched movies rule
-              </label>
-              <label className="block text-sm text-[var(--mm-text2)]">
-                <span className="mb-1 block text-xs text-[var(--mm-text3)]">
-                  {isPlex ? "Plex audienceRating — max ceiling (0–10)" : "Jellyfin/Emby CommunityRating — max ceiling (0–10)"}
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  max={10}
-                  step="0.1"
-                  className="mm-input w-28"
-                  value={lowRatingMax}
-                  disabled={busy}
-                  onChange={(e) => setLowRatingMax(e.target.value)}
-                />
-              </label>
-            </div>
+            <input
+              type="number"
+              min={0}
+              max={10}
+              step="0.1"
+              className="mm-input mt-2 w-28"
+              value={rulesMoviesLowRatingStr}
+              disabled={busy}
+              onChange={(e) => setRulesMoviesLowRatingStr(e.target.value)}
+            />
           ) : (
-            <p className="text-xs text-[var(--mm-text2)]">
-              Low-rating rule is <strong>{scopeRow?.watched_movie_low_rating_reported_enabled ? "on" : "off"}</strong>.
+            <p className="mt-2 text-xs text-[var(--mm-text2)]">
+              Max rating / off:{" "}
+              <strong>
+                {!scopeRow?.watched_movie_low_rating_reported_enabled
+                  ? "0 (off)"
+                  : isPlex
+                    ? scopeRow.watched_movie_low_rating_max_plex_audience_rating
+                    : scopeRow.watched_movie_low_rating_max_jellyfin_emby_community_rating}
+              </strong>
             </p>
           )}
+          <p className="mt-1 text-xs leading-relaxed text-[var(--mm-text3)]">Set 0 to disable.</p>
         </div>
-        <div className="space-y-2" data-testid="pruner-unwatched-stale-panel">
+        <div data-testid="pruner-unwatched-stale-panel">
           <p className="text-sm font-medium text-[var(--mm-text1)]">Unwatched movies older than N days</p>
-          <p className="text-xs leading-relaxed text-[var(--mm-text3)]">
-            {isPlex ? "Unwatched + addedAt age." : "Never-played + DateCreated age."}
-          </p>
           {showInteractiveControls ? (
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 text-sm text-[var(--mm-text)]">
-                <input
-                  type="checkbox"
-                  checked={unwatchedStaleEnabled}
-                  disabled={busy}
-                  onChange={(e) => setUnwatchedStaleEnabled(e.target.checked)}
-                />
-                Enable unwatched stale movies rule
-              </label>
-              <label className="block text-sm text-[var(--mm-text2)]">
-                <span className="mb-1 block text-xs text-[var(--mm-text3)]">Minimum age (days, 7–3650)</span>
-                <input
-                  type="number"
-                  min={7}
-                  max={3650}
-                  className="mm-input w-28"
-                  value={unwatchedStaleDays}
-                  disabled={busy}
-                  onChange={(e) => setUnwatchedStaleDays(parseInt(e.target.value, 10) || 90)}
-                />
-              </label>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                max={3650}
+                className="mm-input w-24"
+                value={rulesMoviesUnwatchedDaysStr}
+                disabled={busy}
+                onChange={(e) => setRulesMoviesUnwatchedDaysStr(e.target.value)}
+              />
+              <span className="text-sm text-[var(--mm-text2)]">days</span>
             </div>
           ) : (
-            <p className="text-xs text-[var(--mm-text2)]">
-              Unwatched stale rule is <strong>{scopeRow?.unwatched_movie_stale_reported_enabled ? "on" : "off"}</strong>
-              {scopeRow ? <> (min age {scopeRow.unwatched_movie_stale_min_age_days} days).</> : null}
+            <p className="mt-2 text-xs text-[var(--mm-text2)]">
+              Days:{" "}
+              <strong>
+                {!scopeRow?.unwatched_movie_stale_reported_enabled ? "0 (off)" : scopeRow.unwatched_movie_stale_min_age_days}
+              </strong>
             </p>
           )}
+          <p className="mt-1 text-xs leading-relaxed text-[var(--mm-text3)]">Set 0 to disable.</p>
         </div>
         {isPlex ? (
           <p className="text-xs text-[var(--mm-text3)]" data-testid="pruner-plex-other-rules-note" role="status">
@@ -973,16 +956,14 @@ export function PrunerScopeTab(props: {
 
   function renderProviderFiltersControls(): ReactNode {
     return (
-      <div className="space-y-8">
+      <div className="space-y-5">
         {isPlex && props.scope === "tv" ? (
           <p className="text-xs leading-relaxed text-amber-100/90" data-testid="pruner-plex-tv-filters-scope-note" role="status">
-            On Plex TV, genre, people, year, and studio filters apply to the <strong>missing primary art</strong> preview
-            rule only.
+            On Plex, filters apply to the missing primary art rule only.
           </p>
         ) : null}
         <div className="space-y-2" data-testid="pruner-genre-filters-panel">
-          <p className="text-sm font-medium text-[var(--mm-text1)]">Genre filter</p>
-          <p className="text-xs text-[var(--mm-text3)]">Comma-separated genres.</p>
+          <p className="text-sm font-medium text-[var(--mm-text1)]">Genre</p>
           {showInteractiveControls ? (
             <input
               type="text"
@@ -994,52 +975,36 @@ export function PrunerScopeTab(props: {
             />
           ) : (
             <p className="text-xs text-[var(--mm-text2)]">
-              {(scopeRow?.preview_include_genres ?? []).join(", ") || "none"}
+              {(scopeRow?.preview_include_genres ?? []).join(", ") || "—"}
             </p>
           )}
-        </div>
-        <div className="space-y-2" data-testid="pruner-people-filters-panel">
-          <p className="text-sm font-medium text-[var(--mm-text1)]">People filter</p>
-          <p className="text-xs text-[var(--mm-text3)]">Comma-separated full names.</p>
-          {showInteractiveControls ? (
-            <input
-              type="text"
-              className="mm-input w-full"
-              placeholder="e.g. Jane Doe, Alan Smithee"
-              value={peopleText}
-              disabled={busy}
-              onChange={(e) => setPeopleText(e.target.value)}
-            />
-          ) : (
-            <p className="text-xs text-[var(--mm-text2)]">
-              {(scopeRow?.preview_include_people ?? []).join(", ") || "none"}
-            </p>
-          )}
+          <p className="text-xs text-[var(--mm-text3)]">Leave blank to include all genres.</p>
         </div>
         <div className="space-y-2" data-testid="pruner-year-filters-panel">
           <p className="text-sm font-medium text-[var(--mm-text1)]">Year range</p>
-          <p className="text-xs text-[var(--mm-text3)]">Inclusive 1900–2100. Blank means open-ended.</p>
           {showInteractiveControls ? (
-            <div className="flex flex-wrap gap-4">
-              <label className="block text-sm text-[var(--mm-text2)]">
-                <span className="mb-1 block text-xs text-[var(--mm-text3)]">Min year</span>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="text-sm text-[var(--mm-text2)]">
+                Min year
                 <input
                   type="number"
                   min={1900}
                   max={2100}
-                  className="mm-input w-28"
+                  className="mm-input ml-2 mt-1 w-24"
+                  placeholder="Min"
                   value={yearMinStr}
                   disabled={busy}
                   onChange={(e) => setYearMinStr(e.target.value)}
                 />
               </label>
-              <label className="block text-sm text-[var(--mm-text2)]">
-                <span className="mb-1 block text-xs text-[var(--mm-text3)]">Max year</span>
+              <label className="text-sm text-[var(--mm-text2)]">
+                Max year
                 <input
                   type="number"
                   min={1900}
                   max={2100}
-                  className="mm-input w-28"
+                  className="mm-input ml-2 mt-1 w-24"
+                  placeholder="Max"
                   value={yearMaxStr}
                   disabled={busy}
                   onChange={(e) => setYearMaxStr(e.target.value)}
@@ -1051,10 +1016,10 @@ export function PrunerScopeTab(props: {
               {scopeRow?.preview_year_min ?? "—"} to {scopeRow?.preview_year_max ?? "—"}
             </p>
           )}
+          <p className="text-xs text-[var(--mm-text3)]">Leave blank for open-ended. Range 1900–2100.</p>
         </div>
         <div className="space-y-2" data-testid="pruner-studio-preview-panel">
-          <p className="text-sm font-medium text-[var(--mm-text1)]">Studio filter</p>
-          <p className="text-xs text-[var(--mm-text3)]">Comma-separated studio names.</p>
+          <p className="text-sm font-medium text-[var(--mm-text1)]">Studio</p>
           {showInteractiveControls ? (
             <input
               type="text"
@@ -1066,184 +1031,37 @@ export function PrunerScopeTab(props: {
             />
           ) : (
             <p className="text-xs text-[var(--mm-text2)]">
-              {(scopeRow?.preview_include_studios ?? []).join(", ") || "none"}
+              {(scopeRow?.preview_include_studios ?? []).join(", ") || "—"}
             </p>
           )}
+          <p className="text-xs text-[var(--mm-text3)]">Leave blank to include all studios.</p>
         </div>
-        {isPlex && props.scope === "movies" ? (
-          <div className="space-y-2" data-testid="pruner-collection-preview-panel">
-            <p className="text-sm font-medium text-[var(--mm-text1)]">Collection filter (Plex)</p>
-            <p className="text-xs text-[var(--mm-text3)]">Comma-separated collection names.</p>
-            {showInteractiveControls ? (
-              <input
-                type="text"
-                className="mm-input w-full"
-                placeholder="e.g. Marvel Cinematic Universe"
-                value={collectionText}
-                disabled={busy}
-                onChange={(e) => setCollectionText(e.target.value)}
-              />
-            ) : (
-              <p className="text-xs text-[var(--mm-text2)]">
-                {(scopeRow?.preview_include_collections ?? []).join(", ") || "none"}
-              </p>
-            )}
-          </div>
-        ) : null}
       </div>
     );
   }
 
-  function renderProviderScheduleControls(): ReactNode {
+  function renderProviderPeopleControls(): ReactNode {
     return (
-      <div className="space-y-6">
-        <p className="text-xs leading-relaxed text-[var(--mm-text3)]">
-          Preview saves a snapshot. Apply uses the selected snapshot only.
-        </p>
-        <div className="space-y-2" data-testid="pruner-run-limits-panel">
-          <p className="text-sm font-medium text-[var(--mm-text1)]">Preview cap per run</p>
-          <p className="text-xs text-[var(--mm-text3)]">Between 1 and 5000 items.</p>
-          {showInteractiveControls ? (
-            <input
-              type="number"
-              min={1}
-              max={5000}
-              className="mm-input w-32"
-              value={previewMaxItems}
-              disabled={busy}
-              onChange={(e) => setPreviewMaxItems(Math.max(1, Math.min(5000, Number(e.target.value) || 500)))}
-            />
-          ) : (
-            <p className="text-xs text-[var(--mm-text2)]">{scopeRow?.preview_max_items ?? "—"}</p>
-          )}
-        </div>
-        <div className="space-y-3" data-testid="pruner-scope-scheduled-preview">
-          <p className="text-sm font-medium text-[var(--mm-text1)]">Scheduled previews</p>
-          <p className="text-xs text-[var(--mm-text3)]">
-            Interval 60 seconds to 24 hours. Scheduled runs use the missing primary art rule only.
-          </p>
-          {showInteractiveControls ? (
-            <>
-              <label className="flex items-center gap-2 text-sm text-[var(--mm-text)]">
-                <input
-                  type="checkbox"
-                  checked={schedEnabled}
-                  disabled={busy}
-                  onChange={(e) => setSchedEnabled(e.target.checked)}
-                />
-                Enable scheduled previews
-              </label>
-              <label className="block text-sm text-[var(--mm-text2)]">
-                <span className="mb-1 block text-xs text-[var(--mm-text3)]">Interval (seconds)</span>
-                <input
-                  type="number"
-                  min={60}
-                  max={86400}
-                  className="mm-input w-36"
-                  value={schedInterval}
-                  disabled={busy}
-                  onChange={(e) => setSchedInterval(parseInt(e.target.value, 10) || 3600)}
-                />
-              </label>
-            </>
-          ) : (
-            <p className="text-xs text-[var(--mm-text2)]">
-              Scheduled preview is <strong>{scopeRow?.scheduled_preview_enabled ? "on" : "off"}</strong>
-              {scopeRow ? <> (every {scopeRow.scheduled_preview_interval_seconds}s).</> : null}
-            </p>
-          )}
-          <p className="text-xs text-[var(--mm-text3)]">
-            Last scheduled enqueue:{" "}
-            <span className="text-[var(--mm-text2)]">
-              {scopeRow?.last_scheduled_preview_enqueued_at
-                ? new Date(scopeRow.last_scheduled_preview_enqueued_at).toLocaleString()
-                : "—"}
-            </span>
-          </p>
-        </div>
+      <div className="space-y-3">
+        <label className="block text-sm font-medium text-[var(--mm-text1)]" htmlFor={`pruner-people-names-${props.scope}-${instanceId}`}>
+          Names
+        </label>
         {showInteractiveControls ? (
-          <div className="space-y-4 border-t border-[var(--mm-border)] pt-4">
-            <p className="text-sm font-medium text-[var(--mm-text1)]">On-demand previews</p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={fetcherMenuButtonClass({ variant: "secondary", disabled: busy })}
-                disabled={busy}
-                onClick={() => void runPreview()}
-              >
-                Queue missing-primary preview
-              </button>
-              <button
-                type="button"
-                className={fetcherMenuButtonClass({ variant: "secondary", disabled: busy || !scopeRow?.last_preview_run_uuid })}
-                disabled={busy || !scopeRow?.last_preview_run_uuid}
-                onClick={() => void loadJsonFor(scopeRow?.last_preview_run_uuid)}
-              >
-                Load latest snapshot JSON
-              </button>
-              {scopeRow?.last_preview_run_uuid ? (
-                <button
-                  type="button"
-                  className={fetcherMenuButtonClass({ variant: "secondary", disabled: busy })}
-                  disabled={busy}
-                  onClick={() => openApplyModal(scopeRow.last_preview_run_uuid!)}
-                >
-                  Apply latest snapshot
-                </button>
-              ) : null}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {props.scope === "tv" && !isPlex ? (
-                <>
-                  <button
-                    type="button"
-                    className={fetcherMenuButtonClass({ variant: "tertiary", disabled: busy || !staleNeverEnabled })}
-                    disabled={busy || !staleNeverEnabled}
-                    onClick={() => void runStaleNeverPreview()}
-                  >
-                    Preview never-played TV
-                  </button>
-                  <button
-                    type="button"
-                    className={fetcherMenuButtonClass({ variant: "tertiary", disabled: busy || !watchedTvEnabled })}
-                    disabled={busy || !watchedTvEnabled}
-                    onClick={() => void runWatchedTvPreview()}
-                  >
-                    Preview watched TV
-                  </button>
-                </>
-              ) : null}
-              {props.scope === "movies" ? (
-                <>
-                  <button
-                    type="button"
-                    className={fetcherMenuButtonClass({ variant: "tertiary", disabled: busy || !watchedMoviesEnabled })}
-                    disabled={busy || !watchedMoviesEnabled}
-                    onClick={() => void runWatchedMoviesPreview()}
-                  >
-                    Preview watched movies
-                  </button>
-                  <button
-                    type="button"
-                    className={fetcherMenuButtonClass({ variant: "tertiary", disabled: busy || !lowRatingEnabled })}
-                    disabled={busy || !lowRatingEnabled}
-                    onClick={() => void runLowRatingMoviesPreview()}
-                  >
-                    Preview low-rating movies
-                  </button>
-                  <button
-                    type="button"
-                    className={fetcherMenuButtonClass({ variant: "tertiary", disabled: busy || !unwatchedStaleEnabled })}
-                    disabled={busy || !unwatchedStaleEnabled}
-                    onClick={() => void runUnwatchedStaleMoviesPreview()}
-                  >
-                    Preview unwatched stale movies
-                  </button>
-                </>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
+          <textarea
+            id={`pruner-people-names-${props.scope}-${instanceId}`}
+            rows={5}
+            className="mm-input min-h-[7rem] w-full resize-y font-sans text-sm"
+            placeholder="e.g. Alex Carter, Jordan Lee (comma or one per line)"
+            value={peopleText}
+            disabled={busy}
+            onChange={(e) => setPeopleText(e.target.value)}
+          />
+        ) : (
+          <p className="whitespace-pre-wrap text-xs text-[var(--mm-text2)]">
+            {(scopeRow?.preview_include_people ?? []).join("\n") || "—"}
+          </p>
+        )}
+        <p className="text-xs text-[var(--mm-text3)]">Leave blank to use no name filter.</p>
       </div>
     );
   }
@@ -1308,115 +1126,31 @@ export function PrunerScopeTab(props: {
     );
   }
 
-  if (isProvider && provSub === "schedule") {
-    const saveLabel = props.scope === "tv" ? "Save TV schedule" : "Save Movies schedule";
+  if (isProvider && provSub === "people") {
+    const saveLabel = props.scope === "tv" ? "Save TV people" : "Save Movies people";
     return (
-      <section className="flex min-h-0 w-full min-w-0 flex-1 flex-col" data-testid={`pruner-provider-subsection-schedule-${props.scope}`}>
+      <section className="flex min-h-0 w-full min-w-0 flex-1 flex-col" data-testid={`pruner-provider-subsection-people-${props.scope}`}>
         <fieldset disabled={Boolean(props.disabledMode)} className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 space-y-6">{renderProviderScheduleControls()}</div>
+          <div className="min-h-0 flex-1">{renderProviderPeopleControls()}</div>
           {showInteractiveControls ? (
             <div className="mt-8 border-t border-[var(--mm-border)] pt-5">
               <button
                 type="button"
                 className={fetcherMenuButtonClass({ variant: "primary", disabled: busy })}
                 disabled={busy}
-                onClick={() => void saveProviderScheduleBundle()}
+                onClick={() => void saveProviderPeopleBundle()}
               >
                 {busy ? "Saving…" : saveLabel}
               </button>
             </div>
           ) : null}
           {bundleMsg ? <p className="mt-3 text-sm text-green-600">{bundleMsg}</p> : null}
-          {schedMsg ? <p className="mt-1 text-xs text-green-600">{schedMsg}</p> : null}
-          {previewMaxItemsMsg ? <p className="mt-1 text-xs text-green-600">{previewMaxItemsMsg}</p> : null}
           {err ? (
             <p className="mt-2 text-sm text-red-600" role="alert">
               {err}
             </p>
           ) : null}
-          {preview ? <p className="mt-2 text-sm text-[var(--mm-text)]">{preview}</p> : null}
-          {jsonPreview ? (
-            <pre className="mt-3 max-h-96 overflow-auto rounded-md border border-[var(--mm-border)] bg-[var(--mm-surface2)] p-3 text-xs">
-              {jsonPreview}
-            </pre>
-          ) : null}
         </fieldset>
-        {applyModalRunId ? (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="pruner-apply-modal-title-2"
-            data-testid="pruner-apply-modal"
-          >
-            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-4 shadow-xl">
-              <h3 id="pruner-apply-modal-title-2" className="text-base font-semibold text-[var(--mm-text)]">
-                {applySnapshotOperatorLabel ?? "Apply from preview snapshot"}
-              </h3>
-              <p className="mt-2 text-sm text-[var(--mm-text2)]">
-                This live action uses <strong>only</strong> the frozen candidate list from one preview snapshot.
-              </p>
-              {applyEligQuery.isLoading ? (
-                <p className="mt-3 text-sm text-[var(--mm-text2)]">Checking eligibility…</p>
-              ) : applyEligQuery.isError ? (
-                <p className="mt-3 text-sm text-red-600" role="alert">
-                  {(applyEligQuery.error as Error).message}
-                </p>
-              ) : applyEligQuery.data ? (
-                <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-[var(--mm-text)]">
-                  <li>
-                    Scope: <strong>{applyEligQuery.data.media_scope === "tv" ? "TV" : "Movies"}</strong>
-                  </li>
-                  <li>
-                    Candidates: <strong>{applyEligQuery.data.candidate_count}</strong>
-                  </li>
-                </ul>
-              ) : null}
-              {applyEligQuery.data && !applyEligQuery.data.eligible ? (
-                <p className="mt-3 text-sm text-amber-700" role="status">
-                  {applyEligQuery.data.reasons.length
-                    ? applyEligQuery.data.reasons.join(" ")
-                    : "This snapshot cannot be applied right now."}
-                </p>
-              ) : null}
-              {applyEligQuery.data?.eligible ? (
-                <label className="mt-4 flex cursor-pointer items-start gap-2 text-sm text-[var(--mm-text)]">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={applySnapshotConfirmed}
-                    onChange={(e) => setApplySnapshotConfirmed(e.target.checked)}
-                  />
-                  <span>I confirm this apply for the selected snapshot only.</span>
-                </label>
-              ) : null}
-              <div className="mt-4 flex flex-wrap justify-end gap-2">
-                <button
-                  type="button"
-                  className="rounded-md border border-[var(--mm-border)] px-3 py-1.5 text-sm font-medium text-[var(--mm-text)]"
-                  onClick={() => closeApplyModal()}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="rounded-md bg-red-800 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-                  data-testid="pruner-apply-confirm"
-                  disabled={
-                    busy ||
-                    !applyEligQuery.data?.eligible ||
-                    !applySnapshotConfirmed ||
-                    applyEligQuery.isLoading ||
-                    applyEligQuery.isError
-                  }
-                  onClick={() => void confirmApplyFromSnapshot()}
-                >
-                  {applySnapshotOperatorLabel ?? "Confirm apply"}
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
       </section>
     );
   }

@@ -7,9 +7,11 @@ import {
   FETCHER_TAB_PANEL_INTRO_CLASS,
   FETCHER_TAB_PANEL_TITLE_CLASS,
 } from "../fetcher/fetcher-tab-panel-intro";
+import { FetcherEnableSwitch } from "../fetcher/fetcher-enable-switch";
 import { fetcherMenuButtonClass, fetcherSectionTabClass } from "../fetcher/fetcher-menu-button";
+import { fetchCsrfToken } from "../../lib/api/auth-api";
 import type { PrunerJobsInspectionRow, PrunerServerInstance } from "../../lib/pruner/api";
-import { patchPrunerInstance, postPrunerConnectionTest, postPrunerInstance } from "../../lib/pruner/api";
+import { patchPrunerInstance, patchPrunerScope, postPrunerConnectionTest, postPrunerInstance } from "../../lib/pruner/api";
 import { useMeQuery } from "../../lib/auth/queries";
 import { usePrunerInstancesQuery, usePrunerJobsInspectionQuery } from "../../lib/pruner/queries";
 import { PrunerScopeTab } from "./pruner-scope-tab";
@@ -445,7 +447,7 @@ function ConnectionsTabPanel({ allInstances }: { allInstances: PrunerServerInsta
   );
 }
 
-type ProviderWorkspaceSection = "rules" | "filters" | "schedule";
+type ProviderWorkspaceSection = "rules" | "filters" | "people";
 
 function ProviderConfigurationWorkspace({ provider, allInstances }: { provider: ProviderTab; allInstances: PrunerServerInstance[] }) {
   const providerName = providerLabel(provider);
@@ -474,7 +476,7 @@ function ProviderConfigurationWorkspace({ provider, allInstances }: { provider: 
         <h2 className="text-base font-semibold text-[var(--mm-text1)]">{providerName}</h2>
         <p className="mt-1 max-w-3xl text-sm leading-snug text-[var(--mm-text2)]">
           Save credentials under <strong className="text-[var(--mm-text)]">Connections</strong>, then use Rules,
-          Filters, and Schedule below.
+          Filters, and People below. Schedules for all providers are on the <strong className="text-[var(--mm-text)]">Schedules</strong> tab.
         </p>
       </div>
       {providerInstances.length > 1 ? (
@@ -503,7 +505,7 @@ function ProviderConfigurationWorkspace({ provider, allInstances }: { provider: 
           [
             ["rules", "Rules"],
             ["filters", "Filters"],
-            ["schedule", "Schedule & limits"],
+            ["people", "People"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -575,8 +577,11 @@ function ProviderConfigurationWorkspace({ provider, allInstances }: { provider: 
             data-provider-section="filters"
           >
             <h3 className="text-base font-semibold text-[var(--mm-text1)]">Filters</h3>
+            <p className="mt-2 text-xs leading-relaxed text-[var(--mm-text3)]">
+              Filters narrow which items appear in previews. They do not affect apply behavior.
+            </p>
             <p className="mt-1 text-sm leading-relaxed text-[var(--mm-text3)]">
-              Optional preview narrowing. One save per column writes every filter in that column.
+              One save per column writes genre, year, and studio filters for that column.
             </p>
             {!hasInstance ? (
               <p
@@ -617,46 +622,50 @@ function ProviderConfigurationWorkspace({ provider, allInstances }: { provider: 
           </div>
         ) : null}
 
-        {providerSection === "schedule" ? (
-          <div className="space-y-5" data-testid={`pruner-provider-configuration-${provider}`} data-provider-section="schedule">
-            <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
-              <div className="mm-card mm-dash-card flex min-h-[12rem] flex-col border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5 sm:p-6">
-                <h3 className="text-base font-semibold text-[var(--mm-text1)]">TV schedule & limits</h3>
-                <p className="mt-1 text-sm text-[var(--mm-text3)]">Preview cap, scheduled previews, and manual previews for TV.</p>
-                {!hasInstance ? (
-                  <p className="mt-3 rounded-md border border-dashed border-[var(--mm-border)] bg-[var(--mm-surface2)]/40 px-3 py-2 text-sm text-[var(--mm-text2)]">
-                    Save a connection first to enable these settings.
-                  </p>
-                ) : null}
-                <div className={`mt-4 flex min-h-0 flex-1 flex-col ${!hasInstance ? "pointer-events-none opacity-45" : ""}`}>
-                  <PrunerScopeTab
-                    scope="tv"
-                    variant="provider"
-                    providerSubSection="schedule"
-                    disabledMode={!hasInstance}
-                    contextOverride={activeCtx}
-                  />
+        {providerSection === "people" ? (
+          <div
+            className="mm-card mm-dash-card border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5 sm:p-6"
+            data-testid={`pruner-provider-configuration-${provider}`}
+            data-provider-section="people"
+          >
+            <h3 className="text-base font-semibold text-[var(--mm-text1)]">People</h3>
+            <p className="mt-1 text-sm leading-relaxed text-[var(--mm-text3)]">
+              Match library titles by credited names in previews. One save per column.
+            </p>
+            {!hasInstance ? (
+              <p
+                className="mt-4 rounded-md border border-dashed border-[var(--mm-border)] bg-[var(--mm-surface2)]/40 px-3 py-2 text-sm text-[var(--mm-text2)]"
+                data-testid="pruner-provider-config-disabled-hint-people"
+              >
+                Save a connection first to enable these settings.
+              </p>
+            ) : null}
+            <div
+              className={`mt-6 grid gap-8 lg:grid-cols-2 lg:gap-10 ${!hasInstance ? "pointer-events-none opacity-45" : ""}`}
+            >
+              <div className="min-h-0 space-y-4" data-testid={`pruner-provider-tv-people-${provider}`}>
+                <div className="flex items-center gap-2 border-b border-[var(--mm-border)] pb-2">
+                  <span className="text-sm font-semibold uppercase tracking-wide text-[var(--mm-text1)]">TV</span>
                 </div>
+                <PrunerScopeTab
+                  scope="tv"
+                  variant="provider"
+                  providerSubSection="people"
+                  disabledMode={!hasInstance}
+                  contextOverride={activeCtx}
+                />
               </div>
-              <div className="mm-card mm-dash-card flex min-h-[12rem] flex-col border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5 sm:p-6">
-                <h3 className="text-base font-semibold text-[var(--mm-text1)]">Movies schedule & limits</h3>
-                <p className="mt-1 text-sm text-[var(--mm-text3)]">
-                  Preview cap, scheduled previews, and manual previews for Movies.
-                </p>
-                {!hasInstance ? (
-                  <p className="mt-3 rounded-md border border-dashed border-[var(--mm-border)] bg-[var(--mm-surface2)]/40 px-3 py-2 text-sm text-[var(--mm-text2)]">
-                    Save a connection first to enable these settings.
-                  </p>
-                ) : null}
-                <div className={`mt-4 flex min-h-0 flex-1 flex-col ${!hasInstance ? "pointer-events-none opacity-45" : ""}`}>
-                  <PrunerScopeTab
-                    scope="movies"
-                    variant="provider"
-                    providerSubSection="schedule"
-                    disabledMode={!hasInstance}
-                    contextOverride={activeCtx}
-                  />
+              <div className="min-h-0 space-y-4 lg:border-l lg:border-[var(--mm-border)] lg:pl-8" data-testid={`pruner-provider-movies-people-${provider}`}>
+                <div className="flex items-center gap-2 border-b border-[var(--mm-border)] pb-2">
+                  <span className="text-sm font-semibold uppercase tracking-wide text-[var(--mm-text1)]">Movies</span>
                 </div>
+                <PrunerScopeTab
+                  scope="movies"
+                  variant="provider"
+                  providerSubSection="people"
+                  disabledMode={!hasInstance}
+                  contextOverride={activeCtx}
+                />
               </div>
             </div>
           </div>
@@ -756,45 +765,216 @@ function TopLevelOverview({ instances }: { instances: PrunerServerInstance[] }) 
   );
 }
 
+function PrunerGlobalScheduleRow({
+  provider,
+  scope,
+  instance,
+}: {
+  provider: ProviderTab;
+  scope: "tv" | "movies";
+  instance: PrunerServerInstance | undefined;
+}) {
+  const qc = useQueryClient();
+  const me = useMeQuery();
+  const canOperate = me.data?.role === "admin" || me.data?.role === "operator";
+  const scopeRow = instance?.scopes.find((s) => s.media_scope === scope);
+  const [schedEnabled, setSchedEnabled] = useState(false);
+  const [schedInterval, setSchedInterval] = useState(3600);
+  const [previewCap, setPreviewCap] = useState(500);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!scopeRow) {
+      setSchedEnabled(false);
+      setSchedInterval(3600);
+      setPreviewCap(500);
+      return;
+    }
+    setSchedEnabled(scopeRow.scheduled_preview_enabled);
+    setSchedInterval(scopeRow.scheduled_preview_interval_seconds);
+    setPreviewCap(scopeRow.preview_max_items);
+  }, [scopeRow?.scheduled_preview_enabled, scopeRow?.scheduled_preview_interval_seconds, scopeRow?.preview_max_items, instance?.id]);
+
+  async function saveRow() {
+    if (!instance) return;
+    setMsg(null);
+    setErr(null);
+    setBusy(true);
+    try {
+      const csrf_token = await fetchCsrfToken();
+      const iv = Math.max(60, Math.min(86400, Number(schedInterval) || 3600));
+      const cap = Math.max(1, Math.min(5000, Number(previewCap) || 500));
+      await patchPrunerScope(instance.id, scope, {
+        scheduled_preview_enabled: schedEnabled,
+        scheduled_preview_interval_seconds: iv,
+        preview_max_items: cap,
+        csrf_token,
+      });
+      await qc.invalidateQueries({ queryKey: ["pruner", "instances"] });
+      setMsg("Saved.");
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const pLabel = providerLabel(provider);
+  const scopeLabel = scope === "tv" ? "TV" : "Movies";
+  const missing = !instance;
+  const testId = `pruner-schedule-row-${provider}-${scope}`;
+
+  return (
+    <div
+      className="mm-card mm-dash-card border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-4 sm:p-5"
+      data-testid={testId}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--mm-border)] pb-3">
+        <div>
+          <p className="text-sm font-semibold text-[var(--mm-text1)]">
+            {pLabel} {scopeLabel}
+          </p>
+          {instance ? (
+            <p className="mt-0.5 text-xs text-[var(--mm-text3)]">{instance.display_name}</p>
+          ) : (
+            <p className="mt-0.5 text-xs text-[var(--mm-text3)]">No {pLabel} instance registered.</p>
+          )}
+        </div>
+      </div>
+      <div className={`mt-4 space-y-4 ${missing || !canOperate ? "pointer-events-none opacity-45" : ""}`}>
+        {scopeRow && instance ? (
+          <>
+            <FetcherEnableSwitch
+              id={`pruner-sched-${provider}-${scope}-en`}
+              label="Scheduled previews"
+              enabled={schedEnabled}
+              disabled={busy || missing || !canOperate}
+              onChange={setSchedEnabled}
+            />
+            <div className="flex flex-wrap items-end gap-4">
+              <label className="block text-sm text-[var(--mm-text2)]">
+                <span className="mb-1 block text-xs text-[var(--mm-text3)]">Interval (seconds)</span>
+                <input
+                  type="number"
+                  min={60}
+                  max={86400}
+                  className="mm-input w-32"
+                  value={schedInterval}
+                  disabled={busy || missing || !canOperate}
+                  onChange={(e) => setSchedInterval(parseInt(e.target.value, 10) || 3600)}
+                />
+              </label>
+              <label className="block text-sm text-[var(--mm-text2)]">
+                <span className="mb-1 block text-xs text-[var(--mm-text3)]">Preview cap (1–5000)</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={5000}
+                  className="mm-input w-32"
+                  value={previewCap}
+                  disabled={busy || missing || !canOperate}
+                  onChange={(e) => setPreviewCap(Math.max(1, Math.min(5000, Number(e.target.value) || 500)))}
+                />
+              </label>
+            </div>
+            <p className="text-xs text-[var(--mm-text3)]">
+              Last scheduled enqueue:{" "}
+              <span className="text-[var(--mm-text2)]">
+                {scopeRow.last_scheduled_preview_enqueued_at
+                  ? formatPrunerDateTime(scopeRow.last_scheduled_preview_enqueued_at)
+                  : "—"}
+              </span>
+            </p>
+            {canOperate ? (
+              <button
+                type="button"
+                className={fetcherMenuButtonClass({ variant: "primary", disabled: busy })}
+                disabled={busy}
+                onClick={() => void saveRow()}
+              >
+                {busy ? "Saving…" : `Save ${pLabel} ${scopeLabel}`}
+              </button>
+            ) : null}
+          </>
+        ) : (
+          <p className="text-xs text-[var(--mm-text3)]">Connect this provider to edit this schedule.</p>
+        )}
+        {msg ? <p className="text-xs text-green-600">{msg}</p> : null}
+        {err ? (
+          <p className="text-xs text-red-500" role="alert">
+            {err}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function TopLevelSchedules({ instances }: { instances: PrunerServerInstance[] }) {
   return (
-    <section className="space-y-3" data-testid="pruner-top-schedules-tab">
-      <h2 className="text-base font-semibold text-[var(--mm-text1)]">Schedules</h2>
-      <p className="text-sm text-[var(--mm-text2)]">
-        Automatic preview schedules across providers. Each row is one instance and one scope (TV or Movies).
-      </p>
+    <section className="space-y-5" data-testid="pruner-top-schedules-tab">
+      <header className="max-w-3xl">
+        <h2 className="text-base font-semibold text-[var(--mm-text1)]">Schedules</h2>
+        <p className="mt-1 text-sm text-[var(--mm-text2)]">
+          Scheduled missing-primary previews per provider and scope. Each row saves independently.
+        </p>
+      </header>
       {instances.length === 0 ? (
-        <p className="rounded-md border border-dashed border-[var(--mm-border)] bg-[var(--mm-surface2)]/35 px-4 py-3 text-sm text-[var(--mm-text2)]">
-          No instances yet — no schedules to show.
+        <p
+          className="rounded-md border border-dashed border-[var(--mm-border)] bg-[var(--mm-surface2)]/35 px-4 py-3 text-sm text-[var(--mm-text2)]"
+          data-testid="pruner-schedules-empty-state"
+        >
+          Register a provider under Connections to enable schedules.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-md border border-[var(--mm-border)]">
-          <table className="w-full min-w-[34rem] border-collapse text-left text-sm">
-            <thead className="bg-[var(--mm-surface2)] text-xs uppercase text-[var(--mm-text2)]">
-              <tr>
-                <th className="px-2 py-2">Provider</th>
-                <th className="px-2 py-2">Instance</th>
-                <th className="px-2 py-2">Scope</th>
-                <th className="px-2 py-2">Scheduled preview</th>
-                <th className="px-2 py-2">Interval (s)</th>
-                <th className="px-2 py-2">Last enqueue</th>
-              </tr>
-            </thead>
-            <tbody>
-              {instances.flatMap((inst) =>
-                inst.scopes.map((sc) => (
-                  <tr key={`${inst.id}-${sc.media_scope}`} className="border-t border-[var(--mm-border)]">
-                    <td className="px-2 py-2 capitalize">{inst.provider}</td>
-                    <td className="px-2 py-2">{inst.display_name}</td>
-                    <td className="px-2 py-2 uppercase">{sc.media_scope}</td>
-                    <td className="px-2 py-2">{sc.scheduled_preview_enabled ? "On" : "Off"}</td>
-                    <td className="px-2 py-2">{sc.scheduled_preview_interval_seconds}</td>
-                    <td className="px-2 py-2">{sc.last_scheduled_preview_enqueued_at ?? "—"}</td>
-                  </tr>
-                )),
-              )}
-            </tbody>
-          </table>
+        <div className="space-y-8">
+          <div>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--mm-text2)]">Emby</h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              <PrunerGlobalScheduleRow
+                provider="emby"
+                scope="tv"
+                instance={instances.find((i) => i.provider === "emby")}
+              />
+              <PrunerGlobalScheduleRow
+                provider="emby"
+                scope="movies"
+                instance={instances.find((i) => i.provider === "emby")}
+              />
+            </div>
+          </div>
+          <div>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--mm-text2)]">Jellyfin</h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              <PrunerGlobalScheduleRow
+                provider="jellyfin"
+                scope="tv"
+                instance={instances.find((i) => i.provider === "jellyfin")}
+              />
+              <PrunerGlobalScheduleRow
+                provider="jellyfin"
+                scope="movies"
+                instance={instances.find((i) => i.provider === "jellyfin")}
+              />
+            </div>
+          </div>
+          <div>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--mm-text2)]">Plex</h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              <PrunerGlobalScheduleRow
+                provider="plex"
+                scope="tv"
+                instance={instances.find((i) => i.provider === "plex")}
+              />
+              <PrunerGlobalScheduleRow
+                provider="plex"
+                scope="movies"
+                instance={instances.find((i) => i.provider === "plex")}
+              />
+            </div>
+          </div>
         </div>
       )}
     </section>
