@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -125,6 +126,7 @@ def mark_found(
     *,
     subtitle_path: str,
     opensubtitles_file_id: str,
+    provider_key: str | None = None,
 ) -> None:
     row = session.scalars(select(SubberSubtitleState).where(SubberSubtitleState.id == state_id)).one_or_none()
     if row is None:
@@ -132,8 +134,53 @@ def mark_found(
     row.status = "found"
     row.subtitle_path = subtitle_path
     row.opensubtitles_file_id = opensubtitles_file_id
+    if provider_key is not None:
+        row.provider_key = provider_key.strip()[:50] or None
     row.updated_at = datetime.now(timezone.utc)
     session.flush()
+
+
+def mark_for_upgrade(session: Session, state_id: int, *, increment_count: bool = True) -> None:
+    row = session.scalars(select(SubberSubtitleState).where(SubberSubtitleState.id == state_id)).one_or_none()
+    if row is None:
+        return
+    row.upgraded_at = datetime.now(timezone.utc)
+    if increment_count:
+        row.upgrade_count = int(row.upgrade_count or 0) + 1
+    row.updated_at = datetime.now(timezone.utc)
+    session.flush()
+
+
+def get_candidates_for_upgrade(session: Session, since_days: int) -> list[SubberSubtitleState]:
+    from datetime import timedelta
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=max(1, int(since_days)))
+    rows = list(
+        session.scalars(
+            select(SubberSubtitleState)
+            .where(SubberSubtitleState.status == "found")
+            .order_by(SubberSubtitleState.id.asc()),
+        ).all(),
+    )
+    out: list[SubberSubtitleState] = []
+    for r in rows:
+        sp = (r.subtitle_path or "").strip()
+        if not sp:
+            continue
+        try:
+            if not os.path.isfile(sp):
+                continue
+        except OSError:
+            continue
+        lu = r.upgraded_at
+        if lu is None:
+            out.append(r)
+            continue
+        luu = lu if lu.tzinfo else lu.replace(tzinfo=timezone.utc)
+        if luu < cutoff:
+            out.append(r)
+    return out
 
 
 def mark_searching(session: Session, state_id: int) -> None:

@@ -36,6 +36,7 @@ REFINER_SUPPLIED_PAYLOAD_EVALUATION_COMPLETED = "refiner.supplied_payload_evalua
 SUBBER_SUBTITLE_SEARCH_COMPLETED = "subber.subtitle_search_completed"
 SUBBER_LIBRARY_SCAN_ENQUEUED = "subber.library_scan_enqueued"
 SUBBER_WEBHOOK_IMPORT_ENQUEUED = "subber.webhook_import_enqueued"
+SUBBER_SUBTITLE_UPGRADE_COMPLETED = "subber.subtitle_upgrade_completed"
 REFINER_CANDIDATE_GATE_COMPLETED = "refiner.candidate_gate_completed"
 REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_COMPLETED = "refiner.watched_folder_remux_scan_dispatch_completed"
 REFINER_FILE_REMUX_PASS_COMPLETED = "refiner.file_remux_pass_completed"

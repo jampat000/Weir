@@ -52,6 +52,25 @@ describe("SubberSettingsTab", () => {
         movies_last_scheduled_scan_enqueued_at: null,
         fetcher_sonarr_base_url_hint: "",
         fetcher_radarr_base_url_hint: "",
+        adaptive_searching_enabled: true,
+        adaptive_searching_delay_hours: 168,
+        adaptive_searching_max_attempts: 3,
+        permanent_skip_after_attempts: 10,
+        exclude_hearing_impaired: false,
+        upgrade_enabled: false,
+        upgrade_schedule_enabled: false,
+        upgrade_schedule_interval_seconds: 604800,
+        upgrade_schedule_hours_limited: false,
+        upgrade_schedule_days: "",
+        upgrade_schedule_start: "00:00",
+        upgrade_schedule_end: "23:59",
+        upgrade_last_scheduled_at: null,
+        sonarr_path_mapping_enabled: false,
+        sonarr_path_sonarr: "",
+        sonarr_path_subber: "",
+        radarr_path_mapping_enabled: false,
+        radarr_path_radarr: "",
+        radarr_path_subber: "",
       },
       isLoading: false,
       isError: false,
@@ -72,6 +91,28 @@ describe("SubberSettingsTab", () => {
       mutate: vi.fn(),
       isPending: false,
     } as unknown as ReturnType<typeof subberQueries.useSubberTestRadarrMutation>);
+    vi.spyOn(subberQueries, "useSubberProvidersQuery").mockReturnValue({
+      data: [
+        {
+          provider_key: "opensubtitles_org",
+          display_name: "OpenSubtitles.org",
+          enabled: false,
+          priority: 0,
+          requires_account: true,
+          has_credentials: false,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof subberQueries.useSubberProvidersQuery>);
+    vi.spyOn(subberQueries, "usePutSubberProviderMutation").mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({}),
+      isPending: false,
+    } as unknown as ReturnType<typeof subberQueries.usePutSubberProviderMutation>);
+    vi.spyOn(subberQueries, "useSubberTestProviderMutation").mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ ok: true, message: "ok" }),
+      isPending: false,
+    } as unknown as ReturnType<typeof subberQueries.useSubberTestProviderMutation>);
   });
 
   it("saves OpenSubtitles when Save is clicked", async () => {
@@ -80,6 +121,12 @@ describe("SubberSettingsTab", () => {
     await waitFor(() => expect(screen.getByTestId("subber-settings-tab")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("subber-save-opensubtitles"));
     await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+  });
+
+  it("renders subtitle providers section", async () => {
+    const client = new QueryClient();
+    render(wrap(<SubberSettingsTab canOperate />, client));
+    await waitFor(() => expect(screen.getByTestId("subber-providers-section")).toBeInTheDocument());
   });
 
   it("runs test connection when Test is clicked", async () => {

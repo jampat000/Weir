@@ -9,11 +9,12 @@ export function SubberOverviewTab() {
   if (!d) return null;
   return (
     <div className="space-y-6" data-testid="subber-overview-tab">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Stat label="Total tracked" value={d.total_tracked} />
         <Stat label="Subtitles found" value={d.found} />
         <Stat label="Still missing" value={d.missing} />
         <Stat label="Searches today" value={d.searches_today} />
+        <Stat label="Upgraded" value={d.upgraded_tracks ?? 0} />
       </div>
       <section>
         <h2 className="text-base font-semibold text-[var(--mm-text)]">Per language</h2>
@@ -52,6 +53,9 @@ export function SubberOverviewTab() {
             <code className="rounded bg-black/25 px-1 font-mono text-[0.85em]">Movie.2023.mkv</code>. Plex, Emby and Jellyfin pick them up automatically.
           </li>
           <li>Your languages are tried in the order you set in Settings. If your first language is not found, Subber tries the next automatically.</li>
+          <li>
+            Subber can periodically re-search for better quality subtitles for files that already have one. Enable subtitle upgrade in the Schedule tab (and turn on upgrades in Settings).
+          </li>
         </ol>
       </section>
       <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-[var(--mm-text)]">

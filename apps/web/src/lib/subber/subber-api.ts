@@ -9,6 +9,8 @@ export type SubberSubtitleLangState = {
   last_searched_at: string | null;
   search_count: number;
   source: string | null;
+  provider_key?: string | null;
+  upgrade_count?: number;
 };
 
 export type SubberTvEpisode = {
@@ -64,6 +66,25 @@ export type SubberSettingsOut = {
   movies_schedule_end: string;
   tv_last_scheduled_scan_enqueued_at: string | null;
   movies_last_scheduled_scan_enqueued_at: string | null;
+  adaptive_searching_enabled: boolean;
+  adaptive_searching_delay_hours: number;
+  adaptive_searching_max_attempts: number;
+  permanent_skip_after_attempts: number;
+  exclude_hearing_impaired: boolean;
+  upgrade_enabled: boolean;
+  upgrade_schedule_enabled: boolean;
+  upgrade_schedule_interval_seconds: number;
+  upgrade_schedule_hours_limited: boolean;
+  upgrade_schedule_days: string;
+  upgrade_schedule_start: string;
+  upgrade_schedule_end: string;
+  upgrade_last_scheduled_at: string | null;
+  sonarr_path_mapping_enabled: boolean;
+  sonarr_path_sonarr: string;
+  sonarr_path_subber: string;
+  radarr_path_mapping_enabled: boolean;
+  radarr_path_radarr: string;
+  radarr_path_subber: string;
   fetcher_sonarr_base_url_hint: string;
   fetcher_radarr_base_url_hint: string;
 };
@@ -92,6 +113,24 @@ export type SubberSettingsPutIn = {
   movies_schedule_days?: string;
   movies_schedule_start?: string;
   movies_schedule_end?: string;
+  adaptive_searching_enabled?: boolean;
+  adaptive_searching_delay_hours?: number;
+  adaptive_searching_max_attempts?: number;
+  permanent_skip_after_attempts?: number;
+  exclude_hearing_impaired?: boolean;
+  upgrade_enabled?: boolean;
+  upgrade_schedule_enabled?: boolean;
+  upgrade_schedule_interval_seconds?: number;
+  upgrade_schedule_hours_limited?: boolean;
+  upgrade_schedule_days?: string;
+  upgrade_schedule_start?: string;
+  upgrade_schedule_end?: string;
+  sonarr_path_mapping_enabled?: boolean;
+  sonarr_path_sonarr?: string;
+  sonarr_path_subber?: string;
+  radarr_path_mapping_enabled?: boolean;
+  radarr_path_radarr?: string;
+  radarr_path_subber?: string;
 };
 
 export type SubberTestConnectionOut = { ok: boolean; message: string };
@@ -103,7 +142,26 @@ export type SubberOverviewOut = {
   searching: number;
   skipped: number;
   searches_today: number;
+  upgraded_tracks: number;
   per_language: { language: string; found: number; missing: number; searching: number; skipped: number; total: number }[];
+};
+
+export type SubberProviderOut = {
+  provider_key: string;
+  display_name: string;
+  enabled: boolean;
+  priority: number;
+  requires_account: boolean;
+  has_credentials: boolean;
+};
+
+export type SubberProviderPutIn = {
+  csrf_token: string;
+  enabled?: boolean;
+  priority?: number;
+  username?: string;
+  password?: string;
+  api_key?: string;
 };
 
 export type SubberJobsInspectionRow = {
@@ -236,6 +294,35 @@ export async function postSubberSearchAllMissingMovies(): Promise<{ status: stri
   });
   if (!r.ok) throw new Error(`Subber search all movies: ${r.status}`);
   return readJson(r);
+}
+
+export async function fetchSubberProviders(): Promise<SubberProviderOut[]> {
+  const r = await apiFetch("/api/v1/subber/providers");
+  if (!r.ok) throw new Error(`Subber providers: ${r.status}`);
+  return readJson<SubberProviderOut[]>(r);
+}
+
+export async function putSubberProvider(providerKey: string, body: SubberProviderPutIn): Promise<SubberProviderOut> {
+  const pk = encodeURIComponent(providerKey);
+  const r = await apiFetch(`/api/v1/subber/providers/${pk}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(`Subber provider save: ${r.status}`);
+  return readJson<SubberProviderOut>(r);
+}
+
+export async function postSubberProviderTest(providerKey: string): Promise<SubberTestConnectionOut> {
+  const csrf = await fetchCsrfToken();
+  const pk = encodeURIComponent(providerKey);
+  const r = await apiFetch(`/api/v1/subber/providers/${pk}/test`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ csrf_token: csrf }),
+  });
+  if (!r.ok) throw new Error(`Subber provider test: ${r.status}`);
+  return readJson<SubberTestConnectionOut>(r);
 }
 
 export async function fetchSubberJobs(limit = 50): Promise<SubberJobsInspectionOut> {

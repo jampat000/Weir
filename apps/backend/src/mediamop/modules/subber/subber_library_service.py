@@ -85,6 +85,8 @@ def build_tv_library(
                 last_searched_at=x.last_searched_at,
                 search_count=int(x.search_count or 0),
                 source=x.source,
+                provider_key=x.provider_key,
+                upgrade_count=int(x.upgrade_count or 0),
             )
             for x in sorted(lang_rows, key=lambda z: z.language_code)
         ]
@@ -143,6 +145,8 @@ def build_movies_library(
                 last_searched_at=x.last_searched_at,
                 search_count=int(x.search_count or 0),
                 source=x.source,
+                provider_key=x.provider_key,
+                upgrade_count=int(x.upgrade_count or 0),
             )
             for x in sorted(lang_rows, key=lambda z: z.language_code)
         ]

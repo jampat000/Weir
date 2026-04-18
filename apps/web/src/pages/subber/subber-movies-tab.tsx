@@ -9,6 +9,18 @@ import {
   useSubberSettingsQuery,
 } from "../../lib/subber/subber-queries";
 
+function subberProviderLabel(key: string | null | undefined): string {
+  if (!key) return "—";
+  const labels: Record<string, string> = {
+    opensubtitles_org: "OpenSubtitles.org",
+    opensubtitles_com: "OpenSubtitles.com",
+    podnapisi: "Podnapisi",
+    subscene: "Subscene",
+    addic7ed: "Addic7ed",
+  };
+  return labels[key] ?? key;
+}
+
 function langBadge(status: string, code: string) {
   const ok = status === "found";
   return (
@@ -134,6 +146,9 @@ export function SubberMoviesTab({ canOperate }: { canOperate: boolean }) {
                       <dt className="text-[var(--mm-text2)]">{subberLanguageLabel(l.language_code)}</dt>
                       <dd>
                         {l.subtitle_path ?? "—"} · Last: {l.last_searched_at ?? "—"} · Count: {l.search_count} · Source: {l.source ?? "—"}
+                        <br />
+                        Found via: {subberProviderLabel(l.provider_key)} · Upgraded:{" "}
+                        {(l.upgrade_count ?? 0) > 0 ? `${l.upgrade_count} times` : "Never upgraded"}
                       </dd>
                     </div>
                   ))}

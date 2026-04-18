@@ -24,6 +24,18 @@ function langBadge(status: string, code: string) {
   );
 }
 
+function subberProviderLabel(key: string | null | undefined): string {
+  if (!key) return "—";
+  const labels: Record<string, string> = {
+    opensubtitles_org: "OpenSubtitles.org",
+    opensubtitles_com: "OpenSubtitles.com",
+    podnapisi: "Podnapisi",
+    subscene: "Subscene",
+    addic7ed: "Addic7ed",
+  };
+  return labels[key] ?? key;
+}
+
 function pickSearchStateId(ep: SubberTvEpisode, prefs: string[]): number | null {
   for (const p of prefs) {
     const row = ep.languages.find((l) => l.language_code.toLowerCase() === p.toLowerCase());
@@ -150,6 +162,9 @@ export function SubberTvTab({ canOperate }: { canOperate: boolean }) {
                                 </dt>
                                 <dd>
                                   Last searched: {l.last_searched_at ?? "—"} · Count: {l.search_count} · Source: {l.source ?? "—"}
+                                  <br />
+                                  Found via: {subberProviderLabel(l.provider_key)} · Upgraded:{" "}
+                                  {(l.upgrade_count ?? 0) > 0 ? `${l.upgrade_count} times` : "Never upgraded"}
                                 </dd>
                               </div>
                             ))}

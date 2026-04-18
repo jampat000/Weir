@@ -45,6 +45,29 @@ class SubberSettingsRow(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    adaptive_searching_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1")
+    adaptive_searching_delay_hours: Mapped[int] = mapped_column(Integer, nullable=False, server_default="168")
+    adaptive_searching_max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="3")
+    permanent_skip_after_attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="10")
+    exclude_hearing_impaired: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="0")
+    upgrade_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="0")
+    upgrade_schedule_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="0")
+    upgrade_schedule_interval_seconds: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default="604800",
+    )
+    upgrade_schedule_hours_limited: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="0")
+    upgrade_schedule_days: Mapped[str] = mapped_column(String(200), nullable=False, server_default="")
+    upgrade_schedule_start: Mapped[str] = mapped_column(String(5), nullable=False, server_default="00:00")
+    upgrade_schedule_end: Mapped[str] = mapped_column(String(5), nullable=False, server_default="23:59")
+    upgrade_last_scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sonarr_path_mapping_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="0")
+    sonarr_path_sonarr: Mapped[str] = mapped_column(String(1000), nullable=False, server_default="")
+    sonarr_path_subber: Mapped[str] = mapped_column(String(1000), nullable=False, server_default="")
+    radarr_path_mapping_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="0")
+    radarr_path_radarr: Mapped[str] = mapped_column(String(1000), nullable=False, server_default="")
+    radarr_path_subber: Mapped[str] = mapped_column(String(1000), nullable=False, server_default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

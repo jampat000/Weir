@@ -81,6 +81,19 @@ def test_get_settings_admin_ok(client_admin: TestClient) -> None:
     body = r.json()
     assert "opensubtitles_username" in body
     assert body.get("opensubtitles_password_set") is False
+    assert "adaptive_searching_enabled" in body
+    assert "upgrade_enabled" in body
+
+
+def test_get_providers_admin_ok(client_admin: TestClient) -> None:
+    _login_admin(client_admin)
+    r = client_admin.get("/api/v1/subber/providers")
+    assert r.status_code == 200
+    rows = r.json()
+    assert isinstance(rows, list)
+    keys = {x.get("provider_key") for x in rows}
+    assert "opensubtitles_org" in keys
+    assert "podnapisi" in keys
 
 
 def test_put_settings_roundtrip_enabled(client_admin: TestClient) -> None:

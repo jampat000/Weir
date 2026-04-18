@@ -84,7 +84,8 @@ def test_subtitle_search_skips_when_found_and_file_exists(session_factory, tmp_p
         assert job.status == SubberJobStatus.COMPLETED.value
 
 
-def test_subtitle_search_marks_skipped_at_search_cap(session_factory) -> None:
+@patch("mediamop.modules.subber.subber_search_job_handler.subber_any_search_configured", return_value=True)
+def test_subtitle_search_marks_skipped_at_search_cap(_mock_cfg, session_factory) -> None:
     with session_factory() as s:
         _seed_settings(s)
         st = SubberSubtitleState(
@@ -92,7 +93,7 @@ def test_subtitle_search_marks_skipped_at_search_cap(session_factory) -> None:
             file_path="/v/b.mkv",
             language_code="en",
             status="missing",
-            search_count=5,
+            search_count=10,
         )
         s.add(st)
         s.commit()
@@ -115,7 +116,7 @@ def test_subtitle_search_marks_skipped_at_search_cap(session_factory) -> None:
         assert row.status == "skipped"
 
 
-@patch("mediamop.modules.subber.subber_search_job_handler.opensubtitles_configured", return_value=True)
+@patch("mediamop.modules.subber.subber_search_job_handler.subber_any_search_configured", return_value=True)
 @patch("mediamop.modules.subber.subber_search_job_handler.search_and_download_subtitle")
 def test_subtitle_search_calls_download(mock_dl, _mock_os_cfg, session_factory) -> None:
     mock_dl.return_value = True

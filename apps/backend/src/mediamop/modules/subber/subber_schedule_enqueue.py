@@ -12,7 +12,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from mediamop.core.config import MediaMopSettings
 from mediamop.modules.fetcher.fetcher_arr_search_schedule_window import DAY_NAMES, fetcher_arr_search_schedule_in_window
-from mediamop.modules.subber.subber_job_kinds import SUBBER_JOB_KIND_LIBRARY_SCAN_MOVIES, SUBBER_JOB_KIND_LIBRARY_SCAN_TV
+from mediamop.modules.subber.subber_job_kinds import (
+    SUBBER_JOB_KIND_LIBRARY_SCAN_MOVIES,
+    SUBBER_JOB_KIND_LIBRARY_SCAN_TV,
+    SUBBER_JOB_KIND_SUBTITLE_UPGRADE,
+)
 from mediamop.modules.subber.subber_jobs_ops import subber_enqueue_or_get_job
 from mediamop.modules.subber.subber_settings_model import SubberSettingsRow
 from mediamop.modules.subber.subber_settings_service import ensure_subber_settings_row
@@ -44,6 +48,25 @@ def _tv_in_window(session: Session, row: SubberSettingsRow, *, when: datetime) -
     days_csv = days_raw if days_raw else ",".join(DAY_NAMES)
     start_s = (row.tv_schedule_start or "00:00").strip() or "00:00"
     end_s = (row.tv_schedule_end or "23:59").strip() or "23:59"
+    return fetcher_arr_search_schedule_in_window(
+        schedule_enabled=True,
+        schedule_days=days_csv,
+        schedule_start=start_s,
+        schedule_end=end_s,
+        timezone_name=tz_name,
+        now=when,
+    )
+
+
+def _upgrade_in_window(session: Session, row: SubberSettingsRow, *, when: datetime) -> bool:
+    if not bool(row.upgrade_schedule_hours_limited):
+        return True
+    suite = ensure_suite_settings_row(session)
+    tz_name = (suite.app_timezone or "UTC").strip() or "UTC"
+    days_raw = (row.upgrade_schedule_days or "").strip()
+    days_csv = days_raw if days_raw else ",".join(DAY_NAMES)
+    start_s = (row.upgrade_schedule_start or "00:00").strip() or "00:00"
+    end_s = (row.upgrade_schedule_end or "23:59").strip() or "23:59"
     return fetcher_arr_search_schedule_in_window(
         schedule_enabled=True,
         schedule_days=days_csv,
@@ -100,6 +123,17 @@ def enqueue_due_subber_library_scans(session: Session, *, now: datetime) -> int:
                     payload_json=json.dumps({"media_scope": "movies"}, separators=(",", ":")),
                 )
                 row.movies_last_scheduled_scan_enqueued_at = when
+                enq += 1
+    if bool(row.upgrade_enabled) and bool(row.upgrade_schedule_enabled):
+        if _branch_due(row.upgrade_last_scheduled_at, int(row.upgrade_schedule_interval_seconds), now=when):
+            if _upgrade_in_window(session, row, when=when):
+                subber_enqueue_or_get_job(
+                    session,
+                    dedupe_key=f"subber:subtitle-upgrade:{uuid.uuid4()}",
+                    job_kind=SUBBER_JOB_KIND_SUBTITLE_UPGRADE,
+                    payload_json=json.dumps({}, separators=(",", ":")),
+                )
+                row.upgrade_last_scheduled_at = when
                 enq += 1
     return enq
 

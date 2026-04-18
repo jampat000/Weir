@@ -10,6 +10,7 @@ import {
   useSubberTestRadarrMutation,
   useSubberTestSonarrMutation,
 } from "../../lib/subber/subber-queries";
+import { SubberSettingsMoreSections } from "./subber-settings-more";
 
 const MASK = "\u2022".repeat(10);
 
@@ -342,6 +343,8 @@ export function SubberSettingsTab({ canOperate }: { canOperate: boolean }) {
           Save preferences
         </button>
       </section>
+
+      <SubberSettingsMoreSections canOperate={canOperate} />
     </div>
   );
 }

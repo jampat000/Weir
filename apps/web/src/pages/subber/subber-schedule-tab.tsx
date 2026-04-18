@@ -37,10 +37,13 @@ type CardProps = {
   end: string;
   setEnd: (v: string) => void;
   lastRun: string | null | undefined;
+  lastRunLabel?: string;
   saveLabel: string;
   idPrefix: string;
   onSave: () => Promise<void>;
   busy: boolean;
+  timedSwitchLabel?: string;
+  intervalHelper?: string;
 };
 
 function ScheduleCard({
@@ -60,10 +63,13 @@ function ScheduleCard({
   end,
   setEnd,
   lastRun,
+  lastRunLabel = "Last automatic scan",
   saveLabel,
   idPrefix,
   onSave,
   busy,
+  timedSwitchLabel = "Enable timed scans",
+  intervalHelper = "How often Subber checks this library for missing subtitles.",
 }: CardProps) {
   const dis = !canOperate || busy;
   return (
@@ -71,10 +77,10 @@ function ScheduleCard({
       <h2 className="text-base font-semibold text-[var(--mm-text)]">{title}</h2>
       <p className="mt-1 text-sm text-[var(--mm-text2)]">{helper}</p>
       <div className="mt-4 space-y-4">
-        <MmOnOffSwitch id={`${idPrefix}-en`} label="Enable timed scans" enabled={enabled} disabled={dis} onChange={setEnabled} />
+        <MmOnOffSwitch id={`${idPrefix}-en`} label={timedSwitchLabel} enabled={enabled} disabled={dis} onChange={setEnabled} />
         <label className="block text-sm text-[var(--mm-text2)]">
           Run interval (minutes)
-          <p className="mt-1 text-xs text-[var(--mm-text2)]">How often Subber checks this library for missing subtitles.</p>
+          <p className="mt-1 text-xs text-[var(--mm-text2)]">{intervalHelper}</p>
           <input
             type="number"
             min={1}
@@ -105,7 +111,7 @@ function ScheduleCard({
           <MmScheduleTimeFields idPrefix={idPrefix} start={start} end={end} disabled={dis} onStart={setStart} onEnd={setEnd} />
         </div>
         <p className="text-xs text-[var(--mm-text2)]">
-          Last automatic scan: <span className="font-medium text-[var(--mm-text)]">{fmtTs(lastRun)}</span>
+          {lastRunLabel}: <span className="font-medium text-[var(--mm-text)]">{fmtTs(lastRun)}</span>
         </p>
         <button
           type="button"
@@ -135,6 +141,13 @@ export function SubberScheduleTab({ canOperate }: { canOperate: boolean }) {
   const [mvDays, setMvDays] = useState("");
   const [mvStart, setMvStart] = useState("00:00");
   const [mvEnd, setMvEnd] = useState("23:59");
+  const [upEn, setUpEn] = useState(false);
+  const [upSched, setUpSched] = useState(false);
+  const [upMin, setUpMin] = useState(10080);
+  const [upHl, setUpHl] = useState(false);
+  const [upDays, setUpDays] = useState("");
+  const [upStart, setUpStart] = useState("00:00");
+  const [upEnd, setUpEnd] = useState("23:59");
 
   useEffect(() => {
     const d = q.data;
@@ -151,6 +164,13 @@ export function SubberScheduleTab({ canOperate }: { canOperate: boolean }) {
     setMvDays(d.movies_schedule_days ?? "");
     setMvStart(d.movies_schedule_start ?? "00:00");
     setMvEnd(d.movies_schedule_end ?? "23:59");
+    setUpEn(Boolean(d.upgrade_enabled));
+    setUpSched(Boolean(d.upgrade_schedule_enabled));
+    setUpMin(Math.max(1, Math.round((d.upgrade_schedule_interval_seconds ?? 604800) / 60)));
+    setUpHl(Boolean(d.upgrade_schedule_hours_limited));
+    setUpDays(d.upgrade_schedule_days ?? "");
+    setUpStart(d.upgrade_schedule_start ?? "00:00");
+    setUpEnd(d.upgrade_schedule_end ?? "23:59");
   }, [q.data]);
 
   async function saveTv() {
@@ -179,11 +199,25 @@ export function SubberScheduleTab({ canOperate }: { canOperate: boolean }) {
     });
   }
 
+  async function saveUpgrade() {
+    const csrf_token = await fetchCsrfToken();
+    await put.mutateAsync({
+      csrf_token,
+      upgrade_enabled: upEn,
+      upgrade_schedule_enabled: upSched,
+      upgrade_schedule_interval_seconds: Math.max(60, Math.min(365 * 24 * 3600, upMin * 60)),
+      upgrade_schedule_hours_limited: upHl,
+      upgrade_schedule_days: upDays,
+      upgrade_schedule_start: upStart,
+      upgrade_schedule_end: upEnd,
+    });
+  }
+
   if (q.isLoading) return <p className="text-sm text-[var(--mm-text2)]">Loading schedule…</p>;
   if (q.isError) return <p className="text-sm text-red-600">{(q.error as Error).message}</p>;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2" data-testid="subber-schedule-tab">
+    <div className="grid gap-4 lg:grid-cols-3" data-testid="subber-schedule-tab">
       <ScheduleCard
         title="TV automatic subtitle scan"
         helper="Subber also searches immediately when Sonarr imports a file, regardless of this schedule."
@@ -228,6 +262,47 @@ export function SubberScheduleTab({ canOperate }: { canOperate: boolean }) {
         onSave={saveMovies}
         busy={put.isPending}
       />
+      <div className="flex flex-col gap-4">
+        <section className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5">
+          <h2 className="text-base font-semibold text-[var(--mm-text)]">Subtitle upgrade</h2>
+          <p className="mt-1 text-sm text-[var(--mm-text2)]">
+            Subber periodically re-searches for better subtitle files for movies and episodes that already have subtitles.
+          </p>
+          <div className="mt-4">
+            <MmOnOffSwitch id="subber-up-en" label="Enable subtitle upgrades" enabled={upEn} disabled={!canOperate || put.isPending} onChange={setUpEn} />
+            <p className="mt-2 text-xs text-[var(--mm-text2)]">
+              {upEn
+                ? "Subber will re-search on the schedule below when timed scans are enabled."
+                : "Subtitle upgrade is off. Subtitles already downloaded will not be re-searched on a schedule."}
+            </p>
+          </div>
+        </section>
+        <ScheduleCard
+          title="Timed upgrade scans"
+          helper="Same day/time window controls as library scans. Saving applies both the master upgrade toggle above and this schedule."
+          canOperate={canOperate}
+          enabled={upSched}
+          setEnabled={setUpSched}
+          intervalMinutes={upMin}
+          setIntervalMinutes={setUpMin}
+          hoursLimited={upHl}
+          setHoursLimited={setUpHl}
+          daysCsv={upDays}
+          setDaysCsv={setUpDays}
+          start={upStart}
+          setStart={setUpStart}
+          end={upEnd}
+          setEnd={setUpEnd}
+          lastRun={q.data?.upgrade_last_scheduled_at}
+          lastRunLabel="Last upgrade scan"
+          saveLabel="Save upgrade schedule"
+          idPrefix="subber-upgrade-sched"
+          onSave={saveUpgrade}
+          busy={put.isPending}
+          timedSwitchLabel="Enable timed upgrade scans"
+          intervalHelper="How often Subber checks for subtitle upgrades. Default is 10080 minutes (1 week)."
+        />
+      </div>
     </div>
   );
 }

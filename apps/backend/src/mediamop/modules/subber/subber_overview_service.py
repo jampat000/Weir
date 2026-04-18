@@ -44,6 +44,12 @@ def build_subber_overview(session: Session) -> SubberOverviewOut:
         if ks in ("found", "missing", "searching", "skipped"):
             d[ks] += int(c)
     per_language = sorted(per_map.values(), key=lambda x: str(x["language"]))
+    upgraded_tracks = int(
+        session.scalar(
+            select(func.count()).select_from(SubberSubtitleState).where(SubberSubtitleState.upgrade_count > 0),
+        )
+        or 0,
+    )
     return SubberOverviewOut(
         total_tracked=total,
         found=found,
@@ -51,5 +57,6 @@ def build_subber_overview(session: Session) -> SubberOverviewOut:
         searching=searching,
         skipped=skipped,
         searches_today=searches_today,
+        upgraded_tracks=upgraded_tracks,
         per_language=per_language,
     )

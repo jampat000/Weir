@@ -4,14 +4,18 @@ import {
   fetchSubberLibraryMovies,
   fetchSubberLibraryTv,
   fetchSubberOverview,
+  fetchSubberProviders,
   fetchSubberSettings,
+  postSubberProviderTest,
   postSubberSearchAllMissingMovies,
   postSubberSearchAllMissingTv,
   postSubberSearchNow,
   postSubberTestOpensubtitles,
   postSubberTestRadarr,
   postSubberTestSonarr,
+  putSubberProvider,
   putSubberSettings,
+  type SubberProviderPutIn,
   type SubberSettingsPutIn,
 } from "./subber-api";
 
@@ -19,6 +23,14 @@ export function useSubberSettingsQuery() {
   return useQuery({
     queryKey: ["subber", "settings"],
     queryFn: fetchSubberSettings,
+    staleTime: 15_000,
+  });
+}
+
+export function useSubberProvidersQuery() {
+  return useQuery({
+    queryKey: ["subber", "providers"],
+    queryFn: fetchSubberProviders,
     staleTime: 15_000,
   });
 }
@@ -63,6 +75,22 @@ export function usePutSubberSettingsMutation() {
       void qc.invalidateQueries({ queryKey: ["subber", "settings"] });
       void qc.invalidateQueries({ queryKey: ["subber", "overview"] });
     },
+  });
+}
+
+export function usePutSubberProviderMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ providerKey, body }: { providerKey: string; body: SubberProviderPutIn }) => putSubberProvider(providerKey, body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["subber", "providers"] });
+    },
+  });
+}
+
+export function useSubberTestProviderMutation() {
+  return useMutation({
+    mutationFn: (providerKey: string) => postSubberProviderTest(providerKey),
   });
 }
 

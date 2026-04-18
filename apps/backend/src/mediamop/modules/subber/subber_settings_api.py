@@ -67,6 +67,25 @@ def _settings_out(db, row: SubberSettingsRow, request: Request, settings: MediaM
         movies_schedule_end=str(row.movies_schedule_end or "23:59"),
         tv_last_scheduled_scan_enqueued_at=row.tv_last_scheduled_scan_enqueued_at,
         movies_last_scheduled_scan_enqueued_at=row.movies_last_scheduled_scan_enqueued_at,
+        adaptive_searching_enabled=bool(row.adaptive_searching_enabled),
+        adaptive_searching_delay_hours=int(row.adaptive_searching_delay_hours or 168),
+        adaptive_searching_max_attempts=int(row.adaptive_searching_max_attempts or 3),
+        permanent_skip_after_attempts=int(row.permanent_skip_after_attempts or 10),
+        exclude_hearing_impaired=bool(row.exclude_hearing_impaired),
+        upgrade_enabled=bool(row.upgrade_enabled),
+        upgrade_schedule_enabled=bool(row.upgrade_schedule_enabled),
+        upgrade_schedule_interval_seconds=int(row.upgrade_schedule_interval_seconds or 604800),
+        upgrade_schedule_hours_limited=bool(row.upgrade_schedule_hours_limited),
+        upgrade_schedule_days=str(row.upgrade_schedule_days or ""),
+        upgrade_schedule_start=str(row.upgrade_schedule_start or "00:00"),
+        upgrade_schedule_end=str(row.upgrade_schedule_end or "23:59"),
+        upgrade_last_scheduled_at=row.upgrade_last_scheduled_at,
+        sonarr_path_mapping_enabled=bool(row.sonarr_path_mapping_enabled),
+        sonarr_path_sonarr=str(row.sonarr_path_sonarr or ""),
+        sonarr_path_subber=str(row.sonarr_path_subber or ""),
+        radarr_path_mapping_enabled=bool(row.radarr_path_mapping_enabled),
+        radarr_path_radarr=str(row.radarr_path_radarr or ""),
+        radarr_path_subber=str(row.radarr_path_subber or ""),
         fetcher_sonarr_base_url_hint=son_hint,
         fetcher_radarr_base_url_hint=rad_hint,
     )
@@ -160,8 +179,48 @@ def put_subber_settings(
     if body.subtitle_folder is not None:
         row.subtitle_folder = body.subtitle_folder.strip()
     _apply_sched(row, body)
+    _apply_extended_settings(row, body)
     db.flush()
     return _settings_out(db, row, request, settings)
+
+
+def _apply_extended_settings(row: SubberSettingsRow, body: SubberSettingsPutIn) -> None:
+    if body.adaptive_searching_enabled is not None:
+        row.adaptive_searching_enabled = bool(body.adaptive_searching_enabled)
+    if body.adaptive_searching_delay_hours is not None:
+        row.adaptive_searching_delay_hours = int(body.adaptive_searching_delay_hours)
+    if body.adaptive_searching_max_attempts is not None:
+        row.adaptive_searching_max_attempts = int(body.adaptive_searching_max_attempts)
+    if body.permanent_skip_after_attempts is not None:
+        row.permanent_skip_after_attempts = int(body.permanent_skip_after_attempts)
+    if body.exclude_hearing_impaired is not None:
+        row.exclude_hearing_impaired = bool(body.exclude_hearing_impaired)
+    if body.upgrade_enabled is not None:
+        row.upgrade_enabled = bool(body.upgrade_enabled)
+    if body.upgrade_schedule_enabled is not None:
+        row.upgrade_schedule_enabled = bool(body.upgrade_schedule_enabled)
+    if body.upgrade_schedule_interval_seconds is not None:
+        row.upgrade_schedule_interval_seconds = int(body.upgrade_schedule_interval_seconds)
+    if body.upgrade_schedule_hours_limited is not None:
+        row.upgrade_schedule_hours_limited = bool(body.upgrade_schedule_hours_limited)
+    if body.upgrade_schedule_days is not None:
+        row.upgrade_schedule_days = body.upgrade_schedule_days.strip()
+    if body.upgrade_schedule_start is not None:
+        row.upgrade_schedule_start = body.upgrade_schedule_start.strip()
+    if body.upgrade_schedule_end is not None:
+        row.upgrade_schedule_end = body.upgrade_schedule_end.strip()
+    if body.sonarr_path_mapping_enabled is not None:
+        row.sonarr_path_mapping_enabled = bool(body.sonarr_path_mapping_enabled)
+    if body.sonarr_path_sonarr is not None:
+        row.sonarr_path_sonarr = body.sonarr_path_sonarr.strip()
+    if body.sonarr_path_subber is not None:
+        row.sonarr_path_subber = body.sonarr_path_subber.strip()
+    if body.radarr_path_mapping_enabled is not None:
+        row.radarr_path_mapping_enabled = bool(body.radarr_path_mapping_enabled)
+    if body.radarr_path_radarr is not None:
+        row.radarr_path_radarr = body.radarr_path_radarr.strip()
+    if body.radarr_path_subber is not None:
+        row.radarr_path_subber = body.radarr_path_subber.strip()
 
 
 def _apply_sched(row: SubberSettingsRow, body: SubberSettingsPutIn) -> None:

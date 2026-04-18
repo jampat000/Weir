@@ -31,6 +31,9 @@ class SubberSubtitleState(Base):
     movie_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     sonarr_episode_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     radarr_movie_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    provider_key: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    upgraded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    upgrade_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

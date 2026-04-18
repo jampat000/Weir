@@ -17,8 +17,8 @@ from mediamop.modules.subber.subber_job_kinds import (
 from mediamop.modules.subber.subber_opensubtitles_client import SubberRateLimitError
 from mediamop.modules.subber.subber_settings_service import ensure_subber_settings_row
 from mediamop.modules.subber.subber_subtitle_search_service import (
-    opensubtitles_configured,
     search_and_download_subtitle,
+    subber_any_search_configured,
 )
 from mediamop.modules.subber.subber_subtitle_state_service import (
     get_state_by_id,
@@ -46,7 +46,13 @@ def make_subber_subtitle_search_handler(
                     return
                 if row.status == "found" and row.subtitle_path and os.path.isfile(row.subtitle_path):
                     return
-                if int(row.search_count or 0) >= 5:
+                settings_row = ensure_subber_settings_row(session)
+                if not settings_row.enabled:
+                    return
+                if not subber_any_search_configured(settings, settings_row, session):
+                    return
+                perm = max(1, int(settings_row.permanent_skip_after_attempts or 10))
+                if int(row.search_count or 0) >= perm:
                     mark_skipped(session, state_id)
                     subber_activity.record_subber_activity(
                         session,
@@ -54,11 +60,6 @@ def make_subber_subtitle_search_handler(
                         title="Subtitle search skipped (limit)",
                         detail={"state_id": state_id, "reason": "search_count"},
                     )
-                    return
-                settings_row = ensure_subber_settings_row(session)
-                if not settings_row.enabled:
-                    return
-                if not opensubtitles_configured(settings, settings_row):
                     return
                 mark_searching(session, state_id)
                 row2 = get_state_by_id(session, state_id)

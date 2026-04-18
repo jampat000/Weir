@@ -33,6 +33,8 @@ class SubberSubtitleLangStateOut(BaseModel):
     last_searched_at: datetime | None = None
     search_count: int
     source: str | None = None
+    provider_key: str | None = None
+    upgrade_count: int = 0
 
 
 class SubberTvEpisodeOut(BaseModel):
@@ -92,6 +94,25 @@ class SubberSettingsOut(BaseModel):
     movies_schedule_end: str
     tv_last_scheduled_scan_enqueued_at: datetime | None = None
     movies_last_scheduled_scan_enqueued_at: datetime | None = None
+    adaptive_searching_enabled: bool = True
+    adaptive_searching_delay_hours: int = 168
+    adaptive_searching_max_attempts: int = 3
+    permanent_skip_after_attempts: int = 10
+    exclude_hearing_impaired: bool = False
+    upgrade_enabled: bool = False
+    upgrade_schedule_enabled: bool = False
+    upgrade_schedule_interval_seconds: int = 604800
+    upgrade_schedule_hours_limited: bool = False
+    upgrade_schedule_days: str = ""
+    upgrade_schedule_start: str = "00:00"
+    upgrade_schedule_end: str = "23:59"
+    upgrade_last_scheduled_at: datetime | None = None
+    sonarr_path_mapping_enabled: bool = False
+    sonarr_path_sonarr: str = ""
+    sonarr_path_subber: str = ""
+    radarr_path_mapping_enabled: bool = False
+    radarr_path_radarr: str = ""
+    radarr_path_subber: str = ""
     fetcher_sonarr_base_url_hint: str = ""
     fetcher_radarr_base_url_hint: str = ""
 
@@ -119,6 +140,24 @@ class SubberSettingsPutIn(BaseModel):
     movies_schedule_days: str | None = None
     movies_schedule_start: str | None = None
     movies_schedule_end: str | None = None
+    adaptive_searching_enabled: bool | None = None
+    adaptive_searching_delay_hours: int | None = Field(None, ge=1, le=24 * 365)
+    adaptive_searching_max_attempts: int | None = Field(None, ge=1, le=1000)
+    permanent_skip_after_attempts: int | None = Field(None, ge=1, le=100_000)
+    exclude_hearing_impaired: bool | None = None
+    upgrade_enabled: bool | None = None
+    upgrade_schedule_enabled: bool | None = None
+    upgrade_schedule_interval_seconds: int | None = Field(None, ge=60, le=365 * 24 * 3600)
+    upgrade_schedule_hours_limited: bool | None = None
+    upgrade_schedule_days: str | None = None
+    upgrade_schedule_start: str | None = None
+    upgrade_schedule_end: str | None = None
+    sonarr_path_mapping_enabled: bool | None = None
+    sonarr_path_sonarr: str | None = None
+    sonarr_path_subber: str | None = None
+    radarr_path_mapping_enabled: bool | None = None
+    radarr_path_radarr: str | None = None
+    radarr_path_subber: str | None = None
 
 
 class SubberTestConnectionOut(BaseModel):
@@ -133,4 +172,22 @@ class SubberOverviewOut(BaseModel):
     searching: int
     skipped: int
     searches_today: int
+    upgraded_tracks: int = 0
     per_language: list[dict[str, int | str]]
+
+
+class SubberProviderOut(BaseModel):
+    provider_key: str
+    display_name: str
+    enabled: bool
+    priority: int
+    requires_account: bool
+    has_credentials: bool
+
+
+class SubberProviderPutIn(BaseModel):
+    enabled: bool | None = None
+    priority: int | None = None
+    username: str | None = None
+    password: str | None = None
+    api_key: str | None = None
