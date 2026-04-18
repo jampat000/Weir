@@ -22,13 +22,6 @@ import {
   type PrunerProviderRulesCardHandle,
 } from "./pruner-provider-operator-workspace";
 import { formatPrunerDateTime, prunerJobKindOperatorLabel } from "./pruner-ui-utils";
-import {
-  committedPrunerRunIntervalMinutes,
-  finalizePrunerRunIntervalMinutesDraft,
-  PRUNER_RUN_INTERVAL_MAX_MINUTES,
-  PRUNER_RUN_INTERVAL_MIN_MINUTES,
-} from "../../lib/ui/pruner-schedule-interval";
-
 type TopTab = "overview" | "emby" | "jellyfin" | "plex" | "jobs";
 type ProviderTab = "emby" | "jellyfin" | "plex";
 
@@ -676,9 +669,6 @@ function PrunerGlobalScheduleRow({
   const me = useMeQuery();
   const canOperate = me.data?.role === "admin" || me.data?.role === "operator";
   const scopeRow = instance?.scopes.find((s) => s.media_scope === scope);
-  const [schedEnabled, setSchedEnabled] = useState(false);
-  const [schedIntervalSec, setSchedIntervalSec] = useState(3600);
-  const [schedIntervalMinDraft, setSchedIntervalMinDraft] = useState<string | null>(null);
   const [schedHoursLimited, setSchedHoursLimited] = useState(false);
   const [schedDays, setSchedDays] = useState("");
   const [schedStart, setSchedStart] = useState("00:00");
@@ -691,9 +681,6 @@ function PrunerGlobalScheduleRow({
 
   useEffect(() => {
     if (!scopeRow) {
-      setSchedEnabled(false);
-      setSchedIntervalSec(3600);
-      setSchedIntervalMinDraft(null);
       setSchedHoursLimited(false);
       setSchedDays("");
       setSchedStart("00:00");
@@ -701,17 +688,12 @@ function PrunerGlobalScheduleRow({
       setPreviewCap(500);
       return;
     }
-    setSchedEnabled(scopeRow.scheduled_preview_enabled);
-    setSchedIntervalSec(scopeRow.scheduled_preview_interval_seconds);
-    setSchedIntervalMinDraft(null);
     setSchedHoursLimited(scopeRow.scheduled_preview_hours_limited ?? false);
     setSchedDays(scopeRow.scheduled_preview_days ?? "");
     setSchedStart(scopeRow.scheduled_preview_start ?? "00:00");
     setSchedEnd(scopeRow.scheduled_preview_end ?? "23:59");
     setPreviewCap(scopeRow.preview_max_items);
   }, [
-    scopeRow?.scheduled_preview_enabled,
-    scopeRow?.scheduled_preview_interval_seconds,
     scopeRow?.scheduled_preview_hours_limited,
     scopeRow?.scheduled_preview_days,
     scopeRow?.scheduled_preview_start,
@@ -720,23 +702,25 @@ function PrunerGlobalScheduleRow({
     instance?.id,
   ]);
 
-  const resolvedIntervalSec =
-    schedIntervalMinDraft !== null
-      ? finalizePrunerRunIntervalMinutesDraft(schedIntervalMinDraft, schedIntervalSec)
-      : schedIntervalSec;
+  const scheduleFieldsDirty =
+    scopeRow != null &&
+    (schedHoursLimited !== (scopeRow.scheduled_preview_hours_limited ?? false) ||
+      schedDays !== (scopeRow.scheduled_preview_days ?? "") ||
+      schedStart !== (scopeRow.scheduled_preview_start ?? "00:00") ||
+      schedEnd !== (scopeRow.scheduled_preview_end ?? "23:59") ||
+      previewCap !== scopeRow.preview_max_items);
 
   async function saveRow() {
-    if (!instance) return;
+    if (!instance || !scopeRow) return;
     setMsg(null);
     setErr(null);
     setBusy(true);
     try {
       const csrf_token = await fetchCsrfToken();
-      const iv = Math.max(60, Math.min(86400, resolvedIntervalSec));
       const cap = Math.max(1, Math.min(5000, Number(previewCap) || 500));
       await patchPrunerScope(instance.id, scope, {
-        scheduled_preview_enabled: schedEnabled,
-        scheduled_preview_interval_seconds: iv,
+        scheduled_preview_enabled: scopeRow.scheduled_preview_enabled,
+        scheduled_preview_interval_seconds: scopeRow.scheduled_preview_interval_seconds,
         scheduled_preview_hours_limited: schedHoursLimited,
         scheduled_preview_days: schedDays,
         scheduled_preview_start: schedStart,
@@ -744,8 +728,6 @@ function PrunerGlobalScheduleRow({
         preview_max_items: cap,
         csrf_token,
       });
-      setSchedIntervalMinDraft(null);
-      setSchedIntervalSec(iv);
       await qc.invalidateQueries({ queryKey: ["pruner", "instances"] });
       setMsg("Saved.");
     } catch (e) {
@@ -755,58 +737,17 @@ function PrunerGlobalScheduleRow({
     }
   }
 
-  const pLabel = providerLabel(provider);
   const missing = !instance;
-  const controlsDisabled = !canOperate || busy;
-  const saveDisabled = busy || !canOperate || missing;
+  const controlsDisabled = !canOperate || busy || missing;
+  const saveDisabled = busy || !canOperate || missing || !scopeRow || !scheduleFieldsDirty;
   const testId = `pruner-schedule-row-${provider}-${scope}`;
   const idPrefix = `pruner-sched-${provider}-${scope}`;
 
-  const cardTitle = scope === "tv" ? "TV automatic cleanup" : "Movies automatic cleanup";
   const saveScheduleLabel = scope === "tv" ? "Save TV schedule" : "Save Movies schedule";
 
   return (
     <section className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-6" data-testid={testId}>
-      <h3 className="text-sm font-semibold text-[var(--mm-text1)]">{cardTitle}</h3>
-      <p className="mt-2 text-xs leading-relaxed text-[var(--mm-text3)]">
-        The schedule runs your saved criteria from the Cleanup tab automatically. When dry run is on in Run now below,
-        scheduled runs only scan — they never delete automatically.
-      </p>
-      {instance ? (
-        <p className="mt-2 text-xs text-[var(--mm-text3)]">{instance.display_name}</p>
-      ) : (
-        <p className="mt-2 text-xs text-[var(--mm-text3)]">No {pLabel} server saved yet.</p>
-      )}
-      <div className="mt-5 space-y-6">
-        <MmOnOffSwitch
-          id={`${idPrefix}-timed-enabled`}
-          label="Enable timed scans"
-          enabled={schedEnabled}
-          disabled={controlsDisabled}
-          onChange={setSchedEnabled}
-        />
-        <div>
-          <span className="text-sm font-medium text-[var(--mm-text1)]">Run interval (minutes)</span>
-          <p className="mt-1 text-xs leading-relaxed text-[var(--mm-text3)]">
-            How often this runs automatically.
-          </p>
-          <input
-            type="number"
-            min={PRUNER_RUN_INTERVAL_MIN_MINUTES}
-            max={PRUNER_RUN_INTERVAL_MAX_MINUTES}
-            className="mm-input mt-2 w-full max-w-xs"
-            value={
-              schedIntervalMinDraft !== null
-                ? schedIntervalMinDraft
-                : committedPrunerRunIntervalMinutes(schedIntervalSec)
-            }
-            onFocus={() => setSchedIntervalMinDraft(committedPrunerRunIntervalMinutes(schedIntervalSec))}
-            onChange={(e) => setSchedIntervalMinDraft(e.target.value)}
-            onBlur={() => setSchedIntervalMinDraft(null)}
-            disabled={controlsDisabled}
-            aria-label="Run interval in minutes"
-          />
-        </div>
+      <div className="space-y-6">
         <div className="space-y-3">
           <div>
             <span className="text-sm font-medium text-[var(--mm-text1)]">{MM_SCHEDULE_TIME_WINDOW_HEADING}</span>

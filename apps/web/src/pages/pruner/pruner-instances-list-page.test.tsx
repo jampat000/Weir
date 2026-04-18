@@ -579,12 +579,11 @@ describe("PrunerInstancesListPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Schedule" }));
     await waitFor(() => expect(screen.getByTestId("pruner-provider-schedule-wrap")).toBeInTheDocument());
     expect(screen.queryByTestId("pruner-provider-schedule-hint")).not.toBeInTheDocument();
-    expect(screen.getAllByLabelText(/Run interval in minutes/i).length).toBeGreaterThanOrEqual(2);
     await waitFor(() => expect(screen.getByTestId("pruner-schedule-row-emby-tv")).toBeInTheDocument());
     expect(screen.getByTestId("pruner-schedule-row-emby-movies")).toBeInTheDocument();
     const tvCard = screen.getByTestId("pruner-schedule-row-emby-tv");
-    expect(within(tvCard).getByText("TV automatic cleanup")).toBeInTheDocument();
-    expect(within(tvCard).getByText(/saved criteria from the Cleanup tab/i)).toBeInTheDocument();
+    expect(within(tvCard).getByText("Time window")).toBeInTheDocument();
+    expect(within(tvCard).queryByLabelText(/Run interval in minutes/i)).not.toBeInTheDocument();
   });
 
   it("each provider Schedule sub-tab renders TV and Movies schedule rows when instances exist", async () => {
@@ -671,7 +670,7 @@ describe("PrunerInstancesListPage", () => {
     }
   });
 
-  it("Emby Schedule sub-tab save PATCHes scheduled_preview_enabled and scheduled_preview_interval_seconds", async () => {
+  it("Emby Schedule sub-tab save PATCHes schedule window fields", async () => {
     const csrfSpy = vi.spyOn(authApi, "fetchCsrfToken").mockResolvedValue("csrf-test");
     const patchSpy = vi.spyOn(prunerApi, "patchPrunerScope").mockResolvedValue({} as never);
     const client = new QueryClient();
@@ -753,9 +752,8 @@ describe("PrunerInstancesListPage", () => {
     await waitFor(() => expect(screen.getByTestId("pruner-schedule-row-emby-tv")).toBeInTheDocument());
 
     const embyTv = screen.getByTestId("pruner-schedule-row-emby-tv");
-    const timedScansGroup = within(embyTv).getByRole("radiogroup", { name: /Enable timed scans/i });
-    fireEvent.click(within(timedScansGroup).getByRole("radio", { name: "On" }));
-    fireEvent.change(within(embyTv).getByLabelText("Run interval in minutes"), { target: { value: "2" } });
+    const hoursGroup = within(embyTv).getByRole("radiogroup", { name: /Limit to these hours/i });
+    fireEvent.click(within(hoursGroup).getByRole("radio", { name: "On" }));
     fireEvent.click(within(embyTv).getByRole("button", { name: /Save TV schedule/i }));
 
     await waitFor(() => {
@@ -763,9 +761,9 @@ describe("PrunerInstancesListPage", () => {
         1,
         "tv",
         expect.objectContaining({
-          scheduled_preview_enabled: true,
-          scheduled_preview_interval_seconds: 120,
-          scheduled_preview_hours_limited: false,
+          scheduled_preview_enabled: false,
+          scheduled_preview_interval_seconds: 3600,
+          scheduled_preview_hours_limited: true,
           scheduled_preview_days: "",
           scheduled_preview_start: "00:00",
           scheduled_preview_end: "23:59",
