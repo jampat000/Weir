@@ -566,7 +566,7 @@ function TopLevelOverview({ instances }: { instances: PrunerServerInstance[] }) 
       <header className="max-w-3xl">
         <h2 className="text-base font-semibold text-[var(--mm-text1)]">Overview</h2>
         <p className="mt-1 text-sm text-[var(--mm-text2)]">
-          Open Emby, Jellyfin, or Plex for connection details, TV and movie cleanup rules, and optional name filters.
+          Open Emby, Jellyfin, or Plex to set up your connection, configure what gets cleaned up, and set a schedule.
         </p>
       </header>
 

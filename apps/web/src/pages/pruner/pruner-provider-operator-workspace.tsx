@@ -278,8 +278,8 @@ function PrunerDryRunControls(props: PrunerDryRunControlsProps) {
       />
       <p className="text-xs text-[var(--mm-text3)]">
         {dryRunEnabled
-          ? "Dry run is ON — clicking Run will show you what matches your settings. Nothing will be deleted."
-          : "Dry run is OFF — clicking Run will immediately and permanently delete everything that matches. Do a dry run first if you are not sure."}
+          ? "Dry run is ON — Run will show you what would be deleted. Nothing is deleted until you turn dry run off."
+          : "Dry run is OFF — Run will immediately and permanently delete everything that matches. We strongly recommend doing a dry run first."}
       </p>
       <div>
         <button
