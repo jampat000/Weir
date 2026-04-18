@@ -423,7 +423,7 @@ describe("PrunerInstancesListPage", () => {
       preview_max_items: 500,
       preview_include_genres: [],
       preview_include_people: [],
-      preview_include_people_roles: ["cast"],
+      preview_include_people_roles: [],
       preview_year_min: null,
       preview_year_max: null,
       preview_include_studios: [],

@@ -141,13 +141,45 @@ def test_jf_emby_preview_people_roles_cast_vs_director() -> None:
     ) is True
 
 
+def test_jf_emby_preview_people_roles_empty_searches_all_credits() -> None:
+    item = {"Genres": [], "People": [{"Name": "Pat", "Type": "Director"}], "ProductionYear": None, "Studios": []}
+    assert jf_emby_item_passes_preview_filters(
+        item,
+        preview_include_genres=[],
+        preview_include_people=["pat"],
+        preview_include_people_roles=[],
+        preview_year_min=None,
+        preview_year_max=None,
+        preview_include_studios=[],
+    ) is True
+
+
 def test_preview_people_roles_roundtrip() -> None:
     col = preview_people_roles_to_db_column(["writer", "cast"])
     assert preview_people_roles_from_db_column(col) == ["cast", "writer"]
 
 
 def test_preview_people_roles_from_db_column_malformed() -> None:
-    assert preview_people_roles_from_db_column("not-json") == ["cast"]
+    assert preview_people_roles_from_db_column("not-json") == []
+
+
+def test_validate_preview_people_roles_list_empty_and_none() -> None:
+    assert validate_preview_people_roles_list([]) == []
+    assert validate_preview_people_roles_list(None) == []
+
+
+def test_preview_people_roles_to_db_column_empty() -> None:
+    assert preview_people_roles_to_db_column([]) == "[]"
+
+
+def test_jellyfin_emby_people_names_for_roles_empty_roles() -> None:
+    item = {"People": [{"Name": "Pat", "Type": "Actor"}]}
+    assert jellyfin_emby_people_names_for_roles(item, []) == []
+
+
+def test_plex_leaf_person_tags_for_roles_empty_roles() -> None:
+    meta = {"Role": [{"tag": "A"}], "Writer": [{"tag": "W"}]}
+    assert plex_leaf_person_tags_for_roles(meta, []) == []
 
 
 def test_validate_preview_people_roles_list_rejects_invalid() -> None:

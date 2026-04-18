@@ -33,7 +33,7 @@ PRUNER_PREVIEW_PEOPLE_ROLES_ORDER: tuple[str, ...] = (
     PRUNER_PEOPLE_ROLE_GUEST_STAR,
 )
 
-DEFAULT_PREVIEW_PEOPLE_ROLES: list[str] = [PRUNER_PEOPLE_ROLE_CAST]
+DEFAULT_PREVIEW_PEOPLE_ROLES: list[str] = []
 
 _JF_EMBY_TYPE_TO_ROLE: dict[str, str] = {
     "actor": PRUNER_PEOPLE_ROLE_CAST,
@@ -77,10 +77,10 @@ def preview_people_filters_to_db_column(tokens: Sequence[str] | None) -> str:
 
 
 def validate_preview_people_roles_list(tokens: Sequence[object] | None) -> list[str]:
-    """Strict role strings; dedupe preserving canonical order; empty -> default cast."""
+    """Strict role strings; dedupe preserving canonical order; null or all-empty -> []."""
 
     if tokens is None:
-        return list(DEFAULT_PREVIEW_PEOPLE_ROLES)
+        return []
     if not isinstance(tokens, list):
         msg = "preview_include_people_roles must be a list of strings or null"
         raise ValueError(msg)
@@ -100,26 +100,26 @@ def validate_preview_people_roles_list(tokens: Sequence[object] | None) -> list[
         seen.add(r)
         out.append(r)
     if not out:
-        return list(DEFAULT_PREVIEW_PEOPLE_ROLES)
+        return []
     return sorted(out, key=lambda z: PRUNER_PREVIEW_PEOPLE_ROLES_ORDER.index(z))
 
 
 def preview_people_roles_from_db_column(raw: str | None) -> list[str]:
-    """Parse ``preview_include_people_roles_json`` — malformed or empty becomes ``[\"cast\"]``."""
+    """Parse ``preview_include_people_roles_json`` — malformed or empty becomes ``[]``."""
 
     if raw is None or not str(raw).strip():
-        return list(DEFAULT_PREVIEW_PEOPLE_ROLES)
+        return []
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        return list(DEFAULT_PREVIEW_PEOPLE_ROLES)
+        return []
     if not isinstance(data, list):
-        return list(DEFAULT_PREVIEW_PEOPLE_ROLES)
+        return []
     tokens = [x for x in data if isinstance(x, str)]
     try:
         norm = validate_preview_people_roles_list(tokens)
     except ValueError:
-        return list(DEFAULT_PREVIEW_PEOPLE_ROLES)
+        return []
     return norm
 
 
@@ -142,7 +142,7 @@ def jellyfin_emby_people_names_for_roles(item: dict[str, Any], roles: Sequence[s
 
     want = {str(x).strip().lower() for x in roles if str(x).strip()}
     if not want:
-        want = {PRUNER_PEOPLE_ROLE_CAST}
+        return []
     out: list[str] = []
     raw = item.get("People")
     if not isinstance(raw, list):
@@ -201,7 +201,7 @@ def plex_leaf_person_tags_for_roles(meta: dict[str, Any], roles: Sequence[str]) 
 
     want = {str(x).strip().lower() for x in roles if str(x).strip()}
     if not want:
-        want = {PRUNER_PEOPLE_ROLE_CAST}
+        return []
     out: list[str] = []
     if PRUNER_PEOPLE_ROLE_CAST in want:
         out.extend(_plex_extract_tag_strings(meta.get("Role")))

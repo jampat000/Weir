@@ -16,7 +16,7 @@ const ROLE_LABELS: Record<PrunerPeopleRoleId, string> = {
 
 const PLEX_UNAVAILABLE: ReadonlySet<PrunerPeopleRoleId> = new Set(["producer", "guest_star"]);
 
-export const DEFAULT_PRUNER_PEOPLE_ROLES: PrunerPeopleRoleId[] = ["cast"];
+export const DEFAULT_PRUNER_PEOPLE_ROLES: PrunerPeopleRoleId[] = [];
 
 export function normalizePeopleRolesFromApi(raw: string[] | undefined | null): PrunerPeopleRoleId[] {
   const out: PrunerPeopleRoleId[] = [];
@@ -27,7 +27,7 @@ export function normalizePeopleRolesFromApi(raw: string[] | undefined | null): P
       out.push(id);
     }
   }
-  return out.length ? out : [...DEFAULT_PRUNER_PEOPLE_ROLES];
+  return out;
 }
 
 /** Plex PATCH: omit tags Plex cannot supply. */
@@ -35,16 +35,9 @@ export function peopleRolesForPlexPersist(roles: readonly PrunerPeopleRoleId[]):
   return roles.filter((r) => !PLEX_UNAVAILABLE.has(r));
 }
 
-/** Hydrate Plex People UI: drop roles Plex cannot supply; empty → cast default. */
+/** Hydrate Plex People UI: drop roles Plex cannot supply. */
 export function peopleRolesForPlexUiState(raw: string[] | undefined | null): PrunerPeopleRoleId[] {
-  const n = normalizePeopleRolesFromApi(raw).filter((r) => !PLEX_UNAVAILABLE.has(r));
-  return n.length ? n : [...DEFAULT_PRUNER_PEOPLE_ROLES];
-}
-
-function persistableRolesEmpty(roles: readonly PrunerPeopleRoleId[], variant: "emby-jellyfin" | "plex"): boolean {
-  const persistable =
-    variant === "plex" ? roles.filter((r) => !PLEX_UNAVAILABLE.has(r)) : [...roles];
-  return persistable.length === 0;
+  return normalizePeopleRolesFromApi(raw).filter((r) => !PLEX_UNAVAILABLE.has(r));
 }
 
 type PrunerPeopleRoleCheckboxesProps = {
@@ -52,10 +45,6 @@ type PrunerPeopleRoleCheckboxesProps = {
   onChange: (next: PrunerPeopleRoleId[]) => void;
   disabled: boolean;
   variant: "emby-jellyfin" | "plex";
-  /** Shown when UI coerced empty selection back to cast. */
-  coerceCastMsg: string | null;
-  onClearCoerceMsg: () => void;
-  onCoercedToCast?: () => void;
   testId?: string;
   /** Overrides the default section title above role toggles. */
   rolesHeading?: string;
@@ -68,9 +57,6 @@ export function PrunerPeopleRoleCheckboxes({
   onChange,
   disabled,
   variant,
-  coerceCastMsg,
-  onClearCoerceMsg,
-  onCoercedToCast,
   testId,
   rolesHeading,
   footerHelper,
@@ -80,24 +66,17 @@ export function PrunerPeopleRoleCheckboxes({
   const roleIds: readonly PrunerPeopleRoleId[] = isPlex ? PLEX_UI_ROLE_IDS : PRUNER_PEOPLE_ROLE_IDS;
 
   function setRoleEnabled(id: PrunerPeopleRoleId, enabled: boolean) {
-    onClearCoerceMsg();
-
     let next: PrunerPeopleRoleId[];
     if (enabled) {
       next = value.includes(id) ? value : [...value, id];
     } else {
       next = value.filter((x) => x !== id);
     }
-
-    if (persistableRolesEmpty(next, variant)) {
-      onCoercedToCast?.();
-      onChange([...DEFAULT_PRUNER_PEOPLE_ROLES]);
-      return;
-    }
     onChange(next);
   }
 
-  const helper = "Only applies when names are entered above. Cast is used by default if no roles are selected.";
+  const helper =
+    "Only applies when names are entered above. Leave all roles off to search all credits.";
 
   const heading = rolesHeading ?? "Match people in these credit roles";
   return (
@@ -122,11 +101,6 @@ export function PrunerPeopleRoleCheckboxes({
       </div>
       <p className="text-xs text-[var(--mm-text3)]">{helper}</p>
       {footerHelper ? <p className="text-xs text-[var(--mm-text3)]">{footerHelper}</p> : null}
-      {coerceCastMsg ? (
-        <p className="text-xs text-amber-600/95" role="status">
-          {coerceCastMsg}
-        </p>
-      ) : null}
     </div>
   );
 }

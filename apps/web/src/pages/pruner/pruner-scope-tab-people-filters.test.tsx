@@ -124,7 +124,7 @@ describe("PrunerScopeTab people filters", () => {
           "tv",
           expect.objectContaining({
             preview_include_people: ["Ada Lovelace", "Grace Hopper"],
-            preview_include_people_roles: ["cast"],
+            preview_include_people_roles: [],
           }),
         );
       });

@@ -19,7 +19,6 @@ from mediamop.modules.pruner.pruner_constants import (
 )
 from mediamop.modules.pruner.pruner_genre_filters import normalized_genre_filter_tokens
 from mediamop.modules.pruner.pruner_people_filters import (
-    DEFAULT_PREVIEW_PEOPLE_ROLES,
     normalized_people_filter_tokens,
     validate_preview_people_roles_list,
 )
@@ -57,12 +56,13 @@ class PrunerScopeSummaryOut(BaseModel):
         ),
     )
     preview_include_people_roles: list[str] = Field(
-        default_factory=lambda: list(DEFAULT_PREVIEW_PEOPLE_ROLES),
+        default_factory=list,
         description=(
             "Which credit roles count toward people-name matching for preview narrowing on this tab. "
             "Jellyfin/Emby match ``People[].Name`` when ``People[].Type`` maps to a selected role. "
             "Plex uses Role / Director / Writer tags on allLeaves; producer and guest_star are ignored on Plex. "
-            "Defaults to cast-only when empty or unset in storage."
+            "When empty, names match against all credits the provider exposes for this rule (all People on JF/Emby; "
+            "Role, Director, and Writer tags on Plex)."
         ),
     )
     preview_year_min: int | None = Field(

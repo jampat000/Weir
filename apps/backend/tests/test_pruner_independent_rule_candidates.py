@@ -227,6 +227,28 @@ def test_list_jf_emby_people_match_tv_and_movies() -> None:
         )
     assert rows[0]["granularity"] == "movie_item"
 
+    with patch.object(pruner_media_library, "_items_page", page_mov):
+        rows_cast_only, _ = list_jf_emby_people_match_candidates(
+            base_url="http://jf",
+            api_key="k",
+            media_scope=MEDIA_SCOPE_MOVIES,
+            max_items=10,
+            preview_include_people=["pat example"],
+            preview_include_people_roles=["cast"],
+        )
+    assert rows_cast_only == []
+
+    with patch.object(pruner_media_library, "_items_page", page_mov):
+        rows_all_roles, _ = list_jf_emby_people_match_candidates(
+            base_url="http://jf",
+            api_key="k",
+            media_scope=MEDIA_SCOPE_MOVIES,
+            max_items=10,
+            preview_include_people=["pat example"],
+            preview_include_people_roles=[],
+        )
+    assert len(rows_all_roles) == 1 and rows_all_roles[0]["granularity"] == "movie_item"
+
 
 def test_list_jf_emby_year_range_tv_and_movies() -> None:
     def page_tv(*, start_index: int, **_kw: object) -> dict:
@@ -420,6 +442,46 @@ def test_list_plex_people_match_tv_and_movies() -> None:
             preview_include_people_roles=None,
         )
     assert rows[0]["granularity"] == "movie_item"
+
+
+def test_list_plex_people_match_empty_roles_includes_writer_tags() -> None:
+    ep_writer_only = {
+        "type": "episode",
+        "ratingKey": "9",
+        "grandparentTitle": "S",
+        "parentIndex": 1,
+        "index": 1,
+        "title": "E",
+        "Writer": [{"tag": "Pat Scribe"}],
+    }
+    mov_dummy = {"type": "movie", "ratingKey": "10", "title": "M", "year": 2000}
+    with patch(
+        "mediamop.modules.pruner.pruner_independent_rule_candidates.http_get_json",
+        _plex_fake_get_for_leaves(ep_writer_only, mov_dummy, movies=False),
+    ):
+        rows_cast, _ = list_plex_people_match_candidates(
+            base_url="http://plex",
+            auth_token="t",
+            media_scope=MEDIA_SCOPE_TV,
+            max_items=10,
+            preview_include_people=["pat scribe"],
+            preview_include_people_roles=["cast"],
+        )
+    assert rows_cast == []
+
+    with patch(
+        "mediamop.modules.pruner.pruner_independent_rule_candidates.http_get_json",
+        _plex_fake_get_for_leaves(ep_writer_only, mov_dummy, movies=False),
+    ):
+        rows_all, _ = list_plex_people_match_candidates(
+            base_url="http://plex",
+            auth_token="t",
+            media_scope=MEDIA_SCOPE_TV,
+            max_items=10,
+            preview_include_people=["pat scribe"],
+            preview_include_people_roles=[],
+        )
+    assert len(rows_all) == 1 and rows_all[0]["item_id"] == "9"
 
 
 def test_list_plex_year_range_tv_and_movies() -> None:

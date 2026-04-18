@@ -15,12 +15,10 @@ from mediamop.modules.pruner.pruner_genre_filters import (
 )
 from mediamop.modules.pruner.pruner_http import http_get_json, join_base_path
 from mediamop.modules.pruner.pruner_people_filters import (
-    DEFAULT_PREVIEW_PEOPLE_ROLES,
-    PRUNER_PEOPLE_ROLE_CAST,
-    PRUNER_PEOPLE_ROLE_DIRECTOR,
-    PRUNER_PEOPLE_ROLE_WRITER,
     item_matches_people_include_filter,
+    jellyfin_emby_item_people_names,
     jellyfin_emby_people_names_for_roles,
+    plex_leaf_person_tags,
     plex_leaf_person_tags_for_roles,
 )
 from mediamop.modules.pruner.pruner_preview_year_filters import (
@@ -37,13 +35,6 @@ from mediamop.modules.pruner.pruner_plex_missing_thumb_candidates import (
     _section_matches_scope,
 )
 from mediamop.modules.pruner.pruner_studio_collection_filters import jellyfin_emby_item_studio_names
-
-_PLEX_PEOPLE_TAGS_ROLES: tuple[str, ...] = (
-    PRUNER_PEOPLE_ROLE_CAST,
-    PRUNER_PEOPLE_ROLE_WRITER,
-    PRUNER_PEOPLE_ROLE_DIRECTOR,
-)
-
 
 def _jf_emby_truncated(
     *,
@@ -276,9 +267,7 @@ def list_jf_emby_people_match_candidates(
         raise ValueError(msg)
 
     pf = list(preview_include_people)
-    roles = list(preview_include_people_roles) if preview_include_people_roles is not None else list(
-        DEFAULT_PREVIEW_PEOPLE_ROLES,
-    )
+    roles = list(preview_include_people_roles) if preview_include_people_roles is not None else []
     candidates: list[dict[str, Any]] = []
     start = 0
     page = min(100, max(1, max_items))
@@ -308,7 +297,10 @@ def list_jf_emby_people_match_candidates(
         for it in items:
             if not isinstance(it, dict):
                 continue
-            names = jellyfin_emby_people_names_for_roles(it, roles)
+            if roles:
+                names = jellyfin_emby_people_names_for_roles(it, roles)
+            else:
+                names = jellyfin_emby_item_people_names(it)
             if not item_matches_people_include_filter(names, pf):
                 continue
             iid = str(it.get("Id", "")).strip()
@@ -637,12 +629,14 @@ def list_plex_people_match_candidates(
     preview_include_people: Sequence[str],
     preview_include_people_roles: Sequence[str] | None,
 ) -> tuple[list[dict[str, Any]], bool]:
-    _ = preview_include_people_roles  # Plex allLeaves: cast / writer / director tags only
     pf = list(preview_include_people)
-    plex_roles = list(_PLEX_PEOPLE_TAGS_ROLES)
+    roles = list(preview_include_people_roles) if preview_include_people_roles is not None else []
 
     def matches(m: dict[str, Any]) -> bool:
-        tags = plex_leaf_person_tags_for_roles(m, plex_roles)
+        if roles:
+            tags = plex_leaf_person_tags_for_roles(m, roles)
+        else:
+            tags = plex_leaf_person_tags(m)
         return item_matches_people_include_filter(tags, pf)
 
     def build(m: dict[str, Any], rk: str) -> dict[str, Any]:

@@ -170,7 +170,7 @@ def test_post_pruner_instances_creates_row_seeds_scopes_and_hides_secrets(client
         assert s["unwatched_movie_stale_min_age_days"] == 90
         assert s["preview_include_genres"] == []
         assert s["preview_include_people"] == []
-        assert s["preview_include_people_roles"] == ["cast"]
+        assert s["preview_include_people_roles"] == []
         assert s["preview_year_min"] is None
         assert s["preview_year_max"] is None
         assert s["preview_include_studios"] == []

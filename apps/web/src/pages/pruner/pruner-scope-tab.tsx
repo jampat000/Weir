@@ -32,7 +32,6 @@ import { FetcherEnableSwitch } from "../fetcher/fetcher-enable-switch";
 import { fetcherMenuButtonClass } from "../fetcher/fetcher-menu-button";
 import { PrunerGenreMultiSelect, prunerGenresFromApi } from "./pruner-genre-multi-select";
 import {
-  DEFAULT_PRUNER_PEOPLE_ROLES,
   PrunerPeopleRoleCheckboxes,
   normalizePeopleRolesFromApi,
   peopleRolesForPlexPersist,
@@ -95,8 +94,7 @@ export function PrunerScopeTab(props: {
   const [genreSelection, setGenreSelection] = useState<string[]>([]);
   const [genreMsg, setGenreMsg] = useState<string | null>(null);
   const [peopleText, setPeopleText] = useState("");
-  const [peopleRoles, setPeopleRoles] = useState<PrunerPeopleRoleId[]>([...DEFAULT_PRUNER_PEOPLE_ROLES]);
-  const [peopleRolesCoerceMsg, setPeopleRolesCoerceMsg] = useState<string | null>(null);
+  const [peopleRoles, setPeopleRoles] = useState<PrunerPeopleRoleId[]>([]);
   const [peopleMsg, setPeopleMsg] = useState<string | null>(null);
   const [yearMinStr, setYearMinStr] = useState("");
   const [yearMaxStr, setYearMaxStr] = useState("");
@@ -1092,16 +1090,16 @@ export function PrunerScopeTab(props: {
             onChange={setPeopleRoles}
             disabled={busy}
             variant={isPlex ? "plex" : "emby-jellyfin"}
-            coerceCastMsg={peopleRolesCoerceMsg}
-            onClearCoerceMsg={() => setPeopleRolesCoerceMsg(null)}
-            onCoercedToCast={() =>
-              setPeopleRolesCoerceMsg("At least one role must be selected — defaulting to cast.")
-            }
             testId={`pruner-provider-inline-people-roles-${instanceId}-${props.scope}`}
           />
         ) : (
           <p className="text-xs text-[var(--mm-text2)]">
-            Roles: <strong>{(scopeRow?.preview_include_people_roles ?? ["cast"]).join(", ")}</strong>
+            Roles:{" "}
+            <strong>
+              {(scopeRow?.preview_include_people_roles ?? []).length
+                ? (scopeRow?.preview_include_people_roles ?? []).join(", ")
+                : "all credits"}
+            </strong>
           </p>
         )}
       </div>
@@ -1417,11 +1415,6 @@ export function PrunerScopeTab(props: {
                 onChange={setPeopleRoles}
                 disabled={busy}
                 variant={isPlex ? "plex" : "emby-jellyfin"}
-                coerceCastMsg={peopleRolesCoerceMsg}
-                onClearCoerceMsg={() => setPeopleRolesCoerceMsg(null)}
-                onCoercedToCast={() =>
-                  setPeopleRolesCoerceMsg("At least one role must be selected — defaulting to cast.")
-                }
                 testId={`pruner-people-filters-roles-${instanceId}-${props.scope}`}
               />
               <button

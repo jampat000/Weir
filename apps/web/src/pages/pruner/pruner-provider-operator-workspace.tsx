@@ -17,7 +17,6 @@ import { fetcherMenuButtonClass } from "../fetcher/fetcher-menu-button";
 import { PrunerGenreMultiSelect, prunerGenresFromApi } from "./pruner-genre-multi-select";
 import { PrunerStudioMultiSelect } from "./pruner-studio-multi-select";
 import {
-  DEFAULT_PRUNER_PEOPLE_ROLES,
   PrunerPeopleRoleCheckboxes,
   normalizePeopleRolesFromApi,
   peopleRolesForPlexPersist,
@@ -427,8 +426,7 @@ export const PrunerProviderRulesCard = forwardRef<PrunerProviderRulesCardHandle,
   const [yearMaxTv, setYearMaxTv] = useState("");
   const [studioTv, setStudioTv] = useState<string[]>([]);
   const [tvPeople, setTvPeople] = useState("");
-  const [tvRoles, setTvRoles] = useState<PrunerPeopleRoleId[]>([...DEFAULT_PRUNER_PEOPLE_ROLES]);
-  const [tvRolesCoerceMsg, setTvRolesCoerceMsg] = useState<string | null>(null);
+  const [tvRoles, setTvRoles] = useState<PrunerPeopleRoleId[]>([]);
 
   const [missingPrimaryMovies, setMissingPrimaryMovies] = useState(true);
   const [watchedMovies, setWatchedMovies] = useState(false);
@@ -439,8 +437,7 @@ export const PrunerProviderRulesCard = forwardRef<PrunerProviderRulesCardHandle,
   const [yearMaxMovies, setYearMaxMovies] = useState("");
   const [studioMovies, setStudioMovies] = useState<string[]>([]);
   const [moviesPeople, setMoviesPeople] = useState("");
-  const [moviesRoles, setMoviesRoles] = useState<PrunerPeopleRoleId[]>([...DEFAULT_PRUNER_PEOPLE_ROLES]);
-  const [moviesRolesCoerceMsg, setMoviesRolesCoerceMsg] = useState<string | null>(null);
+  const [moviesRoles, setMoviesRoles] = useState<PrunerPeopleRoleId[]>([]);
   const [moviesCollections, setMoviesCollections] = useState("");
 
   const [busyTv, setBusyTv] = useState(false);
@@ -569,7 +566,6 @@ export const PrunerProviderRulesCard = forwardRef<PrunerProviderRulesCardHandle,
     setBusyTv(true);
     try {
       await persistTv();
-      setTvRolesCoerceMsg(null);
       setMsgTv("Saved TV settings.");
     } catch (e) {
       setErrTv((e as Error).message);
@@ -585,7 +581,6 @@ export const PrunerProviderRulesCard = forwardRef<PrunerProviderRulesCardHandle,
     setBusyMovies(true);
     try {
       await persistMovies();
-      setMoviesRolesCoerceMsg(null);
       setMsgMovies("Saved Movies settings.");
     } catch (e) {
       setErrMovies((e as Error).message);
@@ -702,11 +697,6 @@ export const PrunerProviderRulesCard = forwardRef<PrunerProviderRulesCardHandle,
               onChange={setTvRoles}
               disabled={tvControlsDisabled}
               variant={isPlex ? "plex" : "emby-jellyfin"}
-              coerceCastMsg={tvRolesCoerceMsg}
-              onClearCoerceMsg={() => setTvRolesCoerceMsg(null)}
-              onCoercedToCast={() =>
-                setTvRolesCoerceMsg("At least one role must be selected — defaulting to cast.")
-              }
               testId={`pruner-provider-tv-people-roles-${provider}`}
               rolesHeading="Check these credits when matching names"
             />
@@ -840,11 +830,6 @@ export const PrunerProviderRulesCard = forwardRef<PrunerProviderRulesCardHandle,
               onChange={setMoviesRoles}
               disabled={moviesControlsDisabled}
               variant={isPlex ? "plex" : "emby-jellyfin"}
-              coerceCastMsg={moviesRolesCoerceMsg}
-              onClearCoerceMsg={() => setMoviesRolesCoerceMsg(null)}
-              onCoercedToCast={() =>
-                setMoviesRolesCoerceMsg("At least one role must be selected — defaulting to cast.")
-              }
               testId={`pruner-provider-movies-people-roles-${provider}`}
               rolesHeading="Check these credits when matching names"
             />

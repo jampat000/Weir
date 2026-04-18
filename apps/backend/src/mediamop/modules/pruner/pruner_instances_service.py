@@ -12,6 +12,7 @@ from mediamop.modules.pruner.pruner_credentials_envelope import (
     encrypt_envelope,
     envelope_secrets_for_provider,
 )
+from mediamop.modules.pruner.pruner_people_filters import preview_people_roles_to_db_column
 from mediamop.modules.pruner.pruner_scope_settings_model import PrunerScopeSettings
 from mediamop.modules.pruner.pruner_server_instance_model import PrunerServerInstance
 
@@ -32,6 +33,7 @@ def ensure_scope_rows_for_instance(session: Session, server_instance_id: int) ->
             PrunerScopeSettings(
                 server_instance_id=server_instance_id,
                 media_scope=scope,
+                preview_include_people_roles_json=preview_people_roles_to_db_column([]),
             ),
         )
 
