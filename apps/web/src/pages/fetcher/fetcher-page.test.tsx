@@ -22,6 +22,7 @@ import type {
   FetcherArrOperatorSettingsOut,
 } from "../../lib/fetcher/arr-operator-settings/types";
 import { fetcherJobsInspectionQueryKey } from "../../lib/fetcher/jobs-inspection/queries";
+import { MM_SCHEDULE_TIME_WINDOW_HELPER } from "../../components/ui/mm-schedule-window-controls";
 import { FETCHER_TAB_RADARR_LABEL, FETCHER_TAB_SONARR_LABEL } from "./fetcher-display-names";
 import { FETCHER_OVERVIEW_FI_NEEDS_ATTENTION_SUBTEXT } from "./fetcher-overview-tab";
 import { FetcherPage } from "./fetcher-page";
@@ -443,9 +444,7 @@ describe("FetcherPage (tabbed IA)", () => {
     expect(screen.getByText("Set up searches for missing TV shows.")).toBeInTheDocument();
     expect(screen.getByText("Set up searches for better quality TV episodes.")).toBeInTheDocument();
     expect(screen.getAllByText("How often this search runs automatically.").length).toBe(2);
-    expect(
-      screen.getAllByText("When limiting is on, this search only runs inside the window you set below.").length,
-    ).toBe(2);
+    expect(screen.getAllByText(MM_SCHEDULE_TIME_WINDOW_HELPER).length).toBe(2);
     expect(screen.getAllByText("How many items this search will look for each time it runs.").length).toBe(2);
     expect(screen.getAllByText("How long to wait before searching the same item again.").length).toBe(2);
     const missing = screen.getByTestId("fetcher-tv-lane-missing");

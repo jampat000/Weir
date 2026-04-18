@@ -3,7 +3,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { MmOnOffSwitch } from "../../components/ui/mm-on-off-switch";
-import { MmScheduleDayChips, MmScheduleTimeFields } from "../../components/ui/mm-schedule-window-controls";
+import {
+  MM_SCHEDULE_TIME_WINDOW_HEADING,
+  MM_SCHEDULE_TIME_WINDOW_HELPER,
+  MmScheduleDayChips,
+  MmScheduleTimeFields,
+} from "../../components/ui/mm-schedule-window-controls";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { fetcherMenuButtonClass, fetcherSectionTabClass } from "../fetcher/fetcher-menu-button";
 import { fetchCsrfToken } from "../../lib/api/auth-api";
@@ -804,10 +809,8 @@ function PrunerGlobalScheduleRow({
         </div>
         <div className="space-y-3">
           <div>
-            <span className="text-sm font-medium text-[var(--mm-text1)]">Time window</span>
-            <p className="mt-1 text-xs leading-relaxed text-[var(--mm-text3)]">
-              When limiting is on, this only runs inside the window you set below.
-            </p>
+            <span className="text-sm font-medium text-[var(--mm-text1)]">{MM_SCHEDULE_TIME_WINDOW_HEADING}</span>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--mm-text3)]">{MM_SCHEDULE_TIME_WINDOW_HELPER}</p>
           </div>
           <div className="space-y-4">
             <MmOnOffSwitch

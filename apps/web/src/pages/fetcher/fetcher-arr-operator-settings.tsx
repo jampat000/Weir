@@ -23,6 +23,11 @@ import {
   FETCHER_TAB_PANEL_INTRO_CLASS,
   FETCHER_TAB_PANEL_TITLE_CLASS,
 } from "./fetcher-tab-panel-intro";
+import {
+  MM_SCHEDULE_DAYS_HELPER,
+  MM_SCHEDULE_TIME_WINDOW_HEADING,
+  MM_SCHEDULE_TIME_WINDOW_HELPER,
+} from "../../components/ui/mm-schedule-window-controls";
 import { draftDiffersFromCommittedLabel } from "./fetcher-numeric-settings-draft";
 
 const WEEKDAY_TOKENS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
@@ -148,9 +153,7 @@ function ScheduleDayChips({
           Clear
         </button>
       </div>
-      <p className="text-xs text-[var(--mm-text3)]">
-        Use a shortcut for common patterns, or tap days to turn them on or off. Every day means this window applies all week.
-      </p>
+      <p className="text-xs text-[var(--mm-text3)]">{MM_SCHEDULE_DAYS_HELPER}</p>
     </div>
   );
 }
@@ -458,10 +461,8 @@ function SearchLaneBubble({
 
       <div className="space-y-3">
         <div>
-          <span className="text-sm font-medium text-[var(--mm-text1)]">Time window</span>
-          <p className="mt-1 text-xs text-[var(--mm-text3)]">
-            When limiting is on, this search only runs inside the window you set below.
-          </p>
+          <span className="text-sm font-medium text-[var(--mm-text1)]">{MM_SCHEDULE_TIME_WINDOW_HEADING}</span>
+          <p className="mt-1 text-xs text-[var(--mm-text3)]">{MM_SCHEDULE_TIME_WINDOW_HELPER}</p>
         </div>
         <div className="space-y-4">
           <FetcherEnableSwitch

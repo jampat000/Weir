@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { MmScheduleDayChips, MmScheduleTimeFields } from "../../components/ui/mm-schedule-window-controls";
+import {
+  MM_SCHEDULE_TIME_WINDOW_HEADING,
+  MM_SCHEDULE_TIME_WINDOW_HELPER,
+  MmScheduleDayChips,
+  MmScheduleTimeFields,
+} from "../../components/ui/mm-schedule-window-controls";
 import { MmOnOffSwitch } from "../../components/ui/mm-on-off-switch";
 import { PageLoading } from "../../components/shared/page-loading";
 import { isHttpErrorFromApi, isLikelyNetworkFailure } from "../../lib/api/error-guards";
@@ -18,36 +23,11 @@ function canEdit(role: string | undefined): boolean {
   return role === "operator" || role === "admin";
 }
 
-const RUN_INTERVAL_MIN_MINUTES = 1;
-const RUN_INTERVAL_MAX_MINUTES = 7 * 24 * 60;
-const DEFAULT_RUN_INTERVAL_MINUTES = 5;
-
-function committedRunIntervalMinutes(seconds: number): string {
-  return String(Math.max(RUN_INTERVAL_MIN_MINUTES, Math.round(seconds / 60)));
-}
-
-function finalizeRunIntervalMinutesDraft(draft: string, committedSeconds: number): number {
-  const raw = draft.trim();
-  if (raw === "") {
-    return Math.max(60, committedSeconds);
-  }
-  const minutes = Number(raw);
-  if (!Number.isFinite(minutes)) {
-    return Math.max(60, committedSeconds);
-  }
-  const clamped = Math.min(RUN_INTERVAL_MAX_MINUTES, Math.max(RUN_INTERVAL_MIN_MINUTES, Math.round(minutes)));
-  return clamped * 60;
-}
-
 function RefinerScopeScheduleCard({
   title,
   idPrefix,
   enabled,
   onEnabled,
-  runIntervalMinutesDraft,
-  runIntervalCommittedSeconds,
-  onRunIntervalDraft,
-  onCommitRunIntervalBlur,
   hoursLimited,
   onHoursLimited,
   scheduleDays,
@@ -63,10 +43,6 @@ function RefinerScopeScheduleCard({
   idPrefix: string;
   enabled: boolean;
   onEnabled: (v: boolean) => void;
-  runIntervalMinutesDraft: string | null;
-  runIntervalCommittedSeconds: number;
-  onRunIntervalDraft: (v: string | null) => void;
-  onCommitRunIntervalBlur: () => void;
   hoursLimited: boolean;
   onHoursLimited: (v: boolean) => void;
   scheduleDays: string;
@@ -82,40 +58,22 @@ function RefinerScopeScheduleCard({
     <section className="rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-6">
       <h3 className="text-sm font-semibold text-[var(--mm-text1)]">{title}</h3>
       <div className="mt-5 space-y-6">
-        <MmOnOffSwitch
-          id={`${idPrefix}-timed-enabled`}
-          label="Enable timed scans"
-          enabled={enabled}
-          disabled={disabled}
-          onChange={onEnabled}
-        />
-        <div>
-          <span className="text-sm font-medium text-[var(--mm-text1)]">Run interval (minutes)</span>
-          <p className="mt-1 text-xs leading-relaxed text-[var(--mm-text3)]">
-            How often this runs automatically.
-          </p>
-          <input
-            type="number"
-            min={RUN_INTERVAL_MIN_MINUTES}
-            max={RUN_INTERVAL_MAX_MINUTES}
-            className="mm-input mt-2 w-full"
-            value={
-              runIntervalMinutesDraft !== null
-                ? runIntervalMinutesDraft
-                : committedRunIntervalMinutes(runIntervalCommittedSeconds)
-            }
-            onFocus={() => onRunIntervalDraft(committedRunIntervalMinutes(runIntervalCommittedSeconds))}
-            onChange={(e) => onRunIntervalDraft(e.target.value)}
-            onBlur={() => onCommitRunIntervalBlur()}
+        <div className="space-y-2">
+          <MmOnOffSwitch
+            id={`${idPrefix}-timed-enabled`}
+            label="Enable scheduled processing"
+            enabled={enabled}
             disabled={disabled}
+            onChange={onEnabled}
           />
+          <p className="text-xs leading-relaxed text-[var(--mm-text3)]">
+            When on, Refiner processes files in your watched folders during the time window below.
+          </p>
         </div>
         <div className="space-y-3">
           <div>
-            <span className="text-sm font-medium text-[var(--mm-text1)]">Time window</span>
-            <p className="mt-1 text-xs leading-relaxed text-[var(--mm-text3)]">
-              When limiting is on, this only runs inside the window you set below.
-            </p>
+            <span className="text-sm font-medium text-[var(--mm-text1)]">{MM_SCHEDULE_TIME_WINDOW_HEADING}</span>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--mm-text3)]">{MM_SCHEDULE_TIME_WINDOW_HELPER}</p>
           </div>
           <div className="space-y-4">
             <MmOnOffSwitch
@@ -156,32 +114,20 @@ export function RefinerSchedulesSection() {
   const editable = canEdit(me.data?.role);
 
   const [movieEnabled, setMovieEnabled] = useState(true);
-  const [movieIntervalDraft, setMovieIntervalDraft] = useState<string | null>(null);
-  const [movieIntervalSeconds, setMovieIntervalSeconds] = useState(DEFAULT_RUN_INTERVAL_MINUTES * 60);
   const [movieHoursLimited, setMovieHoursLimited] = useState(false);
   const [movieDays, setMovieDays] = useState("");
   const [movieStart, setMovieStart] = useState("00:00");
   const [movieEnd, setMovieEnd] = useState("23:59");
 
   const [tvEnabled, setTvEnabled] = useState(true);
-  const [tvIntervalDraft, setTvIntervalDraft] = useState<string | null>(null);
-  const [tvIntervalSeconds, setTvIntervalSeconds] = useState(DEFAULT_RUN_INTERVAL_MINUTES * 60);
   const [tvHoursLimited, setTvHoursLimited] = useState(false);
   const [tvDays, setTvDays] = useState("");
   const [tvStart, setTvStart] = useState("00:00");
   const [tvEnd, setTvEnd] = useState("23:59");
 
-  const resolvedMovieIntervalSec =
-    movieIntervalDraft !== null
-      ? finalizeRunIntervalMinutesDraft(movieIntervalDraft, movieIntervalSeconds)
-      : movieIntervalSeconds;
-  const resolvedTvIntervalSec =
-    tvIntervalDraft !== null ? finalizeRunIntervalMinutesDraft(tvIntervalDraft, tvIntervalSeconds) : tvIntervalSeconds;
-
   const movieDirty =
     q.data !== undefined &&
     (movieEnabled !== q.data.movie_schedule_enabled ||
-      resolvedMovieIntervalSec !== q.data.movie_schedule_interval_seconds ||
       movieHoursLimited !== q.data.movie_schedule_hours_limited ||
       movieDays !== q.data.movie_schedule_days ||
       movieStart !== q.data.movie_schedule_start ||
@@ -190,7 +136,6 @@ export function RefinerSchedulesSection() {
   const tvDirty =
     q.data !== undefined &&
     (tvEnabled !== q.data.tv_schedule_enabled ||
-      resolvedTvIntervalSec !== q.data.tv_schedule_interval_seconds ||
       tvHoursLimited !== q.data.tv_schedule_hours_limited ||
       tvDays !== q.data.tv_schedule_days ||
       tvStart !== q.data.tv_schedule_start ||
@@ -204,15 +149,11 @@ export function RefinerSchedulesSection() {
     }
     if (!scheduleHydratedRef.current) {
       setMovieEnabled(q.data.movie_schedule_enabled);
-      setMovieIntervalSeconds(q.data.movie_schedule_interval_seconds);
-      setMovieIntervalDraft(null);
       setMovieHoursLimited(q.data.movie_schedule_hours_limited);
       setMovieDays(q.data.movie_schedule_days);
       setMovieStart(q.data.movie_schedule_start);
       setMovieEnd(q.data.movie_schedule_end);
       setTvEnabled(q.data.tv_schedule_enabled);
-      setTvIntervalSeconds(q.data.tv_schedule_interval_seconds);
-      setTvIntervalDraft(null);
       setTvHoursLimited(q.data.tv_schedule_hours_limited);
       setTvDays(q.data.tv_schedule_days);
       setTvStart(q.data.tv_schedule_start);
@@ -222,8 +163,6 @@ export function RefinerSchedulesSection() {
     }
     if (!movieDirty) {
       setMovieEnabled(q.data.movie_schedule_enabled);
-      setMovieIntervalSeconds(q.data.movie_schedule_interval_seconds);
-      setMovieIntervalDraft(null);
       setMovieHoursLimited(q.data.movie_schedule_hours_limited);
       setMovieDays(q.data.movie_schedule_days);
       setMovieStart(q.data.movie_schedule_start);
@@ -231,8 +170,6 @@ export function RefinerSchedulesSection() {
     }
     if (!tvDirty) {
       setTvEnabled(q.data.tv_schedule_enabled);
-      setTvIntervalSeconds(q.data.tv_schedule_interval_seconds);
-      setTvIntervalDraft(null);
       setTvHoursLimited(q.data.tv_schedule_hours_limited);
       setTvDays(q.data.tv_schedule_days);
       setTvStart(q.data.tv_schedule_start);
@@ -265,17 +202,6 @@ export function RefinerSchedulesSection() {
   const tvWatchedSet = Boolean((pathSettings.data.refiner_tv_watched_folder ?? "").trim());
   const movieWatchedSet = Boolean((pathSettings.data.refiner_watched_folder ?? "").trim());
 
-  const movieMinutesOk =
-    movieIntervalDraft === null ||
-    (Number.isFinite(Number(movieIntervalDraft.trim() || "0")) &&
-      Number(movieIntervalDraft.trim() || "0") >= RUN_INTERVAL_MIN_MINUTES &&
-      Number(movieIntervalDraft.trim() || "0") <= RUN_INTERVAL_MAX_MINUTES);
-  const tvMinutesOk =
-    tvIntervalDraft === null ||
-    (Number.isFinite(Number(tvIntervalDraft.trim() || "0")) &&
-      Number(tvIntervalDraft.trim() || "0") >= RUN_INTERVAL_MIN_MINUTES &&
-      Number(tvIntervalDraft.trim() || "0") <= RUN_INTERVAL_MAX_MINUTES);
-
   return (
     <section className="mm-fetcher-module-surface w-full min-w-0 rounded border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-6 text-sm leading-relaxed text-[var(--mm-text2)] sm:p-7">
       <h2 className="text-base font-semibold text-[var(--mm-text)]">Schedules</h2>
@@ -300,19 +226,6 @@ export function RefinerSchedulesSection() {
           idPrefix="refiner-schedule-tv"
           enabled={tvEnabled}
           onEnabled={setTvEnabled}
-          runIntervalMinutesDraft={tvIntervalDraft}
-          runIntervalCommittedSeconds={tvIntervalSeconds}
-          onRunIntervalDraft={setTvIntervalDraft}
-          onCommitRunIntervalBlur={() => {
-            const next = finalizeRunIntervalMinutesDraft(
-              tvIntervalDraft !== null ? tvIntervalDraft : committedRunIntervalMinutes(tvIntervalSeconds),
-              tvIntervalSeconds,
-            );
-            setTvIntervalDraft(null);
-            if (next !== tvIntervalSeconds) {
-              setTvIntervalSeconds(next);
-            }
-          }}
           hoursLimited={tvHoursLimited}
           onHoursLimited={setTvHoursLimited}
           scheduleDays={tvDays}
@@ -327,13 +240,13 @@ export function RefinerSchedulesSection() {
               type="button"
               className={mmActionButtonClass({
                 variant: "primary",
-                disabled: !editable || !tvDirty || !tvMinutesOk || saveTvSchedule.isPending,
+                disabled: !editable || !tvDirty || saveTvSchedule.isPending,
               })}
-              disabled={!editable || !tvDirty || !tvMinutesOk || saveTvSchedule.isPending}
+              disabled={!editable || !tvDirty || saveTvSchedule.isPending}
               onClick={() =>
                 saveTvSchedule.mutate({
                   tv_schedule_enabled: tvEnabled,
-                  tv_schedule_interval_seconds: resolvedTvIntervalSec,
+                  tv_schedule_interval_seconds: q.data.tv_schedule_interval_seconds,
                   tv_schedule_hours_limited: tvHoursLimited,
                   tv_schedule_days: tvDays,
                   tv_schedule_start: tvStart,
@@ -350,19 +263,6 @@ export function RefinerSchedulesSection() {
           idPrefix="refiner-schedule-movies"
           enabled={movieEnabled}
           onEnabled={setMovieEnabled}
-          runIntervalMinutesDraft={movieIntervalDraft}
-          runIntervalCommittedSeconds={movieIntervalSeconds}
-          onRunIntervalDraft={setMovieIntervalDraft}
-          onCommitRunIntervalBlur={() => {
-            const next = finalizeRunIntervalMinutesDraft(
-              movieIntervalDraft !== null ? movieIntervalDraft : committedRunIntervalMinutes(movieIntervalSeconds),
-              movieIntervalSeconds,
-            );
-            setMovieIntervalDraft(null);
-            if (next !== movieIntervalSeconds) {
-              setMovieIntervalSeconds(next);
-            }
-          }}
           hoursLimited={movieHoursLimited}
           onHoursLimited={setMovieHoursLimited}
           scheduleDays={movieDays}
@@ -377,13 +277,13 @@ export function RefinerSchedulesSection() {
               type="button"
               className={mmActionButtonClass({
                 variant: "primary",
-                disabled: !editable || !movieDirty || !movieMinutesOk || saveMovieSchedule.isPending,
+                disabled: !editable || !movieDirty || saveMovieSchedule.isPending,
               })}
-              disabled={!editable || !movieDirty || !movieMinutesOk || saveMovieSchedule.isPending}
+              disabled={!editable || !movieDirty || saveMovieSchedule.isPending}
               onClick={() =>
                 saveMovieSchedule.mutate({
                   movie_schedule_enabled: movieEnabled,
-                  movie_schedule_interval_seconds: resolvedMovieIntervalSec,
+                  movie_schedule_interval_seconds: q.data.movie_schedule_interval_seconds,
                   movie_schedule_hours_limited: movieHoursLimited,
                   movie_schedule_days: movieDays,
                   movie_schedule_start: movieStart,

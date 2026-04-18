@@ -5,6 +5,13 @@
 
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 
+/** Word-for-word match across Fetcher, Refiner, and Pruner schedule UIs. */
+export const MM_SCHEDULE_TIME_WINDOW_HEADING = "Time window";
+export const MM_SCHEDULE_TIME_WINDOW_HELPER =
+  "When on, this only runs inside the hours and days you set below. Turn off to run at any time.";
+export const MM_SCHEDULE_DAYS_HELPER =
+  "Use a shortcut for common patterns, or tap days to turn them on or off. Every day means this window applies all week.";
+
 export const SCHEDULE_WEEKDAY_TOKENS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 export type ScheduleWeekdayToken = (typeof SCHEDULE_WEEKDAY_TOKENS)[number];
@@ -130,10 +137,7 @@ export function MmScheduleDayChips({
           Clear
         </button>
       </div>
-      <p className="text-xs text-[var(--mm-text3)]">
-        Use a shortcut for common patterns, or tap days to turn them on or off. Every day means this window applies all
-        week.
-      </p>
+      <p className="text-xs text-[var(--mm-text3)]">{MM_SCHEDULE_DAYS_HELPER}</p>
     </div>
   );
 }
