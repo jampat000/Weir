@@ -695,7 +695,7 @@ export const PrunerProviderRulesCard = forwardRef<PrunerProviderRulesCardHandle,
                 disabled={tvControlsDisabled}
                 onChange={(e) => setTvPeople(e.target.value)}
               />
-              <span className="mt-1 block text-xs text-[var(--mm-text3)]">Leave empty — rule inactive.</span>
+              <span className="mt-1 block text-xs text-[var(--mm-text3)]">Leave empty.</span>
             </label>
             <PrunerPeopleRoleCheckboxes
               value={tvRoles}
@@ -728,7 +728,7 @@ export const PrunerProviderRulesCard = forwardRef<PrunerProviderRulesCardHandle,
               onMax={setYearMaxTv}
               disabled={tvControlsDisabled}
               title="Delete content released in these years"
-              helperText="Leave empty — rule inactive."
+              helperText="Leave empty."
             />
 
             <div className="border-t border-[var(--mm-border)] pt-4 mt-1" role="separator" />
@@ -833,7 +833,7 @@ export const PrunerProviderRulesCard = forwardRef<PrunerProviderRulesCardHandle,
                 disabled={moviesControlsDisabled}
                 onChange={(e) => setMoviesPeople(e.target.value)}
               />
-              <span className="mt-1 block text-xs text-[var(--mm-text3)]">Leave empty — rule inactive.</span>
+              <span className="mt-1 block text-xs text-[var(--mm-text3)]">Leave empty.</span>
             </label>
             <PrunerPeopleRoleCheckboxes
               value={moviesRoles}
@@ -866,13 +866,13 @@ export const PrunerProviderRulesCard = forwardRef<PrunerProviderRulesCardHandle,
               onMax={setYearMaxMovies}
               disabled={moviesControlsDisabled}
               title="Delete content released in these years"
-              helperText="Leave empty — rule inactive."
+              helperText="Leave empty."
             />
             {isPlex ? (
               <CommaField
                 label="Delete content in these collections"
                 placeholder="e.g. MCU, Pixar"
-                helper="Leave empty — rule inactive."
+                helper="Leave empty."
                 value={moviesCollections}
                 onChange={setMoviesCollections}
                 disabled={moviesControlsDisabled}

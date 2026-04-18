@@ -8,7 +8,7 @@ import { mmPickerTriggerClass } from "../../lib/ui/mm-control-roles";
 import { usePrunerStudiosQuery } from "../../lib/pruner/queries";
 
 function studioTriggerSummary(values: string[]): string {
-  if (values.length === 0) return "No studios selected — rule inactive";
+  if (values.length === 0) return "No studios selected";
   if (values.length <= 3) return values.join(", ");
   return `${values.length} studios selected`;
 }
@@ -101,7 +101,7 @@ export function PrunerStudioMultiSelect({
         values={value}
         onChange={onChange}
         disabled={disabled}
-        placeholder="No studios selected — rule inactive"
+        placeholder="No studios selected"
         summaryText={summary}
         data-testid={testId ? `${testId}-picker` : `${baseTestId}-picker`}
       />
