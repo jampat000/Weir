@@ -1,0 +1,26 @@
+# Grouped updates match Dependabot PR titles like "bump the pip group" / "bump the actions group".
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /apps/backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      pip:
+        patterns:
+          - "*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns:
+          - "*"
+    ignore:
+      # v3+ targets Node 24 action runtime; stay on v2 until we intentionally migrate (see release.yml pin).
+      - dependency-name: "softprops/action-gh-release"
+        update-types: ["version-update:semver-major"]
