@@ -614,7 +614,7 @@ export const PrunerProviderRulesCard = forwardRef<PrunerProviderRulesCardHandle,
 
   const narrowingLabelClass = "text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]";
   const narrowDownIntro =
-    "Select specific genres, people, studios or years to target. Leave all fields empty to apply the rules above to your entire library.";
+    "All fields are optional. Leave everything empty to apply your cleanup rules to your entire library.";
 
   return (
     <div
