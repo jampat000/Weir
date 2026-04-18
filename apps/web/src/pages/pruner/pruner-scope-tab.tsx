@@ -2071,11 +2071,11 @@ export function PrunerScopeTab(props: {
           </>
         ) : (
           <p className="text-sm text-[var(--mm-text2)]">
-            Automatic scans are <strong>{scopeRow?.scheduled_preview_enabled ? "on" : "off"}</strong>
+            Timed scans are <strong>{scopeRow?.scheduled_preview_enabled ? "on" : "off"}</strong>
             {scopeRow ? (
               <>
                 {" "}
-                (every {committedPrunerRunIntervalMinutes(scopeRow.scheduled_preview_interval_seconds)} minutes). Sign in
+                (every {Math.round(scopeRow.scheduled_preview_interval_seconds / 60)} minutes). Sign in
                 as an operator to change it.
               </>
             ) : null}
