@@ -26,10 +26,11 @@ export function ApiEntryError({ error }: { error: unknown }) {
           <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-[var(--mm-text)]">
             npm run dev
           </code>{" "}
-          — it starts the API and Vite together (same ports as{" "}
+          — it starts the API, waits until <code className="text-[0.85em]">GET /health</code> succeeds, then
+          starts Vite (ports in{" "}
           <code className="text-[0.85em]">scripts/dev-ports.json</code>
-          ). If the API process exited, check that terminal for Python errors (venv,{" "}
-          <code className="text-[0.85em]">MEDIAMOP_SESSION_SECRET</code>, migrations).
+          ). If you still see this screen, the API never became ready: read the same terminal for Python
+          errors (venv, <code className="text-[0.85em]">MEDIAMOP_SESSION_SECRET</code>, migrations).
         </p>
         <p className="mm-auth-lead">
           <strong>Alternative:</strong> two terminals from the repo root —{" "}
