@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 
@@ -39,8 +40,12 @@ from mediamop.modules.refiner.refiner_failure_cleanup_periodic_enqueue import (
 )
 from mediamop.modules.subber.subber_job_handlers import build_subber_job_handlers
 from mediamop.modules.subber.subber_schedule_enqueue import (
-    start_subber_library_scan_schedule_enqueue_tasks,
-    stop_subber_library_scan_schedule_enqueue_tasks,
+    start_subber_movies_scan_schedule_enqueue_tasks,
+    start_subber_tv_scan_schedule_enqueue_tasks,
+    start_subber_upgrade_schedule_enqueue_tasks,
+    stop_subber_movies_scan_schedule_enqueue_tasks,
+    stop_subber_tv_scan_schedule_enqueue_tasks,
+    stop_subber_upgrade_schedule_enqueue_tasks,
 )
 from mediamop.modules.pruner.pruner_job_handlers import build_pruner_job_handlers
 from mediamop.modules.refiner.refiner_supplied_payload_evaluation_periodic_enqueue import (
@@ -72,6 +77,8 @@ from mediamop.modules.pruner.worker_loop import (
     stop_pruner_worker_background_tasks,
 )
 from mediamop.platform.auth.rate_limit import SlidingWindowLimiter
+
+_lifespan_log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -167,7 +174,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         job_handlers=pruner_handlers,
     )
     subber_handlers = build_subber_job_handlers(settings, session_factory)
-    subber_library_scan_schedule_tasks = start_subber_library_scan_schedule_enqueue_tasks(
+    subber_tv_scan_tasks = start_subber_tv_scan_schedule_enqueue_tasks(
+        session_factory,
+        stop_event=stop,
+        settings=settings,
+    )
+    subber_movies_scan_tasks = start_subber_movies_scan_schedule_enqueue_tasks(
+        session_factory,
+        stop_event=stop,
+        settings=settings,
+    )
+    subber_upgrade_tasks = start_subber_upgrade_schedule_enqueue_tasks(
         session_factory,
         stop_event=stop,
         settings=settings,
@@ -188,7 +205,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await stop_refiner_work_temp_stale_sweep_enqueue_tasks(refiner_work_temp_stale_sweep_tasks)
         await stop_refiner_failure_cleanup_enqueue_tasks(refiner_failure_cleanup_tasks)
         await stop_fetcher_failed_import_cleanup_drive_enqueue_tasks(fetcher_schedule_tasks)
-        await stop_subber_library_scan_schedule_enqueue_tasks(subber_library_scan_schedule_tasks)
+        try:
+            await stop_subber_tv_scan_schedule_enqueue_tasks(subber_tv_scan_tasks)
+        except Exception:
+            _lifespan_log.exception("Subber TV scan schedule enqueue stop failed")
+        try:
+            await stop_subber_movies_scan_schedule_enqueue_tasks(subber_movies_scan_tasks)
+        except Exception:
+            _lifespan_log.exception("Subber Movies scan schedule enqueue stop failed")
+        try:
+            await stop_subber_upgrade_schedule_enqueue_tasks(subber_upgrade_tasks)
+        except Exception:
+            _lifespan_log.exception("Subber upgrade schedule enqueue stop failed")
         await stop_subber_worker_background_tasks(subber_stop, subber_worker_tasks)
         await stop_pruner_preview_schedule_enqueue_tasks(pruner_preview_schedule_tasks)
         await stop_pruner_worker_background_tasks(pruner_stop, pruner_worker_tasks)

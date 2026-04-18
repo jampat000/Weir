@@ -1,4 +1,7 @@
-"""Subber multi-provider table + subtitle state provider columns.
+"""Subber ``subber_providers`` table and seed rows.
+
+Single concern: provider registry persistence. Subtitle-state column additions live in
+``0042_subber_subtitle_state`` (one migration per concern; see project ADR on schema changes).
 
 Revision ID: 0041_subber_providers
 Revises: 0040_subber_settings_extended
@@ -53,22 +56,7 @@ def upgrade() -> None:
                 "VALUES (:pk, 0, :pr, '')",
             ).bindparams(pk=pk, pr=pr),
         )
-    op.add_column(
-        "subber_subtitle_state",
-        sa.Column("provider_key", sa.String(length=50), nullable=True),
-    )
-    op.add_column(
-        "subber_subtitle_state",
-        sa.Column("upgraded_at", sa.DateTime(timezone=True), nullable=True),
-    )
-    op.add_column(
-        "subber_subtitle_state",
-        sa.Column("upgrade_count", sa.Integer(), server_default=sa.text("0"), nullable=False),
-    )
 
 
 def downgrade() -> None:
-    op.drop_column("subber_subtitle_state", "upgrade_count")
-    op.drop_column("subber_subtitle_state", "upgraded_at")
-    op.drop_column("subber_subtitle_state", "provider_key")
     op.drop_table("subber_providers")

@@ -125,6 +125,8 @@ class MediaMopSettings:
     # Subber library scan periodic enqueue (reads ``subber_settings``; independent of worker count).
     subber_library_scan_schedule_enqueue_enabled: bool
     subber_library_scan_schedule_scan_interval_seconds: int
+    # Subber subtitle-upgrade periodic enqueue — separate asyncio task from TV/Movies library scan schedules.
+    subber_upgrade_schedule_enqueue_enabled: bool
     # Refiner supplied payload evaluation (``refiner.supplied_payload_evaluation.v1``) — Refiner-only schedule.
     refiner_supplied_payload_evaluation_schedule_enabled: bool
     refiner_supplied_payload_evaluation_schedule_interval_seconds: int
@@ -311,6 +313,7 @@ class MediaMopSettings:
             10,
             min(300, _env_int("MEDIAMOP_SUBBER_LIBRARY_SCAN_SCHEDULE_SCAN_INTERVAL_SECONDS", 45)),
         )
+        subber_upgrade_sched_enq = _env_bool("MEDIAMOP_SUBBER_UPGRADE_SCHEDULE_ENQUEUE_ENABLED", True)
         def _refiner_supplied_payload_eval_schedule_enabled() -> bool:
             new_k = "MEDIAMOP_REFINER_SUPPLIED_PAYLOAD_EVALUATION_SCHEDULE_ENABLED"
             old_k = "MEDIAMOP_REFINER_LIBRARY_AUDIT_PASS_SCHEDULE_ENABLED"
@@ -633,6 +636,7 @@ class MediaMopSettings:
             subber_worker_count=subber_workers,
             subber_library_scan_schedule_enqueue_enabled=subber_lib_scan_sched_enq,
             subber_library_scan_schedule_scan_interval_seconds=subber_lib_scan_sched_scan_iv,
+            subber_upgrade_schedule_enqueue_enabled=subber_upgrade_sched_enq,
             refiner_supplied_payload_evaluation_schedule_enabled=refiner_payload_eval_on,
             refiner_supplied_payload_evaluation_schedule_interval_seconds=refiner_payload_eval_iv,
             refiner_watched_folder_remux_scan_dispatch_schedule_enabled=refiner_wf_scan_dispatch_on,

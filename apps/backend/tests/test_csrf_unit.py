@@ -59,6 +59,7 @@ def _csrf_settings(**overrides: object) -> MediaMopSettings:
         subber_worker_count=0,
         subber_library_scan_schedule_enqueue_enabled=False,
         subber_library_scan_schedule_scan_interval_seconds=45,
+        subber_upgrade_schedule_enqueue_enabled=False,
         fetcher_radarr_base_url=None,
         fetcher_radarr_api_key=None,
         fetcher_sonarr_base_url=None,
