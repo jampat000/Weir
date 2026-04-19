@@ -143,13 +143,6 @@ export function SubberScheduleTab({ canOperate }: { canOperate: boolean }) {
   const [mvDays, setMvDays] = useState("");
   const [mvStart, setMvStart] = useState("00:00");
   const [mvEnd, setMvEnd] = useState("23:59");
-  const [upEn, setUpEn] = useState(false);
-  const [upSched, setUpSched] = useState(false);
-  const [upMin, setUpMin] = useState(10080);
-  const [upHl, setUpHl] = useState(false);
-  const [upDays, setUpDays] = useState("");
-  const [upStart, setUpStart] = useState("00:00");
-  const [upEnd, setUpEnd] = useState("23:59");
 
   useEffect(() => {
     const d = q.data;
@@ -166,13 +159,6 @@ export function SubberScheduleTab({ canOperate }: { canOperate: boolean }) {
     setMvDays(d.movies_schedule_days ?? "");
     setMvStart(d.movies_schedule_start ?? "00:00");
     setMvEnd(d.movies_schedule_end ?? "23:59");
-    setUpEn(Boolean(d.upgrade_enabled));
-    setUpSched(Boolean(d.upgrade_schedule_enabled));
-    setUpMin(Math.max(1, Math.round((d.upgrade_schedule_interval_seconds ?? 604800) / 60)));
-    setUpHl(Boolean(d.upgrade_schedule_hours_limited));
-    setUpDays(d.upgrade_schedule_days ?? "");
-    setUpStart(d.upgrade_schedule_start ?? "00:00");
-    setUpEnd(d.upgrade_schedule_end ?? "23:59");
   }, [q.data]);
 
   async function saveTv() {
@@ -201,36 +187,13 @@ export function SubberScheduleTab({ canOperate }: { canOperate: boolean }) {
     });
   }
 
-  async function saveUpgrade() {
-    const csrf_token = await fetchCsrfToken();
-    await put.mutateAsync({
-      csrf_token,
-      upgrade_enabled: upEn,
-      upgrade_schedule_enabled: upSched,
-      upgrade_schedule_interval_seconds: Math.max(60, Math.min(365 * 24 * 3600, upMin * 60)),
-      upgrade_schedule_hours_limited: upHl,
-      upgrade_schedule_days: upDays,
-      upgrade_schedule_start: upStart,
-      upgrade_schedule_end: upEnd,
-    });
-  }
-
   if (q.isLoading) return <p className="text-sm text-[var(--mm-text2)]">Loading schedule…</p>;
   if (q.isError) return <p className="text-sm text-red-600">{(q.error as Error).message}</p>;
 
-  const upgradePreface = (
-    <>
-      <MmOnOffSwitch id="subber-up-master" label="Enable subtitle upgrades" enabled={upEn} disabled={!canOperate || put.isPending} onChange={setUpEn} />
-      <p className="text-xs text-[var(--mm-text2)]">
-        {upEn ? "Subtitle upgrade is on." : "Subtitle upgrade is off. Subtitles already downloaded will not be re-searched."}
-      </p>
-    </>
-  );
-
   return (
-    <div className="grid gap-4 lg:grid-cols-3" data-testid="subber-schedule-tab">
+    <div className="grid gap-4 lg:grid-cols-2" data-testid="subber-schedule-tab">
       <ScheduleCard
-        title="TV automatic subtitle scan"
+        title="TV subtitle scan"
         helper="Subber also searches immediately when Sonarr imports a file, regardless of this schedule."
         canOperate={canOperate}
         enabled={tvEn}
@@ -253,7 +216,7 @@ export function SubberScheduleTab({ canOperate }: { canOperate: boolean }) {
         busy={put.isPending}
       />
       <ScheduleCard
-        title="Movies automatic subtitle scan"
+        title="Movies subtitle scan"
         helper="Subber also searches immediately when Radarr imports a file, regardless of this schedule."
         canOperate={canOperate}
         enabled={mvEn}
@@ -273,30 +236,6 @@ export function SubberScheduleTab({ canOperate }: { canOperate: boolean }) {
         saveLabel="Save Movies schedule"
         idPrefix="subber-movies-sched"
         onSave={saveMovies}
-        busy={put.isPending}
-      />
-      <ScheduleCard
-        preface={upgradePreface}
-        title="Subtitle upgrade"
-        helper="Subber periodically re-searches for better subtitle files for movies and episodes that already have subtitles."
-        canOperate={canOperate}
-        enabled={upSched}
-        setEnabled={setUpSched}
-        intervalMinutes={upMin}
-        setIntervalMinutes={setUpMin}
-        intervalMax={525600}
-        hoursLimited={upHl}
-        setHoursLimited={setUpHl}
-        daysCsv={upDays}
-        setDaysCsv={setUpDays}
-        start={upStart}
-        setStart={setUpStart}
-        end={upEnd}
-        setEnd={setUpEnd}
-        lastRun={q.data?.upgrade_last_scheduled_at}
-        saveLabel="Save upgrade schedule"
-        idPrefix="subber-upgrade-sched"
-        onSave={saveUpgrade}
         busy={put.isPending}
       />
     </div>

@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { fetcherSectionTabClass } from "../fetcher/fetcher-menu-button";
 import { useMeQuery } from "../../lib/auth/queries";
+import { SubberConnectionsTab } from "./subber-connections-tab";
 import { SubberJobsTab } from "./subber-jobs-tab";
 import { SubberMoviesTab } from "./subber-movies-tab";
 import { SubberOverviewTab } from "./subber-overview-tab";
+import { SubberPreferencesTab } from "./subber-preferences-tab";
+import { SubberProvidersTab } from "./subber-providers-tab";
 import { SubberScheduleTab } from "./subber-schedule-tab";
-import { SubberSettingsTab } from "./subber-settings-tab";
 import { SubberTvTab } from "./subber-tv-tab";
 
-type TopTab = "overview" | "tv" | "movies" | "settings" | "schedule" | "jobs";
+type TopTab = "overview" | "tv" | "movies" | "connections" | "providers" | "preferences" | "schedule" | "jobs";
 
 export function SubberPage() {
   const me = useMeQuery();
@@ -19,7 +21,9 @@ export function SubberPage() {
     { id: "overview", label: "Overview" },
     { id: "tv", label: "TV" },
     { id: "movies", label: "Movies" },
-    { id: "settings", label: "Settings" },
+    { id: "connections", label: "Connections" },
+    { id: "providers", label: "Providers" },
+    { id: "preferences", label: "Preferences" },
     { id: "schedule", label: "Schedule" },
     { id: "jobs", label: "Jobs" },
   ];
@@ -48,10 +52,14 @@ export function SubberPage() {
       </nav>
 
       <div className="mt-6 sm:mt-7" role="tabpanel">
-        {tab === "overview" ? <SubberOverviewTab onOpenTab={(t) => setTab(t)} /> : null}
+        {tab === "overview" ? (
+          <SubberOverviewTab onOpenTab={(t) => setTab(t === "settings" ? "connections" : t)} />
+        ) : null}
         {tab === "tv" ? <SubberTvTab canOperate={Boolean(canOperate)} /> : null}
         {tab === "movies" ? <SubberMoviesTab canOperate={Boolean(canOperate)} /> : null}
-        {tab === "settings" ? <SubberSettingsTab canOperate={Boolean(canOperate)} /> : null}
+        {tab === "connections" ? <SubberConnectionsTab canOperate={Boolean(canOperate)} /> : null}
+        {tab === "providers" ? <SubberProvidersTab canOperate={Boolean(canOperate)} /> : null}
+        {tab === "preferences" ? <SubberPreferencesTab canOperate={Boolean(canOperate)} /> : null}
         {tab === "schedule" ? <SubberScheduleTab canOperate={Boolean(canOperate)} /> : null}
         {tab === "jobs" ? <SubberJobsTab /> : null}
       </div>

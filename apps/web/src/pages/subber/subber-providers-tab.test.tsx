@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as authApi from "../../lib/api/auth-api";
 import * as subberQueries from "../../lib/subber/subber-queries";
-import { SubberSettingsTab } from "./subber-settings-tab";
+import { SubberProvidersTab } from "./subber-providers-tab";
 
 function wrap(ui: ReactNode, client: QueryClient) {
   return (
@@ -15,7 +15,7 @@ function wrap(ui: ReactNode, client: QueryClient) {
   );
 }
 
-describe("SubberSettingsTab", () => {
+describe("SubberProvidersTab", () => {
   const mutateAsync = vi.fn().mockResolvedValue({});
 
   afterEach(() => {
@@ -129,15 +129,15 @@ describe("SubberSettingsTab", () => {
 
   it("saves OpenSubtitles when Save is clicked", async () => {
     const client = new QueryClient();
-    render(wrap(<SubberSettingsTab canOperate />, client));
-    await waitFor(() => expect(screen.getByTestId("subber-settings-tab")).toBeInTheDocument());
+    render(wrap(<SubberProvidersTab canOperate />, client));
+    await waitFor(() => expect(screen.getByTestId("subber-providers-tab")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("subber-save-opensubtitles"));
     await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
   });
 
   it("renders subtitle providers section", async () => {
     const client = new QueryClient();
-    render(wrap(<SubberSettingsTab canOperate />, client));
+    render(wrap(<SubberProvidersTab canOperate />, client));
     await waitFor(() => expect(screen.getByTestId("subber-providers-section")).toBeInTheDocument());
   });
 
@@ -148,7 +148,7 @@ describe("SubberSettingsTab", () => {
       isPending: false,
     } as unknown as ReturnType<typeof subberQueries.useSubberTestOpensubtitlesMutation>);
     const client = new QueryClient();
-    render(wrap(<SubberSettingsTab canOperate />, client));
+    render(wrap(<SubberProvidersTab canOperate />, client));
     await waitFor(() => expect(screen.getByTestId("subber-test-opensubtitles")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("subber-test-opensubtitles"));
     await waitFor(() => expect(testMut).toHaveBeenCalled());
