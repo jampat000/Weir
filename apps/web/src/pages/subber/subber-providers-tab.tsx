@@ -28,7 +28,7 @@ export function SubberProvidersTab({ canOperate }: { canOperate: boolean }) {
   const [provUser, setProvUser] = useState<Record<string, string>>({});
   const [provPass, setProvPass] = useState<Record<string, string>>({});
   const [provKey, setProvKey] = useState<Record<string, string>>({});
-  const [provPri, setProvPri] = useState<Record<string, number>>({});
+  const [provPri, setProvPri] = useState<Record<string, number | null>>({});
   const [provMsg, setProvMsg] = useState<Record<string, string | null>>({});
   const [provDirty, setProvDirty] = useState<Record<string, boolean>>({});
   const [expandedProviderKey, setExpandedProviderKey] = useState<string | null>(null);
@@ -46,9 +46,9 @@ export function SubberProvidersTab({ canOperate }: { canOperate: boolean }) {
 
   const dis = !canOperate || putProv.isPending;
 
-  async function saveProviderRow(pk: string, enabledP: boolean, priority: number) {
+  async function saveProviderRow(pk: string, enabledP: boolean, priority: number | null) {
     const csrf_token = await fetchCsrfToken();
-    const body: SubberProviderPutIn = { csrf_token, enabled: enabledP, priority };
+    const body: SubberProviderPutIn = { csrf_token, enabled: enabledP, priority: priority ?? undefined };
     const u = provUser[pk]?.trim();
     const p = provPass[pk]?.trim();
     const k = provKey[pk]?.trim();
@@ -58,7 +58,7 @@ export function SubberProvidersTab({ canOperate }: { canOperate: boolean }) {
     await putProv.mutateAsync({ providerKey: pk, body });
   }
 
-  async function saveExpandedProvider(pk: string, enabledP: boolean, priority: number) {
+  async function saveExpandedProvider(pk: string, enabledP: boolean, priority: number | null) {
     try {
       await saveProviderRow(pk, enabledP, priority);
       setProvDirty((d) => ({ ...d, [pk]: false }));
@@ -88,7 +88,10 @@ export function SubberProvidersTab({ canOperate }: { canOperate: boolean }) {
     }
   }
 
-  const sorted = [...(pq.data ?? [])].sort((a, b) => a.priority - b.priority || a.provider_key.localeCompare(b.provider_key));
+  const sorted = [...(pq.data ?? [])].sort(
+    (a, b) =>
+      (a.priority ?? 999_999) - (b.priority ?? 999_999) || a.provider_key.localeCompare(b.provider_key),
+  );
 
   return (
     <div className="space-y-4" data-testid="subber-providers-tab">
@@ -115,7 +118,7 @@ export function SubberProvidersTab({ canOperate }: { canOperate: boolean }) {
           ) : (
             <ul className="divide-y divide-[var(--mm-border)] rounded-md border border-[var(--mm-border)] bg-black/10">
               {sorted.map((p) => {
-                const pri = provPri[p.provider_key] ?? p.priority;
+                const pri = provPri[p.provider_key] ?? p.priority ?? null;
                 const provMsgText = provMsg[p.provider_key];
                 const showCfg = providerNeedsConfigureButton(p);
                 const expanded = expandedProviderKey === p.provider_key;
@@ -161,13 +164,19 @@ export function SubberProvidersTab({ canOperate }: { canOperate: boolean }) {
                       <span
                         className={[
                           "h-2 w-2 shrink-0 rounded-full",
-                          p.enabled ? "bg-emerald-500" : "bg-[var(--mm-border)]",
+                          p.enabled && (p.has_credentials || !p.requires_account)
+                            ? "bg-emerald-500"
+                            : p.enabled && p.requires_account && !p.has_credentials
+                              ? "bg-red-500"
+                              : "bg-[var(--mm-border)]",
                         ].join(" ")}
                       />
                       <span className="min-w-[10rem] text-sm font-semibold text-[var(--mm-text)]">{p.display_name}</span>
                       <span className="text-xs text-[var(--mm-text2)]">{statusEl}</span>
                       <span className="ml-auto flex items-center gap-3">
-                        <span className="text-xs text-[var(--mm-text3)]">Priority {pri}</span>
+                        <span className="text-xs text-[var(--mm-text3)]">
+                          Priority {p.priority !== null && p.priority !== undefined ? p.priority : "—"}
+                        </span>
                         <svg
                           aria-hidden
                           className={[
@@ -272,13 +281,14 @@ export function SubberProvidersTab({ canOperate }: { canOperate: boolean }) {
                                 type="number"
                                 className="mm-input max-w-[4rem] text-sm"
                                 disabled={dis}
-                                value={pri}
-                                onChange={(e) =>
+                                value={pri ?? ""}
+                                onChange={(e) => {
+                                  const v = e.target.value;
                                   setProvPri((x) => ({
                                     ...x,
-                                    [p.provider_key]: Math.max(0, Math.min(9999, Number(e.target.value) || 0)),
-                                  }))
-                                }
+                                    [p.provider_key]: v === "" ? null : Math.max(0, Math.min(9999, Number(v) || 0)),
+                                  }));
+                                }}
                                 onBlur={() => {
                                   if (pri !== p.priority) void saveProviderRow(p.provider_key, p.enabled, pri);
                                 }}

@@ -45,7 +45,7 @@ def _provider_out(settings: MediaMopSettings, row) -> SubberProviderOut:
         provider_key=pk,
         display_name=PROVIDER_DISPLAY_NAMES.get(pk, pk),
         enabled=bool(row.enabled),
-        priority=int(row.priority or 0),
+        priority=int(row.priority) if row.priority is not None else None,
         requires_account=bool(PROVIDER_REQUIRES_ACCOUNT.get(pk, True)),
         has_credentials=provider_has_stored_credentials(settings, row),
     )
@@ -59,7 +59,13 @@ def get_subber_providers(
 ) -> list[SubberProviderOut]:
     rows = get_all_providers(db)
     order = {k: i for i, k in enumerate(ALL_PROVIDER_KEYS)}
-    rows.sort(key=lambda r: (order.get(str(r.provider_key), 99), int(r.priority or 0), r.id))
+    rows.sort(
+        key=lambda r: (
+            order.get(str(r.provider_key), 99),
+            r.priority if r.priority is not None else 10**6,
+            r.id,
+        ),
+    )
     return [_provider_out(settings, r) for r in rows]
 
 

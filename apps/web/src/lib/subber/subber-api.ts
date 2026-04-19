@@ -158,7 +158,7 @@ export type SubberProviderOut = {
   provider_key: string;
   display_name: string;
   enabled: boolean;
-  priority: number;
+  priority: number | null;
   requires_account: boolean;
   has_credentials: boolean;
 };

@@ -20,6 +20,8 @@ from mediamop.modules.subber.subber_provider_registry import (
     PROVIDER_OPENSUBTITLES_COM,
     PROVIDER_OPENSUBTITLES_ORG,
     PROVIDER_REQUIRES_ACCOUNT,
+    PROVIDER_SUBDL,
+    PROVIDER_SUBSOURCE,
 )
 from mediamop.modules.subber.subber_providers_model import SubberProviderRow
 
@@ -28,14 +30,14 @@ def ensure_all_provider_rows(session: Session) -> None:
     """Insert missing provider rows (idempotent for DBs pre-dating migration inserts)."""
 
     existing = set(session.scalars(select(SubberProviderRow.provider_key)).all())
-    for i, pk in enumerate(ALL_PROVIDER_KEYS):
+    for pk in ALL_PROVIDER_KEYS:
         if pk in existing:
             continue
         session.add(
             SubberProviderRow(
                 provider_key=pk,
                 enabled=False,
-                priority=i,
+                priority=None,
                 credentials_ciphertext="",
             ),
         )
@@ -45,7 +47,12 @@ def ensure_all_provider_rows(session: Session) -> None:
 def get_all_providers(session: Session) -> list[SubberProviderRow]:
     ensure_all_provider_rows(session)
     return list(
-        session.scalars(select(SubberProviderRow).order_by(SubberProviderRow.priority.asc(), SubberProviderRow.id.asc())),
+        session.scalars(
+            select(SubberProviderRow).order_by(
+                SubberProviderRow.priority.asc().nulls_last(),
+                SubberProviderRow.id.asc(),
+            ),
+        ),
     )
 
 
@@ -55,7 +62,10 @@ def get_enabled_providers_ordered(session: Session) -> list[SubberProviderRow]:
         session.scalars(
             select(SubberProviderRow)
             .where(SubberProviderRow.enabled.is_(True))
-            .order_by(SubberProviderRow.priority.asc(), SubberProviderRow.id.asc()),
+            .order_by(
+                SubberProviderRow.priority.asc().nulls_last(),
+                SubberProviderRow.id.asc(),
+            ),
         ).all(),
     )
 
@@ -74,6 +84,8 @@ def provider_has_stored_credentials(settings: MediaMopSettings, row: SubberProvi
         return bool(sec.get("username") and sec.get("password") and sec.get("api_key"))
     if row.provider_key == PROVIDER_ADDIC7ED:
         return bool(sec.get("username") and sec.get("password"))
+    if row.provider_key in (PROVIDER_SUBDL, PROVIDER_SUBSOURCE):
+        return bool(sec.get("api_key"))
     return bool(raw.strip() and raw.strip() != "{}")
 
 
@@ -102,6 +114,19 @@ def upsert_provider_settings(
     if row is None:
         raise ValueError(f"Unknown provider_key {provider_key!r}")
     now = datetime.now(timezone.utc)
+
+    # Auto-assign priority when enabling; clear when disabling
+    if enabled is True and row.priority is None:
+        from sqlalchemy import func as sa_func
+        from sqlalchemy import select as sa_select
+
+        max_priority = session.scalar(
+            sa_select(sa_func.max(SubberProviderRow.priority)).where(SubberProviderRow.priority.isnot(None)),
+        )
+        row.priority = 0 if max_priority is None else int(max_priority) + 1
+    elif enabled is False:
+        row.priority = None
+
     if enabled is not None:
         row.enabled = bool(enabled)
     if priority is not None:

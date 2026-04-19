@@ -13,17 +13,27 @@ from sqlalchemy.orm import Session
 
 from mediamop.core.config import MediaMopSettings
 from mediamop.modules.subber import subber_addic7ed_client as addic7ed_client
+from mediamop.modules.subber import subber_gestdown_client as gestdown_client
 from mediamop.modules.subber import subber_opensubtitles_client as os_client
 from mediamop.modules.subber import subber_podnapisi_client as podnapisi_client
+from mediamop.modules.subber import subber_subdl_client as subdl_client
+from mediamop.modules.subber import subber_subf2m_client as subf2m_client
 from mediamop.modules.subber import subber_subscene_client as subscene_client
+from mediamop.modules.subber import subber_subsource_client as subsource_client
+from mediamop.modules.subber import subber_yify_client as yify_client
 from mediamop.modules.subber.subber_credentials_crypto import decrypt_subber_credentials_json, parse_provider_secrets_json
 from mediamop.modules.subber.subber_opensubtitles_client import SubberRateLimitError
 from mediamop.modules.subber.subber_provider_registry import (
     PROVIDER_ADDIC7ED,
+    PROVIDER_GESTDOWN,
     PROVIDER_OPENSUBTITLES_COM,
     PROVIDER_OPENSUBTITLES_ORG,
     PROVIDER_PODNAPISI,
+    PROVIDER_SUBDL,
+    PROVIDER_SUBF2M,
     PROVIDER_SUBSCENE,
+    PROVIDER_SUBSOURCE,
+    PROVIDER_YIFY,
 )
 from mediamop.modules.subber.subber_providers_model import SubberProviderRow
 from mediamop.modules.subber.subber_providers_service import get_enabled_providers_ordered, provider_is_ready_for_search
@@ -33,6 +43,18 @@ from mediamop.modules.subber.subber_subtitle_state_model import SubberSubtitleSt
 from mediamop.modules.subber.subber_subtitle_state_service import mark_found, mark_missing
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_srt_from_zip_or_raw(data: bytes) -> bytes:
+    """If data is a ZIP extract first .srt; otherwise return as-is."""
+    bio = io.BytesIO(data)
+    if zipfile.is_zipfile(bio):
+        bio.seek(0)
+        with zipfile.ZipFile(bio) as zf:
+            for name in zf.namelist():
+                if name.lower().endswith(".srt"):
+                    return zf.read(name)
+    return data
 
 
 def apply_path_mapping(file_path: str, arr_path: str, subber_path: str, enabled: bool) -> str:
@@ -400,6 +422,252 @@ def _try_addic7ed(
     return False
 
 
+def _try_gestdown(
+    *,
+    settings_row: SubberSettingsRow,
+    state_row: SubberSubtitleState,
+    db: Session,
+    prefs: list[str],
+    lang: str,
+    exclude_hi: bool,
+) -> bool:
+    if state_row.media_scope != "tv":
+        return False
+    items = gestdown_client.search(
+        query=_search_query(state_row),
+        season_number=state_row.season_number,
+        episode_number=state_row.episode_number,
+        languages=prefs if prefs else [lang],
+    )
+    for item in items:
+        if exclude_hi and item.get("hearing_impaired"):
+            continue
+        dl_url = item.get("download_url", "")
+        if not dl_url:
+            continue
+        try:
+            raw = gestdown_client.download(download_url=dl_url)
+            srt = _extract_srt_from_zip_or_raw(raw)
+            if not srt.strip():
+                continue
+            picked_lang = str(item.get("language") or lang)
+            _write_srt_for_state(
+                settings_row=settings_row,
+                state_row=state_row,
+                lang=picked_lang,
+                srt_bytes=srt,
+                provider_key=PROVIDER_GESTDOWN,
+                external_file_id=dl_url,
+                db=db,
+            )
+            return True
+        except Exception:
+            logger.exception("Gestdown download failed state_id=%s", state_row.id)
+            continue
+    return False
+
+
+def _try_subdl(
+    *,
+    settings_row: SubberSettingsRow,
+    state_row: SubberSubtitleState,
+    db: Session,
+    prow: SubberProviderRow,
+    settings: MediaMopSettings,
+    prefs: list[str],
+    lang: str,
+    exclude_hi: bool,
+) -> bool:
+    from mediamop.modules.subber.subber_credentials_crypto import (
+        decrypt_subber_credentials_json,
+        parse_provider_secrets_json,
+    )
+
+    raw = decrypt_subber_credentials_json(settings, prow.credentials_ciphertext or "") or "{}"
+    sec = parse_provider_secrets_json(prow.provider_key, raw)
+    api_key = str(sec.get("api_key") or "").strip()
+    if not api_key:
+        return False
+    items = subdl_client.search(
+        api_key=api_key,
+        query=_search_query(state_row),
+        season_number=state_row.season_number if state_row.media_scope == "tv" else None,
+        episode_number=state_row.episode_number if state_row.media_scope == "tv" else None,
+        languages=prefs if prefs else [lang],
+        media_scope=state_row.media_scope,
+    )
+    for item in items:
+        if exclude_hi and item.get("hearing_impaired"):
+            continue
+        dl_url = item.get("download_url", "")
+        if not dl_url:
+            continue
+        try:
+            raw_data = subdl_client.download(download_url=dl_url)
+            srt = _extract_srt_from_zip_or_raw(raw_data)
+            if not srt.strip():
+                continue
+            picked_lang = item.get("language") or lang
+            _write_srt_for_state(
+                settings_row=settings_row,
+                state_row=state_row,
+                lang=picked_lang,
+                srt_bytes=srt,
+                provider_key=PROVIDER_SUBDL,
+                external_file_id=dl_url,
+                db=db,
+            )
+            return True
+        except Exception:
+            logger.exception("SubDL download failed state_id=%s", state_row.id)
+            continue
+    return False
+
+
+def _try_subsource(
+    *,
+    settings_row: SubberSettingsRow,
+    state_row: SubberSubtitleState,
+    db: Session,
+    prow: SubberProviderRow,
+    settings: MediaMopSettings,
+    prefs: list[str],
+    lang: str,
+    exclude_hi: bool,
+) -> bool:
+    from mediamop.modules.subber.subber_credentials_crypto import (
+        decrypt_subber_credentials_json,
+        parse_provider_secrets_json,
+    )
+
+    raw = decrypt_subber_credentials_json(settings, prow.credentials_ciphertext or "") or "{}"
+    sec = parse_provider_secrets_json(prow.provider_key, raw)
+    api_key = str(sec.get("api_key") or "").strip()
+    if not api_key:
+        return False
+    items = subsource_client.search(
+        api_key=api_key,
+        query=_search_query(state_row),
+        season_number=state_row.season_number if state_row.media_scope == "tv" else None,
+        episode_number=state_row.episode_number if state_row.media_scope == "tv" else None,
+        languages=prefs if prefs else [lang],
+        media_scope=state_row.media_scope,
+    )
+    for item in items:
+        if exclude_hi and item.get("hearing_impaired"):
+            continue
+        dl_url = item.get("download_url", "")
+        if not dl_url:
+            continue
+        try:
+            raw_data = subsource_client.download(download_url=dl_url, api_key=api_key)
+            srt = _extract_srt_from_zip_or_raw(raw_data)
+            if not srt.strip():
+                continue
+            picked_lang = item.get("language") or lang
+            _write_srt_for_state(
+                settings_row=settings_row,
+                state_row=state_row,
+                lang=picked_lang,
+                srt_bytes=srt,
+                provider_key=PROVIDER_SUBSOURCE,
+                external_file_id=dl_url,
+                db=db,
+            )
+            return True
+        except Exception:
+            logger.exception("SubSource download failed state_id=%s", state_row.id)
+            continue
+    return False
+
+
+def _try_subf2m(
+    *,
+    settings_row: SubberSettingsRow,
+    state_row: SubberSubtitleState,
+    db: Session,
+    prefs: list[str],
+    lang: str,
+    exclude_hi: bool,
+) -> bool:
+    items = subf2m_client.search(
+        query=_search_query(state_row),
+        season_number=state_row.season_number if state_row.media_scope == "tv" else None,
+        episode_number=state_row.episode_number if state_row.media_scope == "tv" else None,
+        languages=prefs if prefs else [lang],
+        media_scope=state_row.media_scope,
+    )
+    for item in items:
+        if exclude_hi and item.get("hearing_impaired"):
+            continue
+        dl_url = item.get("download_url", "")
+        if not dl_url:
+            continue
+        try:
+            raw_data = subf2m_client.download(download_url=dl_url)
+            srt = _extract_srt_from_zip_or_raw(raw_data)
+            if not srt.strip():
+                continue
+            picked_lang = item.get("language") or lang
+            _write_srt_for_state(
+                settings_row=settings_row,
+                state_row=state_row,
+                lang=picked_lang,
+                srt_bytes=srt,
+                provider_key=PROVIDER_SUBF2M,
+                external_file_id=dl_url,
+                db=db,
+            )
+            return True
+        except Exception:
+            logger.exception("Subf2m download failed state_id=%s", state_row.id)
+            continue
+    return False
+
+
+def _try_yify(
+    *,
+    settings_row: SubberSettingsRow,
+    state_row: SubberSubtitleState,
+    db: Session,
+    prefs: list[str],
+    lang: str,
+    exclude_hi: bool,
+) -> bool:
+    if state_row.media_scope != "movies":
+        return False
+    items = yify_client.search(
+        query=_search_query(state_row),
+        languages=prefs if prefs else [lang],
+    )
+    for item in items:
+        if exclude_hi and item.get("hearing_impaired"):
+            continue
+        dl_url = item.get("download_url", "")
+        if not dl_url:
+            continue
+        try:
+            raw_data = yify_client.download(download_url=dl_url)
+            srt = _extract_srt_from_zip_or_raw(raw_data)
+            if not srt.strip():
+                continue
+            picked_lang = item.get("language") or lang
+            _write_srt_for_state(
+                settings_row=settings_row,
+                state_row=state_row,
+                lang=picked_lang,
+                srt_bytes=srt,
+                provider_key=PROVIDER_YIFY,
+                external_file_id=dl_url,
+                db=db,
+            )
+            return True
+        except Exception:
+            logger.exception("YifySubtitles download failed state_id=%s", state_row.id)
+            continue
+    return False
+
+
 def _legacy_opensubtitles_search(
     *,
     settings: MediaMopSettings,
@@ -543,6 +811,60 @@ def search_and_download_subtitle(
                     db=db,
                     prow=prow,
                     settings=settings,
+                    prefs=prefs,
+                    lang=lang,
+                    exclude_hi=exclude_hi,
+                ):
+                    return True
+            elif pk == PROVIDER_GESTDOWN:
+                if _try_gestdown(
+                    settings_row=settings_row,
+                    state_row=state_row,
+                    db=db,
+                    prefs=prefs,
+                    lang=lang,
+                    exclude_hi=exclude_hi,
+                ):
+                    return True
+            elif pk == PROVIDER_SUBDL:
+                if _try_subdl(
+                    settings_row=settings_row,
+                    state_row=state_row,
+                    db=db,
+                    prow=prow,
+                    settings=settings,
+                    prefs=prefs,
+                    lang=lang,
+                    exclude_hi=exclude_hi,
+                ):
+                    return True
+            elif pk == PROVIDER_SUBSOURCE:
+                if _try_subsource(
+                    settings_row=settings_row,
+                    state_row=state_row,
+                    db=db,
+                    prow=prow,
+                    settings=settings,
+                    prefs=prefs,
+                    lang=lang,
+                    exclude_hi=exclude_hi,
+                ):
+                    return True
+            elif pk == PROVIDER_SUBF2M:
+                if _try_subf2m(
+                    settings_row=settings_row,
+                    state_row=state_row,
+                    db=db,
+                    prefs=prefs,
+                    lang=lang,
+                    exclude_hi=exclude_hi,
+                ):
+                    return True
+            elif pk == PROVIDER_YIFY:
+                if _try_yify(
+                    settings_row=settings_row,
+                    state_row=state_row,
+                    db=db,
                     prefs=prefs,
                     lang=lang,
                     exclude_hi=exclude_hi,

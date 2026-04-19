@@ -142,7 +142,7 @@ class SubberProviderOut(BaseModel):
     provider_key: str
     display_name: str
     enabled: bool
-    priority: int
+    priority: int | None = None
     requires_account: bool
     has_credentials: bool
 
