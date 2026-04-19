@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Link } from "react-router-dom";
+import { MmListboxPicker } from "../../components/ui/mm-listbox-picker";
+import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { useSubberJobsQuery } from "../../lib/subber/subber-queries";
 
 const JOB_FILTER_OPTIONS = [
-  { value: "", label: "Recent (all statuses, newest first)" },
+  { value: "recent", label: "Recent (all statuses, newest first)" },
   { value: "pending", label: "Pending" },
   { value: "running", label: "Running" },
   { value: "failed", label: "Failed" },
@@ -27,19 +29,14 @@ function jobLabel(kind: string): string {
   return JOB_KIND_LABELS[kind] ?? kind;
 }
 
-function fmtJobTs(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
-}
-
 export function SubberJobsTab() {
   const q = useSubberJobsQuery(50);
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("recent");
+  const filterLabelId = useId();
+  const fmt = useAppDateFormatter();
 
-  const filtered = statusFilter ? (q.data?.jobs ?? []).filter((j) => j.status === statusFilter) : (q.data?.jobs ?? []);
+  const filtered =
+    statusFilter === "recent" ? (q.data?.jobs ?? []) : (q.data?.jobs ?? []).filter((j) => j.status === statusFilter);
 
   return (
     <section
@@ -51,21 +48,23 @@ export function SubberJobsTab() {
         <p className="mt-1 text-sm text-[var(--mm-text2)]">Pending, running, and recent Subber work on this server.</p>
       </header>
       <div className="space-y-4 px-5 py-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <select
-            className="mm-input max-w-xs"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            {JOB_FILTER_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <span className="text-sm text-[var(--mm-text2)]">
-            {filtered.length} {filtered.length === 1 ? "row" : "rows"}
-          </span>
+        <div className="flex flex-col gap-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-4 py-4 sm:flex-row sm:items-end sm:justify-between sm:px-5 sm:py-4">
+          <label className="block min-w-0 flex-1">
+            <span id={filterLabelId} className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
+              Show jobs
+            </span>
+            <MmListboxPicker
+              className="mt-2 max-w-xl"
+              ariaLabelledBy={filterLabelId}
+              placeholder="Recent (all statuses, newest first)"
+              options={JOB_FILTER_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+              value={statusFilter}
+              onChange={(v) => setStatusFilter(v)}
+            />
+          </label>
+          <p className="text-[0.7rem] leading-snug text-[var(--mm-text3)] sm:max-w-[14rem] sm:text-right">
+            {filtered.length} row{filtered.length === 1 ? "" : "s"} for this filter.
+          </p>
         </div>
 
         {q.isLoading ? (
@@ -103,7 +102,7 @@ export function SubberJobsTab() {
                         {j.status}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-xs text-[var(--mm-text2)]">{fmtJobTs(j.updated_at)}</td>
+                    <td className="px-3 py-2 text-xs text-[var(--mm-text2)]">{fmt(j.updated_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -113,7 +112,7 @@ export function SubberJobsTab() {
           <div className="space-y-1 rounded border border-[var(--mm-border)] bg-black/10 px-5 py-10 text-center">
             <p className="text-sm font-medium text-[var(--mm-text)]">No jobs match this view</p>
             <p className="text-xs text-[var(--mm-text2)]">
-              {statusFilter
+              {statusFilter !== "recent"
                 ? `Nothing with status "${statusFilter}" yet. Try Recent (all statuses) for the latest rows.`
                 : "No Subber jobs yet. Trigger a sync or search to see activity here."}
             </p>

@@ -6,22 +6,12 @@ import {
 import { activityRecentKey, useActivityRecentQuery } from "../../lib/activity/queries";
 import { useActivityStreamInvalidation } from "../../lib/activity/use-activity-stream-invalidation";
 import { isHttpErrorFromApi, isLikelyNetworkFailure } from "../../lib/api/error-guards";
-
-function formatEventTime(iso: string): string {
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) {
-      return iso;
-    }
-    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(d);
-  } catch {
-    return iso;
-  }
-}
+import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 
 export function ActivityPage() {
   useActivityStreamInvalidation(activityRecentKey);
   const recent = useActivityRecentQuery();
+  const fmt = useAppDateFormatter();
 
   if (recent.isPending) {
     return <PageLoading label="Loading activity" />;
@@ -79,7 +69,7 @@ export function ActivityPage() {
               <div className="mm-activity-row__meta">
                 <span className="mm-activity-pill">{ev.module}</span>
                 <time className="mm-activity-row__time" dateTime={ev.created_at}>
-                  {formatEventTime(ev.created_at)}
+                  {fmt(ev.created_at)}
                 </time>
               </div>
               <div className="mm-activity-row__body">

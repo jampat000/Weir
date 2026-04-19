@@ -1,11 +1,9 @@
 import type { PrunerPreviewRunSummary } from "../../lib/pruner/api";
+import { formatAppDate } from "../../lib/ui/mm-format-date";
 
-/** Format an API ISO timestamp for operator-facing copy (local timezone). */
+/** Format an API ISO timestamp for operator-facing copy (browser locale until suite TZ is wired here). */
 export function formatPrunerDateTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.valueOf())) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(d);
+  return formatAppDate(iso);
 }
 
 /** Plain-language hint for a single preview run row (trust / empty-state clarity). */

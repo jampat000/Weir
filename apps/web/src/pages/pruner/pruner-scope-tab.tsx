@@ -38,6 +38,7 @@ import {
   peopleRolesForPlexUiState,
   type PrunerPeopleRoleId,
 } from "./pruner-people-roles";
+import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { formatPrunerDateTime, previewRunRowCaption } from "./pruner-ui-utils";
 
 type Ctx = { instanceId: number; instance: PrunerServerInstance | undefined };
@@ -63,6 +64,7 @@ export function PrunerScopeTab(props: {
   const outletCtx = useOutletContext<Ctx>();
   const { instanceId, instance } = props.contextOverride ?? outletCtx;
   const me = useMeQuery();
+  const fmt = useAppDateFormatter();
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -2078,9 +2080,7 @@ export function PrunerScopeTab(props: {
         )}
         <p className="text-xs text-[var(--mm-text2)]">
           Last automatic scan:{" "}
-          {scopeRow?.last_scheduled_preview_enqueued_at
-            ? new Date(scopeRow.last_scheduled_preview_enqueued_at).toLocaleString()
-            : "Never run"}
+          {scopeRow?.last_scheduled_preview_enqueued_at ? fmt(scopeRow.last_scheduled_preview_enqueued_at) : "Never run"}
         </p>
       </div>
       {!isProvider ? (
@@ -2113,9 +2113,7 @@ export function PrunerScopeTab(props: {
                   <tr key={row.preview_run_id} className="border-b border-[var(--mm-border)] align-top">
                     <td className="px-2 py-2 text-xs text-[var(--mm-text2)]">{idx + 1}</td>
                     <td className="px-2 py-2 text-xs text-[var(--mm-text2)]">{ruleFamilyColumnLabel(row.rule_family_id)}</td>
-                    <td className="px-2 py-2 text-xs text-[var(--mm-text2)]">
-                      {new Date(row.created_at).toLocaleString()}
-                    </td>
+                    <td className="px-2 py-2 text-xs text-[var(--mm-text2)]">{fmt(row.created_at)}</td>
                     <td className="px-2 py-2 text-xs">
                       <span className="font-medium">{row.outcome}</span>
                       {row.unsupported_detail ? (
@@ -2204,9 +2202,7 @@ export function PrunerScopeTab(props: {
                 </li>
                 <li>
                   Scan time:{" "}
-                  {applyEligQuery.data.preview_created_at
-                    ? new Date(applyEligQuery.data.preview_created_at).toLocaleString()
-                    : "—"}
+                  {applyEligQuery.data.preview_created_at ? fmt(applyEligQuery.data.preview_created_at) : "—"}
                 </li>
                 <li>
                   Items in this list: <strong>{applyEligQuery.data.candidate_count}</strong>

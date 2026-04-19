@@ -15,6 +15,7 @@ import {
 } from "../../lib/fetcher/failed-imports/queries";
 import { useFetcherJobsInspectionQuery, fetcherJobsInspectionQueryKey } from "../../lib/fetcher/jobs-inspection/queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
+import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 
 type ModuleKey = "fetcher" | "refiner" | "pruner" | "subber";
 type ModuleStatus = "Healthy" | "Attention needed" | "Review needed" | "Active" | "Setup needed";
@@ -30,19 +31,7 @@ type ModuleCardData = {
   actionTo: string;
 };
 
-function formatEventTs(iso: string): string {
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) {
-      return iso;
-    }
-    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(d);
-  } catch {
-    return iso;
-  }
-}
-
-function shortLastActivity(items: ActivityEventItem[]): string {
+function shortLastActivity(items: ActivityEventItem[], fmt: (iso: string) => string): string {
   if (items.length === 0) {
     return "No recent activity";
   }
@@ -59,7 +48,7 @@ function shortLastActivity(items: ActivityEventItem[]): string {
   } else if (ev.module === "settings") {
     summary = "Settings updated";
   }
-  return `${moduleLabel}: ${summary} · ${formatEventTs(ev.created_at)}`;
+  return `${moduleLabel}: ${summary} · ${fmt(ev.created_at)}`;
 }
 
 function matchesAttentionText(ev: ActivityEventItem): boolean {
@@ -105,6 +94,7 @@ function StatusTile({ label, value }: { label: string; value: string }) {
 }
 
 export function DashboardPage() {
+  const fmt = useAppDateFormatter();
   useActivityStreamInvalidation(dashboardStatusKey);
   useActivityStreamInvalidation(activityRecentKey);
   useActivityStreamInvalidation(fetcherArrOperatorSettingsQueryKey);
@@ -210,7 +200,7 @@ export function DashboardPage() {
         : activeJobsCount > 0
           ? "Active"
           : "Healthy";
-  const lastActivity = shortLastActivity(recentItems);
+  const lastActivity = shortLastActivity(recentItems, fmt);
 
   const attentionItems: string[] = [];
   if (!fetcherTvConfigured) {

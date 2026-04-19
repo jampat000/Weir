@@ -10,16 +10,8 @@ import {
   MmScheduleTimeFields,
 } from "../../components/ui/mm-schedule-window-controls";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
+import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { usePutSubberSettingsMutation, useSubberSettingsQuery } from "../../lib/subber/subber-queries";
-
-function fmtTs(iso: string | null | undefined): string {
-  if (!iso) return "Never run";
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
-}
 
 const DEFAULT_INTERVAL_HELPER = "How often this runs automatically.";
 
@@ -46,6 +38,7 @@ type CardProps = {
   onSave: () => Promise<void>;
   busy: boolean;
   preface?: ReactNode;
+  fmt: (iso: string | null | undefined) => string;
 };
 
 function ScheduleCard({
@@ -71,6 +64,7 @@ function ScheduleCard({
   onSave,
   busy,
   preface,
+  fmt,
 }: CardProps) {
   const dis = !canOperate || busy;
   return (
@@ -113,7 +107,7 @@ function ScheduleCard({
           <MmScheduleTimeFields idPrefix={idPrefix} start={start} end={end} disabled={dis} onStart={setStart} onEnd={setEnd} />
         </div>
         <p className="text-xs text-[var(--mm-text2)]">
-          Last run: <span className="font-medium text-[var(--mm-text)]">{fmtTs(lastRun)}</span>
+          Last run: <span className="font-medium text-[var(--mm-text)]">{fmt(lastRun)}</span>
         </p>
         <button
           type="button"
@@ -129,6 +123,7 @@ function ScheduleCard({
 }
 
 export function SubberScheduleTab({ canOperate }: { canOperate: boolean }) {
+  const fmt = useAppDateFormatter();
   const q = useSubberSettingsQuery();
   const put = usePutSubberSettingsMutation();
   const [tvEn, setTvEn] = useState(false);
@@ -214,6 +209,7 @@ export function SubberScheduleTab({ canOperate }: { canOperate: boolean }) {
         idPrefix="subber-tv-sched"
         onSave={saveTv}
         busy={put.isPending}
+        fmt={fmt}
       />
       <ScheduleCard
         title="Movies subtitle scan"
@@ -237,6 +233,7 @@ export function SubberScheduleTab({ canOperate }: { canOperate: boolean }) {
         idPrefix="subber-movies-sched"
         onSave={saveMovies}
         busy={put.isPending}
+        fmt={fmt}
       />
     </div>
   );

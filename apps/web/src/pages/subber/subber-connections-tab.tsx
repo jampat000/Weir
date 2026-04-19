@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { fetchCsrfToken } from "../../lib/api/auth-api";
 import { MmOnOffSwitch } from "../../components/ui/mm-on-off-switch";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
+import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import {
   usePutSubberSettingsMutation,
   useSubberLibrarySyncMoviesMutation,
@@ -24,21 +25,14 @@ type ConnectionCheckState = {
 
 const initialCheck: ConnectionCheckState = { outcome: null, at: null, detail: "" };
 
-function formatLastCheck(iso: string | null): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
-}
-
 function ConnectionStatusPanel({
   check,
   idleHelper,
+  fmt,
 }: {
   check: ConnectionCheckState;
   idleHelper?: string;
+  fmt: (iso: string | null) => string;
 }) {
   const main =
     check.outcome === null ? "Not connected yet" : check.outcome === "ok" ? "Connected" : "Connection failed";
@@ -46,7 +40,7 @@ function ConnectionStatusPanel({
     <div className="mt-4 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-3.5 text-sm text-[var(--mm-text2)]">
       <p className="text-sm font-medium text-[var(--mm-text)]">{main}</p>
       <p className="mt-1 text-xs text-[var(--mm-text2)]">
-        Last completed check: <span className="font-medium text-[var(--mm-text)]">{formatLastCheck(check.at)}</span>
+        Last completed check: <span className="font-medium text-[var(--mm-text)]">{fmt(check.at)}</span>
       </p>
       {check.outcome === "ok" && check.quotaNote ? <p className="mt-1 text-xs text-[var(--mm-text2)]">{check.quotaNote}</p> : null}
       {check.outcome === "ok" && check.detail && !check.quotaNote ? (
@@ -166,6 +160,7 @@ function SubberSettingsSubsection({ title, children }: { title: string; children
 }
 
 export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
+  const fmt = useAppDateFormatter();
   const q = useSubberSettingsQuery();
   const put = usePutSubberSettingsMutation();
   const testSon = useSubberTestSonarrMutation();
@@ -195,6 +190,10 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
   const [moviesSyncOk, setMoviesSyncOk] = useState(false);
   const [tvSyncErr, setTvSyncErr] = useState<string | null>(null);
   const [moviesSyncErr, setMoviesSyncErr] = useState<string | null>(null);
+  const [sonDirty, setSonDirty] = useState(false);
+  const [radDirty, setRadDirty] = useState(false);
+  const [sonMapDirty, setSonMapDirty] = useState(false);
+  const [radMapDirty, setRadMapDirty] = useState(false);
 
   useEffect(() => {
     const d = q.data;
@@ -209,6 +208,10 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
     setRadMapEn(Boolean(d.radarr_path_mapping_enabled));
     setRadArr(d.radarr_path_radarr ?? "");
     setRadSub(d.radarr_path_subber ?? "");
+    setSonDirty(false);
+    setRadDirty(false);
+    setSonMapDirty(false);
+    setRadMapDirty(false);
   }, [q.data]);
 
   const base = typeof window !== "undefined" ? window.location.origin : "";
@@ -229,6 +232,7 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
       if (sonKey.trim()) body.sonarr_api_key = sonKey;
       await put.mutateAsync(body);
       flashSave(setSaveSon);
+      setSonDirty(false);
     } catch (e) {
       setSaveSon({ ok: false, err: (e as Error).message });
     }
@@ -242,6 +246,7 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
       if (radKey.trim()) body.radarr_api_key = radKey;
       await put.mutateAsync(body);
       flashSave(setSaveRad);
+      setRadDirty(false);
     } catch (e) {
       setSaveRad({ ok: false, err: (e as Error).message });
     }
@@ -258,6 +263,7 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
         sonarr_path_subber: sonSub.trim(),
       });
       flashSave(setSaveSonMap);
+      setSonMapDirty(false);
     } catch (e) {
       setSaveSonMap({ ok: false, err: (e as Error).message });
     }
@@ -274,6 +280,7 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
         radarr_path_subber: radSub.trim(),
       });
       flashSave(setSaveRadMap);
+      setRadMapDirty(false);
     } catch (e) {
       setSaveRadMap({ ok: false, err: (e as Error).message });
     }
@@ -337,7 +344,10 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
                 className="mm-input mt-1 w-full max-w-xl font-mono text-sm"
                 value={sonUrl}
                 disabled={dis}
-                onChange={(e) => setSonUrl(e.target.value)}
+                onChange={(e) => {
+                  setSonUrl(e.target.value);
+                  setSonDirty(true);
+                }}
                 placeholder="http://127.0.0.1:8989"
               />
               <label className="mt-3 block text-sm font-medium text-[var(--mm-text)]" htmlFor="subber-son-key">
@@ -351,7 +361,10 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
                   value={sonKey}
                   placeholder={q.data?.sonarr_api_key_set ? MASK : ""}
                   disabled={dis}
-                  onChange={(e) => setSonKey(e.target.value)}
+                  onChange={(e) => {
+                    setSonKey(e.target.value);
+                    setSonDirty(true);
+                  }}
                 />
                 <button type="button" className={mmActionButtonClass({ variant: "secondary" })} onClick={() => setShowSonKey(!showSonKey)}>
                   {showSonKey ? "Hide" : "Show"}
@@ -360,8 +373,8 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  className={mmActionButtonClass({ variant: "primary", disabled: dis })}
-                  disabled={dis}
+                  className={mmActionButtonClass({ variant: sonDirty ? "primary" : "secondary", disabled: dis || !sonDirty })}
+                  disabled={dis || !sonDirty}
                   onClick={() => void saveSonarr()}
                   data-testid="subber-save-sonarr"
                 >
@@ -378,7 +391,11 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
                 </button>
               </div>
               <SaveFeedback ok={saveSon.ok} err={saveSon.err} />
-              <ConnectionStatusPanel check={sonCheck} idleHelper="Save your URL and API key, then run a test to confirm Sonarr is reachable." />
+              <ConnectionStatusPanel
+                check={sonCheck}
+                idleHelper="Save your URL and API key, then run a test to confirm Sonarr is reachable."
+                fmt={fmt}
+              />
             </SubberSettingsSubsection>
 
             <SubberSettingsSubsection title="Webhook">
@@ -427,23 +444,48 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
             title="Path mapping"
             description="Only needed when Subber and Sonarr run in separate containers."
           >
-            <MmOnOffSwitch id="subber-son-map" label="Enable Sonarr path mapping" enabled={sonMapEn} disabled={dis} onChange={setSonMapEn} />
+            <MmOnOffSwitch
+              id="subber-son-map"
+              label="Enable Sonarr path mapping"
+              enabled={sonMapEn}
+              disabled={dis}
+              onChange={(v) => {
+                setSonMapEn(v);
+                setSonMapDirty(true);
+              }}
+            />
             {sonMapEn ? (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <label className="block min-w-0 flex-1 text-sm text-[var(--mm-text2)]">
                   Path as Sonarr reports it
-                  <input className="mm-input mt-1 w-full font-mono text-sm" value={sonArr} disabled={dis} onChange={(e) => setSonArr(e.target.value)} />
+                  <input
+                    className="mm-input mt-1 w-full font-mono text-sm"
+                    value={sonArr}
+                    disabled={dis}
+                    onChange={(e) => {
+                      setSonArr(e.target.value);
+                      setSonMapDirty(true);
+                    }}
+                  />
                 </label>
                 <label className="block min-w-0 flex-1 text-sm text-[var(--mm-text2)]">
                   Path as MediaMop sees it
-                  <input className="mm-input mt-1 w-full font-mono text-sm" value={sonSub} disabled={dis} onChange={(e) => setSonSub(e.target.value)} />
+                  <input
+                    className="mm-input mt-1 w-full font-mono text-sm"
+                    value={sonSub}
+                    disabled={dis}
+                    onChange={(e) => {
+                      setSonSub(e.target.value);
+                      setSonMapDirty(true);
+                    }}
+                  />
                 </label>
               </div>
             ) : null}
             <button
               type="button"
-              className={mmActionButtonClass({ variant: "primary", disabled: dis })}
-              disabled={dis}
+              className={mmActionButtonClass({ variant: sonMapDirty ? "primary" : "secondary", disabled: dis || !sonMapDirty })}
+              disabled={dis || !sonMapDirty}
               onClick={() => void saveSonarrPathMapping()}
               data-testid="subber-save-sonarr-path-mapping"
             >
@@ -474,7 +516,10 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
                 className="mm-input mt-1 w-full max-w-xl font-mono text-sm"
                 value={radUrl}
                 disabled={dis}
-                onChange={(e) => setRadUrl(e.target.value)}
+                onChange={(e) => {
+                  setRadUrl(e.target.value);
+                  setRadDirty(true);
+                }}
                 placeholder="http://127.0.0.1:7878"
               />
               <label className="mt-3 block text-sm font-medium text-[var(--mm-text)]" htmlFor="subber-rad-key">
@@ -488,7 +533,10 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
                   value={radKey}
                   placeholder={q.data?.radarr_api_key_set ? MASK : ""}
                   disabled={dis}
-                  onChange={(e) => setRadKey(e.target.value)}
+                  onChange={(e) => {
+                    setRadKey(e.target.value);
+                    setRadDirty(true);
+                  }}
                 />
                 <button type="button" className={mmActionButtonClass({ variant: "secondary" })} onClick={() => setShowRadKey(!showRadKey)}>
                   {showRadKey ? "Hide" : "Show"}
@@ -497,8 +545,8 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  className={mmActionButtonClass({ variant: "primary", disabled: dis })}
-                  disabled={dis}
+                  className={mmActionButtonClass({ variant: radDirty ? "primary" : "secondary", disabled: dis || !radDirty })}
+                  disabled={dis || !radDirty}
                   onClick={() => void saveRadarr()}
                   data-testid="subber-save-radarr"
                 >
@@ -515,7 +563,11 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
                 </button>
               </div>
               <SaveFeedback ok={saveRad.ok} err={saveRad.err} />
-              <ConnectionStatusPanel check={radCheck} idleHelper="Save your URL and API key, then run a test to confirm Radarr is reachable." />
+              <ConnectionStatusPanel
+                check={radCheck}
+                idleHelper="Save your URL and API key, then run a test to confirm Radarr is reachable."
+                fmt={fmt}
+              />
             </SubberSettingsSubsection>
 
             <SubberSettingsSubsection title="Webhook">
@@ -564,23 +616,48 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
             title="Path mapping"
             description="Only needed when Subber and Radarr run in separate containers."
           >
-            <MmOnOffSwitch id="subber-rad-map" label="Enable Radarr path mapping" enabled={radMapEn} disabled={dis} onChange={setRadMapEn} />
+            <MmOnOffSwitch
+              id="subber-rad-map"
+              label="Enable Radarr path mapping"
+              enabled={radMapEn}
+              disabled={dis}
+              onChange={(v) => {
+                setRadMapEn(v);
+                setRadMapDirty(true);
+              }}
+            />
             {radMapEn ? (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <label className="block min-w-0 flex-1 text-sm text-[var(--mm-text2)]">
                   Path as Radarr reports it
-                  <input className="mm-input mt-1 w-full font-mono text-sm" value={radArr} disabled={dis} onChange={(e) => setRadArr(e.target.value)} />
+                  <input
+                    className="mm-input mt-1 w-full font-mono text-sm"
+                    value={radArr}
+                    disabled={dis}
+                    onChange={(e) => {
+                      setRadArr(e.target.value);
+                      setRadMapDirty(true);
+                    }}
+                  />
                 </label>
                 <label className="block min-w-0 flex-1 text-sm text-[var(--mm-text2)]">
                   Path as MediaMop sees it
-                  <input className="mm-input mt-1 w-full font-mono text-sm" value={radSub} disabled={dis} onChange={(e) => setRadSub(e.target.value)} />
+                  <input
+                    className="mm-input mt-1 w-full font-mono text-sm"
+                    value={radSub}
+                    disabled={dis}
+                    onChange={(e) => {
+                      setRadSub(e.target.value);
+                      setRadMapDirty(true);
+                    }}
+                  />
                 </label>
               </div>
             ) : null}
             <button
               type="button"
-              className={mmActionButtonClass({ variant: "primary", disabled: dis })}
-              disabled={dis}
+              className={mmActionButtonClass({ variant: radMapDirty ? "primary" : "secondary", disabled: dis || !radMapDirty })}
+              disabled={dis || !radMapDirty}
               onClick={() => void saveRadarrPathMapping()}
               data-testid="subber-save-radarr-path-mapping"
             >

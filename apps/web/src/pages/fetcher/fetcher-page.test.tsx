@@ -24,7 +24,10 @@ import type {
   FetcherArrOperatorSettingsOut,
 } from "../../lib/fetcher/arr-operator-settings/types";
 import { fetcherJobsInspectionQueryKey } from "../../lib/fetcher/jobs-inspection/queries";
-import { MM_SCHEDULE_TIME_WINDOW_HELPER } from "../../components/ui/mm-schedule-window-controls";
+import {
+  MM_SCHEDULE_TIME_WINDOW_HEADING,
+  MM_SCHEDULE_TIME_WINDOW_HELPER,
+} from "../../components/ui/mm-schedule-window-controls";
 import { FETCHER_TAB_RADARR_LABEL, FETCHER_TAB_SONARR_LABEL } from "./fetcher-display-names";
 import { FetcherPage } from "./fetcher-page";
 
@@ -474,8 +477,8 @@ describe("FetcherPage (tabbed IA)", () => {
     const h = missing.innerHTML;
     const idx = (s: string) => h.indexOf(s);
     expect(idx("Enable timed scans")).toBeLessThan(idx("Run interval"));
-    expect(idx("Run interval")).toBeLessThan(idx("Time window"));
-    expect(idx("Time window")).toBeLessThan(idx("Items per run"));
+    expect(idx("Run interval")).toBeLessThan(idx(MM_SCHEDULE_TIME_WINDOW_HEADING));
+    expect(idx(MM_SCHEDULE_TIME_WINDOW_HEADING)).toBeLessThan(idx("Items per run"));
     expect(idx("Items per run")).toBeLessThan(idx("Retry cooldown"));
     expect(idx("Retry cooldown")).toBeLessThan(idx("Save missing TV show searches"));
   });
@@ -506,8 +509,8 @@ describe("FetcherPage (tabbed IA)", () => {
     const h = missing.innerHTML;
     const idx = (s: string) => h.indexOf(s);
     expect(idx("Enable timed scans")).toBeLessThan(idx("Run interval"));
-    expect(idx("Run interval")).toBeLessThan(idx("Time window"));
-    expect(idx("Time window")).toBeLessThan(idx("Items per run"));
+    expect(idx("Run interval")).toBeLessThan(idx(MM_SCHEDULE_TIME_WINDOW_HEADING));
+    expect(idx(MM_SCHEDULE_TIME_WINDOW_HEADING)).toBeLessThan(idx("Items per run"));
     expect(idx("Items per run")).toBeLessThan(idx("Retry cooldown"));
     expect(idx("Retry cooldown")).toBeLessThan(idx("Save missing movie searches"));
   });

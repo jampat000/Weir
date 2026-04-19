@@ -30,13 +30,17 @@ export function SubberPage() {
 
   return (
     <div className="mm-page" data-testid="subber-scope-page">
-      <header className="mm-page__intro">
+      <header className="mm-page__intro !mb-0">
         <p className="mm-page__eyebrow">MediaMop</p>
         <h1 className="mm-page__title">Subber</h1>
         <p className="mm-page__subtitle">Automatically find and download subtitles for your movies and TV shows.</p>
       </header>
 
-      <nav className="mt-4 flex flex-wrap gap-2" data-testid="subber-top-level-tabs" aria-label="Subber sections">
+      <nav
+        className="mt-3 flex flex-wrap gap-2.5 border-b border-[var(--mm-border)] pb-3.5 sm:mt-4"
+        data-testid="subber-top-level-tabs"
+        aria-label="Subber sections"
+      >
         {tabs.map((t) => (
           <button
             key={t.id}

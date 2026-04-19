@@ -67,6 +67,7 @@ import {
 } from "../../lib/fetcher/failed-imports/user-copy";
 import { MmListboxPicker } from "../../components/ui/mm-listbox-picker";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
+import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { FETCHER_TAB_RADARR_LABEL, FETCHER_TAB_SONARR_LABEL } from "./fetcher-display-names";
 import { FetcherFailedImportsCleanupPolicySection } from "./fetcher-failed-imports-cleanup-policy";
 import {
@@ -166,29 +167,6 @@ function needsAttentionSupportLine(
   return FETCHER_FI_NEEDS_ATTENTION_SUPPORT_NONE;
 }
 
-function formatLastChecked(iso: string | null): string | null {
-  if (!iso) {
-    return null;
-  }
-  const d = new Date(iso);
-  if (Number.isNaN(d.valueOf())) {
-    return null;
-  }
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(d);
-}
-
-function formatUpdated(iso: string): string {
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) {
-      return iso;
-    }
-    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(d);
-  } catch {
-    return iso;
-  }
-}
-
 function GlanceColumn({
   title,
   cleanupLine,
@@ -261,15 +239,17 @@ function NeedsAttentionAxisCard({
   kind,
   configured,
   axis,
+  fmt,
 }: {
   title: string;
   kind: "tv" | "movies";
   configured: boolean;
   axis: FetcherFailedImportQueueAttentionAxis | undefined;
+  fmt: (iso: string | null | undefined) => string;
 }) {
   const status = needsAttentionStatusLine(configured, axis);
   const support = needsAttentionSupportLine(kind, configured, axis);
-  const last = axis ? formatLastChecked(axis.last_checked_at) : null;
+  const last = axis?.last_checked_at ? fmt(axis.last_checked_at) : null;
   return (
     <div className="flex h-full flex-col rounded-md border border-[var(--mm-border)] bg-[var(--mm-surface2)]/35 p-4 text-sm">
       <h3 className="text-sm font-semibold text-[var(--mm-text1)]">{title}</h3>
@@ -290,9 +270,11 @@ function NeedsAttentionAxisCard({
 function FetcherFailedImportsNeedsAttentionSection({
   arr,
   attention,
+  fmt,
 }: {
   arr: UseQueryResult<FetcherArrOperatorSettingsOut, Error>;
   attention: UseQueryResult<FetcherFailedImportQueueAttentionSnapshot, Error>;
+  fmt: (iso: string | null | undefined) => string;
 }) {
   return (
     <section
@@ -312,12 +294,14 @@ function FetcherFailedImportsNeedsAttentionSection({
           kind="tv"
           configured={Boolean(arr.data?.sonarr_server_configured)}
           axis={attention.data?.tv_shows}
+          fmt={fmt}
         />
         <NeedsAttentionAxisCard
           title={FETCHER_TAB_RADARR_LABEL}
           kind="movies"
           configured={Boolean(arr.data?.radarr_server_configured)}
           axis={attention.data?.movies}
+          fmt={fmt}
         />
       </div>
     </section>
@@ -406,7 +390,7 @@ function JobDetailsCell({ lastError, jobKind }: { lastError: string | null; jobK
   );
 }
 
-function TaskRow({ job }: { job: FetcherJobInspectionRow }) {
+function TaskRow({ job, fmt }: { job: FetcherJobInspectionRow; fmt: (iso: string | null | undefined) => string }) {
   const emphasizeFinalize = isHandlerOkFinalizeFailedStatus(job.status);
   return (
     <tr
@@ -433,7 +417,7 @@ function TaskRow({ job }: { job: FetcherJobInspectionRow }) {
         {job.attempt_count} / {job.max_attempts}
       </td>
       <td className="mm-fetcher-fi-inspection__cell align-top py-2 pr-3 text-sm text-[var(--mm-text2)] whitespace-nowrap">
-        {formatUpdated(job.updated_at)}
+        {fmt(job.updated_at)}
       </td>
       <td className="mm-fetcher-fi-inspection__cell align-top py-2 pr-0">
         <JobDetailsCell lastError={job.last_error} jobKind={job.job_kind} />
@@ -448,12 +432,14 @@ function FetcherFailedImportsJobHistoryContent({
   jobs,
   default_terminal_only,
   isEmpty,
+  fmt,
 }: {
   filter: FetcherJobsInspectionFilter;
   setFilter: (f: FetcherJobsInspectionFilter) => void;
   jobs: FetcherJobInspectionRow[];
   default_terminal_only: boolean;
   isEmpty: boolean;
+  fmt: (iso: string | null | undefined) => string;
 }) {
   const filterLabelId = useId();
   return (
@@ -496,7 +482,7 @@ function FetcherFailedImportsJobHistoryContent({
             </thead>
             <tbody className="divide-y divide-[var(--mm-border)]">
               {jobs.map((j) => (
-                <TaskRow key={j.id} job={j} />
+                <TaskRow key={j.id} job={j} fmt={fmt} />
               ))}
             </tbody>
           </table>
@@ -508,6 +494,7 @@ function FetcherFailedImportsJobHistoryContent({
 
 /** Fetcher Failed imports tab: glance → cleanup → attention → manual checks & history. */
 export function FetcherFailedImportsWorkspace() {
+  const fmt = useAppDateFormatter();
   const [filter, setFilter] = useState<FetcherJobsInspectionFilter>("terminal");
   const me = useMeQuery();
   const arr = useFetcherArrOperatorSettingsQuery();
@@ -541,6 +528,7 @@ export function FetcherFailedImportsWorkspace() {
         jobs={jobs}
         default_terminal_only={default_terminal_only}
         isEmpty={jobs.length === 0}
+        fmt={fmt}
       />
     );
   }
@@ -554,7 +542,7 @@ export function FetcherFailedImportsWorkspace() {
       <div className="space-y-6">
         <FetcherFailedImportsAtAGlanceSection arr={arr} attention={attention} policy={cleanupPolicy} />
         <FetcherFailedImportsCleanupPolicySection role={me.data?.role} />
-        <FetcherFailedImportsNeedsAttentionSection arr={arr} attention={attention} />
+        <FetcherFailedImportsNeedsAttentionSection arr={arr} attention={attention} fmt={fmt} />
         <section
           className="mm-card mm-dash-card mm-fetcher-module-surface overflow-x-auto"
           aria-labelledby="mm-fetcher-fi-manual-utility-heading"

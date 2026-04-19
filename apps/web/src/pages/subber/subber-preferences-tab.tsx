@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { fetchCsrfToken } from "../../lib/api/auth-api";
 import { MmOnOffSwitch } from "../../components/ui/mm-on-off-switch";
+import { MmListboxPicker } from "../../components/ui/mm-listbox-picker";
+import type { MmListboxOption } from "../../components/ui/mm-listbox-picker";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { SUBBER_LANGUAGE_OPTIONS, subberLanguageLabel } from "../../lib/subber/subber-languages";
 import { usePutSubberSettingsMutation, useSubberSettingsQuery } from "../../lib/subber/subber-queries";
@@ -75,6 +77,10 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
   const [adaptPerm, setAdaptPerm] = useState(10);
   const [upEn, setUpEn] = useState(false);
   const [upIntervalMin, setUpIntervalMin] = useState(10080);
+  const [langDirty, setLangDirty] = useState(false);
+  const [prefsDirty, setPrefsDirty] = useState(false);
+  const [adaptDirty, setAdaptDirty] = useState(false);
+  const [upgradeDirty, setUpgradeDirty] = useState(false);
 
   const [saveLang, setSaveLang] = useState({ ok: false, err: null as string | null });
   const [savePrefs, setSavePrefs] = useState({ ok: false, err: null as string | null });
@@ -94,6 +100,10 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
     setAdaptPerm(d.permanent_skip_after_attempts ?? 10);
     setUpEn(Boolean(d.upgrade_enabled));
     setUpIntervalMin(Math.max(60, Math.round((d.upgrade_schedule_interval_seconds ?? 604800) / 60)));
+    setLangDirty(false);
+    setPrefsDirty(false);
+    setAdaptDirty(false);
+    setUpgradeDirty(false);
   }, [q.data]);
 
   const dis = !canOperate || put.isPending;
@@ -109,6 +119,7 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
       const csrf_token = await fetchCsrfToken();
       await put.mutateAsync({ csrf_token, language_preferences: langs });
       flashSave(setSaveLang);
+      setLangDirty(false);
     } catch (e) {
       setSaveLang({ ok: false, err: (e as Error).message });
     }
@@ -125,6 +136,7 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
         enabled,
       });
       flashSave(setSavePrefs);
+      setPrefsDirty(false);
     } catch (e) {
       setSavePrefs({ ok: false, err: (e as Error).message });
     }
@@ -142,6 +154,7 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
         permanent_skip_after_attempts: adaptPerm,
       });
       flashSave(setSaveFreq);
+      setAdaptDirty(false);
     } catch (e) {
       setSaveFreq({ ok: false, err: (e as Error).message });
     }
@@ -157,6 +170,7 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
         upgrade_schedule_interval_seconds: Math.max(60, Math.min(365 * 24 * 3600, upIntervalMin * 60)),
       });
       flashSave(setSaveUpgrade);
+      setUpgradeDirty(false);
     } catch (e) {
       setSaveUpgrade({ ok: false, err: (e as Error).message });
     }
@@ -169,11 +183,15 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
     <div className="space-y-8" data-testid="subber-preferences-tab">
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-8">
-          <SubberSettingsSection
-            eyebrow="Search order"
-            title="Subtitle languages"
-            description="Subber tries languages in this order. If the first is not found it tries the next automatically."
-          >
+          <section className="overflow-visible rounded-lg border border-[var(--mm-border)] bg-[var(--mm-card-bg)] shadow-sm">
+            <header className="border-b border-[var(--mm-border)] bg-black/10 px-5 py-4">
+              <p className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--mm-text2)]">Search order</p>
+              <h2 className="mt-1 text-lg font-semibold tracking-tight text-[var(--mm-text)]">Subtitle languages</h2>
+              <div className="mt-2 text-sm leading-relaxed text-[var(--mm-text2)]">
+                Subber tries languages in this order. If the first is not found it tries the next automatically.
+              </div>
+            </header>
+            <div className="space-y-5 px-5 py-5">
             <div className="flex flex-wrap items-center gap-2">
               {langs.map((code, idx) => (
                 <span
@@ -191,6 +209,7 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
                         const n = [...langs];
                         [n[idx - 1], n[idx]] = [n[idx], n[idx - 1]];
                         setLangs(n);
+                        setLangDirty(true);
                       }}
                     >
                       ↑
@@ -204,6 +223,7 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
                         const n = [...langs];
                         [n[idx + 1], n[idx]] = [n[idx], n[idx + 1]];
                         setLangs(n);
+                        setLangDirty(true);
                       }}
                     >
                       ↓
@@ -214,45 +234,51 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
                     className="ml-0.5 rounded px-1.5 text-base leading-none text-[var(--mm-text2)] hover:bg-red-950/30 hover:text-red-300"
                     disabled={dis}
                     aria-label={`Remove ${subberLanguageLabel(code)}`}
-                    onClick={() => setLangs(langs.filter((_, i) => i !== idx))}
+                    onClick={() => {
+                      setLangs(langs.filter((_, i) => i !== idx));
+                      setLangDirty(true);
+                    }}
                   >
                     ×
                   </button>
                 </span>
               ))}
             </div>
-            <label className="block text-sm text-[var(--mm-text2)]">
-              Add language
-              <select
-                className="mm-input mt-1 block max-w-xs"
-                defaultValue=""
+            <div>
+              <span id="subber-add-language-label" className="block text-sm text-[var(--mm-text2)]">
+                Add language
+              </span>
+              <MmListboxPicker
+                className="mt-1 max-w-xs"
+                ariaLabelledBy="subber-add-language-label"
+                placeholder="Choose…"
                 disabled={dis}
-                onChange={(e) => {
-                  const v = e.target.value;
+                options={[
+                  { value: "", label: "Choose…" },
+                  ...SUBBER_LANGUAGE_OPTIONS.filter((o) => !langs.includes(o.code)).map(
+                    (o): MmListboxOption => ({ value: o.code, label: o.label }),
+                  ),
+                ]}
+                value=""
+                onChange={(v) => {
                   if (!v || langs.includes(v)) return;
                   setLangs([...langs, v]);
-                  e.target.value = "";
+                  setLangDirty(true);
                 }}
-              >
-                <option value="">Choose…</option>
-                {SUBBER_LANGUAGE_OPTIONS.filter((o) => !langs.includes(o.code)).map((o) => (
-                  <option key={o.code} value={o.code}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+              />
+            </div>
             <button
               type="button"
-              className={mmActionButtonClass({ variant: "primary", disabled: dis })}
-              disabled={dis}
+              className={mmActionButtonClass({ variant: langDirty ? "primary" : "secondary", disabled: dis || !langDirty })}
+              disabled={dis || !langDirty}
               onClick={() => void saveLanguages()}
               data-testid="subber-save-languages"
             >
               Save languages
             </button>
             <SaveFeedback ok={saveLang.ok} err={saveLang.err} />
-          </SubberSettingsSection>
+            </div>
+          </section>
 
           <SubberSettingsSection
             eyebrow="Files & behavior"
@@ -268,7 +294,10 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
                 className="mm-input mt-1 w-full max-w-xl"
                 value={folder}
                 disabled={dis}
-                onChange={(e) => setFolder(e.target.value)}
+                onChange={(e) => {
+                  setFolder(e.target.value);
+                  setPrefsDirty(true);
+                }}
                 placeholder="Same folder as media file"
               />
               <p className="mt-1 text-xs text-[var(--mm-text2)]">
@@ -283,22 +312,35 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
                 label="Exclude hearing impaired"
                 enabled={excludeHi}
                 disabled={dis}
-                onChange={setExcludeHi}
+                onChange={(v) => {
+                  setExcludeHi(v);
+                  setPrefsDirty(true);
+                }}
               />
               <p className="max-w-xl text-xs text-[var(--mm-text2)]">
                 When on, skips subtitles with sound descriptions like [DOOR CREAKS] or [TENSE MUSIC].
               </p>
             </div>
             <div className="space-y-2">
-              <MmOnOffSwitch id="subber-enabled" layout="inline" label="Enable Subber" enabled={enabled} disabled={dis} onChange={setEnabled} />
+              <MmOnOffSwitch
+                id="subber-enabled"
+                layout="inline"
+                label="Enable Subber"
+                enabled={enabled}
+                disabled={dis}
+                onChange={(v) => {
+                  setEnabled(v);
+                  setPrefsDirty(true);
+                }}
+              />
               <p className="max-w-xl text-xs text-[var(--mm-text2)]">
                 {enabled ? "Subber is on. Searches run on import and schedule." : "Subber is off. No automatic searches will run."}
               </p>
             </div>
             <button
               type="button"
-              className={mmActionButtonClass({ variant: "primary", disabled: dis })}
-              disabled={dis}
+              className={mmActionButtonClass({ variant: prefsDirty ? "primary" : "secondary", disabled: dis || !prefsDirty })}
+              disabled={dis || !prefsDirty}
               onClick={() => void savePreferences()}
               data-testid="subber-save-subtitle-folder"
             >
@@ -314,7 +356,16 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
             title="Adaptive searching"
             description="Back off automatically when subtitles are not found so repeated searches do not burn through your daily download quota."
           >
-            <MmOnOffSwitch id="subber-adapt" label="Enable adaptive searching" enabled={adaptEn} disabled={dis} onChange={setAdaptEn} />
+            <MmOnOffSwitch
+              id="subber-adapt"
+              label="Enable adaptive searching"
+              enabled={adaptEn}
+              disabled={dis}
+              onChange={(v) => {
+                setAdaptEn(v);
+                setAdaptDirty(true);
+              }}
+            />
             {adaptEn ? (
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
@@ -326,7 +377,10 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
                     max={100}
                     value={adaptMax}
                     disabled={dis}
-                    onChange={(e) => setAdaptMax(Number(e.target.value) || 1)}
+                    onChange={(e) => {
+                      setAdaptMax(Number(e.target.value) || 1);
+                      setAdaptDirty(true);
+                    }}
                   />
                   <span className="text-sm text-[var(--mm-text2)]">failed attempts</span>
                 </div>
@@ -339,7 +393,10 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
                     max={8760}
                     value={adaptDelayH}
                     disabled={dis}
-                    onChange={(e) => setAdaptDelayH(Number(e.target.value) || 1)}
+                    onChange={(e) => {
+                      setAdaptDelayH(Number(e.target.value) || 1);
+                      setAdaptDirty(true);
+                    }}
                   />
                   <span className="text-sm text-[var(--mm-text2)]">hours before retrying</span>
                 </div>
@@ -352,13 +409,21 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
                     max={10000}
                     value={adaptPerm}
                     disabled={dis}
-                    onChange={(e) => setAdaptPerm(Number(e.target.value) || 1)}
+                    onChange={(e) => {
+                      setAdaptPerm(Number(e.target.value) || 1);
+                      setAdaptDirty(true);
+                    }}
                   />
                   <span className="text-sm text-[var(--mm-text2)]">total attempts</span>
                 </div>
               </div>
             ) : null}
-            <button type="button" className={mmActionButtonClass({ variant: "primary", disabled: dis })} disabled={dis} onClick={() => void saveSearchFrequency()}>
+            <button
+              type="button"
+              className={mmActionButtonClass({ variant: adaptDirty ? "primary" : "secondary", disabled: dis || !adaptDirty })}
+              disabled={dis || !adaptDirty}
+              onClick={() => void saveSearchFrequency()}
+            >
               Save adaptive settings
             </button>
             <SaveFeedback ok={saveFreq.ok} err={saveFreq.err} />
@@ -369,7 +434,16 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
             title="Subtitle upgrade"
             description="Periodically re-search media that already has subtitles looking for better matches."
           >
-            <MmOnOffSwitch id="subber-up-master" label="Enable subtitle upgrades" enabled={upEn} disabled={dis} onChange={setUpEn} />
+            <MmOnOffSwitch
+              id="subber-up-master"
+              label="Enable subtitle upgrades"
+              enabled={upEn}
+              disabled={dis}
+              onChange={(v) => {
+                setUpEn(v);
+                setUpgradeDirty(true);
+              }}
+            />
             <p className="text-xs text-[var(--mm-text2)]">
               {upEn
                 ? "Subtitle upgrade is on."
@@ -384,15 +458,18 @@ export function SubberPreferencesTab({ canOperate }: { canOperate: boolean }) {
                   max={525600}
                   className="mm-input mt-1 w-full max-w-xs"
                   value={upIntervalMin}
-                  onChange={(e) => setUpIntervalMin(Math.max(60, Math.min(525600, Number(e.target.value) || 60)))}
+                  onChange={(e) => {
+                    setUpIntervalMin(Math.max(60, Math.min(525600, Number(e.target.value) || 60)));
+                    setUpgradeDirty(true);
+                  }}
                   disabled={dis}
                 />
               </label>
             ) : null}
             <button
               type="button"
-              className={mmActionButtonClass({ variant: "primary", disabled: dis })}
-              disabled={dis}
+              className={mmActionButtonClass({ variant: upgradeDirty ? "primary" : "secondary", disabled: dis || !upgradeDirty })}
+              disabled={dis || !upgradeDirty}
               onClick={() => void saveUpgradePrefs()}
             >
               Save upgrade settings
