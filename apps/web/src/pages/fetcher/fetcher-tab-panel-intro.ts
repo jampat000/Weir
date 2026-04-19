@@ -1,5 +1,5 @@
 /**
- * Shared top-of-panel rhythm for Fetcher section tabs (Connections, Sonarr, Radarr, Failed imports).
+ * Shared top-of-panel rhythm for Fetcher section tabs (Connections, Sonarr, Radarr, Schedules).
  * Heading → optional one-line blurb → first card/section.
  */
 export const FETCHER_TAB_PANEL_INTRO_CLASS =

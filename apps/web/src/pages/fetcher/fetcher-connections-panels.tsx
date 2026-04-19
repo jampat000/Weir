@@ -16,6 +16,7 @@ import {
   FETCHER_SAVE_RADARR,
   FETCHER_SAVE_SONARR,
   FETCHER_TAB_RADARR_LABEL,
+  FETCHER_TAB_SCHEDULES_LABEL,
   FETCHER_TAB_SONARR_LABEL,
   FETCHER_TEST_RADARR,
   FETCHER_TEST_SONARR,
@@ -506,8 +507,9 @@ export function FetcherConnectionsPanels({ role }: { role: string | undefined })
           Connections
         </h2>
         <p className={FETCHER_TAB_PANEL_BLURB_CLASS}>
-          Manage Sonarr and Radarr connection state, addresses, and API keys used by Fetcher. Search timing and limits
-          stay on the <strong>{FETCHER_TAB_SONARR_LABEL}</strong> and <strong>{FETCHER_TAB_RADARR_LABEL}</strong> tabs.
+          Manage Sonarr and Radarr connection state, addresses, and API keys used by Fetcher. Search schedules live on
+          the <strong>{FETCHER_TAB_SCHEDULES_LABEL}</strong> tab; per-run limits and failed-import cleanup stay on{" "}
+          <strong>{FETCHER_TAB_SONARR_LABEL}</strong> and <strong>{FETCHER_TAB_RADARR_LABEL}</strong>.
         </p>
       </header>
 

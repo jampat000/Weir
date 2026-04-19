@@ -461,8 +461,16 @@ function CleanupAxisCard({
   );
 }
 
-/** Fetcher Failed imports tab: per-class Sonarr/Radarr queue actions with per-axis save. */
-export function FetcherFailedImportsCleanupPolicySection({ role }: { role: string | undefined }) {
+export type FetcherFailedImportsCleanupPolicyAxes = "both" | "tv" | "movies";
+
+/** Fetcher failed-imports policy: per-class Sonarr/Radarr queue actions with per-axis save. */
+export function FetcherFailedImportsCleanupPolicySection({
+  role,
+  axes = "both",
+}: {
+  role: string | undefined;
+  axes?: FetcherFailedImportsCleanupPolicyAxes;
+}) {
   const q = useFailedImportCleanupPolicyQuery();
   const saveTv = useFailedImportCleanupPolicySaveTvMutation();
   const saveMovies = useFailedImportCleanupPolicySaveMoviesMutation();
@@ -589,47 +597,53 @@ export function FetcherFailedImportsCleanupPolicySection({ role }: { role: strin
       ) : q.data && movies && tvShows ? (
         <div className="mm-card__body mm-card__body--tight mt-1">
           <p className="mb-4 text-sm text-[var(--mm-text2)]">{FETCHER_FI_POLICY_CARD_LEAD}</p>
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
-            <CleanupAxisCard
-              title={FETCHER_FI_POLICY_TV_HEADING}
-              classRows={tvClassRows()}
-              value={tvShows}
-              onChange={setTvShows}
-              runIntervalDraft={tvRunIntervalDraft}
-              setRunIntervalDraft={setTvRunIntervalDraft}
-              optionsDisabled={!canEdit || saveTv.isPending}
-              optionsGroupId="mm-fi-cleanup-tv-options"
-              canEdit={canEdit}
-              saveLabel={FETCHER_FI_POLICY_SAVE_SONARR}
-              saveTestId="fetcher-failed-imports-policy-save-tv"
-              savedTestId="fetcher-failed-imports-policy-saved-tv"
-              onSave={() => mutateSave("tv")}
-              saveDisabled={!dirtyTv || saveTv.isPending}
-              savePending={saveTv.isPending}
-              showSaved={savedTvFlash && !dirtyTv && !saveTv.isPending}
-              showError={Boolean(saveTv.isError && errorAxis === "tv")}
-              errorMessage={saveTvErrorMessage}
-            />
-            <CleanupAxisCard
-              title={FETCHER_FI_POLICY_MOVIES_HEADING}
-              classRows={moviesClassRows()}
-              value={movies}
-              onChange={setMovies}
-              runIntervalDraft={moviesRunIntervalDraft}
-              setRunIntervalDraft={setMoviesRunIntervalDraft}
-              optionsDisabled={!canEdit || saveMovies.isPending}
-              optionsGroupId="mm-fi-cleanup-movies-options"
-              canEdit={canEdit}
-              saveLabel={FETCHER_FI_POLICY_SAVE_RADARR}
-              saveTestId="fetcher-failed-imports-policy-save-movies"
-              savedTestId="fetcher-failed-imports-policy-saved-movies"
-              onSave={() => mutateSave("movies")}
-              saveDisabled={!dirtyMovies || saveMovies.isPending}
-              savePending={saveMovies.isPending}
-              showSaved={savedMoviesFlash && !dirtyMovies && !saveMovies.isPending}
-              showError={Boolean(saveMovies.isError && errorAxis === "movies")}
-              errorMessage={saveMoviesErrorMessage}
-            />
+          <div
+            className={axes === "both" ? "grid gap-4 sm:grid-cols-2 sm:gap-5" : "grid max-w-3xl gap-4 sm:gap-5"}
+          >
+            {axes !== "movies" ? (
+              <CleanupAxisCard
+                title={FETCHER_FI_POLICY_TV_HEADING}
+                classRows={tvClassRows()}
+                value={tvShows}
+                onChange={setTvShows}
+                runIntervalDraft={tvRunIntervalDraft}
+                setRunIntervalDraft={setTvRunIntervalDraft}
+                optionsDisabled={!canEdit || saveTv.isPending}
+                optionsGroupId="mm-fi-cleanup-tv-options"
+                canEdit={canEdit}
+                saveLabel={FETCHER_FI_POLICY_SAVE_SONARR}
+                saveTestId="fetcher-failed-imports-policy-save-tv"
+                savedTestId="fetcher-failed-imports-policy-saved-tv"
+                onSave={() => mutateSave("tv")}
+                saveDisabled={!dirtyTv || saveTv.isPending}
+                savePending={saveTv.isPending}
+                showSaved={savedTvFlash && !dirtyTv && !saveTv.isPending}
+                showError={Boolean(saveTv.isError && errorAxis === "tv")}
+                errorMessage={saveTvErrorMessage}
+              />
+            ) : null}
+            {axes !== "tv" ? (
+              <CleanupAxisCard
+                title={FETCHER_FI_POLICY_MOVIES_HEADING}
+                classRows={moviesClassRows()}
+                value={movies}
+                onChange={setMovies}
+                runIntervalDraft={moviesRunIntervalDraft}
+                setRunIntervalDraft={setMoviesRunIntervalDraft}
+                optionsDisabled={!canEdit || saveMovies.isPending}
+                optionsGroupId="mm-fi-cleanup-movies-options"
+                canEdit={canEdit}
+                saveLabel={FETCHER_FI_POLICY_SAVE_RADARR}
+                saveTestId="fetcher-failed-imports-policy-save-movies"
+                savedTestId="fetcher-failed-imports-policy-saved-movies"
+                onSave={() => mutateSave("movies")}
+                saveDisabled={!dirtyMovies || saveMovies.isPending}
+                savePending={saveMovies.isPending}
+                showSaved={savedMoviesFlash && !dirtyMovies && !saveMovies.isPending}
+                showError={Boolean(saveMovies.isError && errorAxis === "movies")}
+                errorMessage={saveMoviesErrorMessage}
+              />
+            ) : null}
           </div>
           {!canEdit ? (
             <p className="mt-4 text-sm text-[var(--mm-text3)]">{FETCHER_FI_POLICY_VIEWER_NOTE}</p>

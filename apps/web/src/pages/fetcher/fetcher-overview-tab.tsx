@@ -25,9 +25,10 @@ import type {
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import {
   FETCHER_TAB_RADARR_LABEL,
+  FETCHER_TAB_SCHEDULES_LABEL,
   FETCHER_TAB_SONARR_LABEL,
 } from "./fetcher-display-names";
-export type FetcherOverviewOpenSection = "connections" | "failed-imports" | "sonarr" | "radarr";
+export type FetcherOverviewOpenSection = "connections" | "sonarr" | "radarr" | "schedules";
 
 function sonarrTvSearchesOn(data: FetcherArrOperatorSettingsOut): boolean {
   return data.sonarr_missing.enabled || data.sonarr_upgrade.enabled;
@@ -176,11 +177,11 @@ function FetcherOverviewAtAGlance({
   const fiBody = (
     <div className="space-y-4">
       <p>
-        <span className="text-[var(--mm-text3)]">Sonarr (TV):</span>{" "}
+        <span className="text-[var(--mm-text3)]">{FETCHER_TAB_SONARR_LABEL}:</span>{" "}
         <span className="font-medium text-[var(--mm-text1)]">{atGlanceFailedImportCleanupSummary(policy.tv_shows)}</span>
       </p>
       <p>
-        <span className="text-[var(--mm-text3)]">Radarr (Movies):</span>{" "}
+        <span className="text-[var(--mm-text3)]">{FETCHER_TAB_RADARR_LABEL}:</span>{" "}
         <span className="font-medium text-[var(--mm-text1)]">{atGlanceFailedImportCleanupSummary(policy.movies)}</span>
       </p>
       <div className="space-y-2 border-t border-[var(--mm-border)] pt-3">
@@ -228,13 +229,22 @@ function FetcherOverviewAtAGlance({
           body={fiBody}
           footer={
             onOpenSection ? (
-              <button
-                type="button"
-                className={mmActionButtonClass({ variant: "secondary" })}
-                onClick={() => onOpenSection("failed-imports")}
-              >
-                Open Failed imports
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={mmActionButtonClass({ variant: "secondary" })}
+                  onClick={() => onOpenSection("sonarr")}
+                >
+                  Review {FETCHER_TAB_SONARR_LABEL} queues
+                </button>
+                <button
+                  type="button"
+                  className={mmActionButtonClass({ variant: "secondary" })}
+                  onClick={() => onOpenSection("radarr")}
+                >
+                  Review {FETCHER_TAB_RADARR_LABEL} queues
+                </button>
+              </div>
             ) : undefined
           }
         />
@@ -266,7 +276,7 @@ function buildNeedsAttentionItems(
     attention.tv_shows.needs_attention_count !== null &&
     attention.tv_shows.needs_attention_count > 0
   ) {
-    items.push({ text: "Sonarr (TV) failed imports need attention", target: "failed-imports" });
+    items.push({ text: "Sonarr failed imports need attention", target: "sonarr" });
   }
 
   if (
@@ -274,7 +284,7 @@ function buildNeedsAttentionItems(
     attention.movies.needs_attention_count !== null &&
     attention.movies.needs_attention_count > 0
   ) {
-    items.push({ text: "Radarr (Movies) failed imports need attention", target: "failed-imports" });
+    items.push({ text: "Radarr failed imports need attention", target: "radarr" });
   }
 
   return items.slice(0, 3);
@@ -284,7 +294,7 @@ const NEEDS_ATTENTION_ACTION_ORDER: FetcherOverviewOpenSection[] = [
   "connections",
   "sonarr",
   "radarr",
-  "failed-imports",
+  "schedules",
 ];
 
 function needsAttentionActionLabel(target: FetcherOverviewOpenSection): string {
@@ -295,8 +305,8 @@ function needsAttentionActionLabel(target: FetcherOverviewOpenSection): string {
       return `Open ${FETCHER_TAB_SONARR_LABEL}`;
     case "radarr":
       return `Open ${FETCHER_TAB_RADARR_LABEL}`;
-    case "failed-imports":
-      return "Open Failed imports";
+    case "schedules":
+      return `Open ${FETCHER_TAB_SCHEDULES_LABEL}`;
     default: {
       const _exhaustive: never = target;
       return _exhaustive;
@@ -341,7 +351,7 @@ function FetcherOverviewNeedsAttention({
 }
 
 const NEXT_STEPS_BODY =
-  "Use Connections to set up Sonarr and Radarr, Sonarr (TV) and Radarr (Movies) to configure search settings, Failed imports to manage import cleanup, and Activity for a full history.";
+  `Use Connections to set up Sonarr and Radarr, ${FETCHER_TAB_SONARR_LABEL} and ${FETCHER_TAB_RADARR_LABEL} for per-run limits and failed-import cleanup, ${FETCHER_TAB_SCHEDULES_LABEL} for when searches run, and Activity for a full history.`;
 
 function FetcherOverviewNextSteps({ onOpenSection }: { onOpenSection?: (target: FetcherOverviewOpenSection) => void }) {
   return (
@@ -358,7 +368,7 @@ function FetcherOverviewNextSteps({ onOpenSection }: { onOpenSection?: (target: 
             <MmNextStepsButton label="Connections" onClick={() => onOpenSection("connections")} />
             <MmNextStepsButton label={FETCHER_TAB_SONARR_LABEL} onClick={() => onOpenSection("sonarr")} />
             <MmNextStepsButton label={FETCHER_TAB_RADARR_LABEL} onClick={() => onOpenSection("radarr")} />
-            <MmNextStepsButton label="Failed imports" onClick={() => onOpenSection("failed-imports")} />
+            <MmNextStepsButton label={FETCHER_TAB_SCHEDULES_LABEL} onClick={() => onOpenSection("schedules")} />
           </div>
         ) : null}
       </div>

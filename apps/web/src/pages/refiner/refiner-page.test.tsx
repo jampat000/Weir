@@ -118,6 +118,7 @@ describe("RefinerPage", () => {
   it("does not host Fetcher failed-import UI", () => {
     renderRefinerPage();
     expect(screen.queryByTestId("fetcher-failed-imports-workspace")).toBeNull();
+    expect(screen.queryByTestId("fetcher-failed-imports-embedded")).toBeNull();
     expect(screen.queryByTestId("fetcher-failed-imports-settings")).toBeNull();
     expect(screen.queryByTestId("fetcher-failed-imports-status-filter")).toBeNull();
   });

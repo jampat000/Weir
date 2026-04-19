@@ -4,12 +4,16 @@ import {
   FetcherArrOperatorSettingsSection,
   type FetcherArrSettingsTabId,
 } from "./fetcher-arr-operator-settings";
-import { FetcherFailedImportsWorkspace } from "./fetcher-failed-imports-workspace";
-import { FETCHER_TAB_RADARR_LABEL, FETCHER_TAB_SONARR_LABEL } from "./fetcher-display-names";
+import { FetcherFailedImportsEmbedded } from "./fetcher-failed-imports-workspace";
+import {
+  FETCHER_TAB_RADARR_LABEL,
+  FETCHER_TAB_SCHEDULES_LABEL,
+  FETCHER_TAB_SONARR_LABEL,
+} from "./fetcher-display-names";
 import { fetcherSectionTabClass } from "./fetcher-menu-button";
 import { FetcherOverviewTab } from "./fetcher-overview-tab";
 
-type FetcherPageTabId = "overview" | FetcherArrSettingsTabId | "failed-imports";
+type FetcherPageTabId = "overview" | FetcherArrSettingsTabId;
 
 export function FetcherPage() {
   const me = useMeQuery();
@@ -20,8 +24,11 @@ export function FetcherPage() {
     { id: "connections", label: "Connections" },
     { id: "sonarr", label: FETCHER_TAB_SONARR_LABEL },
     { id: "radarr", label: FETCHER_TAB_RADARR_LABEL },
-    { id: "failed-imports", label: "Failed imports" },
+    { id: "schedules", label: FETCHER_TAB_SCHEDULES_LABEL },
   ];
+
+  const showArrSection =
+    tab === "connections" || tab === "sonarr" || tab === "radarr" || tab === "schedules";
 
   return (
     <div className="mm-page">
@@ -53,14 +60,13 @@ export function FetcherPage() {
         ))}
       </nav>
 
-      <div className="mt-6 sm:mt-7" role="tabpanel" aria-label={tabs.find((t) => t.id === tab)?.label}>
+      <div className="mt-6 space-y-6 sm:mt-7 sm:space-y-7" role="tabpanel" aria-label={tabs.find((t) => t.id === tab)?.label}>
         {tab === "overview" ? <FetcherOverviewTab onOpenSection={(target) => setTab(target)} /> : null}
 
-        {tab === "failed-imports" ? <FetcherFailedImportsWorkspace /> : null}
+        {showArrSection ? <FetcherArrOperatorSettingsSection role={me.data?.role} activeTab={tab} /> : null}
 
-        {tab === "connections" || tab === "sonarr" || tab === "radarr" ? (
-          <FetcherArrOperatorSettingsSection role={me.data?.role} activeTab={tab} />
-        ) : null}
+        {tab === "sonarr" ? <FetcherFailedImportsEmbedded axis="tv" /> : null}
+        {tab === "radarr" ? <FetcherFailedImportsEmbedded axis="movies" /> : null}
       </div>
     </div>
   );

@@ -38,15 +38,15 @@ export const FETCHER_FI_MANUAL_SECTION_TITLE = "Run a check now";
 export const FETCHER_FI_MANUAL_SECTION_BODY =
   "Runs one queue pass for that app using the actions you saved under Per-class queue actions.";
 
-export const FETCHER_FI_MANUAL_BTN_MOVIES = "Radarr (Movies)";
-export const FETCHER_FI_MANUAL_BTN_TV = "Sonarr (TV)";
+export const FETCHER_FI_MANUAL_BTN_MOVIES = "Radarr";
+export const FETCHER_FI_MANUAL_BTN_TV = "Sonarr";
 export const FETCHER_FI_MANUAL_PENDING = "Sending…";
 
 export const FETCHER_FI_MANUAL_ERR_MOVIES = "Could not start the movies check.";
 export const FETCHER_FI_MANUAL_ERR_TV = "Could not start the TV check.";
 
-export const FETCHER_FI_MANUAL_RESULT_MOVIES_PREFIX = "Radarr (Movies):";
-export const FETCHER_FI_MANUAL_RESULT_TV_PREFIX = "Sonarr (TV):";
+export const FETCHER_FI_MANUAL_RESULT_MOVIES_PREFIX = "Radarr:";
+export const FETCHER_FI_MANUAL_RESULT_TV_PREFIX = "Sonarr:";
 
 export const FETCHER_FI_PAGE_LOADING_TASKS = "Loading Fetcher jobs…";
 export const FETCHER_FI_PAGE_ERR_LOAD_TASKS = "Could not load Fetcher jobs.";
@@ -86,8 +86,8 @@ export const FETCHER_FI_POLICY_SAVE_SONARR = "Save Sonarr queue actions";
 export const FETCHER_FI_POLICY_SAVE_RADARR = "Save Radarr queue actions";
 export const FETCHER_FI_POLICY_SAVING = "Saving…";
 export const FETCHER_FI_POLICY_SAVED_HINT = "Nothing runs immediately when you save.";
-export const FETCHER_FI_POLICY_MOVIES_HEADING = "Radarr (Movies)";
-export const FETCHER_FI_POLICY_TV_HEADING = "Sonarr (TV)";
+export const FETCHER_FI_POLICY_MOVIES_HEADING = "Radarr";
+export const FETCHER_FI_POLICY_TV_HEADING = "Sonarr";
 
 /** Short row labels on the policy page — one row per **policy-backed** terminal class (six of eight enum outcomes). */
 export const FETCHER_FI_POLICY_ROW_QUALITY = {

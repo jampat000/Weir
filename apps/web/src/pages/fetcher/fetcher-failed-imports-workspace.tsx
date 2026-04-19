@@ -197,10 +197,12 @@ function FetcherFailedImportsAtAGlanceSection({
   arr,
   attention,
   policy,
+  axis,
 }: {
   arr: UseQueryResult<FetcherArrOperatorSettingsOut, Error>;
   attention: UseQueryResult<FetcherFailedImportQueueAttentionSnapshot, Error>;
   policy: UseQueryResult<FetcherFailedImportCleanupPolicyOut, Error>;
+  axis?: "tv" | "movies";
 }) {
   const sonConfigured = arr.data?.sonarr_server_configured ?? false;
   const radConfigured = arr.data?.radarr_server_configured ?? false;
@@ -208,6 +210,9 @@ function FetcherFailedImportsAtAGlanceSection({
   const movPolicy = policy.data?.movies;
   const tvAtt = attention.data?.tv_shows;
   const movAtt = attention.data?.movies;
+
+  const gridClass =
+    axis === undefined ? "mm-card__body mm-card__body--tight mt-1 grid gap-4 sm:grid-cols-2" : "mm-card__body mm-card__body--tight mt-1 grid max-w-xl gap-4";
 
   return (
     <section
@@ -218,17 +223,21 @@ function FetcherFailedImportsAtAGlanceSection({
       <h2 id="mm-fetcher-fi-at-glance-heading" className="mm-card__title">
         {FETCHER_FI_AT_A_GLANCE_SECTION_TITLE}
       </h2>
-      <div className="mm-card__body mm-card__body--tight mt-1 grid gap-4 sm:grid-cols-2">
-        <GlanceColumn
-          title={FETCHER_TAB_SONARR_LABEL}
-          cleanupLine={glanceCleanupLine(tvPolicy)}
-          attentionLine={glanceAttentionLine(sonConfigured, tvAtt)}
-        />
-        <GlanceColumn
-          title={FETCHER_TAB_RADARR_LABEL}
-          cleanupLine={glanceCleanupLine(movPolicy)}
-          attentionLine={glanceAttentionLine(radConfigured, movAtt)}
-        />
+      <div className={gridClass}>
+        {axis !== "movies" ? (
+          <GlanceColumn
+            title={FETCHER_TAB_SONARR_LABEL}
+            cleanupLine={glanceCleanupLine(tvPolicy)}
+            attentionLine={glanceAttentionLine(sonConfigured, tvAtt)}
+          />
+        ) : null}
+        {axis !== "tv" ? (
+          <GlanceColumn
+            title={FETCHER_TAB_RADARR_LABEL}
+            cleanupLine={glanceCleanupLine(movPolicy)}
+            attentionLine={glanceAttentionLine(radConfigured, movAtt)}
+          />
+        ) : null}
       </div>
     </section>
   );
@@ -271,11 +280,16 @@ function FetcherFailedImportsNeedsAttentionSection({
   arr,
   attention,
   fmt,
+  axis,
 }: {
   arr: UseQueryResult<FetcherArrOperatorSettingsOut, Error>;
   attention: UseQueryResult<FetcherFailedImportQueueAttentionSnapshot, Error>;
   fmt: (iso: string | null | undefined) => string;
+  axis?: "tv" | "movies";
 }) {
+  const gridClass =
+    axis === undefined ? "mm-card__body mm-card__body--tight mt-4 grid gap-4 sm:grid-cols-2" : "mm-card__body mm-card__body--tight mt-4 grid max-w-xl gap-4";
+
   return (
     <section
       className="mm-card mm-dash-card mm-fetcher-module-surface"
@@ -288,27 +302,37 @@ function FetcherFailedImportsNeedsAttentionSection({
       <p className="mm-card__body mm-card__body--tight text-sm leading-relaxed text-[var(--mm-text2)]">
         {FETCHER_FI_NEEDS_ATTENTION_LEAD}
       </p>
-      <div className="mm-card__body mm-card__body--tight mt-4 grid gap-4 sm:grid-cols-2">
-        <NeedsAttentionAxisCard
-          title={FETCHER_TAB_SONARR_LABEL}
-          kind="tv"
-          configured={Boolean(arr.data?.sonarr_server_configured)}
-          axis={attention.data?.tv_shows}
-          fmt={fmt}
-        />
-        <NeedsAttentionAxisCard
-          title={FETCHER_TAB_RADARR_LABEL}
-          kind="movies"
-          configured={Boolean(arr.data?.radarr_server_configured)}
-          axis={attention.data?.movies}
-          fmt={fmt}
-        />
+      <div className={gridClass}>
+        {axis !== "movies" ? (
+          <NeedsAttentionAxisCard
+            title={FETCHER_TAB_SONARR_LABEL}
+            kind="tv"
+            configured={Boolean(arr.data?.sonarr_server_configured)}
+            axis={attention.data?.tv_shows}
+            fmt={fmt}
+          />
+        ) : null}
+        {axis !== "tv" ? (
+          <NeedsAttentionAxisCard
+            title={FETCHER_TAB_RADARR_LABEL}
+            kind="movies"
+            configured={Boolean(arr.data?.radarr_server_configured)}
+            axis={attention.data?.movies}
+            fmt={fmt}
+          />
+        ) : null}
       </div>
     </section>
   );
 }
 
-function FetcherFailedImportsManualQueuePassPanel({ enabled }: { enabled: boolean }) {
+function FetcherFailedImportsManualQueuePassPanel({
+  enabled,
+  axis = "both",
+}: {
+  enabled: boolean;
+  axis?: "tv" | "movies" | "both";
+}) {
   const mRad = useFailedImportRadarrEnqueueMutation();
   const mSon = useFailedImportSonarrEnqueueMutation();
 
@@ -321,47 +345,51 @@ function FetcherFailedImportsManualQueuePassPanel({ enabled }: { enabled: boolea
   return (
     <div className="space-y-3" data-testid="fetcher-failed-imports-manual-queue-pass">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <button
-          type="button"
-          className={mmActionButtonClass({
-            variant: "secondary",
-            disabled: queueBusy,
-          })}
-          data-testid="fetcher-failed-imports-queue-pass-radarr"
-          disabled={queueBusy}
-          onClick={() => mRad.mutate()}
-        >
-          {mRad.isPending ? FETCHER_FI_MANUAL_PENDING : FETCHER_FI_MANUAL_BTN_MOVIES}
-        </button>
-        <button
-          type="button"
-          className={mmActionButtonClass({
-            variant: "secondary",
-            disabled: queueBusy,
-          })}
-          data-testid="fetcher-failed-imports-queue-pass-sonarr"
-          disabled={queueBusy}
-          onClick={() => mSon.mutate()}
-        >
-          {mSon.isPending ? FETCHER_FI_MANUAL_PENDING : FETCHER_FI_MANUAL_BTN_TV}
-        </button>
+        {axis !== "tv" ? (
+          <button
+            type="button"
+            className={mmActionButtonClass({
+              variant: "secondary",
+              disabled: queueBusy,
+            })}
+            data-testid="fetcher-failed-imports-queue-pass-radarr"
+            disabled={queueBusy}
+            onClick={() => mRad.mutate()}
+          >
+            {mRad.isPending ? FETCHER_FI_MANUAL_PENDING : FETCHER_FI_MANUAL_BTN_MOVIES}
+          </button>
+        ) : null}
+        {axis !== "movies" ? (
+          <button
+            type="button"
+            className={mmActionButtonClass({
+              variant: "secondary",
+              disabled: queueBusy,
+            })}
+            data-testid="fetcher-failed-imports-queue-pass-sonarr"
+            disabled={queueBusy}
+            onClick={() => mSon.mutate()}
+          >
+            {mSon.isPending ? FETCHER_FI_MANUAL_PENDING : FETCHER_FI_MANUAL_BTN_TV}
+          </button>
+        ) : null}
       </div>
-      {mRad.isError ? (
+      {axis !== "tv" && mRad.isError ? (
         <p className="mt-2 text-sm text-red-400" role="alert">
           {mRad.error instanceof Error ? mRad.error.message : FETCHER_FI_MANUAL_ERR_MOVIES}
         </p>
       ) : null}
-      {mSon.isError ? (
+      {axis !== "movies" && mSon.isError ? (
         <p className="mt-2 text-sm text-red-400" role="alert">
           {mSon.error instanceof Error ? mSon.error.message : FETCHER_FI_MANUAL_ERR_TV}
         </p>
       ) : null}
-      {mRad.isSuccess && mRad.data ? (
+      {axis !== "tv" && mRad.isSuccess && mRad.data ? (
         <p className="mt-2 text-sm text-[var(--mm-text2)]" data-testid="fetcher-failed-imports-queue-pass-radarr-result">
           {FETCHER_FI_MANUAL_RESULT_MOVIES_PREFIX} {failedImportManualQueuePassResultMessage(mRad.data)}
         </p>
       ) : null}
-      {mSon.isSuccess && mSon.data ? (
+      {axis !== "movies" && mSon.isSuccess && mSon.data ? (
         <p className="mt-2 text-sm text-[var(--mm-text2)]" data-testid="fetcher-failed-imports-queue-pass-sonarr-result">
           {FETCHER_FI_MANUAL_RESULT_TV_PREFIX} {failedImportManualQueuePassResultMessage(mSon.data)}
         </p>
@@ -388,6 +416,10 @@ function JobDetailsCell({ lastError, jobKind }: { lastError: string | null; jobK
       </details>
     </div>
   );
+}
+
+function jobMatchesFetcherFailedImportAxis(job: FetcherJobInspectionRow, axis: "tv" | "movies"): boolean {
+  return axis === "tv" ? job.job_kind.includes("sonarr") : job.job_kind.includes("radarr");
 }
 
 function TaskRow({ job, fmt }: { job: FetcherJobInspectionRow; fmt: (iso: string | null | undefined) => string }) {
@@ -492,8 +524,8 @@ function FetcherFailedImportsJobHistoryContent({
   );
 }
 
-/** Fetcher Failed imports tab: glance → cleanup → attention → manual checks & history. */
-export function FetcherFailedImportsWorkspace() {
+/** Failed imports UI embedded under Sonarr (TV) or Radarr (movies). */
+export function FetcherFailedImportsEmbedded({ axis }: { axis: "tv" | "movies" }) {
   const fmt = useAppDateFormatter();
   const [filter, setFilter] = useState<FetcherJobsInspectionFilter>("terminal");
   const me = useMeQuery();
@@ -521,28 +553,29 @@ export function FetcherFailedImportsWorkspace() {
     );
   } else {
     const { jobs, default_terminal_only } = q.data;
+    const scopedJobs = jobs.filter((j) => jobMatchesFetcherFailedImportAxis(j, axis));
     jobHistorySlot = (
       <FetcherFailedImportsJobHistoryContent
         filter={filter}
         setFilter={setFilter}
-        jobs={jobs}
+        jobs={scopedJobs}
         default_terminal_only={default_terminal_only}
-        isEmpty={jobs.length === 0}
+        isEmpty={scopedJobs.length === 0}
         fmt={fmt}
       />
     );
   }
 
   return (
-    <div data-testid="fetcher-failed-imports-workspace">
+    <div data-testid="fetcher-failed-imports-embedded" data-embedded-axis={axis}>
       <header className={FETCHER_TAB_PANEL_INTRO_CLASS}>
         <h2 className={FETCHER_TAB_PANEL_TITLE_CLASS}>Failed imports</h2>
         <p className={FETCHER_TAB_PANEL_BLURB_CLASS}>{FETCHER_FI_SECTION_INTRO_PRIMARY}</p>
       </header>
       <div className="space-y-6">
-        <FetcherFailedImportsAtAGlanceSection arr={arr} attention={attention} policy={cleanupPolicy} />
-        <FetcherFailedImportsCleanupPolicySection role={me.data?.role} />
-        <FetcherFailedImportsNeedsAttentionSection arr={arr} attention={attention} fmt={fmt} />
+        <FetcherFailedImportsAtAGlanceSection arr={arr} attention={attention} policy={cleanupPolicy} axis={axis} />
+        <FetcherFailedImportsCleanupPolicySection role={me.data?.role} axes={axis === "tv" ? "tv" : "movies"} />
+        <FetcherFailedImportsNeedsAttentionSection arr={arr} attention={attention} fmt={fmt} axis={axis} />
         <section
           className="mm-card mm-dash-card mm-fetcher-module-surface overflow-x-auto"
           aria-labelledby="mm-fetcher-fi-manual-utility-heading"
@@ -556,7 +589,10 @@ export function FetcherFailedImportsWorkspace() {
               <h3 className="text-base font-semibold text-[var(--mm-text1)]">{FETCHER_FI_MANUAL_SECTION_TITLE}</h3>
               <p className="mt-1 text-sm text-[var(--mm-text3)]">{FETCHER_FI_MANUAL_SECTION_BODY}</p>
               <div className="mt-3">
-                <FetcherFailedImportsManualQueuePassPanel enabled={showFailedImportManualQueuePassControl(me.data?.role)} />
+                <FetcherFailedImportsManualQueuePassPanel
+                  enabled={showFailedImportManualQueuePassControl(me.data?.role)}
+                  axis={axis}
+                />
               </div>
             </div>
             <div className="border-t border-[var(--mm-border)] pt-6">
