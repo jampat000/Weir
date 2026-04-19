@@ -336,41 +336,48 @@ export function SubberOverviewTab({
         <h2 id="subber-overview-last-30-heading" className="mm-card__title text-lg">
           Last 30 days
         </h2>
-        <div className="mm-card__body mt-5 space-y-5">
-          <div>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
-              <div className="rounded-md bg-black/15 px-2 py-3 text-center sm:px-3">
-                <span className="block text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Downloaded</span>
-                <span className="mt-1 block text-2xl font-bold tabular-nums leading-none text-[var(--mm-text1)]">
-                  {st.subtitles_downloaded}
-                </span>
+        <div className="mm-card__body mt-5">
+          {/* Same inner shell as Refiner overview `AtGlanceCard` + emphasis (Last 30 days card). */}
+          <div className="flex h-full min-h-0 flex-col gap-3.5 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5 text-sm shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] lg:gap-4 lg:p-6">
+            <div className="min-h-0 flex-1 text-[var(--mm-text2)]">
+              <div>
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  <div className="rounded-md bg-black/15 px-2 py-3 text-center sm:px-3">
+                    <span className="block text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Downloaded</span>
+                    <span className="mt-1 block text-2xl font-bold tabular-nums leading-none text-[var(--mm-text1)]">
+                      {st.subtitles_downloaded}
+                    </span>
+                  </div>
+                  <div className="rounded-md bg-black/15 px-2 py-3 text-center sm:px-3">
+                    <span className="block text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Searches</span>
+                    <span className="mt-1 block text-2xl font-bold tabular-nums leading-none text-[var(--mm-text1)]">
+                      {st.searches_last_30_days}
+                    </span>
+                  </div>
+                  <div className="rounded-md bg-black/15 px-2 py-3 text-center sm:px-3">
+                    <span className="block text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Not found</span>
+                    <span className="mt-1 block text-2xl font-bold tabular-nums leading-none text-[var(--mm-text1)]">
+                      {st.not_found_last_30_days}
+                    </span>
+                  </div>
+                </div>
+                <p className="mt-4 text-[0.7rem] leading-snug text-[var(--mm-text3)]">
+                  Counts subtitle activity on this server for the last 30 days.{" "}
+                  {st.upgrades_last_30_days === 1 ? "1 upgrade" : `${st.upgrades_last_30_days} upgrades`} downloaded in the same
+                  window.
+                </p>
               </div>
-              <div className="rounded-md bg-black/15 px-2 py-3 text-center sm:px-3">
-                <span className="block text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Searches</span>
-                <span className="mt-1 block text-2xl font-bold tabular-nums leading-none text-[var(--mm-text1)]">
-                  {st.searches_last_30_days}
-                </span>
-              </div>
-              <div className="rounded-md bg-black/15 px-2 py-3 text-center sm:px-3">
-                <span className="block text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Not found</span>
-                <span className="mt-1 block text-2xl font-bold tabular-nums leading-none text-[var(--mm-text1)]">
-                  {st.not_found_last_30_days}
-                </span>
+              <div className="mt-3 space-y-1 text-sm text-[var(--mm-text2)]">
+                <p>
+                  <span className="font-medium text-[var(--mm-text1)]">TV:</span> {st.tv_tracked} tracked · {st.tv_found} found ·{" "}
+                  {st.tv_missing} missing
+                </p>
+                <p>
+                  <span className="font-medium text-[var(--mm-text1)]">Movies:</span> {st.movies_tracked} tracked · {st.movies_found}{" "}
+                  found · {st.movies_missing} missing
+                </p>
               </div>
             </div>
-            <p className="mt-4 text-[0.7rem] leading-snug text-[var(--mm-text3)]">
-              {st.upgrades_last_30_days === 1 ? "1 upgrade" : `${st.upgrades_last_30_days} upgrades`} downloaded · last 30 days
-            </p>
-          </div>
-          <div className="space-y-1 text-sm text-[var(--mm-text2)]">
-            <p>
-              <span className="font-medium text-[var(--mm-text1)]">TV:</span> {st.tv_tracked} tracked · {st.tv_found}{" "}
-              found · {st.tv_missing} missing
-            </p>
-            <p>
-              <span className="font-medium text-[var(--mm-text1)]">Movies:</span> {st.movies_tracked} tracked ·{" "}
-              {st.movies_found} found · {st.movies_missing} missing
-            </p>
           </div>
         </div>
       </section>
