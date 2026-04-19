@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { fetchCsrfToken } from "../../lib/api/auth-api";
 import { MmOnOffSwitch } from "../../components/ui/mm-on-off-switch";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { SUBBER_LANGUAGE_OPTIONS, subberLanguageLabel } from "../../lib/subber/subber-languages";
-import type { SubberProviderPutIn } from "../../lib/subber/subber-api";
+import type { SubberProviderOut, SubberProviderPutIn } from "../../lib/subber/subber-api";
 import {
   usePutSubberProviderMutation,
   usePutSubberSettingsMutation,
@@ -29,6 +29,13 @@ type ConnectionCheckState = {
 };
 
 const initialCheck: ConnectionCheckState = { outcome: null, at: null, detail: "" };
+
+function providerNeedsConfigureButton(p: SubberProviderOut): boolean {
+  if (p.provider_key === "subscene") return false;
+  if (p.requires_account) return true;
+  if (p.provider_key === "podnapisi") return true;
+  return false;
+}
 
 function formatLastCheck(iso: string | null): string {
   if (!iso) return "—";
@@ -190,11 +197,10 @@ export function SubberSettingsTab({ canOperate }: { canOperate: boolean }) {
   const [saveSon, setSaveSon] = useState({ ok: false, err: null as string | null });
   const [saveRad, setSaveRad] = useState({ ok: false, err: null as string | null });
   const [saveLang, setSaveLang] = useState({ ok: false, err: null as string | null });
-  const [saveFolder, setSaveFolder] = useState({ ok: false, err: null as string | null });
-  const [saveStyle, setSaveStyle] = useState({ ok: false, err: null as string | null });
+  const [savePrefs, setSavePrefs] = useState({ ok: false, err: null as string | null });
   const [saveFreq, setSaveFreq] = useState({ ok: false, err: null as string | null });
   const [saveMap, setSaveMap] = useState({ ok: false, err: null as string | null });
-  const [saveEn, setSaveEn] = useState({ ok: false, err: null as string | null });
+  const [expandedProviderKey, setExpandedProviderKey] = useState<string | null>(null);
 
   useEffect(() => {
     const d = q.data;
@@ -297,25 +303,19 @@ export function SubberSettingsTab({ canOperate }: { canOperate: boolean }) {
     }
   }
 
-  async function saveSubtitleFolder() {
-    setSaveFolder({ ok: false, err: null });
+  async function savePreferences() {
+    setSavePrefs({ ok: false, err: null });
     try {
       const csrf_token = await fetchCsrfToken();
-      await put.mutateAsync({ csrf_token, subtitle_folder: folder.trim() });
-      flashSave(setSaveFolder);
+      await put.mutateAsync({
+        csrf_token,
+        subtitle_folder: folder.trim(),
+        exclude_hearing_impaired: excludeHi,
+        enabled,
+      });
+      flashSave(setSavePrefs);
     } catch (e) {
-      setSaveFolder({ ok: false, err: (e as Error).message });
-    }
-  }
-
-  async function saveSubtitleStyle() {
-    setSaveStyle({ ok: false, err: null });
-    try {
-      const csrf_token = await fetchCsrfToken();
-      await put.mutateAsync({ csrf_token, exclude_hearing_impaired: excludeHi });
-      flashSave(setSaveStyle);
-    } catch (e) {
-      setSaveStyle({ ok: false, err: (e as Error).message });
+      setSavePrefs({ ok: false, err: (e as Error).message });
     }
   }
 
@@ -352,17 +352,6 @@ export function SubberSettingsTab({ canOperate }: { canOperate: boolean }) {
       flashSave(setSaveMap);
     } catch (e) {
       setSaveMap({ ok: false, err: (e as Error).message });
-    }
-  }
-
-  async function saveEnableSubber() {
-    setSaveEn({ ok: false, err: null });
-    try {
-      const csrf_token = await fetchCsrfToken();
-      await put.mutateAsync({ csrf_token, enabled });
-      flashSave(setSaveEn);
-    } catch (e) {
-      setSaveEn({ ok: false, err: (e as Error).message });
     }
   }
 
@@ -424,6 +413,11 @@ export function SubberSettingsTab({ canOperate }: { canOperate: boolean }) {
     if (p) body.password = p;
     if (k) body.api_key = k;
     await putProv.mutateAsync({ providerKey: pk, body });
+  }
+
+  async function saveExpandedProvider(pk: string, enabledP: boolean, priority: number) {
+    await saveProviderRow(pk, enabledP, priority);
+    setExpandedProviderKey(null);
   }
 
   async function runProvTest(pk: string) {
@@ -678,47 +672,53 @@ export function SubberSettingsTab({ canOperate }: { canOperate: boolean }) {
         <p className="text-sm text-[var(--mm-text2)]">
           Subber tries languages in this order. If the first is not found it tries the next automatically.
         </p>
-        <ul className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
           {langs.map((code, idx) => (
-            <li key={`${code}-${idx}`} className="flex flex-wrap items-center gap-2 rounded border border-[var(--mm-border)] bg-black/10 px-2 py-2">
-              <span className="text-sm text-[var(--mm-text)]">
-                {subberLanguageLabel(code)} ({code})
+            <span
+              key={`${code}-${idx}`}
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--mm-border)] bg-black/15 px-2.5 py-1 text-sm text-[var(--mm-text)]"
+            >
+              <span>{subberLanguageLabel(code)}</span>
+              <span className="flex items-center gap-0.5 border-l border-[var(--mm-border)] pl-1.5">
+                <button
+                  type="button"
+                  className="rounded px-1 text-xs text-[var(--mm-text2)] hover:bg-[var(--mm-card-bg)] disabled:opacity-30"
+                  disabled={dis || idx === 0}
+                  aria-label={`Move ${code} up`}
+                  onClick={() => {
+                    const n = [...langs];
+                    [n[idx - 1], n[idx]] = [n[idx], n[idx - 1]];
+                    setLangs(n);
+                  }}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className="rounded px-1 text-xs text-[var(--mm-text2)] hover:bg-[var(--mm-card-bg)] disabled:opacity-30"
+                  disabled={dis || idx >= langs.length - 1}
+                  aria-label={`Move ${code} down`}
+                  onClick={() => {
+                    const n = [...langs];
+                    [n[idx + 1], n[idx]] = [n[idx], n[idx + 1]];
+                    setLangs(n);
+                  }}
+                >
+                  ↓
+                </button>
               </span>
               <button
                 type="button"
-                className={mmActionButtonClass({ variant: "secondary" })}
-                disabled={dis || idx === 0}
-                onClick={() => {
-                  const n = [...langs];
-                  [n[idx - 1], n[idx]] = [n[idx], n[idx - 1]];
-                  setLangs(n);
-                }}
-              >
-                Up
-              </button>
-              <button
-                type="button"
-                className={mmActionButtonClass({ variant: "secondary" })}
-                disabled={dis || idx >= langs.length - 1}
-                onClick={() => {
-                  const n = [...langs];
-                  [n[idx + 1], n[idx]] = [n[idx], n[idx + 1]];
-                  setLangs(n);
-                }}
-              >
-                Down
-              </button>
-              <button
-                type="button"
-                className={mmActionButtonClass({ variant: "secondary" })}
+                className="ml-0.5 rounded px-1.5 text-base leading-none text-[var(--mm-text2)] hover:bg-red-950/30 hover:text-red-300"
                 disabled={dis}
+                aria-label={`Remove ${subberLanguageLabel(code)}`}
                 onClick={() => setLangs(langs.filter((_, i) => i !== idx))}
               >
-                Remove
+                ×
               </button>
-            </li>
+            </span>
           ))}
-        </ul>
+        </div>
         <label className="block text-sm text-[var(--mm-text2)]">
           Add language
           <select
@@ -752,48 +752,60 @@ export function SubberSettingsTab({ canOperate }: { canOperate: boolean }) {
         <SaveFeedback ok={saveLang.ok} err={saveLang.err} />
       </section>
 
-      {/* Card 5 — Subtitle folder */}
-      <section className="space-y-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5">
-        <h2 className="text-base font-semibold text-[var(--mm-text)]">Subtitle folder</h2>
-        <p className="text-sm text-[var(--mm-text2)]">
-          Leave empty to save subtitles in the same folder as your media file. Subtitles are always named to match the media file — for example Movie.2023.en.srt alongside Movie.2023.mkv.
-        </p>
-        <label className="block text-sm text-[var(--mm-text2)]">
-          Subtitle folder
+      {/* Card 5 — Preferences (subtitle folder + hearing impaired + enable) */}
+      <section className="space-y-4 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5">
+        <h2 className="text-base font-semibold text-[var(--mm-text)]">Preferences</h2>
+        <div>
+          <label className="block text-sm font-medium text-[var(--mm-text)]" htmlFor="subber-subtitle-folder">
+            Subtitle folder
+          </label>
           <input
+            id="subber-subtitle-folder"
             className="mm-input mt-1 w-full max-w-xl"
             value={folder}
             disabled={dis}
             onChange={(e) => setFolder(e.target.value)}
             placeholder="Same folder as media file"
           />
-        </label>
+          <p className="mt-1 text-xs text-[var(--mm-text2)]">
+            Leave empty to save subtitles next to your media file. Subtitles are named to match — Movie.2023.en.srt alongside
+            Movie.2023.mkv.
+          </p>
+        </div>
+        <div className="space-y-2">
+          <MmOnOffSwitch
+            id="subber-exclude-hi"
+            layout="inline"
+            label="Exclude hearing impaired"
+            enabled={excludeHi}
+            disabled={dis}
+            onChange={setExcludeHi}
+          />
+          <p className="max-w-xl text-xs text-[var(--mm-text2)]">
+            When on, skips subtitles with sound descriptions like [DOOR CREAKS] or [TENSE MUSIC].
+          </p>
+        </div>
+        <div className="space-y-2">
+          <MmOnOffSwitch id="subber-enabled" layout="inline" label="Enable Subber" enabled={enabled} disabled={dis} onChange={setEnabled} />
+          <p className="max-w-xl text-xs text-[var(--mm-text2)]">
+            {enabled
+              ? "Subber is on. Searches run on import and schedule."
+              : "Subber is off. No automatic searches will run."}
+          </p>
+        </div>
         <button
           type="button"
           className={mmActionButtonClass({ variant: "primary", disabled: dis })}
           disabled={dis}
-          onClick={() => void saveSubtitleFolder()}
+          onClick={() => void savePreferences()}
           data-testid="subber-save-subtitle-folder"
         >
-          Save subtitle folder
+          Save preferences
         </button>
-        <SaveFeedback ok={saveFolder.ok} err={saveFolder.err} />
+        <SaveFeedback ok={savePrefs.ok} err={savePrefs.err} />
       </section>
 
-      {/* Card 6 — Subtitle style */}
-      <section className="space-y-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5">
-        <h2 className="text-base font-semibold text-[var(--mm-text)]">Subtitle style</h2>
-        <MmOnOffSwitch id="subber-exclude-hi" label="Exclude hearing impaired" enabled={excludeHi} disabled={dis} onChange={setExcludeHi} />
-        <p className="text-xs text-[var(--mm-text2)]">
-          When on, Subber skips subtitles that include sound descriptions for hearing impaired viewers — for example [DOOR CREAKS] or [TENSE MUSIC].
-        </p>
-        <button type="button" className={mmActionButtonClass({ variant: "primary", disabled: dis })} disabled={dis} onClick={() => void saveSubtitleStyle()}>
-          Save subtitle style
-        </button>
-        <SaveFeedback ok={saveStyle.ok} err={saveStyle.err} />
-      </section>
-
-      {/* Card 7 — Search frequency */}
+      {/* Card 6 — Search frequency */}
       <section className="space-y-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5">
         <h2 className="text-base font-semibold text-[var(--mm-text)]">Search frequency</h2>
         <MmOnOffSwitch id="subber-adapt" label="Enable adaptive searching" enabled={adaptEn} disabled={dis} onChange={setAdaptEn} />
@@ -801,43 +813,46 @@ export function SubberSettingsTab({ canOperate }: { canOperate: boolean }) {
           When on, Subber automatically searches less often for files that repeatedly return no results. This protects your daily download quota.
         </p>
         {adaptEn ? (
-          <div className="space-y-2">
-            <label className="block text-sm text-[var(--mm-text2)]">
-              Back off after failed attempts
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-[var(--mm-text2)]">Back off after</span>
               <input
                 type="number"
-                className="mm-input mt-1 w-28"
+                className="mm-input max-w-24"
                 min={1}
                 max={100}
                 value={adaptMax}
                 disabled={dis}
                 onChange={(e) => setAdaptMax(Number(e.target.value) || 1)}
               />
-            </label>
-            <label className="block text-sm text-[var(--mm-text2)]">
-              Wait hours before retrying
+              <span className="text-sm text-[var(--mm-text2)]">failed attempts</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-[var(--mm-text2)]">Wait</span>
               <input
                 type="number"
-                className="mm-input mt-1 w-28"
+                className="mm-input max-w-24"
                 min={1}
                 max={8760}
                 value={adaptDelayH}
                 disabled={dis}
                 onChange={(e) => setAdaptDelayH(Number(e.target.value) || 1)}
               />
-            </label>
-            <label className="block text-sm text-[var(--mm-text2)]">
-              Give up after total attempts
+              <span className="text-sm text-[var(--mm-text2)]">hours before retrying</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-[var(--mm-text2)]">Give up after</span>
               <input
                 type="number"
-                className="mm-input mt-1 w-28"
+                className="mm-input max-w-24"
                 min={1}
                 max={10000}
                 value={adaptPerm}
                 disabled={dis}
                 onChange={(e) => setAdaptPerm(Number(e.target.value) || 1)}
               />
-            </label>
+              <span className="text-sm text-[var(--mm-text2)]">total attempts</span>
+            </div>
           </div>
         ) : null}
         <button type="button" className={mmActionButtonClass({ variant: "primary", disabled: dis })} disabled={dis} onClick={() => void saveSearchFrequency()}>
@@ -846,167 +861,214 @@ export function SubberSettingsTab({ canOperate }: { canOperate: boolean }) {
         <SaveFeedback ok={saveFreq.ok} err={saveFreq.err} />
       </section>
 
-      {/* Card 8 — Providers */}
+      {/* Card 7 — Subtitle providers (compact list + accordion) */}
       <section className="space-y-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5" data-testid="subber-providers-section">
         <h2 className="text-base font-semibold text-[var(--mm-text)]">Subtitle providers</h2>
         <p className="text-sm text-[var(--mm-text2)]">
           Subber searches providers in order until a subtitle is found. Lower number = searched first. Enable at least one.
         </p>
         {pq.isLoading ? <p className="text-sm text-[var(--mm-text2)]">Loading providers…</p> : null}
-        <ul className="space-y-4">
-          {sorted.map((p) => (
-            <li key={p.provider_key} className="rounded border border-[var(--mm-border)] bg-black/10 p-4">
-              <h3 className="text-sm font-semibold text-[var(--mm-text)]">{p.display_name}</h3>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <MmOnOffSwitch
-                  id={`prov-en-${p.provider_key}`}
-                  label="Enabled"
-                  enabled={p.enabled}
-                  disabled={dis || putProv.isPending}
-                  onChange={(v) => void saveProviderRow(p.provider_key, v, provPri[p.provider_key] ?? p.priority)}
-                />
-              </div>
-              <label className="mt-2 block text-xs text-[var(--mm-text2)]">
-                Priority
-                <input
-                  type="number"
-                  className="mm-input mt-1 w-24"
-                  disabled={dis}
-                  value={provPri[p.provider_key] ?? p.priority}
-                  onChange={(e) =>
-                    setProvPri((x) => ({
-                      ...x,
-                      [p.provider_key]: Math.max(0, Math.min(9999, Number(e.target.value) || 0)),
-                    }))
-                  }
-                />
-              </label>
-              {p.requires_account ? (
-                <div className="mt-2 space-y-2">
-                  <label className="block text-xs text-[var(--mm-text2)]">
-                    Username
-                    <input
-                      className="mm-input mt-1 w-full max-w-md"
-                      disabled={dis}
-                      value={provUser[p.provider_key] ?? ""}
-                      onChange={(e) => setProvUser((x) => ({ ...x, [p.provider_key]: e.target.value }))}
-                    />
-                  </label>
-                  <label className="block text-xs text-[var(--mm-text2)]">
-                    Password {p.has_credentials ? <span className="text-[0.7rem]">(leave blank to keep)</span> : null}
-                    <input
-                      type="password"
-                      className="mm-input mt-1 w-full max-w-md"
-                      disabled={dis}
-                      placeholder={p.has_credentials ? MASK : ""}
-                      value={provPass[p.provider_key] ?? ""}
-                      onChange={(e) => setProvPass((x) => ({ ...x, [p.provider_key]: e.target.value }))}
-                    />
-                  </label>
-                  {p.provider_key.includes("opensubtitles") ? (
-                    <label className="block text-xs text-[var(--mm-text2)]">
-                      API key
-                      <input
-                        type="password"
-                        className="mm-input mt-1 w-full max-w-md"
-                        disabled={dis}
-                        placeholder={p.has_credentials ? MASK : ""}
-                        value={provKey[p.provider_key] ?? ""}
-                        onChange={(e) => setProvKey((x) => ({ ...x, [p.provider_key]: e.target.value }))}
-                      />
-                    </label>
-                  ) : null}
-                </div>
+        <ul className="divide-y divide-[var(--mm-border)] rounded-md border border-[var(--mm-border)] bg-black/10">
+          {sorted.map((p) => {
+            const pri = provPri[p.provider_key] ?? p.priority;
+            const provMsgText = provMsg[p.provider_key];
+            const showCfg = providerNeedsConfigureButton(p);
+            const expanded = expandedProviderKey === p.provider_key;
+            let statusEl: ReactNode;
+            if (provMsgText) {
+              statusEl =
+                provMsgText === "Connected" ? (
+                  <span className="text-xs font-medium text-emerald-600">{provMsgText}</span>
+                ) : (
+                  <span className="max-w-[14rem] truncate text-xs text-[var(--mm-text2)]" title={provMsgText}>
+                    {provMsgText}
+                  </span>
+                );
+            } else if (p.provider_key === "subscene") {
+              statusEl = <span className="text-xs text-[var(--mm-text2)]">No account needed</span>;
+            } else if (p.requires_account) {
+              statusEl = p.has_credentials ? (
+                <span className="text-xs font-medium text-emerald-600">Configured</span>
               ) : (
-                <p className="mt-2 text-xs text-[var(--mm-text2)]">
-                  {p.provider_key === "podnapisi"
-                    ? "Podnapisi works without an account. Add credentials only if you have one."
-                    : p.provider_key === "subscene"
-                      ? "No account required."
-                      : null}
-                </p>
-              )}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  className={mmActionButtonClass({ variant: "primary", disabled: dis || putProv.isPending })}
-                  disabled={dis || putProv.isPending}
-                  onClick={() => void saveProviderRow(p.provider_key, p.enabled, provPri[p.provider_key] ?? p.priority)}
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  className={mmActionButtonClass({ variant: "secondary", disabled: dis || testProv.isPending })}
-                  disabled={dis || testProv.isPending}
-                  onClick={() => void runProvTest(p.provider_key)}
-                >
-                  Test
-                </button>
-                <span className="text-xs text-[var(--mm-text2)]">
-                  {provMsg[p.provider_key]
-                    ? provMsg[p.provider_key] === "Connected"
-                      ? "Status: Connected"
-                      : `Status: ${provMsg[p.provider_key]}`
-                    : "Status: Not configured"}
-                </span>
-              </div>
-            </li>
-          ))}
+                <span className="text-xs text-[var(--mm-text2)]">Not configured</span>
+              );
+            } else if (p.provider_key === "podnapisi") {
+              statusEl = <span className="text-xs text-[var(--mm-text2)]">Optional credentials</span>;
+            } else {
+              statusEl = <span className="text-xs text-[var(--mm-text2)]">—</span>;
+            }
+            return (
+              <li key={p.provider_key} className="bg-[var(--mm-card-bg)]/40">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
+                  <span className="min-w-[7rem] text-sm font-semibold text-[var(--mm-text)]">{p.display_name}</span>
+                  <div className="max-w-[11rem] shrink-0">
+                    <MmOnOffSwitch
+                      id={`prov-en-${p.provider_key}`}
+                      label="Enabled"
+                      layout="inline"
+                      enabled={p.enabled}
+                      disabled={dis || putProv.isPending}
+                      onChange={(v) => void saveProviderRow(p.provider_key, v, pri)}
+                    />
+                  </div>
+                  <label className="flex items-center gap-1.5 text-xs text-[var(--mm-text2)]">
+                    <span className="sr-only">Priority</span>
+                    <input
+                      type="number"
+                      className="mm-input max-w-16 text-sm"
+                      disabled={dis}
+                      value={pri}
+                      onChange={(e) =>
+                        setProvPri((x) => ({
+                          ...x,
+                          [p.provider_key]: Math.max(0, Math.min(9999, Number(e.target.value) || 0)),
+                        }))
+                      }
+                      onBlur={() => {
+                        if (pri !== p.priority) void saveProviderRow(p.provider_key, p.enabled, pri);
+                      }}
+                    />
+                  </label>
+                  {showCfg ? (
+                    <button
+                      type="button"
+                      className={mmActionButtonClass({ variant: "secondary", disabled: dis })}
+                      disabled={dis}
+                      onClick={() => setExpandedProviderKey(expanded ? null : p.provider_key)}
+                    >
+                      {expanded ? "Close" : "Configure"}
+                    </button>
+                  ) : null}
+                  <span className="ml-auto min-w-0 shrink text-right">{statusEl}</span>
+                </div>
+                {expanded && showCfg ? (
+                  <div className="space-y-3 border-t border-[var(--mm-border)] bg-black/20 px-3 py-3">
+                    {p.provider_key === "podnapisi" && !p.requires_account ? (
+                      <p className="text-xs text-[var(--mm-text2)]">No account required — credentials optional.</p>
+                    ) : null}
+                    {p.requires_account ? (
+                      <div className="space-y-2">
+                        <label className="block text-xs text-[var(--mm-text2)]">
+                          Username
+                          <input
+                            className="mm-input mt-1 w-full max-w-md"
+                            disabled={dis}
+                            value={provUser[p.provider_key] ?? ""}
+                            onChange={(e) => setProvUser((x) => ({ ...x, [p.provider_key]: e.target.value }))}
+                          />
+                        </label>
+                        <label className="block text-xs text-[var(--mm-text2)]">
+                          Password {p.has_credentials ? <span className="text-[0.7rem]">(leave blank to keep)</span> : null}
+                          <input
+                            type="password"
+                            className="mm-input mt-1 w-full max-w-md"
+                            disabled={dis}
+                            placeholder={p.has_credentials ? MASK : ""}
+                            value={provPass[p.provider_key] ?? ""}
+                            onChange={(e) => setProvPass((x) => ({ ...x, [p.provider_key]: e.target.value }))}
+                          />
+                        </label>
+                        {p.provider_key.includes("opensubtitles") ? (
+                          <label className="block text-xs text-[var(--mm-text2)]">
+                            API key
+                            <input
+                              type="password"
+                              className="mm-input mt-1 w-full max-w-md"
+                              disabled={dis}
+                              placeholder={p.has_credentials ? MASK : ""}
+                              value={provKey[p.provider_key] ?? ""}
+                              onChange={(e) => setProvKey((x) => ({ ...x, [p.provider_key]: e.target.value }))}
+                            />
+                          </label>
+                        ) : null}
+                      </div>
+                    ) : p.provider_key === "podnapisi" ? (
+                      <div className="space-y-2">
+                        <label className="block text-xs text-[var(--mm-text2)]">
+                          Username (optional)
+                          <input
+                            className="mm-input mt-1 w-full max-w-md"
+                            disabled={dis}
+                            value={provUser[p.provider_key] ?? ""}
+                            onChange={(e) => setProvUser((x) => ({ ...x, [p.provider_key]: e.target.value }))}
+                          />
+                        </label>
+                        <label className="block text-xs text-[var(--mm-text2)]">
+                          Password (optional)
+                          <input
+                            type="password"
+                            className="mm-input mt-1 w-full max-w-md"
+                            disabled={dis}
+                            placeholder={p.has_credentials ? MASK : ""}
+                            value={provPass[p.provider_key] ?? ""}
+                            onChange={(e) => setProvPass((x) => ({ ...x, [p.provider_key]: e.target.value }))}
+                          />
+                        </label>
+                      </div>
+                    ) : null}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className={mmActionButtonClass({ variant: "primary", disabled: dis || putProv.isPending })}
+                        disabled={dis || putProv.isPending}
+                        onClick={() => void saveExpandedProvider(p.provider_key, p.enabled, pri)}
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        className={mmActionButtonClass({ variant: "secondary", disabled: dis || testProv.isPending })}
+                        disabled={dis || testProv.isPending}
+                        onClick={() => void runProvTest(p.provider_key)}
+                      >
+                        Test
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       </section>
 
-      {/* Card 9 — Path mapping */}
+      {/* Card 8 — Path mapping */}
       <section className="space-y-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5">
         <h2 className="text-base font-semibold text-[var(--mm-text)]">Path mapping</h2>
         <p className="text-sm text-[var(--mm-text2)]">
-          Only needed if MediaMop and Sonarr/Radarr run on different machines or in separate Docker containers. Leave disabled if everything runs on the same machine.
+          Only needed if MediaMop and Sonarr/Radarr run on different machines or Docker containers.
         </p>
         <MmOnOffSwitch id="subber-son-map" label="Enable Sonarr path mapping" enabled={sonMapEn} disabled={dis} onChange={setSonMapEn} />
         {sonMapEn ? (
-          <div className="space-y-2">
-            <label className="block text-sm text-[var(--mm-text2)]">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <label className="block min-w-0 flex-1 text-sm text-[var(--mm-text2)]">
               Path that Sonarr uses
-              <input className="mm-input mt-1 w-full max-w-xl font-mono text-sm" value={sonArr} disabled={dis} onChange={(e) => setSonArr(e.target.value)} />
+              <input className="mm-input mt-1 w-full font-mono text-sm" value={sonArr} disabled={dis} onChange={(e) => setSonArr(e.target.value)} />
             </label>
-            <label className="block text-sm text-[var(--mm-text2)]">
+            <label className="block min-w-0 flex-1 text-sm text-[var(--mm-text2)]">
               Path that MediaMop uses
-              <input className="mm-input mt-1 w-full max-w-xl font-mono text-sm" value={sonSub} disabled={dis} onChange={(e) => setSonSub(e.target.value)} />
+              <input className="mm-input mt-1 w-full font-mono text-sm" value={sonSub} disabled={dis} onChange={(e) => setSonSub(e.target.value)} />
             </label>
           </div>
         ) : null}
         <MmOnOffSwitch id="subber-rad-map" label="Enable Radarr path mapping" enabled={radMapEn} disabled={dis} onChange={setRadMapEn} />
         {radMapEn ? (
-          <div className="space-y-2">
-            <label className="block text-sm text-[var(--mm-text2)]">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <label className="block min-w-0 flex-1 text-sm text-[var(--mm-text2)]">
               Path that Radarr uses
-              <input className="mm-input mt-1 w-full max-w-xl font-mono text-sm" value={radArr} disabled={dis} onChange={(e) => setRadArr(e.target.value)} />
+              <input className="mm-input mt-1 w-full font-mono text-sm" value={radArr} disabled={dis} onChange={(e) => setRadArr(e.target.value)} />
             </label>
-            <label className="block text-sm text-[var(--mm-text2)]">
+            <label className="block min-w-0 flex-1 text-sm text-[var(--mm-text2)]">
               Path that MediaMop uses
-              <input className="mm-input mt-1 w-full max-w-xl font-mono text-sm" value={radSub} disabled={dis} onChange={(e) => setRadSub(e.target.value)} />
+              <input className="mm-input mt-1 w-full font-mono text-sm" value={radSub} disabled={dis} onChange={(e) => setRadSub(e.target.value)} />
             </label>
           </div>
         ) : null}
+        <p className="text-xs text-[var(--mm-text2)]">Leave mapping off if everything runs on the same machine.</p>
         <button type="button" className={mmActionButtonClass({ variant: "primary", disabled: dis })} disabled={dis} onClick={() => void savePathMapping()}>
           Save path mapping
         </button>
         <SaveFeedback ok={saveMap.ok} err={saveMap.err} />
-      </section>
-
-      {/* Card 10 — Enable Subber */}
-      <section className="space-y-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5">
-        <h2 className="text-base font-semibold text-[var(--mm-text)]">Enable Subber</h2>
-        <p className="text-xs text-[var(--mm-text2)]">
-          {enabled
-            ? "Subber is on. Searches run on import and schedule."
-            : "Subber is off. No automatic searches will run."}
-        </p>
-        <MmOnOffSwitch id="subber-enabled" label="Enable Subber" enabled={enabled} disabled={dis} onChange={setEnabled} />
-        <button type="button" className={mmActionButtonClass({ variant: "primary", disabled: dis })} disabled={dis} onClick={() => void saveEnableSubber()}>
-          Save
-        </button>
-        <SaveFeedback ok={saveEn.ok} err={saveEn.err} />
       </section>
     </div>
   );
