@@ -42,6 +42,8 @@ Canonical ports: **[`docs/ports.md`](docs/ports.md)**.
 
 Full instructions: **[`docs/local-development.md`](docs/local-development.md)**.
 
+**Docker (alpha testers):** prerequisites, secrets, Compose, GHCR, and HTTPS notes — **[`docker/README.md`](docker/README.md)**.
+
 ## Product paths
 
 Runtime file layout is anchored by **`MEDIAMOP_HOME`** (optional). Defaults are OS-appropriate (`%LOCALAPPDATA%\MediaMop` on Windows, XDG data dir on Linux/macOS). It must **not** default to “whatever Git clone directory you’re in.” Details in [`docs/local-development.md`](docs/local-development.md).

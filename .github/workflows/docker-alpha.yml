@@ -7,7 +7,7 @@
 #   docker run --rm -e MEDIAMOP_SESSION_SECRET='32+char secret' -p 8788:8788 -v mediamop-home:/data/mediamop \
 #     ghcr.io/OWNER/REPO:TAG
 #
-# See docs/docker.md and docker-compose.mediamop.yml for local compose.
+# Tester docs: docker/README.md · overview: docs/docker.md
 name: Docker alpha
 
 on:

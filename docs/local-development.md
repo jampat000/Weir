@@ -141,7 +141,7 @@ The repo may still ship a **`docker-compose.yml`** that starts **PostgreSQL** on
 
 ## All-in-one Docker (alpha)
 
-For a **single-container** build (API + production web UI, SQLite volume), see **`docs/docker.md`** and **`docker-compose.mediamop.yml`**.
+For a **single-container** build (API + production web UI, SQLite volume), see **`docker/README.md`** (requirements + steps) and **`docker-compose.mediamop.yml`**. Overview: **`docs/docker.md`**.
 
 ## Visual shell
 

@@ -29,7 +29,7 @@ MediaMop ships as a **tested source release**: a **git tag** on `main` that pass
 
 ## Not supported yet
 
-- **Stable** Docker registry publishing (no semver-tagged GA image pipeline). **Alpha:** all-in-one image + `docker-compose.mediamop.yml` — **Actions → Docker alpha**, `docs/docker.md`, GHCR.
+- **Stable** Docker registry publishing (no semver-tagged GA image pipeline). **Alpha:** all-in-one image + `docker-compose.mediamop.yml` — **Actions → Docker alpha**, **`docker/README.md`** (tester checklist), **`docs/docker.md`** (short pointer), GHCR.
 - **Windows** installer / MSIX / signed `.exe` pipeline.
 - **npm / PyPI** registry publishing.
 - **Automation that commits to `main`** (no release bots or version-push workflows).
