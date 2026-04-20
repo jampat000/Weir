@@ -245,7 +245,7 @@ export function SettingsPage() {
                   {(
                     [
                       { id: "default" as const, label: "Default", hint: "Balanced" },
-                      { id: "comfortable" as const, label: "Comfortable", hint: "Larger text, wider cap" },
+                      { id: "comfortable" as const, label: "Comfortable", hint: "Larger text (+10%), wider cap" },
                       { id: "compact" as const, label: "Compact", hint: "Smaller text, narrower cap" },
                     ] as const
                   ).map(({ id, label, hint }) => (

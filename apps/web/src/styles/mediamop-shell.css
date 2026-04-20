@@ -38,7 +38,7 @@ body.mm-body {
   height: 100%;
   margin: 0;
   font-family: var(--mm-font);
-  font-size: calc(15px * var(--mm-density-font-scale));
+  font-size: calc(15.25px * var(--mm-density-font-scale));
   line-height: 1.52;
   font-weight: 400;
   font-feature-settings: var(--mm-font-feature);
@@ -359,24 +359,24 @@ body.mm-body {
 /* Desktop (Material "expanded" and up): first typography step before large / extra-large tiers. */
 @media (min-width: 1280px) {
   body.mm-body {
-    font-size: calc(15.5px * var(--mm-density-font-scale));
+    font-size: calc(15.875px * var(--mm-density-font-scale));
     line-height: 1.53;
   }
 
   .mm-page__title {
-    font-size: clamp(1.58rem, 2.4vw, 1.88rem);
+    font-size: clamp(1.58rem, 2.45vw, 1.95rem);
   }
 
   .mm-page__subtitle,
   .mm-page__lead {
-    font-size: 0.953125rem;
+    font-size: 0.96875rem;
   }
 }
 
 /* Large / extra-large desktop: stronger scale (aligned ~ Material 1200dp+ / 1600dp+). */
 @media (min-width: 1600px) {
   body.mm-body {
-    font-size: calc(15.75px * var(--mm-density-font-scale));
+    font-size: calc(16.25px * var(--mm-density-font-scale));
     line-height: 1.54;
   }
 
@@ -386,12 +386,12 @@ body.mm-body {
   }
 
   .mm-page__title {
-    font-size: clamp(1.65rem, 2.6vw, 2.1rem);
+    font-size: clamp(1.65rem, 2.55vw, 2.12rem);
   }
 
   .mm-page__subtitle,
   .mm-page__lead {
-    font-size: 0.96875rem;
+    font-size: 0.984375rem;
   }
 
   .mm-card {
@@ -403,19 +403,46 @@ body.mm-body {
   }
 
   .mm-card__body {
-    font-size: 0.9375rem;
+    font-size: 0.953125rem;
     line-height: 1.6;
   }
 
   .mm-card__body--tight {
-    font-size: 0.90625rem;
+    font-size: 0.921875rem;
     line-height: 1.57;
+  }
+}
+
+/* QHD / wide 1080p+ windows: extra step before 4K-class widths. */
+@media (min-width: 1920px) {
+  body.mm-body {
+    font-size: calc(16.625px * var(--mm-density-font-scale));
+    line-height: 1.54;
+  }
+
+  .mm-page__title {
+    font-size: clamp(1.68rem, 2.2vw, 2.2rem);
+  }
+
+  .mm-page__subtitle,
+  .mm-page__lead {
+    font-size: 1rem;
+  }
+
+  .mm-card__body {
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  .mm-card__body--tight {
+    font-size: 0.96875rem;
+    line-height: 1.58;
   }
 }
 
 @media (min-width: 2000px) {
   body.mm-body {
-    font-size: calc(16px * var(--mm-density-font-scale));
+    font-size: calc(17.25px * var(--mm-density-font-scale));
     line-height: 1.55;
   }
 
@@ -425,7 +452,7 @@ body.mm-body {
   }
 
   .mm-page__title {
-    font-size: clamp(1.7rem, 2.2vw, 2.2rem);
+    font-size: clamp(1.72rem, 2.05vw, 2.35rem);
   }
 
   .mm-card {
@@ -433,11 +460,11 @@ body.mm-body {
   }
 
   .mm-card__body {
-    font-size: 0.96875rem;
+    font-size: 1.03125rem;
   }
 
   .mm-card__body--tight {
-    font-size: 0.9375rem;
+    font-size: 1rem;
   }
 }
 

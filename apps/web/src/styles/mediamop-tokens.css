@@ -55,7 +55,8 @@
 }
 
 html[data-mm-density="comfortable"] {
-  --mm-density-font-scale: 1.06;
+  /* Stronger lift for QHD / 4K where UI can still feel small next to physical screen size. */
+  --mm-density-font-scale: 1.1;
   --mm-main-max-cap: 2600px;
 }
 
