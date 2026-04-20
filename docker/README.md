@@ -10,7 +10,7 @@ MediaMop is **Windows-first** for day-to-day development; this Docker image exis
 
 **You do not need a GitHub account** to use the image if the container package is **public** (see [For repo maintainers](#for-repo-maintainers-anonymous-docker-pull) — otherwise use `docker login` as in [Pull a pre-built image](#pull-a-pre-built-image-github-container-registry)).
 
-1. **Image must exist.** A maintainer runs **[Docker alpha](../.github/workflows/docker-alpha.yml)** (Actions tab → *Docker alpha* → *Run workflow*) or pushes a tag like `v0.1.0-alpha.1` so CI pushes `ghcr.io/jampat000/mediamop:TAG`.
+1. **Image must exist.** Every push to **`main`** publishes **`ghcr.io/jampat000/mediamop:alpha`** and **`:main`** (same digest). You can also run **[Docker alpha](../.github/workflows/docker-alpha.yml)** manually (Actions → *Docker alpha* → *Run workflow*) or push a tag like `v0.1.0-alpha.1` for that tag name on GHCR.
 
 2. **Pull and run** (replace the secret with a random string **≥ 32 characters**):
 

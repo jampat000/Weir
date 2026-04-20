@@ -49,13 +49,25 @@ jobs:
         id: image
         run: echo "name=${REGISTRY}/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
-      - name: Resolve tag
-        id: tag
+      # Branch pushes to main only used to publish `:main`, so `docker pull …:alpha` never moved.
+      # Publish both tags on main so tester docs (`:alpha`) and explicit `:main` stay in sync.
+      - name: Resolve tags
+        id: tags
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
         run: |
+          IMAGE="${IMAGE_NAME}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "value=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+            echo "value=${IMAGE}:${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            {
+              echo "value<<EOF"
+              echo "${IMAGE}:main"
+              echo "${IMAGE}:alpha"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
           else
-            echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "value=${IMAGE}:${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: docker/setup-qemu-action@v3
@@ -74,8 +86,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ${{ steps.image.outputs.name }}:${{ steps.tag.outputs.value }}
+          tags: ${{ steps.tags.outputs.value }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
