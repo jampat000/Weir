@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { PageLoading } from "../../components/shared/page-loading";
 import { isHttpErrorFromApi, isLikelyNetworkFailure } from "../../lib/api/error-guards";
 import {
@@ -650,29 +649,16 @@ export function FetcherArrOperatorSettingsSection({
             <>
               Turn searches on or off, set how often they run, and limit runs to certain days and times. Per-run limits
               stay on the <strong>{FETCHER_TAB_SONARR_LABEL}</strong> and <strong>{FETCHER_TAB_RADARR_LABEL}</strong> tabs.
-              Follow runs on{" "}
-              <Link to="/app/activity" className="text-[var(--mm-accent)] underline-offset-2 hover:underline">
-                Activity
-              </Link>
-              .
             </>
           ) : isTv ? (
             <>
               Configure Fetcher search behavior for <strong>{FETCHER_TAB_SONARR_LABEL}</strong>, including missing and
-              upgrade lanes. Follow runs on{" "}
-              <Link to="/app/activity" className="text-[var(--mm-accent)] underline-offset-2 hover:underline">
-                Activity
-              </Link>
-              .
+              upgrade lanes.
             </>
           ) : (
             <>
               Configure Fetcher search behavior for <strong>{FETCHER_TAB_RADARR_LABEL}</strong>, including missing and
-              upgrade lanes. Follow runs on{" "}
-              <Link to="/app/activity" className="text-[var(--mm-accent)] underline-offset-2 hover:underline">
-                Activity
-              </Link>
-              .
+              upgrade lanes.
             </>
           )}
         </p>

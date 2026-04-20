@@ -295,7 +295,6 @@ describe("FetcherPage (tabbed IA)", () => {
     expect(screen.getByTestId("fetcher-arr-operator-settings")).toBeInTheDocument();
     const arrPanel = screen.getByTestId("fetcher-arr-operator-settings");
     expect(arrPanel.textContent).toMatch(/Configure Fetcher search behavior for Sonarr/i);
-    expect(within(arrPanel).getByRole("link", { name: "Activity" })).toBeInTheDocument();
   });
 
   it("Schedules tab shows lane cards without a suite timezone preamble banner", () => {
