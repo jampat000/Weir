@@ -73,7 +73,7 @@ export function useSubberLibraryMoviesQuery(filters: {
   });
 }
 
-export function useSubberJobsQuery(limit = 50) {
+export function useSubberJobsQuery(limit = 100) {
   return useQuery({
     queryKey: ["subber", "jobs", limit],
     queryFn: () => fetchSubberJobs(limit),

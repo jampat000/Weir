@@ -30,7 +30,7 @@ export function useRefinerJobsInspectionQuery(filter: RefinerJobsInspectionFilte
     queryKey: refinerJobsInspectionQueryKey(filter),
     queryFn: () =>
       fetchRefinerJobsInspection({
-        limit: 50,
+        limit: 100,
         statuses: statusesForFilter(filter),
       }),
     staleTime: 15_000,

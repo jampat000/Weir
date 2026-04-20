@@ -1227,6 +1227,29 @@ select.mm-input::-ms-expand {
 }
 
 @media (max-width: 640px) {
+  .mm-main {
+    padding-top: clamp(10px, 3.5vw, 16px);
+  }
+
+  .mm-page__intro {
+    margin-bottom: 1rem;
+    padding-bottom: 0.85rem;
+  }
+
+  .mm-page__title {
+    font-size: clamp(1.35rem, 6.2vw, 1.6rem);
+  }
+
+  .mm-page__subtitle,
+  .mm-page__lead {
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .mm-card {
+    padding: 1rem 1rem;
+  }
+
   .mm-sidebar-nav {
     gap: 6px;
     padding-inline: 8px;

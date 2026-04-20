@@ -4,7 +4,7 @@ import { fetcherJobsInspectionPath } from "./api";
 describe("fetcherJobsInspectionPath", () => {
   it("builds the neutral Fetcher jobs inspection URL", () => {
     expect(fetcherJobsInspectionPath({ limit: 50 })).toBe("/api/v1/fetcher/jobs/inspection?limit=50");
-    expect(fetcherJobsInspectionPath()).toBe("/api/v1/fetcher/jobs/inspection?limit=50");
+    expect(fetcherJobsInspectionPath()).toBe("/api/v1/fetcher/jobs/inspection?limit=100");
   });
 
   it("appends repeated status params", () => {

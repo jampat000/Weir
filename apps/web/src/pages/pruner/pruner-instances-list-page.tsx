@@ -1,6 +1,7 @@
 import {
   MmAtGlanceCard,
   MmAtGlanceGrid,
+  MmJobsPagination,
   MmNeedsAttentionList,
   MmNextStepsButton,
   MmOverviewSection,
@@ -8,7 +9,7 @@ import {
   MmStatTile,
   MmStatTileRow,
 } from "../../components/overview/mm-overview-cards";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { MmOnOffSwitch } from "../../components/ui/mm-on-off-switch";
@@ -19,6 +20,7 @@ import {
   MmScheduleTimeFields,
 } from "../../components/ui/mm-schedule-window-controls";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
+import { MmListboxPicker } from "../../components/ui/mm-listbox-picker";
 import { fetcherMenuButtonClass, fetcherSectionTabClass } from "../fetcher/fetcher-menu-button";
 import { fetchCsrfToken } from "../../lib/api/auth-api";
 import type { PrunerJobsInspectionRow, PrunerServerInstance } from "../../lib/pruner/api";
@@ -50,6 +52,14 @@ function parseServerInstanceId(job: PrunerJobsInspectionRow): number | null {
     return null;
   }
 }
+
+const PRUNER_JOB_FILTER_OPTIONS = [
+  { value: "recent", label: "Recent (all statuses, newest first)" },
+  { value: "pending", label: "Pending" },
+  { value: "running", label: "Running" },
+  { value: "failed", label: "Failed" },
+  { value: "completed", label: "Completed" },
+] as const;
 
 function activeRuleCount(scope: PrunerServerInstance["scopes"][number]): number {
   return [
@@ -993,60 +1003,129 @@ function PrunerGlobalScheduleRow({
 }
 
 function TopLevelJobs({ instances }: { instances: PrunerServerInstance[] }) {
-  const jobsQ = usePrunerJobsInspectionQuery(50);
+  const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
+  const jobsQ = usePrunerJobsInspectionQuery(100);
   const byId = useMemo(() => new Map(instances.map((x) => [x.id, x])), [instances]);
+  const [statusFilter, setStatusFilter] = useState("recent");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE_OPTIONS[0]);
+  const filterLabelId = useId();
+  const jobs =
+    statusFilter === "recent" ? (jobsQ.data?.jobs ?? []) : (jobsQ.data?.jobs ?? []).filter((j) => j.status === statusFilter);
+  const totalPages = Math.max(1, Math.ceil(jobs.length / pageSize));
+  const pagedRows = jobs.slice((page - 1) * pageSize, page * pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
   return (
-    <section className="space-y-3" data-testid="pruner-top-jobs-tab">
-      <h2 className="text-base font-semibold text-[var(--mm-text1)]">Jobs</h2>
-      <p className="text-sm text-[var(--mm-text2)]">
-        Recent cleanup and connection tasks. When MediaMop knows which server a task belonged to, it is shown in the
-        table.
-      </p>
-      {jobsQ.isLoading ? <p className="text-sm text-[var(--mm-text2)]">Loading jobs…</p> : null}
-      {jobsQ.isError ? <p className="text-sm text-red-600">{(jobsQ.error as Error).message}</p> : null}
-      {jobsQ.data?.jobs?.length ? (
-        <div className="overflow-x-auto rounded-md border border-[var(--mm-border)]">
-          <table className="w-full min-w-[42rem] border-collapse text-left text-sm">
-            <thead className="bg-[var(--mm-surface2)] text-xs uppercase text-[var(--mm-text2)]">
+    <section
+      className="rounded-lg border border-[var(--mm-border)] bg-[var(--mm-card-bg)] shadow-sm"
+      data-testid="pruner-top-jobs-tab"
+    >
+      <header className="border-b border-[var(--mm-border)] bg-black/10 px-4 py-3.5 sm:px-5 sm:py-4">
+        <h2 className="text-lg font-semibold tracking-tight text-[var(--mm-text)]">Jobs</h2>
+        <p className="mt-1 text-sm text-[var(--mm-text2)]">Pending, running, and recent Pruner work.</p>
+      </header>
+      <div className="space-y-4 px-4 py-4 sm:px-5 sm:py-5">
+        <div className="flex flex-col gap-3 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-3.5 py-3.5 sm:flex-row sm:items-end sm:justify-between sm:px-5 sm:py-4">
+          <label className="block min-w-0 flex-1">
+            <span id={filterLabelId} className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
+              Show jobs
+            </span>
+            <MmListboxPicker
+              className="mt-2 max-w-xl"
+              ariaLabelledBy={filterLabelId}
+              placeholder="Recent (all statuses, newest first)"
+              options={PRUNER_JOB_FILTER_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+              value={statusFilter}
+              onChange={(v) => setStatusFilter(v)}
+            />
+          </label>
+        </div>
+        {jobsQ.isLoading ? <p className="text-sm text-[var(--mm-text2)]">Loading jobs…</p> : null}
+        {jobsQ.isError ? <p className="text-sm text-red-600">{(jobsQ.error as Error).message}</p> : null}
+        {jobs.length ? (
+          <>
+            <div className="overflow-x-auto rounded-md border border-[var(--mm-border)]">
+            <table className="w-full min-w-[32rem] border-collapse text-left text-sm">
+              <thead className="bg-black/20 text-[var(--mm-text2)]">
               <tr>
-                <th className="px-2 py-2">Id</th>
-                <th className="px-2 py-2">What ran</th>
-                <th className="px-2 py-2">Status</th>
-                <th className="px-2 py-2">Provider / server</th>
-                <th className="px-2 py-2">Updated</th>
+                <th className="sticky left-0 top-0 z-30 bg-black/20 px-3 py-2 font-medium">Id</th>
+                <th className="sticky top-0 z-20 bg-black/20 px-3 py-2 font-medium">What ran</th>
+                <th className="sticky top-0 z-20 bg-black/20 px-3 py-2 font-medium">Status</th>
+                <th className="sticky top-0 z-20 bg-black/20 px-3 py-2 font-medium">Server</th>
+                <th className="sticky top-0 z-20 bg-black/20 px-3 py-2 font-medium">Updated</th>
               </tr>
             </thead>
             <tbody>
-              {jobsQ.data.jobs.map((job) => {
+              {pagedRows.map((job) => {
                 const sid = parseServerInstanceId(job);
                 const inst = sid ? byId.get(sid) : undefined;
                 return (
                   <tr key={job.id} className="border-t border-[var(--mm-border)]">
-                    <td className="px-2 py-2 font-mono text-xs">#{job.id}</td>
-                    <td className="px-2 py-2 text-xs">{prunerJobKindOperatorLabel(job.job_kind)}</td>
-                    <td className="px-2 py-2">{job.status}</td>
-                    <td className="px-2 py-2 text-xs">
-                      {inst ? `${inst.provider} / ${inst.display_name}` : sid ? `Server #${sid}` : "—"}
+                    <td className="sticky left-0 z-[1] bg-[var(--mm-card-bg)] px-3 py-2 align-top font-mono text-xs text-[var(--mm-text1)]">
+                      #{job.id}
                     </td>
-                    <td className="px-2 py-2 text-xs">{job.updated_at}</td>
+                    <td className="max-w-[14rem] break-words px-3 py-2 align-top text-xs">{prunerJobKindOperatorLabel(job.job_kind)}</td>
+                    <td className="whitespace-nowrap px-3 py-2 align-top">
+                      <span
+                        className={
+                          job.status === "completed"
+                            ? "text-emerald-500"
+                            : job.status === "failed"
+                              ? "text-red-400"
+                              : job.status === "running"
+                                ? "text-amber-400"
+                                : "text-[var(--mm-text2)]"
+                        }
+                      >
+                        {job.status}
+                      </span>
+                    </td>
+                    <td className="max-w-[14rem] break-words px-3 py-2 align-top text-xs">
+                      {inst ? inst.display_name : sid ? `Server #${sid}` : "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 align-top text-xs text-[var(--mm-text2)]">{job.updated_at}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-        </div>
-      ) : jobsQ.data ? (
-        <p className="rounded-md border border-dashed border-[var(--mm-border)] bg-[var(--mm-surface2)]/35 px-4 py-3 text-sm text-[var(--mm-text2)]">
-          No recent Pruner jobs.
+            </div>
+            <MmJobsPagination
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[...PAGE_SIZE_OPTIONS]}
+            />
+          </>
+        ) : jobsQ.data ? (
+          <div className="space-y-1 rounded border border-[var(--mm-border)] bg-black/10 px-5 py-10 text-center">
+            <p className="text-sm font-medium text-[var(--mm-text)]">No jobs match this view</p>
+            <p className="text-xs text-[var(--mm-text2)]">
+              {statusFilter !== "recent"
+                ? `Nothing with status "${statusFilter}" yet. Try Recent (all statuses) for the latest rows.`
+                : "No recent Pruner jobs yet. Run cleanup or connection tasks to see activity here."}
+            </p>
+          </div>
+        ) : null}
+        <p className="text-xs text-[var(--mm-text2)]">
+          Full detail on what was deleted, skipped, or failed is in the{" "}
+          <Link to="/app/activity" className="font-semibold text-[var(--mm-accent)] underline-offset-2 hover:underline">
+            Activity log
+          </Link>
+          .
         </p>
-      ) : null}
-      <p className="text-xs text-[var(--mm-text2)]">
-        Full detail on what was deleted, skipped, or failed is in the{" "}
-        <Link to="/app/activity" className="font-semibold text-[var(--mm-accent)] underline-offset-2 hover:underline">
-          Activity log
-        </Link>
-        .
-      </p>
+      </div>
     </section>
   );
 }

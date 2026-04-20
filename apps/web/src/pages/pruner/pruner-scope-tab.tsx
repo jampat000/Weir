@@ -2100,7 +2100,7 @@ export function PrunerScopeTab(props: {
           </p>
         ) : runsQuery.data?.length ? (
           <div className="overflow-x-auto rounded-md border border-[var(--mm-border)]">
-            <table className="w-full min-w-[32rem] border-collapse text-left text-sm text-[var(--mm-text)]">
+            <table className="w-full min-w-[30rem] border-collapse text-left text-sm text-[var(--mm-text)]">
               <thead className="border-b border-[var(--mm-border)] bg-[var(--mm-surface2)] text-xs uppercase text-[var(--mm-text2)]">
                 <tr>
                   <th className="px-2 py-2">#</th>
@@ -2117,8 +2117,8 @@ export function PrunerScopeTab(props: {
                   <tr key={row.preview_run_id} className="border-b border-[var(--mm-border)] align-top">
                     <td className="px-2 py-2 text-xs text-[var(--mm-text2)]">{idx + 1}</td>
                     <td className="px-2 py-2 text-xs text-[var(--mm-text2)]">{ruleFamilyColumnLabel(row.rule_family_id)}</td>
-                    <td className="px-2 py-2 text-xs text-[var(--mm-text2)]">{fmt(row.created_at)}</td>
-                    <td className="px-2 py-2 text-xs">
+                    <td className="whitespace-nowrap px-2 py-2 text-xs text-[var(--mm-text2)]">{fmt(row.created_at)}</td>
+                    <td className="max-w-[14rem] break-words px-2 py-2 text-xs">
                       <span className="font-medium">{row.outcome}</span>
                       {row.unsupported_detail ? (
                         <div className="mt-1 text-[var(--mm-text2)]">{row.unsupported_detail}</div>
@@ -2133,7 +2133,7 @@ export function PrunerScopeTab(props: {
                     >
                       {previewRunRowCaption(row)}
                     </td>
-                    <td className="px-2 py-2 text-xs">
+                    <td className="whitespace-nowrap px-2 py-2 text-xs">
                       {row.candidate_count}
                       {row.truncated ? " (list stopped at limit)" : ""}
                     </td>

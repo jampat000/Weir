@@ -3,7 +3,7 @@ import { refinerJobsInspectionPath } from "./api";
 
 describe("refinerJobsInspectionPath", () => {
   it("builds default recent listing URL", () => {
-    expect(refinerJobsInspectionPath()).toBe("/api/v1/refiner/jobs/inspection?limit=50");
+    expect(refinerJobsInspectionPath()).toBe("/api/v1/refiner/jobs/inspection?limit=100");
   });
 
   it("appends repeated status params", () => {

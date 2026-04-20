@@ -30,7 +30,7 @@ export function usePrunerInstanceQuery(instanceId: number) {
   });
 }
 
-export function usePrunerJobsInspectionQuery(limit = 50) {
+export function usePrunerJobsInspectionQuery(limit = 100) {
   return useQuery({
     queryKey: ["pruner", "jobs-inspection", limit],
     queryFn: () => fetchPrunerJobsInspection(limit),

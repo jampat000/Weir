@@ -8,7 +8,7 @@ export type FetchFetcherJobsInspectionOpts = {
 
 export function fetcherJobsInspectionPath(opts?: FetchFetcherJobsInspectionOpts): string {
   const params = new URLSearchParams();
-  const limit = opts?.limit ?? 50;
+  const limit = opts?.limit ?? 100;
   params.set("limit", String(limit));
   if (opts?.statuses?.length) {
     for (const s of opts.statuses) {

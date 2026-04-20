@@ -9,7 +9,7 @@ export type FetchRefinerJobsInspectionOpts = {
 
 export function refinerJobsInspectionPath(opts?: FetchRefinerJobsInspectionOpts): string {
   const params = new URLSearchParams();
-  const limit = opts?.limit ?? 50;
+  const limit = opts?.limit ?? 100;
   params.set("limit", String(limit));
   if (opts?.statuses?.length) {
     for (const s of opts.statuses) {

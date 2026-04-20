@@ -18,7 +18,7 @@ export function useFetcherJobsInspectionQuery(filter: FetcherJobsInspectionFilte
     queryKey: fetcherJobsInspectionQueryKey(filter),
     queryFn: () =>
       fetchFetcherJobsInspection(
-        filter === "terminal" ? { limit: 50 } : { limit: 50, statuses: [filter] },
+        filter === "terminal" ? { limit: 100 } : { limit: 100, statuses: [filter] },
       ),
     staleTime: 15_000,
   });
