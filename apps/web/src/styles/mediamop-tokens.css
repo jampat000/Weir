@@ -32,7 +32,8 @@
   --mm-radius: 12px;
   --mm-radius-sm: 8px;
   --mm-radius-pill: 999px;
-  --mm-main-max: clamp(1200px, 86vw, 1560px);
+  /* Main column width: keep mobile sane, but let large monitors breathe (27" 1440p, ultrawide). */
+  --mm-main-max: clamp(1100px, 92vw, 2100px);
   --mm-space: clamp(1.125rem, 3vw, 1.75rem);
   --mm-space-lg: clamp(1.65rem, 4vw, 2.35rem);
   --mm-font: "Outfit", system-ui, -apple-system, sans-serif;

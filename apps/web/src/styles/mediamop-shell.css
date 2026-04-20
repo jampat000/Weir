@@ -356,6 +356,74 @@ body.mm-body {
   z-index: 1;
 }
 
+/* Large desktop / 1440p: bump base scale slightly so the UI doesn't feel postage-stamp sized. */
+@media (min-width: 1600px) {
+  body.mm-body {
+    font-size: 15.75px;
+    line-height: 1.54;
+  }
+
+  .mm-main {
+    padding-top: 34px;
+    padding-bottom: 44px;
+  }
+
+  .mm-page__title {
+    font-size: clamp(1.65rem, 2.6vw, 2.1rem);
+  }
+
+  .mm-page__subtitle,
+  .mm-page__lead {
+    font-size: 0.96875rem;
+  }
+
+  .mm-card {
+    padding: 1.45rem 1.55rem;
+  }
+
+  .mm-card__title {
+    font-size: 0.6875rem;
+  }
+
+  .mm-card__body {
+    font-size: 0.9375rem;
+    line-height: 1.6;
+  }
+
+  .mm-card__body--tight {
+    font-size: 0.90625rem;
+    line-height: 1.57;
+  }
+}
+
+@media (min-width: 2000px) {
+  body.mm-body {
+    font-size: 16px;
+    line-height: 1.55;
+  }
+
+  .mm-main {
+    padding-top: 36px;
+    padding-bottom: 48px;
+  }
+
+  .mm-page__title {
+    font-size: clamp(1.7rem, 2.2vw, 2.2rem);
+  }
+
+  .mm-card {
+    padding: 1.5rem 1.6rem;
+  }
+
+  .mm-card__body {
+    font-size: 0.96875rem;
+  }
+
+  .mm-card__body--tight {
+    font-size: 0.9375rem;
+  }
+}
+
 .mm-page,
 .mm-card,
 .mm-card__body {
