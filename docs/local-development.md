@@ -139,6 +139,10 @@ If the static site and API are on **different origins**:
 
 The repo may still ship a **`docker-compose.yml`** that starts **PostgreSQL** on host port **5433**. **MediaMop’s backend does not use it** in the SQLite-first configuration. Treat it as optional infrastructure for other experiments, not part of the default onboarding path.
 
+## All-in-one Docker (alpha)
+
+For a **single-container** build (API + production web UI, SQLite volume), see **`docs/docker.md`** and **`docker-compose.mediamop.yml`**.
+
 ## Visual shell
 
 The forward **source of truth** for the product UI is **`apps/web`**.

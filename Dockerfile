@@ -15,6 +15,7 @@ FROM python:3.11-slim-bookworm
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
+    curl \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/mediamop
@@ -29,6 +30,14 @@ RUN chmod +x /entrypoint.sh
 ENV PYTHONPATH=/opt/mediamop/apps/backend/src
 ENV MEDIAMOP_WEB_DIST=/opt/mediamop/web-dist
 ENV MEDIAMOP_ENV=production
+# All-in-one is usually reached over plain HTTP first (localhost / LAN). Secure cookies would
+# never be sent on http://, which breaks sign-in. Set MEDIAMOP_SESSION_COOKIE_SECURE=true when
+# browsers always use HTTPS (e.g. TLS terminated at a reverse proxy in front of this container).
+ENV MEDIAMOP_SESSION_COOKIE_SECURE=false
 
 EXPOSE 8788
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=50s --retries=3 \
+  CMD curl -fsS "http://127.0.0.1:${PORT:-8788}/health" >/dev/null || exit 1
+
 ENTRYPOINT ["/entrypoint.sh"]

@@ -1,0 +1,2 @@
+# Shell entrypoints must use LF so Linux containers do not see /bin/sh^M.
+docker/*.sh text eol=lf
