@@ -180,8 +180,8 @@ describe("BrokerPage", () => {
     render(wrap(<BrokerPage />, client));
     fireEvent.click(screen.getByRole("tab", { name: BROKER_TAB_SEARCH_LABEL }));
     await waitFor(() => expect(screen.getByTestId("broker-search-tab")).toBeInTheDocument());
-    expect(screen.getByPlaceholderText("Search titles…")).toBeInTheDocument();
-    expect(screen.getByText("Type")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Search indexers…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument();
   });
 
   it("Broker nav link appears above Fetcher in the sidebar", async () => {

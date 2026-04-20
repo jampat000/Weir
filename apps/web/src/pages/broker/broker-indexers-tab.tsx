@@ -36,22 +36,36 @@ function Pill({ children, tone }: { children: ReactNode; tone: "neutral" | "blue
       : tone === "purple"
         ? "border-violet-500/40 bg-violet-500/10 text-violet-200"
         : "border-[var(--mm-border)] bg-black/15 text-[var(--mm-text2)]";
-  return <span className={`inline-flex rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide ${cls}`}>{children}</span>;
+  return (
+    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide ${cls}`}>
+      {children}
+    </span>
+  );
 }
 
-function testDotTone(ix: BrokerIndexer): "ok" | "bad" | "muted" {
-  if (ix.last_test_ok === true) {
-    return "ok";
-  }
-  if (ix.last_test_ok === false) {
-    return "bad";
-  }
-  return "muted";
+function protocolLabel(p: string): string {
+  const x = p.toLowerCase();
+  if (x === "torrent") return "Torrent";
+  if (x === "usenet") return "Usenet";
+  return p;
+}
+
+function privacyLabel(p: string): string {
+  const x = p.toLowerCase();
+  if (x === "public") return "Public";
+  if (x === "private") return "Private";
+  return p;
+}
+
+function testDotTone(ix: BrokerIndexer): "ok" | "bad" | "warn" {
+  if (ix.last_test_ok === true) return "ok";
+  if (ix.last_test_ok === false) return "bad";
+  return "warn";
 }
 
 function TestDot({ ix }: { ix: BrokerIndexer }) {
   const t = testDotTone(ix);
-  const cls = t === "ok" ? "bg-emerald-500" : t === "bad" ? "bg-red-500" : "bg-[var(--mm-text3)]";
+  const cls = t === "ok" ? "bg-emerald-500" : t === "bad" ? "bg-red-500" : "bg-amber-500";
   return <span title={ix.last_test_error ?? ""} className={`inline-block h-2 w-2 shrink-0 rounded-full ${cls}`} aria-hidden="true" />;
 }
 
@@ -72,8 +86,6 @@ function indexerShowsApiKey(ix: BrokerIndexer): boolean {
   const meta = nativeMeta(ix.slug);
   return Boolean(meta?.requiresApiKey);
 }
-
-type AddWizardMode = "native" | "torznab" | "newznab" | null;
 
 function IndexerAccordionRow({
   ix,
@@ -96,8 +108,9 @@ function IndexerAccordionRow({
   const [showKey, setShowKey] = useState(false);
   const [priority, setPriority] = useState(String(ix.priority));
   const [cats, setCats] = useState<number[]>(ix.categories ?? []);
-  const [tags, setTags] = useState((ix.tags ?? []).join(", "));
   const [localErr, setLocalErr] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testHint, setTestHint] = useState<string | null>(null);
 
   useEffect(() => {
     if (!expanded) {
@@ -107,8 +120,8 @@ function IndexerAccordionRow({
     setApiKey("");
     setPriority(String(ix.priority));
     setCats(ix.categories ?? []);
-    setTags((ix.tags ?? []).join(", "));
     setLocalErr(null);
+    setTestHint(null);
   }, [expanded, ix]);
 
   function toggleCat(id: number) {
@@ -122,10 +135,7 @@ function IndexerAccordionRow({
       if (Number.isNaN(p)) {
         throw new Error("Priority must be a number.");
       }
-      const tagList = tags
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const tagList = ix.tags ?? [];
       const payload: Parameters<typeof update.mutateAsync>[0]["data"] = {
         url: indexerShowsUrl(ix) ? url.trim() : undefined,
         priority: p,
@@ -155,10 +165,15 @@ function IndexerAccordionRow({
 
   async function onTest() {
     setLocalErr(null);
+    setTestHint(null);
+    setTesting(true);
     try {
       await test.mutateAsync(ix.id);
+      setTestHint("Test queued — refresh row for result.");
     } catch (e) {
       setLocalErr((e as Error).message);
+    } finally {
+      setTesting(false);
     }
   }
 
@@ -174,24 +189,16 @@ function IndexerAccordionRow({
   const mask = "\u2022".repeat(10);
 
   return (
-    <div
-      className="rounded-lg border border-[var(--mm-border)] bg-[var(--mm-card-bg)] shadow-sm"
-      data-testid={`broker-indexer-row-${ix.id}`}
-    >
+    <div className="rounded-lg border border-[var(--mm-border)] bg-[var(--mm-card-bg)] shadow-sm" data-testid={`broker-indexer-row-${ix.id}`}>
       <button
         type="button"
-        className="flex w-full items-center gap-3 px-4 py-3 text-left sm:px-5"
+        className="flex w-full items-center gap-2 px-3 py-2.5 text-left sm:gap-3 sm:px-4"
         onClick={onToggle}
         aria-expanded={expanded}
       >
-        <span className="min-w-0 flex-1 font-medium text-[var(--mm-text1)]">{ix.name}</span>
-        <Pill tone="neutral">{ix.kind}</Pill>
-        <Pill tone="blue">{ix.protocol}</Pill>
-        <Pill tone="purple">{ix.privacy}</Pill>
-        <span className="tabular-nums text-sm text-[var(--mm-text2)]" title="Priority">
-          {ix.priority}
-        </span>
-        <TestDot ix={ix} />
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--mm-text1)]">{ix.name}</span>
+        <Pill tone="blue">{protocolLabel(ix.protocol)}</Pill>
+        <Pill tone="purple">{privacyLabel(ix.privacy)}</Pill>
         <div
           className="shrink-0"
           onClick={(e) => e.stopPropagation()}
@@ -206,70 +213,92 @@ function IndexerAccordionRow({
             onChange={(v) => void onToggleEnabled(v)}
           />
         </div>
+        <TestDot ix={ix} />
+        <span className="shrink-0 tabular-nums text-xs text-[var(--mm-text2)]">{ix.priority}</span>
+        <svg
+          aria-hidden
+          className={`h-4 w-4 shrink-0 text-[var(--mm-text3)] transition-transform ${expanded ? "rotate-180" : ""}`}
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path d="M5.5 7.5 10 12l4.5-4.5H5.5z" />
+        </svg>
       </button>
       {expanded ? (
-        <div className="space-y-4 border-t border-[var(--mm-border)] px-4 py-4 sm:px-5">
+        <div className="space-y-3 border-t border-[var(--mm-border)] bg-black/10 px-3 py-3 sm:px-4">
           {indexerShowsUrl(ix) ? (
-            <label className="block">
-              <span className="text-sm font-medium text-[var(--mm-text)]">URL</span>
-              <input className="mm-input mt-1 w-full max-w-3xl" value={url} onChange={(e) => setUrl(e.target.value)} />
-            </label>
+            <input
+              className="mm-input w-full font-mono text-sm"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="URL"
+              aria-label="Indexer URL"
+            />
           ) : null}
           {indexerShowsApiKey(ix) ? (
-            <div>
-              <span className="text-sm font-medium text-[var(--mm-text)]">API key</span>
-              <div className="mt-1 flex max-w-3xl flex-wrap gap-2">
-                <input
-                  className="mm-input min-w-0 flex-1 font-mono text-sm"
-                  type={showKey ? "text" : "password"}
-                  placeholder={mask}
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  autoComplete="off"
-                />
-                <button
-                  type="button"
-                  className={mmActionButtonClass({ variant: "secondary" })}
-                  onClick={() => setShowKey((s) => !s)}
-                >
-                  {showKey ? "Hide" : "Show"}
-                </button>
-              </div>
-              <p className="mt-1 text-xs text-[var(--mm-text3)]">Leave blank to keep the saved key.</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                className="mm-input min-w-0 flex-1 font-mono text-sm"
+                type={showKey ? "text" : "password"}
+                placeholder={mask}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                autoComplete="off"
+                aria-label="API key"
+              />
+              <button type="button" className={mmActionButtonClass({ variant: "secondary" })} onClick={() => setShowKey((s) => !s)}>
+                {showKey ? "Hide" : "Show"}
+              </button>
             </div>
           ) : null}
-          <label className="block max-w-xs">
-            <span className="text-sm font-medium text-[var(--mm-text)]">Priority</span>
-            <input
-              className="mm-input mt-1 w-full tabular-nums"
-              inputMode="numeric"
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
+          <div className="flex flex-wrap items-center gap-3">
+            <MmOnOffSwitch
+              id={`${baseId}-en-expanded`}
+              label="Enabled"
+              layout="inline"
+              enabled={ix.enabled}
+              disabled={!canOperate || update.isPending}
+              onChange={(v) => void onToggleEnabled(v)}
             />
-          </label>
-          <fieldset>
-            <legend className="text-sm font-medium text-[var(--mm-text)]">Categories</legend>
-            <div className="mt-2 flex flex-wrap gap-3">
-              {CATEGORY_OPTIONS.map((c) => (
-                <label key={c.id} className="flex items-center gap-2 text-sm text-[var(--mm-text2)]">
-                  <input type="checkbox" checked={cats.includes(c.id)} onChange={() => toggleCat(c.id)} />
+            <label className="flex items-center gap-2 text-xs text-[var(--mm-text2)]">
+              Priority
+              <input
+                className="mm-input w-16 tabular-nums"
+                inputMode="numeric"
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+              />
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {CATEGORY_OPTIONS.map((c) => {
+              const on = cats.includes(c.id);
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleCat(c.id)}
+                  className={[
+                    "rounded-full border px-2.5 py-0.5 text-[0.7rem] font-medium transition-colors",
+                    on
+                      ? "border-[rgba(212,175,55,0.45)] bg-[var(--mm-accent-soft)] text-[var(--mm-text1)]"
+                      : "border-[var(--mm-border)] bg-transparent text-[var(--mm-text2)] hover:bg-white/5",
+                  ].join(" ")}
+                >
                   {c.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <label className="block max-w-3xl">
-            <span className="text-sm font-medium text-[var(--mm-text)]">Tags</span>
-            <input className="mm-input mt-1 w-full" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="comma, separated" />
-          </label>
+                </button>
+              );
+            })}
+          </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className={mmActionButtonClass({ variant: "secondary", disabled: !canOperate || test.isPending })}
-              disabled={!canOperate || test.isPending}
+              className={mmActionButtonClass({ variant: "secondary", disabled: !canOperate || testing })}
+              disabled={!canOperate || testing}
               onClick={() => void onTest()}
             >
-              {test.isPending ? "Testing…" : "Test"}
+              {testing ? "Testing…" : "Test"}
             </button>
             <button
               type="button"
@@ -288,12 +317,7 @@ function IndexerAccordionRow({
               Delete
             </button>
           </div>
-          {ix.last_tested_at ? (
-            <p className="text-xs text-[var(--mm-text3)]">
-              Last test: {ix.last_test_ok === true ? "OK" : ix.last_test_ok === false ? "Failed" : "—"}
-              {ix.last_test_error ? ` — ${ix.last_test_error}` : ""}
-            </p>
-          ) : null}
+          {testHint ? <p className="text-xs text-[var(--mm-text3)]">{testHint}</p> : null}
           {localErr ? (
             <p className="text-sm text-red-400" role="alert">
               {localErr}
@@ -305,6 +329,99 @@ function IndexerAccordionRow({
   );
 }
 
+function PendingCustomRow({
+  protocol,
+  canOperate,
+  onCancel,
+  onSave,
+  busy,
+}: {
+  protocol: "torrent" | "usenet";
+  canOperate: boolean;
+  onCancel: () => void;
+  onSave: (payload: {
+    name: string;
+    url: string;
+    apiKey: string;
+    priority: string;
+    cats: number[];
+    enabled: boolean;
+  }) => Promise<void>;
+  busy: boolean;
+}) {
+  const baseId = useId();
+  const [name, setName] = useState("");
+  const [url, setUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [priority, setPriority] = useState("25");
+  const [cats, setCats] = useState<number[]>(protocol === "torrent" ? [5000, 2000] : [2000, 5000]);
+  const [enabled, setEnabled] = useState(true);
+
+  return (
+    <div className="rounded-lg border border-[rgba(212,175,55,0.35)] bg-[var(--mm-card-bg)] shadow-sm">
+      <div className="flex items-center justify-between gap-2 border-b border-[var(--mm-border)] px-3 py-2 sm:px-4">
+        <span className="text-sm font-semibold text-[var(--mm-text1)]">New custom indexer</span>
+        <button type="button" className={mmActionButtonClass({ variant: "secondary", disabled: busy })} disabled={busy} onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+      <div className="space-y-3 px-3 py-3 sm:px-4">
+        <input className="mm-input w-full" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (required)" />
+        <input className="mm-input w-full font-mono text-sm" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="URL (required)" />
+        <div className="flex flex-wrap gap-2">
+          <input
+            className="mm-input min-w-0 flex-1 font-mono text-sm"
+            type={showKey ? "text" : "password"}
+            placeholder={"API key (optional)"}
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+          />
+          <button type="button" className={mmActionButtonClass({ variant: "secondary" })} onClick={() => setShowKey((s) => !s)}>
+            {showKey ? "Hide" : "Show"}
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <MmOnOffSwitch id={`${baseId}-pen`} label="Enabled" layout="inline" enabled={enabled} disabled={busy} onChange={setEnabled} />
+          <label className="flex items-center gap-2 text-xs text-[var(--mm-text2)]">
+            Priority
+            <input className="mm-input w-16 tabular-nums" value={priority} onChange={(e) => setPriority(e.target.value)} />
+          </label>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORY_OPTIONS.map((c) => {
+            const on = cats.includes(c.id);
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setCats((prev) => (prev.includes(c.id) ? prev.filter((x) => x !== c.id) : [...prev, c.id]))}
+                className={[
+                  "rounded-full border px-2.5 py-0.5 text-[0.7rem] font-medium transition-colors",
+                  on
+                    ? "border-[rgba(212,175,55,0.45)] bg-[var(--mm-accent-soft)] text-[var(--mm-text1)]"
+                    : "border-[var(--mm-border)] bg-transparent text-[var(--mm-text2)] hover:bg-white/5",
+                ].join(" ")}
+              >
+                {c.label}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          className={mmActionButtonClass({ variant: "primary", disabled: !canOperate || busy })}
+          disabled={!canOperate || busy}
+          onClick={() => void onSave({ name, url, apiKey, priority, cats, enabled })}
+        >
+          {busy ? "Saving…" : "Save"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function BrokerIndexersTab({ canOperate }: { canOperate: boolean }) {
   const q = useBrokerIndexersQuery();
   const syncSonarr = useBrokerManualSyncMutation("sonarr");
@@ -312,178 +429,151 @@ export function BrokerIndexersTab({ canOperate }: { canOperate: boolean }) {
   const create = useCreateBrokerIndexerMutation();
 
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  /** 1 = pick kind, 2 = native catalog list, 3 = configure */
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [mode, setMode] = useState<AddWizardMode>(null);
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [catalogErr, setCatalogErr] = useState<string | null>(null);
   const [nativeFilter, setNativeFilter] = useState("");
-  const [nativePick, setNativePick] = useState<BrokerNativeCatalogEntry | null>(null);
+  const [nativeKeyEntry, setNativeKeyEntry] = useState<BrokerNativeCatalogEntry | null>(null);
+  const [nativeKeyValue, setNativeKeyValue] = useState("");
+  const [pendingTorrent, setPendingTorrent] = useState(false);
+  const [pendingUsenet, setPendingUsenet] = useState(false);
 
-  const [gName, setGName] = useState("");
-  const [gUrl, setGUrl] = useState("");
-  const [gKey, setGKey] = useState("");
-  const [gShowKey, setGShowKey] = useState(false);
-  const [gPriority, setGPriority] = useState("25");
-  const [gCats, setGCats] = useState<number[]>([5000, 2000]);
-  const [gEnabled, setGEnabled] = useState(true);
-  const [wizardErr, setWizardErr] = useState<string | null>(null);
+  const torrentRows = useMemo(() => (q.data ?? []).filter((i) => i.protocol === "torrent"), [q.data]);
+  const usenetRows = useMemo(() => (q.data ?? []).filter((i) => i.protocol === "usenet"), [q.data]);
 
-  const torrentRows = useMemo(
-    () => (q.data ?? []).filter((i) => i.protocol === "torrent"),
-    [q.data],
-  );
-  const usenetRows = useMemo(
-    () => (q.data ?? []).filter((i) => i.protocol === "usenet"),
-    [q.data],
-  );
-
-  const nativeTorrent = useMemo(
-    () => BROKER_NATIVE_INDEXERS.filter((e) => e.protocol === "torrent"),
-    [],
-  );
-  const nativeUsenet = useMemo(
-    () => BROKER_NATIVE_INDEXERS.filter((e) => e.protocol === "usenet"),
-    [],
-  );
+  const nativeTorrent = useMemo(() => BROKER_NATIVE_INDEXERS.filter((e) => e.protocol === "torrent"), []);
+  const nativeUsenet = useMemo(() => BROKER_NATIVE_INDEXERS.filter((e) => e.protocol === "usenet"), []);
 
   const filteredNative = useMemo(() => {
     const f = nativeFilter.trim().toLowerCase();
-    const match = (e: BrokerNativeCatalogEntry) =>
-      !f || e.name.toLowerCase().includes(f) || e.slug.toLowerCase().includes(f);
-    return {
-      torrent: nativeTorrent.filter(match),
-      usenet: nativeUsenet.filter(match),
-    };
+    const match = (e: BrokerNativeCatalogEntry) => !f || e.name.toLowerCase().includes(f) || e.slug.toLowerCase().includes(f);
+    return { torrent: nativeTorrent.filter(match), usenet: nativeUsenet.filter(match) };
   }, [nativeFilter, nativeTorrent, nativeUsenet]);
 
-  function openModal() {
-    setModalOpen(true);
-    setStep(1);
-    setMode(null);
-    setNativePick(null);
+  function openCatalog() {
+    setCatalogErr(null);
     setNativeFilter("");
-    setGName("");
-    setGUrl("");
-    setGKey("");
-    setGPriority("25");
-    setGCats([5000, 2000]);
-    setGEnabled(true);
-    setWizardErr(null);
+    setNativeKeyEntry(null);
+    setNativeKeyValue("");
+    setCatalogOpen(true);
   }
 
-  function closeModal() {
-    setModalOpen(false);
+  function closeCatalog() {
+    setCatalogOpen(false);
+    setCatalogErr(null);
+    setNativeKeyEntry(null);
+    setNativeKeyValue("");
   }
 
-  function chooseMode(m: AddWizardMode) {
-    setWizardErr(null);
-    if (m === "native") {
-      setMode("native");
-      setNativePick(null);
-      setStep(2);
+  async function createNativeIndexer(entry: BrokerNativeCatalogEntry, apiKey: string) {
+    return create.mutateAsync({
+      name: entry.name,
+      slug: entry.slug,
+      kind: entry.slug,
+      protocol: entry.protocol,
+      privacy: entry.privacy,
+      url: "",
+      api_key: apiKey.trim(),
+      enabled: true,
+      priority: 25,
+      categories: entry.protocol === "torrent" ? [5000] : [2000, 5000],
+      tags: [],
+    });
+  }
+
+  function onCatalogRowClick(entry: BrokerNativeCatalogEntry) {
+    setCatalogErr(null);
+    if (entry.requiresApiKey) {
+      setNativeKeyEntry(entry);
+      setNativeKeyValue("");
       return;
     }
-    setMode(m);
-    setStep(3);
-    setGName("");
-    setGUrl("");
-    setGKey("");
-    if (m === "torznab") {
-      setGCats([5000, 2000]);
-    } else if (m === "newznab") {
-      setGCats([2000, 5000]);
+    void (async () => {
+      try {
+        const created = await createNativeIndexer(entry, "");
+        closeCatalog();
+        setExpandedId(created.id);
+      } catch (e) {
+        setCatalogErr((e as Error).message);
+      }
+    })();
+  }
+
+  async function confirmNativeWithKey() {
+    if (!nativeKeyEntry) return;
+    if (!nativeKeyValue.trim()) {
+      setCatalogErr("API key is required for this indexer.");
+      return;
     }
-  }
-
-  function chooseNative(entry: BrokerNativeCatalogEntry) {
-    setMode("native");
-    setNativePick(entry);
-    setStep(3);
-    setGName(entry.name);
-    setGKey("");
-    setGPriority("25");
-    setGCats(entry.protocol === "torrent" ? [5000] : [2000, 5000]);
-    setGEnabled(true);
-    setWizardErr(null);
-  }
-
-  async function onCreateSave() {
-    setWizardErr(null);
+    setCatalogErr(null);
     try {
-      const pr = Number.parseInt(gPriority, 10);
-      if (Number.isNaN(pr)) {
-        throw new Error("Priority must be a number.");
-      }
-      if (mode === "native" && nativePick) {
-        if (nativePick.requiresApiKey && !gKey.trim()) {
-          throw new Error("API key is required for this indexer.");
-        }
-        await create.mutateAsync({
-          name: gName.trim() || nativePick.name,
-          slug: nativePick.slug,
-          kind: nativePick.slug,
-          protocol: nativePick.protocol,
-          privacy: nativePick.privacy,
-          url: "",
-          api_key: nativePick.requiresApiKey ? gKey.trim() : "",
-          enabled: gEnabled,
-          priority: pr,
-          categories: gCats,
-          tags: [],
-        });
-      } else if (mode === "torznab") {
-        const name = gName.trim();
-        if (!name) {
-          throw new Error("Name is required.");
-        }
-        if (!gUrl.trim()) {
-          throw new Error("URL is required for Torznab.");
-        }
-        const slug = `torznab__${slugifyPart(name)}`;
-        await create.mutateAsync({
-          name,
-          slug,
-          kind: "torznab",
-          protocol: "torrent",
-          privacy: "public",
-          url: gUrl.trim(),
-          api_key: gKey.trim(),
-          enabled: gEnabled,
-          priority: pr,
-          categories: gCats,
-          tags: [],
-        });
-      } else if (mode === "newznab") {
-        const name = gName.trim();
-        if (!name) {
-          throw new Error("Name is required.");
-        }
-        if (!gUrl.trim()) {
-          throw new Error("URL is required for Newznab.");
-        }
-        const slug = `newznab__${slugifyPart(name)}`;
-        await create.mutateAsync({
-          name,
-          slug,
-          kind: "newznab",
-          protocol: "usenet",
-          privacy: "public",
-          url: gUrl.trim(),
-          api_key: gKey.trim(),
-          enabled: gEnabled,
-          priority: pr,
-          categories: gCats,
-          tags: [],
-        });
-      }
-      closeModal();
+      const created = await createNativeIndexer(nativeKeyEntry, nativeKeyValue);
+      closeCatalog();
+      setExpandedId(created.id);
     } catch (e) {
-      setWizardErr((e as Error).message);
+      setCatalogErr((e as Error).message);
     }
   }
 
-  function toggleWizardCat(id: number) {
-    setGCats((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  async function savePendingTorrent(payload: {
+    name: string;
+    url: string;
+    apiKey: string;
+    priority: string;
+    cats: number[];
+    enabled: boolean;
+  }) {
+    const pr = Number.parseInt(payload.priority, 10);
+    if (Number.isNaN(pr)) throw new Error("Priority must be a number.");
+    const name = payload.name.trim();
+    if (!name) throw new Error("Name is required.");
+    if (!payload.url.trim()) throw new Error("URL is required.");
+    const slug = `torznab__${slugifyPart(name)}`;
+    const created = await create.mutateAsync({
+      name,
+      slug,
+      kind: "torznab",
+      protocol: "torrent",
+      privacy: "public",
+      url: payload.url.trim(),
+      api_key: payload.apiKey.trim(),
+      enabled: payload.enabled,
+      priority: pr,
+      categories: payload.cats,
+      tags: [],
+    });
+    setPendingTorrent(false);
+    setExpandedId(created.id);
+  }
+
+  async function savePendingUsenet(payload: {
+    name: string;
+    url: string;
+    apiKey: string;
+    priority: string;
+    cats: number[];
+    enabled: boolean;
+  }) {
+    const pr = Number.parseInt(payload.priority, 10);
+    if (Number.isNaN(pr)) throw new Error("Priority must be a number.");
+    const name = payload.name.trim();
+    if (!name) throw new Error("Name is required.");
+    if (!payload.url.trim()) throw new Error("URL is required.");
+    const slug = `newznab__${slugifyPart(name)}`;
+    const created = await create.mutateAsync({
+      name,
+      slug,
+      kind: "newznab",
+      protocol: "usenet",
+      privacy: "public",
+      url: payload.url.trim(),
+      api_key: payload.apiKey.trim(),
+      enabled: payload.enabled,
+      priority: pr,
+      categories: payload.cats,
+      tags: [],
+    });
+    setPendingUsenet(false);
+    setExpandedId(created.id);
   }
 
   if (q.isPending) {
@@ -494,16 +584,16 @@ export function BrokerIndexersTab({ canOperate }: { canOperate: boolean }) {
   }
 
   return (
-    <div className="space-y-6" data-testid="broker-indexers-tab">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-2">
+    <div className="space-y-5" data-testid="broker-indexers-tab">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             className={mmActionButtonClass({ variant: "secondary", disabled: !canOperate || syncSonarr.isPending })}
             disabled={!canOperate || syncSonarr.isPending}
             onClick={() => void syncSonarr.mutateAsync().catch(() => {})}
           >
-            {syncSonarr.isPending ? "Enqueuing…" : "Sync to Sonarr"}
+            {syncSonarr.isPending ? "Enqueuing…" : "Sync Sonarr"}
           </button>
           <button
             type="button"
@@ -511,210 +601,221 @@ export function BrokerIndexersTab({ canOperate }: { canOperate: boolean }) {
             disabled={!canOperate || syncRadarr.isPending}
             onClick={() => void syncRadarr.mutateAsync().catch(() => {})}
           >
-            {syncRadarr.isPending ? "Enqueuing…" : "Sync to Radarr"}
+            {syncRadarr.isPending ? "Enqueuing…" : "Sync Radarr"}
           </button>
         </div>
-        <button
-          type="button"
-          className={mmActionButtonClass({ variant: "primary", disabled: !canOperate })}
-          disabled={!canOperate}
-          onClick={openModal}
-        >
-          Add indexer
-        </button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            className={mmActionButtonClass({ variant: "secondary", disabled: !canOperate })}
+            disabled={!canOperate}
+            onClick={() => {
+              setExpandedId(null);
+              setPendingUsenet(true);
+              setPendingTorrent(false);
+            }}
+          >
+            Add custom Newznab
+          </button>
+          <button
+            type="button"
+            className={mmActionButtonClass({ variant: "secondary", disabled: !canOperate })}
+            disabled={!canOperate}
+            onClick={() => {
+              setExpandedId(null);
+              setPendingTorrent(true);
+              setPendingUsenet(false);
+            }}
+          >
+            Add custom Torznab
+          </button>
+          <button type="button" className={mmActionButtonClass({ variant: "primary", disabled: !canOperate })} disabled={!canOperate} onClick={openCatalog}>
+            Add indexer
+          </button>
+        </div>
       </div>
 
-      <section data-testid="broker-indexers-torrent-group">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Torrent</h2>
-        <div className="space-y-3">
-          {torrentRows.map((ix) => (
-            <IndexerAccordionRow
-              key={ix.id}
-              ix={ix}
-              expanded={expandedId === ix.id}
-              canOperate={canOperate}
-              onToggle={() => setExpandedId((cur) => (cur === ix.id ? null : ix.id))}
-            />
-          ))}
-          {torrentRows.length === 0 ? <p className="text-sm text-[var(--mm-text2)]">No torrent indexers yet.</p> : null}
-        </div>
-      </section>
-
-      <section data-testid="broker-indexers-usenet-group">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Usenet</h2>
-        <div className="space-y-3">
-          {usenetRows.map((ix) => (
-            <IndexerAccordionRow
-              key={ix.id}
-              ix={ix}
-              expanded={expandedId === ix.id}
-              canOperate={canOperate}
-              onToggle={() => setExpandedId((cur) => (cur === ix.id ? null : ix.id))}
-            />
-          ))}
-          {usenetRows.length === 0 ? <p className="text-sm text-[var(--mm-text2)]">No Usenet indexers yet.</p> : null}
-        </div>
-      </section>
-
-      {modalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="presentation">
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5 shadow-xl"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-[var(--mm-text)]">Add indexer</h2>
-              <button type="button" className={mmActionButtonClass({ variant: "secondary" })} onClick={closeModal}>
-                Close
-              </button>
+      <section
+        className="overflow-hidden rounded-lg border border-[var(--mm-border)] bg-[var(--mm-card-bg)] shadow-sm"
+        data-testid="broker-indexers-torrent-group"
+      >
+        <header className="border-b border-[var(--mm-border)] bg-black/10 px-4 py-3 sm:px-5">
+          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--mm-text2)]">Torrent</p>
+          <h2 className="mt-0.5 text-sm font-semibold text-[var(--mm-text1)]">Torrent indexers</h2>
+        </header>
+        <div className="divide-y divide-[var(--mm-border)] px-3 py-3 sm:px-4 sm:py-4">
+          {pendingTorrent ? (
+            <div className="pb-3">
+              <PendingCustomRow
+                protocol="torrent"
+                canOperate={canOperate}
+                busy={create.isPending}
+                onCancel={() => setPendingTorrent(false)}
+                onSave={async (p) => {
+                  try {
+                    await savePendingTorrent(p);
+                  } catch (e) {
+                    window.alert((e as Error).message);
+                  }
+                }}
+              />
             </div>
-
-            {step === 1 ? (
-              <div className="mt-5 space-y-3">
-                <p className="text-sm text-[var(--mm-text2)]">Choose how to add this indexer.</p>
-                <button type="button" className={mmActionButtonClass({ variant: "secondary" })} onClick={() => chooseMode("native")}>
-                  Native indexer…
-                </button>
-                <button type="button" className={mmActionButtonClass({ variant: "secondary" })} onClick={() => chooseMode("torznab")}>
-                  Torznab (custom URL)
-                </button>
-                <button type="button" className={mmActionButtonClass({ variant: "secondary" })} onClick={() => chooseMode("newznab")}>
-                  Newznab (custom URL)
-                </button>
-              </div>
-            ) : step === 2 && mode === "native" && !nativePick ? (
-              <div className="mt-5 space-y-4">
-                <label className="block">
-                  <span className="text-sm font-medium text-[var(--mm-text)]">Search native indexers</span>
-                  <input className="mm-input mt-1 w-full" value={nativeFilter} onChange={(e) => setNativeFilter(e.target.value)} />
-                </label>
-                <div>
-                  <p className="text-xs font-semibold uppercase text-[var(--mm-text3)]">Torrent</p>
-                  <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded border border-[var(--mm-border)] p-2">
-                    {filteredNative.torrent.map((e) => (
-                      <li key={e.slug}>
-                        <button type="button" className="w-full rounded px-2 py-1.5 text-left text-sm hover:bg-white/5" onClick={() => chooseNative(e)}>
-                          <span className="font-medium text-[var(--mm-text1)]">{e.name}</span>{" "}
-                          <Pill tone="blue">torrent</Pill> <Pill tone="purple">{e.privacy}</Pill>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase text-[var(--mm-text3)]">Usenet</p>
-                  <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded border border-[var(--mm-border)] p-2">
-                    {filteredNative.usenet.map((e) => (
-                      <li key={e.slug}>
-                        <button type="button" className="w-full rounded px-2 py-1.5 text-left text-sm hover:bg-white/5" onClick={() => chooseNative(e)}>
-                          <span className="font-medium text-[var(--mm-text1)]">{e.name}</span>{" "}
-                          <Pill tone="blue">usenet</Pill> <Pill tone="purple">{e.privacy}</Pill>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <button type="button" className={mmActionButtonClass({ variant: "secondary" })} onClick={() => setStep(1)}>
-                  Back
-                </button>
-              </div>
-            ) : step === 3 ? (
-              <div className="mt-5 space-y-4">
-                {mode === "native" && nativePick ? (
-                  <div>
-                    <p className="text-sm text-[var(--mm-text2)]">
-                      <span className="font-medium text-[var(--mm-text1)]">{nativePick.slug}</span> ·{" "}
-                      <Pill tone="blue">{nativePick.protocol}</Pill> <Pill tone="purple">{nativePick.privacy}</Pill>
-                    </p>
-                    <label className="mt-3 block">
-                      <span className="text-sm font-medium text-[var(--mm-text)]">Name</span>
-                      <input className="mm-input mt-1 w-full" value={gName} onChange={(e) => setGName(e.target.value)} />
-                    </label>
-                  </div>
-                ) : null}
-                {(mode === "torznab" || mode === "newznab") && (
-                  <label className="block">
-                    <span className="text-sm font-medium text-[var(--mm-text)]">Name</span>
-                    <input className="mm-input mt-1 w-full" value={gName} onChange={(e) => setGName(e.target.value)} />
-                  </label>
-                )}
-                {(mode === "torznab" || mode === "newznab") && (
-                  <label className="block">
-                    <span className="text-sm font-medium text-[var(--mm-text)]">URL</span>
-                    <input className="mm-input mt-1 w-full font-mono text-sm" value={gUrl} onChange={(e) => setGUrl(e.target.value)} />
-                  </label>
-                )}
-                {mode === "native" && nativePick?.requiresApiKey ? (
-                  <label className="block">
-                    <span className="text-sm font-medium text-[var(--mm-text)]">API key</span>
-                    <input className="mm-input mt-1 w-full font-mono text-sm" value={gKey} onChange={(e) => setGKey(e.target.value)} />
-                  </label>
-                ) : null}
-                {(mode === "torznab" || mode === "newznab") && (
-                  <div>
-                    <span className="text-sm font-medium text-[var(--mm-text)]">API key</span>
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      <input
-                        className="mm-input min-w-0 flex-1 font-mono text-sm"
-                        type={gShowKey ? "text" : "password"}
-                        value={gKey}
-                        onChange={(e) => setGKey(e.target.value)}
-                      />
-                      <button type="button" className={mmActionButtonClass({ variant: "secondary" })} onClick={() => setGShowKey((s) => !s)}>
-                        {gShowKey ? "Hide" : "Show"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-                <label className="block max-w-xs">
-                  <span className="text-sm font-medium text-[var(--mm-text)]">Priority</span>
-                  <input className="mm-input mt-1 w-full" value={gPriority} onChange={(e) => setGPriority(e.target.value)} />
-                </label>
-                <fieldset>
-                  <legend className="text-sm font-medium text-[var(--mm-text)]">Categories</legend>
-                  <div className="mt-2 flex flex-wrap gap-3">
-                    {CATEGORY_OPTIONS.map((c) => (
-                      <label key={c.id} className="flex items-center gap-2 text-sm text-[var(--mm-text2)]">
-                        <input type="checkbox" checked={gCats.includes(c.id)} onChange={() => toggleWizardCat(c.id)} />
-                        {c.label}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-                <MmOnOffSwitch id="wiz-en" label="Enabled" enabled={gEnabled} disabled={false} onChange={setGEnabled} />
-                {wizardErr ? (
-                  <p className="text-sm text-red-400" role="alert">
-                    {wizardErr}
-                  </p>
-                ) : null}
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className={mmActionButtonClass({ variant: "secondary" })}
-                    onClick={() => {
-                      if (mode === "native" && nativePick) {
-                        setNativePick(null);
-                        setStep(2);
-                        return;
-                      }
-                      setStep(1);
-                    }}
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    className={mmActionButtonClass({ variant: "primary", disabled: create.isPending })}
-                    disabled={create.isPending}
-                    onClick={() => void onCreateSave()}
-                  >
-                    {create.isPending ? "Saving…" : "Save indexer"}
-                  </button>
-                </div>
-              </div>
+          ) : null}
+          <div className="space-y-2 pt-1">
+            {torrentRows.map((ix) => (
+              <IndexerAccordionRow
+                key={ix.id}
+                ix={ix}
+                expanded={expandedId === ix.id}
+                canOperate={canOperate}
+                onToggle={() => setExpandedId((cur) => (cur === ix.id ? null : ix.id))}
+              />
+            ))}
+            {torrentRows.length === 0 && !pendingTorrent ? (
+              <p className="py-2 text-sm text-[var(--mm-text2)]">No torrent indexers yet.</p>
             ) : null}
           </div>
+        </div>
+      </section>
+
+      <section
+        className="overflow-hidden rounded-lg border border-[var(--mm-border)] bg-[var(--mm-card-bg)] shadow-sm"
+        data-testid="broker-indexers-usenet-group"
+      >
+        <header className="border-b border-[var(--mm-border)] bg-black/10 px-4 py-3 sm:px-5">
+          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--mm-text2)]">Usenet</p>
+          <h2 className="mt-0.5 text-sm font-semibold text-[var(--mm-text1)]">Usenet indexers</h2>
+        </header>
+        <div className="divide-y divide-[var(--mm-border)] px-3 py-3 sm:px-4 sm:py-4">
+          {pendingUsenet ? (
+            <div className="pb-3">
+              <PendingCustomRow
+                protocol="usenet"
+                canOperate={canOperate}
+                busy={create.isPending}
+                onCancel={() => setPendingUsenet(false)}
+                onSave={async (p) => {
+                  try {
+                    await savePendingUsenet(p);
+                  } catch (e) {
+                    window.alert((e as Error).message);
+                  }
+                }}
+              />
+            </div>
+          ) : null}
+          <div className="space-y-2 pt-1">
+            {usenetRows.map((ix) => (
+              <IndexerAccordionRow
+                key={ix.id}
+                ix={ix}
+                expanded={expandedId === ix.id}
+                canOperate={canOperate}
+                onToggle={() => setExpandedId((cur) => (cur === ix.id ? null : ix.id))}
+              />
+            ))}
+            {usenetRows.length === 0 && !pendingUsenet ? (
+              <p className="py-2 text-sm text-[var(--mm-text2)]">No Usenet indexers yet.</p>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      {catalogOpen ? (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50" role="presentation">
+          <button type="button" className="absolute inset-0 cursor-default" aria-label="Close catalog" onClick={closeCatalog} />
+          <aside
+            className="relative z-10 flex h-full w-full max-w-xl flex-col border-l border-[var(--mm-border)] bg-[var(--mm-card-bg)] shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add indexer from catalog"
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-[var(--mm-border)] px-4 py-3">
+              <h2 className="text-base font-semibold text-[var(--mm-text1)]">Add indexer</h2>
+              <button type="button" className={mmActionButtonClass({ variant: "secondary" })} onClick={closeCatalog}>
+                Back
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+              <input
+                className="mm-input w-full"
+                value={nativeFilter}
+                onChange={(e) => setNativeFilter(e.target.value)}
+                placeholder="Search catalog…"
+                aria-label="Search catalog"
+              />
+              {catalogErr ? (
+                <p className="mt-3 text-sm text-red-400" role="alert">
+                  {catalogErr}
+                </p>
+              ) : null}
+              {nativeKeyEntry ? (
+                <div className="mt-4 rounded-md border border-[var(--mm-border)] bg-black/15 p-3">
+                  <p className="text-sm text-[var(--mm-text2)]">
+                    <span className="font-medium text-[var(--mm-text1)]">{nativeKeyEntry.name}</span> needs an API key.
+                  </p>
+                  <input
+                    className="mm-input mt-2 w-full font-mono text-sm"
+                    value={nativeKeyValue}
+                    onChange={(e) => setNativeKeyValue(e.target.value)}
+                    autoComplete="off"
+                    placeholder="API key"
+                    aria-label="API key for indexer"
+                  />
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button type="button" className={mmActionButtonClass({ variant: "primary" })} onClick={() => void confirmNativeWithKey()}>
+                      Add indexer
+                    </button>
+                    <button type="button" className={mmActionButtonClass({ variant: "secondary" })} onClick={() => setNativeKeyEntry(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              <div className="mt-5 space-y-5">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Torrent</p>
+                  <ul className="mt-2 divide-y divide-[var(--mm-border)] rounded-md border border-[var(--mm-border)] bg-black/10">
+                    {filteredNative.torrent.map((e) => (
+                      <li key={e.slug}>
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-white/[0.04]"
+                          onClick={() => onCatalogRowClick(e)}
+                        >
+                          <span className="min-w-0 flex-1 font-medium text-[var(--mm-text1)]">{e.name}</span>
+                          <Pill tone="purple">{privacyLabel(e.privacy)}</Pill>
+                          {e.requiresApiKey ? (
+                            <span className="shrink-0 text-[0.65rem] text-[var(--mm-text3)]">Key required</span>
+                          ) : null}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Usenet</p>
+                  <ul className="mt-2 divide-y divide-[var(--mm-border)] rounded-md border border-[var(--mm-border)] bg-black/10">
+                    {filteredNative.usenet.map((e) => (
+                      <li key={e.slug}>
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-white/[0.04]"
+                          onClick={() => onCatalogRowClick(e)}
+                        >
+                          <span className="min-w-0 flex-1 font-medium text-[var(--mm-text1)]">{e.name}</span>
+                          <Pill tone="purple">{privacyLabel(e.privacy)}</Pill>
+                          {e.requiresApiKey ? (
+                            <span className="shrink-0 text-[0.65rem] text-[var(--mm-text3)]">Key required</span>
+                          ) : null}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </aside>
         </div>
       ) : null}
     </div>

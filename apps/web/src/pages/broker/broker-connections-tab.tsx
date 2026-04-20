@@ -38,7 +38,7 @@ function CopyRow({ label, value }: { label: string; value: string }) {
     }
   }
   return (
-    <div className="mt-3">
+    <div className="mt-2">
       <p className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">{label}</p>
       <div className="mt-1 flex max-w-3xl flex-wrap gap-2">
         <input readOnly className="mm-input min-w-0 flex-1 font-mono text-xs" value={value} />
@@ -48,6 +48,12 @@ function CopyRow({ label, value }: { label: string; value: string }) {
       </div>
     </div>
   );
+}
+
+function syncStatusDotClass(lastOk: boolean | null): string {
+  if (lastOk === true) return "bg-emerald-500";
+  if (lastOk === false) return "bg-red-500";
+  return "bg-[var(--mm-text3)]";
 }
 
 function ArrConnectionCard({
@@ -89,9 +95,6 @@ function ArrConnectionCard({
   }
 
   const row = q.data;
-  const syncOkIcon = row.last_sync_ok === true ? "✓" : row.last_sync_ok === false ? "✗" : "—";
-  const syncOkClass =
-    row.last_sync_ok === true ? "text-emerald-500" : row.last_sync_ok === false ? "text-red-400" : "text-[var(--mm-text3)]";
 
   async function onSave() {
     setSaveOk(false);
@@ -115,16 +118,16 @@ function ArrConnectionCard({
 
   return (
     <section
-      className="mm-card mm-dash-card mm-fetcher-module-surface"
+      className="mm-card flex h-full min-h-0 flex-col border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-4 shadow-sm sm:p-5"
       data-testid={arrType === "sonarr" ? "broker-connections-sonarr" : "broker-connections-radarr"}
     >
-      <h2 className="mm-card__title text-lg">{title}</h2>
-      <div className="mm-card__body mt-5 space-y-4">
+      <h2 className="text-base font-semibold text-[var(--mm-text1)]">{title}</h2>
+      <div className="mt-3 flex min-h-0 flex-1 flex-col gap-3">
         <label className="block">
-          <span className="text-sm font-medium text-[var(--mm-text)]">URL</span>
+          <span className="text-xs font-medium text-[var(--mm-text2)]">URL</span>
           <input
             id={`${baseId}-url`}
-            className="mm-input mt-1 w-full max-w-2xl"
+            className="mm-input mt-1 w-full"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             autoComplete="off"
@@ -132,10 +135,10 @@ function ArrConnectionCard({
           />
         </label>
         <div>
-          <label className="text-sm font-medium text-[var(--mm-text)]" htmlFor={`${baseId}-key`}>
+          <label className="text-xs font-medium text-[var(--mm-text2)]" htmlFor={`${baseId}-key`}>
             API key
           </label>
-          <div className="mt-1 flex max-w-2xl flex-wrap items-center gap-2">
+          <div className="mt-1 flex flex-wrap items-center gap-2">
             <input
               id={`${baseId}-key`}
               className="mm-input min-w-0 flex-1 font-mono text-sm"
@@ -155,14 +158,13 @@ function ArrConnectionCard({
               {showKey ? "Hide" : "Show"}
             </button>
           </div>
-          <p className="mt-1 text-xs text-[var(--mm-text3)]">Saved keys are never shown again after you leave this page.</p>
         </div>
-        <label className="block max-w-xl">
+        <label className="block">
           <span id={`${baseId}-sync-label`} className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
             Sync mode
           </span>
           <MmListboxPicker
-            className="mt-2"
+            className="mt-1.5"
             ariaLabelledBy={`${baseId}-sync-label`}
             options={SYNC_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
             value={syncMode}
@@ -170,22 +172,17 @@ function ArrConnectionCard({
             disabled={!canOperate}
           />
         </label>
-        <div className="rounded-md border border-[var(--mm-border)] bg-black/10 px-4 py-3 text-sm">
-          <p>
-            <span className="text-[var(--mm-text3)]">Last synced:</span>{" "}
-            <span className="font-medium text-[var(--mm-text1)]">
-              {row.last_synced_at ? fmt(row.last_synced_at) : "Never"}
-            </span>
-          </p>
-          <p className="mt-2">
-            <span className="text-[var(--mm-text3)]">Last sync status:</span>{" "}
-            <span className={`font-semibold ${syncOkClass}`}>{syncOkIcon}</span>
-            {row.last_sync_ok === false && row.last_sync_error ? (
-              <span className="ml-2 text-xs text-red-400">{row.last_sync_error}</span>
-            ) : null}
-          </p>
+        <div className="mt-auto border-t border-[var(--mm-border)] pt-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-[var(--mm-text2)]">
+            <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${syncStatusDotClass(row.last_sync_ok)}`} aria-hidden />
+            <span className="text-xs text-[var(--mm-text3)]">Last synced</span>
+            <span className="font-medium text-[var(--mm-text1)]">{row.last_synced_at ? fmt(row.last_synced_at) : "Never"}</span>
+          </div>
+          {row.last_sync_ok === false && row.last_sync_error ? (
+            <p className="mt-1 text-xs text-red-400">{row.last_sync_error}</p>
+          ) : null}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 border-t border-[var(--mm-border)] pt-3">
           <button
             type="button"
             className={mmActionButtonClass({ variant: "primary", disabled: !canOperate || put.isPending })}
@@ -245,16 +242,18 @@ export function BrokerConnectionsTab({ canOperate }: { canOperate: boolean }) {
   }
 
   return (
-    <div className="space-y-8" data-testid="broker-connections-tab">
-      <ArrConnectionCard title="Sonarr" arrType="sonarr" canOperate={canOperate} />
-      <ArrConnectionCard title="Radarr" arrType="radarr" canOperate={canOperate} />
+    <div className="space-y-5" data-testid="broker-connections-tab">
+      <div className="grid gap-5 lg:grid-cols-2 lg:gap-6">
+        <ArrConnectionCard title="Sonarr" arrType="sonarr" canOperate={canOperate} />
+        <ArrConnectionCard title="Radarr" arrType="radarr" canOperate={canOperate} />
+      </div>
 
-      <section className="mm-card mm-dash-card mm-fetcher-module-surface" data-testid="broker-connections-proxy">
-        <h2 className="mm-card__title text-lg">Proxy API key</h2>
-        <div className="mm-card__body mt-5 space-y-4 text-sm text-[var(--mm-text2)]">
+      <section className="mm-card border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-4 shadow-sm sm:p-5" data-testid="broker-connections-proxy">
+        <h2 className="text-base font-semibold text-[var(--mm-text1)]">Proxy API key</h2>
+        <div className="mt-3 space-y-3 text-sm text-[var(--mm-text2)]">
           <p>
-            Use this key to point Sonarr or Radarr directly at Broker as a single unified indexer. Copy the Torznab or
-            Newznab URL into your *arr indexer settings.
+            Use this key to point Sonarr or Radarr at Broker as a single unified indexer. Copy the Torznab or Newznab URL into
+            your *arr indexer settings.
           </p>
           <CopyRow label="API key" value={key} />
           <CopyRow label="Torznab URL" value={brokerProxyTorznabUrl(key)} />
