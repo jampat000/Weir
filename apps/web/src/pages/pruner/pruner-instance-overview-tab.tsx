@@ -163,7 +163,7 @@ export function PrunerInstanceOverviewTab(props: { contextOverride?: Ctx }) {
   const movies = instance.scopes.find((s) => s.media_scope === "movies");
 
   return (
-    <div className="max-w-5xl space-y-6" data-testid="pruner-instance-overview">
+    <div className="w-full min-w-0 space-y-6" data-testid="pruner-instance-overview">
       <header className="mm-page__intro !mb-0 border-0 p-0 shadow-none">
         <p className="mm-page__eyebrow">This server</p>
         <h2 className="mm-page__title text-xl sm:text-2xl">Overview</h2>
