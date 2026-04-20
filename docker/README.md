@@ -238,6 +238,17 @@ You ran Compose **outside** the repo root, or you **never cloned** the repositor
 
 Update to a **current Docker Desktop / Compose v2** release. That file uses Compose **`include`**, which needs a **recent Compose specification** implementation.
 
+### `500 Internal Server Error` / `dockerDesktopLinuxEngine` when pulling (Windows)
+
+That response comes from **Docker Desktop’s Linux engine**, not from GHCR’s “public vs private” check. Typical fixes (try in order):
+
+1. **Confirm the engine is healthy:** `docker version` and `docker pull hello-world`. If `hello-world` also returns **500**, fix Docker first.
+2. **Restart Docker Desktop** fully (Docker menu → **Quit Docker Desktop**, start it again; wait until it says **running**).
+3. **If you use WSL 2 as the Docker backend:** in an elevated PowerShell, **`wsl --shutdown`**, then start Docker Desktop again. **If you do not have WSL**, skip this — your backend is usually **Hyper-V** (see Docker Desktop → **Settings** → **General**).
+4. **Without WSL:** ensure **virtualization** is on in the BIOS/UEFI, and on Windows Pro/Enterprise that **Hyper-V** / the **Virtual Machine Platform** / **Windows Hypervisor Platform** features match what [Docker’s Windows docs](https://docs.docker.com/desktop/setup/install/windows-install/) require for your edition. Home editions rely on the components Docker Desktop installs; still check virtualization is enabled.
+5. **Update Docker Desktop** to the latest stable build.
+6. If it persists: Docker Desktop → **Troubleshoot** → **Restart** or **Reset to factory defaults** (reset wipes local images/containers — only as a last resort).
+
 ---
 
 ## Environment reference (common)
