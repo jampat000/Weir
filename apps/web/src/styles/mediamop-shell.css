@@ -6,15 +6,27 @@
   box-sizing: border-box;
 }
 
+* {
+  scrollbar-width: auto;
+  scrollbar-color: rgba(231, 231, 234, 0.38) rgba(255, 255, 255, 0.06);
+}
+
 *::-webkit-scrollbar {
-  width: 4px;
+  width: 10px;
+  height: 10px;
 }
 *::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 2px;
+  background: rgba(231, 231, 234, 0.38);
+  border-radius: 999px;
+  border: 2px solid rgba(0, 0, 0, 0);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(231, 231, 234, 0.55);
 }
 
 html {
