@@ -2,7 +2,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { DISPLAY_DENSITY_STORAGE_KEY } from "../../lib/ui/display-density";
 import type { UserPublic } from "../../lib/api/types";
 import { qk } from "../../lib/auth/queries";
 import { suiteSecurityOverviewQueryKey, suiteSettingsQueryKey } from "../../lib/suite/queries";
@@ -52,6 +53,11 @@ function renderSettings(me: UserPublic) {
 }
 
 describe("SettingsPage (suite settings)", () => {
+  beforeEach(() => {
+    localStorage.removeItem(DISPLAY_DENSITY_STORAGE_KEY);
+    document.documentElement.removeAttribute("data-mm-density");
+  });
+
   it("does not mention Sonarr or Radarr on the central Settings page", () => {
     const { container } = renderSettings(operatorMe);
     const t = (container.textContent ?? "").toLowerCase();
@@ -125,5 +131,14 @@ describe("SettingsPage (suite settings)", () => {
     expect(screen.getByRole("listbox")).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  it("applies display density locally without suite save", () => {
+    renderSettings(viewerMe);
+    expect(screen.getByTestId("suite-settings-display-density")).toBeTruthy();
+    fireEvent.click(screen.getByText("Comfortable"));
+    expect(document.documentElement.getAttribute("data-mm-density")).toBe("comfortable");
+    fireEvent.click(screen.getByText("Default"));
+    expect(document.documentElement.getAttribute("data-mm-density")).toBeNull();
   });
 });

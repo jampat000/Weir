@@ -38,7 +38,7 @@ body.mm-body {
   height: 100%;
   margin: 0;
   font-family: var(--mm-font);
-  font-size: 15px;
+  font-size: calc(15px * var(--mm-density-font-scale));
   line-height: 1.52;
   font-weight: 400;
   font-feature-settings: var(--mm-font-feature);
@@ -359,7 +359,7 @@ body.mm-body {
 /* Desktop (Material "expanded" and up): first typography step before large / extra-large tiers. */
 @media (min-width: 1280px) {
   body.mm-body {
-    font-size: 15.5px;
+    font-size: calc(15.5px * var(--mm-density-font-scale));
     line-height: 1.53;
   }
 
@@ -376,7 +376,7 @@ body.mm-body {
 /* Large / extra-large desktop: stronger scale (aligned ~ Material 1200dp+ / 1600dp+). */
 @media (min-width: 1600px) {
   body.mm-body {
-    font-size: 15.75px;
+    font-size: calc(15.75px * var(--mm-density-font-scale));
     line-height: 1.54;
   }
 
@@ -415,7 +415,7 @@ body.mm-body {
 
 @media (min-width: 2000px) {
   body.mm-body {
-    font-size: 16px;
+    font-size: calc(16px * var(--mm-density-font-scale));
     line-height: 1.55;
   }
 

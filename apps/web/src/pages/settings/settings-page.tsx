@@ -14,6 +14,11 @@ import {
   useSuiteSettingsQuery,
   useSuiteSettingsSaveMutation,
 } from "../../lib/suite/queries";
+import {
+  persistDisplayDensity,
+  readStoredDisplayDensity,
+  type DisplayDensity,
+} from "../../lib/ui/display-density";
 
 function canEditSuiteGlobal(role: string | undefined): boolean {
   return role === "operator" || role === "admin";
@@ -61,6 +66,7 @@ export function SettingsPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [changePasswordStatus, setChangePasswordStatus] = useState<string | null>(null);
+  const [displayDensity, setDisplayDensity] = useState<DisplayDensity>(() => readStoredDisplayDensity());
   const timezoneLabelId = useId();
 
   useEffect(() => {
@@ -221,6 +227,53 @@ export function SettingsPage() {
                   Number of days to keep Activity timeline rows before automatic cleanup.
                 </p>
               </label>
+
+              <fieldset className="min-w-0 border-0 p-0">
+                <legend className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
+                  Display density (this browser)
+                </legend>
+                <p className="mt-1 max-w-prose text-xs text-[var(--mm-text3)]">
+                  Adjust type size and how wide the main column can grow on large monitors. Saved only in this browser
+                  (not part of suite save below). Set to Default to clear.
+                </p>
+                <div
+                  className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap"
+                  data-testid="suite-settings-display-density"
+                  role="radiogroup"
+                  aria-label="Display density"
+                >
+                  {(
+                    [
+                      { id: "default" as const, label: "Default", hint: "Balanced" },
+                      { id: "comfortable" as const, label: "Comfortable", hint: "Larger text, wider cap" },
+                      { id: "compact" as const, label: "Compact", hint: "Smaller text, narrower cap" },
+                    ] as const
+                  ).map(({ id, label, hint }) => (
+                    <label
+                      key={id}
+                      className={[
+                        "flex min-w-0 cursor-pointer items-center gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors",
+                        displayDensity === id
+                          ? "border-[var(--mm-accent)] bg-[var(--mm-accent)]/12 text-[var(--mm-text)]"
+                          : "border-[var(--mm-border)] bg-transparent text-[var(--mm-text2)] hover:bg-[var(--mm-card-bg)]",
+                      ].join(" ")}
+                    >
+                      <input
+                        type="radio"
+                        name="mm-display-density"
+                        className="h-4 w-4 shrink-0 accent-[var(--mm-accent)]"
+                        checked={displayDensity === id}
+                        onChange={() => {
+                          setDisplayDensity(id);
+                          persistDisplayDensity(id);
+                        }}
+                      />
+                      <span className="min-w-0 font-medium">{label}</span>
+                      <span className="hidden text-xs text-[var(--mm-text3)] sm:inline">({hint})</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
 
               {save.isError ? (
                 <p className="text-sm text-red-300" role="alert" data-testid="suite-settings-save-error">
