@@ -42,7 +42,7 @@ Canonical ports: **[`docs/ports.md`](docs/ports.md)**.
 
 Full instructions: **[`docs/local-development.md`](docs/local-development.md)**.
 
-**Docker (alpha testers):** prerequisites, secrets, Compose, GHCR, and HTTPS notes — **[`docker/README.md`](docker/README.md)**.
+**Docker (alpha testers):** **`docker pull ghcr.io/jampat000/mediamop:alpha`** then **`docker run …`** (no clone needed) — or clone the repo and use **`docker compose --env-file .env.mediamop pull`** / **`up -d`** from the root that contains **`compose.yaml`**. Full steps and troubleshooting — **[`docker/README.md`](docker/README.md)**.
 
 ## Product paths
 

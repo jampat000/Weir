@@ -135,13 +135,15 @@ If the static site and API are on **different origins**:
 7. **Two dev windows**  
    **`.\scripts\dev.ps1`** (launcher only — preflight warns if `.env` / session secret are missing). Full check: **`.\scripts\verify-local.ps1`** with API running.
 
-## Optional `docker-compose.yml` (PostgreSQL)
+## Optional Postgres container (developers only)
 
-The repo may still ship a **`docker-compose.yml`** that starts **PostgreSQL** on host port **5433**. **MediaMop’s backend does not use it** in the SQLite-first configuration. Treat it as optional infrastructure for other experiments, not part of the default onboarding path.
+**Not used by MediaMop** in normal Docker or SQLite setups — the app stores data in **SQLite** under **`MEDIAMOP_HOME`**.
+
+The repo includes **`docker-compose.postgres.yml`** only for **ad hoc experiments** (starts Postgres on host port **5433**): `docker compose -f docker-compose.postgres.yml up -d`. Ignore it unless you are explicitly testing against Postgres; it is **not** part of the alpha Docker instructions in **`docker/README.md`**.
 
 ## All-in-one Docker (alpha)
 
-For a **single-container** build (API + production web UI, SQLite volume), see **`docker/README.md`** (requirements + steps) and **`docker-compose.mediamop.yml`**. Overview: **`docs/docker.md`**.
+For a **single-container** build (API + production web UI, SQLite volume), see **`docker/README.md`** (requirements + steps), root **`compose.yaml`** (GHCR, default `docker compose`), or **`docker-compose.mediamop.yml`** (local build). Overview: **`docs/docker.md`**.
 
 ## Visual shell
 

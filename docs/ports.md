@@ -32,7 +32,7 @@ For **containers** (Docker/Kubernetes), the API process bind port (e.g. **8000**
 
 ## Database (local dev)
 
-MediaMop **`apps/backend`** uses **file-backed SQLite** under **`MEDIAMOP_HOME`** — there is **no** extra listen port for the database. An optional **`docker-compose.yml`** in this repo may still expose PostgreSQL on **5433** for unrelated experiments; it is **not** used by the default SQLite-first app configuration (see **`docs/local-development.md`**).
+MediaMop **`apps/backend`** uses **file-backed SQLite** under **`MEDIAMOP_HOME`** — there is **no** extra listen port for the database. An optional **developer-only** compose file may expose PostgreSQL on **5433** for experiments; the shipped MediaMop container path is **SQLite-only** (see **`docs/local-development.md`**).
 
 ## CI / E2E
 

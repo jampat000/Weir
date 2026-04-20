@@ -1,9 +1,11 @@
-# MediaMop all-in-one (API + web UI). Does not replace docker-compose.yml (optional Postgres for experiments).
+# MediaMop all-in-one (API + web UI). SQLite inside the container — see docker/README.md.
 #
 # From repo root:
 #   cp docker/mediamop.env.example .env.mediamop
 #   # edit MEDIAMOP_SESSION_SECRET — use a long random value (32+ chars)
 #   docker compose --env-file .env.mediamop -f docker-compose.mediamop.yml up --build
+#
+# Pre-built image (no local build): use docker-compose.mediamop.ghcr.yml — see docker/README.md.
 #
 # Then open http://localhost:8788/ — first visit walks through admin setup when the DB is empty.
 
