@@ -28,7 +28,7 @@ def start_refiner_watched_folder_remux_scan_dispatch_enqueue_tasks(
     stop_event: asyncio.Event,
     settings: MediaMopSettings,
 ) -> list[asyncio.Task[None]]:
-    """Background enqueue tick for the watched-folder remux scan dispatch family only (no Fetcher coupling)."""
+    """Background enqueue tick for the watched-folder remux scan dispatch family only."""
     task = asyncio.create_task(
         _run_periodic_watched_folder_scan_dispatch_enqueue(
             session_factory,

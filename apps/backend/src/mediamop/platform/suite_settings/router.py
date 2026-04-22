@@ -1,4 +1,4 @@
-"""Suite-wide settings (Global) and read-only security overview — not Fetcher/Sonarr/Radarr."""
+"""Suite-wide settings (Global) and read-only security overview — not module *arr* pages."""
 
 from __future__ import annotations
 

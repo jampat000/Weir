@@ -34,7 +34,6 @@ def session_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> sessionm
     home = tmp_path / "mmhome"
     home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("MEDIAMOP_HOME", str(home))
-    monkeypatch.setenv("MEDIAMOP_FETCHER_WORKER_COUNT", "0")
     monkeypatch.setenv("MEDIAMOP_REFINER_WORKER_COUNT", "0")
     monkeypatch.setenv("MEDIAMOP_PRUNER_WORKER_COUNT", "0")
     monkeypatch.setenv("MEDIAMOP_SUBBER_WORKER_COUNT", "0")

@@ -1,5 +1,5 @@
 /**
- * Shared **module top-tab** context strip (Fetcher, Broker, Pruner, Refiner, Subber, …).
+ * Shared **module top-tab** context strip (Pruner, Refiner, Subber, …).
  * Same visual rhythm as Suite Settings tab blurbs: double horizontal rule and even vertical padding.
  */
 

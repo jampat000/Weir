@@ -1,4 +1,4 @@
-"""Permanent guards: module-owned ``job_kind`` prefixes vs Refiner/Fetcher/Pruner/Subber lanes."""
+"""Permanent guards: module-owned ``job_kind`` prefixes vs Refiner/Pruner/Subber lanes."""
 
 from __future__ import annotations
 
@@ -10,20 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from mediamop.core.config import MediaMopSettings
-from mediamop.modules.fetcher.failed_import_drive_job_kinds import (
-    FAILED_IMPORT_JOB_KIND_RADARR_CLEANUP_DRIVE,
-    FETCHER_FAILED_IMPORT_DRIVE_JOB_KINDS,
-)
-from mediamop.modules.fetcher.failed_import_queue_job_handlers import (
-    build_failed_import_queue_job_handlers,
-)
-from mediamop.modules.fetcher.fetcher_jobs_model import FetcherJob, FetcherJobStatus
-from mediamop.modules.fetcher.fetcher_jobs_ops import fetcher_enqueue_or_get_job
-from mediamop.modules.fetcher.fetcher_worker_loop import process_one_fetcher_job
 from mediamop.modules.queue_worker.job_kind_boundaries import (
     job_kind_forbidden_on_refiner_lane,
-    job_kind_is_fetcher_failed_import_namespace,
-    validate_fetcher_worker_handler_registry_keys,
     validate_refiner_worker_handler_registry,
     validate_subber_worker_handler_registry,
     validate_pruner_worker_handler_registry,
@@ -44,13 +32,14 @@ from mediamop.modules.pruner.pruner_jobs_model import PrunerJob, PrunerJobStatus
 from mediamop.modules.pruner.pruner_jobs_ops import pruner_enqueue_or_get_job
 from mediamop.modules.pruner.worker_loop import process_one_pruner_job
 
-import mediamop.modules.fetcher.fetcher_jobs_model  # noqa: F401
 import mediamop.modules.refiner.jobs_model  # noqa: F401
 import mediamop.modules.subber.subber_jobs_model  # noqa: F401
 import mediamop.modules.pruner.pruner_jobs_model  # noqa: F401
 import mediamop.platform.activity.models  # noqa: F401
 import mediamop.platform.auth.models  # noqa: F401
 from mediamop.core.db import Base
+
+_LEGACY_FAILED_IMPORT_DRIVE = "failed_import.radarr.cleanup_drive.v1"
 
 
 @pytest.fixture
@@ -85,13 +74,13 @@ def test_default_refiner_handler_registry_has_no_foreign_lane_keys() -> None:
     assert all(str(k).startswith("refiner.") for k in reg)
 
 
-def test_refiner_enqueue_rejects_fetcher_pruner_subber_namespaces(session_factory) -> None:
+def test_refiner_enqueue_rejects_foreign_namespaces(session_factory) -> None:
     with session_factory() as s:
         with pytest.raises(ValueError, match="refiner_enqueue_or_get_job refuses"):
             refiner_enqueue_or_get_job(
                 s,
                 dedupe_key="x",
-                job_kind=FAILED_IMPORT_JOB_KIND_RADARR_CLEANUP_DRIVE,
+                job_kind=_LEGACY_FAILED_IMPORT_DRIVE,
             )
     with session_factory() as s:
         with pytest.raises(ValueError, match="refiner_enqueue_or_get_job refuses"):
@@ -114,29 +103,10 @@ def test_refiner_enqueue_rejects_unprefixed_job_kind(session_factory) -> None:
             refiner_enqueue_or_get_job(s, dedupe_key="u", job_kind="bare.kind")
 
 
-def test_fetcher_enqueue_rejects_refiner_pruner_subber_prefix(session_factory) -> None:
-    with session_factory() as s:
-        with pytest.raises(ValueError, match="fetcher_enqueue_or_get_job refuses"):
-            fetcher_enqueue_or_get_job(s, dedupe_key="r", job_kind="refiner.compact.v1")
-    with session_factory() as s:
-        with pytest.raises(ValueError, match="fetcher_enqueue_or_get_job refuses"):
-            fetcher_enqueue_or_get_job(s, dedupe_key="t", job_kind="pruner.x.v1")
-    with session_factory() as s:
-        with pytest.raises(ValueError, match="fetcher_enqueue_or_get_job refuses"):
-            fetcher_enqueue_or_get_job(s, dedupe_key="legacy", job_kind="trimmer.x.v1")
-    with session_factory() as s:
-        with pytest.raises(ValueError, match="fetcher_enqueue_or_get_job refuses"):
-            fetcher_enqueue_or_get_job(
-                s,
-                dedupe_key="s",
-                job_kind=SUBBER_JOB_KIND_SUBTITLE_SEARCH_TV,
-            )
-
-
 def test_validate_refiner_worker_handler_registry_rejects_foreign_lane_keys() -> None:
     with pytest.raises(ValueError, match="Refiner worker handler registry"):
         validate_refiner_worker_handler_registry(
-            {FAILED_IMPORT_JOB_KIND_RADARR_CLEANUP_DRIVE: lambda _c: None},
+            {_LEGACY_FAILED_IMPORT_DRIVE: lambda _c: None},
         )
     with pytest.raises(ValueError, match="Refiner worker handler registry"):
         validate_refiner_worker_handler_registry({"pruner.x": lambda _c: None})
@@ -155,37 +125,6 @@ def test_validate_refiner_worker_handler_registry_accepts_refiner_prefixed_keys(
     validate_refiner_worker_handler_registry({"refiner.test.mechanics.v1": lambda _c: None})
 
 
-def test_validate_fetcher_worker_registry_accepts_declared_fetcher_prefixes() -> None:
-    validate_fetcher_worker_handler_registry_keys(
-        {"missing_search.probe.v1": lambda _c: None},
-    )
-    validate_fetcher_worker_handler_registry_keys(
-        {
-            "failed_import.radarr.cleanup_drive.v1": lambda _c: None,
-            "upgrade_search.batch.v1": lambda _c: None,
-        },
-    )
-
-
-def test_validate_fetcher_worker_registry_rejects_pass21_style_keys() -> None:
-    with pytest.raises(ValueError, match="Fetcher worker handler registry keys"):
-        validate_fetcher_worker_handler_registry_keys({"pass21.kind": lambda _c: None})
-
-
-def test_build_failed_import_handlers_keys_match_canonical_frozenset(
-    session_factory,
-    failed_import_queue_worker_runtime_bundle,
-) -> None:
-    settings = MediaMopSettings.load()
-    reg = build_failed_import_queue_job_handlers(
-        settings,
-        session_factory,
-        failed_import_runtime=failed_import_queue_worker_runtime_bundle,
-    )
-    assert set(reg) == FETCHER_FAILED_IMPORT_DRIVE_JOB_KINDS
-    assert all(job_kind_is_fetcher_failed_import_namespace(k) for k in reg)
-
-
 def test_process_one_refiner_job_fails_claimed_row_in_foreign_lane_without_handler(
     session_factory,
 ) -> None:
@@ -195,7 +134,7 @@ def test_process_one_refiner_job_fails_claimed_row_in_foreign_lane_without_handl
         s.add(
             RefinerJob(
                 dedupe_key="legacy",
-                job_kind=FAILED_IMPORT_JOB_KIND_RADARR_CLEANUP_DRIVE,
+                job_kind=_LEGACY_FAILED_IMPORT_DRIVE,
                 status=RefinerJobStatus.PENDING.value,
             ),
         )
@@ -245,7 +184,7 @@ def test_process_one_refiner_job_rejects_unprefixed_job_kind_row(session_factory
         assert "refiner.* prefix" in row.last_error
 
 
-def test_pruner_enqueue_rejects_refiner_fetcher_subber_namespaces(session_factory) -> None:
+def test_pruner_enqueue_rejects_foreign_namespaces(session_factory) -> None:
     with session_factory() as s:
         with pytest.raises(ValueError, match="pruner_enqueue_or_get_job refuses"):
             pruner_enqueue_or_get_job(s, dedupe_key="x", job_kind="refiner.compact.v1")
@@ -254,7 +193,7 @@ def test_pruner_enqueue_rejects_refiner_fetcher_subber_namespaces(session_factor
             pruner_enqueue_or_get_job(
                 s,
                 dedupe_key="y",
-                job_kind=FAILED_IMPORT_JOB_KIND_RADARR_CLEANUP_DRIVE,
+                job_kind=_LEGACY_FAILED_IMPORT_DRIVE,
             )
     with session_factory() as s:
         with pytest.raises(ValueError, match="pruner_enqueue_or_get_job refuses"):
@@ -277,7 +216,7 @@ def test_pruner_enqueue_rejects_unprefixed_job_kind(session_factory) -> None:
 def test_validate_pruner_worker_handler_registry_rejects_foreign_lane_keys() -> None:
     with pytest.raises(ValueError, match="Pruner worker handler registry"):
         validate_pruner_worker_handler_registry(
-            {FAILED_IMPORT_JOB_KIND_RADARR_CLEANUP_DRIVE: lambda _c: None},
+            {_LEGACY_FAILED_IMPORT_DRIVE: lambda _c: None},
         )
     with pytest.raises(ValueError, match="Pruner worker handler registry"):
         validate_pruner_worker_handler_registry({"refiner.x.v1": lambda _c: None})
@@ -359,34 +298,7 @@ def test_process_one_pruner_job_rejects_unprefixed_job_kind_row(session_factory,
         assert "pruner.* prefix" in row.last_error
 
 
-def test_process_one_fetcher_job_fails_claimed_row_with_refiner_prefix(
-    session_factory,
-) -> None:
-    with session_factory() as s:
-        s.add(
-            FetcherJob(
-                dedupe_key="bad",
-                job_kind="refiner.leaked.v1",
-                status=FetcherJobStatus.PENDING.value,
-            ),
-        )
-        s.commit()
-
-    out = process_one_fetcher_job(
-        session_factory,
-        lease_owner="w",
-        job_handlers={},
-    )
-    assert out == "processed"
-    with session_factory() as s:
-        row = s.scalars(select(FetcherJob)).first()
-        assert row is not None
-        assert row.status == FetcherJobStatus.PENDING.value
-        assert row.last_error is not None
-        assert "fetcher worker refused" in row.last_error
-
-
-def test_subber_enqueue_rejects_refiner_pruner_fetcher_namespaces(session_factory) -> None:
+def test_subber_enqueue_rejects_foreign_namespaces(session_factory) -> None:
     with session_factory() as s:
         with pytest.raises(ValueError, match="subber_enqueue_or_get_job refuses"):
             subber_enqueue_or_get_job(s, dedupe_key="x", job_kind="refiner.compact.v1")
@@ -401,7 +313,7 @@ def test_subber_enqueue_rejects_refiner_pruner_fetcher_namespaces(session_factor
             subber_enqueue_or_get_job(
                 s,
                 dedupe_key="f",
-                job_kind=FAILED_IMPORT_JOB_KIND_RADARR_CLEANUP_DRIVE,
+                job_kind=_LEGACY_FAILED_IMPORT_DRIVE,
             )
 
 
@@ -414,7 +326,7 @@ def test_subber_enqueue_rejects_unprefixed_job_kind(session_factory) -> None:
 def test_validate_subber_worker_handler_registry_rejects_foreign_lane_keys() -> None:
     with pytest.raises(ValueError, match="Subber worker handler registry"):
         validate_subber_worker_handler_registry(
-            {FAILED_IMPORT_JOB_KIND_RADARR_CLEANUP_DRIVE: lambda _c: None},
+            {_LEGACY_FAILED_IMPORT_DRIVE: lambda _c: None},
         )
     with pytest.raises(ValueError, match="Subber worker handler registry"):
         validate_subber_worker_handler_registry({"refiner.x.v1": lambda _c: None})

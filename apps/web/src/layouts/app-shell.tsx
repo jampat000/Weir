@@ -1,15 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { BrandHeaderLink } from "../components/brand/brand-header-link";
-import {
-  NavIconActivity,
-  NavIconBroker,
-  NavIconDashboard,
-  NavIconFetcher,
-  NavIconRefiner,
-  NavIconSettings,
-  NavIconSubber,
-  NavIconPruner,
-} from "../components/shell/nav-icons";
+import { NavIconActivity, NavIconDashboard, NavIconRefiner, NavIconSettings, NavIconSubber, NavIconPruner } from "../components/shell/nav-icons";
 import { WEB_APP_VERSION } from "../lib/app-meta";
 import { useLogoutMutation } from "../lib/auth/queries";
 import { useSuiteSettingsQuery } from "../lib/suite/queries";
@@ -44,18 +35,6 @@ export function AppShell() {
           </NavLink>
 
           <p className="mm-sidebar-section-label">Modules</p>
-          <NavLink to="/app/broker" className={sidebarNavClass}>
-            <span className="mm-sidebar-link-icon" aria-hidden="true">
-              <NavIconBroker />
-            </span>
-            <span className="mm-sidebar-link-label">Broker</span>
-          </NavLink>
-          <NavLink to="/app/fetcher" className={sidebarNavClass}>
-            <span className="mm-sidebar-link-icon" aria-hidden="true">
-              <NavIconFetcher />
-            </span>
-            <span className="mm-sidebar-link-label">Fetcher</span>
-          </NavLink>
           <NavLink to="/app/refiner" className={sidebarNavClass}>
             <span className="mm-sidebar-link-icon" aria-hidden="true">
               <NavIconRefiner />

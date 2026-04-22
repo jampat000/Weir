@@ -8,7 +8,7 @@
 
 MediaMop needs durable product state, **SQLAlchemy 2.x**, and **Alembic** for schema evolution. Early drafts considered **PostgreSQL** and **`MEDIAMOP_DATABASE_URL`**; that path is **not** supported.
 
-The **MediaMop** product in this monorepo includes the FastAPI backend and the Vite web app under `apps/web`. A separate “Fetcher-only” repository is **not** required for this ADR to apply.
+The **MediaMop** product in this monorepo includes the FastAPI backend and the Vite web app under `apps/web`.
 
 ## Decision
 
@@ -37,7 +37,7 @@ The **MediaMop** product in this monorepo includes the FastAPI backend and the V
 ## Current implementation snapshot
 
 - **`mediamop.core.db`**: sync SQLite `Engine` + `sessionmaker`, PRAGMA hooks on connect.
-- ORM tables include **`users`**, **`user_sessions`**, **`activity_events`**, module-owned job tables (e.g. **`refiner_jobs`**, **`fetcher_jobs`**) via Alembic.
+- ORM tables include **`users`**, **`user_sessions`**, **`activity_events`**, module-owned job tables (e.g. **`refiner_jobs`**, **`pruner_jobs`**, **`subber_jobs`**) via Alembic.
 - **`mediamop.core.config`**: resolves paths and builds the SQLite SQLAlchemy URL.
 
 ## Historical note

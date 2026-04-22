@@ -145,7 +145,7 @@ function SubberSettingsSection({
         </h2>
         {description ? <div className="mt-2 text-sm leading-relaxed text-[var(--mm-text2)]">{description}</div> : null}
       </header>
-      <div className="space-y-5 px-5 py-5">{children}</div>
+      <div className="mm-bubble-stack px-5 py-5">{children}</div>
     </section>
   );
 }
@@ -317,13 +317,13 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
   if (q.isLoading) return <p className="text-sm text-[var(--mm-text2)]">Loading settings…</p>;
   if (q.isError) return <p className="text-sm text-red-600">{(q.error as Error).message}</p>;
 
-  const sonHint = (q.data?.fetcher_sonarr_base_url_hint || "").trim();
-  const radHint = (q.data?.fetcher_radarr_base_url_hint || "").trim();
+  const sonHint = (q.data?.arr_library_sonarr_base_url_hint || "").trim();
+  const radHint = (q.data?.arr_library_radarr_base_url_hint || "").trim();
 
   return (
-    <div className="space-y-8" data-testid="subber-connections-tab">
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-6">
+    <div className="mm-bubble-stack" data-testid="subber-connections-tab">
+      <div className="mm-bubble-grid lg:grid-cols-2">
+        <div className="mm-bubble-stack">
           <SubberSettingsSection
             eyebrow="TV library"
             title="Sonarr"
@@ -333,7 +333,7 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
             <SubberSettingsSubsection title="Connection">
               {sonHint ? (
                 <p className="text-sm text-[var(--mm-text2)]">
-                  Fetcher already uses <span className="font-mono text-[var(--mm-text)]">{sonHint}</span> — you can paste the same base URL here.
+                  Arr library already uses <span className="font-mono text-[var(--mm-text)]">{sonHint}</span> — you can paste the same base URL here.
                 </p>
               ) : null}
               <label className="block text-sm font-medium text-[var(--mm-text)]" htmlFor="subber-son-url">
@@ -495,7 +495,7 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
           </SubberSettingsSection>
         </div>
 
-        <div className="space-y-6">
+        <div className="mm-bubble-stack">
           <SubberSettingsSection
             eyebrow="Movies library"
             title="Radarr"
@@ -505,7 +505,7 @@ export function SubberConnectionsTab({ canOperate }: { canOperate: boolean }) {
             <SubberSettingsSubsection title="Connection">
               {radHint ? (
                 <p className="text-sm text-[var(--mm-text2)]">
-                  Fetcher already uses <span className="font-mono text-[var(--mm-text)]">{radHint}</span> — you can paste the same base URL here.
+                  Arr library already uses <span className="font-mono text-[var(--mm-text)]">{radHint}</span> — you can paste the same base URL here.
                 </p>
               ) : null}
               <label className="block text-sm font-medium text-[var(--mm-text)]" htmlFor="subber-rad-url">

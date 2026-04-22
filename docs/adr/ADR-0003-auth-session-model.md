@@ -6,7 +6,7 @@ Accepted.
 
 ## Context
 
-The product requires **secure-by-default** web authentication: **server-side sessions** with **hardened cookies**, **CSRF** protection for unsafe browser-initiated requests, **Argon2id** password hashing, and **no browser-stored JWT as the default** for the primary UI. Optional **OIDC** may be added later without rewriting core authorization boundaries. The **Fetcher** application (separate repository) uses a different auth approach; MediaMop **does not** inherit that implementation wholesale.
+The product requires **secure-by-default** web authentication: **server-side sessions** with **hardened cookies**, **CSRF** protection for unsafe browser-initiated requests, **Argon2id** password hashing, and **no browser-stored JWT as the default** for the primary UI. Optional **OIDC** may be added later without rewriting core authorization boundaries.
 
 ## Decision
 

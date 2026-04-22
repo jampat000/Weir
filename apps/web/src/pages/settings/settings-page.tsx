@@ -343,8 +343,8 @@ export function SettingsPage() {
         <p className="mm-page__eyebrow">System</p>
         <h1 className="mm-page__title">Settings</h1>
         <p className="mm-page__lead">
-          MediaMop-wide choices that are not part of Fetcher, Refiner, Pruner, or Subber. Integration details stay on
-          their module pages.
+          MediaMop-wide choices that are not part of Refiner, Pruner, or Subber. Integration details stay on their module
+          pages.
         </p>
       </header>
 
@@ -384,7 +384,7 @@ export function SettingsPage() {
         </div>
 
         {tab === "general" ? (
-          <div data-testid="suite-settings-global" className="space-y-5">
+          <div data-testid="suite-settings-global" className="mm-bubble-stack">
             {!editable ? (
               <p className="text-sm text-[var(--mm-text3)]">
                 Operators and admins can edit General options; everyone can open the Logs tab to read recent events.
@@ -394,8 +394,8 @@ export function SettingsPage() {
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               <div className={`${mmModuleTabBlurbBandClass} lg:col-span-2`}>
                 <p className={mmModuleTabBlurbTextClass}>
-                  Suite-wide choices saved in the app database. Integration details for Fetcher, Refiner, Pruner,
-                  Subber, and Broker stay on those module pages.
+                  Suite-wide choices saved in the app database. Integration details for Refiner, Pruner, and Subber stay
+                  on those module pages.
                 </p>
               </div>
               <section
@@ -504,8 +504,9 @@ export function SettingsPage() {
                     Backup and restore
                   </h3>
                   <p className="mt-1 text-sm text-[var(--mm-text2)]">
-                    Export or import the full suite configuration (Fetcher, Refiner, Pruner, Subber, Broker, and
-                    suite-level settings) as one JSON file. Automatic snapshots use the same JSON format and keep the
+                    Export or import the full suite configuration (Refiner, Pruner, Subber, arr library operator
+                    settings, and suite-level settings) as one JSON file. Automatic snapshots use the same JSON format
+                    and keep the
                     five most recent files on disk.
                   </p>
                 </div>
@@ -683,7 +684,7 @@ export function SettingsPage() {
             ) : null}
           </div>
         ) : tab === "security" ? (
-          <div className="w-full space-y-5" data-testid="suite-settings-security">
+          <div className="mm-bubble-stack w-full" data-testid="suite-settings-security">
             <div className={mmModuleTabBlurbBandClass}>
               <p className={mmModuleTabBlurbTextClass}>
                 Change your MediaMop password here. Sign-in cookie, HTTPS, and rate-limit settings follow the server
@@ -845,7 +846,7 @@ export function SettingsPage() {
             </section>
           </div>
         ) : (
-          <div data-testid="suite-settings-logs" className="w-full space-y-5">
+          <div data-testid="suite-settings-logs" className="mm-bubble-stack w-full">
             <div className={mmModuleTabBlurbBandClass}>
               <p className={mmModuleTabBlurbTextClass}>
                 Timeline events stored in the database and how long they are kept. Open the Activity views on module
@@ -854,9 +855,10 @@ export function SettingsPage() {
             </div>
 
             <section
-              className={`${SUITE_SETTINGS_DASH_CARD_CLASS} w-full max-w-none`}
+              className="mm-card mm-dash-card flex min-h-0 min-w-0 w-full max-w-none flex-col p-5 sm:p-6"
               aria-labelledby="suite-settings-logs-heading"
             >
+              <div className="mm-card-action-body flex-1 min-h-0">
               <div>
                 <h3 id="suite-settings-logs-heading" className="text-base font-semibold text-[var(--mm-text1)]">
                   Logs
@@ -892,7 +894,9 @@ export function SettingsPage() {
                   {save.error instanceof Error ? save.error.message : "Could not save."}
                 </p>
               ) : null}
+              </div>
 
+              <div className="mm-card-action-footer">
               <button
                 type="button"
                 className={mmActionButtonClass({
@@ -905,8 +909,9 @@ export function SettingsPage() {
               >
                 {save.isPending ? "Saving…" : "Save logs settings"}
               </button>
+              </div>
 
-              <div className="border-t border-[var(--mm-border)] pt-5">
+              <div className="mt-4 border-t border-[var(--mm-border)] pt-5">
                 <h4 className="text-sm font-semibold text-[var(--mm-text1)]">Most recent events (20)</h4>
                 <p className="mt-1 text-xs text-[var(--mm-text3)]">Newest first — same data as the Activity feed API.</p>
                 <div className="mt-3 max-h-[28rem] overflow-auto rounded-md border border-[var(--mm-border)]">

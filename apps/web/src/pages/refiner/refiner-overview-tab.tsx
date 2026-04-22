@@ -309,7 +309,7 @@ export function RefinerOverviewTab({
   });
 
   return (
-    <div data-testid="refiner-overview-panel" className="w-full min-w-0 space-y-6 sm:space-y-7">
+    <div data-testid="refiner-overview-panel" className="mm-bubble-stack w-full min-w-0">
       <MmOverviewSection
         headingId="refiner-overview-at-a-glance-heading"
         heading="At a glance"
@@ -369,10 +369,10 @@ export function RefinerOverviewTab({
         heading="Next steps"
         data-testid="refiner-overview-go-deeper"
       >
-        <div className="space-y-5">
+        <div className="mm-bubble-stack">
           <p className="leading-relaxed">
-            Finished work is summarized on Activity. Use Libraries for folders and timers, Schedules for manual scan triggers, Audio & subtitles
-            for defaults, and Jobs for the queue on this server.
+            Finished work is summarized on Activity. Use Libraries for paths, folder timers, and minimum file age. Use Schedules for optional hour
+            limits and to run library scans on demand. Use Audio & subtitles for defaults, and Jobs for the queue on this server.
           </p>
           {onOpenTab ? (
             <div className="flex flex-wrap gap-2.5 border-t border-[var(--mm-border)] pt-4">

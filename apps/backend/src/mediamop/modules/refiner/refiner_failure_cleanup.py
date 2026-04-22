@@ -26,10 +26,7 @@ from mediamop.modules.refiner.refiner_watched_folder_remux_scan_dispatch_ops imp
     refiner_active_remux_pass_exists_for_relative_path,
     relative_posix_path_under_watched,
 )
-from mediamop.modules.fetcher.fetcher_arr_http_resolve import (
-    resolve_radarr_http_credentials,
-    resolve_sonarr_http_credentials,
-)
+from mediamop.platform.arr_library import resolve_radarr_http_credentials, resolve_sonarr_http_credentials
 
 logger = logging.getLogger(__name__)
 

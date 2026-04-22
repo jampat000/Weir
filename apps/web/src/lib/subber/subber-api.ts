@@ -86,8 +86,8 @@ export type SubberSettingsOut = {
   radarr_path_mapping_enabled: boolean;
   radarr_path_radarr: string;
   radarr_path_subber: string;
-  fetcher_sonarr_base_url_hint: string;
-  fetcher_radarr_base_url_hint: string;
+  arr_library_sonarr_base_url_hint: string;
+  arr_library_radarr_base_url_hint: string;
 };
 
 /** Partial update body; same flat keys as ``SubberSettingsOut`` where applicable. */

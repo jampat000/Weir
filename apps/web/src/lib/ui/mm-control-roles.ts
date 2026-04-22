@@ -1,12 +1,12 @@
 /**
  * MediaMop-wide **control roles** (action buttons + section tabs).
  *
- * Hierarchy (Fetcher is the reference surface):
+ * Hierarchy (primary / secondary / tertiary):
  * - **primary** — commit/save (Save, Apply, Confirm, …)
  * - **secondary** — non-commit utilities (Test, Open, Run now, Queue …, Retry, Refresh)
  * - **tertiary** — lower-emphasis helpers (Show/Hide, Clear, compact row actions)
  *
- * Binary booleans use the segmented On/Off control (`MmOnOffSwitch` / `FetcherEnableSwitch`), not these classes.
+ * Binary booleans use the segmented On/Off control (`MmOnOffSwitch`), not these classes.
  */
 
 const actionBase =
@@ -35,7 +35,7 @@ export const mmSelectFieldClass = `${mmNativeFieldShell} mt-1 cursor-pointer`;
 /** Anchored picker button (custom listbox) — visually aligned with {@link mmSelectFieldClass}. */
 export const mmPickerTriggerClass = `${mmNativeFieldShell} mt-1 cursor-pointer text-left`;
 
-/** Checkbox control — matches ``MmMultiOptionRows`` / Fetcher multi-option styling. */
+/** Checkbox control — matches ``MmMultiOptionRows`` multi-option styling. */
 export const mmCheckboxControlClass =
   "mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--mm-border)] text-[var(--mm-gold)] accent-[var(--mm-gold)] " +
   "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mm-accent-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--mm-card-bg)] " +
@@ -57,7 +57,7 @@ export function mmListboxOptionButtonClass(selected: boolean): string {
 /** Monospace for read-only technical strings (resolved paths, env keys, raw ids). */
 export const mmTechnicalMonoSmallClass = "font-mono text-xs break-all text-[var(--mm-text2)]";
 
-/** In-page section tabs (e.g. Fetcher Overview / Connections). Not sidebar navigation. */
+/** In-page section tabs (e.g. module Overview / Connections). Not sidebar navigation. */
 export function mmSectionTabClass(active: boolean): string {
   return [
     "inline-flex min-h-[2.25rem] shrink-0 items-center justify-center whitespace-nowrap rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",

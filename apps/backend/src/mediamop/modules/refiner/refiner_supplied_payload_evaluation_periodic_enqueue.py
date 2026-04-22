@@ -23,7 +23,7 @@ def start_refiner_supplied_payload_evaluation_enqueue_tasks(
     stop_event: asyncio.Event,
     settings: MediaMopSettings,
 ) -> list[asyncio.Task[None]]:
-    """Background enqueue tick for the supplied-payload evaluation family only (no Fetcher coupling)."""
+    """Background enqueue tick for the supplied-payload evaluation family only."""
 
     if not settings.refiner_supplied_payload_evaluation_schedule_enabled:
         return []

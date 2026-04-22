@@ -1,4 +1,4 @@
-"""Small synchronous HTTP helpers for Pruner (stdlib urllib — matches Fetcher Arr client style)."""
+"""Small synchronous HTTP helpers for Pruner (stdlib urllib)."""
 
 from __future__ import annotations
 

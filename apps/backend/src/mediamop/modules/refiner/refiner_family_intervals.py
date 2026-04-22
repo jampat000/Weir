@@ -1,4 +1,4 @@
-"""Refiner-local schedule interval clamps (ADR-0009: not shared with Fetcher or other modules)."""
+"""Refiner-local schedule interval clamps (ADR-0009: not shared with other modules)."""
 
 from __future__ import annotations
 

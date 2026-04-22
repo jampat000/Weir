@@ -2,7 +2,7 @@
 
 ## What shows up in history
 
-Commit `93547e2` is a large Fetcher / Refiner lane split. Git’s rename heuristics paired several **unrelated** paths (similarity-based renames). `git show --stat` can therefore list misleading “rename” pairs for reviewers who infer lineage from rename metadata alone.
+Commit `93547e2` is a large structural refactor. Git’s rename heuristics paired several **unrelated** paths (similarity-based renames). `git show --stat` can therefore list misleading “rename” pairs for reviewers who infer lineage from rename metadata alone.
 
 ## Why this was not “fixed” in the perfection pass
 

@@ -36,7 +36,7 @@ Single canonical backlog for shipped milestones and the next honest slice of wor
 **Completion criteria (must all be true to tick):**
 
 1. The existing manual `refiner.watched_folder.remux_scan_dispatch.v1` enqueue path remains intact.
-2. A **Refiner-local** optional periodic enqueue exists (same `lifespan.py` asyncio pattern as supplied payload evaluation), with **its own** enable + interval + optional periodic remux flags on `MediaMopSettings` — **no** shared timing contract with Fetcher or other Refiner families.
+2. A **Refiner-local** optional periodic enqueue exists (same `lifespan.py` asyncio pattern as supplied payload evaluation), with **its own** enable + interval + optional periodic remux flags on `MediaMopSettings` — **no** shared timing contract across other Refiner families.
 3. **Scan-level duplicate guard:** periodic tick does not enqueue a new scan row while another scan of this job kind is `pending` or `leased`.
 4. **File-level duplicate guard:** unchanged inside the scan handler (same-run set + active remux queue check).
 5. Operators can see periodic config in the Refiner runtime snapshot and honest copy states **restart** is required for env changes.
@@ -48,14 +48,14 @@ Single canonical backlog for shipped milestones and the next honest slice of wor
 
 ## Roadmap item 8 — Central Settings UI (suite: Global + Security only)
 
-**Scope (explicit):** The **central** `/app/settings` page owns **MediaMop suite** presentation and **read-only security posture** — not Fetcher, not Sonarr/Radarr, not Refiner/Pruner/Subber module config.
+**Scope (explicit):** The **central** `/app/settings` page owns **MediaMop suite** presentation and **read-only security posture** — not Sonarr/Radarr, not Refiner/Pruner/Subber module config.
 
 **Completion criteria (must all be true to tick):**
 
 1. **Global:** Operators and admins can edit **product display name** and **optional signed-in home dashboard notice** in the UI; values persist in the **`suite_settings`** SQLite singleton (Alembic migration), via `GET`/`PUT /api/v1/suite/settings` (CSRF + operator auth on write). Viewers can read but not save.
 2. **Security:** All signed-in roles see a **read-only** overview from **startup-loaded** `MediaMopSettings` (`GET /api/v1/suite/security-overview`) with plain-language fields and an explicit note that **configuration file + restart** are required to change those values — no fake “saved” behavior for env-only settings.
-3. **Honesty:** Global saves apply immediately for the running app (database-backed). Security values are **not** presented as live-editable in the browser. No duplicate editing surface for Refiner paths, Fetcher failed-import settings, or other module-owned truth.
-4. **Central page purity:** The central Settings route **does not** surface Sonarr, Radarr, Fetcher cleanup toggles, or Fetcher schedules (asserted in tests / copy).
+3. **Honesty:** Global saves apply immediately for the running app (database-backed). Security values are **not** presented as live-editable in the browser. No duplicate editing surface for Refiner paths, failed-import settings, or other module-owned truth.
+4. **Central page purity:** The central Settings route **does not** surface Sonarr, Radarr, failed-import cleanup toggles, or module-specific schedules (asserted in tests / copy).
 5. **Product wiring:** Saved **product display name** appears in the signed-in shell (sidebar); optional **home notice** appears on the dashboard when set.
 6. **Tests:** Backend API + migration head + security overview builder; frontend settings page (no Sonarr/Radarr strings, viewer cannot save).
 
@@ -63,63 +63,15 @@ Single canonical backlog for shipped milestones and the next honest slice of wor
 
 - [x] **Done** — `suite_settings` table + model/service/schemas, `GET`/`PUT /api/v1/suite/settings`, `GET /api/v1/suite/security-overview`, web Settings page (Global / Security tabs), shell + dashboard wiring, plus suite-level Global fields for activity logging toggle, app timezone, and activity retention days; Security now includes in-app `POST /api/v1/auth/change-password` (current password required, session revoke on success) alongside read-only startup posture, tests.
 
-## Roadmap item 9 — Fetcher module: Sonarr and Radarr settings (connections, searches, schedules)
+## Roadmap item 9 — Arr library: Sonarr and Radarr operator settings (historical milestone, superseded layout)
 
-**Scope (explicit):** Fetcher-owned **TV library (Sonarr)** and **movie library (Radarr)** operator surfaces: **database-backed** connection fields on `fetcher_arr_operator_settings` (encrypted API keys; env fallback when the row is incomplete), **database-backed** automatic search lane preferences on the same singleton, and one-time **connection checks** with outcomes on **Activity** (`fetcher.arr_connection_test_succeeded` / `fetcher.arr_connection_test_failed`). Lives on the **Fetcher page** and `GET`/`PUT`/`POST` under `/api/v1/fetcher/…` — **not** the central `/app/settings` page.
+**Current product shape:** TV (Sonarr) and movie (Radarr) **connections**, **automatic search lane** preferences, and **connection tests** live on the **Refiner** route under **Arr library** APIs (`/api/v1/arr-library/…`) with persistence in the **`arr_library_operator_settings`** SQLite singleton (encrypted API keys where stored; env fallback when the row is incomplete). Connection-test outcomes are recorded on **Activity** under neutral event types.
 
-**Parity targets (from Fetcher reference app):** per-lane enable, how often automatic checks are queued, schedule windows (days + start/end), batch limits, retry spacing, and explicit “check connection” actions. **Not** migrated: monolithic AppSettings backup/restore, Windows updater, or Fetcher auth/IP allowlist as MediaMop auth.
-
-**Persistence truth:**
-
-- **SQLite singleton (`fetcher_arr_operator_settings`) — connections:** per-app **enable**, **base URL**, and **API key** (Fernet ciphertext from `MEDIAMOP_SESSION_SECRET`; not plain text at rest), plus **last connection test** fields. Operators edit these on the Fetcher **Connections** tab; saves are real. If a link is enabled but URL/key are missing or unusable in the row, runtime **falls back** to env (`MEDIAMOP_ARR_SONARR_*` / `MEDIAMOP_ARR_RADARR_*` and legacy `MEDIAMOP_FETCHER_*` where supported) so upgrades stay honest — the UI `connection_note` explains that split in plain language.
-- **Env / server file:** still the compatibility **fallback** for URL/API key when the DB row does not carry a usable secret pair; operators can keep using the file during migration. Central Settings does not own these values.
-- **SQLite singleton (`fetcher_arr_operator_settings`) — search lanes:** all four lanes’ operational fields (enabled, `max_items_per_run`, `retry_delay_minutes`, schedule gate + days + start/end, `schedule_interval_seconds`). This is what **running** search handlers and periodic enqueue read after migration.
-- **Still env-only today:** schedule **time zone name** (`fetcher_arr_search_schedule_timezone` on `MediaMopSettings`) — shown read-only on the operator settings payload; moving it into the DB table is explicitly **deferred**.
-- **Honesty note:** older env keys for per-lane search toggles and intervals still exist on `MediaMopSettings` for compatibility and tests, but **lane runtime behavior follows the SQLite row** once the app is migrated. Do not treat those env fields as live toggles for production behavior after this milestone.
-
-**Restart / apply behavior:**
-
-- Saving lane fields (windows, limits, retry, enable) applies on the next worker pass or enqueue tick without an API restart, except **how often the background loop queues a new check** (`schedule_interval_seconds`): the periodic asyncio tasks read that value on each sleep cycle, but the UI still tells operators to **restart the API** after changing intervals so expectations match every deployment style.
-- Connection checks do not change saved settings.
-
-**Relationship to existing Fetcher surfaces:** failed-import **cleanup policy**, **runtime visibility**, **automation summary** (Overview UI label: **Current search setup**), **jobs inspection**, and **manual enqueue** stay on the **Fetcher route** (no new standalone Fetcher settings page). This item does not duplicate their APIs; **IA correction** (below) places *arr* automation and connections into tabs and removes the long stacked settings dump.
-
-**Explicit non-goals:** central suite Settings changes; Refiner/Pruner/Subber settings; backup/restore; updater; a generic settings framework; persistent “health dashboards” derived from a single test click; a **separate** Fetcher settings route.
-
-**Scope lock — UI correction pass (historical):** An earlier slice locked Fetcher-only web paths. **Current tree:** Connections credentials ship with **backend** migration `0014_fetcher_arr_connection_fields`, resolver + encrypted fields, and web panels under `pages/fetcher/**` / `lib/fetcher/**`. Further item 9 polish still respects “no central Settings / no unrelated modules” unless a later milestone explicitly widens scope.
-
-**What stays locked (product + architecture):**
-
-- Sonarr/Radarr operator surfaces stay on the **Fetcher** page and `/api/v1/fetcher/…`, not central `/app/settings` (Global + Security only there).
-- Connection test outcomes go to **Activity**; **Connections** owns editable URL/key (DB-backed, encrypted) with honest env fallback when the row is incomplete; lane **operational** preferences stay **DB-backed** (`fetcher_arr_operator_settings`).
-- User-facing copy stays **plain and non-technical** (no jargon wall).
-
-**Fetcher page IA (target; web is iterative):** One Fetcher route with **tabs or submenu** (not a separate settings page). Tabs include **Failed imports** for the download-queue workspace. **Treat the Fetcher web slice as ongoing** until copy, inner layouts, and operator review say otherwise — do not “close” this track just because the first tabbed layout shipped.
-
-| Area | Content |
-|------|--------|
-| **Overview** | **At a glance** (Connections → Sonarr → Radarr → Failed imports), **Needs attention**, **Current search setup** (read-only lane snapshot), **Failed imports that need attention** (headline + link — no duplicate Connections block; optional link probes surface in Needs attention only). |
-| **Connections** | **Side-by-side** **Sonarr** then **Radarr** panels: enable switch, URL, masked API key with show/hide, **Save Sonarr** / **Save Radarr** / **Test Sonarr** / **Test Radarr**, last **Connection status** in-panel; tests also log to **Activity**. Schedule time zone and interval/restart notes for **search** timing stay on **Sonarr (TV)** / **Radarr (Movies)** tabs. |
-| **Sonarr (TV)** | **TV-specific** automatic search lane settings (missing + upgrade); SQLite-backed operator fields; time zone + interval / restart plain-language notes for schedules. |
-| **Radarr (Movies)** | **Movie-specific** automatic search lane settings (missing + upgrade); same persistence rules; same schedule notes as TV tab. |
-| **Failed imports** | **Failed-import** workspace (cleanup, runtime, jobs inspection, manual enqueue / run-now) — same route, dedicated tab. |
-
-**Backend/persistence and APIs:** lane prefs and connection rows on `fetcher_arr_operator_settings` are implemented; connection **PUT** routes and resolver wiring ship with migration **0014**; further item 9 work is mostly **web polish and honesty** unless a new API gap appears.
-
-**Completion criteria (must all be true to tick):**
-
-1. Operators can read and (if admin/operator) save the four automatic search lanes on the Fetcher page; viewers see read-only data.
-2. Connection fields and time zone notes match persistence rules above; no fake “saved” messaging where nothing is written (env fallback remains documented in `connection_note` when relevant).
-3. `POST …/fetcher/arr-operator-settings/connection-test` runs a real v3 status call when credentials exist, and always writes a plain-language row to **Activity** (success or failure, including “not configured”).
-4. Central Settings page remains free of Sonarr/Radarr strings (existing test kept green).
-5. Tests cover API auth/roles, validation, connection-test → Activity, schema head includes `fetcher_arr_operator_settings`, and Fetcher page tests cover the **tabbed/submenu** structure.
-6. **IA:** Fetcher page matches the **Overview / Connections / Sonarr (TV) / Radarr (Movies) / Failed imports** table above: **Overview** — landing tab in order **At a glance** → **Needs attention** → **Current search setup** → **Failed imports that need attention** (no repeated lower Connections/service section; no “Download queue preview” naming); deeper detail stays on the other tabs; **Connections** — Sonarr then Radarr panels **side by side** (stacked on small screens) with save/test and in-panel status; **Sonarr (TV)** / **Radarr (Movies)** — lane editors + schedule time zone / restart plain notes; **Failed imports** — full failed-import workspace. **No** long single-column dump mixing those roles.
-7. **Scope:** Item 9 UI correction satisfies the **Scope lock** above (Fetcher-only paths; no unrelated app or backend churn).
+**Central Settings** remains Global + Security only; no duplicate *arr* editing surface there.
 
 ### 9 — status
 
-- [x] **Backend shipped** — migration `0013_fetcher_arr_operator_settings`, prefs + worker/enqueue wiring, `GET`/`PUT /api/v1/fetcher/arr-operator-settings`, `POST …/connection-test`, Activity constants, backend tests; migration **`0014_fetcher_arr_connection_fields`**, encrypted connection keys, `PUT …/arr-connection/{sonarr,radarr}`, resolver (DB → env fallback) across Fetcher/Refiner call sites, backend tests for connection APIs.
-- [ ] **Fetcher web / operator surface — open (same item 9)** — Tabbed shell remains (**Overview / Connections / Sonarr (TV) / Radarr (Movies) / Failed imports**). **Truth pass (web):** Overview **Needs attention** routes connected-but-idle search setups to the correct **Sonarr (TV)** / **Radarr (Movies)** tabs (not only Connections); **Current search setup** shows missing vs upgrade cadence separately when saved lanes differ (no silent pick of one lane). **Independence pass (API + web):** automatic search lanes save via **`PUT …/arr-operator-settings/lanes/{sonarr_missing|sonarr_upgrade|radarr_missing|radarr_upgrade}`** (one lane per request; bulk `PUT …/arr-operator-settings` retained for compatibility); failed-import cleanup saves via **`PUT …/cleanup-policy/tv-shows`** and **`PUT …/cleanup-policy/movies`** with per-card React Query pending; bulk cleanup `PUT` retained for compatibility. **Perfection-gate race fix:** lane refetch after a successful save no longer wipes unsaved draft edits in other lanes; tests cover preserving unsaved lane edits across query refresh. **Shipped in this TV/Movies structure pass:** **Sonarr (TV)** and **Radarr (Movies)** each use **two** bordered bubbles (**missing** + **upgrades**) with locked titles and intro lines; inside each bubble, controls follow **Enable / Disable** (same On/Off switch style as Connections) → **Run interval** → **Schedule** (locked helper + **Limit to these hours** switch + day/time fields) → **Search limit** → **Retry cooldown** → **Save** with locked button labels (**Save missing TV show searches** / **Save TV upgrades** / **Save missing movie searches** / **Save movie upgrades**); per-bubble dirty gating; shared **`FetcherEnableSwitch`** with Connections for visual parity. **Connections truth + UX pass (unchanged):** **`status_headline`**, **`connection_note`**, effective-vs-saved hints, per-panel test pending, backend PUT/headline tests. **This pass added:** clearer save confirmation (accent banner + brief panel highlight, no duplicate “Saved.” in connection status); stronger Fetcher action buttons; aligned Radarr “Missing movies” casing; spacing rhythm tweaks. **Overview correction pass (web):** locked four-section order; **At a glance** inner cards **Connections → Sonarr → Radarr → Failed imports**; **Automation summary** renamed **Current search setup**; **Download queue preview** replaced by **Failed imports that need attention** with locked subtext; paired labels use **Sonarr (TV)** / **Radarr (Movies)**; removed duplicate **Connections & optional service link** block from Overview. **Still in scope:** Failed imports density, cross-tab drafts, accessibility, deep links, backup/restore — item 9 **not** closed.
+- [x] **Done** — backend migrations through head (including table rename to `arr_library_operator_settings`), `arr_library` platform package, Refiner shell integration for failed imports + arr operator UI, web types/tests aligned with removal of standalone download-queue and indexer apps from the shell.
 
 ## Roadmap item 10 — Pruner removal product (library / server integrations)
 
@@ -269,12 +221,15 @@ Single canonical backlog for shipped milestones and the next honest slice of wor
 
 ## Active / next (ordered)
 
-1. **Fetcher operator surface (item 9 web, continued)** — Iterate tabbed Fetcher UX and copy per open bullets above; keep central Settings pure; extend tests as slices land.
-2. **Richer Activity rendering** for watched-folder scan summaries if plain `detail` text is not enough (Refiner-facing polish).
-3. **Taxonomy / tree truth (optional):** suite `dashboard` package location, `queue_worker` naming vs role, `arr_failed_import` vs env seam — only when justified by ownership truth.
-4. **Backlog:** SQLite WAL mode; SSE/WebSocket or similar push for activity/dashboard; app-wide hard copy pass.
+1. **Execution runlist — “Now”** (below): schedule wording standardization (item 2 pass), overview content audit (item 17 pass), Subscene/Addic7ed verification (item 28 pass).
+2. **Pruner roadmap (item 10)** — removal product Phase 2+; see Roadmap item 10 and `docs/pruner-forward-design-constraints.md`.
+3. **Richer Activity rendering** for watched-folder scan summaries if plain `detail` text is not enough (Refiner-facing polish).
+4. **Taxonomy / tree truth (optional):** suite `dashboard` package location, `queue_worker` naming vs role, `arr_failed_import` vs env seam — only when justified by ownership truth.
+5. **Backlog:** SQLite WAL mode; SSE/WebSocket or similar push for activity/dashboard; app-wide hard copy pass.
 
 ## Execution runlist (Now / Next / Later)
+
+**Roadmap item 9** is **closed**; active engineering focus follows this runlist (and **Pruner item 10** remains open in Roadmap above).
 
 ### Now
 

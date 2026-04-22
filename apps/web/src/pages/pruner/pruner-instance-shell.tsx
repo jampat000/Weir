@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useParams } from "react-router-dom";
-import { fetcherSectionTabClass } from "../fetcher/fetcher-menu-button";
+import { mmSectionTabClass } from "../../lib/ui/mm-control-roles";
 import { usePrunerInstanceQuery } from "../../lib/pruner/queries";
 
 export function PrunerInstanceShell() {
@@ -47,16 +47,16 @@ export function PrunerInstanceShell() {
         aria-label="Pruner server sections"
         data-testid="pruner-instance-section-tabs"
       >
-        <NavLink to={`${base}/overview`} className={({ isActive }) => fetcherSectionTabClass(isActive)} end>
+        <NavLink to={`${base}/overview`} className={({ isActive }) => mmSectionTabClass(isActive)} end>
           Overview
         </NavLink>
-        <NavLink to={`${base}/movies`} className={({ isActive }) => fetcherSectionTabClass(isActive)}>
+        <NavLink to={`${base}/movies`} className={({ isActive }) => mmSectionTabClass(isActive)}>
           Movies
         </NavLink>
-        <NavLink to={`${base}/tv`} className={({ isActive }) => fetcherSectionTabClass(isActive)}>
+        <NavLink to={`${base}/tv`} className={({ isActive }) => mmSectionTabClass(isActive)}>
           TV
         </NavLink>
-        <NavLink to={`${base}/connection`} className={({ isActive }) => fetcherSectionTabClass(isActive)}>
+        <NavLink to={`${base}/connection`} className={({ isActive }) => mmSectionTabClass(isActive)}>
           Connection
         </NavLink>
       </nav>

@@ -24,7 +24,7 @@ class RefinerOperatorSettingsOut(BaseModel):
     tv_schedule_days: str = Field(max_length=2000)
     tv_schedule_start: str = Field(max_length=5)
     tv_schedule_end: str = Field(max_length=5)
-    schedule_timezone: str = Field(description="IANA zone for schedule windows (same source as Fetcher: suite settings).")
+    schedule_timezone: str = Field(description="IANA zone for schedule windows (suite settings).")
     updated_at: str
 
 

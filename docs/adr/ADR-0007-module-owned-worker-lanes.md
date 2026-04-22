@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted — **four module lanes** are live: ``fetcher_jobs``, ``refiner_jobs``, ``pruner_jobs``, ``subber_jobs`` (see tables below).
+Accepted — **three module lanes** are live at head: ``refiner_jobs``, ``pruner_jobs``, ``subber_jobs`` (see tables below).
+
+Reserved non-lane ``job_kind`` prefixes (see ``job_kind_boundaries.py``) must never be enqueued on Refiner, Pruner, or Subber tables.
 
 ## Context
 
@@ -17,28 +19,6 @@ MediaMop is **SQLite-first**: one writer per database. Durable background work m
 3. **No shared “jobs” table** partitioned only by `job_kind` as the long-term shape.
 4. **Enqueue / claim / worker startup** for a module stay in that module’s package (composition root may wire lifespan only).
 5. **Cross-lane prefixes are rejected** at enqueue and at worker claim boundaries (see `mediamop.modules.queue_worker.job_kind_boundaries`).
-
-### Fetcher lane (implemented)
-
-| Artifact | Name |
-|----------|------|
-| SQL table | `fetcher_jobs` |
-| ORM model | `FetcherJob` |
-| Status enum | `FetcherJobStatus` |
-| Enqueue | `fetcher_enqueue_or_get_job` |
-| Claim | `claim_next_eligible_fetcher_job` |
-| Worker entry | `start_fetcher_worker_background_tasks` |
-| Worker count env | `MEDIAMOP_FETCHER_WORKER_COUNT` |
-| Reserved `job_kind` prefixes | `failed_import.`, `missing_search.`, `upgrade_search.` |
-
-**Suggested file map (Fetcher; extend as needed)**
-
-- `modules/fetcher/fetcher_jobs_model.py`
-- `modules/fetcher/fetcher_jobs_ops.py`
-- `modules/fetcher/fetcher_worker_loop.py`
-- `modules/fetcher/fetcher_worker_limits.py` (if clamping)
-- `modules/fetcher/failed_import_worker_ports.py` (typed ports for failed-import worker wiring)
-- `modules/fetcher/fetcher_jobs_inspection*.py` / `schemas_*` / `fetcher_jobs_api.py` (read-only ``GET /fetcher/jobs/inspection``)
 
 ### Refiner lane (implemented substrate)
 
@@ -65,7 +45,7 @@ MediaMop is **SQLite-first**: one writer per database. Durable background work m
 - Refiner inspection/recovery HTTP schemas ship only when Refiner exposes operator APIs for `refiner_jobs`.
 - `modules/refiner/router.py` (Refiner-native HTTP only)
 
-**Refiner must not own:** `failed_import.*`, `missing_search.*`, `upgrade_search.*`, `pruner.*`, `subber.*`, or legacy `trimmer.*` (enforced in code).
+**Refiner must not own:** legacy download-queue prefixes (e.g. ``failed_import.``, ``missing_search.``, ``upgrade_search.`` when not ``refiner.*``), ``pruner.*``, ``subber.*``, or legacy ``trimmer.*`` (enforced in code).
 
 ---
 
@@ -86,7 +66,7 @@ MediaMop is **SQLite-first**: one writer per database. Durable background work m
 
 **Package directory:** `apps/backend/src/mediamop/modules/pruner/` (`pruner_jobs_model.py`, `pruner_jobs_ops.py`, `worker_loop.py`, `pruner_job_handlers.py`, …).
 
-**Lifespan:** `start_pruner_worker_background_tasks` runs **independently** of Refiner/Fetcher worker counts (no shared timing tables).
+**Lifespan:** `start_pruner_worker_background_tasks` runs **independently** of other module worker counts (no shared timing tables).
 
 **Forward design:** ``docs/pruner-forward-design-constraints.md`` — TV vs Movies independence, per media-server-instance ownership (Emby, Jellyfin, Plex as peers), no single global server config.
 
@@ -121,11 +101,9 @@ MediaMop is **SQLite-first**: one writer per database. Durable background work m
 
 ## Consequences
 
-- Adding a new **function** in Fetcher is a new **`job_kind`** under `failed_import.` / `missing_search.` / `upgrade_search.` — not a new table unless isolation is proven necessary.
-- Adding **Pruner** or **Subber** is a new **table + worker env + ops names** per this ADR, not new rows in `refiner_jobs`.
+- Adding a new **function** in Refiner, Pruner, or Subber is a new **`job_kind`** under that module’s reserved prefix — not a new table unless isolation is proven necessary.
 - **Cross-lane guards** in `job_kind_boundaries.py` must be extended when a new top-level module gains its own lane (add prefix to forbidden lists on sibling enqueue paths).
 
 ## References
 
 - `apps/backend/src/mediamop/modules/queue_worker/job_kind_boundaries.py`
-- Fetcher split work (historical): `fetcher_jobs` + `MEDIAMOP_FETCHER_WORKER_COUNT`

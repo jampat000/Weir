@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session, sessionmaker
 
 from mediamop.core.config import MediaMopSettings
-from mediamop.modules.fetcher.fetcher_arr_search_schedule_window import DAY_NAMES, fetcher_arr_search_schedule_in_window
+from mediamop.platform.arr_library.schedule_wall_clock import DAY_NAMES, schedule_time_window_active
 from mediamop.modules.subber.subber_job_kinds import (
     SUBBER_JOB_KIND_LIBRARY_SCAN_MOVIES,
     SUBBER_JOB_KIND_LIBRARY_SCAN_TV,
@@ -52,7 +52,7 @@ def _tv_in_window(session: Session, row: SubberSettingsRow, *, when: datetime) -
     days_csv = days_raw if days_raw else ",".join(DAY_NAMES)
     start_s = (row.tv_schedule_start or "00:00").strip() or "00:00"
     end_s = (row.tv_schedule_end or "23:59").strip() or "23:59"
-    return fetcher_arr_search_schedule_in_window(
+    return schedule_time_window_active(
         schedule_enabled=True,
         schedule_days=days_csv,
         schedule_start=start_s,
@@ -71,7 +71,7 @@ def _upgrade_in_window(session: Session, row: SubberSettingsRow, *, when: dateti
     days_csv = days_raw if days_raw else ",".join(DAY_NAMES)
     start_s = (row.upgrade_schedule_start or "00:00").strip() or "00:00"
     end_s = (row.upgrade_schedule_end or "23:59").strip() or "23:59"
-    return fetcher_arr_search_schedule_in_window(
+    return schedule_time_window_active(
         schedule_enabled=True,
         schedule_days=days_csv,
         schedule_start=start_s,
@@ -90,7 +90,7 @@ def _movies_in_window(session: Session, row: SubberSettingsRow, *, when: datetim
     days_csv = days_raw if days_raw else ",".join(DAY_NAMES)
     start_s = (row.movies_schedule_start or "00:00").strip() or "00:00"
     end_s = (row.movies_schedule_end or "23:59").strip() or "23:59"
-    return fetcher_arr_search_schedule_in_window(
+    return schedule_time_window_active(
         schedule_enabled=True,
         schedule_days=days_csv,
         schedule_start=start_s,

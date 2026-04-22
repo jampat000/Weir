@@ -88,7 +88,7 @@ export function RefinerSchedulesSection() {
   }
   if (q.isError || pathSettings.isError) {
     return (
-      <div className="mm-fetcher-module-surface w-full min-w-0 rounded border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-200" role="alert">
+      <div className="mm-module-surface w-full min-w-0 rounded border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-200" role="alert">
         <p className="font-semibold">Could not load Refiner schedules</p>
         <p className="mt-1">
           {isLikelyNetworkFailure(q.error ?? pathSettings.error)
@@ -109,9 +109,10 @@ export function RefinerSchedulesSection() {
   const movieWatchedSet = Boolean((pathSettings.data.refiner_watched_folder ?? "").trim());
 
   return (
-    <section className="mm-bubble-stack mm-fetcher-module-surface w-full min-w-0" data-testid="refiner-schedules-section">
+    <section className="mm-bubble-stack mm-module-surface w-full min-w-0" data-testid="refiner-schedules-section">
       <div className="mm-dash-grid">
-        <section className="mm-card mm-dash-card mm-bubble-stack flex h-full min-h-0 min-w-0 flex-col">
+        <section className="mm-card mm-dash-card flex h-full min-h-0 min-w-0 flex-col">
+          <div className="mm-card-action-body flex-1 min-h-0">
           <div>
             <h3 className="text-base font-semibold text-[var(--mm-text1)]">TV watched-folder window</h3>
             <p className="mt-1 text-sm text-[var(--mm-text2)]">
@@ -149,7 +150,8 @@ export function RefinerSchedulesSection() {
               />
             </div>
           </div>
-          <div className="border-t border-[var(--mm-border)] pt-5">
+          </div>
+          <div className="mm-card-action-footer">
             <button
               type="button"
               className={`${mmActionButtonClass({
@@ -172,7 +174,8 @@ export function RefinerSchedulesSection() {
             </button>
           </div>
         </section>
-        <section className="mm-card mm-dash-card mm-bubble-stack flex h-full min-h-0 min-w-0 flex-col">
+        <section className="mm-card mm-dash-card flex h-full min-h-0 min-w-0 flex-col">
+          <div className="mm-card-action-body flex-1 min-h-0">
           <div>
             <h3 className="text-base font-semibold text-[var(--mm-text1)]">Movies watched-folder window</h3>
             <p className="mt-1 text-sm text-[var(--mm-text2)]">
@@ -210,7 +213,8 @@ export function RefinerSchedulesSection() {
               />
             </div>
           </div>
-          <div className="border-t border-[var(--mm-border)] pt-5">
+          </div>
+          <div className="mm-card-action-footer">
             <button
               type="button"
               className={`${mmActionButtonClass({

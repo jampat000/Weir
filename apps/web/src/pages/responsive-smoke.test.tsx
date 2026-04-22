@@ -3,52 +3,9 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BrokerJobsTab } from "./broker/broker-jobs-tab";
-import { FetcherJobsTab } from "./fetcher/fetcher-jobs-tab";
 import { PrunerInstancesListPage } from "./pruner/pruner-instances-list-page";
 import { RefinerJobsInspectionSection } from "./refiner/refiner-jobs-inspection-section";
 import { SubberJobsTab } from "./subber/subber-jobs-tab";
-
-vi.mock("../lib/broker/broker-queries", () => ({
-  useBrokerJobsQuery: vi.fn(() => ({
-    isLoading: false,
-    isError: false,
-    data: [
-      {
-        id: 1,
-        job_kind: "broker.sync.test.v1",
-        status: "completed",
-        attempt_count: 1,
-        last_error: null,
-        created_at: "2026-04-20T00:00:00Z",
-        updated_at: "2026-04-20T00:00:00Z",
-      },
-    ],
-  })),
-}));
-
-vi.mock("../lib/fetcher/jobs-inspection/queries", () => ({
-  fetcherJobsInspectionQueryKey: () => ["fetcher", "jobs", "inspection", "terminal"] as const,
-  useFetcherJobsInspectionQuery: vi.fn(() => ({
-    isPending: false,
-    isError: false,
-    data: {
-      jobs: [
-        {
-          id: 1,
-          job_kind: "fetcher.search.test.v1",
-          status: "completed",
-          attempt_count: 1,
-          max_attempts: 3,
-          last_error: null,
-          created_at: "2026-04-20T00:00:00Z",
-          updated_at: "2026-04-20T00:00:00Z",
-        },
-      ],
-      default_terminal_only: false,
-    },
-  })),
-}));
 
 vi.mock("../lib/refiner/jobs-inspection/queries", () => ({
   useRefinerJobsInspectionQuery: vi.fn(() => ({
@@ -139,7 +96,11 @@ vi.mock("../lib/auth/queries", async (importOriginal) => {
 
 function withProviders(ui: ReactNode) {
   const client = new QueryClient();
-  return <QueryClientProvider client={client}><MemoryRouter>{ui}</MemoryRouter></QueryClientProvider>;
+  return (
+    <QueryClientProvider client={client}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>
+  );
 }
 
 function setViewport(width: number) {
@@ -152,20 +113,6 @@ const VIEWPORTS = [320, 375, 768, 1024, 1440];
 describe("responsive smoke", () => {
   afterEach(() => {
     vi.clearAllMocks();
-  });
-
-  it.each(VIEWPORTS)("renders Broker jobs at %ipx", (width) => {
-    setViewport(width);
-    render(withProviders(<BrokerJobsTab />));
-    expect(screen.getByTestId("broker-jobs-tab")).toBeInTheDocument();
-    expect(screen.getByText("Jobs")).toBeInTheDocument();
-  });
-
-  it.each(VIEWPORTS)("renders Fetcher jobs at %ipx", (width) => {
-    setViewport(width);
-    render(withProviders(<FetcherJobsTab />));
-    expect(screen.getByTestId("fetcher-jobs-tab")).toBeInTheDocument();
-    expect(screen.getByText("Jobs")).toBeInTheDocument();
   });
 
   it.each(VIEWPORTS)("renders Refiner jobs at %ipx", (width) => {

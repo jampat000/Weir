@@ -64,7 +64,7 @@ _WATCHED_FOLDER_SCAN_PERIODIC_NOTE = (
     "Optional periodic enqueue for refiner.watched_folder.remux_scan_dispatch.v1 uses "
     "MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_ENABLED and "
     "MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_INTERVAL_SECONDS in apps/backend/.env "
-    "(Refiner-only; not shared with Fetcher schedules). Each tick evaluates Movies and TV "
+    "(Refiner-only schedule). Each tick evaluates Movies and TV "
     "independently: when a scope has no pending/leased scan for that scope and its watched folder is saved, "
     "one periodic scan job is enqueued for that scope (still not a filesystem watcher). "
     "File-pass options for periodic ticks: "

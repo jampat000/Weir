@@ -1,4 +1,4 @@
-/** ISO-639-3 codes + English labels — aligned with legacy Fetcher `STREAM_LANGUAGE_OPTIONS` for operator picks. */
+/** ISO-639-3 codes + English labels for operator stream-language picks. */
 export const REFINER_STREAM_LANGUAGE_OPTIONS: readonly { code: string; label: string }[] = [
   { code: "eng", label: "English" },
   { code: "jpn", label: "Japanese" },

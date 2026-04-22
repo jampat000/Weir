@@ -1,6 +1,6 @@
 """Boot API + Vite preview, bootstrap+login, screenshot every Refiner tab, write a zip.
 
-Same prerequisites as ``capture_fetcher_ui_zip.py``.
+Requires a working dev API + web stack (see repo ``README`` / ``docs/local-development.md``) and Playwright Chromium.
 
 Output: ``<repo>/artifacts/refiner-ui-tabs.zip`` (PNG files inside).
 """

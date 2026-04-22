@@ -61,12 +61,12 @@ def test_head_schema_includes_suite_settings_table() -> None:
     assert "configuration_backup_interval_hours" in names
 
 
-def test_head_schema_includes_fetcher_arr_operator_settings_table() -> None:
+def test_head_schema_includes_arr_library_operator_settings_table() -> None:
     settings = MediaMopSettings.load()
     engine = create_db_engine(settings)
     insp = sa.inspect(engine)
-    assert insp.has_table("fetcher_arr_operator_settings")
-    names = {c["name"] for c in insp.get_columns("fetcher_arr_operator_settings")}
+    assert insp.has_table("arr_library_operator_settings")
+    names = {c["name"] for c in insp.get_columns("arr_library_operator_settings")}
     assert "sonarr_missing_search_enabled" in names
     assert "radarr_upgrade_search_schedule_interval_seconds" in names
 
@@ -114,7 +114,7 @@ def test_api_startup_auto_upgrades_known_behind_revision_to_head(
     backend = Path(__file__).resolve().parents[1]
     cfg = Config(str(backend / "alembic.ini"))
     monkeypatch.chdir(backend)
-    command.upgrade(cfg, "0001_initial_auth")
+    command.upgrade(cfg, "0001_mediamop_initial_schema")
 
     with TestClient(create_app()) as client:
         assert client.get("/health").status_code == 200

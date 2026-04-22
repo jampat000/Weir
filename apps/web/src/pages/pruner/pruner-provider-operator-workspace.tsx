@@ -13,7 +13,7 @@ import {
 } from "../../lib/pruner/api";
 import type { PrunerServerInstance } from "../../lib/pruner/api";
 import { MmOnOffSwitch } from "../../components/ui/mm-on-off-switch";
-import { fetcherMenuButtonClass } from "../fetcher/fetcher-menu-button";
+import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { PrunerGenreMultiSelect, prunerGenresFromApi } from "./pruner-genre-multi-select";
 import { PrunerStudioMultiSelect } from "./pruner-studio-multi-select";
 import {
@@ -283,7 +283,7 @@ export function PrunerDryRunControls(props: PrunerDryRunControlsProps) {
       <div>
         <button
           type="button"
-          className={fetcherMenuButtonClass({
+          className={mmActionButtonClass({
             variant: "primary",
             disabled: runBtnDisabled,
           })}
@@ -619,7 +619,8 @@ export const PrunerProviderRulesCard = forwardRef<PrunerProviderRulesCardHandle,
           disabled={tvControlsDisabled}
           className="mm-card mm-dash-card min-w-0 border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5 sm:p-6"
         >
-          <div className="min-w-0 space-y-5" data-testid={`pruner-provider-tv-config-${provider}`}>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid={`pruner-provider-tv-config-${provider}`}>
+            <div className="mm-card-action-body min-h-0 flex-1">
             <div className="space-y-1 border-b border-[var(--mm-border)] pb-2">
               <span className="text-sm font-semibold uppercase tracking-wide text-[var(--mm-text1)]">TV</span>
             </div>
@@ -723,12 +724,12 @@ export const PrunerProviderRulesCard = forwardRef<PrunerProviderRulesCardHandle,
               helperText="Leave empty to skip."
             />
 
-            <div className="border-t border-[var(--mm-border)] pt-4 mt-1" role="separator" />
-            <div className="space-y-3">
+            </div>
+            <div className="mm-card-action-footer">
               {canOperate ? (
                 <button
                   type="button"
-                  className={fetcherMenuButtonClass({ variant: "primary", disabled: saveDisabledTv })}
+                  className={mmActionButtonClass({ variant: "primary", disabled: saveDisabledTv })}
                   disabled={saveDisabledTv}
                   onClick={() => void saveTv()}
                 >
@@ -753,7 +754,8 @@ export const PrunerProviderRulesCard = forwardRef<PrunerProviderRulesCardHandle,
           disabled={moviesControlsDisabled}
           className="mm-card mm-dash-card min-w-0 border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5 sm:p-6"
         >
-          <div className="min-w-0 space-y-5" data-testid={`pruner-provider-movies-config-${provider}`}>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid={`pruner-provider-movies-config-${provider}`}>
+            <div className="mm-card-action-body min-h-0 flex-1">
             <div className="flex items-center gap-2 border-b border-[var(--mm-border)] pb-2">
               <span className="text-sm font-semibold uppercase tracking-wide text-[var(--mm-text1)]">Movies</span>
             </div>
@@ -869,12 +871,12 @@ export const PrunerProviderRulesCard = forwardRef<PrunerProviderRulesCardHandle,
               />
             ) : null}
 
-            <div className="border-t border-[var(--mm-border)] pt-4 mt-1" role="separator" />
-            <div className="space-y-3">
+            </div>
+            <div className="mm-card-action-footer">
               {canOperate ? (
                 <button
                   type="button"
-                  className={fetcherMenuButtonClass({ variant: "primary", disabled: saveDisabledMovies })}
+                  className={mmActionButtonClass({ variant: "primary", disabled: saveDisabledMovies })}
                   disabled={saveDisabledMovies}
                   onClick={() => void saveMovies()}
                 >

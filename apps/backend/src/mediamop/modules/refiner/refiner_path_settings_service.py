@@ -116,7 +116,7 @@ def effective_tv_work_folder(*, row: RefinerPathSettingsRow, mediamop_home: str)
 
 
 def ensure_refiner_path_settings_row(session: Session) -> RefinerPathSettingsRow:
-    """Return singleton row ``id = 1`` (created by Alembic migration ``0011_refiner_path_settings``)."""
+    """Return singleton row ``id = 1`` (seeded by initial Alembic revision on greenfield DBs)."""
 
     row = session.get(RefinerPathSettingsRow, 1)
     if row is None:

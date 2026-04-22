@@ -115,12 +115,9 @@ function renderRefinerPage() {
 }
 
 describe("RefinerPage", () => {
-  it("does not host Fetcher failed-import UI", () => {
+  it("renders the Refiner shell", () => {
     renderRefinerPage();
-    expect(screen.queryByTestId("fetcher-failed-imports-workspace")).toBeNull();
-    expect(screen.queryByTestId("fetcher-failed-imports-embedded")).toBeNull();
-    expect(screen.queryByTestId("fetcher-failed-imports-settings")).toBeNull();
-    expect(screen.queryByTestId("fetcher-failed-imports-status-filter")).toBeNull();
+    expect(screen.getByTestId("refiner-scope-page")).toBeInTheDocument();
   });
 
   it("Overview is the default tab, stays Refiner-scoped, and links Activity without leaking env keys", () => {
@@ -128,7 +125,6 @@ describe("RefinerPage", () => {
     expect(screen.getByTestId("refiner-overview-panel")).toBeInTheDocument();
     const overview = screen.getByTestId("refiner-overview-panel").textContent ?? "";
     expect(overview).toMatch(/At a glance/i);
-    expect(overview).not.toMatch(/Fetcher/i);
     expect(overview).not.toMatch(/MEDIAMOP_/i);
     expect(overview).not.toMatch(/refiner_jobs/i);
     expect(screen.getByRole("link", { name: "Activity" })).toHaveAttribute("href", "/app/activity");
@@ -181,11 +177,6 @@ describe("RefinerPage", () => {
     expect(text).toMatch(/Minimum file age/i);
   });
 
-  it("has no Fetcher link on the page", () => {
-    renderRefinerPage();
-    expect(screen.queryByRole("link", { name: "Fetcher" })).toBeNull();
-  });
-
   it("top-level tabs no longer include Workers", () => {
     renderRefinerPage();
     expect(screen.queryByRole("tab", { name: "Workers" })).toBeNull();
@@ -229,6 +220,5 @@ describe("RefinerPage", () => {
     renderRefinerPage();
     openTab("Schedules");
     expect(screen.queryByText("Suite time zone for schedule windows")).toBeNull();
-    expect(screen.queryByText(/Same clock as Fetcher/i)).toBeNull();
   });
 });

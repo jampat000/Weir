@@ -131,14 +131,10 @@ def test_supplied_payload_evaluation_runs_on_refiner_lane_records_activity(sessi
         assert body.get("blocked_upstream") is False
 
 
-def test_refiner_supplied_payload_evaluation_schedule_settings_independent_from_fetcher(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_refiner_supplied_payload_evaluation_schedule_interval_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MEDIAMOP_REFINER_SUPPLIED_PAYLOAD_EVALUATION_SCHEDULE_INTERVAL_SECONDS", "3333")
-    monkeypatch.setenv("MEDIAMOP_FETCHER_SONARR_MISSING_SEARCH_SCHEDULE_INTERVAL_SECONDS", "4444")
     s = MediaMopSettings.load()
     assert s.refiner_supplied_payload_evaluation_schedule_interval_seconds == 3333
-    assert s.fetcher_sonarr_missing_search_schedule_interval_seconds == 4444
 
 
 def test_legacy_library_audit_pass_schedule_env_still_sets_interval(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -148,8 +144,22 @@ def test_legacy_library_audit_pass_schedule_env_still_sets_interval(monkeypatch:
     assert s.refiner_supplied_payload_evaluation_schedule_interval_seconds == 3120
 
 
-def test_refiner_supplied_payload_evaluation_periodic_module_does_not_import_fetcher() -> None:
+def test_refiner_supplied_payload_evaluation_periodic_module_only_imports_core_and_refiner() -> None:
+    import ast
+
     import mediamop.modules.refiner.refiner_supplied_payload_evaluation_periodic_enqueue as mod
 
-    src = Path(mod.__file__).read_text(encoding="utf-8")
-    assert "mediamop.modules.fetcher" not in src
+    def _allowed_from(m: str) -> bool:
+        return m == "__future__" or m == "mediamop.core.config" or m.startswith("mediamop.modules.refiner.") or m.startswith(
+            "sqlalchemy.",
+        )
+
+    tree = ast.parse(Path(mod.__file__).read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            assert _allowed_from(node.module), node.module
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                root = alias.name.split(".", 1)[0]
+                if root == "mediamop":
+                    assert alias.name.startswith(("mediamop.core", "mediamop.modules.refiner")), alias.name

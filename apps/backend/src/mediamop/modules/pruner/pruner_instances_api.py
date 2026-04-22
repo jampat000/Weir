@@ -74,10 +74,7 @@ from mediamop.modules.pruner.pruner_schemas import (
     PrunerServerInstancePatchHttpIn,
     PrunerStudiosOut,
 )
-from mediamop.modules.fetcher.fetcher_arr_operator_settings_prefs import (
-    normalize_hhmm,
-    validate_schedule_days_csv,
-)
+from mediamop.platform.arr_library.schedule_csv_validate import normalize_hhmm, validate_schedule_days_csv
 from mediamop.modules.pruner.pruner_studio_list import list_distinct_studios
 from mediamop.modules.pruner.pruner_scope_settings_model import PrunerScopeSettings
 from mediamop.modules.pruner.pruner_server_instance_model import PrunerServerInstance

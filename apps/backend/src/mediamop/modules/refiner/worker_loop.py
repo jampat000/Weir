@@ -1,8 +1,7 @@
 """Refiner-only in-process asyncio worker loop.
 
 Claims rows from ``refiner_jobs`` only, dispatches by ``job_kind``, then completes or fails via
-:class:`mediamop.modules.refiner.jobs_ops`. Fetcher background work uses ``fetcher_jobs`` and
-:class:`mediamop.modules.fetcher.fetcher_worker_loop` instead.
+:class:`mediamop.modules.refiner.jobs_ops`.
 """
 
 from __future__ import annotations
@@ -305,7 +304,7 @@ def start_refiner_worker_background_tasks(
     """Create one asyncio task per configured Refiner worker (``refiner_worker_count`` from settings).
 
     When ``refiner_worker_count > 0``, callers must pass ``job_handlers`` (built at the application
-    composition root so Refiner never imports Fetcher).
+    composition root).
 
     Modes:
 

@@ -262,7 +262,7 @@ That response comes from **Docker Desktop’s Linux engine**, not from GHCR’s 
 | `MEDIAMOP_WEB_DIST` | No | set | Points at bundled `dist/`; override only for debugging. |
 | `MEDIAMOP_ENV` | No | `production` | Matches packaged defaults. |
 
-Other **`MEDIAMOP_*`** settings (worker counts, Fetcher, Refiner, etc.) follow the same names as in **[`docs/local-development.md`](../docs/local-development.md)**.
+Other **`MEDIAMOP_*`** settings (worker counts, Refiner, Pruner, Subber, etc.) follow the same names as in **[`docs/local-development.md`](../docs/local-development.md)**.
 
 ---
 

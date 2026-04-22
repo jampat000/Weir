@@ -9,10 +9,7 @@ from typing import Any, Literal, Mapping, Sequence
 from sqlalchemy.orm import Session
 
 from mediamop.core.config import MediaMopSettings
-from mediamop.modules.fetcher.fetcher_arr_http_resolve import (
-    resolve_radarr_http_credentials,
-    resolve_sonarr_http_credentials,
-)
+from mediamop.platform.arr_library import resolve_radarr_http_credentials, resolve_sonarr_http_credentials
 from mediamop.modules.refiner.domain import (
     FileAnchorCandidate,
     RefinerQueueRowView,

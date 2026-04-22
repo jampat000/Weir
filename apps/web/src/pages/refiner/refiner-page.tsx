@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { fetcherSectionTabClass } from "../fetcher/fetcher-menu-button";
+import { mmSectionTabClass } from "../../lib/ui/mm-control-roles";
 import { RefinerProcessSettingsSection } from "./refiner-process-settings-section";
 import { RefinerJobsInspectionSection } from "./refiner-jobs-inspection-section";
 import { RefinerOverviewTab, type RefinerOverviewOpenTab } from "./refiner-overview-tab";
@@ -70,7 +70,7 @@ export function RefinerPage() {
             type="button"
             role="tab"
             aria-selected={tab === id}
-            className={fetcherSectionTabClass(tab === id)}
+            className={mmSectionTabClass(tab === id)}
             onClick={() => setTab(id)}
           >
             {label}

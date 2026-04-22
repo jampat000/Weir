@@ -5,20 +5,11 @@ import { useActivityStreamInvalidation } from "../../lib/activity/use-activity-s
 import type { ActivityEventItem } from "../../lib/api/types";
 import { isHttpErrorFromApi, isLikelyNetworkFailure } from "../../lib/api/error-guards";
 import { dashboardStatusKey, useDashboardStatusQuery } from "../../lib/dashboard/queries";
-import {
-  useFetcherArrOperatorSettingsQuery,
-  fetcherArrOperatorSettingsQueryKey,
-} from "../../lib/fetcher/arr-operator-settings/queries";
-import {
-  useFailedImportQueueAttentionSnapshotQuery,
-  failedImportQueueAttentionSnapshotQueryKey,
-} from "../../lib/fetcher/failed-imports/queries";
-import { useFetcherJobsInspectionQuery, fetcherJobsInspectionQueryKey } from "../../lib/fetcher/jobs-inspection/queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 
-type ModuleKey = "fetcher" | "refiner" | "pruner" | "subber";
-type ModuleStatus = "Healthy" | "Attention needed" | "Review needed" | "Active" | "Setup needed";
+type ModuleKey = "refiner" | "pruner" | "subber";
+type ModuleStatus = "Healthy" | "Review needed" | "Active";
 
 type ModuleCardData = {
   key: ModuleKey;
@@ -37,13 +28,8 @@ function shortLastActivity(items: ActivityEventItem[], fmt: (iso: string) => str
   }
   const ev = items[0];
   const moduleLabel = ev.module ? `${ev.module[0].toUpperCase()}${ev.module.slice(1)}` : "Module";
-  const text = `${ev.title} ${ev.detail || ""}`.toLowerCase();
   let summary = "Update recorded";
-  if (ev.module === "fetcher" && /manual|check|queue|queued|enqueue/.test(text)) {
-    summary = /already/.test(text) ? "Failed-import check already queued" : "Manual failed-import check requested";
-  } else if (ev.module === "fetcher" && /failed import|failed-import/.test(text)) {
-    summary = "Failed-import status updated";
-  } else if (ev.module === "auth") {
+  if (ev.module === "auth") {
     summary = "Sign-in activity updated";
   } else if (ev.module === "settings") {
     summary = "Settings updated";
@@ -60,7 +46,7 @@ function moduleEvents(items: ActivityEventItem[], module: ModuleKey): ActivityEv
   return items.filter((i) => i.module === module);
 }
 
-function deriveGenericModuleCard(module: Exclude<ModuleKey, "fetcher">, items: ActivityEventItem[]): ModuleCardData {
+function deriveModuleCard(module: ModuleKey, items: ActivityEventItem[]): ModuleCardData {
   const events = moduleEvents(items, module);
   const hasAttention = events.some(matchesAttentionText);
   const status: ModuleStatus = hasAttention ? "Review needed" : events.length > 0 ? "Active" : "Healthy";
@@ -97,17 +83,9 @@ export function DashboardPage() {
   const fmt = useAppDateFormatter();
   useActivityStreamInvalidation(dashboardStatusKey);
   useActivityStreamInvalidation(activityRecentKey);
-  useActivityStreamInvalidation(fetcherArrOperatorSettingsQueryKey);
-  useActivityStreamInvalidation(failedImportQueueAttentionSnapshotQueryKey);
-  useActivityStreamInvalidation(fetcherJobsInspectionQueryKey("pending"));
-  useActivityStreamInvalidation(fetcherJobsInspectionQueryKey("leased"));
 
   const dash = useDashboardStatusQuery();
   const recent = useActivityRecentQuery();
-  const arr = useFetcherArrOperatorSettingsQuery();
-  const attention = useFailedImportQueueAttentionSnapshotQuery();
-  const pendingJobs = useFetcherJobsInspectionQuery("pending");
-  const runningJobs = useFetcherJobsInspectionQuery("leased");
 
   if (dash.isPending) {
     return <PageLoading label="Loading dashboard" />;
@@ -130,92 +108,27 @@ export function DashboardPage() {
     );
   }
 
-  const tvNeeds = attention.data?.tv_shows.needs_attention_count;
-  const moviesNeeds = attention.data?.movies.needs_attention_count;
-  const tvNeedsCount = typeof tvNeeds === "number" ? tvNeeds : null;
-  const moviesNeedsCount = typeof moviesNeeds === "number" ? moviesNeeds : null;
-  const fetcherTvConfigured = Boolean(arr.data?.sonarr_server_configured);
-  const fetcherMoviesConfigured = Boolean(arr.data?.radarr_server_configured);
-  const fetcherNeedsAttentionCount = (tvNeedsCount !== null && tvNeedsCount > 0 ? 1 : 0) + (moviesNeedsCount !== null && moviesNeedsCount > 0 ? 1 : 0);
-  const activeJobsCount = (pendingJobs.data?.jobs.length ?? 0) + (runningJobs.data?.jobs.length ?? 0);
-  const fetcherSetupIncomplete = !fetcherTvConfigured || !fetcherMoviesConfigured;
-  const fetcherStatus: ModuleStatus =
-    fetcherSetupIncomplete
-      ? "Setup needed"
-      : fetcherNeedsAttentionCount > 0
-      ? "Attention needed"
-      : activeJobsCount > 0
-        ? "Active"
-        : dash.data.fetcher.reachable === false
-          ? "Review needed"
-          : "Healthy";
-
-  const fetcherCard: ModuleCardData = {
-    key: "fetcher",
-    name: "Fetcher",
-    status: fetcherStatus,
-    summary:
-      fetcherSetupIncomplete
-        ? "Finish Sonarr and Radarr setup to enable full checks."
-        : fetcherNeedsAttentionCount > 0
-        ? "Failed-import queue attention is needed."
-        : activeJobsCount > 0
-          ? "Search and cleanup work is active."
-          : "Search and cleanup signals are currently clear.",
-    tvLine: !fetcherTvConfigured
-      ? "TV: Sonarr connection is not set up."
-      : tvNeedsCount === null
-        ? "TV: Queue check is unavailable right now."
-        : tvNeedsCount > 0
-          ? `TV: ${tvNeedsCount} failed imports need review`
-          : "TV: All clear",
-    moviesLine: !fetcherMoviesConfigured
-      ? "Movies: Radarr connection is not set up."
-      : moviesNeedsCount === null
-        ? "Movies: Queue check is unavailable right now."
-        : moviesNeedsCount > 0
-          ? `Movies: ${moviesNeedsCount} failed imports need review`
-          : "Movies: All clear",
-    actionLabel: "Open Fetcher",
-    actionTo: "/app/fetcher",
-  };
-
   const recentItems = recent.data?.items ?? [];
   const moduleCards: ModuleCardData[] = [
-    fetcherCard,
-    deriveGenericModuleCard("refiner", recentItems),
-    deriveGenericModuleCard("pruner", recentItems),
-    deriveGenericModuleCard("subber", recentItems),
+    deriveModuleCard("refiner", recentItems),
+    deriveModuleCard("pruner", recentItems),
+    deriveModuleCard("subber", recentItems),
   ];
-  const modulesNeedingAttentionTotal = moduleCards.filter(
-    (m) => m.status === "Attention needed" || m.status === "Review needed" || m.status === "Setup needed",
-  ).length;
-  const nonFetcherActiveCount = moduleCards.filter((m) => m.key !== "fetcher" && m.status === "Active").length;
+  const modulesNeedingAttentionTotal = moduleCards.filter((m) => m.status === "Review needed").length;
+  const activeModuleCount = moduleCards.filter((m) => m.status === "Active").length;
 
   const overallStatus =
-    !dash.data.system.healthy || dash.data.fetcher.reachable === false
+    !dash.data.system.healthy
       ? "Review needed"
       : modulesNeedingAttentionTotal > 0
-        ? "Attention needed"
-        : activeJobsCount > 0
+        ? "Review needed"
+        : activeModuleCount > 0
           ? "Active"
           : "Healthy";
   const lastActivity = shortLastActivity(recentItems, fmt);
 
   const attentionItems: string[] = [];
-  if (!fetcherTvConfigured) {
-    attentionItems.push("Fetcher: Set up Sonarr");
-  }
-  if (!fetcherMoviesConfigured) {
-    attentionItems.push("Fetcher: Set up Radarr");
-  }
-  if (tvNeedsCount !== null && tvNeedsCount > 0) {
-    attentionItems.push(`Fetcher: ${tvNeedsCount} TV failed imports still need attention`);
-  }
-  if (moviesNeedsCount !== null && moviesNeedsCount > 0) {
-    attentionItems.push(`Fetcher: ${moviesNeedsCount} movie failed imports still need attention`);
-  }
-  for (const m of moduleCards.filter((x) => x.key !== "fetcher" && x.status === "Review needed")) {
+  for (const m of moduleCards.filter((x) => x.status === "Review needed")) {
     attentionItems.push(`${m.name}: ${m.summary}`);
   }
 
@@ -236,11 +149,11 @@ export function DashboardPage() {
               : `${modulesNeedingAttentionTotal} module${modulesNeedingAttentionTotal === 1 ? "" : "s"} need attention`
           }
         />
-        <StatusTile label="Active jobs" value={activeJobsCount > 0 ? String(activeJobsCount) : "None running"} />
+        <StatusTile label="Active modules" value={activeModuleCount > 0 ? String(activeModuleCount) : "None"} />
         <StatusTile label="Last activity" value={lastActivity} />
       </section>
 
-      <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="dashboard-module-cards">
+      <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="dashboard-module-cards">
         {moduleCards.map((m) => (
           <article key={m.key} className="mm-card mm-dash-card flex h-full flex-col gap-3">
             <div className="flex items-start justify-between gap-2">
@@ -275,13 +188,10 @@ export function DashboardPage() {
       <section className="mm-card mm-dash-card mt-6" data-testid="dashboard-active-work">
         <h2 className="mm-card__title">Active work</h2>
         <div className="mm-card__body mm-card__body--tight space-y-2 text-sm text-[var(--mm-text2)]">
-          <p>{activeJobsCount === 0 ? "Fetcher: No active jobs" : `Fetcher: ${runningJobs.data?.jobs.length ?? 0} running now, ${pendingJobs.data?.jobs.length ?? 0} queued.`}</p>
           <p>
-            Other modules:{" "}
-            {nonFetcherActiveCount > 0
-              ? `${nonFetcherActiveCount} active module signals`
-              : "No active work detected"}
-            .
+            {activeModuleCount > 0
+              ? `${activeModuleCount} module${activeModuleCount === 1 ? "" : "s"} show recent activity.`
+              : "No active module signals detected."}
           </p>
         </div>
       </section>

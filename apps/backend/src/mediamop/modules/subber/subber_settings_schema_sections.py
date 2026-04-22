@@ -30,7 +30,7 @@ class SubberSettingsSonarrOut(BaseModel):
     sonarr_path_mapping_enabled: bool = False
     sonarr_path_sonarr: str = ""
     sonarr_path_subber: str = ""
-    fetcher_sonarr_base_url_hint: str = ""
+    arr_library_sonarr_base_url_hint: str = ""
 
 
 class SubberSettingsRadarrOut(BaseModel):
@@ -39,7 +39,7 @@ class SubberSettingsRadarrOut(BaseModel):
     radarr_path_mapping_enabled: bool = False
     radarr_path_radarr: str = ""
     radarr_path_subber: str = ""
-    fetcher_radarr_base_url_hint: str = ""
+    arr_library_radarr_base_url_hint: str = ""
 
 
 class SubberSettingsTvScheduleOut(BaseModel):

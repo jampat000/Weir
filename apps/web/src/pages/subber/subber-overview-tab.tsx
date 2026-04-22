@@ -37,7 +37,7 @@ function SubberOverviewNextSteps({ onOpenTab }: { onOpenTab?: (tab: SubberOvervi
       data-testid="subber-overview-next-steps"
       data-overview-order="3"
     >
-      <div className="space-y-5">
+      <div className="mm-bubble-stack">
         <p className="leading-relaxed">{SUBBER_NEXT_STEPS_BODY}</p>
         {onOpenTab ? (
           <div className="flex flex-wrap gap-2.5 border-t border-[var(--mm-border)] pt-4">
@@ -250,7 +250,7 @@ export function SubberOverviewTab({
   );
 
   return (
-    <div data-testid="subber-overview-tab" className="w-full min-w-0 space-y-6 sm:space-y-7">
+    <div data-testid="subber-overview-tab" className="mm-bubble-stack w-full min-w-0">
       <MmOverviewSection
         headingId="subber-overview-at-a-glance-heading"
         heading="At a glance"

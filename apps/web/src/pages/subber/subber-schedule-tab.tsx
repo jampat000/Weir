@@ -66,49 +66,51 @@ function ScheduleCard({
   const dis = !canOperate || busy;
   const saveDisabled = dis || !dirty;
   return (
-    <section className="mm-card mm-dash-card mm-bubble-stack flex h-full min-h-0 min-w-0 flex-col">
-      <div>
-        <h3 className="text-base font-semibold text-[var(--mm-text1)]">{title}</h3>
-        <p className="mt-1 text-sm text-[var(--mm-text2)]">{helper}</p>
-      </div>
-      <MmOnOffSwitch id={`${idPrefix}-en`} label="Enable timed scans" enabled={enabled} disabled={dis} onChange={setEnabled} />
-      <div>
-        <span className="text-sm font-medium text-[var(--mm-text1)]">Run interval (minutes)</span>
-        <p className="mt-1 text-xs text-[var(--mm-text3)]">{RUN_INTERVAL_HELPER}</p>
-        <input
-          type="number"
-          min={1}
-          max={intervalMax}
-          className="mm-input mt-2 w-full"
-          value={intervalMinutes}
-          disabled={dis}
-          onChange={(e) => setIntervalMinutes(Math.max(1, Math.min(intervalMax, Number(e.target.value) || 1)))}
-        />
-      </div>
-      <div className="space-y-3">
+    <section className="mm-card mm-dash-card flex h-full min-h-0 min-w-0 flex-col">
+      <div className="mm-card-action-body flex-1 min-h-0">
         <div>
-          <span className="text-sm font-medium text-[var(--mm-text1)]">Schedule window</span>
-          <p className="mt-1 text-xs text-[var(--mm-text3)]">{MM_SCHEDULE_TIME_WINDOW_HELPER}</p>
+          <h3 className="text-base font-semibold text-[var(--mm-text1)]">{title}</h3>
+          <p className="mt-1 text-sm text-[var(--mm-text2)]">{helper}</p>
         </div>
-        <div className="space-y-4">
-          <MmOnOffSwitch
-            id={`${idPrefix}-hours`}
-            label="Limit to these hours"
-            enabled={hoursLimited}
+        <MmOnOffSwitch id={`${idPrefix}-en`} label="Enable timed scans" enabled={enabled} disabled={dis} onChange={setEnabled} />
+        <div>
+          <span className="text-sm font-medium text-[var(--mm-text1)]">Run interval (minutes)</span>
+          <p className="mt-1 text-xs text-[var(--mm-text3)]">{RUN_INTERVAL_HELPER}</p>
+          <input
+            type="number"
+            min={1}
+            max={intervalMax}
+            className="mm-input mt-2 w-full"
+            value={intervalMinutes}
             disabled={dis}
-            onChange={setHoursLimited}
+            onChange={(e) => setIntervalMinutes(Math.max(1, Math.min(intervalMax, Number(e.target.value) || 1)))}
           />
-          <div className="space-y-2">
-            <span className="text-sm font-medium text-[var(--mm-text1)]">Days</span>
-            <MmScheduleDayChips scheduleDaysCsv={daysCsv} disabled={dis} onChangeCsv={setDaysCsv} />
-          </div>
-          <MmScheduleTimeFields idPrefix={idPrefix} start={start} end={end} disabled={dis} onStart={setStart} onEnd={setEnd} />
         </div>
+        <div className="space-y-3">
+          <div>
+            <span className="text-sm font-medium text-[var(--mm-text1)]">Schedule window</span>
+            <p className="mt-1 text-xs text-[var(--mm-text3)]">{MM_SCHEDULE_TIME_WINDOW_HELPER}</p>
+          </div>
+          <div className="space-y-4">
+            <MmOnOffSwitch
+              id={`${idPrefix}-hours`}
+              label="Limit to these hours"
+              enabled={hoursLimited}
+              disabled={dis}
+              onChange={setHoursLimited}
+            />
+            <div className="space-y-2">
+              <span className="text-sm font-medium text-[var(--mm-text1)]">Days</span>
+              <MmScheduleDayChips scheduleDaysCsv={daysCsv} disabled={dis} onChangeCsv={setDaysCsv} />
+            </div>
+            <MmScheduleTimeFields idPrefix={idPrefix} start={start} end={end} disabled={dis} onStart={setStart} onEnd={setEnd} />
+          </div>
+        </div>
+        <p className="text-xs text-[var(--mm-text3)]">
+          Last run: <span className="font-medium text-[var(--mm-text1)]">{fmt(lastRun)}</span>
+        </p>
       </div>
-      <p className="text-xs text-[var(--mm-text3)]">
-        Last run: <span className="font-medium text-[var(--mm-text1)]">{fmt(lastRun)}</span>
-      </p>
-      <div className="border-t border-[var(--mm-border)] pt-5">
+      <div className="mm-card-action-footer">
         <button
           type="button"
           className={`${mmActionButtonClass({ variant: "primary", disabled: saveDisabled })} w-full`}

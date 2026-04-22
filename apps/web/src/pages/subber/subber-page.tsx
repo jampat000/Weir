@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fetcherSectionTabClass } from "../fetcher/fetcher-menu-button";
+import { mmSectionTabClass } from "../../lib/ui/mm-control-roles";
 import { useMeQuery } from "../../lib/auth/queries";
 import { SubberConnectionsTab } from "./subber-connections-tab";
 import { SubberJobsTab } from "./subber-jobs-tab";
@@ -18,7 +18,8 @@ const SUBBER_TAB_BLURBS: Record<TopTab, string> = {
   tv: "Configure TV subtitle rules and run TV subtitle operations.",
   movies: "Configure Movies subtitle rules and run Movies subtitle operations.",
   connections: "Save and test the service connections and credentials Subber depends on.",
-  providers: "Enable, disable, and prioritize subtitle providers used during searches.",
+  providers:
+    "Choose which subtitle sources Subber uses and the order it tries them (lower number = searched first). Open a row to set credentials, enable a source, or test it—keep at least one provider on.",
   preferences: "Set subtitle language, matching, and selection behavior for downloads.",
   schedule: "Control automatic subtitle scan timing for TV and Movies, including optional windows.",
   jobs: "View queued, running, and recent Subber jobs.",
@@ -59,7 +60,7 @@ export function SubberPage() {
             type="button"
             role="tab"
             aria-selected={tab === t.id}
-            className={fetcherSectionTabClass(tab === t.id)}
+            className={mmSectionTabClass(tab === t.id)}
             onClick={() => setTab(t.id)}
           >
             {t.label}

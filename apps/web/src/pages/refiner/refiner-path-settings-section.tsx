@@ -69,7 +69,7 @@ export function RefinerPathSettingsSection() {
   if (q.isError) {
     return (
       <div
-        className="mm-fetcher-module-surface w-full min-w-0 rounded border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-200"
+        className="mm-module-surface w-full min-w-0 rounded border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-200"
         data-testid="refiner-path-settings-error"
         role="alert"
       >
@@ -96,7 +96,7 @@ export function RefinerPathSettingsSection() {
   return (
     <div className="mm-bubble-stack w-full min-w-0" data-testid="refiner-path-settings">
       <section
-        className="mm-card mm-dash-card mm-fetcher-module-surface w-full min-w-0 p-6 text-sm leading-relaxed text-[var(--mm-text2)] sm:p-7"
+        className="mm-card mm-dash-card mm-module-surface w-full min-w-0 p-6 text-sm leading-relaxed text-[var(--mm-text2)] sm:p-7"
         aria-labelledby="refiner-path-settings-heading"
       >
       <h2 id="refiner-path-settings-heading" className="text-base font-semibold text-[var(--mm-text)]">
@@ -185,7 +185,7 @@ export function RefinerPathSettingsSection() {
       </section>
 
       <div className="mm-dash-grid">
-        <div className="mm-card mm-dash-card p-5 sm:p-6">
+        <div className="mm-card mm-dash-card flex flex-col p-5 sm:p-6">
           <div className="border-b border-[var(--mm-border)] pb-4">
             <p className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-[var(--mm-text3)]">Library</p>
             <h3 className="mt-1 text-sm font-semibold text-[var(--mm-text1)]">TV</h3>
@@ -193,7 +193,8 @@ export function RefinerPathSettingsSection() {
           <p className="mt-4 text-xs leading-relaxed text-[var(--mm-text3)]">
             If work is blank, Refiner uses: <span className={mmTechnicalMonoSmallClass}>{d.resolved_default_tv_work_folder}</span>
           </p>
-          <div className="mt-6 space-y-6">
+          <div className="mt-6 flex min-h-0 flex-1 flex-col">
+            <div className="mm-card-action-body flex-1 min-h-0">
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Watched folder</span>
               <input
@@ -229,12 +230,12 @@ export function RefinerPathSettingsSection() {
                 placeholder=""
               />
             </label>
-            <div className="border-t border-[var(--mm-border)] pt-6">
+            <div className="border-t border-[var(--mm-border)] pt-6 pb-6">
               <span id={tvIntervalLabelId} className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
                 Watched folder interval
               </span>
               <p className="mt-1 text-xs leading-relaxed text-[var(--mm-text3)]">
-                How often this library is checked for periodic TV scans. Independent of Movies. Does not affect Fetcher.
+                How often this library is checked for periodic TV scans. Independent of Movies.
               </p>
               <MmListboxPicker
                 className="mt-2 max-w-md"
@@ -251,7 +252,8 @@ export function RefinerPathSettingsSection() {
                 Set a TV output folder before saving when TV watched is set.
               </p>
             ) : null}
-            <div className="border-t border-[var(--mm-border)] pt-6">
+            </div>
+            <div className="mm-card-action-footer">
               <button
                 type="button"
                 className={mmActionButtonClass({
@@ -283,7 +285,7 @@ export function RefinerPathSettingsSection() {
           </div>
         </div>
 
-        <div className="mm-card mm-dash-card p-5 sm:p-6">
+        <div className="mm-card mm-dash-card flex flex-col p-5 sm:p-6">
           <div className="border-b border-[var(--mm-border)] pb-4">
             <p className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-[var(--mm-text3)]">Library</p>
             <h3 className="mt-1 text-sm font-semibold text-[var(--mm-text1)]">Movies</h3>
@@ -291,7 +293,8 @@ export function RefinerPathSettingsSection() {
           <p className="mt-4 text-xs leading-relaxed text-[var(--mm-text3)]">
             If work is blank, Refiner uses: <span className={mmTechnicalMonoSmallClass}>{d.resolved_default_work_folder}</span>
           </p>
-          <div className="mt-6 space-y-6">
+          <div className="mt-6 flex min-h-0 flex-1 flex-col">
+            <div className="mm-card-action-body flex-1 min-h-0">
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Watched folder</span>
               <input
@@ -328,12 +331,12 @@ export function RefinerPathSettingsSection() {
                 required
               />
             </label>
-            <div className="border-t border-[var(--mm-border)] pt-6">
+            <div className="border-t border-[var(--mm-border)] pt-6 pb-6">
               <span id={movieIntervalLabelId} className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
                 Watched folder interval
               </span>
               <p className="mt-1 text-xs leading-relaxed text-[var(--mm-text3)]">
-                How often this library is checked for periodic Movies scans. Independent of TV. Does not affect Fetcher.
+                How often this library is checked for periodic Movies scans. Independent of TV.
               </p>
               <MmListboxPicker
                 className="mt-2 max-w-md"
@@ -345,7 +348,8 @@ export function RefinerPathSettingsSection() {
                 placeholder="Select interval"
               />
             </div>
-            <div className="border-t border-[var(--mm-border)] pt-6">
+            </div>
+            <div className="mm-card-action-footer">
               <button
                 type="button"
                 className={mmActionButtonClass({

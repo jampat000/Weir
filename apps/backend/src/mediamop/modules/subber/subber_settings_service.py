@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from mediamop.modules.fetcher.fetcher_arr_operator_settings_model import FetcherArrOperatorSettingsRow
+from mediamop.platform.arr_library.arr_operator_settings_model import ArrLibraryOperatorSettingsRow
 from mediamop.modules.subber.subber_settings_model import SubberSettingsRow
 
 
@@ -21,10 +21,10 @@ def ensure_subber_settings_row(db: Session) -> SubberSettingsRow:
     return row
 
 
-def get_fetcher_arr_hints(db: Session) -> tuple[str, str]:
-    """(sonarr_base_url, radarr_base_url) from Fetcher singleton for UI prefill hints."""
+def get_arr_library_connection_hints(db: Session) -> tuple[str, str]:
+    """(sonarr_base_url, radarr_base_url) from the shared *arr library singleton for UI prefill hints."""
 
-    r = db.scalars(select(FetcherArrOperatorSettingsRow).where(FetcherArrOperatorSettingsRow.id == 1)).one_or_none()
+    r = db.scalars(select(ArrLibraryOperatorSettingsRow).where(ArrLibraryOperatorSettingsRow.id == 1)).one_or_none()
     if r is None:
         return "", ""
     return (str(r.sonarr_connection_base_url or "").strip(), str(r.radarr_connection_base_url or "").strip())

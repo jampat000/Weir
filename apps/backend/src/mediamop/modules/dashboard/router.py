@@ -18,6 +18,6 @@ def get_dashboard_status(
     db: DbSessionDep,
     settings: SettingsDep,
 ) -> DashboardStatusOut:
-    """Read-only shell dashboard — system + Fetcher probe + persisted activity summary."""
+    """Read-only shell dashboard — system status + persisted activity summary."""
 
     return build_dashboard_status(db, settings)

@@ -8,11 +8,8 @@ from typing import cast
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from mediamop.modules.fetcher.fetcher_arr_operator_settings_prefs import (
-    normalize_hhmm,
-    validate_schedule_days_csv,
-)
-from mediamop.modules.fetcher.fetcher_arr_search_schedule_window import fetcher_arr_search_schedule_in_window
+from mediamop.platform.arr_library.schedule_csv_validate import normalize_hhmm, validate_schedule_days_csv
+from mediamop.platform.arr_library.schedule_wall_clock import schedule_time_window_active
 from mediamop.modules.refiner.refiner_operator_settings_model import RefinerOperatorSettingsRow
 from mediamop.modules.refiner.schemas_refiner_operator_settings import (
     RefinerOperatorSettingsOut,
@@ -26,7 +23,7 @@ def _clamp_max_concurrent_files(raw: int) -> int:
 
 
 def _clamp_scan_schedule_interval_seconds(raw: int) -> int:
-    """Match Fetcher search-lane minimum (60s); Refiner timed-scan cadence only."""
+    """Match suite minimum (60s); Refiner timed-scan cadence only."""
     return max(60, min(int(raw), 7 * 24 * 3600))
 
 
@@ -66,7 +63,7 @@ def refiner_periodic_scope_in_schedule_window(
     media_scope: str,
     now: datetime | None = None,
 ) -> bool:
-    """True when a periodic Refiner watched-folder scan may run for this scope (independent from Fetcher)."""
+    """True when a periodic Refiner watched-folder scan may run for this scope."""
 
     when = now if now is not None else datetime.now(timezone.utc)
     if media_scope == "movie":
@@ -74,7 +71,7 @@ def refiner_periodic_scope_in_schedule_window(
             return True
         suite = ensure_suite_settings_row(db)
         tz_name = (suite.app_timezone or "UTC").strip() or "UTC"
-        return fetcher_arr_search_schedule_in_window(
+        return schedule_time_window_active(
             schedule_enabled=True,
             schedule_days=(row.movie_schedule_days or "").strip(),
             schedule_start=(row.movie_schedule_start or "00:00").strip(),
@@ -87,7 +84,7 @@ def refiner_periodic_scope_in_schedule_window(
             return True
         suite = ensure_suite_settings_row(db)
         tz_name = (suite.app_timezone or "UTC").strip() or "UTC"
-        return fetcher_arr_search_schedule_in_window(
+        return schedule_time_window_active(
             schedule_enabled=True,
             schedule_days=(row.tv_schedule_days or "").strip(),
             schedule_start=(row.tv_schedule_start or "00:00").strip(),

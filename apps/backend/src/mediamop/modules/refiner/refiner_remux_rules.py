@@ -1,7 +1,4 @@
-"""Remux planning rules — Refiner-owned (ported from Fetcher ``app/refiner_rules.py``).
-
-MediaMop does not import Fetcher at runtime; behavior is copied here for ``refiner.file.remux_pass.v1``.
-"""
+"""Remux planning rules — Refiner-owned (``refiner.file.remux_pass.v1``)."""
 
 from __future__ import annotations
 
@@ -564,7 +561,7 @@ def parse_path_lines(raw: str) -> list[str]:
 
 
 def default_refiner_remux_rules_config() -> RefinerRulesConfig:
-    """Sane defaults for remux planning (aligned with historical Fetcher movie defaults)."""
+    """Sane defaults for remux planning."""
 
     return RefinerRulesConfig(
         primary_audio_lang="eng",

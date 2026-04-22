@@ -110,12 +110,13 @@ function ScopeCard({
   const disabled = !editable || isPending;
   const subtitleCodes = parseCsvCodes(draft.subtitle_langs_csv);
   return (
-    <section className="mm-card mm-dash-card p-6">
+    <section className="mm-card mm-dash-card flex flex-col p-6">
       <div className="border-b border-[var(--mm-border)] pb-4">
         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-[var(--mm-text3)]">Scope</p>
         <h3 className="mt-1.5 text-base font-semibold text-[var(--mm-text1)]">{title}</h3>
       </div>
-      <div className="mt-6 space-y-9">
+      <div className="mm-card-action-body mt-6 flex-1 min-h-0">
+      <div className="space-y-9">
         <section className="min-w-0">
           <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Audio</h4>
           <div className="mt-3 grid gap-x-6 gap-y-6 sm:grid-cols-2">
@@ -229,7 +230,8 @@ function ScopeCard({
         </p>
       ) : null}
       {isSuccess && !dirty ? <p className="mt-4 text-xs text-[var(--mm-text3)]">Saved.</p> : null}
-      <div className="mt-8 border-t border-[var(--mm-border)] pt-6">
+      </div>
+      <div className="mm-card-action-footer">
         <button
           type="button"
           className={mmActionButtonClass({
@@ -277,7 +279,7 @@ export function RefinerRemuxSection() {
   if (q.isError) {
     return (
       <div
-        className="mm-fetcher-module-surface w-full min-w-0 rounded border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-200"
+        className="mm-module-surface w-full min-w-0 rounded border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-200"
         data-testid="refiner-remux-settings-error"
         role="alert"
       >
@@ -302,7 +304,7 @@ export function RefinerRemuxSection() {
   return (
     <div className="mm-bubble-stack flex w-full min-w-0 flex-col" data-testid="refiner-remux-section">
       <section
-        className="mm-card mm-dash-card mm-fetcher-module-surface w-full min-w-0 p-6 text-sm leading-relaxed text-[var(--mm-text2)] sm:p-7"
+        className="mm-card mm-dash-card mm-module-surface w-full min-w-0 p-6 text-sm leading-relaxed text-[var(--mm-text2)] sm:p-7"
         aria-labelledby="refiner-audio-subtitles-saved-heading"
         data-testid="refiner-remux-defaults"
       >

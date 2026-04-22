@@ -28,7 +28,7 @@ from mediamop.modules.subber.subber_schemas import (
 from mediamop.modules.subber.subber_settings_model import SubberSettingsRow
 from mediamop.modules.subber.subber_settings_service import (
     ensure_subber_settings_row,
-    get_fetcher_arr_hints,
+    get_arr_library_connection_hints,
     language_preferences_list,
     set_language_preferences_json,
 )
@@ -43,7 +43,7 @@ def _masked_set(ciphertext: str | None) -> bool:
 
 
 def _settings_out(db, row: SubberSettingsRow, request: Request, settings: MediaMopSettings) -> SubberSettingsOut:
-    son_hint, rad_hint = get_fetcher_arr_hints(db)
+    son_hint, rad_hint = get_arr_library_connection_hints(db)
     _ = request, settings
     return SubberSettingsOut(
         enabled=bool(row.enabled),
@@ -89,8 +89,8 @@ def _settings_out(db, row: SubberSettingsRow, request: Request, settings: MediaM
         radarr_path_mapping_enabled=bool(row.radarr_path_mapping_enabled),
         radarr_path_radarr=str(row.radarr_path_radarr or ""),
         radarr_path_subber=str(row.radarr_path_subber or ""),
-        fetcher_sonarr_base_url_hint=son_hint,
-        fetcher_radarr_base_url_hint=rad_hint,
+        arr_library_sonarr_base_url_hint=son_hint,
+        arr_library_radarr_base_url_hint=rad_hint,
     )
 
 

@@ -9,10 +9,7 @@ from typing import Any, Literal
 from sqlalchemy.orm import Session, sessionmaker
 
 from mediamop.core.config import MediaMopSettings
-from mediamop.modules.fetcher.fetcher_arr_http_resolve import (
-    resolve_radarr_http_credentials,
-    resolve_sonarr_http_credentials,
-)
+from mediamop.platform.arr_library import resolve_radarr_http_credentials, resolve_sonarr_http_credentials
 from mediamop.modules.refiner.refiner_candidate_gate_activity import record_refiner_candidate_gate_completed
 from mediamop.modules.refiner.refiner_candidate_gate_evaluate import evaluate_refiner_candidate_gate_from_queue_rows
 from mediamop.modules.refiner.refiner_candidate_gate_queue_fetch import fetch_arr_v3_queue_rows
@@ -73,8 +70,7 @@ def make_refiner_candidate_gate_handler(
         if not base or not key:
             raise RuntimeError(
                 "Refiner candidate gate needs Radarr/Sonarr URL and API key: set "
-                "MEDIAMOP_ARR_*_BASE_URL and MEDIAMOP_ARR_*_API_KEY, or the legacy "
-                "MEDIAMOP_FETCHER_* equivalents for the same app.",
+                "MEDIAMOP_ARR_RADARR_BASE_URL / MEDIAMOP_ARR_RADARR_API_KEY or the Sonarr pair.",
             )
 
         rows = fetch_arr_v3_queue_rows(base_url=base, api_key=key, app=app)

@@ -18,10 +18,9 @@ import {
   MmScheduleDayChips,
   MmScheduleTimeFields,
 } from "../../components/ui/mm-schedule-window-controls";
-import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { mmModuleTabBlurbBandClass, mmModuleTabBlurbTextClass } from "../../lib/ui/mm-module-tab-blurb";
 import { MmListboxPicker } from "../../components/ui/mm-listbox-picker";
-import { fetcherMenuButtonClass, fetcherSectionTabClass } from "../fetcher/fetcher-menu-button";
+import { mmActionButtonClass, mmSectionTabClass } from "../../lib/ui/mm-control-roles";
 import { fetchCsrfToken } from "../../lib/api/auth-api";
 import type { PrunerJobsInspectionRow, PrunerServerInstance } from "../../lib/pruner/api";
 import { patchPrunerInstance, patchPrunerScope, postPrunerConnectionTest, postPrunerInstance } from "../../lib/pruner/api";
@@ -297,13 +296,14 @@ function PrunerConnectionCredentialPanel({
   return (
     <section
       className={[
-        "mm-card mm-dash-card mm-bubble-stack flex h-full min-h-0 min-w-0 flex-col transition-shadow duration-200",
+        "mm-card mm-dash-card flex h-full min-h-0 min-w-0 flex-col transition-shadow duration-200",
         saveJustSucceeded
           ? "ring-2 ring-[var(--mm-accent-ring)] ring-offset-2 ring-offset-[var(--mm-bg-main)] shadow-[0_0_0_1px_rgba(212,175,55,0.12)]"
           : "",
       ].join(" ")}
       data-testid={`pruner-connection-panel-${provider}`}
     >
+      <div className="mm-card-action-body flex-1 min-h-0">
       {!controlled && providerInstances.length > 1 ? (
         <label className="block text-sm text-[var(--mm-text2)]">
           <span className="mb-1 block text-xs text-[var(--mm-text3)]">Server</span>
@@ -358,7 +358,7 @@ function PrunerConnectionCredentialPanel({
           />
           <button
             type="button"
-            className={fetcherMenuButtonClass({
+            className={mmActionButtonClass({
               variant: "tertiary",
               disabled: !canOperate || panelBusy,
             })}
@@ -394,11 +394,12 @@ function PrunerConnectionCredentialPanel({
           Test started — results appear here when it finishes.
         </p>
       ) : null}
+      </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="mm-card-action-footer mm-card-action-footer--row">
         <button
           type="button"
-          className={fetcherMenuButtonClass({
+          className={mmActionButtonClass({
             variant: "primary",
             disabled: !canOperate || !dirty || panelBusy,
           })}
@@ -409,7 +410,7 @@ function PrunerConnectionCredentialPanel({
         </button>
         <button
           type="button"
-          className={fetcherMenuButtonClass({
+          className={mmActionButtonClass({
             variant: "secondary",
             disabled: !canOperate || panelBusy || !selectedInstance,
           })}
@@ -421,7 +422,7 @@ function PrunerConnectionCredentialPanel({
       </div>
 
       <div
-        className="mt-auto rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-3.5 text-sm text-[var(--mm-text2)]"
+        className="mt-4 rounded-md border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-3.5 text-sm text-[var(--mm-text2)]"
         data-testid={`pruner-connection-status-${provider}`}
       >
         <p className="text-sm font-medium text-[var(--mm-text1)]">{connectionStatusMain}</p>
@@ -517,7 +518,7 @@ function ProviderConfigurationWorkspace({
           <button
             key={id}
             type="button"
-            className={fetcherSectionTabClass(providerSection === id)}
+            className={mmSectionTabClass(providerSection === id)}
             aria-current={providerSection === id ? "page" : undefined}
             onClick={() => setProviderSection(id)}
           >
@@ -636,7 +637,7 @@ function PrunerLast30StatsTiles({
 }
 
 const PRUNER_NEXT_STEPS_BODY =
-  "Use Emby, Jellyfin, or Plex to connect your media server and configure cleanup rules. Check Jobs for recent activity and Schedule to set up timed runs.";
+  "Use Emby, Jellyfin, or Plex to connect your media server and configure cleanup rules. Check Jobs for recent activity. Use Schedule for timed scans and optional hour limits.";
 
 function PrunerOverviewNextSteps({ onNavigate }: { onNavigate: (tab: TopTab) => void }) {
   return (
@@ -646,7 +647,7 @@ function PrunerOverviewNextSteps({ onNavigate }: { onNavigate: (tab: TopTab) => 
       data-testid="pruner-overview-next-steps"
       data-overview-order="3"
     >
-      <div className="space-y-5">
+      <div className="mm-bubble-stack">
         <p className="leading-relaxed">{PRUNER_NEXT_STEPS_BODY}</p>
         <div className="flex flex-wrap gap-2.5 border-t border-[var(--mm-border)] pt-4">
           <MmNextStepsButton label="Emby" onClick={() => onNavigate("emby")} />
@@ -737,7 +738,7 @@ function TopLevelOverview({
   );
 
   return (
-    <section className="space-y-6" data-testid="pruner-top-overview-tab">
+    <section className="mm-bubble-stack" data-testid="pruner-top-overview-tab">
       <MmOverviewSection
         headingId="pruner-overview-at-a-glance-heading"
         heading="At a glance"
@@ -922,7 +923,8 @@ function PrunerGlobalScheduleRow({
       : "Limit which days and times Pruner may run scheduled Movies cleanup previews for this provider.";
 
   return (
-    <section className="mm-card mm-dash-card mm-bubble-stack flex h-full min-h-0 min-w-0 flex-col p-6" data-testid={testId}>
+    <section className="mm-card mm-dash-card flex h-full min-h-0 min-w-0 flex-col p-6" data-testid={testId}>
+      <div className="mm-card-action-body flex-1 min-h-0">
       <div>
         <h3 className="text-base font-semibold text-[var(--mm-text1)]">{laneTitle}</h3>
         <p className="mt-1 text-sm text-[var(--mm-text2)]">{laneIntro}</p>
@@ -978,8 +980,15 @@ function PrunerGlobalScheduleRow({
             : "Never run"}
         </span>
       </p>
+      {!canOperate && msg ? <p className="text-xs text-green-600">{msg}</p> : null}
+      {!canOperate && err ? (
+        <p className="text-xs text-red-500" role="alert">
+          {err}
+        </p>
+      ) : null}
+      </div>
       {canOperate ? (
-        <div className="border-t border-[var(--mm-border)] pt-5">
+        <div className="mm-card-action-footer">
           <button
             type="button"
             className={`${mmActionButtonClass({ variant: "primary", disabled: saveDisabled })} w-full`}
@@ -988,16 +997,16 @@ function PrunerGlobalScheduleRow({
           >
             {busy ? "Saving…" : saveScheduleLabel}
           </button>
+          {msg ? <p className="text-xs text-green-600">{msg}</p> : null}
+          {err ? (
+            <p className="text-xs text-red-500" role="alert">
+              {err}
+            </p>
+          ) : null}
         </div>
       ) : null}
-      {msg ? <p className="text-xs text-green-600">{msg}</p> : null}
-      {err ? (
-        <p className="text-xs text-red-500" role="alert">
-          {err}
-        </p>
-      ) : null}
 
-      <div className="border-t border-[var(--mm-border)] pt-6">
+      <div className="mt-4 border-t border-[var(--mm-border)] pt-6">
         <h4 className="text-base font-semibold text-[var(--mm-text1)]">Run now</h4>
         <p className="mt-1 text-xs text-[var(--mm-text3)]">
           Run your saved cleanup criteria immediately without waiting for the schedule.
@@ -1181,7 +1190,7 @@ export function PrunerInstancesListPage() {
             type="button"
             role="tab"
             aria-selected={topTab === id || (topTab === "schedule" && id === "emby")}
-            className={fetcherSectionTabClass(topTab === id || (topTab === "schedule" && id === "emby"))}
+            className={mmSectionTabClass(topTab === id || (topTab === "schedule" && id === "emby"))}
             onClick={() => setTopTab(id)}
           >
             {label}

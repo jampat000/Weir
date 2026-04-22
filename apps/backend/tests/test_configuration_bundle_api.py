@@ -34,7 +34,7 @@ def test_configuration_bundle_get_legacy_path_still_works(client_with_admin: Tes
     _login_admin(client_with_admin)
     r = client_with_admin.get("/api/v1/suite/configuration-bundle")
     assert r.status_code == 200, r.text
-    assert r.json()["format_version"] == 1
+    assert r.json()["format_version"] == 2
 
 
 def test_configuration_bundle_round_trip_suite_name(client_with_admin: TestClient) -> None:
@@ -42,9 +42,9 @@ def test_configuration_bundle_round_trip_suite_name(client_with_admin: TestClien
     r0 = client_with_admin.get("/api/v1/system/suite-configuration-bundle")
     assert r0.status_code == 200, r0.text
     bundle = r0.json()
-    assert bundle["format_version"] == 1
+    assert bundle["format_version"] == 2
     assert "suite_settings" in bundle
-    assert "fetcher_arr_operator_settings" in bundle
+    assert "arr_library_operator_settings" in bundle
 
     b2 = deepcopy(bundle)
     b2["suite_settings"] = dict(bundle["suite_settings"])

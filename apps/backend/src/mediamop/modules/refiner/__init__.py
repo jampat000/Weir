@@ -1,12 +1,11 @@
 """Refiner module — MediaMop’s media refinement surface (movies and TV).
 
-Download-queue failed-import cleanup **planning, drives, and *arr execution** live under
-``mediamop.modules.fetcher`` (Fetcher product/runtime ownership). Shared classification and
-policy toggles live in ``mediamop.modules.arr_failed_import`` (neutral *arr rules).
+Download-queue failed-import cleanup **planning, drives, and *arr execution** use shared rules in
+``mediamop.modules.arr_failed_import`` and HTTP resolution in ``mediamop.platform.arr_library``.
 
 Refiner owns persisted ``refiner_jobs`` and optional in-process Refiner workers
-(``MEDIAMOP_REFINER_WORKER_COUNT``). Durable Fetcher background work uses ``fetcher_jobs`` and
-Fetcher workers instead. Composition may inject neutral ports; Refiner does not import Fetcher.
+(``MEDIAMOP_REFINER_WORKER_COUNT``). Composition may inject neutral ports; Refiner stays decoupled
+from other product modules at import time.
 
 Shipped durable ``refiner.*`` families include queue evaluation, candidate gate, and
 ``refiner.file.remux_pass.v1`` (ffprobe + remux planning under ``mediamop.modules.refiner.refiner_remux_*``;

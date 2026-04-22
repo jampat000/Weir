@@ -39,7 +39,7 @@ export function RefinerProcessSettingsSection() {
   }
   if (q.isError) {
     return (
-      <div className="mm-fetcher-module-surface w-full min-w-0 rounded border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-200" role="alert">
+      <div className="mm-module-surface w-full min-w-0 rounded border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-200" role="alert">
         <p className="font-semibold">Could not load Refiner processing settings</p>
         <p className="mt-1">
           {isLikelyNetworkFailure(q.error)
@@ -67,13 +67,14 @@ export function RefinerProcessSettingsSection() {
     maxConcurrentFiles !== String(q.data.max_concurrent_files) || minFileAgeSeconds !== String(q.data.min_file_age_seconds);
 
   return (
-    <section className="mm-fetcher-module-surface w-full min-w-0 rounded border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-6 text-sm leading-relaxed text-[var(--mm-text2)] sm:p-7">
+    <section className="mm-module-surface flex w-full min-w-0 flex-col rounded border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-6 text-sm leading-relaxed text-[var(--mm-text2)] sm:p-7">
       <h2 className="text-base font-semibold text-[var(--mm-text)]">Processing settings</h2>
       <p className="mt-2 max-w-3xl text-[var(--mm-text3)]">
         Control how many files Refiner works on at once and how long a file must sit unchanged before processing.
         Per-library watched-folder timers are under <strong className="text-[var(--mm-text2)]">Libraries</strong>.
       </p>
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5">
+      <div className="mm-card-action-body mt-6 flex-1 min-h-0">
+      <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
         <div className="block min-w-0">
           <span id={filesAtOnceLabelId} className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
             Files at once
@@ -107,7 +108,8 @@ export function RefinerProcessSettingsSection() {
           {save.error instanceof Error ? save.error.message : "Save failed."}
         </p>
       ) : null}
-      <div className="mt-8 border-t border-[var(--mm-border)] pt-5">
+      </div>
+      <div className="mm-card-action-footer">
         <button
           type="button"
           className={mmActionButtonClass({

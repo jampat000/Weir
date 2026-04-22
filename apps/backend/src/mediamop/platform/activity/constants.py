@@ -8,27 +8,9 @@ AUTH_BOOTSTRAP_SUCCEEDED = "auth.bootstrap_succeeded"
 AUTH_BOOTSTRAP_DENIED = "auth.bootstrap_denied"
 AUTH_PASSWORD_CHANGED = "auth.password_changed"
 
-# Fetcher bridge (throttled in service — not per-request spam)
-FETCHER_PROBE_SUCCEEDED = "fetcher.probe_succeeded"
-FETCHER_PROBE_FAILED = "fetcher.probe_failed"
-
-# Fetcher failed-import download-queue passes (one summary or failure row per run)
-FETCHER_FAILED_IMPORT_RUN_STARTED = "fetcher.failed_import_run_started"
-FETCHER_FAILED_IMPORT_PASS_QUEUED = "fetcher.failed_import_pass_queued"
-FETCHER_FAILED_IMPORT_RUN_SUMMARY = "fetcher.failed_import_run_summary"
-FETCHER_FAILED_IMPORT_RUN_FAILED = "fetcher.failed_import_run_failed"
-FETCHER_FAILED_IMPORT_RECOVERED = "fetcher.failed_import_recovered"
-FETCHER_JOB_RECOVERED_HANDLER_OK_FINALIZE = "fetcher.job_recovered_handler_ok_finalize"
-
-# Fetcher Arr search (missing / upgrade) — summaries mirror audited Fetcher wording where practical.
-FETCHER_ARR_SEARCH_MISSING_DISPATCHED = "fetcher.arr_search_missing_dispatched"
-FETCHER_ARR_SEARCH_MISSING_ZERO_MANUAL = "fetcher.arr_search_missing_zero_manual"
-FETCHER_ARR_SEARCH_UPGRADE_DISPATCHED = "fetcher.arr_search_upgrade_dispatched"
-FETCHER_ARR_SEARCH_UPGRADE_ZERO_MANUAL = "fetcher.arr_search_upgrade_zero_manual"
-
-# Fetcher Sonarr/Radarr connection checks (operator-triggered; not ongoing health)
-FETCHER_ARR_CONNECTION_TEST_SUCCEEDED = "fetcher.arr_connection_test_succeeded"
-FETCHER_ARR_CONNECTION_TEST_FAILED = "fetcher.arr_connection_test_failed"
+# Shared *arr library (Sonarr/Radarr) — operator-triggered connection checks
+ARR_LIBRARY_CONNECTION_TEST_SUCCEEDED = "arr_library.connection_test_succeeded"
+ARR_LIBRARY_CONNECTION_TEST_FAILED = "arr_library.connection_test_failed"
 
 # Refiner durable families (refiner_jobs)
 REFINER_SUPPLIED_PAYLOAD_EVALUATION_COMPLETED = "refiner.supplied_payload_evaluation_completed"

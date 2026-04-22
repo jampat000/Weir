@@ -19,7 +19,7 @@ Take it, fork it, do whatever you want with it.
 
 <!-- README_LOCKED_SECTION_END: project-note -->
 
-MediaMop is a standalone product: **FastAPI + SQLite** backend (`apps/backend`) and **React + Vite** web shell (`apps/web`). This repo is **not** the legacy standalone “Fetcher” deployment or Docker stack from earlier iterations; it **does** ship an in-repo **Fetcher module** (`mediamop.modules.fetcher` plus the Fetcher pages in `apps/web`) for Radarr/Sonarr background work.
+MediaMop is a standalone product: **FastAPI + SQLite** backend (`apps/backend`) and **React + Vite** web shell (`apps/web`). Radarr/Sonarr integration, library settings, and related background work are implemented inside the core backend and **Refiner**, **Pruner**, and **Subber** surfaces (plus shared **arr library** helpers), not as separate first-class apps in the shell.
 
 ## Quick start
 

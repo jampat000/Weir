@@ -1,6 +1,6 @@
 /**
  * Element screenshots for the three overview sections (At a glance, Needs attention, Next steps)
- * on Fetcher, Refiner, Subber, and Pruner — plus Refiner's "Next steps" card (data-testid refiner-overview-go-deeper).
+ * on Refiner, Subber, and Pruner — plus Refiner's "Next steps" card (data-testid refiner-overview-go-deeper).
  *
  * Prerequisites:
  *   cd scripts && npm install && npx playwright install chromium
@@ -73,15 +73,6 @@ async function shotLocator(locator, filePath) {
   await page.locator('[data-testid="shell-ready"]').waitFor({ timeout: 90000 });
 
   const modules = [
-    {
-      name: "fetcher",
-      path: "/app/fetcher",
-      sections: [
-        { testId: "fetcher-overview-at-a-glance", file: "fetcher-at-a-glance.png" },
-        { testId: "fetcher-overview-needs-attention", file: "fetcher-needs-attention.png" },
-        { testId: "fetcher-overview-next-steps", file: "fetcher-next-steps.png" },
-      ],
-    },
     {
       name: "refiner",
       path: "/app/refiner",

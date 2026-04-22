@@ -1,4 +1,4 @@
-"""Refiner candidate gate: refiner_jobs, handler wiring, mocked live queue (no Fetcher lane)."""
+"""Refiner candidate gate: refiner_jobs, handler wiring, mocked live Radarr queue rows."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def session_factory(jobs_engine):
     )
 
 
-def test_candidate_gate_handler_uses_live_queue_shape_not_fetcher_jobs(
+def test_candidate_gate_handler_uses_live_queue_shape(
     session_factory,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -116,8 +116,9 @@ def test_candidate_gate_handler_uses_live_queue_shape_not_fetcher_jobs(
         assert body.get("verdict") == "proceed"
 
 
-def test_refiner_candidate_gate_queue_fetch_module_does_not_import_fetcher() -> None:
+def test_refiner_candidate_gate_queue_fetch_module_has_no_in_repo_package_imports() -> None:
     import mediamop.modules.refiner.refiner_candidate_gate_queue_fetch as mod
 
     src = Path(mod.__file__).read_text(encoding="utf-8")
-    assert "mediamop.modules.fetcher" not in src
+    assert "from mediamop" not in src
+    assert "import mediamop" not in src

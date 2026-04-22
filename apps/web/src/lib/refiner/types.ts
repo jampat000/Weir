@@ -89,7 +89,7 @@ export type RefinerOperatorSettingsOut = {
   tv_schedule_days: string;
   tv_schedule_start: string;
   tv_schedule_end: string;
-  /** IANA id from suite settings (read-only; same clock reference as Fetcher). */
+  /** IANA id from suite settings (read-only; shared suite clock for schedule windows). */
   schedule_timezone: string;
   updated_at: string;
 };

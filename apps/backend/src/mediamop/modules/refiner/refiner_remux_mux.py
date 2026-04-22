@@ -1,4 +1,4 @@
-"""FFprobe / FFmpeg remux execution — Refiner-owned (ported from Fetcher ``app/refiner_mux.py``).
+"""FFprobe / FFmpeg remux execution — Refiner-owned.
 
 Binary resolution: ``<MEDIAMOP_HOME>/bin/ffmpeg/{ffprobe,ffmpeg}[.exe]`` first, then ``PATH``.
 """

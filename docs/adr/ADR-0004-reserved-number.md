@@ -6,7 +6,7 @@
 
 ## Context
 
-ADR numbers were assigned out of strict chronological order while the worker-lane and Fetcher split landed. **0004** is held open rather than renumbering accepted ADRs.
+ADR numbers were assigned out of strict chronological order while major platform work landed. **0004** is held open rather than renumbering accepted ADRs.
 
 ## Decision
 

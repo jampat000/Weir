@@ -20,7 +20,7 @@ from mediamop.core.config import MediaMopSettings
 from mediamop.modules.pruner.pruner_constants import clamp_pruner_scheduled_preview_interval_seconds
 from mediamop.modules.pruner.pruner_job_kinds import PRUNER_CANDIDATE_REMOVAL_PREVIEW_JOB_KIND
 from mediamop.modules.pruner.pruner_jobs_ops import pruner_enqueue_or_get_job
-from mediamop.modules.fetcher.fetcher_arr_search_schedule_window import DAY_NAMES, fetcher_arr_search_schedule_in_window
+from mediamop.platform.arr_library.schedule_wall_clock import DAY_NAMES, schedule_time_window_active
 from mediamop.modules.pruner.pruner_scope_settings_model import PrunerScopeSettings
 from mediamop.modules.pruner.pruner_server_instance_model import PrunerServerInstance
 from mediamop.platform.suite_settings.service import ensure_suite_settings_row
@@ -41,7 +41,7 @@ def _scope_row_in_schedule_window(session: Session, sc: PrunerScopeSettings, *, 
     days_csv = days_raw if days_raw else ",".join(DAY_NAMES)
     start_s = (sc.scheduled_preview_start or "00:00").strip() or "00:00"
     end_s = (sc.scheduled_preview_end or "23:59").strip() or "23:59"
-    return fetcher_arr_search_schedule_in_window(
+    return schedule_time_window_active(
         schedule_enabled=True,
         schedule_days=days_csv,
         schedule_start=start_s,

@@ -12,7 +12,6 @@ from alembic.config import Config
 from starlette.testclient import TestClient
 
 from mediamop.api.factory import create_app
-from mediamop.modules.fetcher.failed_import_queue_worker_runtime import build_failed_import_queue_worker_runtime_bundle
 from tests.integration_helpers import seed_admin_user, seed_viewer_user
 
 
@@ -22,15 +21,11 @@ def _mediamop_sqlite_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
 
     home = tmp_path_factory.mktemp("mediamop_pytest_home")
     os.environ["MEDIAMOP_HOME"] = str(home)
-    # fetcher_worker_count=0 disables in-process Fetcher workers during pytest.
-    # Avoids claiming synthetic ``pending`` rows during API tests (timing-sensitive on CI).
-    os.environ["MEDIAMOP_FETCHER_WORKER_COUNT"] = "0"
     os.environ["MEDIAMOP_REFINER_WORKER_COUNT"] = "0"
     os.environ["MEDIAMOP_PRUNER_WORKER_COUNT"] = "0"
     os.environ["MEDIAMOP_PRUNER_PREVIEW_SCHEDULE_ENQUEUE_ENABLED"] = "0"
     os.environ["MEDIAMOP_PRUNER_APPLY_ENABLED"] = "0"
     os.environ["MEDIAMOP_SUBBER_WORKER_COUNT"] = "0"
-    os.environ["MEDIAMOP_BROKER_WORKER_COUNT"] = "0"
     backend = Path(__file__).resolve().parents[1]
     cfg = Config(str(backend / "alembic.ini"))
     command.upgrade(cfg, "head")
@@ -59,10 +54,3 @@ def client_with_viewer() -> TestClient:
     app = create_app()
     with TestClient(app) as c:
         yield c
-
-
-@pytest.fixture
-def failed_import_queue_worker_runtime_bundle():
-    """Production ``FailedImportQueueWorkerPorts`` bundle for tests that wire the Fetcher worker registry."""
-
-    return build_failed_import_queue_worker_runtime_bundle()

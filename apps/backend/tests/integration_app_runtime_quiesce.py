@@ -22,11 +22,9 @@ def integration_test_set_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, h
 
 
 def integration_test_quiesce_in_process_workers(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("MEDIAMOP_FETCHER_WORKER_COUNT", "0")
     monkeypatch.setenv("MEDIAMOP_REFINER_WORKER_COUNT", "0")
     monkeypatch.setenv("MEDIAMOP_PRUNER_WORKER_COUNT", "0")
     monkeypatch.setenv("MEDIAMOP_SUBBER_WORKER_COUNT", "0")
-    monkeypatch.setenv("MEDIAMOP_BROKER_WORKER_COUNT", "0")
     monkeypatch.setenv("MEDIAMOP_PRUNER_PREVIEW_SCHEDULE_ENQUEUE_ENABLED", "0")
     monkeypatch.setenv("MEDIAMOP_PRUNER_APPLY_ENABLED", "0")
 
@@ -42,7 +40,3 @@ def integration_test_quiesce_periodic_enqueue(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setenv("MEDIAMOP_REFINER_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED", "0")
     monkeypatch.setenv("MEDIAMOP_FAILED_IMPORT_RADARR_CLEANUP_DRIVE_SCHEDULE_ENABLED", "0")
     monkeypatch.setenv("MEDIAMOP_FAILED_IMPORT_SONARR_CLEANUP_DRIVE_SCHEDULE_ENABLED", "0")
-    monkeypatch.setenv("MEDIAMOP_FETCHER_SONARR_MISSING_SEARCH_SCHEDULE_ENABLED", "0")
-    monkeypatch.setenv("MEDIAMOP_FETCHER_SONARR_UPGRADE_SEARCH_SCHEDULE_ENABLED", "0")
-    monkeypatch.setenv("MEDIAMOP_FETCHER_RADARR_MISSING_SEARCH_SCHEDULE_ENABLED", "0")
-    monkeypatch.setenv("MEDIAMOP_FETCHER_RADARR_UPGRADE_SEARCH_SCHEDULE_ENABLED", "0")

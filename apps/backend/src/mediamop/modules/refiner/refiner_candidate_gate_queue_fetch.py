@@ -1,4 +1,4 @@
-"""Refiner-owned live *arr queue fetch (stdlib HTTP only; does not import Fetcher)."""
+"""Refiner-owned live *arr queue fetch (stdlib HTTP only)."""
 
 from __future__ import annotations
 

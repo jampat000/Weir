@@ -20,8 +20,6 @@ from mediamop.modules.arr_failed_import.queue_action import FailedImportQueueHan
 from tests.legacy_refiner_failed_import_env_poison import (
     LEGACY_REFINER_FAILED_IMPORT_CLEANUP_POLICY_ENV_KEYS,
     LEGACY_REFINER_RADARR_CLEANUP_CORRUPT,
-    LEGACY_REFINER_RADARR_DRIVE_SCHEDULE_ENABLED,
-    LEGACY_REFINER_RADARR_DRIVE_SCHEDULE_INTERVAL_SECONDS,
     LEGACY_REFINER_SONARR_CLEANUP_IMPORT_FAILED,
 )
 
@@ -111,13 +109,3 @@ def test_failed_import_cleanup_policies_delegate_through_media_mop_settings() ->
     assert s.sonarr_failed_import_cleanup_policy().handling_quality_rejection is FailedImportQueueHandlingAction.LEAVE_ALONE
 
 
-def test_media_mop_settings_failed_import_schedule_ignores_legacy_refiner_env(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv("MEDIAMOP_FAILED_IMPORT_RADARR_CLEANUP_DRIVE_SCHEDULE_ENABLED", raising=False)
-    monkeypatch.delenv("MEDIAMOP_FAILED_IMPORT_RADARR_CLEANUP_DRIVE_SCHEDULE_INTERVAL_SECONDS", raising=False)
-    monkeypatch.setenv(LEGACY_REFINER_RADARR_DRIVE_SCHEDULE_ENABLED, "1")
-    monkeypatch.setenv(LEGACY_REFINER_RADARR_DRIVE_SCHEDULE_INTERVAL_SECONDS, "7200")
-    s = MediaMopSettings.load()
-    assert s.failed_import_radarr_cleanup_drive_schedule_enabled is False
-    assert s.failed_import_radarr_cleanup_drive_schedule_interval_seconds == 3600

@@ -32,7 +32,7 @@ Thumbs.db
 # Local-only working files (never commit)
 .local/
 
-# Script-generated UI captures (run scripts/capture-fetcher-ui-zip.ps1)
+# Script-generated UI captures (see scripts/capture-overview-sections.cjs)
 artifacts/
 
 # Local scratch (screenshots, one-off captures, ad-hoc Playwright installs)

@@ -1,11 +1,11 @@
 /**
- * Shared weekday + time-window controls (Fetcher ARR search lanes, Refiner watched-folder schedules).
+ * Shared weekday + time-window controls (*arr* search lanes, Refiner watched-folder schedules).
  * Persistence and semantics stay module-specific; this file is presentation only.
  */
 
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 
-/** Word-for-word match across Fetcher, Refiner, and Pruner schedule UIs. */
+/** Word-for-word match across Refiner, Pruner, and Subber schedule UIs. */
 export const MM_SCHEDULE_TIME_WINDOW_HEADING = "Limit to these hours";
 export const MM_SCHEDULE_TIME_WINDOW_HELPER =
   "When on, this only runs inside the hours and days you set below. Turn off to run at any time.";

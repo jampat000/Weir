@@ -6,9 +6,7 @@ Accepted — MediaMop standalone repository (extracted from shared-history monor
 
 ## Context
 
-MediaMop is its **own product** and **own Git repository**. The backend and web shell are developed together here. The **Fetcher** application exists in a **different repository** and is not part of this tree.
-
-Historical note: an experimental Jinja/SQLite package once lived alongside Fetcher; it was **never** the long-term architecture. **Do not** reintroduce that stack as the primary product path.
+MediaMop is its **own product** and **own Git repository**. The backend and web shell are developed together here. Earlier prototype stacks are **not** carried forward as the primary architecture.
 
 ## Decision
 
@@ -30,8 +28,8 @@ Historical note: an experimental Jinja/SQLite package once lived alongside Fetch
 ## Consequences
 
 - **CI** validates `apps/backend`, `apps/web`, and optional E2E under **`tests/e2e/mediamop/`** only in **this** repository.
-- **No Fetcher imports** — this codebase does not bundle the Fetcher `app/` package.
+- **No** third-party application packages are vendored into the runtime tree; product code lives under `mediamop` and `apps/web` only.
 
 ## Compliance
 
-- **No** Fetcher business-logic migration is implied by this ADR alone; slices are explicit, separate efforts.
+- **No** cross-repository business-logic migration is implied by this ADR alone; slices are explicit, separate efforts.

@@ -100,10 +100,6 @@ export function SubberProvidersTab({ canOperate }: { canOperate: boolean }) {
 
   return (
     <div className="mm-bubble-stack" data-testid="subber-providers-tab">
-      <p className="text-sm text-[var(--mm-text2)]">
-        Subber searches providers in priority order until a subtitle is found. Click any row to configure credentials and enable it.
-      </p>
-
       <section
         className="overflow-hidden rounded-lg border border-[var(--mm-border)] bg-[var(--mm-card-bg)] shadow-sm"
         data-testid="subber-providers-section"
@@ -111,9 +107,6 @@ export function SubberProvidersTab({ canOperate }: { canOperate: boolean }) {
         <header className="border-b border-[var(--mm-border)] bg-black/10 px-5 py-4">
           <p className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--mm-text2)]">Sources</p>
           <h2 className="mt-1 text-lg font-semibold tracking-tight text-[var(--mm-text)]">Subtitle providers</h2>
-          <p className="mt-2 text-sm leading-relaxed text-[var(--mm-text2)]">
-            Subber walks this list in order until a subtitle is found. Lower number = searched first. Keep at least one provider enabled.
-          </p>
         </header>
         <div className="px-5 py-5">
           {pq.isLoading ? (

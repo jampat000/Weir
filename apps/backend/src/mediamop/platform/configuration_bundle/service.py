@@ -8,12 +8,6 @@ from typing import Any, TypeVar
 from sqlalchemy import DateTime, delete, inspect, select
 from sqlalchemy.orm import Session
 
-from mediamop.modules.broker.broker_arr_connections_model import BrokerArrConnectionRow
-from mediamop.modules.broker.broker_indexers_model import BrokerIndexerRow
-from mediamop.modules.broker.broker_settings_model import BrokerSettingsRow
-from mediamop.modules.fetcher.cleanup_policy_model import FetcherFailedImportCleanupPolicyRow
-from mediamop.modules.fetcher.fetcher_arr_operator_settings_model import FetcherArrOperatorSettingsRow
-from mediamop.modules.fetcher.fetcher_search_schedule_state_model import FetcherSearchScheduleStateRow
 from mediamop.modules.pruner.pruner_scope_settings_model import PrunerScopeSettings
 from mediamop.modules.pruner.pruner_server_instance_model import PrunerServerInstance
 from mediamop.modules.refiner.refiner_operator_settings_model import RefinerOperatorSettingsRow
@@ -21,10 +15,11 @@ from mediamop.modules.refiner.refiner_path_settings_model import RefinerPathSett
 from mediamop.modules.refiner.refiner_remux_rules_settings_model import RefinerRemuxRulesSettingsRow
 from mediamop.modules.subber.subber_providers_model import SubberProviderRow
 from mediamop.modules.subber.subber_settings_model import SubberSettingsRow
+from mediamop.platform.arr_library.arr_operator_settings_model import ArrLibraryOperatorSettingsRow
 from mediamop.platform.suite_settings.model import SuiteSettingsRow
 from mediamop.platform.suite_settings.service import apply_suite_settings_put, ensure_suite_settings_row
 
-BUNDLE_FORMAT_VERSION = 1
+BUNDLE_FORMAT_VERSION = 2
 
 T = TypeVar("T")
 
@@ -87,15 +82,10 @@ def _sanitize_pruner_scope_export(d: dict[str, Any]) -> dict[str, Any]:
 
 def build_configuration_bundle(session: Session) -> dict[str, Any]:
     suite_row = ensure_suite_settings_row(session)
-    fetcher_arr = session.get(FetcherArrOperatorSettingsRow, 1)
-    fetcher_policy = session.get(FetcherFailedImportCleanupPolicyRow, 1)
-    fetcher_sched = session.get(FetcherSearchScheduleStateRow, 1)
+    arr_library = session.get(ArrLibraryOperatorSettingsRow, 1)
     ref_op = session.get(RefinerOperatorSettingsRow, 1)
     ref_path = session.get(RefinerPathSettingsRow, 1)
     ref_remux = session.get(RefinerRemuxRulesSettingsRow, 1)
-    br_settings = session.get(BrokerSettingsRow, 1)
-    br_indexers = list(session.scalars(select(BrokerIndexerRow).order_by(BrokerIndexerRow.id)).all())
-    br_arr = list(session.scalars(select(BrokerArrConnectionRow).order_by(BrokerArrConnectionRow.id)).all())
     sub_settings = session.get(SubberSettingsRow, 1)
     sub_providers = list(session.scalars(select(SubberProviderRow).order_by(SubberProviderRow.id)).all())
     pruner_instances = list(session.scalars(select(PrunerServerInstance).order_by(PrunerServerInstance.id)).all())
@@ -110,15 +100,10 @@ def build_configuration_bundle(session: Session) -> dict[str, Any]:
     return {
         "format_version": BUNDLE_FORMAT_VERSION,
         "suite_settings": orm_row_to_dict(suite_row),
-        "fetcher_arr_operator_settings": orm_row_to_dict(_req(fetcher_arr, "fetcher_arr_operator_settings")),
-        "fetcher_failed_import_cleanup_policy": orm_row_to_dict(_req(fetcher_policy, "fetcher_failed_import_cleanup_policy")),
-        "fetcher_search_schedule_state": orm_row_to_dict(_req(fetcher_sched, "fetcher_search_schedule_state")),
+        "arr_library_operator_settings": orm_row_to_dict(_req(arr_library, "arr_library_operator_settings")),
         "refiner_operator_settings": orm_row_to_dict(_req(ref_op, "refiner_operator_settings")),
         "refiner_path_settings": orm_row_to_dict(_req(ref_path, "refiner_path_settings")),
         "refiner_remux_rules_settings": orm_row_to_dict(_req(ref_remux, "refiner_remux_rules_settings")),
-        "broker_settings": orm_row_to_dict(_req(br_settings, "broker_settings")),
-        "broker_indexers": [orm_row_to_dict(r) for r in br_indexers],
-        "broker_arr_connections": [orm_row_to_dict(r) for r in br_arr],
         "subber_settings": orm_row_to_dict(_req(sub_settings, "subber_settings")),
         "subber_providers": [orm_row_to_dict(r) for r in sub_providers],
         "pruner_server_instances": [orm_row_to_dict(r) for r in pruner_instances],
@@ -139,21 +124,17 @@ def _apply_singleton(session: Session, model_cls: type[T], data: dict[str, Any])
 
 
 def apply_configuration_bundle(session: Session, bundle: dict[str, Any]) -> None:
-    if bundle.get("format_version") != BUNDLE_FORMAT_VERSION:
+    fv = bundle.get("format_version")
+    if fv != BUNDLE_FORMAT_VERSION:
         msg = f"Unsupported configuration bundle format_version (expected {BUNDLE_FORMAT_VERSION})."
         raise ValueError(msg)
 
     required = (
         "suite_settings",
-        "fetcher_arr_operator_settings",
-        "fetcher_failed_import_cleanup_policy",
-        "fetcher_search_schedule_state",
+        "arr_library_operator_settings",
         "refiner_operator_settings",
         "refiner_path_settings",
         "refiner_remux_rules_settings",
-        "broker_settings",
-        "broker_indexers",
-        "broker_arr_connections",
         "subber_settings",
         "subber_providers",
         "pruner_server_instances",
@@ -175,22 +156,11 @@ def apply_configuration_bundle(session: Session, bundle: dict[str, Any]) -> None
         configuration_backup_interval_hours=ss.get("configuration_backup_interval_hours"),
     )
 
-    _apply_singleton(session, FetcherArrOperatorSettingsRow, bundle["fetcher_arr_operator_settings"])
-    _apply_singleton(session, FetcherFailedImportCleanupPolicyRow, bundle["fetcher_failed_import_cleanup_policy"])
-    _apply_singleton(session, FetcherSearchScheduleStateRow, bundle["fetcher_search_schedule_state"])
+    _apply_singleton(session, ArrLibraryOperatorSettingsRow, bundle["arr_library_operator_settings"])
     _apply_singleton(session, RefinerOperatorSettingsRow, bundle["refiner_operator_settings"])
     _apply_singleton(session, RefinerPathSettingsRow, bundle["refiner_path_settings"])
     _apply_singleton(session, RefinerRemuxRulesSettingsRow, bundle["refiner_remux_rules_settings"])
-    _apply_singleton(session, BrokerSettingsRow, bundle["broker_settings"])
     _apply_singleton(session, SubberSettingsRow, bundle["subber_settings"])
-
-    session.execute(delete(BrokerIndexerRow))
-    for row in bundle["broker_indexers"]:
-        session.add(BrokerIndexerRow(**dict_to_model_kwargs(BrokerIndexerRow, row)))
-
-    session.execute(delete(BrokerArrConnectionRow))
-    for row in bundle["broker_arr_connections"]:
-        session.add(BrokerArrConnectionRow(**dict_to_model_kwargs(BrokerArrConnectionRow, row)))
 
     session.execute(delete(SubberProviderRow))
     for row in bundle["subber_providers"]:

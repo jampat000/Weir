@@ -70,49 +70,6 @@ export function NavIconActivity({ className = "" }: { className?: string }) {
   );
 }
 
-export function NavIconBroker({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <path
-        d="M4.5 7.5h6v5h-6zM13.5 11.5h6v6h-6zM4.5 14.5h6v4h-6z"
-        stroke="currentColor"
-        strokeWidth="1.35"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-export function NavIconFetcher({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <path
-        d="M12 4v12m0 0l-3.5-3.5M12 16l3.5-3.5M5 20h14"
-        stroke="currentColor"
-        strokeWidth="1.35"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 export function NavIconRefiner({ className = "" }: { className?: string }) {
   return (
     <svg

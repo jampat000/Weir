@@ -6,8 +6,7 @@ blob. Among terminals, the first rule in the app-specific terminal order wins.
 Radarr (movies) and Sonarr (TV) share most needles; **quality** rejection phrases differ
 because Sonarr commonly references episodes/files with wording Radarr does not use.
 
-This module is *arr-domain rules only* (no Refiner/Fetcher runtime). Refiner and Fetcher
-both consume it without importing each other.
+This module is *arr-domain rules only* (no queue runtime). Callers consume it via explicit imports.
 """
 
 from __future__ import annotations

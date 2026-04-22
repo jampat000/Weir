@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { fetcherMenuButtonClass } from "../../pages/fetcher/fetcher-menu-button";
+import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 
 /**
  * Shared overview card components used by all four module overview tabs.
@@ -133,7 +133,7 @@ export function MmOverviewSection({
   return (
     <section
       id={id}
-      className="mm-card mm-dash-card mm-fetcher-module-surface"
+      className="mm-card mm-dash-card mm-module-surface"
       aria-labelledby={headingId}
       data-testid={dataTestId}
       data-overview-order={dataOverviewOrder}
@@ -211,7 +211,7 @@ export function MmNextStepsButton({
   onClick: () => void;
 }) {
   return (
-    <button type="button" className={fetcherMenuButtonClass({ variant: "secondary" })} onClick={onClick}>
+    <button type="button" className={mmActionButtonClass({ variant: "secondary" })} onClick={onClick}>
       {label}
     </button>
   );
@@ -254,7 +254,7 @@ export function MmJobsPagination({
         </p>
         <button
           type="button"
-          className={fetcherMenuButtonClass({ variant: "secondary" })}
+          className={mmActionButtonClass({ variant: "secondary" })}
           disabled={page <= 1}
           onClick={() => onPageChange(Math.max(1, page - 1))}
         >
@@ -262,7 +262,7 @@ export function MmJobsPagination({
         </button>
         <button
           type="button"
-          className={fetcherMenuButtonClass({ variant: "secondary" })}
+          className={mmActionButtonClass({ variant: "secondary" })}
           disabled={page >= totalPages}
           onClick={() => onPageChange(Math.min(totalPages, page + 1))}
         >
