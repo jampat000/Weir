@@ -6,7 +6,7 @@
 
 ## Context
 
-`MediaMopSettings` (`mediamop.core.config`) is a frozen dataclass loaded once at process start. It already mixes concerns that belong to different product areas: HTTP/session security, SQLite paths, CORS, **Refiner / Pruner / Subber** worker counts, and **ARR failed-import** cleanup policy + drive schedules (via `FailedImportCleanupSettingsBundle`).
+`MediaMopSettings` (`mediamop.core.config`) is a frozen dataclass loaded once at process start. It mixes concerns that belong to different product areas: HTTP/session security, SQLite paths, CORS, and **Refiner / Pruner / Subber** worker counts plus shared *arr* HTTP defaults and Refiner-side schedule toggles.
 
 Module-owned worker lanes (see [ADR-0007](ADR-0007-module-owned-worker-lanes.md)) place **enqueue, claim, and handlers** in module packages. That does **not** require every env var to be parsed inside those modules today.
 
@@ -26,7 +26,7 @@ Module-owned worker lanes (see [ADR-0007](ADR-0007-module-owned-worker-lanes.md)
 
 4. **Coupling rules**
    - **Tolerated:** module packages reading **already-parsed** values from `MediaMopSettings` passed in from lifespan or route factories; module-owned **defaults** expressed next to the module but **wired** in `MediaMopSettings.load()` until a split happens.
-   - **Not tolerated:** modules importing each other’s internals to “reach” settings; new cross-module env prefixes without ADR updates; silent fallback between `MEDIAMOP_REFINER_*` and `MEDIAMOP_FAILED_IMPORT_*` style namespaces (explicit migration only).
+   - **Not tolerated:** modules importing each other’s internals to “reach” settings; new cross-module env prefixes without ADR updates; silent fallback between legacy and current env namespaces (explicit migration only).
    - **Radarr/Sonarr HTTP URL+key:** callers use `MediaMopSettings.arr_http_radarr_credentials()` / `arr_http_sonarr_credentials()` which read the neutral `MEDIAMOP_ARR_{RADARR|SONARR}_*` pair (see SQLite-backed operator settings in `arr_library_operator_settings` for overrides at runtime where implemented).
 
 5. **Relation to module-owned worker lanes**
@@ -50,8 +50,8 @@ Module-owned worker lanes (see [ADR-0007](ADR-0007-module-owned-worker-lanes.md)
 
 ## Consequences
 
-- New env vars for Refiner / Pruner / Subber / failed-import still land in `MediaMopSettings` until this ADR is superseded.
-- Documentation and tests should name **retired** env keys in one place (see `tests/legacy_refiner_failed_import_env_poison.py`) so migrations stay auditable.
+- New env vars for Refiner / Pruner / Subber still land in `MediaMopSettings` until this ADR is superseded.
+- Documentation and tests should name **retired** env keys explicitly when behavior depends on migration from an older layout.
 
 ## Compliance
 

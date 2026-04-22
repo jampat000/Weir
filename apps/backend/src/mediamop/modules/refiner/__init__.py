@@ -1,7 +1,7 @@
 """Refiner module — MediaMop’s media refinement surface (movies and TV).
 
 Download-queue failed-import cleanup **planning, drives, and *arr execution** use shared rules in
-``mediamop.modules.arr_failed_import`` and HTTP resolution in ``mediamop.platform.arr_library``.
+HTTP resolution in ``mediamop.platform.arr_library``.
 
 Refiner owns persisted ``refiner_jobs`` and optional in-process Refiner workers
 (``MEDIAMOP_REFINER_WORKER_COUNT``). Composition may inject neutral ports; Refiner stays decoupled

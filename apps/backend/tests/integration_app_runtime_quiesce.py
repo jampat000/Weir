@@ -38,5 +38,3 @@ def integration_test_quiesce_periodic_enqueue(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setenv("MEDIAMOP_REFINER_WORK_TEMP_STALE_SWEEP_TV_SCHEDULE_ENABLED", "0")
     monkeypatch.setenv("MEDIAMOP_REFINER_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED", "0")
     monkeypatch.setenv("MEDIAMOP_REFINER_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED", "0")
-    monkeypatch.setenv("MEDIAMOP_FAILED_IMPORT_RADARR_CLEANUP_DRIVE_SCHEDULE_ENABLED", "0")
-    monkeypatch.setenv("MEDIAMOP_FAILED_IMPORT_SONARR_CLEANUP_DRIVE_SCHEDULE_ENABLED", "0")

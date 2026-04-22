@@ -45,7 +45,7 @@ MediaMop is **SQLite-first**: one writer per database. Durable background work m
 - Refiner inspection/recovery HTTP schemas ship only when Refiner exposes operator APIs for `refiner_jobs`.
 - `modules/refiner/router.py` (Refiner-native HTTP only)
 
-**Refiner must not own:** legacy download-queue prefixes (e.g. ``failed_import.``, ``missing_search.``, ``upgrade_search.`` when not ``refiner.*``), ``pruner.*``, ``subber.*``, or legacy ``trimmer.*`` (enforced in code).
+**Refiner must not own:** legacy or foreign queue prefixes (e.g. ``missing_search.``, ``upgrade_search.`` when not ``refiner.*``), ``pruner.*``, ``subber.*``, or legacy ``trimmer.*`` (enforced in code).
 
 ---
 

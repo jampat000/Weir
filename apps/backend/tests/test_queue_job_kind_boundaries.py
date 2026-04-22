@@ -39,7 +39,8 @@ import mediamop.platform.activity.models  # noqa: F401
 import mediamop.platform.auth.models  # noqa: F401
 from mediamop.core.db import Base
 
-_LEGACY_FAILED_IMPORT_DRIVE = "failed_import.radarr.cleanup_drive.v1"
+# Legacy lane prefix still blocked on sibling queues (see ``job_kind_boundaries``).
+_LEGACY_TRIMMER_JOB = "trimmer.radarr.cleanup_drive.v1"
 
 
 @pytest.fixture
@@ -77,13 +78,6 @@ def test_default_refiner_handler_registry_has_no_foreign_lane_keys() -> None:
 def test_refiner_enqueue_rejects_foreign_namespaces(session_factory) -> None:
     with session_factory() as s:
         with pytest.raises(ValueError, match="refiner_enqueue_or_get_job refuses"):
-            refiner_enqueue_or_get_job(
-                s,
-                dedupe_key="x",
-                job_kind=_LEGACY_FAILED_IMPORT_DRIVE,
-            )
-    with session_factory() as s:
-        with pytest.raises(ValueError, match="refiner_enqueue_or_get_job refuses"):
             refiner_enqueue_or_get_job(s, dedupe_key="t", job_kind="pruner.probe.v1")
     with session_factory() as s:
         with pytest.raises(ValueError, match="refiner_enqueue_or_get_job refuses"):
@@ -106,7 +100,7 @@ def test_refiner_enqueue_rejects_unprefixed_job_kind(session_factory) -> None:
 def test_validate_refiner_worker_handler_registry_rejects_foreign_lane_keys() -> None:
     with pytest.raises(ValueError, match="Refiner worker handler registry"):
         validate_refiner_worker_handler_registry(
-            {_LEGACY_FAILED_IMPORT_DRIVE: lambda _c: None},
+            {_LEGACY_TRIMMER_JOB: lambda _c: None},
         )
     with pytest.raises(ValueError, match="Refiner worker handler registry"):
         validate_refiner_worker_handler_registry({"pruner.x": lambda _c: None})
@@ -134,7 +128,7 @@ def test_process_one_refiner_job_fails_claimed_row_in_foreign_lane_without_handl
         s.add(
             RefinerJob(
                 dedupe_key="legacy",
-                job_kind=_LEGACY_FAILED_IMPORT_DRIVE,
+                job_kind=_LEGACY_TRIMMER_JOB,
                 status=RefinerJobStatus.PENDING.value,
             ),
         )
@@ -193,7 +187,7 @@ def test_pruner_enqueue_rejects_foreign_namespaces(session_factory) -> None:
             pruner_enqueue_or_get_job(
                 s,
                 dedupe_key="y",
-                job_kind=_LEGACY_FAILED_IMPORT_DRIVE,
+                job_kind=_LEGACY_TRIMMER_JOB,
             )
     with session_factory() as s:
         with pytest.raises(ValueError, match="pruner_enqueue_or_get_job refuses"):
@@ -216,7 +210,7 @@ def test_pruner_enqueue_rejects_unprefixed_job_kind(session_factory) -> None:
 def test_validate_pruner_worker_handler_registry_rejects_foreign_lane_keys() -> None:
     with pytest.raises(ValueError, match="Pruner worker handler registry"):
         validate_pruner_worker_handler_registry(
-            {_LEGACY_FAILED_IMPORT_DRIVE: lambda _c: None},
+            {_LEGACY_TRIMMER_JOB: lambda _c: None},
         )
     with pytest.raises(ValueError, match="Pruner worker handler registry"):
         validate_pruner_worker_handler_registry({"refiner.x.v1": lambda _c: None})
@@ -313,7 +307,7 @@ def test_subber_enqueue_rejects_foreign_namespaces(session_factory) -> None:
             subber_enqueue_or_get_job(
                 s,
                 dedupe_key="f",
-                job_kind=_LEGACY_FAILED_IMPORT_DRIVE,
+                job_kind=_LEGACY_TRIMMER_JOB,
             )
 
 
@@ -326,7 +320,7 @@ def test_subber_enqueue_rejects_unprefixed_job_kind(session_factory) -> None:
 def test_validate_subber_worker_handler_registry_rejects_foreign_lane_keys() -> None:
     with pytest.raises(ValueError, match="Subber worker handler registry"):
         validate_subber_worker_handler_registry(
-            {_LEGACY_FAILED_IMPORT_DRIVE: lambda _c: None},
+            {_LEGACY_TRIMMER_JOB: lambda _c: None},
         )
     with pytest.raises(ValueError, match="Subber worker handler registry"):
         validate_subber_worker_handler_registry({"refiner.x.v1": lambda _c: None})

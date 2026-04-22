@@ -19,9 +19,6 @@ REFINER_QUEUE_JOB_KIND_PREFIX = "refiner."
 PRUNER_QUEUE_JOB_KIND_PREFIX = "pruner."
 SUBBER_QUEUE_JOB_KIND_PREFIX = "subber."
 
-# Historical job-kind namespace; must never appear on Refiner/Pruner/Subber lanes.
-LEGACY_FAILED_IMPORT_QUEUE_JOB_KIND_PREFIX = "failed_import."
-
 # Legacy Trimmer lane prefix — no longer a valid lane; rejected on every queue (abandoned prefix).
 LEGACY_TRIMMER_QUEUE_JOB_KIND_PREFIX = "trimmer."
 
@@ -32,7 +29,6 @@ def _legacy_or_foreign_prefixes() -> tuple[str, ...]:
 
 # Prefixes that must never be enqueued or executed on ``refiner_jobs`` / Refiner workers.
 _FORBIDDEN_ON_REFINER_LANE: tuple[str, ...] = (
-    LEGACY_FAILED_IMPORT_QUEUE_JOB_KIND_PREFIX,
     PRUNER_QUEUE_JOB_KIND_PREFIX,
     SUBBER_QUEUE_JOB_KIND_PREFIX,
     *_legacy_or_foreign_prefixes(),
@@ -86,7 +82,6 @@ def validate_refiner_worker_handler_registry(
 
 # Prefixes that must never be enqueued or executed on ``pruner_jobs`` / Pruner workers.
 _FORBIDDEN_ON_PRUNER_LANE: tuple[str, ...] = (
-    LEGACY_FAILED_IMPORT_QUEUE_JOB_KIND_PREFIX,
     REFINER_QUEUE_JOB_KIND_PREFIX,
     SUBBER_QUEUE_JOB_KIND_PREFIX,
     *_legacy_or_foreign_prefixes(),
@@ -140,7 +135,6 @@ def validate_pruner_worker_handler_registry(
 
 # Prefixes that must never be enqueued or executed on ``subber_jobs`` / Subber workers.
 _FORBIDDEN_ON_SUBBER_LANE: tuple[str, ...] = (
-    LEGACY_FAILED_IMPORT_QUEUE_JOB_KIND_PREFIX,
     REFINER_QUEUE_JOB_KIND_PREFIX,
     PRUNER_QUEUE_JOB_KIND_PREFIX,
     *_legacy_or_foreign_prefixes(),

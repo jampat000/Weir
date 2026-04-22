@@ -72,7 +72,6 @@ Pruner and Subber packages point to ADR-0007 for lane ownership; **this ADR** is
 
 | Area | Isolated? | Why |
 |------|-----------|-----|
-| Failed-import Radarr vs Sonarr | Yes | Separate `MEDIAMOP_FAILED_IMPORT_*` intervals, separate periodic tasks, separate dedupe keys. |
 | *arr* automatic search four lanes | Yes | Per-lane fields on `arr_library_operator_settings` (and historical per-lane state where applicable), independent schedules and last-run semantics per lane. |
 | Refiner durable families (supplied payload evaluation, candidate gate, file remux pass, watched-folder remux scan dispatch) | Yes | Separate job kinds, handlers, and enqueue paths; supplied payload evaluation has its own optional schedule env + interval only for that family; watched-folder remux scan dispatch has its **own** optional schedule env + interval (and periodic remux flags), independent of supplied payload evaluation; candidate gate and file remux pass remain manual POST enqueue only. No shared last-run or cooldown row across those families. |
 | Pruner lane (Phase 1) | Yes (no product families yet) | Queue/worker infrastructure only; no periodic Pruner tasks. |

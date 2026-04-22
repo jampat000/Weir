@@ -54,8 +54,8 @@ Single canonical backlog for shipped milestones and the next honest slice of wor
 
 1. **Global:** Operators and admins can edit **product display name** and **optional signed-in home dashboard notice** in the UI; values persist in the **`suite_settings`** SQLite singleton (Alembic migration), via `GET`/`PUT /api/v1/suite/settings` (CSRF + operator auth on write). Viewers can read but not save.
 2. **Security:** All signed-in roles see a **read-only** overview from **startup-loaded** `MediaMopSettings` (`GET /api/v1/suite/security-overview`) with plain-language fields and an explicit note that **configuration file + restart** are required to change those values — no fake “saved” behavior for env-only settings.
-3. **Honesty:** Global saves apply immediately for the running app (database-backed). Security values are **not** presented as live-editable in the browser. No duplicate editing surface for Refiner paths, failed-import settings, or other module-owned truth.
-4. **Central page purity:** The central Settings route **does not** surface Sonarr, Radarr, failed-import cleanup toggles, or module-specific schedules (asserted in tests / copy).
+3. **Honesty:** Global saves apply immediately for the running app (database-backed). Security values are **not** presented as live-editable in the browser. No duplicate editing surface for Refiner paths, *arr* library operator settings, or other module-owned truth.
+4. **Central page purity:** The central Settings route **does not** surface Sonarr, Radarr, *arr* automation toggles, or module-specific schedules (asserted in tests / copy).
 5. **Product wiring:** Saved **product display name** appears in the signed-in shell (sidebar); optional **home notice** appears on the dashboard when set.
 6. **Tests:** Backend API + migration head + security overview builder; frontend settings page (no Sonarr/Radarr strings, viewer cannot save).
 
@@ -71,7 +71,7 @@ Single canonical backlog for shipped milestones and the next honest slice of wor
 
 ### 9 — status
 
-- [x] **Done** — backend migrations through head (including table rename to `arr_library_operator_settings`), `arr_library` platform package, Refiner shell integration for failed imports + arr operator UI, web types/tests aligned with removal of standalone download-queue and indexer apps from the shell.
+- [x] **Done** — backend migrations through head (including table rename to `arr_library_operator_settings`), `arr_library` platform package, Refiner shell integration for *arr* operator UI, web types/tests aligned with removal of standalone download-queue and indexer apps from the shell.
 
 ## Roadmap item 10 — Pruner removal product (library / server integrations)
 
@@ -224,7 +224,7 @@ Single canonical backlog for shipped milestones and the next honest slice of wor
 1. **Execution runlist — “Now”** (below): schedule wording standardization (item 2 pass), overview content audit (item 17 pass), Subscene/Addic7ed verification (item 28 pass).
 2. **Pruner roadmap (item 10)** — removal product Phase 2+; see Roadmap item 10 and `docs/pruner-forward-design-constraints.md`.
 3. **Richer Activity rendering** for watched-folder scan summaries if plain `detail` text is not enough (Refiner-facing polish).
-4. **Taxonomy / tree truth (optional):** suite `dashboard` package location, `queue_worker` naming vs role, `arr_failed_import` vs env seam — only when justified by ownership truth.
+4. **Taxonomy / tree truth (optional):** suite `dashboard` package location, `queue_worker` naming vs role — only when justified by ownership truth.
 5. **Backlog:** SQLite WAL mode; SSE/WebSocket or similar push for activity/dashboard; app-wide hard copy pass.
 
 ## Execution runlist (Now / Next / Later)

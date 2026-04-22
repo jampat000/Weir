@@ -13,11 +13,6 @@ from mediamop.core.runtime_paths import (
     resolve_all_runtime_paths,
     sqlalchemy_sqlite_url,
 )
-from mediamop.modules.arr_failed_import.env_settings import (
-    FailedImportCleanupSettingsBundle,
-    load_failed_import_cleanup_settings_bundle,
-)
-from mediamop.modules.arr_failed_import.policy import FailedImportCleanupPolicy
 from mediamop.modules.refiner.refiner_family_intervals import (
     clamp_refiner_min_file_age_seconds,
     clamp_refiner_schedule_interval_seconds,
@@ -102,18 +97,6 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
-def _clamp_failed_import_cleanup_drive_schedule_interval_seconds(n: int) -> int:
-    """Bound failed-import periodic enqueue interval (60s .. 7d) for SQLite / operator sanity."""
-
-    return clamp_failed_import_cleanup_drive_schedule_interval_seconds(n)
-
-
-def clamp_failed_import_cleanup_drive_schedule_interval_seconds(n: int) -> int:
-    """Public clamp for persisted failed-import cleanup drive intervals (API + SQLite policy row)."""
-
-    return max(60, min(int(n), 7 * 24 * 3600))
-
-
 @dataclass(frozen=True, slots=True)
 class MediaMopSettings:
     """Runtime configuration loaded at process start."""
@@ -139,7 +122,6 @@ class MediaMopSettings:
     log_dir: str
     temp_dir: str
     sqlalchemy_database_url: str
-    failed_import_cleanup_env: FailedImportCleanupSettingsBundle
     # 0 = no in-process Refiner workers (Refiner-owned refiner_jobs only); >0 when Refiner queues durable work.
     refiner_worker_count: int
     # 0 = no in-process Pruner workers (Pruner-owned pruner_jobs only); >0 when Pruner queues durable work.
@@ -209,16 +191,6 @@ class MediaMopSettings:
             return self.trusted_browser_origins_override
         return self.cors_origins
 
-    def radarr_failed_import_cleanup_policy(self) -> FailedImportCleanupPolicy:
-        """Resolved Radarr cleanup toggles (from env at load time)."""
-
-        return self.failed_import_cleanup_env.radarr_policy()
-
-    def sonarr_failed_import_cleanup_policy(self) -> FailedImportCleanupPolicy:
-        """Resolved Sonarr cleanup toggles (from env at load time)."""
-
-        return self.failed_import_cleanup_env.sonarr_policy()
-
     def arr_http_radarr_credentials(self) -> tuple[str | None, str | None]:
         """Radarr HTTP ``(base_url, api_key)`` from ``MEDIAMOP_ARR_RADARR_*`` at process start."""
 
@@ -272,7 +244,6 @@ class MediaMopSettings:
         )
         assert_sqlite_db_location_usable(db_p)
         db_url = sqlalchemy_sqlite_url(db_p)
-        failed_import_cleanup = load_failed_import_cleanup_settings_bundle()
         refiner_workers = clamp_refiner_worker_count(_env_int("MEDIAMOP_REFINER_WORKER_COUNT", 0))
         pruner_workers = clamp_pruner_worker_count(_env_int("MEDIAMOP_PRUNER_WORKER_COUNT", 0))
         pruner_preview_sched_enq = _env_bool("MEDIAMOP_PRUNER_PREVIEW_SCHEDULE_ENQUEUE_ENABLED", True)
@@ -435,7 +406,6 @@ class MediaMopSettings:
             log_dir=str(log_p),
             temp_dir=str(temp_p),
             sqlalchemy_database_url=db_url,
-            failed_import_cleanup_env=failed_import_cleanup,
             refiner_worker_count=refiner_workers,
             pruner_worker_count=pruner_workers,
             pruner_preview_schedule_enqueue_enabled=pruner_preview_sched_enq,

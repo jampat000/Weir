@@ -17,6 +17,4 @@ ADRs in this folder capture **locked** structural and platform choices for this 
 | [ADR-0007](ADR-0007-module-owned-worker-lanes.md) | Module-owned worker lanes (SQLite) |
 | [ADR-0008](ADR-0008-mediamop-settings-aggregate-runtime-config.md) | `MediaMopSettings` aggregate for runtime configuration |
 | [ADR-0009](ADR-0009-suite-wide-timing-isolation.md) | Suite-wide timing isolation (durable work) |
-| [ADR-0010](ADR-0010-arr-failed-import-taxonomy-contract.md) | *arr* failed-import taxonomy contract |
-| [ADR-0011](ADR-0011-arr-failed-import-upstream-queue-delete-contract.md) | *arr* failed-import upstream queue delete contract |
 | [ADR-0012](ADR-0012-refiner-preflight-parity-boundary.md) | Refiner preflight parity boundary (FileFlows-aligned) |

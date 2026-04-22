@@ -14,9 +14,6 @@ from mediamop.core.config import (
     MediaMopSettings,
     _expand_loopback_browser_origins_in_development,
 )
-from mediamop.modules.arr_failed_import.env_settings import (
-    default_failed_import_cleanup_settings_bundle,
-)
 from mediamop.platform.auth.csrf import (
     issue_csrf_token,
     validate_browser_post_origin,
@@ -49,7 +46,6 @@ def _csrf_settings(**overrides: object) -> MediaMopSettings:
         log_dir=str(home / "logs"),
         temp_dir=str(home / "temp"),
         sqlalchemy_database_url="sqlite:///" + db.as_posix(),
-        failed_import_cleanup_env=default_failed_import_cleanup_settings_bundle(),
         refiner_worker_count=0,
         pruner_worker_count=0,
         pruner_preview_schedule_enqueue_enabled=False,
