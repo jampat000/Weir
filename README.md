@@ -5,7 +5,7 @@
 
 MediaMop is a vibe-coded project.
 
-I built it because I wanted a media workflow that matched the way I actually manage my library, and I could not find an existing tool that fit. I am not a software engineer, so this started from a very practical place: solve the problems I kept running into and keep refining it until it worked the way I needed.
+I built it because I wanted a media workflow that matched the way I actually manage my library, and I could not find an existing tool that fit. I am not a software engineer and can't code and I have the upmost respect for the people that can.  So this started from a very practical place: solve the problems I kept running into and keep refining it until it worked the way I needed.
 
 It is opinionated on purpose. Every module exists because it solved a real problem in my own setup first.
 
