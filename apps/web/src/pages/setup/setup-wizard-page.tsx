@@ -74,6 +74,11 @@ function labelForPrunerSecret(provider: string): string {
   return provider === "plex" ? "Plex token" : "API key";
 }
 
+function defaultPrunerDisplayName(provider: "jellyfin" | "emby" | "plex"): string {
+  const label = PRUNER_PROVIDER_OPTIONS.find((option) => option.value === provider)?.label ?? "Media server";
+  return `${label} server`;
+}
+
 export function SetupWizardPage() {
   const navigate = useNavigate();
   const me = useMeQuery();
@@ -96,7 +101,6 @@ export function SetupWizardPage() {
   const [tvWatchedFolder, setTvWatchedFolder] = useState("");
   const [tvOutputFolder, setTvOutputFolder] = useState("");
   const [prunerProvider, setPrunerProvider] = useState<"jellyfin" | "emby" | "plex">("jellyfin");
-  const [prunerDisplayName, setPrunerDisplayName] = useState("");
   const [prunerBaseUrl, setPrunerBaseUrl] = useState("");
   const [prunerSecret, setPrunerSecret] = useState("");
   const [sonarrBaseUrl, setSonarrBaseUrl] = useState("");
@@ -146,7 +150,6 @@ export function SetupWizardPage() {
     }
     const provider = String(first.provider) as "jellyfin" | "emby" | "plex";
     setPrunerProvider(provider);
-    setPrunerDisplayName(first.display_name || "");
     setPrunerBaseUrl(first.base_url || "");
   }, [prunerInstancesQ.data]);
 
@@ -282,8 +285,7 @@ export function SetupWizardPage() {
           prunerProvider === "plex"
             ? { auth_token: prunerSecret.trim() }
             : { api_key: prunerSecret.trim() };
-        const displayName =
-          prunerDisplayName.trim() || `${prunerProvider.charAt(0).toUpperCase()}${prunerProvider.slice(1)} server`;
+        const displayName = existing?.display_name?.trim() || defaultPrunerDisplayName(prunerProvider);
         if (existing) {
           await patchPrunerInstance(existing.id, {
             display_name: displayName,
@@ -323,9 +325,12 @@ export function SetupWizardPage() {
               title="App basics"
               description="Set the app clock, visual density, and where MediaMop opens after setup."
             >
-              <div className="grid gap-4 xl:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
+              <div className="space-y-4">
+                <div className="max-w-md">
+                  <label
+                    id="setup-wizard-timezone"
+                    className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]"
+                  >
                     Timezone
                   </label>
                   <MmListboxPicker
@@ -341,14 +346,14 @@ export function SetupWizardPage() {
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">
                     Open first
                   </label>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Open first">
                     {LANDING_OPTIONS.map((option) => (
                       <label
                         key={option.value}
                         className={[
-                          "flex cursor-pointer items-center gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors",
+                          "relative isolate flex min-h-[2.6rem] min-w-0 cursor-pointer items-center gap-2.5 overflow-hidden rounded-md border px-3 py-2 text-sm transition-colors",
                           landingPath === option.value
-                            ? "border-[var(--mm-accent)] bg-[var(--mm-accent)]/12 text-[var(--mm-text)]"
+                            ? "border-[var(--mm-accent)] bg-[rgba(212,175,55,0.14)] text-[var(--mm-text)]"
                             : "border-[var(--mm-border)] bg-transparent text-[var(--mm-text2)] hover:bg-[var(--mm-card-bg)]",
                         ].join(" ")}
                       >
@@ -359,7 +364,7 @@ export function SetupWizardPage() {
                           checked={landingPath === option.value}
                           onChange={() => setLandingPath(option.value)}
                         />
-                        <span className="font-medium text-[var(--mm-text)]">{option.label}</span>
+                        <span className="min-w-0 whitespace-nowrap font-medium text-[var(--mm-text)]">{option.label}</span>
                       </label>
                     ))}
                   </div>
@@ -380,7 +385,7 @@ export function SetupWizardPage() {
                       className={[
                         "flex min-w-0 cursor-pointer items-center gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors",
                         displayDensity === id
-                          ? "border-[var(--mm-accent)] bg-[var(--mm-accent)]/12 text-[var(--mm-text)]"
+                          ? "border-[var(--mm-accent)] bg-[rgba(212,175,55,0.14)] text-[var(--mm-text)]"
                           : "border-[var(--mm-border)] bg-transparent text-[var(--mm-text2)] hover:bg-[var(--mm-card-bg)]",
                       ].join(" ")}
                     >
@@ -489,7 +494,7 @@ export function SetupWizardPage() {
               title="Pruner connection"
               description="Optionally add one media server so Pruner can preview cleanup candidates."
             >
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid gap-4 lg:grid-cols-1">
                 <label className="block text-sm text-[var(--mm-text2)]">
                   <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-[var(--mm-text3)]">
                     Server type
@@ -505,17 +510,6 @@ export function SetupWizardPage() {
                       </option>
                     ))}
                   </select>
-                </label>
-                <label className="block text-sm text-[var(--mm-text2)]">
-                  <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-[var(--mm-text3)]">
-                    Display name
-                  </span>
-                  <input
-                    className="mm-input w-full"
-                    value={prunerDisplayName}
-                    onChange={(e) => setPrunerDisplayName(e.target.value)}
-                    placeholder="Living room server"
-                  />
                 </label>
               </div>
               <div className="grid gap-4 lg:grid-cols-2">
