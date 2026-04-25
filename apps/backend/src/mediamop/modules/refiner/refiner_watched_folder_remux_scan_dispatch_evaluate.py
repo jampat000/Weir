@@ -13,7 +13,6 @@ from mediamop.platform.arr_library import resolve_radarr_http_credentials, resol
 from mediamop.modules.refiner.domain import (
     FileAnchorCandidate,
     RefinerQueueRowView,
-    file_is_owned_by_queue,
     should_block_for_upstream,
 )
 from mediamop.modules.refiner.radarr_queue_adapter import map_radarr_queue_row_to_refiner_view
@@ -43,13 +42,13 @@ def merge_queue_views_for_watched_file(
 
 
 def verdict_for_watched_scan_file(views: Sequence[RefinerQueueRowView], *, candidate: FileAnchorCandidate) -> Verdict:
-    """Same applicability as :func:`file_is_owned_by_queue` / :func:`should_block_for_upstream` on merged queues."""
+    """Decide whether a watched-folder file can be processed.
 
-    if not views:
-        return "not_held"
-    owned = file_is_owned_by_queue(views, file_candidate=candidate)
-    if not owned:
-        return "not_held"
+    Radarr/Sonarr are safety signals only. Refiner must still process files when
+    those apps are not configured, or when the file is not currently in their
+    active queue.
+    """
+
     if should_block_for_upstream(views, file_candidate=candidate):
         return "wait_upstream"
     return "proceed"

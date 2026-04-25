@@ -248,7 +248,7 @@ export function RefinerSchedulesSection() {
           <div className="rounded-md border border-[var(--mm-border)] bg-black/10 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">TV</p>
             <p className="mt-1 text-xs text-[var(--mm-text3)]">
-              Queues only the TV watched-folder scan job. Does not queue Movies.
+              Checks the TV watched folder now and adds any ready files to Refiner.
             </p>
             {!tvWatchedSet ? (
               <p className="mt-2 text-xs text-amber-200/90">Save a TV watched folder in Libraries before running this scan.</p>
@@ -269,16 +269,16 @@ export function RefinerSchedulesSection() {
                   disabled: !canQueueManual || !tvWatchedSet || queueTvScan.isPending,
                 })}
                 disabled={!canQueueManual || !tvWatchedSet || queueTvScan.isPending}
-                onClick={() => queueTvScan.mutate({ enqueue_remux_jobs: false, media_scope: "tv" })}
+                onClick={() => queueTvScan.mutate({ enqueue_remux_jobs: true, media_scope: "tv" })}
               >
-                {queueTvScan.isPending ? "Queuing TV scan…" : "Run TV scan now"}
+                {queueTvScan.isPending ? "Starting TV scan..." : "Scan TV now"}
               </button>
             </div>
           </div>
           <div className="rounded-md border border-[var(--mm-border)] bg-black/10 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--mm-text3)]">Movies</p>
             <p className="mt-1 text-xs text-[var(--mm-text3)]">
-              Queues only the Movies watched-folder scan job. Does not queue TV.
+              Checks the Movies watched folder now and adds any ready files to Refiner.
             </p>
             {!movieWatchedSet ? (
               <p className="mt-2 text-xs text-amber-200/90">Save a Movies watched folder in Libraries before running this scan.</p>
@@ -299,9 +299,9 @@ export function RefinerSchedulesSection() {
                   disabled: !canQueueManual || !movieWatchedSet || queueMovieScan.isPending,
                 })}
                 disabled={!canQueueManual || !movieWatchedSet || queueMovieScan.isPending}
-                onClick={() => queueMovieScan.mutate({ enqueue_remux_jobs: false, media_scope: "movie" })}
+                onClick={() => queueMovieScan.mutate({ enqueue_remux_jobs: true, media_scope: "movie" })}
               >
-                {queueMovieScan.isPending ? "Queuing Movies scan…" : "Run Movies scan now"}
+                {queueMovieScan.isPending ? "Starting Movies scan..." : "Scan Movies now"}
               </button>
             </div>
           </div>

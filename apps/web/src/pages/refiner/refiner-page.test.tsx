@@ -208,8 +208,8 @@ describe("RefinerPage", () => {
   it("Schedules includes independent TV and Movies scan-now actions", () => {
     renderRefinerPage();
     openTab("Schedules");
-    expect(screen.getByRole("button", { name: "Run TV scan now" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Run Movies scan now" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Scan TV now" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Scan Movies now" })).toBeInTheDocument();
   });
 
   it("Schedules tab has no master scheduled-processing toggle (folder poll is under Libraries)", () => {

@@ -81,6 +81,7 @@ def make_refiner_watched_folder_remux_scan_dispatch_handler(
             "job_id": ctx.id,
             "scan_trigger": scan_trigger,
             "media_scope": media_scope,
+            "scan_result_label": "Watched folder checked",
             "watched_folder_resolved": watched_root,
             "enqueue_remux_jobs": enqueue_remux_jobs,
             "min_file_age_seconds": op_settings.min_file_age_seconds,
@@ -95,6 +96,8 @@ def make_refiner_watched_folder_remux_scan_dispatch_handler(
             "remux_jobs_enqueued": 0,
             "skipped_duplicate_same_scan": 0,
             "skipped_duplicate_active_queue": 0,
+            "user_message": "",
+            "waiting_message": None,
             "enqueued_relative_paths_sample": sample_paths,
         }
 
@@ -150,6 +153,39 @@ def make_refiner_watched_folder_remux_scan_dispatch_handler(
                     summary["remux_jobs_enqueued"] += 1
                     if len(sample_paths) < sample_cap:
                         sample_paths.append(rel)
+
+                queued = int(summary["remux_jobs_enqueued"])
+                waiting = int(summary["verdict_wait_upstream"])
+                seen = int(summary["media_candidates_seen"])
+                duplicates = int(summary["skipped_duplicate_same_scan"]) + int(summary["skipped_duplicate_active_queue"])
+                if queued:
+                    summary["scan_result_label"] = "Files added to Refiner"
+                    summary["user_message"] = (
+                        f"{queued} file{' was' if queued == 1 else 's were'} added to Refiner for processing."
+                    )
+                elif waiting:
+                    summary["scan_result_label"] = "Waiting for files to finish"
+                    summary["user_message"] = (
+                        f"{waiting} file{' looks' if waiting == 1 else 's look'} like it is still being copied or imported, "
+                        "so MediaMop left it alone for now."
+                    )
+                    summary["waiting_message"] = "MediaMop will check again on the next scheduled scan."
+                elif seen and not enqueue_remux_jobs:
+                    summary["scan_result_label"] = "Folder checked only"
+                    summary["user_message"] = (
+                        f"{seen} media file{' was' if seen == 1 else 's were'} found, but this scan was set to check only."
+                    )
+                elif seen and duplicates:
+                    summary["scan_result_label"] = "Already queued"
+                    summary["user_message"] = (
+                        "MediaMop found matching media files, but they were already waiting for Refiner."
+                    )
+                elif seen:
+                    summary["scan_result_label"] = "No new Refiner work"
+                    summary["user_message"] = "MediaMop found media files, but there was nothing new to queue."
+                else:
+                    summary["scan_result_label"] = "No media found"
+                    summary["user_message"] = "MediaMop did not find any media files in this watched folder."
 
                 detail = format_scan_summary_for_activity(summary)
                 record_refiner_watched_folder_remux_scan_dispatch_completed(session, detail=detail)

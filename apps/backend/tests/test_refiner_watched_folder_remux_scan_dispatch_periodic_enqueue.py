@@ -37,7 +37,7 @@ def _settings_on() -> MediaMopSettings:
         base,
         refiner_watched_folder_remux_scan_dispatch_schedule_enabled=True,
         refiner_watched_folder_remux_scan_dispatch_schedule_interval_seconds=3600,
-        refiner_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs=False,
+        refiner_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs=True,
     )
 
 
@@ -246,6 +246,7 @@ def test_try_enqueue_periodic_inserts_movie_and_tv_when_both_scopes_ready(tmp_pa
         for r in rows:
             body = json.loads(r.payload_json or "{}")
             assert body.get("scan_trigger") == "periodic"
+            assert body.get("enqueue_remux_jobs") is True
     finally:
         with fac() as db:
             db.execute(delete(RefinerJob))

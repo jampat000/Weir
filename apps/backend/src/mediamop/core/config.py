@@ -290,7 +290,7 @@ class MediaMopSettings:
         )
         refiner_wf_scan_periodic_remux_enq = _env_bool(
             "MEDIAMOP_REFINER_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_PERIODIC_ENQUEUE_REMUX_JOBS",
-            False,
+            True,
         )
         refiner_probe_size_mb = max(1, min(1024, _env_int("MEDIAMOP_REFINER_PROBE_SIZE_MB", 10)))
         refiner_analyze_duration_seconds = max(

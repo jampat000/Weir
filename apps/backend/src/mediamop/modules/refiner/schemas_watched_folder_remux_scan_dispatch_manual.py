@@ -8,16 +8,16 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class RefinerWatchedFolderRemuxScanDispatchManualEnqueueIn(BaseModel):
-    """Queue one watched-folder scan; optional enqueue of per-file ``refiner.file.remux_pass.v1`` rows."""
+    """Queue one watched-folder scan."""
 
     model_config = ConfigDict(extra="forbid")
 
     csrf_token: str = Field(..., min_length=1)
     enqueue_remux_jobs: bool = Field(
-        default=False,
+        default=True,
         description=(
-            "When false (default), the scan only classifies files and writes one activity summary — "
-            "no remux jobs are queued. When true, eligible files (verdict proceed) also enqueue remux jobs."
+            "When true, files found in the watched folder are added to Refiner's processing queue. "
+            "When false, MediaMop only checks the folder and writes an activity summary."
         ),
     )
     media_scope: Literal["movie", "tv"] = Field(
