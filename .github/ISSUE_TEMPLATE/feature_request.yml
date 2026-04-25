@@ -1,0 +1,52 @@
+name: Feature request
+description: Suggest a practical MediaMop improvement or workflow change.
+title: "[Feature]: "
+labels:
+  - type: enhancement
+  - status: needs triage
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem this solves
+      description: Describe the real workflow problem, not just the proposed UI.
+      placeholder: I need MediaMop to...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Explain what should change and how a user would experience it.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Dashboard
+        - Activity
+        - Settings
+        - Refiner
+        - Pruner
+        - Subber
+        - Logs
+        - Setup wizard
+        - Backup and restore
+        - Upgrade
+        - Windows installer
+        - Docker
+        - CI or release
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional. Mention workarounds, similar tools, or approaches that would not fit.
+    validations:
+      required: false
+

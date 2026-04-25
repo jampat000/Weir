@@ -20,7 +20,3 @@ updates:
       actions:
         patterns:
           - "*"
-    ignore:
-      # v3+ targets Node 24 action runtime; stay on v2 until we intentionally migrate (see release.yml pin).
-      - dependency-name: "softprops/action-gh-release"
-        update-types: ["version-update:semver-major"]
