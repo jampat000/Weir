@@ -232,7 +232,7 @@ class _MediaMopTrayApp:
             _load_icon(self._resource_root),
             "MediaMop",
             menu=pystray.Menu(
-                Item("Open MediaMop", self._handle_open),
+                Item("Open MediaMop", self._handle_open, default=True),
                 Item("Open Data Folder", self._handle_open_data_folder),
                 Item("Quit", self._handle_quit),
             ),

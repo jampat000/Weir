@@ -86,3 +86,9 @@ def test_packaged_server_binds_to_lan_interfaces() -> None:
     assert 'host="0.0.0.0"' in source
     assert 'host="127.0.0.1"' not in source
     assert "MediaMop LAN URLs" in source
+
+
+def test_tray_double_click_opens_mediamop() -> None:
+    source = Path(tray_app.__file__).read_text(encoding="utf-8")
+
+    assert 'Item("Open MediaMop", self._handle_open, default=True)' in source
