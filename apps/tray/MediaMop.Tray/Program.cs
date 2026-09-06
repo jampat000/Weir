@@ -20,6 +20,7 @@ static class Program
     internal const int ServerStopTimeoutMs = 10_000;
     internal const double BrowserDebounceCooldownMs = 1250;
     internal const string GitHubRepo = "https://github.com/jampat000/MediaMop";
+    internal const string UpgradeSettingsPath = "/settings?tab=upgrade";
 
     [STAThread]
     static int Main(string[] args)
@@ -177,11 +178,15 @@ static class Program
 
     internal static bool OpenBrowser(
         int port,
-        Action<ProcessStartInfo>? startProcess = null)
+        Action<ProcessStartInfo>? startProcess = null,
+        string relativePath = "/")
     {
+        if (!relativePath.StartsWith('/') || relativePath.StartsWith("//"))
+            throw new ArgumentException("Browser path must be local to MediaMop.", nameof(relativePath));
+
         var startInfo = new ProcessStartInfo
         {
-            FileName = $"http://127.0.0.1:{port}/",
+            FileName = $"http://127.0.0.1:{port}{relativePath}",
             UseShellExecute = true,
         };
 
@@ -199,6 +204,9 @@ static class Program
             return false;
         }
     }
+
+    internal static string? TrayUpdateFallbackPath(bool isInstalled) =>
+        isInstalled ? null : UpgradeSettingsPath;
 
     internal static void AppendFallbackLog(string message)
     {
@@ -903,9 +911,13 @@ sealed class TrayApp : IDisposable
         menu.Items.Add(new ToolStripSeparator());
 
         _updateMenuItem = new ToolStripMenuItem("Check for updates");
-        _updateMenuItem.Click += OnUpdateMenuCheckClick;
-        if (_updateService is null || !_updateService.IsInstalled)
-            _updateMenuItem.Visible = false;
+        var updateFallbackPath = Program.TrayUpdateFallbackPath(
+            _updateService is { IsInstalled: true });
+        if (updateFallbackPath is null)
+            _updateMenuItem.Click += OnUpdateMenuCheckClick;
+        else
+            _updateMenuItem.Click += (_, _) =>
+                OpenBrowserDebounced("tray-update-settings", updateFallbackPath);
         menu.Items.Add(_updateMenuItem);
 
         menu.Items.Add(new ToolStripSeparator());
@@ -964,7 +976,7 @@ sealed class TrayApp : IDisposable
 
     // -- Browser ------------------------------------------------------------
 
-    private void OpenBrowserDebounced(string source)
+    private void OpenBrowserDebounced(string source, string relativePath = "/")
     {
         var now = Environment.TickCount64;
         lock (_browserLock)
@@ -977,7 +989,7 @@ sealed class TrayApp : IDisposable
             _lastBrowserOpenTicks = now;
         }
         Log($"Opening MediaMop in browser on port {_port} (source={source})");
-        Program.OpenBrowser(_port);
+        Program.OpenBrowser(_port, relativePath: relativePath);
     }
 
     // -- Logging ------------------------------------------------------------

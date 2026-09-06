@@ -29,6 +29,7 @@ The .NET tray app launches the Python backend server as a child process and mana
 The tray icon provides:
 - **Open MediaMop** — opens the web UI in your browser
 - **Open Data Folder** — opens the runtime data directory
+- **Check for updates** — checks directly in installed builds or opens **Settings → Upgrade** when install metadata is unavailable
 - **Quit** — stops MediaMop
 
 ## Updates
