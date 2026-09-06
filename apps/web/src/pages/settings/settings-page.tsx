@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { useBlocker, useSearchParams } from "react-router-dom";
 import { PageLoading } from "../../components/shared/page-loading";
 import {
+  WorkspacePage,
+  WorkspaceRailLayout,
+} from "../../components/shared/workspace-shell";
+import {
   isHttpErrorFromApi,
   isLikelyNetworkFailure,
 } from "../../lib/api/error-guards";
@@ -452,20 +456,26 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="mm-page" data-testid="suite-settings-page">
-      <header className="mm-page__intro mm-page__intro--suite-settings-rule">
-        <p className="mm-page__eyebrow">System</p>
-        <h1 className="mm-page__title">Settings</h1>
-        <p className="mm-page__lead">
+    <WorkspacePage
+      variant="rail"
+      eyebrow="System"
+      title="Settings"
+      dataTestId="suite-settings-page"
+      description={
+        <>
           MediaMop-wide choices that are not part of Refiner or Pruner.
           Integration details stay on their module pages.
-        </p>
-      </header>
-
+        </>
+      }
+    >
       <div className="mm-page__body max-w-none">
-        <div className="mm-settings-workspace">
-          <nav className="mm-settings-nav" aria-label="Settings sections">
-            <div className="mm-settings-nav__tabs" role="tablist">
+        <WorkspaceRailLayout
+          navigationLabel="Settings sections"
+          panelId="settings-panel"
+          panelLabelledBy={`settings-tab-${tab}`}
+          dataTestId="settings-workspace"
+          navigation={
+            <>
               <div className="mm-settings-nav__group">
                 <p className="mm-settings-nav__label">Workspace</p>
                 <button
@@ -600,90 +610,81 @@ export function SettingsPage() {
                   </button>
                 ) : null}
               </div>
-            </div>
-          </nav>
-
-          <main
-            id="settings-panel"
-            className="mm-settings-workspace__content"
-            role="tabpanel"
-            aria-labelledby={`settings-tab-${tab}`}
-          >
-            {tab === "general" ? (
-              <SettingsGeneralTab
-                editable={editable}
-                settingsData={settingsQ.data}
-                save={save}
-                appTimezone={appTimezone}
-                setAppTimezone={setAppTimezone}
-                timezoneDirty={timezoneDirty}
-                setLogRetentionDaysDraft={setLogRetentionDaysDraft}
-                normalizedLogRetentionDraft={normalizedLogRetentionDraft}
-                finalizeLogRetentionDays={finalizeLogRetentionDays}
-                logsDirty={logsDirty}
-                lastSuiteSaveTarget={lastSuiteSaveTarget}
-                displayDensity={displayDensity}
-                setDisplayDensity={setDisplayDensity}
-                resetHistoryConfirm={resetHistoryConfirm}
-                setResetHistoryConfirm={setResetHistoryConfirm}
-                resetHistory={resetHistory}
-                resetHistoryMsg={resetHistoryMsg}
-                onSaveTimezone={() => void handleSaveTimezone()}
-                onSaveLogs={() => void handleSaveLogs()}
-                onResetOperationalHistory={() =>
-                  void handleResetOperationalHistory()
-                }
-              />
-            ) : tab === "backup" ? (
-              <SettingsBackupTab
-                editable={editable}
-                settingsData={settingsQ.data}
-                save={save}
-                backupScheduleDirty={backupScheduleDirty}
-                lastSuiteSaveTarget={lastSuiteSaveTarget}
-                configurationBackupEnabled={configurationBackupEnabled}
-                setConfigurationBackupEnabled={setConfigurationBackupEnabled}
-                configurationBackupIntervalHours={
-                  configurationBackupIntervalHours
-                }
-                setConfigurationBackupIntervalHours={
-                  setConfigurationBackupIntervalHours
-                }
-                configurationBackupPreferredTime={
-                  configurationBackupPreferredTime
-                }
-                setConfigurationBackupPreferredTime={
-                  setConfigurationBackupPreferredTime
-                }
-                backupsQ={backupsQ}
-                backupBusy={backupBusy}
-                backupMsg={backupMsg}
-                backupErr={backupErr}
-                onSaveBackupSchedule={() => void handleSaveBackupSchedule()}
-                onDownloadConfiguration={() =>
-                  void handleDownloadConfiguration()
-                }
-                onRestoreFileChange={(e) => void handleRestoreFileChange(e)}
-                onDownloadStoredBackup={(id, fileLabel) =>
-                  void handleDownloadStoredBackup(id, fileLabel)
-                }
-              />
-            ) : tab === "upgrade" ? (
-              <SettingsUpgradeTab updateStatusQ={updateStatusQ} />
-            ) : tab === "security" ? (
-              <SettingsSecurityTab />
-            ) : tab === "media-managers" ? (
-              <SettingsMediaManagersTab />
-            ) : tab === "notifications" ? (
-              <SettingsNotificationsTab />
-            ) : tab === "support" ? (
-              <SettingsSupportTab />
-            ) : (
-              <SettingsLogsTab />
-            )}
-          </main>
-        </div>
+            </>
+          }
+        >
+          {tab === "general" ? (
+            <SettingsGeneralTab
+              editable={editable}
+              settingsData={settingsQ.data}
+              save={save}
+              appTimezone={appTimezone}
+              setAppTimezone={setAppTimezone}
+              timezoneDirty={timezoneDirty}
+              setLogRetentionDaysDraft={setLogRetentionDaysDraft}
+              normalizedLogRetentionDraft={normalizedLogRetentionDraft}
+              finalizeLogRetentionDays={finalizeLogRetentionDays}
+              logsDirty={logsDirty}
+              lastSuiteSaveTarget={lastSuiteSaveTarget}
+              displayDensity={displayDensity}
+              setDisplayDensity={setDisplayDensity}
+              resetHistoryConfirm={resetHistoryConfirm}
+              setResetHistoryConfirm={setResetHistoryConfirm}
+              resetHistory={resetHistory}
+              resetHistoryMsg={resetHistoryMsg}
+              onSaveTimezone={() => void handleSaveTimezone()}
+              onSaveLogs={() => void handleSaveLogs()}
+              onResetOperationalHistory={() =>
+                void handleResetOperationalHistory()
+              }
+            />
+          ) : tab === "backup" ? (
+            <SettingsBackupTab
+              editable={editable}
+              settingsData={settingsQ.data}
+              save={save}
+              backupScheduleDirty={backupScheduleDirty}
+              lastSuiteSaveTarget={lastSuiteSaveTarget}
+              configurationBackupEnabled={configurationBackupEnabled}
+              setConfigurationBackupEnabled={setConfigurationBackupEnabled}
+              configurationBackupIntervalHours={
+                configurationBackupIntervalHours
+              }
+              setConfigurationBackupIntervalHours={
+                setConfigurationBackupIntervalHours
+              }
+              configurationBackupPreferredTime={
+                configurationBackupPreferredTime
+              }
+              setConfigurationBackupPreferredTime={
+                setConfigurationBackupPreferredTime
+              }
+              backupsQ={backupsQ}
+              backupBusy={backupBusy}
+              backupMsg={backupMsg}
+              backupErr={backupErr}
+              onSaveBackupSchedule={() => void handleSaveBackupSchedule()}
+              onDownloadConfiguration={() => void handleDownloadConfiguration()}
+              onRestoreFileChange={(e) => void handleRestoreFileChange(e)}
+              onDownloadStoredBackup={(id, fileLabel) =>
+                void handleDownloadStoredBackup(id, fileLabel)
+              }
+            />
+          ) : tab === "upgrade" ? (
+            <SettingsUpgradeTab updateStatusQ={updateStatusQ} />
+          ) : tab === "security" ? (
+            <SettingsSecurityTab />
+          ) : tab === "media-managers" ? (
+            <SettingsMediaManagersTab />
+          ) : tab === "notifications" ? (
+            <SettingsNotificationsTab />
+          ) : tab === "support" ? (
+            <SettingsSupportTab />
+          ) : (
+            <SettingsLogsTab />
+          )}
+        </WorkspaceRailLayout>
       </div>
-    </div>
+    </WorkspacePage>
   );
 }

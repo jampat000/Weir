@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { mmSectionTabClass } from "../../lib/ui/mm-control-roles";
+import {
+  WorkspacePage,
+  WorkspacePanel,
+  WorkspaceTabList,
+  type WorkspaceTabOption,
+} from "../../components/shared/workspace-shell";
 import { RefinerProcessSettingsSection } from "./refiner-process-settings-section";
 import { RefinerFilesSection } from "./refiner-files-section";
 import { RefinerJobsInspectionSection } from "./refiner-jobs-inspection-section";
@@ -12,10 +17,6 @@ import { RefinerLibrariesSection } from "./refiner-libraries-section";
 import { RefinerMaintenanceSection } from "./refiner-maintenance-section";
 import { RefinerSchedulesSection } from "./refiner-schedules-section";
 import { RefinerRemuxSection } from "./refiner-remux-section";
-import {
-  mmModuleTabBlurbBandClass,
-  mmModuleTabBlurbTextClass,
-} from "../../lib/ui/mm-module-tab-blurb";
 
 type RefinerPageTabId =
   | "overview"
@@ -41,6 +42,16 @@ const REFINER_TAB_BLURBS: Record<RefinerPageTabId, string> = {
   maintenance:
     "Housekeeping MediaMop runs on a schedule, and what this instance is configured with. Start one now if you need to.",
 };
+
+const REFINER_TABS = [
+  { id: "overview", label: "Overview" },
+  { id: "libraries", label: "Libraries" },
+  { id: "audio-subtitles", label: "Audio & subtitles" },
+  { id: "schedules", label: "Schedules" },
+  { id: "files", label: "Files" },
+  { id: "jobs", label: "Jobs" },
+  { id: "maintenance", label: "Maintenance" },
+] as const satisfies readonly WorkspaceTabOption<RefinerPageTabId>[];
 
 const REFINER_CAPABILITY_NOTE =
   "Standalone watched-folder remux works after local safety gates. A media manager adds upstream import protection, library discovery, and safe manager-truth-dependent cleanup; no signal is never treated as an empty queue.";
@@ -78,16 +89,6 @@ export function RefinerPage() {
     setSearchParams(params, { replace: true });
   };
 
-  const tabs: { id: RefinerPageTabId; label: string }[] = [
-    { id: "overview", label: "Overview" },
-    { id: "libraries", label: "Libraries" },
-    { id: "audio-subtitles", label: "Audio & subtitles" },
-    { id: "schedules", label: "Schedules" },
-    { id: "files", label: "Files" },
-    { id: "jobs", label: "Jobs" },
-    { id: "maintenance", label: "Maintenance" },
-  ];
-
   const openFromOverview = (target: RefinerOverviewOpenTab) => {
     const map: Record<RefinerOverviewOpenTab, RefinerPageTabId> = {
       libraries: "libraries",
@@ -99,11 +100,13 @@ export function RefinerPage() {
   };
 
   return (
-    <div className="mm-page w-full min-w-0" data-testid="refiner-scope-page">
-      <header className="mm-page__intro !mb-0">
-        <p className="mm-page__eyebrow">MediaMop</p>
-        <h1 className="mm-page__title">Refiner</h1>
-        <p className="mm-page__subtitle">
+    <WorkspacePage
+      variant="tabs"
+      eyebrow="MediaMop"
+      title="Refiner"
+      dataTestId="refiner-scope-page"
+      description={
+        <>
           Refiner remuxes <strong className="text-[var(--mm-text)]">TV</strong>{" "}
           and <strong className="text-[var(--mm-text)]">Movies</strong> into the
           audio and subtitle layout you want. Each library stays on its own.
@@ -115,64 +118,46 @@ export function RefinerPage() {
             Activity
           </Link>
           .
-        </p>
-      </header>
+        </>
+      }
+    >
+      <WorkspaceTabList
+        tabs={REFINER_TABS}
+        activeId={tab}
+        onSelect={selectTab}
+        ariaLabel="Refiner sections"
+        idPrefix="refiner-tab"
+        panelId="refiner-panel"
+        dataTestId="refiner-section-tabs"
+      />
 
-      <nav
-        className="mb-5 mt-3 flex gap-2.5 overflow-x-auto sm:mt-4 sm:flex-wrap sm:overflow-visible"
-        aria-label="Refiner sections"
-        data-testid="refiner-section-tabs"
+      <WorkspacePanel
+        id="refiner-panel"
+        labelledBy={`refiner-tab-${tab}`}
+        context={REFINER_TAB_BLURBS[tab]}
+        contextTestId="refiner-tab-blurb"
       >
-        {tabs.map(({ id, label }) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={tab === id}
-            className={mmSectionTabClass(tab === id)}
-            onClick={() => selectTab(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
+        {tab === "overview" ? (
+          <RefinerOverviewTab onOpenTab={openFromOverview} />
+        ) : null}
 
-      <div
-        className="mm-bubble-stack"
-        role="tabpanel"
-        aria-label={tabs.find((t) => t.id === tab)?.label}
-      >
-        <div className="mm-bubble-stack w-full min-w-0">
-          <div
-            className={mmModuleTabBlurbBandClass}
-            data-testid="refiner-tab-blurb"
-          >
-            <p className={mmModuleTabBlurbTextClass}>
-              {REFINER_TAB_BLURBS[tab]}
+        {tab === "libraries" ? (
+          <div className="mm-bubble-stack flex w-full min-w-0 flex-col">
+            <p className="max-w-prose text-sm leading-6 text-[var(--mm-text2)]">
+              {REFINER_CAPABILITY_NOTE}
             </p>
+            <RefinerLibrariesSection />
+            <RefinerProcessSettingsSection />
           </div>
-          {tab === "overview" ? (
-            <RefinerOverviewTab onOpenTab={openFromOverview} />
-          ) : null}
+        ) : null}
 
-          {tab === "libraries" ? (
-            <div className="mm-bubble-stack flex w-full min-w-0 flex-col">
-              <p className="max-w-prose text-sm leading-6 text-[var(--mm-text2)]">
-                {REFINER_CAPABILITY_NOTE}
-              </p>
-              <RefinerLibrariesSection />
-              <RefinerProcessSettingsSection />
-            </div>
-          ) : null}
+        {tab === "audio-subtitles" ? <RefinerRemuxSection /> : null}
 
-          {tab === "audio-subtitles" ? <RefinerRemuxSection /> : null}
-
-          {tab === "schedules" ? <RefinerSchedulesSection /> : null}
-          {tab === "files" ? <RefinerFilesSection /> : null}
-          {tab === "jobs" ? <RefinerJobsInspectionSection /> : null}
-          {tab === "maintenance" ? <RefinerMaintenanceSection /> : null}
-        </div>
-      </div>
-    </div>
+        {tab === "schedules" ? <RefinerSchedulesSection /> : null}
+        {tab === "files" ? <RefinerFilesSection /> : null}
+        {tab === "jobs" ? <RefinerJobsInspectionSection /> : null}
+        {tab === "maintenance" ? <RefinerMaintenanceSection /> : null}
+      </WorkspacePanel>
+    </WorkspacePage>
   );
 }
