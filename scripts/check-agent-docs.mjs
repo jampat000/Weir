@@ -39,6 +39,16 @@ for (const rel of requiredFiles) {
   }
 }
 
+const readme = readFileSync(path.join(repoRoot, "README.md"), "utf8");
+for (const legacyUpgradeText of [
+  "MediaMop Updater` service",
+  "predates the updater service",
+]) {
+  if (readme.includes(legacyUpgradeText)) {
+    fail(`README.md contains obsolete pre-v2.3 Windows updater guidance: ${legacyUpgradeText}`);
+  }
+}
+
 const markdownLinkPattern = /!?\[[^\]]*]\(([^)]+)\)/g;
 
 for (const rel of markdownFiles) {

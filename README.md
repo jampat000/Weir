@@ -129,12 +129,12 @@ Current release outputs include:
 
 - GitHub Release on `vX.Y.Z`
 - `mediamop-web-dist.zip`
-- `MediaMopSetup.exe`
+- `MediaMop-win-Setup.exe`
 - Docker images on GHCR such as `ghcr.io/jampat000/mediamop:latest`
 
-On Windows, `MediaMopSetup.exe` now installs the local `MediaMop Updater` service as a required component. After that one admin install, future in-app upgrades can run remotely from Settings without staging installers into the app directory.
+On Windows, `MediaMop-win-Setup.exe` installs the per-user .NET tray app under `%LocalAppData%\MediaMop`; it does not require administrator rights or a separate updater service. The tray app manages automatic Velopack updates, and upgrades can also be started from Settings.
 
-If you are upgrading from an older Windows install that predates the updater service, run the latest `MediaMopSetup.exe` once on the MediaMop computer as administrator. That one-time bootstrap is required before remote in-app upgrades will appear in Settings.
+If you are upgrading from v2.2.x or earlier, uninstall the legacy MediaMop application first, then run the current installer. Runtime data under `C:\ProgramData\MediaMop` is preserved, and the tray app removes the legacy updater service on first launch. See [`docs/release.md`](docs/release.md) for the current packaging and upgrade contract.
 
 ## Docker
 

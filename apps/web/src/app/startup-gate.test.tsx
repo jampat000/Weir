@@ -40,7 +40,7 @@ describe("StartupGate", () => {
 
     expect(await screen.findByText("Starting MediaMop...")).toBeInTheDocument();
     expect(screen.queryByText("App mounted")).not.toBeInTheDocument();
-    expect(screen.getByText("Preparing database.")).toBeInTheDocument();
+    expect(await screen.findByText("Preparing database.")).toBeInTheDocument();
   });
 
   it("mounts children after backend readiness is confirmed", async () => {

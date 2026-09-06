@@ -20,6 +20,7 @@ def safe_copy_to_final(
     final: Path,
     validate_staged: Callable[[Path], None] | None = None,
     progress_callback: Callable[[int, int], None] | None = None,
+    preserve_metadata: bool = True,
 ) -> None:
     """Copy ``source`` to ``final`` without exposing a partial destination file."""
 
@@ -31,7 +32,10 @@ def safe_copy_to_final(
     tmp = Path(tmp_name)
     try:
         if progress_callback is None:
-            shutil.copy2(src, tmp)
+            if preserve_metadata:
+                shutil.copy2(src, tmp)
+            else:
+                shutil.copy(src, tmp)
         else:
             total_bytes = int(src.stat().st_size)
             copied_bytes = 0
@@ -43,7 +47,10 @@ def safe_copy_to_final(
                     # never invalidate a safe copy that is otherwise succeeding.
                     with contextlib.suppress(Exception):
                         progress_callback(copied_bytes, total_bytes)
-            shutil.copystat(src, tmp)
+            if preserve_metadata:
+                shutil.copystat(src, tmp)
+            else:
+                shutil.copymode(src, tmp)
     except Exception as exc:
         _best_effort_unlink(tmp)
         raise FileLifecycleError(f"Could not safely copy {src} to {dst}: {exc}") from exc

@@ -19,9 +19,10 @@ a file MediaMop was asked to keep.
 
 from __future__ import annotations
 
-import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from mediamop.platform.file_lifecycle.mutations import FileLifecycleError, safe_copy_to_final
 
 #: Offered as the starting list. Chosen for what actually travels in a release bundle:
 #: subtitle formats including the ``.idx``/``.sub`` pair, the metadata file, and artwork.
@@ -158,12 +159,12 @@ def migrate_sidecars(
             result.failures.append(f"{sidecar.name} (something else already exists at {destination})")
             continue
         try:
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            if preserve_timestamps:
-                shutil.copy2(sidecar, destination)
-            else:
-                shutil.copy(sidecar, destination)
-        except OSError as exc:
+            safe_copy_to_final(
+                source=sidecar,
+                final=destination,
+                preserve_metadata=preserve_timestamps,
+            )
+        except (FileLifecycleError, OSError) as exc:
             result.failures.append(f"{sidecar.name} ({exc})")
             continue
         result.migrated.append(MigratedSidecar(source=sidecar, destination=destination))

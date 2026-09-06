@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -41,6 +42,18 @@ def test_safe_copy_reports_progress_without_changing_atomic_placement(tmp_path: 
     assert updates[-1] == (source.stat().st_size, source.stat().st_size)
     assert final.read_bytes() == source.read_bytes()
     assert not list(final.parent.glob("*.partial"))
+
+
+def test_safe_copy_can_leave_source_timestamps_behind(tmp_path: Path) -> None:
+    source = tmp_path / "source.srt"
+    final = tmp_path / "out" / "source.srt"
+    source.write_text("subtitle", encoding="utf-8")
+    os.utime(source, (1_000_000_000, 1_000_000_000))
+
+    safe_copy_to_final(source=source, final=final, preserve_metadata=False)
+
+    assert final.read_text(encoding="utf-8") == "subtitle"
+    assert int(final.stat().st_mtime) != 1_000_000_000
 
 
 def test_safe_finalize_file_moves_completed_stage_to_final(tmp_path: Path) -> None:

@@ -57,6 +57,7 @@ $trayDir = Join-Path $repoRoot "apps\\tray\\MediaMop.Tray"
 $serverSpecPath = Join-Path $PSScriptRoot "mediamop-server.spec"
 $distRoot = Join-Path $repoRoot "dist\\windows"
 $velopackOut = Join-Path $distRoot "releases"
+$trayPublishDir = Join-Path $distRoot "tray-publish"
 $ffmpegVendorDir = Join-Path $PSScriptRoot "vendor\\ffmpeg"
 $venvScriptsDir = Join-Path $backendDir ".venv\\Scripts"
 $py = Join-Path $venvScriptsDir "python.exe"
@@ -322,10 +323,17 @@ try {
 }
 
 # ── Clean dist ──
-if (Test-Path $distRoot) {
+if ($SkipDotnetPublish) {
+  if (-not (Test-Path -LiteralPath $trayPublishDir)) {
+    throw "-SkipDotnetPublish requires an existing tray publish output at $trayPublishDir."
+  }
+  Get-ChildItem -LiteralPath $distRoot -Force |
+    Where-Object { $_.Name -ne "tray-publish" } |
+    Remove-Item -Recurse -Force
+} elseif (Test-Path $distRoot) {
   Remove-Item -LiteralPath $distRoot -Recurse -Force
 }
-New-Item -ItemType Directory -Path $distRoot | Out-Null
+New-Item -ItemType Directory -Path $distRoot -Force | Out-Null
 
 # ── FFmpeg ──
 Start-BuildPhase "FFmpeg download + vendor"
@@ -356,7 +364,6 @@ if ($serverVersion -ne $buildVersion) {
 
 # ── .NET tray app publish ──
 Start-BuildPhase ".NET tray publish"
-$trayPublishDir = Join-Path $distRoot "tray-publish"
 if (-not $SkipDotnetPublish) {
   Write-Host "Publishing .NET tray app..."
   Invoke-Native -FilePath dotnet -ArgumentList @(
@@ -387,22 +394,32 @@ Copy-Item -Path (Join-Path $serverOutputDir "*") -Destination $serverDestDir -Re
 # ── vpk pack ──
 Start-BuildPhase "vpk pack"
 Write-Host "Running vpk pack..."
-$vpk = Get-Command vpk -ErrorAction SilentlyContinue
-if (-not $vpk) {
-  Write-Host "Installing Velopack CLI tool..."
-  Invoke-Native -FilePath dotnet -ArgumentList @("tool", "install", "-g", "vpk")
-  $vpk = Get-Command vpk -ErrorAction SilentlyContinue
-  if (-not $vpk) {
-    $dotnetToolsPath = Join-Path $env:USERPROFILE ".dotnet\\tools"
-    $vpkPath = Join-Path $dotnetToolsPath "vpk.exe"
-    if (-not (Test-Path $vpkPath)) {
-      throw "vpk CLI was not found after install. Ensure dotnet tools path is on PATH."
-    }
-    $vpk = Get-Item $vpkPath
-  }
+$trayProjectPath = Join-Path $trayDir "MediaMop.Tray.csproj"
+[xml]$trayProject = Get-Content -LiteralPath $trayProjectPath -Raw
+$velopackReference = @($trayProject.Project.ItemGroup.PackageReference) |
+  Where-Object { $_.Include -eq "Velopack" } |
+  Select-Object -First 1
+$velopackCliVersion = [string]$velopackReference.Version
+if (-not $velopackCliVersion) {
+  throw "Velopack package version was not found in $trayProjectPath."
 }
 
-$vpkExe = if ($vpk -is [System.Management.Automation.ApplicationInfo]) { $vpk.Source } else { $vpk.FullName }
+$vpkListLine = @(Invoke-Native -FilePath dotnet -ArgumentList @("tool", "list", "-g", "vpk")) |
+  Where-Object { $_ -match "^\s*vpk\s+" } |
+  Select-Object -First 1
+$installedVpkVersion = if ($vpkListLine) { ($vpkListLine.Trim() -split "\s+")[1] } else { $null }
+if (-not $installedVpkVersion) {
+  Write-Host "Installing Velopack CLI $velopackCliVersion..."
+  Invoke-Native -FilePath dotnet -ArgumentList @("tool", "install", "-g", "vpk", "--version", $velopackCliVersion)
+} elseif ($installedVpkVersion -ne $velopackCliVersion) {
+  Write-Host "Updating Velopack CLI from $installedVpkVersion to $velopackCliVersion..."
+  Invoke-Native -FilePath dotnet -ArgumentList @("tool", "update", "-g", "vpk", "--version", $velopackCliVersion)
+}
+
+$vpkExe = Join-Path (Join-Path $env:USERPROFILE ".dotnet") "tools\vpk.exe"
+if (-not (Test-Path -LiteralPath $vpkExe)) {
+  throw "vpk CLI was not found after install. Ensure the .NET global tools directory is available."
+}
 
 Invoke-Native -FilePath $vpkExe -ArgumentList @(
   "pack",
