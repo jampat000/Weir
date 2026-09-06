@@ -198,7 +198,7 @@ jobs:
         run: dotnet test apps/tray/MediaMop.Tray.Tests --nologo --verbosity quiet
 
       - name: Install Velopack CLI
-        run: dotnet tool install -g vpk
+        run: dotnet tool install -g vpk --version 1.2.0
 
       - name: MediaMop web - install and build
         working-directory: apps/web

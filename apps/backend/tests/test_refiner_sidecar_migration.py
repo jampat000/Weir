@@ -27,6 +27,7 @@ from mediamop.modules.refiner.refiner_sidecar_migration import (
     migrate_sidecars,
     parse_sidecar_patterns,
 )
+from mediamop.platform.file_lifecycle import mutations as file_lifecycle_mutations
 
 
 @pytest.fixture
@@ -194,6 +195,26 @@ def test_a_failed_copy_blocks_the_source_deletion_and_says_why(tree: tuple[Path,
     assert result.migrated == []
     assert "did not remove the source folder" in result.blocking_reason
     assert "nothing is lost" in result.blocking_reason
+
+
+def test_an_interrupted_copy_never_exposes_a_partial_sidecar(
+    tree: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source, output = tree
+    (source.parent / "Film.2001.1080p.BluRay.srt").write_text("subs")
+
+    def interrupt_copy(source_path: Path, staged_path: Path) -> None:
+        staged_path.write_text("partial", encoding="utf-8")
+        raise OSError("simulated interrupted copy")
+
+    monkeypatch.setattr(file_lifecycle_mutations.shutil, "copy", interrupt_copy)
+
+    result = migrate_sidecars(source_media=source, output_media=output, patterns=(".srt",))
+
+    assert result.blocks_source_deletion is True
+    assert result.migrated == []
+    assert not (output.parent / "Film (2001).srt").exists()
+    assert not list(output.parent.glob("*.partial"))
 
 
 def test_a_directory_in_the_way_is_a_failure_not_an_already_migrated_sidecar(tree: tuple[Path, Path]) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from xml.etree import ElementTree
 
 from mediamop.windows import server_entry
 
@@ -70,12 +71,25 @@ def test_velopack_build_script_includes_ffmpeg_and_version_validation() -> None:
     assert '$buildVersion.StartsWith("v")' in build_text
     assert "does not match backend project version" in build_text
     assert "MediaMopServer.exe reports version" in build_text
+    assert 'Where-Object { $_.Name -ne "tray-publish" }' in build_text
+    assert "-SkipDotnetPublish requires an existing tray publish output" in build_text
+    assert "New-Item -ItemType Directory -Path $distRoot -Force" in build_text
+    assert 'Where-Object { $_.Include -eq "Velopack" }' in build_text
+    assert '@("tool", "update", "-g", "vpk", "--version", $velopackCliVersion)' in build_text
     assert "vpk" in build_text
 
 
 def test_release_workflow_uses_velopack_and_normalized_semver() -> None:
-    workflow = Path(__file__).resolve().parents[3] / ".github" / "workflows" / "release.yml"
+    repo = Path(__file__).resolve().parents[3]
+    workflow = repo / ".github" / "workflows" / "release.yml"
     text = workflow.read_text(encoding="utf-8")
+    ci_text = (repo / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    tray_project = ElementTree.parse(repo / "apps" / "tray" / "MediaMop.Tray" / "MediaMop.Tray.csproj")
+    velopack_version = next(
+        reference.attrib["Version"]
+        for reference in tray_project.findall(".//PackageReference")
+        if reference.attrib.get("Include") == "Velopack"
+    )
 
     assert 'run: echo "plain=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"' in text
     assert "MEDIAMOP_BUILD_VERSION: ${{ steps.version.outputs.plain }}" in text
@@ -87,6 +101,8 @@ def test_release_workflow_uses_velopack_and_normalized_semver() -> None:
     assert "Get-AuthenticodeSignature" in text
     assert "build-velopack.ps1" in text
     assert "mediamop-windows-velopack" in text
-    assert "dotnet tool install -g vpk" in text
+    pinned_vpk_install = f"dotnet tool install -g vpk --version {velopack_version}"
+    assert pinned_vpk_install in text
+    assert pinned_vpk_install in ci_text
     assert text.count('Get-Item -LiteralPath "dist/windows/releases/MediaMop-win-Setup.exe" -ErrorAction Stop') == 2
     assert "MediaMop-*-win-Setup.exe" not in text
