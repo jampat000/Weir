@@ -6,8 +6,8 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, "..");
 const releasePath = resolve(repoRoot, ".github", "workflows", "release.yml");
 const ciPath = resolve(repoRoot, ".github", "workflows", "ci.yml");
-const release = readFileSync(releasePath, "utf8");
-const ci = readFileSync(ciPath, "utf8");
+const release = readFileSync(releasePath, "utf8").replace(/\r\n/g, "\n");
+const ci = readFileSync(ciPath, "utf8").replace(/\r\n/g, "\n");
 
 function requireText(source, marker, file) {
   const index = source.indexOf(marker);

@@ -33,7 +33,7 @@
     "@docusaurus/tsconfig": "^3.10.2",
     "@docusaurus/types": "^3.10.2",
     "@types/react": "^19.2.18",
-    "typescript": "~5.7.2"
+    "typescript": "~6.0.3"
   },
   "browserslist": {
     "production": [
@@ -48,12 +48,13 @@
     ]
   },
   "engines": {
-    "node": ">=20.0"
+    "node": ">=24.15"
   },
   "overrides": {
     "image-size": "^2.0.2",
     "joi": "^18.2.1",
-    "qs": "^6.15.2",
+    "fast-uri": "^3.1.7",
+    "qs": "^6.16.0",
     "serialize-javascript": "^7.0.5",
     "uuid": "^14.0.0",
     "shell-quote": "^1.8.4"

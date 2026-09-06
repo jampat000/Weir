@@ -25,10 +25,7 @@ import type { RefinerRemuxRulesScopeSettings } from "../../lib/refiner/types";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 
 export type RefinerOverviewOpenTab =
-  | "libraries"
-  | "audio-subtitles"
-  | "jobs"
-  | "schedules";
+  "libraries" | "audio-subtitles" | "jobs" | "schedules";
 
 function remuxDefaultsGlanceBody(
   rem: RefinerRemuxRulesScopeSettings,

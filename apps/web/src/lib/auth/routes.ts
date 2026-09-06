@@ -6,8 +6,7 @@ import type { UserPublic } from "../api/types";
  */
 
 export type EntryDecision =
-  | { kind: "wait" }
-  | { kind: "redirect"; to: "/" | "/setup" | "/login" };
+  { kind: "wait" } | { kind: "redirect"; to: "/" | "/setup" | "/login" };
 
 /**
  * Pure helper — tested without React.

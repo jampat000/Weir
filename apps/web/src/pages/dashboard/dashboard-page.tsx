@@ -34,11 +34,7 @@ import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 
 type ModuleKey = "refiner" | "pruner";
 type ModuleStatus =
-  | "Healthy"
-  | "Review needed"
-  | "Active"
-  | "Setup required"
-  | "Paused";
+  "Healthy" | "Review needed" | "Active" | "Setup required" | "Paused";
 type OperationalModule = NonNullable<DashboardStatus["modules"]>[number];
 
 type ModuleMetric = {

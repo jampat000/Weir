@@ -967,8 +967,7 @@ export function RefinerLibrariesSection() {
                     setForm({
                       ...form,
                       rejected_file_action: event.target.value as
-                        | "leave"
-                        | "delete_file",
+                        "leave" | "delete_file",
                     })
                   }
                   disabled={!editable}

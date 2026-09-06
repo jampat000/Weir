@@ -34,6 +34,23 @@ updates:
       web:
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    # Keep unsupported toolchain majors quiet until their peer ecosystem catches up.
+    # eslint-plugin-jsx-a11y 6.10.2 rejects ESLint 10, while openapi-typescript 7.13.0
+    # supports TypeScript 5.x only. Dependabot will resume these automatically
+    # when the bounds below are deliberately revised with the corresponding migration.
+    ignore:
+      - dependency-name: "eslint"
+        versions:
+          - ">=10.0.0"
+      - dependency-name: "@eslint/js"
+        versions:
+          - ">=10.0.0"
+      - dependency-name: "typescript"
+        versions:
+          - ">=6.0.0"
 
   - package-ecosystem: npm
     directory: /docs-site
@@ -44,6 +61,15 @@ updates:
       docs-site:
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    # Docusaurus 3.10.2 still inherits the removed baseUrl compiler option,
+    # so its published tsconfig cannot be typechecked by TypeScript 7 yet.
+    ignore:
+      - dependency-name: "typescript"
+        versions:
+          - ">=7.0.0"
 
   # The tray ships in the Windows installer and had no ecosystem entry at all, so Velopack
   # and the test project's xunit packages were unmonitored. One directory each: Dependabot
