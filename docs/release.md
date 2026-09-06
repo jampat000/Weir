@@ -99,11 +99,15 @@ After installing:
 1. Launch `MediaMop` from the Start Menu or desktop shortcut.
 2. MediaMop starts in the user session, not as a Windows service.
 3. The .NET tray app launches the Python backend server as a child process.
-4. The tray icon opens the local app in the browser and exposes `Open MediaMop`, `Open Data Folder`, and `Quit`.
+4. The tray icon opens the local app in the browser and exposes `Open MediaMop`, `Open Data Folder`, `Check for updates`, and `Quit`.
 5. Application binaries install under `%LocalAppData%\MediaMop` (per-user, no admin required).
 6. The local runtime root is created under `C:\ProgramData\MediaMop`.
 
 Updates are handled automatically by the .NET tray app via Velopack. Delta updates keep downloads small and rollback is automatic on failure. No separate updater service is needed.
+
+If an operator runs a manually staged copy without Velopack install metadata, the
+tray keeps `Check for updates` visible and opens Settings -> Upgrade for the
+browser-based release check. It must not silently remove the update action.
 
 This design is intentional. Running in the user session avoids common NAS or external-drive access issues that affect Windows services, while keeping writable configuration, logs, backups, and the SQLite database out of the application install directory.
 

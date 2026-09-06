@@ -49,4 +49,30 @@ public sealed class BrowserLaunchTests : IDisposable
         Assert.Equal("http://127.0.0.1:8788/", observed.FileName);
         Assert.True(observed.UseShellExecute);
     }
+
+    [Fact]
+    public void Browser_launch_can_open_the_local_upgrade_settings_page()
+    {
+        ProcessStartInfo? observed = null;
+
+        var result = Program.OpenBrowser(
+            8788,
+            info => observed = info,
+            Program.UpgradeSettingsPath);
+
+        Assert.True(result);
+        Assert.NotNull(observed);
+        Assert.Equal("http://127.0.0.1:8788/settings?tab=upgrade", observed.FileName);
+        Assert.True(observed.UseShellExecute);
+    }
+
+    [Theory]
+    [InlineData(true, null)]
+    [InlineData(false, Program.UpgradeSettingsPath)]
+    public void Update_menu_falls_back_to_the_web_upgrade_page_when_unmanaged(
+        bool isInstalled,
+        string? expectedPath)
+    {
+        Assert.Equal(expectedPath, Program.TrayUpdateFallbackPath(isInstalled));
+    }
 }
