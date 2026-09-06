@@ -93,7 +93,7 @@ body.mm-body {
 .mm-settings-workspace {
   display: grid;
   grid-template-columns: minmax(14.5rem, 17rem) minmax(0, 1fr);
-  align-items: start;
+  align-items: stretch;
   gap: 1.25rem;
 }
 
@@ -102,8 +102,7 @@ body.mm-body {
 }
 
 .mm-settings-nav {
-  position: sticky;
-  top: 0;
+  position: relative;
   padding: 0.75rem;
   border: 1px solid var(--mm-border);
   border-radius: 18px;
@@ -116,6 +115,8 @@ body.mm-body {
 }
 
 .mm-settings-nav__tabs {
+  position: sticky;
+  top: 0.75rem;
   display: grid;
   gap: 0.85rem;
 }
@@ -187,6 +188,7 @@ body.mm-body {
   }
 
   .mm-settings-nav__tabs {
+    position: static;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

@@ -49,6 +49,26 @@ def _assert_no_error_state(page) -> None:
     )
 
 
+def _assert_settings_workspace_edges_align(page) -> None:
+    """The desktop navigation rail and active settings panel share both edges."""
+    edges = page.locator(".mm-settings-workspace").evaluate(
+        """workspace => {
+            const nav = workspace
+                .querySelector('.mm-settings-nav')
+                .getBoundingClientRect();
+            const panel = workspace
+                .querySelector('#settings-panel')
+                .getBoundingClientRect();
+            return {
+                top: Math.abs(nav.top - panel.top),
+                bottom: Math.abs(nav.bottom - panel.bottom),
+            };
+        }"""
+    )
+    assert edges["top"] <= 1, f"settings workspace top edges differ: {edges}"
+    assert edges["bottom"] <= 1, f"settings workspace bottom edges differ: {edges}"
+
+
 def test_dashboard_renders_without_error(mediamop_shell: str) -> None:
     """Dashboard page loads, shows key structural elements, and is error-free."""
     base = mediamop_shell.rstrip("/")
@@ -74,12 +94,12 @@ def test_dashboard_renders_without_error(mediamop_shell: str) -> None:
 
 
 def test_settings_general_tab_renders(mediamop_shell: str) -> None:
-    """Settings page (General tab) loads, shows global settings panel, and is error-free."""
+    """Every Settings tab keeps its desktop navigation and panel edges aligned."""
     base = mediamop_shell.rstrip("/")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         try:
-            page = browser.new_page()
+            page = browser.new_page(viewport={"width": 1600, "height": 900})
             page.set_default_timeout(30_000)
 
             ensure_signed_in(page, base)
@@ -89,6 +109,17 @@ def test_settings_general_tab_renders(mediamop_shell: str) -> None:
 
             expect(page.get_by_test_id("suite-settings-page")).to_be_visible()
             expect(page.get_by_test_id("suite-settings-global")).to_be_visible()
+
+            settings_tabs = page.locator(".mm-settings-nav__button")
+            for index in range(settings_tabs.count()):
+                settings_tab = settings_tabs.nth(index)
+                settings_tab.click()
+                expect(settings_tab).to_have_attribute("aria-selected", "true")
+                _assert_settings_workspace_edges_align(page)
+
+            page.get_by_role("tab", name="General", exact=True).click()
+            expect(page.get_by_test_id("suite-settings-global")).to_be_visible()
+            _assert_settings_workspace_edges_align(page)
 
             _assert_no_error_state(page)
             _save_screenshot(page, "settings-general")
