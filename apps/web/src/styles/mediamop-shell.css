@@ -90,18 +90,48 @@ body.mm-body {
   margin: 0 0 calc(12px * var(--mm-density-ui-scale));
 }
 
-.mm-settings-workspace {
+.mm-workspace-page {
+  width: 100%;
+  min-width: 0;
+}
+
+.mm-page__intro.mm-workspace-page__intro--tabs {
+  margin-bottom: 0;
+}
+
+.mm-page__intro.mm-workspace-page__intro--rail {
+  margin-bottom: 1.25rem;
+}
+
+.mm-workspace-tabs {
+  margin: 0.75rem 0 1.25rem;
+  overflow-x: auto;
+}
+
+.mm-workspace-tabs__list {
+  display: flex;
+  width: max-content;
+  gap: 0.625rem;
+}
+
+.mm-workspace-panel,
+.mm-workspace-panel__content {
+  width: 100%;
+  min-width: 0;
+}
+
+.mm-workspace-layout--rail {
   display: grid;
   grid-template-columns: minmax(14.5rem, 17rem) minmax(0, 1fr);
   align-items: stretch;
   gap: 1.25rem;
 }
 
-.mm-settings-workspace__content {
+.mm-workspace-rail__content {
   min-width: 0;
 }
 
-.mm-settings-nav {
+.mm-workspace-rail__navigation {
   position: relative;
   padding: 0.75rem;
   border: 1px solid var(--mm-border);
@@ -114,7 +144,7 @@ body.mm-body {
     0 18px 45px rgba(0, 0, 0, 0.12);
 }
 
-.mm-settings-nav__tabs {
+.mm-workspace-rail__tabs {
   position: sticky;
   top: 0.75rem;
   display: grid;
@@ -138,7 +168,7 @@ body.mm-body {
   text-transform: uppercase;
 }
 
-.mm-settings-nav .rounded-md {
+.mm-workspace-rail__navigation .rounded-md {
   width: 100%;
   justify-content: flex-start;
 }
@@ -179,17 +209,29 @@ body.mm-body {
 }
 
 @media (max-width: 1100px) {
-  .mm-settings-workspace {
+  .mm-workspace-layout--rail {
     grid-template-columns: 1fr;
   }
 
-  .mm-settings-nav {
+  .mm-workspace-rail__navigation {
     position: static;
   }
 
-  .mm-settings-nav__tabs {
+  .mm-workspace-rail__tabs {
     position: static;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 640px) {
+  .mm-workspace-tabs {
+    margin-top: 1rem;
+    overflow: visible;
+  }
+
+  .mm-workspace-tabs__list {
+    width: auto;
+    flex-wrap: wrap;
   }
 }
 
@@ -1957,11 +1999,6 @@ html[data-mm-theme="light"] .mm-theme-toggle {
   border-bottom: 1px solid rgba(255, 255, 255, 0.055);
 }
 
-/* Suite Settings: gap under page intro rule matches Tailwind mb-5 on tab strip (1.25rem). */
-.mm-page__intro.mm-page__intro--suite-settings-rule {
-  margin-bottom: 1.25rem;
-}
-
 .mm-page__intro--hero {
   position: relative;
   padding-top: 0.15rem;
@@ -3281,10 +3318,6 @@ select.mm-input::-ms-expand {
     padding-bottom: 0.85rem;
   }
 
-  .mm-page__intro.mm-page__intro--suite-settings-rule {
-    margin-bottom: 1.25rem;
-  }
-
   .mm-page__title {
     font-size: clamp(1.35rem, 6.2vw, 1.6rem);
   }
@@ -3299,11 +3332,11 @@ select.mm-input::-ms-expand {
     padding: 1rem 1rem;
   }
 
-  .mm-settings-nav {
+  .mm-workspace-rail__navigation {
     padding: 0.65rem;
   }
 
-  .mm-settings-nav__tabs {
+  .mm-workspace-rail__tabs {
     grid-template-columns: 1fr;
     gap: 0.55rem;
   }
