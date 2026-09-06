@@ -3,7 +3,7 @@
 # Build: docker build -t mediamop:local .
 # Run:  docker run --rm -e MEDIAMOP_SESSION_SECRET=... -p 8788:8788 -v mediamop-data:/data/mediamop mediamop:local
 
-FROM node:20-bookworm-slim AS web
+FROM node:24-bookworm-slim AS web
 WORKDIR /src/apps/web
 COPY apps/web/package.json apps/web/package-lock.json ./
 # Resilient installs in CI/buildx (registry flakes, slow links); lockfile must stay in sync with package.json.

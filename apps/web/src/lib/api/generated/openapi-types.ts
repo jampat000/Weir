@@ -2136,10 +2136,7 @@ export interface components {
        * @enum {string}
        */
       kind:
-        | "root_moved"
-        | "library_removed"
-        | "library_added"
-        | "path_not_local";
+        "root_moved" | "library_removed" | "library_added" | "path_not_local";
       /** Library Id */
       library_id?: number | null;
       /** Library Name */
@@ -2995,8 +2992,7 @@ export interface components {
       unwatched_movie_stale_reported_enabled?: boolean | null;
       /** Watched Movie Low Rating Max Jellyfin Emby Community Rating */
       watched_movie_low_rating_max_jellyfin_emby_community_rating?:
-        | number
-        | null;
+        number | null;
       /** Watched Movie Low Rating Max Plex Audience Rating */
       watched_movie_low_rating_max_plex_audience_rating?: number | null;
       /** Watched Movie Low Rating Reported Enabled */
@@ -3718,11 +3714,7 @@ export interface components {
        * @enum {string}
        */
       ffmpeg_strictness:
-        | "very"
-        | "strict"
-        | "normal"
-        | "unofficial"
-        | "experimental";
+        "very" | "strict" | "normal" | "unofficial" | "experimental";
       /**
        * File Detection Interval Seconds
        * @description How long this file's size must stay unchanged before MediaMop treats it as finished being written. 0 turns size settling off.
@@ -4135,11 +4127,7 @@ export interface components {
        * @enum {string}
        */
       ffmpeg_strictness:
-        | "very"
-        | "strict"
-        | "normal"
-        | "unofficial"
-        | "experimental";
+        "very" | "strict" | "normal" | "unofficial" | "experimental";
       /**
        * File Detection Interval Seconds
        * @description How long this file's size must stay unchanged before MediaMop treats it as finished being written. 0 turns size settling off.

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageJson = JSON.parse(
@@ -90,7 +91,7 @@ export default defineConfig(({ mode }) => {
     define: {
       __WEB_PACKAGE_VERSION__: JSON.stringify(packageJson.version),
     },
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
     build: {
       // Source maps are opt-in for local diagnostics. Production artifacts do not expose
       // source paths or ship multi-megabyte maps by default.
