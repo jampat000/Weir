@@ -32,7 +32,7 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(mediamop_shell: str) 
             expect(page.get_by_test_id("dashboard-page")).to_be_visible()
             expect(page.get_by_test_id("dashboard-status-strip")).to_be_visible()
             expect(page.get_by_test_id("dashboard-module-cards")).to_be_visible()
-            expect(page.get_by_test_id("dashboard-global-jobs")).to_be_visible()
+            expect(page.get_by_test_id("dashboard-global-jobs")).not_to_be_attached()
             expect(page.get_by_test_id("dashboard-runtime-health")).not_to_be_visible()
 
             open_sidebar(page, "Activity")

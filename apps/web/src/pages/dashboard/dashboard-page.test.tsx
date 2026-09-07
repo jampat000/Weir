@@ -31,6 +31,7 @@ vi.mock("../../lib/activity/use-activity-stream-invalidation", () => ({
 }));
 
 vi.mock("../../lib/refiner/queries", () => ({
+  refinerOverviewStatsQueryKey: ["refiner", "overview-stats"],
   useRefinerOverviewStatsQuery: (...args: unknown[]) =>
     useRefinerOverviewStatsQuery(...args),
   useRefinerPathSettingsQuery: (...args: unknown[]) =>
@@ -38,11 +39,24 @@ vi.mock("../../lib/refiner/queries", () => ({
 }));
 
 vi.mock("../../lib/refiner/jobs-inspection/queries", () => ({
+  refinerJobsInspectionQueryKey: (filter: string, limit = 100) => [
+    "refiner",
+    "jobs",
+    "inspection",
+    filter,
+    limit,
+  ],
   useRefinerJobsInspectionQuery: (...args: unknown[]) =>
     useRefinerJobsInspectionQuery(...args),
 }));
 
 vi.mock("../../lib/pruner/queries", () => ({
+  prunerOverviewStatsQueryKey: ["pruner", "overview-stats"],
+  prunerJobsInspectionQueryKey: (limit = 100) => [
+    "pruner",
+    "jobs-inspection",
+    limit,
+  ],
   usePrunerOverviewStatsQuery: (...args: unknown[]) =>
     usePrunerOverviewStatsQuery(...args),
   usePrunerInstancesQuery: (...args: unknown[]) =>
@@ -170,7 +184,9 @@ describe("DashboardPage", () => {
     expect(screen.getByTestId("dashboard-module-cards")).toBeInTheDocument();
     expect(screen.getByTestId("dashboard-needs-attention")).toBeInTheDocument();
     expect(screen.getByTestId("dashboard-active-work")).toBeInTheDocument();
-    expect(screen.getByTestId("dashboard-global-jobs")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("dashboard-global-jobs"),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByTestId("dashboard-runtime-health"),
     ).not.toBeInTheDocument();
@@ -199,7 +215,7 @@ describe("DashboardPage", () => {
     expect(Number(columns)).toBe(grid.children.length);
   });
 
-  it("keeps Refiner scan maintenance noise out of the dashboard", () => {
+  it("keeps completed Refiner job history and scan noise off the dashboard", () => {
     useRefinerOverviewStatsQuery.mockReturnValue({
       data: {
         files_processed: 12,
@@ -265,10 +281,10 @@ describe("DashboardPage", () => {
       screen.getByText("2 changed - 0 needed no changes"),
     ).toBeInTheDocument();
     expect(screen.queryByText("Scan watched folders")).not.toBeInTheDocument();
-    expect(screen.getByText("Process file")).toBeInTheDocument();
+    expect(screen.queryByText("Process file")).not.toBeInTheDocument();
   });
 
-  it("shows cancelled jobs as terminal history rather than review work", () => {
+  it("keeps cancelled job history off the live dashboard", () => {
     useRefinerJobsInspectionQuery.mockReturnValue({
       data: {
         jobs: [
@@ -303,12 +319,12 @@ describe("DashboardPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("Cancelled")).toBeInTheDocument();
+    expect(screen.queryByText("Cancelled")).not.toBeInTheDocument();
     expect(
-      screen.getByText(
+      screen.queryByText(
         /This Refiner job was cancelled before a worker started it/,
       ),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("Needs review")).not.toBeInTheDocument();
   });
 

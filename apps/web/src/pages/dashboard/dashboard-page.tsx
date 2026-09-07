@@ -19,12 +19,18 @@ import {
   useDashboardStatusQuery,
 } from "../../lib/dashboard/queries";
 import {
+  prunerJobsInspectionQueryKey,
+  prunerOverviewStatsQueryKey,
   usePrunerInstancesQuery,
   usePrunerJobsInspectionQuery,
   usePrunerOverviewStatsQuery,
 } from "../../lib/pruner/queries";
-import { useRefinerJobsInspectionQuery } from "../../lib/refiner/jobs-inspection/queries";
 import {
+  refinerJobsInspectionQueryKey,
+  useRefinerJobsInspectionQuery,
+} from "../../lib/refiner/jobs-inspection/queries";
+import {
+  refinerOverviewStatsQueryKey,
   useRefinerOverviewStatsQuery,
   useRefinerPathSettingsQuery,
 } from "../../lib/refiner/queries";
@@ -67,12 +73,14 @@ type GlobalJobRow = {
   updatedAt: string;
 };
 
+const DASHBOARD_ACTIVITY_FILTERS = { limit: 20 } as const;
 const DASHBOARD_LIVE_INVALIDATION_KEYS = [
   dashboardStatusKey,
-  activityRecentKey,
-  ["refiner"] as const,
-  ["pruner"] as const,
-  ["suite"] as const,
+  [...activityRecentKey, DASHBOARD_ACTIVITY_FILTERS] as const,
+  refinerOverviewStatsQueryKey,
+  refinerJobsInspectionQueryKey("recent", 12),
+  prunerOverviewStatsQueryKey,
+  prunerJobsInspectionQueryKey(12),
 ] as const;
 
 type DashboardJobRow = {
@@ -560,13 +568,16 @@ function buildPrunerCard(args: {
 
 export function DashboardPage() {
   const fmt = useAppDateFormatter();
-  useActivityStreamInvalidations(DASHBOARD_LIVE_INVALIDATION_KEYS);
+  useActivityStreamInvalidations(DASHBOARD_LIVE_INVALIDATION_KEYS, {
+    exact: true,
+    throttleMs: 1_500,
+  });
 
   const dash = useDashboardStatusQuery();
-  const recent = useActivityRecentQuery({ limit: 20 });
+  const recent = useActivityRecentQuery(DASHBOARD_ACTIVITY_FILTERS);
   const refinerStats = useRefinerOverviewStatsQuery();
   const refinerPaths = useRefinerPathSettingsQuery();
-  const refinerJobs = useRefinerJobsInspectionQuery("recent");
+  const refinerJobs = useRefinerJobsInspectionQuery("recent", 12);
   const prunerStats = usePrunerOverviewStatsQuery();
   const prunerInstances = usePrunerInstancesQuery();
   const prunerJobs = usePrunerJobsInspectionQuery(12);
@@ -892,7 +903,9 @@ export function DashboardPage() {
         />
       </section>
 
-      <section className="mm-dashboard-live-grid">
+      <section
+        className={`mm-dashboard-live-grid${liveNow ? "" : " mm-dashboard-live-grid--idle"}`}
+      >
         <article
           className={`mm-dashboard-live-stage ${liveNow ? "mm-dashboard-live-stage--active" : ""}`}
           data-testid="dashboard-active-work"
@@ -953,23 +966,6 @@ export function DashboardPage() {
                 </div>
               </div>
             )}
-          </div>
-
-          <div className="mm-dashboard-flow" aria-label="Current work flow">
-            <div className={activeJobCount > 0 ? "is-active" : ""}>
-              <span>Processing</span>
-              <strong>{formatCount(activeJobCount)}</strong>
-            </div>
-            <i aria-hidden="true" />
-            <div className={queuedJobCount > 0 ? "is-active" : ""}>
-              <span>{processingPaused ? "Held by pause" : "Queued jobs"}</span>
-              <strong>{formatCount(queuedJobCount)}</strong>
-            </div>
-            <i aria-hidden="true" />
-            <div>
-              <span>Updates today</span>
-              <strong>{formatCount(eventsLast24h)}</strong>
-            </div>
           </div>
         </article>
 
@@ -1059,93 +1055,6 @@ export function DashboardPage() {
             The next completed action or system event will appear here.
           </p>
         )}
-      </section>
-
-      <section
-        className="mm-card mm-dash-card mt-6"
-        data-testid="dashboard-global-jobs"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="mm-card__title">Background work</h2>
-            <p className="mt-1 text-sm text-[var(--mm-text2)]">
-              The latest queued and completed work across Refiner and Pruner.
-              Anything requiring you includes a plain-language next step.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              to="/refiner?tab=jobs"
-              className={mmActionButtonClass({ variant: "tertiary" })}
-            >
-              Refiner jobs
-            </Link>
-            <Link
-              to="/pruner?tab=jobs"
-              className={mmActionButtonClass({ variant: "tertiary" })}
-            >
-              Pruner jobs
-            </Link>
-          </div>
-        </div>
-        <div className="mm-card__body space-y-3">
-          {globalJobs.length === 0 ? (
-            <p className="text-sm text-[var(--mm-text2)]">
-              No recent jobs are recorded.
-            </p>
-          ) : (
-            globalJobs.map((job) => (
-              <article
-                key={job.key}
-                className="rounded-lg border border-[var(--mm-border)] bg-black/10 p-3"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--mm-gold)]">
-                        {job.module}
-                      </span>
-                      <span className="rounded-full border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-2 py-0.5 text-xs text-[var(--mm-text2)]">
-                        {job.status}
-                      </span>
-                    </div>
-                    <h3 className="text-sm font-semibold text-[var(--mm-text1)]">
-                      {job.title}
-                    </h3>
-                    <p className="break-words text-sm text-[var(--mm-text2)] [overflow-wrap:anywhere]">
-                      {job.detail}
-                    </p>
-                    <p className="mt-2 text-xs text-[var(--mm-text3)]">
-                      <span className="font-semibold text-[var(--mm-text2)]">
-                        Next step:
-                      </span>{" "}
-                      {job.nextAction}
-                    </p>
-                    {job.technicalDetail ? (
-                      <details className="mt-2 text-xs text-[var(--mm-text3)]">
-                        <summary className="cursor-pointer select-none">
-                          Technical detail
-                        </summary>
-                        <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded border border-[var(--mm-border)] bg-black/10 p-2 [overflow-wrap:anywhere]">
-                          {job.technicalDetail}
-                        </pre>
-                      </details>
-                    ) : null}
-                    <Link
-                      to={job.actionTo}
-                      className="mt-2 inline-flex text-xs font-semibold text-[var(--mm-accent-bright)] underline underline-offset-2"
-                    >
-                      {job.actionLabel}
-                    </Link>
-                  </div>
-                  <time className="text-sm text-[var(--mm-text3)]">
-                    {fmt(job.updatedAt)}
-                  </time>
-                </div>
-              </article>
-            ))
-          )}
-        </div>
       </section>
     </div>
   );

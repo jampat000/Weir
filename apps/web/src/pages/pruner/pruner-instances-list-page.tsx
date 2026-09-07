@@ -61,7 +61,6 @@ export function PrunerInstancesListPage() {
 
   return (
     <WorkspacePage
-      variant="tabs"
       eyebrow="MediaMop"
       title="Pruner"
       dataTestId="pruner-scope-page"

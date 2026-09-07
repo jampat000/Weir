@@ -538,9 +538,12 @@ class LiveAudit:
             "dashboard-module-cards",
             "dashboard-needs-attention",
             "dashboard-active-work",
-            "dashboard-global-jobs",
         ):
             self.visible(self.page.get_by_test_id(test_id), f"Dashboard {test_id}")
+        self.require(
+            not self.page.get_by_test_id("dashboard-global-jobs").count(),
+            "Dashboard must keep completed job history in Activity and module job views",
+        )
         self.assert_no_visible_crash()
         self.screenshot("dashboard")
         self.record("Dashboard screen, truthful status cards, and action areas")

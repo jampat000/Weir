@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "./app-shell";
 
 const logoutMutate = vi.fn();
+const scrollToMock = vi.fn();
 
 vi.mock("../lib/auth/queries", () => ({
   useLogoutMutation: () => ({
@@ -49,6 +50,8 @@ vi.mock("../lib/suite/queries", () => ({
 describe("AppShell", () => {
   beforeEach(() => {
     logoutMutate.mockReset();
+    scrollToMock.mockReset();
+    window.scrollTo = scrollToMock;
   });
 
   it("keeps only the version and sign-out controls in the sidebar footer", () => {
@@ -69,5 +72,23 @@ describe("AppShell", () => {
     expect(screen.queryByText(/supporter licence/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/licence checks/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/feature limits/i)).not.toBeInTheDocument();
+  });
+
+  it("returns document scrolling to the top when the route changes", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route path="/" element={<AppShell />}>
+            <Route index element={<div>Dashboard page</div>} />
+            <Route path="activity" element={<div>Activity page</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: "Activity" }));
+
+    expect(screen.getByText("Activity page")).toBeInTheDocument();
+    expect(scrollToMock).toHaveBeenLastCalledWith(0, 0);
   });
 });

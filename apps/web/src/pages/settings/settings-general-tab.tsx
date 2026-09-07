@@ -389,7 +389,7 @@ export function SettingsGeneralTab({
                   <label
                     key={id}
                     className={[
-                      "flex min-w-0 cursor-pointer items-center gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors",
+                      "flex min-w-0 cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors",
                       displayDensity === id
                         ? "border-[var(--mm-accent)] bg-[var(--mm-accent)]/12 text-[var(--mm-text)]"
                         : "border-[var(--mm-border)] bg-transparent text-[var(--mm-text2)] hover:bg-[var(--mm-card-bg)]",
@@ -398,16 +398,20 @@ export function SettingsGeneralTab({
                     <input
                       type="radio"
                       name="mm-display-density"
-                      className="h-4 w-4 shrink-0 accent-[var(--mm-accent)]"
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--mm-accent)]"
                       checked={displayDensity === id}
                       onChange={() => {
                         setDisplayDensity(id);
                         persistDisplayDensity(id);
                       }}
                     />
-                    <span className="min-w-0 font-medium">{label}</span>
-                    <span className="text-xs text-[var(--mm-text3)]">
-                      ({hint})
+                    <span className="min-w-0">
+                      <span className="block font-medium text-[var(--mm-text)]">
+                        {label}
+                      </span>
+                      <span className="block text-xs leading-snug text-[var(--mm-text3)]">
+                        {hint}
+                      </span>
                     </span>
                   </label>
                 ))}

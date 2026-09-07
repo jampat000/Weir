@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
 import { activityRecentKey } from "./queries";
-import { useActivityStreamInvalidation } from "./use-activity-stream-invalidation";
+import {
+  useActivityStreamInvalidation,
+  useActivityStreamInvalidations,
+} from "./use-activity-stream-invalidation";
 import { dashboardStatusKey } from "../dashboard/queries";
 
 class FakeEventSource {
@@ -51,7 +54,47 @@ function withQueryClient(qc: QueryClient) {
 describe("useActivityStreamInvalidation", () => {
   afterEach(() => {
     FakeEventSource.instances = [];
+    vi.useRealTimers();
     vi.unstubAllGlobals();
+  });
+
+  it("coalesces dashboard event bursts and invalidates only exact queries", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    const keys = [dashboardStatusKey, activityRecentKey] as const;
+
+    renderHook(
+      () =>
+        useActivityStreamInvalidations(keys, {
+          exact: true,
+          throttleMs: 1_000,
+        }),
+      { wrapper: withQueryClient(qc) },
+    );
+
+    const src = FakeEventSource.instances[0];
+    src.emit("activity.latest", JSON.stringify({ latest_event_id: 1 }));
+    src.emit("activity.latest", JSON.stringify({ latest_event_id: 2 }));
+    src.emit("activity.latest", JSON.stringify({ latest_event_id: 3 }));
+
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(spy).toHaveBeenCalledWith({
+      queryKey: dashboardStatusKey,
+      exact: true,
+    });
+    expect(spy).toHaveBeenCalledWith({
+      queryKey: activityRecentKey,
+      exact: true,
+    });
+
+    vi.advanceTimersByTime(1_000);
+    expect(spy).toHaveBeenCalledTimes(4);
   });
 
   it("invalidates activity recent query on activity.latest", () => {

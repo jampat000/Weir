@@ -101,7 +101,6 @@ export function RefinerPage() {
 
   return (
     <WorkspacePage
-      variant="tabs"
       eyebrow="MediaMop"
       title="Refiner"
       dataTestId="refiner-scope-page"

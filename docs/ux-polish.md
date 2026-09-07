@@ -14,8 +14,9 @@ This is the app-wide UX baseline for MediaMop. Use it when reviewing screens bef
 - Cards in the same section should use consistent spacing, action placement, and visual weight.
 - Primary card actions should sit at the bottom of the card unless the control needs to remain inline for usability.
 - Settings cards should be grouped by user task, not backend implementation.
-- Multi-section product areas use the shared workspace shell: horizontal tabs for Refiner and Pruner, and a grouped navigation rail for Settings. Both variants share the same page intro, content width, spacing, responsive behavior, and tab-to-panel accessibility wiring.
-- Use the navigation rail only when sections need meaningful groups or descriptive labels. Do not turn Dashboard or Activity into tabbed workspaces; they remain task-focused pages.
+- Multi-section product areas use the same themed horizontal section bar in Refiner, Pruner, and Settings. It scrolls horizontally on narrow screens while preserving the tab-to-panel accessibility contract.
+- Dashboard and Activity remain task-focused pages rather than duplicating the section bar. Dashboard is a concise live overview; searchable history and full job lists belong in Activity and each module's Jobs section.
+- The document is the page scroll owner. Do not trap signed-in pages inside a fixed-height nested scrolling pane.
 - Empty states should be compact, aligned with the surrounding layout, and explain what to do next.
 - Long detail views should be compressed by default and expandable when more information is useful.
 

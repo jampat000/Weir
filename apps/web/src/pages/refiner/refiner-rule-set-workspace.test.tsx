@@ -89,20 +89,40 @@ it("edits ordered rules, original-language behavior, metadata cleanup, and the p
 
   render(<RefinerRuleSetWorkspace />, { wrapper });
 
-  expect(await screen.findByText("Audio order")).toBeInTheDocument();
-  expect(screen.getByText("Subtitle order")).toBeInTheDocument();
+  expect(
+    await screen.findByRole("heading", { name: "Audio" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "Subtitles" }),
+  ).toBeInTheDocument();
   expect(screen.getByText("Original language")).toBeInTheDocument();
-  expect(screen.getByText("Metadata cleanup")).toBeInTheDocument();
+  expect(screen.getByText("Remove from container")).toBeInTheDocument();
   expect(screen.getByText("Metadata provider")).toBeInTheDocument();
+
+  const orderedSections = [
+    "Audio",
+    "Subtitles",
+    "Original language",
+    "Remove from container",
+  ].map((name) => screen.getByRole("heading", { name }));
+  orderedSections.slice(0, -1).forEach((heading, index) => {
+    expect(heading.compareDocumentPosition(orderedSections[index + 1]!)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  fireEvent.click(
+    screen.getByRole("button", { name: /Advanced track ordering/ }),
+  );
+  expect(screen.getByText("Audio order")).toBeInTheDocument();
+  expect(screen.getByText("Subtitle order")).toBeInTheDocument();
   expect(screen.getByDisplayValue(">=5.1")).toBeInTheDocument();
 
   fireEvent.click(
     screen.getByRole("checkbox", { name: /Keep the original language/ }),
   );
-  fireEvent.click(
-    screen.getByRole("checkbox", { name: /Remove embedded images/ }),
-  );
-  fireEvent.click(screen.getByRole("button", { name: "Save rule set" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: /Embedded images/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Save profile" }));
 
   await waitFor(() => {
     expect(update).toHaveBeenCalledWith(
@@ -119,6 +139,7 @@ it("edits ordered rules, original-language behavior, metadata cleanup, and the p
   expect(sentRuleSet).not.toHaveProperty("used_by_library_count");
   expect(sentRuleSet).not.toHaveProperty("updated_at");
 
+  fireEvent.click(screen.getByRole("button", { name: "Configure" }));
   fireEvent.change(screen.getByRole("combobox", { name: "Provider" }), {
     target: { value: "tmdb" },
   });

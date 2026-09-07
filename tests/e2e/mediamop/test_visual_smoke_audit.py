@@ -42,6 +42,20 @@ def _save_screenshot(page, test_name: str) -> None:
     page.screenshot(path=str(path), full_page=False)
 
 
+def _scroll_to_top(page) -> None:
+    """Reset the document immediately, even when smooth scrolling is enabled."""
+    page.evaluate(
+        """() => {
+            const root = document.documentElement;
+            const previous = root.style.scrollBehavior;
+            root.style.scrollBehavior = 'auto';
+            window.scrollTo(0, 0);
+            root.style.scrollBehavior = previous;
+        }"""
+    )
+    page.wait_for_function("window.scrollY === 0")
+
+
 def _assert_no_error_state(page) -> None:
     """Assert no error-boundary overlay or generic crash message is visible."""
     expect(page.get_by_test_id("error-boundary")).not_to_be_visible(timeout=2_000)
@@ -50,30 +64,28 @@ def _assert_no_error_state(page) -> None:
     )
 
 
-def _assert_settings_workspace_edges_align(page) -> None:
-    """The desktop navigation rail and active settings panel share both edges."""
-    edges = page.get_by_test_id("settings-workspace").evaluate(
-        """workspace => {
-            const nav = workspace
-                .querySelector('.mm-workspace-rail__navigation')
-                .getBoundingClientRect();
-            const panel = workspace
-                .querySelector('#settings-panel')
-                .getBoundingClientRect();
+def _assert_document_owns_vertical_scroll(page) -> None:
+    """Signed-in pages must not trap wheel input inside the main shell."""
+    scroll = page.evaluate(
+        """() => {
+            const main = document.querySelector('.mm-main');
+            const layout = document.querySelector('.mm-app-layout');
             return {
-                top: Math.abs(nav.top - panel.top),
-                bottom: Math.abs(nav.bottom - panel.bottom),
+                mainOverflowY: getComputedStyle(main).overflowY,
+                layoutOverflowY: getComputedStyle(layout).overflowY,
+                scrollingElement: document.scrollingElement?.tagName,
             };
         }"""
     )
-    assert edges["top"] <= 1, f"settings workspace top edges differ: {edges}"
-    assert edges["bottom"] <= 1, f"settings workspace bottom edges differ: {edges}"
+    assert scroll["mainOverflowY"] not in {"auto", "scroll"}, scroll
+    assert scroll["layoutOverflowY"] not in {"auto", "scroll"}, scroll
+    assert scroll["scrollingElement"] == "HTML", scroll
 
 
 def _assert_tab_workspace(page, *, page_test_id: str, tabs_test_id: str) -> None:
-    """A module workspace uses the shared, accessible tab and panel contract."""
+    """A page uses the shared themed tab bar and accessible panel contract."""
     workspace = page.get_by_test_id(page_test_id)
-    expect(workspace).to_have_class(re.compile(r"\bmm-workspace-page--tabs\b"))
+    expect(workspace).to_have_class(re.compile(r"\bmm-workspace-page\b"))
     tabs = page.get_by_test_id(tabs_test_id)
     expect(tabs).to_have_class(re.compile(r"\bmm-workspace-tabs\b"))
     active_tab = tabs.locator("[role='tab'][aria-selected='true']")
@@ -91,7 +103,7 @@ def test_dashboard_renders_without_error(mediamop_shell: str) -> None:
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         try:
-            page = browser.new_page()
+            page = browser.new_page(viewport={"width": 1600, "height": 900})
             page.set_default_timeout(30_000)
 
             ensure_signed_in(page, base)
@@ -103,6 +115,7 @@ def test_dashboard_renders_without_error(mediamop_shell: str) -> None:
             expect(page.get_by_test_id("dashboard-status-strip")).to_be_visible()
             expect(page.get_by_test_id("dashboard-module-cards")).to_be_visible()
 
+            _assert_document_owns_vertical_scroll(page)
             _assert_no_error_state(page)
             _save_screenshot(page, "dashboard")
         finally:
@@ -126,27 +139,39 @@ def test_settings_general_tab_renders(mediamop_shell: str) -> None:
             expect(page.get_by_test_id("suite-settings-page")).to_be_visible()
             expect(page.get_by_test_id("suite-settings-global")).to_be_visible()
 
-            settings_tabs = page.locator(".mm-settings-nav__button")
+            settings_tabs = page.locator(".mm-workspace-tabs__button")
             for index in range(settings_tabs.count()):
                 settings_tab = settings_tabs.nth(index)
                 settings_tab.click()
                 expect(settings_tab).to_have_attribute("aria-selected", "true")
-                _assert_settings_workspace_edges_align(page)
+
+            page.get_by_role("tab", name="Security", exact=True).click()
+            expect(page.get_by_test_id("suite-settings-security")).to_be_visible()
+            _scroll_to_top(page)
+            page.screenshot(
+                path=str(_SCREENSHOT_DIR / "settings-security-full.png"),
+                full_page=True,
+            )
 
             page.get_by_role("tab", name="General", exact=True).click()
             expect(page.get_by_test_id("suite-settings-global")).to_be_visible()
-            _assert_settings_workspace_edges_align(page)
 
+            _assert_document_owns_vertical_scroll(page)
             _assert_no_error_state(page)
+            _scroll_to_top(page)
             _save_screenshot(page, "settings-general")
+            page.screenshot(
+                path=str(_SCREENSHOT_DIR / "settings-general-full.png"),
+                full_page=True,
+            )
         finally:
             browser.close()
 
 
-def test_module_workspaces_share_tabs_and_responsive_layout(
+def test_module_sections_share_themed_tabs_and_responsive_layout(
     mediamop_shell: str,
 ) -> None:
-    """Refiner and Pruner use one tab workspace without narrow-screen overflow."""
+    """Refiner and Pruner share the horizontal tab bar without page overflow."""
     base = mediamop_shell.rstrip("/")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -176,7 +201,9 @@ def test_module_workspaces_share_tabs_and_responsive_layout(
                     page_test_id=page_test_id,
                     tabs_test_id=tabs_test_id,
                 )
+                _assert_document_owns_vertical_scroll(page)
                 _assert_no_error_state(page)
+                _scroll_to_top(page)
                 _save_screenshot(page, screenshot_name)
 
                 mobile_page = context.new_page()
@@ -190,12 +217,45 @@ def test_module_workspaces_share_tabs_and_responsive_layout(
                         tabs_test_id=tabs_test_id,
                     )
                     assert mobile_page.evaluate(
-                        "document.documentElement.scrollWidth <= "
-                        "document.documentElement.clientWidth"
+                        "document.documentElement.scrollWidth <= document.documentElement.clientWidth"
                     ), f"{label} workspace overflows the narrow viewport"
+                    _assert_document_owns_vertical_scroll(mobile_page)
                     _assert_no_error_state(mobile_page)
                     _save_screenshot(mobile_page, f"{screenshot_name}-mobile")
                 finally:
                     mobile_page.close()
+        finally:
+            browser.close()
+
+
+def test_refiner_audio_subtitles_editor_renders(mediamop_shell: str) -> None:
+    """The full Refiner profile editor remains readable at desktop width."""
+    base = mediamop_shell.rstrip("/")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(viewport={"width": 1600, "height": 900})
+            page.set_default_timeout(30_000)
+            ensure_signed_in(page, base)
+
+            open_sidebar(page, "Refiner")
+            page.get_by_role("tab", name="Audio & subtitles", exact=True).click()
+            expect(page.get_by_test_id("refiner-rule-set-workspace")).to_be_visible()
+            page.get_by_role("button", name="New profile", exact=True).click()
+            expect(page.get_by_label("Profile name", exact=True)).to_be_visible()
+            expect(page.get_by_text("Audio order", exact=True)).not_to_be_visible()
+
+            _assert_document_owns_vertical_scroll(page)
+            _assert_no_error_state(page)
+            _scroll_to_top(page)
+            _save_screenshot(page, "refiner-audio-subtitles")
+            page.screenshot(
+                path=str(_SCREENSHOT_DIR / "refiner-audio-subtitles-full.png"),
+                full_page=True,
+            )
+            page.set_viewport_size({"width": 390, "height": 844})
+            _scroll_to_top(page)
+            page.wait_for_timeout(300)
+            _save_screenshot(page, "refiner-audio-subtitles-mobile")
         finally:
             browser.close()

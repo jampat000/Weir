@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -580,7 +586,9 @@ describe("SettingsPage (suite settings)", () => {
     const trigger = screen.getByRole("button", { name: /Timezone/ });
     expect(trigger).toHaveTextContent("Select timezone");
     fireEvent.click(trigger);
-    const firstOption = screen.getAllByRole("option")[0];
+    const firstOption = within(screen.getByRole("listbox")).getAllByRole(
+      "option",
+    )[0];
     const chosenLabel = firstOption.textContent ?? "";
     fireEvent.mouseDown(firstOption);
     fireEvent.click(firstOption);
