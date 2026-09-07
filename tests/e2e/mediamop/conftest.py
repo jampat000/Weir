@@ -23,14 +23,16 @@ def _repo_root() -> Path:
     for parent in [here.parent, *here.parents]:
         if (parent / "apps" / "backend" / "pyproject.toml").is_file():
             return parent
-    raise RuntimeError("MediaMop E2E: cannot find repo root (apps/backend/pyproject.toml missing)")
+    raise RuntimeError(
+        "MediaMop E2E: cannot find repo root (apps/backend/pyproject.toml missing)"
+    )
 
 
 REPO_ROOT = _repo_root()
 BACKEND_DIR = REPO_ROOT / "apps" / "backend"
 WEB_DIR = REPO_ROOT / "apps" / "web"
 SRC_PATH = (BACKEND_DIR / "src").resolve()
-NPM_CMD = "npm.cmd" if os.name == "nt" else "npm"
+NODE_CMD = "node.exe" if os.name == "nt" else "node"
 
 
 def _pick_loopback_port() -> int:
@@ -68,7 +70,9 @@ def _truncate_auth_tables(home: str) -> None:
     )
 
 
-def _run_backend_code(home: str, code: str, *, extra_env: dict[str, str] | None = None) -> None:
+def _run_backend_code(
+    home: str, code: str, *, extra_env: dict[str, str] | None = None
+) -> None:
     subprocess.run(
         [sys.executable, "-c", code],
         cwd=str(BACKEND_DIR.resolve()),
@@ -94,6 +98,18 @@ def _wait_http(url: str, *, timeout_s: float = 60.0) -> None:
             last = e
             time.sleep(0.25)
     raise RuntimeError(f"timeout waiting for {url}: {last!r}")
+
+
+def _stop_process(process: subprocess.Popen[bytes], *, timeout_s: float = 8.0) -> None:
+    """Stop a fixture process without leaving its runtime behind."""
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=timeout_s)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=timeout_s)
 
 
 @pytest.fixture(scope="session")
@@ -146,8 +162,8 @@ def mediamop_runtime() -> dict[str, str]:
     )
     try:
         _wait_http(f"{api_internal}/health")
-    except Exception:
-        api_proc.terminate()
+    except RuntimeError:
+        _stop_process(api_proc)
         pytest.fail("MediaMop API did not start")
 
     web_env = {
@@ -156,10 +172,9 @@ def mediamop_runtime() -> dict[str, str]:
     }
     web_proc = subprocess.Popen(
         [
-            NPM_CMD,
-            "run",
+            NODE_CMD,
+            str(WEB_DIR / "node_modules" / "vite" / "bin" / "vite.js"),
             "preview",
-            "--",
             "--host",
             "127.0.0.1",
             "--port",
@@ -173,10 +188,12 @@ def mediamop_runtime() -> dict[str, str]:
     )
     try:
         _wait_http(web_origin, timeout_s=90.0)
-    except Exception:
-        web_proc.terminate()
-        api_proc.terminate()
-        pytest.fail("Vite preview did not start (run npm install && npm run build in apps/web first)")
+    except RuntimeError:
+        _stop_process(web_proc)
+        _stop_process(api_proc)
+        pytest.fail(
+            "Vite preview did not start (run npm install && npm run build in apps/web first)"
+        )
 
     try:
         yield {
@@ -185,16 +202,8 @@ def mediamop_runtime() -> dict[str, str]:
             "home": home,
         }
     finally:
-        web_proc.terminate()
-        try:
-            web_proc.wait(timeout=8)
-        except subprocess.TimeoutExpired:
-            web_proc.kill()
-        api_proc.terminate()
-        try:
-            api_proc.wait(timeout=8)
-        except subprocess.TimeoutExpired:
-            api_proc.kill()
+        _stop_process(web_proc)
+        _stop_process(api_proc)
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -214,7 +223,9 @@ def mediamop_home(mediamop_runtime: dict[str, str]) -> str:
 
 @pytest.fixture()
 def seed_activity_event(mediamop_home: str):
-    def _seed(*, event_type: str, module: str, title: str, detail: str | None = None) -> None:
+    def _seed(
+        *, event_type: str, module: str, title: str, detail: str | None = None
+    ) -> None:
         code = (
             "import os, sys\n"
             "sys.path.insert(0, os.environ['MEDIAMOP_BACKEND_SRC'])\n"

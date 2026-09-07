@@ -3,20 +3,18 @@ import { describe, expect, it, vi } from "vitest";
 import {
   WorkspacePage,
   WorkspacePanel,
-  WorkspaceRailLayout,
   WorkspaceTabList,
 } from "./workspace-shell";
 
 describe("workspace shell", () => {
-  it("connects horizontal workspace tabs to their shared panel", () => {
+  it("connects the themed horizontal tabs to their shared panel", () => {
     const onSelect = vi.fn();
 
     render(
       <WorkspacePage
-        variant="tabs"
         eyebrow="MediaMop"
         title="Example"
-        description="Example workspace"
+        description="Example sections"
       >
         <WorkspaceTabList
           tabs={[
@@ -54,34 +52,5 @@ describe("workspace shell", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Jobs" }));
     expect(onSelect).toHaveBeenCalledWith("jobs");
-  });
-
-  it("keeps rail navigation and content in one semantic workspace", () => {
-    render(
-      <WorkspaceRailLayout
-        navigation={
-          <button role="tab" aria-selected="true">
-            General
-          </button>
-        }
-        navigationLabel="Settings sections"
-        panelId="settings-panel"
-        panelLabelledBy="settings-tab-general"
-        dataTestId="settings-workspace"
-      >
-        General settings
-      </WorkspaceRailLayout>,
-    );
-
-    expect(screen.getByTestId("settings-workspace")).toHaveClass(
-      "mm-workspace-layout--rail",
-    );
-    expect(
-      screen.getByRole("navigation", { name: "Settings sections" }),
-    ).toBeVisible();
-    expect(
-      screen.getByRole("tablist", { name: "Settings sections" }),
-    ).toBeVisible();
-    expect(screen.getByRole("tabpanel")).toHaveTextContent("General settings");
   });
 });

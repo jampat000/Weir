@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 
 import { PageLoading } from "../../components/shared/page-loading";
+import { MmMultiListboxPicker } from "../../components/ui/mm-multi-listbox-picker";
 import { useMeQuery } from "../../lib/auth/queries";
 import {
   type RefinerRuleSetWrite,
@@ -17,8 +18,10 @@ import {
   useSaveRefinerMetadataProvider,
   useTestRefinerMetadataProvider,
 } from "../../lib/refiner/metadata-provider-queries";
+import { REFINER_STREAM_LANGUAGE_OPTIONS } from "../../lib/refiner/stream-language-options";
 import {
   mmActionButtonClass,
+  mmCheckboxControlClass,
   mmEditableTextFieldClass,
   mmSelectFieldClass,
 } from "../../lib/ui/mm-control-roles";
@@ -39,6 +42,22 @@ const SORTER_FIELDS = [
   "forced",
   "commentary",
 ];
+
+const SORTER_LABELS: Record<string, string> = {
+  language: "Language",
+  channels: "Channel count",
+  codec: "Codec",
+  bitrate: "Bitrate",
+  title: "Track title",
+  default: "Default flag",
+  forced: "Forced flag",
+  commentary: "Commentary flag",
+};
+
+const LANGUAGE_OPTIONS = REFINER_STREAM_LANGUAGE_OPTIONS.map((option) => ({
+  value: option.code,
+  label: `${option.label} (${option.code})`,
+}));
 
 const DEFAULT_AUDIO_SORTERS: TrackSorter[] = [
   { field: "commentary", value: "", reversed: false },
@@ -119,6 +138,114 @@ function errorText(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+function csvValues(value: string): string[] {
+  return value
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function languageOptionsFor(values: readonly string[]) {
+  const known = new Set(LANGUAGE_OPTIONS.map((option) => option.value));
+  const custom = values
+    .filter((value) => !known.has(value))
+    .map((value) => ({ value, label: value }));
+  return [...LANGUAGE_OPTIONS, ...custom];
+}
+
+function LanguageSelectField({
+  label,
+  value,
+  optional = false,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  optional?: boolean;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const options = languageOptionsFor(value ? [value] : []);
+  return (
+    <label className="block text-sm">
+      <span className="text-[var(--mm-text2)]">{label}</span>
+      <select
+        className={mmSelectFieldClass}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {optional ? <option value="">None</option> : null}
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function LanguageMultiField({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const labelId = useId();
+  const values = csvValues(value);
+  return (
+    <div className="block text-sm">
+      <span id={labelId} className="text-[var(--mm-text2)]">
+        {label}
+      </span>
+      <MmMultiListboxPicker
+        options={languageOptionsFor(values)}
+        values={values}
+        disabled={disabled}
+        ariaLabelledBy={labelId}
+        placeholder="Choose languages…"
+        onChange={(next) => onChange(next.join(","))}
+      />
+    </div>
+  );
+}
+
+function ProfileSettingsSection({
+  step,
+  title,
+  detail,
+  children,
+}: {
+  step: number;
+  title: string;
+  detail: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-[var(--mm-border)] bg-[var(--mm-surface2)] p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--mm-gold)] bg-[var(--mm-accent-soft)] text-xs font-bold text-[var(--mm-text1)]">
+          {step}
+        </span>
+        <div className="min-w-0">
+          <h3 className="font-semibold text-[var(--mm-text1)]">{title}</h3>
+          <p className="mt-1 text-xs leading-5 text-[var(--mm-text3)]">
+            {detail}
+          </p>
+        </div>
+      </div>
+      <div className="mt-4 space-y-3">{children}</div>
+    </section>
+  );
+}
+
 function SorterEditor({
   title,
   detail,
@@ -171,7 +298,7 @@ function SorterEditor({
               >
                 {SORTER_FIELDS.map((field) => (
                   <option key={field} value={field}>
-                    {field}
+                    {SORTER_LABELS[field] ?? field}
                   </option>
                 ))}
               </select>
@@ -192,6 +319,7 @@ function SorterEditor({
               <label className="inline-flex min-h-9 items-center gap-1 px-1 text-xs text-[var(--mm-text2)]">
                 <input
                   type="checkbox"
+                  className={mmCheckboxControlClass}
                   checked={row.reversed}
                   disabled={disabled}
                   onChange={(event) =>
@@ -275,6 +403,8 @@ export function RefinerRuleSetWorkspace() {
   const [providerKey, setProviderKey] = useState("");
   const [clearProviderKey, setClearProviderKey] = useState(false);
   const [providerNotice, setProviderNotice] = useState<string | null>(null);
+  const [advancedOrderingOpen, setAdvancedOrderingOpen] = useState(false);
+  const [providerEditorOpen, setProviderEditorOpen] = useState(false);
 
   useEffect(() => {
     if (creating || !ruleSets.data) return;
@@ -425,7 +555,7 @@ export function RefinerRuleSetWorkspace() {
     <label className="flex items-start gap-3 rounded-lg border border-[var(--mm-border)] px-3 py-2 text-sm">
       <input
         type="checkbox"
-        className="mt-1"
+        className={mmCheckboxControlClass}
         checked={Boolean(draft?.[key])}
         disabled={disabled}
         onChange={(event) => change(key, event.target.checked as never)}
@@ -443,40 +573,41 @@ export function RefinerRuleSetWorkspace() {
 
   return (
     <div className="space-y-5" data-testid="refiner-rule-set-workspace">
-      <section className="mm-module-surface rounded-xl border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="mm-page__eyebrow">Reusable processing profiles</p>
+      <section className="mm-module-surface rounded-xl border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="mm-page__eyebrow">Processing profiles</p>
             <h2 className="mt-1 text-xl font-semibold text-[var(--mm-text1)]">
-              Rule sets
+              Audio &amp; subtitle profiles
             </h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--mm-text2)]">
-              Build one ordered audio, subtitle and metadata policy, then attach
-              it to any number of libraries. Edit a library under Libraries to
-              choose its rule set.
+              Save a profile once, then assign it to one or more libraries.
             </p>
           </div>
-          <button
-            type="button"
-            className={mmActionButtonClass({
-              variant: "primary",
-              disabled: !editable,
-            })}
-            disabled={!editable}
-            onClick={() => {
-              setCreating(true);
-              setSelectedId(null);
-              setDraft({ ...EMPTY_RULE_SET });
-              setNotice(null);
-            }}
-          >
-            New rule set
-          </button>
+          {!creating ? (
+            <button
+              type="button"
+              className={mmActionButtonClass({
+                variant: "primary",
+                disabled: !editable,
+              })}
+              disabled={!editable}
+              onClick={() => {
+                setCreating(true);
+                setSelectedId(null);
+                setDraft({ ...EMPTY_RULE_SET });
+                setNotice(null);
+                setAdvancedOrderingOpen(false);
+              }}
+            >
+              New profile
+            </button>
+          ) : null}
         </div>
 
         {(ruleSets.data?.length ?? 0) > 0 && !creating ? (
-          <label className="mt-4 block max-w-xl text-sm">
-            <span className="text-[var(--mm-text2)]">Rule set to edit</span>
+          <label className="mt-5 block max-w-2xl text-sm">
+            <span className="text-[var(--mm-text2)]">Profile to edit</span>
             <select
               className={mmSelectFieldClass}
               value={selectedId ?? ""}
@@ -486,11 +617,12 @@ export function RefinerRuleSetWorkspace() {
                 setSelectedId(id);
                 setDraft(selected ? writeFromRefinerRuleSet(selected) : null);
                 setNotice(null);
+                setAdvancedOrderingOpen(false);
               }}
             >
               {(ruleSets.data ?? []).map((row) => (
                 <option key={row.id} value={row.id}>
-                  {row.name} · used by {row.used_by_library_count}{" "}
+                  {row.name} · {row.used_by_library_count}{" "}
                   {row.used_by_library_count === 1 ? "library" : "libraries"}
                 </option>
               ))}
@@ -499,105 +631,109 @@ export function RefinerRuleSetWorkspace() {
         ) : null}
 
         {!draft ? (
-          <p className="mt-4 text-sm text-[var(--mm-text3)]">
-            No rule sets exist yet. Create one, then attach it to a library.
-          </p>
+          <div className="mt-5 rounded-xl border border-dashed border-[var(--mm-border)] px-4 py-6 text-sm text-[var(--mm-text2)]">
+            <p className="font-medium text-[var(--mm-text1)]">
+              No profiles yet
+            </p>
+            <p className="mt-1">Create one, then assign it under Libraries.</p>
+          </div>
         ) : (
-          <div className="mt-5 space-y-4">
-            <section className="grid gap-3 rounded-xl border border-[var(--mm-border)] bg-[var(--mm-surface2)] p-4 md:grid-cols-2">
-              {textField("Rule-set name", "name", "English feature films")}
-              <label className="block text-sm">
-                <span className="text-[var(--mm-text2)]">
-                  Audio policy preset
-                </span>
-                <select
-                  className={mmSelectFieldClass}
-                  value={draft.audio_preference_mode}
-                  disabled={disabled}
-                  onChange={(event) => {
-                    const mode = event.target.value;
-                    change("audio_preference_mode", mode);
-                    change(
-                      "audio_sorters_json",
-                      dumpSorters(
-                        mode === "quality_all_languages"
-                          ? DEFAULT_AUDIO_SORTERS.filter(
-                              (row) => row.field !== "default",
-                            )
-                          : DEFAULT_AUDIO_SORTERS,
-                      ),
-                    );
-                  }}
-                >
-                  <option value="preferred_langs_quality">
-                    Languages first, then quality
-                  </option>
-                  <option value="preferred_langs_strict">
-                    Only preferred languages
-                  </option>
-                  <option value="quality_all_languages">
-                    Best quality in any language
-                  </option>
-                </select>
-              </label>
-              {textField("Primary audio language", "primary_audio_lang", "eng")}
-              {textField(
-                "Secondary audio language",
-                "secondary_audio_lang",
-                "jpn",
-              )}
-              {textField(
-                "Tertiary audio language",
-                "tertiary_audio_lang",
-                "fre",
-              )}
-              <label className="block text-sm">
-                <span className="text-[var(--mm-text2)]">
-                  Default audio slot
-                </span>
-                <select
-                  className={mmSelectFieldClass}
-                  value={draft.default_audio_slot}
-                  disabled={disabled}
-                  onChange={(event) =>
-                    change("default_audio_slot", event.target.value)
-                  }
-                >
-                  <option value="primary">Primary</option>
-                  <option value="secondary">Secondary</option>
-                  <option value="tertiary">Tertiary</option>
-                </select>
-              </label>
-              <div className="md:col-span-2">
+          <div className="mt-6 space-y-5 border-t border-[var(--mm-border)] pt-6">
+            <div className="max-w-2xl">
+              {textField("Profile name", "name", "English feature films")}
+            </div>
+
+            <div className="grid items-start gap-4 xl:grid-cols-2">
+              <ProfileSettingsSection
+                step={1}
+                title="Audio"
+                detail="Choose the language priority and which retained track becomes default."
+              >
+                <label className="block text-sm">
+                  <span className="text-[var(--mm-text2)]">
+                    Selection strategy
+                  </span>
+                  <select
+                    className={mmSelectFieldClass}
+                    value={draft.audio_preference_mode}
+                    disabled={disabled}
+                    onChange={(event) => {
+                      const mode = event.target.value;
+                      change("audio_preference_mode", mode);
+                      change(
+                        "audio_sorters_json",
+                        dumpSorters(
+                          mode === "quality_all_languages"
+                            ? DEFAULT_AUDIO_SORTERS.filter(
+                                (row) => row.field !== "default",
+                              )
+                            : DEFAULT_AUDIO_SORTERS,
+                        ),
+                      );
+                    }}
+                  >
+                    <option value="preferred_langs_quality">
+                      Preferred languages, then quality
+                    </option>
+                    <option value="preferred_langs_strict">
+                      Preferred languages only
+                    </option>
+                    <option value="quality_all_languages">
+                      Best quality in any language
+                    </option>
+                  </select>
+                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <LanguageSelectField
+                    label="First choice"
+                    value={draft.primary_audio_lang}
+                    disabled={disabled}
+                    onChange={(value) => change("primary_audio_lang", value)}
+                  />
+                  <LanguageSelectField
+                    label="Second choice"
+                    value={draft.secondary_audio_lang}
+                    optional
+                    disabled={disabled}
+                    onChange={(value) => change("secondary_audio_lang", value)}
+                  />
+                  <LanguageSelectField
+                    label="Third choice"
+                    value={draft.tertiary_audio_lang}
+                    optional
+                    disabled={disabled}
+                    onChange={(value) => change("tertiary_audio_lang", value)}
+                  />
+                  <label className="block text-sm">
+                    <span className="text-[var(--mm-text2)]">
+                      Mark as default
+                    </span>
+                    <select
+                      className={mmSelectFieldClass}
+                      value={draft.default_audio_slot}
+                      disabled={disabled}
+                      onChange={(event) =>
+                        change("default_audio_slot", event.target.value)
+                      }
+                    >
+                      <option value="primary">First choice</option>
+                      <option value="secondary">Second choice</option>
+                      <option value="tertiary">Third choice</option>
+                    </select>
+                  </label>
+                </div>
                 {toggle(
                   "Remove commentary tracks",
-                  "Commentary is excluded before ranking the remaining audio.",
+                  "Exclude commentary before selecting the preferred audio.",
                   "remove_commentary",
                 )}
-              </div>
-            </section>
+              </ProfileSettingsSection>
 
-            <SorterEditor
-              title="Audio order"
-              detail="Top criteria decide first. A match value promotes a specific language, codec or expression such as >=5.1; Reverse flips that criterion."
-              rows={audioSorters}
-              disabled={disabled}
-              onChange={(rows) =>
-                change("audio_sorters_json", dumpSorters(rows))
-              }
-            />
-
-            <section className="space-y-3 rounded-xl border border-[var(--mm-border)] bg-[var(--mm-surface2)] p-4">
-              <div>
-                <h4 className="font-medium text-[var(--mm-text1)]">
-                  Subtitles
-                </h4>
-                <p className="mt-1 text-xs text-[var(--mm-text3)]">
-                  Keep everything, keep a language list, or remove all subtitle
-                  streams.
-                </p>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
+              <ProfileSettingsSection
+                step={2}
+                title="Subtitles"
+                detail="Choose what is retained and which tracks keep their flags."
+              >
                 <label className="block text-sm">
                   <span className="text-[var(--mm-text2)]">
                     Subtitle handling
@@ -611,117 +747,152 @@ export function RefinerRuleSetWorkspace() {
                     }
                   >
                     <option value="keep_all">Keep all subtitles</option>
-                    <option value="keep_listed">Keep listed languages</option>
+                    <option value="keep_listed">Keep selected languages</option>
                     <option value="remove_all">Remove all subtitles</option>
                   </select>
                 </label>
-                {textField(
-                  "Subtitle languages",
-                  "subtitle_langs_csv",
-                  "eng,fre",
-                )}
-                {toggle(
-                  "Keep forced subtitles",
-                  "Preserve forced tracks when subtitles are retained.",
-                  "preserve_forced_subs",
-                )}
-                {toggle(
-                  "Keep default subtitles",
-                  "Preserve tracks already marked default.",
-                  "preserve_default_subs",
-                )}
-              </div>
-            </section>
+                {draft.subtitle_mode === "keep_listed" ? (
+                  <LanguageMultiField
+                    label="Languages to keep"
+                    value={draft.subtitle_langs_csv}
+                    disabled={disabled}
+                    onChange={(value) => change("subtitle_langs_csv", value)}
+                  />
+                ) : null}
+                {draft.subtitle_mode !== "remove_all" ? (
+                  <div className="grid gap-3">
+                    {toggle(
+                      "Keep forced subtitles",
+                      "Preserve tracks needed to translate foreign dialogue.",
+                      "preserve_forced_subs",
+                    )}
+                    {toggle(
+                      "Keep default subtitles",
+                      "Preserve tracks already marked as default.",
+                      "preserve_default_subs",
+                    )}
+                  </div>
+                ) : null}
+              </ProfileSettingsSection>
 
-            <SorterEditor
-              title="Subtitle order"
-              detail="The same ordered criteria are applied to retained subtitle tracks."
-              rows={subtitleSorters}
-              disabled={disabled}
-              onChange={(rows) =>
-                change("subtitle_sorters_json", dumpSorters(rows))
-              }
-            />
+              <ProfileSettingsSection
+                step={3}
+                title="Original language"
+                detail="Optionally keep the title's original spoken language as well."
+              >
+                {toggle(
+                  "Keep the original language",
+                  providerName
+                    ? `Uses ${providerName.toUpperCase()} when it can identify the title.`
+                    : "Requires the metadata provider configured below.",
+                  "keep_original_language",
+                )}
+                {draft.keep_original_language ? (
+                  <div className="space-y-3 border-l-2 border-[var(--mm-border)] pl-4">
+                    <LanguageMultiField
+                      label="Other languages to keep"
+                      value={draft.original_language_additional_csv}
+                      disabled={disabled}
+                      onChange={(value) =>
+                        change("original_language_additional_csv", value)
+                      }
+                    />
+                    {toggle(
+                      "Keep one track per language",
+                      "Avoid duplicate tracks in the same language.",
+                      "original_language_keep_only_first",
+                    )}
+                    {toggle(
+                      "Use audio preferences if no match is found",
+                      "Keeps the profile safe when metadata is incomplete.",
+                      "original_language_first_if_none",
+                    )}
+                    {toggle(
+                      "Treat an untagged track as original",
+                      "Useful when the main track has no language tag.",
+                      "original_language_treat_empty_as_original",
+                    )}
+                  </div>
+                ) : null}
+              </ProfileSettingsSection>
 
-            <section className="space-y-3 rounded-xl border border-[var(--mm-border)] bg-[var(--mm-surface2)] p-4">
-              <div>
-                <h4 className="font-medium text-[var(--mm-text1)]">
-                  Original language
-                </h4>
-                <p className="mt-1 text-xs leading-5 text-[var(--mm-text3)]">
-                  Ask the saved metadata provider for the title&apos;s original
-                  language. If it cannot answer, the audio preset above remains
-                  the safe fallback.
-                </p>
-              </div>
-              {toggle(
-                "Keep the original language",
-                "Uses the provider only for this rule set.",
-                "keep_original_language",
-              )}
-              {draft.keep_original_language ? (
-                <div className="grid gap-3 md:grid-cols-2">
-                  {textField(
-                    "Additional languages to keep",
-                    "original_language_additional_csv",
-                    "eng,jpn",
+              <ProfileSettingsSection
+                step={4}
+                title="Remove from container"
+                detail="Select optional streams and tags Refiner should strip after track selection."
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {toggle(
+                    "Embedded images",
+                    "Strip embedded cover art.",
+                    "remove_images",
                   )}
                   {toggle(
-                    "Keep only the first track per language",
-                    "Avoids duplicate tracks in the same language.",
-                    "original_language_keep_only_first",
+                    "Attachments",
+                    "Strip fonts and other attached files.",
+                    "remove_attachments",
                   )}
                   {toggle(
-                    "Fall back if no original-language track exists",
-                    "Guarantees the output still follows the saved audio preferences.",
-                    "original_language_first_if_none",
+                    "Container title",
+                    "Remove the container title only.",
+                    "remove_title",
                   )}
                   {toggle(
-                    "Treat an untagged track as original",
-                    "Useful for media whose primary track has no language tag.",
-                    "original_language_treat_empty_as_original",
+                    "Language tags",
+                    "Strip language metadata after selection.",
+                    "remove_language_tags",
+                  )}
+                  {toggle(
+                    "Other metadata",
+                    "Strip other container-level tags.",
+                    "remove_other_metadata",
                   )}
                 </div>
-              ) : null}
-            </section>
+              </ProfileSettingsSection>
+            </div>
 
-            <section className="space-y-3 rounded-xl border border-[var(--mm-border)] bg-[var(--mm-surface2)] p-4">
-              <div>
-                <h4 className="font-medium text-[var(--mm-text1)]">
-                  Metadata cleanup
-                </h4>
-                <p className="mt-1 text-xs text-[var(--mm-text3)]">
-                  These removals count as real work even when the audio and
-                  subtitles already match.
-                </p>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                {toggle(
-                  "Remove embedded images",
-                  "Strips cover-art streams.",
-                  "remove_images",
-                )}
-                {toggle(
-                  "Remove attachments",
-                  "Strips fonts and other attached files.",
-                  "remove_attachments",
-                )}
-                {toggle(
-                  "Remove container title",
-                  "Leaves other metadata intact unless selected below.",
-                  "remove_title",
-                )}
-                {toggle(
-                  "Remove language tags",
-                  "Strips per-stream language metadata after selection.",
-                  "remove_language_tags",
-                )}
-                {toggle(
-                  "Remove remaining metadata",
-                  "Strips other container-level tags.",
-                  "remove_other_metadata",
-                )}
-              </div>
+            <section className="rounded-xl border border-[var(--mm-border)] bg-[var(--mm-surface2)]">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-4 p-4 text-left sm:p-5"
+                aria-expanded={advancedOrderingOpen}
+                onClick={() => setAdvancedOrderingOpen((open) => !open)}
+              >
+                <span>
+                  <span className="block font-semibold text-[var(--mm-text1)]">
+                    Advanced track ordering
+                  </span>
+                  <span className="mt-1 block text-xs leading-5 text-[var(--mm-text3)]">
+                    Override the profile defaults with ordered codec, channel,
+                    bitrate, and flag criteria.
+                  </span>
+                </span>
+                <span className="shrink-0 text-sm font-semibold text-[var(--mm-accent-bright)]">
+                  {advancedOrderingOpen ? "Hide" : "Edit"}
+                </span>
+              </button>
+              {advancedOrderingOpen ? (
+                <div className="space-y-4 border-t border-[var(--mm-border)] p-4 sm:p-5">
+                  <SorterEditor
+                    title="Audio order"
+                    detail="The first matching criterion wins. Only add a match value when a criterion needs one."
+                    rows={audioSorters}
+                    disabled={disabled}
+                    onChange={(rows) =>
+                      change("audio_sorters_json", dumpSorters(rows))
+                    }
+                  />
+                  <SorterEditor
+                    title="Subtitle order"
+                    detail="These criteria rank only the subtitle tracks retained above."
+                    rows={subtitleSorters}
+                    disabled={disabled}
+                    onChange={(rows) =>
+                      change("subtitle_sorters_json", dumpSorters(rows))
+                    }
+                  />
+                </div>
+              ) : null}
             </section>
 
             {notice ? (
@@ -732,7 +903,7 @@ export function RefinerRuleSetWorkspace() {
                 {notice}
               </p>
             ) : null}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 border-t border-[var(--mm-border)] pt-5">
               <button
                 type="button"
                 className={mmActionButtonClass({
@@ -742,7 +913,7 @@ export function RefinerRuleSetWorkspace() {
                 disabled={disabled}
                 onClick={() => void saveRuleSet()}
               >
-                {creating ? "Create rule set" : "Save rule set"}
+                {creating ? "Create profile" : "Save profile"}
               </button>
               {!creating && selectedRuleSet ? (
                 <button
@@ -758,11 +929,11 @@ export function RefinerRuleSetWorkspace() {
                   onClick={() => void removeRuleSet()}
                   title={
                     selectedRuleSet.used_by_library_count > 0
-                      ? "Detach this rule set from every library before removing it."
-                      : "Remove this unused rule set."
+                      ? "Detach this profile from every library before removing it."
+                      : "Remove this unused profile."
                   }
                 >
-                  Remove rule set
+                  Remove profile
                 </button>
               ) : null}
               {selectedRuleSet?.used_by_library_count ? (
@@ -771,7 +942,7 @@ export function RefinerRuleSetWorkspace() {
                   {selectedRuleSet.used_by_library_count === 1
                     ? "library"
                     : "libraries"}
-                  ; deletion is locked.
+                  ; removal is locked.
                 </span>
               ) : null}
             </div>
@@ -779,102 +950,130 @@ export function RefinerRuleSetWorkspace() {
         )}
       </section>
 
-      <section className="mm-module-surface rounded-xl border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5">
-        <p className="mm-page__eyebrow">Original-language source</p>
-        <h2 className="mt-1 text-lg font-semibold text-[var(--mm-text1)]">
-          Metadata provider
-        </h2>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--mm-text2)]">
-          The API key is encrypted at rest and never returned to this screen. A
-          failed or missing provider never fails a file; Refiner falls back to
-          the rule set&apos;s audio preferences.
-        </p>
-        <div className="mt-4 grid gap-3 lg:grid-cols-3">
-          <label className="block text-sm">
-            <span className="text-[var(--mm-text2)]">Provider</span>
-            <select
-              className={mmSelectFieldClass}
-              value={providerName}
-              disabled={!editable}
-              onChange={(event) =>
-                setProviderName(event.target.value === "tmdb" ? "tmdb" : "")
-              }
-            >
-              <option value="">None</option>
-              <option value="tmdb">TMDb</option>
-            </select>
-          </label>
-          <label className="block text-sm lg:col-span-2">
-            <span className="text-[var(--mm-text2)]">
-              Provider or gateway URL
+      <section className="mm-module-surface rounded-xl border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="mm-page__eyebrow">Optional connection</p>
+            <h2 className="mt-1 text-lg font-semibold text-[var(--mm-text1)]">
+              Metadata provider
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--mm-text2)]">
+              Only needed by profiles that keep a title&apos;s original
+              language. Refiner falls back safely when metadata is unavailable.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="rounded-full border border-[var(--mm-border)] px-2.5 py-1 text-xs font-semibold text-[var(--mm-text2)]">
+              {providerName
+                ? `${providerName.toUpperCase()} configured`
+                : "Not configured"}
             </span>
-            <input
-              className={mmEditableTextFieldClass}
-              value={providerBaseUrl}
-              disabled={!editable || providerName === ""}
-              onChange={(event) => setProviderBaseUrl(event.target.value)}
-            />
-          </label>
-          <label className="block text-sm lg:col-span-2">
-            <span className="text-[var(--mm-text2)]">API key</span>
-            <input
-              type="password"
-              className={mmEditableTextFieldClass}
-              value={providerKey}
-              disabled={!editable || providerName === "" || clearProviderKey}
-              placeholder={
-                provider.data?.key_configured
-                  ? "Saved — enter a replacement only"
-                  : "Enter API key"
-              }
-              onChange={(event) => setProviderKey(event.target.value)}
-            />
-          </label>
-          <label className="flex items-center gap-2 rounded-lg border border-[var(--mm-border)] px-3 py-2 text-sm text-[var(--mm-text2)]">
-            <input
-              type="checkbox"
-              checked={clearProviderKey}
-              disabled={!editable || !provider.data?.key_configured}
-              onChange={(event) => setClearProviderKey(event.target.checked)}
-            />
-            Remove saved key on save
-          </label>
+            <button
+              type="button"
+              className={mmActionButtonClass({ variant: "secondary" })}
+              aria-expanded={providerEditorOpen}
+              onClick={() => setProviderEditorOpen((open) => !open)}
+            >
+              {providerEditorOpen ? "Close" : "Configure"}
+            </button>
+          </div>
         </div>
-        {providerNotice ? (
-          <p
-            role="status"
-            className="mt-3 rounded border border-[var(--mm-border)] px-3 py-2 text-sm"
-          >
-            {providerNotice}
-          </p>
+
+        {providerEditorOpen ? (
+          <div className="mt-5 border-t border-[var(--mm-border)] pt-5">
+            <div className="grid gap-3 lg:grid-cols-3">
+              <label className="block text-sm">
+                <span className="text-[var(--mm-text2)]">Provider</span>
+                <select
+                  className={mmSelectFieldClass}
+                  value={providerName}
+                  disabled={!editable}
+                  onChange={(event) =>
+                    setProviderName(event.target.value === "tmdb" ? "tmdb" : "")
+                  }
+                >
+                  <option value="">None</option>
+                  <option value="tmdb">TMDb</option>
+                </select>
+              </label>
+              <label className="block text-sm lg:col-span-2">
+                <span className="text-[var(--mm-text2)]">
+                  Provider or gateway URL
+                </span>
+                <input
+                  className={mmEditableTextFieldClass}
+                  value={providerBaseUrl}
+                  disabled={!editable || providerName === ""}
+                  onChange={(event) => setProviderBaseUrl(event.target.value)}
+                />
+              </label>
+              <label className="block text-sm lg:col-span-2">
+                <span className="text-[var(--mm-text2)]">API key</span>
+                <input
+                  type="password"
+                  className={mmEditableTextFieldClass}
+                  value={providerKey}
+                  disabled={
+                    !editable || providerName === "" || clearProviderKey
+                  }
+                  placeholder={
+                    provider.data?.key_configured
+                      ? "Saved — enter a replacement only"
+                      : "Enter API key"
+                  }
+                  onChange={(event) => setProviderKey(event.target.value)}
+                />
+              </label>
+              <label className="flex items-center gap-2 rounded-lg border border-[var(--mm-border)] px-3 py-2 text-sm text-[var(--mm-text2)]">
+                <input
+                  type="checkbox"
+                  className={mmCheckboxControlClass}
+                  checked={clearProviderKey}
+                  disabled={!editable || !provider.data?.key_configured}
+                  onChange={(event) =>
+                    setClearProviderKey(event.target.checked)
+                  }
+                />
+                Remove saved key on save
+              </label>
+            </div>
+            {providerNotice ? (
+              <p
+                role="status"
+                className="mt-3 rounded border border-[var(--mm-border)] px-3 py-2 text-sm"
+              >
+                {providerNotice}
+              </p>
+            ) : null}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={mmActionButtonClass({
+                  variant: "primary",
+                  disabled: !editable || saveProvider.isPending,
+                })}
+                disabled={!editable || saveProvider.isPending}
+                onClick={() => void saveProviderConnection()}
+              >
+                Save provider
+              </button>
+              <button
+                type="button"
+                className={mmActionButtonClass({
+                  variant: "secondary",
+                  disabled:
+                    !editable || providerName === "" || testProvider.isPending,
+                })}
+                disabled={
+                  !editable || providerName === "" || testProvider.isPending
+                }
+                onClick={() => void testProviderConnection()}
+              >
+                Save and test
+              </button>
+            </div>
+          </div>
         ) : null}
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={mmActionButtonClass({
-              variant: "primary",
-              disabled: !editable || saveProvider.isPending,
-            })}
-            disabled={!editable || saveProvider.isPending}
-            onClick={() => void saveProviderConnection()}
-          >
-            Save provider
-          </button>
-          <button
-            type="button"
-            className={mmActionButtonClass({
-              variant: "secondary",
-              disabled:
-                !editable || providerName === "" || testProvider.isPending,
-            })}
-            disabled={
-              !editable || providerName === "" || testProvider.isPending
-            }
-            onClick={() => void testProviderConnection()}
-          >
-            Save and test
-          </button>
-        </div>
       </section>
     </div>
   );

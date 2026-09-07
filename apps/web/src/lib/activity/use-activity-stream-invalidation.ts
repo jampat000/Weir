@@ -68,14 +68,48 @@ export function useActivityStreamInvalidation(queryKey: QueryKey): void {
 
 export function useActivityStreamInvalidations(
   queryKeys: readonly QueryKey[],
+  options: { exact?: boolean; throttleMs?: number } = {},
 ): void {
   const qc = useQueryClient();
+  const exact = options.exact ?? false;
+  const throttleMs = Math.max(0, options.throttleMs ?? 0);
 
   useEffect(() => {
-    return subscribeActivityLatest(() => {
+    let lastRunAt = 0;
+    let trailingTimer: number | null = null;
+    let trailingPending = false;
+
+    const invalidate = () => {
+      lastRunAt = Date.now();
+      trailingPending = false;
       queryKeys.forEach((queryKey) => {
-        void qc.invalidateQueries({ queryKey });
+        void qc.invalidateQueries({ queryKey, exact });
       });
+    };
+
+    const unsubscribe = subscribeActivityLatest(() => {
+      const remaining = throttleMs - (Date.now() - lastRunAt);
+      if (remaining <= 0) {
+        if (trailingTimer !== null) {
+          window.clearTimeout(trailingTimer);
+          trailingTimer = null;
+        }
+        invalidate();
+        return;
+      }
+
+      trailingPending = true;
+      if (trailingTimer === null) {
+        trailingTimer = window.setTimeout(() => {
+          trailingTimer = null;
+          if (trailingPending) invalidate();
+        }, remaining);
+      }
     });
-  }, [qc, queryKeys]);
+
+    return () => {
+      unsubscribe();
+      if (trailingTimer !== null) window.clearTimeout(trailingTimer);
+    };
+  }, [exact, qc, queryKeys, throttleMs]);
 }

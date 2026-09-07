@@ -18,7 +18,8 @@ export type RefinerJobsInspectionFilter =
 
 export const refinerJobsInspectionQueryKey = (
   filter: RefinerJobsInspectionFilter,
-) => ["refiner", "jobs", "inspection", filter] as const;
+  limit = 100,
+) => ["refiner", "jobs", "inspection", filter, limit] as const;
 
 function statusesForFilter(
   filter: RefinerJobsInspectionFilter,
@@ -34,12 +35,13 @@ function statusesForFilter(
 
 export function useRefinerJobsInspectionQuery(
   filter: RefinerJobsInspectionFilter,
+  limit = 100,
 ) {
   return useQuery({
-    queryKey: refinerJobsInspectionQueryKey(filter),
+    queryKey: refinerJobsInspectionQueryKey(filter, limit),
     queryFn: () =>
       fetchRefinerJobsInspection({
-        limit: 100,
+        limit,
         statuses: statusesForFilter(filter),
       }),
     staleTime: 15_000,

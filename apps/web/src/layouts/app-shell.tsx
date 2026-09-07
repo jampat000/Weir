@@ -1,5 +1,5 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { BrandHeaderLink } from "../components/brand/brand-header-link";
 import {
   NavIconActivity,
@@ -27,6 +27,7 @@ function sidebarNavClass({ isActive }: { isActive: boolean }) {
 
 export function AppShell() {
   const navigate = useNavigate();
+  const location = useLocation();
   const logout = useLogoutMutation();
   const suite = useSuiteSettingsQuery();
   const dashboard = useDashboardStatusQuery();
@@ -37,6 +38,11 @@ export function AppShell() {
     (suite.data?.product_display_name ?? "MediaMop").trim() || "MediaMop";
   const appVersion = dashboard.data?.system.api_version;
   const nextTheme: AppTheme = theme === "dark" ? "light" : "dark";
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname, location.search]);
+
   const handleSignOut = () => {
     logout.mutate(undefined, {
       onSettled: () => {

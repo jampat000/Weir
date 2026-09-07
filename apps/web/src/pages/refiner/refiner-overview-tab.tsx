@@ -271,26 +271,27 @@ export function RefinerOverviewTab({
   const failedReady = !failed.isPending && !failed.isError;
 
   const workerBody = (
-    <div className="space-y-3 lg:space-y-3.5">
+    <div className="space-y-2.5">
       <p className="font-medium text-[var(--mm-text1)]">
         Up to {operatorSettings.data.max_concurrent_files} file
         {operatorSettings.data.max_concurrent_files === 1 ? "" : "s"} at once
       </p>
-      <div className="space-y-2 text-xs leading-relaxed text-[var(--mm-text3)] lg:space-y-2.5 lg:text-sm">
-        <p>
-          <span className="font-medium text-[var(--mm-text2)]">
-            Folder checks:
-          </span>{" "}
-          TV every {pathSettings.data.tv_watched_folder_check_interval_seconds}s
-          · Movies every{" "}
-          {pathSettings.data.movie_watched_folder_check_interval_seconds}s
-          (under Libraries). Files must sit unchanged at least{" "}
-          {operatorSettings.data.min_file_age_seconds}s before watched-folder
-          scans enqueue them. The same minimum also applies when TV season
-          cleanup checks episodes Refiner never finished and Sonarr is not
-          tracking in its queue.
-        </p>
-      </div>
+      <dl className="grid gap-2 text-sm text-[var(--mm-text3)] sm:grid-cols-2">
+        <div>
+          <dt>Folder checks</dt>
+          <dd className="font-medium text-[var(--mm-text1)]">
+            TV {pathSettings.data.tv_watched_folder_check_interval_seconds}s ·
+            Movies{" "}
+            {pathSettings.data.movie_watched_folder_check_interval_seconds}s
+          </dd>
+        </div>
+        <div>
+          <dt>Minimum unchanged age</dt>
+          <dd className="font-medium text-[var(--mm-text1)]">
+            {operatorSettings.data.min_file_age_seconds} seconds
+          </dd>
+        </div>
+      </dl>
     </div>
   );
 
@@ -406,8 +407,7 @@ export function RefinerOverviewTab({
           />
         </MmStatTileRow>
         <MmStatCaption>
-          Counts completed and terminal-failed remux jobs in the overview
-          window. Success rate = completed / (completed + failed).
+          Completed and terminal-failed remux jobs during this period.
         </MmStatCaption>
       </div>
     );
@@ -430,23 +430,23 @@ export function RefinerOverviewTab({
         <MmAtGlanceGrid className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-x-5 sm:gap-y-5 lg:grid-cols-12 lg:gap-x-5 lg:gap-y-6">
           <MmAtGlanceCard
             glanceOrder="1"
-            title="Last 30 days"
+            title="30-day results"
             emphasis
             body={statsBody}
             data-testid="refiner-overview-last-30-days"
-            gridClassName="lg:col-span-4"
+            gridClassName="sm:col-span-2 lg:col-span-12"
           />
           <MmAtGlanceCard
             glanceOrder="2"
             title="Libraries"
             body={foldersBody}
-            gridClassName="lg:col-span-4"
+            gridClassName="lg:col-span-6"
           />
           <MmAtGlanceCard
             glanceOrder="3"
             title="Job queue"
             body={queueBody}
-            gridClassName="lg:col-span-4"
+            gridClassName="lg:col-span-6"
           />
           <MmAtGlanceCard
             glanceOrder="4"

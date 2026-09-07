@@ -7,16 +7,24 @@ import {
   fetchPrunerStudios,
 } from "./api";
 
+export const prunerInstancesQueryKey = ["pruner", "instances"] as const;
+export const prunerOverviewStatsQueryKey = [
+  "pruner",
+  "overview-stats",
+] as const;
+export const prunerJobsInspectionQueryKey = (limit = 100) =>
+  ["pruner", "jobs-inspection", limit] as const;
+
 export function usePrunerInstancesQuery() {
   return useQuery({
-    queryKey: ["pruner", "instances"],
+    queryKey: prunerInstancesQueryKey,
     queryFn: fetchPrunerInstances,
   });
 }
 
 export function usePrunerOverviewStatsQuery() {
   return useQuery({
-    queryKey: ["pruner", "overview-stats"],
+    queryKey: prunerOverviewStatsQueryKey,
     queryFn: fetchPrunerOverviewStats,
     staleTime: 30_000,
   });
@@ -32,7 +40,7 @@ export function usePrunerInstanceQuery(instanceId: number) {
 
 export function usePrunerJobsInspectionQuery(limit = 100) {
   return useQuery({
-    queryKey: ["pruner", "jobs-inspection", limit],
+    queryKey: prunerJobsInspectionQueryKey(limit),
     queryFn: () => fetchPrunerJobsInspection(limit),
   });
 }
