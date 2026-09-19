@@ -38,6 +38,17 @@ public sealed class ProcessingJobStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Issue_632_a_job_queued_to_start_later_is_not_claimed_before_then()
+    {
+        var job = await _db.Store.EnqueueOrGetAsync("later", Kind, notBefore: T0.AddSeconds(45));
+
+        Assert.Equal(T0.AddSeconds(45), job.NotBefore);
+        Assert.Equal("2026-04-10 12:00:45.000000", _db.Scalar("SELECT not_before FROM jobs"));
+        Assert.Null(await _db.Store.ClaimNextAsync("w", T0.AddHours(1), T0.AddSeconds(44)));
+        Assert.Equal(job.Id, (await _db.Store.ClaimNextAsync("w", T0.AddHours(1), T0.AddSeconds(45)))!.Id);
+    }
+
+    [Fact]
     public async Task Concurrent_enqueue_same_dedupe_key_single_row()
     {
         using var barrier = new Barrier(8);

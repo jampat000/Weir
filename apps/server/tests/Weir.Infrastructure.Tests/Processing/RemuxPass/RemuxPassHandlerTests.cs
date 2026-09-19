@@ -58,7 +58,8 @@ public sealed class RemuxPassHandlerTests : IDisposable
             policy ?? new QueueingFailurePolicy(_fixture.Jobs),
             TimeProvider.System,
             NullLogger<RemuxPassHandler>.Instance,
-            _fixture.Reporter);
+            _fixture.Reporter,
+            _fixture.Jobs);
     }
 
     private async Task<long> LibraryAsync(string failurePolicy = "pass_through", long maxAttempts = 3, string rejectedFileAction = "leave", string mediaType = "movie")
@@ -153,6 +154,67 @@ public sealed class RemuxPassHandlerTests : IDisposable
 
         Assert.Equal("on_hold|0||", await ScalarText("SELECT status || '|' || failure_attempts || '|' || coalesce(failure_class, '') || '|' || coalesce(next_retry_at, '') FROM files"));
         Assert.Equal((false, false), (((PyBool)result["quarantined"]).Value, ((PyBool)result["retry_scheduled"]).Value));
+    }
+
+    [Fact]
+    public async Task Issue_632_a_handed_off_file_that_is_too_young_is_looked_at_again_instead_of_failing()
+    {
+        // A media manager hands a file over within seconds of the download finishing, inside the minimum file age. That
+        // used to fail its pre-check, never retry, and run the failure policy: every such file was passed through
+        // unprocessed, and under "reject" a good release would have been reported bad.
+        var library = await LibraryAsync(failurePolicy: "reject");
+        await _fixture.Store.Execute("UPDATE operator_settings SET min_file_age_seconds = 60");
+        var source = _folders.Source(Path.Join("Film", "film.mkv"));
+        await FileRowAsync(library, "Film/film.mkv");
+        await _fixture.AddConnectionAsync("native", "Manager", "http://192.0.2.30:5099", "k1");
+        await _fixture.Db(async uow => { await _fixture.Ledger.RecordReceivedAsync(uow, "native", "h632", library, "Film/film.mkv"); return 0; });
+        var handoff = $$$"""{"relative_media_path":"Film/film.mkv","media_scope":"movie","trigger":"webhook","library_id":{{{library}}},"origin":{"source_key":"native","handoff_id":"h632","callback_path":"{{{EventsPath}}}","release_name":"Film.2001"}}""";
+        var first = await EnqueueAsync(handoff, "remux:h632");
+        var before = DateTimeOffset.UtcNow;
+
+        await Handler().HandleAsync(Context(first, handoff), CancellationToken.None);
+
+        // On hold with a reason that says how long; no failure counted, no policy run, and the manager told nothing yet.
+        Assert.Equal("on_hold|0|", await ScalarText("SELECT status || '|' || failure_attempts || '|' || coalesce(failure_class, '') FROM files"));
+        Assert.Contains("changed too recently", await ScalarText("SELECT status_reason FROM files"), StringComparison.Ordinal);
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind <> 'processing.file.remux_pass.v1'"));
+        Assert.Empty(_fixture.Http.RequestsTo(HttpMethod.Post, EventsPath));
+        Assert.True(File.Exists(source));
+
+        // The second look is a job held back until the file is old enough, carrying the hand-off's origin.
+        var secondId = await _fixture.Store.Scalar($"SELECT id FROM jobs WHERE id <> {first}");
+        var secondPayload = await ScalarText($"SELECT payload_json FROM jobs WHERE id = {secondId}");
+        var second = (PyDict)PyJsonParser.Parse(secondPayload);
+        Assert.Equal(1, (long)((PyInt)second["minimum_age_waits"]).Value);
+        Assert.Equal("h632", PyConvert.Str(((PyDict)second["origin"])["handoff_id"]));
+        var notBefore = DateTimeOffset.Parse(await ScalarText($"SELECT not_before FROM jobs WHERE id = {secondId}"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
+        Assert.InRange(notBefore, before.AddSeconds(50), before.AddSeconds(70));
+
+        // Old enough now: the second look processes the file and reports the hand-off as completed.
+        File.SetLastWriteTimeUtc(source, DateTime.UtcNow.AddMinutes(-5));
+        await Handler().HandleAsync(Context(secondId, secondPayload), CancellationToken.None);
+
+        Assert.Equal("processed", await ScalarText("SELECT status FROM files"));
+        Assert.Equal(2, await _fixture.Store.Scalar("SELECT count(*) FROM jobs"));
+        Assert.Single(_fixture.Http.RequestsTo(HttpMethod.Post, EventsPath));
+    }
+
+    [Fact]
+    public async Task Issue_632_a_file_that_never_stops_changing_is_not_looked_at_forever()
+    {
+        var library = await LibraryAsync();
+        await _fixture.Store.Execute("UPDATE operator_settings SET min_file_age_seconds = 60");
+        _folders.Source(Path.Join("Film", "film.mkv"));
+        await FileRowAsync(library, "Film/film.mkv");
+        var payload = $$$"""{"relative_media_path":"Film/film.mkv","media_scope":"movie","library_id":{{{library}}},"minimum_age_waits":{{{RemuxPassHandler.MaxMinimumAgeWaits}}}}""";
+        var id = await EnqueueAsync(payload, "remux:still-changing");
+
+        await Handler().HandleAsync(Context(id, payload), CancellationToken.None);
+
+        Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM jobs"));
+        Assert.StartsWith("on_hold|", await ScalarText("SELECT status || '|' FROM files"), StringComparison.Ordinal);
+        var detail = (PyDict)PyJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.file_remux_pass_completed'"));
+        Assert.Contains("stopped looking", PyConvert.Str(detail["reason"]), StringComparison.Ordinal);
     }
 
     [Fact]
