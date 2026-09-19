@@ -237,11 +237,22 @@ public sealed class RemuxPassRunner
 
             if (age < minAge)
             {
-                return FailBefore(
+                // Not a failure: the guardrail is a wait, and it ends by itself (#632). This used to be FailBefore, which
+                // classifies as "preflight" - "retrying reaches the same conclusion" - so nothing retried and the
+                // library's failure policy ran at once. A media manager hands a file over within seconds of the
+                // download finishing, so every such file was passed through unprocessed, and under "reject" a good
+                // release would have been reported bad. The guardrail itself is unchanged; the handler looks again
+                // once the file is old enough (RemuxPassHandler.DeferUntilOldEnoughAsync).
+                var known = Math.Max(0, age);
+                var remaining = (long)Math.Ceiling(minAge - known);
+                var waiting = SourceNotReady(
                     relativeMediaPath,
-                    "file was modified too recently for safety guardrails " +
-                    $"(minimum age {minAge.ToString(CultureInfo.InvariantCulture)}s, current age {((long)Math.Max(0, Math.Truncate(age))).ToString(CultureInfo.InvariantCulture)}s)",
+                    $"This file changed too recently. Weir waits {minAge.ToString(CultureInfo.InvariantCulture)}s after the last change " +
+                    $"before processing, so it has about {remaining.ToString(CultureInfo.InvariantCulture)}s to go.",
                     inspected);
+                waiting.Set("not_ready_kind", MinimumAgeWait);
+                waiting.Set("not_ready_seconds", remaining);
+                return waiting;
             }
         }
 
@@ -1250,6 +1261,9 @@ public sealed class RemuxPassRunner
 
         return result;
     }
+
+    /// <summary><c>not_ready_kind</c> of a file that is only waiting out the minimum file age (#632).</summary>
+    public const string MinimumAgeWait = "minimum_age";
 
     /// <summary><c>_source_not_ready</c>: an expected wait, not a failure.</summary>
     public static PyDict SourceNotReady(string relativeMediaPath, string reason, string? inspectedSourcePath = null)

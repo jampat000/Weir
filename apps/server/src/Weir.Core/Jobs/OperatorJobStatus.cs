@@ -94,7 +94,9 @@ public static class OperatorJobStatus
             return ($"This job was created with an older processing mode{subject}.", "Remove the old entry from the Files list, then let the next scan create a current job.", technical);
         }
 
-        if (lower.Contains("modified too recently", StringComparison.Ordinal) || lower.Contains("still being written", StringComparison.Ordinal))
+        if (lower.Contains("modified too recently", StringComparison.Ordinal)
+            || lower.Contains("changed too recently", StringComparison.Ordinal)
+            || lower.Contains("still being written", StringComparison.Ordinal))
         {
             return ($"Weir is waiting for this file to finish changing{subject}.", "Wait for the copy or import to finish, then use Check again from Files.", technical);
         }

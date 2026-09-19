@@ -11,6 +11,7 @@ using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Rules;
 using Weir.Core.Time;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Sqlite;
 
@@ -32,6 +33,7 @@ public sealed class RemuxPassHandler : IJobHandler
     private readonly RemuxPassRunner _runner;
     private readonly IFailurePolicy _failurePolicy;
     private readonly HandoffCompletionReporter? _reporter;
+    private readonly ProcessingJobStore? _jobs;
     private readonly TimeProvider _time;
     private readonly ILogger<RemuxPassHandler> _logger;
 
@@ -42,7 +44,8 @@ public sealed class RemuxPassHandler : IJobHandler
         IFailurePolicy failurePolicy,
         TimeProvider time,
         ILogger<RemuxPassHandler> logger,
-        HandoffCompletionReporter? reporter = null)
+        HandoffCompletionReporter? reporter = null,
+        ProcessingJobStore? jobs = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -51,7 +54,15 @@ public sealed class RemuxPassHandler : IJobHandler
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _reporter = reporter;
+        _jobs = jobs;
     }
+
+    /// <summary>
+    /// How many times a file that is only waiting out the minimum file age is looked at again before Weir stops
+    /// looking (#632). Each look is a minute or so apart, so this is about half an hour of a file that never stops
+    /// changing, which is a copy that has gone wrong rather than one that is finishing.
+    /// </summary>
+    public const int MaxMinimumAgeWaits = 30;
 
     public string JobKind => RemuxPassOutcomes.JobKind;
 
@@ -179,9 +190,62 @@ public sealed class RemuxPassHandler : IJobHandler
 
         Merge(result, provenance);
         await ApplyFileOutcomeStateAsync(result, libraryId, mediaScope, origin).ConfigureAwait(false);
+        await DeferUntilOldEnoughAsync(context.Id, data, origin, result, cancellationToken).ConfigureAwait(false);
         await RecordAsync(result, progress.ActivityId).ConfigureAwait(false);
         await FinishRejectedInputCleanupAsync(result, libraryId, mediaScope).ConfigureAwait(false);
         await ReportBackAsync(payloadJson, result).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// A file that is only too young is looked at again once it is old enough (#632).
+    /// </summary>
+    /// <remarks>
+    /// The folder scan has always done this for itself: a young file is on hold until the next scan. A hand-off has no
+    /// next scan - a library fed only by hand-offs may have scanning switched off - so the second look is a job, held back
+    /// with <c>not_before</c> exactly as a retry's backoff is. It carries the hand-off's origin, so the outcome is still
+    /// reported to the media manager that sent it; marking this result <c>retry_scheduled</c> is what stops the reporter
+    /// telling that manager anything yet, because nothing is final. Nothing here is specific to any one manager.
+    /// </remarks>
+    private async Task DeferUntilOldEnoughAsync(long jobId, PyDict data, PyDict? origin, PyDict result, CancellationToken cancellationToken)
+    {
+        if (_jobs is null || result.Get("not_ready_kind") is not PyStr { Value: RemuxPassRunner.MinimumAgeWait })
+        {
+            return;
+        }
+
+        var waits = data.Get("minimum_age_waits") is PyInt counted ? (long)counted.Value : 0;
+        if (waits >= MaxMinimumAgeWaits)
+        {
+            var stopped = "This file has kept changing, so Weir has stopped looking at it. When the copy has finished, use Check again from Files.";
+            result.Set("reason", stopped).Set("preflight_reason", stopped).Set("failure_operator_message", stopped);
+            _logger.LogWarning("A file was still changing after {Waits} looks, so Weir stopped looking: job {JobId}.", waits, jobId);
+            return;
+        }
+
+        var seconds = result.Get("not_ready_seconds") is PyInt remaining ? Math.Max(1, (long)remaining.Value) : 60;
+        // A little past the moment it is old enough, so the second look does not land a fraction of a second early.
+        var lookAgainAt = _time.GetUtcNow().AddSeconds(seconds + 2);
+        var payload = data.Copy().Set("minimum_age_waits", waits + 1);
+        if (origin is { IsTruthy: true })
+        {
+            payload.Set("origin", origin);
+        }
+
+        try
+        {
+            await _jobs.EnqueueOrGetAsync(
+                $"{RemuxPassOutcomes.JobKind}:minimum-age-wait:{jobId}:{waits + 1}",
+                RemuxPassOutcomes.JobKind,
+                PyJsonWriter.Dumps(payload, PyJsonFormat.Compact),
+                cancellationToken: cancellationToken,
+                notBefore: lookAgainAt).ConfigureAwait(false);
+            result.Set("retry_scheduled", true).Set("failure_next_retry_at", PyDateTime.FromDateTimeOffset(lookAgainAt).IsoFormat());
+        }
+        catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
+        {
+            // The file stays on hold with its reason, which is true; it is only the second look that is missing.
+            _logger.LogWarning(exception, "Weir could not queue a second look at a file that is waiting out its minimum age.");
+        }
     }
 
     private sealed record Claim(
