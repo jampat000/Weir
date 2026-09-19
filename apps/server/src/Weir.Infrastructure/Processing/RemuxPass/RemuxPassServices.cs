@@ -114,7 +114,8 @@ public static class RemuxPassServices
             sp.GetRequiredService<IFailurePolicy>(),
             sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredService<ILogger<RemuxPassHandler>>(),
-            sp.GetService<HandoffCompletionReporter>()));
+            sp.GetService<HandoffCompletionReporter>(),
+            sp.GetService<ProcessingJobStore>()));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHandler, RemuxPassHandler>(sp => sp.GetRequiredService<RemuxPassHandler>()));
         // Replaces the jobs port's placeholder, whichever registration runs first.
         services.Replace(ServiceDescriptor.Singleton<IUnhandledJobFailureRecorder, RemuxPassFailureRecorder>());

@@ -119,12 +119,13 @@ public sealed class ProcessingJobStore
         int maxAttempts = JobQueueRules.DefaultMaxAttempts,
         int runnerCost = 0,
         int priority = 0,
+        DateTimeOffset? notBefore = null,
         CancellationToken cancellationToken = default)
     {
         JobKindGuard.ValidateEnqueueJobKind(jobKind);
         ArgumentNullException.ThrowIfNull(dedupeKey);
         return InTransactionAsync(
-            (connection, transaction) => EnqueueOrGet(connection, transaction, dedupeKey, jobKind, payloadJson, maxAttempts, runnerCost, priority),
+            (connection, transaction) => EnqueueOrGet(connection, transaction, dedupeKey, jobKind, payloadJson, maxAttempts, runnerCost, priority, notBefore),
             cancellationToken);
     }
 
@@ -444,7 +445,8 @@ public sealed class ProcessingJobStore
         string? payloadJson,
         int maxAttempts,
         int runnerCost,
-        int priority)
+        int priority,
+        DateTimeOffset? notBefore = null)
     {
         JobKindGuard.ValidateEnqueueJobKind(jobKind);
         var existing = GetByDedupeKey(connection, transaction, dedupeKey);
@@ -453,11 +455,13 @@ public sealed class ProcessingJobStore
             return existing;
         }
 
+        // not_before is the column a retry's backoff already uses, so a job queued to start later is claimed by
+        // exactly the same rule as one that is waiting out a failure (#632).
         var inserted = Scalar(
             connection,
             transaction,
-            "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status, max_attempts, runner_cost, priority) " +
-            "VALUES (@dedupe, @kind, @payload, @status, @max_attempts, @runner_cost, @priority) " +
+            "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status, max_attempts, runner_cost, priority, not_before) " +
+            "VALUES (@dedupe, @kind, @payload, @status, @max_attempts, @runner_cost, @priority, @not_before) " +
             "ON CONFLICT (dedupe_key) DO NOTHING RETURNING id",
             ("@dedupe", dedupeKey),
             ("@kind", jobKind),
@@ -465,7 +469,8 @@ public sealed class ProcessingJobStore
             ("@status", ProcessingJobStatus.Pending),
             ("@max_attempts", Math.Max(1, maxAttempts)),
             ("@runner_cost", Math.Max(0, runnerCost)),
-            ("@priority", priority));
+            ("@priority", priority),
+            ("@not_before", notBefore is { } when ? PythonTimestamps.Orm(when) : null));
         if (inserted is not null and not DBNull)
         {
             RecordQueueDepth(connection, transaction);

@@ -625,10 +625,23 @@ public sealed class RemuxPassRunnerTests : IDisposable
             Assert.False(probeFailure.ContainsKey(key), key);
         }
 
+    }
+
+    [Fact]
+    public async Task Issue_632_a_file_younger_than_the_minimum_age_is_a_wait_with_an_end_not_a_failure()
+    {
+        // It was FailedBeforeExecution, which classifies as "preflight": never retried, and the failure policy ran at
+        // once, so a file handed over seconds after its download finished was passed through unprocessed.
         _folders.Source("young.mkv", 200);
-        var young = await Run("young.mkv", minAge: 999_999);
-        Assert.Equal("failed", Str(young, "preflight_status"));
-        Assert.Contains("too recently", Str(young, "preflight_reason"), StringComparison.Ordinal);
+
+        var young = await Run("young.mkv", minAge: 600);
+
+        Assert.Equal(RemuxPassOutcomes.SourceNotReady, Str(young, "outcome"));
+        Assert.Equal("waiting", Str(young, "preflight_status"));
+        Assert.True(((PyBool)young["retryable_wait"]).Value);
+        Assert.Contains("changed too recently", Str(young, "preflight_reason"), StringComparison.Ordinal);
+        Assert.Equal(RemuxPassRunner.MinimumAgeWait, Str(young, "not_ready_kind"));
+        Assert.InRange((long)((PyInt)young["not_ready_seconds"]).Value, 590, 600);
         Assert.False(young.ContainsKey("source_folder_deleted"));
     }
 
