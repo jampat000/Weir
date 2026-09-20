@@ -119,7 +119,7 @@ const EMPTY_FORM: FormState = {
   scan_interval_seconds: "300",
   hold_minutes: "0",
   file_detection_interval_seconds: "30",
-  max_concurrent_files: "1",
+  max_concurrent_files: "0",
   priority: "0",
   sidecar_patterns_csv: ".srt,.ass,.ssa,.sub,.idx,.vtt,.nfo,.jpg,.png",
   output_collision_policy: "replace",
@@ -243,7 +243,7 @@ function writeFrom(
       form.file_detection_interval_seconds,
       30,
     ),
-    max_concurrent_files: asNumber(form.max_concurrent_files, 1),
+    max_concurrent_files: asNumber(form.max_concurrent_files, 0),
     priority: asNumber(form.priority, 0),
     sidecar_patterns_csv: form.sidecar_patterns_csv.trim(),
     preserve_original_timestamps: form.preserve_original_timestamps,
@@ -1134,7 +1134,31 @@ export function ProcessingLibrariesSection() {
               detail="Priority is relative: higher-numbered libraries are offered work first."
             >
               <div className="grid gap-4 lg:grid-cols-2">
-                {field("Files at once", "max_concurrent_files", "1")}
+                <label className="block text-sm">
+                  <span className="text-[var(--mm-text2)]">Files at once</span>
+                  <select
+                    className={mmSelectFieldClass}
+                    value={form.max_concurrent_files}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        max_concurrent_files: event.target.value,
+                      })
+                    }
+                    disabled={!editable}
+                  >
+                    <option value="0">Same as Process settings</option>
+                    {Array.from({ length: 10 }, (_, i) => (
+                      <option key={i + 1} value={String(i + 1)}>
+                        {i === 0 ? "At most 1 file" : `At most ${i + 1} files`}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="mt-1 block text-xs text-[var(--mm-text3)]">
+                    Only to hold this library below Files at once in Process
+                    settings, so it cannot take every slot.
+                  </span>
+                </label>
                 {field("Queue priority", "priority", "0")}
                 {field("Maximum automatic attempts", "max_attempts", "3")}
                 {field(

@@ -7,6 +7,7 @@ using Weir.Core.Activity;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
+using Weir.Core.Processing;
 using Weir.Core.Workers;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Scheduling;
@@ -145,7 +146,7 @@ public sealed class ProcessingWorkerService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await Task.Yield();
-        // The shipped default is 8 slots; the saved files-at-once value gates how many are active (#329).
+        // The shipped default is 10 slots; the saved files-at-once value gates how many are active (#329, #633).
         _logger.LogDebug(
             "Worker slot cap is {SlotCap}; the saved files-at-once setting gates how many are active.",
             _options.ProcessingWorkerCount);
@@ -160,7 +161,7 @@ public sealed class ProcessingWorkerService : BackgroundService
     {
         var owner = LeaseOwner(workerIndex);
         _heartbeats.Started(HeartbeatModule, workerIndex);
-        var cachedMaxConcurrent = 8;
+        var cachedMaxConcurrent = OperatorSettingsRules.MaxFilesAtOnce;
         long cacheExpires = 0;
         var cacheValid = false;
         try
@@ -172,7 +173,7 @@ public sealed class ProcessingWorkerService : BackgroundService
                 {
                     try
                     {
-                        cachedMaxConcurrent = Math.Max(1, Math.Min(8, await ReadMaxConcurrentFilesAsync(stoppingToken).ConfigureAwait(false)));
+                        cachedMaxConcurrent = (int)OperatorSettingsRules.ClampMaxConcurrentFiles(await ReadMaxConcurrentFilesAsync(stoppingToken).ConfigureAwait(false));
                         cacheExpires = _time.GetTimestamp() + (long)(_timings.ConcurrencyCacheTtl.TotalSeconds * _time.TimestampFrequency);
                         cacheValid = true;
                     }

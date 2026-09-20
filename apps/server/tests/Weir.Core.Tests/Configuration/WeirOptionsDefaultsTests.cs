@@ -61,7 +61,7 @@ public sealed class WeirOptionsDefaultsTests
     [Fact]
     public void Processing()
     {
-        Assert.Equal(8, Defaults.ProcessingWorkerCount);
+        Assert.Equal(10, Defaults.ProcessingWorkerCount);
         Assert.Equal(300, Defaults.ProcessingJobLeaseSeconds);
         Assert.True(Defaults.ProcessingWatcherEnabled);
         Assert.Equal(3.0, Defaults.ProcessingWatcherDebounceSeconds);

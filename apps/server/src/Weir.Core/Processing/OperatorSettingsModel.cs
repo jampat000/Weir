@@ -13,6 +13,12 @@ public sealed record ProcessingOperatorSettingsRecord
     public long RunnerCost1080P { get; init; } = 1;
     public long RunnerCost4K { get; init; } = 1;
     public long RunnerCostUndetermined { get; init; }
+
+    /// <summary>
+    /// Whether the resolution budget (runner capacity and per-resolution costs) also limits what starts (#633). Off, a
+    /// file needs only a free slot, so "Files at once" means what it says.
+    /// </summary>
+    public bool RunnerBudgetEnabled { get; init; }
     public bool WorkTempStaleSweepEnabled { get; init; } = true;
     public bool FailureCleanupEnabled { get; init; }
     public bool KeepFailedWorkFiles { get; init; }
@@ -135,7 +141,23 @@ public static class ScheduleWindow
 /// in <c>operator_settings_service.py</c>).</summary>
 public static class OperatorSettingsRules
 {
-    public static long ClampMaxConcurrentFiles(long raw) => Math.Clamp(raw, 1, 8);
+    /// <summary>The most files Weir runs at once, and so the most worker slots a server starts (#633).</summary>
+    public const int MaxFilesAtOnce = 10;
+
+    /// <summary>A library's own limit meaning "the same as Files at once" (#633).</summary>
+    public const long LibraryFollowsFilesAtOnce = 0;
+
+    public static long ClampMaxConcurrentFiles(long raw) => Math.Clamp(raw, 1, MaxFilesAtOnce);
+
+    /// <summary>A library's own limit: 0 follows "Files at once", otherwise 1 to <see cref="MaxFilesAtOnce"/>.</summary>
+    public static long ClampLibraryMaxConcurrentFiles(long raw) => Math.Clamp(raw, LibraryFollowsFilesAtOnce, MaxFilesAtOnce);
+
+    /// <summary>What a library's own limit comes to once "the same as Files at once" is resolved. Never above it.</summary>
+    public static int EffectiveLibraryLimit(long libraryLimit, long filesAtOnce)
+    {
+        var global = (int)ClampMaxConcurrentFiles(filesAtOnce);
+        return libraryLimit <= LibraryFollowsFilesAtOnce ? global : (int)Math.Min(global, ClampLibraryMaxConcurrentFiles(libraryLimit));
+    }
 
     public static long ClampMinFileAgeSeconds(long raw) => Math.Clamp(raw, 0, 7 * 24 * 3600);
 
