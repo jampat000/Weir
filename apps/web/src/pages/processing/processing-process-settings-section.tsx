@@ -15,6 +15,7 @@ import {
 } from "../../lib/api/error-guards";
 import { useMeQuery } from "../../lib/auth/queries";
 import {
+  useProcessingFilesAtOnceQuery,
   useProcessingOperatorSettingsQuery,
   useProcessingOperatorSettingsSaveMutation,
 } from "../../lib/processing/queries";
@@ -28,11 +29,12 @@ function canEdit(role: string | undefined): boolean {
   return role === "operator" || role === "admin";
 }
 
+/** One file, two files ... up to ten (#633). */
 const FILES_AT_ONCE_OPTIONS: MmListboxOption[] = Array.from(
-  { length: 8 },
+  { length: 10 },
   (_, i) => ({
     value: String(i + 1),
-    label: String(i + 1),
+    label: i === 0 ? "1 file" : `${i + 1} files`,
   }),
 );
 
@@ -41,6 +43,7 @@ export function ProcessingProcessSettingsSection() {
   const me = useMeQuery();
   const q = useProcessingOperatorSettingsQuery();
   const save = useProcessingOperatorSettingsSaveMutation();
+  const filesAtOnce = useProcessingFilesAtOnceQuery();
   const filesAtOnceLabelId = useId();
   const editable = canEdit(me.data?.role);
 
@@ -51,6 +54,7 @@ export function ProcessingProcessSettingsSection() {
   const [runnerCost1080p, setRunnerCost1080p] = useState("2");
   const [runnerCost4k, setRunnerCost4k] = useState("4");
   const [runnerCostUndetermined, setRunnerCostUndetermined] = useState("0");
+  const [runnerBudgetEnabled, setRunnerBudgetEnabled] = useState(false);
   const [minFileAgeSeconds, setMinFileAgeSeconds] = useState("60");
   const [minInputFileSizeMb, setMinInputFileSizeMb] = useState("50");
   const [minimumFreeDiskSpaceGb, setMinimumFreeDiskSpaceGb] = useState("5");
@@ -72,6 +76,7 @@ export function ProcessingProcessSettingsSection() {
     setRunnerCost1080p(String(q.data.runner_cost_1080p));
     setRunnerCost4k(String(q.data.runner_cost_4k));
     setRunnerCostUndetermined(String(q.data.runner_cost_undetermined));
+    setRunnerBudgetEnabled(q.data.runner_budget_enabled);
     setMinFileAgeSeconds(String(q.data.min_file_age_seconds));
     setMinInputFileSizeMb(String(q.data.min_input_file_size_mb));
     setMinimumFreeDiskSpaceGb(
@@ -160,6 +165,7 @@ export function ProcessingProcessSettingsSection() {
     runnerCost1080p !== String(q.data.runner_cost_1080p) ||
     runnerCost4k !== String(q.data.runner_cost_4k) ||
     runnerCostUndetermined !== String(q.data.runner_cost_undetermined) ||
+    runnerBudgetEnabled !== q.data.runner_budget_enabled ||
     minFileAgeSeconds !== String(q.data.min_file_age_seconds) ||
     minInputFileSizeMb !== String(q.data.min_input_file_size_mb) ||
     draftMinimumFreeMb !== q.data.minimum_free_disk_space_mb ||
@@ -247,21 +253,21 @@ export function ProcessingProcessSettingsSection() {
     >
       <p className="mm-quiet-note">
         These defaults apply to every library. Each library can still narrow its
-        own intake, schedule and concurrency above.
+        own intake and schedule, and hold itself below Files at once, above.
       </p>
       <div className="mt-6 text-sm leading-relaxed text-[var(--mm-text2)]">
         <div className="grid max-w-3xl gap-10">
           <QuietFieldGroup
-            title="Throughput budget"
-            detail="Files consume runner units by resolution. Work starts only when both a file slot and enough units are available."
+            title="Files at once"
+            detail="How many files Weir works on at the same time, however they arrived. More at once clears a burst of imports sooner; it is mostly disk work, so a slow disk gains little past two or three."
           >
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className={HALF_WIDTH_FIELD_CLASS}>
               <div className="block min-w-0">
                 <span
                   id={filesAtOnceLabelId}
                   className="text-sm text-[var(--mm-text2)]"
                 >
-                  Absolute file limit
+                  Files at once
                 </span>
                 <MmListboxPicker
                   className="w-full min-w-0"
@@ -273,14 +279,44 @@ export function ProcessingProcessSettingsSection() {
                   placeholder="Select…"
                 />
               </div>
-              {numberField(
-                "Runner capacity (units)",
-                runnerCapacity,
-                setRunnerCapacity,
-                { min: 1, max: 64 },
+            </div>
+            {filesAtOnce.data ? (
+              <p
+                className="mm-quiet-note"
+                data-testid="processing-files-at-once-readout"
+              >
+                {filesAtOnce.data.running} running now.{" "}
+                {filesAtOnce.data.message || "Nothing is waiting."}
+                {filesAtOnce.data.slots_note
+                  ? ` ${filesAtOnce.data.slots_note}`
+                  : ""}
+              </p>
+            ) : null}
+            <div>
+              {toggleField(
+                "Also weigh files by resolution",
+                "For a machine that copes with several small files but only one 4K file. Each file then also needs units from a shared budget, so fewer than the number above may run. Leave off for the number above to mean exactly that.",
+                runnerBudgetEnabled,
+                setRunnerBudgetEnabled,
               )}
             </div>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {runnerBudgetEnabled ? (
+              <div className={HALF_WIDTH_FIELD_CLASS}>
+                {numberField(
+                  "Budget (units)",
+                  runnerCapacity,
+                  setRunnerCapacity,
+                  {
+                    min: 1,
+                    max: 64,
+                    hint: "A file starts only while its cost fits in what is left. A cost above the budget never starts.",
+                  },
+                )}
+              </div>
+            ) : null}
+            <div
+              className={`grid grid-cols-2 gap-4 sm:grid-cols-4 ${runnerBudgetEnabled ? "" : "hidden"}`}
+            >
               {numberField("SD cost", runnerCostSd, setRunnerCostSd, {
                 max: 64,
               })}
@@ -294,7 +330,9 @@ export function ProcessingProcessSettingsSection() {
                 max: 64,
               })}
             </div>
-            <div className={HALF_WIDTH_FIELD_CLASS}>
+            <div
+              className={`${HALF_WIDTH_FIELD_CLASS} ${runnerBudgetEnabled ? "" : "hidden"}`}
+            >
               {numberField(
                 "Unknown-resolution cost",
                 runnerCostUndetermined,
@@ -399,6 +437,7 @@ export function ProcessingProcessSettingsSection() {
               runner_cost_1080p: draftRunnerCost1080p,
               runner_cost_4k: draftRunnerCost4k,
               runner_cost_undetermined: draftRunnerCostUndetermined,
+              runner_budget_enabled: runnerBudgetEnabled,
               work_temp_stale_sweep_enabled: workTempStaleSweepEnabled,
               failure_cleanup_enabled: failureCleanupEnabled,
               keep_failed_work_files: keepFailedWorkFiles,

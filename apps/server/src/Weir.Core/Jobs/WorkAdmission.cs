@@ -196,7 +196,9 @@ public static class WorkAdmissionRules
         RunnerBudget? budget,
         IEnumerable<LeasedJobSnapshot> leasedJobs,
         IEnumerable<LibraryAdmissionSnapshot> libraries,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        long filesAtOnce = 1,
+        bool budgetEnabled = true)
     {
         ArgumentNullException.ThrowIfNull(leasedJobs);
         ArgumentNullException.ThrowIfNull(libraries);
@@ -240,19 +242,22 @@ public static class WorkAdmissionRules
                 continue;
             }
 
-            // A per-library cap so one library cannot occupy the whole budget and starve the others.
-            var cap = Math.Max(1, library.MaxConcurrentFiles == 0 ? 1 : library.MaxConcurrentFiles);
+            // A per-library cap so one library cannot occupy every slot and starve the others. A library that has not
+            // been given its own number follows "Files at once" (#633); it used to mean 1, which silently undercut
+            // that setting for every install that had never opened the library's own field.
+            var cap = Weir.Core.Processing.OperatorSettingsRules.EffectiveLibraryLimit(library.MaxConcurrentFiles, filesAtOnce);
             if (runningPerLibrary.GetValueOrDefault(library.Id) >= cap)
             {
                 blocked.Add(library.Id);
             }
         }
 
+        // With the resolution budget off (#633) a file needs only a free slot: every cost fits.
         return new WorkAdmission(
             pause,
             blocked,
             timezoneName,
-            effectiveBudget.Available(unitsInUse),
+            budgetEnabled ? effectiveBudget.Available(unitsInUse) : int.MaxValue,
             effectiveBudget.Capacity);
     }
 

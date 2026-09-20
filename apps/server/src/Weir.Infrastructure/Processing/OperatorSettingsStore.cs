@@ -13,7 +13,7 @@ public static class OperatorSettingsStore
         "file_log_retention_days, verbose_detection_logging, min_file_age_seconds, min_input_file_size_mb, " +
         "minimum_free_disk_space_mb, movie_schedule_enabled, movie_schedule_hours_limited, movie_schedule_days, " +
         "movie_schedule_start, movie_schedule_end, tv_schedule_enabled, tv_schedule_hours_limited, tv_schedule_days, " +
-        "tv_schedule_start, tv_schedule_end, updated_at";
+        "tv_schedule_start, tv_schedule_end, updated_at, runner_budget_enabled";
 
     public static Task<ProcessingOperatorSettingsRecord?> GetAsync(UnitOfWork uow) =>
         uow.QuerySingleAsync($"SELECT {Columns} FROM operator_settings WHERE id = 1", Read);
@@ -58,6 +58,7 @@ public static class OperatorSettingsStore
         Compare("runner_cost_1080p", before.RunnerCost1080P, after.RunnerCost1080P, v => v);
         Compare("runner_cost_4k", before.RunnerCost4K, after.RunnerCost4K, v => v);
         Compare("runner_cost_undetermined", before.RunnerCostUndetermined, after.RunnerCostUndetermined, v => v);
+        Compare("runner_budget_enabled", before.RunnerBudgetEnabled, after.RunnerBudgetEnabled, v => v ? 1 : 0);
         Compare("work_temp_stale_sweep_enabled", before.WorkTempStaleSweepEnabled, after.WorkTempStaleSweepEnabled, v => v ? 1 : 0);
         Compare("failure_cleanup_enabled", before.FailureCleanupEnabled, after.FailureCleanupEnabled, v => v ? 1 : 0);
         Compare("keep_failed_work_files", before.KeepFailedWorkFiles, after.KeepFailedWorkFiles, v => v ? 1 : 0);
@@ -113,5 +114,6 @@ public static class OperatorSettingsStore
         TvScheduleStart = SqliteValues.GetString(reader, 23),
         TvScheduleEnd = SqliteValues.GetString(reader, 24),
         UpdatedAt = SqliteValues.GetDateTime(reader, 25),
+        RunnerBudgetEnabled = SqliteValues.GetBool(reader, 26),
     };
 }

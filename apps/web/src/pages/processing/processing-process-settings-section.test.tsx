@@ -4,8 +4,12 @@ import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import * as authQueries from "../../lib/auth/queries";
+import * as filesAtOnceApi from "../../lib/processing/files-at-once-api";
 import * as api from "../../lib/processing/operator-settings-api";
-import type { ProcessingOperatorSettingsOut } from "../../lib/processing/types";
+import type {
+  ProcessingFilesAtOnceOut,
+  ProcessingOperatorSettingsOut,
+} from "../../lib/processing/types";
 import { ProcessingProcessSettingsSection } from "./processing-process-settings-section";
 
 const settings: ProcessingOperatorSettingsOut = {
@@ -16,6 +20,7 @@ const settings: ProcessingOperatorSettingsOut = {
   runner_cost_1080p: 2,
   runner_cost_4k: 4,
   runner_cost_undetermined: 0,
+  runner_budget_enabled: true,
   work_temp_stale_sweep_enabled: true,
   failure_cleanup_enabled: false,
   keep_failed_work_files: false,
@@ -38,6 +43,17 @@ const settings: ProcessingOperatorSettingsOut = {
   updated_at: "2026-09-01T04:00:00Z",
 };
 
+const readout: ProcessingFilesAtOnceOut = {
+  files_at_once: 2,
+  worker_slots: 10,
+  effective_files_at_once: 2,
+  running: 2,
+  waiting: 3,
+  waiting_for: "free_slot",
+  message: "3 files are waiting for a free slot: 2 of 2 in use.",
+  slots_note: "",
+};
+
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -54,6 +70,9 @@ it("exposes the complete throughput, record, diagnostic, and cleanup contract", 
     data: { role: "operator" },
   } as ReturnType<typeof authQueries.useMeQuery>);
   vi.spyOn(api, "fetchProcessingOperatorSettings").mockResolvedValue(settings);
+  vi.spyOn(filesAtOnceApi, "fetchProcessingFilesAtOnce").mockResolvedValue(
+    readout,
+  );
   const save = vi
     .spyOn(api, "putProcessingOperatorSettings")
     .mockResolvedValue({
@@ -64,8 +83,10 @@ it("exposes the complete throughput, record, diagnostic, and cleanup contract", 
 
   render(<ProcessingProcessSettingsSection />, { wrapper });
 
-  expect(await screen.findByText("Throughput budget")).toBeInTheDocument();
-  expect(screen.getByLabelText("Runner capacity (units)")).toHaveValue(6);
+  expect(
+    await screen.findByRole("heading", { name: "Files at once" }),
+  ).toBeInTheDocument();
+  expect(screen.getByLabelText(/Budget \(units\)/)).toHaveValue(6);
   expect(screen.getByLabelText("1080p cost")).toHaveValue(2);
   expect(
     screen.getByRole("checkbox", { name: /Reclaim stale temporary files/ }),
@@ -94,12 +115,52 @@ it("exposes the complete throughput, record, diagnostic, and cleanup contract", 
       expect.objectContaining({
         runner_capacity: 6,
         runner_cost_1080p: 2,
+        runner_budget_enabled: true,
         work_temp_stale_sweep_enabled: true,
         failure_cleanup_enabled: false,
         keep_failed_work_files: false,
         file_log_retention_days: 0,
         verbose_detection_logging: true,
       }),
+    );
+  });
+});
+
+it("says what waiting files are waiting for, and hides the resolution budget until it is switched on (#633)", async () => {
+  vi.spyOn(authQueries, "useMeQuery").mockReturnValue({
+    data: { role: "operator" },
+  } as ReturnType<typeof authQueries.useMeQuery>);
+  vi.spyOn(api, "fetchProcessingOperatorSettings").mockResolvedValue({
+    ...settings,
+    runner_budget_enabled: false,
+  });
+  vi.spyOn(filesAtOnceApi, "fetchProcessingFilesAtOnce").mockResolvedValue(
+    readout,
+  );
+  const save = vi
+    .spyOn(api, "putProcessingOperatorSettings")
+    .mockResolvedValue({ ...settings, runner_budget_enabled: true });
+
+  render(<ProcessingProcessSettingsSection />, { wrapper });
+
+  expect(
+    await screen.findByTestId("processing-files-at-once-readout"),
+  ).toHaveTextContent(
+    "2 running now. 3 files are waiting for a free slot: 2 of 2 in use.",
+  );
+  expect(screen.queryByLabelText(/Budget \(units\)/)).not.toBeInTheDocument();
+
+  fireEvent.click(
+    screen.getByRole("checkbox", { name: /Also weigh files by resolution/ }),
+  );
+  expect(screen.getByLabelText(/Budget \(units\)/)).toHaveValue(6);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Save processing settings" }),
+  );
+
+  await waitFor(() => {
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ runner_budget_enabled: true }),
     );
   });
 });
