@@ -101,7 +101,7 @@ public sealed class SystemEndpointsTests
             "{\"name\":\"filesystem_watcher\",\"status\":\"ready\",\"detail\":\"No libraries are being watched for filesystem events.\"}]",
             root.GetProperty("steps").GetRawText());
         Assert.Equal(
-            "[{\"module\":\"processing\",\"expected_workers\":8,\"active_workers\":8,\"stale_workers\":0,\"stopped_workers\":0,\"status\":\"healthy\"," +
+            "[{\"module\":\"processing\",\"expected_workers\":10,\"active_workers\":10,\"stale_workers\":0,\"stopped_workers\":0,\"status\":\"healthy\"," +
             "\"detail\":\"Weir worker heartbeats are current.\"}]",
             root.GetProperty("worker_health").GetRawText());
     }

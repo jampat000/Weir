@@ -159,7 +159,8 @@ public sealed record ProcessingLibraryRecord
     public bool RetryPreflightFailures { get; init; }
     public string FailurePolicy { get; init; } = ProcessingFailurePolicies.PassThrough;
 
-    public long MaxConcurrentFiles { get; init; } = 1;
+    /// <summary>This library's own limit; 0 is "the same as Files at once" (#633).</summary>
+    public long MaxConcurrentFiles { get; init; } = OperatorSettingsRules.LibraryFollowsFilesAtOnce;
     public long Priority { get; init; }
 
     public long? RuleSetId { get; init; }

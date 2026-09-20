@@ -42,6 +42,26 @@ export type ProcessingOverviewStatsOut = {
   net_space_saved_percent: number;
 };
 
+/** What is running, what is waiting, and the one limit the waiting files are waiting on (#633). */
+export type ProcessingFilesAtOnceOut = {
+  files_at_once: number;
+  worker_slots: number;
+  effective_files_at_once: number;
+  running: number;
+  waiting: number;
+  waiting_for:
+    | "nothing"
+    | "workers_off"
+    | "paused"
+    | "free_slot"
+    | "library_limit"
+    | "library_closed"
+    | "resolution_budget"
+    | "starting";
+  message: string;
+  slots_note: string;
+};
+
 export type ProcessingOperatorSettingsOut = {
   max_concurrent_files: number;
   runner_capacity: number;
@@ -49,6 +69,8 @@ export type ProcessingOperatorSettingsOut = {
   runner_cost_720p: number;
   runner_cost_1080p: number;
   runner_cost_4k: number;
+  /** Whether the resolution budget also limits what starts. Off, a file needs only a free slot. */
+  runner_budget_enabled: boolean;
   runner_cost_undetermined: number;
   work_temp_stale_sweep_enabled: boolean;
   failure_cleanup_enabled: boolean;
@@ -82,6 +104,7 @@ export type ProcessingOperatorSettingsPutBody = {
   runner_cost_1080p?: number;
   runner_cost_4k?: number;
   runner_cost_undetermined?: number;
+  runner_budget_enabled?: boolean;
   work_temp_stale_sweep_enabled?: boolean;
   failure_cleanup_enabled?: boolean;
   keep_failed_work_files?: boolean;

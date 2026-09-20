@@ -207,7 +207,9 @@ public sealed class JobRulesTests
         Assert.Equal(0, WeirOptionsLoader.ClampProcessingWorkerCount(0));
         Assert.Equal(1, WeirOptionsLoader.ClampProcessingWorkerCount(1));
         Assert.Equal(8, WeirOptionsLoader.ClampProcessingWorkerCount(8));
-        Assert.Equal(8, WeirOptionsLoader.ClampProcessingWorkerCount(9));
+        // #633: ten slots, so "Files at once" can be 10.
+        Assert.Equal(10, WeirOptionsLoader.ClampProcessingWorkerCount(10));
+        Assert.Equal(10, WeirOptionsLoader.ClampProcessingWorkerCount(11));
         Assert.Equal(60, WeirOptionsLoader.ClampProcessingScheduleIntervalSeconds(5));
         Assert.Equal(604_800, WeirOptionsLoader.ClampProcessingScheduleIntervalSeconds(10_000_000));
         Assert.Equal(0, WeirOptionsLoader.ClampProcessingMinFileAgeSeconds(-5));

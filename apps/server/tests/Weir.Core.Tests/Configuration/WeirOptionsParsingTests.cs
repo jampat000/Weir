@@ -202,8 +202,8 @@ public sealed class WeirOptionsParsingTests
     [InlineData("-3", 1)]
     [InlineData("0", 0)]
     [InlineData("5", 5)]
-    [InlineData("99", 8)]
-    public void Processing_worker_count_is_zero_to_eight_and_negative_means_one(string raw, int expected) =>
+    [InlineData("99", 10)]
+    public void Processing_worker_count_is_zero_to_ten_and_negative_means_one(string raw, int expected) =>
         Assert.Equal(expected, TestRuntime.Load(("WEIR_PROCESSING_WORKER_COUNT", raw)).ProcessingWorkerCount);
 
     [Theory]
