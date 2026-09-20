@@ -583,6 +583,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/processing/files-at-once": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Processing Files At Once
+     * @description What is running, what is waiting, and which limit the waiting files are waiting on.
+     */
+    get: operations["get_processing_files_at_once_api_v1_processing_files_at_once_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/processing/files/requeue": {
     parameters: {
       query?: never;
@@ -3982,7 +4002,8 @@ export interface components {
       max_attempts: number;
       /**
        * Max Concurrent Files
-       * @default 1
+       * @description This library's own limit on files at once. 0 means the same as "Files at once" in Process settings.
+       * @default 0
        */
       max_concurrent_files: number;
       /**
@@ -4228,7 +4249,10 @@ export interface components {
       manager_coverage_detail: string;
       /** Max Attempts */
       max_attempts: number;
-      /** Max Concurrent Files */
+      /**
+       * Max Concurrent Files
+       * @description This library's own limit on files at once. 0 means the same as "Files at once" in Process settings.
+       */
       max_concurrent_files: number;
       /** Max File Size Mb */
       max_file_size_mb: number;
@@ -4416,7 +4440,8 @@ export interface components {
       max_attempts: number;
       /**
        * Max Concurrent Files
-       * @default 1
+       * @description This library's own limit on files at once. 0 means the same as "Files at once" in Process settings.
+       * @default 0
        */
       max_concurrent_files: number;
       /**
@@ -4677,6 +4702,11 @@ export interface components {
       runner_cost_1080p: number;
       /** Runner Cost 4K */
       runner_cost_4k: number;
+      /**
+       * Runner Budget Enabled
+       * @description Whether the resolution budget (runner capacity and per-resolution costs) also limits what starts. Off, a file needs only a free slot.
+       */
+      runner_budget_enabled: boolean;
       /** Runner Cost 720P */
       runner_cost_720p: number;
       /** Runner Cost Sd */
@@ -4751,6 +4781,8 @@ export interface components {
       runner_cost_1080p?: number | null;
       /** Runner Cost 4K */
       runner_cost_4k?: number | null;
+      /** Runner Budget Enabled */
+      runner_budget_enabled?: boolean | null;
       /** Runner Cost 720P */
       runner_cost_720p?: number | null;
       /** Runner Cost Sd */
@@ -6233,6 +6265,42 @@ export interface components {
       /** Managers */
       managers: components["schemas"]["ManagerSetupItemOut"][];
     };
+    /**
+     * ProcessingFilesAtOnceOut
+     * @description What is running, what is waiting, and the one limit the waiting files are waiting on.
+     */
+    ProcessingFilesAtOnceOut: {
+      /** Files At Once */
+      files_at_once: number;
+      /**
+       * Worker Slots
+       * @description Slots this server process started with. It cannot run more than this until it restarts.
+       */
+      worker_slots: number;
+      /** Effective Files At Once */
+      effective_files_at_once: number;
+      /** Running */
+      running: number;
+      /** Waiting */
+      waiting: number;
+      /**
+       * Waiting For
+       * @enum {string}
+       */
+      waiting_for:
+        | "nothing"
+        | "workers_off"
+        | "paused"
+        | "free_slot"
+        | "library_limit"
+        | "library_closed"
+        | "resolution_budget"
+        | "starting";
+      /** Message */
+      message: string;
+      /** Slots Note */
+      slots_note: string;
+    };
   };
   responses: never;
   parameters: never;
@@ -7311,6 +7379,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_processing_files_at_once_api_v1_processing_files_at_once_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProcessingFilesAtOnceOut"];
         };
       };
     };

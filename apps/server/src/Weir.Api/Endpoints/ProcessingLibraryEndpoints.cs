@@ -363,7 +363,9 @@ public static class ProcessingLibraryEndpoints
         var scheduleDays = model.OptionalStr("schedule_days", defaultValue: "", maxLength: 200) ?? string.Empty;
         var scheduleStart = model.OptionalStr("schedule_start", defaultValue: "00:00", maxLength: 5) ?? "00:00";
         var scheduleEnd = model.OptionalStr("schedule_end", defaultValue: "23:59", maxLength: 5) ?? "23:59";
-        var maxConcurrentFiles = model.Number("max_concurrent_files", 1, required: false, ge: 1, le: 8);
+        // 0 is "the same as Files at once" (#633), and what a library starts with.
+        var maxConcurrentFiles = model.Number(
+            "max_concurrent_files", OperatorSettingsRules.LibraryFollowsFilesAtOnce, required: false, ge: 0, le: OperatorSettingsRules.MaxFilesAtOnce);
         var priority = model.Number("priority", 0, required: false, ge: -100, le: 100);
         var ruleSetId = model.OptionalInt("rule_set_id");
         var managerConnectionIds = model.IntList("manager_connection_ids");

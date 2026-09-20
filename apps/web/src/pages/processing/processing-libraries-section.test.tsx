@@ -207,6 +207,33 @@ it("adds a library through the API", async () => {
   });
 });
 
+it("starts a new library on the same files-at-once as Process settings, and lets it be held lower (#633)", async () => {
+  asOperator();
+  vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
+  const create = vi
+    .spyOn(api, "createProcessingLibrary")
+    .mockResolvedValue(library({ id: 9, name: "Kids" }));
+
+  render(<ProcessingLibrariesSection />, { wrapper });
+  fireEvent.click(await screen.findByTestId("processing-library-add"));
+  fireEvent.change(screen.getByPlaceholderText("Movies 4K"), {
+    target: { value: "Kids" },
+  });
+  const filesAtOnce = screen.getByRole("combobox", { name: /Files at once/ });
+  expect(filesAtOnce).toHaveValue("0");
+  expect(filesAtOnce).toHaveTextContent("Same as Process settings");
+  expect(filesAtOnce).toHaveTextContent("At most 10 files");
+
+  fireEvent.change(filesAtOnce, { target: { value: "2" } });
+  fireEvent.click(screen.getByTestId("processing-library-save"));
+
+  await waitFor(() => {
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Kids", max_concurrent_files: 2 }),
+    );
+  });
+});
+
 it("saves the complete library contract without resetting hidden or advanced values", async () => {
   asOperator();
   const existing = library({

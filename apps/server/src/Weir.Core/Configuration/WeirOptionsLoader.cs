@@ -79,7 +79,7 @@ public static class WeirOptionsLoader
 
         var paths = RuntimePaths.Resolve(runtime);
 
-        var processingWorkers = ClampProcessingWorkerCount(EnvInt(runtime, "WEIR_PROCESSING_WORKER_COUNT", 8));
+        var processingWorkers = ClampProcessingWorkerCount(EnvInt(runtime, "WEIR_PROCESSING_WORKER_COUNT", Weir.Core.Processing.OperatorSettingsRules.MaxFilesAtOnce));
         var processingJobLeaseSeconds = ClampProcessingJobLeaseSeconds(EnvInt(runtime, "WEIR_PROCESSING_JOB_LEASE_SECONDS", DefaultProcessingJobLeaseSeconds));
         var watcherEnabled = EnvBool(runtime, "WEIR_PROCESSING_WATCHER_ENABLED", true);
         var watcherDebounce = Math.Max(0.25, Math.Min(300.0, EnvInt(runtime, "WEIR_PROCESSING_WATCHER_DEBOUNCE_SECONDS", 3)));
@@ -181,8 +181,9 @@ public static class WeirOptionsLoader
         };
     }
 
-    /// <summary><c>clamp_processing_worker_count</c>: 0..8 slots; negative values mean 1.</summary>
-    public static int ClampProcessingWorkerCount(long raw) => raw < 0 ? 1 : (int)Math.Min(8, raw);
+    /// <summary><c>clamp_processing_worker_count</c>: 0..10 slots (8 before #633); negative values mean 1.</summary>
+    public static int ClampProcessingWorkerCount(long raw) =>
+        raw < 0 ? 1 : (int)Math.Min(Weir.Core.Processing.OperatorSettingsRules.MaxFilesAtOnce, raw);
 
     /// <summary>
     /// #540 item 1: 30 s .. 1 day. Below 30 s the lease-renewal heartbeat (every ~lease/3) would fire

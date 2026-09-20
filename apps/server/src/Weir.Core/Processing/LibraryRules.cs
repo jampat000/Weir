@@ -61,7 +61,7 @@ public sealed record ProcessingLibraryInput
     public string ScheduleDays { get; init; } = string.Empty;
     public string ScheduleStart { get; init; } = "00:00";
     public string ScheduleEnd { get; init; } = "23:59";
-    public long MaxConcurrentFiles { get; init; } = 1;
+    public long MaxConcurrentFiles { get; init; } = OperatorSettingsRules.LibraryFollowsFilesAtOnce;
     public long Priority { get; init; }
     public long? RuleSetId { get; init; }
     public IReadOnlyList<long> ManagerConnectionIds { get; init; } = [];

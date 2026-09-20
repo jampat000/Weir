@@ -175,7 +175,7 @@ public sealed class AdmissionClaimTests : IDisposable
     [Fact]
     public async Task A_job_costing_more_than_the_budget_left_waits_and_a_free_job_still_runs()
     {
-        _db.Execute("INSERT INTO operator_settings (id, runner_capacity) VALUES (1, 2)");
+        _db.Execute("INSERT INTO operator_settings (id, runner_capacity, runner_budget_enabled) VALUES (1, 2, 1)");
         await _db.Store.EnqueueOrGetAsync("big-1", Remux, runnerCost: 2);
         await _db.Store.EnqueueOrGetAsync("big-2", Remux, runnerCost: 1);
         await _db.Store.EnqueueOrGetAsync("free", Remux, runnerCost: 0);

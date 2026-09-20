@@ -380,7 +380,7 @@ describe("ProcessingPage", () => {
       .closest("section");
     expect(block).not.toBeNull();
     const text = block?.textContent ?? "";
-    expect(text).toMatch(/Absolute file limit/i);
+    expect(text).toMatch(/Files at once/i);
     expect(text).toMatch(/Minimum unchanged age/i);
     expect(text).toMatch(/Verbose file-detection records/i);
   });

@@ -26,6 +26,7 @@ public static class ProcessingSettingsEndpoints
         endpoints.MapV1("GET", "/processing/operator-settings", GetOperatorSettingsAsync);
         endpoints.MapV1("PUT", "/processing/operator-settings", PutOperatorSettingsAsync);
         endpoints.MapV1("GET", "/processing/runtime-settings", GetRuntimeSettingsAsync);
+        endpoints.MapV1("GET", "/processing/files-at-once", GetFilesAtOnceAsync);
         endpoints.MapV1("GET", "/processing/hardware", GetHardwareAsync);
         endpoints.MapV1("GET", "/processing/metadata-provider", GetMetadataProviderAsync);
         endpoints.MapV1("PUT", "/processing/metadata-provider", PutMetadataProviderAsync);
@@ -40,6 +41,7 @@ public static class ProcessingSettingsEndpoints
         .Set("runner_cost_720p", OperatorSettingsRules.ClampRunnerCost(row.RunnerCost720P))
         .Set("runner_cost_1080p", OperatorSettingsRules.ClampRunnerCost(row.RunnerCost1080P))
         .Set("runner_cost_4k", OperatorSettingsRules.ClampRunnerCost(row.RunnerCost4K))
+        .Set("runner_budget_enabled", row.RunnerBudgetEnabled)
         .Set("work_temp_stale_sweep_enabled", row.WorkTempStaleSweepEnabled)
         .Set("failure_cleanup_enabled", row.FailureCleanupEnabled)
         .Set("keep_failed_work_files", row.KeepFailedWorkFiles)
@@ -77,13 +79,14 @@ public static class ProcessingSettingsEndpoints
         var issues = new ValidationIssues();
         var model = new BodyModel(payload, issues);
         var csrfToken = model.Str("csrf_token", minLength: 1);
-        var maxConcurrentFiles = model.OptionalInt("max_concurrent_files", ge: 1, le: 8);
+        var maxConcurrentFiles = model.OptionalInt("max_concurrent_files", ge: 1, le: OperatorSettingsRules.MaxFilesAtOnce);
         var runnerCapacity = model.OptionalInt("runner_capacity", ge: 1, le: 64);
         var runnerCostSd = model.OptionalInt("runner_cost_sd", ge: 0, le: 64);
         var runnerCost720P = model.OptionalInt("runner_cost_720p", ge: 0, le: 64);
         var runnerCost1080P = model.OptionalInt("runner_cost_1080p", ge: 0, le: 64);
         var runnerCost4K = model.OptionalInt("runner_cost_4k", ge: 0, le: 64);
         var runnerCostUndetermined = model.OptionalInt("runner_cost_undetermined", ge: 0, le: 64);
+        var runnerBudgetEnabled = model.OptionalBool("runner_budget_enabled");
         var workTempStaleSweepEnabled = model.OptionalBool("work_temp_stale_sweep_enabled");
         var failureCleanupEnabled = model.OptionalBool("failure_cleanup_enabled");
         var keepFailedWorkFiles = model.OptionalBool("keep_failed_work_files");
@@ -120,7 +123,7 @@ public static class ProcessingSettingsEndpoints
 
         var hasProcessField = maxConcurrentFiles is not null || runnerCapacity is not null || runnerCostSd is not null ||
                                runnerCost720P is not null || runnerCost1080P is not null || runnerCost4K is not null ||
-                               runnerCostUndetermined is not null || workTempStaleSweepEnabled is not null || failureCleanupEnabled is not null ||
+                               runnerCostUndetermined is not null || runnerBudgetEnabled is not null || workTempStaleSweepEnabled is not null || failureCleanupEnabled is not null ||
                                keepFailedWorkFiles is not null || fileLogRetentionDays is not null || verboseDetectionLogging is not null ||
                                minFileAgeSeconds is not null || processingMinInputFileSizeMb is not null || minimumFreeDiskSpaceMb is not null;
         if (!hasProcessField && movieScheduleEnabled is null && tvScheduleEnabled is null)
@@ -139,6 +142,11 @@ public static class ProcessingSettingsEndpoints
         if (maxConcurrentFiles is { } m)
         {
             after = after with { MaxConcurrentFiles = OperatorSettingsRules.ClampMaxConcurrentFiles(m) };
+        }
+
+        if (runnerBudgetEnabled is { } budgetOn)
+        {
+            after = after with { RunnerBudgetEnabled = budgetOn };
         }
 
         if (runnerCapacity is { } rc)
@@ -247,6 +255,26 @@ public static class ProcessingSettingsEndpoints
         var suite = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(OperatorSettingsOut(updated, string.IsNullOrWhiteSpace(suite.AppTimezone) ? "UTC" : suite.AppTimezone.Trim()));
+    }
+
+    /// <summary>What is running, what is waiting and which limit the waiting files are waiting on (#633).</summary>
+    private static async Task<ApiResult> GetFilesAtOnceAsync(ApiRequest request)
+    {
+        await request.RequireUserAsync().ConfigureAwait(false);
+        var store = request.Service<Weir.Infrastructure.Jobs.ProcessingJobStore>();
+        var now = request.Service<TimeProvider>().GetUtcNow();
+        var slots = request.Options.ProcessingWorkerCount;
+        var readout = await store.InTransactionAsync(
+            (connection, transaction) => Weir.Infrastructure.Jobs.WorkAdmissionReader.ReadFilesAtOnce(connection, transaction, now, slots)).ConfigureAwait(false);
+        return ApiRoutes.Ok(new PyDict()
+            .Set("files_at_once", readout.FilesAtOnce)
+            .Set("worker_slots", readout.WorkerSlots)
+            .Set("effective_files_at_once", readout.Effective)
+            .Set("running", readout.Running)
+            .Set("waiting", readout.Waiting)
+            .Set("waiting_for", readout.WaitingFor)
+            .Set("message", readout.Message)
+            .Set("slots_note", readout.SlotsNote));
     }
 
     private static async Task<ApiResult> GetRuntimeSettingsAsync(ApiRequest request)

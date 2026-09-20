@@ -177,3 +177,43 @@ def test_operator_settings_put_invalid_days(admin) -> None:
         },
     )
     assert r.status_code == 400, r.text
+
+
+def test_files_at_once_goes_to_ten_and_no_further(admin) -> None:
+    # #633: one clear choice, 1 to 10.
+    ok = admin.put_csrf(PATH, {"max_concurrent_files": 10})
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["max_concurrent_files"] == 10
+    too_many = admin.put_csrf(PATH, {"max_concurrent_files": 11})
+    assert too_many.status_code == 422, too_many.text
+
+
+def test_resolution_budget_is_a_switch_that_starts_off(server_factory, client_factory) -> None:
+    # #633: off, a file needs only a free slot, so "Files at once" means what it says.
+    admin = h.signed_in_admin(server_factory(), client_factory)
+    assert admin.get(PATH).json()["runner_budget_enabled"] is False
+    r = admin.put_csrf(PATH, {"runner_budget_enabled": True})
+    assert r.status_code == 200, r.text
+    assert r.json()["runner_budget_enabled"] is True
+
+
+def test_files_at_once_read_out_shape(server_factory, client_factory) -> None:
+    # #633: what is running, what is waiting, and the one limit the waiting files are waiting on.
+    admin = h.signed_in_admin(server_factory(), client_factory)
+    r = admin.get(f"{API}/processing/files-at-once")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert list(body) == [
+        "files_at_once",
+        "worker_slots",
+        "effective_files_at_once",
+        "running",
+        "waiting",
+        "waiting_for",
+        "message",
+        "slots_note",
+    ]
+    assert body["files_at_once"] == 1
+    assert body["waiting"] == 0
+    assert body["waiting_for"] == "nothing"
+    assert body["message"] == ""

@@ -3,6 +3,7 @@ import {
   fetchProcessingOperatorSettings,
   putProcessingOperatorSettings,
 } from "./operator-settings-api";
+import { fetchProcessingFilesAtOnce } from "./files-at-once-api";
 import { fetchProcessingOverviewStats } from "./overview-stats-api";
 import { postProcessingWatchedFolderRemuxScanDispatchEnqueue } from "./watched-folder-scan-api";
 import type {
@@ -18,6 +19,21 @@ export const processingOperatorSettingsQueryKey = [
   "processing",
   "operator-settings",
 ] as const;
+
+export const processingFilesAtOnceQueryKey = [
+  "processing",
+  "files-at-once",
+] as const;
+
+/** What is running and what the waiting files are waiting for. Polled: it is a live read-out. */
+export function useProcessingFilesAtOnceQuery() {
+  return useQuery({
+    queryKey: processingFilesAtOnceQueryKey,
+    queryFn: () => fetchProcessingFilesAtOnce(),
+    staleTime: 5_000,
+    refetchInterval: 10_000,
+  });
+}
 
 export function useProcessingOverviewStatsQuery(windowDays?: number) {
   return useQuery({
@@ -45,6 +61,7 @@ export function useProcessingOperatorSettingsSaveMutation() {
       putProcessingOperatorSettings(body),
     onSuccess: (data) => {
       qc.setQueryData(processingOperatorSettingsQueryKey, data);
+      void qc.invalidateQueries({ queryKey: processingFilesAtOnceQueryKey });
       void qc.invalidateQueries({
         queryKey: processingRuntimeSettingsQueryKey,
       });

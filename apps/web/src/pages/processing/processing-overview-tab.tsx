@@ -23,6 +23,7 @@ import {
   useProcessingRuleSetsQuery,
 } from "../../lib/processing/libraries-queries";
 import {
+  useProcessingFilesAtOnceQuery,
   useProcessingOperatorSettingsQuery,
   useProcessingOverviewStatsQuery,
 } from "../../lib/processing/queries";
@@ -364,6 +365,7 @@ export function ProcessingOverviewTab({
 } = {}) {
   const librariesQuery = useProcessingLibrariesQuery();
   const operatorSettings = useProcessingOperatorSettingsQuery();
+  const filesAtOnce = useProcessingFilesAtOnceQuery();
   const ruleSets = useProcessingRuleSetsQuery();
   const overviewStats = useProcessingOverviewStatsQuery();
   const files = useProcessingFilesQuery({ limit: 1 });
@@ -468,6 +470,7 @@ export function ProcessingOverviewTab({
               Click a stage to open Files filtered to it. A file is picked up
               once it has not changed for {settings.min_file_age_seconds}{" "}
               seconds. Up to {settings.max_concurrent_files} at once.
+              {filesAtOnce.data?.message ? ` ${filesAtOnce.data.message}` : ""}
             </span>
             <span>
               {flowSummary()}

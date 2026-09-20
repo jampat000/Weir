@@ -729,15 +729,19 @@ public static class WorkAdmissionReader
         }
 
         RunnerBudget? budget = null;
+        long filesAtOnce = 1;
+        var budgetEnabled = true;
         using (var command = Command(connection, transaction,
-                   "SELECT runner_capacity, runner_cost_sd, runner_cost_720p, runner_cost_1080p, runner_cost_4k, runner_cost_undetermined " +
-                   "FROM operator_settings WHERE id = 1"))
+                   "SELECT runner_capacity, runner_cost_sd, runner_cost_720p, runner_cost_1080p, runner_cost_4k, runner_cost_undetermined, " +
+                   "max_concurrent_files, runner_budget_enabled FROM operator_settings WHERE id = 1"))
         using (var reader = command.ExecuteReader())
         {
             if (reader.Read())
             {
                 budget = RunnerBudget.FromSettings(Long(reader.GetValue(0)), Long(reader.GetValue(1)), Long(reader.GetValue(2)),
                     Long(reader.GetValue(3)), Long(reader.GetValue(4)), Long(reader.GetValue(5)));
+                filesAtOnce = Long(reader.GetValue(6));
+                budgetEnabled = Bool(reader.GetValue(7));
             }
         }
 
@@ -772,7 +776,74 @@ public static class WorkAdmissionReader
             }
         }
 
-        return WorkAdmissionRules.Evaluate(suite, budget, leased, libraries, now);
+        return WorkAdmissionRules.Evaluate(suite, budget, leased, libraries, now, filesAtOnce, budgetEnabled);
+    }
+
+    /// <summary>
+    /// What is running, what is waiting and which limit the waiting files are waiting on (#633). Read in one
+    /// transaction with the same admission the worker's claim uses, so the screen says what the worker would do.
+    /// </summary>
+    public static FilesAtOnceReadout ReadFilesAtOnce(SqliteConnection connection, SqliteTransaction transaction, DateTimeOffset now, int workerSlots)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        var admission = Evaluate(connection, transaction, now);
+
+        long filesAtOnce = 1;
+        var budgetEnabled = true;
+        using (var command = Command(connection, transaction, "SELECT max_concurrent_files, runner_budget_enabled FROM operator_settings WHERE id = 1"))
+        using (var reader = command.ExecuteReader())
+        {
+            if (reader.Read())
+            {
+                filesAtOnce = Long(reader.GetValue(0));
+                budgetEnabled = Bool(reader.GetValue(1));
+            }
+        }
+
+        var running = 0;
+        var runningPerLibrary = new Dictionary<long, int>();
+        using (var command = Command(connection, transaction, "SELECT payload_json FROM jobs WHERE status = 'leased'"))
+        using (var reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                running++;
+                if (JobPayload.LibraryIdForAdmission(reader.IsDBNull(0) ? null : reader.GetString(0)) is { } libraryId)
+                {
+                    runningPerLibrary[libraryId] = runningPerLibrary.GetValueOrDefault(libraryId) + 1;
+                }
+            }
+        }
+
+        // Due file passes only: a job held back with not_before (a retry's backoff, a file waiting out its minimum age)
+        // is not waiting on any limit.
+        var waiting = new List<WaitingJobSnapshot>();
+        using (var command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText =
+                "SELECT runner_cost, payload_json FROM jobs WHERE status = 'pending' AND job_kind = @kind " +
+                "AND (not_before IS NULL OR julianday(not_before) <= julianday(@now))";
+            command.Parameters.AddWithValue("@kind", Weir.Core.Processing.RemuxPass.RemuxPassOutcomes.JobKind);
+            command.Parameters.AddWithValue("@now", PythonTimestamps.Adapter(now));
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                waiting.Add(new WaitingJobSnapshot(Long(reader.GetValue(0)), JobPayload.LibraryIdForAdmission(reader.IsDBNull(1) ? null : reader.GetString(1))));
+            }
+        }
+
+        var libraries = new List<FilesAtOnceLibrary>();
+        using (var command = Command(connection, transaction, "SELECT id, name, enabled, max_concurrent_files FROM libraries ORDER BY id"))
+        using (var reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                libraries.Add(new FilesAtOnceLibrary(reader.GetInt64(0), reader.IsDBNull(1) ? string.Empty : reader.GetString(1), Bool(reader.GetValue(2)), Long(reader.GetValue(3))));
+            }
+        }
+
+        return FilesAtOnceRules.Describe(filesAtOnce, workerSlots, running, runningPerLibrary, waiting, libraries, admission, budgetEnabled);
     }
 
     internal static bool Bool(object? value) => value switch

@@ -4491,11 +4491,12 @@
             "type": "integer"
           },
           "max_concurrent_files": {
-            "default": 1,
-            "maximum": 8.0,
-            "minimum": 1.0,
+            "default": 0,
+            "maximum": 10.0,
+            "minimum": 0.0,
             "title": "Max Concurrent Files",
-            "type": "integer"
+            "type": "integer",
+            "description": "This library's own limit on files at once. 0 means the same as \"Files at once\" in Process settings."
           },
           "max_file_size_mb": {
             "default": 0,
@@ -4905,7 +4906,8 @@
           },
           "max_concurrent_files": {
             "title": "Max Concurrent Files",
-            "type": "integer"
+            "type": "integer",
+            "description": "This library's own limit on files at once. 0 means the same as \"Files at once\" in Process settings."
           },
           "max_file_size_mb": {
             "title": "Max File Size Mb",
@@ -5301,11 +5303,12 @@
             "type": "integer"
           },
           "max_concurrent_files": {
-            "default": 1,
-            "maximum": 8.0,
-            "minimum": 1.0,
+            "default": 0,
+            "maximum": 10.0,
+            "minimum": 0.0,
             "title": "Max Concurrent Files",
-            "type": "integer"
+            "type": "integer",
+            "description": "This library's own limit on files at once. 0 means the same as \"Files at once\" in Process settings."
           },
           "max_file_size_mb": {
             "default": 0,
@@ -5640,7 +5643,7 @@
             "type": "boolean"
           },
           "max_concurrent_files": {
-            "maximum": 8.0,
+            "maximum": 10.0,
             "minimum": 1.0,
             "title": "Max Concurrent Files",
             "type": "integer"
@@ -5707,6 +5710,11 @@
             "minimum": 0.0,
             "title": "Runner Cost 4K",
             "type": "integer"
+          },
+          "runner_budget_enabled": {
+            "title": "Runner Budget Enabled",
+            "type": "boolean",
+            "description": "Whether the resolution budget (runner capacity and per-resolution costs) also limits what starts. Off, a file needs only a free slot."
           },
           "runner_cost_720p": {
             "maximum": 64.0,
@@ -5777,6 +5785,7 @@
           "runner_cost_720p",
           "runner_cost_1080p",
           "runner_cost_4k",
+          "runner_budget_enabled",
           "work_temp_stale_sweep_enabled",
           "failure_cleanup_enabled",
           "keep_failed_work_files",
@@ -5849,7 +5858,7 @@
           "max_concurrent_files": {
             "anyOf": [
               {
-                "maximum": 8.0,
+                "maximum": 10.0,
                 "minimum": 1.0,
                 "type": "integer"
               },
@@ -5994,6 +6003,17 @@
               }
             ],
             "title": "Runner Cost 4K"
+          },
+          "runner_budget_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runner Budget Enabled"
           },
           "runner_cost_720p": {
             "anyOf": [
@@ -8784,6 +8804,68 @@
         ],
         "title": "ManagerSetupOut",
         "type": "object"
+      },
+      "ProcessingFilesAtOnceOut": {
+        "description": "What is running, what is waiting, and the one limit the waiting files are waiting on.",
+        "properties": {
+          "files_at_once": {
+            "title": "Files At Once",
+            "type": "integer",
+            "minimum": 1.0,
+            "maximum": 10.0
+          },
+          "worker_slots": {
+            "title": "Worker Slots",
+            "type": "integer",
+            "description": "Slots this server process started with. It cannot run more than this until it restarts."
+          },
+          "effective_files_at_once": {
+            "title": "Effective Files At Once",
+            "type": "integer"
+          },
+          "running": {
+            "title": "Running",
+            "type": "integer"
+          },
+          "waiting": {
+            "title": "Waiting",
+            "type": "integer"
+          },
+          "waiting_for": {
+            "title": "Waiting For",
+            "type": "string",
+            "enum": [
+              "nothing",
+              "workers_off",
+              "paused",
+              "free_slot",
+              "library_limit",
+              "library_closed",
+              "resolution_budget",
+              "starting"
+            ]
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "slots_note": {
+            "title": "Slots Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "files_at_once",
+          "worker_slots",
+          "effective_files_at_once",
+          "running",
+          "waiting",
+          "waiting_for",
+          "message",
+          "slots_note"
+        ],
+        "title": "ProcessingFilesAtOnceOut",
+        "type": "object"
       }
     }
   },
@@ -10696,6 +10778,29 @@
           }
         },
         "summary": "Get Processing Files",
+        "tags": [
+          "processing",
+          "processing"
+        ]
+      }
+    },
+    "/api/v1/processing/files-at-once": {
+      "get": {
+        "description": "What is running, what is waiting, and which limit the waiting files are waiting on.",
+        "operationId": "get_processing_files_at_once_api_v1_processing_files_at_once_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingFilesAtOnceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Processing Files At Once",
         "tags": [
           "processing",
           "processing"
