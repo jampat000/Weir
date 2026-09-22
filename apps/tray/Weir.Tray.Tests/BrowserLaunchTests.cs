@@ -75,4 +75,17 @@ public sealed class BrowserLaunchTests : IDisposable
     {
         Assert.Equal(expectedPath, Program.TrayUpdateFallbackPath(isInstalled));
     }
+
+    [Fact]
+    public void Issue_638_an_update_restart_does_not_open_the_browser()
+    {
+        Assert.False(Program.OpensBrowser(UpdateService.RestartArguments()));
+    }
+
+    [Fact]
+    public void A_start_a_person_makes_still_opens_the_browser()
+    {
+        Assert.True(Program.OpensBrowser([]));
+        Assert.True(Program.OpensBrowser(["--port", "9400"]));
+    }
 }
