@@ -19,6 +19,12 @@ static class Program
     internal const string GitHubRepo = "https://github.com/jampat000/Weir";
     internal const string UpgradeSettingsPath = "/settings?tab=upgrade";
 
+    /// <summary>
+    /// Start without opening Weir in the browser. The starts nobody asked to see pass it: at sign-in, and after an
+    /// update (#638).
+    /// </summary>
+    internal const string NoBrowserArgument = "--no-browser";
+
     [STAThread]
     static int Main(string[] args)
     {
@@ -54,7 +60,7 @@ static class Program
             return 0;
         }
 
-        bool noBrowser = args.Contains("--no-browser");
+        bool openBrowser = OpensBrowser(args);
 
         using var mutex = new Mutex(false, MutexName, out bool createdNew);
         if (!createdNew)
@@ -62,7 +68,7 @@ static class Program
             AppendFallbackLog("Tray host launch skipped: an existing Weir tray instance is already running.");
             if (PortChoice.SuppliedPort(args, Environment.GetEnvironmentVariable) is { } ignored)
                 AppendFallbackLog($"Ignoring {ignored.Source} {ignored.Text}: Weir is already running. Use \"Change port\" from its tray menu, or quit it and start it again with the new port.");
-            if (!noBrowser)
+            if (openBrowser)
                 OpenExistingInstanceBrowser();
             return 0;
         }
@@ -78,7 +84,7 @@ static class Program
             if (port is null)
                 return 1;
 
-            var app = new TrayApp(port.Value, openBrowserOnReady: !noBrowser);
+            var app = new TrayApp(port.Value, openBrowserOnReady: openBrowser);
             app.Run();
             return 0;
         }
@@ -176,7 +182,7 @@ static class Program
             if (string.IsNullOrEmpty(exe)) return;
             using var key = Registry.CurrentUser.OpenSubKey(
                 @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", writable: true);
-            key?.SetValue("Weir", $"\"{exe}\" --no-browser");
+            key?.SetValue("Weir", $"\"{exe}\" {NoBrowserArgument}");
             AppendFallbackLog(@"Registered Weir startup (HKCU\Run).");
 
             // Remove any manually-created startup folder shortcut so there is only one entry.
@@ -227,6 +233,9 @@ static class Program
             programData = @"C:\ProgramData";
         return Path.Combine(programData, "Weir");
     }
+
+    /// <summary>Whether a start with these arguments opens Weir in the browser once its server is healthy.</summary>
+    internal static bool OpensBrowser(IEnumerable<string> args) => !args.Contains(NoBrowserArgument);
 
     internal static bool OpenBrowser(
         int port,
@@ -424,18 +433,25 @@ sealed class UpdateService
         }
     }
 
-    internal void ApplyAndRestart(string[]? restartArgs = null)
+    /// <summary>
+    /// What Weir is started again with after an update (#638). An update restart is never a person opening Weir:
+    /// in Automatic mode nobody may be at the computer, and "Update now" is pressed in a browser already showing
+    /// Weir, so neither should open a window.
+    /// </summary>
+    internal static string[] RestartArguments() => [Program.NoBrowserArgument];
+
+    internal void ApplyAndRestart()
     {
         if (!_downloaded || _pendingUpdate is null) return;
         _log($"Applying update v{_pendingUpdate.TargetFullRelease.Version} and restarting...");
-        _mgr.ApplyUpdatesAndRestart(_pendingUpdate.TargetFullRelease, restartArgs);
+        _mgr.ApplyUpdatesAndRestart(_pendingUpdate.TargetFullRelease, RestartArguments());
     }
 
     internal void ApplyOnExit()
     {
         if (!_downloaded || _pendingUpdate is null) return;
         _log($"Scheduling update v{_pendingUpdate.TargetFullRelease.Version} to apply on exit...");
-        _mgr.WaitExitThenApplyUpdates(_pendingUpdate.TargetFullRelease, silent: true, restart: true);
+        _mgr.WaitExitThenApplyUpdates(_pendingUpdate.TargetFullRelease, silent: true, restart: true, RestartArguments());
     }
 }
 

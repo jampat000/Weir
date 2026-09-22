@@ -48,6 +48,7 @@ Updates are managed automatically by the .NET tray app via Velopack:
 - Automatic rollback on update failure
 - No admin privileges required for updates
 - Update behavior is configurable (auto, download-only, notify-only)
+- Weir starts again after an update without opening your browser, so an update never leaves a window behind on a computer nobody is watching. Starting Weir yourself still opens it.
 
 ## Choosing the port
 
