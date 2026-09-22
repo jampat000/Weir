@@ -604,9 +604,9 @@ describe("SettingsPage (suite settings)", () => {
     expect(document.body.textContent).not.toContain("�");
   });
 
-  it("shows change password in System", () => {
+  it("shows change password in Security", () => {
     renderSettings(operatorMe);
-    fireEvent.click(screen.getByRole("tab", { name: "System" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Security" }));
     expect(
       screen.getByRole("heading", { name: "Change password" }),
     ).toBeInTheDocument();
@@ -617,7 +617,7 @@ describe("SettingsPage (suite settings)", () => {
 
   it("change password fields use Show/Hide and reset visibility when cleared", () => {
     renderSettings(operatorMe);
-    fireEvent.click(screen.getByRole("tab", { name: "System" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Security" }));
     const current = screen.getByPlaceholderText("Enter current password");
     expect(current).toHaveAttribute("type", "password");
     fireEvent.change(current, { target: { value: "current-secret" } });

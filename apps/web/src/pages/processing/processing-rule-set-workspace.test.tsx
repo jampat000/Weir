@@ -141,7 +141,7 @@ it("edits ordered rules, original-language behavior, metadata cleanup, and the p
 
   // Issue #495/#497: audio keep mode, SDH removal and the subtitle cap/strategy.
   expect(
-    screen.getByRole("heading", { name: "Track naming & chapters" }),
+    screen.getByRole("heading", { name: "Track naming and chapters" }),
   ).toBeInTheDocument();
   fireEvent.change(
     screen.getByRole("combobox", { name: /Audio tracks kept/ }),

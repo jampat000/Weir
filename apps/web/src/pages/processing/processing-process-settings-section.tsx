@@ -256,7 +256,9 @@ export function ProcessingProcessSettingsSection() {
         own intake and schedule, and hold itself below Files at once, above.
       </p>
       <div className="mt-6 text-sm leading-relaxed text-[var(--mm-text2)]">
-        <div className="grid max-w-3xl gap-10">
+        {/* Three short groups of small fields ran down one 48rem column and made Running a 2.5-screen
+            scroll with most of the page empty beside them. Side by side where there is room. */}
+        <div className="grid max-w-3xl gap-10 xl:max-w-none xl:grid-cols-2 xl:gap-x-14">
           <QuietFieldGroup
             title="Files at once"
             detail="How many files Weir works on at the same time, however they arrived. More at once clears a burst of imports sooner; it is mostly disk work, so a slow disk gains little past two or three."

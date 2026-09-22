@@ -1051,3 +1051,83 @@
     display: contents;
   }
 }
+
+/* ── 3d · The fold ───────────────────────────────────────────────────────────
+ * A group that starts closed, for the switches almost nobody changes. It is still a
+ * heading over a hairline — rule 3 holds — with a marker and, when it matters, a line
+ * saying what is inside so the fold never hides that something was changed.
+ */
+.mm-quiet-fold {
+  min-width: 0;
+}
+
+.mm-quiet-fold__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--mm-border);
+  cursor: pointer;
+  list-style: none;
+}
+
+.mm-quiet-fold__head::-webkit-details-marker {
+  display: none;
+}
+
+.mm-quiet-fold__head::before {
+  content: "";
+  flex-shrink: 0;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-right: 1.5px solid var(--mm-text3);
+  border-bottom: 1.5px solid var(--mm-text3);
+  transform: rotate(-45deg) translateY(-0.12rem);
+  transition: transform 0.15s ease;
+}
+
+.mm-quiet-fold[open] > .mm-quiet-fold__head::before {
+  transform: rotate(45deg) translateY(-0.1rem);
+}
+
+.mm-quiet-fold__head:hover::before {
+  border-color: var(--mm-text1);
+}
+
+.mm-quiet-fold__head:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--mm-accent-ring);
+  border-radius: var(--mm-radius-sm);
+}
+
+.mm-quiet-fold__title {
+  margin: 0;
+  color: var(--mm-text1);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+}
+
+.mm-quiet-fold__state {
+  margin-left: auto;
+  font-size: var(--mm-type-caption);
+  color: var(--mm-text3);
+}
+
+.mm-quiet-fold__detail {
+  margin: 0.9rem 0 0;
+  font-size: var(--mm-type-caption);
+  line-height: 1.5;
+  color: var(--mm-text3);
+}
+
+.mm-quiet-fold__body {
+  min-width: 0;
+  margin-top: 0.9rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-quiet-fold__head::before {
+    transition: none;
+  }
+}

@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 
 import { PageLoading } from "../../components/shared/page-loading";
 import {
+  QuietDisclosure,
   QuietFieldGroup,
   QuietSection,
 } from "../../components/shared/quiet-section";
@@ -351,6 +352,33 @@ function ProfileSettingsSection({
     <QuietFieldGroup step={step} title={title} detail={detail}>
       <div className="space-y-3">{children}</div>
     </QuietFieldGroup>
+  );
+}
+
+/** One of the rules that is off by default: closed, and saying what is on inside it. */
+function ProfileSettingsFold({
+  title,
+  detail,
+  on,
+  of,
+  children,
+}: {
+  title: string;
+  detail: string;
+  /** How many of this group's switches are on, so the fold never hides a change. */
+  on: number;
+  of: number;
+  children: ReactNode;
+}) {
+  return (
+    <QuietDisclosure
+      title={title}
+      detail={detail}
+      summaryWhenClosed={on === 0 ? "Off" : `${on} of ${of} on`}
+      defaultOpen={on > 0}
+    >
+      <div className="space-y-3">{children}</div>
+    </QuietDisclosure>
   );
 }
 
@@ -959,171 +987,188 @@ export function ProcessingRuleSetWorkspace() {
                   </div>
                 ) : null}
               </ProfileSettingsSection>
+            </div>
 
-              <ProfileSettingsSection
-                step={3}
-                title="Original language"
-                detail="Optionally keep the title's original spoken language as well."
-              >
-                {toggle(
-                  "Keep the original language",
-                  providerName
-                    ? `Uses ${providerName.toUpperCase()} when it can identify the title.`
-                    : "Requires the metadata provider configured below.",
-                  "keep_original_language",
-                )}
-                {draft.keep_original_language ? (
-                  <div className="space-y-3 border-l-2 border-[var(--mm-border)] pl-4">
-                    <LanguageMultiField
-                      label="Other languages to keep"
-                      value={draft.original_language_additional_csv}
-                      disabled={disabled}
-                      onChange={(value) =>
-                        change("original_language_additional_csv", value)
-                      }
-                    />
-                    {toggle(
-                      "Keep one track per language",
-                      "Avoid duplicate tracks in the same language.",
-                      "original_language_keep_only_first",
-                    )}
-                    {toggle(
-                      "Use audio preferences if no match is found",
-                      "Keeps the profile safe when metadata is incomplete.",
-                      "original_language_first_if_none",
-                    )}
-                    {toggle(
-                      "Treat an untagged track as original",
-                      "Useful when the main track has no language tag.",
-                      "original_language_treat_empty_as_original",
-                    )}
-                  </div>
-                ) : null}
-              </ProfileSettingsSection>
-
-              <ProfileSettingsSection
-                step={4}
-                title="Remove from container"
-                detail="Select optional streams and tags Weir should strip after track selection."
-              >
-                <div className="grid gap-3">
+            <ProfileSettingsFold
+              title="Original language"
+              detail="Optionally keep the title's original spoken language as well."
+              on={draft.keep_original_language ? 1 : 0}
+              of={1}
+            >
+              {toggle(
+                "Keep the original language",
+                providerName
+                  ? `Uses ${providerName.toUpperCase()} when it can identify the title.`
+                  : "Requires the metadata provider configured below.",
+                "keep_original_language",
+              )}
+              {draft.keep_original_language ? (
+                <div className="space-y-3 border-l-2 border-[var(--mm-border)] pl-4">
+                  <LanguageMultiField
+                    label="Other languages to keep"
+                    value={draft.original_language_additional_csv}
+                    disabled={disabled}
+                    onChange={(value) =>
+                      change("original_language_additional_csv", value)
+                    }
+                  />
                   {toggle(
-                    "Embedded images",
-                    "Strip embedded cover art.",
-                    "remove_images",
+                    "Keep one track per language",
+                    "Avoid duplicate tracks in the same language.",
+                    "original_language_keep_only_first",
                   )}
                   {toggle(
-                    "Attachments",
-                    "Strip fonts and other attached files.",
-                    "remove_attachments",
+                    "Use audio preferences if no match is found",
+                    "Keeps the profile safe when metadata is incomplete.",
+                    "original_language_first_if_none",
                   )}
                   {toggle(
-                    "Container title",
-                    "Remove the container title only.",
-                    "remove_title",
-                  )}
-                  {toggle(
-                    "Language tags",
-                    "Strip language metadata after selection.",
-                    "remove_language_tags",
-                  )}
-                  {toggle(
-                    "Other metadata",
-                    "Strip other container-level tags.",
-                    "remove_other_metadata",
+                    "Treat an untagged track as original",
+                    "Useful when the main track has no language tag.",
+                    "original_language_treat_empty_as_original",
                   )}
                 </div>
-              </ProfileSettingsSection>
+              ) : null}
+            </ProfileSettingsFold>
 
-              <ProfileSettingsSection
-                step={5}
-                title="Track naming & chapters"
-                detail="Optional, off by default: give kept tracks consistent names and drop chapter lists."
-              >
+            <ProfileSettingsFold
+              title="Remove from container"
+              detail="Optional streams and tags Weir strips after it has chosen the tracks."
+              on={
+                [
+                  draft.remove_images,
+                  draft.remove_attachments,
+                  draft.remove_title,
+                  draft.remove_language_tags,
+                  draft.remove_other_metadata,
+                ].filter(Boolean).length
+              }
+              of={5}
+            >
+              <div className="grid gap-3">
                 {toggle(
-                  "Standardize audio and subtitle track names",
-                  "Write a name from the template below on every kept track, instead of whatever the release called it.",
-                  "standardize_track_names",
+                  "Embedded images",
+                  "Strip embedded cover art.",
+                  "remove_images",
                 )}
-                {draft.standardize_track_names ? (
-                  <div className="space-y-4 border-l-2 border-[var(--mm-border)] pl-4">
-                    <TrackNameTemplateField
-                      label="Track name template"
-                      detail="Placeholders: {language} {variant} {channels} {codec} {flags}."
-                      value={draft.track_name_template}
-                      disabled={disabled}
-                      onChange={(value) => change("track_name_template", value)}
-                    />
-                    <div className="space-y-3">
-                      <p className="text-xs font-medium text-[var(--mm-text2)]">
-                        Overrides for flagged tracks (checked in this order;
-                        leave blank to fall back to the template above)
-                      </p>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <TrackNameTemplateField
-                          label="Forced tracks"
-                          value={draft.track_name_overrides.forced}
-                          disabled={disabled}
-                          sampleFlags={{ forced: true }}
-                          onChange={(value) =>
-                            change("track_name_overrides", {
-                              ...draft.track_name_overrides,
-                              forced: value,
-                            })
-                          }
-                        />
-                        <TrackNameTemplateField
-                          label="Hearing-impaired tracks"
-                          value={draft.track_name_overrides.hearing_impaired}
-                          disabled={disabled}
-                          sampleFlags={{ hearingImpaired: true }}
-                          onChange={(value) =>
-                            change("track_name_overrides", {
-                              ...draft.track_name_overrides,
-                              hearing_impaired: value,
-                            })
-                          }
-                        />
-                        <TrackNameTemplateField
-                          label="Commentary tracks"
-                          value={draft.track_name_overrides.commentary}
-                          disabled={disabled}
-                          sampleFlags={{ commentary: true }}
-                          onChange={(value) =>
-                            change("track_name_overrides", {
-                              ...draft.track_name_overrides,
-                              commentary: value,
-                            })
-                          }
-                        />
-                        <TrackNameTemplateField
-                          label="Audio description tracks"
-                          value={draft.track_name_overrides.audio_description}
-                          disabled={disabled}
-                          sampleFlags={{ audioDescription: true }}
-                          onChange={(value) =>
-                            change("track_name_overrides", {
-                              ...draft.track_name_overrides,
-                              audio_description: value,
-                            })
-                          }
-                        />
-                      </div>
+                {toggle(
+                  "Attachments",
+                  "Strip fonts and other attached files.",
+                  "remove_attachments",
+                )}
+                {toggle(
+                  "Container title",
+                  "Remove the container title only.",
+                  "remove_title",
+                )}
+                {toggle(
+                  "Language tags",
+                  "Strip language metadata after selection.",
+                  "remove_language_tags",
+                )}
+                {toggle(
+                  "Other metadata",
+                  "Strip other container-level tags.",
+                  "remove_other_metadata",
+                )}
+              </div>
+            </ProfileSettingsFold>
+
+            <ProfileSettingsFold
+              title="Track naming and chapters"
+              detail="Give kept tracks consistent names, and drop the container's chapter list."
+              on={
+                [
+                  draft.standardize_track_names,
+                  draft.clear_video_track_names,
+                  draft.remove_chapters,
+                ].filter(Boolean).length
+              }
+              of={3}
+            >
+              {toggle(
+                "Standardize audio and subtitle track names",
+                "Write a name from the template below on every kept track, instead of whatever the release called it.",
+                "standardize_track_names",
+              )}
+              {draft.standardize_track_names ? (
+                <div className="space-y-4 border-l-2 border-[var(--mm-border)] pl-4">
+                  <TrackNameTemplateField
+                    label="Track name template"
+                    detail="Placeholders: {language} {variant} {channels} {codec} {flags}."
+                    value={draft.track_name_template}
+                    disabled={disabled}
+                    onChange={(value) => change("track_name_template", value)}
+                  />
+                  <div className="space-y-3">
+                    <p className="text-xs font-medium text-[var(--mm-text2)]">
+                      Overrides for flagged tracks (checked in this order; leave
+                      blank to fall back to the template above)
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <TrackNameTemplateField
+                        label="Forced tracks"
+                        value={draft.track_name_overrides.forced}
+                        disabled={disabled}
+                        sampleFlags={{ forced: true }}
+                        onChange={(value) =>
+                          change("track_name_overrides", {
+                            ...draft.track_name_overrides,
+                            forced: value,
+                          })
+                        }
+                      />
+                      <TrackNameTemplateField
+                        label="Hearing-impaired tracks"
+                        value={draft.track_name_overrides.hearing_impaired}
+                        disabled={disabled}
+                        sampleFlags={{ hearingImpaired: true }}
+                        onChange={(value) =>
+                          change("track_name_overrides", {
+                            ...draft.track_name_overrides,
+                            hearing_impaired: value,
+                          })
+                        }
+                      />
+                      <TrackNameTemplateField
+                        label="Commentary tracks"
+                        value={draft.track_name_overrides.commentary}
+                        disabled={disabled}
+                        sampleFlags={{ commentary: true }}
+                        onChange={(value) =>
+                          change("track_name_overrides", {
+                            ...draft.track_name_overrides,
+                            commentary: value,
+                          })
+                        }
+                      />
+                      <TrackNameTemplateField
+                        label="Audio description tracks"
+                        value={draft.track_name_overrides.audio_description}
+                        disabled={disabled}
+                        sampleFlags={{ audioDescription: true }}
+                        onChange={(value) =>
+                          change("track_name_overrides", {
+                            ...draft.track_name_overrides,
+                            audio_description: value,
+                          })
+                        }
+                      />
                     </div>
                   </div>
-                ) : null}
-                {toggle(
-                  "Clear video track names",
-                  'Blank out scene-tag video titles such as "x265-GROUP".',
-                  "clear_video_track_names",
-                )}
-                {toggle(
-                  "Remove chapters",
-                  "Drop the container's chapter list.",
-                  "remove_chapters",
-                )}
-              </ProfileSettingsSection>
-            </div>
+                </div>
+              ) : null}
+              {toggle(
+                "Clear video track names",
+                'Blank out scene-tag video titles such as "x265-GROUP".',
+                "clear_video_track_names",
+              )}
+              {toggle(
+                "Remove chapters",
+                "Drop the container's chapter list.",
+                "remove_chapters",
+              )}
+            </ProfileSettingsFold>
 
             <section>
               <button

@@ -94,6 +94,56 @@ export function QuietFieldGroup({
 }
 
 /**
+ * A group that starts closed, for the settings almost nobody changes.
+ *
+ * A rules editor that shows every one of its twenty-odd switches at once is not nicer for
+ * being shorter — it is just as much to read (James, 23 Sep 2026: "too much going on just on
+ * the one screen and its not nice to look at or even configure"). The ones that are off by
+ * default, and stay off for most people, fold away behind their own heading.
+ *
+ * `<details>` rather than state: it opens without JavaScript, it is in the tab order, it
+ * answers space and enter, and a browser's find-in-page opens it to show a match. Rule 3
+ * still holds — the summary is a heading and a hairline, not a box.
+ *
+ * `summaryWhenClosed` says what is inside without opening it ("3 of 9 on"), so the fold
+ * never hides the fact that something has been changed.
+ */
+export function QuietDisclosure({
+  title,
+  detail,
+  summaryWhenClosed,
+  defaultOpen = false,
+  children,
+  "data-testid": dataTestId,
+}: {
+  title: string;
+  detail?: ReactNode;
+  summaryWhenClosed?: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+  "data-testid"?: string;
+}) {
+  return (
+    <details
+      className="mm-quiet-fold"
+      open={defaultOpen}
+      data-testid={dataTestId}
+    >
+      <summary className="mm-quiet-fold__head">
+        {/* A real heading, closed or open: folding a group away must not take it out of the
+            document's outline, or off the list a screen reader navigates by. */}
+        <h3 className="mm-quiet-fold__title">{title}</h3>
+        {summaryWhenClosed ? (
+          <span className="mm-quiet-fold__state">{summaryWhenClosed}</span>
+        ) : null}
+      </summary>
+      {detail ? <p className="mm-quiet-fold__detail">{detail}</p> : null}
+      <div className="mm-quiet-fold__body">{children}</div>
+    </details>
+  );
+}
+
+/**
  * The hairline above a form's own Save row. `mm-card-action-footer` drew this when the
  * form was a card; without the card it is just a rule and the buttons under it.
  */

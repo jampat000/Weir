@@ -68,6 +68,7 @@ type TabId =
   | "media-managers"
   | "running"
   | "alerts"
+  | "security"
   | "history"
   | "system";
 
@@ -85,6 +86,7 @@ const SETTINGS_TABS: readonly WorkspaceTabOption<TabId>[] = [
   { id: "media-managers", label: "Media managers" },
   { id: "running", label: "Running" },
   { id: "alerts", label: "Alerts" },
+  { id: "security", label: "Security" },
   { id: "system", label: "System" },
   { id: "history", label: "History and logs" },
 ];
@@ -107,11 +109,12 @@ function normalizeSettingsTab(candidate: string | null | undefined): TabId {
     case "history":
     case "logs":
       return "history";
+    case "security":
+      return "security";
     case "system":
     case "general":
     case "backup":
     case "upgrade":
-    case "security":
     case "support":
       return "system";
     default:
@@ -560,12 +563,16 @@ export function SettingsPage() {
         ) : tab === "media-managers" ? (
           <SettingsMediaManagersTab />
         ) : tab === "running" ? (
-          <div className="mm-quiet-stack mm-quiet-stack--columns">
+          <div className="mm-quiet-stack">
             <ProcessingProcessSettingsSection />
             <ProcessingDirectPlaySection />
           </div>
         ) : tab === "alerts" ? (
           <SettingsNotificationsTab />
+        ) : tab === "security" ? (
+          <div className="mm-quiet-stack mm-quiet-stack--columns">
+            <SettingsSecurityTab />
+          </div>
         ) : tab === "history" ? (
           <div className="mm-quiet-stack" data-testid="settings-history">
             <label className="mm-history-show">
@@ -663,7 +670,6 @@ export function SettingsPage() {
               }
             />
             <SettingsUpgradeTab updateStatusQ={updateStatusQ} />
-            <SettingsSecurityTab />
             <ProcessingMaintenanceSection />
             {showSupport ? <SettingsSupportTab /> : null}
           </div>
