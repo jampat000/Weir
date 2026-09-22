@@ -1,4 +1,7 @@
+using System.Collections.Concurrent;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
+using SQLitePCL;
 
 namespace Weir.Infrastructure.Sqlite;
 
@@ -23,6 +26,25 @@ public sealed class SqliteDatabase
     /// </remarks>
     public const int BusyTimeoutMilliseconds = 30_000;
 
+    /// <summary>
+    /// One gate per connection pool (Microsoft.Data.Sqlite keys its pools by the exact connection string), held
+    /// while a pooled handle is handed out and while the pool is cleared (#640).
+    /// </summary>
+    /// <remarks>
+    /// Microsoft.Data.Sqlite takes a handle from its pool under the pool's lock but activates it outside that lock,
+    /// and activation marks the handle in use (<c>_active = true</c>) a moment before it records who holds it. An
+    /// open on another thread that finds the pool empty with an even count first reclaims "leaked" connections —
+    /// ones in use that nobody holds — and a handle in that moment is one. It goes back on the idle stack and out
+    /// again to the second opener, so two connections share one native handle: one's <c>BEGIN IMMEDIATE</c> is
+    /// the other's open transaction, and each later returns the handle to the pool while the other may still be
+    /// using it. The reclaim only runs inside another open or inside a pool clear, so no open or clear of the same
+    /// pool may run while a handle is being activated.
+    /// </remarks>
+    private static readonly ConcurrentDictionary<string, Lock> PoolGates = new(StringComparer.Ordinal);
+
+    private readonly Lock? _poolGate;
+    private readonly ILogger? _logger;
+
     /// <param name="databasePath">The SQLite file.</param>
     /// <param name="pooling">
     /// Off only for a caller deliberately simulating several independent processes sharing one file in a
@@ -32,10 +54,12 @@ public sealed class SqliteDatabase
     /// means "separate workers" in such a test are not actually isolated the way separate real processes
     /// would be — each gets a genuinely fresh, unshared connection instead.
     /// </param>
-    public SqliteDatabase(string databasePath, bool pooling = true)
+    /// <param name="logger">Where a pooled connection found still inside a transaction is reported.</param>
+    public SqliteDatabase(string databasePath, bool pooling = true, ILogger<SqliteDatabase>? logger = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(databasePath);
         DatabasePath = databasePath;
+        _logger = logger;
         ConnectionString = new SqliteConnectionStringBuilder
         {
             DataSource = databasePath,
@@ -52,6 +76,7 @@ public sealed class SqliteDatabase
             // here can hold a stale snapshot and that second path is gone.
             DefaultTimeout = BusyTimeoutMilliseconds / 1000,
         }.ToString();
+        _poolGate = pooling ? PoolGates.GetOrAdd(ConnectionString, static _ => new Lock()) : null;
     }
 
     public string DatabasePath { get; }
@@ -68,15 +93,25 @@ public sealed class SqliteDatabase
     public void ClearPool()
     {
         using var connection = new SqliteConnection(ConnectionString);
-        SqliteConnection.ClearPool(connection);
+        if (_poolGate is null)
+        {
+            SqliteConnection.ClearPool(connection);
+            return;
+        }
+
+        lock (_poolGate)
+        {
+            SqliteConnection.ClearPool(connection);
+        }
     }
 
     public async Task<SqliteConnection> OpenAsync(CancellationToken cancellationToken = default)
     {
-        var connection = new SqliteConnection(ConnectionString);
+        // SqliteConnection.OpenAsync is Open() behind a completed task, so nothing is lost by opening synchronously.
+        cancellationToken.ThrowIfCancellationRequested();
+        var connection = OpenOutsideAnyTransaction();
         try
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             await ApplyPragmasAsync(connection, cancellationToken).ConfigureAwait(false);
             return connection;
         }
@@ -89,11 +124,92 @@ public sealed class SqliteDatabase
 
     public SqliteConnection Open()
     {
+        var connection = OpenOutsideAnyTransaction();
+        try
+        {
+            ApplyPragmasAsync(connection, CancellationToken.None).GetAwaiter().GetResult();
+            return connection;
+        }
+        catch
+        {
+            connection.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Dispose <paramref name="connection"/> so that its native handle is closed instead of going back to the pool,
+    /// which ends any transaction still open on it: SQLite rolls back what a closed connection left open.
+    /// </summary>
+    internal void CloseHandle(SqliteConnection connection)
+    {
+        // That rollback calls any rollback hook still registered on the handle, from inside sqlite3_close_v2. The
+        // one Microsoft.Data.Sqlite registers for a live SqliteTransaction touches the handle being closed and
+        // throws out through the native frame, which on Linux takes the process down.
+        raw.sqlite3_rollback_hook(connection.Handle, null, null);
+
+        // Cleared first, the pool disposes the handle when it comes back rather than keeping it.
+        ClearPool();
+        connection.Dispose();
+    }
+
+    /// <summary>
+    /// A pooled handle that is not inside a transaction. Microsoft.Data.Sqlite does nothing to a handle that comes
+    /// back to its pool, so one whose last user left a transaction open — a ROLLBACK that failed, a connection
+    /// shared by two users (<see cref="PoolGates"/>) — still has it, and after a <c>BEGIN IMMEDIATE</c> still holds
+    /// the write lock that every other writer is queueing for (#640).
+    /// </summary>
+    private SqliteConnection OpenOutsideAnyTransaction()
+    {
+        var connection = OpenPooledHandle();
+        if (raw.sqlite3_get_autocommit(connection.Handle) != 0)
+        {
+            return connection;
+        }
+
+        _logger?.LogWarning(
+            "A pooled connection to {DatabasePath} was handed out still inside a transaction; Weir rolled it back " +
+            "before using the connection.",
+            DatabasePath);
+        try
+        {
+            // If that transaction still has an owner, the rollback hook Microsoft.Data.Sqlite registered for it marks
+            // it rolled back, and the owner's next command fails instead of running outside any transaction.
+            using var rollback = connection.CreateCommand();
+            rollback.CommandText = "ROLLBACK";
+            rollback.ExecuteNonQuery();
+        }
+        catch (SqliteException)
+        {
+            // Checked below.
+        }
+
+        if (raw.sqlite3_get_autocommit(connection.Handle) != 0)
+        {
+            return connection;
+        }
+
+        CloseHandle(connection);
+        return OpenPooledHandle();
+    }
+
+    private SqliteConnection OpenPooledHandle()
+    {
         var connection = new SqliteConnection(ConnectionString);
         try
         {
-            connection.Open();
-            ApplyPragmasAsync(connection, CancellationToken.None).GetAwaiter().GetResult();
+            if (_poolGate is null)
+            {
+                connection.Open();
+            }
+            else
+            {
+                lock (_poolGate)
+                {
+                    connection.Open();
+                }
+            }
+
             return connection;
         }
         catch

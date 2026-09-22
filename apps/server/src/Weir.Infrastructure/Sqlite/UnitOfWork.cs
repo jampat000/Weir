@@ -1,6 +1,7 @@
 using System.Data;
 using System.Globalization;
 using Microsoft.Data.Sqlite;
+using SQLitePCL;
 using Weir.Core.Json;
 using Weir.Core.Time;
 
@@ -185,10 +186,21 @@ public sealed class UnitOfWork : IAsyncDisposable
         }
         catch (SqliteException)
         {
-            // Closing the connection discards the transaction anyway.
+            // Whether the transaction survived is checked below; the error itself changes nothing here.
         }
-
-        await Connection.DisposeAsync().ConfigureAwait(false);
+        finally
+        {
+            // A ROLLBACK that failed leaves the transaction open, and closing a pooled connection does not end it:
+            // the handle goes back to the pool as it is, BEGIN IMMEDIATE's write lock included (#640).
+            if (Connection.State == ConnectionState.Open && raw.sqlite3_get_autocommit(Connection.Handle) == 0)
+            {
+                Database.CloseHandle(Connection);
+            }
+            else
+            {
+                await Connection.DisposeAsync().ConfigureAwait(false);
+            }
+        }
     }
 
     /// <summary>
