@@ -159,15 +159,20 @@ public static partial class IntakeRules
     public static string CancelledTitle(string sourceKey, string relativePath, bool windows) =>
         $"{PyValues.Capitalize(sourceKey)} cancelled its hand-off of {MediaPathNames.Name(relativePath, windows)}";
 
-    /// <summary>The Activity detail when a manager cancels a hand-off.</summary>
-    public static string CancelledDetail(string sourceKey, string handoffId, string relativePath, long? libraryId, string sentence) =>
+    /// <summary>The Activity title when a person cancelled a hand-off's queued pass in Weir (#643).</summary>
+    public static string CancelledInWeirTitle(string sourceKey, string relativePath, bool windows) =>
+        $"The hand-off of {MediaPathNames.Name(relativePath, windows)} from {PyValues.Capitalize(sourceKey)} was cancelled in Weir";
+
+    /// <summary>The Activity detail when a hand-off is cancelled: <c>webhook</c> when its manager did it, <c>manual</c> when a
+    /// person did it in Weir.</summary>
+    public static string CancelledDetail(string sourceKey, string handoffId, string relativePath, long? libraryId, string sentence, string trigger = "webhook") =>
         PyJsonWriter.Dumps(
             new PyDict()
                 .Set("source", sourceKey)
                 .Set("handoff_id", handoffId)
                 .Set("relative_media_path", relativePath)
                 .Set("library_id", libraryId)
-                .Set("trigger", "webhook")
+                .Set("trigger", trigger)
                 .Set("result", "success")
                 .Set("message", sentence),
             PyJsonFormat.Compact);

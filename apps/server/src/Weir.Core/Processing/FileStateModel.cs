@@ -27,11 +27,16 @@ public static class ProcessingFileStatuses
     /// <summary>Terminal: under the opt-in <c>reject</c> policy, the manager accepted that the release is bad.</summary>
     public const string Rejected = "rejected";
 
-    /// <summary>Every persisted status value, in the same order as the Python <c>StrEnum</c>.</summary>
+    /// <summary>Terminal: someone cancelled the file's queued pass before Weir started on it, from the Jobs screen or through
+    /// the media manager that handed it over (#643). The original is untouched, and a scan leaves it alone until the file
+    /// changes or someone queues it again.</summary>
+    public const string Cancelled = "cancelled";
+
+    /// <summary>Every persisted status value: the Python <c>StrEnum</c>'s, in its order, then <see cref="Cancelled"/> (#643).</summary>
     public static readonly IReadOnlyList<string> All =
     [
         Unprocessed, Processing, Processed, ProcessingFailed, Skipped, Disabled, OnHold,
-        OutOfSchedule, BlockedUpstream, PassedThrough, Rejected,
+        OutOfSchedule, BlockedUpstream, PassedThrough, Rejected, Cancelled,
     ];
 
     /// <summary>States where Weir has decided not to act, as opposed to not having acted yet.</summary>
@@ -39,6 +44,16 @@ public static class ProcessingFileStatuses
     {
         Disabled, OnHold, OutOfSchedule, BlockedUpstream, Skipped,
     };
+}
+
+/// <summary>What a cancelled file says on the Files screen (#643).</summary>
+public static class CancelledFileReasons
+{
+    public const string InWeir =
+        "Cancelled from the Jobs screen before Weir started on it. The original is untouched; queue it again from Files to process it.";
+
+    public const string ByManager =
+        "The media manager cancelled this hand-off before Weir started on it. The original is untouched; queue it again from Files to process it.";
 }
 
 /// <summary>One <c>files</c> row.</summary>

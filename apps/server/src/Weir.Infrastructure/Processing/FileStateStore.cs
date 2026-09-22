@@ -82,6 +82,29 @@ public static class FileStateStore
     /// <summary><c>forget_file</c>: removes Weir's record; never touches the file on disk.</summary>
     public static Task ForgetAsync(UnitOfWork uow, long id) => uow.ExecuteAsync("DELETE FROM files WHERE id = @id", ("@id", id));
 
+    /// <summary>
+    /// A queued pass for this file was cancelled before Weir started on it (#643): the file reads cancelled, with
+    /// <paramref name="reason"/>, and no retry is owed. Only a file still waiting, held or failed changes. One that is being
+    /// processed, or already has an outcome, keeps it.
+    /// </summary>
+    public static Task MarkCancelledAsync(UnitOfWork uow, long libraryId, string relativePath, string reason)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        return uow.ExecuteAsync(
+            "UPDATE files SET status = @cancelled, status_reason = @reason, next_retry_at = NULL, hold_until = NULL, " +
+            "blocked_by_connection = NULL, updated_at = CURRENT_TIMESTAMP " +
+            "WHERE library_id = @library AND relative_path = @path AND status IN (@unprocessed, @held, @outside, @blocked, @failed)",
+            ("@cancelled", ProcessingFileStatuses.Cancelled),
+            ("@reason", reason),
+            ("@library", libraryId),
+            ("@path", relativePath),
+            ("@unprocessed", ProcessingFileStatuses.Unprocessed),
+            ("@held", ProcessingFileStatuses.OnHold),
+            ("@outside", ProcessingFileStatuses.OutOfSchedule),
+            ("@blocked", ProcessingFileStatuses.BlockedUpstream),
+            ("@failed", ProcessingFileStatuses.ProcessingFailed));
+    }
+
     /// <summary><c>existing_file_row</c>: the row a previous scan left, or <see langword="null"/>. Settling
     /// compares against this. An alias for <see cref="FindAsync"/> under the Python name callers expect.</summary>
     public static Task<ProcessingFileRecord?> ExistingFileRowAsync(UnitOfWork uow, long libraryId, string relativePath) =>

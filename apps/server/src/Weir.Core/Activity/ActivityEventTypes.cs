@@ -46,6 +46,9 @@ public static class ActivityEventTypes
 
     /// <summary>An operator queued a hand-picked track choice for a held file (#501).</summary>
     public const string ProcessingFileManualPlanQueued = "processing.file_manual_plan_queued";
+
+    /// <summary>A file left the watched folder before Weir finished with it, so it is no longer listed (#645).</summary>
+    public const string ProcessingFileLeftWatchedFolder = "processing.file_left_watched_folder";
 }
 
 /// <summary>

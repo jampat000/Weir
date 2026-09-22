@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Weir.Core.Activity;
@@ -63,6 +64,13 @@ public sealed class RemuxPassHandler : IJobHandler
     /// changing, which is a copy that has gone wrong rather than one that is finishing.
     /// </summary>
     public const int MaxMinimumAgeWaits = 30;
+
+    /// <summary>
+    /// How long Weir waits between looks at a file it could not read from start to finish, and so how long it treats one as
+    /// still arriving (#646). After the last of these, a file that has not changed at all is damaged rather than unfinished,
+    /// and the library's failure policy decides what happens to it. About an hour of patience in all.
+    /// </summary>
+    public static readonly IReadOnlyList<int> UnreadableWaitMinutes = [5, 15, 45];
 
     public string JobKind => RemuxPassOutcomes.JobKind;
 
@@ -188,12 +196,106 @@ public sealed class RemuxPassHandler : IJobHandler
             }
         }
 
+        await SettleUnreadableSourceAsync(context.Id, data, origin, result, cancellationToken).ConfigureAwait(false);
         Merge(result, provenance);
         await ApplyFileOutcomeStateAsync(result, libraryId, mediaScope, origin).ConfigureAwait(false);
         await DeferUntilOldEnoughAsync(context.Id, data, origin, result, cancellationToken).ConfigureAwait(false);
         await RecordAsync(result, progress.ActivityId).ConfigureAwait(false);
         await FinishRejectedInputCleanupAsync(result, libraryId, mediaScope).ConfigureAwait(false);
         await ReportBackAsync(payloadJson, result).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// A file Weir could not read from start to finish is looked at again after a while, and only a few times (#646).
+    /// </summary>
+    /// <remarks>
+    /// Reading a file to the end is how Weir tells a download that is still arriving from one that is damaged, and it cannot
+    /// tell them apart from one look. So the look is repeated, further apart each time, while the file is still changing or
+    /// might be. Before this, every scan read the whole file again for ever: gigabytes of disk reads every few minutes for a
+    /// file nobody was ever told about. Once the file has sat unchanged through <see cref="UnreadableWaitMinutes"/>, it is
+    /// damaged, so this hands it to the library's failure policy with the evidence a reject needs (#471) — the same place a
+    /// file whose contents cannot be read at all ends up. A file that changes starts the count again.
+    /// </remarks>
+    private async Task SettleUnreadableSourceAsync(long jobId, PyDict data, PyDict? origin, PyDict result, CancellationToken cancellationToken)
+    {
+        if (result.Get("not_ready_kind") is not PyStr { Value: RemuxPassRunner.UnreadableWait })
+        {
+            return;
+        }
+
+        var fingerprint = SourceFingerprint(result.Get("inspected_source_path") as PyStr);
+        var unchanged = fingerprint is not null && data.Get("unreadable_fingerprint") is PyStr previous && previous.Value == fingerprint;
+        var looks = unchanged && data.Get("unreadable_looks") is PyInt counted ? (long)counted.Value + 1 : 1;
+        if (_jobs is null)
+        {
+            // Nothing can queue the next look, so the file keeps waiting as it did before, rather than be called damaged
+            // on the strength of one read.
+            return;
+        }
+
+        var waited = UnreadableWaitMinutes.Take((int)Math.Min(looks - 1, UnreadableWaitMinutes.Count)).Sum();
+        if (looks > UnreadableWaitMinutes.Count)
+        {
+            var reason = result.Get("reason") is PyStr said ? said.Value : "Weir could not read this file from start to finish.";
+            var sentence =
+                $"Weir looked at this file {looks.ToString(CultureInfo.InvariantCulture)} times over about " +
+                $"{waited.ToString(CultureInfo.InvariantCulture)} minutes and could not read it from start to finish, and it has not " +
+                $"changed since the first look. It is damaged or incomplete rather than still arriving. {reason}";
+            result.Remove("retryable_wait");
+            result.Remove("not_ready_kind");
+            result.Set("outcome", RemuxPassOutcomes.FailedBeforeExecution)
+                .Set("preflight_status", "failed")
+                .Set("preflight_reason", sentence)
+                .Set("reason", sentence)
+                // Evidence the release is bad, so a library set to reject can act on it (#471).
+                .Set("content_unusable", true);
+            _logger.LogWarning("A file did not read to the end after {Looks} looks, so Weir stopped waiting for it: job {JobId}.", looks, jobId);
+            return;
+        }
+
+        var lookAgainAt = _time.GetUtcNow().AddMinutes(UnreadableWaitMinutes[(int)looks - 1]);
+        var payload = data.Copy().Set("unreadable_looks", looks).Set("unreadable_fingerprint", fingerprint);
+        if (origin is { IsTruthy: true })
+        {
+            payload.Set("origin", origin);
+        }
+
+        try
+        {
+            await _jobs.EnqueueOrGetAsync(
+                $"{RemuxPassOutcomes.JobKind}:unreadable-wait:{jobId}:{looks.ToString(CultureInfo.InvariantCulture)}",
+                RemuxPassOutcomes.JobKind,
+                PyJsonWriter.Dumps(payload, PyJsonFormat.Compact),
+                cancellationToken: cancellationToken,
+                notBefore: lookAgainAt).ConfigureAwait(false);
+            result.Set("retry_scheduled", true).Set("failure_next_retry_at", PyDateTime.FromDateTimeOffset(lookAgainAt).IsoFormat());
+        }
+        catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
+        {
+            // The file stays on hold with its reason, which is true; it is only the next look that is missing.
+            _logger.LogWarning(exception, "Weir could not queue another look at a file that would not read to the end.");
+        }
+    }
+
+    /// <summary>The size and modification time of the file this look read, as one string, or null when it cannot be read.</summary>
+    private static string? SourceFingerprint(PyStr? inspectedSourcePath)
+    {
+        if (inspectedSourcePath is not { Value.Length: > 0 } path)
+        {
+            return null;
+        }
+
+        try
+        {
+            var info = new FileInfo(path.Value);
+            return info.Exists
+                ? $"{info.Length.ToString(CultureInfo.InvariantCulture)}:{info.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture)}"
+                : null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return null;
+        }
     }
 
     /// <summary>
