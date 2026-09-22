@@ -23,7 +23,7 @@ public static class WeirPlatformServices
         ArgumentNullException.ThrowIfNull(options);
         services.TryAddSingleton(options);
         services.TryAddSingleton(TimeProvider.System);
-        services.TryAddSingleton(_ => new SqliteDatabase(options.DbPath));
+        services.TryAddSingleton(sp => new SqliteDatabase(options.DbPath, logger: sp.GetService<ILogger<SqliteDatabase>>()));
         services.TryAddSingleton<WorkerHeartbeats>();
         services.TryAddSingleton<WatcherStateStore>();
         services.TryAddSingleton<ITimeZoneResolver, IanaTimeZoneResolver>();
