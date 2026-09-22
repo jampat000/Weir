@@ -264,7 +264,9 @@ public static class ProcessingSettingsEndpoints
         var store = request.Service<Weir.Infrastructure.Jobs.ProcessingJobStore>();
         var now = request.Service<TimeProvider>().GetUtcNow();
         var slots = request.Options.ProcessingWorkerCount;
-        var readout = await store.InTransactionAsync(
+        // A read, so never the queue's write transaction (#636): under several remuxes that queued behind the workers
+        // until it timed out with "database is locked".
+        var readout = await store.ReadAsync(
             (connection, transaction) => Weir.Infrastructure.Jobs.WorkAdmissionReader.ReadFilesAtOnce(connection, transaction, now, slots)).ConfigureAwait(false);
         return ApiRoutes.Ok(new PyDict()
             .Set("files_at_once", readout.FilesAtOnce)
