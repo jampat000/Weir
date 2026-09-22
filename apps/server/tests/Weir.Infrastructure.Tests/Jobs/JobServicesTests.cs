@@ -203,7 +203,9 @@ public sealed class JobServicesTests : IDisposable
         var service = new PeriodicEnqueueService([flaky], registry, TimeProvider.System, NullLogger<PeriodicEnqueueService>.Instance);
 
         await service.StartAsync(CancellationToken.None);
-        await WaitUntilAsync(() => Task.FromResult(flaky.Calls >= 2), TimeSpan.FromSeconds(10));
+        // The retry is due two seconds after the failure, on the real clock. The ceiling is for busy runners, where
+        // 10 s ran out twice (#639); a passing run still takes about two seconds.
+        await WaitUntilAsync(() => Task.FromResult(flaky.Calls >= 2), TimeSpan.FromSeconds(30));
         await service.StopAsync(CancellationToken.None);
 
         Assert.True(flaky.Calls >= 2);
