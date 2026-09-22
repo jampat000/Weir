@@ -224,8 +224,14 @@ public sealed class RemuxPassHandler : IJobHandler
         }
 
         var fingerprint = SourceFingerprint(result.Get("inspected_source_path") as PyStr);
-        var unchanged = fingerprint is not null && data.Get("unreadable_fingerprint") is PyStr previous && previous.Value == fingerprint;
-        var looks = unchanged && data.Get("unreadable_looks") is PyInt counted ? (long)counted.Value + 1 : 1;
+        var last = data.Get("unreadable_looks") is PyInt counted ? (long)counted.Value : 0;
+        // A look Weir could not measure the file for decides nothing: it neither counts against the file nor clears its
+        // record. Only a look that found the same size and time as the one before is another look at the same file.
+        var looks = fingerprint is null
+            ? Math.Max(1, last)
+            : data.Get("unreadable_fingerprint") is PyStr previous && previous.Value == fingerprint
+                ? last + 1
+                : 1;
         if (_jobs is null)
         {
             // Nothing can queue the next look, so the file keeps waiting as it did before, rather than be called damaged
@@ -254,7 +260,12 @@ public sealed class RemuxPassHandler : IJobHandler
         }
 
         var lookAgainAt = _time.GetUtcNow().AddMinutes(UnreadableWaitMinutes[(int)looks - 1]);
-        var payload = data.Copy().Set("unreadable_looks", looks).Set("unreadable_fingerprint", fingerprint);
+        var payload = data.Copy().Set("unreadable_looks", looks);
+        if (fingerprint is not null)
+        {
+            payload.Set("unreadable_fingerprint", fingerprint);
+        }
+
         if (origin is { IsTruthy: true })
         {
             payload.Set("origin", origin);
