@@ -3561,7 +3561,10 @@ export interface components {
         | "disabled"
         | "on_hold"
         | "out_of_schedule"
-        | "blocked_upstream";
+        | "blocked_upstream"
+        | "passed_through"
+        | "rejected"
+        | "cancelled";
       /**
        * Status Reason
        * @description Why the file is in this state, written for the person reading it.
@@ -3728,6 +3731,9 @@ export interface components {
             | "on_hold"
             | "out_of_schedule"
             | "blocked_upstream"
+            | "passed_through"
+            | "rejected"
+            | "cancelled"
           )
         | null;
       /** Library Id */
@@ -7351,6 +7357,9 @@ export interface operations {
               | "on_hold"
               | "out_of_schedule"
               | "blocked_upstream"
+              | "passed_through"
+              | "rejected"
+              | "cancelled"
             )
           | null;
         path_contains?: string | null;

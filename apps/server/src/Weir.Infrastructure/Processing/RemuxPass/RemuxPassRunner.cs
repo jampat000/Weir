@@ -331,7 +331,11 @@ public sealed class RemuxPassRunner
         }
         catch (MediaCompletenessException exception)
         {
-            return SourceNotReady(relativeMediaPath, exception.Message, inspected);
+            // #646: named, so the handler can tell this wait (a file that will not read to the end) from the others and
+            // stop waiting once the file has sat unchanged through several looks.
+            var waiting = SourceNotReady(relativeMediaPath, exception.Message, inspected);
+            waiting.Set("not_ready_kind", UnreadableWait);
+            return waiting;
         }
 
         var config = request.RulesConfig ?? RemuxRules.DefaultConfig();
@@ -1264,6 +1268,9 @@ public sealed class RemuxPassRunner
 
     /// <summary><c>not_ready_kind</c> of a file that is only waiting out the minimum file age (#632).</summary>
     public const string MinimumAgeWait = "minimum_age";
+
+    /// <summary><c>not_ready_kind</c> of a file Weir could not read from start to finish (#646).</summary>
+    public const string UnreadableWait = "unreadable";
 
     /// <summary><c>_source_not_ready</c>: an expected wait, not a failure.</summary>
     public static PyDict SourceNotReady(string relativeMediaPath, string reason, string? inspectedSourcePath = null)
