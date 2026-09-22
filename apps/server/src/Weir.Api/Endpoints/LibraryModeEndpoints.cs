@@ -32,6 +32,7 @@ public static class LibraryModeEndpoints
         endpoints.MapV1("GET", "/processing/libraries/{library_id}/library-problems", GetProblemsAsync);
         endpoints.MapV1("GET", "/processing/libraries/{library_id}/library-files", GetFilesAsync);
         endpoints.MapV1("POST", "/processing/libraries/{library_id}/library-files/clean", PostCleanAsync);
+        endpoints.MapV1("POST", "/processing/libraries/{library_id}/library-files/leave-alone", PostLeaveAloneAsync);
         endpoints.MapV1("POST", "/processing/libraries/{library_id}/library-schedule", PostScheduleAsync);
         endpoints.MapV1("GET", "/processing/libraries/{library_id}/library-redownloads", GetRedownloadsAsync);
         endpoints.MapV1("POST", "/processing/libraries/{library_id}/library-redownloads", PostRedownloadAsync);
@@ -155,7 +156,9 @@ public static class LibraryModeEndpoints
         .Set("audio_summary", row.AudioSummary)
         .Set("subtitle_summary", row.SubtitleSummary)
         .Set("link_count", row.LinkCount)
-        .Set("problem_kind", row.ProblemKind is { } kind ? LibraryProblems.Name(kind) : null);
+        .Set("problem_kind", row.ProblemKind is { } kind ? LibraryProblems.Name(kind) : null)
+        .Set("cleaned_at", row.CleanedAt is { } cleaned ? cleaned.ToUnixTimeSeconds() : null)
+        .Set("leave_alone", row.LeaveAlone);
 
     /// <summary>
     /// The scan's own state for the header: which job, what it is doing, when it last finished and anything it
@@ -201,12 +204,16 @@ public static class LibraryModeEndpoints
             Search = NullIfBlank(request.Query("q")),
             Facets = facets,
             ProblemKind = LibraryProblems.Parse(request.Query("problem")),
+            State = StateFilter(request.Query("state")),
             Sort = LibraryFileSort.Normalize(request.Query("sort")),
             Descending = string.Equals(request.Query("direction"), "desc", StringComparison.OrdinalIgnoreCase),
             Page = PositiveInt(request.Query("page"), 1),
             PageSize = Math.Clamp(PositiveInt(request.Query("page_size"), LibraryFileSort.DefaultPageSize), 1, LibraryFileSort.MaxPageSize),
         };
     }
+
+    /// <summary>What Weir has done with a file, as a filter: anything else narrows nothing.</summary>
+    private static string? StateFilter(string? value) => value is "cleaned" or "left_alone" ? value : null;
 
     private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
@@ -258,7 +265,9 @@ public static class LibraryModeEndpoints
         .Set("cannot_process", totals.CannotProcess)
         .Set("estimated_bytes_saved", totals.EstimatedBytesSaved)
         .Set("total_removed_audio_tracks", totals.RemovedAudioTracks)
-        .Set("total_removed_subtitle_tracks", totals.RemovedSubtitleTracks);
+        .Set("total_removed_subtitle_tracks", totals.RemovedSubtitleTracks)
+        .Set("cleaned", totals.Cleaned)
+        .Set("left_alone", totals.LeftAlone);
 
     /// <summary><c>share</c> is computed here, not in the browser, so every bar in the UI is drawn from one number.</summary>
     private static PyDict BreakdownRowOut(LibraryBreakdownRow row, long totalFiles) => new PyDict()
@@ -334,6 +343,67 @@ public static class LibraryModeEndpoints
     {
         var removing = files.Where(f => f.Classification == LibraryFileClassification.WouldChange && f.RemovedAudioCount + f.RemovedSubtitleCount > 0).ToList();
         return (removing.Count, removing.Sum(f => f.RemovedAudioCount + f.RemovedSubtitleCount), removing.Sum(f => f.EstimatedBytesSaved));
+    }
+
+    /// <summary>What one person's chosen plan would take out of the one file they chose it for.</summary>
+    private sealed record ManualCleanChoice(int Tracks, long BytesSaved);
+
+    /// <summary>
+    /// Checks a track choice against the tracks the scan already read from the file, so a choice that cannot apply is
+    /// refused here rather than becoming a job that fails later, and so the confirmation dialog quotes the chosen
+    /// plan. The clean job checks again when it runs, against a fresh read: this is about answering the request well,
+    /// not about deciding whether the file is safe to touch.
+    /// </summary>
+    private static ManualCleanChoice ManualChoiceFor(PyDict manualPlan, List<LibraryScanFileEntry> selected)
+    {
+        if (selected.Count != 1)
+        {
+            throw new ApiException(StatusCodes.Status400BadRequest, "Choosing tracks yourself applies to one file at a time.");
+        }
+
+        if (ManualPlanJson.FromPyJson(manualPlan) is not { } choice)
+        {
+            throw new ApiException(
+                StatusCodes.Status422UnprocessableEntity,
+                "'manual_plan' must be an object with 'keep' (a list of {index, default, forced}) and 'order' (a list of track indices).");
+        }
+
+        var entry = selected[0];
+        if (entry.ProbeJson is not { Length: > 0 } probeJson)
+        {
+            throw new ApiException(
+                StatusCodes.Status400BadRequest,
+                "Weir has not read this file's tracks yet. Scan the library again, then choose.");
+        }
+
+        SplitProbeStreams streams;
+        ProbeResult probe;
+        try
+        {
+            probe = ProbeResult.Parse(probeJson);
+            streams = RemuxRules.SplitStreams(probe);
+        }
+        catch (RulesInputException exception)
+        {
+            throw new ApiException(StatusCodes.Status400BadRequest, $"Weir could not read this file's tracks: {exception.Message}");
+        }
+
+        if (!ManualTrackPlan.TryValidate(choice, ManualTrackPlan.ClassifyIndices(streams), out var problem))
+        {
+            throw new ApiException(StatusCodes.Status400BadRequest, problem);
+        }
+
+        var plan = ManualTrackPlan.BuildPlan(streams, choice);
+        if (!RemuxRules.IsRemuxRequired(plan, streams.Audio, streams.Subtitles))
+        {
+            throw new ApiException(
+                StatusCodes.Status400BadRequest,
+                "What you chose is what this file already holds, so there is nothing to do.");
+        }
+
+        return new ManualCleanChoice(
+            plan.RemovedAudio.Count + plan.RemovedSubtitles.Count,
+            LibraryFilePlanner.EstimateSavings(probe, streams, plan));
     }
 
     /// <summary>
@@ -473,6 +543,8 @@ public static class LibraryModeEndpoints
         var model = new BodyModel(payload, issues);
         var paths = model.StrList("paths", []);
         var confirmed = model.Bool("confirm_final_removal", false);
+        var manualPlan = model.OptionalDict("manual_plan");
+        var expectedSizeBytes = model.OptionalInt("expected_size_bytes");
         var csrfToken = model.Str("csrf_token", minLength: 1);
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
@@ -495,6 +567,19 @@ public static class LibraryModeEndpoints
             throw new ApiException(StatusCodes.Status400BadRequest, "None of the selected files are in the latest scan. Scan the library again first.");
         }
 
+        // A file set aside is dropped here rather than inside the queueing loop, so the confirmation dialog quotes
+        // what will actually be removed and no preflight reads a file nothing is going to touch.
+        var marks = await LibraryFileMarksStore.ForLibraryAsync(uow, libraryId).ConfigureAwait(false);
+        var skipped = selected
+            .Where(entry => marks.TryGetValue(entry.Path, out var mark) && mark.LeaveAlone)
+            .Select(entry => entry.Path)
+            .ToList();
+        selected = selected.Where(entry => !skipped.Contains(entry.Path, StringComparer.Ordinal)).ToList();
+        if (selected.Count == 0)
+        {
+            return ApiRoutes.Ok(CleanOut(0, [], 0, 0, 0, skipped, []));
+        }
+
         var settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
         var rules = await RulesForAsync(uow, library).ConfigureAwait(false);
         var connectionsById = await ConnectionsForFilesAsync(uow, request.Service<MediaManagerConnectionService>(), selected).ConfigureAwait(false);
@@ -514,7 +599,12 @@ public static class LibraryModeEndpoints
             await LibraryViewStore.RecordPreflightProblemAsync(uow, libraryId, result.FilePath, result.ProblemKind).ConfigureAwait(false);
         }
 
-        var (removingFiles, removingTracks, bytesSaved) = RemovalTotals(selected);
+        // A track choice describes one file's tracks, so it only ever applies to one file, and what it removes is
+        // what the confirmation dialog must quote — not what the library's own rules would have done to the same file.
+        var chosen = manualPlan is null ? null : ManualChoiceFor(manualPlan, selected);
+        var (removingFiles, removingTracks, bytesSaved) = chosen is { } choice
+            ? (choice.Tracks > 0 ? 1 : 0, choice.Tracks, choice.BytesSaved)
+            : RemovalTotals(selected);
         if (removingFiles > 0 && !confirmed)
         {
             // Nothing is queued, but the preflight notes just recorded above are real observations worth keeping
@@ -525,10 +615,11 @@ public static class LibraryModeEndpoints
 
         var jobStore = request.Service<ProcessingJobStore>();
         var jobIds = new List<long>();
-        var skipped = new List<string>();
         foreach (var entry in selected)
         {
-            if (entry.Classification != LibraryFileClassification.WouldChange)
+            // A file the rules are happy with is still one a person may want to change themselves, so their own
+            // choice is the one thing that gets past this.
+            if (chosen is null && entry.Classification != LibraryFileClassification.WouldChange)
             {
                 continue;
             }
@@ -541,20 +632,59 @@ public static class LibraryModeEndpoints
                 continue;
             }
 
-            var fileConfirmed = entry.RemovedAudioCount + entry.RemovedSubtitleCount == 0 || confirmed;
-            var job = await LibraryScanStore.EnqueueCleanAsync(uow, jobStore, library.Id, entry.Path, "manual", fileConfirmed).ConfigureAwait(false);
+            var fileConfirmed = (chosen is { } c ? c.Tracks == 0 : entry.RemovedAudioCount + entry.RemovedSubtitleCount == 0) || confirmed;
+            var job = await LibraryScanStore.EnqueueCleanAsync(
+                    uow, jobStore, library.Id, entry.Path, "manual", fileConfirmed,
+                    manualPlan, manualPlan is null ? null : expectedSizeBytes ?? entry.SizeBytes)
+                .ConfigureAwait(false);
             jobIds.Add(job.Id);
         }
 
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict()
-            .Set("queued", jobIds.Count)
-            .Set("job_ids", new PyList(jobIds.Select(id => (PyJson)new PyInt(id))))
-            .Set("files_count", removingFiles)
-            .Set("tracks_count", removingTracks)
-            .Set("estimated_bytes_saved", bytesSaved)
-            .Set("skipped_paths", new PyList(skipped.Select(p => (PyJson)new PyStr(p))))
-            .Set("warnings", new PyList(PreflightWarningMessages(preflight.Values).Select(w => (PyJson)new PyStr(w)))));
+        return ApiRoutes.Ok(CleanOut(
+            jobIds.Count, jobIds, removingFiles, removingTracks, bytesSaved, skipped, PreflightWarningMessages(preflight.Values)));
+    }
+
+    private static PyDict CleanOut(
+        int queued,
+        IReadOnlyList<long> jobIds,
+        int filesCount,
+        int tracksCount,
+        long bytesSaved,
+        IReadOnlyList<string> skipped,
+        IReadOnlyList<string> warnings) => new PyDict()
+        .Set("queued", queued)
+        .Set("job_ids", new PyList(jobIds.Select(id => (PyJson)new PyInt(id))))
+        .Set("files_count", filesCount)
+        .Set("tracks_count", tracksCount)
+        .Set("estimated_bytes_saved", bytesSaved)
+        .Set("skipped_paths", new PyList(skipped.Select(p => (PyJson)new PyStr(p))))
+        .Set("warnings", new PyList(warnings.Select(w => (PyJson)new PyStr(w))));
+
+    /// <summary>
+    /// "Leave this file alone", and its undo. It outlives a rescan (the scan rewrites its own index from scratch,
+    /// so this is kept beside it), and nothing cleans the file while it is set: not a selection on the Library
+    /// screen, not a queued job that reaches the handler later.
+    /// </summary>
+    private static async Task<ApiResult> PostLeaveAloneAsync(ApiRequest request)
+    {
+        var payload = await request.ReadBodyAsync().ConfigureAwait(false);
+        var issues = new ValidationIssues();
+        var libraryId = request.PathInt("library_id", issues);
+        var model = new BodyModel(payload, issues);
+        var csrfToken = model.Str("csrf_token", minLength: 1);
+        var filePath = model.Str("path", minLength: 1);
+        var leaveAlone = model.Bool("leave_alone", true);
+        model.Finish(ExtraFields.Forbid);
+        issues.ThrowIfAny();
+
+        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
+        request.RequireConfirmationToken(csrfToken);
+        var uow = await request.DbAsync().ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, libraryId).ConfigureAwait(false);
+        await LibraryFileMarksStore.SetLeaveAloneAsync(uow, library.Id, filePath!, leaveAlone, request.Time.GetUtcNow()).ConfigureAwait(false);
+        await request.CommitAsync().ConfigureAwait(false);
+        return ApiRoutes.Ok(new PyDict().Set("path", filePath).Set("leave_alone", leaveAlone));
     }
 
     private static async Task<ApiResult> PostScheduleAsync(ApiRequest request)

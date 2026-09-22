@@ -3,10 +3,12 @@ using Weir.Core.Activity;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
+using Weir.Core.Media;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Settings;
 using Weir.Core.Time;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
@@ -127,12 +129,16 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             var observedSize = FileSizeBytes(filePath);
             var previous = await FileStateStore.ExistingFileRowAsync(uow, library.Id, rel).ConfigureAwait(false);
 
-            // A library that keeps originals leaves each cleaned source in the watched folder. The file the last successful
-            // pass cleaned — same size, same modification time, both recorded by that pass — is finished: note that it
-            // was seen and move on, so it is never queued again. A new or replaced file at the same path differs in one
-            // of the two and is processed as usual.
+            // The file the last successful pass cleaned — same size, same modification time, both recorded by that pass — is
+            // finished: note that it was seen and move on, so it is never queued again. That holds for a library that keeps
+            // originals (#627) and for one that removes them but had to leave this one in place (#644): TV season cleanup skips
+            // a season while an episode is still queued or its manager cannot be asked, and a Movies removal can be
+            // interrupted. Without this, every scan cleaned such a file again and handed it back again. A new or replaced file
+            // at the same path differs in one of the two and is processed as usual. A movie whose removal was interrupted
+            // goes on below, so that removal can still be finished.
             var keepsOriginals = !library.RemoveOriginalAfterSuccess;
-            if (keepsOriginals && ProcessedSourceRules.IsSameCleanedFile(previous, observedSize, ModifiedTimeNs(filePath)))
+            var alreadyCleaned = ProcessedSourceRules.IsSameCleanedFile(previous, observedSize, ModifiedTimeNs(filePath));
+            if (alreadyCleaned && (keepsOriginals || mediaScope != ProcessingMediaScopes.Movie))
             {
                 await uow.ExecuteAsync(
                     "UPDATE files SET last_seen_at = @seen WHERE id = @id",
@@ -154,7 +160,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
                     FailureAttempts = 0,
                     NextRetryAt = null,
                     Status = previous.Status is ProcessingFileStatuses.ProcessingFailed or ProcessingFileStatuses.OnHold
-                        or ProcessingFileStatuses.PassedThrough or ProcessingFileStatuses.Rejected
+                        or ProcessingFileStatuses.PassedThrough or ProcessingFileStatuses.Rejected or ProcessingFileStatuses.Cancelled
                         ? ProcessingFileStatuses.Unprocessed
                         : previous.Status,
                 };
@@ -163,7 +169,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
 
             if (previous is not null && previous.SizeBytes == observedSize)
             {
-                if (previous.Status is ProcessingFileStatuses.PassedThrough or ProcessingFileStatuses.Rejected)
+                if (previous.Status is ProcessingFileStatuses.PassedThrough or ProcessingFileStatuses.Rejected or ProcessingFileStatuses.Cancelled)
                 {
                     await uow.ExecuteAsync(
                         "UPDATE files SET last_seen_at = @seen WHERE id = @id",
@@ -215,6 +221,26 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             var access = settling.IsSettling
                 ? (Ok: true, Problem: (string?)null)
                 : WatchedFolderScanOps.CheckFileAccess(library.SkipAccessTests, filePath, runtime.OutputFolder);
+
+            if (alreadyCleaned)
+            {
+                // A cleaned movie still in a library that removes originals: its removal was interrupted. Finish it while the
+                // validated output is still there. Never a second pass, and the row keeps its outcome.
+                if (!settling.IsSettling && access.Problem is null &&
+                    !await WatchedFolderScanOps.ActiveRemuxPassExistsForRelativePathAsync(uow, rel, mediaScope, library.Id).ConfigureAwait(false) &&
+                    await WatchedFolderScanOps.CompletedRemuxOutputExistsForRelativePathAsync(uow, rel, mediaScope, library.Id, runtime.OutputFolder, filePath).ConfigureAwait(false))
+                {
+                    await RetryCompletedMovieCleanupAsync(uow, library.Id, runtime.WatchedFolder, filePath, rel, observedSize, settling, now).ConfigureAwait(false);
+                }
+                else
+                {
+                    await uow.ExecuteAsync(
+                        "UPDATE files SET last_seen_at = @seen WHERE id = @id",
+                        ("@seen", SqliteValues.ToSqlite(PyDateTime.FromDateTimeOffset(now))), ("@id", previous!.Id)).ConfigureAwait(false);
+                }
+
+                continue;
+            }
 
             var verdict = FileStateDecision.DecideFileState(
                 library,
@@ -297,6 +323,13 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             await EnqueueRemuxPassAsync(uow, context, library, mediaScope, rel, scanTrigger, previous).ConfigureAwait(false);
         }
 
+        // #645: a file that left the watched folder before Weir finished with it stops being listed. Only while the watched
+        // folder itself can be read, so an unmounted share never empties the list.
+        if (Directory.Exists(runtime.WatchedFolder))
+        {
+            await ForgetVanishedFilesAsync(uow, library.Id, runtime.WatchedFolder, mediaScope, now).ConfigureAwait(false);
+        }
+
         await uow.CommitAsync().ConfigureAwait(false);
 
         // The SKIPPED decision above committed before this mutation. If the process stops between the
@@ -316,6 +349,69 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         await uow.ExecuteAsync(
             "UPDATE files SET failure_class = NULL, failure_attempts = 0, next_retry_at = NULL, status = @status WHERE id = @id",
             ("@status", previous.Status), ("@id", previous.Id)).ConfigureAwait(false);
+    }
+
+    /// <summary>How long a file must have been gone, since a scan last saw it, before Weir stops listing it (#645). Longer than a
+    /// download client takes to move a file, and than a share takes to come back from a blip.</summary>
+    internal static readonly TimeSpan VanishedFileGrace = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    /// #645: a row still waiting, held or failed whose file has not been on disk for <see cref="VanishedFileGrace"/>. The download
+    /// client removed it, a person deleted it, or the manager took it. The scan walks only files on disk, so nothing else would
+    /// ever judge that row again, and it stayed listed for ever. It is forgotten, as Forget does, with one Activity entry
+    /// saying why. A file with a pass queued or running is left to that pass, and a row no scan has ever seen is left alone.
+    /// Outcomes (processed, passed through, rejected, skipped, cancelled) stay as history.
+    /// </summary>
+    private static async Task ForgetVanishedFilesAsync(UnitOfWork uow, long libraryId, string watchedRoot, string mediaScope, DateTimeOffset now)
+    {
+        var rows = await uow.QueryAsync(
+            "SELECT id, relative_path, status, last_seen_at FROM files WHERE library_id = @lib AND last_seen_at IS NOT NULL " +
+            "AND status IN (@waiting, @held, @outside, @blocked, @failed)",
+            reader => (Id: reader.GetInt64(0), RelativePath: reader.GetString(1), Status: reader.GetString(2), LastSeen: PythonTimestamps.Parse(reader.GetValue(3))),
+            ("@lib", libraryId),
+            ("@waiting", ProcessingFileStatuses.Unprocessed),
+            ("@held", ProcessingFileStatuses.OnHold),
+            ("@outside", ProcessingFileStatuses.OutOfSchedule),
+            ("@blocked", ProcessingFileStatuses.BlockedUpstream),
+            ("@failed", ProcessingFileStatuses.ProcessingFailed)).ConfigureAwait(false);
+        var cutoff = now - VanishedFileGrace;
+        foreach (var (id, rel, status, lastSeen) in rows)
+        {
+            if (lastSeen is not { } seen || seen > cutoff)
+            {
+                continue;
+            }
+
+            string path;
+            try
+            {
+                path = Path.GetFullPath(Path.Join(watchedRoot, rel));
+            }
+            catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                continue;
+            }
+
+            if (File.Exists(path) ||
+                await WatchedFolderScanOps.ActiveRemuxPassExistsForRelativePathAsync(uow, rel, mediaScope, libraryId).ConfigureAwait(false))
+            {
+                continue;
+            }
+
+            await FileStateStore.ForgetAsync(uow, id).ConfigureAwait(false);
+            await SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(
+                ActivityEventTypes.ProcessingFileLeftWatchedFolder,
+                "processing",
+                $"{MediaPathNames.Name(rel, OperatingSystem.IsWindows())} left the watched folder before Weir finished with it, so it is no longer listed",
+                PyJsonWriter.Dumps(
+                    new PyDict()
+                        .Set("relative_media_path", rel)
+                        .Set("library_id", libraryId)
+                        .Set("last_status", status)
+                        .Set("trigger", "scan")
+                        .Set("result", "skipped"),
+                    PyJsonFormat.Compact))).ConfigureAwait(false);
+        }
     }
 
     private static async Task RetryCompletedMovieCleanupAsync(
@@ -350,10 +446,13 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         }
         else
         {
+            // The file is cleaned; only removing its original is waiting. It stays processed, so the fingerprint above keeps
+            // recognising it and no scan cleans it again once the manager has imported the output (#644). It read "on hold"
+            // before, and a held file looks unfinished everywhere.
             var retryReason = cleanupReason ?? "The source release folder is still locked.";
             await FileStateStore.RecordFileStateAsync(
                 uow, libraryId, rel,
-                new FileStateVerdict(ProcessingFileStatuses.OnHold, $"The output is complete, but source cleanup is waiting: {retryReason} Weir will try again automatically."),
+                new FileStateVerdict(ProcessingFileStatuses.Processed, $"The output is complete, but removing the original download is waiting: {retryReason} Weir will try again automatically."),
                 observedSize, settling.SizeChangedAt, now).ConfigureAwait(false);
         }
     }

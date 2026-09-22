@@ -331,7 +331,11 @@ public sealed class RemuxPassRunner
         }
         catch (MediaCompletenessException exception)
         {
-            return SourceNotReady(relativeMediaPath, exception.Message, inspected);
+            // #646: named, so the handler can tell this wait (a file that will not read to the end) from the others and
+            // stop waiting once the file has sat unchanged through several looks.
+            var waiting = SourceNotReady(relativeMediaPath, exception.Message, inspected);
+            waiting.Set("not_ready_kind", UnreadableWait);
+            return waiting;
         }
 
         var config = request.RulesConfig ?? RemuxRules.DefaultConfig();
@@ -724,6 +728,9 @@ public sealed class RemuxPassRunner
                 .Set("media_scope", context.Scope)
                 .Set("stream_counts", output["stream_counts"])
                 .Set("duration_seconds", NullableFloat(context.Duration))
+                // What comes out, so Live can say it while the file is being written, not only afterwards.
+                .Set("removed_audio", output["removed_audio"])
+                .Set("removed_subtitles", output["removed_subtitles"])
                 .Set("message", "Weir has started writing the cleaned-up file."));
             // #548: the library's writer choice. The staged output keeps the source's own extension
             // (RemuxToTempFileAsync), so the source path is what decides whether mkvmerge can take it.
@@ -746,6 +753,8 @@ public sealed class RemuxPassRunner
                             .Set("media_scope", context.Scope)
                             .Set("stream_counts", output["stream_counts"])
                             .Set("duration_seconds", NullableFloat(context.Duration))
+                            .Set("removed_audio", output["removed_audio"])
+                            .Set("removed_subtitles", output["removed_subtitles"])
                             .Set("message", "Weir is writing the cleaned-up file."),
                         update)),
                 context.Duration,
@@ -884,6 +893,8 @@ public sealed class RemuxPassRunner
             .Set("inspected_source_path", context.Inspected)
             .Set("output_file", resolvedFinal)
             .Set("media_scope", context.Scope)
+            .Set("removed_audio", output["removed_audio"])
+            .Set("removed_subtitles", output["removed_subtitles"])
             .Set("message", "The cleaned-up file was written. Weir is doing final safety checks."));
         await MigrateSidecarsBeforeCleanupAsync(src, final, sidecarPatterns, request.Runtime.PreserveOriginalTimestamps, output).ConfigureAwait(false);
         await HandleCleanupAfterSuccessAsync(context, output, final, cancellationToken).ConfigureAwait(false);
@@ -1264,6 +1275,9 @@ public sealed class RemuxPassRunner
 
     /// <summary><c>not_ready_kind</c> of a file that is only waiting out the minimum file age (#632).</summary>
     public const string MinimumAgeWait = "minimum_age";
+
+    /// <summary><c>not_ready_kind</c> of a file Weir could not read from start to finish (#646).</summary>
+    public const string UnreadableWait = "unreadable";
 
     /// <summary><c>_source_not_ready</c>: an expected wait, not a failure.</summary>
     public static PyDict SourceNotReady(string relativeMediaPath, string reason, string? inspectedSourcePath = null)

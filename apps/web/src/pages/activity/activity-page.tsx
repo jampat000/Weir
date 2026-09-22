@@ -670,7 +670,14 @@ const FIELD_LABEL_CLASS =
 
 type ExportFormat = "csv" | "json";
 
-export function ActivityPage() {
+/**
+ * The record of what Weir did. Since 3.2 it lives in Settings › History and logs rather than as
+ * a page of its own, so `embedded` drops the page title and header; the list, filters,
+ * exports and removals are unchanged.
+ */
+export function ActivityPage({
+  embedded = false,
+}: { embedded?: boolean } = {}) {
   const [filters, setFilters] = useState<ActivityFiltersState>(EMPTY_FILTERS);
   const [applied, setApplied] = useState<ActivityFiltersState>(EMPTY_FILTERS);
   const [olderItems, setOlderItems] = useState<ActivityEventItem[]>([]);
@@ -766,9 +773,9 @@ export function ActivityPage() {
   if (recent.isError) {
     const err = recent.error;
     return (
-      <div className="mm-page">
-        <header className="mm-page__intro">
-          <h1 className="mm-page__title">Activity</h1>
+      <div className={embedded ? undefined : "mm-page"}>
+        <header className={embedded ? undefined : "mm-page__intro"}>
+          {embedded ? null : <h1 className="mm-page__title">Activity</h1>}
           <p className="mm-page__lead">
             {isLikelyNetworkFailure(err)
               ? "Could not reach the Weir API."
@@ -926,7 +933,9 @@ export function ActivityPage() {
       );
       if (!match) {
         // No tracked file to tell the story of: show the Files screen for that path instead.
-        void navigate(`/processing?tab=files&path=${encodeURIComponent(path)}`);
+        void navigate(
+          `/settings?tab=history&show=downloads&path=${encodeURIComponent(path)}`,
+        );
         return;
       }
       setStoryName(fileNameOf(path));
@@ -1025,12 +1034,16 @@ export function ActivityPage() {
   if (olderError) blockers.push({ key: "older", text: olderError });
 
   return (
-    <div className="mm-page">
-      <header className="mm-page__intro">
-        <h1 className="mm-page__title">Activity</h1>
-        <p className="mm-page__lead">
-          What Weir did, newest first. New entries appear as they happen.
-        </p>
+    <div className={embedded ? undefined : "mm-page"}>
+      <header className={embedded ? undefined : "mm-page__intro"}>
+        {embedded ? null : (
+          <>
+            <h1 className="mm-page__title">Activity</h1>
+            <p className="mm-page__lead">
+              What Weir did, newest first. New entries appear as they happen.
+            </p>
+          </>
+        )}
         {typeof retentionDays === "number" ? (
           <p
             className="mt-1 text-sm text-[var(--mm-text2)]"

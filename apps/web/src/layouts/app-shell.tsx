@@ -1,24 +1,37 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { BrandHeaderLink } from "../components/brand/brand-header-link";
 import {
-  NavIconActivity,
   NavIconChevronLeft,
   NavIconChevronRight,
-  NavIconHome,
-  NavIconProcessing,
+  NavIconLibrary,
+  NavIconLive,
   NavIconSettings,
   NavIconSignOut,
 } from "../components/shell/nav-icons";
-import { PauseControl } from "../components/shell/pause-control";
 import { useLogoutMutation } from "../lib/auth/queries";
+import { useProcessingFilesAtOnceQuery } from "../lib/processing/queries";
 import { useSuiteSettingsQuery } from "../lib/suite/queries";
 import { useSystemReadinessQuery } from "../lib/system/readiness-queries";
-import {
-  persistAppTheme,
-  readStoredAppTheme,
-  type AppTheme,
-} from "../lib/ui/app-theme";
+
+// Between phone width (a drawer below 921px) and 1400px the side menu shrinks to icons by itself, so
+// Live keeps its lanes; a click on Collapse or Expand overrides it until the page is reloaded.
+const LAPTOP_WIDTH = "(min-width: 921px) and (max-width: 1400px)";
+
+function useMediaQuery(query: string): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      if (typeof window.matchMedia !== "function") return () => undefined;
+      const list = window.matchMedia(query);
+      list.addEventListener("change", onChange);
+      return () => list.removeEventListener("change", onChange);
+    },
+    () =>
+      typeof window.matchMedia === "function" &&
+      window.matchMedia(query).matches,
+    () => false,
+  );
+}
 
 function sidebarNavClass({ isActive }: { isActive: boolean }) {
   return isActive ? "mm-sidebar-link active" : "mm-sidebar-link";
@@ -31,12 +44,14 @@ export function AppShell() {
   const suite = useSuiteSettingsQuery();
   const readiness = useSystemReadinessQuery();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [theme, setTheme] = useState<AppTheme>(() => readStoredAppTheme());
+  const [collapsedChoice, setCollapsedChoice] = useState<boolean | null>(null);
+  const laptop = useMediaQuery(LAPTOP_WIDTH);
+  const sidebarCollapsed = collapsedChoice ?? laptop;
+  // How many files are being written right now, beside Live wherever you are in the app.
+  const working = useProcessingFilesAtOnceQuery().data?.running ?? 0;
   const productTitle =
     (suite.data?.product_display_name ?? "Weir").trim() || "Weir";
   const appVersion = readiness.data?.version;
-  const nextTheme: AppTheme = theme === "dark" ? "light" : "dark";
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -71,7 +86,7 @@ export function AppShell() {
               sidebarCollapsed ? "Expand navigation" : "Collapse navigation"
             }
             aria-expanded={!sidebarCollapsed}
-            onClick={() => setSidebarCollapsed((value) => !value)}
+            onClick={() => setCollapsedChoice(!sidebarCollapsed)}
           >
             <span className="mm-sidebar-collapse__icon" aria-hidden="true">
               {sidebarCollapsed ? (
@@ -84,43 +99,44 @@ export function AppShell() {
               {sidebarCollapsed ? "Expand" : "Collapse"}
             </span>
           </button>
+          {/* Three places since 3.2 (docs/exec-plans/active/live-and-library.md): what Weir is
+              doing now, the files already imported, and everything set up once. */}
           <nav className="mm-sidebar-nav" aria-label="Primary">
             <NavLink
               to="/"
               end
               className={sidebarNavClass}
-              title="Home"
+              title="Live"
+              aria-label={working > 0 ? `Live, ${working} working` : undefined}
               onClick={() => setSidebarOpen(false)}
             >
               <span className="mm-sidebar-link-icon" aria-hidden="true">
-                <NavIconHome />
+                <NavIconLive />
               </span>
-              <span className="mm-sidebar-link-label">Home</span>
+              <span className="mm-sidebar-link-label">Live</span>
+              {working > 0 ? (
+                <span
+                  className="mm-sidebar-link-badge"
+                  data-testid="nav-live-working"
+                >
+                  <i className="mm-live-pulse" aria-hidden="true" />
+                  <span className="mm-sidebar-link-badge__text">
+                    {working} working
+                  </span>
+                </span>
+              ) : null}
             </NavLink>
             <NavLink
-              to="/activity"
+              to="/library"
               className={sidebarNavClass}
-              title="Activity"
+              title="Library"
               onClick={() => setSidebarOpen(false)}
             >
               <span className="mm-sidebar-link-icon" aria-hidden="true">
-                <NavIconActivity />
+                <NavIconLibrary />
               </span>
-              <span className="mm-sidebar-link-label">Activity</span>
+              <span className="mm-sidebar-link-label">Library</span>
             </NavLink>
-
-            <NavLink
-              to="/processing"
-              className={sidebarNavClass}
-              title="Processing"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <span className="mm-sidebar-link-icon" aria-hidden="true">
-                <NavIconProcessing />
-              </span>
-              <span className="mm-sidebar-link-label">Processing</span>
-            </NavLink>
-
             <NavLink
               to="/settings"
               className={sidebarNavClass}
@@ -171,7 +187,9 @@ export function AppShell() {
       ) : null}
       <main className="mm-main" id="mm-main-content" tabIndex={-1}>
         <div className="mm-main-inner">
-          <div className="mm-shell-toolbar" aria-label="Display controls">
+          {/* Phones only (hidden on wider screens by CSS): the menu button that opens the side
+              menu. Pause and the theme switch are in each page's title row. */}
+          <div className="mm-shell-toolbar">
             <button
               type="button"
               className="mm-shell-menu-toggle"
@@ -182,23 +200,6 @@ export function AppShell() {
             >
               <span aria-hidden="true">☰</span>
               <span>Menu</span>
-            </button>
-            <PauseControl />
-            <button
-              type="button"
-              className="mm-theme-toggle"
-              data-testid="theme-toggle"
-              aria-label={`Switch to ${nextTheme} mode`}
-              title={`Switch to ${nextTheme} mode`}
-              onClick={() => {
-                setTheme(nextTheme);
-                persistAppTheme(nextTheme);
-              }}
-            >
-              <span className="mm-theme-toggle__dot" aria-hidden="true" />
-              <span className="mm-theme-toggle__label">
-                {theme === "dark" ? "Dark" : "Light"}
-              </span>
             </button>
           </div>
           <Outlet />

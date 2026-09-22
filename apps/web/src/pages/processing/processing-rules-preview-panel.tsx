@@ -302,10 +302,7 @@ export function ProcessingRulesPreviewPanel({
           </div>
           <button
             type="button"
-            className={mmActionButtonClass({
-              variant: "secondary",
-              disabled,
-            })}
+            className={mmActionButtonClass({ variant: "secondary" })}
             disabled={disabled}
             onClick={() => setOpen(true)}
           >
@@ -423,10 +420,7 @@ export function ProcessingRulesPreviewPanel({
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className={mmActionButtonClass({
-            variant: "primary",
-            disabled: !hasPath || libraryId === "" || preview.isPending,
-          })}
+          className={mmActionButtonClass({ variant: "primary" })}
           disabled={!hasPath || libraryId === "" || preview.isPending}
           onClick={runPreview}
         >

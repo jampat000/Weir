@@ -166,11 +166,7 @@ export function SettingsBackupTab({
                 <div className={quietActionRowClass}>
                   <button
                     type="button"
-                    className={mmActionButtonClass({
-                      variant: "secondary",
-                      disabled:
-                        !editable || !backupScheduleDirty || save.isPending,
-                    })}
+                    className={mmActionButtonClass({ variant: "secondary" })}
                     disabled={
                       !editable || !backupScheduleDirty || save.isPending
                     }
@@ -199,10 +195,7 @@ export function SettingsBackupTab({
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    className={mmActionButtonClass({
-                      variant: "secondary",
-                      disabled: backupBusy || save.isPending,
-                    })}
+                    className={mmActionButtonClass({ variant: "secondary" })}
                     disabled={backupBusy || save.isPending}
                     onClick={() => onDownloadConfiguration()}
                   >
@@ -210,10 +203,7 @@ export function SettingsBackupTab({
                   </button>
                   <button
                     type="button"
-                    className={mmActionButtonClass({
-                      variant: "tertiary",
-                      disabled: backupBusy || save.isPending,
-                    })}
+                    className={mmActionButtonClass({ variant: "tertiary" })}
                     disabled={backupBusy || save.isPending}
                     onClick={() => restoreInputRef.current?.click()}
                   >

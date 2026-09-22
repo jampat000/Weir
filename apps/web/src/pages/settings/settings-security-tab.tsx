@@ -330,10 +330,7 @@ export function SettingsSecurityTab() {
                           keeps a real button instead of becoming a quiet text link. */}
                       <button
                         type="button"
-                        className={mmActionButtonClass({
-                          variant: "tertiary",
-                          disabled: session.current || revokeSession.isPending,
-                        })}
+                        className={mmActionButtonClass({ variant: "tertiary" })}
                         disabled={session.current || revokeSession.isPending}
                         onClick={async () => {
                           setSessionStatus(null);
@@ -413,13 +410,7 @@ export function SettingsSecurityTab() {
           ) : null}
           <button
             type="button"
-            className={mmActionButtonClass({
-              variant: "secondary",
-              disabled:
-                changeUsername.isPending ||
-                newUsername.trim() === "" ||
-                usernamePassword === "",
-            })}
+            className={mmActionButtonClass({ variant: "secondary" })}
             disabled={
               changeUsername.isPending ||
               newUsername.trim() === "" ||
@@ -475,10 +466,7 @@ export function SettingsSecurityTab() {
               />
               <button
                 type="button"
-                className={mmActionButtonClass({
-                  variant: "tertiary",
-                  disabled: changePasswordBusy,
-                })}
+                className={mmActionButtonClass({ variant: "tertiary" })}
                 disabled={changePasswordBusy}
                 onClick={() => setShowCurrentPassword((prev) => !prev)}
               >
@@ -508,10 +496,7 @@ export function SettingsSecurityTab() {
               />
               <button
                 type="button"
-                className={mmActionButtonClass({
-                  variant: "tertiary",
-                  disabled: changePasswordBusy,
-                })}
+                className={mmActionButtonClass({ variant: "tertiary" })}
                 disabled={changePasswordBusy}
                 onClick={() => setShowNewPassword((prev) => !prev)}
               >
@@ -541,10 +526,7 @@ export function SettingsSecurityTab() {
               />
               <button
                 type="button"
-                className={mmActionButtonClass({
-                  variant: "tertiary",
-                  disabled: changePasswordBusy,
-                })}
+                className={mmActionButtonClass({ variant: "tertiary" })}
                 disabled={changePasswordBusy}
                 onClick={() => setShowConfirmPassword((prev) => !prev)}
               >
@@ -566,14 +548,7 @@ export function SettingsSecurityTab() {
           ) : null}
           <button
             type="button"
-            className={mmActionButtonClass({
-              variant: "primary",
-              disabled:
-                changePasswordBusy ||
-                currentPassword.trim() === "" ||
-                newPassword.trim() === "" ||
-                confirmPassword.trim() === "",
-            })}
+            className={mmActionButtonClass({ variant: "primary" })}
             disabled={
               changePasswordBusy ||
               currentPassword.trim() === "" ||

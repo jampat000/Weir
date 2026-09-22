@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Weir.Core.LibraryMode;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.LibraryMode;
@@ -27,7 +28,11 @@ public sealed record LibraryFileRow(
     string? AudioSummary,
     string? SubtitleSummary,
     int? LinkCount,
-    LibraryProblemKind? ProblemKind);
+    LibraryProblemKind? ProblemKind,
+    // When Weir last cleaned this file, or null when it never has, and whether a person told Weir to leave it
+    // alone. Both come from library_file_marks (migration 0012), not from the scan.
+    DateTimeOffset? CleanedAt = null,
+    bool LeaveAlone = false);
 
 /// <summary>The Files table's filters. Every field narrows; an empty filter is the whole library.</summary>
 public sealed record LibraryFileQuery
@@ -43,6 +48,9 @@ public sealed record LibraryFileQuery
     public IReadOnlyList<LibraryFileFacet> Facets { get; init; } = [];
 
     public LibraryProblemKind? ProblemKind { get; init; }
+
+    /// <summary><c>cleaned</c> or <c>left_alone</c>: what Weir has done with the file, rather than what is in it.</summary>
+    public string? State { get; init; }
 
     /// <summary>A sort key from <see cref="LibraryFileSort.Columns"/>; anything else falls back to the path.</summary>
     public string Sort { get; init; } = LibraryFileSort.Path;
@@ -93,7 +101,10 @@ public sealed record LibraryTotals(
     long CannotProcess,
     long EstimatedBytesSaved,
     long RemovedAudioTracks,
-    long RemovedSubtitleTracks);
+    long RemovedSubtitleTracks,
+    // Files Weir has cleaned at least once, and files it has been told to leave alone (migration 0012).
+    long Cleaned = 0,
+    long LeftAlone = 0);
 
 /// <summary>One row of a breakdown: how many files carry this value, and how much disk they take between them.</summary>
 public sealed record LibraryBreakdownRow(string Value, long Files, long SizeBytes);
@@ -110,6 +121,14 @@ public sealed record LibraryProblemGroup(LibraryProblemKind Kind, long Files, lo
 /// </summary>
 public static class LibraryViewStore
 {
+    /// <summary>
+    /// Every read here is over the scan's picture with what Weir has done to each file beside it. The join is on the
+    /// path because a scan rewrites <c>library_files</c> from scratch: the marks are keyed by what does not change.
+    /// </summary>
+    private const string FromFiles =
+        "FROM library_files AS f LEFT JOIN library_file_marks AS m " +
+        "ON m.library_id = f.library_id AND m.path = f.path ";
+
     /// <summary>How many paths a Problems group carries inline before the operator has to open Files to see the rest.</summary>
     public const int ProblemSampleSize = 5;
 
@@ -123,12 +142,15 @@ public static class LibraryViewStore
             "COALESCE(SUM(CASE WHEN f.classification = 'would_change' THEN 1 ELSE 0 END), 0), " +
             "COALESCE(SUM(CASE WHEN f.classification = 'cannot_process' THEN 1 ELSE 0 END), 0), " +
             "COALESCE(SUM(f.estimated_bytes_saved), 0), COALESCE(SUM(f.removed_audio_tracks), 0), " +
-            "COALESCE(SUM(f.removed_subtitle_tracks), 0) FROM library_files AS f " + where,
+            "COALESCE(SUM(f.removed_subtitle_tracks), 0), " +
+            "COALESCE(SUM(CASE WHEN m.cleaned_at IS NOT NULL THEN 1 ELSE 0 END), 0), " +
+            "COALESCE(SUM(CASE WHEN COALESCE(m.leave_alone, 0) = 1 THEN 1 ELSE 0 END), 0) " + FromFiles + where,
             reader => new LibraryTotals(
                 reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3),
-                reader.GetInt64(4), reader.GetInt64(5), reader.GetInt64(6), reader.GetInt64(7)),
+                reader.GetInt64(4), reader.GetInt64(5), reader.GetInt64(6), reader.GetInt64(7),
+                reader.GetInt64(8), reader.GetInt64(9)),
             parameters).ConfigureAwait(false);
-        return row ?? new LibraryTotals(0, 0, 0, 0, 0, 0, 0, 0);
+        return row ?? new LibraryTotals(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
     /// <summary>
@@ -171,7 +193,7 @@ public static class LibraryViewStore
     {
         ArgumentNullException.ThrowIfNull(uow);
         var (where, parameters) = BuildWhere(libraryId, filter);
-        return await uow.CountAsync("SELECT COUNT(*) FROM library_files AS f " + where, parameters).ConfigureAwait(false);
+        return await uow.CountAsync("SELECT COUNT(*) " + FromFiles + where, parameters).ConfigureAwait(false);
     }
 
     /// <summary>One page of the Files table. The sort is always tie-broken by path, so paging never repeats a row.</summary>
@@ -189,7 +211,7 @@ public static class LibraryViewStore
             "SELECT f.id, f.path, f.size_bytes, f.mtime, f.classification, f.summary, f.reason, f.removed_audio_tracks, " +
             "f.removed_subtitle_tracks, f.estimated_bytes_saved, f.manager_kind, f.manager_title, f.video_codec, " +
             "f.video_height, f.resolution_class, f.audio_track_count, f.subtitle_track_count, f.audio_summary, " +
-            "f.subtitle_summary, f.link_count, f.problem_kind FROM library_files AS f " + where + " " + order +
+            "f.subtitle_summary, f.link_count, f.problem_kind, m.cleaned_at, COALESCE(m.leave_alone, 0) " + FromFiles + where + " " + order +
             " LIMIT @limit OFFSET @offset",
             ReadRow,
             [.. parameters, ("@limit", (object?)pageSize), ("@offset", offset)]).ConfigureAwait(false);
@@ -285,7 +307,9 @@ public static class LibraryViewStore
         SqliteValues.GetStringOrNull(reader, 17),
         SqliteValues.GetStringOrNull(reader, 18),
         reader.IsDBNull(19) ? null : (int)reader.GetInt64(19),
-        LibraryProblems.Parse(SqliteValues.GetStringOrNull(reader, 20)));
+        LibraryProblems.Parse(SqliteValues.GetStringOrNull(reader, 20)),
+        PythonTimestamps.Parse(reader.GetValue(21)),
+        SqliteValues.GetBool(reader, 22));
 
     private static LibraryFileClassification ClassificationOf(string value) => value switch
     {
@@ -324,6 +348,15 @@ public static class LibraryViewStore
         {
             clauses.Add("(f.path LIKE @search ESCAPE '\\' OR COALESCE(f.manager_title, '') LIKE @search ESCAPE '\\')");
             parameters.Add(("@search", "%" + EscapeLike(filter.Search) + "%"));
+        }
+
+        if (string.Equals(filter.State, "cleaned", StringComparison.Ordinal))
+        {
+            clauses.Add("m.cleaned_at IS NOT NULL");
+        }
+        else if (string.Equals(filter.State, "left_alone", StringComparison.Ordinal))
+        {
+            clauses.Add("COALESCE(m.leave_alone, 0) = 1");
         }
 
         if (filter.ProblemKind is { } problem)

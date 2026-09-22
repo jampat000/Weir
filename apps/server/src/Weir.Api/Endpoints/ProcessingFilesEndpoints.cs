@@ -67,6 +67,13 @@ public static class ProcessingFilesEndpoints
             .Set("progress_percent", progress?.Percent is { } pct ? PyJson.Of(pct) : PyJson.Null)
             .Set("progress_message", progress?.Message)
             .Set("progress_eta_seconds", progress?.EtaSeconds is { } eta ? PyJson.Of(eta) : PyJson.Null)
+            // What Live shows on a working file (docs/exec-plans/active/live-and-library.md): which step, how fast,
+            // and what is coming out. All null when nothing is running on the file.
+            .Set("progress_status", progress?.Status)
+            .Set("progress_speed", progress?.Speed)
+            .Set("progress_elapsed_seconds", progress?.ElapsedSeconds is { } elapsed ? PyJson.Of(elapsed) : PyJson.Null)
+            .Set("progress_removed_audio", progress is null ? PyJson.Null : new PyList(progress.RemovedAudio.Select(t => (PyJson)PyJson.Of(t))))
+            .Set("progress_removed_subtitles", progress is null ? PyJson.Null : new PyList(progress.RemovedSubtitles.Select(t => (PyJson)PyJson.Of(t))))
             .Set("failure_class", row.FailureClass)
             .Set("failure_attempts", row.FailureAttempts)
             .Set("quarantined", quarantined)

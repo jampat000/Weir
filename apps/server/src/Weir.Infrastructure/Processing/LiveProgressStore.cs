@@ -1,3 +1,4 @@
+using System.Globalization;
 using Weir.Core.Activity;
 using Weir.Core.Json;
 using Weir.Core.Time;
@@ -6,30 +7,58 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing;
 
 /// <summary>How far the pass currently working on a file has got (<c>LiveProgress</c>).</summary>
-public sealed record LiveProgress(double? Percent, string? Message, double? EtaSeconds);
+/// <param name="Percent">How much of the file has been written, 0 to 100.</param>
+/// <param name="Message">What the pass says it is doing, in its own words.</param>
+/// <param name="EtaSeconds">The pass's own estimate of the time left.</param>
+/// <param name="Status"><c>processing</c> while the file is written; <c>finishing</c> during the final checks and hand-back.</param>
+/// <param name="Speed">ffmpeg's speed as it reports it, for example <c>148x</c>.</param>
+/// <param name="ElapsedSeconds">How long the pass has been writing.</param>
+/// <param name="RemovedAudio">The audio tracks this pass is taking out, as the plan describes each one.</param>
+/// <param name="RemovedSubtitles">The subtitle tracks this pass is taking out.</param>
+public sealed record LiveProgress(
+    double? Percent,
+    string? Message,
+    double? EtaSeconds,
+    string Status,
+    string? Speed,
+    double? ElapsedSeconds,
+    IReadOnlyList<string> RemovedAudio,
+    IReadOnlyList<string> RemovedSubtitles);
 
 /// <summary>
 /// Reads the live per-file progress Activity row a running pass keeps updated (port of
 /// <c>processing_live_progress.py</c>, #463). Read-only: nothing here writes a second source of truth.
 /// </summary>
+/// <remarks>
+/// A pass inserts one row and rewrites it on every report, so the row's <c>created_at</c> is when the pass
+/// started, not when it last reported. Staleness used to be judged on <c>created_at</c>, which dropped the live
+/// progress of any pass longer than <see cref="StaleAfter"/>: a big file's progress bar vanished part-way. Each
+/// report now carries <c>reported_at</c> (<see cref="RemuxPass.ActivityProgressReporter"/>), and a row is stale
+/// when its last report is. Rows written before that field existed fall back to <c>created_at</c>.
+/// </remarks>
 public static class LiveProgressStore
 {
     private static readonly TimeSpan StaleAfter = TimeSpan.FromMinutes(2);
+
+    /// <summary>How far back to look for a pass that is still running. Generous: nothing is shown from it unless it reported within <see cref="StaleAfter"/>.</summary>
+    private static readonly TimeSpan LongestPass = TimeSpan.FromHours(12);
+
     private static readonly HashSet<string> LiveStatuses = new(StringComparer.Ordinal) { "processing", "finishing" };
     private const int MaxRows = 64;
 
     /// <summary><c>live_progress_by_path</c>: maps <c>relative_media_path</c> to the progress of the pass running on it.</summary>
     public static async Task<Dictionary<string, LiveProgress>> ByPathAsync(UnitOfWork uow, TimeProvider time)
     {
-        var cutoff = time.GetUtcNow() - StaleAfter;
+        var now = time.GetUtcNow();
+        var since = now - LongestPass;
         var rows = await uow.QueryAsync(
-            "SELECT detail FROM activity_events WHERE event_type = @type AND created_at >= @cutoff ORDER BY created_at DESC LIMIT " + MaxRows,
-            reader => reader.IsDBNull(0) ? null : reader.GetString(0),
+            "SELECT created_at, detail FROM activity_events WHERE event_type = @type AND created_at >= @since ORDER BY id DESC LIMIT " + MaxRows,
+            reader => (Created: SqliteValues.GetDateTime(reader, 0), Detail: reader.IsDBNull(1) ? null : reader.GetString(1)),
             ("@type", ActivityEventTypes.ProcessingFileProcessingProgress),
-            ("@cutoff", SqliteValues.ToSqlite(PyDateTime.FromUtc(cutoff.UtcDateTime)))).ConfigureAwait(false);
+            ("@since", SqliteValues.ToSqlite(PyDateTime.FromUtc(since.UtcDateTime)))).ConfigureAwait(false);
 
         var result = new Dictionary<string, LiveProgress>(StringComparer.Ordinal);
-        foreach (var raw in rows)
+        foreach (var (created, raw) in rows)
         {
             if (string.IsNullOrWhiteSpace(raw))
             {
@@ -57,6 +86,12 @@ public static class LiveProgressStore
                 continue;
             }
 
+            var lastReported = ReportedAt(payload) ?? new DateTimeOffset(created.AsUtc, TimeSpan.Zero);
+            if (now - lastReported > StaleAfter)
+            {
+                continue;
+            }
+
             var path = payload.TryGetValue("relative_media_path", out var pathValue) && pathValue is PyStr pathStr ? pathStr.Value.Trim() : string.Empty;
             if (path.Length == 0 || result.ContainsKey(path))
             {
@@ -65,12 +100,31 @@ public static class LiveProgressStore
 
             result[path] = new LiveProgress(
                 CoercePercent(payload.TryGetValue("percent", out var p) ? p : null),
-                payload.TryGetValue("message", out var m) && m is PyStr messageStr && messageStr.Value.Trim().Length > 0 ? messageStr.Value.Trim() : null,
-                CoerceSeconds(payload.TryGetValue("eta_seconds", out var e) ? e : null));
+                Text(payload, "message"),
+                CoerceSeconds(payload.TryGetValue("eta_seconds", out var e) ? e : null),
+                status,
+                Text(payload, "speed"),
+                CoerceSeconds(payload.TryGetValue("elapsed_seconds", out var el) ? el : null),
+                Strings(payload, "removed_audio"),
+                Strings(payload, "removed_subtitles"));
         }
 
         return result;
     }
+
+    private static DateTimeOffset? ReportedAt(PyDict payload) =>
+        payload.TryGetValue("reported_at", out var value) && value is PyStr text
+        && DateTimeOffset.TryParse(text.Value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed)
+            ? parsed
+            : null;
+
+    private static string? Text(PyDict payload, string key) =>
+        payload.TryGetValue(key, out var value) && value is PyStr text && text.Value.Trim().Length > 0 ? text.Value.Trim() : null;
+
+    private static List<string> Strings(PyDict payload, string key) =>
+        payload.TryGetValue(key, out var value) && value is PyList list
+            ? list.Items.OfType<PyStr>().Select(item => item.Value).Where(item => item.Trim().Length > 0).ToList()
+            : [];
 
     private static double? CoercePercent(PyJson? value)
     {

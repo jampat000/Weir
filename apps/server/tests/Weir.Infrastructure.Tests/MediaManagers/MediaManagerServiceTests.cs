@@ -1,9 +1,11 @@
 using System.Globalization;
 using System.Net;
+using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Rules;
 using Weir.Infrastructure.MediaManagers;
+using Weir.Infrastructure.Processing;
 
 namespace Weir.Infrastructure.Tests.MediaManagers;
 
@@ -570,6 +572,93 @@ public sealed class MediaManagerServiceTests
         await fixture.Store.Execute("UPDATE jobs SET status = 'leased' WHERE status = 'pending'");
         var working = await fixture.Db(uow => fixture.Ledger.CancelAsync(uow, fixture.Jobs, restarted), commit: false);
         Assert.Equal((false, "This hand-off is working, so Weir did not cancel it."), working);
+    }
+
+    private static async Task<string> FileStatusAsync(MediaManagerFixture fixture, string relative)
+    {
+        var status = await fixture.Db(uow => uow.ScalarAsync("SELECT status FROM files WHERE relative_path = $p", ("$p", relative)), commit: false);
+        return Convert.ToString(status, CultureInfo.InvariantCulture) ?? string.Empty;
+    }
+
+    [Fact]
+    public async Task Issue_643_cancelling_a_hand_offs_job_in_weir_ends_the_hand_off_and_the_file_reads_cancelled()
+    {
+        using var fixture = new MediaManagerFixture();
+        var watched = fixture.Store.Home.Join("movies");
+        Directory.CreateDirectory(Path.Join(watched, "Film"));
+        await File.WriteAllTextAsync(Path.Join(watched, "Film", "film.mkv"), "12345");
+        await fixture.LibraryAsync("movie", watched);
+        await fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, Handoff("h1", Path.Join(watched, "Film", "film.mkv"))));
+        var job = Assert.Single(await fixture.Jobs.ListAsync());
+
+        var result = await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, job.Id));
+
+        Assert.Equal(JobActionOutcome.Ok, result.Outcome);
+        Assert.Equal("h1", result.EndedHandoff?.HandoffId);
+        var row = (await fixture.Db(uow => HandoffLedgerStore.FindAsync(uow, "deluno", "h1")))!;
+        var status = await fixture.Db(uow => fixture.Ledger.CurrentStatusAsync(uow, row));
+        Assert.Equal(("cancelled", HandoffLedgerRules.CancelledInWeirMessage), (status.State, status.Message));
+        Assert.Equal("cancelled", await FileStatusAsync(fixture, "Film/film.mkv"));
+        Assert.Equal("cancelled", (await fixture.Jobs.ListAsync()).Single().Status);
+
+        // A job that is not pending is refused, and nothing changes.
+        var again = await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, job.Id));
+        Assert.Equal(JobActionOutcome.WrongStatus, again.Outcome);
+        Assert.Equal(JobActionOutcome.NotFound, (await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, 999_999))).Outcome);
+    }
+
+    [Fact]
+    public async Task Issue_643_a_later_hand_off_of_a_processed_path_answers_for_itself_not_the_earlier_result()
+    {
+        using var fixture = new MediaManagerFixture();
+        var watched = fixture.Store.Home.Join("movies");
+        Directory.CreateDirectory(Path.Join(watched, "Film"));
+        await File.WriteAllTextAsync(Path.Join(watched, "Film", "film.mkv"), "12345");
+        var libraryId = await fixture.LibraryAsync("movie", watched);
+        // Cleaned on 20 September for an earlier hand-off.
+        await fixture.Store.Execute(
+            $"INSERT INTO files (library_id, relative_path, status, status_reason, size_bytes, updated_at) VALUES " +
+            $"({libraryId}, 'Film/film.mkv', 'processed', 'Finished processing this file.', 5, '2026-09-20 00:16:00')");
+
+        await fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, Handoff("h2", Path.Join(watched, "Film", "film.mkv"))));
+        var row = (await fixture.Db(uow => HandoffLedgerStore.FindAsync(uow, "deluno", "h2")))!;
+        Assert.Equal("queued", (await fixture.Db(uow => fixture.Ledger.CurrentStatusAsync(uow, row))).State);
+
+        var job = Assert.Single(await fixture.Jobs.ListAsync());
+        await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, job.Id));
+
+        var ended = (await fixture.Db(uow => HandoffLedgerStore.FindAsync(uow, "deluno", "h2")))!;
+        var status = await fixture.Db(uow => fixture.Ledger.CurrentStatusAsync(uow, ended));
+        Assert.Equal("cancelled", status.State);
+        Assert.Null(status.OutputPath);
+        // The file keeps the outcome it already had: the cancelled pass never touched it.
+        Assert.Equal("processed", await FileStatusAsync(fixture, "Film/film.mkv"));
+    }
+
+    [Fact]
+    public async Task Issue_643_a_pack_goes_on_while_other_episodes_are_queued_and_the_managers_own_cancel_marks_files_cancelled()
+    {
+        using var fixture = new MediaManagerFixture();
+        var watched = fixture.Store.Home.Join("tv");
+        Directory.CreateDirectory(Path.Join(watched, "Show.S01"));
+        await File.WriteAllTextAsync(Path.Join(watched, "Show.S01", "Show.S01E01.mkv"), "12345");
+        await File.WriteAllTextAsync(Path.Join(watched, "Show.S01", "Show.S01E02.mkv"), "123456");
+        await fixture.LibraryAsync("tv", watched);
+        await fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, Handoff("pack", Path.Join(watched, "Show.S01"), "tv")));
+        var jobs = await fixture.Jobs.ListAsync();
+        Assert.Equal(2, jobs.Count);
+
+        // One episode cancelled in Weir: the other is still queued, so the hand-off goes on.
+        var first = await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, jobs[0].Id));
+        Assert.Null(first.EndedHandoff);
+        var row = (await fixture.Db(uow => HandoffLedgerStore.FindAsync(uow, "deluno", "pack")))!;
+        Assert.Equal("queued", (await fixture.Db(uow => fixture.Ledger.CurrentStatusAsync(uow, row))).State);
+
+        // The manager cancels the rest itself: every file that had not started reads cancelled.
+        var (cancelled, _) = await fixture.Db(uow => fixture.Ledger.CancelAsync(uow, fixture.Jobs, row));
+        Assert.True(cancelled);
+        Assert.Equal("cancelled", await FileStatusAsync(fixture, "Show.S01/Show.S01E01.mkv"));
+        Assert.Equal("cancelled", await FileStatusAsync(fixture, "Show.S01/Show.S01E02.mkv"));
     }
 
     [Fact]

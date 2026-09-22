@@ -91,10 +91,7 @@ export function LibraryRedownloadsPanel({
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      className={mmActionButtonClass({
-                        variant: "primary",
-                        disabled: requesting,
-                      })}
+                      className={mmActionButtonClass({ variant: "primary" })}
                       disabled={requesting}
                       onClick={() =>
                         onRequest(title.path, () => setConfirming(null))

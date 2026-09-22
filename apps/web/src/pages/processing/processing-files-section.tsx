@@ -74,6 +74,8 @@ const ACTIONABLE_STATUSES = new Set<ProcessingFileStatus>([
   "on_hold",
   "out_of_schedule",
   "blocked_upstream",
+  // A cancelled file is queued again from here (#643).
+  "cancelled",
 ]);
 
 /** One line each, saying what the state means. Shown under the count in the lead band. */
@@ -118,6 +120,8 @@ const PROCESSING_STATUS_TONES: Record<
   // worth a colour, and neither is a library the operator switched off themselves.
   skipped: "neutral",
   disabled: "neutral",
+  // Someone chose to stop it: not a problem to act on, just a file Weir is leaving alone (#643).
+  cancelled: "neutral",
 };
 
 function statusPillClass(status: ProcessingFileStatus): string {
@@ -1000,10 +1004,7 @@ export function ProcessingFilesSection() {
             </span>
             <button
               type="button"
-              className={mmActionButtonClass({
-                variant: "secondary",
-                disabled: bulkWorking || selectedActionableRows.length === 0,
-              })}
+              className={mmActionButtonClass({ variant: "secondary" })}
               onClick={() => void runSelectedActions()}
               disabled={bulkWorking || selectedActionableRows.length === 0}
               data-testid="processing-files-run-selected"

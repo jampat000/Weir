@@ -423,10 +423,7 @@ export function ProcessingProcessSettingsSection() {
       <div className={`${quietActionRowClass} mt-8`}>
         <button
           type="button"
-          className={mmActionButtonClass({
-            variant: "primary",
-            disabled: !editable || !dirty || !draftValid || save.isPending,
-          })}
+          className={mmActionButtonClass({ variant: "primary" })}
           disabled={!editable || !dirty || !draftValid || save.isPending}
           onClick={() =>
             save.mutate({

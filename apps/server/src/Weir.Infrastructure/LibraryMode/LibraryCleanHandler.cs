@@ -85,6 +85,7 @@ public sealed class LibraryCleanHandler : IJobHandler
         ProcessingLibraryRecord? library;
         ProcessingRulesConfig rules;
         LibrarySettings settings;
+        bool leftAlone;
         await using (var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false))
         {
             library = libraryId > 0 ? await LibraryStore.GetAsync(uow, libraryId).ConfigureAwait(false) : null;
@@ -98,7 +99,19 @@ public sealed class LibraryCleanHandler : IJobHandler
             var ruleSet = library.RuleSetId is { } ruleSetId ? await LibraryStore.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) : null;
             rules = ruleSet is not null ? RemuxPassPaths.RulesConfigFor(ruleSet) : RuleSetConversion.ToRulesConfig(null);
             settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
+            leftAlone = await LibraryFileMarksStore.IsLeftAloneAsync(uow, libraryId, path).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
+        }
+
+        if (leftAlone)
+        {
+            await RecordAsync(
+                libraryId,
+                path,
+                trigger,
+                LibraryActivityEventTypes.FileSkipped,
+                "You asked Weir to leave this file alone, so it was not cleaned.").ConfigureAwait(false);
+            return;
         }
 
         // #508 step 1: a file another name still shares data with (almost always a download client still seeding
@@ -136,14 +149,28 @@ public sealed class LibraryCleanHandler : IJobHandler
         }
 
         LibraryFilePlanResult plan;
-        try
+        if (ManualPlanJson.FromPyJson(payload.Get("manual_plan")) is { } choice)
         {
-            plan = LibraryFilePlanner.Classify(probe, rules);
+            var chosen = PlanFromChoice(probe, choice, payload.Get("expected_size_bytes"), path);
+            if (chosen.Problem is { } problem)
+            {
+                await RecordAsync(libraryId, path, trigger, problem.EventType, problem.Message).ConfigureAwait(false);
+                return;
+            }
+
+            plan = chosen.Plan!;
         }
-        catch (RulesInputException exception)
+        else
         {
-            await RecordAsync(libraryId, path, trigger, LibraryActivityEventTypes.FileFailed, $"Weir could not plan this file: {exception.Message}").ConfigureAwait(false);
-            return;
+            try
+            {
+                plan = LibraryFilePlanner.Classify(probe, rules);
+            }
+            catch (RulesInputException exception)
+            {
+                await RecordAsync(libraryId, path, trigger, LibraryActivityEventTypes.FileFailed, $"Weir could not plan this file: {exception.Message}").ConfigureAwait(false);
+                return;
+            }
         }
 
         if (plan.Classification == LibraryFileClassification.Matches)
@@ -209,6 +236,60 @@ public sealed class LibraryCleanHandler : IJobHandler
         }
     }
 
+    /// <summary>A plan built from what a person chose, or the reason Weir would not use their choice.</summary>
+    private sealed record ChosenPlan(LibraryFilePlanResult? Plan, (string EventType, string Message)? Problem);
+
+    /// <summary>
+    /// Turns one person's track choice into a plan for this file. Their choice names track indices in the file they
+    /// were looking at, so a file that has changed since is refused: nothing here could tell which track is which now.
+    /// </summary>
+    private static ChosenPlan PlanFromChoice(ProbeResult probe, ManualPlanChoice choice, PyJson? expectedSize, string path)
+    {
+        if (expectedSize is PyInt expected && CurrentSize(path) != (long)expected.Value)
+        {
+            return new ChosenPlan(null, (LibraryActivityEventTypes.FileFailed,
+                "This file changed after its tracks were chosen, so Weir left it alone. Open it again and choose once more."));
+        }
+
+        SplitProbeStreams split;
+        try
+        {
+            split = RemuxRules.SplitStreams(probe);
+        }
+        catch (RulesInputException exception)
+        {
+            return new ChosenPlan(null, (LibraryActivityEventTypes.FileFailed, $"Weir could not read this file's tracks: {exception.Message}"));
+        }
+
+        if (!ManualTrackPlan.TryValidate(choice, ManualTrackPlan.ClassifyIndices(split), out var invalid))
+        {
+            return new ChosenPlan(null, (LibraryActivityEventTypes.FileFailed, invalid));
+        }
+
+        var chosenPlan = ManualTrackPlan.BuildPlan(split, choice);
+        if (!RemuxRules.IsRemuxRequired(chosenPlan, split.Audio, split.Subtitles))
+        {
+            return new ChosenPlan(null, (LibraryActivityEventTypes.FileSkipped,
+                "What you chose is what this file already holds, so there was nothing to do."));
+        }
+
+        return new ChosenPlan(LibraryFilePlanResult.WouldChange(chosenPlan, LibraryFilePlanner.EstimateSavings(probe, split, chosenPlan)), null);
+    }
+
+    /// <summary>The file's size now, or -1 when Weir cannot read it — which never matches a size someone chose against.</summary>
+    private static long CurrentSize(string path)
+    {
+        try
+        {
+            var info = new FileInfo(path);
+            return info.Exists ? info.Length : -1;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return -1;
+        }
+    }
+
     private async Task OnCommittedAsync(ProcessingLibraryRecord library, string path, LibraryFilePlanResult plan, SwapResult result, CancellationToken cancellationToken)
     {
         // #509 step 1: record what this clean removed for good, keyed the same way library mode identifies the
@@ -241,6 +322,20 @@ public sealed class LibraryCleanHandler : IJobHandler
 #pragma warning restore CA1031
         {
             _logger.LogWarning(exception, "Library clean committed but the manager notify step (#507) failed to run.");
+        }
+
+        // The scan rewrites its index from scratch, so "Weir cleaned this" is kept where a rescan cannot reach it.
+        try
+        {
+            await using var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
+            await LibraryFileMarksStore.MarkCleanedAsync(uow, library.Id, path, _time.GetUtcNow()).ConfigureAwait(false);
+            await uow.CommitAsync().ConfigureAwait(false);
+        }
+#pragma warning disable CA1031 // Best-effort, like the steps above: a committed clean is never undone by bookkeeping.
+        catch (Exception exception)
+#pragma warning restore CA1031
+        {
+            _logger.LogWarning(exception, "Library clean committed but recording that it was cleaned failed.");
         }
 
         var warnings = result.Warnings;

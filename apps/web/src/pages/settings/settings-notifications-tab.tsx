@@ -161,11 +161,7 @@ function ChannelForm({
       <div className="flex gap-2">
         <button
           type="submit"
-          className={mmActionButtonClass({
-            variant: "primary",
-            disabled:
-              saving || !label.trim() || !url.trim() || events.length === 0,
-          })}
+          className={mmActionButtonClass({ variant: "primary" })}
           disabled={
             saving || !label.trim() || !url.trim() || events.length === 0
           }
@@ -174,10 +170,7 @@ function ChannelForm({
         </button>
         <button
           type="button"
-          className={mmActionButtonClass({
-            variant: "tertiary",
-            disabled: saving,
-          })}
+          className={mmActionButtonClass({ variant: "tertiary" })}
           disabled={saving}
           onClick={onCancel}
         >
@@ -228,10 +221,7 @@ function ChannelRow({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            className={mmActionButtonClass({
-              variant: "tertiary",
-              disabled: testing || deleting,
-            })}
+            className={mmActionButtonClass({ variant: "tertiary" })}
             disabled={testing || deleting}
             onClick={onTest}
           >
@@ -239,10 +229,7 @@ function ChannelRow({
           </button>
           <button
             type="button"
-            className={mmActionButtonClass({
-              variant: "secondary",
-              disabled: deleting,
-            })}
+            className={mmActionButtonClass({ variant: "secondary" })}
             disabled={deleting}
             onClick={onEdit}
           >
@@ -250,10 +237,7 @@ function ChannelRow({
           </button>
           <button
             type="button"
-            className={mmActionButtonClass({
-              variant: "tertiary",
-              disabled: deleting,
-            })}
+            className={mmActionButtonClass({ variant: "tertiary" })}
             disabled={deleting}
             aria-haspopup="dialog"
             onClick={onDelete}

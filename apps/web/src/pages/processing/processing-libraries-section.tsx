@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { MmOnOffSwitch } from "../../components/ui/mm-on-off-switch";
 import { PageLoading } from "../../components/shared/page-loading";
+import { SidePanel } from "../../components/shared/side-panel";
 import {
   QuietFieldGroup,
   QuietSection,
@@ -651,7 +652,6 @@ export function ProcessingLibrariesSection() {
                             type="button"
                             className={mmActionButtonClass({
                               variant: "tertiary",
-                              disabled: !editable || index === 0,
                             })}
                             onClick={() => void move(library, -1)}
                             disabled={!editable || index === 0}
@@ -663,8 +663,6 @@ export function ProcessingLibrariesSection() {
                             type="button"
                             className={mmActionButtonClass({
                               variant: "tertiary",
-                              disabled:
-                                !editable || index === ordered.length - 1,
                             })}
                             onClick={() => void move(library, 1)}
                             disabled={!editable || index === ordered.length - 1}
@@ -676,7 +674,6 @@ export function ProcessingLibrariesSection() {
                             type="button"
                             className={mmActionButtonClass({
                               variant: "secondary",
-                              disabled: !editable,
                             })}
                             onClick={() => startEdit(library)}
                             disabled={!editable}
@@ -699,7 +696,6 @@ export function ProcessingLibrariesSection() {
                             type="button"
                             className={mmActionButtonClass({
                               variant: "tertiary",
-                              disabled: !editable,
                             })}
                             onClick={() => void removeLibrary(library)}
                             disabled={!editable}
@@ -872,457 +868,444 @@ export function ProcessingLibrariesSection() {
         </QuietSection>
       ) : null}
 
-      {adding || editingId !== null ? (
-        <QuietSection
-          headingId="processing-library-form-heading"
-          heading={editingId !== null ? "Edit library" : "Add library"}
-          data-testid="processing-library-form"
-        >
-          <div className="mm-quiet-stack">
-            <QuietFieldGroup
-              title="Identity and folders"
-              detail="One watched folder, one safe work area, and one finished output."
-            >
-              <div className="grid gap-4 lg:grid-cols-2">
-                {field("Name", "name", "Movies 4K")}
-                <label className="block text-sm">
-                  <span className="text-[var(--mm-text2)]">Media type</span>
-                  <select
-                    className={mmSelectFieldClass}
-                    value={form.media_type}
-                    onChange={(event) =>
-                      setForm({
-                        ...form,
-                        media_type: event.target.value as ProcessingMediaType,
-                      })
-                    }
-                    disabled={!editable}
-                  >
-                    {MEDIA_TYPES.map((scope) => (
-                      <option key={scope} value={scope}>
-                        {PROCESSING_MEDIA_TYPE_LABELS[scope]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block text-sm">
-                  <span className="text-[var(--mm-text2)]">
-                    Audio, subtitle and metadata rules
-                  </span>
-                  <select
-                    className={mmSelectFieldClass}
-                    value={form.rule_set_id}
-                    onChange={(event) =>
-                      setForm({ ...form, rule_set_id: event.target.value })
-                    }
-                    disabled={!editable}
-                  >
-                    <option value="">Use scope defaults</option>
-                    {(ruleSets.data ?? []).map((ruleSet) => (
-                      <option key={ruleSet.id} value={ruleSet.id}>
-                        {ruleSet.name}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="mt-1 block text-xs text-[var(--mm-text3)]">
-                    Create and edit reusable rule sets under Audio & subtitles.
-                  </span>
-                </label>
-                {field(
-                  "Watched folder",
-                  "watched_folder",
-                  "/srv/media/movies-4k",
-                )}
-                {field(
-                  "Output folder",
-                  "output_folder",
-                  "/srv/media/movies-4k-out",
-                )}
-                {field(
-                  "Work folder",
-                  "work_folder",
-                  "",
-                  "Leave empty to use Weir's private temporary folder.",
-                )}
-              </div>
-            </QuietFieldGroup>
-
-            <LibraryManagerSetup
-              mediaType={form.media_type}
-              watchedFolder={form.watched_folder}
-              outputFolder={form.output_folder}
-              removeOriginal={form.remove_original_after_success}
-              editable={editable}
-              onUseFolders={(watched, output) =>
-                setForm((current) => ({
-                  ...current,
-                  watched_folder: watched ?? current.watched_folder,
-                  output_folder: output ?? current.output_folder,
-                }))
-              }
-            />
-
-            <QuietFieldGroup
-              title="Intake rules"
-              detail="Decide which files belong here before Weir spends time probing or processing them. A maximum of 0 means no limit."
-            >
-              <div className="grid gap-4 lg:grid-cols-2">
-                {field("File types", "media_extensions_csv", ".mkv,.mp4")}
-                {field(
-                  "Downloader folders to ignore",
-                  "exclude_markers_csv",
-                  "__admin__,incomplete",
-                  "Comma-separated folder names used while a download is incomplete.",
-                )}
-                {field(
-                  "Path must match",
-                  "include_patterns_csv",
-                  "*feature*,Movies/*",
-                  "Optional comma-separated wildcards. Empty accepts every path.",
-                )}
-                {field(
-                  "Path must not match",
-                  "exclude_patterns_csv",
-                  "*sample*,*trailer*",
-                  "Optional comma-separated wildcards.",
-                )}
-                {field("Minimum file size (MB)", "min_file_size_mb", "0")}
-                {field("Maximum file size (MB)", "max_file_size_mb", "0")}
-                <div className="space-y-2 lg:col-span-2">
-                  <div>
-                    <p className="text-sm font-medium text-[var(--mm-text1)]">
-                      Created and modified windows
-                    </p>
-                    <p className="text-xs leading-5 text-[var(--mm-text3)]">
-                      Optional. Leave a side blank for no limit. Times are shown
-                      in this browser&apos;s timezone and saved as UTC. Windows
-                      uses the file creation time; Linux and Docker use the best
-                      filesystem birth/change time available.
-                    </p>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {dateTimeField("Created after", "created_after")}
-                    {dateTimeField("Created before", "created_before")}
-                    {dateTimeField("Modified after", "modified_after")}
-                    {dateTimeField("Modified before", "modified_before")}
-                  </div>
-                </div>
-                <label className="block text-sm">
-                  <span className="text-[var(--mm-text2)]">
-                    When a file is rejected
-                  </span>
-                  <select
-                    className={mmSelectFieldClass}
-                    value={form.rejected_file_action}
-                    onChange={(event) =>
-                      setForm({
-                        ...form,
-                        rejected_file_action: event.target.value as
-                          "leave" | "delete_file",
-                      })
-                    }
-                    disabled={!editable}
-                  >
-                    <option value="leave">Leave the file in place</option>
-                    <option value="delete_file">
-                      Delete only the rejected file
-                    </option>
-                  </select>
-                  <span className="mt-1 block text-xs text-[var(--mm-text3)]">
-                    Applies after readiness checks to size and path-rule
-                    rejections. Weir never deletes a populated parent folder
-                    here.
-                  </span>
-                </label>
-              </div>
-              <div className="grid gap-x-10 lg:grid-cols-2">
-                {toggle("Skip hidden files", "exclude_hidden")}
-                {toggle("Only inspect the top folder", "top_level_only")}
-              </div>
-            </QuietFieldGroup>
-
-            <QuietFieldGroup
-              title="File readiness"
-              detail="These checks prevent Weir from starting while a downloader, recorder, or media manager still owns the file."
-            >
-              <div className="grid gap-4 lg:grid-cols-2">
-                {field(
-                  "Minimum unchanged age (seconds)",
-                  "min_file_age_seconds",
-                )}
-                {field("Hold every new file (minutes)", "hold_minutes")}
-                {field(
-                  "Size must stay stable (seconds)",
-                  "file_detection_interval_seconds",
-                )}
-                {field(
-                  "Fallback scan interval (seconds)",
-                  "scan_interval_seconds",
-                )}
-              </div>
-              <div className="grid gap-x-10 lg:grid-cols-2">
-                {toggle(
-                  "Watch this folder for changes",
-                  "file_system_events_enabled",
-                  "The periodic scan remains as a backstop for Docker, SMB, and NFS.",
-                )}
-                {toggle(
-                  "Ignore size changes",
-                  "ignore_size_changes",
-                  "Use only when another system guarantees the file is complete.",
-                )}
-                {toggle(
-                  "Skip read and write tests",
-                  "skip_access_tests",
-                  "Less safe: locked sources and unwritable outputs may fail after queueing.",
-                )}
-              </div>
-            </QuietFieldGroup>
-
-            <QuietFieldGroup
-              title="Output safety"
-              detail="Control sidecars, timestamps, and what happens when the destination already exists."
-            >
-              <div className="grid gap-4 lg:grid-cols-2">
-                {field(
-                  "Sidecar file types",
-                  "sidecar_patterns_csv",
-                  ".srt,.nfo,.jpg",
-                )}
-                <label className="block text-sm">
-                  <span className="text-[var(--mm-text2)]">
-                    Existing output
-                  </span>
-                  <select
-                    className={mmSelectFieldClass}
-                    value={form.output_collision_policy}
-                    onChange={(event) =>
-                      setForm({
-                        ...form,
-                        output_collision_policy: event.target.value,
-                      })
-                    }
-                    disabled={!editable}
-                  >
-                    <option value="replace">Replace it</option>
-                    <option value="skip">Keep it and skip this file</option>
-                    <option value="keep_both">Keep both</option>
-                    <option value="replace_if_larger">
-                      Replace only if new output is larger
-                    </option>
-                    <option value="replace_if_newer">
-                      Replace only if source is newer
-                    </option>
-                  </select>
-                </label>
-              </div>
-              <div className="grid gap-x-10 lg:grid-cols-2">
-                {toggle(
-                  "Preserve original timestamps",
-                  "preserve_original_timestamps",
-                )}
-                {toggle(
-                  "After cleaning, remove the original download",
-                  "remove_original_after_success",
-                  "Turn off if your download client is still seeding it — Sonarr, Radarr or your client will clean it up.",
-                )}
-              </div>
-            </QuietFieldGroup>
-
-            <QuietFieldGroup
-              title="Capacity and recovery"
-              detail="Priority is relative: higher-numbered libraries are offered work first."
-            >
-              <div className="grid gap-4 lg:grid-cols-2">
-                <label className="block text-sm">
-                  <span className="text-[var(--mm-text2)]">Files at once</span>
-                  <select
-                    className={mmSelectFieldClass}
-                    value={form.max_concurrent_files}
-                    onChange={(event) =>
-                      setForm({
-                        ...form,
-                        max_concurrent_files: event.target.value,
-                      })
-                    }
-                    disabled={!editable}
-                  >
-                    <option value="0">Same as Process settings</option>
-                    {Array.from({ length: 10 }, (_, i) => (
-                      <option key={i + 1} value={String(i + 1)}>
-                        {i === 0 ? "At most 1 file" : `At most ${i + 1} files`}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="mt-1 block text-xs text-[var(--mm-text3)]">
-                    Only to hold this library below Files at once in Process
-                    settings, so it cannot take every slot.
-                  </span>
-                </label>
-                {field("Queue priority", "priority", "0")}
-                {field("Maximum automatic attempts", "max_attempts", "3")}
-                {field(
-                  "First retry delay (seconds)",
-                  "retry_backoff_seconds",
-                  "300",
-                )}
-              </div>
-              <div className="grid gap-x-10 lg:grid-cols-2">
-                {toggle(
-                  "Retry processing failures",
-                  "retry_execution_failures",
-                )}
-                {toggle(
-                  "Retry preflight rejections",
-                  "retry_preflight_failures",
-                  "Usually leave this off: retrying does not repair an unsupported or malformed file.",
-                )}
-              </div>
-              <label className="block space-y-1">
-                <span className="text-sm text-[var(--mm-text2)]">
-                  When retries run out
-                </span>
+      <SidePanel
+        open={adding || editingId !== null}
+        title={editingId !== null ? "Edit library" : "Add library"}
+        eyebrow="Settings · Libraries"
+        subtitle={
+          editingId !== null
+            ? "Changes take effect on the next scan; nothing already running is disturbed."
+            : "A library is a watched folder, a work area and an output folder."
+        }
+        onClose={cancel}
+        dataTestId="processing-library-form"
+      >
+        <div className="mm-quiet-stack">
+          <QuietFieldGroup
+            title="Identity and folders"
+            detail="One watched folder, one safe work area, and one finished output."
+          >
+            <div className="grid gap-4 lg:grid-cols-2">
+              {field("Name", "name", "Movies 4K")}
+              <label className="block text-sm">
+                <span className="text-[var(--mm-text2)]">Media type</span>
                 <select
                   className={mmSelectFieldClass}
-                  value={form.failure_policy}
+                  value={form.media_type}
                   onChange={(event) =>
                     setForm({
                       ...form,
-                      failure_policy: event.target
-                        .value as ProcessingFailurePolicy,
+                      media_type: event.target.value as ProcessingMediaType,
                     })
                   }
                   disabled={!editable}
                 >
-                  <option value="pass_through">
-                    Hand the original back unchanged
-                  </option>
-                  <option value="hold">Keep it until someone acts</option>
-                  <option
-                    value="reject"
-                    disabled={
-                      !rejectAvailable && form.failure_policy !== "reject"
-                    }
-                  >
-                    Reject the release so a different one is found
-                  </option>
+                  {MEDIA_TYPES.map((scope) => (
+                    <option key={scope} value={scope}>
+                      {PROCESSING_MEDIA_TYPE_LABELS[scope]}
+                    </option>
+                  ))}
                 </select>
-                <span className="block text-xs text-[var(--mm-text3)]">
-                  {form.failure_policy === "pass_through"
-                    ? "Your media manager still gets the file, exactly as it arrived. The original stays in the watched folder."
-                    : form.failure_policy === "hold"
-                      ? "The file stays with Weir and will not reach your media manager until you deal with it."
-                      : "Weir tells your media manager the release is bad and removes the download once the manager accepts, so it can find a different one. If that cannot be done safely, the original is handed back unchanged instead."}
+              </label>
+              <label className="block text-sm">
+                <span className="text-[var(--mm-text2)]">
+                  Audio, subtitle and metadata rules
                 </span>
-                <span
-                  className="block text-xs text-[var(--mm-text3)]"
-                  data-testid="reject-support"
+                <select
+                  className={mmSelectFieldClass}
+                  value={form.rule_set_id}
+                  onChange={(event) =>
+                    setForm({ ...form, rule_set_id: event.target.value })
+                  }
+                  disabled={!editable}
                 >
-                  {rejectSupport.isLoading
-                    ? "Checking whether Reject is available…"
-                    : rejectSupport.data
-                      ? `Reject: ${rejectSupport.data.reason}`
-                      : null}
+                  <option value="">Use scope defaults</option>
+                  {(ruleSets.data ?? []).map((ruleSet) => (
+                    <option key={ruleSet.id} value={ruleSet.id}>
+                      {ruleSet.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-1 block text-xs text-[var(--mm-text3)]">
+                  Create and edit reusable rule sets under Audio & subtitles.
                 </span>
               </label>
-            </QuietFieldGroup>
+              {field(
+                "Watched folder",
+                "watched_folder",
+                "/srv/media/movies-4k",
+              )}
+              {field(
+                "Output folder",
+                "output_folder",
+                "/srv/media/movies-4k-out",
+              )}
+              {field(
+                "Work folder",
+                "work_folder",
+                "",
+                "Leave empty to use Weir's private temporary folder.",
+              )}
+            </div>
+          </QuietFieldGroup>
 
-            <details>
-              <summary className="cursor-pointer border-b border-[var(--mm-line)] pb-[0.55rem] text-[length:var(--mm-type-eyebrow)] font-semibold uppercase tracking-[var(--mm-tracking-eyebrow)] text-[var(--mm-text3)]">
-                Hardware and compatibility
-              </summary>
-              <p className="mt-3 max-w-prose text-[length:var(--mm-type-caption)] leading-5 text-[var(--mm-text3)]">
-                Software processing is the safest default. Hardware failures
-                fall back to software and are recorded.
-              </p>
-              <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                <label className="block text-sm">
-                  <span className="text-[var(--mm-text2)]">
-                    Hardware decoding
-                  </span>
-                  <select
-                    className={mmSelectFieldClass}
-                    value={form.hardware_decode_mode}
-                    onChange={(event) =>
-                      setForm({
-                        ...form,
-                        hardware_decode_mode: event.target.value,
-                      })
-                    }
-                    disabled={!editable}
-                  >
-                    <option value="off">Off</option>
-                    <option value="auto">Detect automatically</option>
-                    <option value="device">Use a specific method</option>
-                  </select>
-                </label>
-                {field(
-                  "Hardware method",
-                  "hardware_device",
-                  "cuda, qsv, vaapi",
-                )}
-                {field(
-                  "Never use these vendors",
-                  "hardware_disabled_vendors_csv",
-                  "nvidia,intel",
-                )}
-                <label className="block text-sm">
-                  <span className="text-[var(--mm-text2)]">
-                    FFmpeg compatibility
-                  </span>
-                  <select
-                    className={mmSelectFieldClass}
-                    value={form.ffmpeg_strictness}
-                    onChange={(event) =>
-                      setForm({
-                        ...form,
-                        ffmpeg_strictness: event.target.value,
-                      })
-                    }
-                    disabled={!editable}
-                  >
-                    <option value="very">Very strict</option>
-                    <option value="strict">Strict</option>
-                    <option value="normal">Normal</option>
-                    <option value="unofficial">Allow unofficial</option>
-                    <option value="experimental">Allow experimental</option>
-                  </select>
-                </label>
+          <LibraryManagerSetup
+            mediaType={form.media_type}
+            watchedFolder={form.watched_folder}
+            outputFolder={form.output_folder}
+            removeOriginal={form.remove_original_after_success}
+            editable={editable}
+            onUseFolders={(watched, output) =>
+              setForm((current) => ({
+                ...current,
+                watched_folder: watched ?? current.watched_folder,
+                output_folder: output ?? current.output_folder,
+              }))
+            }
+          />
+
+          <QuietFieldGroup
+            title="Intake rules"
+            detail="Decide which files belong here before Weir spends time probing or processing them. A maximum of 0 means no limit."
+          >
+            <div className="grid gap-4 lg:grid-cols-2">
+              {field("File types", "media_extensions_csv", ".mkv,.mp4")}
+              {field(
+                "Downloader folders to ignore",
+                "exclude_markers_csv",
+                "__admin__,incomplete",
+                "Comma-separated folder names used while a download is incomplete.",
+              )}
+              {field(
+                "Path must match",
+                "include_patterns_csv",
+                "*feature*,Movies/*",
+                "Optional comma-separated wildcards. Empty accepts every path.",
+              )}
+              {field(
+                "Path must not match",
+                "exclude_patterns_csv",
+                "*sample*,*trailer*",
+                "Optional comma-separated wildcards.",
+              )}
+              {field("Minimum file size (MB)", "min_file_size_mb", "0")}
+              {field("Maximum file size (MB)", "max_file_size_mb", "0")}
+              <div className="space-y-2 lg:col-span-2">
+                <div>
+                  <p className="text-sm font-medium text-[var(--mm-text1)]">
+                    Created and modified windows
+                  </p>
+                  <p className="text-xs leading-5 text-[var(--mm-text3)]">
+                    Optional. Leave a side blank for no limit. Times are shown
+                    in this browser&apos;s timezone and saved as UTC. Windows
+                    uses the file creation time; Linux and Docker use the best
+                    filesystem birth/change time available.
+                  </p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {dateTimeField("Created after", "created_after")}
+                  {dateTimeField("Created before", "created_before")}
+                  {dateTimeField("Modified after", "modified_after")}
+                  {dateTimeField("Modified before", "modified_before")}
+                </div>
               </div>
-            </details>
-            <QuietFieldGroup title="When this library may run">
-              <ScheduleGridEditor
-                value={form.schedule_grid}
-                onChange={(schedule_grid) =>
-                  setForm({ ...form, schedule_grid })
+              <label className="block text-sm">
+                <span className="text-[var(--mm-text2)]">
+                  When a file is rejected
+                </span>
+                <select
+                  className={mmSelectFieldClass}
+                  value={form.rejected_file_action}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      rejected_file_action: event.target.value as
+                        "leave" | "delete_file",
+                    })
+                  }
+                  disabled={!editable}
+                >
+                  <option value="leave">Leave the file in place</option>
+                  <option value="delete_file">
+                    Delete only the rejected file
+                  </option>
+                </select>
+                <span className="mt-1 block text-xs text-[var(--mm-text3)]">
+                  Applies after readiness checks to size and path-rule
+                  rejections. Weir never deletes a populated parent folder here.
+                </span>
+              </label>
+            </div>
+            <div className="grid gap-x-10 lg:grid-cols-2">
+              {toggle("Skip hidden files", "exclude_hidden")}
+              {toggle("Only inspect the top folder", "top_level_only")}
+            </div>
+          </QuietFieldGroup>
+
+          <QuietFieldGroup
+            title="File readiness"
+            detail="These checks prevent Weir from starting while a downloader, recorder, or media manager still owns the file."
+          >
+            <div className="grid gap-4 lg:grid-cols-2">
+              {field("Minimum unchanged age (seconds)", "min_file_age_seconds")}
+              {field("Hold every new file (minutes)", "hold_minutes")}
+              {field(
+                "Size must stay stable (seconds)",
+                "file_detection_interval_seconds",
+              )}
+              {field(
+                "Fallback scan interval (seconds)",
+                "scan_interval_seconds",
+              )}
+            </div>
+            <div className="grid gap-x-10 lg:grid-cols-2">
+              {toggle(
+                "Watch this folder for changes",
+                "file_system_events_enabled",
+                "The periodic scan remains as a backstop for Docker, SMB, and NFS.",
+              )}
+              {toggle(
+                "Ignore size changes",
+                "ignore_size_changes",
+                "Use only when another system guarantees the file is complete.",
+              )}
+              {toggle(
+                "Skip read and write tests",
+                "skip_access_tests",
+                "Less safe: locked sources and unwritable outputs may fail after queueing.",
+              )}
+            </div>
+          </QuietFieldGroup>
+
+          <QuietFieldGroup
+            title="Output safety"
+            detail="Control sidecars, timestamps, and what happens when the destination already exists."
+          >
+            <div className="grid gap-4 lg:grid-cols-2">
+              {field(
+                "Sidecar file types",
+                "sidecar_patterns_csv",
+                ".srt,.nfo,.jpg",
+              )}
+              <label className="block text-sm">
+                <span className="text-[var(--mm-text2)]">Existing output</span>
+                <select
+                  className={mmSelectFieldClass}
+                  value={form.output_collision_policy}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      output_collision_policy: event.target.value,
+                    })
+                  }
+                  disabled={!editable}
+                >
+                  <option value="replace">Replace it</option>
+                  <option value="skip">Keep it and skip this file</option>
+                  <option value="keep_both">Keep both</option>
+                  <option value="replace_if_larger">
+                    Replace only if new output is larger
+                  </option>
+                  <option value="replace_if_newer">
+                    Replace only if source is newer
+                  </option>
+                </select>
+              </label>
+            </div>
+            <div className="grid gap-x-10 lg:grid-cols-2">
+              {toggle(
+                "Preserve original timestamps",
+                "preserve_original_timestamps",
+              )}
+              {toggle(
+                "After cleaning, remove the original download",
+                "remove_original_after_success",
+                "Turn off if your download client is still seeding it — Sonarr, Radarr or your client will clean it up.",
+              )}
+            </div>
+          </QuietFieldGroup>
+
+          <QuietFieldGroup
+            title="Capacity and recovery"
+            detail="Priority is relative: higher-numbered libraries are offered work first."
+          >
+            <div className="grid gap-4 lg:grid-cols-2">
+              <label className="block text-sm">
+                <span className="text-[var(--mm-text2)]">Files at once</span>
+                <select
+                  className={mmSelectFieldClass}
+                  value={form.max_concurrent_files}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      max_concurrent_files: event.target.value,
+                    })
+                  }
+                  disabled={!editable}
+                >
+                  <option value="0">Same as Process settings</option>
+                  {Array.from({ length: 10 }, (_, i) => (
+                    <option key={i + 1} value={String(i + 1)}>
+                      {i === 0 ? "At most 1 file" : `At most ${i + 1} files`}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-1 block text-xs text-[var(--mm-text3)]">
+                  Only to hold this library below Files at once in Process
+                  settings, so it cannot take every slot.
+                </span>
+              </label>
+              {field("Queue priority", "priority", "0")}
+              {field("Maximum automatic attempts", "max_attempts", "3")}
+              {field(
+                "First retry delay (seconds)",
+                "retry_backoff_seconds",
+                "300",
+              )}
+            </div>
+            <div className="grid gap-x-10 lg:grid-cols-2">
+              {toggle("Retry processing failures", "retry_execution_failures")}
+              {toggle(
+                "Retry preflight rejections",
+                "retry_preflight_failures",
+                "Usually leave this off: retrying does not repair an unsupported or malformed file.",
+              )}
+            </div>
+            <label className="block space-y-1">
+              <span className="text-sm text-[var(--mm-text2)]">
+                When retries run out
+              </span>
+              <select
+                className={mmSelectFieldClass}
+                value={form.failure_policy}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    failure_policy: event.target
+                      .value as ProcessingFailurePolicy,
+                  })
                 }
                 disabled={!editable}
-              />
-            </QuietFieldGroup>
-            <div className={quietActionRowClass}>
-              <button
-                type="button"
-                className={mmActionButtonClass({
-                  variant: "primary",
-                  disabled: !editable || !form.name.trim(),
-                })}
-                onClick={() => void save()}
-                disabled={!editable || !form.name.trim()}
-                data-testid="processing-library-save"
               >
-                Save
-              </button>
-              <button
-                type="button"
-                className={mmActionButtonClass({ variant: "tertiary" })}
-                onClick={cancel}
+                <option value="pass_through">
+                  Hand the original back unchanged
+                </option>
+                <option value="hold">Keep it until someone acts</option>
+                <option
+                  value="reject"
+                  disabled={
+                    !rejectAvailable && form.failure_policy !== "reject"
+                  }
+                >
+                  Reject the release so a different one is found
+                </option>
+              </select>
+              <span className="block text-xs text-[var(--mm-text3)]">
+                {form.failure_policy === "pass_through"
+                  ? "Your media manager still gets the file, exactly as it arrived. The original stays in the watched folder."
+                  : form.failure_policy === "hold"
+                    ? "The file stays with Weir and will not reach your media manager until you deal with it."
+                    : "Weir tells your media manager the release is bad and removes the download once the manager accepts, so it can find a different one. If that cannot be done safely, the original is handed back unchanged instead."}
+              </span>
+              <span
+                className="block text-xs text-[var(--mm-text3)]"
+                data-testid="reject-support"
               >
-                Cancel
-              </button>
+                {rejectSupport.isLoading
+                  ? "Checking whether Reject is available…"
+                  : rejectSupport.data
+                    ? `Reject: ${rejectSupport.data.reason}`
+                    : null}
+              </span>
+            </label>
+          </QuietFieldGroup>
+
+          <details>
+            <summary className="cursor-pointer border-b border-[var(--mm-line)] pb-[0.55rem] text-[length:var(--mm-type-eyebrow)] font-semibold uppercase tracking-[var(--mm-tracking-eyebrow)] text-[var(--mm-text3)]">
+              Hardware and compatibility
+            </summary>
+            <p className="mt-3 max-w-prose text-[length:var(--mm-type-caption)] leading-5 text-[var(--mm-text3)]">
+              Software processing is the safest default. Hardware failures fall
+              back to software and are recorded.
+            </p>
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <label className="block text-sm">
+                <span className="text-[var(--mm-text2)]">
+                  Hardware decoding
+                </span>
+                <select
+                  className={mmSelectFieldClass}
+                  value={form.hardware_decode_mode}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      hardware_decode_mode: event.target.value,
+                    })
+                  }
+                  disabled={!editable}
+                >
+                  <option value="off">Off</option>
+                  <option value="auto">Detect automatically</option>
+                  <option value="device">Use a specific method</option>
+                </select>
+              </label>
+              {field("Hardware method", "hardware_device", "cuda, qsv, vaapi")}
+              {field(
+                "Never use these vendors",
+                "hardware_disabled_vendors_csv",
+                "nvidia,intel",
+              )}
+              <label className="block text-sm">
+                <span className="text-[var(--mm-text2)]">
+                  FFmpeg compatibility
+                </span>
+                <select
+                  className={mmSelectFieldClass}
+                  value={form.ffmpeg_strictness}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      ffmpeg_strictness: event.target.value,
+                    })
+                  }
+                  disabled={!editable}
+                >
+                  <option value="very">Very strict</option>
+                  <option value="strict">Strict</option>
+                  <option value="normal">Normal</option>
+                  <option value="unofficial">Allow unofficial</option>
+                  <option value="experimental">Allow experimental</option>
+                </select>
+              </label>
             </div>
+          </details>
+          <QuietFieldGroup title="When this library may run">
+            <ScheduleGridEditor
+              value={form.schedule_grid}
+              onChange={(schedule_grid) => setForm({ ...form, schedule_grid })}
+              disabled={!editable}
+            />
+          </QuietFieldGroup>
+          <div className={quietActionRowClass}>
+            <button
+              type="button"
+              className={mmActionButtonClass({ variant: "primary" })}
+              onClick={() => void save()}
+              disabled={!editable || !form.name.trim()}
+              data-testid="processing-library-save"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              className={mmActionButtonClass({ variant: "tertiary" })}
+              onClick={cancel}
+            >
+              Cancel
+            </button>
           </div>
-        </QuietSection>
-      ) : null}
+        </div>
+      </SidePanel>
     </div>
   );
 }

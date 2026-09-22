@@ -51,6 +51,35 @@ public sealed class LibraryFilePlannerTests
         Assert.Equal(1_440_000, result.EstimatedBytesSaved);
     }
 
+    // #648: Matroska keeps per-track sizes in the stream's own tags, and reports no bit_rate at all. mkvmerge writes
+    // both the exact byte count and a bit rate, each with the track's language appended.
+    private const string MatroskaWithStatisticsTags =
+        """{"format":{"duration":"120.0"},"streams":[{"index":0,"codec_type":"video","codec_name":"h264"},{"index":1,"codec_type":"audio","codec_name":"eac3","channels":6,"tags":{"language":"eng","BPS-eng":"640000","NUMBER_OF_BYTES-eng":"9600000"},"disposition":{"default":1}},{"index":2,"codec_type":"audio","codec_name":"aac","channels":2,"tags":{"language":"jpn","BPS-jpn":"128000","NUMBER_OF_BYTES-jpn":"1920000"}}]}""";
+
+    private const string MatroskaWithBpsOnly =
+        """{"format":{"duration":"120.0"},"streams":[{"index":0,"codec_type":"video","codec_name":"h264"},{"index":1,"codec_type":"audio","codec_name":"eac3","channels":6,"tags":{"language":"eng"},"disposition":{"default":1}},{"index":2,"codec_type":"audio","codec_name":"aac","channels":2,"tags":{"language":"jpn","BPS":"128000"}}]}""";
+
+    private const string MatroskaWithNoSizes =
+        """{"format":{"duration":"120.0"},"streams":[{"index":0,"codec_type":"video","codec_name":"h264"},{"index":1,"codec_type":"audio","codec_name":"eac3","channels":6,"tags":{"language":"eng"},"disposition":{"default":1}},{"index":2,"codec_type":"audio","codec_name":"aac","channels":2,"tags":{"language":"jpn"}}]}""";
+
+    [Fact]
+    public void Issue_648_a_matroska_track_is_measured_by_its_own_tags_before_any_arithmetic()
+    {
+        var exact = LibraryFilePlanner.Classify(ProbeResult.Parse(MatroskaWithStatisticsTags), EnglishOnlyRules());
+        // The dropped Japanese track says exactly how many bytes it is, so nothing is worked out from a bit rate.
+        Assert.Equal(1_920_000, exact.EstimatedBytesSaved);
+
+        // With only a bit rate to go on: 128000 bits/s * 120s / 8.
+        var fromBitRate = LibraryFilePlanner.Classify(ProbeResult.Parse(MatroskaWithBpsOnly), EnglishOnlyRules());
+        Assert.Equal(1_920_000, fromBitRate.EstimatedBytesSaved);
+
+        // A file that says nothing about its tracks' sizes still reads as one that would change.
+        var unmeasured = LibraryFilePlanner.Classify(ProbeResult.Parse(MatroskaWithNoSizes), EnglishOnlyRules());
+        Assert.Equal(LibraryFileClassification.WouldChange, unmeasured.Classification);
+        Assert.Equal(1, unmeasured.RemovedAudioCount);
+        Assert.Equal(0, unmeasured.EstimatedBytesSaved);
+    }
+
     [Fact]
     public void Two_removed_tracks_read_in_the_plural()
     {

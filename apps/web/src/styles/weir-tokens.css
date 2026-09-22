@@ -2,7 +2,8 @@
 
 :root {
   color-scheme: dark;
-  /* Display density: overridden on `html[data-mm-density="…"]` (see below). */
+  /* Kept as variables because every stylesheet multiplies by them. The setting that changed them was a
+     zoom of the whole interface in four near-identical steps, which the browser's own zoom already does. */
   --mm-density-font-scale: 1.08;
   --mm-density-ui-scale: 1;
   --mm-main-max-cap: 2400px;
@@ -77,6 +78,8 @@
      Layout-only, set per instance from React; no colour or font is introduced here. */
   --mm-flow-share: 1; /* one lead-band segment's share of the band's width */
   --mm-meter-fill: 0%; /* how full a figure tile's meter is */
+  --mm-live-fill: 0%; /* how far a Live working card's pass has got (weir-live.css) */
+  --mm-live-bar: 0%; /* one Live throughput bar's height against the tallest */
   /* 0 while the lead band is one proportional row, 1 once it has restacked into a
      labelled list. Set by weir-content.css alone — never inline, never by a page — and
      every difference between the two states is a calc on it, so the band has one switch
@@ -176,22 +179,4 @@ html[data-mm-theme="light"] {
   /* packaging/brand/weir-mark-light.svg; wordmark #11242b is 14.4:1 on the light page. */
   --mm-brand-water: #0d6f68;
   --mm-brand-wordmark: #11242b;
-}
-
-html[data-mm-density="comfortable"] {
-  --mm-density-font-scale: 1.2;
-  --mm-density-ui-scale: 1.12;
-  --mm-main-max-cap: 2600px;
-}
-
-html[data-mm-density="expanded"] {
-  --mm-density-font-scale: 1.32;
-  --mm-density-ui-scale: 1.22;
-  --mm-main-max-cap: 2800px;
-}
-
-html[data-mm-density="compact"] {
-  --mm-density-font-scale: 0.94;
-  --mm-density-ui-scale: 0.84;
-  --mm-main-max-cap: 2800px;
 }

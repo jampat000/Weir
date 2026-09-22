@@ -18,9 +18,10 @@ function canEdit(role: string | undefined): boolean {
 /**
  * Pause processing, from anywhere in the app.
  *
- * It lives in the shell rather than on the Processing page because the reason to reach for
- * it — the machine is busy and you want it back — has nothing to do with which screen
- * you happen to be on.
+ * It sits in every page's title row (PageHeader) rather than on one page, because the reason
+ * to reach for it — the machine is busy and you want it back — has nothing to do with which
+ * screen you happen to be on. It shares `.mm-head-control` with the theme switch so the two
+ * are exactly the same height.
  */
 export function PauseControl() {
   const me = useMeQuery();
@@ -51,7 +52,7 @@ export function PauseControl() {
         {editable ? (
           <button
             type="button"
-            className="mm-theme-toggle"
+            className="mm-head-control"
             data-testid="pause-resume"
             disabled={save.isPending}
             onClick={resume}
@@ -69,11 +70,25 @@ export function PauseControl() {
     <div className="mm-pause-control" data-testid="pause-control">
       <button
         type="button"
-        className="mm-theme-toggle"
+        className="mm-head-control"
         data-testid="pause-open"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M9 6v12M15 6v12"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+          />
+        </svg>
         Pause processing
       </button>
       {open ? (
@@ -82,7 +97,7 @@ export function PauseControl() {
             <button
               key={d.label}
               type="button"
-              className="mm-theme-toggle"
+              className="mm-head-control"
               data-testid={`pause-for-${d.minutes ?? "indefinite"}`}
               disabled={save.isPending}
               onClick={() => {

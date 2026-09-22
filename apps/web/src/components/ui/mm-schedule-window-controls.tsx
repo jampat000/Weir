@@ -118,7 +118,7 @@ export function MmScheduleDayChips({
         <button
           type="button"
           disabled={disabled}
-          className={mmActionButtonClass({ variant: "secondary", disabled })}
+          className={mmActionButtonClass({ variant: "secondary" })}
           onClick={() => preset("all")}
         >
           Every day
@@ -126,7 +126,7 @@ export function MmScheduleDayChips({
         <button
           type="button"
           disabled={disabled}
-          className={mmActionButtonClass({ variant: "secondary", disabled })}
+          className={mmActionButtonClass({ variant: "secondary" })}
           onClick={() => preset(["Mon", "Tue", "Wed", "Thu", "Fri"])}
         >
           Weekdays
@@ -134,7 +134,7 @@ export function MmScheduleDayChips({
         <button
           type="button"
           disabled={disabled}
-          className={mmActionButtonClass({ variant: "secondary", disabled })}
+          className={mmActionButtonClass({ variant: "secondary" })}
           onClick={() => preset(["Sat", "Sun"])}
         >
           Weekends
@@ -142,7 +142,7 @@ export function MmScheduleDayChips({
         <button
           type="button"
           disabled={disabled}
-          className={mmActionButtonClass({ variant: "secondary", disabled })}
+          className={mmActionButtonClass({ variant: "secondary" })}
           onClick={() => preset("clear")}
         >
           Clear

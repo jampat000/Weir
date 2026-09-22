@@ -308,7 +308,10 @@ export function ProcessingJobsInspectionSection() {
 
           <p className="text-xs text-[var(--mm-text2)]">
             Full detail on each outcome is in the{" "}
-            <Link to="/activity" className="text-[var(--mm-accent)] underline">
+            <Link
+              to="/settings?tab=history"
+              className="text-[var(--mm-accent)] underline"
+            >
               Activity log
             </Link>
             .
@@ -395,10 +398,7 @@ function ProcessingJobRow({
         {showCancel ? (
           <button
             type="button"
-            className={mmActionButtonClass({
-              variant: "tertiary",
-              disabled: cancelMutation.isPending,
-            })}
+            className={mmActionButtonClass({ variant: "tertiary" })}
             disabled={cancelMutation.isPending}
             data-testid={`processing-jobs-cancel-${job.id}`}
             onClick={() => cancelMutation.mutate(job.id)}
@@ -409,10 +409,7 @@ function ProcessingJobRow({
         {showRecover ? (
           <button
             type="button"
-            className={mmActionButtonClass({
-              variant: "secondary",
-              disabled: recoverMutation.isPending,
-            })}
+            className={mmActionButtonClass({ variant: "secondary" })}
             disabled={recoverMutation.isPending}
             data-testid={`processing-jobs-recover-${job.id}`}
             onClick={() => recoverMutation.mutate(job.id)}

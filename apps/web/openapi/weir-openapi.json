@@ -917,6 +917,30 @@
             "title": "Csrf Token",
             "type": "string"
           },
+          "expected_size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The file's size when those tracks were chosen. A file that changed since is left alone rather than cleaned to a stale choice.",
+            "title": "Expected Size Bytes"
+          },
+          "manual_plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcessingManualPlanIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Your own choice of tracks for this one file, instead of the library's rules. Only valid with exactly one path.",
+            "title": "Manual Plan"
+          },
           "paths": {
             "items": {
               "type": "string"
@@ -1139,9 +1163,26 @@
             "title": "Classification",
             "type": "string"
           },
+          "cleaned_at": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When Weir last cleaned this file (unix seconds), or null if it never has.",
+            "title": "Cleaned At"
+          },
           "estimated_bytes_saved": {
             "title": "Estimated Bytes Saved",
             "type": "integer"
+          },
+          "leave_alone": {
+            "description": "You asked Weir to leave this file alone; nothing cleans it until you say otherwise.",
+            "title": "Leave Alone",
+            "type": "boolean"
           },
           "link_count": {
             "anyOf": [
@@ -1292,7 +1333,9 @@
           "subtitle_summary",
           "subtitle_track_count",
           "video_codec",
-          "video_height"
+          "video_height",
+          "cleaned_at",
+          "leave_alone"
         ],
         "title": "LibraryFileOut",
         "type": "object"
@@ -1419,6 +1462,53 @@
           "estimated_bytes_saved"
         ],
         "title": "LibraryFilesSummaryOut",
+        "type": "object"
+      },
+      "LibraryLeaveAloneIn": {
+        "additionalProperties": false,
+        "description": "Library mode: set one file aside so nothing cleans it, or bring it back. Weir server (.NET) only.",
+        "properties": {
+          "csrf_token": {
+            "minLength": 1,
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "leave_alone": {
+            "default": true,
+            "title": "Leave Alone",
+            "type": "boolean"
+          },
+          "path": {
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token",
+          "path"
+        ],
+        "title": "LibraryLeaveAloneIn",
+        "type": "object"
+      },
+      "LibraryLeaveAloneOut": {
+        "additionalProperties": false,
+        "description": "Library mode: what that file is now. Weir server (.NET) only.",
+        "properties": {
+          "leave_alone": {
+            "title": "Leave Alone",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "leave_alone",
+          "path"
+        ],
+        "title": "LibraryLeaveAloneOut",
         "type": "object"
       },
       "LibraryOverviewOut": {
@@ -1895,12 +1985,20 @@
             "title": "Cannot Process",
             "type": "integer"
           },
+          "cleaned": {
+            "title": "Cleaned",
+            "type": "integer"
+          },
           "estimated_bytes_saved": {
             "title": "Estimated Bytes Saved",
             "type": "integer"
           },
           "files": {
             "title": "Files",
+            "type": "integer"
+          },
+          "left_alone": {
+            "title": "Left Alone",
             "type": "integer"
           },
           "matches": {
@@ -1932,7 +2030,9 @@
           "size_bytes",
           "total_removed_audio_tracks",
           "total_removed_subtitle_tracks",
-          "would_change"
+          "would_change",
+          "cleaned",
+          "left_alone"
         ],
         "title": "LibraryTotalsOut",
         "type": "object"
@@ -3554,6 +3654,18 @@
             "description": "Why, written for the person asking why there is no new output for this file.",
             "title": "Output Collision Reason"
           },
+          "progress_elapsed_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long the running pass has been writing, in seconds.",
+            "title": "Progress Elapsed Seconds"
+          },
           "progress_eta_seconds": {
             "anyOf": [
               {
@@ -3589,6 +3701,60 @@
             ],
             "description": "How far the current pass has got, when one is running. Null when nothing is in flight.",
             "title": "Progress Percent"
+          },
+          "progress_removed_audio": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The audio tracks the running pass is taking out, as its plan describes each one. Null when nothing is in flight.",
+            "title": "Progress Removed Audio"
+          },
+          "progress_removed_subtitles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The subtitle tracks the running pass is taking out. Null when nothing is in flight.",
+            "title": "Progress Removed Subtitles"
+          },
+          "progress_speed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The running pass's speed as ffmpeg reports it, for example 148x.",
+            "title": "Progress Speed"
+          },
+          "progress_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "processing while the file is written; finishing during the final checks and hand-back. Null when nothing is in flight.",
+            "title": "Progress Status"
           },
           "quarantined": {
             "default": false,
@@ -3627,7 +3793,10 @@
               "disabled",
               "on_hold",
               "out_of_schedule",
-              "blocked_upstream"
+              "blocked_upstream",
+              "passed_through",
+              "rejected",
+              "cancelled"
             ],
             "title": "Status",
             "type": "string"
@@ -3974,7 +4143,10 @@
                   "disabled",
                   "on_hold",
                   "out_of_schedule",
-                  "blocked_upstream"
+                  "blocked_upstream",
+                  "passed_through",
+                  "rejected",
+                  "cancelled"
                 ],
                 "type": "string"
               },
@@ -10696,7 +10868,10 @@
                     "disabled",
                     "on_hold",
                     "out_of_schedule",
-                    "blocked_upstream"
+                    "blocked_upstream",
+                    "passed_through",
+                    "rejected",
+                    "cancelled"
                   ],
                   "type": "string"
                 },
@@ -12065,6 +12240,27 @@
             }
           },
           {
+            "description": "Narrow to files Weir has cleaned, or files you have set aside.",
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "cleaned",
+                    "left_alone"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
             "in": "query",
             "name": "sort",
             "required": false,
@@ -12207,6 +12403,60 @@
           }
         },
         "summary": "Post Library Files Clean",
+        "tags": [
+          "library-mode"
+        ]
+      }
+    },
+    "/api/v1/processing/libraries/{library_id}/library-files/leave-alone": {
+      "post": {
+        "description": "Library mode. Sets one file aside so nothing cleans it — a rescan does not forget it — or brings it back with leave_alone: false.",
+        "operationId": "post_library_files_leave_alone",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "library_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Library Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LibraryLeaveAloneIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryLeaveAloneOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Library Files Leave Alone",
         "tags": [
           "library-mode"
         ]

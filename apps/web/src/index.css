@@ -2,6 +2,8 @@
 @import "./styles/weir-tokens.css";
 @import "./styles/weir-shell.css";
 @import "./styles/weir-content.css";
+@import "./styles/weir-live.css";
+@import "./styles/weir-library.css";
 
 @theme {
   --font-outfit: "Outfit", system-ui, -apple-system, sans-serif;

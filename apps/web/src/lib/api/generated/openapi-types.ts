@@ -1095,6 +1095,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/processing/libraries/{library_id}/library-files/leave-alone": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Library Files Leave Alone
+     * @description Library mode. Sets one file aside so nothing cleans it — a rescan does not forget it — or brings it back with leave_alone: false.
+     */
+    post: operations["post_library_files_leave_alone"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/processing/libraries/{library_id}/library-overview": {
     parameters: {
       query?: never;
@@ -2342,6 +2362,16 @@ export interface components {
       confirm_final_removal: boolean;
       /** Csrf Token */
       csrf_token: string;
+      /**
+       * Expected Size Bytes
+       * @description The file's size when those tracks were chosen. A file that changed since is left alone rather than cleaned to a stale choice.
+       */
+      expected_size_bytes?: number | null;
+      /**
+       * Manual Plan
+       * @description Your own choice of tracks for this one file, instead of the library's rules. Only valid with exactly one path.
+       */
+      manual_plan?: components["schemas"]["ProcessingManualPlanIn"] | null;
       /** Paths */
       paths: string[];
     };
@@ -2436,8 +2466,18 @@ export interface components {
        * @enum {string}
        */
       classification: "matches" | "would_change" | "cannot_process";
+      /**
+       * Cleaned At
+       * @description When Weir last cleaned this file (unix seconds), or null if it never has.
+       */
+      cleaned_at: number | null;
       /** Estimated Bytes Saved */
       estimated_bytes_saved: number;
+      /**
+       * Leave Alone
+       * @description You asked Weir to leave this file alone; nothing cleans it until you say otherwise.
+       */
+      leave_alone: boolean;
       /** Link Count */
       link_count: number | null;
       /** Manager Kind */
@@ -2537,6 +2577,31 @@ export interface components {
       total_removed_subtitle_tracks: number;
       /** Would Change */
       would_change: number;
+    };
+    /**
+     * LibraryLeaveAloneIn
+     * @description Library mode: set one file aside so nothing cleans it, or bring it back. Weir server (.NET) only.
+     */
+    LibraryLeaveAloneIn: {
+      /** Csrf Token */
+      csrf_token: string;
+      /**
+       * Leave Alone
+       * @default true
+       */
+      leave_alone: boolean;
+      /** Path */
+      path: string;
+    };
+    /**
+     * LibraryLeaveAloneOut
+     * @description Library mode: what that file is now. Weir server (.NET) only.
+     */
+    LibraryLeaveAloneOut: {
+      /** Leave Alone */
+      leave_alone: boolean;
+      /** Path */
+      path: string;
     };
     /**
      * LibraryOverviewOut
@@ -2750,10 +2815,14 @@ export interface components {
     LibraryTotalsOut: {
       /** Cannot Process */
       cannot_process: number;
+      /** Cleaned */
+      cleaned: number;
       /** Estimated Bytes Saved */
       estimated_bytes_saved: number;
       /** Files */
       files: number;
+      /** Left Alone */
+      left_alone: number;
       /** Matches */
       matches: number;
       /** Size Bytes */
@@ -3519,6 +3588,11 @@ export interface components {
        */
       output_collision_reason?: string | null;
       /**
+       * Progress Elapsed Seconds
+       * @description How long the running pass has been writing, in seconds.
+       */
+      progress_elapsed_seconds?: number | null;
+      /**
        * Progress Eta Seconds
        * @description The running pass's own estimate of the time left, when it has one.
        */
@@ -3533,6 +3607,26 @@ export interface components {
        * @description How far the current pass has got, when one is running. Null when nothing is in flight.
        */
       progress_percent?: number | null;
+      /**
+       * Progress Removed Audio
+       * @description The audio tracks the running pass is taking out, as its plan describes each one. Null when nothing is in flight.
+       */
+      progress_removed_audio?: string[] | null;
+      /**
+       * Progress Removed Subtitles
+       * @description The subtitle tracks the running pass is taking out. Null when nothing is in flight.
+       */
+      progress_removed_subtitles?: string[] | null;
+      /**
+       * Progress Speed
+       * @description The running pass's speed as ffmpeg reports it, for example 148x.
+       */
+      progress_speed?: string | null;
+      /**
+       * Progress Status
+       * @description processing while the file is written; finishing during the final checks and hand-back. Null when nothing is in flight.
+       */
+      progress_status?: string | null;
       /**
        * Quarantined
        * @description True when repeated failures placed this file on hold until an operator requeues it.
@@ -3561,7 +3655,10 @@ export interface components {
         | "disabled"
         | "on_hold"
         | "out_of_schedule"
-        | "blocked_upstream";
+        | "blocked_upstream"
+        | "passed_through"
+        | "rejected"
+        | "cancelled";
       /**
        * Status Reason
        * @description Why the file is in this state, written for the person reading it.
@@ -3728,6 +3825,9 @@ export interface components {
             | "on_hold"
             | "out_of_schedule"
             | "blocked_upstream"
+            | "passed_through"
+            | "rejected"
+            | "cancelled"
           )
         | null;
       /** Library Id */
@@ -7351,6 +7451,9 @@ export interface operations {
               | "on_hold"
               | "out_of_schedule"
               | "blocked_upstream"
+              | "passed_through"
+              | "rejected"
+              | "cancelled"
             )
           | null;
         path_contains?: string | null;
@@ -8190,6 +8293,8 @@ export interface operations {
         audio?: string;
         audio_language?: string;
         subtitle_language?: string;
+        /** @description Narrow to files Weir has cleaned, or files you have set aside. */
+        state?: ("cleaned" | "left_alone") | null;
         sort?:
           | "path"
           | "title"
@@ -8264,6 +8369,41 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["LibraryConfirmationRequired"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_library_files_leave_alone: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        library_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LibraryLeaveAloneIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LibraryLeaveAloneOut"];
         };
       };
       /** @description Validation Error */

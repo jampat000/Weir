@@ -15,22 +15,7 @@ import {
   mmModuleTabBlurbBandClass,
   mmModuleTabBlurbTextClass,
 } from "../../lib/ui/mm-module-tab-blurb";
-import {
-  persistDisplayDensity,
-  type DisplayDensity,
-} from "../../lib/ui/display-density";
 import { SettingsQuietSection } from "./settings-shared";
-
-const DENSITY_OPTIONS: ReadonlyArray<{
-  id: DisplayDensity;
-  label: string;
-  hint: string;
-}> = [
-  { id: "compact", label: "Compact", hint: "Tighter, fits more" },
-  { id: "default", label: "Balanced", hint: "The default" },
-  { id: "comfortable", label: "Comfortable", hint: "Larger text" },
-  { id: "expanded", label: "Expanded", hint: "For big screens" },
-];
 
 /** The field caption, spelled exactly as the deleted `.mm-settings-field-label` rule
  *  spelled it, so losing the cards does not quietly restyle the confirmation field
@@ -67,8 +52,6 @@ type SettingsGeneralTabProps = {
   setActivityRetentionDaysDraft: (v: string | null) => void;
   finalizeActivityRetentionDays: () => number | undefined;
   lastSuiteSaveTarget: "timezone" | "logs" | "backup" | null;
-  displayDensity: DisplayDensity;
-  setDisplayDensity: (v: DisplayDensity) => void;
   resetHistoryConfirm: string;
   setResetHistoryConfirm: (v: string) => void;
   resetHistory: ReturnType<typeof useSuiteOperationalHistoryResetMutation>;
@@ -93,8 +76,6 @@ export function SettingsGeneralTab({
   setActivityRetentionDaysDraft,
   finalizeActivityRetentionDays,
   lastSuiteSaveTarget,
-  displayDensity,
-  setDisplayDensity,
   resetHistoryConfirm,
   setResetHistoryConfirm,
   resetHistory,
@@ -167,57 +148,13 @@ export function SettingsGeneralTab({
         <div className={`${quietActionRowClass} mt-6`}>
           <button
             type="button"
-            className={mmActionButtonClass({
-              variant: "primary",
-              disabled: !editable || !timezoneDirty || save.isPending,
-            })}
+            className={mmActionButtonClass({ variant: "primary" })}
             disabled={!editable || !timezoneDirty || save.isPending}
             data-testid="suite-settings-save-timezone"
             onClick={() => onSaveTimezone()}
           >
             {save.isPending ? "Saving..." : "Save time zone"}
           </button>
-        </div>
-      </SettingsQuietSection>
-
-      <SettingsQuietSection
-        headingId="suite-settings-density-heading"
-        heading="Display density"
-      >
-        <p className="mm-quiet-note">
-          Text size and spacing for this browser only. Applies straight away.
-        </p>
-        {/* The tiles keep their own border: it is the radio's target and its
-            selected-state affordance, not a panel around content — the same call the
-            setup wizard's conversion made, and `.mm-density-option` is shared with it.
-            What rule 3 rejected here was the card around them, and that has gone. */}
-        <div
-          className="mm-density-options max-w-2xl"
-          data-testid="suite-settings-display-density"
-          role="radiogroup"
-          aria-label="Display density"
-        >
-          {DENSITY_OPTIONS.map(({ id, label, hint }) => (
-            <label
-              key={id}
-              className={`mm-density-option${displayDensity === id ? " mm-density-option--selected" : ""}`}
-            >
-              <input
-                type="radio"
-                name="mm-display-density"
-                className="mm-density-option__input"
-                checked={displayDensity === id}
-                onChange={() => {
-                  setDisplayDensity(id);
-                  persistDisplayDensity(id);
-                }}
-              />
-              <span className="min-w-0">
-                <span className="mm-density-option__label">{label}</span>
-                <span className="mm-density-option__hint">{hint}</span>
-              </span>
-            </label>
-          ))}
         </div>
       </SettingsQuietSection>
 
@@ -302,10 +239,7 @@ export function SettingsGeneralTab({
         <div className={`${quietActionRowClass} mt-6`}>
           <button
             type="button"
-            className={mmActionButtonClass({
-              variant: "primary",
-              disabled: !editable || !logsDirty || save.isPending,
-            })}
+            className={mmActionButtonClass({ variant: "primary" })}
             disabled={!editable || !logsDirty || save.isPending}
             data-testid="suite-settings-save-logs"
             onClick={() => onSaveLogs()}
@@ -358,12 +292,7 @@ export function SettingsGeneralTab({
           <div className={`${quietActionRowClass} mt-6`}>
             <button
               type="button"
-              className={mmActionButtonClass({
-                variant: "tertiary",
-                disabled:
-                  resetHistory.isPending ||
-                  resetHistoryConfirm.trim().toUpperCase() !== "RESET",
-              })}
+              className={mmActionButtonClass({ variant: "tertiary" })}
               disabled={
                 resetHistory.isPending ||
                 resetHistoryConfirm.trim().toUpperCase() !== "RESET"

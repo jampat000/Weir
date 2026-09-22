@@ -9,7 +9,6 @@ import {
 import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DISPLAY_DENSITY_STORAGE_KEY } from "../../lib/ui/display-density";
 import type { CurrentSession, UserPublic } from "../../lib/api/types";
 import { qk } from "../../lib/auth/queries";
 import * as suiteSettingsApi from "../../lib/suite/suite-settings-api";
@@ -240,8 +239,6 @@ async function renderSettingsWithSupportConfig(
 describe("SettingsPage (suite settings)", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    localStorage.removeItem(DISPLAY_DENSITY_STORAGE_KEY);
-    document.documentElement.removeAttribute("data-mm-density");
   });
 
   afterEach(() => {
@@ -258,12 +255,12 @@ describe("SettingsPage (suite settings)", () => {
     expect(screen.getByTestId("suite-settings-global")).toBeTruthy();
   });
 
-  it("shows development support guidance inside the Support tab without a button when URL is missing", () => {
+  it("shows development support guidance in System without a button when URL is missing", () => {
     renderSettings(operatorMe);
     expect(
       screen.queryByTestId("suite-settings-support"),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "Support" }));
+    fireEvent.click(screen.getByRole("tab", { name: "System" }));
     expect(screen.getByTestId("suite-settings-support")).toBeInTheDocument();
     expect(
       screen.getByText("Weir is free to use. Support is optional."),
@@ -288,7 +285,7 @@ describe("SettingsPage (suite settings)", () => {
       supportUrl: "https://example.com/support",
     });
 
-    fireEvent.click(screen.getByRole("tab", { name: "Support" }));
+    fireEvent.click(screen.getByRole("tab", { name: "System" }));
 
     expect(screen.getByTestId("suite-settings-support")).toBeInTheDocument();
     expect(
@@ -317,6 +314,7 @@ describe("SettingsPage (suite settings)", () => {
     expect(
       screen.queryByRole("tab", { name: "Support" }),
     ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "System" }));
     expect(
       screen.queryByTestId("suite-settings-support"),
     ).not.toBeInTheDocument();
@@ -335,7 +333,7 @@ describe("SettingsPage (suite settings)", () => {
 
   it("shows configuration backup + export for operators", () => {
     renderSettings(operatorMe);
-    fireEvent.click(screen.getByRole("tab", { name: "Backup and restore" }));
+    fireEvent.click(screen.getByRole("tab", { name: "System" }));
     expect(screen.getByTestId("suite-settings-backup-restore")).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "Download configuration now" }),
@@ -406,7 +404,7 @@ describe("SettingsPage (suite settings)", () => {
       });
 
     renderSettings(operatorMe);
-    fireEvent.click(screen.getByRole("tab", { name: "Backup and restore" }));
+    fireEvent.click(screen.getByRole("tab", { name: "System" }));
 
     fireEvent.change(screen.getByLabelText("Minimum time between runs"), {
       target: { value: "12" },
@@ -451,7 +449,7 @@ describe("SettingsPage (suite settings)", () => {
 
   it("hides configuration backup for viewers", () => {
     renderSettings(viewerMe);
-    fireEvent.click(screen.getByRole("tab", { name: "Backup and restore" }));
+    fireEvent.click(screen.getByRole("tab", { name: "System" }));
     expect(
       screen.queryByTestId("suite-settings-backup-restore"),
     ).not.toBeInTheDocument();
@@ -460,7 +458,7 @@ describe("SettingsPage (suite settings)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps General focused and splits Logs, Backup, and Upgrade to their own tabs", () => {
+  it("keeps General focused; backup and upgrade live in System, the server log in History and logs", () => {
     renderSettings(operatorMe);
     expect(screen.queryByText("Product name")).not.toBeInTheDocument();
     expect(screen.queryByText("Application logs")).not.toBeInTheDocument();
@@ -486,7 +484,7 @@ describe("SettingsPage (suite settings)", () => {
     expect(
       screen.queryByTestId("suite-settings-upgrade"),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "Backup and restore" }));
+    fireEvent.click(screen.getByRole("tab", { name: "System" }));
     expect(screen.getByTestId("suite-settings-backup-tab")).toBeInTheDocument();
     expect(
       screen.getByTestId("suite-settings-backup-restore"),
@@ -494,7 +492,7 @@ describe("SettingsPage (suite settings)", () => {
     expect(
       screen.queryByText("System log retention (days)"),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "Upgrade" }));
+    fireEvent.click(screen.getByRole("tab", { name: "System" }));
     expect(
       screen.getByTestId("suite-settings-upgrade-tab"),
     ).toBeInTheDocument();
@@ -502,7 +500,10 @@ describe("SettingsPage (suite settings)", () => {
     expect(
       screen.queryByText("System log retention (days)"),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "Logs" }));
+    fireEvent.click(screen.getByRole("tab", { name: "History and logs" }));
+    fireEvent.change(screen.getByTestId("settings-history-show"), {
+      target: { value: "log" },
+    });
     expect(screen.getByText("Search logs")).toBeInTheDocument();
     expect(screen.getByText("System events")).toBeInTheDocument();
     expect(screen.getByText("Server diagnostics")).toBeInTheDocument();
@@ -514,13 +515,13 @@ describe("SettingsPage (suite settings)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps Upgrade selected when the URL tab query is upgrade", () => {
+  it("opens System when an old address asks for the upgrade tab", () => {
     renderSettings(operatorMe, {
       updateStatus: windowsUpdateAvailableStatus,
       initialEntries: ["/settings?tab=upgrade"],
     });
 
-    expect(screen.getByRole("tab", { name: "Upgrade" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "System" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -563,7 +564,7 @@ describe("SettingsPage (suite settings)", () => {
     qc.setQueryData(suiteMetricsQueryKey, minimalMetrics);
 
     render(wrap(<SettingsPage />, qc));
-    fireEvent.click(screen.getByRole("tab", { name: "Upgrade" }));
+    fireEvent.click(screen.getByRole("tab", { name: "System" }));
 
     // staleTime: Infinity means the pre-seeded data is fresh — the link reads "Check again →"
     expect(screen.getByRole("button", { name: "Check again →" })).toBeEnabled();
@@ -583,16 +584,16 @@ describe("SettingsPage (suite settings)", () => {
 
   it("does not render mojibake in the upgrade panel", () => {
     renderSettings(operatorMe, { updateStatus: windowsUpdateAvailableStatus });
-    fireEvent.click(screen.getByRole("tab", { name: "Upgrade" }));
+    fireEvent.click(screen.getByRole("tab", { name: "System" }));
 
     expect(document.body.textContent).not.toContain("â");
     expect(document.body.textContent).not.toContain("Ã");
     expect(document.body.textContent).not.toContain("�");
   });
 
-  it("shows change password only on Security tab", () => {
+  it("shows change password in System", () => {
     renderSettings(operatorMe);
-    fireEvent.click(screen.getByRole("tab", { name: "Security" }));
+    fireEvent.click(screen.getByRole("tab", { name: "System" }));
     expect(
       screen.getByRole("heading", { name: "Change password" }),
     ).toBeInTheDocument();
@@ -603,7 +604,7 @@ describe("SettingsPage (suite settings)", () => {
 
   it("change password fields use Show/Hide and reset visibility when cleared", () => {
     renderSettings(operatorMe);
-    fireEvent.click(screen.getByRole("tab", { name: "Security" }));
+    fireEvent.click(screen.getByRole("tab", { name: "System" }));
     const current = screen.getByPlaceholderText("Enter current password");
     expect(current).toHaveAttribute("type", "password");
     fireEvent.change(current, { target: { value: "current-secret" } });
@@ -648,20 +649,5 @@ describe("SettingsPage (suite settings)", () => {
     expect(screen.getByRole("listbox")).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
-  });
-
-  it("applies display density locally without suite save", () => {
-    renderSettings(viewerMe);
-    expect(screen.getByTestId("suite-settings-display-density")).toBeTruthy();
-    fireEvent.click(screen.getByText("Comfortable"));
-    expect(document.documentElement.getAttribute("data-mm-density")).toBe(
-      "comfortable",
-    );
-    fireEvent.click(screen.getByText("Expanded"));
-    expect(document.documentElement.getAttribute("data-mm-density")).toBe(
-      "expanded",
-    );
-    fireEvent.click(screen.getByText("Balanced"));
-    expect(document.documentElement.getAttribute("data-mm-density")).toBeNull();
   });
 });

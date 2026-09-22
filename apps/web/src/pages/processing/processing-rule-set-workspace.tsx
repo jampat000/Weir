@@ -432,10 +432,7 @@ function SorterEditor({
               </label>
               <button
                 type="button"
-                className={mmActionButtonClass({
-                  variant: "tertiary",
-                  disabled: disabled || index === 0,
-                })}
+                className={mmActionButtonClass({ variant: "tertiary" })}
                 disabled={disabled || index === 0}
                 onClick={() => move(index, -1)}
                 aria-label={`Move ${title} criterion ${index + 1} up`}
@@ -444,10 +441,7 @@ function SorterEditor({
               </button>
               <button
                 type="button"
-                className={mmActionButtonClass({
-                  variant: "tertiary",
-                  disabled: disabled || index === rows.length - 1,
-                })}
+                className={mmActionButtonClass({ variant: "tertiary" })}
                 disabled={disabled || index === rows.length - 1}
                 onClick={() => move(index, 1)}
                 aria-label={`Move ${title} criterion ${index + 1} down`}
@@ -456,10 +450,7 @@ function SorterEditor({
               </button>
               <button
                 type="button"
-                className={mmActionButtonClass({
-                  variant: "tertiary",
-                  disabled,
-                })}
+                className={mmActionButtonClass({ variant: "tertiary" })}
                 disabled={disabled}
                 onClick={() =>
                   onChange(rows.filter((_, rowIndex) => rowIndex !== index))
@@ -474,7 +465,7 @@ function SorterEditor({
       <div className="mt-4">
         <button
           type="button"
-          className={mmActionButtonClass({ variant: "secondary", disabled })}
+          className={mmActionButtonClass({ variant: "secondary" })}
           disabled={disabled}
           onClick={() =>
             onChange([
@@ -1188,10 +1179,7 @@ export function ProcessingRuleSetWorkspace() {
             <div className="flex flex-wrap items-center gap-2 border-t border-[var(--mm-border)] pt-5">
               <button
                 type="button"
-                className={mmActionButtonClass({
-                  variant: "primary",
-                  disabled,
-                })}
+                className={mmActionButtonClass({ variant: "primary" })}
                 disabled={disabled}
                 onClick={() => void saveRuleSet()}
               >
@@ -1200,11 +1188,7 @@ export function ProcessingRuleSetWorkspace() {
               {!creating && selectedRuleSet ? (
                 <button
                   type="button"
-                  className={mmActionButtonClass({
-                    variant: "tertiary",
-                    disabled:
-                      disabled || selectedRuleSet.used_by_library_count > 0,
-                  })}
+                  className={mmActionButtonClass({ variant: "tertiary" })}
                   disabled={
                     disabled || selectedRuleSet.used_by_library_count > 0
                   }
@@ -1327,10 +1311,7 @@ export function ProcessingRuleSetWorkspace() {
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 type="button"
-                className={mmActionButtonClass({
-                  variant: "primary",
-                  disabled: !editable || saveProvider.isPending,
-                })}
+                className={mmActionButtonClass({ variant: "primary" })}
                 disabled={!editable || saveProvider.isPending}
                 onClick={() => void saveProviderConnection()}
               >
@@ -1338,11 +1319,7 @@ export function ProcessingRuleSetWorkspace() {
               </button>
               <button
                 type="button"
-                className={mmActionButtonClass({
-                  variant: "secondary",
-                  disabled:
-                    !editable || providerName === "" || testProvider.isPending,
-                })}
+                className={mmActionButtonClass({ variant: "secondary" })}
                 disabled={
                   !editable || providerName === "" || testProvider.isPending
                 }

@@ -184,10 +184,7 @@ export function ProcessingDirectPlaySection() {
       <div className={`${quietActionRowClass} mt-8`}>
         <button
           type="button"
-          className={mmActionButtonClass({
-            variant: "primary",
-            disabled: !canSave,
-          })}
+          className={mmActionButtonClass({ variant: "primary" })}
           disabled={!canSave}
           onClick={() =>
             save.mutate(

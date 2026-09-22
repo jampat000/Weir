@@ -103,6 +103,10 @@ export interface LibraryFile {
   subtitle_summary: string | null;
   link_count: number | null;
   problem_kind: LibraryProblemKind | null;
+  /** When Weir last cleaned this file (unix seconds), or null if it never has. Outlives a rescan. */
+  cleaned_at: number | null;
+  /** You asked Weir to leave this file alone; nothing cleans it until you say otherwise. */
+  leave_alone: boolean;
 }
 
 export interface LibraryTotals {
@@ -114,6 +118,9 @@ export interface LibraryTotals {
   total_removed_audio_tracks: number;
   total_removed_subtitle_tracks: number;
   estimated_bytes_saved: number;
+  /** Files Weir has cleaned at least once, and files you have set aside. */
+  cleaned: number;
+  left_alone: number;
 }
 
 export interface LibraryScanInfo {
@@ -166,6 +173,8 @@ export interface LibraryFileFilters {
   manager?: string;
   q?: string;
   problem?: LibraryProblemKind;
+  /** What Weir has done with the file, rather than what is in it. */
+  state?: "cleaned" | "left_alone";
   facets?: Partial<Record<LibraryFacet, string>>;
   sort?: LibraryFileSort;
   direction?: "asc" | "desc";
@@ -291,6 +300,7 @@ export function libraryFileFiltersToParams(
   if (filters.manager) params.set("manager", filters.manager);
   if (filters.q) params.set("q", filters.q);
   if (filters.problem) params.set("problem", filters.problem);
+  if (filters.state) params.set("state", filters.state);
   for (const facet of LIBRARY_FACETS) {
     const value = filters.facets?.[facet];
     if (value) params.set(facet, value);
@@ -359,17 +369,41 @@ async function readConfirmationOr<T>(
   return readJson<T>(r);
 }
 
+/**
+ * Your own choice of tracks for one file (#501's shape), sent with a clean instead of leaving it to the library's
+ * rules. `expected_size_bytes` is the size the file had when you chose: Weir refuses the clean rather than apply
+ * the choice to a file that has changed since.
+ */
+export interface LibraryManualPlan {
+  keep: { index: number; default: boolean; forced: boolean }[];
+  order: number[];
+  expected_size_bytes?: number;
+}
+
 export async function cleanLibraryFiles(
   libraryId: number,
   paths: string[],
   confirm_final_removal: boolean,
+  manual?: LibraryManualPlan,
 ): Promise<LibraryConfirmationRequired | LibraryCleanResult> {
   const csrf_token = await fetchCsrfToken();
   const path = `/api/v1/processing/libraries/${libraryId}/library-files/clean`;
   const r = await apiFetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ paths, confirm_final_removal, csrf_token }),
+    body: JSON.stringify({
+      paths,
+      confirm_final_removal,
+      csrf_token,
+      ...(manual
+        ? {
+            manual_plan: { keep: manual.keep, order: manual.order },
+            ...(manual.expected_size_bytes === undefined
+              ? {}
+              : { expected_size_bytes: manual.expected_size_bytes }),
+          }
+        : {}),
+    }),
   });
   const result = await readConfirmationOr<Omit<LibraryCleanResult, "kind">>(
     path,
@@ -377,6 +411,23 @@ export async function cleanLibraryFiles(
     "Could not queue those files to clean",
   );
   return "kind" in result ? result : { kind: "cleaned", ...result };
+}
+
+/** "Leave this file alone" and its undo; a rescan does not forget it. */
+export async function setLibraryFileLeaveAlone(
+  libraryId: number,
+  filePath: string,
+  leave_alone: boolean,
+): Promise<{ path: string; leave_alone: boolean }> {
+  const csrf_token = await fetchCsrfToken();
+  const path = `/api/v1/processing/libraries/${libraryId}/library-files/leave-alone`;
+  const r = await apiFetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: filePath, leave_alone, csrf_token }),
+  });
+  await requireOk(path, r, "Could not change that file");
+  return readJson<{ path: string; leave_alone: boolean }>(r);
 }
 
 export async function setLibrarySchedule(

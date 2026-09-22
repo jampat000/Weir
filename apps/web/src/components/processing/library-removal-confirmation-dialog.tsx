@@ -87,10 +87,7 @@ export function LibraryRemovalConfirmationDialog({
           </button>
           <button
             type="button"
-            className={mmActionButtonClass({
-              variant: "primary",
-              disabled: busy,
-            })}
+            className={mmActionButtonClass({ variant: "primary" })}
             disabled={busy}
             onClick={onConfirm}
           >

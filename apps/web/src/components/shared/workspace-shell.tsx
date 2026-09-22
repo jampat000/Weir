@@ -1,40 +1,28 @@
 import type { ReactNode } from "react";
+import { PageHeader } from "../shell/page-header";
 import {
   mmModuleTabBlurbBandClass,
   mmModuleTabBlurbTextClass,
 } from "../../lib/ui/mm-module-tab-blurb";
 import { mmSectionTabClass } from "../../lib/ui/mm-control-roles";
 
-function classes(...values: Array<string | undefined>): string {
-  return values.filter(Boolean).join(" ");
-}
-
 type WorkspacePageProps = {
-  eyebrow?: string;
   title: string;
   description: ReactNode;
   children: ReactNode;
   dataTestId?: string;
-  descriptionClassName?: string;
 };
 
+/** A page with a tab row: the shared title row (Pause and the theme switch on the right), then the tabs. */
 export function WorkspacePage({
-  eyebrow,
   title,
   description,
   children,
   dataTestId,
-  descriptionClassName,
 }: WorkspacePageProps) {
   return (
     <div className="mm-page mm-workspace-page" data-testid={dataTestId}>
-      <header className="mm-page__intro mm-workspace-page__intro">
-        {eyebrow ? <p className="mm-page__eyebrow">{eyebrow}</p> : null}
-        <h1 className="mm-page__title">{title}</h1>
-        <p className={classes("mm-page__lead", descriptionClassName)}>
-          {description}
-        </p>
-      </header>
+      <PageHeader title={title} lead={description} />
       {children}
     </div>
   );

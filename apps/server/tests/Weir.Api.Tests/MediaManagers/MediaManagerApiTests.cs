@@ -396,6 +396,44 @@ public sealed class MediaManagerApiTests
     }
 
     [Fact]
+    public async Task Issue_643_cancelling_a_hand_offs_job_on_the_jobs_screen_tells_the_manager_it_is_cancelled()
+    {
+        var watched = Path.Join(Path.GetTempPath(), "weir-handoff-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Join(watched, "Film"));
+        await File.WriteAllTextAsync(Path.Join(watched, "Film", "film.mkv"), "12345");
+        try
+        {
+            var (server, client, _) = await StartAsync(("WEIR_MEDIA_MANAGER_WEBHOOK_SECRET", "s3cret"));
+            await using var _server = server;
+            await TestDatabase.ExecuteAsync(server, "UPDATE libraries SET watched_folder = $w WHERE media_type = 'movie'", ("$w", watched));
+            var manager = new ApiTestClient(server);
+            var secret = new Dictionary<string, string> { ["X-Webhook-Secret"] = "s3cret" };
+            var handoff = new { eventType = "deluno.processor-handoff", handoffId = "h1", libraryId = "lib-1", mediaType = "movies", sourcePath = Path.Join(watched, "Film", "film.mkv"), callbackPath = "/api/integrations/processors/events" };
+            using (var queued = await manager.PostAsync("/api/v1/intake/webhook/deluno", handoff, secret))
+            {
+                Assert.Equal(HttpStatusCode.OK, queued.StatusCode);
+            }
+
+            var jobId = await TestDatabase.ScalarAsync(server, "SELECT id FROM jobs WHERE job_kind = 'processing.file.remux_pass.v1'");
+            using (var cancel = await client.PostAsync($"/api/v1/processing/jobs/{jobId}/cancel-pending", new { csrf_token = await client.CsrfAsync() }))
+            {
+                Assert.Equal(HttpStatusCode.OK, cancel.StatusCode);
+            }
+
+            var status = await Json(await manager.GetAsync("/api/v1/intake/handoffs/deluno/h1", secret));
+            Assert.Equal(
+                ("cancelled", "Someone cancelled this hand-off in Weir before Weir started on it."),
+                (status["state"]!.GetValue<string>(), status["message"]!.GetValue<string>()));
+            Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM files WHERE relative_path = 'Film/film.mkv' AND status = 'cancelled'"));
+            Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE event_type = 'processing.handoff_cancelled' AND title = 'The hand-off of film.mkv from Deluno was cancelled in Weir'"));
+        }
+        finally
+        {
+            Directory.Delete(watched, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Hand_off_routes_without_any_secret_say_what_to_set()
     {
         var (server, _, _) = await StartAsync();

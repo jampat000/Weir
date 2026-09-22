@@ -79,7 +79,7 @@ function LibraryScanNow({
         <button
           type="button"
           aria-label={`Scan ${library.name} now`}
-          className={mmActionButtonClass({ variant: "secondary", disabled })}
+          className={mmActionButtonClass({ variant: "secondary" })}
           disabled={disabled}
           onClick={() =>
             queueScan.mutate({
@@ -180,10 +180,7 @@ function ScheduleWindow({
       <div className={`${quietActionRowClass} mt-6`}>
         <button
           type="button"
-          className={mmActionButtonClass({
-            variant: "primary",
-            disabled: saveDisabled,
-          })}
+          className={mmActionButtonClass({ variant: "primary" })}
           disabled={saveDisabled}
           onClick={onSave}
         >

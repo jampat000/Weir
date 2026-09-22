@@ -8,16 +8,18 @@ import { AppShell } from "../layouts/app-shell";
 import { RequireAuth } from "./require-auth";
 import { RequireSetupWizard } from "./require-setup-wizard";
 import { AppHydrateFallback } from "./hydrate-fallback";
+import {
+  LegacyActivityRedirect,
+  LegacyProcessingRedirect,
+} from "./legacy-redirects";
 
 const routeErrorElement = <RouteErrorScreen />;
 
-// Every route below is an address Weir 3.0.0 actually serves. There are deliberately no
-// redirects from addresses earlier versions used: the `refiner` redirect and the MovedTo
-// helper went when the #578 rename turned the redirect into a route pointing at itself, and
-// `/dashboard` — the page #459 folded into Home — has gone with them. 3.0.0 is a breaking
-// release with no installs to migrate, so an old bookmark gets the Not found page rather than
-// a silent rewrite that then has to be carried forever. The one `Navigate` left is the
-// signed-out catch-all, which is authentication, not history.
+// Three places since 3.2: Live (/), Library and Settings (docs/exec-plans/active/live-and-library.md).
+// 3.0.0 carried no redirects because nobody had installed it yet. 3.1 has been installed, so its
+// two retired addresses redirect: /activity to Settings › History and logs, and each old
+// Processing tab to wherever that tab lives now (legacy-redirects.tsx). Anything older than 3.1,
+// such as /dashboard, still gets the Not found page.
 const router = createBrowserRouter([
   {
     path: "/login",
@@ -58,29 +60,31 @@ const router = createBrowserRouter([
             errorElement: routeErrorElement,
             children: [
               {
-                // What Weir currently has custody of. The landing screen, because it is
-                // the question an operator actually opens the app to answer (#463).
+                // Live: every file Weir is working on, moving as it moves. The landing screen,
+                // because what Weir is doing right now is what an operator opens the app to see.
                 index: true,
                 lazy: async () => ({
-                  Component: (await import("../pages/home/home-page")).HomePage,
+                  Component: (await import("../pages/live/live-page")).LivePage,
+                }),
+                errorElement: routeErrorElement,
+              },
+              {
+                // The files already imported, and what Weir would do to each (library mode).
+                path: "library",
+                lazy: async () => ({
+                  Component: (await import("../pages/library/library-page"))
+                    .LibraryPage,
                 }),
                 errorElement: routeErrorElement,
               },
               {
                 path: "activity",
-                lazy: async () => ({
-                  Component: (await import("../pages/activity/activity-page"))
-                    .ActivityPage,
-                }),
+                element: <LegacyActivityRedirect />,
                 errorElement: routeErrorElement,
               },
               {
                 path: "processing",
-                lazy: async () => ({
-                  Component: (
-                    await import("../pages/processing/processing-page")
-                  ).ProcessingPage,
-                }),
+                element: <LegacyProcessingRedirect />,
                 errorElement: routeErrorElement,
               },
               {

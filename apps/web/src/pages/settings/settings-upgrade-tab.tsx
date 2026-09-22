@@ -210,10 +210,7 @@ export function SettingsUpgradeTab({ updateStatusQ }: SettingsUpgradeTabProps) {
                 </div>
                 <button
                   type="button"
-                  className={mmActionButtonClass({
-                    variant: "primary",
-                    disabled: applyUpdate.isPending || applyUpdate.isSuccess,
-                  })}
+                  className={mmActionButtonClass({ variant: "primary" })}
                   disabled={applyUpdate.isPending || applyUpdate.isSuccess}
                   onClick={() => void applyUpdate.mutateAsync()}
                 >
@@ -382,13 +379,7 @@ export function SettingsUpgradeTab({ updateStatusQ }: SettingsUpgradeTabProps) {
                 <div className={`mt-5 ${quietActionRowClass}`}>
                   <button
                     type="button"
-                    className={mmActionButtonClass({
-                      variant: "primary",
-                      disabled:
-                        !settingsDirty ||
-                        saveMode.isPending ||
-                        updateSettingsQ.isPending,
-                    })}
+                    className={mmActionButtonClass({ variant: "primary" })}
                     disabled={
                       !settingsDirty ||
                       saveMode.isPending ||
@@ -401,10 +392,7 @@ export function SettingsUpgradeTab({ updateStatusQ }: SettingsUpgradeTabProps) {
                   {settingsDirty && (
                     <button
                       type="button"
-                      className={mmActionButtonClass({
-                        variant: "secondary",
-                        disabled: saveMode.isPending,
-                      })}
+                      className={mmActionButtonClass({ variant: "secondary" })}
                       disabled={saveMode.isPending}
                       onClick={() => {
                         setModeDraft(serverMode);

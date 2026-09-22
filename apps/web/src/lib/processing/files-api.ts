@@ -12,7 +12,9 @@ export type ProcessingFileStatus =
   | "out_of_schedule"
   | "blocked_upstream"
   | "passed_through"
-  | "rejected";
+  | "rejected"
+  /** Its queued pass was cancelled before Weir started on it (#643). Left alone until it changes or is queued again. */
+  | "cancelled";
 
 /** Plain words for each state. The reason string carries the detail. */
 export const PROCESSING_FILE_STATUS_LABELS: Record<
@@ -30,6 +32,7 @@ export const PROCESSING_FILE_STATUS_LABELS: Record<
   blocked_upstream: "Blocked upstream",
   passed_through: "Handed back unchanged",
   rejected: "Rejected for a replacement",
+  cancelled: "Cancelled",
 };
 
 /** Whether one device the operator owns will play the file without the media server converting it. */
@@ -56,6 +59,8 @@ export interface ProcessingFile {
   size_bytes: number;
   failure_class: string | null;
   failure_attempts: number;
+  /** On hold after repeated failures, until someone queues it again. Nothing lifts it by itself. */
+  quarantined?: boolean;
   next_retry_at: string | null;
   /** The collision policy in force and what it decided, kept on the file rather than only in an activity note. */
   output_collision_policy: string | null;
@@ -74,6 +79,14 @@ export interface ProcessingFile {
   progress_percent: number | null;
   progress_message: string | null;
   progress_eta_seconds: number | null;
+  /** `processing` while the file is written, `finishing` during the final checks. What Live's lanes key on. */
+  progress_status?: string | null;
+  /** ffmpeg's speed as it reports it, for example "148x". */
+  progress_speed?: string | null;
+  progress_elapsed_seconds?: number | null;
+  /** What the running pass is taking out, one line per track as its plan describes it. */
+  progress_removed_audio?: string[] | null;
+  progress_removed_subtitles?: string[] | null;
   /** When an on-hold file becomes eligible. Null when the wait is on a writer, not the clock. */
   hold_until: string | null;
   size_changed_at: string | null;

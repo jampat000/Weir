@@ -120,6 +120,8 @@ function totals(over: Partial<LibraryTotals> = {}): LibraryTotals {
     total_removed_audio_tracks: 1,
     total_removed_subtitle_tracks: 0,
     estimated_bytes_saved: 1_048_576,
+    cleaned: 0,
+    left_alone: 0,
     ...over,
   };
 }
@@ -146,6 +148,8 @@ function file(over: Partial<LibraryFile> = {}): LibraryFile {
     subtitle_summary: "eng",
     link_count: null,
     problem_kind: null,
+    cleaned_at: null,
+    leave_alone: false,
     ...over,
   };
 }
@@ -519,11 +523,13 @@ it("shows the exact final-removal confirmation text before cleaning, then cleans
   fireEvent.click(screen.getByTestId("library-clean-button"));
 
   await waitFor(() => expect(clean).toHaveBeenCalledTimes(1));
+  // The fourth argument is the per-file track choice, which this screen never sends.
   expect(clean).toHaveBeenNthCalledWith(
     1,
     1,
     ["/srv/movies/library/film.mkv"],
     false,
+    undefined,
   );
 
   // The exact #505 point 5 sentence, verbatim.
@@ -540,6 +546,7 @@ it("shows the exact final-removal confirmation text before cleaning, then cleans
     1,
     ["/srv/movies/library/film.mkv"],
     true,
+    undefined,
   );
 });
 

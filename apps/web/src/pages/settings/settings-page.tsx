@@ -30,10 +30,6 @@ import {
   putConfigurationBundle,
   type ConfigurationBundle,
 } from "../../lib/suite/suite-settings-api";
-import {
-  readStoredDisplayDensity,
-  type DisplayDensity,
-} from "../../lib/ui/display-density";
 import { SHOW_SUPPORT_CARD } from "../../lib/support";
 import { SettingsGeneralTab } from "./settings-general-tab";
 import { SettingsBackupTab } from "./settings-backup-tab";
@@ -43,61 +39,87 @@ import { SettingsLogsTab } from "./settings-logs-tab";
 import { SettingsSupportTab } from "./settings-support-tab";
 import { SettingsNotificationsTab } from "./settings-notifications-tab";
 import { SettingsMediaManagersTab } from "./settings-media-managers-tab";
+import { ActivityPage } from "../activity/activity-page";
+import { ProcessingDirectPlaySection } from "../processing/processing-direct-play-section";
+import { ProcessingFilesSection } from "../processing/processing-files-section";
+import { ProcessingJobsInspectionSection } from "../processing/processing-jobs-inspection-section";
+import { ProcessingLibrariesSection } from "../processing/processing-libraries-section";
+import { ProcessingMaintenanceSection } from "../processing/processing-maintenance-section";
+import { ProcessingProcessSettingsSection } from "../processing/processing-process-settings-section";
+import { ProcessingRemuxSection } from "../processing/processing-remux-section";
+import { ProcessingSchedulesSection } from "../processing/processing-schedules-section";
 
 function canEditSuiteGlobal(role: string | undefined): boolean {
   return role === "operator" || role === "admin";
 }
 
+/**
+ * The seven Settings tabs since 3.2. Weir is the whole app now, so everything set up once lives
+ * here, including what used to be the configuration tabs on Processing
+ * (docs/exec-plans/active/live-and-library.md). James chose tabs across the top over a second
+ * side menu ("I dont like 2 side menus", 2026-09-22).
+ */
 type TabId =
   | "general"
-  | "backup"
-  | "upgrade"
-  | "security"
-  | "logs"
-  | "notifications"
+  | "libraries"
+  | "rules"
   | "media-managers"
-  | "support";
+  | "processing"
+  | "history"
+  | "system";
 
-function settingsTabs(
-  showSupport: boolean,
-): readonly WorkspaceTabOption<TabId>[] {
-  return [
-    { id: "general", label: "General" },
-    { id: "security", label: "Security" },
-    { id: "backup", label: "Backup and restore" },
-    { id: "upgrade", label: "Upgrade" },
-    { id: "logs", label: "Logs" },
-    { id: "notifications", label: "Notifications" },
-    { id: "media-managers", label: "Media managers" },
-    ...(showSupport ? ([{ id: "support", label: "Support" }] as const) : []),
-  ];
-}
+const SETTINGS_TABS: readonly WorkspaceTabOption<TabId>[] = [
+  { id: "general", label: "General" },
+  { id: "libraries", label: "Libraries" },
+  { id: "rules", label: "Rules" },
+  { id: "media-managers", label: "Media managers" },
+  { id: "processing", label: "Processing" },
+  { id: "history", label: "History and logs" },
+  { id: "system", label: "System" },
+];
 
-function normalizeSettingsTab(
-  candidate: string | null | undefined,
-  supportEnabled: boolean,
-): TabId {
+/** A tab name from the address, including the 3.1 names, which land on the tab that took them in. */
+function normalizeSettingsTab(candidate: string | null | undefined): TabId {
   switch ((candidate || "").trim().toLowerCase()) {
-    case "backup":
-      return "backup";
-    case "upgrade":
-      return "upgrade";
-    case "security":
-      return "security";
-    case "logs":
-      return "logs";
-    case "notifications":
-      return "notifications";
+    case "libraries":
+      return "libraries";
+    case "rules":
+      return "rules";
     case "media-managers":
       return "media-managers";
+    case "processing":
+      return "processing";
+    case "history":
+    case "logs":
+      return "history";
+    case "system":
+    case "backup":
+    case "upgrade":
+    case "security":
     case "support":
-      return supportEnabled ? "support" : "general";
+      return "system";
     default:
       return "general";
   }
 }
 
-/** Settings: General (timezone, display density, configuration export), Security, Logs (retention + recent events). */
+/** What History and logs shows: one "Show" choice beside the list, never a second row of tabs. */
+type HistoryView = "activity" | "log" | "jobs" | "downloads";
+
+const HISTORY_VIEWS: { id: HistoryView; label: string }[] = [
+  { id: "activity", label: "Activity" },
+  { id: "downloads", label: "Downloads" },
+  { id: "jobs", label: "Jobs" },
+  { id: "log", label: "Server log" },
+];
+
+function normalizeHistoryView(candidate: string | null): HistoryView {
+  return HISTORY_VIEWS.some((view) => view.id === candidate)
+    ? (candidate as HistoryView)
+    : "activity";
+}
+
+/** Settings: everything set up once, in seven tabs. */
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -106,10 +128,11 @@ export function SettingsPage() {
   const save = useSuiteSettingsSaveMutation();
   const resetHistory = useSuiteOperationalHistoryResetMutation();
 
-  const showSupportTab = SHOW_SUPPORT_CARD;
+  const showSupport = SHOW_SUPPORT_CARD;
   const [tab, setTab] = useState<TabId>(() =>
-    normalizeSettingsTab(searchParams.get("tab"), showSupportTab),
+    normalizeSettingsTab(searchParams.get("tab")),
   );
+  const historyView = normalizeHistoryView(searchParams.get("show"));
 
   function setSettingsTab(nextTab: TabId): void {
     setTab(nextTab);
@@ -119,6 +142,17 @@ export function SettingsPage() {
     } else {
       nextParams.set("tab", nextTab);
     }
+    // These belong to History and logs; they would only confuse another tab.
+    for (const name of ["show", "status", "path"]) nextParams.delete(name);
+    setSearchParams(nextParams);
+  }
+
+  function setHistoryView(next: HistoryView): void {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("tab", "history");
+    if (next === "activity") nextParams.delete("show");
+    else nextParams.set("show", next);
+    for (const name of ["status", "path"]) nextParams.delete(name);
     setSearchParams(nextParams);
   }
   const [appTimezone, setAppTimezone] = useState<string | null>(null);
@@ -128,9 +162,6 @@ export function SettingsPage() {
   const [activityRetentionDaysDraft, setActivityRetentionDaysDraft] = useState<
     string | null
   >(null);
-  const [displayDensity, setDisplayDensity] = useState<DisplayDensity>(() =>
-    readStoredDisplayDensity(),
-  );
   const [backupBusy, setBackupBusy] = useState(false);
   const [backupMsg, setBackupMsg] = useState<string | null>(null);
   const [backupErr, setBackupErr] = useState<string | null>(null);
@@ -176,10 +207,10 @@ export function SettingsPage() {
 
   const editable = canEditSuiteGlobal(me.data?.role);
   const backupsQ = useSuiteConfigurationBackupsQuery(
-    editable && tab === "backup" && Boolean(settingsQ.data),
+    editable && tab === "system" && Boolean(settingsQ.data),
   );
   const updateStatusQ = useSuiteUpdateStatusQuery(
-    tab === "upgrade" && Boolean(settingsQ.data),
+    tab === "system" && Boolean(settingsQ.data),
   );
 
   const serverCuratedTimezone =
@@ -234,16 +265,8 @@ export function SettingsPage() {
   }, [isDirty]);
 
   useEffect(() => {
-    setTab(normalizeSettingsTab(searchParams.get("tab"), showSupportTab));
-  }, [searchParams, showSupportTab]);
-  useEffect(() => {
-    if (tab === "support" && !showSupportTab) {
-      setTab("general");
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.delete("tab");
-      setSearchParams(nextParams, { replace: true });
-    }
-  }, [searchParams, setSearchParams, showSupportTab, tab]);
+    setTab(normalizeSettingsTab(searchParams.get("tab")));
+  }, [searchParams]);
 
   const loadingAny = settingsQ.isPending || me.isPending;
 
@@ -498,16 +521,10 @@ export function SettingsPage() {
     <WorkspacePage
       title="Settings"
       dataTestId="suite-settings-page"
-      description={
-        <>
-          How Weir itself runs: time zone, history, security, backups, updates
-          and connections. Libraries and processing rules are on the Processing
-          page.
-        </>
-      }
+      description="Everything you set up once and rarely touch. Weir is the whole app now, so all of it lives here."
     >
       <WorkspaceTabList
-        tabs={settingsTabs(showSupportTab)}
+        tabs={SETTINGS_TABS}
         activeId={tab}
         onSelect={setSettingsTab}
         ariaLabel="Settings sections"
@@ -517,73 +534,117 @@ export function SettingsPage() {
       />
       <WorkspacePanel id="settings-panel" labelledBy={`settings-tab-${tab}`}>
         {tab === "general" ? (
-          <SettingsGeneralTab
-            editable={editable}
-            settingsData={settingsQ.data}
-            save={save}
-            appTimezone={appTimezone}
-            setAppTimezone={setAppTimezone}
-            timezoneDirty={timezoneDirty}
-            setLogRetentionDaysDraft={setLogRetentionDaysDraft}
-            normalizedLogRetentionDraft={normalizedLogRetentionDraft}
-            finalizeLogRetentionDays={finalizeLogRetentionDays}
-            logsDirty={logsDirty || activityRetentionDirty}
-            normalizedActivityRetentionDraft={normalizedActivityRetentionDraft}
-            setActivityRetentionDaysDraft={setActivityRetentionDaysDraft}
-            finalizeActivityRetentionDays={finalizeActivityRetentionDays}
-            lastSuiteSaveTarget={lastSuiteSaveTarget}
-            displayDensity={displayDensity}
-            setDisplayDensity={setDisplayDensity}
-            resetHistoryConfirm={resetHistoryConfirm}
-            setResetHistoryConfirm={setResetHistoryConfirm}
-            resetHistory={resetHistory}
-            resetHistoryMsg={resetHistoryMsg}
-            onSaveTimezone={() => void handleSaveTimezone()}
-            onSaveLogs={() => void handleSaveLogs()}
-            onResetOperationalHistory={() =>
-              void handleResetOperationalHistory()
-            }
-          />
-        ) : tab === "backup" ? (
-          <SettingsBackupTab
-            editable={editable}
-            settingsData={settingsQ.data}
-            save={save}
-            backupScheduleDirty={backupScheduleDirty}
-            lastSuiteSaveTarget={lastSuiteSaveTarget}
-            configurationBackupEnabled={configurationBackupEnabled}
-            setConfigurationBackupEnabled={setConfigurationBackupEnabled}
-            configurationBackupIntervalHours={configurationBackupIntervalHours}
-            setConfigurationBackupIntervalHours={
-              setConfigurationBackupIntervalHours
-            }
-            configurationBackupPreferredTime={configurationBackupPreferredTime}
-            setConfigurationBackupPreferredTime={
-              setConfigurationBackupPreferredTime
-            }
-            backupsQ={backupsQ}
-            backupBusy={backupBusy}
-            backupMsg={backupMsg}
-            backupErr={backupErr}
-            onSaveBackupSchedule={() => void handleSaveBackupSchedule()}
-            onDownloadConfiguration={() => void handleDownloadConfiguration()}
-            onRestoreFileChange={(e) => void handleRestoreFileChange(e)}
-            onDownloadStoredBackup={(id, fileLabel) =>
-              void handleDownloadStoredBackup(id, fileLabel)
-            }
-          />
-        ) : tab === "upgrade" ? (
-          <SettingsUpgradeTab updateStatusQ={updateStatusQ} />
-        ) : tab === "security" ? (
-          <SettingsSecurityTab />
+          <>
+            <SettingsGeneralTab
+              editable={editable}
+              settingsData={settingsQ.data}
+              save={save}
+              appTimezone={appTimezone}
+              setAppTimezone={setAppTimezone}
+              timezoneDirty={timezoneDirty}
+              setLogRetentionDaysDraft={setLogRetentionDaysDraft}
+              normalizedLogRetentionDraft={normalizedLogRetentionDraft}
+              finalizeLogRetentionDays={finalizeLogRetentionDays}
+              logsDirty={logsDirty || activityRetentionDirty}
+              normalizedActivityRetentionDraft={
+                normalizedActivityRetentionDraft
+              }
+              setActivityRetentionDaysDraft={setActivityRetentionDaysDraft}
+              finalizeActivityRetentionDays={finalizeActivityRetentionDays}
+              lastSuiteSaveTarget={lastSuiteSaveTarget}
+              resetHistoryConfirm={resetHistoryConfirm}
+              setResetHistoryConfirm={setResetHistoryConfirm}
+              resetHistory={resetHistory}
+              resetHistoryMsg={resetHistoryMsg}
+              onSaveTimezone={() => void handleSaveTimezone()}
+              onSaveLogs={() => void handleSaveLogs()}
+              onResetOperationalHistory={() =>
+                void handleResetOperationalHistory()
+              }
+            />
+            <SettingsNotificationsTab />
+          </>
+        ) : tab === "libraries" ? (
+          <div className="mm-quiet-stack">
+            <ProcessingLibrariesSection />
+            <ProcessingSchedulesSection />
+          </div>
+        ) : tab === "rules" ? (
+          <ProcessingRemuxSection />
         ) : tab === "media-managers" ? (
           <SettingsMediaManagersTab />
-        ) : tab === "notifications" ? (
-          <SettingsNotificationsTab />
-        ) : tab === "support" ? (
-          <SettingsSupportTab />
+        ) : tab === "processing" ? (
+          <div className="mm-quiet-stack">
+            <ProcessingProcessSettingsSection />
+            <ProcessingDirectPlaySection />
+          </div>
+        ) : tab === "history" ? (
+          <div className="mm-quiet-stack" data-testid="settings-history">
+            <label className="mm-history-show">
+              <span>Show</span>
+              <select
+                className="mm-input"
+                data-testid="settings-history-show"
+                value={historyView}
+                onChange={(e) =>
+                  setHistoryView(normalizeHistoryView(e.target.value))
+                }
+              >
+                {HISTORY_VIEWS.map((view) => (
+                  <option key={view.id} value={view.id}>
+                    {view.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {historyView === "activity" ? (
+              <ActivityPage embedded />
+            ) : historyView === "downloads" ? (
+              <ProcessingFilesSection />
+            ) : historyView === "jobs" ? (
+              <ProcessingJobsInspectionSection />
+            ) : (
+              <SettingsLogsTab />
+            )}
+          </div>
         ) : (
-          <SettingsLogsTab />
+          <div className="mm-quiet-stack">
+            <SettingsBackupTab
+              editable={editable}
+              settingsData={settingsQ.data}
+              save={save}
+              backupScheduleDirty={backupScheduleDirty}
+              lastSuiteSaveTarget={lastSuiteSaveTarget}
+              configurationBackupEnabled={configurationBackupEnabled}
+              setConfigurationBackupEnabled={setConfigurationBackupEnabled}
+              configurationBackupIntervalHours={
+                configurationBackupIntervalHours
+              }
+              setConfigurationBackupIntervalHours={
+                setConfigurationBackupIntervalHours
+              }
+              configurationBackupPreferredTime={
+                configurationBackupPreferredTime
+              }
+              setConfigurationBackupPreferredTime={
+                setConfigurationBackupPreferredTime
+              }
+              backupsQ={backupsQ}
+              backupBusy={backupBusy}
+              backupMsg={backupMsg}
+              backupErr={backupErr}
+              onSaveBackupSchedule={() => void handleSaveBackupSchedule()}
+              onDownloadConfiguration={() => void handleDownloadConfiguration()}
+              onRestoreFileChange={(e) => void handleRestoreFileChange(e)}
+              onDownloadStoredBackup={(id, fileLabel) =>
+                void handleDownloadStoredBackup(id, fileLabel)
+              }
+            />
+            <SettingsUpgradeTab updateStatusQ={updateStatusQ} />
+            <SettingsSecurityTab />
+            <ProcessingMaintenanceSection />
+            {showSupport ? <SettingsSupportTab /> : null}
+          </div>
         )}
       </WorkspacePanel>
     </WorkspacePage>
