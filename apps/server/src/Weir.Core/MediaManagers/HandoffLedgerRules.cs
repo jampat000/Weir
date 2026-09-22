@@ -50,6 +50,9 @@ public static class HandoffLedgerRules
 
     public const string CancelledMessage = "The media manager cancelled this hand-off before Weir started on it.";
 
+    /// <summary>What the manager hears when a person cancelled the hand-off's queued pass in Weir (#643).</summary>
+    public const string CancelledInWeirMessage = "Someone cancelled this hand-off in Weir before Weir started on it.";
+
     /// <summary>After this many consecutive failures a file is held for a person (<c>PROCESSING_QUARANTINE_AFTER_FAILURES</c>).</summary>
     public const int QuarantineAfterFailures = 3;
 
@@ -70,6 +73,7 @@ public static class HandoffLedgerRules
             "processed" => (Completed, null),
             "passed_through" => (PassedThrough, null),
             "rejected" => (Rejected, null),
+            "cancelled" => (Cancelled, null),
             "processing_failed" => nextRetryAt is { } retryAt ? (Scheduled, retryAt) : (Failed, null),
             "skipped" => (Failed, null),
             "out_of_schedule" => (Scheduled, null),
@@ -98,6 +102,8 @@ public static class HandoffLedgerRules
             }
         }
 
-        return Completed;
+        // Cancelled only when nothing in it was delivered (#643): a pack with one episode cancelled and the rest cleaned is
+        // completed, so the manager still imports what Weir wrote. Deluno stops looking for output once it hears "cancelled".
+        return states.Contains(Cancelled) && !states.Contains(Completed) ? Cancelled : Completed;
     }
 }

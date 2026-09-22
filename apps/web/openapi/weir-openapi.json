@@ -3627,7 +3627,10 @@
               "disabled",
               "on_hold",
               "out_of_schedule",
-              "blocked_upstream"
+              "blocked_upstream",
+              "passed_through",
+              "rejected",
+              "cancelled"
             ],
             "title": "Status",
             "type": "string"
@@ -3974,7 +3977,10 @@
                   "disabled",
                   "on_hold",
                   "out_of_schedule",
-                  "blocked_upstream"
+                  "blocked_upstream",
+                  "passed_through",
+                  "rejected",
+                  "cancelled"
                 ],
                 "type": "string"
               },
@@ -10696,7 +10702,10 @@
                     "disabled",
                     "on_hold",
                     "out_of_schedule",
-                    "blocked_upstream"
+                    "blocked_upstream",
+                    "passed_through",
+                    "rejected",
+                    "cancelled"
                   ],
                   "type": "string"
                 },

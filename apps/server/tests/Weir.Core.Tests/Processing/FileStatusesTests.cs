@@ -11,12 +11,13 @@ namespace Weir.Core.Tests.Processing;
 public sealed class FileStatusesTests
 {
     [Fact]
-    public void All_eleven_python_statuses_are_present()
+    public void All_eleven_python_statuses_are_present_then_cancelled()
     {
+        // #643 added cancelled after the Python enum's eleven, which keep their order.
         Assert.Equal(
             [
                 "unprocessed", "processing", "processed", "processing_failed", "skipped", "disabled",
-                "on_hold", "out_of_schedule", "blocked_upstream", "passed_through", "rejected",
+                "on_hold", "out_of_schedule", "blocked_upstream", "passed_through", "rejected", "cancelled",
             ],
             ProcessingFileStatuses.All);
     }
@@ -24,6 +25,7 @@ public sealed class FileStatusesTests
     [Theory]
     [InlineData(ProcessingFileStatuses.PassedThrough)]
     [InlineData(ProcessingFileStatuses.Rejected)]
+    [InlineData(ProcessingFileStatuses.Cancelled)]
     public void Terminal_bug_530_statuses_are_valid_status_values(string status) => Assert.Contains(status, ProcessingFileStatuses.All);
 
     [Fact]

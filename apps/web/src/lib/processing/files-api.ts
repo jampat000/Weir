@@ -12,7 +12,9 @@ export type ProcessingFileStatus =
   | "out_of_schedule"
   | "blocked_upstream"
   | "passed_through"
-  | "rejected";
+  | "rejected"
+  /** Its queued pass was cancelled before Weir started on it (#643). Left alone until it changes or is queued again. */
+  | "cancelled";
 
 /** Plain words for each state. The reason string carries the detail. */
 export const PROCESSING_FILE_STATUS_LABELS: Record<
@@ -30,6 +32,7 @@ export const PROCESSING_FILE_STATUS_LABELS: Record<
   blocked_upstream: "Blocked upstream",
   passed_through: "Handed back unchanged",
   rejected: "Rejected for a replacement",
+  cancelled: "Cancelled",
 };
 
 /** Whether one device the operator owns will play the file without the media server converting it. */
