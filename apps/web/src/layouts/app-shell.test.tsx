@@ -37,7 +37,7 @@ vi.mock("../lib/system/readiness-queries", () => ({
   }),
 }));
 
-// Live's menu entry says how many files are being written right now.
+// The Processing entry says how many files are being written right now.
 const filesAtOnce = { running: 0 };
 vi.mock("../lib/processing/queries", () => ({
   useProcessingFilesAtOnceQuery: () => ({ data: filesAtOnce }),
@@ -78,7 +78,7 @@ describe("AppShell", () => {
     expect(screen.queryByText(/feature limits/i)).not.toBeInTheDocument();
   });
 
-  it("opens on Live; there is no Home, Dashboard, Activity or Processing entry (3.2)", () => {
+  it("opens on Processing; there is no Home, Dashboard or Activity entry (3.2)", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <Routes>
@@ -89,11 +89,11 @@ describe("AppShell", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("link", { name: "Live" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Processing" })).toHaveAttribute(
       "href",
       "/",
     );
-    for (const retired of ["Home", "Dashboard", "Activity", "Processing"]) {
+    for (const retired of ["Home", "Dashboard", "Activity"]) {
       expect(
         screen.queryByRole("link", { name: retired }),
       ).not.toBeInTheDocument();
@@ -119,7 +119,7 @@ describe("AppShell", () => {
     // The whole nav, in order. A new entry has to be added here deliberately, and a label that
     // stops matching its destination fails rather than quietly misleading someone.
     expect(items).toEqual([
-      ["Live", "/"],
+      ["Processing", "/"],
       ["Library", "/library"],
       ["Settings", "/settings"],
     ]);
@@ -130,7 +130,7 @@ describe("AppShell", () => {
       <MemoryRouter initialEntries={["/library"]}>
         <Routes>
           <Route path="/" element={<AppShell />}>
-            <Route index element={<div>Live</div>} />
+            <Route index element={<div>Processing</div>} />
             <Route path="library" element={<div>Library</div>} />
             <Route path="*" element={<div>Not found</div>} />
           </Route>
@@ -147,7 +147,7 @@ describe("AppShell", () => {
     expect(current()).toEqual(["Library"]);
     unmount();
 
-    // `/dashboard` is the Not found page now that 3.0.0 dropped its redirect (#585). Live is
+    // `/dashboard` is the Not found page now that 3.0.0 dropped its redirect (#585). Processing is
     // the index route, so it must not claim to be the screen you are on.
     render(
       <MemoryRouter initialEntries={["/dashboard"]}>
@@ -163,7 +163,7 @@ describe("AppShell", () => {
     expect(current()).toEqual([]);
   });
 
-  it("shows how many files are being written beside Live, and nothing when none are", () => {
+  it("shows how many files are being written beside Processing, and nothing when none are", () => {
     filesAtOnce.running = 2;
     const view = render(
       <MemoryRouter initialEntries={["/library"]}>
@@ -174,10 +174,10 @@ describe("AppShell", () => {
         </Routes>
       </MemoryRouter>,
     );
-    const live = screen.getByRole("link", { name: "Live, 2 working" });
-    expect(within(live).getByTestId("nav-live-working")).toHaveTextContent(
-      "2 working",
-    );
+    const live = screen.getByRole("link", { name: "Processing, 2 working" });
+    expect(
+      within(live).getByTestId("nav-processing-working"),
+    ).toHaveTextContent("2 working");
 
     filesAtOnce.running = 0;
     view.rerender(
@@ -189,8 +189,10 @@ describe("AppShell", () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(screen.queryByTestId("nav-live-working")).toBeNull();
-    expect(screen.getByRole("link", { name: "Live" })).toBeInTheDocument();
+    expect(screen.queryByTestId("nav-processing-working")).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Processing" }),
+    ).toBeInTheDocument();
   });
 
   it("collapses to icons when asked, and expands again", () => {
@@ -198,7 +200,7 @@ describe("AppShell", () => {
       <MemoryRouter initialEntries={["/"]}>
         <Routes>
           <Route path="/" element={<AppShell />}>
-            <Route index element={<div>Live</div>} />
+            <Route index element={<div>Processing</div>} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -238,7 +240,7 @@ describe("AppShell", () => {
       <MemoryRouter initialEntries={["/"]}>
         <Routes>
           <Route path="/" element={<AppShell />}>
-            <Route index element={<div>Live page</div>} />
+            <Route index element={<div>Processing page</div>} />
             <Route path="library" element={<div>Library page</div>} />
           </Route>
         </Routes>

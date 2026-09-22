@@ -4,7 +4,7 @@
  * signed off by James on 2026-09-22 against the design canvas).
  *
  * Five lanes on a wide screen: Arriving, Waiting, Working, Handing back, Just finished. On a laptop the
- * lanes fold into three columns and on a phone into one, by container query in weir-live.css, so
+ * lanes fold into three columns and on a phone into one, by container query in weir-processing.css, so
  * nothing ever scrolls sideways. It replaced Home and Processing › Overview, which showed the same
  * status band twice under different words.
  *
@@ -64,7 +64,7 @@ import {
   type WaitingItem,
   type WorkSource,
   type WorkingItem,
-} from "./live-model";
+} from "./processing-model";
 
 const FILES_QUERY = { limit: 200 } as const;
 const FAILED_JOBS_LIMIT = 100;
@@ -405,7 +405,7 @@ function More({ count, what }: { count: number; what: string }) {
   );
 }
 
-export function LivePage(): React.ReactElement {
+export function ProcessingPage(): React.ReactElement {
   useActivityStreamInvalidations(LANE_KEYS, { throttleMs: 750 });
   useActivityStreamInvalidations(TOTAL_KEYS, { throttleMs: 3_000 });
   const now = useNow();
@@ -496,7 +496,7 @@ export function LivePage(): React.ReactElement {
     [files.data, navigate, openFile],
   );
 
-  if (files.isPending) return <PageLoading label="Loading Live" />;
+  if (files.isPending) return <PageLoading label="Loading Processing" />;
   if (files.isError) {
     return (
       <div className="mm-page">
@@ -582,9 +582,9 @@ export function LivePage(): React.ReactElement {
   }
 
   return (
-    <div className="mm-page mm-live" data-testid="live-page">
+    <div className="mm-page mm-live" data-testid="processing-page">
       <PageHeader
-        title="Live"
+        title="Processing"
         lead="Every file Weir is working on, from the moment it lands to the moment your media manager has it back."
         aside={
           <>

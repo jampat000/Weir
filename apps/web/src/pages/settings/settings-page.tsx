@@ -31,7 +31,10 @@ import {
   type ConfigurationBundle,
 } from "../../lib/suite/suite-settings-api";
 import { SHOW_SUPPORT_CARD } from "../../lib/support";
-import { SettingsGeneralTab } from "./settings-general-tab";
+import {
+  SettingsHistoryRetentionSection,
+  SettingsInstanceSection,
+} from "./settings-general-tab";
 import { SettingsBackupTab } from "./settings-backup-tab";
 import { SettingsUpgradeTab } from "./settings-upgrade-tab";
 import { SettingsSecurityTab } from "./settings-security-tab";
@@ -60,22 +63,46 @@ function canEditSuiteGlobal(role: string | undefined): boolean {
  * side menu ("I dont like 2 side menus", 2026-09-22).
  */
 type TabId =
-  | "general"
   | "libraries"
   | "rules"
   | "media-managers"
-  | "processing"
+  | "running"
+  | "alerts"
   | "history"
   | "system";
 
+/**
+ * The order someone actually sets Weir up in (James, 23 Sep 2026): say where the media is, say what to
+ * keep, say who to tell, then tune how hard it works. Alerts and System come after, because Weir runs
+ * without either being touched, and History is a record rather than a setting, so it sits last.
+ *
+ * General is gone: it was six unrelated jobs behind two different Save buttons. Its halves went to the
+ * thing each is about — the time zone and the wizard to System, retention and clearing to History.
+ */
 const SETTINGS_TABS: readonly WorkspaceTabOption<TabId>[] = [
-  { id: "general", label: "General" },
   { id: "libraries", label: "Libraries" },
   { id: "rules", label: "Rules" },
   { id: "media-managers", label: "Media managers" },
-  { id: "processing", label: "Processing" },
-  { id: "history", label: "History and logs" },
+  { id: "running", label: "Running" },
+  { id: "alerts", label: "Alerts" },
   { id: "system", label: "System" },
+  { id: "history", label: "History and logs" },
+];
+
+/**
+ * The four steps that have to happen, in the order they have to happen, above the tabs. It says what to do
+ * next rather than claiming what is done: Weir ships with working defaults for most of this, so a tick would
+ * be guesswork, and a row of half-true ticks is worse than none.
+ */
+const SETUP_STEPS: { tab: TabId; label: string; hint: string }[] = [
+  { tab: "libraries", label: "Libraries", hint: "Where your media lives" },
+  { tab: "rules", label: "Rules", hint: "What to keep and remove" },
+  {
+    tab: "media-managers",
+    label: "Media managers",
+    hint: "Who tells Weir about files",
+  },
+  { tab: "running", label: "Running", hint: "How hard, and when" },
 ];
 
 /** A tab name from the address, including the 3.1 names, which land on the tab that took them in. */
@@ -87,19 +114,24 @@ function normalizeSettingsTab(candidate: string | null | undefined): TabId {
       return "rules";
     case "media-managers":
       return "media-managers";
+    case "running":
     case "processing":
-      return "processing";
+      return "running";
+    case "alerts":
+    case "notifications":
+      return "alerts";
     case "history":
     case "logs":
       return "history";
     case "system":
+    case "general":
     case "backup":
     case "upgrade":
     case "security":
     case "support":
       return "system";
     default:
-      return "general";
+      return "libraries";
   }
 }
 
@@ -137,7 +169,8 @@ export function SettingsPage() {
   function setSettingsTab(nextTab: TabId): void {
     setTab(nextTab);
     const nextParams = new URLSearchParams(searchParams);
-    if (nextTab === "general") {
+    // Libraries is where Settings opens, so it needs no tab in the address.
+    if (nextTab === "libraries") {
       nextParams.delete("tab");
     } else {
       nextParams.set("tab", nextTab);
@@ -521,8 +554,30 @@ export function SettingsPage() {
     <WorkspacePage
       title="Settings"
       dataTestId="suite-settings-page"
-      description="Everything you set up once and rarely touch. Weir is the whole app now, so all of it lives here."
+      description="Work down the tabs and Weir is set up. Each one does a single job."
     >
+      <nav className="mm-setup-path" aria-label="Setting Weir up, in order">
+        <ol className="mm-setup-path__steps">
+          {SETUP_STEPS.map((step, index) => (
+            <li key={step.tab} className="mm-setup-path__step">
+              <button
+                type="button"
+                className="mm-setup-path__button"
+                aria-current={tab === step.tab ? "step" : undefined}
+                onClick={() => setSettingsTab(step.tab)}
+              >
+                <span className="mm-setup-path__number" aria-hidden="true">
+                  {index + 1}
+                </span>
+                <span className="mm-setup-path__text">
+                  <span className="mm-setup-path__label">{step.label}</span>
+                  <span className="mm-setup-path__hint">{step.hint}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </nav>
       <WorkspaceTabList
         tabs={SETTINGS_TABS}
         activeId={tab}
@@ -533,38 +588,7 @@ export function SettingsPage() {
         dataTestId="settings-section-tabs"
       />
       <WorkspacePanel id="settings-panel" labelledBy={`settings-tab-${tab}`}>
-        {tab === "general" ? (
-          <>
-            <SettingsGeneralTab
-              editable={editable}
-              settingsData={settingsQ.data}
-              save={save}
-              appTimezone={appTimezone}
-              setAppTimezone={setAppTimezone}
-              timezoneDirty={timezoneDirty}
-              setLogRetentionDaysDraft={setLogRetentionDaysDraft}
-              normalizedLogRetentionDraft={normalizedLogRetentionDraft}
-              finalizeLogRetentionDays={finalizeLogRetentionDays}
-              logsDirty={logsDirty || activityRetentionDirty}
-              normalizedActivityRetentionDraft={
-                normalizedActivityRetentionDraft
-              }
-              setActivityRetentionDaysDraft={setActivityRetentionDaysDraft}
-              finalizeActivityRetentionDays={finalizeActivityRetentionDays}
-              lastSuiteSaveTarget={lastSuiteSaveTarget}
-              resetHistoryConfirm={resetHistoryConfirm}
-              setResetHistoryConfirm={setResetHistoryConfirm}
-              resetHistory={resetHistory}
-              resetHistoryMsg={resetHistoryMsg}
-              onSaveTimezone={() => void handleSaveTimezone()}
-              onSaveLogs={() => void handleSaveLogs()}
-              onResetOperationalHistory={() =>
-                void handleResetOperationalHistory()
-              }
-            />
-            <SettingsNotificationsTab />
-          </>
-        ) : tab === "libraries" ? (
+        {tab === "libraries" ? (
           <div className="mm-quiet-stack">
             <ProcessingLibrariesSection />
             <ProcessingSchedulesSection />
@@ -573,11 +597,13 @@ export function SettingsPage() {
           <ProcessingRemuxSection />
         ) : tab === "media-managers" ? (
           <SettingsMediaManagersTab />
-        ) : tab === "processing" ? (
+        ) : tab === "running" ? (
           <div className="mm-quiet-stack">
             <ProcessingProcessSettingsSection />
             <ProcessingDirectPlaySection />
           </div>
+        ) : tab === "alerts" ? (
+          <SettingsNotificationsTab />
         ) : tab === "history" ? (
           <div className="mm-quiet-stack" data-testid="settings-history">
             <label className="mm-history-show">
@@ -606,9 +632,43 @@ export function SettingsPage() {
             ) : (
               <SettingsLogsTab />
             )}
+            {/* How long what you are looking at is kept, and how to empty it — beside the thing it governs. */}
+            <SettingsHistoryRetentionSection
+              editable={editable}
+              settingsData={settingsQ.data}
+              save={save}
+              setLogRetentionDaysDraft={setLogRetentionDaysDraft}
+              normalizedLogRetentionDraft={normalizedLogRetentionDraft}
+              finalizeLogRetentionDays={finalizeLogRetentionDays}
+              logsDirty={logsDirty || activityRetentionDirty}
+              normalizedActivityRetentionDraft={
+                normalizedActivityRetentionDraft
+              }
+              setActivityRetentionDaysDraft={setActivityRetentionDaysDraft}
+              finalizeActivityRetentionDays={finalizeActivityRetentionDays}
+              lastSuiteSaveTarget={lastSuiteSaveTarget}
+              resetHistoryConfirm={resetHistoryConfirm}
+              setResetHistoryConfirm={setResetHistoryConfirm}
+              resetHistory={resetHistory}
+              resetHistoryMsg={resetHistoryMsg}
+              onSaveLogs={() => void handleSaveLogs()}
+              onResetOperationalHistory={() =>
+                void handleResetOperationalHistory()
+              }
+            />
           </div>
         ) : (
           <div className="mm-quiet-stack">
+            <SettingsInstanceSection
+              editable={editable}
+              settingsData={settingsQ.data}
+              save={save}
+              appTimezone={appTimezone}
+              setAppTimezone={setAppTimezone}
+              timezoneDirty={timezoneDirty}
+              lastSuiteSaveTarget={lastSuiteSaveTarget}
+              onSaveTimezone={() => void handleSaveTimezone()}
+            />
             <SettingsBackupTab
               editable={editable}
               settingsData={settingsQ.data}

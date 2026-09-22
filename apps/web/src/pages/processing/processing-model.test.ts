@@ -12,7 +12,7 @@ import {
   secondsLeft,
   throughput,
   timeLeft,
-} from "./live-model";
+} from "./processing-model";
 
 const NOW = Date.parse("2026-09-22T10:00:00Z");
 

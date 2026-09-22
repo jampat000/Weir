@@ -106,18 +106,20 @@ export function AppShell() {
               to="/"
               end
               className={sidebarNavClass}
-              title="Live"
-              aria-label={working > 0 ? `Live, ${working} working` : undefined}
+              title="Processing"
+              aria-label={
+                working > 0 ? `Processing, ${working} working` : undefined
+              }
               onClick={() => setSidebarOpen(false)}
             >
               <span className="mm-sidebar-link-icon" aria-hidden="true">
                 <NavIconLive />
               </span>
-              <span className="mm-sidebar-link-label">Live</span>
+              <span className="mm-sidebar-link-label">Processing</span>
               {working > 0 ? (
                 <span
                   className="mm-sidebar-link-badge"
-                  data-testid="nav-live-working"
+                  data-testid="nav-processing-working"
                 >
                   <i className="mm-live-pulse" aria-hidden="true" />
                   <span className="mm-sidebar-link-badge__text">

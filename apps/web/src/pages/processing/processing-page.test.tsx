@@ -2,8 +2,8 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProcessingFile } from "../../lib/processing/files-api";
-import { LIBRARY_CLEAN_JOB_KIND } from "./live-model";
-import { LivePage } from "./live-page";
+import { LIBRARY_CLEAN_JOB_KIND } from "./processing-model";
+import { ProcessingPage } from "./processing-page";
 
 const files: {
   files: ProcessingFile[];
@@ -145,12 +145,12 @@ function file(overrides: Partial<ProcessingFile>): ProcessingFile {
 function renderLive() {
   return render(
     <MemoryRouter>
-      <LivePage />
+      <ProcessingPage />
     </MemoryRouter>,
   );
 }
 
-describe("LivePage", () => {
+describe("ProcessingPage", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-09-22T10:00:00Z"));

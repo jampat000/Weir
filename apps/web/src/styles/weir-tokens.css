@@ -78,7 +78,7 @@
      Layout-only, set per instance from React; no colour or font is introduced here. */
   --mm-flow-share: 1; /* one lead-band segment's share of the band's width */
   --mm-meter-fill: 0%; /* how full a figure tile's meter is */
-  --mm-live-fill: 0%; /* how far a Live working card's pass has got (weir-live.css) */
+  --mm-live-fill: 0%; /* how far a Live working card's pass has got (weir-processing.css) */
   --mm-live-bar: 0%; /* one Live throughput bar's height against the tallest */
   /* 0 while the lead band is one proportional row, 1 once it has restacked into a
      labelled list. Set by weir-content.css alone — never inline, never by a page — and

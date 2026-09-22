@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+  cleanup,
   fireEvent,
   render,
   screen,
@@ -247,7 +248,9 @@ describe("SettingsPage (suite settings)", () => {
   });
 
   it("does not mention Sonarr or Radarr on the central Settings page", () => {
-    const { container } = renderSettings(operatorMe);
+    const { container } = renderSettings(operatorMe, {
+      initialEntries: ["/settings?tab=system"],
+    });
     const t = (container.textContent ?? "").toLowerCase();
     expect(t).not.toContain("sonarr");
     expect(t).not.toContain("radarr");
@@ -326,8 +329,10 @@ describe("SettingsPage (suite settings)", () => {
   });
 
   it("hides save for viewers", () => {
-    renderSettings(viewerMe);
+    renderSettings(viewerMe, { initialEntries: ["/settings?tab=system"] });
     expect(screen.getByTestId("suite-settings-save-timezone")).toBeDisabled();
+    cleanup();
+    renderSettings(viewerMe, { initialEntries: ["/settings?tab=history"] });
     expect(screen.getByTestId("suite-settings-save-logs")).toBeDisabled();
   });
 
@@ -360,7 +365,7 @@ describe("SettingsPage (suite settings)", () => {
         activity_retention_days: body.activity_retention_days,
       }));
 
-    renderSettings(operatorMe);
+    renderSettings(operatorMe, { initialEntries: ["/settings?tab=history"] });
     const input = await screen.findByTestId(
       "suite-settings-activity-retention",
     );
@@ -458,16 +463,28 @@ describe("SettingsPage (suite settings)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps General focused; backup and upgrade live in System, the server log in History and logs", () => {
+  it("opens on Libraries, and each tab holds one job", () => {
     renderSettings(operatorMe);
-    expect(screen.queryByText("Product name")).not.toBeInTheDocument();
-    expect(screen.queryByText("Application logs")).not.toBeInTheDocument();
-    expect(screen.getByText("Time zone")).toBeInTheDocument();
-    expect(screen.getByText("Setup wizard")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute(
+    // Settings opens where setting Weir up starts, not on a grab bag.
+    expect(screen.getByRole("tab", { name: "Libraries" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
+    expect(screen.queryByRole("tab", { name: "General" })).toBeNull();
+    expect(screen.queryByText("Time zone")).not.toBeInTheDocument();
+
+    // The instance's own facts, and its backups, are System's.
+    fireEvent.click(screen.getByRole("tab", { name: "System" }));
+    expect(screen.getByText("Time zone")).toBeInTheDocument();
+    expect(screen.getByText("Setup wizard")).toBeInTheDocument();
+    expect(screen.queryByText("Product name")).not.toBeInTheDocument();
+    expect(screen.queryByText("Application logs")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("System log retention (days)"),
+    ).not.toBeInTheDocument();
+
+    // How long history is kept sits with the history it governs.
+    fireEvent.click(screen.getByRole("tab", { name: "History and logs" }));
     expect(screen.getByText("System log retention (days)")).toBeInTheDocument();
     expect(
       screen.getByText("Keep Activity history for (days)"),
@@ -481,9 +498,7 @@ describe("SettingsPage (suite settings)", () => {
     expect(
       screen.queryByTestId("suite-settings-backup-restore"),
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("suite-settings-upgrade"),
-    ).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("tab", { name: "System" }));
     expect(screen.getByTestId("suite-settings-backup-tab")).toBeInTheDocument();
     expect(
@@ -507,9 +522,8 @@ describe("SettingsPage (suite settings)", () => {
     expect(screen.getByText("Search logs")).toBeInTheDocument();
     expect(screen.getByText("System events")).toBeInTheDocument();
     expect(screen.getByText("Server diagnostics")).toBeInTheDocument();
-    expect(
-      screen.queryByText("System log retention (days)"),
-    ).not.toBeInTheDocument();
+    // Retention stays in view whichever of History's lists you are reading: it governs all of them.
+    expect(screen.getByText("System log retention (days)")).toBeInTheDocument();
     expect(
       screen.queryByText("Optional home dashboard notice"),
     ).not.toBeInTheDocument();
@@ -528,9 +542,8 @@ describe("SettingsPage (suite settings)", () => {
     expect(
       screen.getByTestId("suite-settings-upgrade-tab"),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("suite-settings-global"),
-    ).not.toBeInTheDocument();
+    // System is also where this instance's own facts live now, so they are here too.
+    expect(screen.getByTestId("suite-settings-global")).toBeInTheDocument();
   });
 
   it("shows Checking... and disables button when refetch is in flight", async () => {
@@ -617,7 +630,7 @@ describe("SettingsPage (suite settings)", () => {
   });
 
   it("closes timezone dropdown and shows selected timezone", () => {
-    renderSettings(operatorMe);
+    renderSettings(operatorMe, { initialEntries: ["/settings?tab=system"] });
     const trigger = screen.getByRole("button", { name: /Time zone/ });
     expect(trigger).toHaveTextContent("Select time zone");
     fireEvent.click(trigger);
@@ -634,7 +647,7 @@ describe("SettingsPage (suite settings)", () => {
   });
 
   it("closes timezone dropdown on outside click", () => {
-    renderSettings(operatorMe);
+    renderSettings(operatorMe, { initialEntries: ["/settings?tab=system"] });
     const trigger = screen.getByRole("button", { name: /Time zone/ });
     fireEvent.click(trigger);
     expect(screen.getByRole("listbox")).toBeInTheDocument();
@@ -643,7 +656,7 @@ describe("SettingsPage (suite settings)", () => {
   });
 
   it("closes timezone dropdown on Escape", () => {
-    renderSettings(operatorMe);
+    renderSettings(operatorMe, { initialEntries: ["/settings?tab=system"] });
     const trigger = screen.getByRole("button", { name: /Time zone/ });
     fireEvent.click(trigger);
     expect(screen.getByRole("listbox")).toBeInTheDocument();

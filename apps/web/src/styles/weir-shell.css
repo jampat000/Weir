@@ -35,6 +35,10 @@ html {
   background: var(--mm-bg);
   /* Root rem: Tailwind `text-*` scales with display density (rem is relative to html, not body). */
   font-size: calc(16px * var(--mm-density-font-scale));
+  /* Keep the scrollbar's space whether or not there is a scrollbar. Without this, choosing a
+     filter that shortens the page takes the scrollbar away and everything jumps sideways by
+     its width — most visible switching between the filters on the first screen. */
+  scrollbar-gutter: stable;
 }
 
 body.mm-body {
@@ -942,20 +946,13 @@ html[data-mm-theme="light"] .mm-theme-toggle {
   align-items: stretch;
 }
 
+/* Collapsing hides the words beside the mark; it does not move the mark. The brand keeps the
+   box it has when open — same margin, same padding, same alignment — so the one thing that is
+   on screen in both states stays exactly where it was (James, 23 Sep 2026: the collapse should
+   be subtle and must not shift the logo). */
 .mm-sidebar--collapsed .mm-sidebar-brand {
-  align-items: center;
-  justify-content: center;
   width: auto;
-  min-height: calc(70px * var(--mm-density-ui-scale));
-  margin: 0 calc(12px * var(--mm-density-ui-scale))
-    calc(14px * var(--mm-density-ui-scale));
-  padding: 0;
   border-bottom-color: color-mix(in srgb, var(--mm-stone) 10%, transparent);
-}
-
-.mm-sidebar--collapsed .mm-sidebar-brand-logo {
-  align-self: center;
-  margin: 0;
 }
 
 .mm-sidebar--collapsed .mm-sidebar-tagline,
@@ -2261,14 +2258,7 @@ select.mm-input::-ms-expand {
     display: initial;
   }
 
-  .mm-sidebar--collapsed .mm-sidebar-brand {
-    align-items: flex-start;
-    padding-inline: calc(16px * var(--mm-density-ui-scale));
-  }
-
-  .mm-sidebar--collapsed .mm-sidebar-brand-logo {
-    align-self: flex-start;
-  }
+  /* The brand needs no restoring here any more: it keeps its open box in both states. */
 
   .mm-sidebar--collapsed .mm-sidebar-link {
     justify-content: flex-start;

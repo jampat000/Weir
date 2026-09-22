@@ -64,7 +64,9 @@ const router = createBrowserRouter([
                 // because what Weir is doing right now is what an operator opens the app to see.
                 index: true,
                 lazy: async () => ({
-                  Component: (await import("../pages/live/live-page")).LivePage,
+                  Component: (
+                    await import("../pages/processing/processing-page")
+                  ).ProcessingPage,
                 }),
                 errorElement: routeErrorElement,
               },

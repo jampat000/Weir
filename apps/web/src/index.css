@@ -2,7 +2,7 @@
 @import "./styles/weir-tokens.css";
 @import "./styles/weir-shell.css";
 @import "./styles/weir-content.css";
-@import "./styles/weir-live.css";
+@import "./styles/weir-processing.css";
 @import "./styles/weir-library.css";
 
 @theme {

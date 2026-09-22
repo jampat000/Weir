@@ -11,10 +11,6 @@ import {
   mmActionButtonClass,
   mmEditableTextFieldClass,
 } from "../../lib/ui/mm-control-roles";
-import {
-  mmModuleTabBlurbBandClass,
-  mmModuleTabBlurbTextClass,
-} from "../../lib/ui/mm-module-tab-blurb";
 import { SettingsQuietSection } from "./settings-shared";
 
 /** The field caption, spelled exactly as the deleted `.mm-settings-field-label` rule
@@ -28,62 +24,38 @@ const FIELD_HINT_CLASS =
   "text-[length:var(--mm-type-caption)] leading-[1.45] text-[var(--mm-text3)]";
 
 /**
- * A form on a page with no cards still has to say where it starts and stops, because
- * each of these Saves writes a different thing. Without a box, that is the section's
- * own hairline above it and the `.mm-quiet-stack`'s 2.5rem below it: a single column
- * of full-width groups, each closed by its own action row.
+ * What used to be the General tab, split in two (James, 23 Sep 2026: "too much on each screen").
+ * It held six unrelated jobs behind two Save buttons that each wrote something different. Each half
+ * now lives with the thing it is about: the time zone and the wizard are facts about this instance,
+ * so they sit in System; how long logs and Activity are kept, and clearing that history, sit with
+ * History and logs, where you are already looking at what they govern.
  *
- * The two-column grid this replaces could not be made to line up — five groups of
- * genuinely different heights always left a ragged bottom edge and an orphan in the
- * last row — and a settings form gains nothing from a second column anyway.
+ * A form on a page with no cards still has to say where it starts and stops, because each Save
+ * writes a different thing. Without a box, that is the section's own hairline above it and the
+ * `.mm-quiet-stack`'s 2.5rem below it: one column of full-width groups, each closed by its own
+ * action row.
  */
-type SettingsGeneralTabProps = {
+type InstanceProps = {
   editable: boolean;
   settingsData: SuiteSettingsOut;
   save: ReturnType<typeof useSuiteSettingsSaveMutation>;
   appTimezone: string | null;
   setAppTimezone: (v: string) => void;
   timezoneDirty: boolean;
-  setLogRetentionDaysDraft: (v: string | null) => void;
-  normalizedLogRetentionDraft: string;
-  finalizeLogRetentionDays: () => number;
-  logsDirty: boolean;
-  normalizedActivityRetentionDraft: string;
-  setActivityRetentionDaysDraft: (v: string | null) => void;
-  finalizeActivityRetentionDays: () => number | undefined;
   lastSuiteSaveTarget: "timezone" | "logs" | "backup" | null;
-  resetHistoryConfirm: string;
-  setResetHistoryConfirm: (v: string) => void;
-  resetHistory: ReturnType<typeof useSuiteOperationalHistoryResetMutation>;
-  resetHistoryMsg: string | null;
   onSaveTimezone: () => void;
-  onSaveLogs: () => void;
-  onResetOperationalHistory: () => void;
 };
 
-export function SettingsGeneralTab({
+export function SettingsInstanceSection({
   editable,
   settingsData,
   save,
   appTimezone,
   setAppTimezone,
   timezoneDirty,
-  setLogRetentionDaysDraft,
-  normalizedLogRetentionDraft,
-  finalizeLogRetentionDays,
-  logsDirty,
-  normalizedActivityRetentionDraft,
-  setActivityRetentionDaysDraft,
-  finalizeActivityRetentionDays,
   lastSuiteSaveTarget,
-  resetHistoryConfirm,
-  setResetHistoryConfirm,
-  resetHistory,
-  resetHistoryMsg,
   onSaveTimezone,
-  onSaveLogs,
-  onResetOperationalHistory,
-}: SettingsGeneralTabProps) {
+}: InstanceProps) {
   const navigate = useNavigate();
   const timezoneOptions = curatedTimezoneOptionsSorted();
   const wizardState = (settingsData.setup_wizard_state || "pending")
@@ -94,17 +66,10 @@ export function SettingsGeneralTab({
     <div data-testid="suite-settings-global" className="mm-quiet-stack">
       {!editable ? (
         <p className="mm-quiet-note">
-          Operators and admins can edit General options; everyone can open the
-          Logs tab to read recent events.
+          Operators and admins can change these; everyone can read History and
+          logs.
         </p>
       ) : null}
-
-      <div className={mmModuleTabBlurbBandClass}>
-        <p className={mmModuleTabBlurbTextClass}>
-          Time zone, how long history is kept, and how this browser displays
-          Weir.
-        </p>
-      </div>
 
       <SettingsQuietSection
         headingId="suite-settings-timezone-heading"
@@ -159,8 +124,80 @@ export function SettingsGeneralTab({
       </SettingsQuietSection>
 
       <SettingsQuietSection
+        headingId="suite-settings-wizard-heading"
+        heading="Setup wizard"
+      >
+        <p className="mm-quiet-note">
+          Go through the first-run steps again: time zone, backups and library
+          folders. You can leave at any point.
+        </p>
+        <p className={`mt-3 block ${FIELD_HINT_CLASS}`}>
+          {wizardState === "completed"
+            ? "You finished the wizard."
+            : wizardState === "skipped"
+              ? "You skipped the wizard."
+              : "The wizard has not been finished yet."}
+        </p>
+        <div className={`${quietActionRowClass} mt-6`}>
+          <button
+            type="button"
+            className={mmActionButtonClass({ variant: "secondary" })}
+            data-testid="suite-settings-open-setup-wizard"
+            onClick={() => navigate("/setup-wizard")}
+          >
+            Open setup wizard
+          </button>
+        </div>
+      </SettingsQuietSection>
+    </div>
+  );
+}
+
+type RetentionProps = {
+  editable: boolean;
+  settingsData: SuiteSettingsOut;
+  save: ReturnType<typeof useSuiteSettingsSaveMutation>;
+  setLogRetentionDaysDraft: (v: string | null) => void;
+  normalizedLogRetentionDraft: string;
+  finalizeLogRetentionDays: () => number;
+  logsDirty: boolean;
+  normalizedActivityRetentionDraft: string;
+  setActivityRetentionDaysDraft: (v: string | null) => void;
+  finalizeActivityRetentionDays: () => number | undefined;
+  lastSuiteSaveTarget: "timezone" | "logs" | "backup" | null;
+  resetHistoryConfirm: string;
+  setResetHistoryConfirm: (v: string) => void;
+  resetHistory: ReturnType<typeof useSuiteOperationalHistoryResetMutation>;
+  resetHistoryMsg: string | null;
+  onSaveLogs: () => void;
+  onResetOperationalHistory: () => void;
+};
+
+/** How long what you are looking at is kept, and how to empty it. Shown under History and logs. */
+export function SettingsHistoryRetentionSection({
+  editable,
+  settingsData,
+  save,
+  setLogRetentionDaysDraft,
+  normalizedLogRetentionDraft,
+  finalizeLogRetentionDays,
+  logsDirty,
+  normalizedActivityRetentionDraft,
+  setActivityRetentionDaysDraft,
+  finalizeActivityRetentionDays,
+  lastSuiteSaveTarget,
+  resetHistoryConfirm,
+  setResetHistoryConfirm,
+  resetHistory,
+  resetHistoryMsg,
+  onSaveLogs,
+  onResetOperationalHistory,
+}: RetentionProps) {
+  return (
+    <div data-testid="suite-settings-retention" className="mm-quiet-stack">
+      <SettingsQuietSection
         headingId="suite-settings-log-retention-heading"
-        heading="Log and history retention"
+        heading="How long this is kept"
       >
         <p className="mm-quiet-note">
           How long Weir keeps its system log and how far back Activity goes.
@@ -304,33 +341,6 @@ export function SettingsGeneralTab({
           </div>
         </SettingsQuietSection>
       ) : null}
-
-      <SettingsQuietSection
-        headingId="suite-settings-wizard-heading"
-        heading="Setup wizard"
-      >
-        <p className="mm-quiet-note">
-          Go through the first-run steps again: time zone, display, backups and
-          library folders. You can leave at any point.
-        </p>
-        <p className={`mt-3 block ${FIELD_HINT_CLASS}`}>
-          {wizardState === "completed"
-            ? "You finished the wizard."
-            : wizardState === "skipped"
-              ? "You skipped the wizard."
-              : "The wizard has not been finished yet."}
-        </p>
-        <div className={`${quietActionRowClass} mt-6`}>
-          <button
-            type="button"
-            className={mmActionButtonClass({ variant: "secondary" })}
-            data-testid="suite-settings-open-setup-wizard"
-            onClick={() => navigate("/setup-wizard")}
-          >
-            Open setup wizard
-          </button>
-        </div>
-      </SettingsQuietSection>
     </div>
   );
 }
