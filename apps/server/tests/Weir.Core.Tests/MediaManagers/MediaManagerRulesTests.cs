@@ -292,6 +292,19 @@ public sealed class MediaManagerRulesTests
     }
 
     [Fact]
+    public void Issue_643_a_cancelled_file_ends_its_hand_off_only_when_nothing_else_was_delivered()
+    {
+        Assert.Equal(("cancelled", (DateTimeOffset?)null), HandoffLedgerRules.FileState("cancelled", null, 0));
+        Assert.Equal("cancelled", HandoffLedgerRules.Combine(["cancelled"]));
+        Assert.Equal("cancelled", HandoffLedgerRules.Combine(["cancelled", "cancelled"]));
+        // A pack with the rest cleaned is completed, so the manager still imports what Weir wrote.
+        Assert.Equal("completed", HandoffLedgerRules.Combine(["completed", "cancelled"]));
+        Assert.Equal("queued", HandoffLedgerRules.Combine(["cancelled", "queued"]));
+        Assert.Equal("failed", HandoffLedgerRules.Combine(["cancelled", "failed"]));
+        Assert.Equal("passed-through", HandoffLedgerRules.Combine(["cancelled", "passed-through"]));
+    }
+
+    [Fact]
     public void Status_json_writes_utc_with_a_z_and_drops_zero_microseconds()
     {
         var status = new HandoffStatus("h1", "queued", new DateTimeOffset(2026, 9, 17, 10, 0, 0, TimeSpan.Zero), 1, null, null, null);

@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Weir.Api.Http;
+using Weir.Core.Activity;
 using Weir.Core.Auth;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
+using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Validation;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
@@ -86,27 +89,32 @@ public static class ProcessingJobsEndpoints
 
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         request.RequireConfirmationToken(csrfToken);
-        var jobStore = request.Service<ProcessingJobStore>();
-        // Release this request's write lock before ProcessingJobStore opens its own connection, the same
-        // hazard RequeueStore and ProcessingWatchedFolderScanDispatchJobHandler already document. Here the
-        // writer is RequireUserAsync: every SessionRules.LastSeenTouchGap it refreshes user_sessions.last_seen_at,
-        // and that single UPDATE holds the lock until ApiRoutes commits after this handler returns — so the
-        // store's BEGIN IMMEDIATE waits out the full busy timeout on a lock only this handler can release.
-        // That touch is the only write in this transaction (the handler itself writes nothing through uow),
-        // and AuthService.RevokeExpiredAsync already commits session bookkeeping independently of the
-        // request's outcome, so committing it early gives up no atomicity this endpoint relied on.
-        await request.CommitAsync().ConfigureAwait(false);
-        var outcome = await jobStore.CancelPendingAsync(id).ConfigureAwait(false);
-        if (outcome == JobActionOutcome.NotFound)
+        // One transaction, this request's own (#643): the job, the file it was for and the hand-off it belonged to change
+        // together or not at all. Nothing here opens a second connection, so the session touch RequireUserAsync may have
+        // written cannot hold a lock this handler then waits for.
+        var uow = await request.DbAsync().ConfigureAwait(false);
+        var result = await PendingJobCancellation.CancelAsync(uow, request.Service<HandoffLedgerStore>(), id).ConfigureAwait(false);
+        if (result.Outcome == JobActionOutcome.NotFound)
         {
             throw new ApiException(StatusCodes.Status404NotFound, "Job not found.");
         }
 
-        if (outcome == JobActionOutcome.WrongStatus)
+        if (result.Outcome == JobActionOutcome.WrongStatus)
         {
             throw new ApiException(StatusCodes.Status409Conflict, "Only pending jobs can be cancelled (not leased, completed, failed, or already cancelled).");
         }
 
+        if (result.EndedHandoff is { } handoff)
+        {
+            await SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(
+                ActivityEventTypes.ProcessingHandoffCancelled,
+                "processing",
+                IntakeRules.CancelledInWeirTitle(handoff.SourceKey, handoff.RelativePath, OperatingSystem.IsWindows()),
+                IntakeRules.CancelledDetail(
+                    handoff.SourceKey, handoff.HandoffId, handoff.RelativePath, handoff.LibraryId, HandoffLedgerRules.CancelledInWeirMessage, "manual"))).ConfigureAwait(false);
+        }
+
+        await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(new PyDict().Set("ok", true).Set("job_id", id).Set("status", ProcessingJobStatus.Cancelled));
     }
 
