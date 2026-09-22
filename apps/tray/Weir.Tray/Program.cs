@@ -1025,6 +1025,13 @@ sealed class TrayApp : IDisposable
             Visible = false,
         };
 
+        // Clicking the icon is a person asking for Weir, so one click opens it (#638). A double-click still opens
+        // one window: its second event falls inside the debounce.
+        notifyIcon.MouseClick += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left)
+                OpenBrowserDebounced("tray-click");
+        };
         notifyIcon.DoubleClick += (_, _) => OpenBrowserDebounced("tray-dblclick");
 
         return notifyIcon;

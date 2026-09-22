@@ -34,7 +34,7 @@ Weir runs in the user session, not as a Windows service. This avoids common NAS 
 The tray app (`Weir.exe`) starts the Weir server (`server\WeirServer.exe`, a self-contained .NET program) as a child process with `--port <port>`. It watches the server and restarts it if it stops unexpectedly. The server creates or updates its SQLite database itself when it starts.
 
 The tray icon provides:
-- **Open Weir** — opens the web UI in your browser
+- **Open Weir** — opens the web UI in your browser (so does clicking the icon)
 - **Open Data Folder** — opens the runtime data directory
 - **Change port** — moves Weir to a different port and restarts it (the current port is shown in the menu)
 - **Check for updates** — checks directly in installed builds or opens **Settings → Upgrade** when install metadata is unavailable
