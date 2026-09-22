@@ -88,6 +88,35 @@ public sealed class ProcessingFilesAtOnceApiTests
     }
 
     [Fact]
+    public async Task Issue_636_the_read_out_answers_while_something_else_holds_the_write_lock()
+    {
+        // It read through the job queue's write transaction, so with several files being processed it queued behind
+        // the workers' writes and failed with "database is locked" after the busy timeout.
+        var (server, client) = await SignedInAsync();
+        await using var disposeServer = server;
+        using var writer = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={TestDatabase.PathFor(server)};Pooling=False");
+        writer.Open();
+        using (var begin = writer.CreateCommand())
+        {
+            begin.CommandText = "BEGIN IMMEDIATE; UPDATE operator_settings SET max_concurrent_files = 4;";
+            begin.ExecuteNonQuery();
+        }
+
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        using var response = await client.GetAsync("/api/v1/processing/files-at-once");
+        started.Stop();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        // The uncommitted 4 is not visible; the read saw the last committed value and did not wait for the writer.
+        Assert.Equal(1, (await ApiTestClient.Json(response))["files_at_once"]!.GetValue<int>());
+        Assert.True(started.Elapsed < TimeSpan.FromSeconds(10), $"The read-out waited {started.Elapsed.TotalSeconds:0.0}s for the write lock.");
+
+        using var rollback = writer.CreateCommand();
+        rollback.CommandText = "ROLLBACK";
+        rollback.ExecuteNonQuery();
+    }
+
+    [Fact]
     public async Task The_read_out_counts_what_is_running_and_what_is_due_and_says_why_it_waits()
     {
         // The API test server starts with its workers off, so the queued rows stay exactly as seeded - and that is the
