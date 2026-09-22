@@ -68,23 +68,24 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     {
         var data = new SqliteRemuxPassData(_fixture.Store.Database, _fixture.Connections, NullLogger<SqliteRemuxPassData>.Instance);
         var runner = new RemuxPassRunner(
-            new MediaTools(_media, new FixedResolver(), new ListLogger<MediaTools>(), TimeProvider.System),
+            new MediaTools(_media, new FixedResolver(), new ListLogger<MediaTools>(), _fixture.Store.Clock),
             new FixedResolver(),
             data,
             data,
-            new TvSeasonFolderCleanup(_fixture.Store.Database, _fixture.Connections, TimeProvider.System, NullLogger<TvSeasonFolderCleanup>.Instance),
+            new TvSeasonFolderCleanup(_fixture.Store.Database, _fixture.Connections, _fixture.Store.Clock, NullLogger<TvSeasonFolderCleanup>.Instance),
             new FakeOriginalLanguage(),
             new RemuxPassSettings { WatchedFolderMinFileAgeSeconds = 0 },
-            TimeProvider.System,
+            _fixture.Store.Clock,
             NullLogger<RemuxPassRunner>.Instance);
         return new RemuxPassHandler(
             _fixture.Store.Database,
             _fixture.Store.Options,
             runner,
             new QueueingFailurePolicy(_fixture.Jobs),
-            TimeProvider.System,
+            _fixture.Store.Clock,
             NullLogger<RemuxPassHandler>.Instance,
-            _fixture.Reporter);
+            _fixture.Reporter,
+            _fixture.Jobs);
     }
 
     private ProcessingJobProcessor Worker() => new(
@@ -113,6 +114,26 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
         }
     }
 
+    /// <summary>Move the clock on, so a look Weir queued for later is due.</summary>
+    private void Advance(int minutes) => _fixture.Store.Clock.Set(_fixture.Store.Clock.GetUtcNow().AddMinutes(minutes));
+
+    /// <summary>How many times ffmpeg read a file from start to finish.</summary>
+    private int IntegrityReads() => _media.Calls.Count(argv => argv.Contains("-xerror"));
+
+    private async Task DrainAsync()
+    {
+        var worker = Worker();
+        for (var i = 0; i < 20; i++)
+        {
+            if (await worker.ProcessOneAsync("test-worker") == JobProcessOutcome.Idle)
+            {
+                return;
+            }
+        }
+
+        Assert.Fail("The worker never went idle.");
+    }
+
     private async Task ScanAndDrainAsync(string mediaType)
     {
         await ScanAsync(mediaType);
@@ -138,6 +159,15 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
         command.CommandText = "SELECT status FROM files WHERE relative_path = $p";
         command.Parameters.AddWithValue("$p", relative);
         return await command.ExecuteScalarAsync() is { } value and not DBNull ? Convert.ToString(value, CultureInfo.InvariantCulture) : null;
+    }
+
+    private async Task<string> ReasonAsync(string relative)
+    {
+        using var connection = _fixture.Store.Database.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT status_reason FROM files WHERE relative_path = $p";
+        command.Parameters.AddWithValue("$p", relative);
+        return Convert.ToString(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture) ?? string.Empty;
     }
 
     private Task<long> LeftActivityAsync() =>
@@ -356,6 +386,73 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
 
         Assert.Equal("unprocessed", await StatusAsync("Gone/waiting.mkv"));
         Assert.Equal(0, await LeftActivityAsync());
+    }
+
+    // --- #646 ---------------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task A_file_that_will_not_read_to_the_end_is_looked_at_again_later_not_on_every_scan()
+    {
+        await SetUpAsync("movie");
+        _media.IntegrityError = "incomplete media data";
+        _folders.Source(Path.Join("Film.2024", "Film.2024.mkv"));
+
+        await ScanAndDrainAsync("movie");
+
+        Assert.Equal("on_hold", await StatusAsync("Film.2024/Film.2024.mkv"));
+        Assert.Equal(1, IntegrityReads());
+        Assert.Equal(2, await RemuxJobsAsync());
+
+        // Scans meanwhile change nothing: the next look is already queued, for later.
+        await ScanAndDrainAsync("movie");
+        await ScanAndDrainAsync("movie");
+
+        Assert.Equal(1, IntegrityReads());
+        Assert.Equal(2, await RemuxJobsAsync());
+    }
+
+    [Fact]
+    public async Task A_file_that_never_reads_to_the_end_stops_being_waited_for_and_the_failure_policy_runs()
+    {
+        await SetUpAsync("movie");
+        _media.IntegrityError = "incomplete media data";
+        _folders.Source(Path.Join("Film.2024", "Film.2024.mkv"));
+
+        await ScanAndDrainAsync("movie");
+        foreach (var minutes in RemuxPassHandler.UnreadableWaitMinutes)
+        {
+            Assert.Equal("on_hold", await StatusAsync("Film.2024/Film.2024.mkv"));
+            Advance(minutes + 1);
+            await DrainAsync();
+        }
+
+        Assert.Equal(RemuxPassHandler.UnreadableWaitMinutes.Count + 1, IntegrityReads());
+        Assert.Equal("processing_failed", await StatusAsync("Film.2024/Film.2024.mkv"));
+        Assert.Contains(
+            "damaged or incomplete rather than still arriving",
+            await ReasonAsync("Film.2024/Film.2024.mkv"),
+            StringComparison.Ordinal);
+        // The library hands the original back rather than keeping it (its failure policy).
+        Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.pass_through.v1'"));
+    }
+
+    [Fact]
+    public async Task A_file_that_is_still_growing_keeps_being_waited_for()
+    {
+        await SetUpAsync("movie");
+        _media.IntegrityError = "incomplete media data";
+        var source = _folders.Source(Path.Join("Film.2024", "Film.2024.mkv"));
+
+        await ScanAndDrainAsync("movie");
+        for (var i = 0; i < RemuxPassHandler.UnreadableWaitMinutes.Count + 2; i++)
+        {
+            await File.AppendAllTextAsync(source, "more");
+            Advance(60);
+            await DrainAsync();
+            Assert.Equal("on_hold", await StatusAsync("Film.2024/Film.2024.mkv"));
+        }
+
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.pass_through.v1'"));
     }
 
     // --- #643 ---------------------------------------------------------------------------------------------------------
