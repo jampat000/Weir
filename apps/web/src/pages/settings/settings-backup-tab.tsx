@@ -8,10 +8,6 @@ import type {
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import {
-  mmModuleTabBlurbBandClass,
-  mmModuleTabBlurbTextClass,
-} from "../../lib/ui/mm-module-tab-blurb";
-import {
   QuietFieldGroup,
   quietActionRowClass,
 } from "../../components/shared/quiet-section";
@@ -69,12 +65,6 @@ export function SettingsBackupTab({
 
   return (
     <div data-testid="suite-settings-backup-tab" className="mm-quiet-stack">
-      <div className={mmModuleTabBlurbBandClass}>
-        <p className={mmModuleTabBlurbTextClass}>
-          Export, restore, and automatically snapshot Weir configuration.
-        </p>
-      </div>
-
       {editable ? (
         <div
           className="mm-quiet-stack"

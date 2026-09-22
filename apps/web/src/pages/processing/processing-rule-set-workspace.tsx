@@ -739,7 +739,10 @@ export function ProcessingRuleSetWorkspace() {
               {textField("Profile name", "name", "English feature films")}
             </div>
 
-            <div className="grid max-w-2xl gap-10">
+            {/* Five numbered groups ran down one 42rem column inside a panel over 1500px wide, which made
+                the rules a 2830px scroll with half the width empty. Two columns where there is room, in the
+                same order, so steps 1 and 2 sit side by side rather than one below the other. */}
+            <div className="grid max-w-2xl gap-10 xl:max-w-none xl:grid-cols-2 xl:gap-x-14">
               <ProfileSettingsSection
                 step={1}
                 title="Audio"

@@ -89,22 +89,6 @@ const SETTINGS_TABS: readonly WorkspaceTabOption<TabId>[] = [
   { id: "history", label: "History and logs" },
 ];
 
-/**
- * The four steps that have to happen, in the order they have to happen, above the tabs. It says what to do
- * next rather than claiming what is done: Weir ships with working defaults for most of this, so a tick would
- * be guesswork, and a row of half-true ticks is worse than none.
- */
-const SETUP_STEPS: { tab: TabId; label: string; hint: string }[] = [
-  { tab: "libraries", label: "Libraries", hint: "Where your media lives" },
-  { tab: "rules", label: "Rules", hint: "What to keep and remove" },
-  {
-    tab: "media-managers",
-    label: "Media managers",
-    hint: "Who tells Weir about files",
-  },
-  { tab: "running", label: "Running", hint: "How hard, and when" },
-];
-
 /** A tab name from the address, including the 3.1 names, which land on the tab that took them in. */
 function normalizeSettingsTab(candidate: string | null | undefined): TabId {
   switch ((candidate || "").trim().toLowerCase()) {
@@ -556,28 +540,6 @@ export function SettingsPage() {
       dataTestId="suite-settings-page"
       description="Work down the tabs and Weir is set up. Each one does a single job."
     >
-      <nav className="mm-setup-path" aria-label="Setting Weir up, in order">
-        <ol className="mm-setup-path__steps">
-          {SETUP_STEPS.map((step, index) => (
-            <li key={step.tab} className="mm-setup-path__step">
-              <button
-                type="button"
-                className="mm-setup-path__button"
-                aria-current={tab === step.tab ? "step" : undefined}
-                onClick={() => setSettingsTab(step.tab)}
-              >
-                <span className="mm-setup-path__number" aria-hidden="true">
-                  {index + 1}
-                </span>
-                <span className="mm-setup-path__text">
-                  <span className="mm-setup-path__label">{step.label}</span>
-                  <span className="mm-setup-path__hint">{step.hint}</span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ol>
-      </nav>
       <WorkspaceTabList
         tabs={SETTINGS_TABS}
         activeId={tab}
@@ -598,7 +560,7 @@ export function SettingsPage() {
         ) : tab === "media-managers" ? (
           <SettingsMediaManagersTab />
         ) : tab === "running" ? (
-          <div className="mm-quiet-stack">
+          <div className="mm-quiet-stack mm-quiet-stack--columns">
             <ProcessingProcessSettingsSection />
             <ProcessingDirectPlaySection />
           </div>
@@ -658,7 +620,7 @@ export function SettingsPage() {
             />
           </div>
         ) : (
-          <div className="mm-quiet-stack">
+          <div className="mm-quiet-stack mm-quiet-stack--columns">
             <SettingsInstanceSection
               editable={editable}
               settingsData={settingsQ.data}

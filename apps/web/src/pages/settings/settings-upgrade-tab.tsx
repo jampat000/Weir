@@ -8,10 +8,6 @@ import {
 } from "../../lib/suite/queries";
 import type { UpdateMode } from "../../lib/suite/types";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
-import {
-  mmModuleTabBlurbBandClass,
-  mmModuleTabBlurbTextClass,
-} from "../../lib/ui/mm-module-tab-blurb";
 import { quietActionRowClass } from "../../components/shared/quiet-section";
 import { mmStatusPillClass } from "../../lib/ui/mm-status-tone";
 import {
@@ -128,14 +124,10 @@ export function SettingsUpgradeTab({ updateStatusQ }: SettingsUpgradeTabProps) {
 
   return (
     <div data-testid="suite-settings-upgrade-tab" className="mm-quiet-stack">
-      <div className={mmModuleTabBlurbBandClass}>
-        <p className={mmModuleTabBlurbTextClass}>
-          Check the installed version and see the latest release. Windows
-          desktop updates are handled automatically by the Weir tray app.
-        </p>
-      </div>
-
       <div className="mm-quiet-stack" data-testid="suite-settings-upgrade">
+        <p className="mm-quiet-note">
+          On Windows, the Weir tray app installs its own updates.
+        </p>
         {updateStatusQ.isPending ? (
           <p className="mm-quiet-note">Checking for updates...</p>
         ) : !updateStatusQ.data ? (

@@ -3,10 +3,6 @@ import {
   SHOW_SUPPORT_URL_PLACEHOLDER,
   SUPPORT_URL,
 } from "../../lib/support";
-import {
-  mmModuleTabBlurbBandClass,
-  mmModuleTabBlurbTextClass,
-} from "../../lib/ui/mm-module-tab-blurb";
 import { SettingsQuietSection } from "./settings-shared";
 
 export { SHOW_SUPPORT_CARD };
@@ -14,13 +10,6 @@ export { SHOW_SUPPORT_CARD };
 export function SettingsSupportTab() {
   return (
     <div data-testid="suite-settings-support-tab" className="mm-quiet-stack">
-      <div className={mmModuleTabBlurbBandClass}>
-        <p className={mmModuleTabBlurbTextClass}>
-          Optional support details for Weir. Core app features remain fully
-          usable without any support flow.
-        </p>
-      </div>
-
       <SettingsQuietSection
         headingId="suite-settings-support-heading"
         heading="Support Weir"

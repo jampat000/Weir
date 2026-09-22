@@ -12,10 +12,6 @@ import { useSuiteSecurityOverviewQuery } from "../../lib/suite/queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import {
-  mmModuleTabBlurbBandClass,
-  mmModuleTabBlurbTextClass,
-} from "../../lib/ui/mm-module-tab-blurb";
-import {
   formatChangePasswordMutationError,
   formatSessionTimeout,
   SettingsFactTable,
@@ -170,13 +166,6 @@ export function SettingsSecurityTab() {
       className="mm-quiet-stack w-full"
       data-testid="suite-settings-security"
     >
-      <div className={mmModuleTabBlurbBandClass}>
-        <p className={mmModuleTabBlurbTextClass}>
-          Change your Weir password here. Sign-in cookie, HTTPS, and rate-limit
-          settings follow the server configuration at startup - they are not
-          edited in this UI.
-        </p>
-      </div>
       <SettingsQuietSection
         headingId="suite-security-current-sign-in-heading"
         heading="Current sign-in"
