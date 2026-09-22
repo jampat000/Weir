@@ -437,6 +437,26 @@ public sealed class ProcessingJobStore
         }
     }
 
+    /// <summary>
+    /// Several reads that agree with each other, without the write lock (#636). Deferred: Microsoft.Data.Sqlite issues
+    /// a plain BEGIN, and in WAL mode the first read pins a snapshot that neither blocks the workers' writes nor waits
+    /// for them. <see cref="InTransactionAsync{T}"/> is BEGIN IMMEDIATE - right for a claim, wrong for a screen that
+    /// polls: it queues behind every writer and makes every writer queue behind it.
+    /// </summary>
+    public async Task<T> ReadAsync<T>(Func<SqliteConnection, SqliteTransaction, T> read, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(read);
+        var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            var transaction = connection.BeginTransaction(deferred: true);
+            await using (transaction.ConfigureAwait(false))
+            {
+                return read(connection, transaction);
+            }
+        }
+    }
+
     internal ProcessingJob EnqueueOrGet(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -782,6 +802,7 @@ public static class WorkAdmissionReader
     /// <summary>
     /// What is running, what is waiting and which limit the waiting files are waiting on (#633). Read in one
     /// transaction with the same admission the worker's claim uses, so the screen says what the worker would do.
+    /// Callers pass a read transaction (<see cref="ProcessingJobStore.ReadAsync{T}"/>), never the write one (#636).
     /// </summary>
     public static FilesAtOnceReadout ReadFilesAtOnce(SqliteConnection connection, SqliteTransaction transaction, DateTimeOffset now, int workerSlots)
     {
