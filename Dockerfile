@@ -9,7 +9,16 @@
 # Run:
 #   docker run --rm -e WEIR_SESSION_SECRET=... -p 9347:9347 -v weir-data:/data/weir weir:local
 
-FROM node:24-bookworm-slim AS web
+# Base images are pinned by digest so a rebuild reproduces the same bytes; the tag comments are
+# what to look up again when bumping. Digests are the multi-arch manifest list (not a single
+# platform's manifest), matching how buildx resolves --platform=$BUILDPLATFORM/$TARGETARCH below.
+# Re-resolve with `docker buildx imagetools inspect <image>:<tag>` where Docker is available, or
+# without Docker via the registry API, e.g.:
+#   curl -sI -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json" \
+#     "https://mcr.microsoft.com/v2/dotnet/runtime-deps/manifests/10.0-noble" | grep -i docker-content-digest
+# (Docker Hub images such as node need a bearer token first: GET
+# https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/node:pull.)
+FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS web
 WORKDIR /src/apps/web
 COPY apps/web/package.json apps/web/package-lock.json ./
 # Resilient installs in CI/buildx (registry flakes, slow links); lockfile must stay in sync with package.json.
@@ -27,7 +36,7 @@ RUN npm run build
 # a self-contained app for another runtime without emulation (it only downloads the target runtime pack),
 # so this stage stays fast even when the final stage is emulated for a second architecture.
 # Pinned to the exact SDK in apps/server/global.json so image builds match CI.
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.400-noble AS server-build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.400-noble@sha256:4beef5b8919dcaa2dc924233bd069257e883cc7a061e09088a97d152d6a48510 AS server-build
 ARG TARGETARCH
 WORKDIR /src
 # The solution-level MSBuild files (Directory.Build.props holds the product version) and the server source.
@@ -52,7 +61,7 @@ RUN case "$TARGETARCH" in \
 # OpenSSL; not ICU, because Directory.Build.props sets InvariantGlobalization), which is exactly what
 # runtime-deps ships. No second copy of the managed runtime.
 # .NET 10 images are Ubuntu 24.04 (noble); there is no Debian bookworm runtime-deps tag.
-FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble@sha256:099f6f87ed745377dd27bd722f0d1a352bca71b4fddaabfd75e7c064bcaa82da
 # #548: mkvtoolnix is the CLI-only package (mkvmerge, mkvinfo, mkvextract, mkvpropedit); the Qt GUI
 # lives in the separate mkvtoolnix-gui package, which --no-install-recommends already keeps out. It
 # lands mkvmerge on PATH at /usr/bin/mkvmerge, which is the last candidate MediaToolResolver.
@@ -66,10 +75,11 @@ FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble
 # -J — has existed since v68, so both images run the same command line, and taking the tool from apt
 # is what keeps it patched with the rest of the base image. GET /api/v1/system/media-tools reports
 # whichever version an install actually has.
+# No curl: the HEALTHCHECK below runs the app's own --healthcheck switch instead, so the image
+# carries one fewer general-purpose HTTP client.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
-    curl \
     ffmpeg \
     gosu \
     mkvtoolnix \
@@ -77,14 +87,19 @@ RUN apt-get update \
 
 WORKDIR /opt/weir
 # Ubuntu base images ship an `ubuntu` user and group on uid/gid 1000; free them for `weir`.
-RUN if id -u ubuntu >/dev/null 2>&1; then userdel --remove ubuntu; fi   && if getent group ubuntu >/dev/null 2>&1; then groupdel ubuntu; fi   && groupadd --system --gid 1000 weir \
+RUN if id -u ubuntu >/dev/null 2>&1; then userdel --remove ubuntu; fi \
+  && if getent group ubuntu >/dev/null 2>&1; then groupdel ubuntu; fi \
+  && groupadd --system --gid 1000 weir \
   && useradd --system --uid 1000 --gid 1000 --create-home --home-dir /home/weir --shell /usr/sbin/nologin weir \
-  && mkdir -p /data/weir /opt/weir/web-dist \
-  && chown -R weir:weir /data/weir /opt/weir /home/weir
+  && mkdir -p /data/weir \
+  && chown weir:weir /data/weir /home/weir
 
-COPY --from=server-build --chown=weir:weir /out/Weir /opt/weir/Weir
-RUN chmod +x /opt/weir/Weir
-COPY --from=web --chown=weir:weir /src/apps/web/dist /opt/weir/web-dist
+# /opt/weir stays root:root (the default for a RUN/COPY with no --chown, since the build runs as
+# root): the app it runs as `weir` should not be able to rewrite its own binary or web assets if a
+# request handler is ever compromised. Only /data/weir (WEIR_HOME) and /home/weir are weir's.
+COPY --from=server-build /out/Weir /opt/weir/Weir
+RUN chmod 755 /opt/weir/Weir
+COPY --from=web /src/apps/web/dist /opt/weir/web-dist
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
@@ -98,6 +113,6 @@ ENV WEIR_ENV=production
 EXPOSE 9347
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=50s --retries=3 \
-  CMD curl -fsS "http://127.0.0.1:${PORT:-9347}/health" >/dev/null || exit 1
+  CMD ["/bin/sh", "-c", "/opt/weir/Weir --healthcheck --port \"${PORT:-9347}\""]
 
 ENTRYPOINT ["/entrypoint.sh"]
