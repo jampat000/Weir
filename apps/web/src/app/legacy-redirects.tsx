@@ -10,10 +10,10 @@ const PROCESSING_TAB_HOMES: Record<string, string> = {
   files: "/system?tab=history&show=downloads",
   libraries: "/settings?tab=libraries",
   "audio-subtitles": "/settings?tab=rules",
-  schedules: "/settings?tab=libraries",
+  schedules: "/settings?tab=schedule",
   library: "/library",
   jobs: "/system?tab=history&show=jobs",
-  maintenance: "/system",
+  maintenance: "/settings?tab=housekeeping",
 };
 
 /** Filters the old Files and Jobs tabs understood, carried over so a saved filter still works. */

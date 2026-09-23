@@ -398,7 +398,7 @@ function More({ count, what }: { count: number; what: string }) {
   if (count <= 0) return null;
   return (
     <li className="mm-live-lane__more">
-      <Link to="/settings?tab=history&show=downloads">
+      <Link to="/system?tab=history&show=downloads">
         {count.toLocaleString()} more {what} →
       </Link>
     </li>
@@ -490,7 +490,7 @@ export function ProcessingPage(): React.ReactElement {
       void navigate(
         item.source === "library"
           ? `/library?path=${path}`
-          : `/settings?tab=history&show=downloads&path=${path}`,
+          : `/system?tab=history&show=downloads&path=${path}`,
       );
     },
     [files.data, navigate, openFile],
@@ -556,7 +556,7 @@ export function ProcessingPage(): React.ReactElement {
     needs.push({
       key: `worker-${worker.module}`,
       text: `Background work has stopped. ${worker.detail}`,
-      to: "/settings?tab=history&show=jobs",
+      to: "/system?tab=history&show=jobs",
       action: "Open jobs",
     });
   }
@@ -565,7 +565,7 @@ export function ProcessingPage(): React.ReactElement {
     needs.push({
       key: "failed-jobs",
       text: `${failedCount === 1 ? "1 job failed" : `${failedCount >= FAILED_JOBS_LIMIT ? `${FAILED_JOBS_LIMIT}+` : failedCount} jobs failed`}. Each one says what went wrong and what to do next.`,
-      to: "/settings?tab=history&show=jobs&status=failed",
+      to: "/system?tab=history&show=jobs&status=failed",
       action: "Review failed jobs",
     });
   }
@@ -576,7 +576,7 @@ export function ProcessingPage(): React.ReactElement {
         lanes.stuck.length === 1
           ? `${prettyName(lanes.stuck[0].relative_path)} is stuck, so your media manager is still missing it. The original is untouched.`
           : `${lanes.stuck.length} files are stuck, so your media manager is still missing them. The originals are untouched.`,
-      to: "/settings?tab=history&show=downloads&status=processing_failed",
+      to: "/system?tab=history&show=downloads&status=processing_failed",
       action: "Deal with them",
     });
   }
@@ -653,7 +653,7 @@ export function ProcessingPage(): React.ReactElement {
         </div>
         <p className="mm-live-toolbar__note">
           {toolbarNote ? `${toolbarNote} · ` : ""}
-          <Link to="/settings?tab=processing">change in Settings</Link>
+          <Link to="/settings?tab=running">change in Settings</Link>
         </p>
       </div>
 
@@ -765,7 +765,7 @@ export function ProcessingPage(): React.ReactElement {
               count={null}
               hint="Open one to see exactly what Weir did"
               aside={
-                <Link className="mm-live-lane__link" to="/settings?tab=history">
+                <Link className="mm-live-lane__link" to="/system?tab=history">
                   History →
                 </Link>
               }

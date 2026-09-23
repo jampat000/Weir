@@ -927,7 +927,7 @@ export function ProcessingLibrariesSection() {
                   ))}
                 </select>
                 <span className="mt-1 block text-xs text-[var(--mm-text3)]">
-                  Create and edit reusable rule sets under Audio & subtitles.
+                  Create and edit reusable rule sets under Rules.
                 </span>
               </label>
               {field(

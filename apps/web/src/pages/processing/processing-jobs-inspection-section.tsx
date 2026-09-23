@@ -309,7 +309,7 @@ export function ProcessingJobsInspectionSection() {
           <p className="text-xs text-[var(--mm-text2)]">
             Full detail on each outcome is in the{" "}
             <Link
-              to="/settings?tab=history"
+              to="/system?tab=history"
               className="text-[var(--mm-accent)] underline"
             >
               Activity log

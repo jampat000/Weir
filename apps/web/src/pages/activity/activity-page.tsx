@@ -671,7 +671,7 @@ const FIELD_LABEL_CLASS =
 type ExportFormat = "csv" | "json";
 
 /**
- * The record of what Weir did. Since 3.2 it lives in Settings › History and logs rather than as
+ * The record of what Weir did. Since 3.2 it lives in System › History and logs rather than as
  * a page of its own, so `embedded` drops the page title and header; the list, filters,
  * exports and removals are unchanged.
  */
@@ -934,7 +934,7 @@ export function ActivityPage({
       if (!match) {
         // No tracked file to tell the story of: show the Files screen for that path instead.
         void navigate(
-          `/settings?tab=history&show=downloads&path=${encodeURIComponent(path)}`,
+          `/system?tab=history&show=downloads&path=${encodeURIComponent(path)}`,
         );
         return;
       }
@@ -1053,7 +1053,7 @@ export function ActivityPage({
               ? `History goes back ${retentionDays} ${retentionDays === 1 ? "day" : "days"}${shown.oldest_event_at ? ` (oldest entry ${fmt(shown.oldest_event_at)})` : ""}.`
               : "History is kept until you clear it."}{" "}
             <Link
-              to="/settings#activity-retention"
+              to="/system?tab=history#activity-retention"
               className="text-[var(--mm-gold)] underline-offset-2 hover:underline"
             >
               Change how long history is kept

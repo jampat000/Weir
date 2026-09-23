@@ -17,7 +17,7 @@ const routeErrorElement = <RouteErrorScreen />;
 
 // Four places since 3.2: Processing (/), Library, Settings and System.
 // 3.0.0 carried no redirects because nobody had installed it yet. 3.1 has been installed, so its
-// two retired addresses redirect: /activity to Settings › History and logs, and each old
+// two retired addresses redirect: /activity to System › History and logs, and each old
 // Processing tab to wherever that tab lives now (legacy-redirects.tsx). Anything older than 3.1,
 // such as /dashboard, still gets the Not found page.
 const router = createBrowserRouter([

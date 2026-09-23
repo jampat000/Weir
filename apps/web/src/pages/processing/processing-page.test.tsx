@@ -300,7 +300,7 @@ describe("ProcessingPage", () => {
       within(needs).getByRole("link", { name: /Deal with them/ }),
     ).toHaveAttribute(
       "href",
-      "/settings?tab=history&show=downloads&status=processing_failed",
+      "/system?tab=history&show=downloads&status=processing_failed",
     );
   });
 
