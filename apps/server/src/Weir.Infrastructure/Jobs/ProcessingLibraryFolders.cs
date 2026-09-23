@@ -6,8 +6,7 @@ namespace Weir.Infrastructure.Jobs;
 public sealed record ProcessingLibraryFolderRow(long Id, string MediaType, int DisplayOrder, string WorkFolder, string OutputFolder);
 
 /// <summary>
-/// Reads library folders and resolves a library's work folder (ports of <c>list_libraries</c>,
-/// <c>resolve_library</c> and <c>effective_library_work_folder</c>).
+/// Reads library folders and resolves a library's work folder.
 /// </summary>
 public static class ProcessingLibraryFolders
 {
@@ -34,11 +33,11 @@ public static class ProcessingLibraryFolders
         return rows;
     }
 
-    /// <summary><c>normalize_media_scope</c>.</summary>
+    /// <summary><c>tv</c> for "tv" in any case (trimmed); <c>movie</c> for anything else, including empty.</summary>
     public static string NormalizeMediaScope(string? raw) =>
         string.Equals((string.IsNullOrEmpty(raw) ? "movie" : raw).Trim(), "tv", StringComparison.OrdinalIgnoreCase) ? "tv" : "movie";
 
-    /// <summary><c>resolve_library</c>: by id when the payload has one, else the seeded (oldest) library for the scope.</summary>
+    /// <summary>The library by id when the payload has one, else the seeded (first-listed) library for the scope.</summary>
     public static ProcessingLibraryFolderRow? Resolve(IReadOnlyList<ProcessingLibraryFolderRow> libraries, long? libraryId, string? mediaScope)
     {
         ArgumentNullException.ThrowIfNull(libraries);
@@ -56,18 +55,12 @@ public static class ProcessingLibraryFolders
     public static string DefaultTvWorkFolder(string weirHome) => Path.Join(Path.GetFullPath(weirHome), "processing", "processing-tv-work");
 
     /// <summary>
-    /// <c>effective_library_work_folder</c>: the library's own folder, or the per-scope default when it
-    /// has none.
+    /// The library's own work folder, or the per-scope default when it has none.
     /// </summary>
     /// <remarks>
-    /// Until 3.0.0 this also treated two hard-coded Windows paths — <c>C:\ProgramData\Media\
-    /// processing-movie-work</c> and <c>C:\ProgramData\Weir\processing-tv-work</c>, the defaults an
-    /// older MediaMop-era install wrote into <c>work_folder</c> — as if the column were empty, so they
-    /// silently resolved to the <c>WEIR_HOME</c> default instead. Those are gone. A row still holding
-    /// one of those paths is now taken at face value, like any other custom path: it is used as
-    /// written, and if the folder does not exist the caller refuses the run with "the library's
-    /// work/temp folder must be an existing directory when set to a custom path" rather than quietly
-    /// working somewhere else. An empty <c>work_folder</c> is untouched and still gets the default.
+    /// Any non-empty <c>work_folder</c> is taken at face value, including an old install's default path: if
+    /// the folder does not exist the caller refuses the run rather than quietly working somewhere else. Only
+    /// an empty <c>work_folder</c> gets the default.
     /// </remarks>
     public static string EffectiveWorkFolder(ProcessingLibraryFolderRow library, string weirHome)
     {
@@ -82,7 +75,7 @@ public static class ProcessingLibraryFolders
         return scope == "tv" ? DefaultTvWorkFolder(weirHome) : DefaultMovieWorkFolder(weirHome);
     }
 
-    /// <summary><c>Path(text).expanduser()</c> made absolute, for touching the filesystem.</summary>
+    /// <summary>The path with a leading <c>~</c> expanded to the user profile, made absolute, for touching the filesystem.</summary>
     public static string ExpandForFilesystem(string path)
     {
         ArgumentNullException.ThrowIfNull(path);

@@ -9,46 +9,18 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Jobs;
 
 /// <summary>
-/// Periodic tick for <c>processing.watched_folder.remux_scan_dispatch.v1</c> (port of
-/// <c>processing_watched_folder_remux_scan_dispatch_periodic_enqueue.py</c>'s asyncio loop), run as an
-/// <see cref="IPeriodicTask"/> on a short fixed poll rather than Python's dynamically computed sleep — the
-/// per-library due times are tracked in <see cref="_nextRunByLibrary"/> exactly as Python's
-/// <c>next_run_by_library</c> dict, so the *decision* of when a library is due is identical; only the
-/// polling mechanism differs (see <see cref="PeriodicSchedule"/> for the shared timing arithmetic).
+/// Periodic tick for <c>processing.watched_folder.remux_scan_dispatch.v1</c>: a short fixed poll that
+/// enqueues a scan for each enabled library once its own interval is due (see <see cref="PeriodicSchedule"/>
+/// for the timing arithmetic).
 /// </summary>
 /// <remarks>
-/// <b>The fix for #533</b> has two independent parts, both honoured here, and both must allow a scope
-/// before it is ever scheduled:
-/// <list type="bullet">
-/// <item>
-/// <see cref="WeirOptions.ProcessingWatchedFolderRemuxScanDispatchScheduleEnabled"/>
-/// (<c>WEIR_PROCESSING_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_ENABLED</c>, default on): a global kill
-/// switch for every scope's periodic timer. This is the variable the issue names, and the one a fossil
-/// test-helper comment on the Python side already documented as real configuration while nothing in
-/// <c>WeirSettings</c> actually parsed it (removed there in #329 for exactly that reason — reporting a
-/// switch as live while it does nothing is worse than not having it). This port reintroduces it as a
-/// switch that actually works, following the same "env kill switch beside a saved setting" shape already
-/// used for the work-temp-stale-sweep and failure-cleanup families in <c>JobServices.cs</c>.
-/// </item>
-/// <item>
-/// The operator settings singleton's per-scope <c>movie_schedule_enabled</c>/<c>tv_schedule_enabled</c>
-/// column — the switch an operator sees and toggles on the Settings screen. Python's own scheduler never
-/// read this column (only <c>library.enabled</c>), so it was exactly as dead as the removed env var; this
-/// port adds the missing check so the screen stops lying about it too.
-/// </item>
-/// </list>
-/// A scope or library excluded either way is skipped identically to one with <c>enabled = false</c>: it is
-/// simply never scheduled, exactly as though it did not exist for the periodic timer. Manual scans do not
-/// consult any of this — see <see cref="ProcessingWatchedFolderScanDispatchEnqueue.EnqueueScanDispatchJobAsync"/>,
-/// which the manual HTTP route calls directly.
-/// <para>
-/// <c>..._PERIODIC_ENQUEUE_REMUX_JOBS</c> (<see cref="WeirOptions.ProcessingWatchedFolderRemuxScanDispatchPeriodicEnqueueRemuxJobs"/>)
-/// remains a third, orthogonal switch: it controls what a periodic scan *does* once it runs (queue files
-/// for processing, or only check and record state) — never whether it runs at all. With either
-/// schedule-enabled switch off, no periodic scan happens for that scope regardless of this flag; with both
-/// schedule switches on and this flag off, scans keep running (and file state keeps getting recorded and
-/// shown on the Files screen) without queuing remux work.
-/// </para>
+/// Two switches must both allow a scope before it is scheduled (#533): the global kill switch
+/// <see cref="WeirOptions.ProcessingWatchedFolderRemuxScanDispatchScheduleEnabled"/>, and the per-scope
+/// <c>movie_schedule_enabled</c>/<c>tv_schedule_enabled</c> the operator toggles in Settings. A scope switched
+/// off is never scheduled, not even for a catch-up. Manual scans ignore both
+/// (<see cref="ProcessingWatchedFolderScanDispatchEnqueue.EnqueueScanDispatchJobAsync"/>).
+/// <see cref="WeirOptions.ProcessingWatchedFolderRemuxScanDispatchPeriodicEnqueueRemuxJobs"/> only decides what a
+/// periodic scan does (queue remux work, or only record file state), never whether it runs.
 /// </remarks>
 public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicTask
 {
@@ -78,9 +50,9 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
 
     public string Name => "processing-watched-folder-remux-scan-dispatch-enqueue";
 
-    /// <summary>A short, fixed poll. Python computes a dynamic sleep to the nearest due library, capped at
-    /// 60s; a 1s poll reaches the same per-library due times (tracked below) with a simpler, more directly
-    /// testable mechanism, at the cost of a slightly busier idle loop.</summary>
+    /// <summary>A short, fixed poll. Each library's due time is tracked separately, so a 1s poll is simpler
+    /// and easier to test than sleeping until the nearest due library, at the cost of a slightly busier idle
+    /// loop.</summary>
     public TimeSpan Interval => TimeSpan.FromSeconds(1);
 
     public bool RunAtStart => true;
@@ -93,9 +65,8 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
     {
         if (!_options.ProcessingWatchedFolderRemuxScanDispatchScheduleEnabled)
         {
-            // #533: the global kill switch is off. No scope is scheduled — clear any due times a
-            // library earned before the switch was flipped, so turning it back on starts clean rather
-            // than immediately firing a catch-up for every library that missed its window meanwhile.
+            // #533: the global kill switch is off. Clear every due time, so turning it back on starts
+            // clean rather than firing a catch-up for every library that missed its window meanwhile.
             foreach (var id in _nextRunByLibrary.Keys)
             {
                 _wakeups?.ForgetPeriodic(id);

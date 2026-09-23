@@ -4,7 +4,7 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
 
-/// <summary>A guarded filesystem mutation could not complete safely (<c>FileLifecycleError</c>).</summary>
+/// <summary>A guarded filesystem mutation could not complete safely.</summary>
 public sealed class FileLifecycleException : Exception
 {
     public FileLifecycleException()
@@ -22,16 +22,16 @@ public sealed class FileLifecycleException : Exception
     }
 }
 
-/// <summary>Safe filesystem/database reconciliation checks and repairs (port of <c>weir.platform.reconciliation.service</c>).</summary>
+/// <summary>Safe filesystem/database reconciliation checks and repairs.</summary>
 public static class ReconciliationService
 {
     private sealed record LibraryFolders(long Id, string Name, string WatchedFolder, string OutputFolder, string WorkFolder);
 
-    /// <summary><c>build_reconciliation_report</c>.</summary>
+    /// <summary>The reconciliation report over every library's processing folders.</summary>
     public static async Task<PyDict> BuildReportAsync(UnitOfWork uow) =>
         ReconciliationRules.Report(await ScanProcessingPathsAsync(uow).ConfigureAwait(false));
 
-    /// <summary><c>repair_reconciliation_issue</c>. Throws <see cref="PyValueErrorException"/> with the operator's sentence.</summary>
+    /// <summary>Apply one repair action. Throws <see cref="PyValueErrorException"/> with the operator's sentence.</summary>
     public static async Task<PyDict> RepairAsync(UnitOfWork uow, string action, long? dbId, string? path, bool confirm)
     {
         _ = dbId;
@@ -62,7 +62,7 @@ public static class ReconciliationService
         throw new PyValueErrorException($"Unknown reconciliation repair action: {action}");
     }
 
-    /// <summary><c>safe_unlink_under_roots</c>: delete only a path that normalises under one of the roots.</summary>
+    /// <summary>Delete only a path that normalises under one of the roots.</summary>
     public static bool SafeUnlinkUnderRoots(string path, IReadOnlyList<string> allowedRoots)
     {
         ArgumentNullException.ThrowIfNull(allowedRoots);
@@ -156,7 +156,7 @@ public static class ReconciliationService
         return issues;
     }
 
-    /// <summary><c>_configured_processing_work_roots</c>: every library's work folder that exists, resolved.</summary>
+    /// <summary>Every library's work folder that exists, resolved.</summary>
     private static List<string> WorkRoots(IEnumerable<LibraryFolders> libraries)
     {
         var roots = new List<string>();
@@ -177,7 +177,7 @@ public static class ReconciliationService
             }
             catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException)
             {
-                // Python: OSError from resolve() skips the folder.
+                // A folder that cannot be resolved is skipped.
             }
         }
 

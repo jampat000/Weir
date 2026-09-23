@@ -7,7 +7,7 @@ using Weir.Core.Time;
 
 namespace Weir.Infrastructure.Jobs;
 
-/// <summary>What one worker pass came to (Python's <c>"idle" | "processed"</c>).</summary>
+/// <summary>What one worker pass came to: nothing to claim, or one job handled.</summary>
 public enum JobProcessOutcome
 {
     Idle,
@@ -15,8 +15,8 @@ public enum JobProcessOutcome
 }
 
 /// <summary>
-/// Records the file side of a handler crash: Python's <c>record_failure</c> and <c>apply_failure_policy</c>,
-/// which belong to the processing engine port (#522).
+/// Records the file side of a handler crash: the failure against the file and the library's failure
+/// policy, which the processing engine owns (#522).
 /// </summary>
 public interface IUnhandledJobFailureRecorder
 {
@@ -30,13 +30,13 @@ public interface IUnhandledJobFailureRecorder
 /// <summary>A handler failure the handler did not record itself.</summary>
 public sealed record UnhandledJobFailure(JobWorkContext Context, long? LibraryId, string MediaScope, string? RelativeMediaPath, string Message);
 
-/// <summary>Records nothing until the processing engine port supplies the file-state policy.</summary>
+/// <summary>Records nothing; used when no file-state policy is registered.</summary>
 public sealed class NoUnhandledJobFailureRecorder : IUnhandledJobFailureRecorder
 {
     public Task<bool?> RecordAsync(UnhandledJobFailure failure, CancellationToken cancellationToken) => Task.FromResult<bool?>(null);
 }
 
-/// <summary>Job completion and failure notifications (Python's <c>dispatch_job_notification</c>); the notifications port owns delivery.</summary>
+/// <summary>Job completion and failure notifications; the notifications area owns delivery.</summary>
 public interface IJobNotifications
 {
     /// <summary>
@@ -47,7 +47,7 @@ public interface IJobNotifications
     void Dispatch(string moduleName, string eventKind, long jobId, string jobKind, bool willRetry = false);
 }
 
-/// <summary>Sends nothing until the notifications port supplies an implementation.</summary>
+/// <summary>Sends nothing; used when no notification sender is registered.</summary>
 public sealed class NoJobNotifications : IJobNotifications
 {
     public void Dispatch(string moduleName, string eventKind, long jobId, string jobKind, bool willRetry = false)
@@ -57,7 +57,7 @@ public sealed class NoJobNotifications : IJobNotifications
 
 /// <summary>
 /// One worker pass: claim at most one job under the current admission, run its handler, then complete
-/// or fail it (port of <c>process_one_processing_job</c>).
+/// or fail it.
 /// </summary>
 public sealed class ProcessingJobProcessor
 {
@@ -94,7 +94,7 @@ public sealed class ProcessingJobProcessor
 
     /// <summary>
     /// The kinds this processor claims. Defaults to the registry's kinds plus refused kinds; null claims
-    /// every kind as Python does (used by parity tests).
+    /// every kind (used by tests).
     /// </summary>
     public ClaimableKinds? Kinds { get; init; }
 
@@ -256,13 +256,13 @@ public sealed class ProcessingJobProcessor
     }
 
     /// <summary>
-    /// #540 item 1: run the handler while a background heartbeat renews its lease roughly every
-    /// <paramref name="leaseSeconds"/> / 3 seconds, so a handler that runs longer than one lease (a
-    /// remux longer than 300 s, say) keeps its row leased instead of letting a second worker claim it
-    /// and start a second ffmpeg process on the same file. Completion and failure already verify the
-    /// lease owner themselves (<see cref="ProcessingJobStore.CompleteClaimedAsync"/> and
+    /// Run the handler while a background heartbeat renews its lease roughly every
+    /// <paramref name="leaseSeconds"/> / 3 seconds (#540 item 1), so a handler that runs longer than one
+    /// lease (a remux longer than 300 s, say) keeps its row leased instead of letting a second worker claim
+    /// it and start a second ffmpeg process on the same file. Completion and failure verify the lease owner
+    /// themselves (<see cref="ProcessingJobStore.CompleteClaimedAsync"/> and
     /// <see cref="ProcessingJobStore.FailClaimedAsync"/>); this only keeps the lease alive while the
-    /// handler is genuinely still running.
+    /// handler is still running.
     /// </summary>
     private async Task RunHandlerWithLeaseRenewalAsync(IJobHandler handler, JobWorkContext context, int leaseSeconds, CancellationToken cancellationToken)
     {
@@ -313,8 +313,8 @@ public sealed class ProcessingJobProcessor
     }
 
     /// <summary>
-    /// <c>_record_unhandled_processing_failure</c>: the file-state policy (#522 seam) and one
-    /// <c>processing.worker_failure</c> Activity entry.
+    /// Record an unhandled failure: the file-state policy (#522) and one <c>processing.worker_failure</c>
+    /// Activity entry.
     /// </summary>
     private async Task RecordUnhandledFailureAsync(JobWorkContext context, string message)
     {
@@ -366,7 +366,7 @@ public sealed class ProcessingJobProcessor
         }
     }
 
-    /// <summary><c>job_provenance</c>: <c>trigger</c> and <c>run_id</c> from the payload, only when present and valid.</summary>
+    /// <summary>Copy <c>trigger</c> and <c>run_id</c> from the payload, only when present and valid.</summary>
     internal static void AddProvenance(PyDict detail, System.Text.Json.JsonElement? payload)
     {
         if (payload is not { } element)
@@ -401,7 +401,7 @@ public sealed class ProcessingJobProcessor
         {
             await _queue.FailClaimedAsync(context.Id, context.LeaseOwner, errorText, when, CancellationToken.None).ConfigureAwait(false);
         }
-#pragma warning disable CA1031 // Python logs and carries on: the worker must survive a failed write.
+#pragma warning disable CA1031 // Log and carry on: the worker must survive a failed write.
         catch (Exception exception)
 #pragma warning restore CA1031
         {

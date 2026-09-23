@@ -5,50 +5,15 @@ using Weir.Core.MediaManagers;
 namespace Weir.Infrastructure.MediaManagers;
 
 /// <summary>
-/// <see cref="IManagerRedownload"/> for Sonarr/Radarr (issue #509's only verified managers). Verified against
-/// the sources named below rather than assumed:
-///
-/// <list type="bullet">
-/// <item>
-/// <b>Delete removes the file from disk, through the recycle bin when one is configured.</b>
-/// <c>DELETE /api/v3/moviefile/{id}</c> / <c>episodefile/{id}</c> reach
-/// <c>MediaFileDeletionService.DeleteMovieFile</c>/<c>DeleteEpisodeFile</c>
-/// (Radarr <c>src/NzbDrone.Core/MediaFiles/MediaFileDeletionService.cs</c>, develop; Sonarr's file of the
-/// same name on <c>v5-develop</c> is structurally identical), which calls
-/// <c>IRecycleBinProvider.DeleteFile</c> before removing the DB row. <c>RecycleBinProvider.DeleteFolder</c>
-/// (same repo, <c>RecycleBinProvider.cs</c>) shows the branch: <c>ConfigService.RecycleBin</c> empty means
-/// <c>_diskProvider.DeleteFolder(path, true)</c> — permanent — otherwise the item is moved into that
-/// folder. Either way the manager's own listing (and <c>ListLibraryFilesAsync</c>, #507) no longer shows the
-/// file once this call returns: <b>this is the destructive step the issue requires flagging.</b>
-/// </item>
-/// <item>
-/// <b>A same-quality search normally will not replace the file ("not an upgrade").</b>
-/// <c>UpgradableSpecification.IsUpgradable</c> (Radarr <c>src/NzbDrone.Core/DecisionEngine/Specifications
-/// /UpgradableSpecification.cs</c>, develop) rejects a candidate release whose quality is equal to what is
-/// already imported unless its custom-format score is strictly higher (<c>UpgradeableRejectReason
-/// .CustomFormatScore</c>/<c>QualityCutoff</c>); Sonarr's file of the same name is the same shape. This is
-/// exactly why deleting the file record first is required before searching: without it, a release matching
-/// the file Weir just narrowed down (same container/quality, different audio tracks) is routinely rejected
-/// as not an upgrade and nothing is ever downloaded.
-/// </item>
-/// <item>
-/// <b>Search command shapes.</b> <c>MoviesSearchCommand</c> (Radarr <c>src/NzbDrone.Core/IndexerSearch
-/// /MoviesSearchCommand.cs</c>): <c>MovieIds: List&lt;int&gt;</c>. <c>SeriesSearchCommand</c> (Sonarr
-/// <c>src/NzbDrone.Core/IndexerSearch/SeriesSearchCommand.cs</c>): <c>SeriesId: int</c>. Posted the same way
-/// <see cref="HttpMediaManagerPort.FileChangedAsync"/> already posts <c>RescanMovie</c>/<c>RescanSeries</c>:
-/// <c>POST /api/v3/command</c> with the class name minus "Command", camelCased properties.
-/// </item>
-/// </list>
-///
-/// <para><b>TV granularity.</b> #507's <c>ListLibraryFilesAsync</c> matches a Sonarr episode file to its
-/// <i>series</i> id, not an episode id (Sonarr has no "every episode file" endpoint — see
-/// <see cref="HttpMediaManagerPort.ListLibraryFilesAsync"/>'s remarks), so a redownload request here only
-/// ever names a series id and a file path. Deleting the one matching <c>episodefile</c> is still precise;
-/// searching afterwards uses <c>SeriesSearchCommand</c> for the whole series rather than
-/// <c>EpisodeSearchCommand</c>, which the issue names as an explicit alternative and which this port would
-/// otherwise need an extra <c>/api/v3/episode?episodeFileId=</c> call to resolve into episode ids. Once #507
-/// or a later issue tracks individual episode ids, narrowing this to <c>EpisodeSearchCommand</c> is a small
-/// change here, not a redesign.</para>
+/// <see cref="IManagerRedownload"/> for Sonarr/Radarr (#509).
+/// <para><c>DELETE /api/v3/moviefile/{id}</c> or <c>episodefile/{id}</c> removes the file from disk, into the
+/// manager's recycle bin when one is configured and permanently otherwise. <b>This is the destructive step.</b>
+/// The file record must be deleted before searching, because Radarr and Sonarr reject a same-quality release as
+/// "not an upgrade" unless its custom-format score is higher, so a search alone would download nothing.</para>
+/// <para>The search is <c>MoviesSearchCommand</c> <c>{movieIds}</c> or <c>SeriesSearchCommand</c> <c>{seriesId}</c>,
+/// posted to <c>/api/v3/command</c>. TV works at series granularity because Sonarr file listings map to a series id
+/// (see <see cref="HttpMediaManagerPort.ListLibraryFilesAsync"/>); <c>EpisodeSearchCommand</c> would need an extra
+/// episode lookup.</para>
 /// </summary>
 public sealed class ArrManagerRedownload : IManagerRedownload
 {

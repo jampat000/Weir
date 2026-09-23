@@ -8,13 +8,13 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Jobs;
 
 /// <summary>
-/// Which job kinds a claim may lease. Python claims every kind; the .NET workers claim only kinds they
-/// have a handler for, plus kinds no worker may run, which they claim only to refuse
-/// (see <see cref="JobHandlerRegistry"/>).
+/// Which job kinds a claim may lease: kinds the workers have a handler for, plus kinds no worker may run,
+/// which they claim only to refuse (see <see cref="JobHandlerRegistry"/>). A <see langword="null"/>
+/// <see cref="ClaimableKinds"/> claims every kind.
 /// </summary>
 public sealed record ClaimableKinds(IReadOnlyList<string> HandledKinds, bool IncludeRefusedKinds)
 {
-    /// <summary>What the .NET workers claim for a registry.</summary>
+    /// <summary>What the workers claim for a registry.</summary>
     public static ClaimableKinds For(JobHandlerRegistry registry)
     {
         ArgumentNullException.ThrowIfNull(registry);
@@ -22,7 +22,7 @@ public sealed record ClaimableKinds(IReadOnlyList<string> HandledKinds, bool Inc
     }
 }
 
-/// <summary>Queue counters for the metrics port (Python's <c>record_module_job_event</c> and <c>set_module_queue_depth</c>).</summary>
+/// <summary>Queue counters for metrics: job events and queue depth per module.</summary>
 public interface IJobQueueMetrics
 {
     /// <summary><paramref name="jobEvent"/> is <c>started</c>, <c>completed</c> or <c>failed</c>.</summary>
@@ -31,7 +31,7 @@ public interface IJobQueueMetrics
     void SetQueueDepth(string moduleName, int depth);
 }
 
-/// <summary>Discards queue counters until the metrics port supplies an implementation.</summary>
+/// <summary>Discards queue counters when no metrics sink is configured.</summary>
 public sealed class NoJobQueueMetrics : IJobQueueMetrics
 {
     public static NoJobQueueMetrics Instance { get; } = new();
@@ -46,21 +46,18 @@ public sealed class NoJobQueueMetrics : IJobQueueMetrics
 }
 
 /// <summary>
-/// The durable <c>jobs</c> queue (port of <c>weir.processing.jobs_ops</c>): enqueue-or-get by dedupe
-/// key, atomic claim with a lease, complete, fail with retry and backoff, and the operator actions.
+/// The durable <c>jobs</c> queue: enqueue-or-get by dedupe key, atomic claim with a lease, complete,
+/// fail with retry and backoff, and the operator actions.
 /// </summary>
 /// <remarks>
 /// Every operation runs in one <c>BEGIN IMMEDIATE</c> transaction, so SQLite's single writer serialises
-/// it against every other connection, including the Python backend's. The claim is Python's single
-/// <c>UPDATE … WHERE id = (SELECT … LIMIT 1) RETURNING id</c> statement, with the same timestamp
-/// strings, compared with <c>julianday()</c> rather than as text (#540 item 2): Python's own text
-/// comparison sorts <c>+</c> (the sqlite3 adapter's offset marker) before <c>.</c> (a fractional
-/// second's leading character), so a <c>not_before</c> with microseconds compares greater than an
-/// <c>@now</c> at the exact same instant whose microseconds happen to be zero (the adapter omits a
-/// zero fraction entirely) — a retried job then misses its own <c>not_before</c> second. Comparing by
-/// Julian day is immune to that and reads both the ORM's offset-less, always-fractional shape and the
-/// adapter's offset-bearing, zero-fraction-omitted shape identically, so rows either backend wrote
-/// still compare correctly.
+/// it against every other connection. The claim is a single
+/// <c>UPDATE … WHERE id = (SELECT … LIMIT 1) RETURNING id</c> statement that compares timestamps with
+/// <c>julianday()</c> rather than as text (#540 item 2). As text, <c>+</c> (an offset marker) sorts before
+/// <c>.</c> (a fraction's first character), so a <c>not_before</c> with microseconds would compare greater
+/// than an <c>@now</c> at the same instant whose zero fraction is omitted, and a retried job would miss its
+/// own <c>not_before</c> second. Julian day reads both stored shapes (see <see cref="PythonTimestamps"/>)
+/// identically.
 /// </remarks>
 public sealed class ProcessingJobStore
 {
@@ -108,8 +105,7 @@ public sealed class ProcessingJobStore
     public SqliteDatabase Database => _database;
 
     /// <summary>
-    /// <c>processing_enqueue_or_get_job</c>: insert a pending job, or return the row already holding
-    /// <paramref name="dedupeKey"/>.
+    /// Insert a pending job, or return the row already holding <paramref name="dedupeKey"/>.
     /// </summary>
     /// <exception cref="ArgumentException">The job kind is retired or not a <c>processing.*</c> kind.</exception>
     public Task<ProcessingJob> EnqueueOrGetAsync(
@@ -130,7 +126,7 @@ public sealed class ProcessingJobStore
     }
 
     /// <summary>
-    /// <c>claim_next_eligible_processing_job</c>: atomically lease the next pending or expired-lease row.
+    /// Atomically lease the next pending or expired-lease row.
     /// Increments <c>attempt_count</c> on every claim, including a reclaim.
     /// </summary>
     public Task<ProcessingJob?> ClaimNextAsync(
@@ -166,11 +162,10 @@ public sealed class ProcessingJobStore
             cancellationToken);
 
     /// <summary>
-    /// #540 item 1: extend the lease of a row this owner still holds, so a handler that outlives its
-    /// original lease (a long remux, for instance) is never reclaimed by another worker while it is
-    /// still genuinely running. There is no Python equivalent — nothing renews a lease today — so this
-    /// is .NET-only; a worker calls it on a heartbeat, well inside the lease, while the handler runs.
-    /// Returns <see langword="false"/> when the lease is no longer this owner's (already completed,
+    /// Extend the lease of a row this owner still holds, so a handler that outlives its original lease
+    /// (a long remux, for instance) is never reclaimed by another worker while it is still running
+    /// (#540 item 1). A worker calls it on a heartbeat, well inside the lease, while the handler runs.
+    /// Returns <see langword="false"/> when this owner has lost the lease (already completed,
     /// failed, or reclaimed after running unrenewed past its expiry), in which case the caller should
     /// stop renewing and let completion/failure fail its own lease check.
     /// </summary>
@@ -198,7 +193,7 @@ public sealed class ProcessingJobStore
             cancellationToken);
     }
 
-    /// <summary><c>complete_claimed_processing_job</c>: only for the owning, unexpired lease.</summary>
+    /// <summary>Mark the job completed; only for the owning, unexpired lease.</summary>
     public Task<bool> CompleteClaimedAsync(long jobId, string leaseOwner, DateTimeOffset? now = null, CancellationToken cancellationToken = default)
     {
         var when = now ?? _time.GetUtcNow();
@@ -226,8 +221,7 @@ public sealed class ProcessingJobStore
     }
 
     /// <summary>
-    /// <c>fail_claimed_processing_job</c>: after a failed attempt, requeue with backoff, or mark failed once
-    /// the attempts are used.
+    /// After a failed attempt, requeue with backoff, or mark failed once the attempts are used.
     /// </summary>
     public Task<bool> FailClaimedAsync(long jobId, string leaseOwner, string errorMessage, DateTimeOffset? now = null, CancellationToken cancellationToken = default)
     {
@@ -275,8 +269,8 @@ public sealed class ProcessingJobStore
     }
 
     /// <summary>
-    /// <c>fail_leased_processing_job_after_complete_failure</c>: the handler succeeded but recording it did
-    /// not. Terminal and not claimable; <c>attempt_count</c> is unchanged.
+    /// For a handler that succeeded when recording its completion did not. Terminal and not claimable;
+    /// <c>attempt_count</c> is unchanged.
     /// </summary>
     public Task<bool> FailLeasedAfterCompleteFailureAsync(long jobId, string leaseOwner, string errorMessage, DateTimeOffset? now = null, CancellationToken cancellationToken = default)
     {
@@ -307,8 +301,8 @@ public sealed class ProcessingJobStore
     }
 
     /// <summary>
-    /// <c>recover_handler_ok_finalize_failed_to_completed</c>: operator recovery that marks the row
-    /// completed without re-running the handler.
+    /// Operator recovery that marks a <c>handler_ok_finalize_failed</c> row completed without re-running
+    /// the handler.
     /// </summary>
     public Task<JobActionOutcome> RecoverHandlerOkFinalizeFailedToCompletedAsync(
         long jobId,
@@ -347,8 +341,8 @@ public sealed class ProcessingJobStore
     }
 
     /// <summary>
-    /// <c>cancel_pending_processing_job</c>: only pending rows. The dedupe key becomes a tombstone so a later
-    /// enqueue may reuse it.
+    /// Cancel a pending row (only pending rows). The dedupe key becomes a tombstone so a later enqueue may
+    /// reuse it.
     /// </summary>
     public Task<JobActionOutcome> CancelPendingAsync(long jobId, CancellationToken cancellationToken = default) =>
         InTransactionAsync(
@@ -378,7 +372,7 @@ public sealed class ProcessingJobStore
             },
             cancellationToken);
 
-    /// <summary><c>move_processing_job_to_top</c>: raise one pending job above everything else waiting.</summary>
+    /// <summary>Raise one pending job above everything else waiting.</summary>
     public Task<JobActionOutcome> MoveToTopAsync(long jobId, CancellationToken cancellationToken = default) =>
         InTransactionAsync(
             (connection, transaction) =>
@@ -536,9 +530,8 @@ public sealed class ProcessingJobStore
     }
 
     /// <summary>
-    /// <c>_admission_predicate</c>: SQL narrowing the claim to work this pass may start. Library ids are
-    /// integers formatted into the statement, as Python does, because a variable-length <c>IN</c> list
-    /// cannot be one bound parameter.
+    /// SQL narrowing the claim to work this pass may start. Library ids are integers formatted into the
+    /// statement because a variable-length <c>IN</c> list cannot be one bound parameter.
     /// </summary>
     internal static string AdmissionPredicate(WorkAdmission? admission, List<(string Name, object? Value)> parameters)
     {
@@ -563,10 +556,9 @@ public sealed class ProcessingJobStore
         {
             if (admission.Pause.ScanWhilePaused)
             {
-                // #540 item 3: substr/= rather than LIKE, for the same reason KindsPredicate uses it —
-                // LIKE is case-insensitive and treats '_' as a wildcard, so
-                // "processing.watched-folder.remux-scan-dispatch" (hyphens) also read as the detection
-                // prefix and kept running through a pause.
+                // substr/= rather than LIKE (#540 item 3): LIKE is case-insensitive and treats '_' as a
+                // wildcard, so "processing.watched-folder.remux-scan-dispatch" (hyphens) would match the
+                // detection prefix and keep running through a pause.
                 var prefixes = new List<string>();
                 for (var index = 0; index < WorkAdmissionRules.DetectionJobKindPrefixes.Count; index++)
                 {
@@ -584,7 +576,7 @@ public sealed class ProcessingJobStore
         return "\n    " + string.Join("\n    ", clauses);
     }
 
-    /// <summary>The .NET-only narrowing to kinds this server can run or must refuse.</summary>
+    /// <summary>SQL narrowing the claim to kinds this server can run or must refuse.</summary>
     internal static string KindsPredicate(ClaimableKinds? kinds, List<(string Name, object? Value)> parameters)
     {
         if (kinds is null)
@@ -609,8 +601,8 @@ public sealed class ProcessingJobStore
 
         if (kinds.IncludeRefusedKinds)
         {
-            // substr/= rather than LIKE: LIKE is case-insensitive and treats '_' as a wildcard, and
-            // Python's str.startswith is neither.
+            // substr/= rather than LIKE: a prefix test must be exact, and LIKE is case-insensitive and
+            // treats '_' as a wildcard.
             alternatives.Add(PrefixTest(JobKindGuard.JobKindPrefix, "@refused_prefix", parameters, negate: true));
             for (var index = 0; index < JobKindGuard.RetiredPrefixes.Count; index++)
             {
@@ -722,7 +714,7 @@ public sealed class ProcessingJobStore
     }
 }
 
-/// <summary>Builds <see cref="WorkAdmission"/> from the database (the IO half of <c>evaluate_work_admission</c>).</summary>
+/// <summary>Builds <see cref="WorkAdmission"/> from the database; <see cref="WorkAdmissionRules"/> holds the rules.</summary>
 public static class WorkAdmissionReader
 {
     public static WorkAdmission Evaluate(SqliteConnection connection, SqliteTransaction transaction, DateTimeOffset now)

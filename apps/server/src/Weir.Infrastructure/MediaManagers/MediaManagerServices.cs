@@ -24,7 +24,7 @@ public static class MediaManagerServices
         services.TryAddSingleton<IManagerHttpHandlerFactory, SocketsManagerHttpHandlerFactory>();
         services.TryAddSingleton<IMediaManagerPorts, HttpMediaManagerPorts>();
         services.TryAddSingleton<MediaManagerConnectionService>();
-        // Every minute, each manager's connection test, so Weir knows within a minute when one goes quiet (23 Sep 2026).
+        // Every minute, each manager's connection test, so Weir knows within a minute when one goes quiet.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IPeriodicTask, ManagerHeartbeatTask>());
         services.TryAddSingleton<LibraryDiscoveryService>();
         services.TryAddSingleton<ManagerSetupCheck>();
@@ -38,7 +38,7 @@ public static class MediaManagerServices
         services.TryAddSingleton<MetadataProviderService>();
         services.TryAddSingleton<ILibraryFileChangeNotifier, LibraryFileChangeNotifier>();
 
-        // #509: redownloading a title after a removed track can no longer be restored. The store and
+        // #509: redownloading a title when a removed track cannot be restored from the file. The store and
         // tracker default to in-memory (see their remarks for why); FileLogRemovedTrackStore is available
         // to opt into instead once a caller wants the payload-backed history to survive a restart.
         services.TryAddSingleton<IManagerRedownload, ArrManagerRedownload>();

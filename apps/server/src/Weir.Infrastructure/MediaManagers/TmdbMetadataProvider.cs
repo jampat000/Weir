@@ -9,7 +9,7 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
 
-/// <summary>One metadata provider (<c>MetadataProvider</c>). Implementations never throw.</summary>
+/// <summary>One metadata provider. Implementations never throw.</summary>
 public interface IMetadataProvider
 {
     string Name { get; }
@@ -19,7 +19,7 @@ public interface IMetadataProvider
     Task<LookupResult> TestConnectionAsync(CancellationToken cancellationToken = default);
 }
 
-/// <summary>Bounded, thread-safe, oldest-first lookup cache, shared across passes within one process (<c>_Cache</c>).</summary>
+/// <summary>Bounded, thread-safe, oldest-first lookup cache, shared across passes within one process.</summary>
 public sealed class MetadataLookupCache
 {
     private readonly Lock _lock = new();
@@ -32,7 +32,7 @@ public sealed class MetadataLookupCache
         _max = maxEntries;
     }
 
-    /// <summary>The process-wide cache (<c>_SHARED_CACHE</c>).</summary>
+    /// <summary>The process-wide cache.</summary>
     public static MetadataLookupCache Shared { get; } = new();
 
     public int Count
@@ -79,7 +79,7 @@ public sealed class MetadataLookupCache
         }
     }
 
-    /// <summary><c>clear_metadata_cache</c>: used by tests and after a credential change.</summary>
+    /// <summary>Empty the cache: used by tests and after a credential change.</summary>
     public void Clear()
     {
         lock (_lock)
@@ -91,7 +91,7 @@ public sealed class MetadataLookupCache
 }
 
 /// <summary>
-/// TMDb over its v3 API, directly or through a gateway (port of <c>tmdb_provider.TmdbMetadataProvider</c>). The base URL
+/// TMDb over its v3 API, directly or through a gateway. The base URL
 /// is checked with <see cref="ExternalUrlPolicy.ValidateExternalProviderUrl"/>, so localhost and private addresses are refused.
 /// </summary>
 public sealed class TmdbMetadataProvider : IMetadataProvider
@@ -116,7 +116,7 @@ public sealed class TmdbMetadataProvider : IMetadataProvider
 
     public string Name => "tmdb";
 
-    /// <summary><c>lookup_movie</c>: every failure is a status, never an exception. Negative answers are cached too.</summary>
+    /// <summary>Look a movie up: every failure is a status, never an exception. Negative answers are cached too.</summary>
     public async Task<LookupResult> LookupMovieAsync(string title, int? year, CancellationToken cancellationToken = default)
     {
         var cleaned = PyStrings.Strip(title ?? string.Empty);
@@ -151,7 +151,7 @@ public sealed class TmdbMetadataProvider : IMetadataProvider
         return result;
     }
 
-    /// <summary><c>test_connection</c>: a cheap real query, so a saved key is proven rather than assumed.</summary>
+    /// <summary>A cheap real query, so a saved key is proven rather than assumed.</summary>
     public async Task<LookupResult> TestConnectionAsync(CancellationToken cancellationToken = default)
     {
         if (_apiKey.Length == 0)
@@ -229,7 +229,7 @@ public sealed class TmdbMetadataProvider : IMetadataProvider
     }
 }
 
-/// <summary>Building the configured provider and testing it (port of <c>integrations.metadata.provider_service</c>).</summary>
+/// <summary>Building the configured provider and testing it.</summary>
 public sealed class MetadataProviderService
 {
     private readonly CredentialCipher _cipher;
@@ -241,14 +241,14 @@ public sealed class MetadataProviderService
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
     }
 
-    /// <summary><c>store_provider_key</c>: encrypted with the manager-credential envelope, or empty.</summary>
+    /// <summary>The provider key as stored: encrypted with the manager-credential envelope, or empty.</summary>
     public string StoreProviderKey(string plaintext)
     {
         ArgumentNullException.ThrowIfNull(plaintext);
         return PyStrings.Strip(plaintext).Length > 0 ? _cipher.Encrypt(plaintext) : string.Empty;
     }
 
-    /// <summary><c>build_provider</c>: null is a normal answer; every caller degrades to the language preferences.</summary>
+    /// <summary>The configured provider: null is a normal answer; every caller degrades to the language preferences.</summary>
     public async Task<IMetadataProvider?> BuildProviderAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -277,7 +277,7 @@ public sealed class MetadataProviderService
         return new TmdbMetadataProvider(key, _handlers, baseUrl.Length > 0 ? baseUrl : TmdbResponses.DefaultBaseUrl);
     }
 
-    /// <summary><c>test_provider</c>: prove a saved connection works rather than assuming it.</summary>
+    /// <summary>Prove a saved connection works rather than assuming it.</summary>
     public async Task<LookupResult> TestProviderAsync(UnitOfWork uow, CancellationToken cancellationToken = default)
     {
         var provider = await BuildProviderAsync(uow).ConfigureAwait(false);

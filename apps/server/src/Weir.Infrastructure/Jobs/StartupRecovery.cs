@@ -13,17 +13,16 @@ public sealed record StartupRecoveryReport(StartupJobRecoveryResult Jobs, int Pa
 public sealed record InterruptedJob(long Id, string JobKind, string? PayloadJson);
 
 /// <summary>
-/// Startup crash recovery: ports of <c>recover_incomplete_jobs_after_startup</c> and
-/// <c>cleanup_processing_partial_output_files</c>, plus the #534 fix for remux temp output left in work folders.
+/// Startup crash recovery: requeue or fail jobs left leased, remove hidden <c>.partial</c> output files, and
+/// remove remux temp output left in work folders (#534).
 /// </summary>
 /// <remarks>
 /// Startup is a hard process boundary for this single-node app: no worker is running yet, so a leased
 /// row belongs to a dead worker, and a Weir temp file belongs to interrupted work.
 /// <para>
-/// #534: Python removed only hidden <c>.partial</c> files from output folders, leaving a crashed
-/// remux's multi-gigabyte temp output in the work folder forever. Here recovery also removes (1) the
+/// A crashed remux can leave multi-gigabyte temp output in the work folder, so recovery removes (1) the
 /// remux temp output of every job that was in progress, found from its payload's library and file, and
-/// (2) any other remux temp output in a library work folder. Both only ever match the exact names Weir
+/// (2) any other remux temp output in a library work folder (#534). Both only ever match the exact names Weir
 /// creates (<see cref="WeirTempFiles"/>), never other files, and only at the top of the work folder,
 /// where Weir writes them.
 /// </para>
@@ -63,7 +62,7 @@ public static class StartupRecovery
         return new StartupRecoveryReport(result, partialRemoved, tempRemoved);
     }
 
-    /// <summary><c>recover_incomplete_jobs_after_startup</c> inside the caller's transaction.</summary>
+    /// <summary>Requeue or fail every leased job, inside the caller's transaction.</summary>
     public static (StartupJobRecoveryResult Result, List<InterruptedJob> Interrupted) RecoverIncompleteJobs(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -151,7 +150,7 @@ public static class StartupRecovery
     }
 
     /// <summary>
-    /// <c>cleanup_processing_partial_output_files</c>: hidden <c>*.partial</c> files under every library output
+    /// Remove hidden <c>*.partial</c> files under every library output
     /// folder and <c>WEIR_HOME/processing-output</c>, searched recursively.
     /// </summary>
     public static int CleanupPartialOutputFiles(IReadOnlyList<ProcessingLibraryFolderRow> libraries, string weirHome)
@@ -208,7 +207,7 @@ public static class StartupRecovery
                 }
                 catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
                 {
-                    // Python: except OSError: continue
+                    // A file that cannot be removed now is skipped.
                 }
             }
         }
