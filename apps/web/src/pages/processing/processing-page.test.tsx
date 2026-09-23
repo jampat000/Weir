@@ -509,5 +509,7 @@ describe("ProcessingPage", () => {
       "Nothing handed back in the last 2 hours.",
     );
     expect(figure.querySelector(".mm-live-spark__bar")).toBeNull();
+    // The chart's place is kept, empty, so switching views never resizes the bar (James, 23 Sep 2026).
+    expect(figure.querySelector(".mm-live-spark__bars")).not.toBeNull();
   });
 });

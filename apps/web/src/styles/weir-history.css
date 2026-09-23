@@ -283,57 +283,149 @@
   color: var(--mm-text2);
 }
 
+/* What Weir kept and removed: the heading carries both counts, each track reads in full text with a Kept or Removed
+   label, and a coloured edge tells the two apart at a glance (James, 23 Sep 2026: it read as hidden). */
+.mm-history-trackset {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mm-history-trackset__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--mm-text1);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.mm-history-count {
+  padding: 2px 10px;
+  border-radius: var(--mm-radius-pill);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.mm-history-count.is-kept {
+  background: color-mix(
+    in srgb,
+    var(--mm-status-healthy-text) 16%,
+    transparent
+  );
+  color: var(--mm-status-healthy-text);
+}
+
+.mm-history-count.is-removed {
+  background: color-mix(in srgb, var(--mm-status-failed-text) 16%, transparent);
+  color: var(--mm-status-failed-text);
+}
+
+.mm-history-count.is-none {
+  background: color-mix(in srgb, var(--mm-text3) 14%, transparent);
+  color: var(--mm-text2);
+}
+
 .mm-history-tracks {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
 }
 
-.mm-history-tracks caption {
-  padding-bottom: 6px;
-  text-align: left;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--mm-text2);
+.mm-history-tracks tr {
+  border-bottom: 1px solid var(--mm-border);
+}
+
+.mm-history-tracks tr.is-kept > :first-child {
+  box-shadow: inset 3px 0 0 var(--mm-status-healthy-text);
+}
+
+.mm-history-tracks tr.is-removed > :first-child {
+  box-shadow: inset 3px 0 0 var(--mm-status-failed-text);
+}
+
+.mm-history-tracks tr.is-removed {
+  background: color-mix(in srgb, var(--mm-status-failed-text) 5%, transparent);
 }
 
 .mm-history-tracks th,
 .mm-history-tracks td {
-  height: 34px;
-  padding: 0 8px 0 0;
-  border-bottom: 1px solid var(--mm-border);
+  padding: 8px 10px;
   text-align: left;
+  vertical-align: middle;
 }
 
 .mm-history-tracks th {
-  width: 76px;
-  font-size: 0.65625rem;
+  width: 88px;
+  font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--mm-text3);
+  color: var(--mm-text2);
 }
 
-.mm-history-tracks td.is-removed {
-  color: var(--mm-text3);
+.mm-history-track {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mm-history-track__what {
+  display: block;
+  color: var(--mm-text1);
+  font-weight: 500;
+}
+
+.mm-history-tracks tr.is-removed .mm-history-track__what {
+  color: var(--mm-text2);
   text-decoration: line-through;
   text-decoration-color: color-mix(
     in srgb,
-    var(--mm-status-failed-text) 60%,
+    var(--mm-status-failed-text) 70%,
     transparent
   );
 }
 
-.mm-history-kept {
-  width: 40%;
-  color: var(--mm-accent-bright);
+.mm-history-track__why {
+  display: block;
+  margin-top: 2px;
+  color: var(--mm-text2);
+  font-size: var(--mm-type-caption);
 }
 
-.mm-history-gone {
-  width: 40%;
-  color: var(--mm-text2);
+.mm-history-track__verdict {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.mm-history-verdict {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--mm-radius-pill);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.mm-history-verdict.is-kept {
+  background: color-mix(
+    in srgb,
+    var(--mm-status-healthy-text) 16%,
+    transparent
+  );
+  color: var(--mm-status-healthy-text);
+}
+
+.mm-history-verdict.is-removed {
+  background: color-mix(in srgb, var(--mm-status-failed-text) 16%, transparent);
+  color: var(--mm-status-failed-text);
+}
+
+.mm-history-sizes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .mm-history-story {

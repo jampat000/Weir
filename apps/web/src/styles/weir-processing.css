@@ -861,7 +861,11 @@
    words need, so the block is one clean rectangle. */
 .mm-live-figure--trend {
   display: grid;
-  grid-template-columns: auto minmax(9rem, 1fr);
+  /* A fixed size whatever it holds: the three views (Everything, New downloads, Library cleaning) have very different
+     numbers, and a figure that grew and shrank with them moved the whole bar each time the view changed. */
+  width: 20rem;
+  max-width: 100%;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
   grid-template-areas:
     "label label"
     "value chart"
@@ -949,7 +953,9 @@
 
 .mm-live-trend__legend {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
   gap: 2px 12px;
   min-height: 1.35em;
   margin: 4px 0 0;
@@ -1056,4 +1062,10 @@
   font-size: 0.71875rem;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+/* Today's two plain figures keep their width as their numbers change ("20" or "2,421", "20.3 MB" or "260 GB"),
+   so nothing beside them moves when the view changes. */
+.mm-live-toolbar__figures > .mm-live-figure:not(.mm-live-figure--trend) {
+  min-width: 7.5rem;
 }

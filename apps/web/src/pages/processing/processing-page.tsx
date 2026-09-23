@@ -520,36 +520,38 @@ function HandedBackFigure({
       <span className="mm-live-figure__value" aria-hidden="true">
         {total.toLocaleString()}
       </span>
-      {total > 0 ? (
-        <span
-          className="mm-live-spark__bars"
-          aria-hidden="true"
-          onMouseLeave={() => setPointed(null)}
-        >
-          {handed.buckets.map((b, index) => (
+      {/* The chart's place is always kept, so switching to a view with nothing handed back does not change the bar's
+          size (James, 23 Sep 2026: "we need to stop the shift"). It stays empty then, not a row of empty bars. */}
+      <span
+        className="mm-live-spark__bars"
+        aria-hidden="true"
+        onMouseLeave={() => setPointed(null)}
+      >
+        {(total > 0 ? handed.buckets : []).map((b, index) => (
+          <span
+            key={b.from}
+            className="mm-live-spark__slot"
+            onMouseEnter={() => setPointed(index)}
+          >
             <span
-              key={b.from}
-              className="mm-live-spark__slot"
-              onMouseEnter={() => setPointed(index)}
+              className="mm-live-spark__bar"
+              style={{
+                height: `${handed.peak > 0 ? (b.total / handed.peak) * 100 : 0}%`,
+              }}
             >
-              <span
-                className="mm-live-spark__bar"
-                style={{ height: `${(b.total / handed.peak) * 100}%` }}
-              >
-                {(["warn", "same", "ok"] as const).map((tone) =>
-                  b[tone] > 0 ? (
-                    <span
-                      key={tone}
-                      className={`mm-live-spark__seg mm-live-spark__seg--${tone}`}
-                      style={{ flexGrow: b[tone] }}
-                    />
-                  ) : null,
-                )}
-              </span>
+              {(["warn", "same", "ok"] as const).map((tone) =>
+                b[tone] > 0 ? (
+                  <span
+                    key={tone}
+                    className={`mm-live-spark__seg mm-live-spark__seg--${tone}`}
+                    style={{ flexGrow: b[tone] }}
+                  />
+                ) : null,
+              )}
             </span>
-          ))}
-        </span>
-      ) : null}
+          </span>
+        ))}
+      </span>
       <p className="mm-live-trend__legend" aria-hidden="true">
         {total === 0 ? (
           "Nothing handed back in the last 2 hours."
