@@ -9,10 +9,7 @@ import {
   cleanLibraryFiles,
   fetchLibraryFiles,
   fetchLibraryOverview,
-  fetchLibraryProblems,
-  fetchLibraryRedownloads,
   fetchLibrarySettings,
-  requestLibraryRedownload,
   saveLibraryFolders,
   saveLibrarySettings,
   setLibraryFileLeaveAlone,
@@ -36,12 +33,6 @@ export const libraryFilesKey = (
 export const libraryOverviewKey = (libraryId: number) => [
   "processing",
   "library-overview",
-  libraryId,
-];
-
-export const libraryProblemsKey = (libraryId: number) => [
-  "processing",
-  "library-problems",
   libraryId,
 ];
 
@@ -74,7 +65,6 @@ export function useSaveLibraryPreflightSettings(libraryId: number) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: librarySettingsKey(libraryId) });
       // clean_hardlinked_files decides whether seeding counts as a problem at all (#568).
-      void qc.invalidateQueries({ queryKey: libraryProblemsKey(libraryId) });
       void qc.invalidateQueries({ queryKey: libraryOverviewKey(libraryId) });
     },
   });
@@ -88,7 +78,6 @@ function invalidateLibraryViews(
   for (const key of [
     ["processing", "library-files", libraryId],
     libraryOverviewKey(libraryId),
-    libraryProblemsKey(libraryId),
   ]) {
     void qc.invalidateQueries({ queryKey: key });
   }
@@ -131,15 +120,6 @@ export function useLibraryOverviewQuery(libraryId: number, enabled = true) {
   });
 }
 
-/** #568's Problems view. */
-export function useLibraryProblemsQuery(libraryId: number, enabled = true) {
-  return useQuery({
-    queryKey: libraryProblemsKey(libraryId),
-    queryFn: () => fetchLibraryProblems(libraryId),
-    enabled: enabled && libraryId > 0,
-  });
-}
-
 export function useCleanLibraryFiles(libraryId: number) {
   const qc = useQueryClient();
   return useMutation({
@@ -164,31 +144,6 @@ export function useSetLibraryFileLeaveAlone(libraryId: number) {
     mutationFn: ({ path, leaveAlone }: { path: string; leaveAlone: boolean }) =>
       setLibraryFileLeaveAlone(libraryId, path, leaveAlone),
     onSuccess: () => invalidateLibraryViews(qc, libraryId),
-  });
-}
-
-export const libraryRedownloadsKey = (libraryId: number) => [
-  "processing",
-  "library-redownloads",
-  libraryId,
-];
-
-/** #509 step 2: titles a rule change now keeps a track for that a past clean removed. */
-export function useLibraryRedownloadsQuery(libraryId: number, enabled = true) {
-  return useQuery({
-    queryKey: libraryRedownloadsKey(libraryId),
-    queryFn: () => fetchLibraryRedownloads(libraryId),
-    enabled: enabled && libraryId > 0,
-  });
-}
-
-/** #509 step 3: "Download again", shown only when the title's can_redownload is true. */
-export function useRequestLibraryRedownload(libraryId: number) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (path: string) => requestLibraryRedownload(libraryId, path),
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: libraryRedownloadsKey(libraryId) }),
   });
 }
 

@@ -4,33 +4,9 @@
  */
 import { fetchCsrfToken } from "../api/auth-api";
 import { apiFetch, readJson, requireOk } from "../api/client";
-import { processingStreamLanguageLabel } from "./stream-language-options";
 
 export type LibraryFileClassification =
   "matches" | "would_change" | "cannot_process";
-
-export const LIBRARY_FILE_CLASSIFICATION_LABELS: Record<
-  LibraryFileClassification,
-  string
-> = {
-  matches: "Matches the rules",
-  would_change: "Would change",
-  cannot_process: "Cannot process",
-};
-
-/**
- * Issue #551: the manager kinds a library file can be matched to (only Sonarr/Radarr support the title
- * listing the match is built from — see docs/archive/server-port-notes.md's "Manager title matching"), for the Library
- * tab's manager filter. Matches the `manager` query param `fetchLibraryFiles` already sends straight through
- * to `manager_kind` on the server.
- */
-export const LIBRARY_MANAGER_FILTER_OPTIONS: {
-  value: string;
-  label: string;
-}[] = [
-  { value: "radarr", label: "Radarr" },
-  { value: "sonarr", label: "Sonarr" },
-];
 
 export interface LibrarySettings {
   library_folders: string[];
@@ -168,13 +144,6 @@ export interface LibraryOverview {
   totals: LibraryTotals;
   breakdowns: LibraryBreakdowns;
   problems: LibraryProblemGroup[];
-}
-
-export interface LibraryProblemsResult {
-  library_id: number;
-  scan: LibraryScanInfo | null;
-  groups: LibraryProblemGroup[];
-  total: number;
 }
 
 /** Every way the Files table can be narrowed, sorted and paged. */
@@ -344,16 +313,6 @@ export async function fetchLibraryOverview(
   return readJson<LibraryOverview>(r);
 }
 
-/** #568's Problems: files Weir will not clean, grouped by reason, each with what to do. */
-export async function fetchLibraryProblems(
-  libraryId: number,
-): Promise<LibraryProblemsResult> {
-  const path = `/api/v1/processing/libraries/${libraryId}/library-problems`;
-  const r = await apiFetch(path);
-  await requireOk(path, r, "Could not load this library's problems");
-  return readJson<LibraryProblemsResult>(r);
-}
-
 /** Parses the structured 400 the API returns when removal needs confirming. Rethrows anything else. */
 async function readConfirmationOr<T>(
   path: string,
@@ -459,140 +418,3 @@ export async function setLibrarySchedule(
   );
 }
 
-/** One track a Processing pass removed from a file for good (issue #509). */
-export interface RemovedTrack {
-  language: string;
-  type: "audio" | "subtitle";
-  codec: string;
-  variant: string | null;
-  reason: string;
-}
-
-/**
- * One title whose current rules would now keep a track a past clean removed for good (#509 step 2). The
- * "Download again" action is only ever shown when `can_redownload` is true: a manager kind #509 verified
- * (Sonarr/Radarr) and a file #551's title matching actually resolved to one of that manager's titles.
- * `unavailable_reason` explains why in plain language when it is false.
- */
-export interface LibraryRedownloadTitle {
-  path: string;
-  manager_kind: string | null;
-  manager_title: string | null;
-  removed_tracks: RemovedTrack[];
-  can_redownload: boolean;
-  confirmation_message: string | null;
-  unavailable_reason: string | null;
-}
-
-export interface LibraryRedownloadsResult {
-  library_id: number;
-  titles: LibraryRedownloadTitle[];
-  total: number;
-}
-
-export interface LibraryRedownloadResult {
-  path: string;
-  outcome: string;
-  message: string;
-}
-
-export async function fetchLibraryRedownloads(
-  libraryId: number,
-): Promise<LibraryRedownloadsResult> {
-  const path = `/api/v1/processing/libraries/${libraryId}/library-redownloads`;
-  const r = await apiFetch(path);
-  await requireOk(path, r, "Could not load titles missing tracks");
-  return readJson<LibraryRedownloadsResult>(r);
-}
-
-export async function requestLibraryRedownload(
-  libraryId: number,
-  filePath: string,
-): Promise<LibraryRedownloadResult> {
-  const csrf_token = await fetchCsrfToken();
-  const path = `/api/v1/processing/libraries/${libraryId}/library-redownloads`;
-  const r = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      path: filePath,
-      confirm_destructive: true,
-      csrf_token,
-    }),
-  });
-  await requireOk(path, r, "Could not ask the manager to download this again");
-  return readJson<LibraryRedownloadResult>(r);
-}
-
-/** The heading each breakdown gets, and which sub-view shows it. */
-export const LIBRARY_FACET_LABELS: Record<LibraryFacet, string> = {
-  video_codec: "Video codec",
-  resolution: "Resolution",
-  audio: "Audio codec and channels",
-  audio_language: "Audio languages",
-  subtitle_language: "Subtitle languages",
-};
-
-/**
- * The server canonicalises a track language with `OriginalLanguage.CanonicalLanguage`, which picks the
- * ISO 639-2/B spelling ("ger", "fre", "chi"), while the operator picker lists the /T spelling ("deu",
- * "fra", "zho") for some of the same languages. Both name the same language, so a breakdown row would
- * otherwise read "ger" where the rest of the app says "German". Only the entries where the two standards
- * actually differ are listed.
- */
-const LIBRARY_LANGUAGE_LABEL_ALIASES: Record<string, string> = {
-  ger: "deu",
-  chi: "zho",
-  dut: "nld",
-  cze: "ces",
-  gre: "ell",
-  rum: "ron",
-  ice: "isl",
-};
-
-/** What one value of a facet reads as in the UI. Codes stay codes; only the display changes. */
-export function libraryFacetValueLabel(
-  facet: LibraryFacet,
-  value: string,
-): string {
-  if (value === "unknown") return "Unknown";
-  if (facet === "audio_language" || facet === "subtitle_language") {
-    return processingStreamLanguageLabel(
-      LIBRARY_LANGUAGE_LABEL_ALIASES[value] ?? value,
-    );
-  }
-  if (facet === "resolution") {
-    return (
-      { "4k": "4K", "1080p": "1080p", "720p": "720p", sd: "SD" }[value] ?? value
-    );
-  }
-  if (facet === "audio") {
-    const [codec, ...rest] = value.split(" ");
-    return `${codec.toUpperCase()} ${rest.join(" ")}`.trim();
-  }
-  return value.toUpperCase();
-}
-
-/** A file's resolution as the Files table shows it, e.g. "4K" or "1080p". */
-export function libraryResolutionLabel(resolutionClass: string): string {
-  return libraryFacetValueLabel("resolution", resolutionClass);
-}
-
-/** A file's video codec as the Files table shows it; "Unknown" when the probe did not say. */
-export function libraryCodecLabel(codec: string): string {
-  return codec === "unknown" ? "Unknown" : codec.toUpperCase();
-}
-
-/** Bytes as an operator reads them: binary units, one decimal from KB up (mirrors SafeSwapRules.FormatBytes). */
-export function formatBytes(bytes: number): string {
-  const units = ["bytes", "KB", "MB", "GB", "TB"];
-  let value = Math.max(0, bytes);
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return unit === 0
-    ? `${Math.trunc(value)} bytes`
-    : `${value.toFixed(1)} ${units[unit]}`;
-}

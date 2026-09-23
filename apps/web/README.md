@@ -2,7 +2,7 @@
 
 **React + TypeScript + Vite** app served by the .NET server (`apps/server`) on the same origin as the API. It uses the server's cookie session auth. **This directory is the source of truth** for Weir's UI: tokens, logo, the **Outfit** font, the shell and every screen.
 
-`src/lib/app-meta.ts` exposes the `package.json` version as `WEB_APP_VERSION`, injected at build time by `vite.config.ts` `define`.
+The version in the shell footer is the one the running server reports (`GET /api/v1/system/readiness`), not `package.json`.
 
 ## Stack
 
