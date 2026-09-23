@@ -75,19 +75,36 @@ $velopackOut = Join-Path $distRoot "releases"
 $trayPublishDir = Join-Path $distRoot "tray-publish"
 $serverPublishDir = Join-Path $distRoot "server-publish"
 # Ignored by version control and reused between builds: Ensure-WindowsFfmpegRuntime downloads again
-# only when the vendored copy no longer matches the upstream checksum (CI caches this folder too).
+# only when the vendored copy no longer matches the pin below (CI caches this folder too).
+#
+# Pinned the same way #548 pins MKVToolNix below: a specific, immutable BtbN release rather than
+# the `latest` tag. BtbN republishes `latest` from git master continuously, so it is a moving
+# target with no stable checksum authority of its own — its checksums.sha256 is published inside
+# that same mutable release, which proves a download wasn't corrupted in transit, not who built it
+# or that it is the build Weir was tested against.
+#
+# To bump: browse https://github.com/BtbN/FFmpeg-Builds/releases, pick a dated
+# autobuild-YYYY-MM-DD-HH-MM tag (or a versioned "release" build such as n9.0.2 if BtbN has cut
+# one), and find the win64 LGPL (non-shared) zip in its assets — e.g. with
+# `gh release view <tag> -R BtbN/FFmpeg-Builds --json assets`. Update $ffmpegVersion,
+# $ffmpegReleaseTag and $ffmpegArchiveName together, then get $ffmpegArchiveSha256 by downloading
+# that zip to a scratch folder (never the repo) and hashing it yourself — don't just copy the
+# number from the release's own checksums.sha256, since that is the thing being pinned against.
+# Extract the zip and hash ffmpeg.exe/ffprobe.exe for $ffmpegExeSha256/$ffprobeExeSha256. Finally
+# delete packaging/windows/vendor/ffmpeg and re-run this script once to pick up and verify the
+# new build end to end.
+$ffmpegVersion = "n9.0.2 (BtbN autobuild-2026-09-23-14-55)"
+$ffmpegReleaseTag = "autobuild-2026-09-23-14-55"
 $ffmpegVendorDir = Join-Path $PSScriptRoot "vendor\\ffmpeg"
-$ffmpegArchiveName = "ffmpeg-master-latest-win64-lgpl.zip"
-$ffmpegArchiveUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/$ffmpegArchiveName"
-$ffmpegChecksumsUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/checksums.sha256"
-# #548: MKVToolNix, for the mkvmerge writer (Weir.Infrastructure.Media.MkvmergeRemuxWriter). Vendored
-# and cached exactly like ffmpeg above, with one deliberate difference: the version is *pinned* here
-# rather than tracked from a "latest" tag. BtbN republishes its `latest` release continuously and
-# publishes a checksums.sha256 next to it, so ffmpeg can be verified against whatever upstream says
-# today; MKVToolNix publishes immutable per-version directories instead, and the tool that writes the
-# user's Matroska output is not something that should change underneath a Weir release without
-# somebody choosing it. Bumping means editing both lines below together — the checksum is the one
-# upstream publishes at
+$ffmpegArchiveName = "ffmpeg-n9.0.2-3-ga5923073bf-win64-lgpl-9.0.zip"
+$ffmpegArchiveUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/$ffmpegReleaseTag/$ffmpegArchiveName"
+$ffmpegArchiveSha256 = "90e05f6093e72d44ed931413444b5a50b18cf6683674bea53b89b9f0532603fd"
+$ffmpegExeSha256 = "957331f732598e71938c4e6d083e58bf3b222525445482799cece09b54814411"
+$ffprobeExeSha256 = "3400f29503df724150c05ac162149e913fce682a603ba8101fd6f3df9dd67c24"
+# #548: MKVToolNix, for the mkvmerge writer (Weir.Infrastructure.Media.MkvmergeRemuxWriter). Vendored,
+# cached and pinned exactly like ffmpeg above, against MKVToolNix's own immutable per-version release
+# directories rather than BtbN's. Bumping means editing both lines below together — the checksum is
+# the one upstream publishes at
 # https://mkvtoolnix.download/windows/releases/<version>/mkvtoolnix-64-bit-<version>.zip.sha256
 # (also listed in that directory's sha256sums.txt). Weir uses only mkvmerge's long-stable CLI surface
 # (`-o`, `--identification-format json`, per-track selection — see Weir.Core.Media.MkvmergeCommands),
@@ -113,21 +130,23 @@ function Invoke-Native {
   }
 }
 
-function Get-ExpectedFfmpegSha256 {
-  $checksumsPath = Join-Path ([System.IO.Path]::GetTempPath()) ("weir-ffmpeg-checksums-" + [System.Guid]::NewGuid().ToString("N") + ".sha256")
-  try {
-    Invoke-WebRequest -Uri $ffmpegChecksumsUrl -OutFile $checksumsPath -UseBasicParsing
-    $checksumsText = Get-Content -LiteralPath $checksumsPath -Raw
-    $checksumPattern = "(?im)^([a-f0-9]{64})\s+\*?$([regex]::Escape($ffmpegArchiveName))\s*$"
-    $checksumMatch = [regex]::Match($checksumsText, $checksumPattern)
-    if (-not $checksumMatch.Success) {
-      throw "FFmpeg checksum entry for '$ffmpegArchiveName' was not found in checksums.sha256."
-    }
-    return $checksumMatch.Groups[1].Value.ToLowerInvariant()
-  } finally {
-    if (Test-Path -LiteralPath $checksumsPath) {
-      Remove-Item -LiteralPath $checksumsPath -Force -ErrorAction SilentlyContinue
-    }
+function Assert-WindowsFfmpegExeHashes {
+  # Re-hashing the extracted exes — both right after download and again on every cache hit — is
+  # deliberately redundant with the archive-hash check: it catches the vendor folder being
+  # repopulated by something other than this function (a stale or tampered CI cache entry, a
+  # half-written previous run) without trusting the stamp file's own say-so about what it
+  # contains. Verified against the pinned constants above, not against whatever the stamp records.
+  param(
+    [Parameter(Mandatory)][string]$FfmpegExePath,
+    [Parameter(Mandatory)][string]$FfprobeExePath
+  )
+  $actualFfmpegSha256 = (Get-FileHash -LiteralPath $FfmpegExePath -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($actualFfmpegSha256 -ne $ffmpegExeSha256) {
+    throw "ffmpeg.exe hash mismatch at $FfmpegExePath. Expected $ffmpegExeSha256 but got $actualFfmpegSha256. Delete $ffmpegVendorDir and re-run, or re-pin the hash if $ffmpegVersion was deliberately bumped."
+  }
+  $actualFfprobeSha256 = (Get-FileHash -LiteralPath $FfprobeExePath -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($actualFfprobeSha256 -ne $ffprobeExeSha256) {
+    throw "ffprobe.exe hash mismatch at $FfprobeExePath. Expected $ffprobeExeSha256 but got $actualFfprobeSha256. Delete $ffmpegVendorDir and re-run, or re-pin the hash if $ffmpegVersion was deliberately bumped."
   }
 }
 
@@ -136,18 +155,16 @@ function Ensure-WindowsFfmpegRuntime {
   $ffprobeExe = Join-Path $ffmpegVendorDir "ffprobe.exe"
   $stampPath = Join-Path $ffmpegVendorDir ".ffmpeg-archive.sha256"
 
-  Write-Host "Resolving Windows FFmpeg checksum..."
-  $expectedSha256 = Get-ExpectedFfmpegSha256
-
   if ((Test-Path -LiteralPath $ffmpegExe) -and
       (Test-Path -LiteralPath $ffprobeExe) -and
       (Test-Path -LiteralPath $stampPath)) {
     $vendoredSha256 = (Get-Content -LiteralPath $stampPath -Raw).Trim().ToLowerInvariant()
-    if ($vendoredSha256 -eq $expectedSha256) {
-      Write-Host "Vendored FFmpeg already matches upstream ($expectedSha256); skipping download."
+    if ($vendoredSha256 -eq $ffmpegArchiveSha256) {
+      Assert-WindowsFfmpegExeHashes -FfmpegExePath $ffmpegExe -FfprobeExePath $ffprobeExe
+      Write-Host "Vendored FFmpeg $ffmpegVersion already matches the pinned hashes; skipping download."
       return
     }
-    Write-Host "Vendored FFmpeg is stale (have $vendoredSha256, want $expectedSha256); refreshing."
+    Write-Host "Vendored FFmpeg archive stamp is stale (have $vendoredSha256, want $ffmpegArchiveSha256); refreshing."
   }
 
   $downloadRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("weir-ffmpeg-" + [System.Guid]::NewGuid().ToString("N"))
@@ -156,11 +173,11 @@ function Ensure-WindowsFfmpegRuntime {
   try {
     New-Item -ItemType Directory -Path $downloadRoot | Out-Null
     New-Item -ItemType Directory -Path $extractRoot | Out-Null
-    Write-Host "Downloading Windows FFmpeg runtime..."
+    Write-Host "Downloading Windows FFmpeg runtime ($ffmpegVersion)..."
     Invoke-WebRequest -Uri $ffmpegArchiveUrl -OutFile $archivePath -UseBasicParsing
     $actualSha256 = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actualSha256 -ne $expectedSha256) {
-      throw "Downloaded FFmpeg archive hash mismatch. Expected $expectedSha256 but got $actualSha256."
+    if ($actualSha256 -ne $ffmpegArchiveSha256) {
+      throw "Downloaded FFmpeg archive hash mismatch. Expected $ffmpegArchiveSha256 but got $actualSha256."
     }
     Expand-Archive -LiteralPath $archivePath -DestinationPath $extractRoot -Force
     $binDir = Get-ChildItem -Path $extractRoot -Recurse -Directory |
@@ -172,18 +189,18 @@ function Ensure-WindowsFfmpegRuntime {
     if (-not $binDir) {
       throw "Downloaded FFmpeg archive did not contain ffmpeg.exe and ffprobe.exe."
     }
+    Assert-WindowsFfmpegExeHashes `
+      -FfmpegExePath (Join-Path $binDir.FullName "ffmpeg.exe") `
+      -FfprobeExePath (Join-Path $binDir.FullName "ffprobe.exe")
     if (Test-Path $ffmpegVendorDir) {
       Remove-Item -LiteralPath $ffmpegVendorDir -Recurse -Force
     }
     New-Item -ItemType Directory -Path $ffmpegVendorDir | Out-Null
     foreach ($name in @("ffmpeg.exe", "ffprobe.exe")) {
       $src = Join-Path $binDir.FullName $name
-      if (-not (Test-Path -LiteralPath $src)) {
-        throw "Expected $name was not found in the downloaded FFmpeg archive at $src"
-      }
       Copy-Item -LiteralPath $src -Destination (Join-Path $ffmpegVendorDir $name) -Force
     }
-    Set-Content -LiteralPath (Join-Path $ffmpegVendorDir ".ffmpeg-archive.sha256") -Value $expectedSha256 -Encoding ascii
+    Set-Content -LiteralPath (Join-Path $ffmpegVendorDir ".ffmpeg-archive.sha256") -Value $ffmpegArchiveSha256 -Encoding ascii
   } finally {
     if (Test-Path $downloadRoot) {
       Remove-Item -LiteralPath $downloadRoot -Recurse -Force -ErrorAction SilentlyContinue
