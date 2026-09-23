@@ -360,6 +360,24 @@ function ConnectionCard({
                 {connection.name} has them.
               </p>
             ) : null}
+            {connection.kind === "sonarr" || connection.kind === "radarr" ? (
+              // #652: Sonarr and Radarr already say when they import a file. With this set up Weir marks the file
+              // "Imported by …" in History and tidies its own copy away when that is safe.
+              <p
+                className="mb-3 text-[var(--mm-text2)]"
+                data-testid="media-manager-import-webhook"
+              >
+                So Weir hears when {connection.name} imports a file: in{" "}
+                {connection.name}, open Settings → Connect, add a{" "}
+                <strong>Webhook</strong>, tick <strong>On Import</strong> and{" "}
+                <strong>On Upgrade</strong>, and use the address below with
+                method POST. Add a header named <code>X-Webhook-Secret</code>{" "}
+                holding the secret. History then says &ldquo;Imported by{" "}
+                {connection.name}&rdquo;, and Weir removes its own hand-back
+                copy once {connection.name} has taken it, only when that copy is
+                still exactly as Weir wrote it.
+              </p>
+            ) : null}
             <p className="text-[var(--mm-text2)]">
               In {connection.name}, send files to this address:
             </p>
