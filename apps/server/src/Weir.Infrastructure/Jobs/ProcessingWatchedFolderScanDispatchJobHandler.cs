@@ -405,8 +405,10 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
     /// "cancelled, queue it again", for files that no longer exist. A row no scan has seen now counts from when it was last
     /// written, so it still gets the same grace before it is judged.
     /// </remarks>
-    private static async Task ForgetVanishedFilesAsync(UnitOfWork uow, long libraryId, string watchedRoot, string mediaScope, DateTimeOffset now)
+    /// <returns>The relative paths of the rows it forgot.</returns>
+    internal static async Task<List<string>> ForgetVanishedFilesAsync(UnitOfWork uow, long libraryId, string watchedRoot, string mediaScope, DateTimeOffset now, string trigger = "scan")
     {
+        var forgotten = new List<string>();
         var rows = await uow.QueryAsync(
             "SELECT id, relative_path, status, coalesce(last_seen_at, updated_at, created_at) FROM files WHERE library_id = @lib " +
             "AND status IN (@waiting, @held, @outside, @blocked, @failed, @cancelled)",
@@ -452,10 +454,13 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
                         .Set("relative_media_path", rel)
                         .Set("library_id", libraryId)
                         .Set("last_status", status)
-                        .Set("trigger", "scan")
+                        .Set("trigger", trigger)
                         .Set("result", "skipped"),
                     PyJsonFormat.Compact))).ConfigureAwait(false);
+            forgotten.Add(rel);
         }
+
+        return forgotten;
     }
 
     private static async Task RetryCompletedMovieCleanupAsync(
