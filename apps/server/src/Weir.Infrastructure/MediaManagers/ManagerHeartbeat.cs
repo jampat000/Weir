@@ -62,13 +62,15 @@ public static class ManagerHealthProbe
 /// saves the answer, so everything that depends on a manager — the Libraries list, the Media managers screen, and the
 /// work that waits for a manager's word — knows within a minute that one has gone quiet or come back, and can say so
 /// in plain words. Before this the saved answer was only as fresh as the last time someone pressed Test.
+/// A manager that answers is also sent any hand-off report Weir could not deliver while it was not answering (#652).
 /// </summary>
-public sealed class ManagerHeartbeatTask(
+public sealed partial class ManagerHeartbeatTask(
     SqliteDatabase database,
     MediaManagerConnectionService connections,
     IManagerHttpHandlerFactory handlers,
     TimeProvider time,
-    ILogger<ManagerHeartbeatTask> logger) : IPeriodicTask
+    ILogger<ManagerHeartbeatTask> logger,
+    HandoffCompletionReporter? reporter = null) : IPeriodicTask
 {
     /// <summary>How long one manager may take to answer before the heartbeat counts it as not there.</summary>
     public static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(10);
@@ -110,6 +112,31 @@ public sealed class ManagerHeartbeatTask(
                 await MediaManagerConnectionStore.RecordTestResultAsync(write, row.Id, ok, PyDateTime.UtcNow(time), detail).ConfigureAwait(false);
                 await write.CommitAsync().ConfigureAwait(false);
             }
+
+            if (ok && reporter is not null)
+            {
+                await SendWaitingReportsAsync(reporter, row, cancellationToken).ConfigureAwait(false);
+            }
         }
     }
+
+    /// <summary>The reports Weir owes this manager, now that it answers. A failure here never stops the heartbeat.</summary>
+    private async Task SendWaitingReportsAsync(HandoffCompletionReporter sender, MediaManagerConnectionRecord row, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var uow = await UnitOfWork.OpenAsync(database, cancellationToken).ConfigureAwait(false);
+            await using (uow.ConfigureAwait(false))
+            {
+                await sender.SendWaitingReportsAsync(uow, row.Kind, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or InvalidOperationException or IOException)
+        {
+            LogWaitingReportsFailed(logger, exception, row.Name);
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "{Name} is answering again, but Weir could not send the hand-off reports it owes it.")]
+    private static partial void LogWaitingReportsFailed(ILogger logger, Exception error, string name);
 }

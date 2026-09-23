@@ -48,6 +48,29 @@ export interface ProcessingDirectPlay {
   reasons: string[];
 }
 
+/**
+ * The copy Weir handed back for a media manager to import, and what became of it (#652): what the manager said, and
+ * whether Weir removed its copy.
+ */
+export interface ProcessingFileHandback {
+  output_path: string;
+  written_at: string | null;
+  /** Null while no media manager has said anything about it. */
+  outcome: "imported" | "not-imported" | null;
+  /** Sonarr, Radarr, Deluno. */
+  outcome_by: string | null;
+  outcome_at: string | null;
+  /** Where the manager put it in its library. */
+  imported_path: string | null;
+  /** Why the manager will not import it. */
+  outcome_reason: string | null;
+  /** When Weir removed its copy. */
+  released_at: string | null;
+  settled_at: string | null;
+  /** What happened to the copy, in plain words. */
+  release_note: string | null;
+}
+
 export interface ProcessingFile {
   id: number;
   library_id: number;
@@ -96,6 +119,8 @@ export interface ProcessingFile {
   updated_at: string;
   last_seen_at: string | null;
   last_attempt_at: string | null;
+  /** The copy Weir handed back, when it wrote one. */
+  handback?: ProcessingFileHandback | null;
 }
 
 export interface ProcessingFilesPage {

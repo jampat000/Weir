@@ -23,13 +23,18 @@ public static class MaintenanceStore
     {
         ["work_temp_stale_sweep"] = [PeriodicJobKinds.WorkTempStaleSweep],
         ["failure_cleanup"] = [PeriodicJobKinds.MovieFailureCleanupSweep, PeriodicJobKinds.TvFailureCleanupSweep],
+        ["unclaimed_handbacks"] = [PeriodicJobKinds.UnclaimedHandbackCleanup],
     };
 
     private static readonly Dictionary<string, string> FamilyDescriptions = new(StringComparer.Ordinal)
     {
         ["work_temp_stale_sweep"] = "Deletes half-written copies Weir left in its work folders once they are old. Never touches a file being written, or the copy of a file that failed while you keep failed work files.",
         ["failure_cleanup"] = "Deletes the download a file came from once Weir has given up on it for good and no media manager still has it. This removes the original, so it stays off until you switch it on.",
+        ["unclaimed_handbacks"] = "Deletes Weir's own cleaned copy from a hand-back folder when no media manager imported it in time. Only a copy that is still exactly as Weir wrote it; never a download. It stays off until you switch it on.",
     };
+
+    /// <summary>The families Settings › Cleanup lists, in its order.</summary>
+    public static IReadOnlyList<string> Families { get; } = ["work_temp_stale_sweep", "failure_cleanup", "unclaimed_handbacks"];
 
     /// <summary>The job kinds a family's timers queue, for asking the clock when it next runs.</summary>
     public static IReadOnlyList<string> JobKindsFor(string family) => FamilyJobKinds[family];
@@ -63,6 +68,16 @@ public static class MaintenanceStore
         var dedupe = scope == "tv" ? PeriodicJobKinds.WorkTempStaleSweepDedupeKeyTv : PeriodicJobKinds.WorkTempStaleSweepDedupeKeyMovie;
         var payload = PyJsonWriter.Dumps(new PyDict().Set("media_scope", scope).Set("trigger", trigger), PyJsonFormat.Compact);
         return jobStore.EnqueueOrGetAsync(dedupe, PeriodicJobKinds.WorkTempStaleSweep, payload);
+    }
+
+    /// <summary>The unclaimed hand-back cleanup now (#652): single-flight per scope, ignores the schedule toggle like the others.</summary>
+    public static Task EnqueueUnclaimedHandbackCleanupAsync(ProcessingJobStore jobStore, string mediaScope, string trigger)
+    {
+        ArgumentNullException.ThrowIfNull(jobStore);
+        var scope = mediaScope == "tv" ? "tv" : "movie";
+        var dedupe = scope == "tv" ? PeriodicJobKinds.UnclaimedHandbackCleanupDedupeKeyTv : PeriodicJobKinds.UnclaimedHandbackCleanupDedupeKeyMovie;
+        var payload = PyJsonWriter.Dumps(new PyDict().Set("media_scope", scope).Set("trigger", trigger), PyJsonFormat.Compact);
+        return jobStore.EnqueueOrGetAsync(dedupe, PeriodicJobKinds.UnclaimedHandbackCleanup, payload);
     }
 
     /// <summary>

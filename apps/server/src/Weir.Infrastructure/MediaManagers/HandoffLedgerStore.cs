@@ -10,7 +10,10 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
 
-/// <summary>One <c>media_manager_handoffs</c> row.</summary>
+/// <summary>
+/// One <c>media_manager_handoffs</c> row. <see cref="Outcome"/> is the manager's own word on what became of the file
+/// (<c>imported</c> or <c>not-imported</c>, #652), with what Weir answered and whether it released its copy.
+/// </summary>
 public sealed record HandoffLedgerRow(
     long Id,
     string SourceKey,
@@ -20,7 +23,11 @@ public sealed record HandoffLedgerRow(
     string State,
     string? OutputPath,
     string? Message,
-    DateTimeOffset? LastChangedAt);
+    DateTimeOffset? LastChangedAt,
+    string? Outcome = null,
+    string? OutcomeMessage = null,
+    bool OutcomeReleased = false,
+    string? DownloadId = null);
 
 /// <summary>The <c>files</c> columns the ledger reads.</summary>
 public sealed record HandoffFileRow(long Id, string RelativePath, string Status, string StatusReason, long FailureAttempts, DateTimeOffset? NextRetryAt, DateTimeOffset? UpdatedAt);
@@ -31,7 +38,9 @@ public sealed record HandoffFileRow(long Id, string RelativePath, string Status,
 /// </summary>
 public sealed class HandoffLedgerStore
 {
-    private const string LedgerColumns = "id, source_key, handoff_id, library_id, relative_path, state, output_path, message, last_changed_at";
+    private const string LedgerColumns =
+        "id, source_key, handoff_id, library_id, relative_path, state, output_path, message, last_changed_at, outcome, outcome_message, " +
+        "outcome_released, download_id";
 
     private const string JobColumns =
         "id, dedupe_key, job_kind, payload_json, status, lease_owner, lease_expires_at, attempt_count, " +
@@ -55,8 +64,12 @@ public sealed class HandoffLedgerStore
             ("$id", handoffId));
     }
 
-    /// <summary><c>record_handoff_received</c>: at intake. A repeat of a finished hand-off starts it over.</summary>
-    public async Task RecordReceivedAsync(UnitOfWork uow, string sourceKey, string handoffId, long? libraryId, string relativePath)
+    /// <summary>
+    /// <c>record_handoff_received</c>: at intake. A repeat of a finished hand-off starts it over, and so forgets what the
+    /// manager said about the last copy (#652). The manager's download id, when it sent one, is kept so a Sonarr or Radarr
+    /// import can be matched by it.
+    /// </summary>
+    public async Task RecordReceivedAsync(UnitOfWork uow, string sourceKey, string handoffId, long? libraryId, string relativePath, string? downloadId = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var now = PythonTimestamps.Orm(_time.GetUtcNow());
@@ -64,26 +77,78 @@ public sealed class HandoffLedgerStore
         if (row is null)
         {
             await uow.ExecuteAsync(
-                "INSERT INTO media_manager_handoffs (source_key, handoff_id, library_id, relative_path, state, output_path, message, created_at, last_changed_at) " +
-                "VALUES ($source, $id, $library, $path, $state, NULL, NULL, $now, $now)",
+                "INSERT INTO media_manager_handoffs (source_key, handoff_id, library_id, relative_path, state, output_path, message, created_at, last_changed_at, download_id) " +
+                "VALUES ($source, $id, $library, $path, $state, NULL, NULL, $now, $now, $download)",
                 ("$source", sourceKey),
                 ("$id", handoffId),
                 ("$library", libraryId),
                 ("$path", relativePath),
                 ("$state", HandoffLedgerRules.Queued),
-                ("$now", now)).ConfigureAwait(false);
+                ("$now", now),
+                ("$download", string.IsNullOrWhiteSpace(downloadId) ? null : downloadId.Trim())).ConfigureAwait(false);
         }
         else if (HandoffLedgerRules.TerminalStates.Contains(row.State))
         {
             await uow.ExecuteAsync(
                 "UPDATE media_manager_handoffs SET library_id = $library, relative_path = $path, state = $state, output_path = NULL, " +
-                "message = NULL, last_changed_at = $now WHERE id = $row",
+                "message = NULL, last_changed_at = $now, outcome = NULL, outcome_at = NULL, outcome_message = NULL, outcome_released = 0, " +
+                "pending_report_json = NULL, download_id = coalesce($download, download_id) WHERE id = $row",
                 ("$library", libraryId),
                 ("$path", relativePath),
                 ("$state", HandoffLedgerRules.Queued),
                 ("$now", now),
+                ("$download", string.IsNullOrWhiteSpace(downloadId) ? null : downloadId.Trim()),
                 ("$row", row.Id)).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>The manager's own word on a finished hand-off (#652), and what Weir answered.</summary>
+    public async Task RecordManagerOutcomeAsync(UnitOfWork uow, long rowId, string outcome, DateTimeOffset occurredAt, string message, bool released)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        await uow.ExecuteAsync(
+            "UPDATE media_manager_handoffs SET outcome = $outcome, outcome_at = $at, outcome_message = $message, outcome_released = $released, " +
+            "last_changed_at = $now WHERE id = $row",
+            ("$outcome", outcome),
+            ("$at", PythonTimestamps.Orm(occurredAt)),
+            ("$message", PyStrings.Slice(message, 2000)),
+            ("$released", released ? 1 : 0),
+            ("$now", PythonTimestamps.Orm(_time.GetUtcNow())),
+            ("$row", rowId)).ConfigureAwait(false);
+    }
+
+    /// <summary>Hand-offs whose manager gave this download id, newest first.</summary>
+    public static Task<List<HandoffLedgerRow>> WithDownloadIdAsync(UnitOfWork uow, string downloadId)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        return uow.QueryAsync(
+            $"SELECT {LedgerColumns} FROM media_manager_handoffs WHERE download_id = $download ORDER BY id DESC",
+            ReadLedger,
+            ("$download", downloadId));
+    }
+
+    /// <summary>
+    /// A report Weir owes the manager because it was not answering when the pass ended (null clears it). The heartbeat
+    /// sends it once the manager answers (<see cref="HandoffCompletionReporter.SendWaitingReportsAsync"/>).
+    /// </summary>
+    public static Task SetPendingReportAsync(UnitOfWork uow, string sourceKey, string handoffId, string? reportJson)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        return uow.ExecuteAsync(
+            "UPDATE media_manager_handoffs SET pending_report_json = $report WHERE source_key = $source AND handoff_id = $id",
+            ("$report", reportJson),
+            ("$source", sourceKey),
+            ("$id", handoffId));
+    }
+
+    /// <summary>Every report Weir still owes a manager of this kind: the hand-off id and the saved report.</summary>
+    public static Task<List<(string HandoffId, string ReportJson)>> PendingReportsAsync(UnitOfWork uow, string sourceKey)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        return uow.QueryAsync(
+            "SELECT handoff_id, pending_report_json FROM media_manager_handoffs WHERE source_key = $source AND pending_report_json IS NOT NULL ORDER BY id",
+            reader => (SqliteValues.GetString(reader, 0), SqliteValues.GetString(reader, 1)),
+            ("$source", sourceKey));
     }
 
     /// <summary><c>record_handoff_outcome</c>: a result Weir reached. Unknown and cancelled hand-offs are left alone.</summary>
@@ -522,7 +587,11 @@ public sealed class HandoffLedgerStore
         SqliteValues.GetString(reader, 5),
         SqliteValues.GetStringOrNull(reader, 6),
         SqliteValues.GetStringOrNull(reader, 7),
-        PythonTimestamps.Parse(reader.GetValue(8)));
+        PythonTimestamps.Parse(reader.GetValue(8)),
+        SqliteValues.GetStringOrNull(reader, 9),
+        SqliteValues.GetStringOrNull(reader, 10),
+        SqliteValues.GetBool(reader, 11),
+        SqliteValues.GetStringOrNull(reader, 12));
 
     internal static ProcessingJob ReadJob(SqliteDataReader reader) => new(
         reader.GetInt64(0),

@@ -43,6 +43,7 @@ function jobKindLabel(jobKind: string): string {
     "processing.file.remux_pass.v1": "Process media file",
     "processing.work_temp_stale_sweep.v1": "Clean temporary work files",
     "processing.failure_cleanup.v1": "Clean failed work files",
+    "processing.unclaimed_handback_cleanup.v1": "Remove unclaimed hand-backs",
   };
   if (labels[jobKind]) return labels[jobKind];
   const last = jobKind.split(".").filter(Boolean).at(-2) ?? jobKind;

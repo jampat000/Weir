@@ -1,5 +1,6 @@
 import type {
   ProcessingFile,
+  ProcessingFileHandback,
   ProcessingFileLogEntry,
   ProcessingFileStatus,
 } from "../../lib/processing/files-api";
@@ -254,6 +255,66 @@ export function sizesFromRecord(detail: Record<string, unknown>): {
   if (typeof before !== "number" || typeof after !== "number") return null;
   if (before <= 0 || after <= 0) return null;
   return { before, after, saved: Math.max(0, before - after) };
+}
+
+/** What became of the copy Weir handed back, as History tells it. */
+export type HandbackStory = {
+  heading: string;
+  sentence: string;
+  tone: "good" | "neutral" | "warn";
+};
+
+/**
+ * What became of the copy Weir handed back (#652): "Imported by Sonarr", "Deluno will not import it", or still
+ * waiting for a media manager, with what Weir did with its copy. Null when Weir wrote no copy.
+ */
+export function handbackStory(
+  handback: ProcessingFileHandback | null | undefined,
+  now: number,
+): HandbackStory | null {
+  if (!handback) return null;
+  const by = handback.outcome_by ?? "Your media manager";
+  const note = handback.release_note ?? "";
+  if (handback.outcome === "imported") {
+    const when = handback.outcome_at
+      ? ` ${agoWords(handback.outcome_at, now)}`
+      : "";
+    const where = handback.imported_path
+      ? ` It is in the library at ${handback.imported_path}.`
+      : "";
+    return {
+      heading: `Imported by ${by}`,
+      sentence: `${by} imported it${when}.${where} ${note}`.trim(),
+      tone: "good",
+    };
+  }
+  if (handback.outcome === "not-imported") {
+    return {
+      heading: `${by} will not import it`,
+      sentence:
+        note ||
+        `${by} will not import this file. Weir kept its copy at ${handback.output_path}.`,
+      tone: "warn",
+    };
+  }
+  if (handback.settled_at && note) {
+    return { heading: "Handed back", sentence: note, tone: "neutral" };
+  }
+  const when = handback.written_at
+    ? ` ${agoWords(handback.written_at, now)}`
+    : "";
+  return {
+    heading: "Handed back",
+    sentence: `Weir put the cleaned copy at ${handback.output_path}${when} for your media manager to import. No media manager has said it imported it yet.`,
+    tone: "neutral",
+  };
+}
+
+/** "Imported by Sonarr" once a media manager has said so, for the list. */
+export function importedLabel(file: ProcessingFile): string | null {
+  return file.handback?.outcome === "imported"
+    ? `Imported by ${file.handback.outcome_by ?? "your media manager"}`
+    : null;
 }
 
 /** The newest record that describes a pass over the file, skipping the cleanup notes some passes add. */

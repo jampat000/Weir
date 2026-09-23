@@ -584,6 +584,14 @@ public sealed class RemuxPassHandler : IJobHandler
                         rel,
                         result.Get("source_fingerprint_size") is PyInt size ? (long)size.Value : null,
                         result.Get("source_fingerprint_mtime_ns") is PyInt mtime ? (long)mtime.Value : null).ConfigureAwait(false);
+
+                    // #652: exactly which copy this pass handed back, so it can be released safely once a manager has it.
+                    // Only a copy this pass wrote itself: after a collision skip the file at that path is not Weir's.
+                    if (result.Get("output_file") is PyStr { Value.Length: > 0 } handedBack &&
+                        result.Get("output_collision_action") is PyStr { Value: "write" })
+                    {
+                        await HandbackStore.RecordWrittenAsync(uow, library.Id, rel, handedBack.Value, now).ConfigureAwait(false);
+                    }
                 },
                 _logger,
                 "file outcome").ConfigureAwait(false);

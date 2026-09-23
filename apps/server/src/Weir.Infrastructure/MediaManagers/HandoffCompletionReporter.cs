@@ -18,8 +18,11 @@ public sealed record HandoffReportTarget(ManagerConnection Connection, string Ur
 /// Reports a finished hand-off to the manager that asked for it (port of <c>completion_callback</c>). The processing
 /// port calls <see cref="ReportHandoffCompletionAsync"/> when a pass ends; the reject policy uses the parts.
 /// </summary>
-public sealed class HandoffCompletionReporter
+public sealed partial class HandoffCompletionReporter
 {
+    /// <summary>How <see cref="PostHandoffReportAsync"/> says the manager did not answer at all.</summary>
+    private const string NotAnsweringPrefix = "failed: could not reach ";
+
     private readonly MediaManagerConnectionService _connections;
     private readonly HandoffLedgerStore _ledger;
     private readonly IManagerHttpHandlerFactory _handlers;
@@ -224,9 +227,126 @@ public sealed class HandoffCompletionReporter
         var body = CompletionReports.BuildCompletionBody(origin, result, outputPath);
         var delivery = await PostHandoffReportAsync(target, body, cancellationToken).ConfigureAwait(false);
         var relative = result.Get("relative_media_path") is PyStr text ? text.Value : null;
-        await RecordOutcomeAsync(uow, origin, body, (target, delivery, relative)).ConfigureAwait(false);
+        long? libraryId = payload is PyDict carried && carried.Get("library_id") is PyInt library ? (long)library.Value : null;
+        await RecordOutcomeAsync(uow, origin, body, (target, delivery, relative), libraryId).ConfigureAwait(false);
         return delivery.Status;
     }
+
+    /// <summary>The manager did not answer at all, as opposed to answering with a refusal.</summary>
+    public static bool IsNotAnswering(HandoffReportDelivery delivery) =>
+        delivery is { Accepted: false } && delivery.Status.StartsWith(NotAnsweringPrefix, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Send every report Weir still owes a manager of this kind because it was not answering when the pass ended (item 5 of
+    /// #652). The heartbeat calls this once the manager answers its connection test. A report the manager answers, accepted
+    /// or refused, is no longer owed, and the file's History stops saying Weir is waiting; one it still does not answer
+    /// stays owed. Each report is committed on its own. Returns how many the manager answered.
+    /// </summary>
+    public async Task<int> SendWaitingReportsAsync(UnitOfWork uow, string sourceKey, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        var answered = 0;
+        foreach (var (handoffId, reportJson) in await HandoffLedgerStore.PendingReportsAsync(uow, sourceKey).ConfigureAwait(false))
+        {
+            if (PendingReport.Parse(reportJson) is not { } pending)
+            {
+                await HandoffLedgerStore.SetPendingReportAsync(uow, sourceKey, handoffId, null).ConfigureAwait(false);
+                await uow.CommitAsync().ConfigureAwait(false);
+                continue;
+            }
+
+            var origin = new HandoffOrigin(sourceKey, handoffId, pending.CallbackPath, pending.ReleaseName, pending.ManagerLibraryId);
+            var (target, _) = await ResolveHandoffTargetAsync(uow, origin).ConfigureAwait(false);
+            if (target is null)
+            {
+                continue;
+            }
+
+            var delivery = await PostHandoffReportAsync(target, pending.Body, cancellationToken).ConfigureAwait(false);
+            if (IsNotAnswering(delivery))
+            {
+                continue;
+            }
+
+            await HandoffLedgerStore.SetPendingReportAsync(uow, sourceKey, handoffId, null).ConfigureAwait(false);
+            await RecordHandoffReportAsync(uow, target, pending.Body, delivery, pending.RelativePath).ConfigureAwait(false);
+            if (pending.LibraryId is { } libraryId && pending.RelativePath is { } relativePath)
+            {
+                await ReplaceFileSentenceAsync(
+                    uow,
+                    libraryId,
+                    relativePath,
+                    ManagerWaitMessages.ReportWaiting(target.Connection.Name),
+                    delivery.Accepted ? ManagerWaitMessages.ReportDelivered(target.Connection.Name) : string.Empty).ConfigureAwait(false);
+            }
+
+            await uow.CommitAsync().ConfigureAwait(false);
+            LogWaitingReportSent(_logger, target.Connection.Name, handoffId, delivery.Status);
+            answered++;
+        }
+
+        return answered;
+    }
+
+    /// <summary>A file's status reason with one sentence swapped for another (or dropped), so History reads as things are now.</summary>
+    private static Task<int> ReplaceFileSentenceAsync(UnitOfWork uow, long libraryId, string relativePath, string sentence, string replacement) =>
+        uow.ExecuteAsync(
+            "UPDATE files SET status_reason = trim(replace(status_reason, $old, $new)), updated_at = CURRENT_TIMESTAMP " +
+            "WHERE library_id = $library AND relative_path = $path AND instr(status_reason, $old) > 0",
+            ("$old", sentence),
+            ("$new", replacement),
+            ("$library", libraryId),
+            ("$path", relativePath));
+
+    /// <summary>A file's status reason with a sentence added once.</summary>
+    private static Task<int> AppendFileSentenceAsync(UnitOfWork uow, long libraryId, string relativePath, string sentence) =>
+        uow.ExecuteAsync(
+            "UPDATE files SET status_reason = trim(status_reason || ' ' || $sentence), updated_at = CURRENT_TIMESTAMP " +
+            "WHERE library_id = $library AND relative_path = $path AND instr(status_reason, $sentence) = 0",
+            ("$sentence", sentence),
+            ("$library", libraryId),
+            ("$path", relativePath));
+
+    /// <summary>A report Weir owes a manager that was not answering, as saved on the hand-off row.</summary>
+    private sealed record PendingReport(
+        string? CallbackPath, string? ReleaseName, string? ManagerLibraryId, PyDict Body, long? LibraryId, string? RelativePath)
+    {
+        public string ToJson() => PyJsonWriter.Dumps(
+            new PyDict()
+                .Set("callback_path", CallbackPath)
+                .Set("release_name", ReleaseName)
+                .Set("manager_library_id", ManagerLibraryId)
+                .Set("body", Body)
+                .Set("library_id", LibraryId)
+                .Set("relative_media_path", RelativePath),
+            PyJsonFormat.Compact);
+
+        public static PendingReport? Parse(string json)
+        {
+            try
+            {
+                if (PyJsonParser.Parse(json) is not PyDict dict || dict.Get("body") is not PyDict body)
+                {
+                    return null;
+                }
+
+                return new PendingReport(
+                    HandoffOrigin.OptionalText(dict.Get("callback_path")),
+                    HandoffOrigin.OptionalText(dict.Get("release_name")),
+                    HandoffOrigin.OptionalText(dict.Get("manager_library_id")),
+                    body,
+                    dict.Get("library_id") is PyInt library ? (long)library.Value : null,
+                    HandoffOrigin.OptionalText(dict.Get("relative_media_path")));
+            }
+            catch (PyJsonDecodeException)
+            {
+                return null;
+            }
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "{Manager} is answering again; the hand-off report Weir owed it for {HandoffId}: {Status}")]
+    private static partial void LogWaitingReportSent(ILogger logger, string manager, string handoffId, string status);
 
     /// <summary>
     /// <c>translate_output_path</c>: <paramref name="outputFile"/> rebuilt under the manager's output folder, or null when it is
@@ -292,8 +412,13 @@ public sealed class HandoffCompletionReporter
         return null;
     }
 
-    /// <summary><c>_record_outcome</c>: keep the ledger and Activity in step with a final outcome, then commit. Never throws.</summary>
-    private async Task RecordOutcomeAsync(UnitOfWork uow, HandoffOrigin origin, PyDict body, (HandoffReportTarget Target, HandoffReportDelivery Delivery, string? Relative)? report)
+    /// <summary>
+    /// <c>_record_outcome</c>: keep the ledger and Activity in step with a final outcome, then commit. Never throws. A report
+    /// the manager did not answer is kept on the hand-off for the heartbeat to send once it answers, and the file's
+    /// History says Weir is waiting for it, in plain words (#652).
+    /// </summary>
+    private async Task RecordOutcomeAsync(
+        UnitOfWork uow, HandoffOrigin origin, PyDict body, (HandoffReportTarget Target, HandoffReportDelivery Delivery, string? Relative)? report, long? libraryId = null)
     {
         try
         {
@@ -319,6 +444,18 @@ public sealed class HandoffCompletionReporter
             if (report is { } sent)
             {
                 await RecordHandoffReportAsync(uow, sent.Target, body, sent.Delivery, sent.Relative).ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(origin.HandoffId))
+                {
+                    var waiting = IsNotAnswering(sent.Delivery);
+                    var owed = waiting
+                        ? new PendingReport(origin.CallbackPath, origin.ReleaseName, origin.LibraryId, body, libraryId, sent.Relative).ToJson()
+                        : null;
+                    await HandoffLedgerStore.SetPendingReportAsync(uow, origin.SourceKey, origin.HandoffId, owed).ConfigureAwait(false);
+                    if (waiting && libraryId is { } library && !string.IsNullOrEmpty(sent.Relative))
+                    {
+                        await AppendFileSentenceAsync(uow, library, sent.Relative, ManagerWaitMessages.ReportWaiting(sent.Target.Connection.Name)).ConfigureAwait(false);
+                    }
+                }
             }
 
             await uow.CommitAsync().ConfigureAwait(false);

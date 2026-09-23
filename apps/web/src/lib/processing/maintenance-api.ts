@@ -1,7 +1,8 @@
 import { fetchCsrfToken } from "../api/auth-api";
 import { apiFetch, readJson, requireOk } from "../api/client";
 
-export type MaintenanceFamily = "work_temp_stale_sweep" | "failure_cleanup";
+export type MaintenanceFamily =
+  "work_temp_stale_sweep" | "failure_cleanup" | "unclaimed_handbacks";
 
 export interface MaintenanceFamilyState {
   family: MaintenanceFamily;
@@ -17,6 +18,8 @@ export interface MaintenanceFamilyState {
   interval_seconds?: number;
   /** When it next runs by itself; null while it is switched off. */
   next_run_at?: string | null;
+  /** Unclaimed hand-backs only: how many days a copy waits before the job may remove it. */
+  window_days?: number;
 }
 
 export interface MaintenanceState {

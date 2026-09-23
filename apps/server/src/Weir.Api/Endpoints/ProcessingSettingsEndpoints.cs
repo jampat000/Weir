@@ -4,6 +4,7 @@ using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
 using Weir.Core.Media;
+using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Media;
@@ -47,6 +48,10 @@ public static class ProcessingSettingsEndpoints
         // Null: the interval the environment gives. Settings › Cleanup shows the one in force from /processing/maintenance.
         .Set("work_temp_stale_sweep_interval_seconds", row.WorkTempStaleSweepIntervalSeconds is { } sweepEvery ? PyJson.Of(sweepEvery) : PyJson.Null)
         .Set("failure_cleanup_interval_seconds", row.FailureCleanupIntervalSeconds is { } cleanupEvery ? PyJson.Of(cleanupEvery) : PyJson.Null)
+        // #652: Settings › Cleanup › Unclaimed hand-backs. Off until a person switches it on; a null interval is six hours.
+        .Set("unclaimed_handback_cleanup_enabled", row.UnclaimedHandbackCleanupEnabled)
+        .Set("unclaimed_handback_window_days", OperatorSettingsRules.ClampUnclaimedHandbackWindowDays(row.UnclaimedHandbackWindowDays))
+        .Set("unclaimed_handback_cleanup_interval_seconds", row.UnclaimedHandbackCleanupIntervalSeconds is { } unclaimedEvery ? PyJson.Of(unclaimedEvery) : PyJson.Null)
         .Set("keep_failed_work_files", row.KeepFailedWorkFiles)
         .Set("file_log_retention_days", OperatorSettingsRules.ClampFileLogRetentionDays(row.FileLogRetentionDays))
         .Set("verbose_detection_logging", row.VerboseDetectionLogging)
@@ -96,6 +101,11 @@ public static class ProcessingSettingsEndpoints
             "work_temp_stale_sweep_interval_seconds", ge: OperatorSettingsRules.MinCleanupIntervalSeconds, le: OperatorSettingsRules.MaxCleanupIntervalSeconds);
         var failureCleanupIntervalSeconds = model.OptionalInt(
             "failure_cleanup_interval_seconds", ge: OperatorSettingsRules.MinCleanupIntervalSeconds, le: OperatorSettingsRules.MaxCleanupIntervalSeconds);
+        var unclaimedHandbackCleanupEnabled = model.OptionalBool("unclaimed_handback_cleanup_enabled");
+        var unclaimedHandbackWindowDays = model.OptionalInt(
+            "unclaimed_handback_window_days", ge: HandbackRules.MinUnclaimedWindowDays, le: HandbackRules.MaxUnclaimedWindowDays);
+        var unclaimedHandbackCleanupIntervalSeconds = model.OptionalInt(
+            "unclaimed_handback_cleanup_interval_seconds", ge: OperatorSettingsRules.MinCleanupIntervalSeconds, le: OperatorSettingsRules.MaxCleanupIntervalSeconds);
         var keepFailedWorkFiles = model.OptionalBool("keep_failed_work_files");
         var fileLogRetentionDays = model.OptionalInt("file_log_retention_days", ge: 0, le: 3650);
         var verboseDetectionLogging = model.OptionalBool("verbose_detection_logging");
@@ -132,6 +142,8 @@ public static class ProcessingSettingsEndpoints
                                runnerCost720P is not null || runnerCost1080P is not null || runnerCost4K is not null ||
                                runnerCostUndetermined is not null || runnerBudgetEnabled is not null || workTempStaleSweepEnabled is not null || failureCleanupEnabled is not null ||
                                workTempStaleSweepIntervalSeconds is not null || failureCleanupIntervalSeconds is not null ||
+                               unclaimedHandbackCleanupEnabled is not null || unclaimedHandbackWindowDays is not null ||
+                               unclaimedHandbackCleanupIntervalSeconds is not null ||
                                keepFailedWorkFiles is not null || fileLogRetentionDays is not null || verboseDetectionLogging is not null ||
                                minFileAgeSeconds is not null || processingMinInputFileSizeMb is not null || minimumFreeDiskSpaceMb is not null;
         if (!hasProcessField && movieScheduleEnabled is null && tvScheduleEnabled is null)
@@ -210,6 +222,21 @@ public static class ProcessingSettingsEndpoints
         if (failureCleanupIntervalSeconds is { } cleanupEvery)
         {
             after = after with { FailureCleanupIntervalSeconds = cleanupEvery };
+        }
+
+        if (unclaimedHandbackCleanupEnabled is { } unclaimedOn)
+        {
+            after = after with { UnclaimedHandbackCleanupEnabled = unclaimedOn };
+        }
+
+        if (unclaimedHandbackWindowDays is { } unclaimedDays)
+        {
+            after = after with { UnclaimedHandbackWindowDays = OperatorSettingsRules.ClampUnclaimedHandbackWindowDays(unclaimedDays) };
+        }
+
+        if (unclaimedHandbackCleanupIntervalSeconds is { } unclaimedEvery)
+        {
+            after = after with { UnclaimedHandbackCleanupIntervalSeconds = unclaimedEvery };
         }
 
         if (keepFailedWorkFiles is { } kf)

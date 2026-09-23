@@ -88,7 +88,7 @@ def test_maintenance_state_lists_every_promoted_family(admin) -> None:
     body = admin.get(f"{API}/processing/maintenance").json()
 
     families = {row["family"] for row in body["families"]}
-    assert families == {"work_temp_stale_sweep", "failure_cleanup"}
+    assert families == {"work_temp_stale_sweep", "failure_cleanup", "unclaimed_handbacks"}
     cleanup = next(row for row in body["families"] if row["family"] == "failure_cleanup")
     assert "deletes the original" in cleanup["description"]
 

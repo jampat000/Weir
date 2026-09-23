@@ -1,0 +1,172 @@
+namespace Weir.Core.MediaManagers;
+
+/// <summary>
+/// What became of a file Weir handed back (#652): the words for a manager's "imported" or "will not import", and how a
+/// path the manager reports is matched to Weir's own copy. No filesystem or database access here.
+/// </summary>
+public static class HandbackRules
+{
+    /// <summary>The intake capability that says Weir takes <c>POST …/intake/handoffs/{source}/{id}/outcome</c>.</summary>
+    public const string OutcomeCapability = "handoff-outcome";
+
+    /// <summary>The manager imported the file.</summary>
+    public const string Imported = "imported";
+
+    /// <summary>The manager will never import the file. Final: a manager does not send it for a failure it will retry.</summary>
+    public const string NotImported = "not-imported";
+
+    /// <summary>The outcomes a manager may send, in the spelling agreed with Deluno.</summary>
+    public static readonly IReadOnlyList<string> Outcomes = [Imported, NotImported];
+
+    /// <summary>How long an unclaimed copy waits before the Cleanup job may remove it, unless a person changes it.</summary>
+    public const int DefaultUnclaimedWindowDays = 14;
+
+    /// <summary>The shortest and longest wait Settings › Cleanup offers.</summary>
+    public const int MinUnclaimedWindowDays = 1;
+
+    public const int MaxUnclaimedWindowDays = 365;
+
+    /// <summary>How often the unclaimed hand-back cleanup runs when nobody has chosen: every six hours.</summary>
+    public const int DefaultUnclaimedIntervalSeconds = 6 * 3600;
+
+    /// <summary>
+    /// Whether <paramref name="managerPath"/>, a path as a manager reports it, names the copy whose path under Weir's output
+    /// folder is <paramref name="relativeParts"/>. This reverses <c>HandoffCompletionReporter.TranslateOutputPath</c> when
+    /// the manager's own name for the folder is not known, which is the usual case for Sonarr and Radarr: they see Weir's
+    /// output folder through a remote path mapping Weir cannot read. The copy's whole path below the output folder (its
+    /// folders and its name) must end the manager's path, so a file of the same name in another folder is not it.
+    /// </summary>
+    public static bool ManagerPathEndsWith(string managerPath, IReadOnlyList<string> relativeParts)
+    {
+        ArgumentNullException.ThrowIfNull(relativeParts);
+        var parts = Parts(managerPath);
+        if (relativeParts.Count == 0 || parts.Count <= relativeParts.Count)
+        {
+            return false;
+        }
+
+        var comparison = Comparison(managerPath);
+        var offset = parts.Count - relativeParts.Count;
+        for (var index = 0; index < relativeParts.Count; index++)
+        {
+            if (!string.Equals(parts[offset + index], relativeParts[index], comparison))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>Two paths as a manager writes them name the same file: separators and a trailing slash do not count.</summary>
+    public static bool SameManagerPath(string? left, string? right)
+    {
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+        {
+            return false;
+        }
+
+        var a = Parts(left);
+        var b = Parts(right);
+        var comparison = Comparison(left);
+        return a.Count == b.Count && a.Zip(b).All(pair => string.Equals(pair.First, pair.Second, comparison));
+    }
+
+    /// <summary>The last part of a path, in either style.</summary>
+    public static string FileName(string path) => Parts(path) is { Count: > 0 } parts ? parts[^1] : string.Empty;
+
+    private static List<string> Parts(string path) =>
+        [.. (path ?? string.Empty).Trim().Split('/', '\\').Where(part => part.Length > 0 && part != ".")];
+
+    /// <summary>A Windows-style path (a drive letter or a backslash) ignores case, as Windows does; any other does not.</summary>
+    private static StringComparison Comparison(string path)
+    {
+        var text = (path ?? string.Empty).Trim();
+        var windows = text.Contains('\\', StringComparison.Ordinal) || (text.Length >= 2 && text[1] == ':' && char.IsLetter(text[0]));
+        return windows || OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+    }
+
+    // --- words ----------------------------------------------------------------------------------------------------------
+
+    /// <summary>The Activity title for a manager's word on a file.</summary>
+    public static string OutcomeTitle(string manager, string outcome, string fileName) =>
+        outcome == NotImported ? $"{manager} will not import {fileName}" : $"{manager} imported {fileName}";
+
+    public static string RemovedNote(string manager) =>
+        $"Weir removed its copy from the hand-back folder, because {manager} has the file now.";
+
+    public static string AlreadyGoneNote(string manager) =>
+        $"{manager} moved Weir's copy into its library, so there was nothing for Weir to remove.";
+
+    public const string ChangedNote =
+        "Weir's copy has changed since Weir wrote it, so Weir left it alone.";
+
+    public const string OutsideNote =
+        "Weir's copy is not inside this library's output folder any more, so Weir left it alone.";
+
+    public const string UnrecordedNote =
+        "Weir kept its copy, because it has no record of exactly which file it wrote.";
+
+    public const string SameAsLibraryNote =
+        "The manager's library file is Weir's copy itself, so Weir left it where it is.";
+
+    public static string InUseNote(string reason) =>
+        $"Weir could not remove its copy ({reason}). It is still in the hand-back folder; remove it by hand if you want the space back.";
+
+    public static string UnsignedNote(string manager) =>
+        $"Weir kept its copy, because {manager}'s messages to Weir carry no webhook secret, so Weir cannot be sure this one came from {manager}. " +
+        "Set a webhook secret for it on the Media managers page and Weir will tidy up after its imports.";
+
+    public static string NotImportedNote(string manager, string? reason) =>
+        string.IsNullOrWhiteSpace(reason)
+            ? $"{manager} will not import this file. Weir kept its copy in the hand-back folder."
+            : $"{manager} will not import this file: {reason.Trim().TrimEnd('.')}. Weir kept its copy in the hand-back folder.";
+
+    public static string UnclaimedNote(long days) =>
+        $"No media manager imported it within {days} {(days == 1 ? "day" : "days")}, so Weir removed its copy.";
+
+    public const string UnclaimedGoneNote =
+        "Weir's copy had already left the hand-back folder, so there was nothing to remove.";
+
+    /// <summary>What the outcome endpoint says about a hand-off whose files Weir released, kept, or found gone.</summary>
+    public static string OutcomeMessage(string manager, string outcome, int removed, int gone, int kept, string? firstKeptNote)
+    {
+        if (outcome == NotImported)
+        {
+            return "Weir recorded that the file will not be imported, and kept its copy.";
+        }
+
+        if (removed + gone + kept == 0)
+        {
+            return $"Weir recorded that {manager} imported the file. {UnrecordedNote}";
+        }
+
+        if (kept > 0)
+        {
+            return $"Weir recorded that {manager} imported the file. {firstKeptNote ?? UnrecordedNote}";
+        }
+
+        return removed > 0
+            ? $"Weir recorded that {manager} imported the file and released its copy."
+            : $"Weir recorded that {manager} imported the file. {AlreadyGoneNote(manager)}";
+    }
+}
+
+/// <summary>
+/// The plain words for work held up because a linked media manager is not answering (James, 23 Sep 2026). The heartbeat
+/// (<c>ManagerHeartbeatTask</c>) is what notices it answering again.
+/// </summary>
+public static class ManagerWaitMessages
+{
+    /// <summary>A hand-back Weir could not report, which the heartbeat sends once the manager answers.</summary>
+    public static string ReportWaiting(string manager) =>
+        $"Waiting for {manager}, which is not answering. Weir will tell it this file is ready when it answers.";
+
+    /// <summary>The same report, delivered once the manager answered again.</summary>
+    public static string ReportDelivered(string manager) =>
+        $"{manager} is answering again, and Weir has told it this file is ready.";
+
+    /// <summary>A rejection Weir could not make because the manager did not answer; the original was handed back instead.</summary>
+    public static string RejectNotAnswering(string manager) =>
+        $"{manager} is not answering, so Weir could not reject this release.";
+}

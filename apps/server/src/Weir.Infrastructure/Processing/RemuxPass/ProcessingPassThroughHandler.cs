@@ -129,7 +129,7 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
                 .Set("output_file", result.Destination)
                 .Set("processing_output_folder_resolved", RemuxPassPaths.Resolve(delivery.OutputFolder))
                 .Set("passed_through_after_failure", true);
-            var reportPayload = PyJsonWriter.Dumps(new PyDict().Set("origin", origin), PyJsonFormat.Compact);
+            var reportPayload = PyJsonWriter.Dumps(new PyDict().Set("origin", origin).Set("library_id", delivery.LibraryId), PyJsonFormat.Compact);
             var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
             string status;
             await using (uow.ConfigureAwait(false))
@@ -146,6 +146,12 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
     {
         await RemuxPassFileState.RecordOutputCollisionAsync(uow, relativePath, result.Collision, settings.LibraryId).ConfigureAwait(false);
         await RemuxPassFileState.MarkFileStatusAsync(uow, settings.LibraryId, relativePath, ProcessingFileStatuses.PassedThrough, result.Sentence, now).ConfigureAwait(false);
+        if (result.Delivered)
+        {
+            // #652: the copy handed back, so it can be released safely once a manager has it.
+            await HandbackStore.RecordWrittenAsync(uow, settings.LibraryId, relativePath, result.Destination, now).ConfigureAwait(false);
+        }
+
         var detail = new PyDict()
             .Set("job_id", jobId)
             .Set("relative_media_path", relativePath)

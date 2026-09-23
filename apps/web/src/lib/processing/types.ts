@@ -77,6 +77,12 @@ export type ProcessingOperatorSettingsOut = {
   /** Seconds; null keeps the interval the environment gives. Settings › Cleanup reads the one in force from maintenance. */
   work_temp_stale_sweep_interval_seconds?: number | null;
   failure_cleanup_interval_seconds?: number | null;
+  /** Remove Weir's own hand-back copies nobody claimed. Off until a person switches it on. */
+  unclaimed_handback_cleanup_enabled?: boolean;
+  /** How many days an unclaimed copy waits, 1 to 365; 14 unless a person changes it. */
+  unclaimed_handback_window_days?: number;
+  /** Seconds; null keeps six hours. */
+  unclaimed_handback_cleanup_interval_seconds?: number | null;
   keep_failed_work_files: boolean;
   file_log_retention_days: number;
   verbose_detection_logging: boolean;
@@ -113,6 +119,10 @@ export type ProcessingOperatorSettingsPutBody = {
   /** 900 (15 minutes) to 2592000 (30 days). */
   work_temp_stale_sweep_interval_seconds?: number;
   failure_cleanup_interval_seconds?: number;
+  unclaimed_handback_cleanup_enabled?: boolean;
+  /** 1 to 365. */
+  unclaimed_handback_window_days?: number;
+  unclaimed_handback_cleanup_interval_seconds?: number;
   keep_failed_work_files?: boolean;
   file_log_retention_days?: number;
   verbose_detection_logging?: boolean;

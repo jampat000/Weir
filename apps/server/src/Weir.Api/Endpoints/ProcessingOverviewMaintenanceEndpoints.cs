@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Routing;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
+using Weir.Core.MediaManagers;
+using Weir.Core.Processing;
 using Weir.Core.Time;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Jobs;
@@ -64,6 +66,7 @@ public static class ProcessingOverviewMaintenanceEndpoints
         var operatorRow = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
         var sweep = await MaintenanceStore.StateForAsync(uow, "work_temp_stale_sweep", operatorRow.WorkTempStaleSweepEnabled).ConfigureAwait(false);
         var cleanup = await MaintenanceStore.StateForAsync(uow, "failure_cleanup", operatorRow.FailureCleanupEnabled).ConfigureAwait(false);
+        var unclaimed = await MaintenanceStore.StateForAsync(uow, "unclaimed_handbacks", operatorRow.UnclaimedHandbackCleanupEnabled).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
 
         var clock = request.Service<PeriodicEnqueueClock>();
@@ -79,6 +82,8 @@ public static class ProcessingOverviewMaintenanceEndpoints
         [
             Out(sweep, operatorRow.WorkTempStaleSweepIntervalSeconds, options.ProcessingWorkTempStaleSweepMovieScheduleIntervalSeconds),
             Out(cleanup, operatorRow.FailureCleanupIntervalSeconds, options.ProcessingMovieFailureCleanupScheduleIntervalSeconds),
+            Out(unclaimed, operatorRow.UnclaimedHandbackCleanupIntervalSeconds, HandbackRules.DefaultUnclaimedIntervalSeconds)
+                .Set("window_days", OperatorSettingsRules.ClampUnclaimedHandbackWindowDays(operatorRow.UnclaimedHandbackWindowDays)),
         ])));
     }
 
@@ -88,7 +93,7 @@ public static class ProcessingOverviewMaintenanceEndpoints
         var issues = new ValidationIssues();
         var model = new BodyModel(payload, issues);
         var csrfToken = model.Str("csrf_token", minLength: 1);
-        var family = model.Literal("family", ["work_temp_stale_sweep", "failure_cleanup"]);
+        var family = model.Literal("family", MaintenanceStore.Families);
         var mediaScope = model.Literal("media_scope", ["movie", "tv"], defaultValue: "movie");
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
@@ -103,6 +108,16 @@ public static class ProcessingOverviewMaintenanceEndpoints
             await request.CommitAsync().ConfigureAwait(false);
             var scopeWord = mediaScope == "tv" ? "TV" : "Movies";
             return ApiRoutes.Ok(new PyDict().Set("queued", true).Set("detail", $"Queued a work file sweep for {scopeWord}. It runs as soon as a worker is free."));
+        }
+
+        if (family == "unclaimed_handbacks")
+        {
+            await MaintenanceStore.EnqueueUnclaimedHandbackCleanupAsync(request.Service<ProcessingJobStore>(), mediaScope, "manual").ConfigureAwait(false);
+            await request.CommitAsync().ConfigureAwait(false);
+            var scopeWord = mediaScope == "tv" ? "TV" : "Movies";
+            return ApiRoutes.Ok(new PyDict()
+                .Set("queued", true)
+                .Set("detail", $"Queued the unclaimed hand-back cleanup for {scopeWord}. It runs as soon as a worker is free."));
         }
 
         var (jobId, inserted) = await MaintenanceStore.EnqueueFailureCleanupSweepAsync(uow, mediaScope, "manual").ConfigureAwait(false);

@@ -109,6 +109,9 @@ const EVENT_LABELS: Record<string, string> = {
   "processing.work_temp_stale_sweep_completed":
     "Temporary files cleanup finished",
   "processing.failure_cleanup_sweep_completed": "Failed-remux cleanup finished",
+  "processing.handback_outcome": "What became of a hand-back",
+  "processing.unclaimed_handback_cleanup_completed":
+    "Unclaimed hand-backs cleanup finished",
 };
 
 function compactActivityTitle(text: string, maxLength = 92): string {
