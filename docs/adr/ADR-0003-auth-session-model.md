@@ -29,6 +29,8 @@ The product requires **secure-by-default** web authentication: **server-side ses
 - Any historical Jinja/SQLite spike (outside this repository) is **not** the reference implementation for the final Weir auth stack.
 - New auth code must live under **`apps/backend/src/weir/platform/`** (or a dedicated submodule) when implemented, and must satisfy this ADR.
 
+  > **Update:** since [ADR-0017](ADR-0017-backend-on-dotnet.md) the auth code is in the .NET server: rules and rate limiting in `Weir.Core/Auth`, Argon2id and CSRF tokens in `Weir.Core/Security`, the `users` and `user_sessions` stores and the offline password recovery command in `Weir.Infrastructure/Auth`, and the `/api/v1/auth/` routes in `Weir.Api/Endpoints/AuthEndpoints.cs`. The decisions above are unchanged. CSRF tokens keep the itsdangerous-compatible signed format, so the routes below behave as they did.
+
 ## Current implementation snapshot
 
 - **Routes** under ``/api/v1/auth/``: ``GET /csrf``, ``POST /login``, ``POST /logout``, ``GET /me``, ``GET /bootstrap/status``, ``POST /bootstrap``.
@@ -43,6 +45,8 @@ The product requires **secure-by-default** web authentication: **server-side ses
 
 - Distributed rate limiting
 - Trusted proxy client IP parsing
+
+  > **Update:** done. When `WEIR_TRUSTED_PROXY_IPS` lists the proxy, the login and bootstrap rate limits use the client address from `X-Forwarded-For`; without it the header is ignored and a warning is logged. Sign-ins, failed sign-ins, sign-outs, bootstrap, session revocations and username or password changes are also recorded as `auth.*` activity events, which gives auth a basic audit trail.
 - Audit logging for auth events
 - Additional non-auth module authorization/RBAC depth
 - Invitation/reset/onboarding product flows

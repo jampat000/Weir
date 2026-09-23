@@ -59,19 +59,21 @@ account — there's no separate sign-up step.
 
 ## 3. Follow the setup wizard
 
-The setup wizard has two parts:
+The setup wizard has three parts:
 
-- **Basics** — your time zone, and how compact you want the interface.
-- **Libraries** — a **Watched folder** and an **Output folder** for Movies, and the same for TV.
+- **Basics**: your time zone.
+- **Libraries**: a **Watched folder** and an **Output folder** for Movies, and the same for TV.
   - **Watched folder**: where your downloads finish. Weir cleans whatever lands here.
   - **Output folder**: where Weir puts each cleaned file.
+- **Automatic backups**: whether Weir keeps a rolling copy of its configuration, and how often.
 
-You can skip the wizard and set these later on the **Processing** page.
+You can skip the wizard and set these later: libraries under **Settings › Libraries**, backups
+under **System › Backups**.
 
 ## 4. Choose what to keep
 
-On **Processing**, set each library's audio and subtitle rules — for example, keep English and
-Japanese audio, keep English subtitles, and drop commentary tracks.
+Under **Settings › Rules**, set the audio and subtitle rules your libraries use. For example, keep
+English and Japanese audio, keep English subtitles, and drop commentary tracks.
 
 ## 5. Try it with a real file
 
@@ -79,19 +81,20 @@ Put a video file in a watched folder. Weir usually notices within seconds. On ne
 in Docker it can take up to five minutes, because Weir falls back to checking on a timer instead
 of relying on filesystem notifications.
 
-- The file shows up on **Home** while Weir works on it.
-- Once it's done, it shows up in **Activity**, and the cleaned copy is in the output folder.
+- The file shows up on **Processing** while Weir works on it.
+- Once it's done, it shows up in **History**, and the cleaned copy is in the output folder.
 
-Already have a library you want to clean up? Open **Processing → Library**, pick the library and
-press **Scan now**. Weir shows you what it would remove and how much space that frees before it
-changes anything.
+Already have a library you want to clean up? In **Settings › Libraries**, edit the library and add
+its folders under **Files already in your library**. Then open **Library**, pick the library from
+the title and press **Check again**. Weir shows you what it would remove and how much space that
+frees before it changes anything.
 
 ## If nothing happens
 
 | Problem | Try this |
 | --- | --- |
 | Files sit in the watched folder and nothing happens | In Docker, check the path in Weir is the path **inside the container**, not the path on the host. Weir can take up to five minutes to notice a file. |
-| "Permission denied" in Activity | Set `WEIR_PUID` / `WEIR_PGID` to the user that owns your media folders. See [Docker deployment](deployment/docker). |
+| "Permission denied" in a file's History | Set `WEIR_PUID` / `WEIR_PGID` to the user that owns your media folders. See [Docker deployment](deployment/docker). |
 | Can't open Weir | Check the container is running and you're using the right port. Weir's health check is at `http://your-server-ip:9347/health`. |
 
 ## Next steps

@@ -18,8 +18,8 @@ This release focuses on <plain-language summary in one sentence>.
 
 ## Upgrade Notes
 
-- Windows users can install the release with `Weir-win-Setup.exe`; existing application data is preserved.
-- After that one-time bootstrap, future upgrades can be started from **Settings -> Upgrade**.
+- Windows: **Check for updates** in the tray or **System › About**, or install `Weir-win-Setup.exe` over the top. Existing data is kept.
+- Docker: `docker compose pull && docker compose up -d`.
 - <Any additional one-time action or compatibility warning>
 
 ## Docker

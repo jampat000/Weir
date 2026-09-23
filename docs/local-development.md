@@ -1,6 +1,6 @@
 # Weir — local development (server + web)
 
-This **Weir** repository contains **`apps/server`** (the C# / .NET 10 server: HTTP API, **SQLite**, cookie sessions, the job queue and Processing), **`apps/web`** (React/Vite) and **`apps/tray`** (the Windows tray app). Media manager connections (Radarr, Sonarr, Deluno, or anything posting Weir's own payload) live under **Settings -> Media managers**; inbound events all arrive at `POST /api/v1/intake/webhook/{source}`. Library automation and failed-import tooling ship as part of the **Processing** surface, not as separate dashboard apps. See [ADR-0013](adr/ADR-0013-media-managers-are-kinds-not-products.md).
+This **Weir** repository contains **`apps/server`** (the C# / .NET 10 server: HTTP API, **SQLite**, cookie sessions, the job queue and Processing), **`apps/web`** (React/Vite) and **`apps/tray`** (the Windows tray app). Media manager connections (Sonarr, Radarr, Deluno, or anything posting Weir's own payload) live under **Settings › Media managers**; inbound events all arrive at `POST /api/v1/intake/webhook/{source}`. See [ADR-0013](adr/ADR-0013-media-managers-are-kinds-not-products.md).
 
 **Local web/API ports** are versioned in **`scripts/dev-ports.json`**; the policy is summarized in **[`docs/ports.md`](ports.md)**.
 
@@ -20,7 +20,7 @@ git config core.hooksPath .githooks
 
 The hook delegates to `scripts/pre-push-check.ps1`. It skips checks gracefully if `ruff` or `apps/web/node_modules` are not yet installed — set those up first for full coverage.
 
-The server persists state in **file-backed SQLite** under **`WEIR_HOME`** and creates or migrates its database itself when it starts; there is no separate migration command. You do **not** install or run PostgreSQL for normal Weir development.
+The server persists state in **file-backed SQLite** under **`WEIR_HOME`** and creates or migrates its database itself when it starts; there is no separate migration command.
 Docker Desktop is not required for normal local development or for shipping a release.
 
 ## `.env` (local)
@@ -71,7 +71,7 @@ npm ci
 npm run dev
 ```
 
-**`npm run dev`** clears processes listening on the **default** dev API and web ports from **`scripts/dev-ports.json`**, then starts the .NET server (**`dotnet watch run`**) and Vite together (see **`apps/web/scripts/run-dev-stack.mjs`**). Use **`npm run dev:quick`** only when you are sure those ports are already free.
+**`npm run dev`** stops this worktree's previous dev API (by the PID it recorded) and anything listening on the dev web port from **`scripts/dev-ports.json`**, then starts the .NET server (**`dotnet watch run`**) and Vite together (see **`apps/web/scripts/run-dev-stack.mjs`**). Use **`npm run dev:quick`** only when you are sure those ports are already free.
 
 The Vite dev server and **`vite preview`** use **[`scripts/dev-ports.json`](../scripts/dev-ports.json)**. See **[`docs/ports.md`](ports.md)**. To override temporarily, set **`VITE_DEV_API_PROXY_TARGET`** and **`WEIR_DEV_API_PORT`** together.
 
@@ -85,7 +85,7 @@ npm run api:types:generate   # regenerate src/lib/api/generated/openapi-types.ts
 npm run api:types:check      # CI: fails when the generated types are stale
 ```
 
-When you add or change an endpoint, edit **`weir-openapi.json`** in the same change (it used to be exported from the Python backend; it is maintained by hand now), regenerate the types, and keep **`OpenApiDocumentParityTests`** in **`apps/server/tests/Weir.Api.Tests`** passing.
+When you add or change an endpoint, edit **`weir-openapi.json`** in the same change (it is maintained by hand), regenerate the types, and keep **`OpenApiDocumentParityTests`** in **`apps/server/tests/Weir.Api.Tests`** passing.
 
 ## Weir home (product paths)
 
@@ -139,7 +139,7 @@ python -m pytest tests/e2e/weir -q --tb=short
 
 The contract suite is described in **[`tests/contract/README.md`](../tests/contract/README.md)**. For E2E, **`WEIR_E2E_HOME`** gives a fixed data directory (otherwise a temp directory is used), **`WEIR_E2E_SERVER_EXE`** runs a published server instead of **`dotnet run --no-build`**, and **`WEIR_E2E_LEDGER`** overrides the leftover-server ledger (see **`tests/e2e/weir/conftest.py`**).
 
-## Split-origin production (deferred wiring)
+## Split-origin production
 
 If the static site and API are on **different origins**:
 
@@ -162,7 +162,7 @@ If the static site and API are on **different origins**:
    **`GET /health`** on the API port (**`scripts/dev-ports.json`**) returns **200** once the server process is up, and **`GET /ready`** reports **`ready: true`** once its database is open. **`/api/v1`** still needs **`WEIR_SESSION_SECRET`** and a **writable** database path under **`WEIR_HOME`**. The web shell treats **network errors** (no TCP response) separately from **HTTP 503** from a live API (see **`apps/web`** error guards + **`ApiEntryError`**).
 
 5. **"Weir cannot start: ... schema"**  
-   The server opens a database at its own schema head (or the last schema the retired Python backend wrote) and refuses anything else rather than guess. Point **`WEIR_HOME`** (or **`WEIR_DB_PATH`**) at a fresh folder for a clean database.
+   The server upgrades a database at any earlier schema revision it knows and refuses anything else (a file with no schema, or a revision it does not recognise) rather than guess. Point **`WEIR_HOME`** (or **`WEIR_DB_PATH`**) at a fresh folder for a clean database.
 
 6. **Port already in use**  
    See **`scripts/dev-ports.json`**. **`WEIR_DEV_API_PORT`** + **`VITE_DEV_API_PROXY_TARGET`** can override for one session.
@@ -170,15 +170,9 @@ If the static site and API are on **different origins**:
 7. **Two dev windows**  
    **`.\scripts\dev.ps1`** (launcher only — preflight warns if `.env`, the session secret or `dotnet` are missing). Full check: **`.\scripts\verify-local.ps1`** with the API running.
 
-## Optional Postgres container (developers only)
-
-**Not used by Weir** in normal Docker or SQLite setups — the app stores data in **SQLite** under **`WEIR_HOME`**.
-
-Weir local development is SQLite-first. There is no separate Postgres compose path in the greenfield repo state.
-
 ## All-in-one Docker
 
-For a **single-container** runtime (the .NET server + production web UI + ffmpeg, SQLite volume), see **`docker/README.md`** and root **`compose.yaml`**. Build locally with `docker build -t weir:local .`.
+For a **single-container** runtime (the .NET server, the production web app, ffmpeg and mkvmerge, with SQLite on a volume), see **`docker/README.md`** and root **`compose.yaml`**. Build locally with `docker build -t weir:local .`.
 
 For maintainers without working local Docker, use GitHub-hosted validation:
 
@@ -190,4 +184,4 @@ The release workflow also builds, publishes, verifies, and smoke-tests Docker on
 
 ## Visual shell
 
-The forward **source of truth** for the product UI is **`apps/web`**.
+The **source of truth** for the product UI is **`apps/web`**. How page content is laid out is in [`design/content-language.md`](design/content-language.md).

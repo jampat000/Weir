@@ -1,6 +1,6 @@
 /**
  * Library mode (#505): clean files already in a library, in place. Weir server (.NET) only — there is no
- * Python backend route to match (see apps/server/README.md, "Library mode").
+ * Python backend route to match (see docs/archive/server-port-notes.md, "Library mode").
  */
 import { fetchCsrfToken } from "../api/auth-api";
 import { apiFetch, readJson, requireOk } from "../api/client";
@@ -20,7 +20,7 @@ export const LIBRARY_FILE_CLASSIFICATION_LABELS: Record<
 
 /**
  * Issue #551: the manager kinds a library file can be matched to (only Sonarr/Radarr support the title
- * listing the match is built from — see apps/server/README.md's "Manager title matching"), for the Library
+ * listing the match is built from — see docs/archive/server-port-notes.md's "Manager title matching"), for the Library
  * tab's manager filter. Matches the `manager` query param `fetchLibraryFiles` already sends straight through
  * to `manager_kind` on the server.
  */
@@ -38,7 +38,7 @@ export interface LibrarySettings {
   /** #508 step 1: clean a file even while another name still shares its data (seeding). Default false. */
   clean_hardlinked_files: boolean;
   /** #508 step 2: skip a clean that would make a manager re-download the title. Default true. Not yet enforced
-   * server-side — see apps/server/README.md's "Seams for #507, #508 and #509" — but always safe to save. */
+   * server-side — see docs/archive/server-port-notes.md's "Seams for #507, #508 and #509" — but always safe to save. */
   skip_if_manager_would_redownload: boolean;
 }
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — **three module lanes** are live at head: ``jobs``, ``pruner_jobs``, ``subber_jobs`` (see tables below).
+Accepted; superseded in part by [ADR-0016](ADR-0016-one-thing-that-never-strands-a-file.md). When this was written, **three module lanes** were live: ``jobs``, ``pruner_jobs``, ``subber_jobs`` (see tables below).
 
 > **Update (2026-08-28): Subber moved to Deluno.** This ADR is left as it was written — an ADR records the decision, not the current file list — but wherever it names Subber, read it as an example rather than as a lane that still exists. The ``subber_jobs`` table is dropped by migration ``0010_drop_subber_tables``, and ``subber.`` is now an abandoned prefix refused on every remaining lane, alongside ``trimmer.``.
 >
@@ -79,7 +79,7 @@ Weir is **SQLite-first**: one writer per database. Durable background work must 
 
 **Lifespan:** `start_pruner_worker_background_tasks` runs **independently** of other module worker counts (no shared timing tables).
 
-**Forward design:** ``docs/pruner-forward-design-constraints.md`` — TV vs Movies independence, per media-server-instance ownership (Emby, Jellyfin, Plex as peers), no single global server config.
+**Forward design:** ``docs/pruner-forward-design-constraints.md`` (removed with Pruner, #473) — TV vs Movies independence, per media-server-instance ownership (Emby, Jellyfin, Plex as peers), no single global server config.
 
 ---
 

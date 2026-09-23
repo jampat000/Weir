@@ -122,7 +122,7 @@ A folder layout that works well:
 
 - Images are published for **linux/amd64** and **linux/arm64** (`ghcr.io/jampat000/weir:latest` and `:X.Y.Z`)
 - A self-contained .NET server, with the bundled web UI
-- ffmpeg, mkvmerge (MKVToolNix), curl and gosu on a slim Debian base
+- ffmpeg, mkvmerge (MKVToolNix), curl and gosu on an Ubuntu base (.NET runtime-deps, noble)
 - Runs as the `weir` user (UID/GID 1000 by default, or whatever `WEIR_PUID`/`WEIR_PGID` you set)
 - Data volume `/data/weir`, port `9347`
 - A built-in health check on `/health`
@@ -139,8 +139,8 @@ one, Weir generates one and keeps it in that same volume.
 | I want to… | Do this |
 | --- | --- |
 | Use a different port | Change the left number: `"8080:9347"` puts Weir at `http://your-server-ip:8080` |
-| Pin a version instead of `latest` | `image: ghcr.io/jampat000/weir:3.0.1` |
-| Use HTTPS through a reverse proxy | Set `WEIR_SESSION_COOKIE_SECURE=true` and `WEIR_TRUSTED_PROXY_IPS=<your proxy's IP>`. See [Reverse proxy](reverse-proxy) |
+| Pin a version instead of `latest` | `image: ghcr.io/jampat000/weir:3.2.4` |
+| Use HTTPS through a reverse proxy | Set `WEIR_TRUSTED_PROXY_IPS=<your proxy's IP>`. The sign-in cookie becomes HTTPS-only on its own once requests arrive over HTTPS; set `WEIR_SESSION_COOKIE_SECURE=true` only to force it. See [Reverse proxy](reverse-proxy) |
 | Protect saved API keys with their own secret | Set `WEIR_CREDENTIALS_SECRET` to a long random value (`openssl rand -hex 32`) **before** you add Sonarr or Radarr |
 | Use a GPU | See [hardware acceleration](https://github.com/jampat000/Weir/blob/main/docker/README.md#hardware-acceleration-and-device-passthrough) in the Docker reference. It's optional; Weir doesn't re-encode, so you usually don't need it |
 

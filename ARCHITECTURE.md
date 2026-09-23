@@ -26,7 +26,12 @@ Weir is a self-hosted media operations app:
   one is asked what it is importing and which files it still keeps. "Could not ask" is a
   distinct answer from "nothing is importing", and only the latter clears a delete. See
   [ADR-0015](docs/adr/ADR-0015-media-manager-port-outbound.md).
-- **Home, Activity, and Settings** expose runtime health, history, logs, backups, upgrades, and security posture.
+- **Library mode** cleans files already imported into a library, replacing each one in place with
+  its cleaned copy through the crash-safe swap described in the
+  [file lifecycle contract](docs/file-lifecycle-contract.md).
+- The app's pages are **Processing** (the first screen: every file Weir is working on now),
+  **History**, **Library**, **Settings** and **System**. System holds updates, backups, security
+  and logs.
 
 ## Runtime Shape
 
@@ -45,8 +50,8 @@ flowchart LR
   UI["Frontend (React/Vite)"] --> API["Weir.Api (ASP.NET Core endpoints)"]
   API --> Core["Core + Platform Services"]
   Core --> Processing["Processing (the application)"]
-  Core --> Activity["Activity"]
-  Core --> Integrations["External Integrations (Arr, OpenSubtitles, etc.)"]
+  Core --> History["History (activity records)"]
+  Core --> Integrations["Media managers (Sonarr, Radarr, Deluno; TMDb metadata)"]
   Core --> DB["SQLite (numbered SQL migrations)"]
   Processing --> Jobs["Durable jobs (jobs) + workers"]
 ```
@@ -66,7 +71,7 @@ Solution `apps/server/Weir.slnx`; details in [`apps/server/README.md`](apps/serv
 
 - `src/app`: app-level router and providers.
 - `src/layouts`: shell/navigation layout.
-- `src/pages`: feature pages (Home, Processing, Activity, Settings, setup).
+- `src/pages`: feature pages (Processing, History, Library, Settings, System), plus sign-in and setup.
 - `src/lib`: API clients, query hooks, typed data helpers, and UI helpers.
 - `src/components`: reusable UI and brand components.
 - `src/styles`: design tokens and shell styling.
@@ -87,7 +92,7 @@ Solution `apps/server/Weir.slnx`; details in [`apps/server/README.md`](apps/serv
 flowchart LR
   Enqueue["Enqueue request"] --> Jobs["jobs + workers"]
   Jobs --> Result["Job result (completed/failed/pending retry)"]
-  Result --> Activity["Activity + logs"]
+  Result --> History["History + logs"]
   Result --> Metrics["Runtime metrics / Prometheus"]
 ```
 

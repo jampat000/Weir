@@ -1,13 +1,11 @@
 # Agent Harness Operating Model
 
-Weir should be easy for coding agents to inspect, modify, validate, and repair without relying on hidden context.
-
-This document adapts the harness-engineering model to this repository: humans steer priorities and acceptance criteria; agents execute changes through repo-local tools, tests, docs, and pull requests.
+Weir should be easy for coding agents to inspect, modify, validate, and repair without relying on hidden context. People set priorities and acceptance criteria; agents make changes through repo-local tools, tests, docs, and pull requests.
 
 ## Principles
 
 1. **Repository knowledge is the source of truth.**
-   If a decision matters after the current conversation ends, put it in docs, tests, scripts, schemas, or issue templates.
+   If a decision matters after the current conversation ends, put it in docs, tests, scripts, schemas, or a GitHub issue.
 
 2. **The root agent guide is a map, not a manual.**
    [`../AGENTS.md`](../AGENTS.md) points to deeper docs. Keep it short enough that agents can read it on every task.
@@ -22,7 +20,7 @@ This document adapts the harness-engineering model to this repository: humans st
    File lifecycle, release, security, and upgrade rules should have tests or smoke checks where practical.
 
 6. **Keep PRs small and recoverable.**
-   Agent throughput is useful only when each change has a clear scope, validation path, and rollback story.
+   Each change needs a clear scope, a validation path, and a rollback story.
 
 ## Expected Agent Loop
 
@@ -30,20 +28,35 @@ This document adapts the harness-engineering model to this repository: humans st
 2. Inspect current code before proposing implementation details.
 3. Implement focused changes on a branch.
 4. Run the narrowest meaningful validation first, then broader checks as risk increases.
-5. Update docs or execution plans when the change alters durable behavior.
+5. Update docs when the change alters durable behavior.
 6. Open or update a pull request with summary, validation, and remaining risks.
 
-## Feedback Loops To Prefer
+## Where things live
 
-- Backend unit tests for service logic, schema behavior, file lifecycle, and worker decisions.
-- Frontend unit tests for query states, Home and Processing Overview summaries, settings flows, and user-facing text.
-- E2E smoke tests for login, app shell navigation, and Home refresh. (There is no Dashboard page and no module entry points: #459 folded the Dashboard into Home (called In hand until 3.0.0), and 3.0.0 dropped the `/dashboard` redirect.)
+- Docs index: [`README.md`](README.md). Architecture: [`../ARCHITECTURE.md`](../ARCHITECTURE.md).
+- Server: `apps/server` (.NET 10). Web app: `apps/web` (React/Vite). Windows tray: `apps/tray`.
+- Page layout rules: [`design/content-language.md`](design/content-language.md).
+- Planned and in-flight work: [GitHub issues](https://github.com/jampat000/Weir/issues). Completed historical plans: [`archive/`](archive/).
+- Local setup and ports: [`local-development.md`](local-development.md), [`ports.md`](ports.md).
+
+## Validation commands
+
+| Area | Command |
+|------|---------|
+| Server | `dotnet build apps/server/Weir.slnx -warnaserror` and `dotnet test apps/server/Weir.slnx` |
+| Web (from `apps/web`) | `npm run lint`, `npm run format`, `npm run build`, `npm run test` |
+| API types (from `apps/web`) | `npm run api:types:check` |
+| Dead code | `node scripts/check-dead-code.mjs` |
+| Docs map | `node scripts/check-agent-docs.mjs` |
+| Contract suite | [`../tests/contract/README.md`](../tests/contract/README.md) |
+| E2E | `python -m pytest tests/e2e/weir -q --tb=short` (see [`local-development.md`](local-development.md)) |
+| Windows and Docker smoke | [`smoke-checklists.md`](smoke-checklists.md) |
+
+## Feedback loops to prefer
+
+- Server unit tests for service logic, schema behavior, file lifecycle, and worker decisions.
+- Web unit tests for query states, the Processing, History and Library screens, settings flows, and user-facing text.
+- E2E smoke tests for sign-in, navigation, and live refresh.
 - Windows package smoke for installer, tray, startup, and upgrade behavior.
 - Docker smoke for container startup and health.
-- GitHub issues for backlog items that should survive beyond the current PR.
-
-## What To Encode Next
-
-Use GitHub Issues (label: `priority: low`) for cleanup candidates that are real but not release blockers.
-
-Promote items to execution plans when they become scoped enough to implement.
+- GitHub issues for backlog items that should survive beyond the current PR. Use `priority: low` for cleanup candidates that are real but not release blockers.

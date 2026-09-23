@@ -5,7 +5,7 @@ title: Connecting Deluno, Sonarr and Radarr
 
 # Connecting Deluno, Sonarr and Radarr
 
-Under **Settings → Media managers**, Weir can connect to the tools that manage your downloads and
+Under **Settings › Media managers**, Weir can connect to the tools that manage your downloads and
 library, so cleaning happens automatically instead of you moving files around by hand.
 
 There are four kinds of connection: **Deluno**, **Sonarr**, **Radarr**, and **Something else** for
@@ -27,13 +27,8 @@ This matters because your download client and Sonarr/Radarr are often still work
 the same time Weir notices it in the watched folder — Weir checking their queue first avoids
 racing an import that's already in progress.
 
-The same connection also powers **Download again**: if you change your rules later and an already
-imported file lost a track you now want to keep, Weir can ask Radarr or Sonarr to fetch that
-release again.
-
-- Connecting **Radarr** lets Weir check what Radarr is still importing, and download a film again.
-- Connecting **Sonarr** lets Weir check what Sonarr is still importing, and download an episode
-  again.
+When Weir cleans a file that is already in your library, it tells the connected manager to look at
+that file again.
 
 ## Sonarr and Radarr: getting cleaned files imported
 
@@ -43,7 +38,7 @@ mapping** in Sonarr/Radarr points them at the output folder. They only ever see 
 
 ### 1. Set up the library in Weir
 
-Open **Processing → Libraries** and edit the library:
+Open **Settings › Libraries** and edit the library:
 
 - **Watched folder**: where your download client finishes files, e.g. `/media/downloads/complete/tv`.
 - **Output folder**: where Weir puts cleaned files, e.g. `/media/weir/tv`.
@@ -57,13 +52,13 @@ Open **Processing → Libraries** and edit the library:
 
 ### 2. Connect Sonarr (or Radarr) to Weir
 
-Under **Settings → Media managers**, add Sonarr with its address and API key. You'll find the key in
-Sonarr under **Settings → General**.
+Under **Settings › Media managers**, add Sonarr with its address and API key. You'll find the key in
+Sonarr on its **General** settings page.
 
 ### 3. Add the remote path mapping in Sonarr
 
 The library's **Media manager** section in Weir shows the exact values, with copy buttons. In Sonarr, go
-to **Settings → Download Clients → Remote Path Mappings** and press **+**:
+to **Settings › Download Clients › Remote Path Mappings** and press **+**:
 
 | Field | Value |
 | --- | --- |

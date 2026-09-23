@@ -376,7 +376,7 @@ public sealed class MediaGoldenParityTests
 /// purpose makes the .NET port behave differently from the Python code the fixtures were captured from.
 /// Regenerating the fixtures with <c>scripts/generate-ffmpeg-golden.py</c> would erase that difference (Python
 /// was not changed), so each entry here patches the loaded expectation instead, named for the GitHub issue that
-/// required it, keeping every other case in the file an unmodified proof of parity. See apps/server/README.md,
+/// required it, keeping every other case in the file an unmodified proof of parity. See docs/archive/server-port-notes.md,
 /// "ffmpeg parity", for the mechanism.
 /// </summary>
 internal static class GoldenDivergences
@@ -424,7 +424,7 @@ internal static class GoldenDivergences
     /// fixed clear of stale per-track statistics tags on every kept video/audio/subtitle stream. None of the
     /// fixtures these cases were captured from ever set #498's StandardizeTrackNames/ClearVideoTrackNames
     /// (<see cref="MediaGoldenParityTests.ReadPlan"/> does not even read those two fields), so the new tags always
-    /// land right before the output path, at the very end — see apps/server/README.md, "ffmpeg parity".
+    /// land right before the output path, at the very end — see docs/archive/server-port-notes.md, "ffmpeg parity".
     /// </summary>
     public static IReadOnlyList<string> RemuxArgv(IReadOnlyList<string> golden, JsonElement input)
     {

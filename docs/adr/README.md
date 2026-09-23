@@ -9,17 +9,17 @@ Some ADR numbers are intentionally absent. Those numbers were reserved for draft
 and timing-based pruning must follow [ADR-0009](ADR-0009-suite-wide-timing-isolation.md)
 (per module, then per job family).
 
-| ADR | Title |
-|-----|--------|
-| [ADR-0001](ADR-0001-repo-structure.md) | Repository and application layout |
-| [ADR-0002](ADR-0002-database-sqlite-alembic.md) | Database and Alembic (SQLite-first) |
-| [ADR-0003](ADR-0003-auth-session-model.md) | Auth and session model |
-| [ADR-0007](ADR-0007-module-owned-worker-lanes.md) | Module-owned worker lanes (SQLite) — superseded in part by one lane (#459) |
-| [ADR-0008](ADR-0008-weir-settings-aggregate-runtime-config.md) | `WeirSettings` aggregate for runtime configuration |
-| [ADR-0009](ADR-0009-suite-wide-timing-isolation.md) | Suite-wide timing isolation (durable work) |
-| [ADR-0012](ADR-0012-processing-preflight-parity-boundary.md) | Processing preflight parity boundary (FileFlows-aligned) |
-| [ADR-0013](ADR-0013-media-managers-are-kinds-not-products.md) | A media manager is a kind, not a product name |
-| [ADR-0014](ADR-0014-processing-libraries-replace-fixed-scopes.md) | A Processing library is a row, not one of two fixed scopes |
-| [ADR-0015](ADR-0015-media-manager-port-outbound.md) | Processing asks a port, and "no answer" is not "nothing" |
-| [ADR-0016](ADR-0016-one-thing-that-never-strands-a-file.md) | One thing that never strands a file |
-| [ADR-0017](ADR-0017-backend-on-dotnet.md) | Weir's backend moves to C# on .NET 10 |
+| ADR | Title | Status |
+|-----|-------|--------|
+| [ADR-0001](ADR-0001-repo-structure.md) | Repository and application layout | Accepted; backend path updated by ADR-0017 |
+| [ADR-0002](ADR-0002-database-sqlite-alembic.md) | Database and Alembic (SQLite-first) | Accepted; Alembic replaced by numbered SQL migrations (ADR-0017) |
+| [ADR-0003](ADR-0003-auth-session-model.md) | Auth and session model | Accepted |
+| [ADR-0007](ADR-0007-module-owned-worker-lanes.md) | Module-owned worker lanes (SQLite) | Accepted; superseded in part by ADR-0016 (one lane, #459) |
+| [ADR-0008](ADR-0008-weir-settings-aggregate-runtime-config.md) | `WeirSettings` aggregate for runtime configuration | Superseded by ADR-0017 (`WeirOptions`/`WeirOptionsLoader`) |
+| [ADR-0009](ADR-0009-suite-wide-timing-isolation.md) | Suite-wide timing isolation (durable work) | Accepted |
+| [ADR-0012](ADR-0012-processing-preflight-parity-boundary.md) | Processing preflight parity boundary (FileFlows-aligned) | Accepted |
+| [ADR-0013](ADR-0013-media-managers-are-kinds-not-products.md) | A media manager is a kind, not a product name | Accepted |
+| [ADR-0014](ADR-0014-processing-libraries-replace-fixed-scopes.md) | A Processing library is a row, not one of two fixed scopes | Accepted |
+| [ADR-0015](ADR-0015-media-manager-port-outbound.md) | Processing asks a port, and "no answer" is not "nothing" | Accepted; retention half moved out by ADR-0016 |
+| [ADR-0016](ADR-0016-one-thing-that-never-strands-a-file.md) | One thing that never strands a file | Accepted |
+| [ADR-0017](ADR-0017-backend-on-dotnet.md) | Weir's backend moves to C# on .NET 10 | Accepted |

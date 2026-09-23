@@ -94,7 +94,7 @@ public static class MkvmergeCommands
     /// <summary>
     /// The containers this writer handles. WebM stays on ffmpeg: it is a constrained Matroska profile and the
     /// #503 trial's corpus was all <c>.mkv</c>, so mkvmerge's attachment and codec allowances were never shown
-    /// to carry over (see docs/trials/503-mkvmerge-vs-ffmpeg.md, "Recommendation").
+    /// to carry over (see docs/engineering/503-mkvmerge-vs-ffmpeg.md, "Recommendation").
     /// </summary>
     public static IReadOnlySet<string> SupportedExtensions { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".mkv" };
 

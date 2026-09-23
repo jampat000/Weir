@@ -1,45 +1,67 @@
-# Weir Documentation Index
+# Weir documentation index
 
-This directory is the repository-local system of record. Keep durable decisions here instead of relying on chat history, issue comments, or local notes.
+This directory holds the repository's own documentation: how Weir is built, released and kept safe.
+Guides for people running Weir are on the [documentation site](https://jampat000.github.io/Weir/),
+whose source is in [`../docs-site/docs`](../docs-site/docs).
 
-## Operating Model
+## User
 
-- [`agent-harness.md`](agent-harness.md) - agent-first working model, feedback loops, and cleanup cadence.
-- [`triage.md`](triage.md) - issue labels, impact triage, and backlog expectations.
-- [`release-governance.md`](release-governance.md) - release controls and pre/post-release gates.
-- [`release.md`](release.md) - release procedure and artifacts.
-- [`release-notes/TEMPLATE.md`](release-notes/TEMPLATE.md) - required plain-language release notes template.
-- [`smoke-checklists.md`](smoke-checklists.md) - Windows and Docker smoke paths.
+- [`../README.md`](../README.md) - what Weir does, installing on Docker and Windows, first steps.
+- [`../docker/README.md`](../docker/README.md) - the full Docker reference: every variable, GPUs, file ownership, network shares.
+- [`docker.md`](docker.md) - short summary of the Docker runtime.
+- [`ports.md`](ports.md) - the ports Weir and its development servers use.
+- [`deployment-model.md`](deployment-model.md) - the supported deployment model: one process, one database.
+- [`../CHANGELOG.md`](../CHANGELOG.md) - one line per released version.
+- [`release-notes/`](release-notes/) - the full notes for each release.
+- [`../SUPPORT.md`](../SUPPORT.md) - how to get help and what to include in an issue.
+- [`../SECURITY.md`](../SECURITY.md) - how to report a vulnerability.
 
-## Architecture And Runtime
+## Maintainer
+
+- [`../CONTRIBUTING.md`](../CONTRIBUTING.md) - how changes are made and validated.
+- [`agent-harness.md`](agent-harness.md) - working model for coding agents: where things live and which checks to run.
+- [`local-development.md`](local-development.md) - local setup and the development workflow.
+- [`triage.md`](triage.md) - issue labels and triage rules.
+- [`exec-plans/README.md`](exec-plans/README.md) - where execution plans live.
+- [`release.md`](release.md) - the release procedure and what each release produces.
+- [`release-governance.md`](release-governance.md) - repository controls and the checks before and after a release.
+- [`release-notes/TEMPLATE.md`](release-notes/TEMPLATE.md) - the template for release notes.
+- [`smoke-checklists.md`](smoke-checklists.md) - manual Windows and Docker smoke checks.
+- [`security-hardening.md`](security-hardening.md) - security baseline and credential handling.
+- [`operator-messaging-standard.md`](operator-messaging-standard.md) - how operator-facing messages are worded.
+- [`settings-truthfulness-audit.md`](settings-truthfulness-audit.md) - what each setting actually does when saved.
+- [`visual-identity.md`](visual-identity.md) - palette, logo and brand assets.
+- [`ux-polish.md`](ux-polish.md) - the UI review baseline.
+- [`design/content-language.md`](design/content-language.md) - how the content of each page is laid out.
+- [`engineering/503-mkvmerge-vs-ffmpeg.md`](engineering/503-mkvmerge-vs-ffmpeg.md) - the trial that chose mkvmerge for Matroska output.
+- [`../apps/server/README.md`](../apps/server/README.md) - the .NET server: projects, build, schema and publishing.
+- [`../apps/web/README.md`](../apps/web/README.md) - the web app.
+- [`../tests/contract/README.md`](../tests/contract/README.md) - the API contract suite.
+
+## Architecture
 
 - [`../ARCHITECTURE.md`](../ARCHITECTURE.md) - top-level architecture map.
 - [`adr/README.md`](adr/README.md) - architecture decision records.
-- [`deployment-model.md`](deployment-model.md) - deployment assumptions.
-- [`docker.md`](docker.md) - Docker runtime behavior.
-- [`ports.md`](ports.md) - canonical ports.
-- [`local-development.md`](local-development.md) - local setup and dev workflow.
+- [`file-lifecycle-contract.md`](file-lifecycle-contract.md) - how Weir moves, replaces and deletes media files safely.
+- [`diagnostics-contract.md`](diagnostics-contract.md) - diagnostics and failure reporting.
+- [`processing-manager-capabilities.md`](processing-manager-capabilities.md) - what Processing does on its own and what needs a media manager.
 
-## Product And UX Rules
+## Archive
 
-- [`visual-identity.md`](visual-identity.md) - brand and visual identity.
-- [`ux-polish.md`](ux-polish.md) - UI polish baseline.
-- [`design/content-language.md`](design/content-language.md) - how the content of every page is laid out: the lead band, the hero figure row, and the borderless body.
-- [`design/redesign-docs-impact.md`](design/redesign-docs-impact.md) - inventory of every screenshot and prose passage the content-language redesign makes wrong or stale, what has been fixed already, and the screenshot refresh plan for after the in-flight conversions land.
-- [`operator-messaging-standard.md`](operator-messaging-standard.md) - operator-facing wording.
+Historical records, kept for context. They don't describe the current product.
 
-## Reliability And Safety
+- [`archive/server-port-notes.md`](archive/server-port-notes.md) - notes from porting the server from Python to .NET.
+- [`archive/processing-library-model.md`](archive/processing-library-model.md) - the plan that replaced fixed Movies and TV scopes with libraries.
+- [`archive/live-and-library.md`](archive/live-and-library.md) - decisions behind the 3.2 layout.
+- [`archive/fileflows-parity-audit.md`](archive/fileflows-parity-audit.md) - a capability comparison with FileFlows.
+- [`archive/redesign-docs-impact.md`](archive/redesign-docs-impact.md) - docs affected by the content-language redesign.
+- [`archive/site-qa-findings.md`](archive/site-qa-findings.md) - a QA pass over every screen after the redesign.
 
-- [`file-lifecycle-contract.md`](file-lifecycle-contract.md) - file mutation and deletion safety.
-- [`diagnostics-contract.md`](diagnostics-contract.md) - diagnostics behavior.
-- [`security-hardening.md`](security-hardening.md) - security posture and credential handling.
-- [`settings-truthfulness-audit.md`](settings-truthfulness-audit.md) - settings truthfulness audit history.
-- [`fileflows-parity-audit.md`](fileflows-parity-audit.md) - current Processing/FileFlows capability and regression audit.
+## Maintenance rule
 
-## Execution Plans
+When a code change alters a documented invariant, update the doc in the same pull request. If a doc
+can't be updated confidently, open a follow-up issue with the missing context.
 
-- [`exec-plans/README.md`](exec-plans/README.md) - plan format and lifecycle.
-
-## Maintenance Rule
-
-When code behavior changes a documented invariant, update the relevant doc in the same pull request. If a doc cannot be updated confidently, open a follow-up issue with the missing context.
+`node scripts/check-agent-docs.mjs` checks every relative link in these docs, the docs site and
+`docker/`, and fails when a current doc names a retired screen as if it still existed. A line that
+mentions a retired name on purpose, to say it is gone, ends with `<!-- retired-ui: history -->`.

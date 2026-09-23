@@ -9,9 +9,10 @@ Weir is a self-hosted media processing stage: it cleans new downloads, and files
 library. Processing is the application — it remuxes media into cleaner outputs, either as files
 arrive in a library's watched folder or as a pass over a library you already have. mkvmerge writes
 Matroska and ffmpeg writes everything else, and each library can be set to use ffmpeg for
-everything instead. Around it, the platform provides activity history, logs, backups, upgrades,
-and security posture. The main screen, **Home**, shows what Weir is holding right now and
-anything that needs a person.
+everything instead. Around it, the platform provides history, logs, backups, updates and
+security. The first screen, **Processing**, shows every file Weir is working on right now, from
+the moment it arrives until its media manager has it back. **History**, **Library**, **Settings**
+and **System** sit beside it.
 
 ## Runtime shape
 
@@ -21,8 +22,8 @@ flowchart LR
   API --> Core["Weir.Core (records + rules)"]
   API --> Infra["Weir.Infrastructure (SQLite, filesystem, ffmpeg, jobs)"]
   Infra --> Processing["Processing (the application)"]
-  Infra --> Activity["Activity"]
-  Infra --> Integrations["External Integrations (Arr, OpenSubtitles, etc.)"]
+  Infra --> History["History (activity records)"]
+  Infra --> Integrations["Media managers (Sonarr, Radarr, Deluno; TMDb metadata)"]
   Infra --> DB["SQLite (numbered SQL migrations)"]
   Processing --> Jobs["Durable jobs (jobs) + workers"]
 ```
@@ -49,9 +50,11 @@ The server lives in `apps/server` (solution `Weir.slnx`).
 | `src/Weir.Core` | Records and rules only — no disk, network or database access |
 | `tests/` | xUnit tests for each project |
 
-The database schema is unchanged from the earlier Python backend. The server still records its
-schema revision in the `alembic_version` table so it can open databases that backend created,
-but the .NET migrations are now the only source of schema changes.
+The server records its schema revision in the `alembic_version` table, a name kept from the
+earlier Python backend, so older databases still open. The numbered SQL migrations in
+`Weir.Infrastructure/Migrations` are the only source of schema changes. On start, a database at an
+earlier revision is upgraded in place, in one transaction; a database from a newer release is
+refused and left unchanged.
 
 ## Frontend map
 
@@ -59,7 +62,7 @@ but the .NET migrations are now the only source of schema changes.
 |-----------|---------------|
 | `src/app` | App-level router and providers |
 | `src/layouts` | Shell/navigation layout |
-| `src/pages` | Feature pages (Home, Processing, Activity, Settings, setup) |
+| `src/pages` | Feature pages (Processing, History, Library, Settings, System), plus sign-in and setup |
 | `src/lib` | API clients, query hooks, typed data helpers |
 | `src/components` | Reusable UI and brand components |
 
@@ -69,7 +72,7 @@ but the .NET migrations are now the only source of schema changes.
 flowchart LR
   Enqueue["Enqueue request"] --> Jobs["jobs + workers"]
   Jobs --> Result["Job result (completed/failed/pending retry)"]
-  Result --> Activity["Activity + logs"]
+  Result --> History["History + logs"]
   Result --> Metrics["Runtime metrics / Prometheus"]
 ```
 

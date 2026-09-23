@@ -1,7 +1,7 @@
 import { Navigate, useSearchParams } from "react-router-dom";
 
 /**
- * Where the pre-3.2 Processing tabs live now (docs/exec-plans/active/live-and-library.md).
+ * Where the pre-3.2 Processing tabs live now (docs/archive/live-and-library.md).
  * 3.0.0 dropped every old address because nobody had installed it yet; 3.1 has been installed,
  * so its bookmarks and any links a user saved land on the same thing in its new place.
  */

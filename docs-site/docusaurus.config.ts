@@ -4,7 +4,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
   title: 'Weir',
-  tagline: 'Self-hosted media operations for people who want more control',
+  tagline: 'Keep the audio and subtitle tracks you want. Drop the rest.',
   favicon: 'img/favicon.ico',
 
   future: {
@@ -51,7 +51,6 @@ const config: Config = {
   ],
 
   themeConfig: {
-    image: 'img/social-card.png',
     colorMode: {
       defaultMode: 'dark',
       respectPrefersColorScheme: true,

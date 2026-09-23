@@ -90,7 +90,7 @@ $ffmpegChecksumsUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/l
 # upstream publishes at
 # https://mkvtoolnix.download/windows/releases/<version>/mkvtoolnix-64-bit-<version>.zip.sha256
 # (also listed in that directory's sha256sums.txt). v102.0 is the current stable, released
-# 2026-09-14. Note the #503 trial (docs/trials/503-mkvmerge-vs-ffmpeg.md) measured v100.0; Weir uses
+# 2026-09-14. Note the #503 trial (docs/engineering/503-mkvmerge-vs-ffmpeg.md) measured v100.0; Weir uses
 # only mkvmerge's long-stable CLI surface (`-o`, `--identification-format json`, per-track
 # selection — see Weir.Core.Media.MkvmergeCommands), so the pin is not tied to the trial's build.
 $mkvtoolnixVersion = "102.0"
