@@ -20,12 +20,23 @@ public sealed class WebhookJobNotificationsTests : IDisposable
 
     private readonly StoreFixture _store = new();
     private readonly RecordingPoster _poster = new();
+    private readonly NotificationDispatcher _dispatcher;
     private readonly WebhookJobNotifications _notifications;
 
     public WebhookJobNotificationsTests()
     {
-        _notifications = new WebhookJobNotifications(
-            _store.Database, new NotificationDispatcher(_poster, _store.Clock), NullLogger<WebhookJobNotifications>.Instance);
+        _dispatcher = new NotificationDispatcher(_poster, _store.Clock);
+        _notifications = new WebhookJobNotifications(_store.Database, _dispatcher, NullLogger<WebhookJobNotifications>.Instance);
+    }
+
+    /// <summary>
+    /// Everything posted once the background deliveries have finished. Waiting on the deliveries themselves, not on a
+    /// clock, is what keeps these tests steady on a slow runner (#669).
+    /// </summary>
+    private async Task<List<(string Url, string Body)>> PostsAsync()
+    {
+        await _dispatcher.WhenIdleAsync();
+        return _poster.Posts;
     }
 
     public void Dispose() => _store.Dispose();
@@ -50,7 +61,7 @@ public sealed class WebhookJobNotificationsTests : IDisposable
 
         _notifications.Dispatch("processing", "completed", job, RemuxPass);
 
-        var posts = await _poster.WaitForAsync(2);
+        var posts = await PostsAsync();
         Assert.Equal(["https://alerts.example.com/any", "https://alerts.example.com/files"], posts.Select(p => p.Url).Order());
         Assert.All(posts, p => Assert.Contains("\"processing_job_completed\"", p.Body, StringComparison.Ordinal));
     }
@@ -63,7 +74,7 @@ public sealed class WebhookJobNotificationsTests : IDisposable
 
         _notifications.Dispatch("processing", "failed", job, LibraryClean);
 
-        var post = Assert.Single(await _poster.WaitForAsync(1));
+        var post = Assert.Single(await PostsAsync());
         Assert.Equal("https://alerts.example.com/files", post.Url);
     }
 
@@ -75,7 +86,7 @@ public sealed class WebhookJobNotificationsTests : IDisposable
 
         _notifications.Dispatch("processing", "completed", job, FolderScan);
 
-        Assert.Empty(await _poster.WaitForAsync(1, TimeSpan.FromMilliseconds(400)));
+        Assert.Empty(await PostsAsync());
     }
 
     [Fact]
@@ -87,7 +98,7 @@ public sealed class WebhookJobNotificationsTests : IDisposable
 
         _notifications.Dispatch("processing", "failed", job, FolderScan);
 
-        var post = Assert.Single(await _poster.WaitForAsync(1));
+        var post = Assert.Single(await PostsAsync());
         Assert.Equal("https://alerts.example.com/failures", post.Url);
     }
 
@@ -99,39 +110,20 @@ public sealed class WebhookJobNotificationsTests : IDisposable
 
         _notifications.Dispatch("processing", "failed", job, RemuxPass, willRetry: true);
 
-        Assert.Empty(await _poster.WaitForAsync(1, TimeSpan.FromMilliseconds(400)));
+        Assert.Empty(await PostsAsync());
     }
 
-    /// <summary>Records every post instead of sending it, and lets a test wait for the background delivery.</summary>
+    /// <summary>Records every post instead of sending it.</summary>
     private sealed class RecordingPoster : IExternalJsonPoster
     {
         private readonly ConcurrentQueue<(string Url, string Body)> _posts = new();
+
+        public List<(string Url, string Body)> Posts => [.. _posts];
 
         public Task<int> PostJsonAsync(string url, byte[] body, IReadOnlyDictionary<string, string> headers, TimeSpan timeout, CancellationToken cancellationToken)
         {
             _posts.Enqueue((url, Encoding.UTF8.GetString(body)));
             return Task.FromResult(204);
-        }
-
-        /// <summary>The posts once <paramref name="count"/> have arrived, or whatever arrived by the deadline.</summary>
-        public async Task<List<(string Url, string Body)>> WaitForAsync(int count, TimeSpan? within = null)
-        {
-            var deadline = DateTime.UtcNow + (within ?? TimeSpan.FromSeconds(5));
-            while (_posts.Count < count && DateTime.UtcNow < deadline)
-            {
-                await Task.Delay(20);
-            }
-
-            if (within is not null)
-            {
-                // Waiting for nothing: give a stray delivery the whole window to show up.
-                while (DateTime.UtcNow < deadline)
-                {
-                    await Task.Delay(20);
-                }
-            }
-
-            return [.. _posts];
         }
     }
 }
