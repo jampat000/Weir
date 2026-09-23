@@ -151,10 +151,20 @@ export interface LibraryProblemGroup {
   sample_paths: string[];
 }
 
+/**
+ * "Scheduled scan and clean": once a day, inside the library's own schedule window. `next_run_at` is null when it
+ * is off or cannot run (no library folders, the library switched off, a window that never opens).
+ */
+export interface LibraryModeSchedule {
+  enabled: boolean;
+  next_run_at: string | null;
+}
+
 export interface LibraryOverview {
   library_id: number;
   folders_configured: number;
   scan: LibraryScanInfo | null;
+  schedule: LibraryModeSchedule;
   totals: LibraryTotals;
   breakdowns: LibraryBreakdowns;
   problems: LibraryProblemGroup[];

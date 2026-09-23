@@ -8,6 +8,7 @@ using Weir.Core.LibraryMode;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Rules;
+using Weir.Core.Time;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.LibraryMode;
@@ -235,7 +236,7 @@ public static class LibraryModeEndpoints
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await RequireLibraryAsync(uow, libraryId).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, libraryId).ConfigureAwait(false);
         var settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
         var totals = await LibraryViewStore.TotalsAsync(uow, libraryId).ConfigureAwait(false);
         var breakdowns = await LibraryViewStore.AllBreakdownsAsync(uow, libraryId).ConfigureAwait(false);
@@ -252,9 +253,24 @@ public static class LibraryModeEndpoints
             .Set("library_id", libraryId)
             .Set("folders_configured", settings.Folders.Count)
             .Set("scan", await ScanOutAsync(uow, libraryId).ConfigureAwait(false))
+            .Set("schedule", await ScheduleOutAsync(uow, library, settings, request.Time.GetUtcNow()).ConfigureAwait(false))
             .Set("totals", TotalsOut(totals))
             .Set("breakdowns", breakdownsOut)
             .Set("problems", new PyList(problems.Select(group => (PyJson)ProblemGroupOut(group)))));
+    }
+
+    /// <summary>
+    /// "Scheduled scan and clean": whether it is on and when it next runs. <c>next_run_at</c> is null when it is off or
+    /// cannot run (no library folders, the library switched off, a window that never opens); a run that is due is
+    /// reported as now, since the timer starts it within half a minute.
+    /// </summary>
+    private static async Task<PyDict> ScheduleOutAsync(
+        Weir.Infrastructure.Sqlite.UnitOfWork uow, ProcessingLibraryRecord library, LibrarySettings settings, DateTimeOffset now)
+    {
+        var next = await LibraryModeScheduling.NextRunAsync(uow, library, settings, now).ConfigureAwait(false);
+        return new PyDict()
+            .Set("enabled", settings.ScheduleEnabled)
+            .Set("next_run_at", next is { } at ? PyDateTime.FromDateTimeOffset(at < now ? now : at).PydanticJson() : null);
     }
 
     private static PyDict TotalsOut(LibraryTotals totals) => new PyDict()
@@ -423,102 +439,6 @@ public static class LibraryModeEndpoints
             .Set("estimated_bytes_saved", bytesSaved)
             .Set("warnings", new PyList(warnings.Select(w => (PyJson)new PyStr(w)))));
 
-    /// <summary>
-    /// #508's hardlink preflight (step 1) for a set of already-scanned files, run at request time rather than trusting the
-    /// scan's own cached classification, since a download client can start seeding a file at any moment after it was scanned.
-    /// The re-download-risk half (step 2, #551) runs too, for any file a scan matched to a Sonarr/Radarr title: the match
-    /// already carries the manager's file id and quality profile id, so no extra lookup is needed beyond the two calls
-    /// <see cref="RedownloadRiskChecker"/> itself makes. A file with nothing removed, or no match, never dials out.
-    /// </summary>
-    private static async Task<List<LibraryFilePreflightResult>> PreflightAsync(
-        IEnumerable<LibraryScanFileEntry> files,
-        LibrarySettings settings,
-        ProcessingRulesConfig rules,
-        string mediaScope,
-        IHardlinkInspector inspector,
-        RedownloadRiskChecker riskChecker,
-        IReadOnlyDictionary<long, ManagerConnection> connectionsById,
-        CancellationToken cancellationToken)
-    {
-        var results = new List<LibraryFilePreflightResult>();
-        foreach (var file in files)
-        {
-            int? linkCount;
-            try
-            {
-                linkCount = inspector.LinkCount(file.Path);
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                linkCount = null;
-            }
-
-            var hardlink = HardlinkPolicy.Evaluate(linkCount, settings.CleanHardlinkedFiles);
-            var risk = await RedownloadRiskForFileAsync(file, rules, mediaScope, riskChecker, connectionsById, settings.SkipIfManagerWouldRedownload, cancellationToken).ConfigureAwait(false);
-            results.Add(LibraryCleanPreflight.Evaluate(file.Path, hardlink, risk));
-        }
-
-        return results;
-    }
-
-    private static async Task<RedownloadRiskAssessment?> RedownloadRiskForFileAsync(
-        LibraryScanFileEntry file,
-        ProcessingRulesConfig rules,
-        string mediaScope,
-        RedownloadRiskChecker riskChecker,
-        IReadOnlyDictionary<long, ManagerConnection> connectionsById,
-        bool skipIfManagerWouldRedownload,
-        CancellationToken cancellationToken)
-    {
-        if (file.ManagerConnectionId is not { } connectionId ||
-            file.ManagerFileId is not { } fileId ||
-            file.ManagerQualityProfileId is not { } qualityProfileId ||
-            !connectionsById.TryGetValue(connectionId, out var connection))
-        {
-            return null;
-        }
-
-        var removedAudioLanguages = RemovedAudioLanguages(file, rules);
-        if (removedAudioLanguages.Count == 0)
-        {
-            return null;
-        }
-
-        return await riskChecker.CheckAsync(
-                connection, mediaScope, fileId, qualityProfileId, file.ManagerTitle ?? Path.GetFileName(file.Path),
-                removedAudioLanguages, skipIfManagerWouldRedownload, cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// The languages of the audio tracks the current rules would remove from an already-scanned file, re-derived
-    /// from its cached ffprobe JSON (the scan's own plan cache carries only a count, not the languages) — the same
-    /// replan <see cref="LibraryCleanHandler"/> runs before actually touching the file.
-    /// </summary>
-    private static List<string> RemovedAudioLanguages(LibraryScanFileEntry file, ProcessingRulesConfig rules)
-    {
-        if (file.RemovedAudioCount == 0 || file.ProbeJson is not { Length: > 0 } probeJson)
-        {
-            return [];
-        }
-
-        try
-        {
-            var classification = LibraryFilePlanner.Classify(ProbeResult.Parse(probeJson), rules);
-            return classification.Plan?.RemovedTrackRecords
-                .Where(track => track.Type == RemovedTrackType.Audio)
-                .Select(track => track.Language)
-                .ToList() ?? [];
-        }
-        catch (RulesInputException)
-        {
-            return [];
-        }
-    }
-
-    private static List<string> PreflightWarningMessages(IEnumerable<LibraryFilePreflightResult> preflight) =>
-        preflight.Where(r => r.Skip).Select(r => $"{Path.GetFileName(r.FilePath)}: {string.Join(" ", r.SkipReasons)}").ToList();
-
     /// <summary>The library's rules, exactly as the scan and clean handlers resolve them (no rule set = the defaults).</summary>
     private static async Task<ProcessingRulesConfig> RulesForAsync(Weir.Infrastructure.Sqlite.UnitOfWork uow, ProcessingLibraryRecord library)
     {
@@ -583,7 +503,7 @@ public static class LibraryModeEndpoints
         var settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
         var rules = await RulesForAsync(uow, library).ConfigureAwait(false);
         var connectionsById = await ConnectionsForFilesAsync(uow, request.Service<MediaManagerConnectionService>(), selected).ConfigureAwait(false);
-        var preflightResults = await PreflightAsync(
+        var preflightResults = await LibraryCleanPreflightRunner.RunAsync(
                 selected, settings, rules, library.MediaType, request.Service<IHardlinkInspector>(),
                 request.Service<RedownloadRiskChecker>(), connectionsById, request.Context.RequestAborted)
             .ConfigureAwait(false);
@@ -610,7 +530,7 @@ public static class LibraryModeEndpoints
             // Nothing is queued, but the preflight notes just recorded above are real observations worth keeping
             // even if the operator cancels the dialog, so they are committed rather than rolled back with it.
             await request.CommitAsync().ConfigureAwait(false);
-            return ConfirmationRequired(removingFiles, removingTracks, bytesSaved, PreflightWarningMessages(preflight.Values));
+            return ConfirmationRequired(removingFiles, removingTracks, bytesSaved, LibraryCleanPreflightRunner.WarningMessages(preflight.Values));
         }
 
         var jobStore = request.Service<ProcessingJobStore>();
@@ -642,7 +562,7 @@ public static class LibraryModeEndpoints
 
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(CleanOut(
-            jobIds.Count, jobIds, removingFiles, removingTracks, bytesSaved, skipped, PreflightWarningMessages(preflight.Values)));
+            jobIds.Count, jobIds, removingFiles, removingTracks, bytesSaved, skipped, LibraryCleanPreflightRunner.WarningMessages(preflight.Values)));
     }
 
     private static PyDict CleanOut(
@@ -716,11 +636,11 @@ public static class LibraryModeEndpoints
             {
                 var rules = await RulesForAsync(uow, library).ConfigureAwait(false);
                 var connectionsById = await ConnectionsForFilesAsync(uow, request.Service<MediaManagerConnectionService>(), files).ConfigureAwait(false);
-                var preflight = await PreflightAsync(
+                var preflight = await LibraryCleanPreflightRunner.RunAsync(
                         files, settings, rules, library.MediaType, request.Service<IHardlinkInspector>(),
                         request.Service<RedownloadRiskChecker>(), connectionsById, request.Context.RequestAborted)
                     .ConfigureAwait(false);
-                return ConfirmationRequired(removingFiles, removingTracks, bytesSaved, PreflightWarningMessages(preflight));
+                return ConfirmationRequired(removingFiles, removingTracks, bytesSaved, LibraryCleanPreflightRunner.WarningMessages(preflight));
             }
         }
 

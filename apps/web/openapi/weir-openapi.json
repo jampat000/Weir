@@ -1511,6 +1511,35 @@
         "title": "LibraryLeaveAloneOut",
         "type": "object"
       },
+      "LibraryModeScheduleOut": {
+        "additionalProperties": false,
+        "description": "\"Scheduled scan and clean\": whether it is on and when it next runs. It runs once a day, inside the library's own schedule window.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it next runs; now when it is due. Null when it is off or cannot run: no library folders, the library switched off, or a schedule window that never opens.",
+            "title": "Next Run At"
+          }
+        },
+        "required": [
+          "enabled",
+          "next_run_at"
+        ],
+        "title": "LibraryModeScheduleOut",
+        "type": "object"
+      },
       "LibraryOverviewOut": {
         "additionalProperties": false,
         "description": "Issue #568: what the library holds and its state, aggregated in SQL rather than in the browser.",
@@ -1544,6 +1573,9 @@
             ],
             "title": "Scan"
           },
+          "schedule": {
+            "$ref": "#/components/schemas/LibraryModeScheduleOut"
+          },
           "totals": {
             "$ref": "#/components/schemas/LibraryTotalsOut"
           }
@@ -1554,6 +1586,7 @@
           "library_id",
           "problems",
           "scan",
+          "schedule",
           "totals"
         ],
         "title": "LibraryOverviewOut",
@@ -6013,11 +6046,6 @@
             "title": "Updated At",
             "type": "string"
           },
-          "verbose_detection_logging": {
-            "description": "Record extra detail from the file-detection stage. Turn this on while working out why a file is or is not being picked up, and turn it off again afterwards — it is loud.",
-            "title": "Verbose Detection Logging",
-            "type": "boolean"
-          },
           "work_temp_stale_sweep_enabled": {
             "description": "Reclaim Weir's own stale working files. Safe, and on by default.",
             "title": "Work Temp Stale Sweep Enabled",
@@ -6048,7 +6076,6 @@
           "failure_cleanup_enabled",
           "keep_failed_work_files",
           "file_log_retention_days",
-          "verbose_detection_logging",
           "runner_cost_undetermined",
           "min_file_age_seconds",
           "min_input_file_size_mb",
@@ -6392,6 +6419,8 @@
                 "type": "null"
               }
             ],
+            "deprecated": true,
+            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused.",
             "title": "Verbose Detection Logging"
           },
           "work_temp_stale_sweep_enabled": {

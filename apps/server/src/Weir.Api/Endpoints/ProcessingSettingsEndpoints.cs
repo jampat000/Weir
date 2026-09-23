@@ -49,7 +49,6 @@ public static class ProcessingSettingsEndpoints
         .Set("failure_cleanup_interval_seconds", row.FailureCleanupIntervalSeconds is { } cleanupEvery ? PyJson.Of(cleanupEvery) : PyJson.Null)
         .Set("keep_failed_work_files", row.KeepFailedWorkFiles)
         .Set("file_log_retention_days", OperatorSettingsRules.ClampFileLogRetentionDays(row.FileLogRetentionDays))
-        .Set("verbose_detection_logging", row.VerboseDetectionLogging)
         .Set("runner_cost_undetermined", OperatorSettingsRules.ClampRunnerCost(row.RunnerCostUndetermined))
         .Set("min_file_age_seconds", OperatorSettingsRules.ClampMinFileAgeSeconds(row.MinFileAgeSeconds))
         .Set("min_input_file_size_mb", OperatorSettingsRules.ClampSizeMb(row.ProcessingMinInputFileSizeMb))
@@ -98,7 +97,9 @@ public static class ProcessingSettingsEndpoints
             "failure_cleanup_interval_seconds", ge: OperatorSettingsRules.MinCleanupIntervalSeconds, le: OperatorSettingsRules.MaxCleanupIntervalSeconds);
         var keepFailedWorkFiles = model.OptionalBool("keep_failed_work_files");
         var fileLogRetentionDays = model.OptionalInt("file_log_retention_days", ge: 0, le: 3650);
-        var verboseDetectionLogging = model.OptionalBool("verbose_detection_logging");
+        // Removed on 23 Sep 2026 (nothing ever acted on it). Still read, and then ignored, so an older client that sends it
+        // is not refused: the body forbids fields it does not know.
+        var retiredVerboseDetectionLogging = model.OptionalBool("verbose_detection_logging");
         var minFileAgeSeconds = model.OptionalInt("min_file_age_seconds", ge: 0, le: 7 * 24 * 3600);
         var processingMinInputFileSizeMb = model.OptionalInt("min_input_file_size_mb", ge: 0, le: 1024 * 1024);
         var minimumFreeDiskSpaceMb = model.OptionalInt("minimum_free_disk_space_mb", ge: 0, le: 1024 * 1024);
@@ -132,7 +133,7 @@ public static class ProcessingSettingsEndpoints
                                runnerCost720P is not null || runnerCost1080P is not null || runnerCost4K is not null ||
                                runnerCostUndetermined is not null || runnerBudgetEnabled is not null || workTempStaleSweepEnabled is not null || failureCleanupEnabled is not null ||
                                workTempStaleSweepIntervalSeconds is not null || failureCleanupIntervalSeconds is not null ||
-                               keepFailedWorkFiles is not null || fileLogRetentionDays is not null || verboseDetectionLogging is not null ||
+                               keepFailedWorkFiles is not null || fileLogRetentionDays is not null || retiredVerboseDetectionLogging is not null ||
                                minFileAgeSeconds is not null || processingMinInputFileSizeMb is not null || minimumFreeDiskSpaceMb is not null;
         if (!hasProcessField && movieScheduleEnabled is null && tvScheduleEnabled is null)
         {
@@ -215,11 +216,6 @@ public static class ProcessingSettingsEndpoints
         if (keepFailedWorkFiles is { } kf)
         {
             after = after with { KeepFailedWorkFiles = kf };
-        }
-
-        if (verboseDetectionLogging is { } vd)
-        {
-            after = after with { VerboseDetectionLogging = vd };
         }
 
         if (minFileAgeSeconds is { } mfa)

@@ -158,6 +158,7 @@ function overview(over: Partial<LibraryOverview> = {}): LibraryOverview {
   return {
     library_id: 1,
     folders_configured: 1,
+    schedule: { enabled: false, next_run_at: null },
     scan: {
       job_id: 9,
       status: "completed",

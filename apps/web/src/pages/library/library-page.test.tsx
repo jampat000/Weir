@@ -104,6 +104,9 @@ vi.mock("../../lib/processing/rules-preview-api", () => ({
       inspected_path: "x",
     }),
 }));
+vi.mock("../../lib/suite/queries", () => ({
+  useSuiteSettingsQuery: () => ({ data: { app_timezone: "UTC" } }),
+}));
 vi.mock("../../lib/activity/queries", () => ({
   activityRecentKey: ["activity", "recent"],
   useActivityRecentQuery: () => ({ data: { items: [] } }),
@@ -172,6 +175,7 @@ describe("LibraryPage", () => {
     overviewResult = {
       library_id: 1,
       folders_configured: 1,
+      schedule: { enabled: false, next_run_at: null },
       scan: {
         job_id: 1,
         status: "completed",
@@ -243,6 +247,41 @@ describe("LibraryPage", () => {
     expect(
       screen.getByText(/back if everything that would change is cleaned/),
     ).toBeInTheDocument();
+  });
+
+  it("says when the scheduled check and clean next runs, and nothing while it is off", () => {
+    const { unmount } = renderLibrary();
+    expect(screen.queryByTestId("library-schedule")).not.toBeInTheDocument();
+    unmount();
+
+    overviewResult = {
+      ...overviewResult,
+      schedule: { enabled: true, next_run_at: "2999-01-02T02:00:00Z" },
+    };
+    const next = renderLibrary();
+    expect(screen.getByTestId("library-schedule")).toHaveTextContent(
+      /next scheduled check and clean .*2999/,
+    );
+    next.unmount();
+
+    overviewResult = {
+      ...overviewResult,
+      schedule: { enabled: true, next_run_at: "2020-01-01T00:00:00Z" },
+    };
+    const due = renderLibrary();
+    expect(screen.getByTestId("library-schedule")).toHaveTextContent(
+      "scheduled check and clean starting now",
+    );
+    due.unmount();
+
+    overviewResult = {
+      ...overviewResult,
+      schedule: { enabled: true, next_run_at: null },
+    };
+    renderLibrary();
+    expect(screen.getByTestId("library-schedule")).toHaveTextContent(
+      /cannot run/,
+    );
   });
 
   it("makes each count a filter, and asks the server for that filter", () => {
