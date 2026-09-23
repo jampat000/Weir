@@ -338,7 +338,7 @@ public sealed class MediaToolsGoldenTests
 /// <summary>
 /// Deliberate divergences from the golden fixtures in <c>tests/Weir.Core.Tests/Media/golden</c> (shared with
 /// <c>Weir.Core.Tests</c>, which has its own copy of this patch for the argv-level fixtures): a deliberate bug fix
-/// makes the logs differ from the recorded output, and the fixtures stay as recorded. apps/server/README.md
+/// makes the logs differ from the recorded output, and the fixtures stay as recorded. docs/archive/server-port-notes.md, "ffmpeg parity",
 /// describes the mechanism.
 /// </summary>
 internal static class GoldenDivergences

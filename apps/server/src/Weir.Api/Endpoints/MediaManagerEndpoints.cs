@@ -493,8 +493,9 @@ public static class MediaManagerEndpoints
     /// <c>POST /intake/handoffs/{source_key}/{handoff_id}/outcome</c> (#652, agreed with Deluno): the manager
     /// says what became of the file Weir handed back. <c>imported</c> records it and releases Weir's copy when that is safe;
     /// <c>not-imported</c> is final, and records it and keeps the copy. The same outcome sent again gets the same 200; a
-    /// hand-off never received is 404; one not finished, or with a different outcome already recorded, is 409; a body
-    /// that cannot be read is 422. Authenticated by <c>X-Webhook-Secret</c>, like the other hand-off routes.
+    /// hand-off never received is 404; one not finished, or with a different outcome already recorded, is 409 with a
+    /// <c>code</c> saying which (#664); a body that cannot be read is 422. Authenticated by <c>X-Webhook-Secret</c>, like
+    /// the other hand-off routes.
     /// </summary>
     private static async Task<ApiResult> PostHandoffOutcomeAsync(ApiRequest request)
     {
@@ -534,7 +535,10 @@ public static class MediaManagerEndpoints
                     StatusCodes.Status409Conflict,
                     recorded == HandbackRules.Imported
                         ? $"{manager} already said it imported this file, so Weir kept that answer."
-                        : $"{manager} already said it will not import this file, so Weir kept that answer.");
+                        : $"{manager} already said it will not import this file, so Weir kept that answer.")
+                {
+                    Code = HandbackRules.OutcomeAlreadyRecordedCode,
+                };
             }
 
             return ApiRoutes.Ok(OutcomeOut(row.HandoffId, recorded, row.OutcomeReleased, row.OutcomeMessage ?? string.Empty));
@@ -544,11 +548,15 @@ public static class MediaManagerEndpoints
         if (status.State is not (HandoffLedgerRules.Completed or HandoffLedgerRules.PassedThrough))
         {
             await request.CommitAsync().ConfigureAwait(false);
+            var ended = HandoffLedgerRules.TerminalStates.Contains(status.State);
             throw new ApiException(
                 StatusCodes.Status409Conflict,
-                HandoffLedgerRules.TerminalStates.Contains(status.State)
+                ended
                     ? $"This hand-off ended {status.State}, so Weir handed back no file to import."
-                    : $"Weir has not finished this hand-off yet (it is {status.State}), so there is no file to import.");
+                    : $"Weir has not finished this hand-off yet (it is {status.State}), so there is no file to import.")
+            {
+                Code = ended ? HandbackRules.HandoffEndedCode : HandbackRules.HandoffNotFinishedCode,
+            };
         }
 
         var result = await request.Service<HandbackOutcomes>().RecordHandoffOutcomeAsync(

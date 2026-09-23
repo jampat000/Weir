@@ -23,15 +23,15 @@ This checklist defines the current practical hardening baseline for Weir.
   credentials. Keep them separate.
 - `WEIR_METRICS_BEARER_TOKEN` can gate machine access to `/metrics` without requiring an operator browser session.
 - To rotate `WEIR_CREDENTIALS_SECRET`, set the new value as `WEIR_CREDENTIALS_SECRET`, add the old value to
-  `WEIR_PREVIOUS_CREDENTIALS_SECRETS`, restart Weir, then re-save Sonarr and Radarr
-  credentials. After every saved credential has been re-written with the new value, remove the old value from
+  `WEIR_PREVIOUS_CREDENTIALS_SECRETS`, restart Weir, then re-save every media manager
+  connection (Settings › Media managers) and the TMDb metadata provider key (Settings › Rules). After every saved credential has been re-written with the new value, remove the old value from
   `WEIR_PREVIOUS_CREDENTIALS_SECRETS` and restart again.
 
 ## Repository and dependency controls
 
 - `main` is protected by GitHub rules.
 - Required checks are `weir`, `docker-smoke`, and `windows-package-smoke`.
-- Dependabot is enabled for NuGet (`apps/server`, `apps/tray`), npm, GitHub Actions, and the Python test-runner packages in `tests/requirements.txt`.
+- Dependabot is enabled for NuGet (`apps/server`, `apps/tray`), npm (`apps/web`, `docs-site`), GitHub Actions, and the Python test-runner packages in `tests/requirements.txt`.
 - CodeQL code scanning (C# and JavaScript/TypeScript) runs on `main`, pull requests to `main`, weekly schedule, and manual dispatch.
 - Security vulnerabilities are reported privately through `SECURITY.md`.
 - Public issues are not used for unpatched vulnerabilities.
@@ -53,4 +53,4 @@ Run this list before any major release:
 3. Confirm CodeQL has no open high-confidence security findings.
 4. Confirm auth setup, login, logout, and password validation smoke tests pass.
 5. Confirm backup files do not expose secrets in public docs, logs, or screenshots.
-6. Confirm activity/log views do not expose tokens or internal implementation details to normal users.
+6. Confirm History and System › Logs do not expose tokens or internal implementation details to normal users.

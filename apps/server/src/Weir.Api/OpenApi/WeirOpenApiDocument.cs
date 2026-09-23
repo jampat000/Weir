@@ -9,7 +9,7 @@ namespace Weir.Api.OpenApi;
 /// </summary>
 /// <remarks>
 /// Pruning rather than generating keeps every schema identical to the document existing clients were generated
-/// from (README, "Schema parity"; ADR-0017). <c>OpenApiDocumentParityTests</c> checks the gap between the two
+/// from (apps/server/README.md, "API contract"; ADR-0017). <c>OpenApiDocumentParityTests</c> checks the gap between the two
 /// against an allowlist, so a mapped route dropping out or an unlisted gap appearing fails the build.
 /// </remarks>
 public static class WeirOpenApiDocument

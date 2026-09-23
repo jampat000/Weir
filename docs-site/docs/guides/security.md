@@ -59,7 +59,7 @@ The docs build runs an image-format preflight and rejects ICNS, JXL, HEIC, and H
 3. Confirm CodeQL has no open high-confidence findings
 4. Confirm auth smoke tests pass
 5. Confirm backup files don't expose secrets
-6. Confirm activity/log views don't expose tokens
+6. Confirm History and the logs don't expose tokens
 
 ## Locked out
 
@@ -75,12 +75,24 @@ account, and signs out every existing session. This works only from the server's
 it is not reachable over HTTP — because reaching the server's shell is the proof of identity
 recovery relies on.
 
+In Docker:
+
 ```bash
-docker exec weir /opt/weir/Weir recover
+docker exec -it -u weir -e WEIR_HOME=/data/weir weir /opt/weir/Weir recover
 ```
 
-On a Windows install, run `Weir.exe recover` from the installation directory. Building from
-source, use `dotnet run --project apps/server/src/Weir.Host -- recover`.
+`-u weir` runs it as the same user as the server, so the database keeps the right owner, and
+`WEIR_HOME` points it at the data volume. If you gave the container a different `WEIR_HOME`, use
+that path instead.
+
+On a Windows install, run the server executable, not the tray app:
+
+```powershell
+& "$env:LocalAppData\Weir\current\server\WeirServer.exe" recover
+```
+
+From Command Prompt, that is `"%LocalAppData%\Weir\current\server\WeirServer.exe" recover`.
+Building from source, use `dotnet run --project apps/server/src/Weir.Host -- recover`.
 
 You will be prompted for the new password (typed without being echoed to the screen), which
 keeps it out of your shell history. For scripted use, pass `--password`. To see the accounts

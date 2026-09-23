@@ -364,7 +364,7 @@ public sealed class MediaManagerApiTests
             Assert.Equal((HttpStatusCode.Unauthorized, "Invalid or missing X-Webhook-Secret header."), (noSecret.StatusCode, await Detail(noSecret)));
         }
 
-        Assert.Equal("""{"capabilities":["handoff-status","handoff-cancel","handoff-outcome"]}""", await (await manager.GetAsync("/api/v1/intake/capabilities", secret)).Content.ReadAsStringAsync());
+        Assert.Equal("""{"capabilities":["handoff-status","handoff-cancel","handoff-outcome","handoff-outcome-codes"]}""", await (await manager.GetAsync("/api/v1/intake/capabilities", secret)).Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.NotFound, (await manager.GetAsync("/api/v1/intake/handoffs/deluno/h1", secret)).StatusCode);
         Assert.Equal("Unknown media manager source 'plex'.", await Detail(await manager.GetAsync("/api/v1/intake/handoffs/plex/h1", secret)));
 

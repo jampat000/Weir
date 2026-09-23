@@ -1,7 +1,7 @@
 /**
  * What happened to one file, read from the Activity entry written when Weir finished with it: a
  * download's `processing.file_remux_pass_completed`, or a library file's `library.file_cleaned`.
- * Live's "Just finished" list reads these (docs/exec-plans/active/live-and-library.md). Every number
+ * Live's "Just finished" list reads these (docs/archive/live-and-library.md). Every number
  * comes from the entry itself; nothing is estimated here.
  */
 import type { ActivityEventItem } from "../api/types";

@@ -10,7 +10,7 @@ namespace Weir.Core.LibraryMode;
 /// Per-library settings (<see cref="LibrarySettings"/>) live in <c>libraries</c> columns and the
 /// <c>library_folders</c> table, and the scan index in <c>library_files</c> (#557) — see
 /// <c>Weir.Infrastructure.LibraryMode.LibrarySettingsStore</c>/<c>LibraryScanStore</c> and
-/// <c>apps/server/README.md</c>, "Library mode". <see cref="ScanKind"/> is an ordinary <c>jobs</c> row (a scan
+/// <c>docs/archive/server-port-notes.md</c>, "Library mode". <see cref="ScanKind"/> is an ordinary <c>jobs</c> row (a scan
 /// is real, visible work with a lifecycle); its bulky per-file payload lives in <c>library_files</c>.
 /// </remarks>
 public static class LibraryModeJobKinds

@@ -110,7 +110,7 @@ public sealed class SchemaMigrator
 
     /// <summary>
     /// The schema before issue #557's migrations. The checked-in <c>schema/alembic-head.sql</c> reference and
-    /// <c>SchemaParityTests</c> stay pinned to this revision (see apps/server/README.md, "Schema") rather than
+    /// <c>SchemaParityTests</c> stay pinned to this revision (see apps/server/README.md, "Schema and migrations") rather than
     /// to the moving <see cref="HeadRevision"/>, so the reference file never changes.
     /// </summary>
     public static string BaselineRevision => Migrations[0].Revision;

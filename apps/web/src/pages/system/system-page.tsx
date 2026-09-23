@@ -50,7 +50,7 @@ function canEditSuiteGlobal(role: string | undefined): boolean {
 /**
  * The seven Settings tabs since 3.2. Weir is the whole app now, so everything set up once lives
  * here, including what used to be the configuration tabs on Processing
- * (docs/exec-plans/active/live-and-library.md). James chose tabs across the top over a second
+ * (docs/archive/live-and-library.md). James chose tabs across the top over a second
  * side menu ("I dont like 2 side menus", 2026-09-22).
  */
 type TabId = "about" | "backups" | "security" | "logs";

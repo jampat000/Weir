@@ -40,6 +40,12 @@ public sealed class ApiException : Exception
     public string Detail { get; }
 
     public IReadOnlyDictionary<string, string>? Headers { get; }
+
+    /// <summary>
+    /// A stable, machine-readable name for this error, sent as <c>code</c> beside <c>detail</c>. Set only where a client
+    /// needs to act on which error it got; <c>detail</c> is wording for people and may change.
+    /// </summary>
+    public string? Code { get; init; }
 }
 
 /// <summary>Writes JSON and plain-text responses with the exact bytes, content type and length existing clients expect.</summary>
@@ -74,7 +80,13 @@ public static class PyResponses
             context.Response.Headers[name] = value;
         }
 
-        return WriteJsonAsync(context, exception.StatusCode, new PyDict().Set("detail", exception.Detail));
+        var body = new PyDict().Set("detail", exception.Detail);
+        if (exception.Code is { } code)
+        {
+            body.Set("code", code);
+        }
+
+        return WriteJsonAsync(context, exception.StatusCode, body);
     }
 
     public static Task WriteValidationErrorAsync(HttpContext context, RequestValidationException exception)
@@ -96,18 +108,26 @@ public static class PyResponses
 public static class PyRequestBody
 {
     /// <summary>
+    /// The largest body Weir reads. The biggest legitimate body is a configuration backup being restored, which is
+    /// well under this; anything larger is refused before it is buffered, so a request cannot fill memory.
+    /// </summary>
+    public const int MaxBodyBytes = 8 * 1024 * 1024;
+
+    private const string TooLargeDetail = "The request body is larger than Weir accepts.";
+
+    /// <summary>
     /// The JSON body, <see langword="null"/> when the request has none, or the raw text when the content type is
     /// not JSON. A JSON syntax error is a 422 <c>json_invalid</c>; undecodable bytes are a 400.
     /// </summary>
     public static async Task<PyJson?> ReadAsync(HttpContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        byte[] bytes;
-        using (var buffer = new MemoryStream())
+        if (context.Request.ContentLength > MaxBodyBytes)
         {
-            await context.Request.Body.CopyToAsync(buffer, context.RequestAborted).ConfigureAwait(false);
-            bytes = buffer.ToArray();
+            throw new ApiException(StatusCodes.Status413PayloadTooLarge, TooLargeDetail);
         }
+
+        var bytes = await ReadCappedAsync(context.Request.Body, context.RequestAborted).ConfigureAwait(false);
 
         if (bytes.Length == 0)
         {
@@ -144,6 +164,25 @@ public static class PyRequestBody
                     new PyDict().Set("error", exception.Detail)),
             ]);
         }
+    }
+
+    /// <summary>Reads the body, stopping with a 413 as soon as it passes <see cref="MaxBodyBytes"/>, whatever Content-Length said.</summary>
+    private static async Task<byte[]> ReadCappedAsync(Stream body, CancellationToken cancellationToken)
+    {
+        using var buffer = new MemoryStream();
+        var chunk = new byte[81920];
+        int read;
+        while ((read = await body.ReadAsync(chunk, cancellationToken).ConfigureAwait(false)) > 0)
+        {
+            if (buffer.Length + read > MaxBodyBytes)
+            {
+                throw new ApiException(StatusCodes.Status413PayloadTooLarge, TooLargeDetail);
+            }
+
+            buffer.Write(chunk, 0, read);
+        }
+
+        return buffer.ToArray();
     }
 
     /// <summary>Whether the media type, parameters ignored, is <c>application/json</c> or <c>application/*+json</c>.</summary>

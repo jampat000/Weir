@@ -5,13 +5,13 @@ it; the inner stream turns a quarter and runs off to the right as the tailrace, 
 bar underneath. One colour, all fills, so the Windows tray icon — a single-colour mask — is the
 same mark as the one in the app.
 
-## Two optical sizes, on purpose (#582, reopened by James)
+## Two optical sizes, on purpose
 
 There are **two drawings of this mark in the repo, and that is deliberate, not drift**:
 
-- **Three streams — the primary mark.** This is the mark exactly as traced from the Midjourney
-  render James accepted, and it is what he asked for after looking at the two-stream mark #582
-  shipped ("logo is not exact I want this one"). It is used everywhere the mark is seen at a
+- **Three streams — the primary mark.** This is the mark exactly as traced from the accepted
+  render (`design-options/logos-round4/source.png`). It replaced the two-stream mark that first
+  shipped. It is used everywhere the mark is seen at a
   size that can actually show it: `weir-mark.svg`, `weir-mark-light.svg`, `weir-app-icon.svg`
   below, the SVG favicon (`apps/web/public/favicon.svg`), the apple touch icon, the in-app
   sidebar mark (`apps/web/src/components/brand/weir-logo.tsx`), the docs logo, and every
@@ -47,7 +47,7 @@ person actually sees in a tab strip or a system tray for no legibility gain. See
 | `weir-app-icon.svg` | three (primary) | The mark on the `#0b1418` rounded tile. Source of every favicon/Windows icon frame **24px and above**. |
 | `weir-app-icon-small.svg` | two (fallback) | The same tile with the small-size fallback geometry. Source of the favicon/Windows icon frame at **16px only**. |
 
-Those accents are the live Theme A "Tailrace" tokens from `apps/web/src/styles/weir-tokens.css`.
+Those accents are the Tailrace theme tokens from `apps/web/src/styles/weir-tokens.css`.
 The web app draws the same geometry inline (`apps/web/src/components/brand/weir-logo.tsx`) so it
 follows the theme tokens `--mm-brand-water` and `--mm-brand-wordmark` instead — always the
 three-stream primary mark, since the sidebar never renders it anywhere near 16px. The wordmark is
@@ -55,9 +55,8 @@ the word "Weir" set in the app font (Outfit), not outlines.
 
 ## Where the geometry comes from (#581)
 
-The SVGs here are generated, not drawn. James accepted a rendered mark after four rounds of
-hand-drawn ones were rejected; that render is kept at `design-options/logos-round4/source.png`,
-and the build traces it rather than redrawing it by eye:
+The SVGs here are generated, not drawn. The accepted render is kept at
+`design-options/logos-round4/source.png`, and the build traces it rather than redrawing it by eye:
 
 - `design-options/logos-round4/build/trace.py` thresholds the render to two colours, walks the
   contours and least-squares fits a circle to every band edge. Residuals are under 1.3px on a

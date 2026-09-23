@@ -23,7 +23,7 @@ namespace Weir.Api.Endpoints;
 
 /// <summary>
 /// Library mode (#505): library-folder settings, scanning, the file list and Clean, and the schedule toggle. See
-/// <c>apps/server/README.md</c>, "Library mode", for the storage decision behind it.
+/// <c>docs/archive/server-port-notes.md</c>, "Library mode", for the storage decision behind it.
 /// </summary>
 public static class LibraryModeEndpoints
 {

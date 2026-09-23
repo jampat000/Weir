@@ -1,14 +1,14 @@
-# Weir — web shell
+# Weir — web app
 
-**React + TypeScript + Vite** app: real consumer of the .NET server's (`apps/server`) cookie session auth and bootstrap APIs. **This directory is the forward visual source of truth** for the Weir shell (tokens, logo, **Outfit**, sidebar/main). Branding was initially ported from an older static/CSS spike (not maintained in this repository); ongoing UI work should live here only.
+**React + TypeScript + Vite** app served by the .NET server (`apps/server`) on the same origin as the API. It uses the server's cookie session auth. **This directory is the source of truth** for Weir's UI: tokens, logo, the **Outfit** font, the shell and every screen.
 
-**Version:** the shell footer reads **`package.json`** `version`, injected at build time via `vite.config.ts` `define` (`WEB_APP_VERSION` in `src/lib/app-meta.ts`).
+`src/lib/app-meta.ts` exposes the `package.json` version as `WEB_APP_VERSION`, injected at build time by `vite.config.ts` `define`.
 
 ## Stack
 
-- React 19, React Router 6, TanStack Query
-- Tailwind CSS (minimal tokens in `tailwind.config.js`); **shell look** is owned by `src/styles/weir-tokens.css` and `src/styles/weir-shell.css` - **warm charcoal base + gold accent** product language (approved one-pager direction); indigo only as a restrained depth veil in tokens.
-- Vitest + Testing Library for small unit tests
+- React 19, React Router 7, TanStack Query
+- Tailwind CSS 4 (`@tailwindcss/vite`, `@theme` in `src/index.css`). The look is owned by `src/styles/weir-tokens.css`, `weir-shell.css`, `weir-content.css` and the screen stylesheets `weir-processing.css`, `weir-history.css` and `weir-library.css`. See [`../../docs/visual-identity.md`](../../docs/visual-identity.md) and [`../../docs/design/content-language.md`](../../docs/design/content-language.md). A Tailwind utility cannot override a property a `weir-*` class sets; the content-language doc explains why.
+- Vitest + Testing Library for unit tests
 
 ## Development
 
@@ -18,16 +18,16 @@ npm ci
 npm run dev
 ```
 
-**`npm run dev`** first runs **`dev:stop-api`** and **`dev:stop-web`**, then starts **both** the .NET server (`dotnet watch run`, same as `../../scripts/dev-backend.ps1`) and Vite in one terminal via `scripts/run-dev-stack.mjs` (no reliance on `node_modules/.bin` shims, which some Windows setups omit). **`dev:stop-api`** stops only *this worktree's* dev API — the process `run-api-dev.mjs` spawned and recorded in `.dev-api.pid` at the repo root, verified by its command line before it is touched — never whatever else happens to be listening on the dev API port; that port and an installed Weir's port can coincide (see **`../../docs/ports.md`**), and killing by port alone would silently take down an installed instance. **`dev:stop-web`** still stops by port (nothing production listens on the dev **web** port). Override the dev API port with **`WEIR_DEV_API_PORT`** / the dev web port with **`WEIR_DEV_WEB_PORT`**. The stack **waits for `GET /health` on the API port before starting Vite**, so the browser is not served until the server has finished starting up (including creating or migrating its SQLite database). Override wait with **`WEIR_DEV_STACK_API_WAIT_MS`** (default `120000`). Use **`npm run dev:quick`** to skip the port-stop step when you know the default ports are free. Use **`npm run dev:web`** for Vite only (e.g. when the API is already running elsewhere).
+**`npm run dev`** first runs **`dev:stop-api`** and **`dev:stop-web`**, then starts **both** the .NET server (`dotnet watch run`, same as `../../scripts/dev-backend.ps1`) and Vite in one terminal via `scripts/run-dev-stack.mjs` (no reliance on `node_modules/.bin` shims, which some Windows setups omit). **`dev:stop-api`** stops only *this worktree's* dev API — the process `run-api-dev.mjs` spawned and recorded in `.dev-api.pid` at the repo root, verified by its command line before it is touched — never whatever else happens to be listening on the dev API port, so an installed Weir is never taken down (see **`../../docs/ports.md`**). **`dev:stop-web`** still stops by port (nothing production listens on the dev **web** port). Override the dev API port with **`WEIR_DEV_API_PORT`** / the dev web port with **`WEIR_DEV_WEB_PORT`**. The stack **waits for `GET /health` on the API port before starting Vite**, so the browser is not served until the server has finished starting up (including creating or migrating its SQLite database). Override wait with **`WEIR_DEV_STACK_API_WAIT_MS`** (default `120000`). Use **`npm run dev:quick`** to skip the port-stop step when you know the default ports are free. Use **`npm run dev:web`** for Vite only (e.g. when the API is already running elsewhere).
 
 **`package-lock.json`** is committed; use **`npm ci`** for reproducible installs (CI uses **`npm ci`**).
 
-- **Frontend:** **`http://127.0.0.1:8782`** (locked in **`../../scripts/dev-ports.json`**; see **`../../docs/ports.md`**)
+- **Web app:** **`http://127.0.0.1:8782`** (from **`../../scripts/dev-ports.json`**; see **`../../docs/ports.md`**)
 - **Server (standalone):** **`../../scripts/dev-backend.ps1`** (the .NET server via `dotnet watch run`) on the **API** host/port from the same JSON file.
 
 Vite **`server`** and **`preview`** proxy **`/api`** to that API origin (override with `VITE_DEV_API_PROXY_TARGET`). The browser uses one origin for the page and `/api/*`, so **HttpOnly** cookies work in dev and **`npm run preview`** (E2E uses ephemeral ports).
 
-Do not point the SPA at the raw API port unless CORS and cookie **`SameSite`** / **`Secure`** are set for cross-origin deployment.
+Do not point the app at the raw API port unless CORS and cookie **`SameSite`** / **`Secure`** are set for cross-origin deployment.
 
 ### Server CORS / trusted origins
 
@@ -42,28 +42,29 @@ Then set in this app:
 
 - `VITE_API_BASE_URL` — split-origin **production** (or `vite preview`) API origin (no trailing slash); **ignored in `vite dev`** so `/api` always goes through the dev proxy
 
-**Production (split origins):** use **HTTPS** end-to-end; set **`WEIR_CORS_ORIGINS`** / **`WEIR_TRUSTED_BROWSER_ORIGINS`** to the **single** public web origin you ship; set **`VITE_API_BASE_URL`** here to the API origin (no trailing slash). Session cookies on the API host generally need **`SameSite=None; Secure`** so credentialed `fetch` from the web origin works. The server’s cookie flags are env-driven — see ADR-0003 and **`../../docs/local-development.md`**.
+**Production (split origins):** use **HTTPS** end-to-end; set **`WEIR_CORS_ORIGINS`** / **`WEIR_TRUSTED_BROWSER_ORIGINS`** to the **single** public web origin you ship; set **`VITE_API_BASE_URL`** here to the API origin (no trailing slash). Session cookies on the API host generally need **`SameSite=None; Secure`** so credentialed `fetch` from the web origin works. The server's cookie flags are env-driven — see ADR-0003 and **`../../docs/local-development.md`**.
 
 ## Routes
 
-| Path | Purpose |
-|------|---------|
-| `/` | Authenticated app shell root (**Home**, which #459 folded the old dashboard into), guarded by session + setup wizard checks |
-| `/setup` | First-run admin creation (`POST /api/v1/auth/bootstrap`) while allowed; otherwise redirects |
-| `/login` | Session login (`POST /api/v1/auth/login`) |
-| `/setup-wizard` | First-run setup wizard for signed-in users before normal module access |
-| `/settings` | Suite settings: Global (saved in-app) and Security (read-only startup snapshot) |
+Defined in `src/app/router.tsx`.
+
+| Path | Screen |
+|------|--------|
+| `/login` | Sign in |
+| `/setup` | Create admin (first run, while no admin exists) |
+| `/setup-wizard` | Setup wizard: time zone, the first Movies and TV folders, automatic backups |
+| `/` | Processing, the first screen: what Weir is working on now |
+| `/history` | History: every file Weir has touched |
+| `/library` | Library: files already in a library, and what Weir would do to each |
+| `/settings` | Settings: Libraries, Rules, Media managers, Performance, Cleanup, Schedule, Alerts (`?tab=`) |
+| `/system` | System: About, Backups, Security, Logs (`?tab=`) |
+| `/activity`, `/processing` | Redirects from 3.1 addresses (`src/app/legacy-redirects.tsx`) |
+
+Everything under `/` needs a session and a finished or skipped setup wizard.
 
 ## API usage
 
-All calls use `credentials: 'include'` and the real endpoints:
-
-- `GET /api/v1/auth/bootstrap/status`
-- `GET /api/v1/auth/csrf`
-- `POST /api/v1/auth/bootstrap`
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/logout`
-- `GET /api/v1/auth/me`
+All calls use `credentials: 'include'`. Types are generated from `openapi/weir-openapi.json` (`npm run api:types:generate`; CI runs `npm run api:types:check`).
 
 **No** `localStorage` (or other browser storage) for session or tokens — TanStack Query caches in memory only.
 
@@ -71,21 +72,22 @@ All calls use `credentials: 'include'` and the real endpoints:
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Stop default dev ports, then API + Vite |
-| `npm run dev:quick` | API + Vite without stopping ports first |
-| `npm run build` | Typecheck + production bundle |
+| `npm run dev` | Stop the dev API and web port, then API + Vite |
+| `npm run dev:quick` | API + Vite without stopping anything first |
+| `npm run lint` | ESLint, no warnings allowed |
+| `npm run format` | Prettier check |
+| `npm run build` | Token check, typecheck, production bundle, bundle budget |
 | `npm run preview` | Preview production build |
 | `npm run test` | Vitest |
-| `npm run ci` | `build` + `test` (matches CI gate for this package) |
+| `npm run api:types:check` | Regenerate API types and fail on drift |
+| `npm run ci` | `lint`, `format`, `check:tokens`, `build`, `test` |
 
 ## CI
 
-GitHub Actions **Test** workflow runs **`npm ci`**, **`npm run build`**, and **`npm run test`** in this directory after the .NET server build and tests, then Playwright E2E in `tests/e2e/weir/` against the real .NET server serving the built web app (not `vite preview`) (see **`../../docs/local-development.md`**).
+The GitHub Actions **Test** workflow runs `npm ci`, `api:types:check`, lint, format, build and unit tests in this directory after the .NET server build and tests, then Playwright E2E in `tests/e2e/weir/` against the real .NET server serving the built web app (not `vite preview`) (see **`../../docs/local-development.md`**).
 
 ## Intentionally not built
 
-- Module pages (Processing, settings product, …)
-- Role-based navigation / permissions UI
 - Non-session auth (JWT-in-browser, token storage)
 
 See **`../../docs/adr/`** (especially ADR-0003).

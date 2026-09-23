@@ -1,6 +1,7 @@
 import type {ReactNode} from 'react';
 import clsx from 'clsx';
 import Link from '@docusaurus/Link';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 
@@ -10,8 +11,39 @@ const features = [
   {
     title: 'Processing',
     description:
-      'Cleans new downloads, and files already in your library: keep the audio and subtitle tracks you want and remove the rest, library by library, with configurable worker lanes.',
-    screenshot: '/Weir/img/history.png',
+      'The first screen. Every file Weir is working on, from the moment it lands in a watched folder until your media manager has the cleaned copy.',
+  },
+  {
+    title: 'History',
+    description:
+      'Every file Weir has touched: what it was, which tracks it kept and removed, and what came out. When something goes wrong, the reason is here.',
+  },
+  {
+    title: 'Library',
+    description:
+      'Files already on your storage, checked against your rules. See what would change, and how much space it would free, before anything is touched.',
+  },
+  {
+    title: 'Media managers',
+    description:
+      'Connect Sonarr, Radarr or Deluno. Weir checks what Sonarr and Radarr are still importing before it touches a file. Deluno hands files to Weir and is told when each one is ready.',
+  },
+];
+
+const screenshots = [
+  {
+    title: 'Processing',
+    caption:
+      'Every file Weir is working on, from the moment it lands to the moment your media manager has it back.',
+    src: '/img/processing.png',
+    alt: "Weir's Processing screen",
+  },
+  {
+    title: 'History',
+    caption:
+      'Every file Weir has touched: what it was, what Weir did, and what came out.',
+    src: '/img/history.png',
+    alt: "Weir's History screen",
   },
 ];
 
@@ -40,20 +72,13 @@ function Hero(): ReactNode {
 function Feature({
   title,
   description,
-  screenshot,
 }: {
   title: string;
   description: string;
-  screenshot: string;
 }): ReactNode {
   return (
-    <div className={clsx('col col--4')}>
+    <div className={clsx('col col--3')}>
       <div className={styles.featureCard}>
-        <img
-          src={screenshot}
-          alt={`${title} screenshot`}
-          className={styles.featureImage}
-        />
         <h3>{title}</h3>
         <p>{description}</p>
       </div>
@@ -66,8 +91,8 @@ function Features(): ReactNode {
     <section className={styles.features}>
       <div className="container">
         <div className="row">
-          {features.map((props, idx) => (
-            <Feature key={idx} {...props} />
+          {features.map((props) => (
+            <Feature key={props.title} {...props} />
           ))}
         </div>
       </div>
@@ -75,20 +100,23 @@ function Features(): ReactNode {
   );
 }
 
-function HomeScreenPreview(): ReactNode {
+function Screenshot({
+  title,
+  caption,
+  src,
+  alt,
+}: {
+  title: string;
+  caption: string;
+  src: string;
+  alt: string;
+}): ReactNode {
   return (
     <section className={styles.preview}>
       <div className="container">
-        <h2>Processing, at a glance</h2>
-        <p>
-          Every file Weir is working on, from the moment it lands to the moment
-          your media manager has it back.
-        </p>
-        <img
-          src="/Weir/img/processing.png"
-          alt="Weir's Processing screen"
-          className={styles.dashboardImage}
-        />
+        <h2>{title}</h2>
+        <p>{caption}</p>
+        <img src={useBaseUrl(src)} alt={alt} className={styles.dashboardImage} />
       </div>
     </section>
   );
@@ -97,11 +125,13 @@ function HomeScreenPreview(): ReactNode {
 export default function Home(): ReactNode {
   const {siteConfig} = useDocusaurusContext();
   return (
-    <Layout title="Home" description={siteConfig.tagline}>
+    <Layout description={siteConfig.tagline}>
       <Hero />
       <main>
         <Features />
-        <HomeScreenPreview />
+        {screenshots.map((props) => (
+          <Screenshot key={props.title} {...props} />
+        ))}
       </main>
     </Layout>
   );

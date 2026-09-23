@@ -375,7 +375,7 @@ public sealed class MediaGoldenParityTests
 /// Deliberate divergences from the golden fixtures in <c>tests/Weir.Core.Tests/Media/golden</c>: a bug fixed on
 /// purpose changes the expected output of cases recorded before the fix. Each entry here patches the loaded
 /// expectation instead of editing the fixture, named for the GitHub issue that required it, so every other case
-/// in the file stays an unmodified recorded answer. See apps/server/README.md, "ffmpeg parity", for the mechanism.
+/// in the file stays an unmodified recorded answer. See docs/archive/server-port-notes.md, "ffmpeg parity", for the mechanism.
 /// </summary>
 internal static class GoldenDivergences
 {
@@ -422,7 +422,7 @@ internal static class GoldenDivergences
     /// fixed clear of stale per-track statistics tags on every kept video/audio/subtitle stream. None of the
     /// fixtures these cases were captured from ever set #498's StandardizeTrackNames/ClearVideoTrackNames
     /// (<see cref="MediaGoldenParityTests.ReadPlan"/> does not even read those two fields), so the new tags always
-    /// land right before the output path, at the very end — see apps/server/README.md, "ffmpeg parity".
+    /// land right before the output path, at the very end — see docs/archive/server-port-notes.md, "ffmpeg parity".
     /// </summary>
     public static IReadOnlyList<string> RemuxArgv(IReadOnlyList<string> golden, JsonElement input)
     {

@@ -13,6 +13,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/jampat000/Weir/actions/workflows/ci.yml"><img alt="Test" src="https://github.com/jampat000/Weir/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/jampat000/Weir/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/jampat000/Weir?label=release"></a>
   <a href="https://github.com/jampat000/Weir/pkgs/container/weir"><img alt="Docker" src="https://img.shields.io/badge/docker-ghcr.io%2Fjampat000%2Fweir-blue"></a>
   <a href="LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-green"></a>
@@ -28,13 +29,13 @@
 <!-- README_LOCKED_SECTION_START: project-note -->
 ## A note on this project
 
-Weir is a vibe-coded project.
+Weir started as a tool for my own library. I wanted every file to keep only the audio and subtitle tracks I actually use, and nothing I tried did that well, especially for a library I already had.
 
-I built it because I wanted a media workflow that matched the way I actually manage my library, and I could not find an existing tool that fit. I am not a software engineer and can't code and I have the upmost respect for the people that can.  So this started from a very practical place: solve the problems I kept running into and keep refining it until it worked the way I needed.
+I'm not a software engineer, so I'll be upfront about it: Weir is built with AI coding assistants. I've tried to make up for that with process. Every change goes in through a pull request that has to pass the full test suite (unit, API contract and end-to-end tests), and a release only goes out once those tests pass on the exact code being shipped. Weir also works on a copy of each file and only replaces the original once the new one checks out, so a bug shouldn't cost you anything in your library.
 
-It is opinionated on purpose. Every module exists because it solved a real problem in my own setup first.
+It's opinionated. Everything in it is there because it fixed a real problem in my own setup first. If it suits the way you manage your library too, use it, improve it, and share what you change under the same license.
 
-If it happens to fit the way you manage your library too, use it, improve it, and share those improvements under the same open license.
+— James
 
 <!-- README_LOCKED_SECTION_END: project-note -->
 
@@ -49,7 +50,20 @@ Weir removes them, so every file ends up with just the tracks you chose.
 - **It never re-encodes.** Tracks are copied as they are, so there's no quality loss and it's fast.
 - **Nothing is lost if something goes wrong.** Weir works on a copy and only replaces a file once the new one checks out.
 
+Beyond the cleaning itself:
+
+- **History** keeps a record of every file Weir handled: which tracks it kept and removed, and why a file was held or skipped.
+- **Library** lists the files already on your storage, library by library. You can open any file and choose its tracks yourself when the rules don't fit it.
+- **Schedules** set the hours each library may start work, so cleaning a large library can wait for the night.
+- **Alerts** go to Discord or any webhook when a file finishes or fails.
+- **Media managers** work alongside Weir. Deluno hands files over and imports them once they're clean. Sonarr and Radarr import from Weir's output folder, and Weir checks their queues before it touches a file.
+
 Everything Weir needs comes with it, including ffmpeg and MKVToolNix. There's nothing else to install.
+
+## Requirements
+
+- Windows 10 or 11 (64-bit, x64), or
+- any 64-bit Linux machine or NAS with Docker, on Intel/AMD (amd64) or ARM (arm64).
 
 ## Screenshots
 
@@ -186,8 +200,8 @@ A folder layout that works well:
 | I want to… | Do this |
 | --- | --- |
 | Use a different port | Change the left number: `"8080:9347"` puts Weir at `http://your-server-ip:8080` |
-| Pin a version instead of `latest` | `image: ghcr.io/jampat000/weir:3.1.0` |
-| Use HTTPS through a reverse proxy | Set `WEIR_SESSION_COOKIE_SECURE=true` and `WEIR_TRUSTED_PROXY_IPS=<your proxy's IP>`. See [the reverse proxy guide](docs-site/docs/deployment/reverse-proxy.md) |
+| Pin a version instead of `latest` | `image: ghcr.io/jampat000/weir:3.2.4` |
+| Use HTTPS through a reverse proxy | Set `WEIR_TRUSTED_PROXY_IPS=<your proxy's IP>`. The sign-in cookie becomes HTTPS-only on its own once requests arrive over HTTPS; set `WEIR_SESSION_COOKIE_SECURE=true` only to force it. See [the reverse proxy guide](https://jampat000.github.io/Weir/docs/deployment/reverse-proxy) |
 | Protect saved API keys with their own secret | Set `WEIR_CREDENTIALS_SECRET` to a long random value (`openssl rand -hex 32`) **before** you add Sonarr or Radarr |
 | Use a GPU | See [hardware acceleration](docker/README.md#hardware-acceleration-and-device-passthrough). It's optional; Weir doesn't re-encode, so you usually don't need it |
 
@@ -210,7 +224,7 @@ folder, change the port, check for updates or quit.
 - Weir runs as you, not as a Windows service, so it can reach your mapped network drives and NAS shares.
 - Installing without a screen (a script, or remotely)? Pass the port: `Weir-win-Setup.exe -- --port 9347`.
 
-More in the [Windows guide](docs-site/docs/deployment/windows.md).
+More in the [Windows guide](https://jampat000.github.io/Weir/docs/deployment/windows).
 
 ## First steps
 
@@ -219,25 +233,25 @@ More in the [Windows guide](docs-site/docs/deployment/windows.md).
    - **Watched folder**: where your downloads finish. Weir cleans whatever lands here.
    - **Output folder**: where Weir puts each cleaned file.
 
-   You can skip the wizard and do this later on the **Processing** page.
-3. **Choose what to keep.** On **Processing**, set each library's audio and subtitle languages.
+   You can skip the wizard and add libraries later under **Settings › Libraries**.
+3. **Choose what to keep.** Under **Settings › Rules**, set the audio and subtitle languages each library keeps.
 4. **Try it.** Put a file in a watched folder. Weir usually notices within seconds. On network shares
    and in Docker it can take up to five minutes, because Weir falls back to checking on a timer.
    The file shows up on **Processing** while it's being worked on, and in **History** once it's done.
 
-To clean a library you already have, open **Processing → Library**, pick the library and press
-**Scan now**. Weir shows you what it would remove and how much space that frees before it changes
+To clean a library you already have, open **Library**, pick the library from the title and press
+**Check again**. Weir shows you what it would remove and how much space that frees before it changes
 anything.
 
 ### Connecting other apps
 
-Under **Settings → Media managers** you can connect:
+Under **Settings › Media managers** you can connect:
 
 - **Deluno** hands each file to Weir, waits for it to be cleaned, then imports it. This is the fully automatic setup.
 - **Sonarr and Radarr** import the cleaned files from Weir's output folder. Weir also checks their
-  queue before it touches a file, and they power **Download again** for titles that lost tracks after
-  you changed your rules. See [Sonarr and Radarr](#sonarr-and-radarr) below.
-- **Anything else** can hand files to Weir by posting to `/api/v1/intake/webhook/native`. The [API reference](docs-site/docs/api/index.md) links the full specification.
+  queue before it touches a file, and tells them to re-read a file after it cleans that file in
+  your library. See [Sonarr and Radarr](#sonarr-and-radarr) below.
+- **Anything else** can hand files to Weir by posting to `/api/v1/intake/webhook/native`. The [API reference](https://jampat000.github.io/Weir/docs/api/) links the full specification.
 
 ### Sonarr and Radarr
 
@@ -246,15 +260,15 @@ folder, and Sonarr or Radarr import from there. You connect them with a **remote
 tells Sonarr "when the download client says a file is in the downloads folder, look in Weir's output
 folder instead." Sonarr then only ever sees cleaned files.
 
-1. **In Weir**, open **Processing → Libraries** and edit the library.
+1. **In Weir**, open **Settings › Libraries** and edit the library.
    - **Watched folder**: where your download client finishes files, e.g. `/media/downloads/complete/tv`
    - **Output folder**: where Weir puts cleaned files, e.g. `/media/weir/tv`
    - Using torrents? Turn **After cleaning, remove the original download** off, so the torrent keeps
      seeding. Your download client or Sonarr removes it later, as they normally would.
-2. **Connect Sonarr** under **Settings → Media managers**, with its address and API key
-   (Sonarr: **Settings → General → API Key**).
+2. **Connect Sonarr** under **Settings › Media managers**, with its address and API key
+   (Sonarr shows its API key on its **General** settings page).
 3. Back in the library, the **Media manager** section shows the exact mapping to add, with copy buttons.
-4. **In Sonarr**, go to **Settings → Download Clients → Remote Path Mappings** and press **+**:
+4. **In Sonarr**, go to **Settings › Download Clients › Remote Path Mappings** and press **+**:
    - **Host**: exactly what's in your download client's **Host** field on that same screen, e.g. `qbittorrent`
    - **Remote Path**: Weir's watched folder, e.g. `/media/downloads/complete/tv/`
    - **Local Path**: Weir's output folder, e.g. `/media/weir/tv/`
@@ -271,10 +285,10 @@ every minute and imports the cleaned file as soon as it appears.
 ## Updating
 
 - **Docker:** `docker compose pull && docker compose up -d`. Your data carries over.
-- **Windows:** right-click the tray icon and choose **Check for updates**, or go to **System → About** in Weir.
+- **Windows:** right-click the tray icon and choose **Check for updates**, or go to **System › About** in Weir.
 
 Weir updates its database itself when it starts. Before a big upgrade, it's worth taking a backup
-in **Settings → Backup and restore**.
+in **System › Backups**.
 
 What changed in each version: [release notes](https://github.com/jampat000/Weir/releases).
 
@@ -288,13 +302,16 @@ What changed in each version: [release notes](https://github.com/jampat000/Weir/
 | Logged out after every restart | You're setting `WEIR_SESSION_SECRET` to a different value each time. Remove it and let Weir manage it |
 
 Still stuck? [Open an issue](https://github.com/jampat000/Weir/issues). Include what you expected,
-what happened, and the lines from **Settings → Logs**.
+what happened, and the lines from **System › Logs**. [SUPPORT.md](SUPPORT.md) lists what else helps.
+
+Found a security problem? Don't open a public issue. Report it privately as described in
+[SECURITY.md](SECURITY.md).
 
 ## Documentation
 
 - [Documentation site](https://jampat000.github.io/Weir/): installing, reverse proxies, security, the API
 - [Docker reference](docker/README.md): every variable, GPUs, file ownership, network shares
-- [Release notes](https://github.com/jampat000/Weir/releases)
+- [Changelog](CHANGELOG.md): one line per version, linked to the full release notes
 
 ## Building from source
 
@@ -314,7 +331,8 @@ This starts the server and the web app together at `http://localhost:8782/`. See
 ## Support Weir
 
 Weir is free. If it saves you time, the best ways to help are to star the repository, report bugs
-you find, and share improvements.
+you find, and share improvements. You can also sponsor it through
+[GitHub Sponsors](https://github.com/sponsors/jampat000).
 
 ## License
 

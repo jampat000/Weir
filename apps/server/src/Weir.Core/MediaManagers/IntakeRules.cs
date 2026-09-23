@@ -25,10 +25,11 @@ public static partial class IntakeRules
     public const string NeverReceivedDetail = "Weir has never received this hand-off.";
 
     /// <summary>
-    /// The hand-off capabilities Weir advertises. <c>handoff-outcome</c> (#652, agreed with Deluno) means a manager may
-    /// tell Weir what became of a file Weir handed back, at <c>POST /api/v1/intake/handoffs/{source}/{id}/outcome</c>.
+    /// What a media manager may rely on at <c>/api/v1/intake</c>: asking about and cancelling a hand-off, reporting what
+    /// became of a file Weir handed back (#652), and a <c>code</c> on each 409 from that report (#664).
     /// </summary>
-    public static readonly IReadOnlyList<string> HandoffCapabilities = ["handoff-status", "handoff-cancel", HandbackRules.OutcomeCapability];
+    public static readonly IReadOnlyList<string> HandoffCapabilities =
+        ["handoff-status", "handoff-cancel", HandbackRules.OutcomeCapability, HandbackRules.OutcomeCodesCapability];
 
     /// <summary>The remux job's key for a hand-off, exactly as intake writes it.</summary>
     public static string RemuxDedupeKey(string sourceKey, string handoffId) => $"{RemuxPassJobKind}:{sourceKey}:handoff:{handoffId}";

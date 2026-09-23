@@ -1,7 +1,7 @@
 /*
  * Live (pages/live/live-page.tsx): the first screen. Every file Weir is working on, in five lanes
  * that fold to fit the width they are given, never wider than it (the no-sideways-scroll rule James
- * signed the design off on, docs/exec-plans/active/live-and-library.md).
+ * signed the design off on, docs/archive/live-and-library.md).
  *
  * The lanes follow the board's own width, not the window's, so a collapsed sidebar or a narrow
  * browser window gets the layout that fits the space actually left:

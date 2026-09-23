@@ -11,7 +11,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.LibraryMode;
 
 /// <summary>
-/// Registers library mode (#505): the #506 safe swap (see <c>apps/server/README.md</c>, "Library mode: safe
+/// Registers library mode (#505): the #506 safe swap (see <c>docs/archive/server-port-notes.md</c>, "Library mode: safe
 /// swap"), its scan and clean job handlers, and the real
 /// notify seam (#507, <c>Weir.Infrastructure.MediaManagers.LibraryFileChangeNotifier</c>, registered by
 /// <c>AddWeirMediaManagers</c>).

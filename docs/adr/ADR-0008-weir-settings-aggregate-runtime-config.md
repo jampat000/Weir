@@ -4,6 +4,8 @@
 
 **Accepted** for the current codebase size. This documents an intentional coupling tradeoff, not an accidental omission.
 
+> **Superseded by [ADR-0017](ADR-0017-backend-on-dotnet.md): configuration is `WeirOptions`/`WeirOptionsLoader`.** `WeirSettings` and `weir.core.config` went with the Python backend. The single-aggregate idea carries over: `WeirOptionsLoader.Load` (in `Weir.Core/Configuration`) reads the `WEIR_*` environment once at startup into one immutable `WeirOptions` record, and settings an operator changes while Weir runs live in the database instead.
+
 > **Update (2026-08-28): Subber moved to Deluno.** This ADR is left as it was written — an ADR records the decision, not the current file list — but wherever it names Subber, read it as an example rather than as a lane that still exists. The ``subber_jobs`` table is dropped by migration ``0010_drop_subber_tables``, and ``subber.`` is now an abandoned prefix refused on every remaining lane, alongside ``trimmer.``.
 
 ## Context

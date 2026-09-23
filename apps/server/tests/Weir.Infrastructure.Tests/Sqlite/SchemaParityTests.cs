@@ -9,7 +9,7 @@ namespace Weir.Infrastructure.Tests.Sqlite;
 /// (rule-set extra columns, library-mode tables and so on), so this test builds at
 /// <see cref="SchemaMigrator.BaselineRevision"/> — the one migration that must always match the reference
 /// exactly — rather than at the moving <see cref="SchemaMigrator.HeadRevision"/> (see
-/// apps/server/README.md, "Schema"). Each migration after the baseline is proved by its own test instead
+/// apps/server/README.md, "Schema and migrations"). Each migration after the baseline is proved by its own test instead
 /// (see <c>Migrations</c> in this folder).
 /// </summary>
 public sealed class SchemaParityTests

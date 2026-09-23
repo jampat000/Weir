@@ -6,13 +6,13 @@ Do not open public issues for unpatched security vulnerabilities. Use the proces
 
 When opening an issue, include:
 
-- Weir version or commit
+- Weir version or commit (shown in System › About)
 - install type: Windows installer, Docker, or local development
 - operating system and browser
 - exact steps to reproduce
 - expected result
 - actual result
-- relevant logs with secrets and private paths removed
+- relevant logs from System › Logs, with secrets and private paths removed
 
 ## Windows LAN access
 

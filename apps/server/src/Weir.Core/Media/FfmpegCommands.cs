@@ -42,13 +42,13 @@ public static class FfmpegCommands
     /// be reported as a plain failure instead of <c>MediaUnreadableException</c>. Verbosity does not affect
     /// <c>-print_format json</c>, so stdout is unchanged, and stderr carries the error lines
     /// <see cref="ProbeOutput.FailureFor"/> classifies. The golden files record <c>-v quiet</c>; see
-    /// apps/server/README.md "ffmpeg parity" for how the tests patch that token.
+    /// docs/archive/server-port-notes.md, "ffmpeg parity", for how the tests patch that token.
     /// <para>
     /// <c>-show_chapters</c> (#498) lets a caller know whether a file has chapters
     /// (<see cref="Weir.Core.Rules.RemuxRules.IsRemuxRequired"/>'s <c>chaptersPresent</c>, for the "remove chapters"
     /// option) without a second probe. Every probe's JSON carries a <c>chapters</c> array (see
     /// <see cref="ProbeResult.Chapters"/>), empty when the file has none; every other field is unchanged. The golden
-    /// files predate this option and are patched at that one argv token (README "ffmpeg parity" and each patch
+    /// files predate this option and are patched at that one argv token (docs/archive/server-port-notes.md, "ffmpeg parity", and each patch
     /// site's <c>GoldenDivergences</c> helper).
     /// </para>
     /// </remarks>
