@@ -182,15 +182,18 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     private Task<long> LeftActivityAsync() =>
         _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.file_left_watched_folder'");
 
-    /// <summary>A row as a scan leaves it. <paramref name="lastSeenMinutesAgo"/> null is a row no scan has seen.</summary>
-    private Task InsertRowAsync(string relative, string status, long size = 2000, int? lastSeenMinutesAgo = 60)
+    /// <summary>
+    /// A row as a scan leaves it. <paramref name="lastSeenMinutesAgo"/> null is a row no scan has seen, like a hand-off's file
+    /// recorded on receipt; <paramref name="writtenMinutesAgo"/> is when the row was last written.
+    /// </summary>
+    private Task InsertRowAsync(string relative, string status, long size = 2000, int? lastSeenMinutesAgo = 60, int writtenMinutesAgo = 60)
     {
-        var lastSeen = lastSeenMinutesAgo is { } minutes
-            ? "'" + _fixture.Store.Clock.GetUtcNow().AddMinutes(-minutes).ToString("yyyy-MM-dd HH:mm:ss.ffffff", CultureInfo.InvariantCulture) + "'"
-            : "NULL";
+        string At(int minutes) =>
+            "'" + _fixture.Store.Clock.GetUtcNow().AddMinutes(-minutes).ToString("yyyy-MM-dd HH:mm:ss.ffffff", CultureInfo.InvariantCulture) + "'";
+        var lastSeen = lastSeenMinutesAgo is { } minutes ? At(minutes) : "NULL";
         return _fixture.Store.Execute(
-            $"INSERT INTO files (library_id, relative_path, status, status_reason, size_bytes, last_seen_at) " +
-            $"VALUES ({_libraryId}, '{relative}', '{status}', 'seeded', {size}, {lastSeen})");
+            $"INSERT INTO files (library_id, relative_path, status, status_reason, size_bytes, last_seen_at, created_at, updated_at) " +
+            $"VALUES ({_libraryId}, '{relative}', '{status}', 'seeded', {size}, {lastSeen}, {At(writtenMinutesAgo)}, {At(writtenMinutesAgo)})");
     }
 
     // --- #644 ---------------------------------------------------------------------------------------------------------
@@ -335,7 +338,7 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     }
 
     [Fact]
-    public async Task Waiting_and_failed_rows_for_files_that_are_gone_are_forgotten_but_outcomes_stay()
+    public async Task Waiting_failed_and_cancelled_rows_for_files_that_are_gone_are_forgotten_but_outcomes_stay()
     {
         await SetUpAsync("movie");
         await InsertRowAsync("Gone/waiting.mkv", ProcessingFileStatuses.Unprocessed);
@@ -352,21 +355,53 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
         Assert.Null(await StatusAsync("Gone/outside.mkv"));
         Assert.Equal("processed", await StatusAsync("Gone/processed.mkv"));
         Assert.Equal("passed_through", await StatusAsync("Gone/passed.mkv"));
-        Assert.Equal("cancelled", await StatusAsync("Gone/cancelled.mkv"));
-        Assert.Equal(3, await LeftActivityAsync());
+        // A cancelled hand-off is one Weir never started; with its file gone there is nothing left to queue again.
+        Assert.Null(await StatusAsync("Gone/cancelled.mkv"));
+        Assert.Equal(4, await LeftActivityAsync());
     }
 
     [Fact]
-    public async Task A_row_seen_moments_ago_or_never_seen_is_kept()
+    public async Task A_row_seen_or_written_moments_ago_is_kept()
     {
         await SetUpAsync("movie");
         await InsertRowAsync("Gone/just-seen.mkv", ProcessingFileStatuses.Unprocessed, lastSeenMinutesAgo: 2);
-        await InsertRowAsync("Gone/never-seen.mkv", ProcessingFileStatuses.Unprocessed, lastSeenMinutesAgo: null);
+        await InsertRowAsync("Gone/just-handed-off.mkv", ProcessingFileStatuses.Unprocessed, lastSeenMinutesAgo: null, writtenMinutesAgo: 2);
 
         await ScanAsync("movie");
 
         Assert.Equal("unprocessed", await StatusAsync("Gone/just-seen.mkv"));
-        Assert.Equal("unprocessed", await StatusAsync("Gone/never-seen.mkv"));
+        Assert.Equal("unprocessed", await StatusAsync("Gone/just-handed-off.mkv"));
+        Assert.Equal(0, await LeftActivityAsync());
+    }
+
+    [Fact]
+    public async Task A_hand_off_row_no_scan_saw_is_forgotten_once_its_file_has_been_gone_a_while()
+    {
+        // The Deluno soak, 23 Sep 2026: hand-off rows (recorded on receipt, never seen by a scan) and a failed row for a
+        // release folder stayed listed for good after their files were deleted.
+        await SetUpAsync("movie");
+        await InsertRowAsync("Film.1/Film.mkv", ProcessingFileStatuses.Unprocessed, lastSeenMinutesAgo: null);
+        await InsertRowAsync("Film.2/Film.mkv", ProcessingFileStatuses.Cancelled, lastSeenMinutesAgo: null);
+        await InsertRowAsync("Film", ProcessingFileStatuses.ProcessingFailed, lastSeenMinutesAgo: null, writtenMinutesAgo: 60 * 24 * 4);
+
+        await ScanAsync("movie");
+
+        Assert.Null(await StatusAsync("Film.1/Film.mkv"));
+        Assert.Null(await StatusAsync("Film.2/Film.mkv"));
+        Assert.Null(await StatusAsync("Film"));
+        Assert.Equal(3, await LeftActivityAsync());
+    }
+
+    [Fact]
+    public async Task A_row_whose_path_is_a_folder_still_on_disk_is_kept()
+    {
+        await SetUpAsync("movie");
+        Directory.CreateDirectory(Path.Join(_folders.Watched, "Release.Folder"));
+        await InsertRowAsync("Release.Folder", ProcessingFileStatuses.ProcessingFailed, lastSeenMinutesAgo: null);
+
+        await ScanAsync("movie");
+
+        Assert.Equal("processing_failed", await StatusAsync("Release.Folder"));
         Assert.Equal(0, await LeftActivityAsync());
     }
 
