@@ -3,10 +3,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
-import type {
-  ProcessingLibrary,
-  ProcessingRuleSetWrite,
-} from "../../../../lib/processing/libraries-api";
+import type { ProcessingLibrary } from "../../../../lib/processing/libraries-api";
+import type { ProcessingRuleSetWrite } from "../../../../lib/processing/rule-sets-api";
 import * as librariesQueries from "../../../../lib/processing/libraries-queries";
 import * as rulesPreviewApi from "../../../../lib/processing/rules-preview-api";
 import type { ProcessingRulesPreviewResult } from "../../../../lib/processing/rules-preview-api";

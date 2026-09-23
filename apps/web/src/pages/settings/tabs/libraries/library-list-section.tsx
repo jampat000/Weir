@@ -4,8 +4,8 @@ import type { MediaManagerConnection } from "../../../../lib/media-managers/medi
 import {
   processingMediaTypeBadge,
   type ProcessingLibrary,
-  type ProcessingRuleSet,
 } from "../../../../lib/processing/libraries-api";
+import { type ProcessingRuleSet } from "../../../../lib/processing/rule-sets-api";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 
 /**

@@ -3,8 +3,8 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
-import * as api from "../../../../lib/processing/libraries-api";
-import type { ProcessingManagerSetupItem } from "../../../../lib/processing/libraries-api";
+import * as managersApi from "../../../../lib/processing/library-managers-api";
+import type { ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { LibraryManagerSetup } from "./library-manager-setup";
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -55,7 +55,7 @@ const deluno: ProcessingManagerSetupItem = {
 
 function setup(managers: ProcessingManagerSetupItem[]) {
   return vi
-    .spyOn(api, "fetchProcessingManagerSetup")
+    .spyOn(managersApi, "fetchProcessingManagerSetup")
     .mockResolvedValue({ media_type: "tv", managers });
 }
 

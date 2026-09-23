@@ -1,10 +1,6 @@
-/**
- * Library mode (#505): clean files already in a library, in place. Weir server (.NET) only — there is no
- * Python backend route to match (see docs/archive/server-port-notes.md, "Library mode").
- */
-import { fetchCsrfToken } from "../api/auth-api";
+/** Library mode (#505): clean files already in a library, in place. */
+import { sendJson, sendJsonUnchecked } from "../api/send-json";
 import { apiFetch, readJson, requireOk } from "../api/client";
-
 import type { Schema } from "../api/types";
 
 export type LibrarySettings = Schema<"LibrarySettingsOut">;
@@ -104,28 +100,21 @@ export async function saveLibrarySettings(
     skip_if_manager_would_redownload?: boolean;
   },
 ): Promise<LibrarySettings> {
-  const csrf_token = await fetchCsrfToken();
   const path = librarySettingsPath(libraryId);
-  const r = await apiFetch(path, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...updates, csrf_token }),
-  });
-  await requireOk(path, r, "Could not save this library's settings");
+  const r = await sendJson(
+    path,
+    "PUT",
+    updates,
+    "Could not save this library's settings",
+  );
   return readJson<LibrarySettings>(r);
 }
 
 export async function triggerLibraryScan(
   libraryId: number,
 ): Promise<LibraryScanTrigger> {
-  const csrf_token = await fetchCsrfToken();
   const path = `/api/v1/processing/libraries/${libraryId}/library-scan`;
-  const r = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ csrf_token }),
-  });
-  await requireOk(path, r, "Could not start a library scan");
+  const r = await sendJson(path, "POST", {}, "Could not start a library scan");
   return readJson<LibraryScanTrigger>(r);
 }
 
@@ -215,24 +204,18 @@ export async function cleanLibraryFiles(
   confirm_final_removal: boolean,
   manual?: LibraryManualPlan,
 ): Promise<LibraryConfirmationRequired | LibraryCleanResult> {
-  const csrf_token = await fetchCsrfToken();
   const path = `/api/v1/processing/libraries/${libraryId}/library-files/clean`;
-  const r = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      paths,
-      confirm_final_removal,
-      csrf_token,
-      ...(manual
-        ? {
-            manual_plan: { keep: manual.keep, order: manual.order },
-            ...(manual.expected_size_bytes === undefined
-              ? {}
-              : { expected_size_bytes: manual.expected_size_bytes }),
-          }
-        : {}),
-    }),
+  const r = await sendJsonUnchecked(path, "POST", {
+    paths,
+    confirm_final_removal,
+    ...(manual
+      ? {
+          manual_plan: { keep: manual.keep, order: manual.order },
+          ...(manual.expected_size_bytes === undefined
+            ? {}
+            : { expected_size_bytes: manual.expected_size_bytes }),
+        }
+      : {}),
   });
   const result = await readConfirmationOr<Omit<LibraryCleanResult, "kind">>(
     path,
@@ -248,14 +231,13 @@ export async function setLibraryFileLeaveAlone(
   filePath: string,
   leave_alone: boolean,
 ): Promise<{ path: string; leave_alone: boolean }> {
-  const csrf_token = await fetchCsrfToken();
   const path = `/api/v1/processing/libraries/${libraryId}/library-files/leave-alone`;
-  const r = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: filePath, leave_alone, csrf_token }),
-  });
-  await requireOk(path, r, "Could not change that file");
+  const r = await sendJson(
+    path,
+    "POST",
+    { path: filePath, leave_alone },
+    "Could not change that file",
+  );
   return readJson<{ path: string; leave_alone: boolean }>(r);
 }
 
@@ -264,12 +246,10 @@ export async function setLibrarySchedule(
   enabled: boolean,
   confirm_final_removal: boolean,
 ): Promise<LibraryConfirmationRequired | LibrarySettings> {
-  const csrf_token = await fetchCsrfToken();
   const path = `/api/v1/processing/libraries/${libraryId}/library-schedule`;
-  const r = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ enabled, confirm_final_removal, csrf_token }),
+  const r = await sendJsonUnchecked(path, "POST", {
+    enabled,
+    confirm_final_removal,
   });
   return readConfirmationOr<LibrarySettings>(
     path,

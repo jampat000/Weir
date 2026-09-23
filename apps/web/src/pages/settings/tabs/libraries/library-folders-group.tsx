@@ -1,6 +1,6 @@
 import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
-import type { ProcessingRuleSet } from "../../../../lib/processing/libraries-api";
+import type { ProcessingRuleSet } from "../../../../lib/processing/rule-sets-api";
 import {
   MEDIA_TYPE_OPTIONS,
   WRITER_HINTS,

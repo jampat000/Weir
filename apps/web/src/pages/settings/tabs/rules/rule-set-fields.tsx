@@ -5,7 +5,7 @@ import {
   QuietDisclosure,
   QuietFieldGroup,
 } from "../../../../components/shared/quiet-section";
-import type { ProcessingRuleSetWrite } from "../../../../lib/processing/libraries-api";
+import type { ProcessingRuleSetWrite } from "../../../../lib/processing/rule-sets-api";
 import {
   DEFAULT_TRACK_NAME_TEMPLATE,
   SAMPLE_TRACK,

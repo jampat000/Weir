@@ -1,4 +1,4 @@
-import { fetchCsrfToken } from "../api/auth-api";
+import { sendJson } from "../api/send-json";
 import { apiFetch, readJson, requireOk } from "../api/client";
 import type { RequestBody } from "../api/types";
 
@@ -29,16 +29,11 @@ export async function fetchPause(): Promise<PauseState> {
 }
 
 export async function savePause(body: PauseWrite): Promise<PauseState> {
-  const csrf_token = await fetchCsrfToken();
   const path = pausePath();
-  const response = await apiFetch(path, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, csrf_token }),
-  });
-  await requireOk(
+  const response = await sendJson(
     path,
-    response,
+    "PUT",
+    body,
     "Could not change whether processing is paused",
   );
   return readJson<PauseState>(response);

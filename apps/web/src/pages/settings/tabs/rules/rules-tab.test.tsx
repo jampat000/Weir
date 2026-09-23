@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import * as authQueries from "../../../../lib/auth/queries";
-import * as librariesApi from "../../../../lib/processing/libraries-api";
-import type { ProcessingRuleSet } from "../../../../lib/processing/libraries-api";
+import * as ruleSetsApi from "../../../../lib/processing/rule-sets-api";
+import type { ProcessingRuleSet } from "../../../../lib/processing/rule-sets-api";
 import * as providerApi from "../../../../lib/processing/metadata-provider-api";
 import { RulesTab } from "./rules-tab";
 
@@ -72,11 +72,9 @@ it("edits ordered rules, original-language behavior, metadata cleanup, and the p
   vi.spyOn(authQueries, "useMeQuery").mockReturnValue({
     data: { role: "operator" },
   } as ReturnType<typeof authQueries.useMeQuery>);
-  vi.spyOn(librariesApi, "fetchProcessingRuleSets").mockResolvedValue([
-    ruleSet,
-  ]);
+  vi.spyOn(ruleSetsApi, "fetchProcessingRuleSets").mockResolvedValue([ruleSet]);
   const update = vi
-    .spyOn(librariesApi, "updateProcessingRuleSet")
+    .spyOn(ruleSetsApi, "updateProcessingRuleSet")
     .mockResolvedValue({
       ...ruleSet,
       keep_original_language: true,

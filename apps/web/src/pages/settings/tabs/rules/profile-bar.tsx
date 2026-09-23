@@ -1,5 +1,5 @@
 import { Field } from "../../../../components/shared/field";
-import type { ProcessingRuleSet } from "../../../../lib/processing/libraries-api";
+import type { ProcessingRuleSet } from "../../../../lib/processing/rule-sets-api";
 import { plural } from "../../../../lib/ui/mm-plural";
 import type { RuleSetBinding } from "./rule-set-fields";
 

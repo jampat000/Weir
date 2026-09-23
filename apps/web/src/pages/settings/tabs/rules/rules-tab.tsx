@@ -10,7 +10,7 @@ import {
   writeFromProcessingRuleSet,
   type ProcessingRuleSet,
   type ProcessingRuleSetWrite,
-} from "../../../../lib/processing/libraries-api";
+} from "../../../../lib/processing/rule-sets-api";
 import {
   useCreateProcessingRuleSet,
   useDeleteProcessingRuleSet,

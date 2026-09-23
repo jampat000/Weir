@@ -1,4 +1,4 @@
-import { fetchCsrfToken } from "../api/auth-api";
+import { sendJson } from "../api/send-json";
 import { apiFetch, readJson, requireOk } from "../api/client";
 import type { RequestBody, Schema } from "../api/types";
 
@@ -24,26 +24,23 @@ export async function fetchProcessingMetadataProvider(): Promise<ProcessingMetad
 export async function putProcessingMetadataProvider(
   data: ProcessingMetadataProviderWrite,
 ): Promise<ProcessingMetadataProvider> {
-  const csrf_token = await fetchCsrfToken();
-  const response = await apiFetch(path, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...data, csrf_token }),
-  });
-  await requireOk(path, response, "Could not save the metadata provider");
+  const response = await sendJson(
+    path,
+    "PUT",
+    data,
+    "Could not save the metadata provider",
+  );
   return readJson<ProcessingMetadataProvider>(response);
 }
 
 export async function testProcessingMetadataProvider(
   data: ProcessingMetadataProviderWrite,
 ): Promise<ProcessingMetadataProviderTest> {
-  const csrf_token = await fetchCsrfToken();
-  const testPath = `${path}/test`;
-  const response = await apiFetch(testPath, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...data, csrf_token }),
-  });
-  await requireOk(testPath, response, "Could not test the metadata provider");
+  const response = await sendJson(
+    `${path}/test`,
+    "POST",
+    data,
+    "Could not test the metadata provider",
+  );
   return readJson<ProcessingMetadataProviderTest>(response);
 }

@@ -1,4 +1,5 @@
 import { fetchCsrfToken } from "../api/auth-api";
+import { sendJson } from "../api/send-json";
 import { apiFetch, readJson, requireOk } from "../api/client";
 
 import type {
@@ -56,14 +57,8 @@ export async function fetchAppSettings(): Promise<AppSettings> {
 export async function putAppSettings(
   body: AppSettingsPutBody,
 ): Promise<AppSettings> {
-  const csrf_token = await fetchCsrfToken();
   const path = appSettingsPath();
-  const r = await apiFetch(path, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, csrf_token }),
-  });
-  await requireOk(path, r, "Could not save settings");
+  const r = await sendJson(path, "PUT", body, "Could not save settings");
   return readJson<AppSettings>(r);
 }
 
@@ -120,14 +115,8 @@ export async function fetchUpdateSettings(): Promise<UpdateSettingsOut> {
 export async function putUpdateSettings(
   body: UpdateSettingsPutBody,
 ): Promise<UpdateSettingsOut> {
-  const csrf_token = await fetchCsrfToken();
   const path = updateSettingsPath();
-  const r = await apiFetch(path, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, csrf_token }),
-  });
-  await requireOk(path, r, "Could not save update settings");
+  const r = await sendJson(path, "PUT", body, "Could not save update settings");
   return readJson<UpdateSettingsOut>(r);
 }
 
@@ -139,14 +128,8 @@ export async function fetchUpdateState(): Promise<UpdateStateOut> {
 }
 
 export async function postApplyUpdate(): Promise<UpdateStateOut> {
-  const csrf_token = await fetchCsrfToken();
   const path = applyUpdatePath();
-  const r = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ csrf_token }),
-  });
-  await requireOk(path, r, "Could not signal update apply");
+  const r = await sendJson(path, "POST", {}, "Could not signal update apply");
   return readJson<UpdateStateOut>(r);
 }
 
@@ -165,14 +148,13 @@ export async function fetchOperationalHistoryPreview(): Promise<HistoryResetResu
 export async function resetOperationalHistory(
   confirm: string,
 ): Promise<HistoryResetResult> {
-  const csrf_token = await fetchCsrfToken();
   const path = operationalHistoryResetPath();
-  const r = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ csrf_token, confirm }),
-  });
-  await requireOk(path, r, "Could not reset activity history");
+  const r = await sendJson(
+    path,
+    "POST",
+    { confirm },
+    "Could not reset activity history",
+  );
   return readJson<HistoryResetResult>(r);
 }
 
@@ -186,14 +168,13 @@ export async function fetchConfigurationBundle(): Promise<ConfigurationBundle> {
 export async function putConfigurationBundle(
   bundle: ConfigurationBundle,
 ): Promise<ConfigurationBundle> {
-  const csrf_token = await fetchCsrfToken();
   const path = configurationBundlePath();
-  const r = await apiFetch(path, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ csrf_token, bundle }),
-  });
-  await requireOk(path, r, "Could not restore configuration");
+  const r = await sendJson(
+    path,
+    "PUT",
+    { bundle },
+    "Could not restore configuration",
+  );
   return readJson<ConfigurationBundle>(r);
 }
 
@@ -226,14 +207,13 @@ export async function fetchNotificationChannels(): Promise<NotificationChannelLi
 export async function createNotificationChannel(
   data: NotificationChannelIn,
 ): Promise<NotificationChannelOut> {
-  const csrf_token = await fetchCsrfToken();
   const path = notificationChannelsPath();
-  const r = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...data, csrf_token }),
-  });
-  await requireOk(path, r, "Could not create notification channel");
+  const r = await sendJson(
+    path,
+    "POST",
+    data,
+    "Could not create notification channel",
+  );
   return readJson<NotificationChannelOut>(r);
 }
 
@@ -241,14 +221,13 @@ export async function updateNotificationChannel(
   id: number,
   data: NotificationChannelIn,
 ): Promise<NotificationChannelOut> {
-  const csrf_token = await fetchCsrfToken();
   const path = `${notificationChannelsPath()}/${id}`;
-  const r = await apiFetch(path, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...data, csrf_token }),
-  });
-  await requireOk(path, r, "Could not update notification channel");
+  const r = await sendJson(
+    path,
+    "PUT",
+    data,
+    "Could not update notification channel",
+  );
   return readJson<NotificationChannelOut>(r);
 }
 
@@ -267,13 +246,12 @@ export async function deleteNotificationChannel(id: number): Promise<void> {
 export async function testNotificationChannel(
   id: number,
 ): Promise<NotificationChannelTestOut> {
-  const csrf_token = await fetchCsrfToken();
   const path = `${notificationChannelsPath()}/${id}/test`;
-  const r = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ csrf_token }),
-  });
-  await requireOk(path, r, "Could not test notification channel");
+  const r = await sendJson(
+    path,
+    "POST",
+    {},
+    "Could not test notification channel",
+  );
   return readJson<NotificationChannelTestOut>(r);
 }

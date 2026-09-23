@@ -7,7 +7,7 @@ import type { MediaManagerConnection } from "../../../../lib/media-managers/medi
 import type {
   DiscoverableProcessingLibrary,
   ProcessingLibraryDrift,
-} from "../../../../lib/processing/libraries-api";
+} from "../../../../lib/processing/library-managers-api";
 import {
   useDiscoverProcessingLibraries,
   useImportDiscoveredProcessingLibraries,

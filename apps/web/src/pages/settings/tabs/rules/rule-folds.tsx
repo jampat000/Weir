@@ -1,4 +1,4 @@
-import type { ProcessingTrackNameOverrides } from "../../../../lib/processing/libraries-api";
+import type { ProcessingTrackNameOverrides } from "../../../../lib/processing/rule-sets-api";
 import type { TrackNamePreviewFlags } from "../../../../lib/processing/track-name-preview";
 import { LanguageMultiField } from "./language-fields";
 import {

@@ -1,8 +1,8 @@
-import { fetchCsrfToken } from "../api/auth-api";
-import { apiFetch, readJson, requireOk } from "../api/client";
+import { sendJson } from "../api/send-json";
+import { readJson } from "../api/client";
 import type { Schema } from "../api/types";
 
-import { type ProcessingRuleSetWrite } from "./libraries-api";
+import { type ProcessingRuleSetWrite } from "./rule-sets-api";
 
 export type ProcessingRulesPreviewTrack =
   Schema<"ProcessingRulesPreviewTrackOut">;
@@ -26,18 +26,16 @@ export async function previewProcessingRules({
   absolutePath,
   rules,
 }: ProcessingRulesPreviewRequest): Promise<ProcessingRulesPreviewResult> {
-  const csrf_token = await fetchCsrfToken();
   const path = `/api/v1/processing/libraries/${libraryId}/preview`;
-  const response = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      csrf_token,
+  const response = await sendJson(
+    path,
+    "POST",
+    {
       ...(relativePath ? { relative_path: relativePath } : {}),
       ...(absolutePath ? { absolute_path: absolutePath } : {}),
       ...(rules ? { rules } : {}),
-    }),
-  });
-  await requireOk(path, response, "Could not preview these rules on that file");
+    },
+    "Could not preview these rules on that file",
+  );
   return readJson<ProcessingRulesPreviewResult>(response);
 }

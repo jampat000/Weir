@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { errorMessage } from "../../../../lib/api/error-message";
-import type { ProcessingRuleSetWrite } from "../../../../lib/processing/libraries-api";
+import type { ProcessingRuleSetWrite } from "../../../../lib/processing/rule-sets-api";
 import { useProcessingRulesPreview } from "../../../../lib/processing/libraries-queries";
 import type {
   ProcessingRulesPreviewRequest,

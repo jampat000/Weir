@@ -1,4 +1,4 @@
-import { fetchCsrfToken } from "../api/auth-api";
+import { sendJson } from "../api/send-json";
 import { apiFetch, readJson, requireOk } from "../api/client";
 import type { RequestBody, Schema } from "../api/types";
 
@@ -148,14 +148,13 @@ export async function fetchProcessingFiles(
 }
 
 export async function forgetProcessingFile(id: number): Promise<void> {
-  const csrf_token = await fetchCsrfToken();
   const path = `${processingFilesPath()}/${id}`;
-  const r = await apiFetch(path, {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ csrf_token }),
-  });
-  await requireOk(path, r, "Could not remove that file from the list");
+  await sendJson(
+    path,
+    "DELETE",
+    {},
+    "Could not remove that file from the list",
+  );
 }
 
 export type ProcessingFileMoveToTopResult =
@@ -164,16 +163,11 @@ export type ProcessingFileMoveToTopResult =
 export async function moveProcessingFileToTop(
   id: number,
 ): Promise<ProcessingFileMoveToTopResult> {
-  const csrf_token = await fetchCsrfToken();
   const path = `${processingFilesPath()}/${id}/move-to-top`;
-  const response = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ csrf_token }),
-  });
-  await requireOk(
+  const response = await sendJson(
     path,
-    response,
+    "POST",
+    {},
     "Could not move that file to the front of the queue",
   );
   return readJson<ProcessingFileMoveToTopResult>(response);
@@ -184,14 +178,13 @@ export type ProcessingRequeueResult = Schema<"ProcessingRequeueOut">;
 export async function requeueProcessingFile(
   id: number,
 ): Promise<ProcessingRequeueResult> {
-  const csrf_token = await fetchCsrfToken();
   const path = `${processingFilesPath()}/${id}/requeue`;
-  const response = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ csrf_token }),
-  });
-  await requireOk(path, response, "Could not queue that file again");
+  const response = await sendJson(
+    path,
+    "POST",
+    {},
+    "Could not queue that file again",
+  );
   return readJson<ProcessingRequeueResult>(response);
 }
 
@@ -205,14 +198,13 @@ export interface ProcessingBulkRequeueQuery {
 export async function requeueProcessingFiles(
   query: ProcessingBulkRequeueQuery,
 ): Promise<ProcessingRequeueResult> {
-  const csrf_token = await fetchCsrfToken();
   const path = `${processingFilesPath()}/requeue`;
-  const response = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...query, csrf_token }),
-  });
-  await requireOk(path, response, "Could not queue those files again");
+  const response = await sendJson(
+    path,
+    "POST",
+    query,
+    "Could not queue those files again",
+  );
   return readJson<ProcessingRequeueResult>(response);
 }
 
@@ -333,13 +325,12 @@ export async function postProcessingManualPlan(
   id: number,
   choice: ProcessingManualPlanChoice,
 ): Promise<ProcessingManualPlanResult> {
-  const csrf_token = await fetchCsrfToken();
   const path = `${processingFilesPath()}/${id}/manual-plan`;
-  const response = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...choice, csrf_token }),
-  });
-  await requireOk(path, response, "Could not queue that track choice");
+  const response = await sendJson(
+    path,
+    "POST",
+    choice,
+    "Could not queue that track choice",
+  );
   return readJson<ProcessingManualPlanResult>(response);
 }

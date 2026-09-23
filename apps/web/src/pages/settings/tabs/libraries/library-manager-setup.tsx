@@ -12,9 +12,9 @@ import { useEffect, useState } from "react";
 import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
 import {
   PROCESSING_MEDIA_TYPE_LABELS,
-  type ProcessingManagerSetupItem,
   type ProcessingMediaType,
 } from "../../../../lib/processing/libraries-api";
+import { type ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { useProcessingManagerSetupQuery } from "../../../../lib/processing/libraries-queries";
 
 /** The folders as the user types them, settled for a moment before each check. */

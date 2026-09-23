@@ -5,6 +5,8 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 
 import * as api from "../../../../lib/processing/libraries-api";
+import * as managersApi from "../../../../lib/processing/library-managers-api";
+import * as ruleSetsApi from "../../../../lib/processing/rule-sets-api";
 import type { ProcessingLibrary } from "../../../../lib/processing/libraries-api";
 import * as authQueries from "../../../../lib/auth/queries";
 import * as managerApi from "../../../../lib/media-managers/media-managers-api";
@@ -90,7 +92,7 @@ function asOperator() {
     data: { role: "operator" },
   } as ReturnType<typeof authQueries.useMeQuery>);
   vi.spyOn(managerApi, "fetchMediaManagerConnections").mockResolvedValue([]);
-  vi.spyOn(api, "fetchProcessingRuleSets").mockResolvedValue([]);
+  vi.spyOn(ruleSetsApi, "fetchProcessingRuleSets").mockResolvedValue([]);
 }
 
 afterEach(() => {
@@ -131,7 +133,7 @@ it("discovers and imports selected manager libraries", async () => {
     },
   ]);
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
-  vi.spyOn(api, "discoverProcessingLibraries").mockResolvedValue([
+  vi.spyOn(managersApi, "discoverProcessingLibraries").mockResolvedValue([
     {
       key: "movies-4k",
       name: "Movies 4K",
@@ -145,7 +147,7 @@ it("discovers and imports selected manager libraries", async () => {
     },
   ]);
   const imported = vi
-    .spyOn(api, "importDiscoveredProcessingLibraries")
+    .spyOn(managersApi, "importDiscoveredProcessingLibraries")
     .mockResolvedValue([library({ id: 4, name: "Movies 4K" })]);
 
   render(<LibrariesTab />, { wrapper });
@@ -343,7 +345,7 @@ it("offers Reject only when a linked manager can take one, and says why", async 
     library({ manager_connection_ids: [4] }),
   ]);
   const support = vi
-    .spyOn(api, "fetchProcessingRejectSupport")
+    .spyOn(managersApi, "fetchProcessingRejectSupport")
     .mockResolvedValue({
       available: false,
       reason: "Deluno does not yet say it can replace a rejected release.",
@@ -368,7 +370,7 @@ it("lets an operator choose Reject when a linked manager supports it", async () 
   asOperator();
   const existing = library({ manager_connection_ids: [2] });
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([existing]);
-  vi.spyOn(api, "fetchProcessingRejectSupport").mockResolvedValue({
+  vi.spyOn(managersApi, "fetchProcessingRejectSupport").mockResolvedValue({
     available: true,
     reason:
       "Radarr can remove the download, blocklist the release and search for another.",
@@ -401,7 +403,7 @@ it("keeps the original download when told to, saves it, and asks the check about
   const existing = library({ media_type: "tv", name: "TV" });
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([existing]);
   const check = vi
-    .spyOn(api, "fetchProcessingManagerSetup")
+    .spyOn(managersApi, "fetchProcessingManagerSetup")
     .mockResolvedValue({ media_type: "tv", managers: [] });
   const update = vi
     .spyOn(api, "updateProcessingLibrary")
@@ -447,7 +449,7 @@ it("fills a library's folders from what Deluno reports, then saves them", async 
     output_folder: "",
   });
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([existing]);
-  vi.spyOn(api, "fetchProcessingManagerSetup").mockResolvedValue({
+  vi.spyOn(managersApi, "fetchProcessingManagerSetup").mockResolvedValue({
     media_type: "tv",
     managers: [
       {

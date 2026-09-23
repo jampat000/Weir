@@ -1,4 +1,4 @@
-import { fetchCsrfToken } from "../api/auth-api";
+import { sendJson } from "../api/send-json";
 import { apiFetch, readJson, requireOk } from "../api/client";
 import type { Schema } from "../api/types";
 
@@ -19,13 +19,12 @@ export async function fetchDirectPlayDevices(): Promise<DirectPlayDevices> {
 export async function putDirectPlayDevices(
   selected: string[],
 ): Promise<DirectPlayDevices> {
-  const csrf_token = await fetchCsrfToken();
   const path = directPlayDevicesPath();
-  const r = await apiFetch(path, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ csrf_token, selected }),
-  });
-  await requireOk(path, r, "Could not save your Direct Play devices");
+  const r = await sendJson(
+    path,
+    "PUT",
+    { selected },
+    "Could not save your Direct Play devices",
+  );
   return readJson<DirectPlayDevices>(r);
 }

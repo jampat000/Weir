@@ -6,10 +6,8 @@ import {
 } from "../../../../components/shared/quiet-section";
 import { SidePanel } from "../../../../components/shared/side-panel";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
-import type {
-  ProcessingLibrary,
-  ProcessingRuleSet,
-} from "../../../../lib/processing/libraries-api";
+import type { ProcessingLibrary } from "../../../../lib/processing/libraries-api";
+import type { ProcessingRuleSet } from "../../../../lib/processing/rule-sets-api";
 import { useProcessingRejectSupportQuery } from "../../../../lib/processing/libraries-queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { effectiveGrid, windowNow } from "../schedule/schedule-model";

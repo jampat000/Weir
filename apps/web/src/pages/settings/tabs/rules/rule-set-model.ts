@@ -1,4 +1,4 @@
-import type { ProcessingRuleSetWrite } from "../../../../lib/processing/libraries-api";
+import type { ProcessingRuleSetWrite } from "../../../../lib/processing/rule-sets-api";
 import { DEFAULT_TRACK_NAME_TEMPLATE } from "../../../../lib/processing/track-name-preview";
 
 /** One criterion in a track order: which field, an optional value it must match, and its direction. */

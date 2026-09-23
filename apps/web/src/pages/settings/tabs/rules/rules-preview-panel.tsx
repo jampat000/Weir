@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
 
 import { ServerFolderPickerButton } from "../../../../components/ui/server-folder-picker-button";
-import type { ProcessingRuleSetWrite } from "../../../../lib/processing/libraries-api";
+import type { ProcessingRuleSetWrite } from "../../../../lib/processing/rule-sets-api";
 import { useProcessingLibrariesQuery } from "../../../../lib/processing/libraries-queries";
 import {
   mmActionButtonClass,
