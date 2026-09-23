@@ -5,28 +5,33 @@ using Xunit;
 namespace Weir.Tray.Tests;
 
 /// <summary>
-/// The install and uninstall hooks used to kill every process named Weir or WeirServer on the
-/// machine. A machine can run more than one Weir, so they must stop only this install's own.
+/// A machine can run more than one Weir, so the install and uninstall hooks stop only this install's own
+/// Weir and WeirServer processes, never every process with those names.
 /// </summary>
 public sealed class InstallProcessesTests : IDisposable
 {
-    private readonly string _root;
+    private readonly TempDirectory _root = TempDirectory.Create();
     private readonly List<Process> _started = [];
-
-    public InstallProcessesTests()
-    {
-        _root = Path.Combine(Path.GetTempPath(), "weir-tray-tests", Guid.NewGuid().ToString("n"));
-        Directory.CreateDirectory(_root);
-    }
 
     public void Dispose()
     {
         foreach (var p in _started)
         {
-            try { if (!p.HasExited) p.Kill(entireProcessTree: true); p.WaitForExit(5_000); } catch { }
+            try
+            {
+                if (!p.HasExited)
+                {
+                    p.Kill(entireProcessTree: true);
+                }
+                p.WaitForExit(5_000);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                // Already gone, which is what this clean-up wants.
+            }
             p.Dispose();
         }
-        try { Directory.Delete(_root, recursive: true); } catch { }
+        _root.Dispose();
     }
 
     [Theory]
@@ -52,8 +57,8 @@ public sealed class InstallProcessesTests : IDisposable
     [Fact]
     public void Stops_this_installs_server_and_leaves_another_weir_running()
     {
-        var install = Path.Combine(_root, "install", "current");
-        var elsewhere = Path.Combine(_root, "Deluno", "Weir", "app", "current");
+        var install = Path.Combine(_root.Path, "install", "current");
+        var elsewhere = Path.Combine(_root.Path, "Deluno", "Weir", "app", "current");
         var inside = StartFakeServer(Path.Combine(install, "server"));
         var outside = StartFakeServer(Path.Combine(elsewhere, "server"));
         var log = new List<string>();

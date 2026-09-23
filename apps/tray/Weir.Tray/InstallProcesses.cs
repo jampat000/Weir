@@ -5,12 +5,10 @@ namespace Weir.Tray;
 /// <summary>
 /// Finding and stopping this install's own Weir processes — and only those.
 ///
-/// The installer hooks used to kill every process named <c>Weir</c> or <c>WeirServer</c> on the
-/// machine, matched by name alone. A machine can run more than one Weir — a second install, a
-/// portable copy, a developer build, a soak rig kept alive by scheduled tasks — and installing or
-/// uninstalling this one silently killed all of them. A process is now stopped only when its
-/// executable is inside this install's directory. If its path cannot be read (access denied, a
-/// different user's process, already gone) it is left alone: not knowing is not permission.
+/// A machine can run more than one Weir — a second install, a portable copy, a developer build —
+/// so a process named <c>Weir</c> or <c>WeirServer</c> is stopped only when its executable is
+/// inside this install's directory. If its path cannot be read (access denied, a different
+/// user's process, already gone) it is left alone: not knowing is not permission.
 /// </summary>
 static class InstallProcesses
 {
@@ -33,9 +31,20 @@ static class InstallProcesses
     /// </summary>
     internal static bool IsInside(string? executable, string root)
     {
-        if (string.IsNullOrWhiteSpace(executable)) return false;
+        if (string.IsNullOrWhiteSpace(executable))
+        {
+            return false;
+        }
         string full;
-        try { full = Path.GetFullPath(executable); } catch { return false; }
+        try
+        {
+            full = Path.GetFullPath(executable);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            // A path that cannot be normalized cannot be shown to be inside; StopOwn logs the process it leaves.
+            return false;
+        }
         var prefix = Normalize(root) + Path.DirectorySeparatorChar;
         return full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
     }
@@ -52,7 +61,15 @@ static class InstallProcesses
         int? session = null;
         if (sameSessionOnly)
         {
-            try { session = Process.GetCurrentProcess().SessionId; } catch { return stopped; }
+            try
+            {
+                session = Process.GetCurrentProcess().SessionId;
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or PlatformNotSupportedException)
+            {
+                log($"{why}: stopped nothing: could not read this process's Windows session ({ex.Message}).");
+                return stopped;
+            }
         }
 
         foreach (var name in Names)
@@ -61,12 +78,19 @@ static class InstallProcesses
             {
                 using (proc)
                 {
-                    if (proc.Id == self) continue;
+                    if (proc.Id == self)
+                    {
+                        continue;
+                    }
 
                     string? path;
                     try
                     {
-                        if (session is { } s && proc.SessionId != s) continue;
+                        if (session is { } s && proc.SessionId != s)
+                        {
+                            continue;
+                        }
+
                         path = proc.MainModule?.FileName;
                     }
                     catch (Exception ex)
