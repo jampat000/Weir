@@ -528,6 +528,16 @@ public sealed class RemuxPassHandler : IJobHandler
                         if (await RemuxPassFileState.MarkFileStatusAsync(uow, library.Id, rel, ProcessingFileStatuses.OnHold, reason, now).ConfigureAwait(false))
                         {
                             await RemuxPassFileState.ClearFailureFieldsAsync(uow, library.Id, rel).ConfigureAwait(false);
+                            // Another look is booked (#646): the file is on hold until it, not ready for the next free lane.
+                            if (result.Get("failure_next_retry_at") is PyStr { Value.Length: > 0 } booked &&
+                                PythonTimestamps.Parse(booked.Value) is { } lookAgainAt)
+                            {
+                                await uow.ExecuteAsync(
+                                    "UPDATE files SET hold_until = $hold WHERE library_id = $library AND relative_path = $path",
+                                    ("$hold", PythonTimestamps.Orm(lookAgainAt)),
+                                    ("$library", library.Id),
+                                    ("$path", rel)).ConfigureAwait(false);
+                            }
                         }
 
                         updates.Set("retry_scheduled", false).Set("quarantined", false).Set("failure_next_retry_at", PyNull.Instance).Set("failure_operator_message", reason);

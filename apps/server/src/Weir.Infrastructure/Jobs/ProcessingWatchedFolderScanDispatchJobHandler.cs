@@ -257,6 +257,20 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
                 effectiveMinAgeSeconds,
                 now);
 
+            // A pass for this file booked for later is not a file waiting for a free lane. Calling it ready put it first in
+            // line on Processing while a lane stood empty, for as long as Weir was deliberately leaving it alone. It is on
+            // hold until the booked look, for the reason the last pass gave; the pass itself is already queued.
+            if (verdict.Eligible &&
+                await WatchedFolderScanOps.HeldBackRemuxPassStartsAtAsync(uow, rel, mediaScope, library.Id, now).ConfigureAwait(false) is { } lookAgainAt)
+            {
+                verdict = new FileStateVerdict(
+                    ProcessingFileStatuses.OnHold,
+                    previous is { Status: ProcessingFileStatuses.OnHold, StatusReason.Length: > 0 }
+                        ? previous.StatusReason
+                        : "Weir has another look at this file booked, and leaves it alone until then.",
+                    HoldUntil: lookAgainAt);
+            }
+
             await FileStateStore.RecordFileStateAsync(
                 uow, library.Id, rel, verdict, observedSize, settling.SizeChangedAt, now).ConfigureAwait(false);
 
