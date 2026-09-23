@@ -9,6 +9,24 @@ public static class HandbackRules
     /// <summary>The intake capability that says Weir takes <c>POST …/intake/handoffs/{source}/{id}/outcome</c>.</summary>
     public const string OutcomeCapability = "handoff-outcome";
 
+    /// <summary>
+    /// The intake capability that says every 409 from the outcome route carries a <c>code</c> naming its case (#664), so a
+    /// manager can tell a final refusal from one worth retrying without reading the wording.
+    /// </summary>
+    public const string OutcomeCodesCapability = "handoff-outcome-codes";
+
+    /// <summary>409 code: a different outcome is already recorded for this hand-off. Final; sending it again never succeeds.</summary>
+    public const string OutcomeAlreadyRecordedCode = "outcome_already_recorded";
+
+    /// <summary>409 code: Weir is still working on the hand-off. Worth sending again later.</summary>
+    public const string HandoffNotFinishedCode = "handoff_not_finished";
+
+    /// <summary>
+    /// 409 code: the hand-off ended without a file to import (failed, rejected or cancelled). Weir works out a hand-off's
+    /// state from its jobs and files each time it is asked, so this can still change; a manager may send the outcome again.
+    /// </summary>
+    public const string HandoffEndedCode = "handoff_ended";
+
     /// <summary>The manager imported the file.</summary>
     public const string Imported = "imported";
 
