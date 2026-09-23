@@ -18,6 +18,8 @@ export type ArrivingItem = {
   file: ProcessingFile;
   name: string;
   facts: string;
+  /** The file's path, so its full name can be shown under the friendly title. */
+  path: string;
   note: string;
   /** When the wait ends (epoch ms), for a countdown. Null when the wait is on a writer, not a clock. */
   holdUntil: number | null;
@@ -41,6 +43,8 @@ export type WaitingItem = {
   key: string;
   source: WorkSource;
   name: string;
+  /** The file's path, so its full name can be shown under the friendly title. */
+  path: string;
   facts: string;
   note: string | null;
   libraryName: string;
@@ -51,6 +55,8 @@ export type WorkingItem = {
   key: string;
   source: WorkSource;
   name: string;
+  /** The file's path, so its full name can be shown under the friendly title. */
+  path: string;
   facts: string;
   libraryName: string;
   percent: number | null;
@@ -65,6 +71,8 @@ export type HandingItem = {
   key: string;
   source: WorkSource;
   name: string;
+  /** The file's path, so its full name can be shown under the friendly title. */
+  path: string;
   libraryName: string;
   file: ProcessingFile | null;
 };
@@ -200,6 +208,7 @@ export function buildLanes(
           key,
           file,
           name,
+          path: file.relative_path,
           facts,
           note: firstSentence(file.status_reason),
           holdUntil,
@@ -217,6 +226,7 @@ export function buildLanes(
           key,
           file,
           name,
+          path: file.relative_path,
           facts,
           note: file.blocked_by_connection
             ? `${file.blocked_by_connection} is still importing it.`
@@ -233,6 +243,7 @@ export function buildLanes(
           key,
           source: "download",
           name,
+          path: file.relative_path,
           facts,
           note:
             file.status === "out_of_schedule"
@@ -248,6 +259,7 @@ export function buildLanes(
             key,
             source: "download",
             name,
+            path: file.relative_path,
             libraryName,
             file,
           });
@@ -257,6 +269,7 @@ export function buildLanes(
           key,
           source: "download",
           name,
+          path: file.relative_path,
           facts,
           libraryName,
           percent: file.progress_percent,
@@ -285,6 +298,7 @@ export function buildLanes(
       key: `job-${row.id}`,
       source: "library" as const,
       name: prettyName(path || `Library file ${row.id}`),
+      path,
       facts: "Cleaning in place",
       libraryName,
       file: null,
