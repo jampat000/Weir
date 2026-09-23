@@ -11,7 +11,7 @@ const features = [
     title: 'Processing',
     description:
       'Cleans new downloads, and files already in your library: keep the audio and subtitle tracks you want and remove the rest, library by library, with configurable worker lanes.',
-    screenshot: '/Weir/img/processing.png',
+    screenshot: '/Weir/img/history.png',
   },
 ];
 
@@ -79,14 +79,14 @@ function HomeScreenPreview(): ReactNode {
   return (
     <section className={styles.preview}>
       <div className="container">
-        <h2>Home, at a glance</h2>
+        <h2>Processing, at a glance</h2>
         <p>
-          Files Weir is responsible for right now, between your media manager
-          handing them over and getting them back.
+          Every file Weir is working on, from the moment it lands to the moment
+          your media manager has it back.
         </p>
         <img
-          src="/Weir/img/home.png"
-          alt="Weir's Home screen"
+          src="/Weir/img/processing.png"
+          alt="Weir's Processing screen"
           className={styles.dashboardImage}
         />
       </div>

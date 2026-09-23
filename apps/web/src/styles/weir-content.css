@@ -1630,6 +1630,7 @@
   margin: 0;
   padding: 0;
   list-style: none;
+  font-size: var(--mm-type-body);
 }
 
 .mm-library-cleaning__folders li {

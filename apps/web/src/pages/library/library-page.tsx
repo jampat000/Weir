@@ -592,8 +592,10 @@ export function LibraryPage(): React.ReactElement {
           aria-label={`Files in ${chosen.name}`}
         >
           <div role="row" className="mm-library-row mm-library-row--head">
-            <span role="columnheader" className="sr-only">
-              Select
+            {/* The cell stays in the grid and only its word is hidden: an sr-only cell leaves the grid, which slid
+                every heading one column left of its values. */}
+            <span role="columnheader">
+              <span className="sr-only">Select</span>
             </span>
             <span role="columnheader">File</span>
             <span role="columnheader">What Weir would do</span>
