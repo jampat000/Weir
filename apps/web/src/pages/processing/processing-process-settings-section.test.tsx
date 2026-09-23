@@ -31,7 +31,6 @@ const settings: ProcessingOperatorSettingsOut = {
   failure_cleanup_enabled: false,
   keep_failed_work_files: false,
   file_log_retention_days: 90,
-  verbose_detection_logging: false,
   min_file_age_seconds: 60,
   min_input_file_size_mb: 50,
   minimum_free_disk_space_mb: 5120,

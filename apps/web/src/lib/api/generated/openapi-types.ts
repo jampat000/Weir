@@ -4876,11 +4876,6 @@ export interface components {
       /** Updated At */
       updated_at: string;
       /**
-       * Verbose Detection Logging
-       * @description Record extra detail from the file-detection stage. Turn this on while working out why a file is or is not being picked up, and turn it off again afterwards — it is loud.
-       */
-      verbose_detection_logging: boolean;
-      /**
        * Work Temp Stale Sweep Enabled
        * @description Reclaim Weir's own stale working files. Safe, and on by default.
        */
@@ -4948,7 +4943,11 @@ export interface components {
       tv_schedule_hours_limited?: boolean | null;
       /** Tv Schedule Start */
       tv_schedule_start?: string | null;
-      /** Verbose Detection Logging */
+      /**
+       * Verbose Detection Logging
+       * @deprecated
+       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused.
+       */
       verbose_detection_logging?: boolean | null;
       /** Work Temp Stale Sweep Enabled */
       work_temp_stale_sweep_enabled?: boolean | null;

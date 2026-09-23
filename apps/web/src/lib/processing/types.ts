@@ -79,7 +79,6 @@ export type ProcessingOperatorSettingsOut = {
   failure_cleanup_interval_seconds?: number | null;
   keep_failed_work_files: boolean;
   file_log_retention_days: number;
-  verbose_detection_logging: boolean;
   min_file_age_seconds: number;
   min_input_file_size_mb: number;
   minimum_free_disk_space_mb: number;
@@ -115,7 +114,6 @@ export type ProcessingOperatorSettingsPutBody = {
   failure_cleanup_interval_seconds?: number;
   keep_failed_work_files?: boolean;
   file_log_retention_days?: number;
-  verbose_detection_logging?: boolean;
   min_file_age_seconds?: number;
   min_input_file_size_mb?: number;
   minimum_free_disk_space_mb?: number;

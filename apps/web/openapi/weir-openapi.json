@@ -6013,11 +6013,6 @@
             "title": "Updated At",
             "type": "string"
           },
-          "verbose_detection_logging": {
-            "description": "Record extra detail from the file-detection stage. Turn this on while working out why a file is or is not being picked up, and turn it off again afterwards — it is loud.",
-            "title": "Verbose Detection Logging",
-            "type": "boolean"
-          },
           "work_temp_stale_sweep_enabled": {
             "description": "Reclaim Weir's own stale working files. Safe, and on by default.",
             "title": "Work Temp Stale Sweep Enabled",
@@ -6048,7 +6043,6 @@
           "failure_cleanup_enabled",
           "keep_failed_work_files",
           "file_log_retention_days",
-          "verbose_detection_logging",
           "runner_cost_undetermined",
           "min_file_age_seconds",
           "min_input_file_size_mb",
@@ -6392,6 +6386,8 @@
                 "type": "null"
               }
             ],
+            "deprecated": true,
+            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused.",
             "title": "Verbose Detection Logging"
           },
           "work_temp_stale_sweep_enabled": {

@@ -29,7 +29,6 @@ public sealed record ProcessingOperatorSettingsRecord
     public long? FailureCleanupIntervalSeconds { get; init; }
     public bool KeepFailedWorkFiles { get; init; }
     public long FileLogRetentionDays { get; init; } = 90;
-    public bool VerboseDetectionLogging { get; init; }
     public long MinFileAgeSeconds { get; init; } = 60;
     public long ProcessingMinInputFileSizeMb { get; init; } = 50;
     public long MinimumFreeDiskSpaceMb { get; init; } = 5120;
