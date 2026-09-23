@@ -51,25 +51,25 @@ public sealed class BrowserLaunchTests : IDisposable
     }
 
     [Fact]
-    public void Browser_launch_can_open_the_local_upgrade_settings_page()
+    public void Browser_launch_can_open_the_local_update_check_page()
     {
         ProcessStartInfo? observed = null;
 
         var result = Program.OpenBrowser(
             9347,
             info => observed = info,
-            Program.UpgradeSettingsPath);
+            Program.UpdateCheckPath);
 
         Assert.True(result);
         Assert.NotNull(observed);
-        Assert.Equal("http://127.0.0.1:9347/settings?tab=upgrade", observed.FileName);
+        Assert.Equal("http://127.0.0.1:9347/system?tab=about", observed.FileName);
         Assert.True(observed.UseShellExecute);
     }
 
     [Theory]
     [InlineData(true, null)]
-    [InlineData(false, Program.UpgradeSettingsPath)]
-    public void Update_menu_falls_back_to_the_web_upgrade_page_when_unmanaged(
+    [InlineData(false, Program.UpdateCheckPath)]
+    public void Update_menu_falls_back_to_the_web_update_check_when_unmanaged(
         bool isInstalled,
         string? expectedPath)
     {
