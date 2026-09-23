@@ -31,7 +31,9 @@ import { useProcessingJobsInspectionQuery } from "../../lib/processing/jobs-insp
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 import { useProcessingFilesAtOnceQuery } from "../../lib/processing/queries";
 import { processingKeys } from "../../lib/processing/query-keys";
+import { parseAppTime } from "../../lib/ui/mm-format-date";
 import { plural } from "../../lib/ui/mm-plural";
+import { useNow } from "../../lib/ui/use-now";
 import { FinishedLane } from "./finished-lane";
 import { EmptyLane, Lane, More } from "./lane";
 import { ArrivingCard, HandingCard, WaitingCard } from "./lane-cards";
@@ -46,6 +48,7 @@ import { WorkingCard } from "./working-card";
 
 const FILES_QUERY = { limit: 200 } as const;
 const ACTIVE_JOBS_LIMIT = 50;
+/** Once a second, so countdowns and "min ago" move between server updates. */
 const TICK_MS = 1000;
 /** Arriving counts down to each library's next look, which moves with every scan. */
 const LIBRARIES_REFRESH_MS = 10_000;
@@ -74,16 +77,6 @@ const TOTAL_KEYS = [
 const LANE_THROTTLE_MS = 750;
 const TOTAL_THROTTLE_MS = 3_000;
 
-/** Re-renders once a second so countdowns and "min ago" move between server updates. */
-function useNow(): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), TICK_MS);
-    return () => window.clearInterval(id);
-  }, []);
-  return now;
-}
-
 /** The lanes' files, grouped by where each one is, with what each library knows about its next look. */
 function useLanes() {
   const files = useProcessingFilesQuery(FILES_QUERY);
@@ -96,8 +89,8 @@ function useLanes() {
     const all = libraries.data ?? [];
     const nextLooks = new Map<number, { at: number; interval: number }>();
     for (const library of all) {
-      const at = library.next_look_at ? Date.parse(library.next_look_at) : NaN;
-      if (Number.isFinite(at)) {
+      const at = parseAppTime(library.next_look_at);
+      if (at != null) {
         nextLooks.set(library.id, {
           at,
           interval: library.scan_interval_seconds,
@@ -142,7 +135,7 @@ export function ProcessingPage(): React.ReactElement {
   useActivityStreamInvalidations(TOTAL_KEYS, {
     throttleMs: TOTAL_THROTTLE_MS,
   });
-  const now = useNow();
+  const now = useNow(TICK_MS);
   const board = useLanes();
   useRefetchOverdueLooks(board, now);
   const { files, lanes } = board;
