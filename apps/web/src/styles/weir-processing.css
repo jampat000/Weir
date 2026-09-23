@@ -127,6 +127,8 @@
   background: color-mix(in srgb, var(--mm-surface) 92%, transparent);
 }
 
+/* Figures line up by their tops: the trend figure carries a legend under its chart, and
+   bottom-aligned figures would sink the other numbers to meet it. */
 .mm-live-toolbar__figures {
   display: flex;
   flex-wrap: wrap;
@@ -585,17 +587,15 @@
   flex-shrink: 0;
 }
 
-.mm-live-ring__track,
-.mm-live-ring__fill {
+.mm-live-ring__track {
   fill: none;
   stroke-width: 3;
-}
-
-.mm-live-ring__track {
   stroke: color-mix(in srgb, var(--mm-text1) 12%, transparent);
 }
 
 .mm-live-ring__fill {
+  fill: none;
+  stroke-width: 3;
   stroke: var(--mm-accent);
   stroke-linecap: round;
   transform: rotate(-90deg);
@@ -848,12 +848,6 @@
 
 .mm-live-dot--warn {
   background: var(--mm-status-warning-text);
-}
-
-/* Today's figures line up by their tops here: Last 2 hours carries a legend under its chart, and
-   bottom-aligned figures would sink the other two numbers to meet it. */
-.mm-live-toolbar__figures {
-  align-items: flex-start;
 }
 
 /* Last 2 hours: its label and number on the same lines as today's two figures, the chart right

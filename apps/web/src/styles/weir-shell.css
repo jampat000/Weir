@@ -215,10 +215,6 @@ body.mm-body {
   min-width: 0;
 }
 
-.mm-page__intro.mm-workspace-page__intro {
-  margin-bottom: 0;
-}
-
 .mm-workspace-tabs {
   width: 100%;
   margin: 0.9rem 0 1.25rem;
@@ -592,17 +588,14 @@ body.mm-body {
   content: "−";
 }
 
-.mm-activity-cluster__summary strong,
-.mm-activity-cluster__summary small {
-  display: block;
-}
-
 .mm-activity-cluster__summary strong {
+  display: block;
   color: var(--mm-text1);
   font-size: 0.9rem;
 }
 
 .mm-activity-cluster__summary small {
+  display: block;
   margin-top: 0.18rem;
   color: var(--mm-text2);
   font-size: 0.74rem;
@@ -780,18 +773,6 @@ body.mm-body {
   outline-offset: 2px;
 }
 
-.mm-theme-toggle__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--mm-accent);
-  box-shadow: 0 0 0 3px var(--mm-accent-soft);
-}
-
-.mm-theme-toggle__label {
-  line-height: 1;
-}
-
 html[data-mm-theme="light"] .mm-theme-toggle {
   background:
     linear-gradient(
@@ -938,14 +919,16 @@ html[data-mm-theme="light"] .mm-theme-toggle {
     background 0.16s ease;
 }
 
-.mm-sidebar-collapse:hover,
-.mm-sidebar-collapse:focus-visible {
+.mm-sidebar-collapse:hover {
   color: var(--mm-accent-bright);
   border-color: var(--mm-accent-ring);
   background: var(--mm-accent-soft);
 }
 
 .mm-sidebar-collapse:focus-visible {
+  color: var(--mm-accent-bright);
+  border-color: var(--mm-accent-ring);
+  background: var(--mm-accent-soft);
   outline: 2px solid var(--mm-accent-ring);
   outline-offset: 1px;
 }
@@ -1428,15 +1411,6 @@ html[data-mm-theme="light"] .mm-theme-toggle {
   margin-bottom: var(--mm-space-lg);
   padding-bottom: calc(var(--mm-space) + 0.5rem);
   border-bottom: 1px solid rgba(255, 255, 255, 0.055);
-}
-
-.mm-page__eyebrow {
-  margin: 0 0 0.45rem;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--mm-eyebrow-color);
 }
 
 .mm-page__title {
@@ -2449,137 +2423,6 @@ select option:disabled {
   gap: 8px;
 }
 
-/* --- Home: files Weir currently has custody of (#463) --------------------------------------
-   The page's lead band, figure row and sections are the page-neutral primitives in
-   weir-content.css. What is left here is the file row itself, which nothing else draws:
-   built on the type ramp and surface tokens rather than fixed values, so both themes work
-   and the four density steps still scale it. */
-
-.mm-home-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* A borderless list of rows, flush with its section heading: one hairline per row, none
-   under the last. The card these used to sit in is gone — see docs/design/content-language.md. */
-.mm-home-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 20rem);
-  gap: 1rem;
-  align-items: start;
-  padding: 0.7rem 0;
-  border-bottom: 1px solid var(--mm-border);
-}
-
-.mm-home-row:last-child {
-  border-bottom: none;
-}
-
-.mm-home-row__main {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  min-width: 0;
-}
-
-.mm-home-row__name {
-  font-size: var(--mm-type-body);
-  color: var(--mm-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Numbers and codecs line up column-to-column without the whole screen reading as a terminal. */
-.mm-home-row__facts {
-  font-size: var(--mm-type-caption);
-  color: var(--mm-text3);
-  font-variant-numeric: tabular-nums;
-}
-
-.mm-home-row__state {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  font-size: var(--mm-type-caption);
-  color: var(--mm-text2);
-  min-width: 0;
-}
-
-/* Held upstream is not a failure — the guardrail is working. */
-.mm-home-row__state--held {
-  color: var(--mm-status-info-text);
-}
-
-.mm-home-row__reason {
-  color: var(--mm-text3);
-  overflow-wrap: anywhere;
-}
-
-.mm-home-row__progress {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.15rem;
-}
-
-.mm-home-row__progress-track {
-  position: relative;
-  flex-grow: 1;
-  height: 5px;
-  border-radius: var(--mm-radius-pill);
-  background: var(--mm-input-bg);
-  overflow: hidden;
-}
-
-.mm-home-row__progress-fill {
-  display: block;
-  height: 100%;
-  border-radius: var(--mm-radius-pill);
-  background: var(--mm-accent);
-  transition: width 0.6s ease;
-}
-
-.mm-home-row__progress-text {
-  flex-shrink: 0;
-  color: var(--mm-accent-bright);
-  font-variant-numeric: tabular-nums;
-}
-
-@media (max-width: 720px) {
-  .mm-home-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-/* The file name is a button that opens its story (#468). Reset the button chrome so it still
-   reads as a name in a list, with the affordance carried by hover and focus instead. */
-button.mm-home-row__name {
-  display: block;
-  width: 100%;
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  font-size: var(--mm-type-body);
-  text-align: left;
-  color: var(--mm-text);
-  cursor: pointer;
-}
-
-button.mm-home-row__name:hover {
-  color: var(--mm-accent-bright);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-button.mm-home-row__name:focus-visible {
-  outline: 2px solid var(--mm-accent-ring);
-  outline-offset: 2px;
-  border-radius: 2px;
-}
-
 /* --- File story slide-over (#468) ------------------------------------------------------------ */
 
 .mm-story-layer {
@@ -2956,16 +2799,6 @@ html[data-mm-theme="light"] .bg-black\/20 {
   background-color: var(--mm-well-bg);
 }
 
-/* Display density tiles. Shared by Settings > General and the setup wizard: the tile's
-   border is the radio's hit target and its selected state, not a panel around content.
-   The Settings > General cards that used to box them in went with that tab's conversion
-   to the content language (docs/design/content-language.md, rule 3). */
-@media (max-width: 360px) {
-  .mm-density-options {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 /* Setup wizard (pages/setup/setup-wizard-page.tsx). */
 .mm-wizard-label {
   display: block;
@@ -2984,10 +2817,6 @@ html[data-mm-theme="light"] .bg-black\/20 {
   .mm-wizard-basics {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
   }
-}
-
-.mm-density-options--wide {
-  margin-top: 0;
 }
 
 .mm-wizard-libraries {

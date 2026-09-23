@@ -148,6 +148,8 @@
   display: block;
   max-width: 100%;
   overflow-wrap: anywhere;
+  font-weight: 600;
+  color: var(--mm-text);
 }
 
 .mm-history-file__sub {
@@ -155,21 +157,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.mm-history-file__name {
-  font-weight: 600;
-  color: var(--mm-text);
+  font-size: 0.75rem;
+  color: var(--mm-text3);
 }
 
 .mm-history-file:hover .mm-history-file__name,
 .mm-history-file:focus-visible .mm-history-file__name {
   color: var(--mm-accent-bright);
-}
-
-.mm-history-file__sub {
-  font-size: 0.75rem;
-  color: var(--mm-text3);
 }
 
 .mm-history-what--working {
