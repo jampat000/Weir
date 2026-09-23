@@ -34,7 +34,7 @@ vi.mock("./tabs/cleanup-tab", () => ({
 vi.mock("./tabs/schedule/schedule-tab", () => ({
   ScheduleTab: () => <div>Schedule content</div>,
 }));
-vi.mock("./tabs/alerts-tab", () => ({
+vi.mock("./tabs/alerts/alerts-tab", () => ({
   AlertsTab: () => <div>Alerts content</div>,
 }));
 
