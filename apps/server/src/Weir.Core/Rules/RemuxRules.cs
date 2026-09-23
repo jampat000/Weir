@@ -8,6 +8,13 @@ public static class RemuxRuleValues
 {
     public const string SubtitleModeRemoveAll = "remove_all";
     public const string SubtitleModeKeepSelected = "keep_selected";
+
+    /// <summary>
+    /// Keep every subtitle track, whatever its language: the stored default and what Settings › Rules calls
+    /// "Keep all subtitles". The planner used to know only remove-all and keep-selected, so this fell into
+    /// keep-selected with an empty language list and removed every subtitle, forced and default included.
+    /// </summary>
+    public const string SubtitleModeKeepAll = "keep_all";
     public const string DefaultAudioSlotPrimary = "primary";
     public const string DefaultAudioSlotSecondary = "secondary";
     public const string PolicyPreferredLangsQuality = "preferred_langs_quality";
@@ -31,12 +38,24 @@ public static class RemuxRuleValues
 
 /// <summary>
 /// The rules in force for one pass (<c>processing_remux_rules.ProcessingRulesConfig</c>).
-/// <see cref="SubtitleMode"/> and <see cref="AudioPreferenceMode"/> stay strings: the planner
-/// treats any subtitle mode other than <c>remove_all</c> as keep-selected and normalizes an
-/// unknown policy to the default, exactly as the reference does.
+/// <see cref="SubtitleMode"/> and <see cref="AudioPreferenceMode"/> stay strings: a subtitle mode is one of
+/// <c>remove_all</c>, <c>keep_selected</c> or <c>keep_all</c> once <c>RuleSetConversion.NormalizeSubtitleMode</c>
+/// has read it, and the planner normalizes an unknown policy to the default.
 /// </summary>
 public sealed record ProcessingRulesConfig
 {
+    /// <summary>
+    /// Whether these rules drop every subtitle track: remove-all, or keep-selected with no language chosen.
+    /// Keep-all never does. The planner, the per-track explanation and the removed-track comparison all ask
+    /// this one question, so they cannot disagree about which files lose their subtitles.
+    /// </summary>
+    public bool RemovesEverySubtitle =>
+        SubtitleMode == RemuxRuleValues.SubtitleModeRemoveAll
+        || (SubtitleMode != RemuxRuleValues.SubtitleModeKeepAll && SubtitleLangs.Count == 0);
+
+    /// <summary>Whether these rules keep every subtitle track whatever its language (subject to the hearing-impaired rule and the per-language cap).</summary>
+    public bool KeepsEverySubtitleLanguage => SubtitleMode == RemuxRuleValues.SubtitleModeKeepAll;
+
     public required string PrimaryAudioLang { get; init; }
     public required string SecondaryAudioLang { get; init; }
     public required string TertiaryAudioLang { get; init; }
@@ -1235,7 +1254,7 @@ public static partial class RemuxRules
 
         var keptSubtitles = new List<PlannedTrack>();
         var removedSubtitleLabels = new List<string>();
-        if (config.SubtitleMode == RemuxRuleValues.SubtitleModeRemoveAll || config.SubtitleLangs.Count == 0)
+        if (config.RemovesEverySubtitle)
         {
             foreach (var s in subtitles)
             {
@@ -1266,6 +1285,11 @@ public static partial class RemuxRules
                 rank[LanguageVariants.NormalizeLanguageOrVariant(config.SubtitleLangs[n])] = n;
             }
 
+            // Keep-all: every language is wanted. Each language (or variant, or untagged) is its own slot, in the
+            // order it first appears in the file, so the per-language cap still means per language.
+            var keepAll = config.KeepsEverySubtitleLanguage;
+            var seenSlots = new Dictionary<string, int>(StringComparer.Ordinal);
+
             var subtitleCandidates = new List<SubtitleCandidate>();
 
             foreach (var (s, index) in WithIndex(subtitles))
@@ -1278,10 +1302,24 @@ public static partial class RemuxRules
                 // A variant-specific tier ("fre-CA") takes priority over a broader base tier
                 // ("fre") when a track matches both; a plain base tier still matches every variant.
                 var variant = LanguageVariants.DetectVariant(s.Tag("title"), lang, rawLanguageTag);
-                var matchedTier = variant is not null && rank.TryGetValue(variant, out var variantRank)
-                    ? variantRank
-                    : rank.GetValueOrDefault(lang, -1);
-                if (lang.Length == 0 || matchedTier < 0)
+                int matchedTier;
+                if (keepAll)
+                {
+                    var slot = variant ?? langLabel;
+                    if (!seenSlots.TryGetValue(slot, out matchedTier))
+                    {
+                        matchedTier = seenSlots.Count;
+                        seenSlots[slot] = matchedTier;
+                    }
+                }
+                else
+                {
+                    matchedTier = variant is not null && rank.TryGetValue(variant, out var variantRank)
+                        ? variantRank
+                        : rank.GetValueOrDefault(lang, -1);
+                }
+
+                if (!keepAll && (lang.Length == 0 || matchedTier < 0))
                 {
                     removedSubtitleLabels.Add(langLabel);
                     removedTrackRecords.Add(new RemovedTrackRecord
@@ -1344,9 +1382,12 @@ public static partial class RemuxRules
             // unlimited, today's behaviour). A forced track kept under preserve-forced is exempt.
             keptSubtitles = ApplySubtitleCap(subtitleCandidates, config, notes, removedSubtitleLabels);
 
-            keptSubtitles = [.. keptSubtitles
-                .OrderBy(t => t.Variant is not null && rank.TryGetValue(t.Variant, out var vr) ? vr : rank.GetValueOrDefault(t.LangLabel, 99))
-                .ThenBy(t => t.InputIndex)];
+            // Keep-all leaves the file's own order; keep-selected orders by the configured language list.
+            keptSubtitles = keepAll
+                ? [.. keptSubtitles.OrderBy(t => t.InputIndex)]
+                : [.. keptSubtitles
+                    .OrderBy(t => t.Variant is not null && rank.TryGetValue(t.Variant, out var vr) ? vr : rank.GetValueOrDefault(t.LangLabel, 99))
+                    .ThenBy(t => t.InputIndex)];
         }
 
         return new RemuxPlan

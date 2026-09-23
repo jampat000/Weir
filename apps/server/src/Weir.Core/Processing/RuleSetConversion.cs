@@ -11,14 +11,19 @@ namespace Weir.Core.Processing;
 public static class RuleSetConversion
 {
     /// <summary>
-    /// The planner's own reading of a stored subtitle mode (<c>_normalize_subtitle_mode</c>). The stored
-    /// server default is <c>keep_all</c>, which is not one of the two modes the planner implements; it
-    /// asks only whether the value is <c>remove_all</c> and treats everything else as keep-selected.
+    /// A stored subtitle mode as the planner reads it. <c>remove_all</c> removes every subtitle;
+    /// <c>keep_listed</c> (what Settings › Rules saves) and <c>keep_selected</c> keep the listed languages;
+    /// anything else, including the stored default <c>keep_all</c>, keeps every subtitle. This used to map
+    /// everything but <c>remove_all</c> to keep-selected, so "Keep all subtitles" — with its language list
+    /// hidden and empty — removed every subtitle track. An unknown value now errs towards keeping.
     /// </summary>
     public static string NormalizeSubtitleMode(string? raw) =>
-        string.Equals((raw ?? string.Empty).Trim(), RemuxRuleValues.SubtitleModeRemoveAll, StringComparison.OrdinalIgnoreCase)
-            ? RemuxRuleValues.SubtitleModeRemoveAll
-            : RemuxRuleValues.SubtitleModeKeepSelected;
+        (raw ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            RemuxRuleValues.SubtitleModeRemoveAll => RemuxRuleValues.SubtitleModeRemoveAll,
+            "keep_listed" or RemuxRuleValues.SubtitleModeKeepSelected => RemuxRuleValues.SubtitleModeKeepSelected,
+            _ => RemuxRuleValues.SubtitleModeKeepAll,
+        };
 
     /// <summary>One rule set as the config the planner takes. A missing rule set yields the shipped defaults.</summary>
     public static ProcessingRulesConfig ToRulesConfig(ProcessingRuleSetRecord? row)
