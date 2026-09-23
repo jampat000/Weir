@@ -61,6 +61,18 @@ public sealed class PyJsonEncodingException : Exception
 /// </summary>
 public static class PyJsonParser
 {
+    /// <summary>
+    /// The deepest nesting of arrays and objects a document may have. Parsing recurses once per level, so without a
+    /// limit a small body of nested brackets overflows the stack and ends the process; no real payload comes close.
+    /// </summary>
+    public const int MaxDepth = 128;
+
+    /// <summary>
+    /// The most digits an integer may have. Parsing a big integer costs time that grows faster than its length, so
+    /// a single huge number could tie up a request thread; no setting or payload Weir reads needs more than a few dozen.
+    /// </summary>
+    public const int MaxIntegerDigits = 4300;
+
     private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     /// <summary><c>json.loads(bytes)</c>: detect the encoding the way <c>json.detect_encoding</c> does, then parse.</summary>
@@ -136,7 +148,7 @@ public static class PyJsonParser
         }
 
         var idx = SkipWhitespace(s, 0);
-        var value = ScanOnceOrExpectingValue(s, idx, out var end);
+        var value = ScanOnceOrExpectingValue(s, idx, 0, out var end);
         end = SkipWhitespace(s, end);
         if (end != s.Length)
         {
@@ -156,14 +168,14 @@ public static class PyJsonParser
         return idx;
     }
 
-    private static PyJson ScanOnceOrExpectingValue(string s, int idx, out int end)
+    private static PyJson ScanOnceOrExpectingValue(string s, int idx, int depth, out int end)
     {
-        var value = ScanOnce(s, idx, out end);
+        var value = ScanOnce(s, idx, depth, out end);
         return value ?? throw new PyJsonDecodeException("Expecting value", idx);
     }
 
     /// <summary>Returns <see langword="null"/> where the C scanner raises <c>StopIteration(idx)</c>.</summary>
-    private static PyJson? ScanOnce(string s, int idx, out int end)
+    private static PyJson? ScanOnce(string s, int idx, int depth, out int end)
     {
         end = idx;
         if (idx >= s.Length)
@@ -177,9 +189,9 @@ public static class PyJsonParser
             case '"':
                 return new PyStr(ScanString(s, idx + 1, out end));
             case '{':
-                return ParseObject(s, idx + 1, out end);
+                return ParseObject(s, idx + 1, EnterContainer(depth, idx), out end);
             case '[':
-                return ParseArray(s, idx + 1, out end);
+                return ParseArray(s, idx + 1, EnterContainer(depth, idx), out end);
             case 'n' when idx + 4 <= s.Length && string.CompareOrdinal(s, idx, "null", 0, 4) == 0:
                 end = idx + 4;
                 return PyNull.Instance;
@@ -202,6 +214,9 @@ public static class PyJsonParser
                 return MatchNumber(s, idx, out end);
         }
     }
+
+    private static int EnterContainer(int depth, int idx) =>
+        depth < MaxDepth ? depth + 1 : throw new PyJsonDecodeException($"Nested more than {MaxDepth} levels deep", idx);
 
     private static PyJson? MatchNumber(string s, int start, out int end)
     {
@@ -261,12 +276,17 @@ public static class PyJsonParser
 
         end = idx;
         var text = s[start..idx];
+        if (!isFloat && text.Length - (text[0] == '-' ? 1 : 0) > MaxIntegerDigits)
+        {
+            throw new PyJsonDecodeException($"Integer longer than {MaxIntegerDigits} digits", start);
+        }
+
         return isFloat
             ? new PyFloat(double.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture))
             : new PyInt(BigInteger.Parse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture));
     }
 
-    private static PyDict ParseObject(string s, int idx, out int end)
+    private static PyDict ParseObject(string s, int idx, int depth, out int end)
     {
         var result = new PyDict();
         idx = SkipWhitespace(s, idx);
@@ -291,7 +311,7 @@ public static class PyJsonParser
             }
 
             idx = SkipWhitespace(s, idx + 1);
-            var value = ScanOnceOrExpectingValue(s, idx, out idx);
+            var value = ScanOnceOrExpectingValue(s, idx, depth, out idx);
             result.Set(key, value);
             idx = SkipWhitespace(s, idx);
             if (idx < s.Length && s[idx] == '}')
@@ -309,7 +329,7 @@ public static class PyJsonParser
         }
     }
 
-    private static PyList ParseArray(string s, int idx, out int end)
+    private static PyList ParseArray(string s, int idx, int depth, out int end)
     {
         var result = new PyList();
         idx = SkipWhitespace(s, idx);
@@ -321,7 +341,7 @@ public static class PyJsonParser
 
         while (true)
         {
-            var value = ScanOnceOrExpectingValue(s, idx, out idx);
+            var value = ScanOnceOrExpectingValue(s, idx, depth, out idx);
             result.Items.Add(value);
             idx = SkipWhitespace(s, idx);
             if (idx < s.Length && s[idx] == ']')
