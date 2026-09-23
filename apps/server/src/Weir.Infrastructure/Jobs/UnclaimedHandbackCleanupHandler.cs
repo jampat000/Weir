@@ -42,7 +42,7 @@ public sealed partial class UnclaimedHandbackCleanupHandler : IJobHandler
     {
         ArgumentNullException.ThrowIfNull(context);
         var payload = JobPayload.ParseObject(context.PayloadJson);
-        var scope = ProcessingLibraryFolders.NormalizeMediaScope(JobPayload.StringProperty(payload, "media_scope"));
+        var scope = ProcessingMediaScopes.Normalize(JobPayload.StringProperty(payload, "media_scope"));
         var trigger = JobPayload.StringProperty(payload, "trigger");
 
         long days;

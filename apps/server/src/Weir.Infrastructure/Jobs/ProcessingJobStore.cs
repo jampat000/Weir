@@ -63,7 +63,8 @@ public sealed class ProcessingJobStore
 {
     public const string MetricsModule = "processing";
 
-    private const string SelectColumns =
+    /// <summary>Every jobs column, in the order <see cref="ReadJob"/> reads them.</summary>
+    internal const string JobColumns =
         "id, dedupe_key, job_kind, payload_json, status, lease_owner, lease_expires_at, attempt_count, " +
         "max_attempts, last_error, not_before, runner_cost, priority, created_at, updated_at";
 
@@ -409,7 +410,7 @@ public sealed class ProcessingJobStore
 
     public Task<IReadOnlyList<ProcessingJob>> ListAsync(CancellationToken cancellationToken = default) =>
         InTransactionAsync<IReadOnlyList<ProcessingJob>>(
-            (connection, transaction) => Query(connection, transaction, $"SELECT {SelectColumns} FROM jobs ORDER BY id"),
+            (connection, transaction) => Query(connection, transaction, $"SELECT {JobColumns} FROM jobs ORDER BY id"),
             cancellationToken);
 
     /// <summary>Run <paramref name="work"/> in one <c>BEGIN IMMEDIATE</c> transaction and commit.</summary>
@@ -616,7 +617,25 @@ public sealed class ProcessingJobStore
     }
 
     internal static ProcessingJob? Get(SqliteConnection connection, SqliteTransaction transaction, long jobId) =>
-        Query(connection, transaction, $"SELECT {SelectColumns} FROM jobs WHERE id = @id", ("@id", jobId)).FirstOrDefault();
+        Query(connection, transaction, $"SELECT {JobColumns} FROM jobs WHERE id = @id", ("@id", jobId)).FirstOrDefault();
+
+    /// <summary>One jobs row selected as <see cref="JobColumns"/>, in that column order.</summary>
+    internal static ProcessingJob ReadJob(SqliteDataReader reader) => new(
+        reader.GetInt64(0),
+        reader.GetString(1),
+        reader.GetString(2),
+        reader.IsDBNull(3) ? null : reader.GetString(3),
+        reader.GetString(4),
+        reader.IsDBNull(5) ? null : reader.GetString(5),
+        PythonTimestamps.Parse(reader.GetValue(6)),
+        (int)reader.GetInt64(7),
+        (int)reader.GetInt64(8),
+        reader.IsDBNull(9) ? null : reader.GetString(9),
+        PythonTimestamps.Parse(reader.GetValue(10)),
+        (int)reader.GetInt64(11),
+        (int)reader.GetInt64(12),
+        PythonTimestamps.Parse(reader.GetValue(13)) ?? DateTimeOffset.MinValue,
+        PythonTimestamps.Parse(reader.GetValue(14)) ?? DateTimeOffset.MinValue);
 
     internal static List<ProcessingJob> Query(SqliteConnection connection, SqliteTransaction transaction, string sql, params (string Name, object? Value)[] parameters)
     {
@@ -625,22 +644,7 @@ public sealed class ProcessingJobStore
         var rows = new List<ProcessingJob>();
         while (reader.Read())
         {
-            rows.Add(new ProcessingJob(
-                reader.GetInt64(0),
-                reader.GetString(1),
-                reader.GetString(2),
-                reader.IsDBNull(3) ? null : reader.GetString(3),
-                reader.GetString(4),
-                reader.IsDBNull(5) ? null : reader.GetString(5),
-                PythonTimestamps.Parse(reader.GetValue(6)),
-                (int)reader.GetInt64(7),
-                (int)reader.GetInt64(8),
-                reader.IsDBNull(9) ? null : reader.GetString(9),
-                PythonTimestamps.Parse(reader.GetValue(10)),
-                (int)reader.GetInt64(11),
-                (int)reader.GetInt64(12),
-                PythonTimestamps.Parse(reader.GetValue(13)) ?? DateTimeOffset.MinValue,
-                PythonTimestamps.Parse(reader.GetValue(14)) ?? DateTimeOffset.MinValue));
+            rows.Add(ReadJob(reader));
         }
 
         return rows;
@@ -651,7 +655,7 @@ public sealed class ProcessingJobStore
         Query(
             connection,
             transaction,
-            $"SELECT {SelectColumns} FROM jobs WHERE job_kind = @kind AND status IN (@pending, @leased) ORDER BY id",
+            $"SELECT {JobColumns} FROM jobs WHERE job_kind = @kind AND status IN (@pending, @leased) ORDER BY id",
             ("@kind", jobKind),
             ("@pending", ProcessingJobStatus.Pending),
             ("@leased", ProcessingJobStatus.Leased));
@@ -682,7 +686,7 @@ public sealed class ProcessingJobStore
         expires >= when;
 
     internal static ProcessingJob? GetByDedupeKey(SqliteConnection connection, SqliteTransaction transaction, string dedupeKey) =>
-        Query(connection, transaction, $"SELECT {SelectColumns} FROM jobs WHERE dedupe_key = @dedupe", ("@dedupe", dedupeKey)).FirstOrDefault();
+        Query(connection, transaction, $"SELECT {JobColumns} FROM jobs WHERE dedupe_key = @dedupe", ("@dedupe", dedupeKey)).FirstOrDefault();
 
     private static SqliteCommand Command(SqliteConnection connection, SqliteTransaction transaction, string sql, (string Name, object? Value)[] parameters)
     {

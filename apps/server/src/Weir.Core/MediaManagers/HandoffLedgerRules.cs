@@ -1,4 +1,5 @@
 using Weir.Core.Json;
+using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Time;
 
 namespace Weir.Core.MediaManagers;
@@ -53,8 +54,8 @@ public static class HandoffLedgerRules
     /// <summary>What the manager hears when a person cancelled the hand-off's queued pass in Weir (#643).</summary>
     public const string CancelledInWeirMessage = "Someone cancelled this hand-off in Weir before Weir started on it.";
 
-    /// <summary>After this many consecutive failures a file is held for a person.</summary>
-    public const int QuarantineAfterFailures = 3;
+    /// <summary>After this many consecutive failures a file is held for a person; the same limit the retry policy applies.</summary>
+    public const int QuarantineAfterFailures = RetryPolicy.QuarantineAfterFailures;
 
     /// <summary>
     /// One file's state in the manager's words, and when it would next run if known.

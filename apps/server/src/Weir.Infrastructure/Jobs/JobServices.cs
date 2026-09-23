@@ -537,7 +537,7 @@ public sealed class UnclaimedHandbackCleanupEnqueuer : IPeriodicEnqueuer
     public UnclaimedHandbackCleanupEnqueuer(ProcessingJobStore store, string mediaScope)
     {
         _store = store;
-        _scope = ProcessingLibraryFolders.NormalizeMediaScope(mediaScope);
+        _scope = ProcessingMediaScopes.Normalize(mediaScope);
     }
 
     public string Name => $"unclaimed hand-back cleanup ({_scope})";
@@ -574,7 +574,7 @@ public sealed class WorkTempStaleSweepEnqueuer : IPeriodicEnqueuer
     public WorkTempStaleSweepEnqueuer(ProcessingJobStore store, string mediaScope, TimeSpan interval, bool killSwitch)
     {
         _store = store;
-        _scope = ProcessingLibraryFolders.NormalizeMediaScope(mediaScope);
+        _scope = ProcessingMediaScopes.Normalize(mediaScope);
         Interval = interval;
         _killSwitch = killSwitch;
     }
@@ -632,7 +632,7 @@ public sealed class FailureCleanupSweepEnqueuer : IPeriodicEnqueuer
     public FailureCleanupSweepEnqueuer(ProcessingJobStore store, string mediaScope, TimeSpan interval, bool killSwitch)
     {
         _store = store;
-        _scope = string.Equals(mediaScope.Trim(), "tv", StringComparison.OrdinalIgnoreCase) ? "tv" : "movie";
+        _scope = ProcessingMediaScopes.Normalize(mediaScope);
         Interval = interval;
         _killSwitch = killSwitch;
     }
@@ -688,9 +688,7 @@ public sealed class FailureCleanupSweepEnqueuer : IPeriodicEnqueuer
         var active = ProcessingJobStore.Query(
             connection,
             transaction,
-            "SELECT id, dedupe_key, job_kind, payload_json, status, lease_owner, lease_expires_at, attempt_count, max_attempts, " +
-            "last_error, not_before, runner_cost, priority, created_at, updated_at FROM jobs " +
-            "WHERE job_kind = @kind AND status IN (@pending, @leased) ORDER BY id ASC LIMIT 1",
+            $"SELECT {ProcessingJobStore.JobColumns} FROM jobs WHERE job_kind = @kind AND status IN (@pending, @leased) ORDER BY id ASC LIMIT 1",
             ("@kind", jobKind),
             ("@pending", ProcessingJobStatus.Pending),
             ("@leased", ProcessingJobStatus.Leased)).FirstOrDefault();

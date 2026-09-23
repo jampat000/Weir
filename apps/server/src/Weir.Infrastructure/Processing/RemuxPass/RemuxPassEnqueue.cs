@@ -119,9 +119,8 @@ public static class RemuxPassEnqueue
         }
 
         var rows = await uow.QueryAsync(
-            "SELECT id, dedupe_key, job_kind, payload_json, status, lease_owner, lease_expires_at, attempt_count, max_attempts, last_error, " +
-            "not_before, runner_cost, priority, created_at, updated_at FROM jobs WHERE job_kind = $kind AND status = $pending ORDER BY id",
-            MediaManagers.HandoffLedgerStore.ReadJob,
+            $"SELECT {ProcessingJobStore.JobColumns} FROM jobs WHERE job_kind = $kind AND status = $pending ORDER BY id",
+            ProcessingJobStore.ReadJob,
             ("$kind", RemuxPassOutcomes.JobKind),
             ("$pending", ProcessingJobStatus.Pending)).ConfigureAwait(false);
         foreach (var job in rows)

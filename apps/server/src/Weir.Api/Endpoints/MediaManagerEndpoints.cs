@@ -10,6 +10,7 @@ using Weir.Core.Validation;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Sqlite;
+using static Weir.Api.Endpoints.EndpointLookups;
 
 namespace Weir.Api.Endpoints;
 
@@ -19,7 +20,6 @@ namespace Weir.Api.Endpoints;
 public static class MediaManagerEndpoints
 {
     private const string InvalidCsrf = "Invalid or expired CSRF token.";
-    private const string NoSuchConnection = "That media manager connection does not exist.";
 
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(15);
 
@@ -66,19 +66,6 @@ public static class MediaManagerEndpoints
             throw new ApiException(StatusCodes.Status400BadRequest, InvalidCsrf);
         }
     }
-
-    /// <summary>An <c>int = Path(ge=1)</c> parameter.</summary>
-    private static long ConnectionId(ApiRequest request, ValidationIssues issues)
-    {
-        var raw = request.RouteValue("connection_id") ?? string.Empty;
-        return PydanticRules.TryInt(new PyStr(raw), ["path", "connection_id"], 1, null, issues, out var value)
-            ? value > long.MaxValue ? long.MaxValue : (long)value
-            : 0;
-    }
-
-    private static async Task<MediaManagerConnectionRecord> RequireConnectionAsync(UnitOfWork uow, long connectionId) =>
-        await MediaManagerConnectionStore.GetAsync(uow, connectionId).ConfigureAwait(false)
-        ?? throw new ApiException(StatusCodes.Status404NotFound, NoSuchConnection);
 
     private static MediaManagerConnectionService Connections(ApiRequest request) => request.Service<MediaManagerConnectionService>();
 

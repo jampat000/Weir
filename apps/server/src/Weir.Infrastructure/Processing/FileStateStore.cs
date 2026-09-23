@@ -44,7 +44,7 @@ public static class FileStateStore
         if (!string.IsNullOrEmpty(filter.PathContains))
         {
             clauses.Add("relative_path LIKE @path_contains ESCAPE '\\'");
-            parameters.Add(("@path_contains", "%" + EscapeLike(filter.PathContains) + "%"));
+            parameters.Add(("@path_contains", "%" + SqliteLike.Escape(filter.PathContains) + "%"));
         }
 
         if (filter.Since is { } since)
@@ -57,8 +57,6 @@ public static class FileStateStore
         var sql = $"SELECT {Columns} FROM files {where} ORDER BY last_seen_at DESC, id DESC LIMIT {filter.ClampedLimit}";
         return uow.QueryAsync(sql, Read, [.. parameters]);
     }
-
-    private static string EscapeLike(string value) => value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
 
     /// <summary>A count per known status, zero-filled.</summary>
     public static async Task<Dictionary<string, long>> StatusCountsAsync(UnitOfWork uow, long? libraryId)
@@ -191,6 +189,18 @@ public static class FileStateStore
 
         await uow.ExecuteAsync($"UPDATE files SET {string.Join(", ", sets)} WHERE id = @id", [.. parameters]).ConfigureAwait(false);
         return id;
+    }
+
+    /// <summary>
+    /// Records that a scan saw the row's file on disk at <paramref name="seenAt"/>, changing nothing else. The vanished-file
+    /// sweep (#645) reads this to tell a file that is gone from one a scan simply left alone.
+    /// </summary>
+    public static async Task TouchLastSeenAsync(UnitOfWork uow, long fileId, DateTimeOffset seenAt)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        await uow.ExecuteAsync(
+            "UPDATE files SET last_seen_at = @seen WHERE id = @id",
+            ("@seen", SqliteValues.ToSqlite(PyDateTime.FromDateTimeOffset(seenAt))), ("@id", fileId)).ConfigureAwait(false);
     }
 
     /// <summary>Moves a file Weir has already seen into a new state. Does nothing when the row does not

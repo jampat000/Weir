@@ -152,7 +152,7 @@ public sealed class RemuxPassRunner
     {
         var relativeMediaPath = request.RelativeMediaPath;
         var runtime = request.Runtime;
-        var scope = NormalizeScope(request.MediaScope);
+        var scope = ProcessingMediaScopes.Normalize(request.MediaScope);
         var passThrough = request.PassThroughUnchanged;
         var report = request.ProgressReporter;
 
@@ -1325,9 +1325,6 @@ public sealed class RemuxPassRunner
 
         return result;
     }
-
-    /// <summary><c>tv</c> for a TV scope, <c>movie</c> for anything else.</summary>
-    public static string NormalizeScope(string? raw) => string.Equals(PyStrings.Strip(raw ?? "movie"), "tv", StringComparison.OrdinalIgnoreCase) ? "tv" : "movie";
 
     private static PyList StringList(IEnumerable<string> values) => new(values.Select(value => (PyJson)new PyStr(value)));
 

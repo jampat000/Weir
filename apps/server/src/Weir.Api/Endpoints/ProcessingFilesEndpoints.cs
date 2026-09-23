@@ -6,6 +6,7 @@ using Weir.Core.Activity;
 using Weir.Core.Auth;
 using Weir.Core.Json;
 using Weir.Core.Processing;
+using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Rules;
 using Weir.Core.Text;
 using Weir.Core.Time;
@@ -42,7 +43,7 @@ public static class ProcessingFilesEndpoints
 
     private static PyDict FileOut(ProcessingFileRecord row, string libraryName, List<DirectPlayBadge> directPlay, LiveProgress? progress)
     {
-        var quarantined = row.Status == ProcessingFileStatuses.OnHold && row.FailureAttempts >= 3;
+        var quarantined = row.Status == ProcessingFileStatuses.OnHold && row.FailureAttempts >= RetryPolicy.QuarantineAfterFailures;
         return new PyDict()
             .Set("id", row.Id)
             .Set("library_id", row.LibraryId)

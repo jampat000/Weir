@@ -7,7 +7,6 @@ using Weir.Core.Media;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Settings;
-using Weir.Core.Time;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
@@ -149,9 +148,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             var alreadyCleaned = ProcessedSourceRules.IsSameCleanedFile(previous, observedSize, ModifiedTimeNs(filePath));
             if (alreadyCleaned && (keepsOriginals || mediaScope != ProcessingMediaScopes.Movie))
             {
-                await uow.ExecuteAsync(
-                    "UPDATE files SET last_seen_at = @seen WHERE id = @id",
-                    ("@seen", SqliteValues.ToSqlite(PyDateTime.FromDateTimeOffset(now))), ("@id", previous!.Id)).ConfigureAwait(false);
+                await FileStateStore.TouchLastSeenAsync(uow, previous!.Id, now).ConfigureAwait(false);
                 continue;
             }
 
@@ -180,9 +177,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             {
                 if (previous.Status is ProcessingFileStatuses.PassedThrough or ProcessingFileStatuses.Rejected or ProcessingFileStatuses.Cancelled)
                 {
-                    await uow.ExecuteAsync(
-                        "UPDATE files SET last_seen_at = @seen WHERE id = @id",
-                        ("@seen", SqliteValues.ToSqlite(PyDateTime.FromDateTimeOffset(now))), ("@id", previous.Id)).ConfigureAwait(false);
+                    await FileStateStore.TouchLastSeenAsync(uow, previous.Id, now).ConfigureAwait(false);
                     continue;
                 }
 
@@ -202,17 +197,13 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
                         continue;
                     }
 
-                    await uow.ExecuteAsync(
-                        "UPDATE files SET last_seen_at = @seen WHERE id = @id",
-                        ("@seen", SqliteValues.ToSqlite(PyDateTime.FromDateTimeOffset(now))), ("@id", previous.Id)).ConfigureAwait(false);
+                    await FileStateStore.TouchLastSeenAsync(uow, previous.Id, now).ConfigureAwait(false);
                     continue;
                 }
 
-                if (previous.Status == ProcessingFileStatuses.OnHold && previous.FailureAttempts >= 3)
+                if (previous.Status == ProcessingFileStatuses.OnHold && previous.FailureAttempts >= RetryPolicy.QuarantineAfterFailures)
                 {
-                    await uow.ExecuteAsync(
-                        "UPDATE files SET last_seen_at = @seen WHERE id = @id",
-                        ("@seen", SqliteValues.ToSqlite(PyDateTime.FromDateTimeOffset(now))), ("@id", previous.Id)).ConfigureAwait(false);
+                    await FileStateStore.TouchLastSeenAsync(uow, previous.Id, now).ConfigureAwait(false);
                     continue;
                 }
             }
@@ -240,9 +231,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
                 }
                 else
                 {
-                    await uow.ExecuteAsync(
-                        "UPDATE files SET last_seen_at = @seen WHERE id = @id",
-                        ("@seen", SqliteValues.ToSqlite(PyDateTime.FromDateTimeOffset(now))), ("@id", previous!.Id)).ConfigureAwait(false);
+                    await FileStateStore.TouchLastSeenAsync(uow, previous!.Id, now).ConfigureAwait(false);
                 }
 
                 continue;

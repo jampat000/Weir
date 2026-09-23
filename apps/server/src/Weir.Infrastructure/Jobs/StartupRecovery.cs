@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Weir.Core.Jobs;
+using Weir.Core.Processing;
 using Weir.Core.Time;
 
 namespace Weir.Infrastructure.Jobs;
@@ -131,7 +132,7 @@ public static class StartupRecovery
             var library = ProcessingLibraryFolders.Resolve(libraries, JobPayload.LooseInteger(payload, "library_id"), scope);
             var workFolder = library is not null
                 ? ProcessingLibraryFolders.EffectiveWorkFolder(library, weirHome)
-                : ProcessingLibraryFolders.NormalizeMediaScope(scope) == "tv"
+                : ProcessingMediaScopes.Normalize(scope) == "tv"
                     ? ProcessingLibraryFolders.DefaultTvWorkFolder(weirHome)
                     : ProcessingLibraryFolders.DefaultMovieWorkFolder(weirHome);
             var pattern = WeirTempFiles.RemuxTempNameFor(relative);

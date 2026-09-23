@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Weir.Core.Processing;
 
 namespace Weir.Infrastructure.Jobs;
 
@@ -33,10 +34,6 @@ public static class ProcessingLibraryFolders
         return rows;
     }
 
-    /// <summary><c>tv</c> for "tv" in any case (trimmed); <c>movie</c> for anything else, including empty.</summary>
-    public static string NormalizeMediaScope(string? raw) =>
-        string.Equals((string.IsNullOrEmpty(raw) ? "movie" : raw).Trim(), "tv", StringComparison.OrdinalIgnoreCase) ? "tv" : "movie";
-
     /// <summary>The library by id when the payload has one, else the seeded (first-listed) library for the scope.</summary>
     public static ProcessingLibraryFolderRow? Resolve(IReadOnlyList<ProcessingLibraryFolderRow> libraries, long? libraryId, string? mediaScope)
     {
@@ -46,7 +43,7 @@ public static class ProcessingLibraryFolders
             return found;
         }
 
-        var scope = NormalizeMediaScope(mediaScope);
+        var scope = ProcessingMediaScopes.Normalize(mediaScope);
         return libraries.FirstOrDefault(library => library.MediaType == scope);
     }
 

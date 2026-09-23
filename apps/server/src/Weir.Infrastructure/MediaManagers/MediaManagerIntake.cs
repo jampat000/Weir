@@ -3,6 +3,7 @@ using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
+using Weir.Core.Processing;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
@@ -156,7 +157,7 @@ public sealed class MediaManagerIntake
             return (chosen.Library, chosen.Resolved);
         }
 
-        var scope = ProcessingLibraryFolders.NormalizeMediaScope(importEvent.MediaScope);
+        var scope = ProcessingMediaScopes.Normalize(importEvent.MediaScope);
         var fallback = libraries.FirstOrDefault(library => library.MediaType == scope);
         return (fallback, HandoffPaths.RelativeMediaPathForHandoff(fallback?.WatchedFolder ?? string.Empty, importEvent.FilePath));
     }

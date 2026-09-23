@@ -43,10 +43,6 @@ public sealed class HandoffLedgerStore
         "id, source_key, handoff_id, library_id, relative_path, state, output_path, message, last_changed_at, outcome, outcome_message, " +
         "outcome_released, download_id, created_at";
 
-    private const string JobColumns =
-        "id, dedupe_key, job_kind, payload_json, status, lease_owner, lease_expires_at, attempt_count, " +
-        "max_attempts, last_error, not_before, runner_cost, priority, created_at, updated_at";
-
     private readonly TimeProvider _time;
 
     public HandoffLedgerStore(TimeProvider time)
@@ -261,9 +257,9 @@ public sealed class HandoffLedgerStore
         // is still an undelivered outcome the manager needs to hear about (as failed, with the reason) rather than
         // silently vanishing from the ledger's view.
         return await uow.QueryAsync(
-            $"SELECT {JobColumns} FROM jobs WHERE ({string.Join(" OR ", conditions)}) AND " +
+            $"SELECT {ProcessingJobStore.JobColumns} FROM jobs WHERE ({string.Join(" OR ", conditions)}) AND " +
             "(status IN ($pending, $leased) OR (status = $failed AND job_kind IN ($pass_kind, $reject_kind)))",
-            ReadJob,
+            ProcessingJobStore.ReadJob,
             [.. parameters]).ConfigureAwait(false);
     }
 
@@ -616,21 +612,4 @@ public sealed class HandoffLedgerStore
         SqliteValues.GetBool(reader, 11),
         SqliteValues.GetStringOrNull(reader, 12),
         PythonTimestamps.Parse(reader.GetValue(13)));
-
-    internal static ProcessingJob ReadJob(SqliteDataReader reader) => new(
-        reader.GetInt64(0),
-        reader.GetString(1),
-        reader.GetString(2),
-        reader.IsDBNull(3) ? null : reader.GetString(3),
-        reader.GetString(4),
-        reader.IsDBNull(5) ? null : reader.GetString(5),
-        PythonTimestamps.Parse(reader.GetValue(6)),
-        (int)reader.GetInt64(7),
-        (int)reader.GetInt64(8),
-        reader.IsDBNull(9) ? null : reader.GetString(9),
-        PythonTimestamps.Parse(reader.GetValue(10)),
-        (int)reader.GetInt64(11),
-        (int)reader.GetInt64(12),
-        PythonTimestamps.Parse(reader.GetValue(13)) ?? DateTimeOffset.MinValue,
-        PythonTimestamps.Parse(reader.GetValue(14)) ?? DateTimeOffset.MinValue);
 }

@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
+using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Rules;
 
@@ -362,7 +363,7 @@ public sealed class OutputFolderCleanup
 
                 if (data is PyDict dict)
                 {
-                    scope = NormalizeScope(dict.Get("media_scope"));
+                    scope = ProcessingMediaScopes.Normalize((dict.Get("media_scope") as PyStr)?.Value);
                     if (dict.Get("relative_media_path") is PyStr jr && PyStrings.Strip(jr.Value).Length > 0)
                     {
                         jobRel = NormalizeRelativeForMatch(jr.Value);
@@ -442,9 +443,6 @@ public sealed class OutputFolderCleanup
 
         return false;
     }
-
-    private static string NormalizeScope(PyJson? raw) =>
-        raw is PyStr text && string.Equals(PyStrings.Strip(text.Value), "tv", StringComparison.OrdinalIgnoreCase) ? "tv" : "movie";
 
     /// <summary>The media files directly inside <paramref name="folder"/>, in name order.</summary>
     public static IReadOnlyList<string> DirectChildMediaCandidates(string folder)

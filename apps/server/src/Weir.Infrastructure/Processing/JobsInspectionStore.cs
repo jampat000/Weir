@@ -1,4 +1,7 @@
+using Microsoft.Data.Sqlite;
 using Weir.Core.Jobs;
+using Weir.Core.Time;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
@@ -30,8 +33,7 @@ public static class JobsInspectionStore
     /// </summary>
     public static async Task<(List<ProcessingJob> Rows, bool DefaultRecentSlice)> ListAsync(UnitOfWork uow, int limit, IReadOnlyList<string>? statuses)
     {
-        const string columns = "id, dedupe_key, job_kind, payload_json, status, lease_owner, lease_expires_at, attempt_count, " +
-                                "max_attempts, last_error, not_before, runner_cost, priority, created_at, updated_at";
+        const string columns = ProcessingJobStore.JobColumns;
         if (statuses is { Count: > 0 })
         {
             var placeholders = string.Join(",", statuses.Select((_, i) => $"@status{i}"));
@@ -50,9 +52,11 @@ public static class JobsInspectionStore
         return (recent, true);
     }
 
-    private static DateTimeOffset? ToOffset(Weir.Core.Time.PyDateTime? value) => value is { } v ? new DateTimeOffset(v.AsUtc, TimeSpan.Zero) : null;
+    private static DateTimeOffset? ToOffset(PyDateTime? value) => value is { } v ? new DateTimeOffset(v.AsUtc, TimeSpan.Zero) : null;
 
-    private static ProcessingJob Read(Microsoft.Data.Sqlite.SqliteDataReader reader) => new(
+    // Timestamps go through the strict ISO reader in SqliteValues rather than ProcessingJobStore.ReadJob's parser: the two
+    // differ on unusual stored text, and the inspection API keeps its existing output and errors.
+    private static ProcessingJob Read(SqliteDataReader reader) => new(
         reader.GetInt64(0),
         reader.GetString(1),
         reader.GetString(2),

@@ -12,6 +12,7 @@ using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
+using static Weir.Api.Endpoints.EndpointLookups;
 
 namespace Weir.Api.Endpoints;
 
@@ -42,23 +43,6 @@ public static class ProcessingLibraryEndpoints
         endpoints.MapV1("DELETE", "/processing/rule-sets/{rule_set_id}", DeleteRuleSetAsync);
         return endpoints;
     }
-
-    private static async Task<ProcessingLibraryRecord> RequireLibraryAsync(UnitOfWork uow, long id) =>
-        await LibraryStore.GetAsync(uow, id).ConfigureAwait(false)
-        ?? throw new ApiException(StatusCodes.Status404NotFound, "That library does not exist.");
-
-    /// <summary>The <c>connection_id</c> path parameter: an integer of at least 1, else a validation issue.</summary>
-    private static long ConnectionId(ApiRequest request, ValidationIssues issues)
-    {
-        var raw = request.RouteValue("connection_id") ?? string.Empty;
-        return PydanticRules.TryInt(new PyStr(raw), ["path", "connection_id"], 1, null, issues, out var value)
-            ? value > long.MaxValue ? long.MaxValue : (long)value
-            : 0;
-    }
-
-    private static async Task<MediaManagerConnectionRecord> RequireConnectionAsync(UnitOfWork uow, long connectionId) =>
-        await MediaManagerConnectionStore.GetAsync(uow, connectionId).ConfigureAwait(false)
-        ?? throw new ApiException(StatusCodes.Status404NotFound, "That media manager connection does not exist.");
 
     private static async Task<ProcessingRuleSetRecord> RequireRuleSetAsync(UnitOfWork uow, long id) =>
         await LibraryStore.GetRuleSetAsync(uow, id).ConfigureAwait(false)
