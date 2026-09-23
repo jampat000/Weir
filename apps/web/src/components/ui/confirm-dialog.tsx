@@ -49,7 +49,7 @@ export function ConfirmDialog({
       initialFocus={cancelRef}
     >
       {description ? (
-        <div id={descriptionId} className="mm-modal__body">
+        <div id={descriptionId} className="mm-modal__body space-y-2">
           {description}
         </div>
       ) : null}

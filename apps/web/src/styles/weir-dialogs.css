@@ -45,10 +45,6 @@
   line-height: 1.5rem;
 }
 
-.mm-modal__body > :not(:last-child) {
-  margin-block-end: 0.5rem;
-}
-
 .mm-modal__error {
   margin-top: 0.75rem;
   color: var(--mm-status-failed-text);
