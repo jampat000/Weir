@@ -394,10 +394,8 @@ public sealed class MediaManagerApiTests
     }
 
     /// <summary>
-    /// H3: a webhook secret authenticated against any enabled connection of
-    /// the same kind, so one same-kind connection's own secret could drive or read another's hand-offs. The secret
-    /// that created a hand-off is now the only one (besides the instance-wide fallback a secret-less connection
-    /// still accepts) that can ask about it or cancel it.
+    /// The secret that created a hand-off (or the instance-wide fallback a secret-less connection accepts) is the
+    /// only one that can ask about it or cancel it; another same-kind connection's own secret is refused.
     /// </summary>
     [Fact]
     public async Task A_hand_offs_secret_scopes_it_to_the_connection_that_received_it()

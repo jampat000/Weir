@@ -703,9 +703,8 @@ public sealed class MediaManagerServiceTests
     }
 
     /// <summary>
-    /// #M1/H3: the connection-less native source has no address of its own to
-    /// prove who is calling, so unlike a real manager connection it refuses an unsigned write once nobody has ever
-    /// configured a secret for it, rather than queuing real work for anyone who can reach the port.
+    /// The connection-less native source has no address of its own to prove who is calling, so unlike a real
+    /// manager connection it refuses an unsigned write once nobody has ever configured a secret for it.
     /// </summary>
     [Fact]
     public async Task The_native_source_refuses_writes_with_no_secret_configured_anywhere()
@@ -720,7 +719,7 @@ public sealed class MediaManagerServiceTests
         Assert.False(identity.Authenticated);
     }
 
-    /// <summary>A hand-off's callback path is later joined onto the manager's own base URL and carries its API key back (#M2).</summary>
+    /// <summary>A hand-off's callback path is later joined onto the manager's own base URL and carries its API key back.</summary>
     [Theory]
     [InlineData("/../etc/passwd")]
     [InlineData("//evil.example/callback")]

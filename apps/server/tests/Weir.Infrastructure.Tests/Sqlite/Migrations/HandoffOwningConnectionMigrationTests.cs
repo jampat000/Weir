@@ -3,10 +3,10 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Tests.Sqlite.Migrations;
 
 /// <summary>
-/// #H3's migration (<c>0016_handoff_owning_connection.sql</c>): backfilling which connection an existing hand-off
-/// belongs to. The <c>ALTER TABLE</c> that adds the column cannot be replayed against an already-migrated database
-/// (SQLite refuses a column that already exists), so this proves the backfill query itself — the same one the
-/// migration runs once, at upgrade time — against rows inserted after that column already exists.
+/// <c>0016_handoff_owning_connection.sql</c>: backfilling which connection an existing hand-off belongs to. The
+/// <c>ALTER TABLE</c> that adds the column cannot be replayed against an already-migrated database (SQLite refuses
+/// a column that already exists), so this proves the backfill query itself — the same one the migration runs once,
+/// at upgrade time — against rows inserted after that column already exists.
 /// </summary>
 public sealed class HandoffOwningConnectionMigrationTests : IDisposable
 {

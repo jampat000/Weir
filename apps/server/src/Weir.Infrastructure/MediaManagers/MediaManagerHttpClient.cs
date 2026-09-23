@@ -13,7 +13,7 @@ namespace Weir.Infrastructure.MediaManagers;
 /// <summary>
 /// Which addresses a manager connection's traffic may reach, once resolved. A media manager lives on the LAN or the
 /// same host, so <see cref="Local"/> keeps private ranges and loopback allowed; the metadata provider is a public
-/// service, so <see cref="Public"/> requires a globally-routable address (ADR-0015; audit report findings H1/H2).
+/// service, so <see cref="Public"/> requires a globally-routable address (ADR-0015).
 /// </summary>
 public enum ManagerAddressPolicy
 {

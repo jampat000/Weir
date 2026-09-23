@@ -15,7 +15,7 @@ namespace Weir.Infrastructure.MediaManagers;
 /// One <c>media_manager_handoffs</c> row. <see cref="Outcome"/> is the manager's own word on what became of the file
 /// (<c>imported</c> or <c>not-imported</c>, #652), with what Weir answered and whether it released its copy.
 /// <see cref="ConnectionId"/> is the connection this hand-off belongs to when that was unambiguous at intake; a
-/// hand-off route that reveals file paths requires that connection's own secret, never another same-kind one (H3).
+/// hand-off route that reveals file paths requires that connection's own secret, never another same-kind one.
 /// </summary>
 public sealed record HandoffLedgerRow(
     long Id,

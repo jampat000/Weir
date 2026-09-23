@@ -7,8 +7,8 @@ using Weir.Infrastructure.MediaManagers;
 namespace Weir.Infrastructure.Tests.MediaManagers;
 
 /// <summary>
-/// The production handler factory end to end: a fake resolver stands in for DNS (audit report findings H1/H2),
-/// and a raw loopback listener proves an allowed address is actually reached, not merely classified as allowed.
+/// The production handler factory end to end: a fake resolver stands in for DNS, and a raw loopback listener
+/// proves an allowed address is actually reached, not merely classified as allowed.
 /// </summary>
 public sealed class SocketsManagerHttpHandlerFactoryTests : IDisposable
 {

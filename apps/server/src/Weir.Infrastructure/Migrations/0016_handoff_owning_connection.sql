@@ -1,12 +1,8 @@
 -- Weir schema 0016 (revision 0051_handoff_owning_connection): a hand-off remembers which connection it belongs to.
 --
--- A webhook secret used to authenticate against any enabled connection of the same kind, so a second connection of
--- that kind (a 4K Radarr beside a 1080p one) could drive or read another connection's hand-offs with its own secret.
--- Closing that means every hand-off route must know which connection owns it, not merely its kind.
---
--- Existing rows are backfilled only where it is unambiguous: a source_key with exactly one enabled connection. A
--- source_key with several connections, or none (including the connection-less "native" source, which never has a
--- row here), is left null; a null owner keeps today's kind-wide check rather than gaining a new restriction.
+-- Each hand-off records the connection that owns it, so the status, cancel and outcome routes accept only that
+-- connection's secret. Existing rows are backfilled where exactly one enabled connection has the source key; the
+-- rest stay null and keep the kind-wide check.
 ALTER TABLE media_manager_handoffs ADD COLUMN connection_id INTEGER;
 
 UPDATE media_manager_handoffs

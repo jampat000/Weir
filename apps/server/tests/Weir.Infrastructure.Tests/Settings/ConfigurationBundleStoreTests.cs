@@ -5,7 +5,7 @@ using Weir.Infrastructure.Tests.Platform;
 
 namespace Weir.Infrastructure.Tests.Settings;
 
-/// <summary>#L1: the metadata provider key never leaves in an export.</summary>
+/// <summary>The metadata provider key never leaves in an export.</summary>
 public sealed class ConfigurationBundleStoreTests : IDisposable
 {
     private readonly StoreFixture _store = new();

@@ -5,8 +5,8 @@ using Weir.Infrastructure.Http;
 namespace Weir.Infrastructure.Tests.Http;
 
 /// <summary>
-/// Ports of audit report findings H1/H2: address filtering after resolution, proved with a fake resolver rather
-/// than real DNS so the PoC hostnames from the report behave the same every run.
+/// Address filtering after resolution, proved with a fake resolver rather than real DNS so the answers behave the
+/// same every run.
 /// </summary>
 public sealed class OutboundAddressGuardTests
 {
@@ -42,9 +42,9 @@ public sealed class OutboundAddressGuardTests
     }
 
     [Theory]
-    [InlineData("metadata.google.internal", "169.254.169.254")] // H2: a hostname resolving to the metadata endpoint
-    [InlineData("localtest.me", "127.0.0.1")] // H2: public DNS name that resolves to loopback
-    [InlineData("decimal-loopback.example", "127.0.0.1")] // H2: a numeric-encoded host, once resolved
+    [InlineData("metadata.google.internal", "169.254.169.254")] // a hostname resolving to the metadata endpoint
+    [InlineData("localtest.me", "127.0.0.1")] // a public DNS name that resolves to loopback
+    [InlineData("decimal-loopback.example", "127.0.0.1")] // a numeric-encoded host, once resolved
     public async Task A_hostname_that_resolves_to_a_non_public_address_is_refused_for_the_public_policy(string host, string resolvesTo)
     {
         var resolved = await OutboundAddressGuard.ResolveAllowedAsync(host, OutboundAddressGuard.IsPublic, FakeResolver(resolvesTo), CancellationToken.None);

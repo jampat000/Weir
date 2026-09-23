@@ -207,9 +207,8 @@ public sealed class TmdbMetadataProvider : IMetadataProvider
         try
         {
             // The api_key travels in the query string, so a redirect would carry it to whatever host answered;
-            // TMDb's own API never redirects, and the host must resolve to a public address (audit report finding
-            // H2: a gateway address that is not caught by ValidateExternalProviderUrl's string checks alone, such
-            // as a numeric-encoded loopback address or a hostname that merely resolves to one).
+            // TMDb's own API never redirects, and the host must resolve to a public address — the same rule the
+            // notification poster applies, checked here after resolution rather than on the configured string alone.
             using var client = new HttpClient(_handlers.Handler(followRedirects: false, ManagerAddressPolicy.Public), disposeHandler: false) { Timeout = TmdbResponses.Timeout };
             using var request = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/search/movie?{TmdbResponses.UrlEncode(parameters)}");
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));

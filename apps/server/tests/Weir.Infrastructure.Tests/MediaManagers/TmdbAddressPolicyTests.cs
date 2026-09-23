@@ -5,9 +5,8 @@ using Weir.Infrastructure.MediaManagers;
 namespace Weir.Infrastructure.Tests.MediaManagers;
 
 /// <summary>
-/// H2: the metadata provider resolves its configured host and requires a
-/// public address, the same check the notification poster already applied — proved with a fake resolver standing
-/// in for the report's proof-of-concept hostnames, never real DNS.
+/// The metadata provider resolves its configured host and requires a public address, the same check the
+/// notification poster applies — proved with a fake resolver, never real DNS.
 /// </summary>
 public sealed class TmdbAddressPolicyTests
 {

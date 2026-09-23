@@ -443,10 +443,8 @@ public static class MediaManagerEndpoints
         var row = await HandoffLedgerStore.FindAsync(uow, key, handoffId).ConfigureAwait(false)
             ?? throw new ApiException(StatusCodes.Status404NotFound, IntakeRules.NeverReceivedDetail);
 
-        // H3: a secret that proves a specific, different connection must not unlock this hand-off. A secret that
-        // proved nothing more specific than "the instance-wide secret" is the pre-existing, weaker tier this
-        // hand-off already accepted (its own connection, if it has one, never bothered to set its own secret
-        // either) and stays accepted, matching AuthoriseAsync's own fallback.
+        // A secret that names a specific, different connection is refused; the shared instance-wide secret still
+        // works for any hand-off whose own connection has no secret of its own, matching AuthoriseAsync's fallback.
         if (row.ConnectionId is { } owner && identity.ConnectionId is { } matched && matched != owner)
         {
             throw new ApiException(StatusCodes.Status401Unauthorized, IntakeRules.MissingSecretDetail);

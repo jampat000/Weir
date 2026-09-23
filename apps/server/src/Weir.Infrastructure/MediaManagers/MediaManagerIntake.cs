@@ -82,9 +82,8 @@ public sealed class MediaManagerIntake
     /// </summary>
     /// <remarks>
     /// An unchecked "imported" is still recorded, but it never removes a file (#652). The connection-less native
-    /// source has no address of its own to prove who is calling, so unlike a real manager connection it is refused
-    /// once nobody has ever configured a secret for it, rather than left open (audit report findings H3/M1; the
-    /// proof-of-concept queued real work through this exact, unscoped source).
+    /// source has no address of its own to prove who is calling, so it refuses a write once nobody has ever
+    /// configured a secret for it, rather than accepting one unchecked as a real connection does.
     /// </remarks>
     public async Task<MediaManagerIntakeIdentity> AuthoriseAsync(UnitOfWork uow, string sourceKey, string? presented)
     {
