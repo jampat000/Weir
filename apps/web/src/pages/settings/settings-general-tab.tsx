@@ -1,9 +1,9 @@
 import { useNavigate } from "react-router-dom";
-import type { SuiteSettingsOut } from "../../lib/suite/types";
+import type { AppSettings } from "../../lib/settings/types";
 import type {
-  useSuiteOperationalHistoryResetMutation,
-  useSuiteSettingsSaveMutation,
-} from "../../lib/suite/queries";
+  useHistoryResetMutation,
+  useAppSettingsSaveMutation,
+} from "../../lib/settings/queries";
 import {
   QuietDisclosure,
   quietActionRowClass,
@@ -35,7 +35,7 @@ const FIELD_HINT_CLASS =
  * action row.
  */
 type InstanceProps = {
-  settingsData: SuiteSettingsOut;
+  settingsData: AppSettings;
 };
 
 /** The setup wizard. The time zone that sat above it moved to Settings › Schedule (canvas board 6), where every time
@@ -79,8 +79,8 @@ export function SettingsInstanceSection({ settingsData }: InstanceProps) {
 
 type RetentionProps = {
   editable: boolean;
-  settingsData: SuiteSettingsOut;
-  save: ReturnType<typeof useSuiteSettingsSaveMutation>;
+  settingsData: AppSettings;
+  save: ReturnType<typeof useAppSettingsSaveMutation>;
   setLogRetentionDaysDraft: (v: string | null) => void;
   normalizedLogRetentionDraft: string;
   finalizeLogRetentionDays: () => number;
@@ -88,10 +88,10 @@ type RetentionProps = {
   normalizedActivityRetentionDraft: string;
   setActivityRetentionDaysDraft: (v: string | null) => void;
   finalizeActivityRetentionDays: () => number | undefined;
-  lastSuiteSaveTarget: "timezone" | "logs" | "backup" | null;
+  lastSaveTarget: "timezone" | "logs" | "backup" | null;
   resetHistoryConfirm: string;
   setResetHistoryConfirm: (v: string) => void;
-  resetHistory: ReturnType<typeof useSuiteOperationalHistoryResetMutation>;
+  resetHistory: ReturnType<typeof useHistoryResetMutation>;
   resetHistoryMsg: string | null;
   onSaveLogs: () => void;
   onResetOperationalHistory: () => void;
@@ -109,7 +109,7 @@ export function SettingsHistoryRetentionSection({
   normalizedActivityRetentionDraft,
   setActivityRetentionDaysDraft,
   finalizeActivityRetentionDays,
-  lastSuiteSaveTarget,
+  lastSaveTarget,
   resetHistoryConfirm,
   setResetHistoryConfirm,
   resetHistory,
@@ -184,7 +184,7 @@ export function SettingsHistoryRetentionSection({
             </label>
           ) : null}
         </div>
-        {save.isError && lastSuiteSaveTarget === "logs" ? (
+        {save.isError && lastSaveTarget === "logs" ? (
           <p
             className="mt-4 text-sm text-[var(--mm-status-failed-text)]"
             role="alert"

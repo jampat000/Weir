@@ -26,19 +26,20 @@ import {
   type LibraryFileFilters,
   type LibraryModeSchedule,
   type LibraryProblemKind,
-} from "../../lib/processing/library-api";
+} from "../../lib/processing/library-mode-api";
 import {
   useCleanLibraryFiles,
   useLibraryFilesQuery,
   useLibraryOverviewQuery,
   useSetLibraryFileLeaveAlone,
   useTriggerLibraryScan,
-} from "../../lib/processing/library-queries";
+} from "../../lib/processing/library-mode-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 import { parseAppDate, useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { LibraryFileDrawer } from "./library-file-drawer";
 import { LibraryPicker } from "./library-picker";
 import { baseName } from "../../lib/format/path";
+import { processingKeys } from "../../lib/processing/query-keys";
 
 const PAGE_SIZE = 200;
 
@@ -223,8 +224,8 @@ export function LibraryPage(): React.ReactElement {
   // true of a file. Slowly, because a library is a long list to re-read and nothing here changes by the second.
   const libraryKeys = useMemo(
     () => [
-      ["processing", "library-files", chosen?.id ?? 0],
-      ["processing", "library-overview", chosen?.id ?? 0],
+      processingKeys.libraryFiles(chosen?.id ?? 0),
+      processingKeys.libraryOverview(chosen?.id ?? 0),
     ],
     [chosen?.id],
   );

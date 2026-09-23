@@ -1,12 +1,12 @@
 import { useState } from "react";
-import type { NotificationChannelOut } from "../../lib/suite/types";
+import type { NotificationChannelOut } from "../../lib/settings/types";
 import {
   useCreateNotificationChannelMutation,
   useDeleteNotificationChannelMutation,
-  useSuiteNotificationChannelsQuery,
+  useNotificationChannelsQuery,
   useTestNotificationChannelMutation,
   useUpdateNotificationChannelMutation,
-} from "../../lib/suite/queries";
+} from "../../lib/settings/queries";
 import { ConfirmRemovalDialog } from "../../components/ui/confirm-removal-dialog";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { QuietFieldGroup } from "../../components/shared/quiet-section";
@@ -275,7 +275,7 @@ function ChannelRow({
 }
 
 export function SettingsNotificationsTab() {
-  const channelsQ = useSuiteNotificationChannelsQuery();
+  const channelsQ = useNotificationChannelsQuery();
   const createMutation = useCreateNotificationChannelMutation();
   const updateMutation = useUpdateNotificationChannelMutation();
   const deleteMutation = useDeleteNotificationChannelMutation();

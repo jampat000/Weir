@@ -19,11 +19,11 @@ import {
 import {
   curatedTimezoneOptionsSorted,
   CURATED_TIMEZONE_ID_SET,
-} from "../../lib/suite/timezone-options";
+} from "../../lib/settings/timezone-options";
 import {
-  useSuiteSettingsQuery,
-  useSuiteSettingsSaveMutation,
-} from "../../lib/suite/queries";
+  useAppSettingsQuery,
+  useAppSettingsSaveMutation,
+} from "../../lib/settings/queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { errorMessage } from "../../lib/api/error-message";
 
@@ -74,9 +74,9 @@ function firstLibraryOfType(
 export function SetupWizardPage() {
   const navigate = useNavigate();
   const me = useMeQuery();
-  const settingsQ = useSuiteSettingsQuery();
+  const settingsQ = useAppSettingsQuery();
   const processingQ = useProcessingLibrariesQuery();
-  const saveSuite = useSuiteSettingsSaveMutation();
+  const saveAppSettings = useAppSettingsSaveMutation();
   const createLibrary = useCreateProcessingLibrary();
   const updateLibrary = useUpdateProcessingLibrary();
 
@@ -184,7 +184,9 @@ export function SetupWizardPage() {
   }
 
   const savePending =
-    saveSuite.isPending || createLibrary.isPending || updateLibrary.isPending;
+    saveAppSettings.isPending ||
+    createLibrary.isPending ||
+    updateLibrary.isPending;
 
   function renderFolderInput({
     id,
@@ -289,7 +291,7 @@ export function SetupWizardPage() {
     }
 
     try {
-      await saveSuite.mutateAsync({
+      await saveAppSettings.mutateAsync({
         product_display_name: current.product_display_name,
         signed_in_home_notice: current.signed_in_home_notice,
         setup_wizard_state: nextState,

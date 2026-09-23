@@ -13,7 +13,7 @@ import {
 } from "../components/shell/nav-icons";
 import { useLogoutMutation } from "../lib/auth/queries";
 import { useProcessingFilesAtOnceQuery } from "../lib/processing/queries";
-import { useSuiteSettingsQuery } from "../lib/suite/queries";
+import { useAppSettingsQuery } from "../lib/settings/queries";
 import { useSystemReadinessQuery } from "../lib/system/readiness-queries";
 
 // Between phone width (a drawer below 921px) and 1400px the side menu shrinks to icons by itself, so
@@ -43,7 +43,7 @@ export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const logout = useLogoutMutation();
-  const suite = useSuiteSettingsQuery();
+  const suite = useAppSettingsQuery();
   const readiness = useSystemReadinessQuery();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsedChoice, setCollapsedChoice] = useState<boolean | null>(null);

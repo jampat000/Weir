@@ -1,11 +1,11 @@
 import type { ChangeEvent } from "react";
 import { useRef } from "react";
 import { SettingRow } from "../../components/shared/settings-group";
-import type { SuiteSettingsOut } from "../../lib/suite/types";
+import type { AppSettings } from "../../lib/settings/types";
 import type {
-  useSuiteConfigurationBackupsQuery,
-  useSuiteSettingsSaveMutation,
-} from "../../lib/suite/queries";
+  useConfigurationBackupsQuery,
+  useAppSettingsSaveMutation,
+} from "../../lib/settings/queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import {
@@ -21,17 +21,17 @@ import { formatBytes } from "../../lib/format/bytes";
 
 type SettingsBackupTabProps = {
   editable: boolean;
-  settingsData: SuiteSettingsOut;
-  save: ReturnType<typeof useSuiteSettingsSaveMutation>;
+  settingsData: AppSettings;
+  save: ReturnType<typeof useAppSettingsSaveMutation>;
   backupScheduleDirty: boolean;
-  lastSuiteSaveTarget: "timezone" | "logs" | "backup" | null;
+  lastSaveTarget: "timezone" | "logs" | "backup" | null;
   configurationBackupEnabled: boolean;
   setConfigurationBackupEnabled: (v: boolean) => void;
   configurationBackupIntervalHours: number;
   setConfigurationBackupIntervalHours: (v: number) => void;
   configurationBackupPreferredTime: string;
   setConfigurationBackupPreferredTime: (v: string) => void;
-  backupsQ: ReturnType<typeof useSuiteConfigurationBackupsQuery>;
+  backupsQ: ReturnType<typeof useConfigurationBackupsQuery>;
   backupBusy: boolean;
   backupMsg: string | null;
   backupErr: string | null;
@@ -46,7 +46,7 @@ export function SettingsBackupTab({
   settingsData,
   save,
   backupScheduleDirty,
-  lastSuiteSaveTarget,
+  lastSaveTarget,
   configurationBackupEnabled,
   setConfigurationBackupEnabled,
   configurationBackupIntervalHours,
@@ -167,7 +167,7 @@ export function SettingsBackupTab({
                   >
                     {save.isPending ? "Saving..." : "Save backup schedule"}
                   </button>
-                  {save.isError && lastSuiteSaveTarget === "backup" ? (
+                  {save.isError && lastSaveTarget === "backup" ? (
                     <p
                       className="mm-status-text--failed text-sm"
                       role="alert"

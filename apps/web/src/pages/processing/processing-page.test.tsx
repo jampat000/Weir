@@ -51,7 +51,6 @@ vi.mock("../../lib/activity/use-activity-stream-invalidation", () => ({
   useActivityStreamInvalidations: () => undefined,
 }));
 vi.mock("../../lib/processing/files-queries", () => ({
-  processingFilesKey: () => ["processing", "files"],
   useProcessingFilesQuery: () => ({
     data: files,
     isPending: false,
@@ -66,8 +65,6 @@ vi.mock("../../lib/processing/files-queries", () => ({
   }),
 }));
 vi.mock("../../lib/processing/queries", () => ({
-  processingOverviewStatsQueryKey: ["processing", "overview-stats"],
-  processingFilesAtOnceQueryKey: ["processing", "files-at-once"],
   useProcessingOverviewStatsQuery: () => ({ data: stats }),
   useProcessingFilesAtOnceQuery: () => ({
     data: {
@@ -80,11 +77,6 @@ vi.mock("../../lib/processing/queries", () => ({
   }),
 }));
 vi.mock("../../lib/processing/jobs-inspection/queries", () => ({
-  processingJobsInspectionQueryKey: (filter: string) => [
-    "processing",
-    "jobs",
-    filter,
-  ],
   useProcessingJobsInspectionQuery: (filter: string) => ({
     data: jobs[filter],
   }),
@@ -106,7 +98,6 @@ vi.mock("../../lib/auth/queries", () => ({
   useMeQuery: () => ({ data: { role: "operator" } }),
 }));
 vi.mock("../../lib/activity/queries", () => ({
-  activityRecentKey: ["activity", "recent"],
   useActivityRecentQuery: (filters: { event_type: string }) => ({
     data: activity[filters.event_type] ?? { items: [] },
   }),

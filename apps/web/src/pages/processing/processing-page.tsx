@@ -28,29 +28,24 @@ import {
   type FinishedFile,
 } from "../../lib/activity/processing-outcome";
 import {
-  activityRecentKey,
   useActivityRecentQuery,
   useActivityWindowQuery,
 } from "../../lib/activity/queries";
+import { activityKeys } from "../../lib/activity/query-keys";
 import { useActivityStreamInvalidations } from "../../lib/activity/use-activity-stream-invalidation";
 import { usePauseQuery } from "../../lib/pause/pause-queries";
 import type { ProcessingFile } from "../../lib/processing/files-api";
 import {
-  processingFilesKey,
   useProcessingFileLog,
   useProcessingFilesQuery,
 } from "../../lib/processing/files-queries";
-import {
-  processingJobsInspectionQueryKey,
-  useProcessingJobsInspectionQuery,
-} from "../../lib/processing/jobs-inspection/queries";
+import { useProcessingJobsInspectionQuery } from "../../lib/processing/jobs-inspection/queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 import {
-  processingFilesAtOnceQueryKey,
-  processingOverviewStatsQueryKey,
   useProcessingFilesAtOnceQuery,
   useProcessingOverviewStatsQuery,
 } from "../../lib/processing/queries";
+import { processingKeys } from "../../lib/processing/query-keys";
 import { useSystemReadinessQuery } from "../../lib/system/readiness-queries";
 import { formatBytes } from "../../lib/format/bytes";
 import {
@@ -95,14 +90,14 @@ const FINISHED_SHOWN = 5;
 // stream, so the lanes follow it closely and the totals, which only change when a file finishes,
 // follow it at a gentler pace.
 const LANE_KEYS = [
-  processingFilesKey(FILES_QUERY),
-  processingJobsInspectionQueryKey("active", ACTIVE_JOBS_LIMIT),
+  processingKeys.fileList(FILES_QUERY),
+  processingKeys.jobsInspectionList("active", ACTIVE_JOBS_LIMIT),
 ] as const;
 const TOTAL_KEYS = [
-  [...processingOverviewStatsQueryKey, 1],
-  processingFilesAtOnceQueryKey,
-  processingJobsInspectionQueryKey("failed", FAILED_JOBS_LIMIT),
-  activityRecentKey,
+  processingKeys.overviewStats(1),
+  processingKeys.filesAtOnce,
+  processingKeys.jobsInspectionList("failed", FAILED_JOBS_LIMIT),
+  activityKeys.recent,
 ] as const;
 
 type Filter = "all" | WorkSource;

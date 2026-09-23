@@ -7,10 +7,10 @@ import type {
   MaintenanceFamilyState,
 } from "../../lib/processing/maintenance-api";
 import {
-  processingMaintenanceKey,
   useProcessingMaintenanceQuery,
   useRunProcessingMaintenance,
 } from "../../lib/processing/maintenance-queries";
+import { processingKeys } from "../../lib/processing/query-keys";
 import {
   useProcessingOperatorSettingsQuery,
   useProcessingOperatorSettingsSaveMutation,
@@ -119,7 +119,7 @@ export function ProcessingMaintenanceSection() {
     try {
       await save.mutateAsync(body);
       void queryClient.invalidateQueries({
-        queryKey: processingMaintenanceKey(),
+        queryKey: processingKeys.maintenance,
       });
       setNotice(said);
     } catch {

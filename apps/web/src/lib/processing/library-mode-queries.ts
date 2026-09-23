@@ -17,28 +17,13 @@ import {
   triggerLibraryScan,
   type LibraryFileFilters,
   type LibraryManualPlan,
-} from "./library-api";
-
-export const librarySettingsKey = (libraryId: number) => [
-  "processing",
-  "library-settings",
-  libraryId,
-];
-
-export const libraryFilesKey = (
-  libraryId: number,
-  filters: LibraryFileFilters,
-) => ["processing", "library-files", libraryId, filters];
-
-export const libraryOverviewKey = (libraryId: number) => [
-  "processing",
-  "library-overview",
-  libraryId,
-];
+} from "./library-mode-api";
+import { previewProcessingRules } from "./rules-preview-api";
+import { processingKeys } from "./query-keys";
 
 export function useLibrarySettingsQuery(libraryId: number, enabled = true) {
   return useQuery({
-    queryKey: librarySettingsKey(libraryId),
+    queryKey: processingKeys.librarySettings(libraryId),
     queryFn: () => fetchLibrarySettings(libraryId),
     enabled: enabled && libraryId > 0,
   });
@@ -49,7 +34,9 @@ export function useSaveLibraryFolders(libraryId: number) {
   return useMutation({
     mutationFn: (folders: string[]) => saveLibraryFolders(libraryId, folders),
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: librarySettingsKey(libraryId) }),
+      void qc.invalidateQueries({
+        queryKey: processingKeys.librarySettings(libraryId),
+      }),
   });
 }
 
@@ -63,9 +50,13 @@ export function useSaveLibraryPreflightSettings(libraryId: number) {
       skip_if_manager_would_redownload?: boolean;
     }) => saveLibrarySettings(libraryId, updates),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: librarySettingsKey(libraryId) });
+      void qc.invalidateQueries({
+        queryKey: processingKeys.librarySettings(libraryId),
+      });
       // clean_hardlinked_files decides whether seeding counts as a problem at all (#568).
-      void qc.invalidateQueries({ queryKey: libraryOverviewKey(libraryId) });
+      void qc.invalidateQueries({
+        queryKey: processingKeys.libraryOverview(libraryId),
+      });
     },
   });
 }
@@ -76,8 +67,8 @@ function invalidateLibraryViews(
   libraryId: number,
 ) {
   for (const key of [
-    ["processing", "library-files", libraryId],
-    libraryOverviewKey(libraryId),
+    processingKeys.libraryFiles(libraryId),
+    processingKeys.libraryOverview(libraryId),
   ]) {
     void qc.invalidateQueries({ queryKey: key });
   }
@@ -97,7 +88,7 @@ export function useLibraryFilesQuery(
   enabled = true,
 ) {
   return useQuery({
-    queryKey: libraryFilesKey(libraryId, filters),
+    queryKey: processingKeys.libraryFileList(libraryId, filters),
     queryFn: () => fetchLibraryFiles(libraryId, filters),
     enabled: enabled && libraryId > 0,
     // Changing a sort, a filter or the page makes a new query key. Without this the table would blank out
@@ -112,11 +103,29 @@ export function useLibraryFilesQuery(
  */
 export function useLibraryOverviewQuery(libraryId: number, enabled = true) {
   return useQuery({
-    queryKey: libraryOverviewKey(libraryId),
+    queryKey: processingKeys.libraryOverview(libraryId),
     queryFn: () => fetchLibraryOverview(libraryId),
     enabled: enabled && libraryId > 0,
     refetchInterval: (query) =>
       query.state.data?.scan?.running ? 3000 : false,
+  });
+}
+
+/**
+ * What the library's rules would do to one file. A preview reads the real file, so it is asked for once
+ * per opened file and never on a timer.
+ */
+export function useLibraryFilePreviewQuery(
+  libraryId: number,
+  path: string | null,
+) {
+  return useQuery({
+    queryKey: processingKeys.libraryFilePreview(libraryId, path ?? ""),
+    queryFn: () =>
+      previewProcessingRules({ libraryId, absolutePath: path ?? "" }),
+    enabled: path !== null,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
   });
 }
 
@@ -159,7 +168,9 @@ export function useSetLibrarySchedule(libraryId: number) {
     }) => setLibrarySchedule(libraryId, enabled, confirm),
     onSuccess: (result) => {
       if (!("kind" in result)) {
-        void qc.invalidateQueries({ queryKey: librarySettingsKey(libraryId) });
+        void qc.invalidateQueries({
+          queryKey: processingKeys.librarySettings(libraryId),
+        });
       }
     },
   });

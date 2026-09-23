@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { apiFetch, readJson, requireOk } from "../api/client";
 import type { Schema } from "../api/types";
+import { systemKeys } from "./query-keys";
 
 export type MediaTools = Schema<"MediaToolsOut">;
 
@@ -16,7 +17,7 @@ export async function fetchMediaTools(): Promise<MediaTools> {
 
 export function useMediaToolsQuery() {
   return useQuery({
-    queryKey: ["system", "media-tools"],
+    queryKey: systemKeys.mediaTools,
     queryFn: fetchMediaTools,
     staleTime: 5 * 60_000,
   });

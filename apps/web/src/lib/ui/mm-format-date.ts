@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useSuiteSettingsQuery } from "../suite/queries";
+import { useAppSettingsQuery } from "../settings/queries";
 
 export function parseAppDate(iso: string): Date {
   // Backend timestamps have no Z suffix — append it to force UTC parsing.
@@ -10,7 +10,7 @@ export function parseAppDate(iso: string): Date {
 export function useAppDateFormatter(): (
   iso: string | null | undefined,
 ) => string {
-  const q = useSuiteSettingsQuery();
+  const q = useAppSettingsQuery();
   const tz = q.data?.app_timezone || undefined;
 
   return useCallback(

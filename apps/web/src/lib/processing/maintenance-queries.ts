@@ -8,12 +8,11 @@ import {
 } from "./maintenance-api";
 import { fetchProcessingRuntimeSettings } from "./runtime-settings-api";
 import type { ProcessingRuntimeSettingsOut } from "./types";
-
-export const processingMaintenanceKey = () => ["processing", "maintenance"];
+import { processingKeys } from "./query-keys";
 
 export function useProcessingMaintenanceQuery() {
   return useQuery<MaintenanceState>({
-    queryKey: processingMaintenanceKey(),
+    queryKey: processingKeys.maintenance,
     queryFn: fetchProcessingMaintenance,
     // A queued sweep starts within seconds, so the panel has to notice without a reload.
     refetchInterval: 15_000,
@@ -31,18 +30,13 @@ export function useRunProcessingMaintenance() {
       mediaScope: "movie" | "tv";
     }) => runProcessingMaintenance(family, mediaScope),
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: processingMaintenanceKey() }),
+      void qc.invalidateQueries({ queryKey: processingKeys.maintenance }),
   });
 }
 
-export const processingRuntimeSettingsKey = () => [
-  "processing",
-  "runtime-settings",
-];
-
 export function useProcessingRuntimeSettingsQuery() {
   return useQuery<ProcessingRuntimeSettingsOut>({
-    queryKey: processingRuntimeSettingsKey(),
+    queryKey: processingKeys.runtimeSettings,
     queryFn: fetchProcessingRuntimeSettings,
   });
 }

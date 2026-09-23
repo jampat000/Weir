@@ -16,20 +16,20 @@ import {
 import { canEdit } from "../../lib/auth/can-edit";
 import { useMeQuery } from "../../lib/auth/queries";
 import {
-  suiteConfigurationBackupsQueryKey,
-  useSuiteConfigurationBackupsQuery,
-  useSuiteOperationalHistoryResetMutation,
-  useSuiteSettingsQuery,
-  useSuiteSettingsSaveMutation,
-  useSuiteUpdateStatusQuery,
-} from "../../lib/suite/queries";
-import type { SuiteSettingsPutBody } from "../../lib/suite/types";
+  useConfigurationBackupsQuery,
+  useHistoryResetMutation,
+  useAppSettingsQuery,
+  useAppSettingsSaveMutation,
+  useUpdateStatusQuery,
+} from "../../lib/settings/queries";
+import { settingsKeys } from "../../lib/settings/query-keys";
+import type { AppSettingsPutBody } from "../../lib/settings/types";
 import {
   fetchConfigurationBundle,
   fetchStoredConfigurationBackupBlob,
   putConfigurationBundle,
   type ConfigurationBundle,
-} from "../../lib/suite/suite-settings-api";
+} from "../../lib/settings/settings-api";
 import { SHOW_SUPPORT_CARD } from "../../lib/support";
 import {
   SettingsHistoryRetentionSection,
@@ -107,9 +107,9 @@ export function SystemPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const me = useMeQuery();
-  const settingsQ = useSuiteSettingsQuery();
-  const save = useSuiteSettingsSaveMutation();
-  const resetHistory = useSuiteOperationalHistoryResetMutation();
+  const settingsQ = useAppSettingsQuery();
+  const save = useAppSettingsSaveMutation();
+  const resetHistory = useHistoryResetMutation();
 
   const showSupport = SHOW_SUPPORT_CARD;
   const [tab, setTab] = useState<TabId>(() =>
@@ -159,7 +159,7 @@ export function SystemPage() {
     configurationBackupPreferredTime,
     setConfigurationBackupPreferredTime,
   ] = useState("02:00");
-  const [lastSuiteSaveTarget, setLastSuiteSaveTarget] = useState<
+  const [lastSaveTarget, setLastSaveTarget] = useState<
     "timezone" | "logs" | "backup" | null
   >(null);
 
@@ -188,10 +188,10 @@ export function SystemPage() {
   const editable = canEdit(me.data?.role);
   // Read on Backups, where the list is shown. It was asked for only on This instance, so Backups showed an
   // empty list until you had visited the other tab first.
-  const backupsQ = useSuiteConfigurationBackupsQuery(
+  const backupsQ = useConfigurationBackupsQuery(
     editable && tab === "backups" && Boolean(settingsQ.data),
   );
-  const updateStatusQ = useSuiteUpdateStatusQuery(
+  const updateStatusQ = useUpdateStatusQuery(
     tab === "about" && Boolean(settingsQ.data),
   );
 
@@ -371,7 +371,7 @@ export function SystemPage() {
     return Math.min(Math.max(Math.trunc(n), 0), 3650);
   };
 
-  const buildSuitePutBody = (): SuiteSettingsPutBody => {
+  const buildSettingsPutBody = (): AppSettingsPutBody => {
     const d = settingsQ.data;
     const name = (d.product_display_name || "Weir").trim() || "Weir";
     const tz = (d.app_timezone ?? "UTC").trim() || "UTC";
@@ -379,7 +379,7 @@ export function SystemPage() {
       3650,
       Math.max(1, Math.trunc(Number(finalizeLogRetentionDays()))),
     );
-    const body: SuiteSettingsPutBody = {
+    const body: AppSettingsPutBody = {
       product_display_name: name,
       signed_in_home_notice: d.signed_in_home_notice,
       setup_wizard_state: d.setup_wizard_state,
@@ -406,11 +406,11 @@ export function SystemPage() {
     if (!settingsQ.data) {
       return;
     }
-    setLastSuiteSaveTarget("logs");
+    setLastSaveTarget("logs");
     save.reset();
     try {
-      await save.mutateAsync(buildSuitePutBody());
-      setLastSuiteSaveTarget(null);
+      await save.mutateAsync(buildSettingsPutBody());
+      setLastSaveTarget(null);
     } catch {
       /* surfaced via save.isError */
     }
@@ -422,14 +422,14 @@ export function SystemPage() {
     }
     setBackupErr(null);
     setBackupMsg(null);
-    setLastSuiteSaveTarget("backup");
+    setLastSaveTarget("backup");
     save.reset();
     try {
-      await save.mutateAsync(buildSuitePutBody());
-      setLastSuiteSaveTarget(null);
+      await save.mutateAsync(buildSettingsPutBody());
+      setLastSaveTarget(null);
       setBackupMsg("Backup schedule saved.");
       await queryClient.invalidateQueries({
-        queryKey: suiteConfigurationBackupsQueryKey,
+        queryKey: settingsKeys.configurationBackups,
       });
     } catch (e) {
       setBackupErr(errorMessage(e, "Could not save backup schedule."));
@@ -500,7 +500,7 @@ export function SystemPage() {
               settingsData={settingsQ.data}
               save={save}
               backupScheduleDirty={backupScheduleDirty}
-              lastSuiteSaveTarget={lastSuiteSaveTarget}
+              lastSaveTarget={lastSaveTarget}
               configurationBackupEnabled={configurationBackupEnabled}
               setConfigurationBackupEnabled={setConfigurationBackupEnabled}
               configurationBackupIntervalHours={
@@ -571,7 +571,7 @@ export function SystemPage() {
               }
               setActivityRetentionDaysDraft={setActivityRetentionDaysDraft}
               finalizeActivityRetentionDays={finalizeActivityRetentionDays}
-              lastSuiteSaveTarget={lastSuiteSaveTarget}
+              lastSaveTarget={lastSaveTarget}
               resetHistoryConfirm={resetHistoryConfirm}
               setResetHistoryConfirm={setResetHistoryConfirm}
               resetHistory={resetHistory}

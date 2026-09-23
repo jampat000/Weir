@@ -3,11 +3,11 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import * as api from "../../lib/suite/suite-settings-api";
+import * as api from "../../lib/settings/settings-api";
 import type {
   NotificationChannelListOut,
   NotificationChannelOut,
-} from "../../lib/suite/types";
+} from "../../lib/settings/types";
 import { SettingsNotificationsTab } from "./settings-notifications-tab";
 
 function channel(over: Partial<NotificationChannelOut> = {}) {

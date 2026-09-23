@@ -16,12 +16,15 @@ const files: {
 const requeue = vi.fn();
 const fetchLog = vi.fn<(id: number) => Promise<ProcessingFileLog>>();
 
-vi.mock("../../lib/processing/files-queries", () => {
+vi.mock("../../lib/processing/files-queries", async (importOriginal) => {
   const mutation = (fn = vi.fn()) => ({
     mutateAsync: fn,
     isPending: false,
   });
   return {
+    ...(await importOriginal<
+      typeof import("../../lib/processing/files-queries")
+    >()),
     useProcessingFilesQuery: () => ({
       data: files,
       isLoading: false,

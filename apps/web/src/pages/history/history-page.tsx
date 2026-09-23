@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { FileName } from "../../components/shared/file-name";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -9,11 +8,11 @@ import { usePauseQuery } from "../../lib/pause/pause-queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import {
   PROCESSING_FILE_STATUS_LABELS,
-  fetchProcessingFileLog,
   processingFileLogDownloadPath,
   type ProcessingFile,
 } from "../../lib/processing/files-api";
 import {
+  useProcessingFileLogQuery,
   useProcessingFilesQuery,
   useRequeueProcessingFiles,
 } from "../../lib/processing/files-queries";
@@ -325,10 +324,7 @@ function HistoryDetail({
   const working = file.status === "processing";
   const pause = usePauseQuery();
   const guidance = fileGuidance(file, pause.data?.paused === true);
-  const record = useQuery({
-    queryKey: ["processing", "files", file.id, "log", file.updated_at],
-    queryFn: () => fetchProcessingFileLog(file.id),
-  });
+  const record = useProcessingFileLogQuery(file.id, file.updated_at);
   const pass = latestPass(record.data?.entries ?? []);
   const tracks = pass ? tracksFromRecord(pass.detail) : [];
   const sizes = detailSizes(file, pass?.detail ?? null);

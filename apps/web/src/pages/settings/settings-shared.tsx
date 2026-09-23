@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { SuiteLogEntry } from "../../lib/suite/types";
+import type { ServerLogEntry } from "../../lib/settings/types";
 
 export type LogLevelFilter = "" | "INFO" | "WARNING" | "ERROR";
 
@@ -75,7 +75,7 @@ export function logLevelToneClass(level: string): string {
   }
 }
 
-export function renderLogTechnicalDetails(entry: SuiteLogEntry) {
+export function renderLogTechnicalDetails(entry: ServerLogEntry) {
   if (
     !entry.traceback &&
     !entry.source &&

@@ -6,30 +6,29 @@ import type {
   NotificationChannelListOut,
   NotificationChannelOut,
   NotificationChannelTestOut,
-  SuiteConfigurationBackupListOut,
-  SuiteLogsOut,
-  SuiteMetricsOut,
-  SuiteOperationalHistoryResetOut,
-  SuiteSecurityOverviewOut,
-  SuiteSettingsOut,
-  SuiteSettingsPutBody,
-  SuiteUpdateStatusOut,
+  ConfigurationBackupList,
+  ServerLogs,
+  ServerMetrics,
+  HistoryResetResult,
+  SecurityOverview,
+  AppSettings,
+  AppSettingsPutBody,
+  UpdateStatus,
   UpdateSettingsOut,
   UpdateSettingsPutBody,
   UpdateStateOut,
 } from "./types";
 
-export const suiteSettingsPath = () => "/api/v1/suite/settings";
-export const suiteSecurityOverviewPath = () =>
-  "/api/v1/suite/security-overview";
-export const suiteUpdateStatusPath = () => "/api/v1/suite/update-status";
-export const suiteLogsPath = () => "/api/v1/suite/logs";
-export const suiteMetricsPath = () => "/api/v1/suite/metrics";
-export const suiteOperationalHistoryResetPath = () =>
+export const appSettingsPath = () => "/api/v1/suite/settings";
+export const securityOverviewPath = () => "/api/v1/suite/security-overview";
+export const updateStatusPath = () => "/api/v1/suite/update-status";
+export const serverLogsPath = () => "/api/v1/suite/logs";
+export const serverMetricsPath = () => "/api/v1/suite/metrics";
+export const operationalHistoryResetPath = () =>
   "/api/v1/suite/operational-history/reset";
-export const suiteUpdateSettingsPath = () => "/api/v1/suite/update-settings";
-export const suiteUpdateStatePath = () => "/api/v1/suite/update-state";
-export const suiteApplyUpdatePath = () => "/api/v1/suite/apply-update";
+export const updateSettingsPath = () => "/api/v1/suite/update-settings";
+export const updateStatePath = () => "/api/v1/suite/update-state";
+export const applyUpdatePath = () => "/api/v1/suite/apply-update";
 
 /**
  * GET/PUT configuration bundle. This used to be a list of three addresses tried in turn — the
@@ -38,56 +37,56 @@ export const suiteApplyUpdatePath = () => "/api/v1/suite/apply-update";
  * one. 3.0.0 serves the one address and the client asks for the one address; a 404 here now means
  * the request is genuinely wrong, instead of being swallowed and retried against an alias.
  */
-export const suiteConfigurationBundlePath = () =>
+export const configurationBundlePath = () =>
   "/api/v1/suite/configuration-bundle";
-export const suiteConfigurationBackupsPath = () =>
+export const configurationBackupsPath = () =>
   "/api/v1/suite/configuration-backups";
 
 export type ConfigurationBundle = Record<string, unknown> & {
   format_version: number;
 };
 
-export async function fetchSuiteSettings(): Promise<SuiteSettingsOut> {
-  const path = suiteSettingsPath();
+export async function fetchAppSettings(): Promise<AppSettings> {
+  const path = appSettingsPath();
   const r = await apiFetch(path);
   await requireOk(path, r, "Could not load settings");
-  return readJson<SuiteSettingsOut>(r);
+  return readJson<AppSettings>(r);
 }
 
-export async function putSuiteSettings(
-  body: SuiteSettingsPutBody,
-): Promise<SuiteSettingsOut> {
+export async function putAppSettings(
+  body: AppSettingsPutBody,
+): Promise<AppSettings> {
   const csrf_token = await fetchCsrfToken();
-  const path = suiteSettingsPath();
+  const path = appSettingsPath();
   const r = await apiFetch(path, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...body, csrf_token }),
   });
   await requireOk(path, r, "Could not save settings");
-  return readJson<SuiteSettingsOut>(r);
+  return readJson<AppSettings>(r);
 }
 
-export async function fetchSuiteSecurityOverview(): Promise<SuiteSecurityOverviewOut> {
-  const path = suiteSecurityOverviewPath();
+export async function fetchSecurityOverview(): Promise<SecurityOverview> {
+  const path = securityOverviewPath();
   const r = await apiFetch(path);
   await requireOk(path, r, "Could not load security overview");
-  return readJson<SuiteSecurityOverviewOut>(r);
+  return readJson<SecurityOverview>(r);
 }
 
-export async function fetchSuiteUpdateStatus(): Promise<SuiteUpdateStatusOut> {
-  const path = suiteUpdateStatusPath();
+export async function fetchUpdateStatus(): Promise<UpdateStatus> {
+  const path = updateStatusPath();
   const r = await apiFetch(path);
   await requireOk(path, r, "Could not check for updates");
-  return readJson<SuiteUpdateStatusOut>(r);
+  return readJson<UpdateStatus>(r);
 }
 
-export async function fetchSuiteLogs(filters?: {
+export async function fetchServerLogs(filters?: {
   level?: string;
   search?: string;
   has_exception?: boolean;
   limit?: number;
-}): Promise<SuiteLogsOut> {
+}): Promise<ServerLogs> {
   const params = new URLSearchParams();
   if (filters?.level) params.set("level", filters.level);
   if (filters?.search) params.set("search", filters.search);
@@ -97,22 +96,22 @@ export async function fetchSuiteLogs(filters?: {
     params.set("limit", String(filters.limit));
   const path =
     params.size > 0
-      ? `${suiteLogsPath()}?${params.toString()}`
-      : suiteLogsPath();
+      ? `${serverLogsPath()}?${params.toString()}`
+      : serverLogsPath();
   const r = await apiFetch(path);
   await requireOk(path, r, "Could not load logs");
-  return readJson<SuiteLogsOut>(r);
+  return readJson<ServerLogs>(r);
 }
 
-export async function fetchSuiteMetrics(): Promise<SuiteMetricsOut> {
-  const path = suiteMetricsPath();
+export async function fetchServerMetrics(): Promise<ServerMetrics> {
+  const path = serverMetricsPath();
   const r = await apiFetch(path);
   await requireOk(path, r, "Could not load runtime health");
-  return readJson<SuiteMetricsOut>(r);
+  return readJson<ServerMetrics>(r);
 }
 
 export async function fetchUpdateSettings(): Promise<UpdateSettingsOut> {
-  const path = suiteUpdateSettingsPath();
+  const path = updateSettingsPath();
   const r = await apiFetch(path);
   await requireOk(path, r, "Could not load update settings");
   return readJson<UpdateSettingsOut>(r);
@@ -122,7 +121,7 @@ export async function putUpdateSettings(
   body: UpdateSettingsPutBody,
 ): Promise<UpdateSettingsOut> {
   const csrf_token = await fetchCsrfToken();
-  const path = suiteUpdateSettingsPath();
+  const path = updateSettingsPath();
   const r = await apiFetch(path, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -133,7 +132,7 @@ export async function putUpdateSettings(
 }
 
 export async function fetchUpdateState(): Promise<UpdateStateOut> {
-  const path = suiteUpdateStatePath();
+  const path = updateStatePath();
   const r = await apiFetch(path);
   await requireOk(path, r, "Could not load update state");
   return readJson<UpdateStateOut>(r);
@@ -141,7 +140,7 @@ export async function fetchUpdateState(): Promise<UpdateStateOut> {
 
 export async function postApplyUpdate(): Promise<UpdateStateOut> {
   const csrf_token = await fetchCsrfToken();
-  const path = suiteApplyUpdatePath();
+  const path = applyUpdatePath();
   const r = await apiFetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -152,7 +151,7 @@ export async function postApplyUpdate(): Promise<UpdateStateOut> {
 }
 
 /** Exactly what clearing history would remove, so the confirmation can say so. Removes nothing. */
-export async function fetchSuiteOperationalHistoryPreview(): Promise<SuiteOperationalHistoryResetOut> {
+export async function fetchOperationalHistoryPreview(): Promise<HistoryResetResult> {
   const path = "/api/v1/suite/operational-history/preview";
   const r = await apiFetch(path);
   await requireOk(
@@ -160,25 +159,25 @@ export async function fetchSuiteOperationalHistoryPreview(): Promise<SuiteOperat
     r,
     "Could not check what clearing history would remove",
   );
-  return readJson<SuiteOperationalHistoryResetOut>(r);
+  return readJson<HistoryResetResult>(r);
 }
 
-export async function resetSuiteOperationalHistory(
+export async function resetOperationalHistory(
   confirm: string,
-): Promise<SuiteOperationalHistoryResetOut> {
+): Promise<HistoryResetResult> {
   const csrf_token = await fetchCsrfToken();
-  const path = suiteOperationalHistoryResetPath();
+  const path = operationalHistoryResetPath();
   const r = await apiFetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ csrf_token, confirm }),
   });
   await requireOk(path, r, "Could not reset activity history");
-  return readJson<SuiteOperationalHistoryResetOut>(r);
+  return readJson<HistoryResetResult>(r);
 }
 
 export async function fetchConfigurationBundle(): Promise<ConfigurationBundle> {
-  const path = suiteConfigurationBundlePath();
+  const path = configurationBundlePath();
   const r = await apiFetch(path);
   await requireOk(path, r, "Could not export configuration");
   return readJson<ConfigurationBundle>(r);
@@ -188,7 +187,7 @@ export async function putConfigurationBundle(
   bundle: ConfigurationBundle,
 ): Promise<ConfigurationBundle> {
   const csrf_token = await fetchCsrfToken();
-  const path = suiteConfigurationBundlePath();
+  const path = configurationBundlePath();
   const r = await apiFetch(path, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -198,17 +197,17 @@ export async function putConfigurationBundle(
   return readJson<ConfigurationBundle>(r);
 }
 
-export async function fetchConfigurationBackupList(): Promise<SuiteConfigurationBackupListOut> {
-  const path = suiteConfigurationBackupsPath();
+export async function fetchConfigurationBackupList(): Promise<ConfigurationBackupList> {
+  const path = configurationBackupsPath();
   const r = await apiFetch(path);
   await requireOk(path, r, "Could not load automatic snapshots");
-  return readJson<SuiteConfigurationBackupListOut>(r);
+  return readJson<ConfigurationBackupList>(r);
 }
 
 export async function fetchStoredConfigurationBackupBlob(
   backupId: number,
 ): Promise<Blob> {
-  const path = `${suiteConfigurationBackupsPath()}/${backupId}/download`;
+  const path = `${configurationBackupsPath()}/${backupId}/download`;
   const r = await apiFetch(path);
   await requireOk(path, r, "Could not download automatic snapshot");
   return r.blob();

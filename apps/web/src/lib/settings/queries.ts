@@ -4,76 +4,60 @@ import {
   deleteNotificationChannel,
   fetchConfigurationBackupList,
   fetchNotificationChannels,
-  fetchSuiteLogs,
-  fetchSuiteMetrics,
-  fetchSuiteSecurityOverview,
-  fetchSuiteSettings,
-  fetchSuiteUpdateStatus,
+  fetchServerLogs,
+  fetchServerMetrics,
+  fetchSecurityOverview,
+  fetchAppSettings,
+  fetchUpdateStatus,
   fetchUpdateSettings,
   fetchUpdateState,
   postApplyUpdate,
-  putSuiteSettings,
+  putAppSettings,
   putUpdateSettings,
-  resetSuiteOperationalHistory,
+  resetOperationalHistory,
   testNotificationChannel,
   updateNotificationChannel,
-} from "./suite-settings-api";
+} from "./settings-api";
+import { settingsKeys } from "./query-keys";
 import type {
+  AppSettingsPutBody,
   NotificationChannelIn,
-  SuiteSettingsPutBody,
+  ServerLogFilters,
   UpdateSettingsPutBody,
 } from "./types";
 
-export const suiteSettingsQueryKey = ["suite", "settings"] as const;
-export const suiteSecurityOverviewQueryKey = [
-  "suite",
-  "security-overview",
-] as const;
-export const suiteConfigurationBackupsQueryKey = [
-  "suite",
-  "configuration-backups",
-] as const;
-export const suiteUpdateStatusQueryKey = ["suite", "update-status"] as const;
-export const suiteUpdateSettingsQueryKey = [
-  "suite",
-  "update-settings",
-] as const;
-export const suiteUpdateStateQueryKey = ["suite", "update-state"] as const;
-export const suiteLogsQueryKey = ["suite", "logs"] as const;
-export const suiteMetricsQueryKey = ["suite", "metrics"] as const;
-
-export function useSuiteSettingsQuery() {
+export function useAppSettingsQuery() {
   return useQuery({
-    queryKey: suiteSettingsQueryKey,
-    queryFn: () => fetchSuiteSettings(),
+    queryKey: settingsKeys.app,
+    queryFn: () => fetchAppSettings(),
     staleTime: 30_000,
   });
 }
 
-export function useSuiteSecurityOverviewQuery() {
+export function useSecurityOverviewQuery() {
   return useQuery({
-    queryKey: suiteSecurityOverviewQueryKey,
-    queryFn: () => fetchSuiteSecurityOverview(),
+    queryKey: settingsKeys.securityOverview,
+    queryFn: () => fetchSecurityOverview(),
     staleTime: 30_000,
   });
 }
 
-export function useSuiteConfigurationBackupsQuery(enabled: boolean) {
+export function useConfigurationBackupsQuery(enabled: boolean) {
   return useQuery({
-    queryKey: suiteConfigurationBackupsQueryKey,
+    queryKey: settingsKeys.configurationBackups,
     queryFn: () => fetchConfigurationBackupList(),
     enabled,
     staleTime: 15_000,
   });
 }
 
-export function useSuiteUpdateStatusQuery(
+export function useUpdateStatusQuery(
   enabled = true,
   refetchInterval: number | false = false,
 ) {
   return useQuery({
-    queryKey: suiteUpdateStatusQueryKey,
-    queryFn: () => fetchSuiteUpdateStatus(),
+    queryKey: settingsKeys.updateStatus,
+    queryFn: () => fetchUpdateStatus(),
     enabled,
     staleTime: enabled && refetchInterval ? 0 : 60_000,
     refetchInterval,
@@ -83,7 +67,7 @@ export function useSuiteUpdateStatusQuery(
 
 export function useUpdateStateQuery(enabled = true) {
   return useQuery({
-    queryKey: suiteUpdateStateQueryKey,
+    queryKey: settingsKeys.updateState,
     queryFn: () => fetchUpdateState(),
     enabled,
     staleTime: 0,
@@ -97,14 +81,14 @@ export function useApplyUpdateMutation() {
   return useMutation({
     mutationFn: () => postApplyUpdate(),
     onSuccess: (data) => {
-      qc.setQueryData(suiteUpdateStateQueryKey, data);
+      qc.setQueryData(settingsKeys.updateState, data);
     },
   });
 }
 
 export function useUpdateSettingsQuery(enabled = true) {
   return useQuery({
-    queryKey: suiteUpdateSettingsQueryKey,
+    queryKey: settingsKeys.updateSettings,
     queryFn: () => fetchUpdateSettings(),
     enabled,
     staleTime: 30_000,
@@ -117,33 +101,25 @@ export function useUpdateSettingsMutation() {
   return useMutation({
     mutationFn: (body: UpdateSettingsPutBody) => putUpdateSettings(body),
     onSuccess: (data) => {
-      qc.setQueryData(suiteUpdateSettingsQueryKey, data);
+      qc.setQueryData(settingsKeys.updateSettings, data);
     },
   });
 }
 
-export function useSuiteOperationalHistoryResetMutation() {
+export function useHistoryResetMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (confirm: string) => resetSuiteOperationalHistory(confirm),
+    mutationFn: (confirm: string) => resetOperationalHistory(confirm),
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: suiteMetricsQueryKey });
+      await qc.invalidateQueries({ queryKey: settingsKeys.metrics });
     },
   });
 }
 
-export function useSuiteLogsQuery(
-  filters: {
-    level?: string;
-    search?: string;
-    has_exception?: boolean;
-    limit?: number;
-  },
-  enabled = true,
-) {
+export function useServerLogsQuery(filters: ServerLogFilters, enabled = true) {
   return useQuery({
-    queryKey: [...suiteLogsQueryKey, filters] as const,
-    queryFn: () => fetchSuiteLogs(filters),
+    queryKey: settingsKeys.logsFor(filters),
+    queryFn: () => fetchServerLogs(filters),
     enabled,
     refetchInterval: enabled ? 5000 : false,
     staleTime: 2000,
@@ -151,10 +127,10 @@ export function useSuiteLogsQuery(
   });
 }
 
-export function useSuiteMetricsQuery(enabled = true) {
+export function useServerMetricsQuery(enabled = true) {
   return useQuery({
-    queryKey: suiteMetricsQueryKey,
-    queryFn: () => fetchSuiteMetrics(),
+    queryKey: settingsKeys.metrics,
+    queryFn: () => fetchServerMetrics(),
     enabled,
     staleTime: 5000,
     refetchInterval: enabled ? 10000 : false,
@@ -162,14 +138,9 @@ export function useSuiteMetricsQuery(enabled = true) {
   });
 }
 
-export const suiteNotificationChannelsQueryKey = [
-  "suite",
-  "notification-channels",
-] as const;
-
-export function useSuiteNotificationChannelsQuery(enabled = true) {
+export function useNotificationChannelsQuery(enabled = true) {
   return useQuery({
-    queryKey: suiteNotificationChannelsQueryKey,
+    queryKey: settingsKeys.notificationChannels,
     queryFn: () => fetchNotificationChannels(),
     enabled,
     staleTime: 30_000,
@@ -183,7 +154,7 @@ export function useCreateNotificationChannelMutation() {
       createNotificationChannel(data),
     onSuccess: async () => {
       await qc.invalidateQueries({
-        queryKey: suiteNotificationChannelsQueryKey,
+        queryKey: settingsKeys.notificationChannels,
       });
     },
   });
@@ -196,7 +167,7 @@ export function useUpdateNotificationChannelMutation() {
       updateNotificationChannel(id, data),
     onSuccess: async () => {
       await qc.invalidateQueries({
-        queryKey: suiteNotificationChannelsQueryKey,
+        queryKey: settingsKeys.notificationChannels,
       });
     },
   });
@@ -208,7 +179,7 @@ export function useDeleteNotificationChannelMutation() {
     mutationFn: (id: number) => deleteNotificationChannel(id),
     onSuccess: async () => {
       await qc.invalidateQueries({
-        queryKey: suiteNotificationChannelsQueryKey,
+        queryKey: settingsKeys.notificationChannels,
       });
     },
   });
@@ -220,13 +191,13 @@ export function useTestNotificationChannelMutation() {
   });
 }
 
-export function useSuiteSettingsSaveMutation() {
+export function useAppSettingsSaveMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: SuiteSettingsPutBody) => putSuiteSettings(body),
+    mutationFn: (body: AppSettingsPutBody) => putAppSettings(body),
     onSuccess: async (data) => {
-      qc.setQueryData(suiteSettingsQueryKey, data);
-      await qc.invalidateQueries({ queryKey: suiteSettingsQueryKey });
+      qc.setQueryData(settingsKeys.app, data);
+      await qc.invalidateQueries({ queryKey: settingsKeys.app });
     },
   });
 }

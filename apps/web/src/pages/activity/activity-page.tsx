@@ -8,10 +8,8 @@ import {
   ProcessingFileProcessingProgressDetail,
   ProcessingFileRemuxPassActivityDetail,
 } from "../../lib/activity/processing-file-remux-pass-detail";
-import {
-  activityRecentKey,
-  useActivityRecentQuery,
-} from "../../lib/activity/queries";
+import { useActivityRecentQuery } from "../../lib/activity/queries";
+import { activityKeys } from "../../lib/activity/query-keys";
 import { useActivityStreamInvalidation } from "../../lib/activity/use-activity-stream-invalidation";
 import {
   ACTIVITY_RESULT_LABELS,
@@ -34,9 +32,9 @@ import { useCanEdit } from "../../lib/auth/can-edit";
 import { fetchProcessingFiles } from "../../lib/processing/files-api";
 import { useProcessingFileLog } from "../../lib/processing/files-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
-import { useSuiteOperationalHistoryResetMutation } from "../../lib/suite/queries";
-import { fetchSuiteOperationalHistoryPreview } from "../../lib/suite/suite-settings-api";
-import type { SuiteOperationalHistoryResetOut } from "../../lib/suite/types";
+import { useHistoryResetMutation } from "../../lib/settings/queries";
+import { fetchOperationalHistoryPreview } from "../../lib/settings/settings-api";
+import type { HistoryResetResult } from "../../lib/settings/types";
 import {
   isHttpErrorFromApi,
   isLikelyNetworkFailure,
@@ -689,8 +687,9 @@ export function ActivityPage({
   } | null>(null);
   const [removalBusy, setRemovalBusy] = useState(false);
   const [removalError, setRemovalError] = useState<string | null>(null);
-  const [clearPreview, setClearPreview] =
-    useState<SuiteOperationalHistoryResetOut | null>(null);
+  const [clearPreview, setClearPreview] = useState<HistoryResetResult | null>(
+    null,
+  );
   const [clearError, setClearError] = useState<string | null>(null);
   const [storyName, setStoryName] = useState<string | null>(null);
   const [storyLookupError, setStoryLookupError] = useState<string | null>(null);
@@ -701,7 +700,7 @@ export function ActivityPage({
   const canRemove = useCanEdit();
   const libraries = useProcessingLibrariesQuery();
   const fileLog = useProcessingFileLog();
-  const resetHistory = useSuiteOperationalHistoryResetMutation();
+  const resetHistory = useHistoryResetMutation();
 
   const queryFilters = useMemo(() => {
     const libraryId = Number(applied.libraryId);
@@ -721,7 +720,7 @@ export function ActivityPage({
   }, [applied, about]);
   const dataKey = JSON.stringify(queryFilters);
 
-  useActivityStreamInvalidation(activityRecentKey);
+  useActivityStreamInvalidation(activityKeys.recent);
   const recent = useActivityRecentQuery(queryFilters);
   const fmt = useAppDateFormatter();
 
@@ -976,7 +975,7 @@ export function ActivityPage({
     setClearError(null);
     setNotice(null);
     try {
-      setClearPreview(await fetchSuiteOperationalHistoryPreview());
+      setClearPreview(await fetchOperationalHistoryPreview());
     } catch (e) {
       setActionError(
         errorMessage(e, "Could not check what clearing history would remove."),

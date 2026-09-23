@@ -9,7 +9,7 @@ import {
   useRevokeOtherSessionsMutation,
   useRevokeSessionMutation,
 } from "../../lib/auth/queries";
-import { useSuiteSecurityOverviewQuery } from "../../lib/suite/queries";
+import { useSecurityOverviewQuery } from "../../lib/settings/queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import {
@@ -33,7 +33,7 @@ export function SettingsSecurityTab() {
   const [newUsername, setNewUsername] = useState("");
   const [usernamePassword, setUsernamePassword] = useState("");
   const currentSessionQ = useCurrentSessionQuery();
-  const securityOverviewQ = useSuiteSecurityOverviewQuery();
+  const securityOverviewQ = useSecurityOverviewQuery();
   const sessionsQ = useActiveSessionsQuery(currentSessionQ.data !== null);
   const revokeOthers = useRevokeOtherSessionsMutation();
   const revokeSession = useRevokeSessionMutation();

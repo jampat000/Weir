@@ -24,14 +24,14 @@ import {
 import { useProcessingMaintenanceQuery } from "../../lib/processing/maintenance-queries";
 import { useProcessingWatchedFolderRemuxScanDispatchEnqueueMutation } from "../../lib/processing/queries";
 import {
-  useSuiteSettingsQuery,
-  useSuiteSettingsSaveMutation,
-} from "../../lib/suite/queries";
+  useAppSettingsQuery,
+  useAppSettingsSaveMutation,
+} from "../../lib/settings/queries";
 import {
   CURATED_TIMEZONE_ID_SET,
   curatedTimezoneOptionsSorted,
-} from "../../lib/suite/timezone-options";
-import type { SuiteSettingsOut } from "../../lib/suite/types";
+} from "../../lib/settings/timezone-options";
+import type { AppSettings } from "../../lib/settings/types";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { CLEANUP_JOBS, everyWords } from "./processing-maintenance-section";
@@ -65,11 +65,11 @@ function TimeZoneRow({
   editable,
   now,
 }: {
-  settings: SuiteSettingsOut;
+  settings: AppSettings;
   editable: boolean;
   now: Date;
 }) {
-  const save = useSuiteSettingsSaveMutation();
+  const save = useAppSettingsSaveMutation();
   const saved = CURATED_TIMEZONE_ID_SET.has(settings.app_timezone || "")
     ? settings.app_timezone
     : "";
@@ -308,7 +308,7 @@ function LibraryHoursEditor({
  */
 export function ProcessingSchedulesSection() {
   const me = useMeQuery();
-  const settings = useSuiteSettingsQuery();
+  const settings = useAppSettingsQuery();
   const libraries = useProcessingLibrariesQuery();
   const maintenance = useProcessingMaintenanceQuery();
   const formatDate = useAppDateFormatter();

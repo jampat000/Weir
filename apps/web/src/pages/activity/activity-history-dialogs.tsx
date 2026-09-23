@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import type { ActivityFileHistoryPreview } from "../../lib/api/types";
-import type { SuiteOperationalHistoryResetOut } from "../../lib/suite/types";
+import type { HistoryResetResult } from "../../lib/settings/types";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { plural } from "../../lib/ui/mm-plural";
 
@@ -117,7 +117,7 @@ export function ClearAllHistoryDialog({
   onCancel,
   onConfirm,
 }: {
-  preview: SuiteOperationalHistoryResetOut;
+  preview: HistoryResetResult;
   busy: boolean;
   error: string | null;
   onCancel: () => void;

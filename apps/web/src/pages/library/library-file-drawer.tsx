@@ -9,7 +9,6 @@
  * A slide-over, like the file story on Live: close it and the table is exactly where it was.
  */
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { SidePanel } from "../../components/shared/side-panel";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
@@ -18,11 +17,9 @@ import { formatBytes } from "../../lib/format/bytes";
 import type {
   LibraryFile,
   LibraryManualPlan,
-} from "../../lib/processing/library-api";
-import {
-  previewProcessingRules,
-  type ProcessingRulesPreviewTrack,
-} from "../../lib/processing/rules-preview-api";
+} from "../../lib/processing/library-mode-api";
+import { useLibraryFilePreviewQuery } from "../../lib/processing/library-mode-queries";
+import type { ProcessingRulesPreviewTrack } from "../../lib/processing/rules-preview-api";
 import { baseName } from "../../lib/format/path";
 import { errorMessage } from "../../lib/api/error-message";
 
@@ -66,20 +63,7 @@ export function LibraryFileDrawer({
   // The tracks you have said to keep, once you start choosing; null while the rules are deciding.
   const [keep, setKeep] = useState<Set<number> | null>(null);
 
-  const preview = useQuery({
-    queryKey: [
-      "processing",
-      "library-file-preview",
-      libraryId,
-      file?.path ?? "",
-    ],
-    queryFn: () =>
-      previewProcessingRules({ libraryId, absolutePath: file!.path }),
-    // A preview runs a real read of a real file, so it is asked for once per opened file, not on a timer.
-    enabled: open,
-    staleTime: 5 * 60 * 1000,
-    retry: false,
-  });
+  const preview = useLibraryFilePreviewQuery(libraryId, file?.path ?? null);
   const history = useActivityRecentQuery(
     open ? { limit: 6, file: file.path } : undefined,
   );

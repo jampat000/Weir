@@ -25,14 +25,13 @@ const mocks = vi.hoisted(() => ({
   fetchActivityExport: vi.fn(),
   fetchActivityFileHistoryPreview: vi.fn(),
   removeActivityFileHistory: vi.fn(),
-  fetchSuiteOperationalHistoryPreview: vi.fn(),
-  resetSuiteOperationalHistory: vi.fn(),
+  fetchOperationalHistoryPreview: vi.fn(),
+  resetOperationalHistory: vi.fn(),
   fetchProcessingFiles: vi.fn(),
   fetchProcessingFileLog: vi.fn(),
 }));
 
 vi.mock("../../lib/activity/queries", () => ({
-  activityRecentKey: ["activity", "recent"],
   useActivityRecentQuery: (...args: unknown[]) =>
     mocks.useActivityRecentQuery(...args),
 }));
@@ -64,13 +63,10 @@ vi.mock("../../lib/api/activity-api", async (importOriginal) => ({
   removeActivityFileHistory: mocks.removeActivityFileHistory,
 }));
 
-vi.mock("../../lib/suite/suite-settings-api", async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import("../../lib/suite/suite-settings-api")
-  >()),
-  fetchSuiteOperationalHistoryPreview:
-    mocks.fetchSuiteOperationalHistoryPreview,
-  resetSuiteOperationalHistory: mocks.resetSuiteOperationalHistory,
+vi.mock("../../lib/settings/settings-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/settings/settings-api")>()),
+  fetchOperationalHistoryPreview: mocks.fetchOperationalHistoryPreview,
+  resetOperationalHistory: mocks.resetOperationalHistory,
 }));
 
 vi.mock("../../lib/processing/files-api", async (importOriginal) => ({
@@ -528,13 +524,13 @@ describe("ActivityPage", () => {
 
   it("clears all history only after RESET is typed, listing the counts", async () => {
     mocks.useActivityRecentQuery.mockReturnValue(recentResult([fileEvent]));
-    mocks.fetchSuiteOperationalHistoryPreview.mockResolvedValue({
+    mocks.fetchOperationalHistoryPreview.mockResolvedValue({
       status: "preview",
       activity_events_deleted: 12,
       jobs_deleted: 4,
       total_deleted: 16,
     });
-    mocks.resetSuiteOperationalHistory.mockResolvedValue({
+    mocks.resetOperationalHistory.mockResolvedValue({
       status: "reset",
       activity_events_deleted: 12,
       jobs_deleted: 4,
@@ -568,7 +564,7 @@ describe("ActivityPage", () => {
     fireEvent.click(confirm);
 
     await waitFor(() =>
-      expect(mocks.resetSuiteOperationalHistory).toHaveBeenCalledWith("RESET"),
+      expect(mocks.resetOperationalHistory).toHaveBeenCalledWith("RESET"),
     );
     await waitFor(() =>
       expect(screen.getByRole("status")).toHaveTextContent(

@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import type { useSuiteUpdateStatusQuery } from "../../lib/suite/queries";
+import type { useUpdateStatusQuery } from "../../lib/settings/queries";
 import {
   useApplyUpdateMutation,
   useUpdateSettingsQuery,
   useUpdateSettingsMutation,
   useUpdateStateQuery,
-} from "../../lib/suite/queries";
-import type { UpdateMode } from "../../lib/suite/types";
+} from "../../lib/settings/queries";
+import type { UpdateMode } from "../../lib/settings/types";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { quietActionRowClass } from "../../components/shared/quiet-section";
 import { mmStatusPillClass } from "../../lib/ui/mm-status-tone";
@@ -19,7 +19,7 @@ function sentenceCase(text: string): string {
 }
 
 type SettingsUpgradeTabProps = {
-  updateStatusQ: ReturnType<typeof useSuiteUpdateStatusQuery>;
+  updateStatusQ: ReturnType<typeof useUpdateStatusQuery>;
 };
 
 const UPDATE_MODES: {

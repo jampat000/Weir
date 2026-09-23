@@ -4,7 +4,7 @@ import type { RequestBody, Schema } from "../api/types";
  * The server writes every key, null included. The schema lists the nullable ones as optional, so this
  * is kept by hand to say what actually arrives.
  */
-export type SuiteSettingsOut = {
+export type AppSettings = {
   product_display_name: string;
   signed_in_home_notice: string | null;
   setup_wizard_state: "pending" | "skipped" | "completed" | string;
@@ -19,12 +19,11 @@ export type SuiteSettingsOut = {
   updated_at: string;
 };
 
-export type SuiteSettingsPutBody = RequestBody<"SuiteSettingsPutIn">;
+export type AppSettingsPutBody = RequestBody<"SuiteSettingsPutIn">;
 
-export type SuiteSecurityOverviewOut = Schema<"SuiteSecurityOverviewOut">;
-export type SuiteConfigurationBackupListOut =
-  Schema<"SuiteConfigurationBackupListOut">;
-export type SuiteUpdateStatusOut = Schema<"SuiteUpdateStatusOut">;
+export type SecurityOverview = Schema<"SuiteSecurityOverviewOut">;
+export type ConfigurationBackupList = Schema<"SuiteConfigurationBackupListOut">;
+export type UpdateStatus = Schema<"SuiteUpdateStatusOut">;
 export type UpdateSettingsOut = Schema<"UpdateSettingsOut">;
 export type UpdateMode = UpdateSettingsOut["mode"];
 export type UpdateSettingsPutBody = RequestBody<"UpdateSettingsPutIn">;
@@ -34,14 +33,20 @@ export type UpdateStateOut = {
   pending_version: string | null;
 };
 
-export type SuiteOperationalHistoryResetOut =
-  Schema<"SuiteOperationalHistoryResetOut">;
-export type SuiteLogEntry = Schema<"SuiteLogEntryOut">;
-export type SuiteLogsOut = Schema<"SuiteLogsOut">;
-export type SuiteMetricsOut = Schema<"SuiteMetricsOut">;
+export type HistoryResetResult = Schema<"SuiteOperationalHistoryResetOut">;
+export type ServerLogEntry = Schema<"SuiteLogEntryOut">;
+export type ServerLogs = Schema<"SuiteLogsOut">;
+export type ServerMetrics = Schema<"SuiteMetricsOut">;
 export type NotificationChannelOut = Schema<"NotificationChannelOut">;
 export type NotificationChannelListOut = Schema<"NotificationChannelListOut">;
 export type NotificationChannelIn = RequestBody<"NotificationChannelIn">;
+export type ServerLogFilters = {
+  level?: string;
+  search?: string;
+  has_exception?: boolean;
+  limit?: number;
+};
+
 export type NotificationChannelTestOut = {
   ok: boolean;
   error: string | null;

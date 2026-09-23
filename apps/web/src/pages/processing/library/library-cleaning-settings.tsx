@@ -6,7 +6,7 @@ import {
   useSaveLibraryFolders,
   useSaveLibraryPreflightSettings,
   useSetLibrarySchedule,
-} from "../../../lib/processing/library-queries";
+} from "../../../lib/processing/library-mode-queries";
 import { mmActionButtonClass } from "../../../lib/ui/mm-control-roles";
 import { errorMessage } from "../../../lib/api/error-message";
 

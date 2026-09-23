@@ -1,8 +1,8 @@
 import { useState } from "react";
 import {
-  useSuiteLogsQuery,
-  useSuiteMetricsQuery,
-} from "../../lib/suite/queries";
+  useServerLogsQuery,
+  useServerMetricsQuery,
+} from "../../lib/settings/queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { mmEditableTextFieldClass } from "../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
@@ -25,13 +25,13 @@ export function SettingsLogsTab() {
   const [logLevel, setLogLevel] = useState<LogLevelFilter>("");
   const [tracebacksOnly, setTracebacksOnly] = useState(false);
 
-  const logsQ = useSuiteLogsQuery({
+  const logsQ = useServerLogsQuery({
     level: logLevel || undefined,
     search: logSearch.trim() || undefined,
     has_exception: tracebacksOnly ? true : undefined,
     limit: 100,
   });
-  const metricsQ = useSuiteMetricsQuery();
+  const metricsQ = useServerMetricsQuery();
 
   const runtimeMetrics = metricsQ.data;
   const runtimeRequestIssues = requestIssueSummary(

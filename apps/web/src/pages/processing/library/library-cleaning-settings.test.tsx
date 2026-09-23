@@ -9,7 +9,7 @@ import {
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
-import * as api from "../../../lib/processing/library-api";
+import * as api from "../../../lib/processing/library-mode-api";
 import { LibraryCleaningSettings } from "./library-cleaning-settings";
 
 function wrapper({ children }: { children: ReactNode }) {
