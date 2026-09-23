@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 
 namespace Weir.Tray;
@@ -65,7 +66,7 @@ static class InstallProcesses
             {
                 session = Process.GetCurrentProcess().SessionId;
             }
-            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or PlatformNotSupportedException)
+            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception or PlatformNotSupportedException)
             {
                 log($"{why}: stopped nothing: could not read this process's Windows session ({ex.Message}).");
                 return stopped;
@@ -93,7 +94,7 @@ static class InstallProcesses
 
                         path = proc.MainModule?.FileName;
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or NotSupportedException)
                     {
                         log($"{why}: left {name} (pid {proc.Id}) running: could not read where it runs from ({ex.Message}).");
                         continue;
@@ -112,7 +113,7 @@ static class InstallProcesses
                         stopped.Add(proc.Id);
                         log($"{why}: stopped {name} (pid {proc.Id}) at {path}.");
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or NotSupportedException or AggregateException)
                     {
                         log($"{why}: could not stop {name} (pid {proc.Id}) at {path}: {ex.Message}");
                     }

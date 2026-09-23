@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
@@ -227,7 +228,7 @@ static class Program
         return SystemIcons.Application;
     }
 
-    // A second launch while Weir is running: open the running one, at the port its server listens on now.
+    // A second launch while Weir is running: open the running one, at the port its server is listening on.
     private static void OpenExistingInstanceBrowser()
     {
         var portFile = Path.Combine(RuntimeHome(), ServerHost.CurrentPortFileName);
@@ -293,7 +294,7 @@ static class Program
             (startProcess ?? (info => Process.Start(info)?.Dispose()))(startInfo);
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or PlatformNotSupportedException)
         {
             // Opening a browser is a convenience action. Session 0, disconnected RDP
             // sessions, and hardened shell policies can reject shell execution; none of

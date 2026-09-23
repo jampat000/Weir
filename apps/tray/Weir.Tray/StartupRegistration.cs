@@ -1,3 +1,4 @@
+using System.Security;
 using Microsoft.Win32;
 
 namespace Weir.Tray;
@@ -33,7 +34,7 @@ static class StartupRegistration
                 TrayLog.Write("Removed the startup folder shortcut; the Run key starts Weir now.");
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is SecurityException or UnauthorizedAccessException or IOException)
         {
             TrayLog.Write($"Could not register startup: {ex.Message}");
         }
@@ -52,7 +53,7 @@ static class StartupRegistration
                 TrayLog.Write("Removed startup folder shortcut.");
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is SecurityException or UnauthorizedAccessException or IOException)
         {
             TrayLog.Write($"Could not deregister startup: {ex.Message}");
         }
