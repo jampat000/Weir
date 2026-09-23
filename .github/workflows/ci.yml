@@ -1,14 +1,16 @@
-# Weir - .NET server build and tests, web build/tests, E2E smoke, contract suite, Docker smoke, and
-# Windows packaging smoke.
-# Triggers: push to main, pull_request, workflow_dispatch.
-# Path-aware: the `changes` job decides which parts run. On push to main (a squash merge already
-# tested on its pull request) only the build and unit test steps run, and the packaging smokes only
-# when packaging, app or workflow files changed.
-# GitHub shows the job as "Test / weir".
-# The release does not re-run these tests: scripts/verify-ci-for-release.mjs makes a tagged release
-# prove that this workflow passed on the tagged commit, by the job and step names it lists. Renaming a
-# job or step it names means updating that list; scripts/check-release-workflow-gates.mjs enforces it.
-name: Test
+# Weir CI: the server on Linux and Windows, the web app, the E2E smoke, the contract suite (ci-contract.yml), the
+# tray, and the Docker and Windows package smokes (ci-packaging.yml). Triggers: push to main, pull_request,
+# workflow_dispatch.
+#
+# `changes` turns the paths a change touches into one run_* flag per job, and each job runs only when its flag
+# is true; a manual run runs everything. `ci-passed` needs every job and passes only when each job that was due
+# passed and each job that was not due was skipped (scripts/ci-passed.mjs). It is the one check main's ruleset
+# requires, and the one the release asks for on the tagged commit (scripts/verify-ci-for-release.mjs).
+# scripts/check-release-workflow-gates.mjs checks that ci-passed needs every job here.
+#
+# A push to main always runs server-windows and tray, whatever changed, so every commit a release can tag has
+# had its server tested on Windows and its tray tested in that exact tree.
+name: CI
 
 on:
   push:
@@ -28,10 +30,6 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
 
 jobs:
-  # Which parts of the repo a change touches, so the jobs below skip work nothing changed.
-  # `workflows` counts as touching everything. A manual run (workflow_dispatch) runs everything.
-  # The required checks (weir, docker-smoke, windows-package-smoke) keep running as jobs and skip
-  # their expensive steps instead, so a skipped check still reports success.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -39,25 +37,27 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      server: ${{ steps.filter.outputs.server }}
-      web: ${{ steps.filter.outputs.web }}
-      harness: ${{ steps.filter.outputs.harness }}
-      contract: ${{ steps.filter.outputs.contract }}
-      packaging: ${{ steps.filter.outputs.packaging }}
-      docker: ${{ steps.filter.outputs.docker }}
-      workflows: ${{ steps.filter.outputs.workflows }}
-      contract_areas: ${{ steps.areas.outputs.required }}
+      run_server_linux: ${{ steps.flags.outputs.run_server_linux }}
+      run_server_windows: ${{ steps.flags.outputs.run_server_windows }}
+      run_server_audit: ${{ steps.flags.outputs.run_server_audit }}
+      run_web: ${{ steps.flags.outputs.run_web }}
+      run_web_audit: ${{ steps.flags.outputs.run_web_audit }}
+      run_e2e: ${{ steps.flags.outputs.run_e2e }}
+      run_contract: ${{ steps.flags.outputs.run_contract }}
+      run_tray: ${{ steps.flags.outputs.run_tray }}
+      run_packaging: ${{ steps.flags.outputs.run_packaging }}
+      run_arm64: ${{ steps.flags.outputs.run_arm64 }}
+      contract_areas: ${{ steps.areas.outputs.areas }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # The contract suite runs one area per runner. The list is read from areas.json rather than
-      # written out here, so an area added there gets its own leg without anyone editing this file.
-      - name: Required contract areas
+      # One contract leg per area in areas.json, so a new area gets its leg without editing this file.
+      - name: Contract areas
         id: areas
         run: |
-          areas="$(jq -c '[.areas[] | select((.required // []) | index("dotnet")) | .name]' tests/contract/areas.json)"
-          echo "Required on dotnet: $areas"
-          echo "required=$areas" >> "$GITHUB_OUTPUT"
+          areas="$(jq -c '[.areas[].name]' tests/contract/areas.json)"
+          echo "Contract areas: $areas"
+          echo "areas=$areas" >> "$GITHUB_OUTPUT"
 
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
@@ -77,6 +77,10 @@ jobs:
               - 'tests/e2e/weir/_runtime.py'
               - 'tests/requirements.txt'
               - 'apps/server/**'
+            tray:
+              - 'apps/tray/**'
+              # The tray imports the server's build rules and product version.
+              - 'apps/server/Directory.Build.props'
             packaging:
               - 'packaging/**'
               - 'docker/**'
@@ -88,6 +92,8 @@ jobs:
               - 'apps/web/**'
               - 'scripts/smoke-windows-package.ps1'
               - 'scripts/live-packaged-e2e.py'
+              - 'scripts/wait-for-health.mjs'
+              - 'scripts/ffmpeg-cache-key.mjs'
             docker:
               - 'docker/**'
               - 'Dockerfile'
@@ -95,53 +101,54 @@ jobs:
             workflows:
               - '.github/**'
 
-  weir:
-    needs: changes
-    # Runs even if the change detection failed; the RUN_* flags then default to running everything.
-    if: ${{ !cancelled() }}
+      # Web checks also run for server and harness changes: the server embeds the OpenAPI document the web
+      # app's generated types come from, and the E2E smoke and contract suite serve the built web app. The
+      # audits and the E2E smoke run on pull requests; a push to main was a squash merge its pull request
+      # already ran them on. The arm64 image builds under QEMU, which is slow, so only when the image changes.
+      - name: Which jobs are due
+        id: flags
+        env:
+          EVENT: ${{ github.event_name }}
+          SERVER: ${{ steps.filter.outputs.server }}
+          WEB: ${{ steps.filter.outputs.web }}
+          HARNESS: ${{ steps.filter.outputs.harness }}
+          CONTRACT: ${{ steps.filter.outputs.contract }}
+          TRAY: ${{ steps.filter.outputs.tray }}
+          PACKAGING: ${{ steps.filter.outputs.packaging }}
+          DOCKER: ${{ steps.filter.outputs.docker }}
+          WORKFLOWS: ${{ steps.filter.outputs.workflows }}
+        run: |
+          set -euo pipefail
+          either() { for value in "$@"; do if [ "$value" = true ]; then echo true; return; fi; done; echo false; }
+          manual=$([ "$EVENT" = workflow_dispatch ] && echo true || echo false)
+          main_push=$([ "$EVENT" = push ] && echo true || echo false)
+          all=$(either "$manual" "$WORKFLOWS")
+          on_pull_request() { if [ "$main_push" = true ]; then echo false; else echo "$1"; fi; }
+
+          web=$(either "$all" "$SERVER" "$HARNESS" "$WEB")
+          {
+            echo "run_server_linux=$(either "$all" "$SERVER")"
+            echo "run_server_windows=$(either "$all" "$SERVER" "$main_push")"
+            echo "run_server_audit=$(on_pull_request "$(either "$all" "$SERVER")")"
+            echo "run_web=$web"
+            echo "run_web_audit=$(on_pull_request "$(either "$all" "$WEB")")"
+            echo "run_e2e=$(on_pull_request "$web")"
+            echo "run_contract=$(either "$all" "$CONTRACT")"
+            echo "run_tray=$(either "$all" "$TRAY" "$main_push")"
+            echo "run_packaging=$(either "$all" "$PACKAGING")"
+            echo "run_arm64=$(either "$manual" "$DOCKER")"
+          } | tee -a "$GITHUB_OUTPUT"
+
+  # Cheap checks on the repository itself, on every change.
+  repo-checks:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      WEIR_SESSION_SECRET: ${{ github.run_id }}-${{ github.job }}-${{ github.run_attempt }}-ci-session-secret-32chars-min
-      # 'true' or 'false'. Web steps also run for server changes: the server embeds the committed
-      # OpenAPI document the web app's generated types come from, and the E2E smoke needs both.
-      RUN_SERVER: ${{ github.event_name == 'workflow_dispatch' || needs.changes.result != 'success' || needs.changes.outputs.server == 'true' || needs.changes.outputs.workflows == 'true' }}
-      RUN_WEB: ${{ github.event_name == 'workflow_dispatch' || needs.changes.result != 'success' || needs.changes.outputs.server == 'true' || needs.changes.outputs.harness == 'true' || needs.changes.outputs.workflows == 'true' || needs.changes.outputs.web == 'true' }}
-      RUN_WEB_AUDIT: ${{ github.event_name != 'push' && (github.event_name == 'workflow_dispatch' || needs.changes.result != 'success' || needs.changes.outputs.web == 'true' || needs.changes.outputs.workflows == 'true') }}
-      RUN_SERVER_AUDIT: ${{ github.event_name != 'push' && (github.event_name == 'workflow_dispatch' || needs.changes.result != 'success' || needs.changes.outputs.server == 'true' || needs.changes.outputs.workflows == 'true') }}
-      RUN_E2E: ${{ github.event_name != 'push' && (github.event_name == 'workflow_dispatch' || needs.changes.result != 'success' || needs.changes.outputs.server == 'true' || needs.changes.outputs.harness == 'true' || needs.changes.outputs.workflows == 'true' || needs.changes.outputs.web == 'true') }}
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Nothing to test for this change
-        if: env.RUN_SERVER != 'true' && env.RUN_WEB != 'true'
-        run: echo "No server, web, test, script or workflow files changed."
-
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        if: env.RUN_SERVER == 'true' || env.RUN_E2E == 'true'
-        with:
-          global-json-file: apps/server/global.json
-
-      # Warnings are errors, and so are the unused-member analyzers (IDE0051/IDE0052, apps/server/.editorconfig):
-      # that is the server's dead-code guard.
-      - name: Build Weir server (warnings are errors)
-        if: env.RUN_SERVER == 'true' || env.RUN_E2E == 'true'
-        run: dotnet build apps/server/Weir.slnx -warnaserror
-
-      - name: Test Weir server
-        if: env.RUN_SERVER == 'true'
-        run: dotnet test apps/server/Weir.slnx --no-build
-
-      - name: Server dependency vulnerability scan
-        if: env.RUN_SERVER_AUDIT == 'true'
-        run: node scripts/check-dotnet-vulnerabilities.mjs apps/server/Weir.slnx
-
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        if: env.RUN_WEB == 'true'
         with:
           node-version: "24"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
 
       - name: Weir agent documentation map
         run: node scripts/check-agent-docs.mjs
@@ -149,372 +156,229 @@ jobs:
       - name: GitHub Actions pin check
         run: node scripts/check-github-action-pins.mjs
 
-      - name: Release publication gate ordering
+      - name: Release and CI gate rules
         run: |
           node scripts/check-release-workflow-gates.mjs
-          node --test scripts/verify-ci-for-release.test.mjs
+          node --test scripts/verify-ci-for-release.test.mjs scripts/ci-passed.test.mjs
 
-      - name: Weir web - install, lint, format, build, unit tests
-        if: env.RUN_WEB == 'true'
+  server-linux:
+    needs: changes
+    if: needs.changes.outputs.run_server_linux == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: apps/server/global.json
+          cache: true
+          cache-dependency-path: apps/server/**/packages.lock.json
+
+      - name: Restore Weir server (locked)
+        run: dotnet restore apps/server/Weir.slnx --locked-mode
+
+      # Warnings are errors, and so are the unused-member analyzers (IDE0051/IDE0052, apps/server/.editorconfig):
+      # that is the server's dead-code guard.
+      - name: Build Weir server (warnings are errors)
+        run: dotnet build apps/server/Weir.slnx -warnaserror --no-restore
+
+      - name: Test Weir server
+        run: dotnet test apps/server/Weir.slnx --no-build
+
+      - name: Server dependency vulnerability scan
+        if: needs.changes.outputs.run_server_audit == 'true'
+        run: node scripts/check-dotnet-vulnerabilities.mjs apps/server/Weir.slnx
+
+  # The server's Windows-only code paths (file identity, same-folder renames, sharing violations) only run here.
+  server-windows:
+    needs: changes
+    if: needs.changes.outputs.run_server_windows == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: apps/server/global.json
+          cache: true
+          cache-dependency-path: apps/server/**/packages.lock.json
+
+      - name: Restore Weir server (locked)
+        run: dotnet restore apps/server/Weir.slnx --locked-mode
+
+      - name: Build Weir server (warnings are errors)
+        run: dotnet build apps/server/Weir.slnx -warnaserror --no-restore
+
+      - name: Test Weir server
+        run: dotnet test apps/server/Weir.slnx --no-build
+
+  # The production web build, once, for the E2E smoke and every contract leg to serve.
+  web-dist:
+    needs: changes
+    if: needs.changes.outputs.run_web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Weir web - install and build (tokens, types, bundle budget)
+        working-directory: apps/web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Upload web dist
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: weir-web-dist
+          if-no-files-found: error
+          retention-days: 1
+          path: apps/web/dist
+
+  web:
+    needs: changes
+    if: needs.changes.outputs.run_web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      # The build itself is web-dist's.
+      - name: Weir web - install, API types, lint, format, unit tests
         working-directory: apps/web
         run: |
           npm ci
           npm run api:types:check
           npm run lint
           npm run format
-          npm run build
           npm run test
 
       # After the web install above, so it reuses apps/web/node_modules for ts-prune.
       - name: Weir dead-code guard
-        if: env.RUN_WEB == 'true'
         run: node scripts/check-dead-code.mjs
 
       - name: Frontend dependency vulnerability scan
-        if: env.RUN_WEB_AUDIT == 'true'
+        if: needs.changes.outputs.run_web_audit == 'true'
         working-directory: apps/web
         run: npm audit --audit-level=high
 
+  e2e-smoke:
+    needs: [changes, web-dist]
+    if: needs.changes.outputs.run_e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      WEIR_SESSION_SECRET: ${{ github.run_id }}-${{ github.job }}-${{ github.run_attempt }}-ci-session-secret-32chars-min
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: apps/server/global.json
+          cache: true
+          cache-dependency-path: apps/server/**/packages.lock.json
+
+      # The smoke runs `dotnet run --no-build` on the host (tests/e2e/weir/conftest.py).
+      - name: Build Weir server (the server under test)
+        run: |
+          dotnet restore apps/server/src/Weir.Host --locked-mode
+          dotnet build apps/server/src/Weir.Host --no-restore
+
+      - name: Download web dist
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: weir-web-dist
+          path: apps/web/dist
+
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        if: env.RUN_E2E == 'true'
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: tests/requirements.txt
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('tests/requirements.txt') }}
+
       - name: Install locked test runner + Playwright browser
-        if: env.RUN_E2E == 'true'
         run: |
           python -m pip install --require-hashes -r tests/requirements.txt
           python -m playwright install --with-deps chromium
 
       - name: Weir E2E smoke (Playwright + real .NET server)
-        if: env.RUN_E2E == 'true'
         env:
           WEIR_E2E: "1"
           WEIR_HOME: ${{ runner.temp }}/weir-e2e
         run: python -m pytest tests/e2e/weir -q --tb=short
 
-  # The server's Windows-only code paths (file identity, same-folder renames, sharing violations) only
-  # run on Windows. Not a required check; runs when the server or the workflows change.
-  weir-server-windows:
-    name: weir-server (windows-latest)
-    needs: changes
-    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || needs.changes.result != 'success' || needs.changes.outputs.server == 'true' || needs.changes.outputs.workflows == 'true') }}
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        with:
-          global-json-file: apps/server/global.json
-
-      - name: Build Weir server (warnings are errors)
-        run: dotnet build apps/server/Weir.slnx -warnaserror
-
-      - name: Test Weir server
-        run: dotnet test apps/server/Weir.slnx --no-build
-
-  # Language-neutral contract suite (#516): starts the .NET server as a separate process and talks to
-  # it only over HTTP (tests/contract/README.md). One leg per area areas.json requires on dotnet (every
-  # area, today), all at once: run one after another they took about 18.5 minutes on a single runner.
-  contract-area:
-    name: contract (${{ matrix.area }})
-    needs: changes
-    # Needs the area list from `changes`, so unlike the jobs above it cannot run when change detection
-    # failed. The `contract` job below then fails rather than passes, which is the safe way round.
-    if: ${{ !cancelled() && needs.changes.result == 'success' && (github.event_name == 'workflow_dispatch' || needs.changes.outputs.contract == 'true' || needs.changes.outputs.workflows == 'true') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        area: ${{ fromJSON(needs.changes.outputs.contract_areas) }}
-    env:
-      WEIR_CONTRACT_SERVER: dotnet
-      WEIR_SESSION_SECRET: ${{ github.run_id }}-${{ github.job }}-${{ github.run_attempt }}-ci-session-secret-32chars-min
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: tests/requirements.txt
-
-      - name: Install locked contract suite dependencies and ffmpeg
-        run: |
-          python -m pip install --require-hashes -r tests/requirements.txt
-          command -v ffmpeg >/dev/null || (sudo apt-get update && sudo apt-get install -y ffmpeg)
-
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        with:
-          global-json-file: apps/server/global.json
-
-      # Each leg builds for itself. The build takes under a minute; handing seven runners one build
-      # through an artifact costs about as long in upload and download, and adds a job every leg must
-      # wait for. Only the host is built, because the suite runs `dotnet run --no-build` on it
-      # (tests/contract/support/launcher.py); the `weir` job builds the whole solution, warnings as errors.
-      - name: Build Weir server (the server under test)
-        run: dotnet build apps/server/src/Weir.Host
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-
-      - name: Weir web - install and build (served by the server under test)
-        working-directory: apps/web
-        run: |
-          npm ci
-          npm run build
-
-      - name: Contract suite lint
-        run: |
-          ruff check tests/contract
-          ruff format --check tests/contract
-
-      # --contract-required-only on top of --contract-area: a leg for an area that is not required
-      # selects nothing, which pytest reports as a failure (exit 5), never as a pass.
-      - name: Contract suite, required area (${{ matrix.area }})
-        id: contract
-        env:
-          # The suite reaps servers an earlier run left behind through this ledger file; one per leg.
-          WEIR_CONTRACT_LEDGER: ${{ runner.temp }}/weir-contract-servers-${{ matrix.area }}.json
-          CONTRACT_AREA: ${{ matrix.area }}
-        run: python -m pytest tests/contract -q --tb=short -p no:cacheprovider --contract-required-only --contract-area "$CONTRACT_AREA"
-
-      # #586: the suite already writes one log per server it starts (ServerUnderTest.logs_dir,
-      # tests/contract/support/launcher.py), but they land in pytest's basetemp under the runner's
-      # temp dir, outside the workspace, and nothing ever collected them — so an intermittent
-      # failure left no server-side evidence at all. Copy them somewhere uploadable.
-      - name: Collect contract server logs
-        if: ${{ !cancelled() && steps.contract.outcome == 'failure' }}
-        run: |
-          shopt -s nullglob globstar
-          mkdir -p artifacts/contract-logs
-          for log in /tmp/pytest-of-*/pytest-*/**/contract-logs/server-*.log; do
-            cp "$log" "artifacts/contract-logs/$(printf '%s' "${log#/tmp/}" | tr '/' '_')"
-          done
-          ls -la artifacts/contract-logs
-
-      - name: Upload contract server logs
-        if: ${{ !cancelled() && steps.contract.outcome == 'failure' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: weir-contract-logs-${{ matrix.area }}
-          if-no-files-found: warn
-          path: artifacts/contract-logs/*
-
-  # The contract suite's single verdict, "every required area passed", and the check to require on
-  # main: a leg's name follows areas.json, this one never changes. `always()` so that it reports rather
-  # than being skipped, because GitHub counts a skipped required check as passing.
+  # The contract suite, one leg per area (ci-contract.yml).
   contract:
-    needs: [changes, contract-area]
+    needs: [changes, web-dist]
+    if: needs.changes.outputs.run_contract == 'true'
+    uses: ./.github/workflows/ci-contract.yml
+    with:
+      areas: ${{ needs.changes.outputs.contract_areas }}
+
+  # The tray's unit tests: port choice, update settings and menu state, the health wait, the session secret's
+  # access list, and which processes the installer may stop.
+  tray:
+    needs: changes
+    if: needs.changes.outputs.run_tray == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: apps/server/global.json
+          cache: true
+          cache-dependency-path: apps/tray/**/packages.lock.json
+
+      - name: Restore Weir tray (locked)
+        run: dotnet restore apps/tray/Weir.Tray.slnx --locked-mode
+
+      # Warnings are errors through apps/tray/Directory.Build.props.
+      - name: Build Weir tray
+        run: dotnet build apps/tray/Weir.Tray.slnx --no-restore
+
+      - name: Test Weir tray
+        run: dotnet test apps/tray/Weir.Tray.slnx --no-build
+
+  # The Docker and Windows package smokes (ci-packaging.yml).
+  packaging:
+    needs: changes
+    if: needs.changes.outputs.run_packaging == 'true'
+    uses: ./.github/workflows/ci-packaging.yml
+    with:
+      arm64: ${{ needs.changes.outputs.run_arm64 == 'true' }}
+
+  # The verdict. `always()` so it reports even when a job it needs failed or was skipped.
+  ci-passed:
+    needs: [changes, repo-checks, server-linux, server-windows, web-dist, web, e2e-smoke, contract, tray, packaging]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    env:
-      RUN_CONTRACT: ${{ github.event_name == 'workflow_dispatch' || needs.changes.result != 'success' || needs.changes.outputs.contract == 'true' || needs.changes.outputs.workflows == 'true' }}
-      LEGS: ${{ needs.contract-area.result }}
-      AREAS: ${{ needs.changes.outputs.contract_areas }}
-    steps:
-      - name: Every required contract area passed
-        run: |
-          if [ "$RUN_CONTRACT" = "true" ]; then
-            if [ "$LEGS" = "success" ]; then
-              echo "Every required contract area passed: $AREAS"
-              exit 0
-            fi
-            echo "::error::The contract suite had to run, and its areas ended '$LEGS' (areas: ${AREAS:-unknown}). Every required area must pass."
-            exit 1
-          fi
-          if [ "$LEGS" = "skipped" ]; then
-            echo "No contract, server or workflow files changed, so the contract suite did not need to run."
-            exit 0
-          fi
-          echo "::error::The contract suite was not due to run, yet its areas ended '$LEGS'."
-          exit 1
-
-  docker-smoke:
-    needs: changes
-    # Runs even if the change detection failed; the RUN_* flags then default to running everything.
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    env:
-      RUN_PACKAGING: ${{ github.event_name == 'workflow_dispatch' || needs.changes.result != 'success' || needs.changes.outputs.packaging == 'true' || needs.changes.outputs.workflows == 'true' }}
-      # The arm64 image is built under QEMU, which is slow, so only when the image definition itself
-      # changed (or on a manual run). Releases always build and publish both architectures.
-      RUN_ARM64: ${{ github.event_name == 'workflow_dispatch' || needs.changes.result != 'success' || needs.changes.outputs.docker == 'true' }}
-      WEIR_SESSION_SECRET: ${{ github.run_id }}-${{ github.job }}-${{ github.run_attempt }}-ci-session-secret-32chars-min
-      WEIR_LIVE_E2E_FIXTURE_HOST_ROOT: ${{ github.workspace }}/artifacts/docker-ci-fixture
-      WEIR_LIVE_E2E_FIXTURE_SERVER_ROOT: /e2e-fixture
-      WEIR_LIVE_E2E_FFMPEG: ffmpeg
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Nothing to package for this change
-        if: env.RUN_PACKAGING != 'true'
-        run: echo "No packaging, app or workflow files changed."
-
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        if: env.RUN_PACKAGING == 'true'
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: tests/requirements.txt
-
-      - name: Install locked live-audit dependencies and browser
-        if: env.RUN_PACKAGING == 'true'
-        run: |
-          python -m pip install --require-hashes -r tests/requirements.txt
-          python -m playwright install --with-deps chromium
-          command -v ffmpeg >/dev/null || (sudo apt-get update && sudo apt-get install -y ffmpeg)
-
-      - name: Build Weir Docker image
-        if: env.RUN_PACKAGING == 'true'
-        run: docker build -t weir-ci-smoke .
-
-      - name: Start Weir Docker candidate
-        if: env.RUN_PACKAGING == 'true'
-        run: |
-          docker rm -f weir-ci-smoke >/dev/null 2>&1 || true
-          mkdir -p "$WEIR_LIVE_E2E_FIXTURE_HOST_ROOT"
-          chmod 0777 "$WEIR_LIVE_E2E_FIXTURE_HOST_ROOT"
-          docker run -d --name weir-ci-smoke -p 9347:9347 \
-            -v "$WEIR_LIVE_E2E_FIXTURE_HOST_ROOT:$WEIR_LIVE_E2E_FIXTURE_SERVER_ROOT" \
-            -e WEIR_SESSION_SECRET="$WEIR_SESSION_SECRET" \
-            -e WEIR_SESSION_COOKIE_SECURE=false \
-            weir-ci-smoke
-          for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:9347/health >/tmp/weir-health.json; then
-              cat /tmp/weir-health.json
-              exit 0
-            fi
-            sleep 2
-          done
-          docker logs weir-ci-smoke
-          exit 1
-
-      # #548: the writer setting's "best" default degrades to ffmpeg without complaint when mkvmerge is
-      # missing, so an image that quietly stopped installing it would pass every other step here. This
-      # asserts the binary is in the image and runs at all; the live E2E below reads
-      # /api/v1/system/media-tools, which proves the endpoint answers in a real deployment.
-      - name: Docker candidate carries mkvmerge
-        if: env.RUN_PACKAGING == 'true'
-        run: |
-          version="$(docker exec weir-ci-smoke mkvmerge --version | head -n 1)"
-          case "$version" in
-            mkvmerge\ *) echo "Docker image carries $version" ;;
-            *) echo "The Docker image did not report a usable mkvmerge: $version" >&2; exit 1 ;;
-          esac
-
-      - name: Full live E2E against Docker candidate
-        if: env.RUN_PACKAGING == 'true'
+      - name: Every job that was due passed
         env:
-          WEIR_LIVE_BASE_URL: http://127.0.0.1:9347
-          WEIR_LIVE_E2E_ARTIFACTS: artifacts/docker-ci-e2e
-        run: python scripts/live-packaged-e2e.py
-
-      - name: Upload Docker live-audit evidence
-        if: always() && env.RUN_PACKAGING == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: weir-docker-live-audit
-          if-no-files-found: warn
-          path: artifacts/docker-ci-e2e/*
-
-      - name: Cleanup Weir Docker smoke
-        if: always() && env.RUN_PACKAGING == 'true'
-        run: docker rm -f weir-ci-smoke >/dev/null 2>&1 || true
-
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
-        if: env.RUN_PACKAGING == 'true' && env.RUN_ARM64 == 'true'
-        with:
-          platforms: arm64
-
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-        if: env.RUN_PACKAGING == 'true' && env.RUN_ARM64 == 'true'
-
-      # The server itself is cross-published natively in the SDK stage; only the final stage's apt-get
-      # runs emulated. Proves the multi-arch image the release publishes still builds.
-      - name: Build Weir Docker image (linux/arm64)
-        if: env.RUN_PACKAGING == 'true' && env.RUN_ARM64 == 'true'
-        run: docker buildx build --platform linux/arm64 -t weir-ci-smoke:arm64 .
-
-  windows-package-smoke:
-    needs: changes
-    # Runs even if the change detection failed; the RUN_* flags then default to running everything.
-    if: ${{ !cancelled() }}
-    runs-on: windows-latest
-    timeout-minutes: 60
-    env:
-      RUN_PACKAGING: ${{ github.event_name == 'workflow_dispatch' || needs.changes.result != 'success' || needs.changes.outputs.packaging == 'true' || needs.changes.outputs.workflows == 'true' }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Nothing to package for this change
-        if: env.RUN_PACKAGING != 'true'
-        run: echo "No packaging, app or workflow files changed."
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        if: env.RUN_PACKAGING == 'true'
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-
-      # .NET 10 for the server (apps/server/global.json), .NET 9 for the tray app it ships with.
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        if: env.RUN_PACKAGING == 'true'
-        with:
-          dotnet-version: "9.0.x"
-          global-json-file: apps/server/global.json
-
-      - name: Weir tray unit tests
-        if: env.RUN_PACKAGING == 'true'
-        run: dotnet test apps/tray/Weir.Tray.Tests --nologo --verbosity quiet
-
-      - name: Install Velopack CLI
-        if: env.RUN_PACKAGING == 'true'
-        run: dotnet tool install -g vpk --version 1.2.0
-
-      # FFmpeg is ~46% of this job (203.8s of 444.9s measured on v2.4.1) and the
-      # vendor folder is gitignored, so every run started from nothing. The key
-      # rolls per run and restores the newest previous cache; the build script
-      # still checks the vendored copy against the current upstream checksum, so
-      # a stale restore is refreshed rather than shipped.
-      - name: Cache vendored FFmpeg
-        if: env.RUN_PACKAGING == 'true'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: packaging/windows/vendor/ffmpeg
-          key: ffmpeg-vendor-${{ runner.os }}-${{ github.run_id }}
-          restore-keys: |
-            ffmpeg-vendor-${{ runner.os }}-
-
-      # #548: same reasoning as FFmpeg above — an ~85 MB download the gitignored vendor folder would
-      # otherwise repeat every run. The key carries the pinned version, so bumping
-      # $mkvtoolnixVersion in build-velopack.ps1 misses the cache and downloads the new archive
-      # rather than restoring the old one; the build script re-checks the vendored copy against the
-      # pinned checksum either way.
-      - name: Cache vendored MKVToolNix
-        if: env.RUN_PACKAGING == 'true'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: packaging/windows/vendor/mkvtoolnix
-          key: mkvtoolnix-vendor-${{ runner.os }}-${{ hashFiles('packaging/windows/build-velopack.ps1') }}
-          restore-keys: |
-            mkvtoolnix-vendor-${{ runner.os }}-
-
-      # Builds the web app, publishes the .NET server and the tray, vendors FFmpeg and MKVToolNix and packs.
-      - name: Build Weir Windows package (Velopack)
-        if: env.RUN_PACKAGING == 'true'
-        run: powershell -ExecutionPolicy Bypass -File packaging/windows/build-velopack.ps1
-
-      - name: Smoke test packaged Windows server
-        if: env.RUN_PACKAGING == 'true'
-        run: powershell -ExecutionPolicy Bypass -File scripts/smoke-windows-package.ps1
+          NEEDS: ${{ toJSON(needs) }}
+        run: node scripts/ci-passed.mjs

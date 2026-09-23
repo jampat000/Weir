@@ -1,10 +1,9 @@
-# Tag-driven release: push tag v* -> CI proof, Windows installer, Docker image, GitHub Release.
+# Tag-driven release: push tag v* (not a prerelease v*-*) -> CI proof, Windows installer, Docker image, GitHub Release.
 #
 # Every job but publish starts at once and none of them can publish anything:
 #
-#   ci-passed         ci.yml already passed on this exact commit (scripts/verify-ci-for-release.mjs).
-#                     The release no longer re-runs the server tests, web tests and contract suite
-#                     that run already ran; it refuses to publish without that proof instead.
+#   ci-passed         ci.yml's ci-passed job already passed on this exact commit
+#                     (scripts/verify-ci-for-release.mjs), so the release does not repeat CI's tests.
 #   validate          release-only checks: notes file, gate ordering, dependency advisories as of
 #                     today, the E2E smoke, and the production web build that ships as an asset.
 #   windows-smoke     builds, smokes and uploads the Windows package (artifact, not public).
@@ -13,6 +12,8 @@
 #
 # publish needs all five. It alone holds registry credentials, `packages: write` and
 # `contents: write`, so nothing reaches ghcr or the Releases page unless every check above passed.
+# It pushes only the version tag, smokes that image, publishes the GitHub Release, and only then
+# moves `latest`, so `latest` never points at an image that failed its smoke.
 # scripts/check-release-workflow-gates.mjs enforces that shape.
 name: Release
 
@@ -20,6 +21,7 @@ on:
   push:
     tags:
       - "v*"
+      - "!v*-*"
 
 concurrency:
   group: release-${{ github.ref }}
@@ -40,7 +42,6 @@ jobs:
   # period, and it fails with the fix (a manual ci.yml run on the tag) when no run can prove the commit.
   ci-passed:
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.ref_name, '-') }}
     timeout-minutes: 50
     permissions:
       actions: read
@@ -55,7 +56,6 @@ jobs:
 
   windows-smoke:
     runs-on: windows-latest
-    if: ${{ !contains(github.ref_name, '-') }}
     timeout-minutes: 60
     permissions:
       contents: read
@@ -73,59 +73,31 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
 
-      # The product version lives in two files: WeirVersion in apps/server/Directory.Build.props (the
-      # server, installer and image) and apps/web/package.json. Both must equal the tag.
       - name: Validate release version alignment
         shell: bash
-        env:
-          TAG_VERSION: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          node - <<'JS'
-          const fs = require("node:fs");
-          const tag = process.env.TAG_VERSION.trim().replace(/^v/, "");
-          const props = fs.readFileSync("apps/server/Directory.Build.props", "utf8");
-          const server = (props.match(/<WeirVersion>([^<]+)<\/WeirVersion>/) || [])[1]?.trim();
-          const web = JSON.parse(fs.readFileSync("apps/web/package.json", "utf8")).version;
-          const mismatches = [
-            ["apps/server/Directory.Build.props WeirVersion", server],
-            ["apps/web/package.json version", web],
-          ].filter(([, value]) => value !== tag);
-          if (mismatches.length) {
-            console.error(`ERROR: Release tag v${tag} does not match versioned files:`);
-            for (const [name, value] of mismatches) console.error(`  - ${name}: ${value}`);
-            process.exit(1);
-          }
-          console.log(`Release versions aligned at ${tag}.`);
-          JS
+        run: node scripts/check-release-version.mjs "$GITHUB_REF_NAME"
 
-      # .NET 10 for the server (apps/server/global.json), .NET 9 for the tray app it ships with.
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
-          dotnet-version: "9.0.x"
           global-json-file: apps/server/global.json
+          cache: true
+          cache-dependency-path: |
+            apps/server/**/packages.lock.json
+            apps/tray/**/packages.lock.json
 
-      - name: Install Velopack CLI
-        run: dotnet tool install -g vpk --version 1.2.0
+      # Same caches as ci-packaging.yml: FFmpeg keyed on upstream's current build checksum, MKVToolNix on the
+      # build script that pins it. The build script re-checks the vendored copy either way.
+      - name: FFmpeg build checksum
+        id: ffmpeg
+        shell: bash
+        run: node scripts/ffmpeg-cache-key.mjs >> "$GITHUB_OUTPUT"
 
-      # FFmpeg is ~46% of this job (203.8s of 444.9s measured on v2.4.1) and the
-      # vendor folder is gitignored, so every run started from nothing. The key
-      # rolls per run and restores the newest previous cache; the build script
-      # still checks the vendored copy against the current upstream checksum, so
-      # a stale restore is refreshed rather than shipped.
       - name: Cache vendored FFmpeg
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: packaging/windows/vendor/ffmpeg
-          key: ffmpeg-vendor-${{ runner.os }}-${{ github.run_id }}
-          restore-keys: |
-            ffmpeg-vendor-${{ runner.os }}-
+          key: ${{ runner.os }}-${{ steps.ffmpeg.outputs.key }}
 
-      # #548: same reasoning as FFmpeg above — an ~85 MB download the gitignored vendor folder would
-      # otherwise repeat every run. The key carries the pinned version, so bumping
-      # $mkvtoolnixVersion in build-velopack.ps1 misses the cache and downloads the new archive
-      # rather than restoring the old one; the build script re-checks the vendored copy against the
-      # pinned checksum either way.
       - name: Cache vendored MKVToolNix
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
@@ -134,7 +106,8 @@ jobs:
           restore-keys: |
             mkvtoolnix-vendor-${{ runner.os }}-
 
-      # Builds the web app, publishes the .NET server (win-x64 single file) and the tray, vendors FFmpeg and MKVToolNix and packs.
+      # Builds the web app, publishes the .NET server (win-x64 single file) and the tray, vendors FFmpeg and
+      # MKVToolNix, installs the pinned vpk CLI and packs.
       - name: Build Weir Windows package (Velopack)
         env:
           WEIR_BUILD_VERSION: ${{ steps.version.outputs.plain }}
@@ -204,7 +177,6 @@ jobs:
   # What CI cannot have proven: the artefacts built here, and advisories published since CI ran.
   validate:
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.ref_name, '-') }}
     timeout-minutes: 30
     permissions:
       contents: read
@@ -229,10 +201,14 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: apps/server/global.json
+          cache: true
+          cache-dependency-path: apps/server/**/packages.lock.json
 
       # For the E2E smoke below. ci.yml already ran the server's tests on this commit (ci-passed).
       - name: Build Weir server (warnings are errors)
-        run: dotnet build apps/server/Weir.slnx -warnaserror
+        run: |
+          dotnet restore apps/server/Weir.slnx --locked-mode
+          dotnet build apps/server/Weir.slnx -warnaserror --no-restore
 
       # Advisories are published every day, so this is re-checked at release time, not taken from CI.
       - name: Server dependency vulnerability scan
@@ -243,6 +219,12 @@ jobs:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: tests/requirements.txt
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('tests/requirements.txt') }}
 
       - name: Install locked test runner and Playwright browser
         run: |
@@ -287,7 +269,6 @@ jobs:
   # Actions cache (not a registry), so publish rebuilds from them instead of from scratch.
   docker-candidate:
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.ref_name, '-') }}
     timeout-minutes: 45
     permissions:
       contents: read
@@ -308,6 +289,12 @@ jobs:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: tests/requirements.txt
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('tests/requirements.txt') }}
 
       - name: Install locked live-audit dependencies and browser
         run: |
@@ -338,15 +325,7 @@ jobs:
             -e WEIR_SESSION_SECRET="$WEIR_SESSION_SECRET" \
             -e WEIR_SESSION_COOKIE_SECURE=false \
             "weir-release-candidate:${{ steps.version.outputs.plain }}"
-          for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:9347/health >/tmp/weir-candidate-health.json; then
-              cat /tmp/weir-candidate-health.json
-              exit 0
-            fi
-            sleep 2
-          done
-          docker logs weir-release-candidate
-          exit 1
+          node scripts/wait-for-health.mjs --container weir-release-candidate
 
       - name: Full live E2E against unpushed Docker release candidate
         env:
@@ -371,7 +350,6 @@ jobs:
   # amd64 job so its ~4 minutes under QEMU overlap everything else instead of following it.
   docker-arm64:
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.ref_name, '-') }}
     timeout-minutes: 45
     permissions:
       contents: read
@@ -401,7 +379,6 @@ jobs:
 
   publish:
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.ref_name, '-') }}
     timeout-minutes: 60
     # Every gate. Without ci-passed a commit CI never passed could ship; without windows-smoke a Docker
     # image could reach ghcr for a release that has no Windows build.
@@ -449,8 +426,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Rebuilt from the layers docker-candidate and docker-arm64 cached, as it used to be rebuilt from
-      # the same job's builder cache before those jobs were split out.
+      # Rebuilt from the layers docker-candidate and docker-arm64 cached. Only the version tag: `latest`
+      # moves to it at the very end, once the image and the release are known good.
       - name: Publish release Docker image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
@@ -463,17 +440,17 @@ jobs:
           cache-from: |
             type=gha,scope=weir-release-amd64
             type=gha,scope=weir-release-arm64
-          tags: |
-            ${{ steps.image.outputs.name }}:${{ steps.version.outputs.plain }}
-            ${{ steps.image.outputs.name }}:latest
+          tags: ${{ steps.image.outputs.name }}:${{ steps.version.outputs.plain }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.version.outputs.plain }}
 
       - name: Verify published Docker manifest
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}:${{ steps.version.outputs.plain }}
         run: |
-          manifest="$(docker manifest inspect "${{ steps.image.outputs.name }}:latest")"
+          manifest="$(docker manifest inspect "$IMAGE")"
           echo "$manifest"
           for arch in amd64 arm64; do
             if ! echo "$manifest" | grep -q "\"architecture\": \"$arch\""; then
@@ -483,21 +460,15 @@ jobs:
           done
 
       - name: Smoke test published Docker image
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}:${{ steps.version.outputs.plain }}
         run: |
           docker rm -f weir-release-smoke >/dev/null 2>&1 || true
           docker run -d --name weir-release-smoke -p 9347:9347 \
             -e WEIR_SESSION_SECRET="$WEIR_SESSION_SECRET" \
             -e WEIR_SESSION_COOKIE_SECURE=false \
-            "${{ steps.image.outputs.name }}:latest"
-          for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:9347/health >/tmp/weir-health.json; then
-              cat /tmp/weir-health.json
-              exit 0
-            fi
-            sleep 2
-          done
-          docker logs weir-release-smoke
-          exit 1
+            "$IMAGE"
+          node scripts/wait-for-health.mjs --container weir-release-smoke
 
       - name: Cleanup Docker smoke container
         if: always()
@@ -520,3 +491,11 @@ jobs:
             weir-web-dist.zip
             windows-artifact/*
           body_path: release-notes.md
+
+      # Last, so `latest` only ever names an image that passed its smoke and has a published release. A copy of
+      # the version's manifest list: both architectures, provenance and SBOM included, nothing rebuilt.
+      - name: Tag the published image latest
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          VERSION: ${{ steps.version.outputs.plain }}
+        run: docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:$VERSION"

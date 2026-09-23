@@ -1,0 +1,98 @@
+# The contract suite (#516), called by ci.yml: starts the .NET server as a separate process and talks to it only
+# over HTTP (tests/contract/README.md). One leg per area in tests/contract/areas.json, all at once, rather than one
+# long runner. Serves the web build ci.yml's web-dist job uploaded to this run.
+name: Contract suite
+
+on:
+  workflow_call:
+    inputs:
+      areas:
+        description: JSON list of contract area names, one leg each.
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+jobs:
+  area:
+    name: contract (${{ matrix.area }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        area: ${{ fromJSON(inputs.areas) }}
+    env:
+      WEIR_SESSION_SECRET: ${{ github.run_id }}-${{ github.job }}-${{ github.run_attempt }}-ci-session-secret-32chars-min
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: tests/requirements.txt
+
+      - name: Install locked contract suite dependencies and ffmpeg
+        run: |
+          python -m pip install --require-hashes -r tests/requirements.txt
+          command -v ffmpeg >/dev/null || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: apps/server/global.json
+          cache: true
+          cache-dependency-path: apps/server/**/packages.lock.json
+
+      # Only the host: the suite runs `dotnet run --no-build` on it (tests/contract/support/launcher.py), and
+      # server-linux builds the whole solution with warnings as errors.
+      - name: Build Weir server (the server under test)
+        run: |
+          dotnet restore apps/server/src/Weir.Host --locked-mode
+          dotnet build apps/server/src/Weir.Host --no-restore
+
+      - name: Download web dist (served by the server under test)
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: weir-web-dist
+          path: apps/web/dist
+
+      - name: Contract suite lint
+        run: |
+          ruff check tests/contract
+          ruff format --check tests/contract
+
+      # --contract-area refuses an unknown area and one that collects no tests, so a leg can never pass empty.
+      - name: Contract suite, area (${{ matrix.area }})
+        id: contract
+        env:
+          # The suite reaps servers an earlier run left behind through this ledger file; one per leg.
+          WEIR_CONTRACT_LEDGER: ${{ runner.temp }}/weir-contract-servers-${{ matrix.area }}.json
+          CONTRACT_AREA: ${{ matrix.area }}
+        run: python -m pytest tests/contract -q --tb=short -p no:cacheprovider --contract-area "$CONTRACT_AREA"
+
+      # #586: the suite writes one log per server it starts (ServerUnderTest.logs_dir,
+      # tests/contract/support/launcher.py) into pytest's basetemp, outside the workspace. Copy them somewhere
+      # uploadable so an intermittent failure keeps its server-side evidence.
+      - name: Collect contract server logs
+        if: ${{ !cancelled() && steps.contract.outcome == 'failure' }}
+        run: |
+          shopt -s nullglob globstar
+          mkdir -p artifacts/contract-logs
+          for log in /tmp/pytest-of-*/pytest-*/**/contract-logs/server-*.log; do
+            cp "$log" "artifacts/contract-logs/$(printf '%s' "${log#/tmp/}" | tr '/' '_')"
+          done
+          ls -la artifacts/contract-logs
+
+      - name: Upload contract server logs
+        if: ${{ !cancelled() && steps.contract.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: weir-contract-logs-${{ matrix.area }}
+          if-no-files-found: warn
+          path: artifacts/contract-logs/*

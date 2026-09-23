@@ -1,19 +1,17 @@
 #!/usr/bin/env node
 // Release gate: refuse to publish a tag unless `.github/workflows/ci.yml` already passed on the exact
-// commit the tag points at.
-//
-// The release used to rebuild and re-run the server tests, the web tests and the whole contract suite
-// on a commit main's CI had just tested. This replaces that second run with proof of the first. A CI
-// run counts only when all of these hold:
+// commit the tag points at, instead of re-running CI's tests in the release. A CI run counts only when
+// all of these hold:
 //
 // - it ran ci.yml for exactly this commit, as a `push` (to main) or a `workflow_dispatch` run. A
 //   `pull_request` run is never accepted: its head_sha is the branch head, but what it tested was that
 //   head merged into the base branch as it stood then, which is not this tree;
 // - its latest attempt finished `success` (a run that failed and passed on re-run counts; a run that
 //   passed and was then re-run into a failure does not);
-// - every job and step in REQUIRED_EVIDENCE below concluded `success` in that latest attempt. `skipped`
-//   is not enough: ci.yml's path filter skips work a push did not touch, and a skip proves nothing
-//   about this tree. That is what separates "some run succeeded" from "the tests ran and passed".
+// - its `ci-passed` job and that job's verdict step concluded `success` in that latest attempt. ci-passed
+//   (scripts/ci-passed.mjs) passes only when every job due for the change passed and every other job was
+//   skipped by path filtering. A push or manual run always runs server-windows and tray, so the verdict
+//   also means the tagged tree itself was built and tested on Windows.
 //
 // While a qualifying run could still appear (a CI run for this commit is queued or in progress, or the
 // tag was pushed seconds after the merge and the run does not exist yet) the gate waits. When nothing
@@ -26,7 +24,6 @@
 // Options: --sha <sha> --wait-minutes <n> --appear-minutes <n> --poll-seconds <n>
 
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -35,50 +32,9 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const CI_WORKFLOW = "ci.yml";
 export const ACCEPTED_EVENTS = ["push", "workflow_dispatch"];
 
-// What the release used to re-run itself, as ci.yml names it. `{area}` expands to every area
-// tests/contract/areas.json requires on the .NET server. scripts/check-release-workflow-gates.mjs
-// fails if ci.yml stops declaring any of these names, so a rename cannot silently disarm the gate.
-export const REQUIRED_EVIDENCE = [
-  {
-    job: "weir",
-    steps: [
-      "Build Weir server (warnings are errors)",
-      "Test Weir server",
-      "Weir web - install, lint, format, build, unit tests",
-      "Weir dead-code guard",
-    ],
-  },
-  { job: "weir-server (windows-latest)", steps: ["Test Weir server"] },
-  { job: "contract ({area})", steps: ["Contract suite, required area ({area})"], perArea: true },
-  { job: "contract", steps: ["Every required contract area passed"] },
-];
-
-export function requiredContractAreas(areasJson) {
-  const areas = (areasJson.areas || [])
-    .filter((area) => (area.required || []).includes("dotnet"))
-    .map((area) => area.name);
-  if (areas.length === 0) {
-    throw new Error("tests/contract/areas.json requires no area on dotnet; refusing to treat that as proof.");
-  }
-  return areas;
-}
-
-export function expandEvidence(areas) {
-  const expanded = [];
-  for (const entry of REQUIRED_EVIDENCE) {
-    if (!entry.perArea) {
-      expanded.push({ job: entry.job, steps: entry.steps });
-      continue;
-    }
-    for (const area of areas) {
-      expanded.push({
-        job: entry.job.replaceAll("{area}", area),
-        steps: entry.steps.map((step) => step.replaceAll("{area}", area)),
-      });
-    }
-  }
-  return expanded;
-}
+// The ci.yml job and step that carry CI's verdict. scripts/check-release-workflow-gates.mjs fails if
+// ci.yml stops declaring them, so a rename cannot silently disarm the gate.
+export const REQUIRED_EVIDENCE = [{ job: "ci-passed", steps: ["Every job that was due passed"] }];
 
 // Judges one completed run against the evidence. `jobs` must be the run's latest attempt
 // (GET .../runs/{id}/jobs?filter=latest). Returns the reasons it does not qualify; empty means it does.
@@ -188,10 +144,7 @@ async function main() {
   const token = process.env.GITHUB_TOKEN;
   if (!repository || !token) throw new Error("GITHUB_REPOSITORY and GITHUB_TOKEN must be set.");
   const api = createApi(repository, token);
-  const areas = requiredContractAreas(
-    JSON.parse(readFileSync(resolve(repoRoot, "tests", "contract", "areas.json"), "utf8")),
-  );
-  const evidence = expandEvidence(areas);
+  const evidence = REQUIRED_EVIDENCE;
 
   if (options.runId) {
     const run = await api(`/actions/runs/${options.runId}`);
@@ -206,7 +159,6 @@ async function main() {
   if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error(`Not a full commit SHA: ${sha}`);
   const tag = process.env.GITHUB_REF_NAME || "<tag>";
   console.log(`Release gate: ${CI_WORKFLOW} must have passed on ${sha}.`);
-  console.log(`Required contract areas (areas.json): ${areas.join(", ")}`);
 
   const started = Date.now();
   const verdicts = new Map(); // `${id}:${attempt}` -> problems, for completed runs only
@@ -221,7 +173,7 @@ async function main() {
       const key = `${run.id}:${run.run_attempt}`;
       if (!verdicts.has(key)) verdicts.set(key, { run, problems: evaluateRun(run, await latestJobs(api, run.id), evidence) });
       if (verdicts.get(key).problems.length === 0) {
-        console.log(`PASS: ${describe(run)} ran and passed every required job on ${sha}.`);
+        console.log(`PASS: ${describe(run)} passed ci-passed on ${sha}.`);
         return;
       }
     }
