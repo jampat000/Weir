@@ -590,7 +590,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task Issue_545_item_1_a_manager_that_has_not_imported_yet_keeps_the_season_folder()
+    public async Task A_manager_that_has_not_imported_yet_keeps_the_season_folder()
     {
         // The manager answers (it is reachable and reporting), but its own library listing does not yet include
         // this release — exactly what a manager that has not scanned or finished importing yet looks like. Reporting
@@ -609,7 +609,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task Issue_545_item_1_a_manager_that_renamed_the_release_on_import_still_confirms_it()
+    public async Task A_manager_that_renamed_the_release_on_import_still_confirms_it()
     {
         // A manager that renames on import (a common *arr pattern) will not report the exact output path Weir wrote,
         // but the same title (file-name stem) shows up at a different path — that is still positive evidence.
@@ -676,7 +676,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task Issue_632_a_file_younger_than_the_minimum_age_is_a_wait_with_an_end_not_a_failure()
+    public async Task A_file_younger_than_the_minimum_age_is_a_wait_with_an_end_not_a_failure()
     {
         // It was FailedBeforeExecution, which classifies as "preflight": never retried, and the failure policy ran at
         // once, so a file handed over seconds after its download finished was passed through unprocessed.
@@ -763,7 +763,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task Issue_537_item_4_the_original_language_decides_the_kept_audio()
+    public async Task The_original_language_decides_the_kept_audio()
     {
         _folders.Source(Path.Join("Amelie.2001.1080p", "film.mkv"));
         _media.Probes["film.mkv"] =

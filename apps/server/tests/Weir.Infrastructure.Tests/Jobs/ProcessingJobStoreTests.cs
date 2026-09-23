@@ -38,7 +38,7 @@ public sealed class ProcessingJobStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task Issue_632_a_job_queued_to_start_later_is_not_claimed_before_then()
+    public async Task A_job_queued_to_start_later_is_not_claimed_before_then()
     {
         var job = await _db.Store.EnqueueOrGetAsync("later", Kind, notBefore: T0.AddSeconds(45));
 

@@ -88,7 +88,7 @@ public sealed class ProcessingFilesAtOnceApiTests
     }
 
     [Fact]
-    public async Task Issue_636_the_read_out_answers_while_something_else_holds_the_write_lock()
+    public async Task The_read_out_answers_while_something_else_holds_the_write_lock()
     {
         // It read through the job queue's write transaction, so with several files being processed it queued behind
         // the workers' writes and failed with "database is locked" after the busy timeout.

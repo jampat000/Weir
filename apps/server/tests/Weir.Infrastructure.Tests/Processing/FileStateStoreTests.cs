@@ -28,7 +28,7 @@ public sealed class FileStateStoreTests
     [Theory]
     [InlineData(ProcessingFileStatuses.PassedThrough)]
     [InlineData(ProcessingFileStatuses.Rejected)]
-    public async Task Listing_by_either_bug_530_status_returns_the_row_without_raising(string status)
+    public async Task Listing_by_passed_through_or_rejected_returns_the_row_without_raising(string status)
     {
         using var db = new JobsTestDatabase();
         var libraryId = InsertLibrary(db);
@@ -43,7 +43,7 @@ public sealed class FileStateStoreTests
     }
 
     [Fact]
-    public async Task Status_counts_include_both_bug_530_statuses_alongside_every_other_status()
+    public async Task Status_counts_include_passed_through_and_rejected_alongside_every_other_status()
     {
         using var db = new JobsTestDatabase();
         var libraryId = InsertLibrary(db);

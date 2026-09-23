@@ -115,7 +115,7 @@ public sealed class OutputFolderCleanupTests : IDisposable
     }
 
     [Fact]
-    public async Task Issue_545_item_1_a_manager_that_has_not_imported_yet_keeps_the_folder()
+    public async Task A_manager_that_has_not_imported_yet_keeps_the_folder()
     {
         // The manager is reachable and answers, but its library does not yet include this release — exactly what
         // "hasn't imported yet" (or "imports by copy and scans later") looks like. Reporting zero files that

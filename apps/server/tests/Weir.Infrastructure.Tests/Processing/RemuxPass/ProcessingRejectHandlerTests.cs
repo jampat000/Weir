@@ -255,7 +255,7 @@ public sealed class ProcessingRejectHandlerTests : IDisposable
     // --- fix #532: a rejection always upserts a Files row ----------------------------------------
 
     [Fact]
-    public async Task Fix_532_a_rejection_upserts_a_files_row_even_with_no_prior_scan()
+    public async Task A_rejection_upserts_a_files_row_even_with_no_prior_scan()
     {
         var library = await LibraryAsync(rejectedFileAction: "delete_file");
         _folders.Source("Film/film.mkv");

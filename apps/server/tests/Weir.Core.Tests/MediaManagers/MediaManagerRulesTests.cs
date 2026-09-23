@@ -270,7 +270,7 @@ public sealed class MediaManagerRulesTests
     }
 
     [Fact]
-    public void Issue_531_a_failure_with_a_retry_owed_is_scheduled_even_after_the_backoff_ends()
+    public void A_failure_with_a_retry_owed_is_scheduled_even_after_the_backoff_ends()
     {
         var future = new DateTimeOffset(2026, 9, 17, 12, 0, 0, TimeSpan.Zero);
         Assert.Equal(("scheduled", future), HandoffLedgerRules.FileState("processing_failed", future, 1));
@@ -290,7 +290,7 @@ public sealed class MediaManagerRulesTests
     }
 
     [Fact]
-    public void Issue_643_a_cancelled_file_ends_its_hand_off_only_when_nothing_else_was_delivered()
+    public void A_cancelled_file_ends_its_hand_off_only_when_nothing_else_was_delivered()
     {
         Assert.Equal(("cancelled", (DateTimeOffset?)null), HandoffLedgerRules.FileState("cancelled", null, 0));
         Assert.Equal("cancelled", HandoffLedgerRules.Combine(["cancelled"]));

@@ -25,7 +25,7 @@ public sealed class FileStatusesTests
     [InlineData(ProcessingFileStatuses.PassedThrough)]
     [InlineData(ProcessingFileStatuses.Rejected)]
     [InlineData(ProcessingFileStatuses.Cancelled)]
-    public void Terminal_bug_530_statuses_are_valid_status_values(string status) => Assert.Contains(status, ProcessingFileStatuses.All);
+    public void Terminal_outcome_statuses_are_valid_status_values(string status) => Assert.Contains(status, ProcessingFileStatuses.All);
 
     [Fact]
     public void Withheld_statuses_do_not_include_the_two_terminal_ones()

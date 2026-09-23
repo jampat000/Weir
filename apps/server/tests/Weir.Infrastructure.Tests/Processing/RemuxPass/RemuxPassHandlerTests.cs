@@ -118,7 +118,7 @@ public sealed class RemuxPassHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Issue_545_item_5_media_facts_and_collision_writes_are_scoped_by_library_id()
+    public async Task Media_facts_and_collision_writes_are_scoped_by_library_id()
     {
         // Matching measured-media-facts and output-collision writes on relative_path alone would update two
         // libraries that happen to share a path. Only the pass's own library's row should change.
@@ -156,7 +156,7 @@ public sealed class RemuxPassHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Issue_632_a_handed_off_file_that_is_too_young_is_looked_at_again_instead_of_failing()
+    public async Task A_handed_off_file_that_is_too_young_is_looked_at_again_instead_of_failing()
     {
         // A media manager hands a file over within seconds of the download finishing, inside the minimum file age.
         // Failing the pre-check there would skip the retry and run the failure policy: every such file would be passed
@@ -199,7 +199,7 @@ public sealed class RemuxPassHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Issue_632_a_file_that_never_stops_changing_is_not_looked_at_forever()
+    public async Task A_file_that_never_stops_changing_is_not_looked_at_forever()
     {
         var library = await LibraryAsync();
         await _fixture.Store.Execute("UPDATE operator_settings SET min_file_age_seconds = 60");
@@ -276,7 +276,7 @@ public sealed class RemuxPassHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Issue_545_item_2_a_replaced_file_queues_again_after_the_first_pass_through_finished()
+    public async Task A_replaced_file_queues_again_after_the_first_pass_through_finished()
     {
         // A pass-through job dedupe-keyed by path alone would block forever — once one finishes, a later failure
         // of a re-download with the same name would never queue another. The fingerprint folded into the key

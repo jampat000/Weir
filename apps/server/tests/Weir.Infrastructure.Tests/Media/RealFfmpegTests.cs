@@ -193,7 +193,7 @@ public sealed class RealFfmpegTests : IDisposable
     }
 
     [RequiresFfmpegFact]
-    public async Task Issue_500_a_correct_remux_that_keeps_the_planned_subtitle_passes_staged_validation()
+    public async Task A_correct_remux_that_keeps_the_planned_subtitle_passes_staged_validation()
     {
         var fixture = await GenerateFixtureWithSubtitleAsync();
         var tools = Tools();
@@ -222,7 +222,7 @@ public sealed class RealFfmpegTests : IDisposable
     }
 
     [RequiresFfmpegFact]
-    public async Task Issue_500_an_output_that_drops_a_subtitle_the_plan_kept_fails_staged_validation()
+    public async Task An_output_that_drops_a_subtitle_the_plan_kept_fails_staged_validation()
     {
         var fixture = await GenerateFixtureWithSubtitleAsync("with-subs-wrong.mkv");
         var tools = Tools();

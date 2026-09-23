@@ -533,7 +533,7 @@ public sealed class MediaManagerServiceTests
     }
 
     [Fact]
-    public async Task Issue_545_item_3_the_ledger_reports_a_pass_through_jobs_own_state_and_its_final_failure()
+    public async Task The_ledger_reports_a_pass_through_jobs_own_state_and_its_final_failure()
     {
         // #545 item 3: a pass-through or reject job that is queued (but not yet delivered) must still be visible to
         // the manager polling the status API — as scheduled or working, never silently dropped — and one that
@@ -600,7 +600,7 @@ public sealed class MediaManagerServiceTests
     }
 
     [Fact]
-    public async Task Issue_643_cancelling_a_hand_offs_job_in_weir_ends_the_hand_off_and_the_file_reads_cancelled()
+    public async Task Cancelling_a_hand_offs_job_in_weir_ends_the_hand_off_and_the_file_reads_cancelled()
     {
         using var fixture = new MediaManagerFixture();
         var watched = fixture.Store.Home.Join("movies");
@@ -627,7 +627,7 @@ public sealed class MediaManagerServiceTests
     }
 
     [Fact]
-    public async Task Issue_643_a_later_hand_off_of_a_processed_path_answers_for_itself_not_the_earlier_result()
+    public async Task A_later_hand_off_of_a_processed_path_answers_for_itself_not_the_earlier_result()
     {
         using var fixture = new MediaManagerFixture();
         var watched = fixture.Store.Home.Join("movies");
@@ -655,7 +655,7 @@ public sealed class MediaManagerServiceTests
     }
 
     [Fact]
-    public async Task Issue_643_a_pack_goes_on_while_other_episodes_are_queued_and_the_managers_own_cancel_marks_files_cancelled()
+    public async Task A_pack_goes_on_while_other_episodes_are_queued_and_the_managers_own_cancel_marks_files_cancelled()
     {
         using var fixture = new MediaManagerFixture();
         var watched = fixture.Store.Home.Join("tv");

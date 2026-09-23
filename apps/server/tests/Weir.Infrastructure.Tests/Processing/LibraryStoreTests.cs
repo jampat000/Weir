@@ -186,7 +186,7 @@ public sealed class LibraryStoreTests
     }
 
     [Fact]
-    public async Task Creating_and_updating_a_rule_set_round_trips_every_495_497_498_field()
+    public async Task Creating_and_updating_a_rule_set_round_trips_every_sorter_and_naming_field()
     {
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
@@ -249,7 +249,7 @@ public sealed class LibraryStoreTests
     }
 
     [Fact]
-    public async Task A_pre_495_497_498_row_with_a_plain_sorter_array_column_reads_back_every_new_field_at_its_default()
+    public async Task A_row_from_before_sorters_and_naming_with_a_plain_sorter_array_column_reads_back_every_new_field_at_its_default()
     {
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);

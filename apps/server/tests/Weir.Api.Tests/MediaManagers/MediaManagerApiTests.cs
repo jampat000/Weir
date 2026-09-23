@@ -394,7 +394,7 @@ public sealed class MediaManagerApiTests
     }
 
     [Fact]
-    public async Task Issue_643_cancelling_a_hand_offs_job_on_the_jobs_screen_tells_the_manager_it_is_cancelled()
+    public async Task Cancelling_a_hand_offs_job_on_the_jobs_screen_tells_the_manager_it_is_cancelled()
     {
         var watched = Path.Join(Path.GetTempPath(), "weir-handoff-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Join(watched, "Film"));
@@ -441,7 +441,7 @@ public sealed class MediaManagerApiTests
     }
 
     [Fact]
-    public async Task Issue_527_a_reconciliation_repair_needs_the_origin_check_and_a_csrf_token()
+    public async Task A_reconciliation_repair_needs_the_origin_check_and_a_csrf_token()
     {
         var (server, client, _) = await StartAsync(("WEIR_TRUSTED_BROWSER_ORIGINS", "http://weir.local"));
         await using var _server = server;
