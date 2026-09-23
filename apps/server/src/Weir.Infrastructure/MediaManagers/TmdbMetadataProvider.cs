@@ -104,14 +104,14 @@ public sealed class TmdbMetadataProvider : IMetadataProvider
     private readonly Lock _rateLock = new();
     private DateTimeOffset? _nextSlot;
 
-    public TmdbMetadataProvider(string apiKey, IManagerHttpHandlerFactory handlers, string baseUrl = TmdbResponses.DefaultBaseUrl, MetadataLookupCache? cache = null, TimeProvider? time = null)
+    public TmdbMetadataProvider(string apiKey, IManagerHttpHandlerFactory handlers, TimeProvider time, string baseUrl = TmdbResponses.DefaultBaseUrl, MetadataLookupCache? cache = null)
     {
         _apiKey = PyStrings.Strip(apiKey ?? string.Empty);
         var trimmed = PyStrings.Strip(string.IsNullOrEmpty(baseUrl) ? TmdbResponses.DefaultBaseUrl : baseUrl).TrimEnd('/');
         _baseUrl = trimmed;
         _cache = cache ?? MetadataLookupCache.Shared;
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
-        _time = time ?? TimeProvider.System;
+        _time = time ?? throw new ArgumentNullException(nameof(time));
     }
 
     public string Name => "tmdb";
@@ -234,11 +234,13 @@ public sealed class MetadataProviderService
 {
     private readonly CredentialCipher _cipher;
     private readonly IManagerHttpHandlerFactory _handlers;
+    private readonly TimeProvider _time;
 
-    public MetadataProviderService(CredentialCipher cipher, IManagerHttpHandlerFactory handlers)
+    public MetadataProviderService(CredentialCipher cipher, IManagerHttpHandlerFactory handlers, TimeProvider time)
     {
         _cipher = cipher ?? throw new ArgumentNullException(nameof(cipher));
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
+        _time = time ?? throw new ArgumentNullException(nameof(time));
     }
 
     /// <summary>The provider key as stored: encrypted with the manager-credential envelope, or empty.</summary>
@@ -274,7 +276,7 @@ public sealed class MetadataProviderService
         }
 
         var baseUrl = PyStrings.Strip(row[2]);
-        return new TmdbMetadataProvider(key, _handlers, baseUrl.Length > 0 ? baseUrl : TmdbResponses.DefaultBaseUrl);
+        return new TmdbMetadataProvider(key, _handlers, _time, baseUrl.Length > 0 ? baseUrl : TmdbResponses.DefaultBaseUrl);
     }
 
     /// <summary>Prove a saved connection works rather than assuming it.</summary>

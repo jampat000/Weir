@@ -762,13 +762,13 @@ public sealed class ActivityProgressReporter
     private readonly TimeProvider _time;
     private readonly Lock _lock = new();
 
-    public ActivityProgressReporter(SqliteDatabase database, long jobId, PyDict extra, ILogger logger, TimeProvider? time = null)
+    public ActivityProgressReporter(SqliteDatabase database, long jobId, PyDict extra, ILogger logger, TimeProvider time)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _jobId = jobId;
         _extra = extra ?? new PyDict();
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _time = time ?? TimeProvider.System;
+        _time = time ?? throw new ArgumentNullException(nameof(time));
     }
 
     /// <summary>The progress row, once written; the handler turns it into the completed row.</summary>

@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
@@ -130,7 +131,7 @@ public sealed partial class ManagerHeartbeatTask(
                 await sender.SendWaitingReportsAsync(uow, row.Kind, cancellationToken).ConfigureAwait(false);
             }
         }
-        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or InvalidOperationException or IOException)
+        catch (Exception exception) when (exception is SqliteException or InvalidOperationException or IOException)
         {
             LogWaitingReportsFailed(logger, exception, row.Name);
         }

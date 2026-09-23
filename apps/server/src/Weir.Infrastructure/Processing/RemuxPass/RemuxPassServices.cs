@@ -53,8 +53,10 @@ public sealed class RemuxPassFailureRecorder : IUnhandledJobFailureRecorder
                 {
                     origin = PyJsonParser.Parse(failure.Context.PayloadJson ?? "{}") is PyDict payload ? payload.Get("origin") as PyDict : null;
                 }
-                catch (PyJsonDecodeException)
+                catch (PyJsonDecodeException exception)
                 {
+                    // The failure is still recorded and the policy still applied, only without the hand-off origin.
+                    _logger.LogWarning(exception, "Unhandled-failure recorder could not read the payload of job_id={JobId}; applying the failure policy without its origin.", failure.Context.Id);
                 }
 
                 await _policy.ApplyFailurePolicyAsync(uow, library, failure.RelativeMediaPath, decision.WillRetry, origin, badRelease: false).ConfigureAwait(false);
@@ -106,7 +108,7 @@ public static class RemuxPassServices
             sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredService<ILogger<RemuxPassRunner>>(),
             sp.GetService<RuntimeMetricsStore>(),
-            sp.GetService<Weir.Infrastructure.Processing.IOutputOwnership>()));
+            sp.GetService<IOutputOwnership>()));
         services.TryAddSingleton(sp => new RemuxPassHandler(
             sp.GetRequiredService<SqliteDatabase>(),
             sp.GetRequiredService<WeirOptions>(),

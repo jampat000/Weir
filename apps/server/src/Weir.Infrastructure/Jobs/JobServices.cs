@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -7,9 +8,12 @@ using Weir.Core.Activity;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
+using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Workers;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.LibraryMode;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Scheduling;
 using Weir.Infrastructure.Sqlite;
 
@@ -40,14 +44,14 @@ public sealed class JobsStartupRecoveryService : IHostedService
     private readonly WeirOptions _options;
     private readonly TimeProvider _time;
     private readonly ILogger<JobsStartupRecoveryService> _logger;
-    private readonly Weir.Infrastructure.LibraryMode.SwapRecoverySweep? _swapSweep;
+    private readonly SwapRecoverySweep? _swapSweep;
 
     public JobsStartupRecoveryService(
         ProcessingJobStore store,
         WeirOptions options,
         TimeProvider time,
         ILogger<JobsStartupRecoveryService> logger,
-        Weir.Infrastructure.LibraryMode.SwapRecoverySweep? swapSweep = null)
+        SwapRecoverySweep? swapSweep = null)
     {
         _store = store;
         _options = options;
@@ -59,7 +63,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
     public StartupRecoveryReport? LastReport { get; private set; }
 
     /// <summary>The #506 startup sweep's last report, when library mode is registered; null otherwise.</summary>
-    public Weir.Infrastructure.LibraryMode.SwapRecoveryReport? LastSwapSweepReport { get; private set; }
+    public SwapRecoveryReport? LastSwapSweepReport { get; private set; }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -95,7 +99,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
             var uow = await UnitOfWork.OpenAsync(_store.Database, cancellationToken).ConfigureAwait(false);
             await using (uow.ConfigureAwait(false))
             {
-                var given = await Weir.Infrastructure.Processing.LibraryStore.GiveEveryLibraryAProfileAsync(uow).ConfigureAwait(false);
+                var given = await LibraryStore.GiveEveryLibraryAProfileAsync(uow).ConfigureAwait(false);
                 await uow.CommitAsync().ConfigureAwait(false);
                 if (given > 0)
                 {
@@ -103,7 +107,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
                 }
             }
         }
-        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or InvalidOperationException)
+        catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
         {
             _logger.LogWarning(exception, "Could not give every library a profile; this is tried again at the next start.");
         }
@@ -116,10 +120,10 @@ public sealed class JobsStartupRecoveryService : IHostedService
             var uow = await UnitOfWork.OpenAsync(_store.Database, cancellationToken).ConfigureAwait(false);
             await using (uow.ConfigureAwait(false))
             {
-                return await Weir.Infrastructure.LibraryMode.LibrarySettingsStore.AllFoldersAsync(uow).ConfigureAwait(false);
+                return await LibrarySettingsStore.AllFoldersAsync(uow).ConfigureAwait(false);
             }
         }
-        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or InvalidOperationException)
+        catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
         {
             _logger.LogWarning(exception, "Could not read library folders for the startup sweep; it will only look at paths recorded on job rows.");
             return [];
@@ -180,6 +184,9 @@ public sealed class ProcessingWorkerService : BackgroundService
         await Task.WhenAll(slots).ConfigureAwait(false);
     }
 
+    /// <summary>How often a slot repeats the same "could not read the files-at-once setting" warning.</summary>
+    internal static readonly TimeSpan SettingsReadFailureLogInterval = TimeSpan.FromMinutes(1);
+
     /// <summary>One slot: repeatedly process jobs until stopping.</summary>
     internal async Task RunSlotAsync(int workerIndex, CancellationToken stoppingToken)
     {
@@ -188,6 +195,8 @@ public sealed class ProcessingWorkerService : BackgroundService
         var cachedMaxConcurrent = OperatorSettingsRules.MaxFilesAtOnce;
         long cacheExpires = 0;
         var cacheValid = false;
+        string? lastReadFailure = null;
+        long? lastReadFailureLoggedAt = null;
         try
         {
             while (!stoppingToken.IsCancellationRequested)
@@ -201,9 +210,23 @@ public sealed class ProcessingWorkerService : BackgroundService
                         cacheExpires = _time.GetTimestamp() + (long)(_timings.ConcurrencyCacheTtl.TotalSeconds * _time.TimestampFrequency);
                         cacheValid = true;
                     }
+#pragma warning disable CA1031 // The slot keeps its previous value and tries again next pass; a settings read must not stop it.
                     catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
                     {
-                        // Keep the previous value and try again next pass.
+                        // The read is retried on every pass until it works, so the warning is written only when the
+                        // problem changes or once a minute, never once per pass.
+                        if (exception.Message != lastReadFailure || lastReadFailureLoggedAt is null ||
+                            _time.GetElapsedTime(lastReadFailureLoggedAt.Value) >= SettingsReadFailureLogInterval)
+                        {
+                            _logger.LogWarning(
+                                exception,
+                                "Worker slot {WorkerIndex} could not read the files-at-once setting; keeping {FilesAtOnce}.",
+                                workerIndex,
+                                cachedMaxConcurrent);
+                            lastReadFailure = exception.Message;
+                            lastReadFailureLoggedAt = _time.GetTimestamp();
+                        }
                     }
                 }
 
@@ -544,7 +567,7 @@ public sealed class UnclaimedHandbackCleanupEnqueuer : IPeriodicEnqueuer
 
     public string JobKind => PeriodicJobKinds.UnclaimedHandbackCleanup;
 
-    public TimeSpan Interval => TimeSpan.FromSeconds(Weir.Core.MediaManagers.HandbackRules.DefaultUnclaimedIntervalSeconds);
+    public TimeSpan Interval => TimeSpan.FromSeconds(HandbackRules.DefaultUnclaimedIntervalSeconds);
 
     public Task<bool> IsEnabledAsync(CancellationToken cancellationToken) =>
         WorkTempStaleSweepEnqueuer.OperatorSettingFlagAsync(_store, "unclaimed_handback_cleanup_enabled", defaultValue: false, cancellationToken);
@@ -677,8 +700,8 @@ public sealed class FailureCleanupSweepEnqueuer : IPeriodicEnqueuer
             cancellationToken);
 
     internal static (ProcessingJob Job, bool Inserted) EnqueueSweep(
-        Microsoft.Data.Sqlite.SqliteConnection connection,
-        Microsoft.Data.Sqlite.SqliteTransaction transaction,
+        SqliteConnection connection,
+        SqliteTransaction transaction,
         ProcessingJobStore store,
         string scope,
         string trigger)

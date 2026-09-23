@@ -4,6 +4,7 @@ using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
+using Weir.Core.Time;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
@@ -585,7 +586,7 @@ public sealed class HandoffLedgerStore
         return dict.Get("relative_media_path") is { IsTruthy: true } value ? PyConvert.Str(value) : string.Empty;
     }
 
-    private DateTimeOffset PyDateTimeNow() => Weir.Core.Time.PyDateTime.TruncateToMicroseconds(_time.GetUtcNow());
+    private DateTimeOffset PyDateTimeNow() => PyDateTime.TruncateToMicroseconds(_time.GetUtcNow());
 
     private static DateTimeOffset Min(DateTimeOffset a, DateTimeOffset b) => a <= b ? a : b;
 

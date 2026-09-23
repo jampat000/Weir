@@ -10,6 +10,7 @@ using Weir.Core.Metrics;
 using Weir.Infrastructure;
 using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.Http;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing.RemuxPass;
@@ -40,7 +41,7 @@ public static class WeirApi
         services.AddSingleton<IExternalJsonPoster, ExternalJsonPoster>();
         services.AddSingleton<NotificationDispatcher>();
         // Registered before AddWeirJobs, whose TryAdd would otherwise install the version that sends nothing.
-        services.AddSingleton<Weir.Infrastructure.Jobs.IJobNotifications, WebhookJobNotifications>();
+        services.AddSingleton<IJobNotifications, WebhookJobNotifications>();
         services.AddWeirMediaManagers(options);
         services.AddWeirProcessingApis();
         services.AddWeirProcessingFailureFollowUps(options);

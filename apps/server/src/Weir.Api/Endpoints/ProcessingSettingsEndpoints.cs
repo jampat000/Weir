@@ -7,6 +7,7 @@ using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Validation;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
@@ -300,13 +301,13 @@ public static class ProcessingSettingsEndpoints
     private static async Task<ApiResult> GetFilesAtOnceAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
-        var store = request.Service<Weir.Infrastructure.Jobs.ProcessingJobStore>();
+        var store = request.Service<ProcessingJobStore>();
         var now = request.Service<TimeProvider>().GetUtcNow();
         var slots = request.Options.ProcessingWorkerCount;
         // A read, so never the queue's write transaction (#636): under several remuxes that queued behind the workers
         // until it timed out with "database is locked".
         var readout = await store.ReadAsync(
-            (connection, transaction) => Weir.Infrastructure.Jobs.WorkAdmissionReader.ReadFilesAtOnce(connection, transaction, now, slots)).ConfigureAwait(false);
+            (connection, transaction) => WorkAdmissionReader.ReadFilesAtOnce(connection, transaction, now, slots)).ConfigureAwait(false);
         return ApiRoutes.Ok(new PyDict()
             .Set("files_at_once", readout.FilesAtOnce)
             .Set("worker_slots", readout.WorkerSlots)

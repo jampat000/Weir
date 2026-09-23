@@ -141,7 +141,9 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
                 var activeSkip = !inserted && skip is not null && skip.StartsWith("active_scan_already_queued_", StringComparison.Ordinal);
                 nextDelay = activeSkip ? TimeSpan.FromSeconds(Math.Min(interval.TotalSeconds, 5.0)) : interval;
             }
+#pragma warning disable CA1031 // One library's failed tick is logged and cooled down; the scheduler keeps running for the others.
             catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
             {
                 _logger.LogError(exception, "Watched-folder scheduler failed for library {Library}", library.Name);
                 nextDelay = PeriodicSchedule.FailureCooldown;

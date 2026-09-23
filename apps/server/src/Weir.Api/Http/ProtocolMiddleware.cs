@@ -46,7 +46,9 @@ public sealed class ServerErrorMiddleware
         {
             await _next(context).ConfigureAwait(false);
         }
+#pragma warning disable CA1031 // The last line of defence: any unhandled failure becomes a plain 500.
         catch (Exception) when (!context.Response.HasStarted && !context.RequestAborted.IsCancellationRequested)
+#pragma warning restore CA1031
         {
             context.Items[ResponseMarkers.ServerError] = true;
             context.Response.Clear();

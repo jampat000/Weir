@@ -1,4 +1,5 @@
 using Weir.Core.Jobs;
+using Weir.Core.MediaManagers;
 using Weir.Core.Time;
 
 namespace Weir.Core.Processing;
@@ -192,5 +193,5 @@ public static class OperatorSettingsRules
 
     /// <summary>The unclaimed hand-back wait, 1 to 365 days.</summary>
     public static long ClampUnclaimedHandbackWindowDays(long raw) =>
-        Math.Clamp(raw, Weir.Core.MediaManagers.HandbackRules.MinUnclaimedWindowDays, Weir.Core.MediaManagers.HandbackRules.MaxUnclaimedWindowDays);
+        Math.Clamp(raw, HandbackRules.MinUnclaimedWindowDays, HandbackRules.MaxUnclaimedWindowDays);
 }

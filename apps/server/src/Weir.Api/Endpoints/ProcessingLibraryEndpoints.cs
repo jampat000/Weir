@@ -9,6 +9,7 @@ using Weir.Core.Rules;
 using Weir.Core.Time;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Jobs;
+using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
@@ -547,7 +548,7 @@ public static class ProcessingLibraryEndpoints
 
         // #505: a deleted library takes its library-mode settings and scan history with it (both live on
         // jobs rows, not a foreign-keyed table — see apps/server/README.md, "Library mode").
-        await Weir.Infrastructure.LibraryMode.LibrarySettingsStore.DeleteAllForLibraryAsync(uow, row.Id).ConfigureAwait(false);
+        await LibrarySettingsStore.DeleteAllForLibraryAsync(uow, row.Id).ConfigureAwait(false);
 
         await request.CommitAsync().ConfigureAwait(false);
         return new CustomApiResult(context =>
@@ -879,7 +880,7 @@ public static class ProcessingLibraryEndpoints
         // #505 point 6: saving rules on a library with library folders runs a background re-plan (a normal scan, trigger
         // "rule_change"); the web shows "Apply to library? N files would change" once it finishes. Nothing runs on its own.
         var rescanJobIds = new List<long>();
-        var jobStore = request.Service<Weir.Infrastructure.Jobs.ProcessingJobStore>();
+        var jobStore = request.Service<ProcessingJobStore>();
         foreach (var library in await LibraryStore.ListAsync(uow).ConfigureAwait(false))
         {
             if (library.RuleSetId != updated.Id)
@@ -887,13 +888,13 @@ public static class ProcessingLibraryEndpoints
                 continue;
             }
 
-            var librarySettings = await Weir.Infrastructure.LibraryMode.LibrarySettingsStore.GetAsync(uow, library.Id).ConfigureAwait(false);
+            var librarySettings = await LibrarySettingsStore.GetAsync(uow, library.Id).ConfigureAwait(false);
             if (librarySettings.Folders.Count == 0)
             {
                 continue;
             }
 
-            var job = await Weir.Infrastructure.LibraryMode.LibraryScanStore.RequestScanAsync(uow, jobStore, library.Id, "rule_change").ConfigureAwait(false);
+            var job = await LibraryScanStore.RequestScanAsync(uow, jobStore, library.Id, "rule_change").ConfigureAwait(false);
             rescanJobIds.Add(job.Id);
         }
 

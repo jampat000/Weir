@@ -146,7 +146,9 @@ public static class AuthEndpoints
 
             throw new ApiException(StatusCodes.Status503ServiceUnavailable, queryFailed);
         }
+#pragma warning disable CA1031 // Any failure reading bootstrap status becomes a 503 with a next step, never a bare 500.
         catch (Exception exception) when (exception is not ApiException and not OperationCanceledException)
+#pragma warning restore CA1031
         {
             request.LoggerFactory.CreateLogger("weir.platform.auth.router").LogError(exception, "bootstrap status: unexpected failure");
             throw new ApiException(

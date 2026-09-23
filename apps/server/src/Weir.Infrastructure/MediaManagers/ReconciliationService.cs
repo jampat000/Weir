@@ -1,4 +1,5 @@
 using Weir.Core.Json;
+using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Infrastructure.IO;
 using Weir.Infrastructure.Sqlite;
@@ -195,7 +196,7 @@ public static class ReconciliationService
         }
     }
 
-    private static string PurePathName(string path) => Weir.Core.Media.MediaPathNames.Name(path, OperatingSystem.IsWindows());
+    private static string PurePathName(string path) => MediaPathNames.Name(path, OperatingSystem.IsWindows());
 
     private static Task<List<LibraryFolders>> ListLibrariesAsync(UnitOfWork uow)
     {

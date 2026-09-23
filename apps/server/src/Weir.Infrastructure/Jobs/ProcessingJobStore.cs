@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
+using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Time;
 using Weir.Infrastructure.Sqlite;
 
@@ -841,7 +842,7 @@ public static class WorkAdmissionReader
             command.CommandText =
                 "SELECT runner_cost, payload_json FROM jobs WHERE status = 'pending' AND job_kind = @kind " +
                 "AND (not_before IS NULL OR julianday(not_before) <= julianday(@now))";
-            command.Parameters.AddWithValue("@kind", Weir.Core.Processing.RemuxPass.RemuxPassOutcomes.JobKind);
+            command.Parameters.AddWithValue("@kind", RemuxPassOutcomes.JobKind);
             command.Parameters.AddWithValue("@now", PythonTimestamps.Adapter(now));
             using var reader = command.ExecuteReader();
             while (reader.Read())

@@ -16,6 +16,7 @@ using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 using static Weir.Api.Endpoints.EndpointLookups;
+using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Endpoints;
 
@@ -165,7 +166,7 @@ public static class LibraryModeEndpoints
     /// The scan's own state for the header: which job, what it is doing, when it last finished and anything it
     /// could not do. <c>running</c> is what the "Scan now" button and its progress read.
     /// </summary>
-    private static async Task<PyJson> ScanOutAsync(Weir.Infrastructure.Sqlite.UnitOfWork uow, long libraryId)
+    private static async Task<PyJson> ScanOutAsync(UnitOfWork uow, long libraryId)
     {
         var latest = await LibraryScanStore.LatestAsync(uow, libraryId).ConfigureAwait(false);
         var snapshot = await LibraryScanStore.LatestSnapshotAsync(uow, libraryId).ConfigureAwait(false);
@@ -265,7 +266,7 @@ public static class LibraryModeEndpoints
     /// reported as now, since the timer starts it within half a minute.
     /// </summary>
     private static async Task<PyDict> ScheduleOutAsync(
-        Weir.Infrastructure.Sqlite.UnitOfWork uow, ProcessingLibraryRecord library, LibrarySettings settings, DateTimeOffset now)
+        UnitOfWork uow, ProcessingLibraryRecord library, LibrarySettings settings, DateTimeOffset now)
     {
         var next = await LibraryModeScheduling.NextRunAsync(uow, library, settings, now).ConfigureAwait(false);
         return new PyDict()
@@ -440,7 +441,7 @@ public static class LibraryModeEndpoints
             .Set("warnings", new PyList(warnings.Select(w => (PyJson)new PyStr(w)))));
 
     /// <summary>The library's rules, exactly as the scan and clean handlers resolve them (no rule set = the defaults).</summary>
-    private static async Task<ProcessingRulesConfig> RulesForAsync(Weir.Infrastructure.Sqlite.UnitOfWork uow, ProcessingLibraryRecord library)
+    private static async Task<ProcessingRulesConfig> RulesForAsync(UnitOfWork uow, ProcessingLibraryRecord library)
     {
         var ruleSet = library.RuleSetId is { } ruleSetId ? await LibraryStore.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) : null;
         return ruleSet is not null ? RemuxPassPaths.RulesConfigFor(ruleSet) : RuleSetConversion.ToRulesConfig(null);
@@ -448,7 +449,7 @@ public static class LibraryModeEndpoints
 
     /// <summary>Every distinct manager connection a set of scanned files was matched to, resolved once for a preflight pass.</summary>
     private static async Task<Dictionary<long, ManagerConnection>> ConnectionsForFilesAsync(
-        Weir.Infrastructure.Sqlite.UnitOfWork uow, MediaManagerConnectionService connections, IEnumerable<LibraryScanFileEntry> files)
+        UnitOfWork uow, MediaManagerConnectionService connections, IEnumerable<LibraryScanFileEntry> files)
     {
         var ids = files.Select(f => f.ManagerConnectionId).OfType<long>().Distinct().ToList();
         var resolved = await connections.ConnectionsByIdAsync(uow, ids).ConfigureAwait(false);

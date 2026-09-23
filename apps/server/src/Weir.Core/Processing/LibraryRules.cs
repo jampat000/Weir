@@ -1,4 +1,5 @@
 using Weir.Core.Jobs;
+using Weir.Core.Media;
 using Weir.Core.Rules;
 
 namespace Weir.Core.Processing;
@@ -42,7 +43,7 @@ public sealed record ProcessingLibraryInput
     public string HardwareDevice { get; init; } = string.Empty;
     public string HardwareDisabledVendorsCsv { get; init; } = string.Empty;
     public string FfmpegStrictness { get; init; } = "normal";
-    public string RemuxWriter { get; init; } = Weir.Core.Media.RemuxWriterChoice.Best;
+    public string RemuxWriter { get; init; } = RemuxWriterChoice.Best;
     public bool RewriteWithFfmpeg { get; init; } = true;
     public long ScanIntervalSeconds { get; init; } = 300;
     public long HoldMinutes { get; init; }

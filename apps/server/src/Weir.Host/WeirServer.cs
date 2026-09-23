@@ -1,4 +1,5 @@
 using System.Collections;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Console;
 using Weir.Api;
 using Weir.Api.Http;
@@ -204,7 +205,7 @@ public static class WeirServer
                 logger.LogWarning("Suite log prune skipped because the active log could not be rewritten.");
             }
         }
-        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or FormatException or InvalidOperationException)
+        catch (Exception exception) when (exception is SqliteException or FormatException or InvalidOperationException)
         {
             logger.LogError(exception, "Weir startup step failed but startup will continue step={Step}", "log_retention_prune");
         }
@@ -223,7 +224,7 @@ public static class WeirServer
                 uow.DisposeAsync().AsTask().GetAwaiter().GetResult();
             }
         }
-        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or FormatException or InvalidOperationException)
+        catch (Exception exception) when (exception is SqliteException or FormatException or InvalidOperationException)
         {
             logger.LogError(exception, "Weir startup step failed but startup will continue step={Step}", "inactive_session_cleanup");
         }

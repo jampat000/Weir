@@ -1,3 +1,4 @@
+using Weir.Core.Media;
 using Weir.Core.Rules;
 using Weir.Core.Time;
 
@@ -129,7 +130,7 @@ public sealed record ProcessingLibraryRecord
     public string FfmpegStrictness { get; init; } = "normal";
 
     /// <summary>#548: which tool writes the output. See <see cref="Weir.Core.Media.RemuxWriterChoice"/>.</summary>
-    public string RemuxWriter { get; init; } = Weir.Core.Media.RemuxWriterChoice.Best;
+    public string RemuxWriter { get; init; } = RemuxWriterChoice.Best;
 
     /// <summary>#548: rewrite with ffmpeg when the preferred writer cannot write or validate a file.</summary>
     public bool RewriteWithFfmpeg { get; init; } = true;

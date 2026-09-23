@@ -90,7 +90,9 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
                 {
                     await ReconcileAsync(watches, pending, immediateScans, restarts, stoppingToken).ConfigureAwait(false);
                 }
+#pragma warning disable CA1031 // The watcher keeps its previous watch set when settings cannot be read.
                 catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
                 {
                     _logger.LogError(exception, "Filesystem watcher could not read library settings; keeping the previous watch set.");
                 }
@@ -316,7 +318,9 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
 
             await uow.CommitAsync().ConfigureAwait(false);
         }
+#pragma warning disable CA1031 // A failed enqueue must not stop the watcher; the periodic scan still runs.
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             // A failed enqueue must not kill the watcher: the periodic scan is still running, and the next
             // event (or tick, for an overflow) gets another attempt.

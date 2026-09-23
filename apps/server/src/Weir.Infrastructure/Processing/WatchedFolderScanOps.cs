@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Weir.Core.Activity;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Processing;
@@ -316,7 +317,7 @@ public static class WatchedFolderScanOps
             "ORDER BY id DESC LIMIT 50",
             reader => reader.IsDBNull(0) ? null : reader.GetString(0),
             ("@module", "processing"),
-            ("@type", Weir.Core.Activity.ActivityEventTypes.ProcessingFileRemuxPassCompleted),
+            ("@type", ActivityEventTypes.ProcessingFileRemuxPassCompleted),
             ("@needle", relativePosix)).ConfigureAwait(false);
 
         foreach (var raw in rows)

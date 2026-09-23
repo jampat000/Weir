@@ -1,5 +1,6 @@
 using Weir.Core.Jobs;
 using Weir.Core.Json;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Processing.RemuxPass;
 
 namespace Weir.Infrastructure.Processing;
@@ -85,7 +86,7 @@ public abstract class ProcessingFailureCleanupSweepHandler : IJobHandler
 public sealed class MovieFailureCleanupSweepHandler : ProcessingFailureCleanupSweepHandler
 {
     public MovieFailureCleanupSweepHandler(ProcessingFailureCleanupSweep sweep)
-        : base(sweep, Weir.Infrastructure.Jobs.PeriodicJobKinds.MovieFailureCleanupSweep, "movie")
+        : base(sweep, PeriodicJobKinds.MovieFailureCleanupSweep, "movie")
     {
     }
 }
@@ -94,7 +95,7 @@ public sealed class MovieFailureCleanupSweepHandler : ProcessingFailureCleanupSw
 public sealed class TvFailureCleanupSweepHandler : ProcessingFailureCleanupSweepHandler
 {
     public TvFailureCleanupSweepHandler(ProcessingFailureCleanupSweep sweep)
-        : base(sweep, Weir.Infrastructure.Jobs.PeriodicJobKinds.TvFailureCleanupSweep, "tv")
+        : base(sweep, PeriodicJobKinds.TvFailureCleanupSweep, "tv")
     {
     }
 }

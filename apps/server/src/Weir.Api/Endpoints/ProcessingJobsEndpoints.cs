@@ -7,6 +7,7 @@ using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
+using Weir.Core.Time;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
@@ -41,14 +42,14 @@ public static class ProcessingJobsEndpoints
             .Set("attempt_count", job.AttemptCount)
             .Set("max_attempts", job.MaxAttempts)
             .Set("lease_owner", job.LeaseOwner)
-            .Set("lease_expires_at", job.LeaseExpiresAt is { } lease ? Weir.Core.Time.PyDateTime.FromDateTimeOffset(lease).PydanticJson() : null)
+            .Set("lease_expires_at", job.LeaseExpiresAt is { } lease ? PyDateTime.FromDateTimeOffset(lease).PydanticJson() : null)
             .Set("last_error", job.LastError)
             .Set("operator_message", message)
             .Set("next_action", nextAction)
             .Set("technical_detail", technicalDetail)
             .Set("payload_json", job.PayloadJson)
-            .Set("created_at", Weir.Core.Time.PyDateTime.FromDateTimeOffset(job.CreatedAt).PydanticJson())
-            .Set("updated_at", Weir.Core.Time.PyDateTime.FromDateTimeOffset(job.UpdatedAt).PydanticJson());
+            .Set("created_at", PyDateTime.FromDateTimeOffset(job.CreatedAt).PydanticJson())
+            .Set("updated_at", PyDateTime.FromDateTimeOffset(job.UpdatedAt).PydanticJson());
     }
 
     private static async Task<ApiResult> GetInspectionAsync(ApiRequest request)

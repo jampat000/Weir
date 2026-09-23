@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Routing;
 using Weir.Api.Http;
 using Weir.Core.Auth;
+using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Jobs;
@@ -34,7 +35,7 @@ public static class ProcessingRemuxPassEndpoints
         request.RequireConfirmationToken(csrfToken, "Invalid or expired CSRF token.");
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        Weir.Core.Jobs.ProcessingJob job;
+        ProcessingJob job;
         try
         {
             job = await RemuxPassEnqueue.EnqueueManualAsync(uow, request.Service<ProcessingJobStore>(), relativeMediaPath, mediaScope, libraryId, passThrough)

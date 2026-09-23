@@ -232,7 +232,9 @@ public static class ActivityEndpoints
             {
                 latestId = await readLatestId(cancellationToken).ConfigureAwait(false);
             }
+#pragma warning disable CA1031 // A failed read must not end the live stream; it backs off and tries again.
             catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
             {
                 logger.LogWarning("SSE activity stream: read_latest_id failed, retrying after back-off");
                 await Task.Delay(poll, time, cancellationToken).ConfigureAwait(false);

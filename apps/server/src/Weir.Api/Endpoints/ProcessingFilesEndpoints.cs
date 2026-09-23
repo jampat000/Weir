@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Routing;
 using Weir.Api.Http;
 using Weir.Core.Activity;
 using Weir.Core.Auth;
+using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
@@ -18,6 +19,7 @@ using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.DirectPlay;
 using Weir.Infrastructure.Processing.RemuxPass;
+using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Endpoints;
 
@@ -153,7 +155,7 @@ public static class ProcessingFilesEndpoints
             .Set("limit", limit));
     }
 
-    private static async Task<ProcessingFileRecord> RequireFileAsync(Weir.Infrastructure.Sqlite.UnitOfWork uow, long id) =>
+    private static async Task<ProcessingFileRecord> RequireFileAsync(UnitOfWork uow, long id) =>
         await FileStateStore.GetAsync(uow, id).ConfigureAwait(false)
         ?? throw new ApiException(StatusCodes.Status404NotFound, "Weir has no record of that file.");
 
@@ -212,7 +214,7 @@ public static class ProcessingFilesEndpoints
         // a read apart from that session touch, so committing here changes nothing else.
         await request.CommitAsync().ConfigureAwait(false);
         var outcome = await jobStore.MoveToTopAsync(job.Value.Id).ConfigureAwait(false);
-        if (outcome != Weir.Core.Jobs.JobActionOutcome.Ok)
+        if (outcome != JobActionOutcome.Ok)
         {
             return ApiRoutes.Ok(new PyDict().Set("moved", false).Set("detail", "This file's work has already started, so it cannot be moved ahead of anything."));
         }
@@ -221,7 +223,7 @@ public static class ProcessingFilesEndpoints
     }
 
     /// <summary>The oldest pending remux job for this path.</summary>
-    private static async Task<(long Id, string PayloadJson)?> FindPendingRemuxJobAsync(Weir.Infrastructure.Sqlite.UnitOfWork uow, string relativePath)
+    private static async Task<(long Id, string PayloadJson)?> FindPendingRemuxJobAsync(UnitOfWork uow, string relativePath)
     {
         var rows = await uow.QueryAsync(
             "SELECT id, payload_json FROM jobs WHERE job_kind = @kind AND status = 'pending' ORDER BY id",

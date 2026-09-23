@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net.Http.Headers;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Activity;
@@ -395,7 +396,9 @@ public sealed partial class HandoffCompletionReporter
         {
             description = await port.DescribeAsync(connection, cancellationToken).ConfigureAwait(false);
         }
+#pragma warning disable CA1031 // An unreadable library list only means the output path cannot be placed; the report still goes out.
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             _logger.LogWarning(exception, "Could not read {Label}'s libraries to place the output path.", connection.Label);
             return null;
@@ -460,7 +463,7 @@ public sealed partial class HandoffCompletionReporter
 
             await uow.CommitAsync().ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or InvalidOperationException or IOException)
+        catch (Exception exception) when (exception is SqliteException or InvalidOperationException or IOException)
         {
             await uow.RollbackAsync().ConfigureAwait(false);
             _logger.LogWarning(exception, "Could not record the hand-off outcome.");

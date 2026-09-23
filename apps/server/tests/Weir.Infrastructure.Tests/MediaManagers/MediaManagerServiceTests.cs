@@ -395,7 +395,7 @@ public sealed class MediaManagerServiceTests
     public async Task A_lookup_returns_the_original_language_and_repeats_come_from_the_cache()
     {
         var http = new FakeManagerHttp().Json(HttpMethod.Get, "/3/search/movie", SearchPayload);
-        var provider = new TmdbMetadataProvider("k", http, cache: new MetadataLookupCache());
+        var provider = new TmdbMetadataProvider("k", http, TimeProvider.System, cache: new MetadataLookupCache());
         var result = await provider.LookupMovieAsync("Film", 2001);
         Assert.True(result.Matched);
         Assert.Equal(("fr", 2001), (result.Metadata!.OriginalLanguage, result.Metadata.Year!.Value));
@@ -407,25 +407,25 @@ public sealed class MediaManagerServiceTests
     public async Task Provider_failures_are_statuses_never_exceptions()
     {
         var empty = new FakeManagerHttp().Json(HttpMethod.Get, "/3/search/movie", """{"results":[]}""");
-        var cached = new TmdbMetadataProvider("k", empty, cache: new MetadataLookupCache());
+        var cached = new TmdbMetadataProvider("k", empty, TimeProvider.System, cache: new MetadataLookupCache());
         Assert.Equal(LookupResult.StatusNoMatch, (await cached.LookupMovieAsync("Unknown", 1999)).Status);
         await cached.LookupMovieAsync("Unknown", 1999);
         Assert.Single(empty.Requests);
 
         var none = new FakeManagerHttp();
-        Assert.Equal(LookupResult.StatusNotConfigured, (await new TmdbMetadataProvider(string.Empty, none, cache: new MetadataLookupCache()).LookupMovieAsync("Film", 2001)).Status);
-        var down = await new TmdbMetadataProvider("k", none, cache: new MetadataLookupCache()).LookupMovieAsync("Film", 2001);
+        Assert.Equal(LookupResult.StatusNotConfigured, (await new TmdbMetadataProvider(string.Empty, none, TimeProvider.System, cache: new MetadataLookupCache()).LookupMovieAsync("Film", 2001)).Status);
+        var down = await new TmdbMetadataProvider("k", none, TimeProvider.System, cache: new MetadataLookupCache()).LookupMovieAsync("Film", 2001);
         Assert.Equal(LookupResult.StatusUnreachable, down.Status);
         Assert.Contains("could not reach", down.Detail, StringComparison.Ordinal);
 
         var rejected = new FakeManagerHttp().Json(HttpMethod.Get, "/3/search/movie", string.Empty, HttpStatusCode.Unauthorized);
-        var refusal = await new TmdbMetadataProvider("wrong", rejected, cache: new MetadataLookupCache()).LookupMovieAsync("Film", 2001);
+        var refusal = await new TmdbMetadataProvider("wrong", rejected, TimeProvider.System, cache: new MetadataLookupCache()).LookupMovieAsync("Film", 2001);
         Assert.Equal(LookupResult.StatusNotConfigured, refusal.Status);
         Assert.Contains("rejected the configured key", refusal.Detail, StringComparison.Ordinal);
 
         var gateway = new FakeManagerHttp().Json(HttpMethod.Get, "/search/movie", SearchPayload);
-        Assert.True((await new TmdbMetadataProvider("k", gateway, "https://metadata.example.workers.dev", new MetadataLookupCache()).LookupMovieAsync("Film", 2001)).Matched);
-        var internalAddress = await new TmdbMetadataProvider("k", gateway, "http://169.254.169.254/latest", new MetadataLookupCache()).LookupMovieAsync("Film", 2001);
+        Assert.True((await new TmdbMetadataProvider("k", gateway, TimeProvider.System, "https://metadata.example.workers.dev", new MetadataLookupCache()).LookupMovieAsync("Film", 2001)).Matched);
+        var internalAddress = await new TmdbMetadataProvider("k", gateway, TimeProvider.System, "http://169.254.169.254/latest", new MetadataLookupCache()).LookupMovieAsync("Film", 2001);
         Assert.Equal(LookupResult.StatusNotConfigured, internalAddress.Status);
         Assert.Contains("not usable", internalAddress.Detail, StringComparison.Ordinal);
     }
@@ -434,7 +434,7 @@ public sealed class MediaManagerServiceTests
     public async Task The_saved_provider_is_built_from_suite_settings()
     {
         using var fixture = new MediaManagerFixture();
-        var service = new MetadataProviderService(fixture.Cipher, fixture.Http);
+        var service = new MetadataProviderService(fixture.Cipher, fixture.Http, fixture.Store.Clock);
         Assert.Equal(LookupResult.StatusNotConfigured, (await fixture.Db(uow => service.TestProviderAsync(uow))).Status);
         var ciphertext = service.StoreProviderKey("tmdb-key");
         await fixture.Db(uow => uow.ExecuteAsync("UPDATE suite_settings SET metadata_provider = 'TMDB', metadata_provider_key_ciphertext = $c WHERE id = 1", ("$c", ciphertext)));

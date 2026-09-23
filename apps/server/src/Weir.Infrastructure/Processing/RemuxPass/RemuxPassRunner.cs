@@ -272,7 +272,9 @@ public sealed class RemuxPassRunner
                 // Evidence the release is bad, so a library set to reject can act on it (#471).
                 new PyDict().Set("content_unusable", true));
         }
+#pragma warning disable CA1031 // Any ffprobe failure fails this file before anything is written.
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             return FailBefore(relativeMediaPath, $"ffprobe failed: {exception.Message}", inspected);
         }
@@ -282,7 +284,9 @@ public sealed class RemuxPassRunner
         {
             sourceWarnings = await _tools.ProbeWarningLinesAsync(src, cancellationToken).ConfigureAwait(false);
         }
+#pragma warning disable CA1031 // A baseline that cannot be read counts as no known warnings (#500).
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             // #500: a baseline that could not be read is treated as "no known warnings", so a genuine new warning on
             // the output still fails validation instead of being silently accepted.
@@ -609,7 +613,9 @@ public sealed class RemuxPassRunner
         {
             return SourceNotReady(relativeMediaPath, exception.Message, context.Inspected);
         }
+#pragma warning disable CA1031 // Any failure while copying becomes this file's recorded failure; the worker survives it.
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             report?.Invoke(new PyDict()
                 .Set("status", "failed")
@@ -656,7 +662,9 @@ public sealed class RemuxPassRunner
         {
             output.Set("unchanged_output_method", await DetachHardlinkedOutputIfSourceRemainsAsync(context, finalSkip, method, ReportCopyProgress).ConfigureAwait(false));
         }
+#pragma warning disable CA1031 // The source stays put when the output cannot be detached; the file is failed, not the worker.
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             FileLifecycle.BestEffortDelete(finalSkip);
             output.Set("ok", false);
@@ -823,7 +831,9 @@ public sealed class RemuxPassRunner
                 .Set("reason", exception.Message));
             return SourceNotReady(relativeMediaPath, exception.Message, context.Inspected);
         }
+#pragma warning disable CA1031 // Any failure while writing becomes this file's recorded failure; the worker survives it.
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+#pragma warning restore CA1031
         {
             report?.Invoke(new PyDict()
                 .Set("status", "failed")
@@ -1209,7 +1219,9 @@ public sealed class RemuxPassRunner
         {
             lookup = await _originalLanguage.LookupAsync(scope, relativeMediaPath, origin, cancellationToken).ConfigureAwait(false);
         }
+#pragma warning disable CA1031 // A failed lookup degrades to the language preferences; the pass still runs.
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             _logger.LogWarning(exception, "Original-language lookup failed for {Path}.", relativeMediaPath);
             lookup = new LookupResult { Status = LookupResult.StatusUnreachable, Detail = $"The metadata lookup failed ({exception.Message})." };

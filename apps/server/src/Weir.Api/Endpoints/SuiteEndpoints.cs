@@ -127,7 +127,9 @@ public static class SuiteEndpoints
                 logger.LogWarning("Suite log prune skipped because the active log could not be rewritten.");
             }
         }
+#pragma warning disable CA1031 // Pruning the log is housekeeping; a failure is logged and the request still succeeds.
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             logger.LogWarning(exception, "Suite log prune skipped because the active log could not be rewritten.");
         }
@@ -293,7 +295,9 @@ public static class SuiteEndpoints
         {
             return ApiRoutes.Ok(UpdateStatus.Unavailable(currentVersion, installType, "not_published", "No public Weir release is published yet."));
         }
+#pragma warning disable CA1031 // An update check that fails for any reason reads as unavailable, never an error page.
         catch (Exception exception) when (exception is not OperationCanceledException || !request.Context.RequestAborted.IsCancellationRequested)
+#pragma warning restore CA1031
         {
             return ApiRoutes.Ok(UpdateStatus.Unavailable(currentVersion, installType, "unavailable", "Could not check for updates right now."));
         }

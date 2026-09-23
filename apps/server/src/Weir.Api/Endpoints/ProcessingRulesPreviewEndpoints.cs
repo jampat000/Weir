@@ -12,6 +12,7 @@ using Weir.Infrastructure.Browse;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
+using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Endpoints;
 
@@ -148,7 +149,7 @@ public static class ProcessingRulesPreviewEndpoints
 
     private static async Task<ApiResult> RunPreviewAsync(
         ApiRequest request,
-        Weir.Infrastructure.Sqlite.UnitOfWork uow,
+        UnitOfWork uow,
         ProcessingLibraryRecord library,
         string resolvedPath,
         LibraryRules.RuleSetInput? ruleSetInput)
@@ -171,7 +172,9 @@ public static class ProcessingRulesPreviewEndpoints
         {
             throw new ApiException(StatusCodes.Status400BadRequest, $"Weir could not read this file's contents: {exception.Message}");
         }
+#pragma warning disable CA1031 // Any ffprobe failure is the operator's 400, not a server error.
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             throw new ApiException(StatusCodes.Status400BadRequest, $"ffprobe failed: {exception.Message}");
         }
@@ -220,7 +223,7 @@ public static class ProcessingRulesPreviewEndpoints
 
     /// <summary>Unsaved rules (validated exactly like a save) take priority; otherwise the library's saved
     /// rule set; otherwise the shipped defaults — the same fallback order a live pass uses.</summary>
-    private static async Task<ProcessingRulesConfig> BuildConfigAsync(Weir.Infrastructure.Sqlite.UnitOfWork uow, ProcessingLibraryRecord library, LibraryRules.RuleSetInput? ruleSetInput)
+    private static async Task<ProcessingRulesConfig> BuildConfigAsync(UnitOfWork uow, ProcessingLibraryRecord library, LibraryRules.RuleSetInput? ruleSetInput)
     {
         if (ruleSetInput is not null)
         {
@@ -265,7 +268,9 @@ public static class ProcessingRulesPreviewEndpoints
         {
             lookup = await lookupService.LookupAsync(scope, resolvedPath, origin: null, request.Context.RequestAborted).ConfigureAwait(false);
         }
+#pragma warning disable CA1031 // A failed metadata lookup is shown as unreachable; the preview still answers.
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             lookup = new LookupResult { Status = LookupResult.StatusUnreachable, Detail = $"The metadata lookup failed ({exception.Message})." };
         }

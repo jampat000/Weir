@@ -1,4 +1,5 @@
 using Weir.Core.Json;
+using Weir.Core.Media;
 using Weir.Core.Processing;
 using Weir.Core.Rules;
 using Weir.Infrastructure.IO;
@@ -21,7 +22,7 @@ public sealed record ProcessingPathRuntime
     public string FfmpegStrictness { get; init; } = "normal";
 
     /// <summary>#548: which tool writes this library's output (<see cref="Weir.Core.Media.RemuxWriterChoice"/>).</summary>
-    public string RemuxWriter { get; init; } = Weir.Core.Media.RemuxWriterChoice.Best;
+    public string RemuxWriter { get; init; } = RemuxWriterChoice.Best;
 
     /// <summary>#548: rewrite with ffmpeg when the preferred writer cannot write or validate a file.</summary>
     public bool RewriteWithFfmpeg { get; init; } = true;
@@ -227,7 +228,7 @@ public static class RemuxPassPaths
             HardwareDevice = library.HardwareDevice ?? string.Empty,
             HardwareDisabledVendorsCsv = library.HardwareDisabledVendorsCsv ?? string.Empty,
             FfmpegStrictness = string.IsNullOrEmpty(library.FfmpegStrictness) ? "normal" : library.FfmpegStrictness,
-            RemuxWriter = Weir.Core.Media.RemuxWriterChoice.Normalize(library.RemuxWriter),
+            RemuxWriter = RemuxWriterChoice.Normalize(library.RemuxWriter),
             RewriteWithFfmpeg = library.RewriteWithFfmpeg,
             RemoveOriginalAfterSuccess = library.RemoveOriginalAfterSuccess,
         }, null);
