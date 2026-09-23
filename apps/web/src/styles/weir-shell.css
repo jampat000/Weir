@@ -2033,17 +2033,52 @@ select.mm-input {
   -moz-appearance: none;
   appearance: none;
   cursor: pointer;
-  padding: 0.625rem 2.35rem 0.625rem 0.75rem;
+  padding: 0.625rem 3rem 0.625rem 0.75rem;
+  /* The mark is the accent colour and it stands in a tinted well behind a hairline, so a control
+     that opens is told apart from one you type into at a glance, not by looking for a 11px grey
+     chevron (James, 23 Sep 2026: "things need to be made obvious and look obvious"). */
   background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' viewBox='0 0 14 14'%3E%3Cpath stroke='%23aeb4bf' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.65' d='m3.5 5.5 3.5 3.5 3.5-3.5'/%3E%3C/svg%3E"),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018) 0%, transparent 52%);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' viewBox='0 0 14 14'%3E%3Cpath stroke='%233ED7C8' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m3.5 5.5 3.5 3.5 3.5-3.5'/%3E%3C/svg%3E"),
+    linear-gradient(
+      to right,
+      var(--mm-border) 0,
+      var(--mm-border) 1px,
+      var(--mm-accent-soft) 1px,
+      var(--mm-accent-soft) 100%
+    );
   background-repeat: no-repeat, no-repeat;
   background-position:
-    right 0.65rem center,
-    0 0;
+    right 0.82rem center,
+    right 0 center;
   background-size:
-    0.7rem auto,
-    auto;
+    0.85rem auto,
+    2.4rem 100%;
+}
+
+html[data-mm-theme="light"] select.mm-input {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' viewBox='0 0 14 14'%3E%3Cpath stroke='%230D6F68' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m3.5 5.5 3.5 3.5 3.5-3.5'/%3E%3C/svg%3E"),
+    linear-gradient(
+      to right,
+      var(--mm-border) 0,
+      var(--mm-border) 1px,
+      var(--mm-accent-soft) 1px,
+      var(--mm-accent-soft) 100%
+    );
+}
+
+/* The anchored listbox trigger draws its own chevron in markup, so it takes the well on its own. */
+.mm-input--opens {
+  background-image: linear-gradient(
+    to right,
+    var(--mm-border) 0,
+    var(--mm-border) 1px,
+    var(--mm-accent-soft) 1px,
+    var(--mm-accent-soft) 100%
+  );
+  background-repeat: no-repeat;
+  background-position: right 0 center;
+  background-size: 2.4rem 100%;
 }
 
 select.mm-input::-ms-expand {

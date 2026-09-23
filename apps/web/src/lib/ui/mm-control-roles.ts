@@ -32,8 +32,10 @@ const mmNativeFieldShell =
 /** Native dropdown / listbox-style ``<select>`` — use under a field label (includes top spacing). */
 export const mmSelectFieldClass = `${mmNativeFieldShell} mt-1 cursor-pointer`;
 
-/** Anchored picker button (custom listbox) — visually aligned with {@link mmSelectFieldClass}. */
-export const mmPickerTriggerClass = `${mmNativeFieldShell} mt-1 cursor-pointer text-left`;
+/** Anchored picker button (custom listbox) — visually aligned with {@link mmSelectFieldClass}.
+ *  `mm-input--opens` gives it the same tinted well a native select has, so everything that opens
+ *  something looks alike; it draws its own chevron in markup, so the well comes without the mark. */
+export const mmPickerTriggerClass = `${mmNativeFieldShell} mm-input--opens mt-1 cursor-pointer text-left`;
 
 /** Checkbox control — used for multi-option rows and standalone toggles. */
 export const mmCheckboxControlClass =

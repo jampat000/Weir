@@ -97,10 +97,13 @@
   --mm-shadow-card-inner: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
   --mm-shadow-shell: 0 22px 60px rgba(2, 12, 16, 0.55);
   /* Inset field wells — slightly below card plane; tuned for quiet premium (not deep black wells). */
-  --mm-input-bg: rgba(11, 20, 24, 0.92);
-  --mm-input-bg-hover: rgba(9, 17, 20, 0.94);
-  --mm-input-border: rgba(232, 241, 244, 0.11);
-  --mm-input-border-hover: rgba(232, 241, 244, 0.17);
+  /* A field lifts off the page rather than sinking into it: at 0.92 alpha over the same colour as
+     the background, a control was invisible but for an 11% border (James, 23 Sep 2026: the boxes
+     "dont fit the theme anymore"). */
+  --mm-input-bg: rgba(232, 241, 244, 0.055);
+  --mm-input-bg-hover: rgba(232, 241, 244, 0.085);
+  --mm-input-border: rgba(232, 241, 244, 0.22);
+  --mm-input-border-hover: rgba(62, 215, 200, 0.45);
   --mm-input-border-focus: rgba(62, 215, 200, 0.45);
   /* Focus halo for `.mm-input` / picker triggers — calmer than global `--mm-accent-soft` fills. */
   --mm-input-focus-ring: rgba(62, 215, 200, 0.18);
@@ -168,8 +171,8 @@ html[data-mm-theme="light"] {
   --mm-shadow-shell: 0 22px 60px rgba(16, 54, 64, 0.14);
   --mm-input-bg: rgba(255, 255, 255, 0.96);
   --mm-input-bg-hover: rgba(255, 255, 255, 1);
-  --mm-input-border: rgba(17, 36, 43, 0.18);
-  --mm-input-border-hover: rgba(17, 36, 43, 0.26);
+  --mm-input-border: rgba(17, 36, 43, 0.28);
+  --mm-input-border-hover: rgba(13, 111, 104, 0.5);
   --mm-input-border-focus: rgba(13, 111, 104, 0.55);
   --mm-input-focus-ring: rgba(13, 111, 104, 0.18);
   --mm-eyebrow-color: var(--mm-stone-muted);
