@@ -3,10 +3,10 @@ using Weir.Core.Rules;
 
 namespace Weir.Core.Tests.Rules;
 
-/// <summary>Ported from <c>apps/backend/tests/test_processing_track_sorters.py</c>.</summary>
+/// <summary>Track sorters: parsing, validation, description and the sort keys they give each track.</summary>
 public sealed class TrackSorterTests
 {
-    /// <summary>The ranking exactly as it was before the sorter list, copied from the Python test.</summary>
+    /// <summary>The fixed quality ranking the default sorter list must reproduce.</summary>
     private static List<long> OriginalQualitySortKey(SortableTrack track, int? fallbackPreferredPenalty = null)
     {
         long com = track.Commentary ? 1 : 0;
@@ -53,7 +53,7 @@ public sealed class TrackSorterTests
     // --- the equivalence that matters ----------------------------------------------------
 
     [Fact]
-    public void The_seeded_default_ranks_identically_to_the_old_tuple()
+    public void The_seeded_default_ranks_identically_to_the_fixed_quality_ranking()
     {
         var tracks = new List<SortableTrack>();
         var index = 0;

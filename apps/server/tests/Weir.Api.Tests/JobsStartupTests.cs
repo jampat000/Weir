@@ -6,13 +6,13 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Tests;
 
-/// <summary>The jobs area wired into the real server: crash recovery on start, and workers that leave unported kinds alone.</summary>
+/// <summary>The jobs area wired into the real server: crash recovery on start, and workers that leave kinds without a handler alone.</summary>
 public sealed class JobsStartupTests
 {
     [Fact]
     public async Task Every_job_kind_weir_queues_on_a_timer_has_a_handler()
     {
-        // The work file sweep was queued every hour with no handler, so it waited in the queue for ever.
+        // A timer job with no handler would wait in the queue for ever.
         await using var server = await WeirTestServer.StartAsync();
         var handled = server.Services.GetServices<IJobHandler>().Select(h => h.JobKind).ToHashSet(StringComparer.Ordinal);
 
@@ -25,7 +25,7 @@ public sealed class JobsStartupTests
     [Fact]
     public async Task The_workers_deliver_job_alerts_to_the_channels_on_Settings_Alerts()
     {
-        // Only a notifier that sends nothing used to be registered, so no real job ever produced an alert.
+        // A notifier that sends nothing would mean no real job ever produces an alert.
         await using var server = await WeirTestServer.StartAsync();
 
         Assert.IsType<WebhookJobNotifications>(server.Services.GetRequiredService<IJobNotifications>());
@@ -67,7 +67,7 @@ public sealed class JobsStartupTests
         Assert.False(File.Exists(tempFile));
         Assert.True(File.Exists(operatorFile));
 
-        // The remux pass is ported (#522 part 3), so a running .NET worker claims the recovered row and runs it to the end.
+        // A running worker handles the remux pass (#522 part 3), so it claims the recovered row and runs it to the end.
         var store = server.Services.GetRequiredService<ProcessingJobStore>();
         var deadline = DateTime.UtcNow.AddSeconds(30);
         ProcessingJob job;

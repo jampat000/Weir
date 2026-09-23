@@ -3,8 +3,8 @@ using Weir.Core.Activity;
 namespace Weir.Core.Tests.Activity;
 
 /// <summary>
-/// Ports of <c>classify_activity</c>'s behaviour and the <c>constants</c> contract. Expected facts were
-/// produced by the Python function.
+/// How an activity event's type and detail become its facts (trigger, result, library, file and run), and the
+/// event type constants.
 /// </summary>
 public sealed partial class ActivityClassifierTests
 {
@@ -29,9 +29,8 @@ public sealed partial class ActivityClassifierTests
         Assert.Equal(new ActivityFacts("manual", "failed", null, null, null), ActivityClassifier.Classify(ActivityEventTypes.AuthBootstrapDenied, "An admin account already exists."));
         Assert.Equal(new ActivityFacts("manual", null, null, null, null), ActivityClassifier.Classify(ActivityEventTypes.SystemReconciliationRepair, null));
         Assert.Equal(new ActivityFacts(null, "failed", null, null, null), ActivityClassifier.Classify(ActivityEventTypes.ProcessingWorkerFailure, null));
-        // #540 item 8: Python checks "failure" (in the event type's name) before "completed", so a
-        // cleanup sweep that finished with no result given reads as "failed". Fixed here to match the
-        // type's own terminal verb ("completed") first, so it reads as "success" instead.
+        // #540 item 8: the type's own terminal verb ("completed") is matched before "failure" in its name,
+        // so a cleanup sweep that finished with no result given reads as "success", not "failed".
         Assert.Equal("success", ActivityClassifier.Classify(ActivityEventTypes.ProcessingFailureCleanupSweepCompleted, "not json").Result);
         Assert.Equal("warning", ActivityClassifier.Classify(ActivityEventTypes.ProcessingFileRejectFellBack, null).Result);
     }
@@ -40,22 +39,22 @@ public sealed partial class ActivityClassifierTests
     public void Booleans_are_not_library_ids_and_not_run_ids()
     {
         Assert.Equal(new ActivityFacts(null, "failed", null, null, null), ActivityClassifier.Classify("processing.x", "{\"ok\": false, \"library_id\": true}"));
-        // #540 item 5: Python's isinstance(run_id, (str, int)) also accepts a bool, so run_id: true
-        // read as the run key "run:True". Fixed here to reject booleans, so neither id is set.
+        // #540 item 5: booleans are rejected, so run_id: true does not become the run key "run:True"
+        // and neither id is set.
         Assert.Equal(new ActivityFacts("manual", "failed", null, null, null), ActivityClassifier.Classify("auth.login", "{\"ok\":false,\"library_id\":true,\"run_id\":true}"));
         Assert.Equal(new ActivityFacts(null, null, null, null, null), ActivityClassifier.Classify("processing.x", "{\"library_id\": 1.0, \"run_id\": \" \"}"));
     }
 
     [Fact]
-    public void The_detail_is_read_the_way_json_loads_and_str_strip_read_it()
+    public void The_detail_is_read_leniently_and_its_values_fully_trimmed()
     {
-        // json.loads accepts NaN, keeps integers of any size and lets the last duplicate key win.
+        // The detail accepts NaN, keeps integers of any size and lets the last duplicate key win.
         Assert.Equal("worker", ActivityClassifier.Classify("processing.x", "{\"trigger\":\"worker\",\"x\":NaN}").Trigger);
         Assert.Equal("retry", ActivityClassifier.Classify("processing.x", "{\"trigger\":\"worker\",\"trigger\":\"retry\"}").Trigger);
         Assert.Equal(
             "run:123456789012345678901234567890",
             ActivityClassifier.Classify("processing.x", "{\"run_id\":123456789012345678901234567890}").RunKey);
-        // str.strip() removes U+001C..U+001F, which .NET's Trim keeps.
+        // Trimming also removes U+001C..U+001F, which .NET's Trim keeps.
         Assert.Equal(
             new ActivityFacts("worker", null, null, "a", null),
             ActivityClassifier.Classify("processing.x", "{\"trigger\":\"\\u001cWorker\\u001c\",\"relative_media_path\":\"\\u2028a\\u001f\"}"));

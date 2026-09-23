@@ -2,7 +2,7 @@ using Weir.Core.Jobs;
 
 namespace Weir.Core.Tests.Jobs;
 
-/// <summary>Ports of the grid and wall-clock assertions in <c>test_processing_schedules_and_pause.py</c>.</summary>
+/// <summary>The weekly schedule grid and its wall-clock rules.</summary>
 public sealed class ScheduleGridTests
 {
     /// <summary>A Wednesday at 14:00 UTC.</summary>
@@ -120,7 +120,7 @@ public sealed class ScheduleGridTests
     }
 
     [Fact]
-    public void Weekday_numbering_matches_python_monday_first()
+    public void Weekday_numbering_starts_at_zero_on_monday()
     {
         Assert.Equal(0, ScheduleGrid.PythonWeekday(DayOfWeek.Monday));
         Assert.Equal(6, ScheduleGrid.PythonWeekday(DayOfWeek.Sunday));

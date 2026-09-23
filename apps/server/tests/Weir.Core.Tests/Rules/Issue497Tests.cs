@@ -6,7 +6,7 @@ namespace Weir.Core.Tests.Rules;
 /// Issue #497: keep more than one audio track (one per configured language slot), cap subtitles
 /// per language by quality, and put content tier (main &gt; dub/audio description &gt; commentary)
 /// first in the default audio sorters. The golden corpus (<see cref="GoldenParityTests"/>) already
-/// proves <c>audio_keep_mode: single</c> gives identical plans to today (585 pre-existing cases,
+/// proves <c>audio_keep_mode: single</c> gives the recorded plans (585 recorded cases,
 /// 80 of them carrying a wording-only override for the new default sorter); these tests isolate
 /// the new behaviour so a regression points straight at the cause.
 /// </summary>
@@ -16,7 +16,7 @@ public sealed class Issue497Tests
 
     private static readonly ProbeStreamInfo Video = Stream("""{"index": 0, "codec_type": "video", "codec_name": "h264"}""");
 
-    // --- audio_keep_mode: single is the default and never changes today's plans -----------
+    // --- audio_keep_mode: single is the default and never changes the recorded plans -----
 
     [Fact]
     public void Single_is_the_default_audio_keep_mode()

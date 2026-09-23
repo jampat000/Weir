@@ -7,10 +7,10 @@ using static Weir.Api.Tests.Platform.ApiTestClient;
 namespace Weir.Api.Tests.Platform;
 
 /// <summary>
-/// Deliberate deviations from the Python backend: bugs the contract suite found (#528, #529, #535, #536),
-/// fixed in the .NET server instead of ported.
+/// Bugs the contract suite found (#528, #529, #535, #536): forwarded headers, expired sessions, API paths
+/// and invalid UTF-8 in logs.
 /// </summary>
-public sealed class PythonBugFixTests
+public sealed class ContractSuiteBugFixTests
 {
     /// <summary>A login request from a chosen TCP peer, with extra headers.</summary>
     private static async Task<HttpContext> LoginFromPeerAsync(WeirTestServer server, string peer, IReadOnlyDictionary<string, string> headers)

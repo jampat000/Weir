@@ -44,7 +44,7 @@ public sealed class WebAppTests
     [InlineData("/health-check", "text/html")]
     [InlineData("/missing.png", "text/html")]
     [InlineData("/assets/missing.js", null)]
-    public async Task Other_misses_are_fastapi_json_404s(string path, string? accept)
+    public async Task Other_misses_are_json_404s(string path, string? accept)
     {
         await using var server = await WeirTestServer.StartAsync(WithWebDist, prepareHome: WeirTestServer.WriteWebDist);
 
@@ -115,7 +115,7 @@ public sealed class WebAppTests
         Assert.Equal("public, max-age=31536000, immutable", Header(brotli, "Cache-Control"));
         Assert.Equal("Accept-Encoding", Header(brotli, "Vary"));
         Assert.Equal("application/javascript", brotli.Content.Headers.ContentType?.ToString());
-        // Outside the header middleware, as in Python.
+        // Static assets are served outside the security-header middleware.
         Assert.Equal(string.Empty, Header(brotli, "X-Request-ID"));
         Assert.Equal(string.Empty, Header(brotli, "Content-Security-Policy"));
 
@@ -174,7 +174,7 @@ public sealed class WebAppTests
     [InlineData("/file.", "")]
     [InlineData("/archive.tar.gz", ".gz")]
     [InlineData("/dir.d/", ".d")]
-    public void Path_suffix_matches_pathlib(string path, string expected) => Assert.Equal(expected, WebApp.PathSuffix(path));
+    public void Path_suffix_is_the_last_segments_extension(string path, string expected) => Assert.Equal(expected, WebApp.PathSuffix(path));
 
     private static async Task<HttpResponseMessage> Get(
         WeirTestServer server,

@@ -5,16 +5,16 @@ using Weir.Core.Security;
 namespace Weir.Core.Tests.Security;
 
 /// <summary>
-/// Values made by the Python backend (Fixtures/python-security.json) must verify here, and values made
-/// here must match what Python makes, so a database and a browser survive switching servers.
+/// Security values written by earlier releases (the security fixture under Fixtures/) must verify here, and new values
+/// must match their format exactly, so existing databases and browser sessions keep working.
 /// </summary>
-public sealed class PythonSecurityCompatibilityTests
+public sealed class SecurityCompatibilityTests
 {
     private static readonly JsonElement Fixture = JsonDocument.Parse(
         File.ReadAllText(Path.Join(AppContext.BaseDirectory, "Fixtures", "python-security.json"))).RootElement;
 
     [Fact]
-    public void Argon2id_hashes_made_by_argon2_cffi_verify()
+    public void Argon2id_hashes_from_earlier_releases_verify()
     {
         var password = Fixture.GetProperty("password");
         Assert.Equal(PasswordVerification.Match, PasswordHasher.Verify(password.GetProperty("plain").GetString()!, password.GetProperty("hash").GetString()!));
@@ -60,7 +60,7 @@ public sealed class PythonSecurityCompatibilityTests
     }
 
     [Fact]
-    public void New_hashes_use_the_python_parameters_and_phc_format()
+    public void New_hashes_use_the_stored_parameters_and_phc_format()
     {
         var hash = PasswordHasher.Hash("correct horse battery staple");
         Assert.Matches(@"^\$argon2id\$v=19\$m=65536,t=3,p=1\$[A-Za-z0-9+/]{22}\$[A-Za-z0-9+/]{43}$", hash);
@@ -79,7 +79,7 @@ public sealed class PythonSecurityCompatibilityTests
     public void An_empty_stored_hash_is_a_mismatch() => Assert.Equal(PasswordVerification.Mismatch, PasswordHasher.Verify("x", string.Empty));
 
     [Fact]
-    public void Csrf_tokens_issued_by_python_verify_and_dotnet_issues_identical_tokens()
+    public void Stored_csrf_tokens_verify_and_new_ones_are_identical()
     {
         var csrf = Fixture.GetProperty("csrf");
         var secret = csrf.GetProperty("secret").GetString()!;
@@ -114,7 +114,7 @@ public sealed class PythonSecurityCompatibilityTests
     }
 
     [Fact]
-    public void Session_token_hashes_match_python()
+    public void Session_token_hashes_match_the_stored_hashes()
     {
         var hash = Fixture.GetProperty("session_token_hash");
         Assert.Equal(hash.GetProperty("sha256").GetString(), SessionTokens.Hash(hash.GetProperty("raw").GetString()!));
@@ -122,7 +122,7 @@ public sealed class PythonSecurityCompatibilityTests
     }
 
     [Fact]
-    public void Credential_envelopes_encrypted_by_python_decrypt()
+    public void Credential_envelopes_from_earlier_releases_decrypt()
     {
         var credentials = Fixture.GetProperty("credentials");
         var plaintext = credentials.GetProperty("plaintext").GetString()!;
@@ -143,7 +143,7 @@ public sealed class PythonSecurityCompatibilityTests
     }
 
     [Fact]
-    public void Credential_encryption_uses_the_python_envelope_and_rewraps_legacy_values()
+    public void Credential_encryption_uses_the_stored_envelope_and_rewraps_legacy_values()
     {
         var legacy = new CredentialCipher(null, "legacy-session-secret", [], TimeProvider.System);
         var legacyCiphertext = legacy.Encrypt("  arr-key  ");

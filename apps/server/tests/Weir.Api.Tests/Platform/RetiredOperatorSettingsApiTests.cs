@@ -3,8 +3,8 @@ using System.Net;
 namespace Weir.Api.Tests.Platform;
 
 /// <summary>
-/// "Verbose file-detection records" was removed on 23 Sep 2026: nothing ever acted on it. The settings no longer show it,
-/// and an older client that still sends it is answered as though it had not, rather than refused.
+/// "Verbose file-detection records" is retired because nothing acted on it. The settings do not show it, and an
+/// older client that still sends it is answered as though it had not, rather than refused.
 /// </summary>
 public sealed class RetiredOperatorSettingsApiTests
 {
@@ -18,7 +18,7 @@ public sealed class RetiredOperatorSettingsApiTests
     }
 
     [Fact]
-    public async Task Verbose_detection_logging_is_no_longer_a_setting()
+    public async Task Verbose_detection_logging_is_not_a_setting()
     {
         var (server, client) = await SignedInAsync();
         await using var disposeServer = server;

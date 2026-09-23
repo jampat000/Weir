@@ -6,7 +6,7 @@ using Weir.Core.Rules;
 
 namespace Weir.Core.Tests.Processing.RemuxPass;
 
-/// <summary>Ported from <c>apps/backend/tests/test_processing_file_remux_pass_visibility.py</c>.</summary>
+/// <summary>What a remux pass shows about its plan and outcome.</summary>
 public sealed class RemuxPassVisibilityTests
 {
     private static PyDict Parse(string json) => (PyDict)PyJsonParser.Parse(json);
@@ -141,7 +141,7 @@ public sealed class RemuxPassVisibilityTests
     }
 }
 
-/// <summary>Ported from the policy half of <c>test_processing_requeue_service.py</c> and <c>processing_failure_classes.py</c>.</summary>
+/// <summary>Failure classes and the requeue policy each library's retry settings give them.</summary>
 public sealed class FailureClassesTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 29, 12, 0, 0, TimeSpan.Zero);
@@ -231,7 +231,7 @@ public sealed class FailureClassesTests
     }
 }
 
-/// <summary>Ported from the size-settling tests of <c>apps/backend/tests/test_processing_file_settling.py</c>.</summary>
+/// <summary>Size settling: a file is left alone until its size stops changing.</summary>
 public sealed class FileSettlingTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 29, 12, 0, 0, TimeSpan.Zero);
@@ -309,7 +309,7 @@ public sealed class FileSettlingTests
     }
 }
 
-/// <summary>Ported from <c>apps/backend/tests/test_processing_manager_library_truth.py</c>.</summary>
+/// <summary>The library-truth gate: what the media managers report about a file's folder.</summary>
 public sealed class LibraryTruthGateTests
 {
     private static readonly string Folder = OperatingSystem.IsWindows() ? @"C:\out\Title" : "/out/Title";
@@ -413,7 +413,7 @@ public sealed class ReleaseTitleTests
     public void Nothing_usable_is_null(string? name) => Assert.Null(ReleaseTitle.Parse(name));
 }
 
-/// <summary>What a pass reads off the probe (<c>run.py</c> and <c>processing_runner_units.py</c> helpers).</summary>
+/// <summary>What a pass reads off the probe.</summary>
 public sealed class RemuxPassMediaTests
 {
     private static ProbeStreamInfo Stream(string json) => ProbeStreamInfo.Parse(json);

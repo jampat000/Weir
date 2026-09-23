@@ -2,8 +2,7 @@ using Weir.Core.Processing;
 
 namespace Weir.Core.Tests.Processing;
 
-/// <summary>Ported assertions from <c>processing_library_crud.py</c>'s <c>_validate_folders</c>,
-/// <c>_validate_name</c> and <c>_validate_scope</c> (#460, ADR-0014).</summary>
+/// <summary>Library folder, name and scope validation (#460, ADR-0014).</summary>
 public sealed class LibraryRulesTests
 {
     [Fact]

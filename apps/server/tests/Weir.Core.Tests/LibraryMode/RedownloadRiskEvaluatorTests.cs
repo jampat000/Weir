@@ -115,7 +115,7 @@ public sealed class RedownloadRiskEvaluatorTests
     }
 
     [Fact]
-    public void A_language_id_this_port_could_not_place_also_cannot_tell()
+    public void An_unplaceable_language_id_also_cannot_tell()
     {
         var unplaced = new CustomFormatSnapshot(4, "Unplaceable", [new FormatSpecificationSnapshot(RedownloadRiskEvaluator.LanguageImplementation, false, LanguageCode: null, ExceptLanguage: false)]);
         var snapshot = new FileFormatSnapshot(["eng", "jpn"], [unplaced], CustomFormatScore: 100);

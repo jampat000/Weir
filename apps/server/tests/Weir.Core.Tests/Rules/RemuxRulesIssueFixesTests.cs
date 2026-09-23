@@ -63,9 +63,9 @@ public sealed class RemuxRulesIssueFixesTests
     // --- item 5: a non-string tag value is missing, not stringified -----------------------
 
     [Fact]
-    public void A_list_valued_title_no_longer_falsely_marks_a_track_as_commentary()
+    public void A_list_valued_title_does_not_mark_a_track_as_commentary()
     {
-        // str(["Commentary"]) is "['Commentary']", which contains "commentary" — the exact
+        // Stringified, ["Commentary"] becomes "['Commentary']", which contains "commentary" — the exact
         // false match the issue describes. The value is not a string, so it must be ignored.
         var listTitled = Stream("""{"index": 1, "codec_type": "audio", "codec_name": "aac", "channels": 2, "bit_rate": "128000", "tags": {"language": null, "title": ["Commentary"]}}""");
         var config = RemuxRules.DefaultConfig() with { RemoveCommentary = true };
@@ -86,7 +86,7 @@ public sealed class RemuxRulesIssueFixesTests
         var plan = RemuxRules.PlanRemux([Video], [nullLanguage], [], RemuxRules.DefaultConfig());
 
         Assert.NotNull(plan);
-        // str(None) == "None"; a real, if bogus, three-letter-looking value must not appear here.
+        // Stringified, null becomes "None"; a real, if bogus, three-letter-looking value must not appear here.
         Assert.Equal(string.Empty, plan!.Audio[0].LangLabel);
     }
 

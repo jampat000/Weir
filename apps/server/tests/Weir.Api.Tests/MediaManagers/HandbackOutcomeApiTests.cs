@@ -323,9 +323,9 @@ public sealed class HandbackOutcomeApiTests : IDisposable
     [Fact]
     public async Task A_failed_job_left_by_an_earlier_hand_off_of_the_same_file_does_not_fail_this_one()
     {
-        // The rig, 23 Sep 2026: Tears of Steel had two earlier hand-offs that ended badly, one with a pass-through that
-        // ran out of retries. That job is found by the file's path, so the new hand-off, which Weir had just completed,
-        // read "failed", and Weir refused Deluno's "imported" with 409.
+        // An earlier hand-off of the same file left a pass-through that ran out of retries. That job is found by the
+        // file's path, so without a guard the new hand-off, which Weir has just completed, reads "failed" and Weir
+        // refuses Deluno's "imported" with 409.
         await using var server = await StartAsync();
         await FailedPassThroughAsync(server, "2026-09-22 09:00:00.000000");
         await FinishedHandoffAsync(server);
@@ -342,8 +342,8 @@ public sealed class HandbackOutcomeApiTests : IDisposable
     [Fact]
     public async Task A_failed_row_left_for_the_release_folder_by_an_earlier_hand_off_does_not_fail_this_one()
     {
-        // The rig's other half of the same story: a row for the release folder itself, failed four days before, sat
-        // under the new hand-off's path and was counted with the file Weir had just finished inside it.
+        // A failed row for the release folder itself, left days earlier, sits under the new hand-off's path and must
+        // not be counted with the file Weir has just finished inside it.
         await using var server = await StartAsync();
         var library = await MoviesAsync(server);
         await TestDatabase.ExecuteAsync(

@@ -3,8 +3,8 @@ using Weir.Core.Processing;
 
 namespace Weir.Core.Tests.Processing;
 
-/// <summary>Ported behavior from <c>processing_file_story.py</c> (#468): narrate a stored pass record in
-/// plain language, never raising on a partial or malformed one.</summary>
+/// <summary>The file story (#468): narrate a stored pass record in plain language, never throwing on a
+/// partial or malformed one.</summary>
 public sealed class FileStoryTests
 {
     [Fact]

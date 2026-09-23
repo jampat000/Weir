@@ -6,22 +6,19 @@ using Weir.Core.Rules;
 namespace Weir.Core.Tests.Rules;
 
 /// <summary>
-/// The .NET rules engine against answers recorded from the Python reference by
-/// <c>scripts/generate-rules-golden.py</c>. Every golden file holds an input and Python's result;
-/// these tests run the same input through <c>Weir.Core.Rules</c> and require the same result,
-/// down to the bytes of every note.
+/// The rules engine against the recorded answers in the golden files. Every golden file holds an
+/// input and its expected result; these tests run the same input through <c>Weir.Core.Rules</c> and
+/// require the same result, down to the bytes of every note.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Golden overrides.</b> Issue #537 fixed defects that the golden corpus had pinned as "today's
-/// behaviour" (see items 1, 2, 3, 5, 6). Regenerating those cases from Python would just re-record
-/// the same bugs, since the fix is deliberately not in Python — <c>apps/backend</c> is being
-/// retired (ADR-0017) and is not touched by this change. Instead, a case whose correct answer now
-/// differs from Python's recorded one gets a file in <c>golden/overrides/</c> with the same name
+/// <b>Golden overrides.</b> Recorded answers are never edited, so a deliberate behaviour change (such
+/// as the defects #537 fixed, items 1, 2, 3, 5 and 6) stays visible. A case whose correct answer
+/// differs from its recorded one gets a file in <c>golden/overrides/</c> with the same name
 /// (for a <c>plan-*.json</c> case) holding <c>{"issue": 537, "items": [...], "expected": {...}}</c>
 /// — the issue number, which item(s) of it, and the new expected output — and this test compares
 /// against that instead of the original file's "expected". Every other case is still compared
-/// against Python's recorded output, unchanged. <c>sorters.json</c> holds several cases in one
+/// against its recorded output, unchanged. <c>sorters.json</c> holds several cases in one
 /// file, so its override (same shape, plus a "cases" list of <c>{"index": N, "expected": {...}}</c>
 /// keyed by position in the file's "cases" array) overrides only the cases named in it.
 /// </para>
@@ -66,7 +63,7 @@ public sealed class GoldenParityTests
 
     [Theory]
     [MemberData(nameof(PlanCases))]
-    public void Plans_match_the_python_engine(string fileName)
+    public void Plans_match_the_golden_files(string fileName)
     {
         using var document = Load(fileName);
         var input = document.RootElement.GetProperty("input");
@@ -120,7 +117,7 @@ public sealed class GoldenParityTests
     }
 
     [Fact]
-    public void Sorters_match_the_python_engine()
+    public void Sorters_match_the_golden_files()
     {
         using var document = Load("sorters.json");
         var tracks = document.RootElement.GetProperty("tracks").EnumerateArray().Select(ReadSortableTrack).ToList();
@@ -175,7 +172,7 @@ public sealed class GoldenParityTests
     }
 
     [Fact]
-    public void Original_language_selection_matches_the_python_engine()
+    public void Original_language_selection_matches_the_golden_files()
     {
         using var document = Load("original-language.json");
         var cases = document.RootElement.EnumerateArray().ToList();
@@ -232,7 +229,7 @@ public sealed class GoldenParityTests
     /// An override file's per-case "expected" for <c>helpers.json</c>'s "presets" array, keyed by
     /// position in that array. Issue #497 put a new leading key in <c>DefaultAudioSorters</c>, so
     /// every preset that falls back to it (every input but <c>quality_all_languages</c>) dumps
-    /// differently than Python recorded.
+    /// differently from the recorded output.
     /// </summary>
     private static Dictionary<int, string> LoadHelpersPresetOverrides()
     {
@@ -257,7 +254,7 @@ public sealed class GoldenParityTests
     }
 
     [Fact]
-    public void Helpers_match_the_python_engine()
+    public void Helpers_match_the_golden_files()
     {
         using var document = Load("helpers.json");
         var root = document.RootElement;
@@ -313,7 +310,7 @@ public sealed class GoldenParityTests
 
     // --- running a case ----------------------------------------------------------------
 
-    /// <summary>The sequence <c>file_remux_pass/run.py</c> runs, as the generator records it.</summary>
+    /// <summary>The sequence a remux pass runs: split the streams, plan, then the display lines and metadata flags.</summary>
     private static void WritePlanOutcome(Utf8JsonWriter writer, ProbeResult probe, ProcessingRulesConfig config)
     {
         string json;
@@ -500,8 +497,8 @@ public sealed class GoldenParityTests
             },
             PreferredAudioIndices = json.GetProperty("preferred_audio_indices").EnumerateArray().Select(e => e.GetInt32()).ToList(),
             OriginalLanguageNote = json.GetProperty("original_language_note").GetString()!,
-            // Issue #495: new in the C# port, so it is absent from every golden file recorded from
-            // the Python engine; absent means false, exactly like every other case that never sets it.
+            // Issue #495: this option postdates the golden files, so it is absent from all of them;
+            // absent means false, exactly like every other case that never sets it.
             RemoveHearingImpairedSubs = json.TryGetProperty("remove_hearing_impaired_subs", out var hi) && hi.GetBoolean(),
         };
     }

@@ -42,9 +42,8 @@ internal sealed class ScriptedManager : IManagerHttpHandlerFactory
 }
 
 /// <summary>
-/// Ports of <c>test_media_manager_connections_api.py</c>, <c>test_media_manager_capabilities_api.py</c>,
-/// <c>test_media_manager_intake_api.py</c>, <c>test_media_manager_handoff_status_api.py</c> and
-/// <c>test_reconciliation_service.py</c> over the real HTTP pipeline, plus the #527 fix.
+/// Media manager connections, capabilities, intake, hand-off status and reconciliation over the real HTTP
+/// pipeline, plus the #527 fix.
 /// </summary>
 public sealed class MediaManagerApiTests
 {
@@ -341,9 +340,8 @@ public sealed class MediaManagerApiTests
             Assert.Equal(HttpStatusCode.OK, (await client.PostAsync("/api/v1/intake/webhook/radarr", new { eventType = "Grab" }, new Dictionary<string, string> { ["X-Webhook-Secret"] = "s3cret" })).StatusCode);
         }
 
-        // WEIR_SUBBER_WEBHOOK_SECRET, the pre-v2.4.3 name, was read as a fallback until 3.0.0. It no
-        // longer configures anything, so the webhook is simply unguarded here rather than demanding a
-        // secret the caller would have no way to know about.
+        // WEIR_SUBBER_WEBHOOK_SECRET is a retired name that configures nothing, so the webhook is simply
+        // unguarded here rather than demanding a secret the caller would have no way to know about.
         await using (var server = await WeirTestServer.StartAsync([("WEIR_SESSION_SECRET", Secret), ("WEIR_PROCESSING_WORKER_COUNT", "0"), ("WEIR_SUBBER_WEBHOOK_SECRET", "s3cret")]))
         {
             var client = new ApiTestClient(server);

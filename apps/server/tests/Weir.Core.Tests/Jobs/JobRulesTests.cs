@@ -6,8 +6,8 @@ using Weir.Core.Time;
 namespace Weir.Core.Tests.Jobs;
 
 /// <summary>
-/// Job kind guard, worker failure wording (#488), backoff and recovery wording. Expected strings were
-/// produced by the Python reference (<c>weir.platform.jobs.worker_failures</c>, <c>jobs_ops</c>, <c>job_kind_guard</c>).
+/// Job kind guard, worker failure wording (#488), backoff and recovery wording. Expected strings are exact
+/// because they are stored on job rows and matched by existing clients and the contract suite.
 /// </summary>
 public sealed class JobRulesTests
 {
@@ -22,7 +22,7 @@ public sealed class JobRulesTests
     [InlineData("processing.supplied_payload_evaluation.v1", true)]
     [InlineData("processing.candidate_gate.v1", true)]
     [InlineData("processing.file.remux_pass.v1", false)]
-    [InlineData("Trimmer.x", false)] // case-sensitive, like str.startswith
+    [InlineData("Trimmer.x", false)] // case-sensitive
     [InlineData("bare.kind", false)]
     public void Retired_prefixes_are_recognised(string kind, bool retired)
     {
@@ -30,7 +30,7 @@ public sealed class JobRulesTests
     }
 
     [Fact]
-    public void Enqueue_refuses_retired_and_unprefixed_kinds_with_python_wording()
+    public void Enqueue_refuses_retired_and_unprefixed_kinds_with_exact_wording()
     {
         Assert.Equal(
             "processing_enqueue_or_get_job refuses a retired job_kind (got 'pruner.candidate_removal.preview.v1')",
@@ -80,7 +80,7 @@ public sealed class JobRulesTests
     }
 
     [Fact]
-    public void Worker_failure_wording_matches_python_exactly()
+    public void Worker_failure_wording_is_exact()
     {
         Assert.Equal(
             "Weir job failed: The job hit an unexpected error. Weir will try this job again shortly. Technical detail: RuntimeError: worker refused a retired job_kind: 'trimmer.radarr.cleanup_drive.v1' (row id=7); nothing runs this kind any more",
@@ -97,8 +97,8 @@ public sealed class JobRulesTests
         Assert.Equal(
             "Weir job failed: The job hit an unexpected error. Weir will try this job again shortly. Technical detail: ProcessingNoHandlerForJobKind: no job handler registered for job_kind='processing.test.unknown.v1'",
             WorkerFailures.StoredError(WorkerFailures.JobFailure("Weir", WorkerFailures.NoHandler("processing.test.unknown.v1"), willRetry: true)));
-        // #540 item 7: Python's next-action fallback doubled "the" ("Re-enter the the provider
-        // credentials...") when no provider is known; fixed here to say it once.
+        // #540 item 7: when no provider is known, the next-action fallback says "the" once, not
+        // "Re-enter the the provider credentials...".
         Assert.Equal(
             "Weir job failed: Weir could not use the saved credentials. This job is marked failed so it does not look successful. Next action: Re-enter the provider credentials and run the connection test again. Technical detail: RuntimeError: api_key=[redacted] token: [redacted]",
             WorkerFailures.StoredError(WorkerFailures.JobFailure("Weir", FailureMessages.RuntimeError("api_key=abc123 token: xyz"), willRetry: false)));
@@ -170,7 +170,7 @@ public sealed class JobRulesTests
     }
 
     [Fact]
-    public void Python_isoformat_omits_zero_microseconds_and_keeps_the_offset()
+    public void Iso_timestamps_omit_zero_microseconds_and_keep_the_offset()
     {
         var at = new DateTimeOffset(2026, 4, 10, 13, 0, 0, TimeSpan.Zero);
         Assert.Equal("2026-04-10 13:00:00+00:00", PyDateTime.FromDateTimeOffset(at).IsoFormat(' '));
@@ -201,7 +201,7 @@ public sealed class JobRulesTests
     }
 
     [Fact]
-    public void Worker_slot_count_and_schedule_intervals_clamp_like_python()
+    public void Worker_slot_count_and_schedule_intervals_are_clamped()
     {
         Assert.Equal(1, WeirOptionsLoader.ClampProcessingWorkerCount(-1));
         Assert.Equal(0, WeirOptionsLoader.ClampProcessingWorkerCount(0));

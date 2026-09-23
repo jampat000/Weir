@@ -3,9 +3,8 @@ using Weir.Core.Rules;
 namespace Weir.Core.Tests.Rules;
 
 /// <summary>
-/// Ported from <c>apps/backend/tests/test_processing_original_language.py</c>: the selection and
-/// language-code mapping tests. The TMDb provider tests (HTTP, caching, SSRF refusal) belong to
-/// the metadata provider port and are not here.
+/// Original-language track selection and language-code mapping. The TMDb provider (HTTP, caching,
+/// SSRF refusal) is tested with the metadata provider, not here.
 /// </summary>
 public sealed class OriginalLanguageTests
 {

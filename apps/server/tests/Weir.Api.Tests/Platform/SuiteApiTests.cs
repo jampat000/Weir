@@ -11,9 +11,8 @@ using static Weir.Api.Tests.Platform.ApiTestClient;
 namespace Weir.Api.Tests.Platform;
 
 /// <summary>
-/// Ports of <c>test_suite_settings_api.py</c>, <c>test_pause_api.py</c>, <c>test_metrics_auth.py</c>,
-/// <c>test_local_browse_api.py</c>, <c>test_configuration_bundle_api.py</c>, <c>test_cors_policy.py</c>,
-/// <c>test_head_mirrors_get.py</c> and <c>test_suite_operational_history.py</c>.
+/// Suite settings, pause, metrics auth, local browse, configuration bundles, the CORS policy, HEAD mirroring
+/// GET, and operational history over real HTTP.
 /// </summary>
 public sealed class SuiteApiTests
 {
@@ -244,10 +243,8 @@ public sealed class SuiteApiTests
     }
 
     /// <summary>
-    /// Each of these was a second address for a handler that already had one, carried over from the
-    /// Python suite's <c>system_configuration</c> router and its <c>/suite/settings/...</c> spellings
-    /// so an older web bundle or a partly-forwarding proxy would still find the endpoint. 3.0.0
-    /// serves one address per handler; this is here so an alias cannot quietly reappear.
+    /// Each of these is a retired second address for a handler that already has one. The server serves one
+    /// address per handler; this is here so an alias cannot quietly reappear.
     /// </summary>
     [Fact]
     public async Task The_retired_url_aliases_for_bundles_snapshots_and_update_status_are_not_served()
