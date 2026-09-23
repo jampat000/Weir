@@ -405,7 +405,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
     /// "cancelled, queue it again", for files that no longer exist. A row no scan has seen now counts from when it was last
     /// written, so it still gets the same grace before it is judged.
     /// </remarks>
-    private static async Task ForgetVanishedFilesAsync(UnitOfWork uow, long libraryId, string watchedRoot, string mediaScope, DateTimeOffset now)
+    internal static async Task ForgetVanishedFilesAsync(UnitOfWork uow, long libraryId, string watchedRoot, string mediaScope, DateTimeOffset now)
     {
         var rows = await uow.QueryAsync(
             "SELECT id, relative_path, status, coalesce(last_seen_at, updated_at, created_at) FROM files WHERE library_id = @lib " +

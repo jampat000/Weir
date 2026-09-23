@@ -393,6 +393,26 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     }
 
     [Fact]
+    public async Task The_sweep_forgets_gone_files_in_a_library_whose_scan_never_runs()
+    {
+        // The soak rig after 3.2.3: periodic scans are off for libraries fed by Deluno's hand-offs, so the rows the scan
+        // would have cleared stayed. The sweep runs the same rule on its own clock, without queueing any work.
+        await SetUpAsync("movie");
+        await InsertRowAsync("Film.1/Film.mkv", ProcessingFileStatuses.Unprocessed, lastSeenMinutesAgo: null);
+        await InsertRowAsync("Film", ProcessingFileStatuses.ProcessingFailed, lastSeenMinutesAgo: null, writtenMinutesAgo: 60 * 24 * 4);
+        _folders.Source(Path.Join("Still.Here", "Still.Here.mkv"));
+        await InsertRowAsync("Still.Here/Still.Here.mkv", ProcessingFileStatuses.Unprocessed, lastSeenMinutesAgo: null);
+
+        await new VanishedFileSweepTask(_fixture.Store.Database, _fixture.Store.Options, _fixture.Store.Clock).RunOnceAsync(CancellationToken.None);
+
+        Assert.Null(await StatusAsync("Film.1/Film.mkv"));
+        Assert.Null(await StatusAsync("Film"));
+        Assert.Equal("unprocessed", await StatusAsync("Still.Here/Still.Here.mkv"));
+        Assert.Equal(2, await LeftActivityAsync());
+        Assert.Equal(0, await RemuxJobsAsync());
+    }
+
+    [Fact]
     public async Task A_row_whose_path_is_a_folder_still_on_disk_is_kept()
     {
         await SetUpAsync("movie");
