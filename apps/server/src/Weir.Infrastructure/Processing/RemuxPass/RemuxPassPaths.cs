@@ -321,7 +321,7 @@ public static class RemuxPassPaths
 
         if (!PathContainment.IsUnder(root, source))
         {
-            return new RejectedFileCleanupResult(false, $"Weir did not delete the rejected file because it was not safely inside the watched folder ({source} is not inside {root}).");
+            return new RejectedFileCleanupResult(false, "Weir did not delete the rejected file because it was not safely inside the watched folder.");
         }
 
         if (!File.Exists(source))

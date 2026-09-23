@@ -4,9 +4,9 @@ namespace Weir.Infrastructure.Tests.Sqlite;
 
 /// <summary>
 /// The baseline migration creates exactly the database that existing installs were created with. The
-/// reference, <c>schema/alembic-head.sql</c>, is <c>sqlite_master</c> plus seeded rows dumped from a real
-/// <c>alembic upgrade head</c> (#523). It is frozen and never edited: issue #557 deliberately diverges the
-/// *current* head from this shape (rule-set extra columns, library-mode tables, ...), so this test builds at
+/// reference, <c>schema/alembic-head.sql</c>, is that database's <c>sqlite_master</c> plus its seeded rows (#523).
+/// It is frozen and never edited: the migrations from #557 on move the current head away from this shape
+/// (rule-set extra columns, library-mode tables and so on), so this test builds at
 /// <see cref="SchemaMigrator.BaselineRevision"/> — the one migration that must always match the reference
 /// exactly — rather than at the moving <see cref="SchemaMigrator.HeadRevision"/> (see
 /// apps/server/README.md, "Schema"). Each migration after the baseline is proved by its own test instead
@@ -15,7 +15,7 @@ namespace Weir.Infrastructure.Tests.Sqlite;
 public sealed class SchemaParityTests
 {
     [Fact]
-    public void The_baseline_migration_creates_the_alembic_head_schema_and_seed_rows()
+    public void The_baseline_migration_creates_the_reference_schema_and_seed_rows()
     {
         using var temp = new TempDirectory();
         var alembic = temp.Join("alembic.sqlite3");
