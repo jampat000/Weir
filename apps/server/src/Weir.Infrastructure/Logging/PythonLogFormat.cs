@@ -5,14 +5,14 @@ using Microsoft.Extensions.Logging;
 namespace Weir.Infrastructure.Logging;
 
 /// <summary>
-/// The log formats the Python backend writes, so the Logs screen, support bundles and anyone
-/// tailing the file see the same thing from either server.
+/// Weir's log line formats: JSON lines in <c>weir.log</c> and plain console lines. The formats are
+/// fixed so the Logs screen, support bundles, existing log readers and support tooling keep parsing them.
 /// </summary>
 public static class PythonLogFormat
 {
     /// <summary>
-    /// <c>WEIR_LOG_LEVEL</c> the way Python's <c>getattr(logging, name.upper(), logging.INFO)</c>
-    /// reads it: a known level name, otherwise INFO. <c>NOTSET</c> logs everything.
+    /// Reads <c>WEIR_LOG_LEVEL</c>: a known level name in any case, otherwise INFO. <c>NOTSET</c> logs
+    /// everything.
     /// </summary>
     public static LogLevel ParseMinimumLevel(string? name) => (name ?? string.Empty).ToUpperInvariant() switch
     {
@@ -24,7 +24,7 @@ public static class PythonLogFormat
         _ => LogLevel.Information,
     };
 
-    /// <summary>Python's <c>levelname</c> for a .NET level.</summary>
+    /// <summary>The level name written in log lines (DEBUG, INFO, WARNING, ERROR, CRITICAL) for a .NET level.</summary>
     public static string LevelName(LogLevel level) => level switch
     {
         LogLevel.Trace or LogLevel.Debug => "DEBUG",
@@ -35,7 +35,7 @@ public static class PythonLogFormat
         _ => "NOTSET",
     };
 
-    /// <summary><c>datetime.now(UTC).isoformat().replace("+00:00", "Z")</c>.</summary>
+    /// <summary>ISO 8601 UTC with a <c>Z</c> suffix: microseconds when there are any, none on an exact second.</summary>
     public static string IsoTimestamp(DateTimeOffset now)
     {
         var utc = now.UtcDateTime;
@@ -46,9 +46,9 @@ public static class PythonLogFormat
     }
 
     /// <summary>
-    /// One line of <c>weir.log</c>, as <c>JsonLineFormatter</c> writes it: the same keys in the same
-    /// order, <c>json.dumps</c> separators and <c>ensure_ascii</c> escaping. .NET has no source file
-    /// and line for a log call, so <c>source</c> is null.
+    /// One line of <c>weir.log</c>: fixed keys in a fixed order, <c>", "</c> and <c>": "</c> separators, and
+    /// every non-ASCII character escaped as <c>\uXXXX</c>. There is no source file and line for a log call,
+    /// so <c>source</c> is null.
     /// </summary>
     public static string JsonLine(DateTimeOffset now, LogLevel level, string logger, string message, Exception? exception, string? correlationId, string? jobId)
     {
@@ -75,7 +75,7 @@ public static class PythonLogFormat
         return builder.ToString();
     }
 
-    /// <summary>The console line: <c>%(asctime)s %(levelname)s %(name)s %(message)s</c>, local time.</summary>
+    /// <summary>The console line: local time (<c>yyyy-MM-dd HH:mm:ss,fff</c>), level, logger name and message, space-separated.</summary>
     public static string ConsoleLine(DateTimeOffset now, LogLevel level, string logger, string message, Exception? exception)
     {
         var local = now.ToLocalTime();

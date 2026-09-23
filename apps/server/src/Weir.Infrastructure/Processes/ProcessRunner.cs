@@ -8,10 +8,10 @@ namespace Weir.Infrastructure.Processes;
 /// <summary>What a child process reads on stdin.</summary>
 public enum ProcessInput
 {
-    /// <summary>End of file immediately (<c>subprocess.DEVNULL</c>).</summary>
+    /// <summary>End of file immediately.</summary>
     Null,
 
-    /// <summary>This process's own stdin (the <c>subprocess</c> default).</summary>
+    /// <summary>This process's own stdin, inherited.</summary>
     Inherit,
 }
 

@@ -12,8 +12,8 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.LibraryMode;
 
 /// <summary>
-/// Registers library mode (#505): the #506 safe swap (not wired into anything until now — see
-/// <c>apps/server/README.md</c>, "Library mode: safe swap"), its scan and clean job handlers, and the real
+/// Registers library mode (#505): the #506 safe swap (see <c>apps/server/README.md</c>, "Library mode: safe
+/// swap"), its scan and clean job handlers, and the real
 /// notify seam (#507, <c>Weir.Infrastructure.MediaManagers.LibraryFileChangeNotifier</c>, registered by
 /// <c>AddWeirMediaManagers</c>).
 /// </summary>
@@ -27,7 +27,7 @@ public static class LibraryModeServices
         services.TryAddSingleton<Processes.IProcessRunner, Processes.ProcessRunner>();
         services.TryAddSingleton<MediaTools>();
 
-        // The #506 safe swap: real files, real journal (jobs.payload_json — no new table), the #500 seam.
+        // The #506 safe swap: real files, the library_swaps journal, the #500 output check.
         services.TryAddSingleton<ISwapFileSystem>(_ => PhysicalSwapFileSystem.Instance);
         services.TryAddSingleton(sp => new ProcessingJobSwapJournal(sp.GetRequiredService<SqliteDatabase>()));
         services.TryAddSingleton<ISwapJournal>(sp => sp.GetRequiredService<ProcessingJobSwapJournal>());
@@ -41,8 +41,8 @@ public static class LibraryModeServices
         services.TryAddSingleton<RedownloadRiskChecker>();
 
         // #509: what a clean removed for good, and asking a manager to redownload a title that is missing it.
-        // FileLogRemovedTrackStore is durable (file_logs.detail_json — no migration, ADR-0017); the
-        // redownload tracker stays in-memory (see its own remarks) since nothing yet calls its ClearAsync hook.
+        // FileLogRemovedTrackStore is durable (the removed_tracks table); the redownload tracker stays
+        // in-memory (see its own remarks) since nothing calls its ClearAsync hook.
         services.TryAddSingleton<IRemovedTrackStore, FileLogRemovedTrackStore>();
         services.TryAddSingleton<IRedownloadTracker, InMemoryRedownloadTracker>();
         services.TryAddSingleton<IManagerRedownload, ArrManagerRedownload>();

@@ -271,7 +271,7 @@ public static class ActivityEndpoints
         }
     }
 
-    /// <summary><c>datetime.fromisoformat</c> of a date query, or 400 <c>Invalid {name}.</c> (an empty value is no filter).</summary>
+    /// <summary>An ISO 8601 date query, or 400 <c>Invalid {name}.</c> (an empty value is no filter).</summary>
     private static PyDateTime? ParseWhen(string? raw, string name)
     {
         if (string.IsNullOrEmpty(raw))

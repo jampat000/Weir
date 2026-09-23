@@ -139,7 +139,7 @@ public static class WebApp
             PathSuffix(path).Length == 0;
     }
 
-    /// <summary><c>pathlib.PurePath(path).suffix</c>.</summary>
+    /// <summary>The last dot-suffix of the final path component; none for a dot file such as <c>.env</c>.</summary>
     internal static string PathSuffix(string path)
     {
         var name = path.TrimEnd('/');

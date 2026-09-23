@@ -6,8 +6,8 @@ namespace Weir.Infrastructure.LibraryMode;
 /// <summary>
 /// Per-library #505 settings (<see cref="LibrarySettings"/>): real columns on <c>libraries</c>
 /// (<c>library_schedule_enabled</c>, <c>clean_hardlinked_files</c>, <c>skip_if_manager_would_redownload</c>)
-/// plus the <c>library_folders</c> table, since #557's migration (0038_library_mode_settings) moved this off
-/// the one permanent <c>jobs</c> row per library that job-row retention could otherwise prune.
+/// plus the <c>library_folders</c> table, rather than a <c>jobs</c> row that job-row retention could prune
+/// (#557, migration 0038_library_mode_settings).
 /// </summary>
 public static class LibrarySettingsStore
 {

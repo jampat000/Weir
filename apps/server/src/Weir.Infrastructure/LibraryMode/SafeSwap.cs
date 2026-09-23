@@ -67,7 +67,7 @@ public sealed record SwapResult(SwapOutcome Outcome, string Message, bool Backup
 /// <item>Copy the original's permissions to the copy (best effort; never the mtime).</item>
 /// <item>Journal <c>committing</c>; rename original → <c>&lt;name&gt;.weir-bak&lt;ext&gt;</c>; check the backup is still the fingerprinted file.</item>
 /// <item>Rename copy → original name. <b>This rename is the commit.</b></item>
-/// <item>Journal <c>committed</c> (<c>swap_committed</c>); delete the backup (a failure is logged, the sweep retries); journal <c>finished</c>.</item>
+/// <item>Journal <c>committed</c>; delete the backup (a failure is logged, the sweep retries); journal <c>finished</c>.</item>
 /// </list>
 /// <para>
 /// Any failure before the commit rolls back by looking at the files, not at how far the code got: if the original name is

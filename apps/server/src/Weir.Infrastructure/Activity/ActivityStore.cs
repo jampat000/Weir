@@ -4,17 +4,17 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Activity;
 
-/// <summary>The auth-side Activity helpers of <c>weir.platform.activity.service</c>, written through <see cref="SqliteActivityWriter"/>.</summary>
+/// <summary>The auth-side Activity helpers, written through <see cref="SqliteActivityWriter"/>.</summary>
 public static class ActivityStore
 {
     private static readonly TimeSpan LoginFailedSuppress = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan BootstrapDeniedSuppress = TimeSpan.FromSeconds(60);
 
-    /// <summary><c>record_activity_event</c> inside the caller's unit of work.</summary>
+    /// <summary>Records an event inside the caller's unit of work.</summary>
     public static Task<long> RecordAsync(UnitOfWork uow, string eventType, string module, string title, string? detail) =>
         SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(eventType, module, title, detail));
 
-    /// <summary><c>maybe_record_login_failed</c>: one event per username per two minutes.</summary>
+    /// <summary>Records a failed sign-in: at most one event per username per two minutes.</summary>
     public static async Task MaybeRecordLoginFailedAsync(UnitOfWork uow, string username, PyDateTime now)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -33,7 +33,7 @@ public static class ActivityStore
         await RecordAsync(uow, ActivityEventTypes.AuthLoginFailed, "auth", "Sign-in failed", username).ConfigureAwait(false);
     }
 
-    /// <summary><c>maybe_record_bootstrap_denied</c>: at most one per minute.</summary>
+    /// <summary>Records a refused bootstrap: at most one event per minute.</summary>
     public static async Task MaybeRecordBootstrapDeniedAsync(UnitOfWork uow, PyDateTime now)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -51,7 +51,7 @@ public static class ActivityStore
     }
 }
 
-/// <summary>Port of <c>weir.platform.suite_settings.operational_history</c>.</summary>
+/// <summary>Previews and resets operational history: all Activity events plus finished job rows.</summary>
 public static class OperationalHistoryStore
 {
     private const string TerminalStatuses = "('completed', 'failed', 'handler_ok_finalize_failed', 'cancelled')";

@@ -8,12 +8,12 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Scheduling;
 
 /// <summary>
-/// Background work that runs on a timer, the way the Python lifespan's <c>asyncio</c> loops run it.
+/// Background work that runs on a timer for as long as the server runs.
 /// <see cref="PeriodicTaskService"/> hosts every registered task.
 /// </summary>
 public interface IPeriodicTask
 {
-    /// <summary>The asyncio task name Python used, for logs.</summary>
+    /// <summary>The task's name, used in its logger category.</summary>
     string Name { get; }
 
     /// <summary>Time between runs.</summary>
@@ -25,7 +25,7 @@ public interface IPeriodicTask
     /// <summary>How long to wait after a failed run before trying again (the interval when <see langword="null"/>).</summary>
     TimeSpan? FailureCooldown { get; }
 
-    /// <summary>What Python logs (with the exception) when a run fails.</summary>
+    /// <summary>What is logged (with the exception) when a run fails.</summary>
     string FailureMessage { get; }
 
     Task RunOnceAsync(CancellationToken cancellationToken);
@@ -63,7 +63,7 @@ public static class PeriodicTaskRunner
             catch (Exception exception)
 #pragma warning restore CA1031
             {
-#pragma warning disable CA2254 // The message is each task's fixed Python wording.
+#pragma warning disable CA2254 // The message is each task's fixed wording, not a template with arguments.
                 logger.LogError(exception, task.FailureMessage);
 #pragma warning restore CA2254
                 wait = task.FailureCooldown ?? task.Interval;
@@ -110,7 +110,7 @@ public sealed class PeriodicTaskService : BackgroundService
             CancellationToken.None)));
 }
 
-/// <summary><c>auth-session-cleanup</c>: delete sessions that can no longer authenticate, hourly.</summary>
+/// <summary><c>auth-session-cleanup</c>: delete inactive sessions (ones that can never authenticate again), hourly.</summary>
 public sealed class SessionCleanupTask : IPeriodicTask
 {
     private readonly SqliteDatabase _database;
@@ -183,7 +183,7 @@ public sealed class LogRetentionTask : IPeriodicTask
 
     public Task RunOnceAsync(CancellationToken cancellationToken) => TickAsync(null, cancellationToken);
 
-    /// <summary><c>run_log_retention_tick</c>: 1 when the log was pruned.</summary>
+    /// <summary>One retention check: 1 when the log was pruned, 0 when the last prune was under a day ago.</summary>
     public async Task<int> TickAsync(DateTimeOffset? now, CancellationToken cancellationToken)
     {
         var when = now ?? _time.GetUtcNow();
@@ -198,8 +198,8 @@ public sealed class LogRetentionTask : IPeriodicTask
     }
 
     /// <summary>
-    /// <c>prune_logs_for_retention</c>'s read, shared with the startup prune:
-    /// <c>max(1, ensure_suite_settings_row(session).log_retention_days)</c>.
+    /// The number of days of log to keep, shared with the startup prune: the suite settings'
+    /// <c>log_retention_days</c>, at least 1.
     /// </summary>
     public static async Task<int> ReadKeepDaysAsync(SqliteDatabase database, CancellationToken cancellationToken = default)
     {
@@ -231,7 +231,7 @@ public sealed class ConfigurationBackupTask : IPeriodicTask
 
     public bool RunAtStart => true;
 
-    /// <summary><c>SUITE_CONFIGURATION_BACKUP_FAILURE_COOLDOWN_SECONDS</c>.</summary>
+    /// <summary>A failed run is retried after five seconds rather than the next minute.</summary>
     public TimeSpan? FailureCooldown => TimeSpan.FromSeconds(5);
 
     public string FailureMessage => "Suite configuration backup tick failed";

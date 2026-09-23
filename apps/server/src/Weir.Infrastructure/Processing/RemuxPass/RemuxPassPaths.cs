@@ -47,7 +47,7 @@ public static class RemuxPassPaths
 
     private static StringComparison PathComparison => Windows ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
-    /// <summary><c>Path(raw).expanduser().resolve()</c> as far as .NET can: absolute and normalised.</summary>
+    /// <summary>The path absolute and normalised, with a leading <c>~</c> expanded to the user's home and no trailing separator.</summary>
     public static string Resolve(string raw)
     {
         var text = raw;
@@ -61,11 +61,11 @@ public static class RemuxPassPaths
         return full.Length > root.Length ? full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) : full;
     }
 
-    /// <summary><c>Path.relative_to</c> as a test.</summary>
+    /// <summary>Whether <paramref name="path"/> is <paramref name="root"/> or inside it, compared component by component.</summary>
     public static bool IsUnder(string path, string root) => RelativeTo(path, root) is not null;
 
     /// <summary>
-    /// <c>path.relative_to(root)</c>: the relative part with the platform separator (empty for the root itself), or null when
+    /// The part of <paramref name="path"/> below <paramref name="root"/> with the platform separator (empty for the root itself), or null when
     /// <paramref name="path"/> is not under <paramref name="root"/>.
     /// </summary>
     public static string? RelativeTo(string path, string root)
@@ -91,7 +91,7 @@ public static class RemuxPassPaths
     /// <summary>Two resolved paths name the same place.</summary>
     public static bool SamePath(string a, string b) => RelativeTo(a, b) is { Length: 0 };
 
-    /// <summary><c>as_posix()</c> of a relative path.</summary>
+    /// <summary>A relative path with forward slashes.</summary>
     public static string Posix(string relative) => relative.Replace('\\', '/');
 
     private static List<string> Split(string path)

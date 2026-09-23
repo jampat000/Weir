@@ -9,8 +9,7 @@ using Weir.Infrastructure.Processes;
 namespace Weir.Infrastructure.Media;
 
 /// <summary>
-/// ffprobe and ffmpeg execution (<c>processing_remux_mux.py</c> and <c>detect_acceleration</c>): probing, output
-/// validation, the full-read integrity check, remuxing with progress, and hardware detection. Decisions live in
+/// ffprobe and ffmpeg execution: probing, output validation, the full-read integrity check, remuxing with progress, and hardware detection. Decisions live in
 /// <see cref="Weir.Core.Media"/>; this class runs the tools and hands their output over.
 /// </summary>
 public sealed partial class MediaTools
@@ -43,7 +42,7 @@ public sealed partial class MediaTools
     }
 
     /// <summary>
-    /// <c>ffprobe_json</c>: probes <paramref name="path"/> and returns ffprobe's JSON object. Throws
+    /// Probes <paramref name="path"/> and returns ffprobe's JSON object. Throws
     /// <see cref="MediaUnreadableException"/> when ffprobe says the contents are unreadable,
     /// <see cref="MediaToolException"/> for any other failure, and <see cref="MediaToolTimeoutException"/> on timeout.
     /// </summary>
@@ -95,7 +94,7 @@ public sealed partial class MediaTools
         return ProbeOutput.Interpret(result.ExitCode, stdout, stderr);
     }
 
-    /// <summary><c>validate_remux_output</c>: probes the staged output and checks audio count and duration.</summary>
+    /// <summary>Probes the staged output and checks audio count and duration.</summary>
     public async Task ValidateRemuxOutputAsync(string path, int expectedAudio = 0, double? expectedDurationSeconds = null, CancellationToken cancellationToken = default)
     {
         var data = await FfprobeJsonAsync(path, cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -103,28 +102,25 @@ public sealed partial class MediaTools
     }
 
     /// <summary>
-    /// <c>validate_media_integrity</c>: reads the primary video from start to finish and throws
+    /// Reads the primary video from start to finish and throws
     /// <see cref="MediaCompletenessException"/> for damaged or truncated input.
     /// </summary>
     /// <param name="path">The file to read.</param>
     /// <param name="expectedDurationSeconds">
-    /// The probed duration, when known. Deliberate divergence (#539 item 3): the reference only looks at the
-    /// exit code, so a Matroska file cut off mid-cluster keeps its header duration and a truncated demux that
-    /// only warns (see <see cref="ProbeOutput.IntegrityIncompleteMarkers"/>) still reports success. When a
-    /// duration is given, the last timestamp the demux actually reached (from <c>-progress pipe:1</c>) is
-    /// compared against it with the same tolerance as <see cref="ProbeOutput.ValidateRemuxOutput"/>, "where
-    /// practical" meaning: only when ffmpeg reported at least one timestamp, since a source with no video stream
-    /// or one <c>-err_detect explode</c> kills before the first frame reports none.
+    /// The probed duration, when known. The exit code alone is not enough: a Matroska file cut off mid-cluster
+    /// keeps its header duration, and a truncated demux that only warns (see
+    /// <see cref="ProbeOutput.IntegrityIncompleteMarkers"/>) still exits 0 (#539 item 3). When a duration is
+    /// given, the last timestamp the demux actually reached (from <c>-progress pipe:1</c>) is compared against it
+    /// with the same tolerance as <see cref="ProbeOutput.ValidateRemuxOutput"/>, but only when ffmpeg reported at
+    /// least one timestamp, since a source with no video stream or one <c>-err_detect explode</c> kills before
+    /// the first frame reports none.
     /// </param>
     /// <param name="cancellationToken">Cancellation.</param>
     /// <remarks>
-    /// Deliberate divergence (#539 item 5): the reference skips this check entirely on Windows
-    /// (<c>if os.name != "nt"</c> in <c>file_remux_pass/run.py</c>), reasoning that POSIX locks are advisory and a
-    /// Docker bind-mount writer often does not take one, while Windows write handles are assumed exclusive. That
-    /// assumption does not hold for every way Weir sees a file arrive on Windows — an SMB share, a WSL2 bind
-    /// mount, or a downloader that preallocates then writes can all leave a reader able to open a file that is
-    /// not finished. This method makes no such distinction and always does the full read; callers should not
-    /// reintroduce a Windows skip without a concrete, current reason to.
+    /// The full read runs on Windows too (#539 item 5). Windows write handles are not a reliable sign that a
+    /// file is finished: an SMB share, a WSL2 bind mount, or a downloader that preallocates then writes can all
+    /// leave a reader able to open a file that is not finished. Callers should not add a Windows skip without a
+    /// concrete, current reason to.
     /// </remarks>
     public async Task ValidateMediaIntegrityAsync(string path, double? expectedDurationSeconds = null, CancellationToken cancellationToken = default)
     {
@@ -171,23 +167,22 @@ public sealed partial class MediaTools
     }
 
     /// <summary>
-    /// <c>run_ffmpeg</c>. Without a progress callback ffmpeg runs quietly; with one, <c>-progress pipe:1</c> is
+    /// Runs ffmpeg. Without a progress callback ffmpeg runs quietly; with one, <c>-progress pipe:1</c> is
     /// added and each block is reported. Failures throw <see cref="MediaToolException"/> carrying the tail of stderr.
     /// </summary>
     /// <remarks>
-    /// Two #539 item 5 decisions, both deliberate divergences from the reference:
+    /// Timeouts (#539 items 4 and 5):
     /// <list type="bullet">
     /// <item>A plain (non-progress) timeout raises <see cref="MediaToolTimeoutException"/>, the same classified
-    /// error probing uses, rather than letting <c>subprocess.TimeoutExpired</c> (an unrelated exception type in
-    /// Python) escape uncaught. A progress-mode timeout still raises <see cref="MediaToolException"/> with
-    /// "ffmpeg timed out" to match the reference's own message for that path.</item>
+    /// error probing uses. A progress-mode timeout raises <see cref="MediaToolException"/> with
+    /// "ffmpeg timed out", the message that path reports.</item>
     /// <item>A timeout, in either mode, kills the whole process tree (<see cref="Processes.ProcessRunner"/>), not
-    /// just the direct ffmpeg child the reference kills — ffmpeg can spawn helper processes (for some hwaccel or
-    /// filter setups) that would otherwise survive and keep the output file open.</item>
+    /// just the direct ffmpeg child: ffmpeg can spawn helper processes (for some hwaccel or filter setups) that
+    /// would otherwise survive and keep the output file open.</item>
     /// </list>
-    /// The progress-mode timeout itself is enforced by <see cref="Processes.ProcessRunner"/> on a wall-clock timer
-    /// independent of stdout activity (#539 item 4), unlike the reference's loop, which only checks its limit as a
-    /// progress line arrives and so never stops a process that goes silent (stuck reading its input, for example).
+    /// The progress-mode timeout is enforced by <see cref="Processes.ProcessRunner"/> on a wall-clock timer
+    /// independent of stdout activity, so it also stops a process that goes silent (stuck reading its input,
+    /// for example) rather than only checking its limit as a progress line arrives.
     /// </remarks>
     public async Task RunFfmpegAsync(
         IReadOnlyList<string> argv,
@@ -231,8 +226,7 @@ public sealed partial class MediaTools
             new ProcessRequest
             {
                 Argv = progressArgv,
-                // The reference checks its limit only as lines arrive; the runner also enforces it for an ffmpeg
-                // that goes silent, and kills the whole tree either way.
+                // The runner enforces the limit even for an ffmpeg that goes silent, and kills the whole tree.
                 Timeout = timeout,
                 Stdin = ProcessInput.Null,
                 Stderr = ProcessOutput.Tail,
@@ -266,7 +260,7 @@ public sealed partial class MediaTools
     }
 
     /// <summary>
-    /// <c>remux_to_temp_file</c>: writes the remux into <paramref name="workDir"/> and validates it. The temp file is
+    /// Writes the remux into <paramref name="workDir"/> and validates it. The temp file is
     /// deleted on any failure; the caller owns moving or deleting it on success.
     /// </summary>
     /// <param name="src">The source file to remux.</param>
@@ -281,17 +275,14 @@ public sealed partial class MediaTools
     /// the caller, so #500's new-warnings check has a baseline to compare the output against.
     /// </param>
     /// <param name="progressCallback">Reported to as ffmpeg runs, when given.</param>
-    /// <param name="durationSeconds">The expected output duration, for progress percentage only (validation now derives its own expected duration from the kept streams; see <see cref="ValidateStagedOutputAsync"/>).</param>
+    /// <param name="durationSeconds">The expected output duration, for progress percentage only (validation derives its own expected duration from the kept streams; see <see cref="ValidateStagedOutputAsync"/>).</param>
     /// <param name="acceleration">
-    /// The hardware acceleration decision, when one was made. Fixes #539 item 2: the reference builds an argv
-    /// with the hwaccel flags only to show them (in <c>run.py</c>, for logging), and <c>remux_to_temp_file</c>
-    /// builds its own argv that never includes <paramref name="acceleration"/>'s flags, so the setting has no
-    /// effect on what actually runs. Here <see cref="FfmpegCommands.BuildRemuxArgv"/> is the one builder used for
-    /// both: its result is what <see cref="LogFfmpegDebug"/> shows and what <see cref="RunFfmpegAsync"/> executes,
-    /// so a decided acceleration can no longer diverge between the two.
+    /// The hardware acceleration decision, when one was made. <see cref="FfmpegCommands.BuildRemuxArgv"/> is the
+    /// one argv builder: its result is both what <see cref="LogFfmpegDebug"/> shows and what
+    /// <see cref="RunFfmpegAsync"/> executes, so the logged hwaccel flags cannot differ from the ones that run (#539 item 2).
     /// </param>
     /// <param name="writer">
-    /// #548: which tool writes the output. Null keeps today's behaviour, ffmpeg. Whatever writes it, the
+    /// #548: which tool writes the output. Null means ffmpeg. Whatever writes it, the
     /// staged output is validated here by <see cref="ValidateStagedOutputAsync"/> in exactly the same way.
     /// </param>
     /// <param name="rewriteWithFfmpegOnFailure">
@@ -343,8 +334,8 @@ public sealed partial class MediaTools
                 // #548: the reason the better writer can be the default. A file mkvmerge declined, or wrote in a
                 // shape the validation above rejected, is written again by ffmpeg and validated again — so the
                 // preferred writer can only ever match or beat "ffmpeg only", never lose to it. If this second
-                // attempt fails too, it throws and the outer catch cleans up, exactly as a plain ffmpeg write
-                // always has. The temp file is overwritten in place by the retry.
+                // attempt fails too, it throws and the outer catch cleans up, exactly as for a plain ffmpeg
+                // write. The temp file is overwritten in place by the retry.
                 LogWriterFellBack(chosen.Name, error.Message);
                 usedWriter = ffmpeg.Name;
                 await ffmpeg.WriteAsync(request, cancellationToken).ConfigureAwait(false);
@@ -385,8 +376,8 @@ public sealed partial class MediaTools
     /// #500: validates a staged remux output against the whole plan instead of just an audio count and a duration
     /// floor — container family, per-position track type, counts per type, disposition and language per kept
     /// track, new ffprobe warnings, and cleared metadata (<see cref="RemuxOutputValidation.ValidateAgainstPlan"/>).
-    /// This is now the staged-output check the remux pass calls; <see cref="ValidateRemuxOutputAsync"/> is kept
-    /// only so the golden-parity tests can still prove the older Python check byte for byte.
+    /// This is the staged-output check the remux pass calls; <see cref="ValidateRemuxOutputAsync"/> is kept
+    /// only for the golden-file tests of the simpler audio-count and duration check.
     /// </summary>
     /// <param name="outputPath">The staged output to validate.</param>
     /// <param name="sourcePath">
@@ -478,15 +469,14 @@ public sealed partial class MediaTools
     }
 
     /// <summary>
-    /// <c>detect_acceleration</c>: what ffmpeg was built with. Never throws for a missing, failing or slow ffmpeg;
+    /// The hardware acceleration methods ffmpeg was built with. Never throws for a missing, failing or slow ffmpeg;
     /// the report says why nothing was found.
     /// </summary>
     /// <remarks>
-    /// #539 item 5: the reference decodes <c>ffmpeg -hwaccels</c>'s output with the process's locale encoding
-    /// (subprocess's default), which can raise or mangle text on a locale that is not UTF-8. This always decodes
-    /// as UTF-8 with replacement (<see cref="ProbeOutput.CapturedText"/>), matching every other tool output this
-    /// class reads; the method names it detects (<c>cuda</c>, <c>qsv</c>, …) are ASCII, so the only practical
-    /// effect is that a mangled heading line is filtered out instead of raising.
+    /// <c>ffmpeg -hwaccels</c>'s output is decoded as UTF-8 with replacement (<see cref="ProbeOutput.CapturedText"/>),
+    /// like every other tool output this class reads, rather than with the locale encoding, which can raise or
+    /// mangle text on a locale that is not UTF-8 (#539 item 5). The method names it detects (<c>cuda</c>,
+    /// <c>qsv</c>, …) are ASCII, so a mangled heading line is simply filtered out.
     /// </remarks>
     public async Task<AccelerationReport> DetectAccelerationAsync(string ffmpegBin, CancellationToken cancellationToken = default)
     {
@@ -599,7 +589,7 @@ public sealed partial class MediaTools
             : stdout;
     }
 
-    /// <summary><c>tempfile.mkstemp</c>: a new file named prefix + 8 random characters + suffix, created exclusively.</summary>
+    /// <summary>A new file named prefix + 8 random characters + suffix, created exclusively so no other writer shares it.</summary>
     private static string CreateTempFile(string directory, string prefix, string suffix)
     {
         const string Characters = "abcdefghijklmnopqrstuvwxyz0123456789_";
@@ -622,7 +612,7 @@ public sealed partial class MediaTools
         }
     }
 
-    /// <summary>What <c>ffprobe_json</c> reads about the file before probing it.</summary>
+    /// <summary>What <see cref="FfprobeJsonAsync"/> reads about the file before probing it.</summary>
     internal static MediaFileState InspectFile(string path)
     {
         var resolvedPath = ResolvePath(path);
@@ -672,8 +662,7 @@ public sealed partial class MediaTools
     }
 
     /// <summary>
-    /// #548: ffmpeg's half of <see cref="IRemuxWriter"/> — the same call
-    /// <see cref="RemuxToTempFileAsync"/> has always made, lifted out so the writer choice has somewhere to
+    /// #548: ffmpeg's half of <see cref="IRemuxWriter"/>, separate so the writer choice has somewhere to
     /// dispatch to. Validation is deliberately not here: the caller runs it on whichever writer wrote the file.
     /// </summary>
     public Task WriteWithFfmpegAsync(RemuxWriteRequest request, CancellationToken cancellationToken = default)
@@ -814,8 +803,8 @@ public sealed partial class MediaTools
     /// Only for a writer that is not already ffmpeg (there is nothing to fall back to), only when the setting
     /// allows it, and never for cancellation — a cancelled job must stay cancelled rather than quietly start a
     /// second, longer write. Everything else is worth retrying: whether mkvmerge declined the plan, failed to
-    /// run, or produced something <see cref="ValidateStagedOutputAsync"/> rejected, ffmpeg writing it the way
-    /// it always has is the outcome the user would have had anyway.
+    /// run, or produced something <see cref="ValidateStagedOutputAsync"/> rejected, ffmpeg writing it is the
+    /// outcome the user would have had without mkvmerge.
     /// </para>
     /// </summary>
     private static bool ShouldRewriteWithFfmpeg(Exception error, IRemuxWriter chosen, bool enabled) =>
@@ -830,5 +819,5 @@ public sealed partial class MediaTools
     private partial void LogWriterUsed(string writer, string path);
 }
 
-/// <summary>The file facts <c>ffprobe_json</c> logs and checks: resolved path, existence, size and mtime (seconds since the epoch).</summary>
+/// <summary>The file facts <see cref="MediaTools.FfprobeJsonAsync"/> logs and checks: resolved path, existence, size and mtime (seconds since the epoch).</summary>
 internal readonly record struct MediaFileState(string ResolvedPath, bool Exists, bool IsFile, long SizeBytes, double MtimeEpoch);

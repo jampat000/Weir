@@ -78,7 +78,7 @@ public static class LibraryFileMarksStore
         return marks;
     }
 
-    /// <summary>Forget everything Weir knows about a file it no longer has (a library's folders changed, say).</summary>
+    /// <summary>Forget everything Weir knows about a file that has left the library (a library's folders changed, say).</summary>
     public static Task ForgetAsync(UnitOfWork uow, long libraryId, string path)
     {
         ArgumentNullException.ThrowIfNull(uow);

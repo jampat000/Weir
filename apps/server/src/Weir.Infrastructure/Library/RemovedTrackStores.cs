@@ -7,10 +7,9 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Library;
 
 /// <summary>
-/// In-memory <see cref="IRemovedTrackStore"/> (#509 step 1): keeps the most recently recorded removed
-/// tracks for each file for the life of the process. This is the store registered by default — nothing in
-/// this build yet needs the records to outlive a restart, since the library-mode job that would call
-/// <see cref="RecordAsync"/> for real (#505) has not landed. Safe as a DI singleton.
+/// In-memory <see cref="IRemovedTrackStore"/> (#509): keeps the most recently recorded removed tracks for
+/// each file for the life of the process; <see cref="FileLogRemovedTrackStore"/> is the durable one. Safe as a
+/// DI singleton.
 /// </summary>
 public sealed class InMemoryRemovedTrackStore : IRemovedTrackStore
 {
@@ -36,12 +35,11 @@ public sealed class InMemoryRemovedTrackStore : IRemovedTrackStore
 }
 
 /// <summary>
-/// The durable <see cref="IRemovedTrackStore"/> (#509 step 1): a real <c>removed_tracks</c> table, one row
-/// per removed track, added by #557's migration (0041_removed_tracks). Before #557 this reused
-/// <c>file_logs.detail_json</c> (an existing JSON-capable column) since the schema was frozen; that
-/// column has no retention exemption (<see cref="Weir.Infrastructure.Processing.FileLogStore.PruneAsync"/> deletes any row past its
-/// window regardless of outcome), so a removed-track record could disappear from under #509's "titles
-/// missing tracks your new rules keep" list. The dedicated table has no such exposure.
+/// The durable <see cref="IRemovedTrackStore"/> (#509, #557): the <c>removed_tracks</c> table, one row per
+/// removed track. A dedicated table rather than <c>file_logs</c>, because
+/// <see cref="Weir.Infrastructure.Processing.FileLogStore.PruneAsync"/> deletes any <c>file_logs</c> row past its
+/// window regardless of outcome, which would drop records from the "titles missing tracks your new rules
+/// keep" list.
 /// </summary>
 public sealed class FileLogRemovedTrackStore : IRemovedTrackStore
 {

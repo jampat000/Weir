@@ -25,8 +25,9 @@ public sealed record SwapRecoveryReport(int TempFilesDeleted, int BackupsDeleted
 }
 
 /// <summary>
-/// The startup sweep for interrupted library swaps (#506), after Muxarr's <c>CleanupMuxbakFiles</c> and <c>RestoreFromBackup</c>.
-/// Run it before any worker starts.
+/// The startup sweep for interrupted library swaps (#506). Run it before any worker starts.
+/// The approach follows Muxarr's <c>CleanupMuxbakFiles</c>/<c>RestoreFromBackup</c> (https://github.com/KirovAir/muxarr, GPL-3.0);
+/// see THIRD_PARTY_NOTICES.md.
 /// </summary>
 /// <remarks>
 /// <para>For each original it looks at the files only, so it is correct whatever step a crash interrupted:</para>

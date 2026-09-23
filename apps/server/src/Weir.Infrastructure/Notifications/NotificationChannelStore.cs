@@ -4,7 +4,7 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Notifications;
 
-/// <summary>The <c>notification_channels</c> table (port of <c>weir.platform.notifications.ops</c>).</summary>
+/// <summary>The <c>notification_channels</c> table.</summary>
 public static class NotificationChannelStore
 {
     private const string Columns = "id, label, provider, url, events_json, enabled, created_at, updated_at";
@@ -21,7 +21,7 @@ public static class NotificationChannelStore
         return uow.QuerySingleAsync($"SELECT {Columns} FROM notification_channels WHERE notification_channels.id = $id", Read, ("$id", id));
     }
 
-    /// <summary><c>get_channels_for_event</c>.</summary>
+    /// <summary>The enabled channels subscribed to <paramref name="jobEvent"/>.</summary>
     public static async Task<List<NotificationChannelRecord>> ForEventAsync(UnitOfWork uow, string jobEvent)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -29,7 +29,7 @@ public static class NotificationChannelStore
         return [.. rows.Where(row => NotificationRules.ParseEvents(row.EventsJson).Contains(jobEvent, StringComparer.Ordinal))];
     }
 
-    /// <summary><c>create_notification_channel</c> (validation is the caller's).</summary>
+    /// <summary>Inserts a channel (validation is the caller's).</summary>
     public static async Task<NotificationChannelRecord> CreateAsync(UnitOfWork uow, string label, string provider, string url, IReadOnlyList<string> events, bool enabled)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -44,7 +44,7 @@ public static class NotificationChannelStore
             ?? throw new InvalidOperationException("Notification channel was not created.");
     }
 
-    /// <summary><c>update_notification_channel</c> for an existing row.</summary>
+    /// <summary>Updates an existing channel row.</summary>
     public static async Task<NotificationChannelRecord> UpdateAsync(
         UnitOfWork uow, NotificationChannelRecord row, string label, string provider, string url, IReadOnlyList<string> events, bool enabled)
     {

@@ -12,10 +12,8 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Auth;
 
 /// <summary>
-/// Port of <c>weir.platform.auth.recover</c> (#454, #553): recover the Weir operator account from the
-/// server's own console when every session is locked out or the password is forgotten. Local-only —
-/// there is no HTTP endpoint for this, exactly as Python shipped it as a console script rather than a
-/// route. Reaching the server's own shell (and so its database, under <c>WEIR_HOME</c>) is the proof of
+/// Recovers the Weir operator account from the server's own console when every session is locked out or
+/// the password is forgotten (#454, #553). Local-only: there is deliberately no HTTP endpoint. Reaching the server's own shell (and so its database, under <c>WEIR_HOME</c>) is the proof of
 /// identity; there is no email reset and no second admin to rescue the first.
 /// </summary>
 public static class RecoverCommand
@@ -59,8 +57,8 @@ public static class RecoverCommand
             return ExitFailed;
         }
 
-        // WeirSettings.load() itself ensures the runtime directories and asserts the db path is usable;
-        // WeirOptionsLoader.Load does not, so both calls are repeated here to match.
+        // WeirOptionsLoader.Load neither creates the runtime directories nor checks the db path, and this
+        // command runs without the server's startup, so both happen here.
         var options = WeirOptionsLoader.Load(runtime);
         RuntimeDirectories.Ensure(options);
         RuntimeDirectories.AssertSqliteDbLocationUsable(options.DbPath);
@@ -136,7 +134,7 @@ public static class RecoverCommand
     }
 
     /// <summary>
-    /// Port of <c>reset_account_password</c>: validate the new password, re-activate the account (an
+    /// Resets the account's password: validate the new password, re-activate the account (an
     /// inactive sole admin is its own lockout), revoke every still-active session and record it in
     /// Activity. Returns the number of sessions revoked.
     /// </summary>
@@ -169,7 +167,7 @@ public static class RecoverCommand
         return revoked;
     }
 
-    /// <summary>Port of <c>_read_new_password</c>.</summary>
+    /// <summary>The new password: the one supplied on the command line, or read twice from the console.</summary>
     private static string ReadNewPassword(string? supplied, IRecoverPasswordPrompt prompt)
     {
         if (supplied is not null)

@@ -6,20 +6,19 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Activity;
 
 /// <summary>
-/// Tells live Activity listeners about writes once they commit (Python's <c>after_commit</c> listener in
-/// <c>weir.platform.activity.service</c>): the ids a transaction recorded or updated are collected, and
+/// Tells live Activity listeners about writes once they commit: the ids a transaction recorded or updated are collected, and
 /// after its commit the database's <see cref="ActivityLatestNotifier"/> hears the largest. A rollback, or a
 /// transaction that is never reported committed, notifies nobody.
 /// </summary>
 public static class ActivityNotifications
 {
-    /// <summary><c>_PENDING_ACTIVITY_IDS_INFO_KEY</c>.</summary>
+    /// <summary>The unit-of-work key under which pending Activity ids wait for commit.</summary>
     private const string PendingKey = "weir_activity_pending_latest_ids";
 
     private static readonly ConditionalWeakTable<SqliteDatabase, ActivityLatestNotifier> Notifiers = [];
     private static readonly ConditionalWeakTable<SqliteTransaction, PendingIds> PendingByTransaction = [];
 
-    /// <summary>The notifier for one database (Python's process-wide <c>activity_latest_notifier</c>, per server here).</summary>
+    /// <summary>The notifier for one database, one per server.</summary>
     public static ActivityLatestNotifier For(SqliteDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);

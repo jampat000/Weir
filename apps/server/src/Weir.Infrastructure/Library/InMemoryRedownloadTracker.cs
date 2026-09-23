@@ -4,10 +4,9 @@ using Weir.Core.Library;
 namespace Weir.Infrastructure.Library;
 
 /// <summary>
-/// The default <see cref="IRedownloadTracker"/> (#509 step 4): in-memory, for the same reason
-/// <see cref="InMemoryRemovedTrackStore"/> is — nothing yet calls <see cref="ClearAsync"/> from a real
-/// download pipeline (that hook belongs to library mode, #505, or the watched-folder intake once either is
-/// wired to call it), so there is nothing durable a restart could lose today. Safe as a DI singleton.
+/// The default <see cref="IRedownloadTracker"/> (#509): in-memory, because no download pipeline calls
+/// <see cref="ClearAsync"/> (that hook belongs to library mode, #505, or the watched-folder intake), so a
+/// restart loses nothing durable. Safe as a DI singleton.
 /// </summary>
 public sealed class InMemoryRedownloadTracker : IRedownloadTracker
 {

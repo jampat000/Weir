@@ -1,9 +1,8 @@
 namespace Weir.Infrastructure.Auth;
 
 /// <summary>
-/// Parses <c>Weir recover</c>'s command line, the same three options the Python
-/// <c>argparse.ArgumentParser</c> in <c>weir.platform.auth.recover.main</c> declared
-/// (<c>--username</c>, <c>--password</c>, <c>--list</c>) plus the implicit <c>-h</c>/<c>--help</c>.
+/// Parses <c>Weir recover</c>'s command line: <c>--username</c>, <c>--password</c> and <c>--list</c>,
+/// plus <c>-h</c>/<c>--help</c>.
 /// </summary>
 public sealed record RecoverArguments(string? Username, string? Password, bool List, bool ShowHelp, string? Error)
 {
@@ -72,7 +71,7 @@ public sealed record RecoverArguments(string? Username, string? Password, bool L
 
     private static RecoverArguments Failure(string message) => new(null, null, false, false, message);
 
-    /// <summary>Matches <paramref name="name"/> as <c>--name value</c> or <c>--name=value</c>, argparse-style.</summary>
+    /// <summary>Matches <paramref name="name"/> as <c>--name value</c> or <c>--name=value</c>.</summary>
     private static bool TryMatchOption(
         IReadOnlyList<string> args, ref int i, string arg, string name, out string? value, out bool missingValue)
     {

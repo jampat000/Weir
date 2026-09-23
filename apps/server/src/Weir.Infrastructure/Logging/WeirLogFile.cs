@@ -8,7 +8,7 @@ namespace Weir.Infrastructure.Logging;
 /// <summary>
 /// The single JSON-lines runtime log, <c>{WEIR_LOG_DIR}/weir.log</c>. Writes and the retention
 /// rewrite share one lock so the file is never replaced while a handle is open, which Windows
-/// does not allow (port of <c>LockedFileHandler</c> and <c>prune_active_log_file</c>).
+/// does not allow.
 /// </summary>
 public sealed class WeirLogFile : IDisposable
 {
@@ -53,7 +53,7 @@ public sealed class WeirLogFile : IDisposable
 
     /// <summary>
     /// Keep only lines whose <c>timestamp</c> is within <paramref name="keepDays"/> (at least one day).
-    /// Lines that are not JSON with a readable timestamp are dropped, as in Python. Returns
+    /// Lines that are not JSON with a readable timestamp are dropped. Returns
     /// <see langword="false"/> when the file could not be rewritten; the log is left as it was.
     /// </summary>
     public bool Prune(int keepDays)
@@ -101,7 +101,7 @@ public sealed class WeirLogFile : IDisposable
                     }
                     catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
                     {
-                        // Best effort, as in Python.
+                        // Best effort: a leftover temporary file does no harm.
                     }
                 }
 
@@ -118,8 +118,7 @@ public sealed class WeirLogFile : IDisposable
     }
 
     /// <summary>
-    /// Read every line while holding the write lock (Python's <c>log_file_lock()</c> around
-    /// <c>read_suite_logs</c>). Returns <see langword="false"/> when the file exists but could not be opened.
+    /// Read every line while holding the write lock, so a prune cannot replace the file mid-read. Returns <see langword="false"/> when the file exists but could not be opened.
     /// </summary>
     public bool ReadLines(Action<string> onLine)
     {

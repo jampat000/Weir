@@ -36,7 +36,7 @@ public sealed class DirectoryBrowseException : Exception
     public int StatusCode { get; }
 }
 
-/// <summary>Server-side folder browsing for path settings (port of <c>weir.platform.local_browse.router</c>).</summary>
+/// <summary>Server-side folder browsing for path settings.</summary>
 public static partial class DirectoryBrowser
 {
     public static PyDict Browse(string? path)
@@ -206,7 +206,7 @@ public static partial class DirectoryBrowser
     private static List<string> ValidWindowsRoots() =>
         [.. Enumerable.Range('A', 26).Select(c => $"{(char)c}:\\").Where(Directory.Exists)];
 
-    /// <summary><c>_normalize_directory_path</c>.</summary>
+    /// <summary>An absolute, link-resolved directory path inside an allowed root, or a 400 <see cref="DirectoryBrowseException"/>.</summary>
     private static string NormalizeDirectoryPath(string path)
     {
         var sanitized = path.Replace("\0", string.Empty, StringComparison.Ordinal);
@@ -230,7 +230,7 @@ public static partial class DirectoryBrowser
         return value.StartsWith('/') ? value : throw new DirectoryBrowseException(400, "Path must begin at the filesystem root.");
     }
 
-    /// <summary><c>os.path.isabs</c> (Python 3.11: on Windows a leading separator counts).</summary>
+    /// <summary>Whether the path is absolute; on Windows a leading separator counts as absolute too.</summary>
     private static bool IsAbsolute(string path)
     {
         if (!OperatingSystem.IsWindows())
@@ -243,7 +243,7 @@ public static partial class DirectoryBrowser
         return head.StartsWith('\\') || (head.Length >= 3 && head[1..3] == ":\\");
     }
 
-    /// <summary><c>Path(p).parent</c> as a string.</summary>
+    /// <summary>The parent directory; a root is its own parent.</summary>
     private static string ParentOf(string path)
     {
         if (OperatingSystem.IsWindows())
@@ -267,7 +267,7 @@ public static partial class DirectoryBrowser
         return string.IsNullOrEmpty(unixParent) ? "/" : unixParent;
     }
 
-    /// <summary><c>os.path.realpath</c>: absolute, normalised, links resolved where the path exists.</summary>
+    /// <summary>The real path: absolute, normalised, links resolved where the path exists.</summary>
     internal static string RealPath(string path)
     {
         var full = Path.GetFullPath(path);
@@ -303,7 +303,7 @@ public static partial class DirectoryBrowser
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
-                // Unresolvable links stay as written, as realpath does.
+                // Unresolvable links stay as written rather than failing the whole path.
             }
 
             current = next;

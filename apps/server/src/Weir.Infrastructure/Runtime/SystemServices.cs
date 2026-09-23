@@ -6,7 +6,7 @@ using Weir.Core.Updates;
 
 namespace Weir.Infrastructure.Runtime;
 
-/// <summary>The tray's update files under <c>WEIR_HOME</c> (port of the file side of <c>update_service</c>).</summary>
+/// <summary>The tray's update files under <c>WEIR_HOME</c>: settings, state and the apply-now flag.</summary>
 public sealed class UpdateFiles
 {
     public const string SettingsFileName = "update-settings.json";
@@ -20,7 +20,7 @@ public sealed class UpdateFiles
         _options = options;
     }
 
-    /// <summary><c>get_update_settings</c>, with <paramref name="warn"/> called when the file is unreadable.</summary>
+    /// <summary>Read the update settings, with <paramref name="warn"/> called when the file is unreadable.</summary>
     public PyDict ReadSettings(Action<string>? warn = null)
     {
         var path = Path.Join(_options.WeirHome, SettingsFileName);
@@ -56,14 +56,14 @@ public sealed class UpdateFiles
         return parsed;
     }
 
-    /// <summary><c>put_update_settings</c>: written whole to a unique scratch file, then renamed into place.</summary>
+    /// <summary>Save the update settings: written whole to a unique scratch file, then renamed into place.</summary>
     public PyDict WriteSettings(string mode, bool checkOnStartup, long checkIntervalMinutes)
     {
         var path = Path.Join(_options.WeirHome, SettingsFileName);
         var text = UpdateStatus.SerializeUpdateSettings(mode, checkOnStartup, checkIntervalMinutes);
         if (OperatingSystem.IsWindows())
         {
-            // Python writes in text mode, so newlines become CRLF on Windows.
+            // The file is written as Windows text, with CRLF newlines.
             text = text.Replace("\n", "\r\n", StringComparison.Ordinal);
         }
 
@@ -86,7 +86,7 @@ public sealed class UpdateFiles
         return UpdateStatus.UpdateSettingsOut(mode, checkOnStartup, checkIntervalMinutes);
     }
 
-    /// <summary><c>get_update_state</c>.</summary>
+    /// <summary>Read the update state the tray writes; a missing or unreadable file reads as the default state.</summary>
     public PyDict ReadState()
     {
         var path = Path.Join(_options.WeirHome, StateFileName);
@@ -105,7 +105,7 @@ public sealed class UpdateFiles
         }
     }
 
-    /// <summary><c>write_apply_update_flag</c>: <c>Path.touch()</c>.</summary>
+    /// <summary>Create the apply-now flag file, or refresh its modified time when it already exists.</summary>
     public void WriteApplyFlag()
     {
         var path = Path.Join(_options.WeirHome, ApplyFlagFileName);
@@ -120,7 +120,7 @@ public sealed class UpdateFiles
         }
     }
 
-    /// <summary><c>_detect_install_type</c>: <c>WEIR_RUNTIME</c>, a Docker marker, a packaged Windows build, else source.</summary>
+    /// <summary>The install type: <c>WEIR_RUNTIME</c>, a Docker marker, a packaged Windows build, else source.</summary>
     public static string DetectInstallType(string? runtimeVariable)
     {
         var runtime = (runtimeVariable ?? string.Empty).Trim().ToLowerInvariant();
@@ -134,7 +134,7 @@ public sealed class UpdateFiles
             return "docker";
         }
 
-        // A single-file publish is .NET's equivalent of a frozen (PyInstaller) build.
+        // Only the packaged Windows build is published as a single file.
         var singleFile = string.IsNullOrEmpty(typeof(UpdateFiles).Assembly.Location);
         return singleFile && OperatingSystem.IsWindows() ? "windows" : "source";
     }
