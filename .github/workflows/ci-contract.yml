@@ -52,9 +52,10 @@ jobs:
       # Only the host: the suite runs `dotnet run --no-build` on it (tests/contract/support/launcher.py), and
       # server-linux builds the whole solution with warnings as errors.
       - name: Build Weir server (the server under test)
+        working-directory: apps/server
         run: |
-          dotnet restore apps/server/src/Weir.Host --locked-mode
-          dotnet build apps/server/src/Weir.Host --no-restore
+          dotnet restore src/Weir.Host --locked-mode
+          dotnet build src/Weir.Host --no-restore
 
       - name: Download web dist (served by the server under test)
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8

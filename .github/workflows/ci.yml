@@ -175,16 +175,21 @@ jobs:
           cache: true
           cache-dependency-path: apps/server/**/packages.lock.json
 
+      # From apps/server, so its global.json picks the pinned SDK: the lock files record the trimming tools that
+      # SDK brings (Weir.Core is trimmable), and a runner's newer default SDK would not match them.
       - name: Restore Weir server (locked)
-        run: dotnet restore apps/server/Weir.slnx --locked-mode
+        working-directory: apps/server
+        run: dotnet restore Weir.slnx --locked-mode
 
       # Warnings are errors, and so are the unused-member analyzers (IDE0051/IDE0052, apps/server/.editorconfig):
       # that is the server's dead-code guard.
       - name: Build Weir server (warnings are errors)
-        run: dotnet build apps/server/Weir.slnx -warnaserror --no-restore
+        working-directory: apps/server
+        run: dotnet build Weir.slnx -warnaserror --no-restore
 
       - name: Test Weir server
-        run: dotnet test apps/server/Weir.slnx --no-build
+        working-directory: apps/server
+        run: dotnet test Weir.slnx --no-build
 
       - name: Server dependency vulnerability scan
         if: needs.changes.outputs.run_server_audit == 'true'
@@ -205,14 +210,19 @@ jobs:
           cache: true
           cache-dependency-path: apps/server/**/packages.lock.json
 
+      # From apps/server, so its global.json picks the pinned SDK: the lock files record the trimming tools that
+      # SDK brings (Weir.Core is trimmable), and a runner's newer default SDK would not match them.
       - name: Restore Weir server (locked)
-        run: dotnet restore apps/server/Weir.slnx --locked-mode
+        working-directory: apps/server
+        run: dotnet restore Weir.slnx --locked-mode
 
       - name: Build Weir server (warnings are errors)
-        run: dotnet build apps/server/Weir.slnx -warnaserror --no-restore
+        working-directory: apps/server
+        run: dotnet build Weir.slnx -warnaserror --no-restore
 
       - name: Test Weir server
-        run: dotnet test apps/server/Weir.slnx --no-build
+        working-directory: apps/server
+        run: dotnet test Weir.slnx --no-build
 
   # The production web build, once, for the E2E smoke and every contract leg to serve.
   web-dist:
@@ -294,9 +304,10 @@ jobs:
 
       # The smoke runs `dotnet run --no-build` on the host (tests/e2e/weir/conftest.py).
       - name: Build Weir server (the server under test)
+        working-directory: apps/server
         run: |
-          dotnet restore apps/server/src/Weir.Host --locked-mode
-          dotnet build apps/server/src/Weir.Host --no-restore
+          dotnet restore src/Weir.Host --locked-mode
+          dotnet build src/Weir.Host --no-restore
 
       - name: Download web dist
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8

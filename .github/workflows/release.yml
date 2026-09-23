@@ -206,9 +206,10 @@ jobs:
 
       # For the E2E smoke below. ci.yml already ran the server's tests on this commit (ci-passed).
       - name: Build Weir server (warnings are errors)
+        working-directory: apps/server
         run: |
-          dotnet restore apps/server/Weir.slnx --locked-mode
-          dotnet build apps/server/Weir.slnx -warnaserror --no-restore
+          dotnet restore Weir.slnx --locked-mode
+          dotnet build Weir.slnx -warnaserror --no-restore
 
       # Advisories are published every day, so this is re-checked at release time, not taken from CI.
       - name: Server dependency vulnerability scan
