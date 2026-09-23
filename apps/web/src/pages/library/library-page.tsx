@@ -11,6 +11,7 @@
  * Every number here comes from the library scan on the server; nothing is counted in the browser.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FileName } from "../../components/shared/file-name";
 import { useSearchParams } from "react-router-dom";
 import { PageHeader } from "../../components/shell/page-header";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
@@ -648,7 +649,7 @@ export function LibraryPage(): React.ReactElement {
                       type="button"
                       onClick={() => setOpenPath(file.path)}
                     >
-                      {fileName(file.path)}
+                      <FileName path={file.path} />
                     </button>
                   </span>
                   <span role="cell" className="mm-library-verdict">

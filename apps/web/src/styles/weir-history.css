@@ -143,7 +143,13 @@
   cursor: pointer;
 }
 
-.mm-history-file__name,
+/* A file's name is shown whole, wrapping between its parts, never cut to "…" (James, 23 Sep 2026). */
+.mm-history-file__name {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
 .mm-history-file__sub {
   max-width: 100%;
   overflow: hidden;

@@ -14,6 +14,7 @@
  * countdowns and "min ago" labels move between updates.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FileName } from "../../components/shared/file-name";
 import type { CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FileStoryPanel } from "../../components/processing/file-story-panel";
@@ -191,6 +192,7 @@ function ArrivingCard({ item, now }: { item: ArrivingItem; now: number }) {
         <Ring item={item} now={now} />
         <div className="mm-live-card__names">
           <span className="mm-live-card__title">{item.name}</span>
+          <FileName path={item.path} className="mm-live-card__file" />
           <span className="mm-live-card__sub">{item.facts}</span>
         </div>
       </div>
@@ -217,6 +219,7 @@ function WaitingCard({ item, index }: { item: WaitingItem; index: number }) {
         <SourceTag source={item.source} libraryName={item.libraryName} />
       </div>
       <span className="mm-live-card__title">{item.name}</span>
+      <FileName path={item.path} className="mm-live-card__file" />
       <span className="mm-live-card__sub">{item.note ?? item.facts}</span>
     </li>
   );
@@ -279,6 +282,7 @@ function WorkingCard({
           <span className="mm-live-card__title mm-live-card__title--lg">
             {title}
           </span>
+          <FileName path={item.path} className="mm-live-card__file" />
           <span className="mm-live-card__sub">{item.facts}</span>
         </div>
         <div className="mm-live-work__pct">
@@ -360,6 +364,7 @@ function HandingCard({ item }: { item: HandingItem }) {
     <li className="mm-live-card" data-testid="live-handing">
       <SourceTag source={item.source} libraryName={item.libraryName} />
       <span className="mm-live-card__title">{item.name}</span>
+      <FileName path={item.path} className="mm-live-card__file" />
       <p className="mm-live-card__note mm-live-card__note--busy">
         <span className="mm-live-spin" aria-hidden="true" />
         {item.source === "library"
@@ -400,6 +405,7 @@ function FinishedRow({
           </button>
           <span className="mm-live-done__ago">{ago(item.finishedAt, now)}</span>
         </span>
+        <FileName path={item.relativePath} className="mm-live-card__file" />
         <span className="mm-live-card__sub" title={finishedLine(item)}>
           {finishedLine(item)}
         </span>
