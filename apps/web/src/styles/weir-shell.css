@@ -2052,6 +2052,19 @@ select.mm-input::-ms-expand {
   display: none;
 }
 
+/* The open list is drawn by the browser. On Windows Chrome it took a white background from the OS while the
+   options kept the field's pale dark-theme text, so every choice but the highlighted one was unreadable
+   (James, 23 Sep 2026). The options carry the theme's own surface and text, on every select, whatever its class. */
+select option,
+select optgroup {
+  background-color: var(--mm-surface-2);
+  color: var(--mm-text1);
+}
+
+select option:disabled {
+  color: var(--mm-text3);
+}
+
 .mm-auth-input {
   font: inherit;
   min-height: var(--mm-control-height-lg);

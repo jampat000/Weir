@@ -1,11 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
-  cleanup,
   fireEvent,
   render,
   screen,
   waitFor,
-  within,
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
@@ -329,9 +327,6 @@ describe("SystemPage", () => {
   });
 
   it("hides save for viewers", () => {
-    renderSettings(viewerMe, { initialEntries: ["/system"] });
-    expect(screen.getByTestId("suite-settings-save-timezone")).toBeDisabled();
-    cleanup();
     renderSettings(viewerMe, { initialEntries: ["/system?tab=history"] });
     expect(screen.getByTestId("suite-settings-save-logs")).toBeDisabled();
   });
@@ -468,7 +463,8 @@ describe("SystemPage", () => {
       "aria-selected",
       "true",
     );
-    expect(screen.getByText("Time zone")).toBeInTheDocument();
+    // The time zone moved to Settings › Schedule, beside the times it governs.
+    expect(screen.queryByText("Time zone")).not.toBeInTheDocument();
     expect(screen.getByText("Setup wizard")).toBeInTheDocument();
     // Housekeeping is a file-processing job, so it lives under Settings, not here.
     expect(screen.queryByText("Housekeeping")).not.toBeInTheDocument();
@@ -595,40 +591,5 @@ describe("SystemPage", () => {
     expect(current).toHaveAttribute("type", "text");
     fireEvent.change(current, { target: { value: "" } });
     expect(current).toHaveAttribute("type", "password");
-  });
-
-  it("closes timezone dropdown and shows selected timezone", () => {
-    renderSettings(operatorMe, { initialEntries: ["/system"] });
-    const trigger = screen.getByRole("button", { name: /Time zone/ });
-    expect(trigger).toHaveTextContent("Select time zone");
-    fireEvent.click(trigger);
-    const firstOption = within(screen.getByRole("listbox")).getAllByRole(
-      "option",
-    )[0];
-    const chosenLabel = firstOption.textContent ?? "";
-    fireEvent.mouseDown(firstOption);
-    fireEvent.click(firstOption);
-    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Time zone/ })).toHaveTextContent(
-      chosenLabel,
-    );
-  });
-
-  it("closes timezone dropdown on outside click", () => {
-    renderSettings(operatorMe, { initialEntries: ["/system"] });
-    const trigger = screen.getByRole("button", { name: /Time zone/ });
-    fireEvent.click(trigger);
-    expect(screen.getByRole("listbox")).toBeInTheDocument();
-    fireEvent.mouseDown(document.body);
-    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
-  });
-
-  it("closes timezone dropdown on Escape", () => {
-    renderSettings(operatorMe, { initialEntries: ["/system"] });
-    const trigger = screen.getByRole("button", { name: /Time zone/ });
-    fireEvent.click(trigger);
-    expect(screen.getByRole("listbox")).toBeInTheDocument();
-    fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 });

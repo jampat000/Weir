@@ -14,7 +14,6 @@ import {
   isLikelyNetworkFailure,
 } from "../../lib/api/error-guards";
 import { useMeQuery } from "../../lib/auth/queries";
-import { CURATED_TIMEZONE_ID_SET } from "../../lib/suite/timezone-options";
 import {
   suiteConfigurationBackupsQueryKey,
   useSuiteConfigurationBackupsQuery,
@@ -141,7 +140,6 @@ export function SystemPage() {
     for (const name of ["status", "path"]) nextParams.delete(name);
     setSearchParams(nextParams);
   }
-  const [appTimezone, setAppTimezone] = useState<string | null>(null);
   const [logRetentionDaysDraft, setLogRetentionDaysDraft] = useState<
     string | null
   >(null);
@@ -171,8 +169,6 @@ export function SystemPage() {
     if (!settingsQ.data) {
       return;
     }
-    const fromServer = settingsQ.data.app_timezone || "";
-    setAppTimezone(CURATED_TIMEZONE_ID_SET.has(fromServer) ? fromServer : null);
     setLogRetentionDaysDraft(null);
     setActivityRetentionDaysDraft(null);
     setConfigurationBackupEnabled(
@@ -201,15 +197,6 @@ export function SystemPage() {
     tab === "about" && Boolean(settingsQ.data),
   );
 
-  const serverCuratedTimezone =
-    settingsQ.data &&
-    CURATED_TIMEZONE_ID_SET.has(settingsQ.data.app_timezone || "")
-      ? settingsQ.data.app_timezone
-      : null;
-
-  const timezoneDirty =
-    settingsQ.data !== undefined && appTimezone !== serverCuratedTimezone;
-
   const logsDirty =
     settingsQ.data !== undefined &&
     logRetentionDaysDraft !== null &&
@@ -229,8 +216,7 @@ export function SystemPage() {
         ((
           settingsQ.data.configuration_backup_preferred_time || "02:00"
         ).trim() || "02:00"));
-  const isDirty =
-    timezoneDirty || logsDirty || activityRetentionDirty || backupScheduleDirty;
+  const isDirty = logsDirty || activityRetentionDirty || backupScheduleDirty;
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       isDirty && currentLocation.pathname !== nextLocation.pathname,
@@ -319,8 +305,6 @@ export function SystemPage() {
       await queryClient.invalidateQueries();
       const refreshed = await settingsQ.refetch();
       if (refreshed.data) {
-        const tz = refreshed.data.app_timezone || "";
-        setAppTimezone(CURATED_TIMEZONE_ID_SET.has(tz) ? tz : null);
         setLogRetentionDaysDraft(null);
         setActivityRetentionDaysDraft(null);
       }
@@ -392,7 +376,7 @@ export function SystemPage() {
   const buildSuitePutBody = (): SuiteSettingsPutBody => {
     const d = settingsQ.data;
     const name = (d.product_display_name || "Weir").trim() || "Weir";
-    const tz = (appTimezone ?? d.app_timezone ?? "UTC").trim() || "UTC";
+    const tz = (d.app_timezone ?? "UTC").trim() || "UTC";
     const retention = Math.min(
       3650,
       Math.max(1, Math.trunc(Number(finalizeLogRetentionDays()))),
@@ -419,20 +403,6 @@ export function SystemPage() {
     };
     return body;
   };
-
-  async function handleSaveTimezone() {
-    if (!settingsQ.data) {
-      return;
-    }
-    setLastSuiteSaveTarget("timezone");
-    save.reset();
-    try {
-      await save.mutateAsync(buildSuitePutBody());
-      setLastSuiteSaveTarget(null);
-    } catch {
-      /* surfaced via save.isError */
-    }
-  }
 
   async function handleSaveLogs() {
     if (!settingsQ.data) {
@@ -526,16 +496,7 @@ export function SystemPage() {
             {/* What it is, before anything you can change about it. */}
             <AboutFacts />
             <SettingsUpgradeTab updateStatusQ={updateStatusQ} />
-            <SettingsInstanceSection
-              editable={editable}
-              settingsData={settingsQ.data}
-              save={save}
-              appTimezone={appTimezone}
-              setAppTimezone={setAppTimezone}
-              timezoneDirty={timezoneDirty}
-              lastSuiteSaveTarget={lastSuiteSaveTarget}
-              onSaveTimezone={() => void handleSaveTimezone()}
-            />
+            <SettingsInstanceSection settingsData={settingsQ.data} />
             {showSupport ? <SettingsSupportTab /> : null}
           </div>
         ) : tab === "backups" ? (

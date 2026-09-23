@@ -4,8 +4,6 @@ import type {
   useSuiteOperationalHistoryResetMutation,
   useSuiteSettingsSaveMutation,
 } from "../../lib/suite/queries";
-import { curatedTimezoneOptionsSorted } from "../../lib/suite/timezone-options";
-import { MmListboxPicker } from "../../components/ui/mm-listbox-picker";
 import {
   QuietDisclosure,
   quietActionRowClass,
@@ -36,93 +34,19 @@ const FIELD_HINT_CLASS =
  * action row.
  */
 type InstanceProps = {
-  editable: boolean;
   settingsData: SuiteSettingsOut;
-  save: ReturnType<typeof useSuiteSettingsSaveMutation>;
-  appTimezone: string | null;
-  setAppTimezone: (v: string) => void;
-  timezoneDirty: boolean;
-  lastSuiteSaveTarget: "timezone" | "logs" | "backup" | null;
-  onSaveTimezone: () => void;
 };
 
-export function SettingsInstanceSection({
-  editable,
-  settingsData,
-  save,
-  appTimezone,
-  setAppTimezone,
-  timezoneDirty,
-  lastSuiteSaveTarget,
-  onSaveTimezone,
-}: InstanceProps) {
+/** The setup wizard. The time zone that sat above it moved to Settings › Schedule (canvas board 6), where every time
+ *  it governs is shown. */
+export function SettingsInstanceSection({ settingsData }: InstanceProps) {
   const navigate = useNavigate();
-  const timezoneOptions = curatedTimezoneOptionsSorted();
   const wizardState = (settingsData.setup_wizard_state || "pending")
     .trim()
     .toLowerCase();
 
   return (
     <div data-testid="suite-settings-global" className="mm-quiet-stack">
-      {!editable ? (
-        <p className="mm-quiet-note">
-          Operators and admins can change these; everyone can read History and
-          logs.
-        </p>
-      ) : null}
-
-      <SettingsQuietSection
-        headingId="suite-settings-timezone-heading"
-        heading="Time zone"
-      >
-        <p className="mm-quiet-note">
-          Times across Weir, and schedule windows, use this zone.
-        </p>
-        <div className="mt-4 max-w-md min-w-0">
-          <MmListboxPicker
-            ariaLabelledBy="suite-settings-timezone-heading"
-            ariaDescribedBy="suite-timezone-hint"
-            placeholder="Select time zone"
-            disabled={!editable || save.isPending}
-            options={timezoneOptions.map((tz) => ({
-              value: tz.id,
-              label: tz.label,
-            }))}
-            value={appTimezone ?? ""}
-            onChange={(v) => setAppTimezone(v)}
-          />
-          <p
-            id="suite-timezone-hint"
-            className={`mt-2 block ${FIELD_HINT_CLASS}`}
-          >
-            Not listed? Pick a city in the same zone; it only changes how times
-            are shown.
-          </p>
-        </div>
-        {save.isError && lastSuiteSaveTarget === "timezone" ? (
-          <p
-            className="mt-4 text-sm text-[var(--mm-status-failed-text)]"
-            role="alert"
-            data-testid="suite-settings-timezone-save-error"
-          >
-            {save.error instanceof Error
-              ? save.error.message
-              : "Could not save."}
-          </p>
-        ) : null}
-        <div className={`${quietActionRowClass} mt-6`}>
-          <button
-            type="button"
-            className={mmActionButtonClass({ variant: "primary" })}
-            disabled={!editable || !timezoneDirty || save.isPending}
-            data-testid="suite-settings-save-timezone"
-            onClick={() => onSaveTimezone()}
-          >
-            {save.isPending ? "Saving..." : "Save time zone"}
-          </button>
-        </div>
-      </SettingsQuietSection>
-
       {/* Opened once, if ever, so it does not take a heading's worth of the page from the
           things you came here to change. */}
       <QuietDisclosure title="Setup wizard" summaryWhenClosed="Run once">

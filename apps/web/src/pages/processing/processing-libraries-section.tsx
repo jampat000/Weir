@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { MmOnOffSwitch } from "../../components/ui/mm-on-off-switch";
 import { PageLoading } from "../../components/shared/page-loading";
@@ -9,7 +10,7 @@ import {
   QuietSection,
   quietActionRowClass,
 } from "../../components/shared/quiet-section";
-import { ScheduleGridEditor } from "./schedule-grid-editor";
+import { effectiveGrid, windowNow } from "./schedule-model";
 import { LibraryManagerSetup } from "./library/library-manager-setup";
 import { useMeQuery } from "../../lib/auth/queries";
 import { useMediaManagerConnectionsQuery } from "../../lib/media-managers/queries";
@@ -570,8 +571,8 @@ export function ProcessingLibrariesSection() {
         <p className="mm-quiet-note">
           A library is a folder Weir watches and a folder it hands clean files
           back to. A library from a media manager is kept in step with it; one
-          made here is yours alone, and can still be linked to a manager in its
-          editor. A 4K library and a kids library are separate libraries.
+          added in Weir is yours alone, and can still be linked to a manager in
+          its editor. A 4K library and a kids library are separate libraries.
         </p>
         {rows.length === 0 ? (
           <p className="mm-quiet-note mt-4">
@@ -1371,12 +1372,22 @@ export function ProcessingLibrariesSection() {
               </label>
             </div>
           </details>
+          {/* The hours are drawn in Settings › Schedule, beside every other library's week (canvas board 6). One
+              editor, so the two can never disagree. */}
           <QuietFieldGroup title="When this library may run">
-            <ScheduleGridEditor
-              value={form.schedule_grid}
-              onChange={(schedule_grid) => setForm({ ...form, schedule_grid })}
-              disabled={!editable}
-            />
+            <p className="mm-quiet-note" data-testid="processing-library-hours">
+              {(() => {
+                const existing = rows.find((r) => r.id === editingId);
+                if (!existing) return "Any time, until you choose hours. ";
+                return windowNow(effectiveGrid(existing), undefined, new Date())
+                  .kind === "any"
+                  ? "Any time. "
+                  : "On the hours chosen for it. ";
+              })()}
+              <Link className="mm-schedule-link" to="/settings?tab=schedule">
+                Change the hours in Schedule
+              </Link>
+            </p>
           </QuietFieldGroup>
           <div className={quietActionRowClass}>
             <button
@@ -1428,7 +1439,7 @@ function LibrarySource({
         </span>
       ) : (
         <span className="mm-quiet-table__strong mm-library-source">
-          Made here
+          Added in Weir
         </span>
       )}
       <span className="mm-quiet-table__sub">
@@ -1436,7 +1447,7 @@ function LibrarySource({
           ? "kept in step with it"
           : linked.length > 0
             ? `linked to ${linked.map(nameOf).join(", ")}`
-            : "no media manager"}
+            : "not linked to a media manager"}
       </span>
       {quiet ? (
         <span className="mm-quiet-table__sub mm-status-text--failed">

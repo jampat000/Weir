@@ -1545,3 +1545,77 @@
   font-size: 0.8125rem;
   color: var(--mm-text2);
 }
+
+/* Settings › Schedule (canvas board 6): the time zone on one line, a week per library, its editor underneath. */
+.mm-schedule-zone {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: min(100%, 34rem);
+}
+
+.mm-schedule-zone > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Seven rows of 24 hours, lit where the library may start work. Small on purpose: it is read at a glance,
+   and the editor below is where hours are drawn. */
+.mm-week {
+  display: grid;
+  gap: 2px;
+  width: 16rem;
+}
+
+.mm-week__day {
+  display: grid;
+  grid-template-columns: 0.9rem repeat(24, minmax(0, 1fr));
+  gap: 1px;
+  align-items: center;
+}
+
+.mm-week__label {
+  color: var(--mm-text3);
+  font-size: 0.625rem;
+  line-height: 1;
+}
+
+.mm-week__hour {
+  height: 6px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--mm-text3) 22%, transparent);
+}
+
+.mm-week__hour.is-on {
+  background: var(--mm-accent);
+}
+
+.mm-schedule-table tr.is-selected > * {
+  background: var(--mm-accent-soft);
+}
+
+.mm-schedule-actions {
+  white-space: nowrap;
+}
+
+.mm-schedule-actions > * + * {
+  margin-left: 0.5rem;
+}
+
+.mm-schedule-link {
+  color: var(--mm-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mm-schedule-editor {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--mm-border);
+}
+
+.mm-schedule-editor__title {
+  margin: 0 0 0.75rem;
+  color: var(--mm-text1);
+  font-weight: 600;
+}

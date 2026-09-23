@@ -25,7 +25,7 @@ function canEdit(role: string | undefined): boolean {
 }
 
 /** The two cleanup jobs Weir times, in words a person uses, with the setting each one's switch and timer save to. */
-const JOBS: {
+export const CLEANUP_JOBS: {
   family: MaintenanceFamily;
   name: string;
   enabledField: "work_temp_stale_sweep_enabled" | "failure_cleanup_enabled";
@@ -182,7 +182,7 @@ export function ProcessingMaintenanceSection() {
               </tr>
             </thead>
             <tbody>
-              {JOBS.map((job) => {
+              {CLEANUP_JOBS.map((job) => {
                 const state = families.find((f) => f.family === job.family);
                 if (!state) return null;
                 const interval = state.interval_seconds ?? 3600;

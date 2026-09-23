@@ -678,14 +678,15 @@ class LiveAudit:
                     if cancel.count():
                         self.click(cancel.last, "cancel library editor")
             elif tab == "Schedule":
-                for scope in ("TV", "Movies"):
-                    self.require(
-                        self.page.get_by_text(
-                            f"{scope} watched-folder window", exact=True
-                        ).count()
-                        > 0,
-                        f"{scope} schedule controls missing",
-                    )
+                # A week per library, the time zone above them (canvas board 6).
+                self.visible(
+                    self.page.get_by_text("Time zone", exact=True),
+                    "time zone control",
+                )
+                self.require(
+                    self.page.get_by_test_id("schedule-library-row").count() > 0,
+                    "no library weeks on Schedule",
+                )
 
         self.screenshot("settings")
         self.record(
@@ -732,9 +733,6 @@ class LiveAudit:
         )
         self.visible(
             self.page.get_by_test_id("suite-settings-global"), "System › About"
-        )
-        self.visible(
-            self.page.get_by_text("Time zone", exact=True), "time zone control"
         )
         self.require(
             self.page.get_by_text("What Weir works with", exact=True).count()
