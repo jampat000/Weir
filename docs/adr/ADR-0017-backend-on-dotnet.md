@@ -2,11 +2,11 @@
 
 - **Status:** Accepted
 - **Date:** 2026-09-17
-- **Decided by:** James
+- **Decided by:** project owner
 
 ## Context
 
-Weir started as Weir, a Python (FastAPI, SQLAlchemy, Alembic) backend with a React + TypeScript web app. The product has since narrowed to one job: a processing stage between a media manager's completed downloads and its import, and soon also its library (library mode, #505). It is **Windows first**, with Linux and Docker as full targets.
+Weir started as MediaMop, a Python (FastAPI, SQLAlchemy, Alembic) backend with a React + TypeScript web app. The product has since narrowed to one job: a processing stage between a media manager's completed downloads and its import, and soon also its library (library mode, #505). It is **Windows first**, with Linux and Docker as full targets.
 
 The rename to Weir (#458) was already a reset: no installs, no compatibility promises. That made it the one cheap moment to ask whether the stack is the right one, independent of what exists.
 

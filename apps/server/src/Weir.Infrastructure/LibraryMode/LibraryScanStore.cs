@@ -16,7 +16,7 @@ public sealed record LibraryScanJobRow(long JobId, string Status, string? Payloa
 /// <summary>
 /// Requests a #505 library scan and reads back the latest one's result. Each request is an ordinary
 /// <see cref="LibraryModeJobKinds.ScanKind"/> job row; the newest completed row for a library is the file index / plan cache
-/// (see <c>apps/server/README.md</c>, "Library mode").
+/// (see <c>docs/archive/server-port-notes.md</c>, "Library mode").
 /// </summary>
 public static class LibraryScanStore
 {

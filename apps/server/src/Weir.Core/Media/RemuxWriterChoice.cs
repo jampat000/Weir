@@ -22,7 +22,7 @@ public static class RemuxWriterChoice
     /// (<c>RewriteWithFfmpeg</c>), so the result matches or beats what ffmpeg alone would have produced. On
     /// Matroska it beats it: mkvmerge keeps attachments and disposition flags by default, drops stale
     /// per-track statistics tags, and can author editions and ordered chapters, none of which ffmpeg's CLI
-    /// does without help — see docs/trials/503-mkvmerge-vs-ffmpeg.md.
+    /// does without help — see docs/engineering/503-mkvmerge-vs-ffmpeg.md.
     /// </para>
     /// </summary>
     public const string Best = "best";

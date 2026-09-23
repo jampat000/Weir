@@ -128,7 +128,7 @@ public sealed record ProcessingRulesConfig
     /// <summary>
     /// Issue #537 item 4: how a caller feeds an original-language decision in cleanly, once the
     /// remux pass can look one up (it needs the manager/TMDb metadata lookup from #520, not ported
-    /// yet — see apps/server/README.md). <see cref="PreferredAudioIndices"/> and
+    /// yet — see docs/archive/server-port-notes.md). <see cref="PreferredAudioIndices"/> and
     /// <see cref="OriginalLanguageNote"/> already flow straight into <see cref="RemuxRules.PlanRemux"/>
     /// unchanged; this just saves a caller from copying both fields by hand.
     /// </summary>
