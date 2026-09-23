@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.Data.Sqlite;
 using Weir.Core.Library;
 using Weir.Core.Rules;
 using Weir.Core.Time;
@@ -7,37 +7,9 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Library;
 
 /// <summary>
-/// In-memory <see cref="IRemovedTrackStore"/> (#509): keeps the most recently recorded removed tracks for
-/// each file for the life of the process; <see cref="FileLogRemovedTrackStore"/> is the durable one. Safe as a
-/// DI singleton.
-/// </summary>
-public sealed class InMemoryRemovedTrackStore : IRemovedTrackStore
-{
-    private readonly ConcurrentDictionary<RemovedTrackFileKey, IReadOnlyList<RemovedTrackRecord>> _byFile = new();
-
-    public Task RecordAsync(RemovedTrackFileKey key, IReadOnlyList<RemovedTrackRecord> tracks, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(key);
-        ArgumentNullException.ThrowIfNull(tracks);
-        _byFile[key] = [.. tracks];
-        return Task.CompletedTask;
-    }
-
-    public Task<IReadOnlyList<RemovedTrackRecord>> GetAsync(RemovedTrackFileKey key, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(key);
-        return Task.FromResult(_byFile.TryGetValue(key, out var tracks) ? tracks : (IReadOnlyList<RemovedTrackRecord>)[]);
-    }
-
-    public Task<IReadOnlyDictionary<RemovedTrackFileKey, IReadOnlyList<RemovedTrackRecord>>> GetAllAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyDictionary<RemovedTrackFileKey, IReadOnlyList<RemovedTrackRecord>>>(
-            new Dictionary<RemovedTrackFileKey, IReadOnlyList<RemovedTrackRecord>>(_byFile));
-}
-
-/// <summary>
-/// The durable <see cref="IRemovedTrackStore"/> (#509, #557): the <c>removed_tracks</c> table, one row per
-/// removed track. A dedicated table rather than <c>file_logs</c>, because
-/// <see cref="Weir.Infrastructure.Processing.FileLogStore.PruneAsync"/> deletes any <c>file_logs</c> row past its
+/// The durable <see cref="IRemovedTrackStore"/> (#509, #557): the <c>removed_tracks</c> table from migration
+/// <c>0006_removed_tracks.sql</c>, one row per removed track. A dedicated table rather than <c>file_logs</c>, because
+/// <see cref="Processing.FileLogStore.PruneAsync"/> deletes any <c>file_logs</c> row past its
 /// window regardless of outcome, which would drop records from the "titles missing tracks your new rules
 /// keep" list.
 /// </summary>
@@ -46,10 +18,10 @@ public sealed class FileLogRemovedTrackStore : IRemovedTrackStore
     private readonly SqliteDatabase _database;
     private readonly TimeProvider _time;
 
-    public FileLogRemovedTrackStore(SqliteDatabase database, TimeProvider? time = null)
+    public FileLogRemovedTrackStore(SqliteDatabase database, TimeProvider time)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
-        _time = time ?? TimeProvider.System;
+        _time = time ?? throw new ArgumentNullException(nameof(time));
     }
 
     public async Task RecordAsync(RemovedTrackFileKey key, IReadOnlyList<RemovedTrackRecord> tracks, CancellationToken cancellationToken = default)
@@ -118,7 +90,7 @@ public sealed class FileLogRemovedTrackStore : IRemovedTrackStore
         return result.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<RemovedTrackRecord>)pair.Value);
     }
 
-    private static RemovedTrackRecord ReadFrom(Microsoft.Data.Sqlite.SqliteDataReader reader, int offset) => new()
+    private static RemovedTrackRecord ReadFrom(SqliteDataReader reader, int offset) => new()
     {
         Language = SqliteValues.GetString(reader, offset),
         Type = SqliteValues.GetString(reader, offset + 1) == "subtitle" ? RemovedTrackType.Subtitle : RemovedTrackType.Audio,

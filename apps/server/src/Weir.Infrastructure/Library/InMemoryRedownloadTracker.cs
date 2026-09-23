@@ -13,9 +13,9 @@ public sealed class InMemoryRedownloadTracker : IRedownloadTracker
     private readonly ConcurrentDictionary<RemovedTrackFileKey, WaitingForRedownload> _waiting = new();
     private readonly TimeProvider _time;
 
-    public InMemoryRedownloadTracker(TimeProvider? time = null)
+    public InMemoryRedownloadTracker(TimeProvider time)
     {
-        _time = time ?? TimeProvider.System;
+        _time = time ?? throw new ArgumentNullException(nameof(time));
     }
 
     public Task MarkWaitingAsync(RemovedTrackFileKey file, string reason, CancellationToken cancellationToken = default)

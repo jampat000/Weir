@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Library;
-using Weir.Core.MediaManagers;
 using Weir.Infrastructure.Library;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.MediaManagers;
@@ -23,9 +22,7 @@ public static class LibraryModeServices
     {
         ArgumentNullException.ThrowIfNull(options);
         services.AddWeirMediaManagers(options);
-        services.TryAddSingleton<IMediaToolResolver>(sp => new MediaToolResolver(sp.GetRequiredService<WeirOptions>().WeirHome));
-        services.TryAddSingleton<Processes.IProcessRunner, Processes.ProcessRunner>();
-        services.TryAddSingleton<MediaTools>();
+        services.AddWeirMediaTools();
 
         // The #506 safe swap: real files, the library_swaps journal, the #500 output check.
         services.TryAddSingleton<ISwapFileSystem>(_ => PhysicalSwapFileSystem.Instance);
@@ -41,11 +38,11 @@ public static class LibraryModeServices
         services.TryAddSingleton<RedownloadRiskChecker>();
 
         // #509: what a clean removed for good, and asking a manager to redownload a title that is missing it.
-        // FileLogRemovedTrackStore is durable (the removed_tracks table); the redownload tracker stays
-        // in-memory (see its own remarks) since nothing calls its ClearAsync hook.
+        // The only registrations of these two: the removed_tracks table keeps removed-track history across restarts,
+        // and the redownload tracker stays in memory (see its remarks). AddWeirMediaManagers registers the redownload
+        // call itself.
         services.TryAddSingleton<IRemovedTrackStore, FileLogRemovedTrackStore>();
         services.TryAddSingleton<IRedownloadTracker, InMemoryRedownloadTracker>();
-        services.TryAddSingleton<IManagerRedownload, ArrManagerRedownload>();
 
         // #507's notify seam: AddWeirMediaManagers (above) registers the real LibraryFileChangeNotifier.
         services.TryAddSingleton<LibraryScanHandler>();

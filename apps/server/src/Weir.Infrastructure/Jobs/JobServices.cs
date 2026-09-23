@@ -742,8 +742,7 @@ public static class WeirJobs
         services.TryAddSingleton<IJobNotifications, NoJobNotifications>();
         services.TryAddSingleton<IUnhandledJobFailureRecorder, NoUnhandledJobFailureRecorder>();
         services.TryAddSingleton(new WorkerLoopTimings { LeaseSeconds = options.ProcessingJobLeaseSeconds });
-        services.TryAddSingleton(sp => new ProcessingJobStore(
-            sp.GetRequiredService<SqliteDatabase>(), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<IJobQueueMetrics>()));
+        services.AddWeirJobStore();
         services.TryAddSingleton(sp => new JobHandlerRegistry(sp.GetServices<IJobHandler>()));
         services.TryAddSingleton<ProcessingJobProcessor>();
         // The work file sweep is queued below, so it needs a handler or its jobs would wait in the queue for ever.

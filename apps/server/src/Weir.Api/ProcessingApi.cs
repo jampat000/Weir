@@ -2,12 +2,9 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Weir.Api.Endpoints;
-using Weir.Core.Configuration;
 using Weir.Core.Jobs;
-using Weir.Core.Processing;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
-using Weir.Infrastructure.Processes;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Scheduling;
@@ -26,9 +23,7 @@ public static class ProcessingApi
     /// already register.</summary>
     public static IServiceCollection AddWeirProcessingApis(this IServiceCollection services)
     {
-        services.TryAddSingleton<IMediaToolResolver>(sp => MediaToolResolver.ForCurrentProcess(sp.GetRequiredService<WeirOptions>().WeirHome));
-        services.TryAddSingleton<IProcessRunner, ProcessRunner>();
-        services.TryAddSingleton<MediaTools>();
+        services.AddWeirMediaTools();
         // Caps the #502 "Try on a file" preview at one run at a time (see RulesPreviewGate's own docs).
         services.TryAddSingleton<RulesPreviewGate>();
 
@@ -50,7 +45,6 @@ public static class ProcessingApi
         // Watched-folder filesystem watcher (#552): FileSystemWatcher per enabled/watched library, feeding
         // the same scan-dispatch enqueue above. Runs independently of the periodic scheduler — see
         // ProcessingWatchedFolderWatcherService's own docs for what it does.
-        services.TryAddSingleton<WatcherStateStore>();
         services.AddHostedService<ProcessingWatchedFolderWatcherService>();
         return services;
     }

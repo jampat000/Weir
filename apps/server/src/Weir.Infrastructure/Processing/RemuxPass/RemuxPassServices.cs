@@ -9,7 +9,6 @@ using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.MediaManagers;
-using Weir.Infrastructure.Processes;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
@@ -76,11 +75,7 @@ public static class RemuxPassServices
         ArgumentNullException.ThrowIfNull(options);
         services.AddWeirPlatform(options);
         services.AddWeirMediaManagers(options);
-        services.TryAddSingleton<IMediaToolResolver>(sp => MediaToolResolver.ForCurrentProcess(sp.GetRequiredService<WeirOptions>().WeirHome));
-        services.TryAddSingleton<IProcessRunner, ProcessRunner>();
-        services.TryAddSingleton<MediaTools>();
-        services.TryAddSingleton(sp => new ProcessingJobStore(
-            sp.GetRequiredService<SqliteDatabase>(), sp.GetRequiredService<TimeProvider>(), sp.GetService<IJobQueueMetrics>()));
+        services.AddWeirMediaTools();
         services.TryAddSingleton<SqliteRemuxPassData>();
         services.TryAddSingleton<IRemuxPassFileFacts>(sp => sp.GetRequiredService<SqliteRemuxPassData>());
         services.TryAddSingleton<IPostSuccessCleanupData>(sp => sp.GetRequiredService<SqliteRemuxPassData>());

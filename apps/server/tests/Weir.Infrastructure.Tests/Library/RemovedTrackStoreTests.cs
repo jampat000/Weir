@@ -6,8 +6,8 @@ using Weir.Infrastructure.Tests.Platform;
 namespace Weir.Infrastructure.Tests.Library;
 
 /// <summary>
-/// Both <see cref="IRemovedTrackStore"/> implementations (#509 step 1): in-memory and the durable
-/// <c>removed_tracks</c>-table-backed store. <see cref="FileLogRemovedTrackStore"/> only reads and writes the
+/// The <see cref="IRemovedTrackStore"/> (#509): the durable <c>removed_tracks</c>-table-backed
+/// store. <see cref="FileLogRemovedTrackStore"/> only reads and writes the
 /// table; converting legacy free-text <c>removed_audio</c>/<c>removed_subtitles</c> lists is #557's one-time
 /// migration (see <c>Migrations/RemovedTracksMigrationTests</c>).
 /// </summary>
@@ -22,24 +22,15 @@ public sealed class RemovedTrackStoreTests
     };
 
     [Fact]
-    public async Task In_memory_store_round_trips_and_replaces_on_a_second_record()
+    public async Task A_record_survives_a_new_store_over_the_same_database()
     {
-        var store = new InMemoryRemovedTrackStore();
+        using var fixture = new StoreFixture();
         var key = new RemovedTrackFileKey(1, "Movies/A.mkv");
+        await new FileLogRemovedTrackStore(fixture.Database, fixture.Clock).RecordAsync(key, [Track("jpn")]);
 
-        Assert.Empty(await store.GetAsync(key));
+        var afterRestart = new FileLogRemovedTrackStore(fixture.Database, fixture.Clock);
 
-        await store.RecordAsync(key, [Track("jpn")]);
-        Assert.Equal(["jpn"], (await store.GetAsync(key)).Select(t => t.Language));
-
-        // A second recording (a re-clean under different rules) replaces, it does not accumulate.
-        await store.RecordAsync(key, [Track("fre"), Track("spa", RemovedTrackType.Subtitle)]);
-        var tracks = await store.GetAsync(key);
-        Assert.Equal(["fre", "spa"], tracks.Select(t => t.Language));
-
-        var all = await store.GetAllAsync();
-        var only = Assert.Single(all);
-        Assert.Equal(key, only.Key);
+        Assert.Equal(["jpn"], (await afterRestart.GetAsync(key)).Select(t => t.Language));
     }
 
     [Fact]
