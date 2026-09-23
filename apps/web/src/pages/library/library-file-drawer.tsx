@@ -6,7 +6,7 @@
  * Two of those things are yours rather than the rules': you can pick the tracks for this one file, the way a
  * held download already lets you (#501), and you can set the file aside so nothing cleans it at all.
  *
- * A slide-over, like the file story on Live: close it and the table is exactly where it was.
+ * A slide-over, like the file story on the Processing page: close it and the table is exactly where it was.
  */
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -22,11 +22,7 @@ import { useLibraryFilePreviewQuery } from "../../lib/processing/library-mode-qu
 import type { ProcessingRulesPreviewTrack } from "../../lib/processing/rules-preview-api";
 import { baseName } from "../../lib/format/path";
 import { errorMessage } from "../../lib/api/error-message";
-
-function when(iso: string): string {
-  const at = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`);
-  return Number.isNaN(at.getTime()) ? iso : at.toLocaleString();
-}
+import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 
 function trackLabel(track: ProcessingRulesPreviewTrack): string {
   return [
@@ -62,6 +58,7 @@ export function LibraryFileDrawer({
   const open = file !== null;
   // The tracks you have said to keep, once you start choosing; null while the rules are deciding.
   const [keep, setKeep] = useState<Set<number> | null>(null);
+  const when = useAppDateFormatter();
 
   const preview = useLibraryFilePreviewQuery(libraryId, file?.path ?? null);
   const history = useActivityRecentQuery(

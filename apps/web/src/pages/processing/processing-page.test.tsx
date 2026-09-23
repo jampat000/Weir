@@ -94,6 +94,9 @@ vi.mock("../../lib/pause/pause-queries", () => ({
   usePauseQuery: () => ({ data: pause }),
   useSavePause: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+vi.mock("../../lib/settings/queries", () => ({
+  useAppSettingsQuery: () => ({ data: undefined }),
+}));
 vi.mock("../../lib/auth/queries", () => ({
   useMeQuery: () => ({ data: { role: "operator" } }),
 }));
@@ -500,7 +503,48 @@ describe("ProcessingPage", () => {
       "Nothing handed back in the last 2 hours.",
     );
     expect(figure.querySelector(".mm-live-spark__bar")).toBeNull();
-    // The chart's place is kept, empty, so switching views never resizes the bar (James, 23 Sep 2026).
+    // The chart's place is kept, empty, so switching views never resizes the toolbar.
     expect(figure.querySelector(".mm-live-spark__bars")).not.toBeNull();
+  });
+
+  it("lets the keyboard walk the bars and reads each one's five minutes in the legend", () => {
+    activity["processing.file_remux_pass_completed"] = {
+      items: [
+        {
+          id: 601,
+          created_at: "2026-09-22T09:40:00",
+          event_type: "processing.file_remux_pass_completed",
+          title: "x",
+          library_id: 1,
+          relative_path: "Starlit.Relay.S02E04.mkv",
+          detail: JSON.stringify({
+            outcome: "live_output_written",
+            ok: true,
+            relative_media_path: "Starlit.Relay.S02E04.mkv",
+          }),
+        },
+      ],
+    };
+    renderLive();
+    const figure = screen.getByTestId("live-handed-back");
+    const bars = within(figure).getByRole("slider");
+
+    bars.focus();
+    expect(bars).toHaveAttribute(
+      "aria-valuetext",
+      expect.stringMatching(/^In the last/),
+    );
+    for (let step = 0; step < 24; step += 1) {
+      if (bars.getAttribute("aria-valuetext")?.includes("cleaned")) break;
+      fireEvent.keyDown(bars, { key: "ArrowLeft" });
+    }
+
+    expect(bars).toHaveAttribute(
+      "aria-valuetext",
+      expect.stringContaining("1 cleaned"),
+    );
+    expect(figure.querySelector(".mm-live-trend__pointed")).toHaveTextContent(
+      "1 cleaned",
+    );
   });
 });

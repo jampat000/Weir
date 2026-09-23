@@ -2,25 +2,26 @@ import { describe, expect, it } from "vitest";
 import type { FinishedFile } from "../../lib/activity/processing-outcome";
 import type { ProcessingFile } from "../../lib/processing/files-api";
 import type { ProcessingJobInspectionRow } from "../../lib/processing/jobs-inspection/types";
+import { handedBack, handedBackSince } from "./handed-back-model";
 import {
   LIBRARY_CLEAN_JOB_KIND,
-  ago,
+  arrivingDeadline,
   buildLanes,
   fileFacts,
-  finishedLine,
   prettyName,
+  secondsLeft,
+} from "./processing-model";
+import {
+  ago,
+  clock,
+  finishedLine,
   readRate,
   ringLabel,
   ringState,
-  arrivingDeadline,
   runningFor,
-  secondsLeft,
   speedWords,
-  clock,
-  handedBack,
-  handedBackSince,
   timeLeft,
-} from "./processing-model";
+} from "./processing-words";
 
 const NOW = Date.parse("2026-09-22T10:00:00Z");
 

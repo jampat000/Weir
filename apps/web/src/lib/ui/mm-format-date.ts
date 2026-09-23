@@ -1,12 +1,22 @@
 import { useCallback } from "react";
 import { useAppSettingsQuery } from "../settings/queries";
 
+/** A trailing "Z", "+10:00", "-0500": the timestamp already says which zone it is in. */
+const HAS_ZONE = /(?:[zZ]|[+-]\d\d:?\d\d)$/;
+
+/** The server writes UTC timestamps without a zone, so one without a zone is read as UTC. */
 export function parseAppDate(iso: string): Date {
-  // Backend timestamps have no Z suffix — append it to force UTC parsing.
-  const s = iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z";
-  return new Date(s);
+  return new Date(HAS_ZONE.test(iso) ? iso : `${iso}Z`);
 }
 
+/** A server timestamp in ms since the epoch, or null when it is missing or unreadable. */
+export function parseAppTime(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const ms = parseAppDate(iso).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/** Formats server timestamps in the timezone chosen in Settings, or the browser's when none is set. */
 export function useAppDateFormatter(): (
   iso: string | null | undefined,
 ) => string {
@@ -23,6 +33,7 @@ export function useAppDateFormatter(): (
           timeZone: tz,
         }).format(parseAppDate(iso));
       } catch {
+        // An unreadable timestamp or an unknown timezone: show what the server sent.
         return iso;
       }
     },

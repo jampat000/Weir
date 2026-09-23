@@ -7,7 +7,9 @@
  * wants the technical detail, but it is never the first thing shown.
  */
 
-import { useEffect, useId, useRef } from "react";
+import { useId } from "react";
+import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
+import { useModalFocus } from "../../lib/ui/use-modal-focus";
 import { DirectPlayLine } from "./direct-play-line";
 import type {
   ProcessingDirectPlay,
@@ -21,11 +23,6 @@ const TONE_CLASS: Record<string, string> = {
   bad: "mm-story-step--bad",
   neutral: "",
 };
-
-function formatWhen(iso: string): string {
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
-}
 
 function Step({ step }: { step: ProcessingFileStoryStep }): React.ReactElement {
   return (
@@ -57,28 +54,8 @@ export function FileStoryPanel({
   onClose,
 }: FileStoryPanelProps): React.ReactElement | null {
   const titleId = useId();
-  const panelRef = useRef<HTMLDivElement>(null);
-  const returnFocusTo = useRef<Element | null>(null);
-
-  // Move focus into the panel when it opens, and give it back to whatever opened it on close.
-  useEffect(() => {
-    if (!open) return undefined;
-    returnFocusTo.current = document.activeElement;
-    panelRef.current?.focus();
-    return () => {
-      const target = returnFocusTo.current;
-      if (target instanceof HTMLElement) target.focus();
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  const panelRef = useModalFocus<HTMLDivElement>({ open, onClose });
+  const formatWhen = useAppDateFormatter();
 
   if (!open) return null;
 
