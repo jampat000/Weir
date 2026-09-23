@@ -7,22 +7,9 @@ namespace Weir.Tray.Tests;
 
 public sealed class BrowserLaunchTests : IDisposable
 {
-    private readonly string _home;
-    private readonly string? _previousHome;
+    private readonly TempDirectory _home = TempDirectory.AsWeirHome();
 
-    public BrowserLaunchTests()
-    {
-        _home = Path.Combine(Path.GetTempPath(), "weir-tray-tests", Guid.NewGuid().ToString("n"));
-        Directory.CreateDirectory(_home);
-        _previousHome = Environment.GetEnvironmentVariable("WEIR_HOME");
-        Environment.SetEnvironmentVariable("WEIR_HOME", _home);
-    }
-
-    public void Dispose()
-    {
-        Environment.SetEnvironmentVariable("WEIR_HOME", _previousHome);
-        try { Directory.Delete(_home, recursive: true); } catch { }
-    }
+    public void Dispose() => _home.Dispose();
 
     [Fact]
     public void Browser_shell_failure_is_non_fatal_and_logged()
@@ -32,7 +19,7 @@ public sealed class BrowserLaunchTests : IDisposable
             _ => throw new Win32Exception(unchecked((int)0x80004021), "Shell execution unavailable"));
 
         Assert.False(result);
-        var log = File.ReadAllText(Path.Combine(_home, "tray-host.log"));
+        var log = File.ReadAllText(Path.Combine(_home.Path, "tray-host.log"));
         Assert.Contains("Could not open Weir in the browser", log);
         Assert.Contains("Shell execution unavailable", log);
     }
@@ -66,18 +53,8 @@ public sealed class BrowserLaunchTests : IDisposable
         Assert.True(observed.UseShellExecute);
     }
 
-    [Theory]
-    [InlineData(true, null)]
-    [InlineData(false, Program.UpdateCheckPath)]
-    public void Update_menu_falls_back_to_the_web_update_check_when_unmanaged(
-        bool isInstalled,
-        string? expectedPath)
-    {
-        Assert.Equal(expectedPath, Program.TrayUpdateFallbackPath(isInstalled));
-    }
-
     [Fact]
-    public void Issue_638_an_update_restart_does_not_open_the_browser()
+    public void An_update_restart_does_not_open_the_browser()
     {
         Assert.False(Program.OpensBrowser(UpdateService.RestartArguments()));
     }

@@ -6,37 +6,25 @@ namespace Weir.Tray.Tests;
 
 /// <summary>
 /// The tray is the component that actually installs an update, so what it reads out of
-/// update-settings.json decides whether software lands on a machine unattended. These
-/// tests exist because that read had no coverage at all while it silently escalated a
-/// damaged file to Auto.
+/// update-settings.json decides whether software lands on a machine unattended. A damaged
+/// file must never read as Auto.
 /// </summary>
 public sealed class UpdateSettingsTests : IDisposable
 {
-    private readonly string _home;
-    private readonly string? _previousHome;
+    // Load logs to tray-host.log on the failure path, so the temp folder is also WEIR_HOME: a test can never
+    // append to a real install's log.
+    private readonly TempDirectory _temp = TempDirectory.AsWeirHome();
 
-    public UpdateSettingsTests()
-    {
-        _home = Path.Combine(Path.GetTempPath(), "weir-tray-tests", Guid.NewGuid().ToString("n"));
-        Directory.CreateDirectory(_home);
-        // Load logs through Program.RuntimeHome() on the failure path; point that at the
-        // temp folder so a test can never append to a real install's tray-host.log.
-        _previousHome = Environment.GetEnvironmentVariable("WEIR_HOME");
-        Environment.SetEnvironmentVariable("WEIR_HOME", _home);
-    }
+    public void Dispose() => _temp.Dispose();
 
-    public void Dispose()
-    {
-        Environment.SetEnvironmentVariable("WEIR_HOME", _previousHome);
-        try { Directory.Delete(_home, recursive: true); } catch { }
-    }
+    private string Home => _temp.Path;
 
-    private string SettingsPath => Path.Combine(_home, "update-settings.json");
+    private string SettingsPath => Path.Combine(Home, "update-settings.json");
 
     [Fact]
     public void No_file_is_the_shipped_default()
     {
-        var got = UpdateSettings.Load(_home);
+        var got = UpdateSettings.Load(Home);
 
         Assert.Equal(UpdateMode.Auto, got.Mode);
         Assert.True(got.CheckOnStartup);
@@ -51,9 +39,9 @@ public sealed class UpdateSettingsTests : IDisposable
             Mode = UpdateMode.DownloadOnly,
             CheckOnStartup = false,
             CheckIntervalMinutes = 240,
-        }.Save(_home);
+        }.Save(Home);
 
-        var got = UpdateSettings.Load(_home);
+        var got = UpdateSettings.Load(Home);
 
         Assert.Equal(UpdateMode.DownloadOnly, got.Mode);
         Assert.False(got.CheckOnStartup);
@@ -65,10 +53,10 @@ public sealed class UpdateSettingsTests : IDisposable
     {
         // The operator chose something. Auto is the only mode that installs with nobody
         // watching, so it is the one guess that can act against that choice.
-        new UpdateSettings { Mode = UpdateMode.NotifyOnly }.Save(_home);
+        new UpdateSettings { Mode = UpdateMode.NotifyOnly }.Save(Home);
         File.WriteAllText(SettingsPath, "{\"mode\": \"Notify");
 
-        Assert.Equal(UpdateMode.NotifyOnly, UpdateSettings.Load(_home).Mode);
+        Assert.Equal(UpdateMode.NotifyOnly, UpdateSettings.Load(Home).Mode);
     }
 
     [Fact]
@@ -76,17 +64,17 @@ public sealed class UpdateSettingsTests : IDisposable
     {
         File.WriteAllText(SettingsPath, "{\"mode\": \"InstallEverythingNow\"}");
 
-        Assert.Equal(UpdateMode.NotifyOnly, UpdateSettings.Load(_home).Mode);
+        Assert.Equal(UpdateMode.NotifyOnly, UpdateSettings.Load(Home).Mode);
     }
 
     [Fact]
     public void An_empty_file_falls_back_to_notify_only()
     {
-        // Deserialize returns null for a bare "null" document rather than throwing, which
-        // is the case the old `?? new UpdateSettings()` quietly turned into Auto.
+        // Deserialize returns null for a bare "null" document rather than throwing, so this
+        // case needs its own check to avoid reading as the default, Auto.
         File.WriteAllText(SettingsPath, "null");
 
-        Assert.Equal(UpdateMode.NotifyOnly, UpdateSettings.Load(_home).Mode);
+        Assert.Equal(UpdateMode.NotifyOnly, UpdateSettings.Load(Home).Mode);
     }
 
     [Fact]
@@ -94,9 +82,9 @@ public sealed class UpdateSettingsTests : IDisposable
     {
         File.WriteAllText(SettingsPath, "{ not json");
 
-        UpdateSettings.Load(_home);
+        UpdateSettings.Load(Home);
 
-        var log = File.ReadAllText(Path.Combine(_home, "tray-host.log"));
+        var log = File.ReadAllText(Path.Combine(Home, "tray-host.log"));
         Assert.Contains("update-settings.json could not be read", log);
         Assert.Contains("NotifyOnly", log);
     }
@@ -104,28 +92,27 @@ public sealed class UpdateSettingsTests : IDisposable
     [Fact]
     public void A_stale_scratch_file_from_another_writer_is_not_touched()
     {
-        // The backend writes this same file. Both used to pick the same scratch name, so one
-        // could rename the other's half-written file into place and report success. The name
-        // is unique per write now, which is why this pre-existing file survives untouched.
-        // Planted at exactly the name the old code used, so this fails against it.
+        // The server writes this same file. A shared scratch name would let one writer rename the
+        // other's half-written file into place and report success, so each write uses its own name
+        // and a scratch file at the obvious shared name survives untouched.
         var foreign = SettingsPath + ".tmp";
         File.WriteAllText(foreign, "{\"mode\": \"Auto\"}");
 
-        new UpdateSettings { Mode = UpdateMode.NotifyOnly }.Save(_home);
+        new UpdateSettings { Mode = UpdateMode.NotifyOnly }.Save(Home);
 
-        Assert.Equal(UpdateMode.NotifyOnly, UpdateSettings.Load(_home).Mode);
+        Assert.Equal(UpdateMode.NotifyOnly, UpdateSettings.Load(Home).Mode);
         Assert.True(File.Exists(foreign));
     }
 
     [Fact]
     public void The_file_is_replaced_whole_and_leaves_no_scratch_file()
     {
-        new UpdateSettings { Mode = UpdateMode.DownloadOnly, CheckIntervalMinutes = 10080 }.Save(_home);
-        new UpdateSettings { Mode = UpdateMode.Auto, CheckIntervalMinutes = 1 }.Save(_home);
+        new UpdateSettings { Mode = UpdateMode.DownloadOnly, CheckIntervalMinutes = 10080 }.Save(Home);
+        new UpdateSettings { Mode = UpdateMode.Auto, CheckIntervalMinutes = 1 }.Save(Home);
 
         using var doc = JsonDocument.Parse(File.ReadAllText(SettingsPath));
         Assert.Equal("Auto", doc.RootElement.GetProperty("mode").GetString());
         Assert.Equal(1, doc.RootElement.GetProperty("checkIntervalMinutes").GetInt32());
-        Assert.Empty(Directory.GetFiles(_home, "*.tmp"));
+        Assert.Empty(Directory.GetFiles(Home, "*.tmp"));
     }
 }

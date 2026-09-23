@@ -1,4 +1,5 @@
-"""Contract port of the retired Python backend's tests/test_processing_watched_folder_remux_scan_dispatch_manual_enqueue_api.py."""
+"""Manually queueing a watched-folder scan: it needs a watched folder, and by default it queues remux
+jobs for what it finds."""
 
 from __future__ import annotations
 

@@ -65,30 +65,59 @@ def _log(tool_dir: Path, tool: str, argv: list[str], **extra: object) -> None:
 
 
 def _bump_counter(tool_dir: Path, key: str) -> int:
-    """How many times ``key`` has been seen, including this time. Serialised with a lock file."""
+    """How many times ``key`` has been seen, including this time.
 
-    lock = tool_dir / "counters.lock"
-    deadline = time.time() + 10
+    Tool processes can run side by side, so the read-modify-write happens only while holding an OS
+    lock on ``counters.lock``. The OS releases that lock if its holder dies, so a waiter never steals it.
+    """
+
+    with open(tool_dir / "counters.lock", "a+b") as lock:
+        _lock(lock, timeout_s=30.0)
+        try:
+            path = tool_dir / "counters.json"
+            try:
+                counters = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                counters = {}
+            counters[key] = int(counters.get(key, 0)) + 1
+            path.write_text(json.dumps(counters), encoding="utf-8")
+            return int(counters[key])
+        finally:
+            _unlock(lock)
+
+
+def _lock(handle, *, timeout_s: float) -> None:
+    """Take an exclusive lock on the first byte of ``handle``; fail, never steal, after ``timeout_s``."""
+
+    deadline = time.monotonic() + timeout_s
     while True:
         try:
-            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            break
-        except FileExistsError:
-            if time.time() > deadline:
-                lock.unlink(missing_ok=True)
+            if os.name == "nt":
+                import msvcrt
+
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except OSError as exc:
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"{handle.name} stayed locked for {timeout_s:.0f}s") from exc
             time.sleep(0.01)
-    try:
-        path = tool_dir / "counters.json"
-        try:
-            counters = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            counters = {}
-        counters[key] = int(counters.get(key, 0)) + 1
-        path.write_text(json.dumps(counters), encoding="utf-8")
-        return int(counters[key])
-    finally:
-        os.close(fd)
-        lock.unlink(missing_ok=True)
+
+
+def _unlock(handle) -> None:
+    if os.name == "nt":
+        import msvcrt
+
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 DEFAULT_PROBE = {

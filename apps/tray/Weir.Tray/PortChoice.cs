@@ -8,10 +8,9 @@ namespace Weir.Tray;
 // ---------------------------------------------------------------------------
 // Which port Weir listens on, and how that choice is made and kept.
 //
-// The tray used to re-pick a free port on every start and remember nothing, so a user
-// whose port was busy once got a different address next time and their bookmark broke.
-// Now the port is chosen once — by the person, or by an administrator on the command
-// line — saved under the runtime home, and reused. It never moves on its own.
+// The port is chosen once — by the person, or by an administrator on the command line —
+// saved under the runtime home, and reused. It never moves on its own, because every
+// bookmark and link to Weir carries it.
 // ---------------------------------------------------------------------------
 
 /// <summary>Why the port dialog is being shown.</summary>
@@ -62,9 +61,14 @@ static class PortChoice
         for (var i = 0; i < args.Count; i++)
         {
             if (string.Equals(args[i], "--port", StringComparison.OrdinalIgnoreCase))
+            {
                 return (i + 1 < args.Count ? args[i + 1] : "", "--port");
+            }
+
             if (args[i].StartsWith("--port=", StringComparison.OrdinalIgnoreCase))
+            {
                 return (args[i]["--port=".Length..], "--port");
+            }
         }
 
         var env = getEnv(PortEnvironmentVariable);
@@ -74,7 +78,11 @@ static class PortChoice
     /// <summary>A whole number from 1 to 65535, or null.</summary>
     internal static int? ParsePort(string? text)
     {
-        if (text is null) return null;
+        if (text is null)
+        {
+            return null;
+        }
+
         return int.TryParse(text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var port)
             && port is >= 1 and <= 65535
             ? port
@@ -89,11 +97,20 @@ static class PortChoice
     internal static string? Validate(string? text, int? allowedInUse, Func<int, bool> isInUse)
     {
         if (string.IsNullOrWhiteSpace(text))
+        {
             return "Enter a port number.";
+        }
+
         if (ParsePort(text) is not { } port)
+        {
             return "A port is a whole number from 1 to 65535.";
+        }
+
         if (port != allowedInUse && isInUse(port))
+        {
             return $"Another program on this computer is already using port {port}. Choose a different number.";
+        }
+
         return null;
     }
 
@@ -102,7 +119,10 @@ static class PortChoice
     {
         for (var port = start; port < start + range && port <= 65535; port++)
         {
-            if (!isInUse(port)) return port;
+            if (!isInUse(port))
+            {
+                return port;
+            }
         }
         return null;
     }
@@ -130,8 +150,8 @@ static class PortChoice
             if (port is { } p)
             {
                 // An administrator said which port. Use it, save it, never ask. If it is busy the
-                // server will fail to bind and say so; second-guessing an explicit choice here is
-                // exactly the silent drift this replaces.
+                // server will fail to bind and say so; second-guessing an explicit choice would move
+                // Weir to an address nobody chose.
                 var busy = isInUse(p) ? " It looks like another program is using it right now, so the server may not be able to start." : "";
                 return new PortDecision(p, Save: p != saved, $"Using port {p} from {s.Source}.{busy}");
             }
@@ -141,7 +161,9 @@ static class PortChoice
         if (saved is { } savedPort)
         {
             if (!isInUse(savedPort))
+            {
                 return new PortDecision(savedPort, Save: false, $"{rejectedSupplied}Using saved port {savedPort}.");
+            }
 
             if (!interactive)
             {
@@ -197,9 +219,9 @@ static class PortChoice
         {
             return File.Exists(path) ? ParsePort(File.ReadAllText(path)) : null;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Program.AppendFallbackLog($"{SavedPortFileName} could not be read ({ex.Message}); treating the port as not yet chosen.");
+            TrayLog.Write($"{SavedPortFileName} could not be read ({ex.Message}); treating the port as not yet chosen.");
             return null;
         }
     }
@@ -216,10 +238,10 @@ static class PortChoice
             File.WriteAllText(tmp, port.ToString(CultureInfo.InvariantCulture));
             File.Move(tmp, path, overwrite: true);
         }
-        catch
+        finally
         {
-            if (File.Exists(tmp)) File.Delete(tmp);
-            throw;
+            // Only still there when the write or the rename failed.
+            File.Delete(tmp);
         }
     }
 
@@ -237,8 +259,10 @@ static class PortChoice
                 && System.Diagnostics.Process.GetCurrentProcess().SessionId != 0
                 && SystemInformation.UserInteractive;
         }
-        catch
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or PlatformNotSupportedException)
         {
+            // Not knowing whether anyone is there means not asking: a dialog nobody can answer would hang the start.
+            TrayLog.Write($"Could not tell whether this is an interactive desktop ({ex.Message}); treating it as not.");
             return false;
         }
     }
@@ -253,9 +277,15 @@ static class PortChoice
         try
         {
             if (IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners().Any(ep => ep.Port == port))
+            {
                 return true;
+            }
         }
-        catch { }
+        catch (NetworkInformationException ex)
+        {
+            // The bind below still answers the question.
+            TrayLog.Write($"Could not read the TCP listener table ({ex.Message}); checking port {port} by binding it.");
+        }
 
         try
         {

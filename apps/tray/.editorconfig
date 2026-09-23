@@ -1,0 +1,37 @@
+root = true
+
+# The same enforced style as apps/server/.editorconfig, which cannot be shared: an .editorconfig only applies to
+# files under its own folder.
+
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,props,targets,csproj,slnx,xml}]
+indent_size = 2
+
+[*.cs]
+# Style that the build enforces (EnforceCodeStyleInBuild + TreatWarningsAsErrors).
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_style_readonly_field = true:warning
+csharp_prefer_braces = true:warning
+dotnet_diagnostic.IDE0005.severity = warning  # unnecessary usings
+dotnet_diagnostic.IDE0161.severity = warning  # file-scoped namespaces
+dotnet_diagnostic.IDE0011.severity = warning  # braces
+dotnet_diagnostic.IDE0044.severity = warning  # readonly fields
+# Unused private members and private members that are written but never read fail the build.
+dotnet_diagnostic.IDE0051.severity = warning  # unused private members
+dotnet_diagnostic.IDE0052.severity = warning  # unread private members
+dotnet_sort_system_directives_first = true
+
+[Weir.Tray.Tests/**.cs]
+# Test names read as sentences.
+dotnet_diagnostic.CA1707.severity = none
+# xUnit test classes are instantiated by the runner.
+dotnet_diagnostic.CA1515.severity = none
+dotnet_diagnostic.CA2007.severity = none
+# Table-driven assertions spell their expected values inline.
+dotnet_diagnostic.CA1861.severity = none

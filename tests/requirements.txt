@@ -6,9 +6,10 @@
 #
 # Hash-locked: install with
 #   python -m pip install --require-hashes -r tests/requirements.txt
-# Versions were carried over from the retired backend's requirements.lock (pip-compile output) when the
-# Python backend was deleted (#523). To change one, update its version and every --hash line together
-# (pip-compile --generate-hashes against these same top-level names reproduces the file).
+# Every package, direct or transitive, is pinned to an exact version with its hashes, so CI and every
+# workstation run the harnesses against the same code and pip refuses anything that does not match.
+# To change one, update its version and every --hash line together (pip-compile --generate-hashes
+# against these same top-level names reproduces the file).
 #
 anyio==4.15.1 \
     --hash=sha256:6152fdbbf9a77fdec97731721bebf7c4c44f7c29b424b0065826173efc7ed101 \

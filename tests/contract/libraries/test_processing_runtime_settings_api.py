@@ -1,4 +1,4 @@
-"""Port of the retired Python backend's tests/test_processing_runtime_settings_api.py."""
+"""Processing runtime settings: who may read them, and their shape."""
 
 from __future__ import annotations
 
@@ -49,8 +49,8 @@ def test_processing_runtime_settings_operator_shape(admin) -> None:
         "watched_folder_scan_periodic_configuration_note",
     ):
         assert key in body, key
-    # Removed in #329: both reported themselves as live startup configuration while the
-    # scheduler read the per-scope database toggles instead.
+    # Not reported (#329): the scheduler reads the per-scope database toggles, so these would
+    # misdescribe the live configuration.
     assert "processing_watched_folder_remux_scan_dispatch_schedule_enabled" not in body
     assert "processing_watched_folder_remux_scan_dispatch_schedule_interval_seconds" not in body
 

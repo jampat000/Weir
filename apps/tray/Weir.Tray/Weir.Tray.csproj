@@ -1,18 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- Target framework, analyzers, warnings as errors and the version come from ../Directory.Build.props. -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0-windows</TargetFramework>
-    <Nullable>enable</Nullable>
-    <UseWindowsForms>true</UseWindowsForms>
-    <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationIcon>..\..\..\packaging\windows\assets\weir-tray-icon.ico</ApplicationIcon>
     <AssemblyName>Weir</AssemblyName>
     <RootNamespace>Weir.Tray</RootNamespace>
-    <Version>1.0.0</Version>
-    <Company>Weir</Company>
-    <Product>Weir</Product>
     <Description>Weir desktop tray host</Description>
+    <!-- The tray only ships as win-x64 (packaging/windows/build-velopack.ps1), so its lock file covers that
+         runtime too and a package build restores exactly what CI locked. -->
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,12 +17,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Velopack" Version="1.2.0" />
+    <PackageReference Include="Velopack" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- UpdateSettings is internal and stays that way: it is not API, it is this app's
-         own on-disk state. The tests reach it through here rather than by widening it. -->
+    <!-- The tests reach the tray's internal types (its own on-disk state and helpers) here rather than by
+         widening them. -->
     <InternalsVisibleTo Include="Weir.Tray.Tests" />
   </ItemGroup>
 

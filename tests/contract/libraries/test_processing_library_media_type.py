@@ -1,4 +1,5 @@
-"""Port of the retired Python backend's tests/test_processing_library_media_type.py (the HTTP parts)."""
+"""A library's media type and folders: overlap rules, several libraries of one type, and which library
+a hand-off lands in."""
 
 from __future__ import annotations
 

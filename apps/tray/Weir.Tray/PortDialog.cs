@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Weir.Tray;
 
 /// <summary>
@@ -49,7 +51,10 @@ sealed class PortDialog : Form
         // findable: in the taskbar and in front, not behind whatever the person was doing.
         ShowInTaskbar = prompt.Reason != PortPromptReason.Change;
         TopMost = prompt.Reason != PortPromptReason.Change;
-        if (icon is not null) Icon = icon;
+        if (icon is not null)
+        {
+            Icon = icon;
+        }
 
         const int width = 400;
         var layout = new TableLayoutPanel
@@ -77,7 +82,9 @@ sealed class PortDialog : Form
 
         var situation = Situation(prompt);
         if (situation is not null)
+        {
             layout.Controls.Add(Paragraph(situation, width, bold: prompt.CurrentPortInUse));
+        }
 
         var defaultBusy = prompt.Reason == PortPromptReason.Change
             ? PortChoice.DefaultPort != prompt.CurrentPort && isInUse(PortChoice.DefaultPort)
@@ -168,7 +175,7 @@ sealed class PortDialog : Form
         else
         {
             _useCustom.Checked = true;
-            _customPort.Text = prefill?.ToString() ?? "";
+            _customPort.Text = prefill?.ToString(CultureInfo.InvariantCulture) ?? "";
         }
 
         // The two options sit in different layout containers (the custom one shares a row with
@@ -176,22 +183,34 @@ sealed class PortDialog : Form
         // so the exclusivity is done here. Without it both stay ticked and the default wins.
         _useDefault.CheckedChanged += (_, _) =>
         {
-            if (_useDefault.Checked) _useCustom.Checked = false;
+            if (_useDefault.Checked)
+            {
+                _useCustom.Checked = false;
+            }
+
             Refresh_();
         };
         _useCustom.CheckedChanged += (_, _) =>
         {
-            if (_useCustom.Checked) _useDefault.Checked = false;
+            if (_useCustom.Checked)
+            {
+                _useDefault.Checked = false;
+            }
+
             Refresh_();
         };
         _customPort.TextChanged += (_, _) =>
         {
-            if (!_useCustom.Checked) _useCustom.Checked = true;
+            if (!_useCustom.Checked)
+            {
+                _useCustom.Checked = true;
+            }
+
             _error.Visible = false;
             _error.Text = "";
             Refresh_();
         };
-        _customPort.Enter += (_, _) => { if (!_useCustom.Checked) _useCustom.Checked = true; };
+        _customPort.Enter += (_, _) => { if (!_useCustom.Checked) { _useCustom.Checked = true; } };
         ok.Click += (_, _) => Accept();
         Shown += (_, _) =>
         {
@@ -257,7 +276,7 @@ sealed class PortDialog : Form
     private void Accept()
     {
         var allowed = _prompt.Reason == PortPromptReason.Change ? _prompt.CurrentPort : (int?)null;
-        var text = _useDefault.Checked ? PortChoice.DefaultPort.ToString() : _customPort.Text;
+        var text = _useDefault.Checked ? PortChoice.DefaultPort.ToString(CultureInfo.InvariantCulture) : _customPort.Text;
         var problem = PortChoice.Validate(text, allowed, _isInUse);
         if (problem is not null)
         {

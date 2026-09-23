@@ -1,4 +1,4 @@
-"""Port of the retired Python backend's tests/test_suite_operational_history.py."""
+"""Resetting operational history: it needs confirmation, and clears history without touching active work."""
 
 from __future__ import annotations
 

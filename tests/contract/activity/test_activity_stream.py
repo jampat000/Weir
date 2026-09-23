@@ -1,4 +1,4 @@
-"""Contract port of the retired Python backend's tests/test_activity_stream.py (the activity SSE freshness stream)."""
+"""The activity freshness stream (server-sent events) and how recording an event treats retention."""
 
 from __future__ import annotations
 

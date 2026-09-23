@@ -1,8 +1,6 @@
-"""Contract port of the retired Python backend's tests/test_http_hardening.py.
-
-The original drives the trusted-proxy and compressed-asset middlewares on bare Starlette apps; here
-the same behaviour is observed on a real server: the forwarded scheme through the sign-in cookie's
-``Secure`` flag, and the assets through a ``WEIR_WEB_DIST`` folder with pre-compressed siblings.
+"""Trusted-proxy and compressed-asset handling, observed on a real server: the forwarded scheme through
+the sign-in cookie's ``Secure`` flag, and the assets through a ``WEIR_WEB_DIST`` folder with
+pre-compressed siblings.
 """
 
 from __future__ import annotations

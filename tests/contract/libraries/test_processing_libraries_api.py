@@ -1,4 +1,4 @@
-"""Port of the retired Python backend's tests/test_libraries_api.py."""
+"""Libraries and rule sets: create, edit, delete, reorder, and the reject-support checks."""
 
 from __future__ import annotations
 
@@ -33,9 +33,8 @@ def operator(admin: WeirClient) -> WeirClient:
 
 
 def _create(c: WeirClient, **overrides: Any):
-    # Disabled: the server's own periodic scan (which no env var switches off) queues a scan
-    # job for every enabled library with a watched folder, and that job counts as queued work.
-    # The originals never started the scheduler; nothing asserted here depends on ``enabled``.
+    # Disabled: the server's own periodic scan queues a scan job for every enabled library with a
+    # watched folder, and that job counts as queued work. Nothing asserted here depends on ``enabled``.
     body: dict[str, Any] = {
         "enabled": False,
         "name": "Movies 4K",

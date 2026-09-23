@@ -38,12 +38,12 @@ python -m pip install --require-hashes -r tests/requirements.txt
 python -m playwright install chromium
 ```
 
-Contract suite (every area is required on .NET; see [`tests/contract/README.md`](tests/contract/README.md)):
+Contract suite (every area in `tests/contract/areas.json`; see [`tests/contract/README.md`](tests/contract/README.md)):
 
 ```powershell
 dotnet build apps/server/Weir.slnx
 cd apps/web; npm ci; npm run build; cd ../..
-python -m pytest tests/contract -q --contract-required-only
+python -m pytest tests/contract -q
 ```
 
 E2E smoke (a temporary SQLite home, Playwright Chromium, the built web app served by the .NET server):
@@ -55,6 +55,8 @@ $env:WEIR_E2E = "1"
 $env:WEIR_SESSION_SECRET = "local-dev-secret-at-least-32-characters-long"
 python -m pytest tests/e2e/weir -q --tb=short
 ```
+
+Tray (Windows): `dotnet build apps/tray/Weir.Tray.slnx` and `dotnet test apps/tray/Weir.Tray.slnx`.
 
 Windows package: `powershell -ExecutionPolicy Bypass -File packaging/windows/build-velopack.ps1`, then `powershell -ExecutionPolicy Bypass -File scripts/smoke-windows-package.ps1`.
 

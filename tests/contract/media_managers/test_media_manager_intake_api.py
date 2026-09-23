@@ -1,4 +1,4 @@
-"""Contract port of the retired Python backend's tests/test_media_manager_intake_api.py."""
+"""The intake webhook: which Sonarr, Radarr, Deluno and native events queue work, and its secret."""
 
 from __future__ import annotations
 
@@ -275,12 +275,11 @@ def test_configured_secret_is_required(server_factory, client_factory) -> None:
 
 
 def test_the_old_subber_env_name_no_longer_configures_the_secret(server_factory, client_factory) -> None:
-    """WEIR_SUBBER_WEBHOOK_SECRET was the pre-v2.4.3 name and was read as a fallback until 3.0.0.
+    """Only WEIR_MEDIA_MANAGER_WEBHOOK_SECRET configures the shared secret, not WEIR_SUBBER_WEBHOOK_SECRET.
 
-    Reading two spellings of a shared secret meant a 401 could come from either one being wrong, so
-    3.0.0 reads WEIR_MEDIA_MANAGER_WEBHOOK_SECRET and nothing else. Setting only the old name now
-    leaves the webhook with no instance-wide secret at all, which is what this asserts: not a
-    stricter check, just no secret configured.
+    With two spellings a 401 could come from either one being wrong. Setting only the other name leaves
+    the webhook with no instance-wide secret at all, which is what this asserts: not a stricter check,
+    just no secret configured.
     """
 
     sut = server_factory({**NO_WEBHOOK_SECRET, "WEIR_SUBBER_WEBHOOK_SECRET": "s3cret"})

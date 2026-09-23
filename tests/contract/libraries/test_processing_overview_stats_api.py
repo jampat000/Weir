@@ -1,4 +1,4 @@
-"""Port of the retired Python backend's tests/test_processing_overview_stats_api.py."""
+"""Processing overview stats: access, shape, and remux savings counted only from finished successes."""
 
 from __future__ import annotations
 

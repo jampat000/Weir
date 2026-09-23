@@ -1,4 +1,4 @@
-"""Port of the retired Python backend's tests/test_pause_api.py (the pause endpoint, ``/api/v1/pause``)."""
+"""The pause endpoint (``/api/v1/pause``): expiry, resuming, scan-while-paused and validation."""
 
 from __future__ import annotations
 

@@ -1,7 +1,7 @@
-"""Correct-behaviour proof for #543 items 1-3, fixed when the backend moved to .NET.
+"""#543 items 1-3: counting, time filters and paging on ``/api/v1/activity/recent``.
 
-Each test asserts what ``/api/v1/activity/recent`` should do (the Activity section of
-``apps/server/README.md`` documents the fix).
+Each test asserts what the endpoint must do (the Activity section of ``apps/server/README.md``
+describes it).
 
 Two things every test here works around:
 
@@ -30,7 +30,7 @@ from tests.contract.support.launcher import ServerUnderTest
 def test_recent_total_and_has_more_count_every_matching_row_with_no_filter(
     server: ServerUnderTest, client_factory: Callable[..., WeirClient]
 ) -> None:
-    """Item 1: Python's unfiltered count query drops its FROM (``SELECT count(*)``, which is 1)."""
+    """Item 1: with no filter, the total counts every row (a count query without its FROM answers 1)."""
 
     now = datetime.now(UTC)
     with seed.stopped(server) as conn:
@@ -72,7 +72,7 @@ def test_recent_date_filters_normalize_stored_timestamps_and_honor_offsets(
     exact_second = datetime.now(UTC).replace(microsecond=0)
     with seed.stopped(server) as conn:
         conn.execute("DELETE FROM activity_events")
-        # A whole second: seed.utc_text (like SQLAlchemy) writes this with no fractional part.
+        # A whole second: seed.utc_text writes this with no fractional part.
         insert_event(conn, event_type="a.exact", module="custom", title="exact second", created_at=exact_second)
     client = client_factory(server)
     client.ensure_admin()
@@ -107,7 +107,7 @@ def test_recent_paging_by_before_id_never_skips_or_repeats_a_tied_or_out_of_orde
     with seed.stopped(server) as conn:
         conn.execute("DELETE FROM activity_events")
         # Row 2 is chronologically the oldest despite its small id; rows 1 and 3 tie on created_at.
-        # Plain "id < before_id" paging (Python's) loses that ordering: it can repeat row 4 on a later
+        # Plain "id < before_id" paging loses that ordering: it can repeat row 4 on a later
         # page (small id, but already returned) or skip rows entirely.
         insert_event(conn, event_type="a.1", module="custom", title="A", created_at=now - timedelta(seconds=1))
         insert_event(conn, event_type="a.2", module="custom", title="B", created_at=now - timedelta(seconds=6))

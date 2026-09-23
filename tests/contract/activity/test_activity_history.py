@@ -1,4 +1,4 @@
-"""Contract port of the retired Python backend's tests/test_activity_history.py (filter, export, retention, removal)."""
+"""Activity history: filtering, export, retention and removal."""
 
 from __future__ import annotations
 
@@ -182,7 +182,7 @@ def test_activity_older_than_the_horizon_is_pruned_and_zero_keeps_everything(ser
 
     _put_activity_retention(client, 90)
     with seed.stopped(sut) as conn:
-        # Job rows now default to the same ninety days.
+        # Job rows default to the same ninety days.
         _insert_terminal_job(conn, dedupe_key="job-91-days", age=timedelta(days=91))
         _insert_terminal_job(conn, dedupe_key="job-89-days", age=timedelta(days=89))
     client = client_factory(sut)

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import importlib.util
 import json
 import secrets
 import shutil
@@ -33,9 +34,23 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from build_contact_sheet import build_contact_sheet  # noqa: E402
+
+def _load_contact_sheet_builder():
+    """Import scripts/build-contact-sheet.py, whose kebab-case filename is not a legal module name."""
+
+    path = Path(__file__).resolve().parent / "build-contact-sheet.py"
+    spec = importlib.util.spec_from_file_location("weir_build_contact_sheet", path)
+    if spec is None or spec.loader is None:  # pragma: no cover - defensive
+        raise SystemExit(f"Could not load the contact sheet builder from {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module.build_contact_sheet
+
+
+build_contact_sheet = _load_contact_sheet_builder()
+
 from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright  # noqa: E402
 from tests.e2e.weir import _runtime as runtime  # noqa: E402
 from tests.e2e.weir.utils import db_path_for_home  # noqa: E402
