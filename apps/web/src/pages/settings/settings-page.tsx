@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
+import { systemAddressForSettingsTab } from "../../app/legacy-redirects";
 import {
   WorkspacePage,
   WorkspacePanel,
@@ -95,6 +96,11 @@ export function SettingsPage() {
     }
     for (const name of ["show", "status", "path"]) nextParams.delete(name);
     setSearchParams(nextParams);
+  }
+
+  const movedToSystem = systemAddressForSettingsTab(searchParams.get("tab"));
+  if (movedToSystem) {
+    return <Navigate to={movedToSystem} replace />;
   }
 
   return (
