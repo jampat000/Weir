@@ -13,7 +13,7 @@ import {
 import { effectiveGrid, windowNow } from "./schedule-model";
 import { LibraryCleaningSettings } from "./library/library-cleaning-settings";
 import { LibraryManagerSetup } from "./library/library-manager-setup";
-import { useMeQuery } from "../../lib/auth/queries";
+import { useCanEdit } from "../../lib/auth/can-edit";
 import { useMediaManagerConnectionsQuery } from "../../lib/media-managers/queries";
 import {
   PROCESSING_MEDIA_TYPE_LABELS,
@@ -38,10 +38,7 @@ import {
   useUpdateProcessingLibrary,
 } from "../../lib/processing/libraries-queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
-
-function canEdit(role: string | undefined): boolean {
-  return role === "operator" || role === "admin";
-}
+import { errorMessage } from "../../lib/api/error-message";
 
 const MEDIA_TYPES: ProcessingMediaType[] = ["movie", "tv"];
 
@@ -289,16 +286,6 @@ function writeFrom(
   };
 }
 
-function errorText(error: unknown, fallback: string): string {
-  if (error && typeof error === "object" && "message" in error) {
-    const message = String(
-      (error as { message: unknown }).message ?? "",
-    ).trim();
-    if (message) return message;
-  }
-  return fallback;
-}
-
 /**
  * Processing libraries: add, edit, reorder, enable, remove.
  *
@@ -306,7 +293,7 @@ function errorText(error: unknown, fallback: string): string {
  * an ordinary thing to have rather than a schema change (ADR-0014).
  */
 export function ProcessingLibrariesSection() {
-  const me = useMeQuery();
+  const editable = useCanEdit();
   const libraries = useProcessingLibrariesQuery();
   const ruleSets = useProcessingRuleSetsQuery();
   const create = useCreateProcessingLibrary();
@@ -328,7 +315,6 @@ export function ProcessingLibrariesSection() {
     string[]
   >([]);
 
-  const editable = canEdit(me.data?.role);
   const rows = libraries.data ?? [];
   // Reject is offered for the manager chosen in the editor, saved or not.
   const editingConnectionIds = form.manager_connection_id
@@ -376,7 +362,7 @@ export function ProcessingLibrariesSection() {
       }
       cancel();
     } catch (error) {
-      setNotice(errorText(error, "That library could not be saved."));
+      setNotice(errorMessage(error, "That library could not be saved."));
     }
   };
 
@@ -391,7 +377,7 @@ export function ProcessingLibrariesSection() {
         },
       });
     } catch (error) {
-      setNotice(errorText(error, "That library could not be changed."));
+      setNotice(errorMessage(error, "That library could not be changed."));
     }
   };
 
@@ -401,7 +387,7 @@ export function ProcessingLibrariesSection() {
       await remove.mutateAsync(library.id);
     } catch (error) {
       // The refusal reason is the useful part: it says how much work is in flight.
-      setNotice(errorText(error, "That library could not be removed."));
+      setNotice(errorMessage(error, "That library could not be removed."));
     }
   };
 
@@ -416,7 +402,7 @@ export function ProcessingLibrariesSection() {
     try {
       await reorder.mutateAsync(swapped.map((r) => r.id));
     } catch (error) {
-      setNotice(errorText(error, "Libraries could not be reordered."));
+      setNotice(errorMessage(error, "Libraries could not be reordered."));
     }
   };
 
@@ -432,7 +418,7 @@ export function ProcessingLibrariesSection() {
       await discover.mutateAsync(connectionId);
     } catch (error) {
       setNotice(
-        errorText(
+        errorMessage(
           error,
           "Weir could not discover libraries from that manager.",
         ),
@@ -456,7 +442,7 @@ export function ProcessingLibrariesSection() {
         `${created.length} ${created.length === 1 ? "library was" : "libraries were"} imported. Review its local paths before enabling processing.`,
       );
     } catch (error) {
-      setNotice(errorText(error, "Those libraries could not be imported."));
+      setNotice(errorMessage(error, "Those libraries could not be imported."));
     }
   };
 
@@ -471,7 +457,10 @@ export function ProcessingLibrariesSection() {
       await drift.mutateAsync(connectionId);
     } catch (error) {
       setNotice(
-        errorText(error, "Weir could not compare libraries with that manager."),
+        errorMessage(
+          error,
+          "Weir could not compare libraries with that manager.",
+        ),
       );
     }
   };
@@ -484,7 +473,7 @@ export function ProcessingLibrariesSection() {
         `${library.name} is now a manual library. Its folders and settings were not changed.`,
       );
     } catch (error) {
-      setNotice(errorText(error, "That library could not be unlinked."));
+      setNotice(errorMessage(error, "That library could not be unlinked."));
     }
   };
 

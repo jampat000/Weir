@@ -10,6 +10,7 @@ import {
   isHttpErrorFromApi,
   isLikelyNetworkFailure,
 } from "../../lib/api/error-guards";
+import { canEdit } from "../../lib/auth/can-edit";
 import { useMeQuery } from "../../lib/auth/queries";
 import {
   useProcessingFilesAtOnceQuery,
@@ -17,10 +18,7 @@ import {
   useProcessingOperatorSettingsSaveMutation,
 } from "../../lib/processing/queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
-
-function canEdit(role: string | undefined): boolean {
-  return role === "operator" || role === "admin";
-}
+import { errorMessage } from "../../lib/api/error-message";
 
 /** Files at once goes from one to ten (#633). */
 const FILES_AT_ONCE = Array.from({ length: 10 }, (_, i) => i + 1);
@@ -306,7 +304,7 @@ export function ProcessingProcessSettingsSection() {
 
       {save.isError ? (
         <p className="mm-status-text--failed mt-3 text-sm" role="alert">
-          {save.error instanceof Error ? save.error.message : "Save failed."}
+          {errorMessage(save.error, "Save failed.")}
         </p>
       ) : null}
       <div className="mt-4 flex justify-end">

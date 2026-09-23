@@ -417,4 +417,3 @@ export async function setLibrarySchedule(
     "Could not change the library schedule",
   );
 }
-

@@ -15,8 +15,9 @@ import {
 import {
   CONFIGURATION_BACKUP_INTERVAL_HOURS,
   SettingsQuietSection,
-  formatBackupBytes,
 } from "./settings-shared";
+import { errorMessage } from "../../lib/api/error-message";
+import { formatBytes } from "../../lib/format/bytes";
 
 type SettingsBackupTabProps = {
   editable: boolean;
@@ -172,9 +173,7 @@ export function SettingsBackupTab({
                       role="alert"
                       data-testid="suite-settings-backup-save-error"
                     >
-                      {save.error instanceof Error
-                        ? save.error.message
-                        : "Could not save."}
+                      {errorMessage(save.error, "Could not save.")}
                     </p>
                   ) : null}
                 </div>
@@ -236,7 +235,7 @@ export function SettingsBackupTab({
                   className="text-sm text-[var(--mm-status-failed-text)]"
                   role="alert"
                 >
-                  {(backupsQ.error as Error).message}
+                  {errorMessage(backupsQ.error, "Could not load backups.")}
                 </p>
               ) : (backupsQ.data?.items.length ?? 0) === 0 ? (
                 <p className="mm-quiet-note">No automatic snapshots yet.</p>
@@ -259,7 +258,7 @@ export function SettingsBackupTab({
                             {formatDate(row.created_at)}
                           </th>
                           <td data-label="Size">
-                            {formatBackupBytes(row.size_bytes)}
+                            {formatBytes(row.size_bytes)}
                           </td>
                           <td data-label="">
                             <button

@@ -8,6 +8,7 @@ import {
 } from "../../components/shared/quiet-section";
 import { ProcessingRulesPreviewPanel } from "./processing-rules-preview-panel";
 import { MmMultiListboxPicker } from "../../components/ui/mm-multi-listbox-picker";
+import { canEdit } from "../../lib/auth/can-edit";
 import { useMeQuery } from "../../lib/auth/queries";
 import {
   type ProcessingRuleSetWrite,
@@ -38,6 +39,7 @@ import {
   mmActionButtonClass,
   mmCheckboxControlClass,
 } from "../../lib/ui/mm-control-roles";
+import { errorMessage } from "../../lib/api/error-message";
 
 type TrackSorter = {
   field: string;
@@ -142,10 +144,6 @@ const EMPTY_RULE_SET: ProcessingRuleSetWrite = {
   remove_chapters: false,
 };
 
-function canEdit(role: string | undefined): boolean {
-  return role === "operator" || role === "admin";
-}
-
 function parseSorters(raw: string, fallback: TrackSorter[]): TrackSorter[] {
   try {
     const parsed = JSON.parse(raw) as unknown;
@@ -175,10 +173,6 @@ function dumpSorters(rows: TrackSorter[]): string {
       reversed: row.reversed,
     })),
   );
-}
-
-function errorText(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }
 
 function csvValues(value: string): string[] {
@@ -598,7 +592,7 @@ export function ProcessingRuleSetWorkspace() {
       setDraft(writeFromProcessingRuleSet(saved));
       setNotice(`${saved.name} was saved.`);
     } catch (error) {
-      setNotice(errorText(error, "That rule set could not be saved."));
+      setNotice(errorMessage(error, "That rule set could not be saved."));
     }
   };
 
@@ -612,7 +606,7 @@ export function ProcessingRuleSetWorkspace() {
       setDraft(null);
       setNotice(`${selectedRuleSet.name} was removed.`);
     } catch (error) {
-      setNotice(errorText(error, "That rule set could not be removed."));
+      setNotice(errorMessage(error, "That rule set could not be removed."));
     }
   };
 
@@ -639,7 +633,7 @@ export function ProcessingRuleSetWorkspace() {
       );
     } catch (error) {
       setProviderNotice(
-        errorText(error, "The metadata provider could not be saved."),
+        errorMessage(error, "The metadata provider could not be saved."),
       );
     }
   };
@@ -651,7 +645,9 @@ export function ProcessingRuleSetWorkspace() {
       const result = await testProvider.mutateAsync(providerBody());
       setProviderNotice(result.detail);
     } catch (error) {
-      setProviderNotice(errorText(error, "The metadata provider test failed."));
+      setProviderNotice(
+        errorMessage(error, "The metadata provider test failed."),
+      );
     }
   };
 

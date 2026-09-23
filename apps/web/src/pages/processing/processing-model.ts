@@ -8,6 +8,7 @@ import type { FinishedFile } from "../../lib/activity/processing-outcome";
 import { formatBytes } from "../../lib/format/bytes";
 import type { ProcessingFile } from "../../lib/processing/files-api";
 import type { ProcessingJobInspectionRow } from "../../lib/processing/jobs-inspection/types";
+import { baseName } from "../../lib/format/path";
 
 export const LIBRARY_CLEAN_JOB_KIND = "processing.library.clean.v1";
 
@@ -95,7 +96,7 @@ function words(raw: string): string {
 
 /** "The.Quiet.Harbour.S01E03.1080p.WEB-DL.mkv" reads as "The Quiet Harbour S01E03". */
 export function prettyName(path: string): string {
-  const base = path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
+  const base = baseName(path);
   const stem = base.replace(/\.[a-z0-9]{2,4}$/i, "");
   const episode = EPISODE.exec(stem);
   if (episode) return `${words(episode[1])} ${episode[2].toUpperCase()}`;

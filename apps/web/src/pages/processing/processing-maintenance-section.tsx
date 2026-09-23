@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 
 import { MmOnOffSwitch } from "../../components/ui/mm-on-off-switch";
-import { useMeQuery } from "../../lib/auth/queries";
+import { useCanEdit } from "../../lib/auth/can-edit";
 import type {
   MaintenanceFamily,
   MaintenanceFamilyState,
@@ -19,10 +19,6 @@ import type { ProcessingOperatorSettingsPutBody } from "../../lib/processing/typ
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { useQueryClient } from "@tanstack/react-query";
-
-function canEdit(role: string | undefined): boolean {
-  return role === "admin" || role === "operator";
-}
 
 /** The cleanup jobs Weir times, in words a person uses, with the setting each one's switch and timer save to. */
 export const CLEANUP_JOBS: {
@@ -105,7 +101,7 @@ function lastRunLine(
  */
 export function ProcessingMaintenanceSection() {
   const formatDate = useAppDateFormatter();
-  const me = useMeQuery();
+  const editable = useCanEdit();
   const maintenance = useProcessingMaintenanceQuery();
   const settings = useProcessingOperatorSettingsQuery();
   const save = useProcessingOperatorSettingsSaveMutation();
@@ -116,7 +112,6 @@ export function ProcessingMaintenanceSection() {
   const [retention, setRetention] = useState<string | null>(null);
   const [handbackWait, setHandbackWait] = useState<string | null>(null);
 
-  const editable = canEdit(me.data?.role);
   const families = maintenance.data?.families ?? [];
 
   async function change(body: ProcessingOperatorSettingsPutBody, said: string) {

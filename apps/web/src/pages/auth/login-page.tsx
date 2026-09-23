@@ -12,6 +12,7 @@ import {
   useLoginMutation,
   useMeQuery,
 } from "../../lib/auth/queries";
+import { errorMessage } from "../../lib/api/error-message";
 
 function EyeIcon() {
   return (
@@ -125,9 +126,7 @@ export function LoginPage() {
     }
     const status = httpStatusFromApiError(login.error);
     if (status === 400 || status === 401) {
-      return login.error instanceof Error
-        ? login.error.message
-        : "Sign-in failed.";
+      return errorMessage(login.error, "Sign-in failed.");
     }
     if (
       isLikelyNetworkFailure(login.error) ||

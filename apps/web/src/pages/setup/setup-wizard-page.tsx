@@ -25,6 +25,7 @@ import {
   useSuiteSettingsSaveMutation,
 } from "../../lib/suite/queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
+import { errorMessage } from "../../lib/api/error-message";
 
 const BACKUP_INTERVAL_OPTIONS = [
   { value: "24", label: "Every day" },
@@ -320,9 +321,7 @@ export function SetupWizardPage() {
 
       void navigate("/", { replace: true });
     } catch (err) {
-      setStatusMessage(
-        err instanceof Error ? err.message : "Could not save setup.",
-      );
+      setStatusMessage(errorMessage(err, "Could not save setup."));
     }
   }
 

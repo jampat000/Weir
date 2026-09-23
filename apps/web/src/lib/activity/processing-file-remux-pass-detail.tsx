@@ -1,4 +1,7 @@
 /** Persisted ``event_type`` for Processing file remux pass must match backend ``PROCESSING_FILE_REMUX_PASS_COMPLETED``. */
+import { baseName } from "../format/path";
+import { formatBytes } from "../format/bytes";
+import { parseActivityDetail } from "./detail";
 export const PROCESSING_FILE_REMUX_PASS_COMPLETED_EVENT =
   "processing.file_remux_pass_completed";
 export const PROCESSING_FILE_PROCESSING_PROGRESS_EVENT =
@@ -78,20 +81,6 @@ function outcomeLabel(
   }
 }
 
-function formatBytes(value: number | null | undefined): string | null {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0)
-    return null;
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let size = value;
-  let unitIndex = 0;
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-  const decimals = size >= 100 || unitIndex === 0 ? 0 : size >= 10 ? 1 : 2;
-  return `${size.toFixed(decimals)} ${units[unitIndex]}`;
-}
-
 function formatDuration(seconds: number | null | undefined): string | null {
   if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds < 0)
     return null;
@@ -118,7 +107,7 @@ export function formatProcessingProcessingSpeed(
 
 function filenameFromPath(path: string | undefined): string {
   if (!path) return "this file";
-  return path.split(/[\\/]/).filter(Boolean).at(-1) || "this file";
+  return baseName(path) || "this file";
 }
 
 function formatSavings(
@@ -251,14 +240,7 @@ export function ProcessingFileRemuxPassActivityDetail({
 }: {
   detail: string;
 }) {
-  let parsed: RemuxDetail | null = null;
-  try {
-    const raw: unknown = JSON.parse(detail);
-    parsed =
-      typeof raw === "object" && raw !== null ? (raw as RemuxDetail) : null;
-  } catch {
-    parsed = null;
-  }
+  const parsed = parseActivityDetail(detail) as RemuxDetail | null;
 
   if (!parsed) {
     return (
@@ -424,16 +406,7 @@ export function ProcessingFileProcessingProgressDetail({
 }: {
   detail: string;
 }) {
-  let parsed: ProcessingProgressDetail | null = null;
-  try {
-    const raw: unknown = JSON.parse(detail);
-    parsed =
-      typeof raw === "object" && raw !== null
-        ? (raw as ProcessingProgressDetail)
-        : null;
-  } catch {
-    parsed = null;
-  }
+  const parsed = parseActivityDetail(detail) as ProcessingProgressDetail | null;
 
   if (!parsed) {
     return <p className="text-sm leading-6 text-[var(--mm-text2)]">{detail}</p>;

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { DirectPlayLine } from "../../components/processing/direct-play-line";
 import { PageHeader } from "../../components/shell/page-header";
-import { useMeQuery } from "../../lib/auth/queries";
+import { useCanEdit } from "../../lib/auth/can-edit";
 import { usePauseQuery } from "../../lib/pause/pause-queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import {
@@ -22,19 +22,19 @@ import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-quer
 import {
   HISTORY_GROUPS,
   agoWords,
-  fileName,
   handbackStory,
   historyGroupOf,
   importedLabel,
   inGroup,
   latestPass,
   newestFirst,
-  sizeWords,
   detailSizes,
   tookWords,
   tracksFromRecord,
   type HistoryGroup,
 } from "./history-model";
+import { baseName } from "../../lib/format/path";
+import { formatBytes } from "../../lib/format/bytes";
 
 /** How far back History looks, as the server's within_days. */
 const PERIODS: { id: string; label: string; days?: number }[] = [
@@ -74,8 +74,7 @@ export function HistoryPage() {
     path_contains: params.get("q") ?? undefined,
   });
   const libraries = useProcessingLibrariesQuery();
-  const me = useMeQuery();
-  const editable = me.data?.role === "operator" || me.data?.role === "admin";
+  const editable = useCanEdit();
   const requeueFailed = useRequeueProcessingFiles();
   const [bulkNotice, setBulkNotice] = useState<string | null>(null);
 
@@ -290,7 +289,7 @@ function HistoryList({
                     className="mm-history-file__name"
                   />
                   <span className="mm-history-file__sub">
-                    {[file.library_name, sizeWords(file.size_bytes)]
+                    {[file.library_name, formatBytes(file.size_bytes)]
                       .filter(Boolean)
                       .join(" · ")}
                   </span>
@@ -348,7 +347,7 @@ function HistoryDetail({
     >
       <p className="mm-history-detail__eyebrow">{file.library_name}</p>
       <h2 id="history-detail-title" className="mm-history-detail__title">
-        {fileName(file.relative_path)}
+        {baseName(file.relative_path)}
       </h2>
       <p className="mm-history-detail__lead">
         {PROCESSING_FILE_STATUS_LABELS[file.status] ?? file.status}
@@ -420,12 +419,12 @@ function HistoryDetail({
           <dl className="mm-history-figures">
             <div>
               <dt>Before</dt>
-              <dd>{sizes.before == null ? "—" : sizeWords(sizes.before)}</dd>
+              <dd>{sizes.before == null ? "—" : formatBytes(sizes.before)}</dd>
             </div>
             <div>
               <dt>After</dt>
               <dd>
-                {sizes.after == null ? "Not written" : sizeWords(sizes.after)}
+                {sizes.after == null ? "Not written" : formatBytes(sizes.after)}
               </dd>
             </div>
             <div>
@@ -435,7 +434,7 @@ function HistoryDetail({
                   ? "—"
                   : sizes.saved === 0
                     ? "0 B"
-                    : sizeWords(sizes.saved)}
+                    : formatBytes(sizes.saved)}
               </dd>
             </div>
           </dl>

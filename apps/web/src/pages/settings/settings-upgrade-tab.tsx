@@ -11,6 +11,7 @@ import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { quietActionRowClass } from "../../components/shared/quiet-section";
 import { mmStatusPillClass } from "../../lib/ui/mm-status-tone";
 import { SettingsQuietSection, type SettingsFact } from "./settings-shared";
+import { errorMessage } from "../../lib/api/error-message";
 
 /** "up to date" -> "Up to date": status pills across Weir are sentence case. */
 function sentenceCase(text: string): string {
@@ -124,9 +125,10 @@ export function SettingsUpgradeTab({ updateStatusQ }: SettingsUpgradeTabProps) {
             className="text-sm text-[var(--mm-status-failed-text)]"
             role="alert"
           >
-            {updateStatusQ.error instanceof Error
-              ? updateStatusQ.error.message
-              : "Could not check for updates right now."}
+            {errorMessage(
+              updateStatusQ.error,
+              "Could not check for updates right now.",
+            )}
           </p>
         ) : (
           <>
@@ -147,9 +149,10 @@ export function SettingsUpgradeTab({ updateStatusQ }: SettingsUpgradeTabProps) {
                       className="mm-status-text--failed mt-1 text-xs"
                       role="alert"
                     >
-                      {applyUpdate.error instanceof Error
-                        ? applyUpdate.error.message
-                        : "Could not signal restart."}
+                      {errorMessage(
+                        applyUpdate.error,
+                        "Could not signal restart.",
+                      )}
                     </p>
                   )}
                   {applyUpdate.isSuccess && (
@@ -334,9 +337,10 @@ export function SettingsUpgradeTab({ updateStatusQ }: SettingsUpgradeTabProps) {
 
                 {saveMode.isError && (
                   <p className="mm-status-text--failed text-sm" role="alert">
-                    {saveMode.error instanceof Error
-                      ? saveMode.error.message
-                      : "Could not save update settings."}
+                    {errorMessage(
+                      saveMode.error,
+                      "Could not save update settings.",
+                    )}
                   </p>
                 )}
                 {saveMsg && !saveMode.isError && (

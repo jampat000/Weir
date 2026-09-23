@@ -30,7 +30,7 @@ import {
   fetchActivityRecent,
   removeActivityFileHistory,
 } from "../../lib/api/activity-api";
-import { useMeQuery } from "../../lib/auth/queries";
+import { useCanEdit } from "../../lib/auth/can-edit";
 import { fetchProcessingFiles } from "../../lib/processing/files-api";
 import { useProcessingFileLog } from "../../lib/processing/files-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
@@ -48,6 +48,8 @@ import {
   RemoveFileHistoryDialog,
 } from "./activity-history-dialogs";
 import { plural } from "../../lib/ui/mm-plural";
+import { baseName } from "../../lib/format/path";
+import { errorMessage } from "../../lib/api/error-message";
 
 type ActivityTone = "info" | "success" | "warning" | "error";
 
@@ -154,10 +156,6 @@ function last24HoursRange(now: Date): { from: string; to: string } {
   };
 }
 
-function fileNameOf(path: string): string {
-  return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
-}
-
 function localInputToIso(value: string): string | undefined {
   if (!value.trim()) return undefined;
   const parsed = new Date(value);
@@ -221,10 +219,7 @@ function normalizeProcessingSummary(
     const status = asString(parsed?.status);
     const percent = asNumber(parsed?.percent);
     const name =
-      asString(parsed?.relative_media_path)
-        ?.split(/[\\/]/)
-        .filter(Boolean)
-        .at(-1) ?? "file";
+      baseName(asString(parsed?.relative_media_path) ?? "") || "file";
     return {
       title:
         status === "finished"
@@ -258,14 +253,8 @@ function normalizeProcessingSummary(
     const remuxNeeded = asBoolean(parsed?.remux_required);
     const passedThrough = asBoolean(parsed?.pass_through_unchanged) === true;
     const fileName =
-      asString(parsed?.relative_media_path)
-        ?.split(/[\\/]/)
-        .filter(Boolean)
-        .at(-1) ??
-      asString(parsed?.inspected_source_path)
-        ?.split(/[\\/]/)
-        .filter(Boolean)
-        .at(-1) ??
+      baseName(asString(parsed?.relative_media_path) ?? "") ||
+      baseName(asString(parsed?.inspected_source_path) ?? "") ||
       "File";
     return {
       title: passedThrough
@@ -709,8 +698,7 @@ export function ActivityPage({
   const [moreFilters, setMoreFilters] = useState(false);
 
   const navigate = useNavigate();
-  const me = useMeQuery();
-  const canRemove = me.data?.role === "operator" || me.data?.role === "admin";
+  const canRemove = useCanEdit();
   const libraries = useProcessingLibrariesQuery();
   const fileLog = useProcessingFileLog();
   const resetHistory = useSuiteOperationalHistoryResetMutation();
@@ -915,9 +903,7 @@ export function ActivityPage({
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setActionError(
-        e instanceof Error ? e.message : "Could not export activity.",
-      );
+      setActionError(errorMessage(e, "Could not export activity."));
     } finally {
       setExporting(null);
     }
@@ -947,13 +933,11 @@ export function ActivityPage({
         );
         return;
       }
-      setStoryName(fileNameOf(path));
+      setStoryName(baseName(path));
       fileLog.mutate(match.id);
     } catch (e) {
-      setStoryName(fileNameOf(path));
-      setStoryLookupError(
-        e instanceof Error ? e.message : "Could not find this file.",
-      );
+      setStoryName(baseName(path));
+      setStoryLookupError(errorMessage(e, "Could not find this file."));
     }
   }
 
@@ -965,9 +949,7 @@ export function ActivityPage({
       const preview = await fetchActivityFileHistoryPreview(target);
       setRemoval({ target, preview });
     } catch (e) {
-      setActionError(
-        e instanceof Error ? e.message : "Could not check this file's history.",
-      );
+      setActionError(errorMessage(e, "Could not check this file's history."));
     }
   }
 
@@ -983,11 +965,7 @@ export function ActivityPage({
       );
       await refreshAfterRemoval();
     } catch (e) {
-      setRemovalError(
-        e instanceof Error
-          ? e.message
-          : "Could not remove this file's history.",
-      );
+      setRemovalError(errorMessage(e, "Could not remove this file's history."));
     } finally {
       setRemovalBusy(false);
     }
@@ -1001,9 +979,7 @@ export function ActivityPage({
       setClearPreview(await fetchSuiteOperationalHistoryPreview());
     } catch (e) {
       setActionError(
-        e instanceof Error
-          ? e.message
-          : "Could not check what clearing history would remove.",
+        errorMessage(e, "Could not check what clearing history would remove."),
       );
     }
   }
@@ -1018,9 +994,7 @@ export function ActivityPage({
       );
       await refreshAfterRemoval();
     } catch (e) {
-      setClearError(
-        e instanceof Error ? e.message : "Could not clear history.",
-      );
+      setClearError(errorMessage(e, "Could not clear history."));
     }
   }
 

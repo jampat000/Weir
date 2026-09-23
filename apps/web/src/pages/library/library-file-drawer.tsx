@@ -23,6 +23,8 @@ import {
   previewProcessingRules,
   type ProcessingRulesPreviewTrack,
 } from "../../lib/processing/rules-preview-api";
+import { baseName } from "../../lib/format/path";
+import { errorMessage } from "../../lib/api/error-message";
 
 function when(iso: string): string {
   const at = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`);
@@ -87,7 +89,7 @@ export function LibraryFileDrawer({
 
   if (!file) return null;
 
-  const name = file.path.split(/[\\/]/).filter(Boolean).at(-1) ?? file.path;
+  const name = baseName(file.path);
   const tracks = preview.data?.tracks ?? [];
   const audio = tracks.filter((track) => track.type === "audio");
   const subtitles = tracks.filter((track) => track.type === "subtitle");
@@ -177,7 +179,7 @@ export function LibraryFileDrawer({
         ) : preview.isError ? (
           <p className="mm-drawer__note">
             Weir could not read this file just now:{" "}
-            {(preview.error as Error).message}
+            {errorMessage(preview.error, "it could not be opened.")}
           </p>
         ) : (
           <>

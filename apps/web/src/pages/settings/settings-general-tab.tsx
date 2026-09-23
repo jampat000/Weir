@@ -10,6 +10,7 @@ import {
 } from "../../components/shared/quiet-section";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { SettingsQuietSection } from "./settings-shared";
+import { errorMessage } from "../../lib/api/error-message";
 
 /** The field caption, spelled exactly as the deleted `.mm-settings-field-label` rule
  *  spelled it, so losing the cards does not quietly restyle the confirmation field
@@ -189,9 +190,7 @@ export function SettingsHistoryRetentionSection({
             role="alert"
             data-testid="suite-settings-logs-save-error"
           >
-            {save.error instanceof Error
-              ? save.error.message
-              : "Could not save."}
+            {errorMessage(save.error, "Could not save.")}
           </p>
         ) : null}
         <div className={`${quietActionRowClass} mt-6`}>
@@ -242,9 +241,10 @@ export function SettingsHistoryRetentionSection({
               className="mt-4 max-w-md rounded-md border border-[var(--mm-border)] bg-[var(--mm-status-failed-bg)] px-3 py-2 text-sm text-[var(--mm-status-failed-text)]"
               role="alert"
             >
-              {resetHistory.error instanceof Error
-                ? resetHistory.error.message
-                : "Could not reset activity history."}
+              {errorMessage(
+                resetHistory.error,
+                "Could not reset activity history.",
+              )}
             </p>
           ) : null}
           <div className={`${quietActionRowClass} mt-6`}>

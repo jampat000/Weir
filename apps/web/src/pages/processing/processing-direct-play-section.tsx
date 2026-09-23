@@ -9,6 +9,7 @@ import {
   isHttpErrorFromApi,
   isLikelyNetworkFailure,
 } from "../../lib/api/error-guards";
+import { canEdit } from "../../lib/auth/can-edit";
 import { useMeQuery } from "../../lib/auth/queries";
 import type { DirectPlayDevice } from "../../lib/processing/direct-play-api";
 import {
@@ -16,10 +17,7 @@ import {
   useDirectPlayDevicesSaveMutation,
 } from "../../lib/processing/direct-play-queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
-
-function canEdit(role: string | undefined): boolean {
-  return role === "operator" || role === "admin";
-}
+import { errorMessage } from "../../lib/api/error-message";
 
 /** Splits "https://… (checked 2026-09-17)" into its link and its date. */
 function parseSource(source: string): {
@@ -179,7 +177,7 @@ export function ProcessingDirectPlaySection() {
         )}
         {save.isError ? (
           <p className="mm-status-text--failed mt-3 text-sm" role="alert">
-            {save.error instanceof Error ? save.error.message : "Save failed."}
+            {errorMessage(save.error, "Save failed.")}
           </p>
         ) : null}
       </div>

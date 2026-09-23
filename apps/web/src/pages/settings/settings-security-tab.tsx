@@ -13,13 +13,13 @@ import { useSuiteSecurityOverviewQuery } from "../../lib/suite/queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import {
-  formatChangePasswordMutationError,
   formatSessionTimeout,
   SettingsFactTable,
   SettingsQuietSection,
   SUITE_PASSWORD_FIELD_CLASS,
   type SettingsFact,
 } from "./settings-shared";
+import { errorMessage } from "../../lib/api/error-message";
 
 function securityFlag(value: boolean, good: boolean): string {
   return value === good ? "On" : "Needs attention";
@@ -336,9 +336,10 @@ export function SettingsSecurityTab() {
             </label>
             {changeUsername.isError ? (
               <p className="mm-status-text--failed text-sm" role="alert">
-                {changeUsername.error instanceof Error
-                  ? changeUsername.error.message
-                  : "Could not change the username."}
+                {errorMessage(
+                  changeUsername.error,
+                  "Could not change the username.",
+                )}
               </p>
             ) : null}
             {changeUsername.isSuccess ? (
@@ -475,7 +476,10 @@ export function SettingsSecurityTab() {
             </label>
             {changePassword.isError ? (
               <p className="mm-status-text--failed text-sm" role="alert">
-                {formatChangePasswordMutationError(changePassword.error)}
+                {errorMessage(
+                  changePassword.error,
+                  "Could not change password.",
+                )}
               </p>
             ) : null}
             {changePasswordStatus ? (

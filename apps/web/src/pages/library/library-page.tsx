@@ -38,6 +38,7 @@ import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-quer
 import { parseAppDate, useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { LibraryFileDrawer } from "./library-file-drawer";
 import { LibraryPicker } from "./library-picker";
+import { baseName } from "../../lib/format/path";
 
 const PAGE_SIZE = 200;
 
@@ -136,10 +137,6 @@ function verdictOf(file: LibraryFile): string {
     );
   }
   return parts.length ? `Removes ${parts.join(", ")}` : "Would change";
-}
-
-function fileName(path: string): string {
-  return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
 }
 
 /**
@@ -553,7 +550,7 @@ export function LibraryPage(): React.ReactElement {
               : "Nothing was queued."}
             {outcome.skipped_paths.length > 0
               ? ` Weir left ${outcome.skipped_paths.length.toLocaleString()} alone: ${outcome.skipped_paths
-                  .map(fileName)
+                  .map((path) => baseName(path))
                   .join(", ")}.`
               : ""}
           </p>
@@ -638,7 +635,7 @@ export function LibraryPage(): React.ReactElement {
                     <input
                       type="checkbox"
                       className="mm-library-check"
-                      aria-label={`Select ${fileName(file.path)}`}
+                      aria-label={`Select ${baseName(file.path)}`}
                       checked={selected.has(file.path)}
                       disabled={file.classification !== "would_change"}
                       onChange={() => toggle(file.path)}

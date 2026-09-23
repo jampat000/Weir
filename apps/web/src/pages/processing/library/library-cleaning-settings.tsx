@@ -8,10 +8,7 @@ import {
   useSetLibrarySchedule,
 } from "../../../lib/processing/library-queries";
 import { mmActionButtonClass } from "../../../lib/ui/mm-control-roles";
-
-function message(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
-}
+import { errorMessage } from "../../../lib/api/error-message";
 
 /**
  * The files already on your storage, for one library: the folders the Library screen reads, the two safety checks
@@ -40,7 +37,7 @@ export function LibraryCleaningSettings({
   if (settings.isError || !settings.data) {
     return (
       <p className="mm-status-text--failed text-sm" role="alert">
-        {message(settings.error, "These settings could not be loaded.")}
+        {errorMessage(settings.error, "These settings could not be loaded.")}
       </p>
     );
   }
@@ -51,7 +48,8 @@ export function LibraryCleaningSettings({
   const folders = (next: string[]) => {
     setError(null);
     saveFolders.mutate(next, {
-      onError: (e) => setError(message(e, "The folders could not be saved.")),
+      onError: (e) =>
+        setError(errorMessage(e, "The folders could not be saved.")),
     });
   };
 
@@ -69,7 +67,7 @@ export function LibraryCleaningSettings({
     setError(null);
     savePreflight.mutate(
       { library_folders: data.library_folders, [field]: next },
-      { onError: (e) => setError(message(e, "That could not be saved.")) },
+      { onError: (e) => setError(errorMessage(e, "That could not be saved.")) },
     );
   };
 
@@ -82,7 +80,7 @@ export function LibraryCleaningSettings({
       {
         onSuccess: () => setConfirming(false),
         onError: (e) =>
-          setError(message(e, "The daily check could not be changed.")),
+          setError(errorMessage(e, "The daily check could not be changed.")),
       },
     );
   };

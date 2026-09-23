@@ -9,26 +9,6 @@ export const CONFIGURATION_BACKUP_INTERVAL_HOURS = [
 export const SUITE_PASSWORD_FIELD_CLASS =
   "mm-input w-full min-w-0 flex-1 text-sm tracking-normal text-[var(--mm-text)]";
 
-export function formatChangePasswordMutationError(err: unknown): string {
-  if (err instanceof Error) {
-    return err.message;
-  }
-  if (typeof err === "string") {
-    return err;
-  }
-  return "Could not change password.";
-}
-
-export function formatBackupBytes(n: number): string {
-  if (n < 1024) {
-    return `${n} B`;
-  }
-  if (n < 1024 * 1024) {
-    return `${(n / 1024).toFixed(1)} KB`;
-  }
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 export function formatSessionTimeout(minutes: number): string {
   if (minutes % 1440 === 0) {
     const days = minutes / 1440;

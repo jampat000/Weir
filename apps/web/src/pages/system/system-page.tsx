@@ -13,6 +13,7 @@ import {
   isHttpErrorFromApi,
   isLikelyNetworkFailure,
 } from "../../lib/api/error-guards";
+import { canEdit } from "../../lib/auth/can-edit";
 import { useMeQuery } from "../../lib/auth/queries";
 import {
   suiteConfigurationBackupsQueryKey,
@@ -42,10 +43,7 @@ import { SettingsSupportTab } from "../settings/settings-support-tab";
 import { ActivityPage } from "../activity/activity-page";
 import { ProcessingJobsInspectionSection } from "../processing/processing-jobs-inspection-section";
 import { AboutFacts } from "./about-facts";
-
-function canEditSuiteGlobal(role: string | undefined): boolean {
-  return role === "operator" || role === "admin";
-}
+import { errorMessage } from "../../lib/api/error-message";
 
 /**
  * The seven Settings tabs since 3.2. Weir is the whole app now, so everything set up once lives
@@ -187,7 +185,7 @@ export function SystemPage() {
     );
   }, [settingsQ.data]);
 
-  const editable = canEditSuiteGlobal(me.data?.role);
+  const editable = canEdit(me.data?.role);
   // Read on Backups, where the list is shown. It was asked for only on This instance, so Backups showed an
   // empty list until you had visited the other tab first.
   const backupsQ = useSuiteConfigurationBackupsQuery(
@@ -261,7 +259,7 @@ export function SystemPage() {
       URL.revokeObjectURL(url);
       setBackupMsg("Download started.");
     } catch (e) {
-      setBackupErr(e instanceof Error ? e.message : "Could not export.");
+      setBackupErr(errorMessage(e, "Could not export."));
     } finally {
       setBackupBusy(false);
     }
@@ -310,7 +308,7 @@ export function SystemPage() {
       }
       setBackupMsg("Configuration restored.");
     } catch (e) {
-      setBackupErr(e instanceof Error ? e.message : "Could not restore.");
+      setBackupErr(errorMessage(e, "Could not restore."));
     } finally {
       setBackupBusy(false);
     }
@@ -434,9 +432,7 @@ export function SystemPage() {
         queryKey: suiteConfigurationBackupsQueryKey,
       });
     } catch (e) {
-      setBackupErr(
-        e instanceof Error ? e.message : "Could not save backup schedule.",
-      );
+      setBackupErr(errorMessage(e, "Could not save backup schedule."));
     }
   }
 
@@ -454,9 +450,7 @@ export function SystemPage() {
       URL.revokeObjectURL(url);
       setBackupMsg("Download started.");
     } catch (e) {
-      setBackupErr(
-        e instanceof Error ? e.message : "Could not download snapshot.",
-      );
+      setBackupErr(errorMessage(e, "Could not download snapshot."));
     } finally {
       setBackupBusy(false);
     }

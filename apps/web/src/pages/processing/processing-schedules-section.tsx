@@ -11,6 +11,7 @@ import {
   isHttpErrorFromApi,
   isLikelyNetworkFailure,
 } from "../../lib/api/error-guards";
+import { canEdit } from "../../lib/auth/can-edit";
 import { useMeQuery } from "../../lib/auth/queries";
 import {
   writeFromProcessingLibrary,
@@ -43,10 +44,7 @@ import {
   windowNow,
   zoneClock,
 } from "./schedule-model";
-
-function canEdit(role: string | undefined): boolean {
-  return role === "operator" || role === "admin";
-}
+import { errorMessage } from "../../lib/api/error-message";
 
 /** A minute-by-minute clock, so "open until" and "it is 14:32 there" stay true while the page is open. */
 function useMinuteClock(): Date {
@@ -121,9 +119,7 @@ function TimeZoneRow({
       </div>
       {save.isError ? (
         <p className="mm-status-text--failed mt-2 text-sm" role="alert">
-          {save.error instanceof Error
-            ? save.error.message
-            : "The time zone could not be saved."}
+          {errorMessage(save.error, "The time zone could not be saved.")}
         </p>
       ) : null}
     </SettingRow>
@@ -228,9 +224,7 @@ function ScanNowButton({
       </button>
       {queueScan.isError ? (
         <span className="mm-status-text--failed block text-xs" role="alert">
-          {queueScan.error instanceof Error
-            ? queueScan.error.message
-            : "The scan could not be queued."}
+          {errorMessage(queueScan.error, "The scan could not be queued.")}
         </span>
       ) : null}
     </>
@@ -267,9 +261,7 @@ function LibraryHoursEditor({
       />
       {update.isError ? (
         <p className="mm-status-text--failed mt-2 text-sm" role="alert">
-          {update.error instanceof Error
-            ? update.error.message
-            : "These hours could not be saved."}
+          {errorMessage(update.error, "These hours could not be saved.")}
         </p>
       ) : null}
       <div className={`${quietActionRowClass} mt-4`}>

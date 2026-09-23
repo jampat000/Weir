@@ -1,9 +1,6 @@
 import { Fragment } from "react";
 
-/** The last part of a path: the file's own name. */
-export function baseName(path: string): string {
-  return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
-}
+import { baseName } from "../../lib/format/path";
 
 /**
  * A file's full name, never cut short (James, 23 Sep 2026: "we need to ensure we see the file label"). A release name

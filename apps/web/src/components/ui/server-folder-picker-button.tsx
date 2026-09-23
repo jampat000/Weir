@@ -5,6 +5,7 @@ import {
   type DirectoryBrowseResponse,
 } from "../../lib/system/directory-browser-api";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
+import { errorMessage } from "../../lib/api/error-message";
 
 type Props = {
   title: string;
@@ -66,9 +67,7 @@ export function ServerFolderPickerButton({
         }
         if (!cancelled) {
           setData(null);
-          setError(
-            err instanceof Error ? err.message : "Folder browser unavailable.",
-          );
+          setError(errorMessage(err, "Folder browser unavailable."));
           setNotice(null);
         }
       } finally {

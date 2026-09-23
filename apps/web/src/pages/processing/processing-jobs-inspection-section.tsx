@@ -5,6 +5,7 @@ import {
   isHttpErrorFromApi,
   isLikelyNetworkFailure,
 } from "../../lib/api/error-guards";
+import { canEdit } from "../../lib/auth/can-edit";
 import { useMeQuery } from "../../lib/auth/queries";
 import type { ProcessingJobsInspectionFilter } from "../../lib/processing/jobs-inspection/queries";
 import {
@@ -17,10 +18,7 @@ import { MmListboxPicker } from "../../components/ui/mm-listbox-picker";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { usePauseQuery } from "../../lib/pause/pause-queries";
-
-function canCancelProcessingJobs(role: string | undefined): boolean {
-  return role === "operator" || role === "admin";
-}
+import { errorMessage } from "../../lib/api/error-message";
 
 function statusLabel(status: string): string {
   const labels: Record<string, string> = {
@@ -113,7 +111,7 @@ export function ProcessingJobsInspectionSection() {
   const q = useProcessingJobsInspectionQuery(filter);
   const cancel = useProcessingJobCancelPendingMutation();
   const recover = useProcessingJobRecoverFinalizeFailedMutation();
-  const canCancel = canCancelProcessingJobs(me.data?.role);
+  const canCancel = canEdit(me.data?.role);
   const formatDate = useAppDateFormatter();
 
   const jobs = q.data?.jobs ?? [];
@@ -186,9 +184,7 @@ export function ProcessingJobsInspectionSection() {
                 ? "Could not reach the Weir API. Check that the backend is running."
                 : isHttpErrorFromApi(q.error)
                   ? "The server refused this request. Sign in again, then try this page."
-                  : q.error instanceof Error
-                    ? q.error.message
-                    : "Could not load jobs."}
+                  : errorMessage(q.error, "Could not load jobs.")}
             </p>
           ) : null}
 
@@ -198,9 +194,7 @@ export function ProcessingJobsInspectionSection() {
               role="alert"
               data-testid="processing-jobs-inspection-cancel-error"
             >
-              {cancel.error instanceof Error
-                ? cancel.error.message
-                : "Cancel failed."}
+              {errorMessage(cancel.error, "Cancel failed.")}
             </p>
           ) : null}
           {recover.isError ? (
@@ -209,9 +203,7 @@ export function ProcessingJobsInspectionSection() {
               role="alert"
               data-testid="processing-jobs-inspection-recover-error"
             >
-              {recover.error instanceof Error
-                ? recover.error.message
-                : "Recovery failed."}
+              {errorMessage(recover.error, "Recovery failed.")}
             </p>
           ) : null}
 

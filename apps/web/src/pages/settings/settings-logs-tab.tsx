@@ -17,6 +17,7 @@ import {
   type LogLevelFilter,
   type SettingsFact,
 } from "./settings-shared";
+import { errorMessage } from "../../lib/api/error-message";
 
 export function SettingsLogsTab() {
   const formatDateTime = useAppDateFormatter();
@@ -133,9 +134,10 @@ export function SettingsLogsTab() {
                 className="mt-4 text-sm text-[var(--mm-status-failed-text)]"
                 role="alert"
               >
-                {metricsQ.error instanceof Error
-                  ? metricsQ.error.message
-                  : "Could not load server diagnostics."}
+                {errorMessage(
+                  metricsQ.error,
+                  "Could not load server diagnostics.",
+                )}
               </p>
             ) : (
               <div className="mt-4">
@@ -268,9 +270,7 @@ export function SettingsLogsTab() {
             className="mt-4 text-sm text-[var(--mm-status-failed-text)]"
             role="alert"
           >
-            {logsQ.error instanceof Error
-              ? logsQ.error.message
-              : "Could not load logs."}
+            {errorMessage(logsQ.error, "Could not load logs.")}
           </p>
         ) : (logsQ.data?.items.length ?? 0) === 0 ? (
           <p className="mm-quiet-note mt-4">

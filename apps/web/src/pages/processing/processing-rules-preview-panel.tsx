@@ -16,30 +16,13 @@ import {
   mmEditableTextFieldClass,
   mmSelectFieldClass,
 } from "../../lib/ui/mm-control-roles";
+import { errorMessage } from "../../lib/api/error-message";
+import { formatBytes } from "../../lib/format/bytes";
 
 /** Rules edits change so often (every keystroke, debounced) that re-running on every one of them
  * would spam the single-preview-at-a-time server gate; this is long enough to wait for a pause in
  * typing without feeling sluggish. */
 const RERUN_DEBOUNCE_MS = 700;
-
-function errorText(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
-}
-
-function formatBytes(value: number | null | undefined): string | null {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-    return null;
-  }
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let size = value;
-  let unitIndex = 0;
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-  const decimals = size >= 100 || unitIndex === 0 ? 0 : size >= 10 ? 1 : 2;
-  return `${size.toFixed(decimals)} ${units[unitIndex]}`;
-}
 
 function joinPath(folder: string, fileName: string): string {
   const trimmedFolder = folder.trim().replace(/[/\\]+$/, "");
@@ -94,7 +77,10 @@ function TrackRow({ track }: { track: ProcessingRulesPreviewTrack }) {
 }
 
 function PreviewResults({ result }: { result: ProcessingRulesPreviewResult }) {
-  const sizeText = formatBytes(result.estimated_size_reduction_bytes);
+  const reduction = result.estimated_size_reduction_bytes;
+  // A file the plan would make bigger has no "smaller" to state.
+  const sizeText =
+    reduction != null && reduction >= 0 ? formatBytes(reduction) : "";
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -269,7 +255,7 @@ export function ProcessingRulesPreviewPanel({
         onSuccess: (data) => setResult(data),
         onError: (err) => {
           setResult(null);
-          setError(errorText(err, "That file could not be previewed."));
+          setError(errorMessage(err, "That file could not be previewed."));
         },
       },
     );

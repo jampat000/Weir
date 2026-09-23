@@ -12,6 +12,7 @@ import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { QuietFieldGroup } from "../../components/shared/quiet-section";
 import { Field } from "../../components/shared/field";
 import { SettingsQuietSection } from "./settings-shared";
+import { errorMessage } from "../../lib/api/error-message";
 
 /**
  * What each event means, in the order the columns read. "Anything" covers files and Weir's own jobs alike: a file's
@@ -330,9 +331,7 @@ export function SettingsNotificationsTab() {
         },
       });
     } catch (err) {
-      setToggleError(
-        err instanceof Error ? err.message : "That change could not be saved.",
-      );
+      setToggleError(errorMessage(err, "That change could not be saved."));
     }
   };
 
@@ -353,9 +352,7 @@ export function SettingsNotificationsTab() {
       await deleteMutation.mutateAsync(id);
       setPendingDelete(null);
     } catch (err) {
-      setDeleteError(
-        err instanceof Error ? err.message : "Could not remove this channel.",
-      );
+      setDeleteError(errorMessage(err, "Could not remove this channel."));
     } finally {
       setDeletingId(null);
     }
@@ -376,7 +373,7 @@ export function SettingsNotificationsTab() {
         ...prev,
         [id]: {
           ok: false,
-          error: err instanceof Error ? err.message : "Unknown error",
+          error: errorMessage(err, "Unknown error"),
         },
       }));
     } finally {
@@ -441,9 +438,10 @@ export function SettingsNotificationsTab() {
             className="mt-4 text-sm text-[var(--mm-status-failed-text)]"
             role="alert"
           >
-            {channelsQ.error instanceof Error
-              ? channelsQ.error.message
-              : "Could not load notification channels."}
+            {errorMessage(
+              channelsQ.error,
+              "Could not load notification channels.",
+            )}
           </p>
         ) : (
           <>
@@ -493,9 +491,10 @@ export function SettingsNotificationsTab() {
                                 saving={updateMutation.isPending}
                                 saveError={
                                   updateMutation.isError
-                                    ? updateMutation.error instanceof Error
-                                      ? updateMutation.error.message
-                                      : "Could not save."
+                                    ? errorMessage(
+                                        updateMutation.error,
+                                        "Could not save.",
+                                      )
                                     : null
                                 }
                               />
@@ -539,9 +538,10 @@ export function SettingsNotificationsTab() {
               saving={createMutation.isPending}
               saveError={
                 createMutation.isError
-                  ? createMutation.error instanceof Error
-                    ? createMutation.error.message
-                    : "Could not create channel."
+                  ? errorMessage(
+                      createMutation.error,
+                      "Could not create channel.",
+                    )
                   : null
               }
             />

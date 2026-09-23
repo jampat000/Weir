@@ -25,6 +25,7 @@ import {
   QuietFieldGroup,
   quietActionRowClass,
 } from "../../components/shared/quiet-section";
+import { errorMessage } from "../../lib/api/error-message";
 
 const KINDS: MediaManagerKind[] = ["radarr", "sonarr", "deluno", "native"];
 
@@ -198,7 +199,7 @@ function AddConnectionForm({ onCancel }: { onCancel: () => void }) {
 
         {create.isError ? (
           <p className="mm-status-text--failed mt-2 text-sm" role="alert">
-            {(create.error as Error).message}
+            {errorMessage(create.error, "Could not add this media manager.")}
           </p>
         ) : null}
 
@@ -313,9 +314,10 @@ function ConnectionCard({
             busy={remove.isPending}
             error={
               remove.isError
-                ? remove.error instanceof Error
-                  ? remove.error.message
-                  : "Could not remove this connection."
+                ? errorMessage(
+                    remove.error,
+                    "Could not remove this connection.",
+                  )
                 : null
             }
             onCancel={() => {
