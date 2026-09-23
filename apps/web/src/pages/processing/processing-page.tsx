@@ -13,7 +13,7 @@
  * finished. The page follows the Activity stream rather than polling, and ticks once a second so the
  * countdowns and "min ago" labels move between updates.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FileStoryPanel } from "../../components/processing/file-story-panel";
@@ -664,6 +664,21 @@ export function ProcessingPage(): React.ReactElement {
       ),
     [files.data, activeJobs.data, libraryNames, minAge, nextLooks],
   );
+
+  // A countdown that has run out means Weir is looking at that file now. Its answer — picked up, or held again for a
+  // new reason with a new time — only reaches the screen as fresh data, and a scan that changes nothing else sends no
+  // live event, so fetch it rather than keep saying "checking it now".
+  const lastLookRefetch = useRef(0);
+  useEffect(() => {
+    const due = lanes.arriving.some((item) => {
+      const deadline = arrivingDeadline(item);
+      return deadline != null && deadline <= now - 1500;
+    });
+    if (!due || now - lastLookRefetch.current < 3000) return;
+    lastLookRefetch.current = now;
+    void files.refetch();
+    void libraries.refetch();
+  }, [now, lanes.arriving, files, libraries]);
   const finished = useMemo(() => {
     const all = [...(passes.data?.items ?? []), ...(cleans.data?.items ?? [])]
       .map(finishedFileFromEvent)

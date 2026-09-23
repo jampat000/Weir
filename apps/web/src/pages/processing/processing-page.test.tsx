@@ -44,6 +44,8 @@ const readiness = {
   worker_health: [] as { module: string; status: string; detail: string }[],
 };
 const stats = { files_processed: 38, net_space_saved_bytes: 44_236_078_284 };
+const refetchFiles = vi.fn();
+const refetchLibraries = vi.fn();
 
 vi.mock("../../lib/activity/use-activity-stream-invalidation", () => ({
   useActivityStreamInvalidations: () => undefined,
@@ -54,6 +56,7 @@ vi.mock("../../lib/processing/files-queries", () => ({
     data: files,
     isPending: false,
     isError: false,
+    refetch: refetchFiles,
   }),
   useProcessingFileLog: () => ({
     mutate: vi.fn(),
@@ -87,7 +90,10 @@ vi.mock("../../lib/processing/jobs-inspection/queries", () => ({
   }),
 }));
 vi.mock("../../lib/processing/libraries-queries", () => ({
-  useProcessingLibrariesQuery: () => ({ data: libraries }),
+  useProcessingLibrariesQuery: () => ({
+    data: libraries,
+    refetch: refetchLibraries,
+  }),
 }));
 vi.mock("../../lib/system/readiness-queries", () => ({
   useSystemReadinessQuery: () => ({ data: readiness }),
@@ -166,6 +172,47 @@ describe("ProcessingPage", () => {
     activity["library.file_cleaned"] = { items: [] };
     pause.paused = false;
     readiness.worker_health = [];
+    refetchFiles.mockClear();
+    refetchLibraries.mockClear();
+  });
+
+  it("fetches fresh data once a countdown runs out, instead of saying it is checking for ever", () => {
+    files.files = [
+      file({
+        id: 1,
+        status: "on_hold",
+        status_reason: "This file changed too recently.",
+        hold_until: "2026-09-22T09:59:55Z",
+      }),
+    ];
+    renderLive();
+
+    expect(screen.getByTestId("live-arriving")).toHaveTextContent(
+      "Its wait is over. Weir is checking it now.",
+    );
+    expect(refetchFiles).toHaveBeenCalled();
+    expect(refetchLibraries).toHaveBeenCalled();
+  });
+
+  it("counts a file waiting on its manager down to Weir's next look", () => {
+    libraries[0] = {
+      ...libraries[0],
+      next_look_at: "2026-09-22T10:03:12Z",
+      scan_interval_seconds: 300,
+    } as (typeof libraries)[number];
+    files.files = [
+      file({
+        id: 2,
+        status: "blocked_upstream",
+        blocked_by_connection: "Sonarr",
+      }),
+    ];
+    renderLive();
+
+    expect(screen.getByTestId("live-arriving")).toHaveTextContent(
+      "Sonarr is still importing it. Weir looks again in 3:12.",
+    );
+    delete (libraries[0] as { next_look_at?: string }).next_look_at;
   });
 
   it("puts each file in the lane its state names, with what it is doing", () => {
