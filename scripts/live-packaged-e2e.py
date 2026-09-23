@@ -10,7 +10,7 @@ Usage (from the repository root)::
     python -m pip install --require-hashes -r tests/requirements.txt
     WEIR_LIVE_BASE_URL=http://app-server:8791 python scripts/live-packaged-e2e.py
 
-The audit covers the authenticated routes, every visible module/settings tab,
+The audit covers the authenticated routes, every Settings and System tab,
 the safe CRUD/test controls, responsive shell controls, and the public HTTP
 contract.  Screenshots and a machine-readable summary are written under the
 ignored ``artifacts/live-packaged-e2e`` directory.
@@ -493,9 +493,23 @@ class LiveAudit:
         self.require(
             collapse.get_attribute("aria-expanded") == "true", "sidebar starts expanded"
         )
+        # The mark, not its box: the wordmark beside it folds away on collapse by design.
+        logo = self.page.locator(".mm-sidebar .mm-logo-mark")
+        expanded_logo = logo.bounding_box()
         self.click(collapse, "collapse sidebar")
         self.require(
             collapse.get_attribute("aria-expanded") == "false", "sidebar collapses"
+        )
+        self.page.wait_for_timeout(600)
+        collapsed_logo = logo.bounding_box()
+        self.require(
+            expanded_logo is not None
+            and collapsed_logo is not None
+            and all(
+                abs(expanded_logo[key] - collapsed_logo[key]) <= 1
+                for key in ("x", "y", "width", "height")
+            ),
+            f"the logo moved or resized when the sidebar collapsed: {expanded_logo} -> {collapsed_logo}",
         )
         self.click(collapse, "expand sidebar")
         self.require(
@@ -530,24 +544,76 @@ class LiveAudit:
         self.page.set_viewport_size({"width": 1_440, "height": 1_000})
         self.record("desktop collapse/theme and mobile navigation controls")
 
-    def home(self) -> None:
-        self.open_sidebar("Home")
-        self.visible(
-            self.page.get_by_role("heading", name="Home", exact=True), "Home page"
-        )
-        # The dashboard folded into Home (#459): no sidebar entry any more.
-        self.require(
-            not self.page.get_by_role("link", name="Dashboard", exact=True).count(),
-            "Dashboard must not appear in the sidebar",
-        )
-        self.assert_no_visible_crash()
-        self.screenshot("home")
-        self.record("Home main screen")
+    def open_tab(self, sidebar: str, tab: str) -> None:
+        """A tab on Settings or System (3.2): the side menu entry, then the tab across the top."""
 
-    def activity(self) -> None:
-        self.open_sidebar("Activity")
+        self.open_sidebar(sidebar)
+        self.click(
+            self.page.get_by_role("tab", name=tab, exact=True),
+            f"open {sidebar} › {tab}",
+        )
+        self.visible(
+            self.page.get_by_role("tab", name=tab, exact=True, selected=True),
+            f"{sidebar} › {tab} selected",
+        )
+
+    def open_history(self, show: str = "Activity") -> None:
+        """System › History and logs; ``show`` is the label of one option in its Show choice."""
+
+        self.open_tab("System", "History and logs")
+        choice = self.visible(
+            self.page.get_by_test_id("settings-history-show"), "History and logs Show choice"
+        )
+        if show != "Activity":
+            choice.select_option(label=show)
+        self.require(
+            (choice.locator("option:checked").text_content() or "").strip() == show,
+            f"History and logs is not showing {show}",
+        )
+
+    def tab_labels(self, tabs_test_id: str) -> list[str]:
+        tabs = self.page.get_by_test_id(tabs_test_id).get_by_role("tab")
+        return [label.strip() for label in tabs.all_text_contents()]
+
+    def processing_live(self) -> None:
+        self.open_sidebar("Processing")
+        self.visible(self.page.get_by_test_id("processing-page"), "Processing page")
+        self.visible(
+            self.page.get_by_role("heading", name="Processing", exact=True),
+            "Processing heading",
+        )
+        # Four places since 3.2. Home became Processing, the dashboard folded into it (#459), and
+        # Activity is System › History and logs.
+        primary = self.page.get_by_role("navigation", name="Primary")
+        labels = [text.strip() for text in primary.locator(".mm-sidebar-link-label").all_text_contents()]
+        self.require(
+            labels == ["Processing", "Library", "Settings", "System"],
+            f"primary navigation is {labels}",
+        )
+        for retired in ("Home", "Dashboard", "Activity"):
+            self.require(
+                not self.page.get_by_role("link", name=retired, exact=True).count(),
+                f"{retired} must not appear in the sidebar",
+            )
+        self.assert_no_visible_crash()
+        self.screenshot("processing")
+        self.record("Processing main screen and the four-place side menu")
+
+    def library(self) -> None:
+        self.open_sidebar("Library")
+        self.visible(self.page.get_by_test_id("library-page"), "Library page")
+        self.assert_no_visible_crash()
+        self.screenshot("library")
+        self.record("Library screen")
+
+    def history_activity(self) -> None:
+        self.open_history()
         self.visible(self.page.get_by_test_id("activity-feed"), "Activity feed")
-        selects = self.page.locator("select")
+        # Scoped to the filters: the Show choice above them is a select too.
+        filters = self.visible(
+            self.page.get_by_test_id("activity-filters"), "Activity filters"
+        )
+        selects = filters.locator("select")
         self.require(selects.count() >= 2, "Activity filters are incomplete")
         self.require(
             self.page.get_by_text("All modules", exact=True).count() == 0,
@@ -555,23 +621,20 @@ class LiveAudit:
         )
         if selects.nth(0).locator("option").count() > 1:
             selects.nth(0).select_option(index=1)
-        self.page.get_by_placeholder("Search titles and details").fill("audit")
-        self.page.locator('input[type="datetime-local"]').nth(0).fill(
-            "2026-01-01T00:00"
-        )
-        self.page.locator('input[type="datetime-local"]').nth(1).fill(
-            "2026-12-31T23:59"
-        )
+        filters.get_by_placeholder("Search titles and details").fill("audit")
+        filters.locator('input[type="datetime-local"]').nth(0).fill("2026-01-01T00:00")
+        filters.locator('input[type="datetime-local"]').nth(1).fill("2026-12-31T23:59")
         self.click(
-            self.page.get_by_role("button", name="Apply filters", exact=True),
+            filters.get_by_role("button", name="Apply filters", exact=True),
             "apply Activity filters",
         )
         self.visible(
             self.page.get_by_test_id("activity-summary").get_by_text("matching your filters"),
             "Activity active filter state",
         )
+        # Exactly "Clear →": its neighbour "Clear all history →" deletes Activity.
         self.click(
-            self.page.get_by_role("button", name="Clear →", exact=True),
+            filters.get_by_role("button", name="Clear →", exact=True),
             "clear Activity filters",
         )
         self.page.wait_for_timeout(500)
@@ -579,132 +642,147 @@ class LiveAudit:
             not self.page.get_by_test_id("activity-summary").get_by_text("matching your filters").count(),
             "Activity filters did not clear",
         )
-        self.screenshot("activity")
-        self.record("Activity feed, filters, bounded refresh state, and clear action")
+        self.screenshot("history-activity")
+        self.record("History and logs: Activity feed, filters, and clear action")
 
-    def processing(self) -> None:
-        self.open_sidebar("Processing")
-        self.visible(self.page.get_by_test_id("processing-scope-page"), "Processing page")
+    def settings_tabs(self) -> None:
+        self.open_sidebar("Settings")
+        self.visible(self.page.get_by_test_id("suite-settings-page"), "Settings page")
         expected = {
-            "Overview": "processing-overview-panel",
             "Libraries": "processing-libraries-section",
-            "Audio & subtitles": "processing-rule-set-workspace",
-            "Schedules": "processing-schedules-section",
-            "Files": "processing-files-section",
-            "Jobs": "processing-jobs-inspection-section",
-            "Maintenance": "processing-maintenance-section",
+            "Rules": "processing-rule-set-workspace",
+            "Media managers": "suite-settings-media-managers",
+            "Running": "processing-direct-play-section",
+            "Housekeeping": "processing-maintenance-section",
+            "Schedule": "processing-schedules-section",
+            "Alerts": "suite-settings-notifications",
         }
+        labels = self.tab_labels("settings-section-tabs")
+        self.require(labels == list(expected), f"Settings tabs are {labels}")
         for tab, test_id in expected.items():
             self.click(
                 self.page.get_by_role("tab", name=tab, exact=True),
-                f"open Processing {tab} tab",
+                f"open Settings {tab} tab",
             )
-            self.visible(self.page.get_by_test_id(test_id), f"Processing {tab} panel")
+            self.visible(self.page.get_by_test_id(test_id), f"Settings {tab} panel")
 
             if tab == "Libraries":
                 edit_buttons = self.page.get_by_role("button", name="Edit", exact=True)
                 if edit_buttons.count():
-                    self.click(edit_buttons.first, "open Processing library editor")
+                    self.click(edit_buttons.first, "open library editor")
                     self.visible(
                         self.page.get_by_test_id("processing-library-form"),
-                        "Processing library form",
+                        "library form",
                     )
                     cancel = self.page.get_by_role("button", name="Cancel", exact=True)
                     if cancel.count():
-                        self.click(cancel.last, "cancel Processing library editor")
-            elif tab == "Schedules":
-                self.require(
-                    self.page.get_by_text(
-                        "TV watched-folder window", exact=True
-                    ).count()
-                    > 0,
-                    "Processing TV schedule controls missing",
-                )
-                self.require(
-                    self.page.get_by_text(
-                        "Movies watched-folder window", exact=True
-                    ).count()
-                    > 0,
-                    "Processing Movies schedule controls missing",
-                )
-            elif tab == "Files":
-                # The lead band replaced the old "All (N)" pill row: every state is a
-                # segment, and clicking one filters the list while clicking it again
-                # clears it.  The band only draws when Weir is holding files, because a
-                # row of zeroes on a fresh install is the thing the content language
-                # forbids -- so this asserts whichever of the two states is real, and
-                # never that the tab rendered nothing at all.  Decided here, while the
-                # panel is settled: every filter change re-keys the files query, which
-                # remounts the panel through its loading state.
-                band = self.page.get_by_test_id("processing-files-buckets")
-                if band.count():
-                    self.visible(band, "Processing files state band")
-                    segment = self.page.get_by_test_id(
-                        "processing-files-bucket-unprocessed"
-                    )
-                    self.click(segment, "filter Processing files by state")
-                    self.visible(
-                        self.page.get_by_test_id("processing-files-flow-caption"),
-                        "Processing files band caption",
-                    )
-                    self.click(segment, "clear the Processing files state filter")
-                else:
+                        self.click(cancel.last, "cancel library editor")
+            elif tab == "Schedule":
+                for scope in ("TV", "Movies"):
                     self.require(
-                        self.page.get_by_text("No files match", exact=False).count()
+                        self.page.get_by_text(
+                            f"{scope} watched-folder window", exact=True
+                        ).count()
                         > 0,
-                        "Processing files tab showed neither a state band nor its "
-                        "empty state",
+                        f"{scope} schedule controls missing",
                     )
-                self.page.get_by_placeholder("part of a file or folder name").fill(
-                    "audit"
-                )
-                self.visible(
-                    self.page.get_by_test_id("processing-files-section"),
-                    "Processing files list after the path filter",
-                )
-            elif tab == "Maintenance":
-                self.require(
-                    self.page.get_by_text(
-                        "What this instance is running with", exact=True
-                    ).count()
-                    > 0,
-                    "Processing runtime settings are missing",
-                )
 
-        self.screenshot("processing")
+        self.screenshot("settings")
         self.record(
-            "Processing overview, libraries, remux, schedules, files, jobs, and maintenance tabs"
+            "Settings libraries, rules, media managers, running, housekeeping, schedule, and alerts tabs"
         )
 
-    def settings_general_and_setup(self) -> None:
-        self.open_sidebar("Settings")
-        self.visible(self.page.get_by_test_id("suite-settings-page"), "Settings page")
+    def history_downloads_and_jobs(self) -> None:
+        self.open_history("Downloads")
         self.visible(
-            self.page.get_by_test_id("suite-settings-global"), "Settings General tab"
+            self.page.get_by_test_id("processing-files-section"), "History Downloads list"
         )
+        # The lead band draws only when Weir is holding files, because a row of zeroes on a fresh
+        # install is the thing the content language forbids -- so this asserts whichever of the two
+        # states is real, and never that the list rendered nothing at all. Decided here, while the
+        # list is settled: every filter change re-keys the files query, which remounts the list
+        # through its loading state.
+        band = self.page.get_by_test_id("processing-files-buckets")
+        if band.count():
+            self.visible(band, "Downloads state band")
+            segment = self.page.get_by_test_id("processing-files-bucket-unprocessed")
+            self.click(segment, "filter Downloads by state")
+            self.visible(
+                self.page.get_by_test_id("processing-files-flow-caption"),
+                "Downloads band caption",
+            )
+            self.click(segment, "clear the Downloads state filter")
+        else:
+            self.require(
+                self.page.get_by_text("No files match", exact=False).count() > 0,
+                "Downloads showed neither a state band nor its empty state",
+            )
+        self.page.get_by_placeholder("part of a file or folder name").fill("audit")
         self.visible(
-            self.page.get_by_text("Time zone", exact=True), "Settings time zone control"
-        )
-        density = self.page.get_by_role("radiogroup", name="Display density")
-        self.visible(density, "Settings display density control")
-        options = density.get_by_role("radio")
-        self.require(
-            options.count() >= 3, "Settings display density options are incomplete"
-        )
-        options.nth(2).click()
-        self.require(
-            self.page.locator("html").get_attribute("data-mm-density") == "comfortable",
-            "display density did not apply",
+            self.page.get_by_test_id("processing-files-section"),
+            "Downloads list after the path filter",
         )
 
-        # Exercise the wizard's supported re-entry path, then leave it with the
-        # safe skip action so the disposable audit account remains usable.
+        self.open_history("Jobs")
+        self.visible(
+            self.page.get_by_test_id("processing-jobs-inspection-section"),
+            "History Jobs list",
+        )
+        self.screenshot("history-jobs")
+        self.record("History and logs: Downloads filters and Jobs")
+
+    def system_instance_and_setup(self) -> None:
+        self.open_sidebar("System")
+        self.visible(self.page.get_by_test_id("suite-system-page"), "System page")
+        labels = self.tab_labels("system-section-tabs")
+        self.require(
+            labels == ["This instance", "Backups", "Security", "History and logs"],
+            f"System tabs are {labels}",
+        )
+        self.visible(
+            self.page.get_by_test_id("suite-settings-global"), "System › This instance"
+        )
+        self.visible(
+            self.page.get_by_text("Time zone", exact=True), "time zone control"
+        )
+        self.require(
+            self.page.get_by_text("What this instance is running with", exact=True).count()
+            > 0,
+            "runtime facts are missing from This instance",
+        )
+        # Display density was removed in 3.2 and must not come back.
+        self.require(
+            not self.page.get_by_text("Display density", exact=False).count(),
+            "Display density is back",
+        )
+        self.require(
+            self.page.locator("html").get_attribute("data-mm-density") is None,
+            "the page still carries a display density",
+        )
+        self.visible(
+            self.page.get_by_test_id("suite-settings-upgrade-tab"), "Upgrade section"
+        )
+        self.click(
+            self.page.get_by_role("button", name="Check again →", exact=True),
+            "refresh upgrade status",
+        )
+
+        # Exercise the wizard's supported re-entry path, then leave it with the safe skip action so
+        # the disposable audit account remains usable. It folds away because it is run once.
+        self.click(
+            self.page.get_by_role("heading", name="Setup wizard", exact=True),
+            "open the Setup wizard group",
+        )
         self.click(
             self.page.get_by_test_id("suite-settings-open-setup-wizard"),
-            "open setup wizard from Settings",
+            "open setup wizard from System",
         )
         self.visible(
             self.page.get_by_test_id("setup-wizard-skip"), "re-entered setup wizard"
+        )
+        self.require(
+            not self.page.get_by_text("Display density", exact=False).count(),
+            "Display density is back in the setup wizard",
         )
         self.click(
             self.page.get_by_test_id("setup-wizard-skip"),
@@ -713,38 +791,19 @@ class LiveAudit:
         self.page.wait_for_url(
             lambda url: "/setup-wizard" not in url, timeout=TIMEOUT_MS
         )
-        self.open_sidebar("Settings")
+        self.open_sidebar("System")
         self.visible(
             self.page.get_by_test_id("suite-settings-global"),
-            "return to Settings General",
+            "return to System › This instance",
         )
-        self.screenshot("settings-general")
-        self.record("Settings General, timezone/density controls, and wizard re-entry")
+        self.screenshot("system-instance")
+        self.record("System › This instance: time zone, runtime facts, upgrade refresh, and wizard re-entry")
 
-    def settings_backup_upgrade_logs_security(self) -> None:
-        # The tab labels are a product contract; assert all of them before
-        # interacting with each panel.
-        for label in (
-            "General",
-            "Security",
-            "Backup and restore",
-            "Upgrade",
-            "Logs",
-            "Notifications",
-            "Media managers",
-        ):
-            self.require(
-                self.page.get_by_role("tab", name=label, exact=True).count() > 0,
-                f"Settings tab missing: {label}",
-            )
-
-        self.click(
-            self.page.get_by_role("tab", name="Backup and restore", exact=True),
-            "open Settings backup",
-        )
+    def system_backups_logs_security(self) -> None:
+        self.open_tab("System", "Backups")
         self.visible(
             self.page.get_by_test_id("suite-settings-backup-tab"),
-            "Settings backup panel",
+            "System backups panel",
         )
         self.require(
             self.page.get_by_role(
@@ -762,49 +821,32 @@ class LiveAudit:
             "configuration export is not JSON",
         )
 
-        self.click(
-            self.page.get_by_role("tab", name="Upgrade", exact=True),
-            "open Settings upgrade",
+        self.open_history("Server log")
+        logs = self.visible(
+            self.page.get_by_test_id("suite-settings-logs"), "server log panel"
         )
         self.visible(
-            self.page.get_by_test_id("suite-settings-upgrade-tab"),
-            "Settings upgrade panel",
+            logs.get_by_text("Server diagnostics", exact=True),
+            "server diagnostics disclosure",
         )
-        self.click(
-            self.page.get_by_role("button", name="Check again →", exact=True),
-            "refresh upgrade status",
-        )
-
-        self.click(
-            self.page.get_by_role("tab", name="Logs", exact=True), "open Settings logs"
-        )
-        self.visible(
-            self.page.get_by_test_id("suite-settings-logs"), "Settings logs panel"
-        )
-        self.visible(
-            self.page.get_by_text("Server diagnostics", exact=True),
-            "Settings diagnostics disclosure",
-        )
-        self.page.get_by_placeholder(
+        logs.get_by_placeholder(
             "Search message, detail, traceback, logger, or source"
         ).fill("audit")
-        level_select = self.page.locator("select").first
+        # Scoped to the log panel: the Show choice above it is a select too.
+        level_select = logs.locator("select").first
         if level_select.count():
             level_select.select_option(index=1)
-        toggles = self.page.get_by_role("radio")
+        toggles = logs.get_by_role("radio")
         if toggles.count() >= 2:
             toggles.last.click()
-        refresh = self.page.get_by_role("button", name="Refresh →", exact=True)
+        refresh = logs.get_by_role("button", name="Refresh →", exact=True)
         if refresh.count():
-            self.click(refresh, "refresh Settings logs")
+            self.click(refresh, "refresh server log")
 
-        self.click(
-            self.page.get_by_role("tab", name="Security", exact=True),
-            "open Settings security",
-        )
+        self.open_tab("System", "Security")
         self.visible(
             self.page.get_by_test_id("suite-settings-security"),
-            "Settings security panel",
+            "System security panel",
         )
         self.visible(
             self.page.get_by_text("Security posture", exact=True), "security posture"
@@ -816,19 +858,16 @@ class LiveAudit:
             self.page.get_by_role("heading", name="Change password", exact=True),
             "change-password controls",
         )
-        self.screenshot("settings-security")
+        self.screenshot("system-security")
         self.record(
-            "Settings backup/export, upgrade refresh, logs filters, and security/session posture"
+            "System backup/export, server log filters, and security/session posture"
         )
 
     def settings_notifications(self) -> None:
-        self.click(
-            self.page.get_by_role("tab", name="Notifications", exact=True),
-            "open Settings notifications",
-        )
+        self.open_tab("Settings", "Alerts")
         self.visible(
             self.page.get_by_test_id("suite-settings-notifications"),
-            "Settings notifications panel",
+            "Settings alerts panel",
         )
         # Make reruns safe after a diagnostic failure leaves the disposable
         # channel behind.
@@ -1259,37 +1298,51 @@ class LiveAudit:
         )
 
     def settings_history_and_navigation(self) -> None:
-        self.click(
-            self.page.get_by_role("tab", name="General", exact=True),
-            "set Settings history origin to General",
-        )
-        self.visible(
-            self.page.get_by_test_id("suite-settings-global"),
-            "Settings General history origin",
-        )
-        self.click(
-            self.page.get_by_role("tab", name="Security", exact=True),
-            "exercise Settings URL history forward target",
-        )
-        self.require(
-            "tab=security" in self.page.url,
-            "Settings security tab is not represented in the URL",
-        )
-        self.page.go_back()
-        self.visible(
-            self.page.get_by_test_id("suite-settings-global"),
-            "Settings browser-back returns General",
-        )
-        self.page.go_forward()
-        self.visible(
-            self.page.get_by_test_id("suite-settings-security"),
-            "Settings browser-forward returns Security",
-        )
+        for sidebar, first, first_id, second, second_param, second_id in (
+            (
+                "Settings",
+                "Libraries",
+                "processing-libraries-section",
+                "Schedule",
+                "tab=schedule",
+                "processing-schedules-section",
+            ),
+            (
+                "System",
+                "This instance",
+                "suite-settings-global",
+                "Security",
+                "tab=security",
+                "suite-settings-security",
+            ),
+        ):
+            self.open_tab(sidebar, first)
+            self.visible(
+                self.page.get_by_test_id(first_id), f"{sidebar} history origin {first}"
+            )
+            self.click(
+                self.page.get_by_role("tab", name=second, exact=True),
+                f"exercise {sidebar} URL history forward target",
+            )
+            self.require(
+                second_param in self.page.url,
+                f"{sidebar} {second} tab is not represented in the URL",
+            )
+            self.page.go_back()
+            self.visible(
+                self.page.get_by_test_id(first_id),
+                f"{sidebar} browser-back returns {first}",
+            )
+            self.page.go_forward()
+            self.visible(
+                self.page.get_by_test_id(second_id),
+                f"{sidebar} browser-forward returns {second}",
+            )
         self.page.goto(BASE_URL + "/not-a-real-screen", wait_until="domcontentloaded")
         self.visible(
             self.page.get_by_text("Page not found", exact=False), "not-found route"
         )
-        self.record("Settings URL history and not-found route")
+        self.record("Settings and System URL history and not-found route")
 
     def finish(self) -> dict[str, Any]:
         # Warnings are retained in the report for review.  Runtime errors,
@@ -1340,11 +1393,13 @@ def run(playwright: Playwright) -> dict[str, Any]:
         audit.bootstrap_and_sign_in()
         audit.authenticated_read_surface()
         audit.shell_and_responsive()
-        audit.home()
-        audit.activity()
-        audit.processing()
-        audit.settings_general_and_setup()
-        audit.settings_backup_upgrade_logs_security()
+        audit.processing_live()
+        audit.library()
+        audit.history_activity()
+        audit.settings_tabs()
+        audit.history_downloads_and_jobs()
+        audit.system_instance_and_setup()
+        audit.system_backups_logs_security()
         audit.settings_notifications()
         audit.settings_media_managers()
         audit.processing_pass_through_lifecycle()

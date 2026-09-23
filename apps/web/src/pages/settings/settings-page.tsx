@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   WorkspacePage,
@@ -76,6 +76,11 @@ export function SettingsPage() {
   const [tab, setTab] = useState<TabId>(() =>
     normalizeSettingsTab(searchParams.get("tab")),
   );
+
+  // Back, Forward and the side menu change the address without remounting the page.
+  useEffect(() => {
+    setTab(normalizeSettingsTab(searchParams.get("tab")));
+  }, [searchParams]);
 
   function setSettingsTab(nextTab: TabId): void {
     setTab(nextTab);

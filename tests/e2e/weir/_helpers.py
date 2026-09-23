@@ -75,3 +75,25 @@ def ensure_signed_in(page: Page, base_url: str) -> None:
 
 def open_sidebar(page: Page, label: str) -> None:
     page.get_by_role("link", name=label, exact=True).click()
+
+
+def open_tab(page: Page, sidebar: str, tab: str) -> None:
+    """A tab on Settings or System (3.2): the side menu entry, then the tab across the top."""
+
+    open_sidebar(page, sidebar)
+    selected = page.get_by_role("tab", name=tab, exact=True)
+    selected.click()
+    expect(selected).to_have_attribute("aria-selected", "true")
+
+
+def open_history(page: Page, show: str = "Activity") -> None:
+    """System › History and logs, where the Activity page, Downloads, Jobs and the server log live since 3.2.
+
+    ``show`` is the label of one option in its Show choice.
+    """
+
+    open_tab(page, "System", "History and logs")
+    choice = page.get_by_test_id("settings-history-show")
+    if show != "Activity":
+        choice.select_option(label=show)
+    expect(choice.locator("option:checked")).to_have_text(show)

@@ -7,7 +7,7 @@ import re
 import pytest
 from playwright.sync_api import expect, sync_playwright
 
-from ._helpers import ensure_signed_in, open_sidebar
+from ._helpers import ensure_signed_in, open_history
 
 pytestmark = [
     pytest.mark.weir_e2e,
@@ -61,7 +61,7 @@ def test_processing_activity_card_shows_before_after_processing_details(
             page.set_default_timeout(30_000)
 
             ensure_signed_in(page, base)
-            open_sidebar(page, "Activity")
+            open_history(page)
 
             expect(page.get_by_role("heading", name="Example.Movie.2024.mkv was processed successfully")).to_be_visible()
             page.get_by_role("button", name="Apply filters", exact=True).click()
