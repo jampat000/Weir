@@ -1,4 +1,5 @@
-"""Port of the retired Python backend's tests/test_processing_api_surface.py."""
+"""The Processing API surface: every promised route is published, retired ones stay gone, and the
+maintenance, hardware and metadata provider routes answer."""
 
 from __future__ import annotations
 
@@ -45,7 +46,7 @@ REQUIRED_SURFACES: tuple[tuple[str, str], ...] = (
     ("POST", "/api/v1/processing/metadata-provider/test"),
 )
 
-#: Prefixes retired during the epic.
+#: Route prefixes that must not be published.
 RETIRED_SURFACES: tuple[str, ...] = (
     "/api/v1/processing/jobs/candidate-gate/enqueue",
     "/api/v1/processing/jobs/supplied-payload-evaluation/enqueue",

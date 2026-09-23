@@ -1,6 +1,4 @@
-"""Contract port of the retired Python backend's tests/test_auth_cookie_secure_mode.py.
-
-The sign-in cookie's ``Secure`` flag follows the request scheme (#452): a Secure cookie over plain
+"""The sign-in cookie's ``Secure`` flag follows the request scheme (#452): a Secure cookie over plain
 HTTP is silently discarded by browsers, locking the operator out.
 """
 

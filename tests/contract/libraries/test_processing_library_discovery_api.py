@@ -1,8 +1,4 @@
-"""Media-manager library discovery, import, drift and unlink (#554).
-
-Port of the HTTP-relevant assertions in ``apps/backend/tests/test_processing_library_discovery.py``,
-against a real (fake) Deluno manager rather than a monkeypatched ``_descriptors_for``.
-"""
+"""Media-manager library discovery, import, drift and unlink (#554), against a fake Deluno manager."""
 
 from __future__ import annotations
 
@@ -21,7 +17,7 @@ LIBRARIES = f"{API}/processing/libraries"
 def _reset(c: WeirClient) -> None:
     """Leave only the seeded libraries and no media manager connections, so each test starts the same way.
 
-    A library this file imported is always enabled with a real watched folder — on either backend, the
+    A library this file imported is always enabled with a real watched folder, so the
     server's own periodic scan can queue a scan job for it before this runs, and Processing refuses to
     delete a library with a job queued or running. Deleting it is still attempted (most of the time
     nothing has been queued yet), but best-effort: every manifest name used below is unique to its own

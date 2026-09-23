@@ -1,7 +1,7 @@
 """Black-box processing: work that is interrupted, paused, or outside its schedule.
 
-Covers behaviour the backend tested from the inside in test_startup_crash_recovery.py and
-test_processing_schedules_and_pause.py.
+Pause and the schedule window are checked when a worker claims a job and leave no trace in the API, so
+the "nothing starts" claims here are watched with ``never_within`` rather than read from state.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 from tests.contract.processing import _helpers as h
 from tests.contract.support.client import API
 from tests.contract.support.fake_ffmpeg import fake_media_bytes, probe
-from tests.contract.support.polling import wait_until
+from tests.contract.support.polling import never_within, wait_until
 
 SLOTS_PER_DAY = 96
 
@@ -75,7 +75,7 @@ def test_pause_stops_new_work_until_resumed(
 
     h.post_handoff(admin, handoff_id="handoff-paused-1", source_path=source)
     # Several worker passes happen in this time; none may start the file.
-    h.never_within(lambda: bool(fake_ffmpeg.calls()), seconds=12, what="ffprobe/ffmpeg running while paused")
+    never_within(fake_ffmpeg.calls, seconds=12, what="ffprobe/ffmpeg running while paused")
     assert h.handoff_status(admin, "handoff-paused-1")["state"] == "queued"
     assert [j["status"] for j in h.jobs(admin, kind=h.REMUX_KIND)] == ["pending"]
     assert h.callbacks(fake, "handoff-paused-1") == []
@@ -113,7 +113,7 @@ def test_schedule_window_blocks_work_outside_its_hours(
     source = _source(folders, "Night.Only.2022")
 
     h.post_handoff(admin, handoff_id="handoff-window-1", source_path=source)
-    h.never_within(lambda: bool(fake_ffmpeg.calls()), seconds=12, what="ffprobe/ffmpeg running outside the window")
+    never_within(fake_ffmpeg.calls, seconds=12, what="ffprobe/ffmpeg running outside the window")
     assert h.handoff_status(admin, "handoff-window-1")["state"] == "queued"
     assert [j["status"] for j in h.jobs(admin, kind=h.REMUX_KIND)] == ["pending"]
 

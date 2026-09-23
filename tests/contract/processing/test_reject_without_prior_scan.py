@@ -1,16 +1,9 @@
-"""Correct behaviour for #532: a rejected hand-off must have a Files row even when no watched-folder
-scan ever saw the file first.
+"""#532: a rejected hand-off must have a Files row even when no watched-folder scan ever saw the file.
 
-Root cause, read from the source: ``reject_bad_release`` (``processing_pass_through.py``) marks the
-file's status through ``mark_file_status`` (``processing_file_state_service.py``), which only *updates*
-an existing ``files`` row — ``if row is None: return None`` — rather than upserting one. A
-hand-off Weir has never scanned has no row, so the rejection is silently dropped everywhere except
-Activity.
-
-This also needed the 500 fix from #530 (``ProcessingFileOut.status`` does not list ``rejected``), exactly
-as the issue notes. Fixed on dotnet (#522 part 4): ``ProcessingRejectHandler`` upserts the Files row
-(``RemuxPassFileState.UpsertRejectedAsync``) instead of the update-only ``mark_file_status``. The
-Python backend is being retired (ADR-0017) and keeps the bug.
+A hand-off Weir has never scanned has no ``files`` row yet, so a rejection that only updated an
+existing row would be dropped everywhere except Activity. ``ProcessingRejectHandler`` upserts the row
+(``RemuxPassFileState.UpsertRejectedAsync``); reading it back also relies on ``GET /processing/files``
+listing ``rejected`` rows (#530).
 """
 
 from __future__ import annotations

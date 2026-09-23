@@ -1,4 +1,4 @@
-"""Port of the retired Python backend's tests/test_direct_play.py (the HTTP parts)."""
+"""Direct Play: choosing devices changes only the badge a file shows."""
 
 from __future__ import annotations
 

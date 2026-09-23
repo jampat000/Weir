@@ -1,25 +1,16 @@
-"""Real-ffmpeg proof for #539 items 1 and 3, and #494: bugs that only show up against real ffmpeg.
+"""Real-ffmpeg checks for #539 items 1 and 3, and #494: behaviour that only shows up against real ffmpeg.
 
-The fake ffmpeg tool cannot reproduce these: it lets a scenario hand a classification straight to
-Weir (``probe_error=...``), so it never exercises the actual bug, which is in how Weir reads
-ffprobe's own stderr. Empirically checked against the bundled ffmpeg
-(``dist/windows/WeirServer/_internal/bin/ffmpeg``) while writing these tests:
+The fake ffmpeg tool hands a classification straight to Weir (``probe_error=...``), so it never
+exercises how Weir reads ffprobe's own stderr. Against real ffmpeg:
 
-- ``ffprobe_json`` (``processing_remux_mux.py``) runs ffprobe with ``-v quiet``. On a zero-filled
-  ``.mkv``, real ffprobe exits 1 with **empty stderr** and stdout ``{\\n\\n}`` — the classification
-  markers Weir looks for (``EBML header parsing failed``, etc.) never reach it with ``-v quiet``;
-  they are present with ``-v error``. So ``MediaUnreadableError`` can never fire on a real unreadable
-  file, and neither can the reject-policy path that depends on it (#539 item 1, #494). Fixed on dotnet:
-  ffprobe runs with ``-v error`` (``FfmpegCommands.BuildFfprobeArgv``, #522 part 2) and the reject job
-  handler (``ProcessingRejectHandler``, #522 part 4) reports the hand-off ``failed`` with
-  ``disposition: rejected`` end to end. The Python backend is being retired (ADR-0017) and keeps the bug.
-- ``validate_media_integrity`` runs the primary video through ``ffmpeg ... -f null -`` and only
-  fails on a non-zero exit code. On a real MKV truncated after encoding, ffmpeg prints
-  ``File ended prematurely`` to stderr but still **exits 0**, and the container's own header still
-  reports the original (pre-truncation) duration — so this check does not catch it, and Weir accepts
-  the file as complete (#539 item 3). It is also skipped outright on Windows
-  (``if os.name != "nt":`` in ``file_remux_pass/run.py``), which is item 5's Windows question, not
-  fixed by this test.
+- On a zero-filled ``.mkv``, ffprobe exits 1, and the classification markers Weir looks for
+  (``EBML header parsing failed``, etc.) reach stderr only with ``-v error``, not with ``-v quiet``.
+  Weir runs ffprobe with ``-v error`` (``FfmpegCommands.BuildFfprobeArgv``), so the file is classified
+  unreadable and, under the reject policy, the hand-off is reported ``failed`` with
+  ``disposition: rejected`` (#539 item 1, #494).
+- On an MKV truncated after encoding, ``ffmpeg ... -f null -`` prints ``File ended prematurely`` but
+  still exits 0, and the container header still names the original duration, so an exit-code check
+  alone would accept the file as whole (#539 item 3).
 """
 
 from __future__ import annotations
@@ -31,6 +22,7 @@ import pytest
 
 from tests.contract.processing import _helpers as h
 from tests.contract.support.client import API
+from tests.contract.support.polling import never_within
 
 pytestmark = pytest.mark.real_ffmpeg
 
@@ -126,8 +118,8 @@ def test_a_truncated_mkv_never_completes_as_if_it_were_whole(
     release = folders.watched / "Truncated.539"
     release.mkdir()
     source = release / "truncated.mkv"
-    # Cut well short of the end: the container header still names the full duration (empirically
-    # confirmed), so only an end-to-end integrity read can catch this.
+    # Cut well short of the end: the container header still names the full duration, so only an
+    # end-to-end integrity read can catch this.
     source.write_bytes(data[: len(data) * 60 // 100])
 
     server = server_factory(
@@ -143,7 +135,7 @@ def test_a_truncated_mkv_never_completes_as_if_it_were_whole(
 
     h.post_handoff(admin, handoff_id="handoff-truncated-539", source_path=source)
 
-    h.never_within(
+    never_within(
         lambda: h.handoff_status(admin, "handoff-truncated-539")["state"] == "completed",
         seconds=20,
         what="a truncated file to be wrongly reported completed with a false, pre-truncation duration",

@@ -1,8 +1,7 @@
 """Black-box processing: what happens when a file cannot be processed.
 
-Covers behaviour the backend tested from the inside in test_processing_pass_through.py,
-test_processing_reject.py and test_processing_retry_and_requeue.py: retries, handing the original back,
-holding after repeated failures, and rejecting a bad release through Deluno or a Radarr queue.
+Retries, handing the original back, holding after repeated failures, and rejecting a bad release
+through Deluno or a Radarr queue.
 """
 
 from __future__ import annotations
@@ -38,8 +37,7 @@ def test_failure_is_retried_then_the_original_is_passed_through_unchanged(
     original = fake_media_bytes(probe(audio_languages=("eng", "fre")))
     source.write_bytes(original)
     rel = "Broken.Remux.2021/film.mkv"
-    # Works around #531 item 1 (see the docstring on detect_without_queueing): without a scan
-    # recording the file's size first, the retry count this test drives would keep resetting.
+    # A scan records the file first, as in normal use (see detect_without_queueing).
     h.detect_without_queueing(admin, library, rel)
 
     h.post_handoff(admin, handoff_id="handoff-pt-1", source_path=source)
@@ -101,20 +99,23 @@ def test_three_failures_hold_the_file_and_the_handoff_reads_failed(
     assert h.jobs(admin, kind=h.PASS_THROUGH_KIND) == []
     assert source.is_file()
     assert len(fake_ffmpeg.calls(tool="ffmpeg", step="remux")) == 3
-    # Held means held: another scan does not start it again.
-    h.enqueue_scan(admin, library)
-    h.never_within(
-        lambda: len(fake_ffmpeg.calls(tool="ffmpeg", step="remux")) > 3, seconds=8, what="a fourth remux attempt"
-    )
+    # Held means held: another scan does not start it again. A scan queues its remux jobs before it
+    # finishes, so once it has finished with no remux job waiting or running, none is coming.
+    scan = h.wait_for_job_finished(admin, h.enqueue_scan(admin, library))
+    assert scan["status"] == "completed", scan
+    assert [j for j in h.jobs(admin, kind=h.REMUX_KIND) if j["status"] in ("pending", "leased")] == []
+    assert len(fake_ffmpeg.calls(tool="ffmpeg", step="remux")) == 3
+    held = h.file_row(admin, library["id"], rel)
+    assert held is not None
+    assert held["status"] == "on_hold"
+    assert held["next_retry_at"] is None
 
 
 def test_content_rejection_under_reject_policy_reports_rejected_to_deluno_and_removes_the_download(
     server_factory, client_factory, fake_ffmpeg, fake_managers, tmp_path: Path
 ) -> None:
-    # This scenario never runs a scan before the hand-off, so today's #532 bug (a rejection with no
-    # prior scan writes no Files row) applies here too — this test just never looks at
-    # GET /processing/files to notice. The correct behaviour is asserted in
-    # tests/contract/processing/test_reject_without_prior_scan.py.
+    # This scenario never runs a scan before the hand-off. That such a rejection still gets a Files row
+    # (#532) is asserted in tests/contract/processing/test_reject_without_prior_scan.py.
     _server, admin = _signed_in_working_server(server_factory, client_factory, fake_ffmpeg)
     folders = h.Folders.make(tmp_path)
     fake, library = h.deluno_setup(
@@ -129,10 +130,8 @@ def test_content_rejection_under_reject_policy_reports_rejected_to_deluno_and_re
     release.mkdir()
     source = release / "film.mkv"
     # A video with no audio at all: the release itself is bad. This is a *preflight* content
-    # rejection the fake ffmpeg can simulate directly. It is not the same bug as #494/#539 item 1
-    # (an unreadable file on *real* ffmpeg never gets classified because ffprobe_json runs with
-    # ``-v quiet``, so the classification markers never reach stderr) — that needs real ffmpeg and
-    # is asserted separately in tests/contract/processing/test_real_ffmpeg_known_bugs.py.
+    # rejection the fake ffmpeg can simulate directly. An unreadable file needs real ffmpeg to
+    # classify (#494/#539 item 1) and is covered in tests/contract/processing/test_real_ffmpeg_known_bugs.py.
     source.write_bytes(fake_media_bytes(probe(audio_languages=())))
 
     h.post_handoff(admin, handoff_id="handoff-reject-1", source_path=source)

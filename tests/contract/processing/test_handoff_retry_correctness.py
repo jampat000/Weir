@@ -1,33 +1,15 @@
-"""Correct behaviour for #531: hand-off retries must not reset the failure count, and must not lose
-the hand-off's origin when a scan requeues the file.
+"""#531: hand-off retries must not reset the failure count, and must not lose the hand-off's origin
+when a scan requeues the file.
 
-Root causes, read from the source while writing these tests (both in
-``processing_watched_folder_remux_scan_dispatch_handlers.py`` and friends):
-
-- Item 1: a hand-off's file has no recorded size until a scan sees it: ``record_failure``
-  (``processing_requeue_service.py``) creates the Files row on the first execution failure but never
-  sets ``size_bytes``, so it stays ``None``. The *first* scan afterwards
-  (``processing_watched_folder_remux_scan_dispatch_handlers.py``) compares ``previous.size_bytes !=
-  observed_size`` — ``None != <real size>`` — and resets ``failure_attempts`` to 0, exactly once,
-  because that same scan pass also records the real size (so later scans see no change). The
-  workaround (``tests/contract/processing/_helpers.py``'s ``detect_without_queueing``) runs a
-  size-recording scan before the hand-off; the test below deliberately skips it and instead checks
-  the fingerprint and the reset directly, because a test that only waits for the eventual
-  failure-attempts count would still reach it after the one-time reset and falsely pass.
-- Item 2: the payload a scan-driven retry builds (``payload_body`` in
-  ``processing_watched_folder_remux_scan_dispatch_handlers.py``) never copies the job's ``origin``.
-  ``completion_callback.report_handoff_completion`` reads ``origin`` from the payload and returns
-  immediately when it is ``None`` — before posting anything *and* before recording the ledger's own
-  ``output_path`` — so once a file has been retried even once, its eventual pass-through is reported
-  to nobody: no callback, and ``GET /intake/handoffs/{source}/{id}`` keeps ``outputPath: null``
-  forever. See the comment on ``test_failure_is_retried_then_the_original_is_passed_through_unchanged``
-  in ``test_failure_policies.py``: its ``all(report["status"] != "failed" ...)`` assertion is true
-  today only because the callback list is empty, not because a real completion was reported.
-
-dotnet fixed item 2 too: ``ProcessingWatchedFolderScanDispatchJobHandler.EnqueueRemuxPassAsync`` (the scan's
-own automatic retry path — the same method used for a fresh candidate) now looks up
-``HandoffOriginCarry.FindAsync`` and copies ``origin`` onto the requeued job's payload, the same fix
-``RequeueStore.RequeueFileAsync`` already applied to the manual-retry half (#531 item 2).
+- Item 1: a hand-off's file has its size recorded when it arrives. Without that, the first scan after
+  a failure sees a changed size and resets ``failure_attempts`` to 0, once. The test below skips
+  ``detect_without_queueing`` and checks the fingerprint and the reset directly, because a test that
+  only waited for the final failure count would still reach it after a one-time reset.
+- Item 2: a scan-driven retry carries the job's ``origin`` onto the requeued payload
+  (``ProcessingWatchedFolderScanDispatchJobHandler.EnqueueRemuxPassAsync`` looks it up with
+  ``HandoffOriginCarry.FindAsync``, as ``RequeueStore.RequeueFileAsync`` does for a manual retry).
+  Without it, the eventual pass-through is reported to nobody: no callback, and
+  ``GET /intake/handoffs/{source}/{id}`` keeps ``outputPath: null``.
 """
 
 from __future__ import annotations
@@ -41,11 +23,10 @@ from tests.contract.support.polling import wait_until
 REMUX_CRASH = "Conversion failed: the fake ffmpeg was told to fail"
 
 
-# dotnet fixed by this integration: the watched-folder scan's automatic retry (previous.Status ==
-# ProcessingFailed, due for another attempt) used to enqueue through RequeueStore.RequeueFileAsync, whose
-# "manual retry" reset (failure_attempts back to 0, backoff cleared) is meant for a human's "retry now", not
-# an automatic, policy-governed retry — RetryPolicy/RecordFailureAsync own that. Every scan cycle silently
-# wiped the counter this test checks. Fixed by enqueueing the same way a fresh candidate would instead.
+# The scan's automatic retry (a processing_failed file due another attempt) is queued like a fresh
+# candidate, not through RequeueStore.RequeueFileAsync: that is a person's "retry now" and resets
+# failure_attempts and the backoff, which would wipe the count this test checks on every scan. Automatic
+# retries are counted by RetryPolicy/RecordFailureAsync.
 def test_a_hand_offs_fingerprint_is_recorded_up_front_so_a_scan_never_resets_its_failures(
     server_factory, client_factory, fake_ffmpeg, fake_managers, tmp_path: Path
 ) -> None:
@@ -74,8 +55,8 @@ def test_a_hand_offs_fingerprint_is_recorded_up_front_so_a_scan_never_resets_its
     )
 
     # A scan that merely notices this (already-known) file must not treat it as a changed source.
-    # ``enqueue_remux_jobs=False`` only skips queueing new remux work — the size comparison (and the
-    # bugged reset) run regardless, so this isolates the effect of the scan itself.
+    # ``enqueue_remux_jobs=False`` only skips queueing new remux work — the size comparison (and any
+    # reset) run regardless, so this isolates the effect of the scan itself.
     h.enqueue_scan(admin, library, enqueue_remux_jobs=False)
 
     def _seen_again() -> dict | None:
@@ -105,8 +86,8 @@ def test_pass_through_after_a_retry_reports_a_completion_callback_with_output_pa
     source.write_bytes(original)
     rel = "Broken.Origin.531/film.mkv"
 
-    # No detect_without_queueing here either: the very first scan a failure schedules is the one
-    # that (today) drops the origin, so the scenario must go through at least one such retry.
+    # No detect_without_queueing here either: the origin must survive the very first scan-driven
+    # retry, so the scenario goes through at least one.
     h.post_handoff(admin, handoff_id="handoff-origin-531", source_path=source)
 
     h.drive_retries_until(
