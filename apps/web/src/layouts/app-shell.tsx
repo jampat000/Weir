@@ -7,6 +7,7 @@ import {
   NavIconLibrary,
   NavIconLive,
   NavIconSettings,
+  NavIconSystem,
   NavIconSignOut,
 } from "../components/shell/nav-icons";
 import { useLogoutMutation } from "../lib/auth/queries";
@@ -76,31 +77,30 @@ export function AppShell() {
         // "Product, complementary" told a screen-reader user nothing about where they were.
         aria-label={productTitle}
       >
+        <button
+          type="button"
+          className="mm-sidebar-collapse"
+          data-testid="sidebar-collapse"
+          aria-label={
+            sidebarCollapsed ? "Expand navigation" : "Collapse navigation"
+          }
+          aria-expanded={!sidebarCollapsed}
+          onClick={() => setCollapsedChoice(!sidebarCollapsed)}
+        >
+          {/* The chevron says it on its own; aria-label carries the words for anyone who needs
+              them (James, 23 Sep 2026). */}
+          <span className="mm-sidebar-collapse__icon" aria-hidden="true">
+            {sidebarCollapsed ? (
+              <NavIconChevronRight />
+            ) : (
+              <NavIconChevronLeft />
+            )}
+          </span>
+        </button>
         <div className="mm-sidebar-inner">
           <BrandHeaderLink to="/" productTitle={productTitle} />
-          <button
-            type="button"
-            className="mm-sidebar-collapse"
-            data-testid="sidebar-collapse"
-            aria-label={
-              sidebarCollapsed ? "Expand navigation" : "Collapse navigation"
-            }
-            aria-expanded={!sidebarCollapsed}
-            onClick={() => setCollapsedChoice(!sidebarCollapsed)}
-          >
-            <span className="mm-sidebar-collapse__icon" aria-hidden="true">
-              {sidebarCollapsed ? (
-                <NavIconChevronRight />
-              ) : (
-                <NavIconChevronLeft />
-              )}
-            </span>
-            <span className="mm-sidebar-collapse__label">
-              {sidebarCollapsed ? "Expand" : "Collapse"}
-            </span>
-          </button>
-          {/* Three places since 3.2 (docs/exec-plans/active/live-and-library.md): what Weir is
-              doing now, the files already imported, and everything set up once. */}
+          {/* Four places since 3.2: what Weir is doing now, the files already imported, how Weir
+              treats your media, and Weir itself. */}
           <nav className="mm-sidebar-nav" aria-label="Primary">
             <NavLink
               to="/"
@@ -149,6 +149,17 @@ export function AppShell() {
                 <NavIconSettings />
               </span>
               <span className="mm-sidebar-link-label">Settings</span>
+            </NavLink>
+            <NavLink
+              to="/system"
+              className={sidebarNavClass}
+              title="System"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <span className="mm-sidebar-link-icon" aria-hidden="true">
+                <NavIconSystem />
+              </span>
+              <span className="mm-sidebar-link-label">System</span>
             </NavLink>
           </nav>
           <div className="mm-sidebar-footer">

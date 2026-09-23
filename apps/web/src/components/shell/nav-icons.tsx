@@ -164,3 +164,43 @@ export function NavIconSignOut({ className = "" }: { className?: string }) {
     </svg>
   );
 }
+
+/** System: a server, for the screen about the install rather than about your media. */
+export function NavIconSystem({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <rect
+        x="3.25"
+        y="4.25"
+        width="17.5"
+        height="6"
+        rx="1.6"
+        stroke="currentColor"
+        strokeWidth="1.35"
+      />
+      <rect
+        x="3.25"
+        y="13.75"
+        width="17.5"
+        height="6"
+        rx="1.6"
+        stroke="currentColor"
+        strokeWidth="1.35"
+      />
+      <path
+        d="M6.75 7.25h.01M6.75 16.75h.01"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}

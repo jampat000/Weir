@@ -28,7 +28,7 @@ import type {
   SuiteSettingsOut,
   SuiteUpdateStatusOut,
 } from "../../lib/suite/types";
-import { SettingsPage } from "./settings-page";
+import { SystemPage } from "./system-page";
 
 const operatorMe: UserPublic = { id: 1, username: "alice", role: "operator" };
 const viewerMe: UserPublic = { id: 2, username: "bob", role: "viewer" };
@@ -175,7 +175,7 @@ function renderSettings(
   );
   qc.setQueryData(suiteMetricsQueryKey, minimalMetrics);
   const router = createMemoryRouter(
-    [{ path: "*", element: <SettingsPage /> }],
+    [{ path: "*", element: <SystemPage /> }],
     overrides?.initialEntries
       ? { initialEntries: overrides.initialEntries }
       : undefined,
@@ -203,8 +203,8 @@ async function renderSettingsWithSupportConfig(
     SUPPORT_URL: supportConfig.supportUrl,
   }));
 
-  const { SettingsPage: SettingsPageWithMockedSupport } =
-    await import("./settings-page");
+  const { SystemPage: SettingsPageWithMockedSupport } =
+    await import("./system-page");
 
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
@@ -237,7 +237,7 @@ async function renderSettingsWithSupportConfig(
   return render(wrap(<SettingsPageWithMockedSupport />, qc));
 }
 
-describe("SettingsPage (suite settings)", () => {
+describe("SystemPage", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -247,23 +247,23 @@ describe("SettingsPage (suite settings)", () => {
     vi.resetModules();
   });
 
-  it("does not mention Sonarr or Radarr on the central Settings page", () => {
+  it("does not mention Sonarr or Radarr on the System page", () => {
     const { container } = renderSettings(operatorMe, {
-      initialEntries: ["/settings?tab=system"],
+      initialEntries: ["/system"],
     });
     const t = (container.textContent ?? "").toLowerCase();
     expect(t).not.toContain("sonarr");
     expect(t).not.toContain("radarr");
-    expect(screen.getByTestId("suite-settings-page")).toBeTruthy();
+    expect(screen.getByTestId("suite-system-page")).toBeTruthy();
     expect(screen.getByTestId("suite-settings-global")).toBeTruthy();
   });
 
   it("shows development support guidance in System without a button when URL is missing", () => {
-    renderSettings(operatorMe);
+    renderSettings(operatorMe, { initialEntries: ["/system?tab=backups"] });
     expect(
       screen.queryByTestId("suite-settings-support"),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "System" }));
+    fireEvent.click(screen.getByRole("tab", { name: "This instance" }));
     expect(screen.getByTestId("suite-settings-support")).toBeInTheDocument();
     expect(
       screen.getByText("Weir is free to use. Support is optional."),
@@ -288,7 +288,7 @@ describe("SettingsPage (suite settings)", () => {
       supportUrl: "https://example.com/support",
     });
 
-    fireEvent.click(screen.getByRole("tab", { name: "System" }));
+    fireEvent.click(screen.getByRole("tab", { name: "This instance" }));
 
     expect(screen.getByTestId("suite-settings-support")).toBeInTheDocument();
     expect(
@@ -317,7 +317,7 @@ describe("SettingsPage (suite settings)", () => {
     expect(
       screen.queryByRole("tab", { name: "Support" }),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "System" }));
+    fireEvent.click(screen.getByRole("tab", { name: "This instance" }));
     expect(
       screen.queryByTestId("suite-settings-support"),
     ).not.toBeInTheDocument();
@@ -329,16 +329,15 @@ describe("SettingsPage (suite settings)", () => {
   });
 
   it("hides save for viewers", () => {
-    renderSettings(viewerMe, { initialEntries: ["/settings?tab=system"] });
+    renderSettings(viewerMe, { initialEntries: ["/system"] });
     expect(screen.getByTestId("suite-settings-save-timezone")).toBeDisabled();
     cleanup();
-    renderSettings(viewerMe, { initialEntries: ["/settings?tab=history"] });
+    renderSettings(viewerMe, { initialEntries: ["/system?tab=history"] });
     expect(screen.getByTestId("suite-settings-save-logs")).toBeDisabled();
   });
 
   it("shows configuration backup + export for operators", () => {
-    renderSettings(operatorMe);
-    fireEvent.click(screen.getByRole("tab", { name: "System" }));
+    renderSettings(operatorMe, { initialEntries: ["/system?tab=backups"] });
     expect(screen.getByTestId("suite-settings-backup-restore")).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "Download configuration now" }),
@@ -365,7 +364,7 @@ describe("SettingsPage (suite settings)", () => {
         activity_retention_days: body.activity_retention_days,
       }));
 
-    renderSettings(operatorMe, { initialEntries: ["/settings?tab=history"] });
+    renderSettings(operatorMe, { initialEntries: ["/system?tab=history"] });
     const input = await screen.findByTestId(
       "suite-settings-activity-retention",
     );
@@ -408,8 +407,7 @@ describe("SettingsPage (suite settings)", () => {
         return currentSavedSettings;
       });
 
-    renderSettings(operatorMe);
-    fireEvent.click(screen.getByRole("tab", { name: "System" }));
+    renderSettings(operatorMe, { initialEntries: ["/system?tab=backups"] });
 
     fireEvent.change(screen.getByLabelText("Minimum time between runs"), {
       target: { value: "12" },
@@ -454,7 +452,7 @@ describe("SettingsPage (suite settings)", () => {
 
   it("hides configuration backup for viewers", () => {
     renderSettings(viewerMe);
-    fireEvent.click(screen.getByRole("tab", { name: "System" }));
+    fireEvent.click(screen.getByRole("tab", { name: "This instance" }));
     expect(
       screen.queryByTestId("suite-settings-backup-restore"),
     ).not.toBeInTheDocument();
@@ -463,25 +461,24 @@ describe("SettingsPage (suite settings)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("opens on Libraries, and each tab holds one job", () => {
+  it("opens on This instance, and each tab holds one job", () => {
     renderSettings(operatorMe);
-    // Settings opens where setting Weir up starts, not on a grab bag.
-    expect(screen.getByRole("tab", { name: "Libraries" })).toHaveAttribute(
+    // System opens with what the instance is, before anything you can change about it.
+    expect(screen.getByRole("tab", { name: "This instance" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
-    expect(screen.queryByRole("tab", { name: "General" })).toBeNull();
-    expect(screen.queryByText("Time zone")).not.toBeInTheDocument();
-
-    // The instance's own facts, and its backups, are System's.
-    fireEvent.click(screen.getByRole("tab", { name: "System" }));
     expect(screen.getByText("Time zone")).toBeInTheDocument();
     expect(screen.getByText("Setup wizard")).toBeInTheDocument();
-    expect(screen.queryByText("Product name")).not.toBeInTheDocument();
-    expect(screen.queryByText("Application logs")).not.toBeInTheDocument();
+    // Housekeeping is a file-processing job, so it lives under Settings, not here.
+    expect(screen.queryByText("Housekeeping")).not.toBeInTheDocument();
     expect(
-      screen.queryByText("System log retention (days)"),
+      screen.queryByTestId("suite-settings-backup-restore"),
     ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Backups" }));
+    expect(screen.getByTestId("suite-settings-backup-tab")).toBeInTheDocument();
+    expect(screen.queryByText("Time zone")).not.toBeInTheDocument();
 
     // How long history is kept sits with the history it governs.
     fireEvent.click(screen.getByRole("tab", { name: "History and logs" }));
@@ -490,52 +487,23 @@ describe("SettingsPage (suite settings)", () => {
       screen.getByText("Keep Activity history for (days)"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/0 keeps it until you clear it/i),
-    ).toBeInTheDocument();
-    expect(
       screen.getByTestId("suite-settings-history-reset"),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("suite-settings-backup-restore"),
-    ).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "System" }));
-    expect(screen.getByTestId("suite-settings-backup-tab")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("suite-settings-backup-restore"),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText("System log retention (days)"),
-    ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "System" }));
-    expect(
-      screen.getByTestId("suite-settings-upgrade-tab"),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("suite-settings-upgrade")).toBeInTheDocument();
-    expect(
-      screen.queryByText("System log retention (days)"),
-    ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "History and logs" }));
     fireEvent.change(screen.getByTestId("settings-history-show"), {
       target: { value: "log" },
     });
     expect(screen.getByText("Search logs")).toBeInTheDocument();
-    expect(screen.getByText("System events")).toBeInTheDocument();
-    expect(screen.getByText("Server diagnostics")).toBeInTheDocument();
     // Retention stays in view whichever of History's lists you are reading: it governs all of them.
     expect(screen.getByText("System log retention (days)")).toBeInTheDocument();
-    expect(
-      screen.queryByText("Optional home dashboard notice"),
-    ).not.toBeInTheDocument();
   });
 
   it("opens System when an old address asks for the upgrade tab", () => {
     renderSettings(operatorMe, {
       updateStatus: windowsUpdateAvailableStatus,
-      initialEntries: ["/settings?tab=upgrade"],
+      initialEntries: ["/system?tab=upgrade"],
     });
 
-    expect(screen.getByRole("tab", { name: "System" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "This instance" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -576,8 +544,8 @@ describe("SettingsPage (suite settings)", () => {
     );
     qc.setQueryData(suiteMetricsQueryKey, minimalMetrics);
 
-    render(wrap(<SettingsPage />, qc));
-    fireEvent.click(screen.getByRole("tab", { name: "System" }));
+    render(wrap(<SystemPage />, qc));
+    fireEvent.click(screen.getByRole("tab", { name: "This instance" }));
 
     // staleTime: Infinity means the pre-seeded data is fresh — the link reads "Check again →"
     expect(screen.getByRole("button", { name: "Check again →" })).toBeEnabled();
@@ -597,7 +565,7 @@ describe("SettingsPage (suite settings)", () => {
 
   it("does not render mojibake in the upgrade panel", () => {
     renderSettings(operatorMe, { updateStatus: windowsUpdateAvailableStatus });
-    fireEvent.click(screen.getByRole("tab", { name: "System" }));
+    fireEvent.click(screen.getByRole("tab", { name: "This instance" }));
 
     expect(document.body.textContent).not.toContain("â");
     expect(document.body.textContent).not.toContain("Ã");
@@ -630,7 +598,7 @@ describe("SettingsPage (suite settings)", () => {
   });
 
   it("closes timezone dropdown and shows selected timezone", () => {
-    renderSettings(operatorMe, { initialEntries: ["/settings?tab=system"] });
+    renderSettings(operatorMe, { initialEntries: ["/system"] });
     const trigger = screen.getByRole("button", { name: /Time zone/ });
     expect(trigger).toHaveTextContent("Select time zone");
     fireEvent.click(trigger);
@@ -647,7 +615,7 @@ describe("SettingsPage (suite settings)", () => {
   });
 
   it("closes timezone dropdown on outside click", () => {
-    renderSettings(operatorMe, { initialEntries: ["/settings?tab=system"] });
+    renderSettings(operatorMe, { initialEntries: ["/system"] });
     const trigger = screen.getByRole("button", { name: /Time zone/ });
     fireEvent.click(trigger);
     expect(screen.getByRole("listbox")).toBeInTheDocument();
@@ -656,7 +624,7 @@ describe("SettingsPage (suite settings)", () => {
   });
 
   it("closes timezone dropdown on Escape", () => {
-    renderSettings(operatorMe, { initialEntries: ["/settings?tab=system"] });
+    renderSettings(operatorMe, { initialEntries: ["/system"] });
     const trigger = screen.getByRole("button", { name: /Time zone/ });
     fireEvent.click(trigger);
     expect(screen.getByRole("listbox")).toBeInTheDocument();

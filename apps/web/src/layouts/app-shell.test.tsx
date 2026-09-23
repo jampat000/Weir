@@ -122,6 +122,7 @@ describe("AppShell", () => {
       ["Processing", "/"],
       ["Library", "/library"],
       ["Settings", "/settings"],
+      ["System", "/system"],
     ]);
   });
 

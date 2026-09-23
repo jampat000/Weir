@@ -15,7 +15,7 @@ import {
 
 const routeErrorElement = <RouteErrorScreen />;
 
-// Three places since 3.2: Live (/), Library and Settings (docs/exec-plans/active/live-and-library.md).
+// Four places since 3.2: Processing (/), Library, Settings and System.
 // 3.0.0 carried no redirects because nobody had installed it yet. 3.1 has been installed, so its
 // two retired addresses redirect: /activity to Settings › History and logs, and each old
 // Processing tab to wherever that tab lives now (legacy-redirects.tsx). Anything older than 3.1,
@@ -94,6 +94,15 @@ const router = createBrowserRouter([
                 lazy: async () => ({
                   Component: (await import("../pages/settings/settings-page"))
                     .SettingsPage,
+                }),
+                errorElement: routeErrorElement,
+              },
+              {
+                // Weir itself: what it is running, what it keeps, and who can sign in.
+                path: "system",
+                lazy: async () => ({
+                  Component: (await import("../pages/system/system-page"))
+                    .SystemPage,
                 }),
                 errorElement: routeErrorElement,
               },

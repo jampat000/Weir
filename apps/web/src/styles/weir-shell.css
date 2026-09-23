@@ -805,6 +805,8 @@ html[data-mm-theme="light"] .mm-theme-toggle {
 .mm-sidebar {
   width: var(--mm-sidebar-w);
   flex-shrink: 0;
+  /* The collapse handle sits on the seam between the menu and the page, so it needs an origin. */
+  position: relative;
   background:
     linear-gradient(
       180deg,
@@ -840,6 +842,8 @@ html[data-mm-theme="light"] .mm-theme-toggle {
   padding: calc(14px * var(--mm-density-ui-scale)) 0
     calc(14px * var(--mm-density-ui-scale));
   overflow-y: auto;
+  /* The menu may scroll down when it is long; it never scrolls sideways (James, 23 Sep 2026). */
+  overflow-x: clip;
 }
 
 /* AppHydrateFallback (app/hydrate-fallback.tsx) stands in for the real sidebar while a route's
@@ -903,24 +907,27 @@ html[data-mm-theme="light"] .mm-theme-toggle {
   opacity: 0.98;
 }
 
+/* On the divider, at the top: the handle sits centred on the line between the menu and the page
+   (James, 23 Sep 2026, pointing at the spot). It is outside .mm-sidebar-inner, the part that
+   scrolls, so straddling the edge cannot give the menu a sideways scrollbar. */
 .mm-sidebar-collapse {
+  position: absolute;
+  top: 0.85rem;
+  right: -0.875rem;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
-  width: auto;
-  min-width: 40px;
-  height: 32px;
-  margin: 0 0.8rem 0.55rem auto;
-  padding: 0 0.65rem;
-  border: 1px solid var(--mm-border);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--mm-surface-2) 72%, transparent);
+  width: 1.625rem;
+  height: 1.625rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--mm-border-sidebar);
+  border-radius: 50%;
+  background: var(--mm-bg-main);
   color: var(--mm-text3);
   cursor: pointer;
   font: inherit;
-  font-size: 0.72rem;
-  white-space: nowrap;
   transition:
     color 0.16s ease,
     border-color 0.16s ease,
@@ -933,7 +940,6 @@ html[data-mm-theme="light"] .mm-theme-toggle {
   color: var(--mm-accent-bright);
   border-color: var(--mm-accent-ring);
   background: var(--mm-accent-soft);
-  transform: translateY(-1px);
 }
 
 .mm-sidebar-collapse:focus-visible {
@@ -947,11 +953,13 @@ html[data-mm-theme="light"] .mm-theme-toggle {
 }
 
 /* Collapsing hides the words beside the mark; it does not move the mark. The brand keeps the
-   box it has when open — same margin, same padding, same alignment — so the one thing that is
-   on screen in both states stays exactly where it was (James, 23 Sep 2026: the collapse should
-   be subtle and must not shift the logo). */
+   inset it has when open, so the one thing on screen in both states stays exactly where it was
+   (James, 23 Sep 2026). Only the room to the right of the mark goes, because there is none in a
+   rail this narrow — keeping it made the brand 9px wider than the rail. */
 .mm-sidebar--collapsed .mm-sidebar-brand {
   width: auto;
+  margin-right: 0;
+  padding-right: 0;
   border-bottom-color: color-mix(in srgb, var(--mm-stone) 10%, transparent);
 }
 
@@ -996,17 +1004,8 @@ html[data-mm-theme="light"] .mm-theme-toggle {
   display: none;
 }
 
-.mm-sidebar--collapsed .mm-sidebar-collapse__label {
-  display: none;
-}
-
-.mm-sidebar--collapsed .mm-sidebar-collapse {
-  align-self: center;
-  width: 40px;
-  min-width: 40px;
-  margin: 0 auto calc(10px * var(--mm-density-ui-scale));
-  padding-inline: 0;
-}
+/* The handle is the same handle whether the panel is open or shut — it used to be widened to 40px
+   when collapsed while its height stayed put, which made a circle into an egg (James, 23 Sep 2026). */
 
 .mm-sidebar-collapse__icon {
   display: inline-flex;
