@@ -162,7 +162,7 @@ public static class ActivityHistory
                 string.Create(
                     CultureInfo.InvariantCulture,
                     $"This removes {Plural.Of(counts.ActivityEvents, "Activity event")} and {Plural.Of(counts.ProcessingRecords, "processing record")} about {counts.RelativePath}. ") +
-                "It does not touch the file itself, its current status on the Files screen, or anything else's history.");
+                "It does not touch the file itself, its current status in Weir, or anything else's history.");
     }
 
     /// <summary>What removing one file's history deleted.</summary>

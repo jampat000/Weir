@@ -97,7 +97,7 @@ public static class ConfigurationBundleStore
 
     private static async Task ApplySuiteSettingsAsync(UnitOfWork uow, PyJson section, ITimeZoneResolver zones)
     {
-        var ss = section as PyDict ?? throw new PyTypeErrorException($"'{section.PythonTypeName}' object is not subscriptable");
+        var ss = section as PyDict ?? throw new PyTypeErrorException($"The backup's {SuiteTable} section must be an object.");
         var name = PyConvert.Str(Required(ss, "product_display_name"));
         var noticeValue = ss.Get("signed_in_home_notice");
         var timezone = PyConvert.Str(Required(ss, "app_timezone"));
@@ -105,7 +105,7 @@ public static class ConfigurationBundleStore
         string? notice = null;
         if (noticeValue is not null && noticeValue.IsTruthy)
         {
-            notice = noticeValue is PyStr s ? s.Value : throw new PyTypeErrorException($"'{noticeValue.PythonTypeName}' object has no attribute 'strip'");
+            notice = noticeValue is PyStr s ? s.Value : throw new PyTypeErrorException("The backup's signed_in_home_notice must be text.");
         }
 
         bool? backupEnabled = ss.Get("configuration_backup_enabled") is { } enabledValue and not PyNull ? enabledValue.IsTruthy : null;
@@ -142,7 +142,7 @@ public static class ConfigurationBundleStore
 
     private static async Task ApplySingletonAsync(UnitOfWork uow, string table, PyJson section)
     {
-        var data = section as PyDict ?? throw new PyTypeErrorException($"'{section.PythonTypeName}' object has no attribute 'items'");
+        var data = section as PyDict ?? throw new PyTypeErrorException($"The backup's {table} section must be an object.");
         var columns = await ColumnsAsync(uow, table).ConfigureAwait(false);
         var kwargs = ToKwargs(columns, data);
         var pk = kwargs.GetValueOrDefault("id");
@@ -198,13 +198,13 @@ public static class ConfigurationBundleStore
         var libraryColumns = await ColumnsAsync(uow, LibrariesTable).ConfigureAwait(false);
         foreach (var row in Iterate(bundle.Get(RuleSetsTable) ?? new PyList()))
         {
-            var data = row as PyDict ?? throw new PyTypeErrorException($"'{row.PythonTypeName}' object has no attribute 'items'");
+            var data = row as PyDict ?? throw new PyTypeErrorException($"Each row in the backup's {RuleSetsTable} section must be an object.");
             await InsertAsync(uow, RuleSetsTable, ruleColumns, ToKwargs(ruleColumns, data)).ConfigureAwait(false);
         }
 
         foreach (var row in Iterate(bundle[LibrariesTable]))
         {
-            var data = row as PyDict ?? throw new PyTypeErrorException($"'{row.PythonTypeName}' object has no attribute 'items'");
+            var data = row as PyDict ?? throw new PyTypeErrorException($"Each row in the backup's {LibrariesTable} section must be an object.");
             await InsertAsync(uow, LibrariesTable, libraryColumns, ToKwargs(libraryColumns, data)).ConfigureAwait(false);
         }
     }
@@ -214,11 +214,11 @@ public static class ConfigurationBundleStore
         PyList list => list.Items,
         PyDict dict => dict.Keys.Select(key => (PyJson)new PyStr(key)),
         PyStr text => text.Value.Select(c => (PyJson)new PyStr(c.ToString())),
-        _ => throw new PyTypeErrorException($"'{value.PythonTypeName}' object is not iterable"),
+        _ => throw new PyTypeErrorException("A section of the backup that holds rows must be a list."),
     };
 
     private static PyJson Required(PyDict dict, string key) =>
-        dict.Get(key) ?? throw new PyTypeErrorException($"KeyError: {PyStrings.Repr(key)}");
+        dict.Get(key) ?? throw new PyTypeErrorException($"The backup is missing {key}.");
 
     private static long Saturate(System.Numerics.BigInteger value) =>
         value > long.MaxValue ? long.MaxValue : value < long.MinValue ? long.MinValue : (long)value;

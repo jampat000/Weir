@@ -268,7 +268,7 @@ public static class UpdateStatus
 
         if (raw is not PyDict dict)
         {
-            throw new PyTypeErrorException($"'{raw.PythonTypeName}' object has no attribute 'get'");
+            throw new PyTypeErrorException("update-settings.json must hold a JSON object.");
         }
 
         var mode = PyConvert.Str(dict.Get("mode") ?? new PyStr(string.Empty)).Trim();

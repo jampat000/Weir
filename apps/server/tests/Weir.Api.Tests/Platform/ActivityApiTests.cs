@@ -171,7 +171,7 @@ public sealed class ActivityApiTests
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
         Assert.Equal(
             "{\"relative_path\":\"Heat/heat.mkv\",\"activity_events\":2,\"processing_records\":1,\"message\":\"This removes 2 Activity events and 1 processing record about Heat/heat.mkv. " +
-            "It does not touch the file itself, its current status on the Files screen, or anything else's history.\"}",
+            "It does not touch the file itself, its current status in Weir, or anything else's history.\"}",
             await preview.Content.ReadAsStringAsync());
 
         using var removed = await client.PostAsync(

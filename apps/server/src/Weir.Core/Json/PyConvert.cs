@@ -93,12 +93,12 @@ public static class PyConvert
             case PyFloat f:
                 if (double.IsNaN(f.Value))
                 {
-                    throw new PyValueErrorException("cannot convert float NaN to integer");
+                    throw new PyValueErrorException("NaN is not a whole number.");
                 }
 
                 if (double.IsInfinity(f.Value))
                 {
-                    throw new PyTypeErrorException("cannot convert float infinity to integer");
+                    throw new PyTypeErrorException("Infinity is not a whole number.");
                 }
 
                 return new BigInteger(Math.Truncate(f.Value));
@@ -108,10 +108,9 @@ public static class PyConvert
                     return parsed;
                 }
 
-                throw new PyValueErrorException($"invalid literal for int() with base 10: {PyStrings.Repr(s.Value)}");
+                throw new PyValueErrorException($"{PyStrings.Repr(s.Value)} is not a whole number.");
             default:
-                throw new PyTypeErrorException(
-                    $"int() argument must be a string, a bytes-like object or a real number, not '{value.PythonTypeName}'");
+                throw new PyTypeErrorException($"Expected a whole number but found {KindText(value)}.");
         }
     }
 
@@ -190,9 +189,22 @@ public static class PyConvert
         PyBool b => b.Value ? 1L : 0L,
         PyInt i => i.Value >= long.MinValue && i.Value <= long.MaxValue
             ? (long)i.Value
-            : throw new PyTypeErrorException("Python int too large to convert to SQLite INTEGER"),
+            : throw new PyTypeErrorException("The number is too large to store."),
         PyFloat f => f.Value,
         PyStr s => s.Value,
-        _ => throw new PyTypeErrorException($"Error binding parameter - type '{value.PythonTypeName}' is not supported"),
+        _ => throw new PyTypeErrorException($"Weir cannot store {KindText(value)} in a single database column."),
+    };
+
+    /// <summary>A JSON value's kind in plain words, for error messages.</summary>
+    private static string KindText(PyJson value) => value switch
+    {
+        PyNull => "nothing",
+        PyBool => "true or false",
+        PyInt => "a whole number",
+        PyFloat => "a decimal number",
+        PyStr => "text",
+        PyList => "a list",
+        PyDict => "an object",
+        _ => "a date and time",
     };
 }

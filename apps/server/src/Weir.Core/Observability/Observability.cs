@@ -88,7 +88,7 @@ public static class OperatorMessages
 {
     private static readonly Dictionary<string, string> ProviderLabels = new(StringComparer.Ordinal)
     {
-        ["emby"] = "Emby", ["jellyfin"] = "Jellyfin", ["plex"] = "Plex", ["radarr"] = "Radarr", ["sonarr"] = "Sonarr",
+        ["deluno"] = "Deluno", ["radarr"] = "Radarr", ["sonarr"] = "Sonarr", ["tmdb"] = "TMDb",
     };
 
     private static readonly Dictionary<string, string> ScopeLabels = new(StringComparer.Ordinal)
