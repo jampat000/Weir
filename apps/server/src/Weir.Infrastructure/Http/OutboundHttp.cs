@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Security;
@@ -210,6 +211,7 @@ public sealed class NotificationDispatcher
     private static readonly TimeSpan DispatchTimeout = TimeSpan.FromSeconds(10);
     private readonly IExternalJsonPoster _poster;
     private readonly TimeProvider _time;
+    private readonly ConcurrentDictionary<Task, byte> _inFlight = new();
 
     public NotificationDispatcher(IExternalJsonPoster poster, TimeProvider time)
     {
@@ -272,7 +274,7 @@ public sealed class NotificationDispatcher
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(warn);
         var (jobEvent, title, detail) = NotificationRules.JobNotification(module, eventKind, jobId, jobKind, willRetry);
-        _ = Task.Run(async () =>
+        Track(Task.Run(async () =>
         {
             List<NotificationChannelRecord> channels;
             try
@@ -326,6 +328,18 @@ public sealed class NotificationDispatcher
                     warn($"Notification dispatch failed for channel {channel.Id} ({channel.Label}) event={jobEvent}: {message}", null);
                 }
             }
-        });
+        }));
+    }
+
+    /// <summary>
+    /// Completes once every delivery started so far has finished. The caller of <see cref="DispatchJobNotification"/>
+    /// never waits for its delivery; this is for anything that must, such as a clean shutdown or a test.
+    /// </summary>
+    public Task WhenIdleAsync() => Task.WhenAll(_inFlight.Keys);
+
+    private void Track(Task delivery)
+    {
+        _inFlight.TryAdd(delivery, 0);
+        _ = delivery.ContinueWith(finished => _inFlight.TryRemove(finished, out _), TaskScheduler.Default);
     }
 }
