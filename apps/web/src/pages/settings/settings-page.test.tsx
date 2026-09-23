@@ -19,7 +19,7 @@ vi.mock("./tabs/libraries/libraries-tab", () => ({
 vi.mock("./tabs/rules/rules-tab", () => ({
   RulesTab: () => <div>Rules content</div>,
 }));
-vi.mock("./tabs/media-managers-tab", () => ({
+vi.mock("./tabs/media-managers/media-managers-tab", () => ({
   MediaManagersTab: () => <div>Media managers content</div>,
 }));
 vi.mock("./tabs/performance/process-settings-section", () => ({

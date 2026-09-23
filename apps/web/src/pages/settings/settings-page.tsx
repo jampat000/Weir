@@ -7,7 +7,7 @@ import {
   WorkspaceTabList,
   type WorkspaceTabOption,
 } from "../../components/shared/workspace-shell";
-import { MediaManagersTab } from "./tabs/media-managers-tab";
+import { MediaManagersTab } from "./tabs/media-managers/media-managers-tab";
 import { AlertsTab } from "./tabs/alerts/alerts-tab";
 import { DirectPlaySection } from "./tabs/performance/direct-play-section";
 import { LibrariesTab } from "./tabs/libraries/libraries-tab";
