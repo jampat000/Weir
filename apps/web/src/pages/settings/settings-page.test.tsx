@@ -28,7 +28,7 @@ vi.mock("./tabs/performance/process-settings-section", () => ({
 vi.mock("./tabs/performance/direct-play-section", () => ({
   DirectPlaySection: () => null,
 }));
-vi.mock("./tabs/cleanup-tab", () => ({
+vi.mock("./tabs/cleanup/cleanup-tab", () => ({
   CleanupTab: () => <div>Housekeeping content</div>,
 }));
 vi.mock("./tabs/schedule/schedule-tab", () => ({

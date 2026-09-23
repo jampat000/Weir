@@ -5,7 +5,7 @@ import type { MaintenanceFamilyState } from "../../../../lib/processing/maintena
 import { useProcessingMaintenanceQuery } from "../../../../lib/processing/maintenance-queries";
 import type { AppSettings } from "../../../../lib/settings/types";
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
-import { CLEANUP_JOBS, everyWords } from "../cleanup-tab";
+import { CLEANUP_JOBS, everyWords } from "../cleanup/cleanup-jobs";
 import { backupWords } from "./schedule-model";
 
 const UNKNOWN = "—";

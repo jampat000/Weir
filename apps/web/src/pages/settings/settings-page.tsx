@@ -11,7 +11,7 @@ import { MediaManagersTab } from "./tabs/media-managers/media-managers-tab";
 import { AlertsTab } from "./tabs/alerts/alerts-tab";
 import { DirectPlaySection } from "./tabs/performance/direct-play-section";
 import { LibrariesTab } from "./tabs/libraries/libraries-tab";
-import { CleanupTab } from "./tabs/cleanup-tab";
+import { CleanupTab } from "./tabs/cleanup/cleanup-tab";
 import { ProcessSettingsSection } from "./tabs/performance/process-settings-section";
 import { RulesTab } from "./tabs/rules/rules-tab";
 import { ScheduleTab } from "./tabs/schedule/schedule-tab";

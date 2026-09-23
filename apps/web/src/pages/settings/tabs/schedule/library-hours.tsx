@@ -9,7 +9,7 @@ import {
 import { useUpdateProcessingLibrary } from "../../../../lib/processing/libraries-queries";
 import { useProcessingWatchedFolderRemuxScanDispatchEnqueueMutation } from "../../../../lib/processing/queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
-import { everyWords } from "../cleanup-tab";
+import { everyWords } from "../cleanup/cleanup-jobs";
 import { ScheduleGridEditor } from "./schedule-grid-editor";
 import {
   DAY_NAMES,

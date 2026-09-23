@@ -9,10 +9,10 @@ import {
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
-import * as authQueries from "../../../lib/auth/queries";
-import type { MaintenanceState } from "../../../lib/processing/maintenance-api";
-import * as maintenanceQueries from "../../../lib/processing/maintenance-queries";
-import * as processingQueries from "../../../lib/processing/queries";
+import * as authQueries from "../../../../lib/auth/queries";
+import type { MaintenanceState } from "../../../../lib/processing/maintenance-api";
+import * as maintenanceQueries from "../../../../lib/processing/maintenance-queries";
+import * as processingQueries from "../../../../lib/processing/queries";
 import { CleanupTab } from "./cleanup-tab";
 
 const mutate = vi.fn();
