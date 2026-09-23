@@ -18,6 +18,8 @@ export type ActivityRecentFilters = {
   result?: string;
   library_id?: number;
   file?: string;
+  /** "weir": Weir's own events, not about one file (System › Logs). "files": the events about a file. */
+  about?: "weir" | "files";
 };
 
 /** The filters shared by the feed and the export, as query parameters. */
@@ -35,6 +37,7 @@ function activityFilterParams(
   if (options?.library_id !== undefined)
     q.set("library_id", String(Math.trunc(options.library_id)));
   if (options?.file) q.set("file", options.file);
+  if (options?.about) q.set("about", options.about);
   return q;
 }
 

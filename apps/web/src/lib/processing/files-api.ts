@@ -48,6 +48,29 @@ export interface ProcessingDirectPlay {
   reasons: string[];
 }
 
+/**
+ * The copy Weir handed back for a media manager to import, and what became of it (#652): what the manager said, and
+ * whether Weir removed its copy.
+ */
+export interface ProcessingFileHandback {
+  output_path: string;
+  written_at: string | null;
+  /** Null while no media manager has said anything about it. */
+  outcome: "imported" | "not-imported" | null;
+  /** Sonarr, Radarr, Deluno. */
+  outcome_by: string | null;
+  outcome_at: string | null;
+  /** Where the manager put it in its library. */
+  imported_path: string | null;
+  /** Why the manager will not import it. */
+  outcome_reason: string | null;
+  /** When Weir removed its copy. */
+  released_at: string | null;
+  settled_at: string | null;
+  /** What happened to the copy, in plain words. */
+  release_note: string | null;
+}
+
 export interface ProcessingFile {
   id: number;
   library_id: number;
@@ -59,6 +82,8 @@ export interface ProcessingFile {
   size_bytes: number;
   failure_class: string | null;
   failure_attempts: number;
+  /** On hold after repeated failures, until someone queues it again. Nothing lifts it by itself. */
+  quarantined?: boolean;
   next_retry_at: string | null;
   /** The collision policy in force and what it decided, kept on the file rather than only in an activity note. */
   output_collision_policy: string | null;
@@ -77,6 +102,14 @@ export interface ProcessingFile {
   progress_percent: number | null;
   progress_message: string | null;
   progress_eta_seconds: number | null;
+  /** `processing` while the file is written, `finishing` during the final checks. What Live's lanes key on. */
+  progress_status?: string | null;
+  /** ffmpeg's speed as it reports it, for example "148x". */
+  progress_speed?: string | null;
+  progress_elapsed_seconds?: number | null;
+  /** What the running pass is taking out, one line per track as its plan describes it. */
+  progress_removed_audio?: string[] | null;
+  progress_removed_subtitles?: string[] | null;
   /** When an on-hold file becomes eligible. Null when the wait is on a writer, not the clock. */
   hold_until: string | null;
   size_changed_at: string | null;
@@ -86,6 +119,8 @@ export interface ProcessingFile {
   updated_at: string;
   last_seen_at: string | null;
   last_attempt_at: string | null;
+  /** The copy Weir handed back, when it wrote one. */
+  handback?: ProcessingFileHandback | null;
 }
 
 export interface ProcessingFilesPage {

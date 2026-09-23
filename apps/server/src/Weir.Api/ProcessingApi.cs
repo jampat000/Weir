@@ -42,6 +42,7 @@ public static class ProcessingApi
         // Watched-folder scan dispatch (#522 part 5): the job handler that runs a scan, and the periodic
         // scheduler that enqueues one per library. Additive: the job handler registry (AddWeirJobs) simply
         // gains one more kind it can claim, and the periodic task joins the others already registered.
+        services.AddSingleton<ScanWakeups>();
         services.AddSingleton<ProcessingWatchedFolderScanDispatchJobHandler>();
         services.AddSingleton<IJobHandler>(sp => sp.GetRequiredService<ProcessingWatchedFolderScanDispatchJobHandler>());
         services.AddSingleton<IPeriodicTask, ProcessingWatchedFolderScanDispatchScheduleTask>();

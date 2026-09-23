@@ -109,6 +109,9 @@ const EVENT_LABELS: Record<string, string> = {
   "processing.work_temp_stale_sweep_completed":
     "Temporary files cleanup finished",
   "processing.failure_cleanup_sweep_completed": "Failed-remux cleanup finished",
+  "processing.handback_outcome": "What became of a hand-back",
+  "processing.unclaimed_handback_cleanup_completed":
+    "Unclaimed hand-backs cleanup finished",
 };
 
 function compactActivityTitle(text: string, maxLength = 92): string {
@@ -670,7 +673,19 @@ const FIELD_LABEL_CLASS =
 
 type ExportFormat = "csv" | "json";
 
-export function ActivityPage() {
+/**
+ * The record of what Weir did. Since 3.2 it lives in System › History and logs rather than as
+ * a page of its own, so `embedded` drops the page title and header; the list, filters,
+ * exports and removals are unchanged.
+ */
+export function ActivityPage({
+  embedded = false,
+  about,
+}: {
+  embedded?: boolean;
+  /** "weir" keeps Weir's own events and leaves each file's story to History (System › Logs). */
+  about?: "weir" | "files";
+} = {}) {
   const [filters, setFilters] = useState<ActivityFiltersState>(EMPTY_FILTERS);
   const [applied, setApplied] = useState<ActivityFiltersState>(EMPTY_FILTERS);
   const [olderItems, setOlderItems] = useState<ActivityEventItem[]>([]);
@@ -704,6 +719,7 @@ export function ActivityPage() {
     const libraryId = Number(applied.libraryId);
     return {
       limit: 100,
+      ...(about ? { about } : {}),
       event_type: applied.eventType || undefined,
       search: applied.search.trim() || undefined,
       date_from: localInputToIso(applied.from),
@@ -714,7 +730,7 @@ export function ActivityPage() {
         applied.libraryId && Number.isFinite(libraryId) ? libraryId : undefined,
       file: applied.file.trim() || undefined,
     };
-  }, [applied]);
+  }, [applied, about]);
   const dataKey = JSON.stringify(queryFilters);
 
   useActivityStreamInvalidation(activityRecentKey);
@@ -766,9 +782,9 @@ export function ActivityPage() {
   if (recent.isError) {
     const err = recent.error;
     return (
-      <div className="mm-page">
-        <header className="mm-page__intro">
-          <h1 className="mm-page__title">Activity</h1>
+      <div className={embedded ? undefined : "mm-page"}>
+        <header className={embedded ? undefined : "mm-page__intro"}>
+          {embedded ? null : <h1 className="mm-page__title">Activity</h1>}
           <p className="mm-page__lead">
             {isLikelyNetworkFailure(err)
               ? "Could not reach the Weir API."
@@ -926,7 +942,9 @@ export function ActivityPage() {
       );
       if (!match) {
         // No tracked file to tell the story of: show the Files screen for that path instead.
-        void navigate(`/processing?tab=files&path=${encodeURIComponent(path)}`);
+        void navigate(
+          `/system?tab=history&show=downloads&path=${encodeURIComponent(path)}`,
+        );
         return;
       }
       setStoryName(fileNameOf(path));
@@ -1025,12 +1043,16 @@ export function ActivityPage() {
   if (olderError) blockers.push({ key: "older", text: olderError });
 
   return (
-    <div className="mm-page">
-      <header className="mm-page__intro">
-        <h1 className="mm-page__title">Activity</h1>
-        <p className="mm-page__lead">
-          What Weir did, newest first. New entries appear as they happen.
-        </p>
+    <div className={embedded ? undefined : "mm-page"}>
+      <header className={embedded ? undefined : "mm-page__intro"}>
+        {embedded ? null : (
+          <>
+            <h1 className="mm-page__title">Activity</h1>
+            <p className="mm-page__lead">
+              What Weir did, newest first. New entries appear as they happen.
+            </p>
+          </>
+        )}
         {typeof retentionDays === "number" ? (
           <p
             className="mt-1 text-sm text-[var(--mm-text2)]"
@@ -1040,7 +1062,7 @@ export function ActivityPage() {
               ? `History goes back ${retentionDays} ${retentionDays === 1 ? "day" : "days"}${shown.oldest_event_at ? ` (oldest entry ${fmt(shown.oldest_event_at)})` : ""}.`
               : "History is kept until you clear it."}{" "}
             <Link
-              to="/settings#activity-retention"
+              to="/system?tab=history#activity-retention"
               className="text-[var(--mm-gold)] underline-offset-2 hover:underline"
             >
               Change how long history is kept
@@ -1102,7 +1124,7 @@ export function ActivityPage() {
               id="activity-filters-heading"
               className="mm-quiet-section__title"
             >
-              Filter activity
+              {about === "weir" ? "Filter events" : "Filter activity"}
             </h2>
             <div className="mm-quiet-section__aside">
               <button
@@ -1218,41 +1240,49 @@ export function ActivityPage() {
                   )}
                 </select>
               </label>
-              <label
-                className={`${FIELD_LABEL_CLASS} mm-activity-filters__extra`}
-              >
-                Library
-                <select
-                  className="mm-input"
-                  value={filters.libraryId}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      libraryId: e.target.value,
-                    }))
-                  }
-                >
-                  <option value="">All libraries</option>
-                  {(libraries.data ?? []).map((library) => (
-                    <option key={library.id} value={String(library.id)}>
-                      {library.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label
-                className={`${FIELD_LABEL_CLASS} mm-activity-filters__extra`}
-              >
-                File
-                <input
-                  className="mm-input"
-                  value={filters.file}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, file: e.target.value }))
-                  }
-                  placeholder="Part of a file path"
-                />
-              </label>
+              {/* Logs keeps Weir's own events, which belong to no library and no file. */}
+              {about === "weir" ? null : (
+                <>
+                  <label
+                    className={`${FIELD_LABEL_CLASS} mm-activity-filters__extra`}
+                  >
+                    Library
+                    <select
+                      className="mm-input"
+                      value={filters.libraryId}
+                      onChange={(e) =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          libraryId: e.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">All libraries</option>
+                      {(libraries.data ?? []).map((library) => (
+                        <option key={library.id} value={String(library.id)}>
+                          {library.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label
+                    className={`${FIELD_LABEL_CLASS} mm-activity-filters__extra`}
+                  >
+                    File
+                    <input
+                      className="mm-input"
+                      value={filters.file}
+                      onChange={(e) =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          file: e.target.value,
+                        }))
+                      }
+                      placeholder="Part of a file path"
+                    />
+                  </label>
+                </>
+              )}
               <label
                 className={`${FIELD_LABEL_CLASS} mm-activity-filters__extra`}
               >
@@ -1313,7 +1343,7 @@ export function ActivityPage() {
               id="activity-history-heading"
               className="mm-quiet-section__title"
             >
-              History
+              {about === "weir" ? "Events" : "History"}
             </h2>
             <div className="mm-quiet-section__aside">
               <button

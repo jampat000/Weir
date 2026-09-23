@@ -74,11 +74,16 @@ export function useProcessingManagerSetupQuery(
   });
 }
 
-export function useProcessingLibrariesQuery(enabled = true) {
+/** `refetchIntervalMs` keeps each library's next look current on a screen that counts down to it. */
+export function useProcessingLibrariesQuery(
+  enabled = true,
+  refetchIntervalMs?: number,
+) {
   return useQuery<ProcessingLibrary[]>({
     queryKey: processingLibrariesKey,
     queryFn: fetchProcessingLibraries,
     enabled,
+    refetchInterval: refetchIntervalMs,
   });
 }
 

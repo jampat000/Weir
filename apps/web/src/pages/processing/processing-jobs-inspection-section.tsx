@@ -43,6 +43,7 @@ function jobKindLabel(jobKind: string): string {
     "processing.file.remux_pass.v1": "Process media file",
     "processing.work_temp_stale_sweep.v1": "Clean temporary work files",
     "processing.failure_cleanup.v1": "Clean failed work files",
+    "processing.unclaimed_handback_cleanup.v1": "Remove unclaimed hand-backs",
   };
   if (labels[jobKind]) return labels[jobKind];
   const last = jobKind.split(".").filter(Boolean).at(-2) ?? jobKind;
@@ -308,7 +309,10 @@ export function ProcessingJobsInspectionSection() {
 
           <p className="text-xs text-[var(--mm-text2)]">
             Full detail on each outcome is in the{" "}
-            <Link to="/activity" className="text-[var(--mm-accent)] underline">
+            <Link
+              to="/system?tab=history"
+              className="text-[var(--mm-accent)] underline"
+            >
               Activity log
             </Link>
             .
@@ -395,10 +399,7 @@ function ProcessingJobRow({
         {showCancel ? (
           <button
             type="button"
-            className={mmActionButtonClass({
-              variant: "tertiary",
-              disabled: cancelMutation.isPending,
-            })}
+            className={mmActionButtonClass({ variant: "tertiary" })}
             disabled={cancelMutation.isPending}
             data-testid={`processing-jobs-cancel-${job.id}`}
             onClick={() => cancelMutation.mutate(job.id)}
@@ -409,10 +410,7 @@ function ProcessingJobRow({
         {showRecover ? (
           <button
             type="button"
-            className={mmActionButtonClass({
-              variant: "secondary",
-              disabled: recoverMutation.isPending,
-            })}
+            className={mmActionButtonClass({ variant: "secondary" })}
             disabled={recoverMutation.isPending}
             data-testid={`processing-jobs-recover-${job.id}`}
             onClick={() => recoverMutation.mutate(job.id)}

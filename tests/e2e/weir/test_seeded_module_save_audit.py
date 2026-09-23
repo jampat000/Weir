@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import expect, sync_playwright
 
-from ._helpers import ensure_signed_in, open_sidebar
+from ._helpers import ensure_signed_in, open_sidebar, open_tab
 
 pytestmark = [
     pytest.mark.weir_e2e,
@@ -34,27 +34,33 @@ def test_saved_state_persists_across_settings_and_processing(
 
             ensure_signed_in(page, base)
 
-            open_sidebar(page, "Settings")
+            # The setup wizard reopens from System › About, where it folds away because it
+            # is run once. Display density was removed in 3.2: not in the wizard, not on the page.
+            open_sidebar(page, "System")
             expect(page.get_by_test_id("suite-settings-global")).to_be_visible()
+            page.get_by_role("heading", name="Setup wizard", exact=True).click()
             page.get_by_test_id("suite-settings-open-setup-wizard").click()
             expect(page).to_have_url(re.compile(r".*/setup-wizard"))
-            page.get_by_label("Display density").get_by_text("Comfortable").click()
+            expect(page.get_by_role("heading", name="Set up Weir")).to_be_visible()
+            expect(page.get_by_text("Display density", exact=False)).to_have_count(0)
             page.get_by_test_id("setup-wizard-skip").click()
-            expect(page).to_have_url(re.compile(r".*/(?:$|[/?#])"))
-            expect(page.locator("html")).to_have_attribute("data-mm-density", "comfortable")
+            expect(page).to_have_url(re.compile(r".*/(?:$|[?#])"))
+            expect(page.get_by_test_id("processing-page")).to_be_visible()
+            expect(page.locator("html")).not_to_have_attribute("data-mm-density", re.compile(".*"))
 
-            open_sidebar(page, "Processing")
-            page.get_by_role("tab", name="Libraries", exact=True).click()
+            # Libraries is where Settings opens.
+            open_tab(page, "Settings", "Libraries")
             libraries = page.get_by_test_id("processing-libraries-section")
             expect(libraries).to_be_visible()
-            libraries.get_by_role("button", name="Edit").nth(1).click()
+            libraries.get_by_role("button", name="Edit", exact=True).nth(1).click()
             form = page.get_by_test_id("processing-library-form")
             form.get_by_role("textbox", name="Watched folder").fill(str(tv_watch))
             form.get_by_role("textbox", name="Output folder").fill(str(tv_output))
             page.get_by_test_id("processing-library-save").click()
-            open_sidebar(page, "Home")
+            expect(form).to_have_count(0)
             open_sidebar(page, "Processing")
-            page.get_by_role("tab", name="Libraries", exact=True).click()
+            expect(page.get_by_test_id("processing-page")).to_be_visible()
+            open_tab(page, "Settings", "Libraries")
             expect(page.get_by_test_id("processing-libraries-section")).to_contain_text(str(tv_watch))
         finally:
             browser.close()

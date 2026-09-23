@@ -99,10 +99,7 @@ export function RemoveFileHistoryDialog({
         </button>
         <button
           type="button"
-          className={mmActionButtonClass({
-            variant: "primary",
-            disabled: busy || nothing,
-          })}
+          className={mmActionButtonClass({ variant: "primary" })}
           disabled={busy || nothing}
           onClick={onConfirm}
         >
@@ -182,10 +179,7 @@ export function ClearAllHistoryDialog({
         </button>
         <button
           type="button"
-          className={mmActionButtonClass({
-            variant: "primary",
-            disabled: busy || !ready,
-          })}
+          className={mmActionButtonClass({ variant: "primary" })}
           disabled={busy || !ready}
           onClick={() => onConfirm(typed.trim())}
         >

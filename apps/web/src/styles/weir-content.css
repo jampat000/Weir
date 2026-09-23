@@ -633,11 +633,11 @@
 .mm-quiet-group__head {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 0.25rem 1rem;
-  padding-bottom: 0.55rem;
-  border-bottom: 1px solid var(--mm-line);
+  padding-bottom: 0.6rem;
+  border-bottom: 2px solid var(--mm-line);
 }
 
 .mm-quiet-group__name {
@@ -650,18 +650,26 @@
 /* An optional "step n of five" cue. Decorative: keep it out of the heading's accessible
  * name, which stays exactly the group's own title. */
 .mm-quiet-group__step {
-  color: var(--mm-gold-dim);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: var(--mm-accent-soft);
+  color: var(--mm-accent);
   font-size: var(--mm-type-eyebrow);
-  font-weight: 600;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
+  align-self: center;
 }
 
 .mm-quiet-group__title {
   margin: 0;
-  color: var(--mm-text3);
-  font-size: var(--mm-type-eyebrow);
-  font-weight: 600;
-  letter-spacing: var(--mm-tracking-eyebrow);
+  color: var(--mm-text1);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -996,4 +1004,689 @@
   font-size: 0.7rem;
   font-weight: 800;
   vertical-align: -0.15em;
+}
+
+/* Settings › History and logs: the one "Show" choice that picks what the list holds. It sits on
+   the list's own line; a second row of tabs under the Settings tabs is what James turned down. */
+.mm-history-show {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: calc(10px * var(--mm-density-ui-scale));
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--mm-text2);
+}
+
+.mm-history-show .mm-input {
+  width: auto;
+  min-width: 12rem;
+}
+
+/* ── 3c · The quiet body, in columns ─────────────────────────────────────────
+ * A settings tab is a stack of short, independent groups sitting in a panel over
+ * 1500px wide, which made every one of them a long scroll: System ran to 5.6
+ * screens, Running to 2.5 (James, 23 Sep 2026: "each of them are heavily scrolly").
+ *
+ * Rule 3 still holds — nothing here gains a card, a panel or a well. The groups are
+ * simply allowed to use the width the panel already has. CSS columns are right for
+ * this rather than a grid: the groups are independent and vary from 112px to 709px
+ * tall, and the browser balances the columns itself, where a grid would leave a
+ * ragged hole beside every short group.
+ */
+@media (min-width: 1180px) {
+  .mm-quiet-stack--columns {
+    display: block;
+    columns: 2;
+    column-gap: 3.25rem;
+  }
+
+  /* A group is one thing: it never splits across the fold between columns. The second selector
+     catches the groups a stepped-aside wrapper promotes (see below), which are no longer children. */
+  .mm-quiet-stack--columns > *,
+  .mm-quiet-stack--columns > .mm-quiet-stack > * {
+    break-inside: avoid;
+    margin-bottom: 2.5rem;
+  }
+}
+
+/* A tab that gathers several former tabs nests each one in its own stack. Those wrappers are not
+   groups — they are just where a component starts — so in columns they step aside and let the groups
+   themselves be the things the columns balance. Without this, one wrapper 2115px tall decided the
+   height of the whole page. */
+@media (min-width: 1180px) {
+  .mm-quiet-stack--columns > .mm-quiet-stack {
+    display: contents;
+  }
+}
+
+/* ── 3d · The fold ───────────────────────────────────────────────────────────
+ * A group that starts closed, for the switches almost nobody changes. It is still a
+ * heading over a hairline — rule 3 holds — with a marker and, when it matters, a line
+ * saying what is inside so the fold never hides that something was changed.
+ */
+.mm-quiet-fold {
+  min-width: 0;
+}
+
+.mm-quiet-fold__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--mm-border);
+  cursor: pointer;
+  list-style: none;
+}
+
+.mm-quiet-fold__head::-webkit-details-marker {
+  display: none;
+}
+
+.mm-quiet-fold__head::before {
+  content: "";
+  flex-shrink: 0;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-right: 1.5px solid var(--mm-text3);
+  border-bottom: 1.5px solid var(--mm-text3);
+  transform: rotate(-45deg) translateY(-0.12rem);
+  transition: transform 0.15s ease;
+}
+
+.mm-quiet-fold[open] > .mm-quiet-fold__head::before {
+  transform: rotate(45deg) translateY(-0.1rem);
+}
+
+.mm-quiet-fold__head:hover::before {
+  border-color: var(--mm-text1);
+}
+
+.mm-quiet-fold__head:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--mm-accent-ring);
+  border-radius: var(--mm-radius-sm);
+}
+
+.mm-quiet-fold__title {
+  margin: 0;
+  color: var(--mm-text1);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+}
+
+.mm-quiet-fold__state {
+  margin-left: auto;
+  font-size: var(--mm-type-caption);
+  color: var(--mm-text3);
+}
+
+.mm-quiet-fold__detail {
+  margin: 0.9rem 0 0;
+  font-size: var(--mm-type-caption);
+  line-height: 1.5;
+  color: var(--mm-text3);
+}
+
+.mm-quiet-fold__body {
+  min-width: 0;
+  margin-top: 0.9rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-quiet-fold__head::before {
+    transition: none;
+  }
+}
+
+/* ── 3e · One shape for a setting ────────────────────────────────────────────
+ * A label, its control, and the line under it that explains the control. Every setting in
+ * Settings is this shape, and a control is one of three widths chosen by what goes in it, so
+ * two fields that do the same job are the same size on every screen (James, 23 Sep 2026: "its
+ * not aligned, its not uniform, its not standardised").
+ */
+.mm-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.mm-field__label {
+  font-size: var(--mm-type-caption);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--mm-text2);
+}
+
+.mm-field__hint {
+  font-size: var(--mm-type-caption);
+  line-height: 1.45;
+  color: var(--mm-text3);
+}
+
+/* The control inside takes the field's width rather than stretching to the column. A fixed width,
+   capped at the room there is: `min(100%, …)` resolved against nothing inside a row of fields, so
+   each dropdown sized itself to its own text and a row of "medium" fields came out three widths. */
+.mm-field--short .mm-input {
+  width: var(--mm-field-short);
+  max-width: 100%;
+}
+
+.mm-field--medium .mm-input {
+  width: var(--mm-field-medium);
+  max-width: 100%;
+}
+
+.mm-field--wide .mm-input {
+  width: var(--mm-field-wide);
+  max-width: 100%;
+}
+
+/* A row of settings that belong together, on one baseline. */
+.mm-field-row {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.1rem 1.5rem;
+}
+
+/*
+ * Settings groups (3.2): the group's name and why it matters on the left, one setting per row on the right,
+ * hairlines between. components/shared/settings-group.tsx. Two groups sit side by side above 1180px
+ * (.mm-setgroups--columns), because a page too long for the screen uses the width, not more boxes.
+ */
+.mm-setgroups {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 1180px) {
+  .mm-setgroups--columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 56px;
+    align-items: start;
+  }
+}
+
+.mm-setgroup {
+  display: grid;
+  grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+  gap: 28px;
+  padding: 16px 0;
+  border-top: 1px solid var(--mm-border);
+}
+
+@media (max-width: 760px) {
+  .mm-setgroup {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+}
+
+.mm-setgroup__title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--mm-text);
+}
+
+.mm-setgroup__detail {
+  margin: 6px 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--mm-text3);
+}
+
+.mm-setgroup__rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mm-setrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 48px;
+  padding: 6px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--mm-border) 60%, transparent);
+}
+
+.mm-setrow:last-child {
+  border-bottom: 0;
+}
+
+.mm-setrow--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.mm-setrow__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mm-setrow__label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--mm-text);
+}
+
+.mm-setrow__hint {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--mm-text3);
+}
+
+.mm-setrow__control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+.mm-setrow--stacked .mm-setrow__control {
+  flex-wrap: wrap;
+}
+
+.mm-setrow__unit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  color: var(--mm-text2);
+}
+
+/* Every number in a group lines up: the box is one width and its unit sits in a fixed column after it, so
+   "seconds", "MB" and "GB" do not push the boxes to different places. */
+.mm-setrow__number {
+  width: 6.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-setrow__unit > span {
+  min-width: 3.75rem;
+}
+
+/* A row of numbered choices (Files at once): one press, no dropdown to open. */
+.mm-choice-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  border: 1px solid var(--mm-line);
+}
+
+.mm-choice-row button {
+  min-width: 34px;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--mm-text2);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.mm-choice-row button:hover:not(:disabled) {
+  color: var(--mm-text);
+}
+
+.mm-choice-row button[aria-pressed="true"] {
+  background: var(--mm-accent-soft);
+  color: var(--mm-text);
+  box-shadow: inset 0 0 0 1px var(--mm-accent-ring);
+}
+
+.mm-choice-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Settings › Cleanup: each job's own switch and timer on one row. */
+.mm-cleanup-table .mm-quiet-table__name {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 34rem;
+}
+
+.mm-cleanup-what {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--mm-text3);
+}
+
+.mm-cleanup-what--warn {
+  color: var(--mm-status-warning-text);
+}
+
+.mm-cleanup-every {
+  width: 10rem;
+}
+
+/* Settings › Alerts: how an alert travels, in three plain steps, then one column per event. */
+.mm-alert-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 32px;
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+  counter-reset: mm-alert-step;
+}
+
+@media (max-width: 900px) {
+  .mm-alert-steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.mm-alert-steps li {
+  position: relative;
+  padding-left: 40px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--mm-text3);
+  counter-increment: mm-alert-step;
+}
+
+.mm-alert-steps li::before {
+  content: counter(mm-alert-step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--mm-accent-ring);
+  color: var(--mm-accent-bright);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.mm-alert-steps b {
+  display: block;
+  font-weight: 600;
+  color: var(--mm-text);
+}
+
+.mm-alerts-cell {
+  text-align: center;
+  width: 8.5rem;
+}
+
+/* System › About: what Weir works with, its updates, and its time zone and setup, side by side (canvas board 11). */
+.mm-about-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 48px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .mm-about-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1400px) {
+  .mm-about-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Facts, one per line: the name dim on the left, the fact on the right. */
+.mm-kv {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mm-kv > div {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--mm-border) 60%, transparent);
+  font-size: 0.875rem;
+}
+
+.mm-kv > div:last-child {
+  border-bottom: 0;
+}
+
+.mm-kv dt {
+  color: var(--mm-text3);
+}
+
+.mm-kv dd {
+  margin: 0;
+  color: var(--mm-text);
+  overflow-wrap: anywhere;
+}
+
+/* System › Backups: what and when on the left, the backups on this machine on the right (canvas board 12). */
+.mm-backups-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 56px;
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .mm-backups-grid {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  }
+
+  .mm-backups-grid__wide {
+    grid-column: 1 / -1;
+  }
+}
+
+/* System › Security: changing the username and the password, side by side (canvas board 13). */
+.mm-security-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 56px;
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .mm-security-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Settings › Libraries: where a library comes from, and its folders in the code face they are typed in. */
+.mm-library-source {
+  display: block;
+}
+
+.mm-library-source--synced {
+  color: var(--mm-accent-bright);
+}
+
+.mm-library-path {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+/* Settings › Rules: which profile, its name, and who uses it, on one line (canvas board 5A). */
+.mm-profile-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 20px;
+  margin-top: 4px;
+}
+
+.mm-profile-bar__used {
+  margin: 0 0 9px;
+  font-size: 0.8125rem;
+  color: var(--mm-text2);
+}
+
+/* Settings › Schedule (canvas board 6): the time zone on one line, a week per library, its editor underneath. */
+.mm-schedule-zone {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: min(100%, 34rem);
+}
+
+.mm-schedule-zone > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Seven rows of 24 hours, lit where the library may start work. Small on purpose: it is read at a glance,
+   and the editor below is where hours are drawn. */
+.mm-week {
+  display: grid;
+  gap: 2px;
+  width: 16rem;
+}
+
+.mm-week__day {
+  display: grid;
+  grid-template-columns: 0.9rem repeat(24, minmax(0, 1fr));
+  gap: 1px;
+  align-items: center;
+}
+
+.mm-week__label {
+  color: var(--mm-text3);
+  font-size: 0.625rem;
+  line-height: 1;
+}
+
+.mm-week__hour {
+  height: 6px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--mm-text3) 22%, transparent);
+}
+
+.mm-week__hour.is-on {
+  background: var(--mm-accent);
+}
+
+.mm-schedule-table tr.is-selected > * {
+  background: var(--mm-accent-soft);
+}
+
+.mm-schedule-actions {
+  white-space: nowrap;
+}
+
+.mm-schedule-actions > * + * {
+  margin-left: 0.5rem;
+}
+
+.mm-schedule-link {
+  color: var(--mm-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mm-schedule-editor {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--mm-border);
+}
+
+.mm-schedule-editor__title {
+  margin: 0 0 0.75rem;
+  color: var(--mm-text1);
+  font-weight: 600;
+}
+
+/* Library editor › Files already in your library: the folders, then one switch per row. */
+.mm-library-cleaning {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.mm-library-cleaning__folders {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--mm-type-body);
+}
+
+.mm-library-cleaning__folders li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--mm-border);
+  overflow-wrap: anywhere;
+}
+
+.mm-library-cleaning__folders li:last-child {
+  border-bottom: 0;
+}
+
+.mm-library-cleaning__empty {
+  color: var(--mm-text3);
+}
+
+.mm-library-cleaning__add {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.mm-library-cleaning__add .mm-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 28rem;
+}
+
+.mm-library-cleaning__switches {
+  display: grid;
+  gap: 0.6rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--mm-border);
+}
+
+.mm-library-cleaning__hint {
+  margin: -0.3rem 0 0;
+  color: var(--mm-text3);
+  font-size: var(--mm-type-caption);
+}
+
+.mm-library-cleaning__confirm {
+  padding: 0.75rem 0 0.75rem 0.9rem;
+  border-left: 2px solid var(--mm-status-warning-text);
+  color: var(--mm-text2);
+}
+
+.mm-library-cleaning__confirm p {
+  margin: 0 0 0.6rem;
+}
+
+.mm-library-cleaning__confirm-actions {
+  display: flex;
+  gap: 0.5rem;
 }

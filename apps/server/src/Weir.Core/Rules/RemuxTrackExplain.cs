@@ -103,7 +103,8 @@ public static partial class RemuxRules
             }
         }
 
-        var removeAll = config.SubtitleMode == RemuxRuleValues.SubtitleModeRemoveAll || config.SubtitleLangs.Count == 0;
+        var removeAll = config.RemovesEverySubtitle;
+        var keepAll = config.KeepsEverySubtitleLanguage;
         var selectedLangs = removeAll ? [] : new HashSet<string>(config.SubtitleLangs.Select(NormalizeLang), StringComparer.Ordinal);
         foreach (var (stream, index) in WithIndex(subtitles))
         {
@@ -114,7 +115,7 @@ public static partial class RemuxRules
                 continue;
             }
 
-            if (lang.Length == 0 || !selectedLangs.Contains(lang))
+            if (!keepAll && (lang.Length == 0 || !selectedLangs.Contains(lang)))
             {
                 decisions.Add(new TrackDecision(
                     index, "subtitle", false, $"Removed: language '{(lang.Length > 0 ? lang : "und")}' is not in the configured subtitle languages."));
@@ -131,7 +132,9 @@ public static partial class RemuxRules
             }
 
             var forced = config.PreserveForcedSubs && flags.Forced.Value;
-            var reason = $"Kept: language '{lang}' matches the configured subtitle languages.";
+            var reason = keepAll
+                ? "Kept: the saved rules keep every subtitle language."
+                : $"Kept: language '{lang}' matches the configured subtitle languages.";
             if (forced && flags.Forced.Source == TrackFlagSource.Name)
             {
                 reason += " Counts as forced because its name says so.";

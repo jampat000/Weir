@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -25,7 +31,6 @@ const settings: ProcessingOperatorSettingsOut = {
   failure_cleanup_enabled: false,
   keep_failed_work_files: false,
   file_log_retention_days: 90,
-  verbose_detection_logging: false,
   min_file_age_seconds: 60,
   min_input_file_size_mb: 50,
   minimum_free_disk_space_mb: 5120,
@@ -65,78 +70,71 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("exposes the complete throughput, record, diagnostic, and cleanup contract", async () => {
+function mockSignedIn() {
   vi.spyOn(authQueries, "useMeQuery").mockReturnValue({
     data: { role: "operator" },
   } as ReturnType<typeof authQueries.useMeQuery>);
-  vi.spyOn(api, "fetchProcessingOperatorSettings").mockResolvedValue(settings);
   vi.spyOn(filesAtOnceApi, "fetchProcessingFilesAtOnce").mockResolvedValue(
     readout,
   );
+}
+
+it("saves Files at once up to ten, and the budget and checks with it", async () => {
+  mockSignedIn();
+  vi.spyOn(api, "fetchProcessingOperatorSettings").mockResolvedValue(settings);
   const save = vi
     .spyOn(api, "putProcessingOperatorSettings")
-    .mockResolvedValue({
-      ...settings,
-      file_log_retention_days: 0,
-      verbose_detection_logging: true,
-    });
+    .mockResolvedValue({ ...settings, max_concurrent_files: 10 });
 
   render(<ProcessingProcessSettingsSection />, { wrapper });
 
-  expect(
-    await screen.findByRole("heading", { name: "Files at once" }),
-  ).toBeInTheDocument();
-  expect(screen.getByLabelText(/Budget \(units\)/)).toHaveValue(6);
-  expect(screen.getByLabelText("1080p cost")).toHaveValue(2);
-  expect(
-    screen.getByRole("checkbox", { name: /Reclaim stale temporary files/ }),
-  ).toBeChecked();
-  expect(
-    screen.getByRole("checkbox", {
-      name: /Delete source after a terminal failure/,
-    }),
-  ).not.toBeChecked();
+  const choices = await screen.findByRole("group", { name: "Files at once" });
+  expect(screen.getByRole("button", { name: "2" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(choices.querySelectorAll("button")).toHaveLength(10);
+  expect(screen.getByLabelText("Budget")).toHaveValue(6);
+  expect(screen.getByLabelText("A 1080p file costs")).toHaveValue(2);
+  expect(screen.getByLabelText("Wait until it stops changing for")).toHaveValue(
+    60,
+  );
 
-  fireEvent.change(
-    screen.getByRole("spinbutton", {
-      name: /Processing-record retention \(days\)/,
-    }),
-    { target: { value: "0" } },
-  );
+  // #633 promised ten; the page refused to save more than eight until 3.2.
+  fireEvent.click(screen.getByRole("button", { name: "10" }));
   fireEvent.click(
-    screen.getByRole("checkbox", { name: /Verbose file-detection records/ }),
-  );
-  fireEvent.click(
-    screen.getByRole("button", { name: "Save processing settings" }),
+    screen.getByRole("button", { name: "Save performance settings" }),
   );
 
   await waitFor(() => {
     expect(save).toHaveBeenCalledWith(
       expect.objectContaining({
+        max_concurrent_files: 10,
         runner_capacity: 6,
         runner_cost_1080p: 2,
         runner_budget_enabled: true,
-        work_temp_stale_sweep_enabled: true,
-        failure_cleanup_enabled: false,
         keep_failed_work_files: false,
-        file_log_retention_days: 0,
-        verbose_detection_logging: true,
+        min_file_age_seconds: 60,
       }),
     );
   });
+  // The cleanup switches and record keeping are Cleanup's; Performance never sends them.
+  const body = save.mock.calls[0][0];
+  expect(body).not.toHaveProperty("work_temp_stale_sweep_enabled");
+  expect(body).not.toHaveProperty("failure_cleanup_enabled");
+  expect(body).not.toHaveProperty("file_log_retention_days");
+  expect(body).not.toHaveProperty("verbose_detection_logging");
+  expect(
+    screen.queryByText(/Verbose file-detection records/),
+  ).not.toBeInTheDocument();
 });
 
 it("says what waiting files are waiting for, and hides the resolution budget until it is switched on (#633)", async () => {
-  vi.spyOn(authQueries, "useMeQuery").mockReturnValue({
-    data: { role: "operator" },
-  } as ReturnType<typeof authQueries.useMeQuery>);
+  mockSignedIn();
   vi.spyOn(api, "fetchProcessingOperatorSettings").mockResolvedValue({
     ...settings,
     runner_budget_enabled: false,
   });
-  vi.spyOn(filesAtOnceApi, "fetchProcessingFilesAtOnce").mockResolvedValue(
-    readout,
-  );
   const save = vi
     .spyOn(api, "putProcessingOperatorSettings")
     .mockResolvedValue({ ...settings, runner_budget_enabled: true });
@@ -148,14 +146,15 @@ it("says what waiting files are waiting for, and hides the resolution budget unt
   ).toHaveTextContent(
     "2 running now. 3 files are waiting for a free slot: 2 of 2 in use.",
   );
-  expect(screen.queryByLabelText(/Budget \(units\)/)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Budget")).not.toBeInTheDocument();
 
+  const budgetSwitch = screen.getByRole("radiogroup", {
+    name: "Also weigh files by resolution",
+  });
+  fireEvent.click(within(budgetSwitch).getByRole("radio", { name: "On" }));
+  expect(screen.getByLabelText("Budget")).toHaveValue(6);
   fireEvent.click(
-    screen.getByRole("checkbox", { name: /Also weigh files by resolution/ }),
-  );
-  expect(screen.getByLabelText(/Budget \(units\)/)).toHaveValue(6);
-  fireEvent.click(
-    screen.getByRole("button", { name: "Save processing settings" }),
+    screen.getByRole("button", { name: "Save performance settings" }),
   );
 
   await waitFor(() => {

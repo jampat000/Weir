@@ -1,513 +1,110 @@
-import { useQueryClient } from "@tanstack/react-query";
-import type { ChangeEvent } from "react";
 import { useEffect, useState } from "react";
-import { useBlocker, useSearchParams } from "react-router-dom";
-import { PageLoading } from "../../components/shared/page-loading";
+import { useSearchParams } from "react-router-dom";
 import {
   WorkspacePage,
   WorkspacePanel,
   WorkspaceTabList,
   type WorkspaceTabOption,
 } from "../../components/shared/workspace-shell";
-import {
-  isHttpErrorFromApi,
-  isLikelyNetworkFailure,
-} from "../../lib/api/error-guards";
-import { useMeQuery } from "../../lib/auth/queries";
-import { CURATED_TIMEZONE_ID_SET } from "../../lib/suite/timezone-options";
-import {
-  suiteConfigurationBackupsQueryKey,
-  useSuiteConfigurationBackupsQuery,
-  useSuiteOperationalHistoryResetMutation,
-  useSuiteSettingsQuery,
-  useSuiteSettingsSaveMutation,
-  useSuiteUpdateStatusQuery,
-} from "../../lib/suite/queries";
-import type { SuiteSettingsPutBody } from "../../lib/suite/types";
-import {
-  fetchConfigurationBundle,
-  fetchStoredConfigurationBackupBlob,
-  putConfigurationBundle,
-  type ConfigurationBundle,
-} from "../../lib/suite/suite-settings-api";
-import {
-  readStoredDisplayDensity,
-  type DisplayDensity,
-} from "../../lib/ui/display-density";
-import { SHOW_SUPPORT_CARD } from "../../lib/support";
-import { SettingsGeneralTab } from "./settings-general-tab";
-import { SettingsBackupTab } from "./settings-backup-tab";
-import { SettingsUpgradeTab } from "./settings-upgrade-tab";
-import { SettingsSecurityTab } from "./settings-security-tab";
-import { SettingsLogsTab } from "./settings-logs-tab";
-import { SettingsSupportTab } from "./settings-support-tab";
-import { SettingsNotificationsTab } from "./settings-notifications-tab";
 import { SettingsMediaManagersTab } from "./settings-media-managers-tab";
+import { SettingsNotificationsTab } from "./settings-notifications-tab";
+import { ProcessingDirectPlaySection } from "../processing/processing-direct-play-section";
+import { ProcessingLibrariesSection } from "../processing/processing-libraries-section";
+import { ProcessingMaintenanceSection } from "../processing/processing-maintenance-section";
+import { ProcessingProcessSettingsSection } from "../processing/processing-process-settings-section";
+import { ProcessingRemuxSection } from "../processing/processing-remux-section";
+import { ProcessingSchedulesSection } from "../processing/processing-schedules-section";
 
-function canEditSuiteGlobal(role: string | undefined): boolean {
-  return role === "operator" || role === "admin";
-}
-
+/**
+ * Settings: how Weir treats your media. Where it lives, what to keep, who to tell about it, how hard
+ * to work and when, and what to say when something needs you.
+ *
+ * Weir itself — what it is running, what it keeps, who can sign in — is the System screen beside this
+ * one in the menu (James, 23 Sep 2026). Splitting them turned one row of nine tabs into two short
+ * rows, and stopped a page about your library sitting next to a page about restoring a backup.
+ *
+ * The order is the order someone sets Weir up in: say where the media is, say what to keep, say who
+ * to tell, then tune how hard it works and when. James chose tabs across the top over a second side
+ * menu ("I dont like 2 side menus", 2026-09-22).
+ */
 type TabId =
-  | "general"
-  | "backup"
-  | "upgrade"
-  | "security"
-  | "logs"
-  | "notifications"
+  | "libraries"
+  | "rules"
   | "media-managers"
-  | "support";
+  | "performance"
+  | "cleanup"
+  | "schedule"
+  | "alerts";
 
-function settingsTabs(
-  showSupport: boolean,
-): readonly WorkspaceTabOption<TabId>[] {
-  return [
-    { id: "general", label: "General" },
-    { id: "security", label: "Security" },
-    { id: "backup", label: "Backup and restore" },
-    { id: "upgrade", label: "Upgrade" },
-    { id: "logs", label: "Logs" },
-    { id: "notifications", label: "Notifications" },
-    { id: "media-managers", label: "Media managers" },
-    ...(showSupport ? ([{ id: "support", label: "Support" }] as const) : []),
-  ];
-}
+const SETTINGS_TABS: readonly WorkspaceTabOption<TabId>[] = [
+  { id: "libraries", label: "Libraries" },
+  { id: "rules", label: "Rules" },
+  { id: "media-managers", label: "Media managers" },
+  { id: "performance", label: "Performance" },
+  { id: "cleanup", label: "Cleanup" },
+  { id: "schedule", label: "Schedule" },
+  { id: "alerts", label: "Alerts" },
+];
 
-function normalizeSettingsTab(
-  candidate: string | null | undefined,
-  supportEnabled: boolean,
-): TabId {
+/** A tab name from the address, including the names earlier versions used. */
+function normalizeSettingsTab(candidate: string | null | undefined): TabId {
   switch ((candidate || "").trim().toLowerCase()) {
-    case "backup":
-      return "backup";
-    case "upgrade":
-      return "upgrade";
-    case "security":
-      return "security";
-    case "logs":
-      return "logs";
-    case "notifications":
-      return "notifications";
+    case "rules":
+    case "audio-subtitles":
+      return "rules";
     case "media-managers":
       return "media-managers";
-    case "support":
-      return supportEnabled ? "support" : "general";
+    case "performance":
+    case "running":
+    case "processing":
+      return "performance";
+    case "cleanup":
+    case "housekeeping":
+    case "maintenance":
+      return "cleanup";
+    case "schedule":
+    case "schedules":
+      return "schedule";
+    case "alerts":
+    case "notifications":
+      return "alerts";
     default:
-      return "general";
+      return "libraries";
   }
 }
 
-/** Settings: General (timezone, display density, configuration export), Security, Logs (retention + recent events). */
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const queryClient = useQueryClient();
-  const me = useMeQuery();
-  const settingsQ = useSuiteSettingsQuery();
-  const save = useSuiteSettingsSaveMutation();
-  const resetHistory = useSuiteOperationalHistoryResetMutation();
-
-  const showSupportTab = SHOW_SUPPORT_CARD;
   const [tab, setTab] = useState<TabId>(() =>
-    normalizeSettingsTab(searchParams.get("tab"), showSupportTab),
+    normalizeSettingsTab(searchParams.get("tab")),
   );
+
+  // Back, Forward and the side menu change the address without remounting the page.
+  useEffect(() => {
+    setTab(normalizeSettingsTab(searchParams.get("tab")));
+  }, [searchParams]);
 
   function setSettingsTab(nextTab: TabId): void {
     setTab(nextTab);
     const nextParams = new URLSearchParams(searchParams);
-    if (nextTab === "general") {
+    // Libraries is where Settings opens, so it needs no tab in the address.
+    if (nextTab === "libraries") {
       nextParams.delete("tab");
     } else {
       nextParams.set("tab", nextTab);
     }
+    for (const name of ["show", "status", "path"]) nextParams.delete(name);
     setSearchParams(nextParams);
-  }
-  const [appTimezone, setAppTimezone] = useState<string | null>(null);
-  const [logRetentionDaysDraft, setLogRetentionDaysDraft] = useState<
-    string | null
-  >(null);
-  const [activityRetentionDaysDraft, setActivityRetentionDaysDraft] = useState<
-    string | null
-  >(null);
-  const [displayDensity, setDisplayDensity] = useState<DisplayDensity>(() =>
-    readStoredDisplayDensity(),
-  );
-  const [backupBusy, setBackupBusy] = useState(false);
-  const [backupMsg, setBackupMsg] = useState<string | null>(null);
-  const [backupErr, setBackupErr] = useState<string | null>(null);
-  const [resetHistoryMsg, setResetHistoryMsg] = useState<string | null>(null);
-  const [resetHistoryConfirm, setResetHistoryConfirm] = useState("");
-  const [configurationBackupEnabled, setConfigurationBackupEnabled] =
-    useState(false);
-  const [
-    configurationBackupIntervalHours,
-    setConfigurationBackupIntervalHours,
-  ] = useState(24);
-  const [
-    configurationBackupPreferredTime,
-    setConfigurationBackupPreferredTime,
-  ] = useState("02:00");
-  const [lastSuiteSaveTarget, setLastSuiteSaveTarget] = useState<
-    "timezone" | "logs" | "backup" | null
-  >(null);
-
-  useEffect(() => {
-    if (!settingsQ.data) {
-      return;
-    }
-    const fromServer = settingsQ.data.app_timezone || "";
-    setAppTimezone(CURATED_TIMEZONE_ID_SET.has(fromServer) ? fromServer : null);
-    setLogRetentionDaysDraft(null);
-    setActivityRetentionDaysDraft(null);
-    setConfigurationBackupEnabled(
-      Boolean(settingsQ.data.configuration_backup_enabled),
-    );
-    setConfigurationBackupIntervalHours(
-      Number.isFinite(
-        Number(settingsQ.data.configuration_backup_interval_hours),
-      )
-        ? Number(settingsQ.data.configuration_backup_interval_hours)
-        : 24,
-    );
-    setConfigurationBackupPreferredTime(
-      (settingsQ.data.configuration_backup_preferred_time || "02:00").trim() ||
-        "02:00",
-    );
-  }, [settingsQ.data]);
-
-  const editable = canEditSuiteGlobal(me.data?.role);
-  const backupsQ = useSuiteConfigurationBackupsQuery(
-    editable && tab === "backup" && Boolean(settingsQ.data),
-  );
-  const updateStatusQ = useSuiteUpdateStatusQuery(
-    tab === "upgrade" && Boolean(settingsQ.data),
-  );
-
-  const serverCuratedTimezone =
-    settingsQ.data &&
-    CURATED_TIMEZONE_ID_SET.has(settingsQ.data.app_timezone || "")
-      ? settingsQ.data.app_timezone
-      : null;
-
-  const timezoneDirty =
-    settingsQ.data !== undefined && appTimezone !== serverCuratedTimezone;
-
-  const logsDirty =
-    settingsQ.data !== undefined &&
-    logRetentionDaysDraft !== null &&
-    logRetentionDaysDraft !== String(settingsQ.data.log_retention_days);
-  const activityRetentionDirty =
-    settingsQ.data !== undefined &&
-    activityRetentionDaysDraft !== null &&
-    activityRetentionDaysDraft !==
-      String(settingsQ.data.activity_retention_days ?? "");
-  const backupScheduleDirty =
-    settingsQ.data !== undefined &&
-    (configurationBackupEnabled !==
-      Boolean(settingsQ.data.configuration_backup_enabled) ||
-      configurationBackupIntervalHours !==
-        Number(settingsQ.data.configuration_backup_interval_hours || 24) ||
-      configurationBackupPreferredTime !==
-        ((
-          settingsQ.data.configuration_backup_preferred_time || "02:00"
-        ).trim() || "02:00"));
-  const isDirty =
-    timezoneDirty || logsDirty || activityRetentionDirty || backupScheduleDirty;
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      isDirty && currentLocation.pathname !== nextLocation.pathname,
-  );
-  useEffect(() => {
-    if (blocker.state !== "blocked") return;
-    if (window.confirm("You have unsaved changes. Leave without saving?")) {
-      blocker.proceed();
-    } else {
-      blocker.reset();
-    }
-  }, [blocker]);
-  useEffect(() => {
-    if (!isDirty) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [isDirty]);
-
-  useEffect(() => {
-    setTab(normalizeSettingsTab(searchParams.get("tab"), showSupportTab));
-  }, [searchParams, showSupportTab]);
-  useEffect(() => {
-    if (tab === "support" && !showSupportTab) {
-      setTab("general");
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.delete("tab");
-      setSearchParams(nextParams, { replace: true });
-    }
-  }, [searchParams, setSearchParams, showSupportTab, tab]);
-
-  const loadingAny = settingsQ.isPending || me.isPending;
-
-  async function handleDownloadConfiguration() {
-    setBackupErr(null);
-    setBackupMsg(null);
-    setBackupBusy(true);
-    try {
-      const bundle = await fetchConfigurationBundle();
-      const blob = new Blob([JSON.stringify(bundle, null, 2)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `weir-configuration-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      setBackupMsg("Download started.");
-    } catch (e) {
-      setBackupErr(e instanceof Error ? e.message : "Could not export.");
-    } finally {
-      setBackupBusy(false);
-    }
-  }
-
-  async function handleRestoreFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const input = event.target;
-    const file = input.files?.[0];
-    input.value = "";
-    if (!file) {
-      return;
-    }
-    setBackupErr(null);
-    setBackupMsg(null);
-    try {
-      const text = await file.text();
-      const parsed = JSON.parse(text) as unknown;
-      if (typeof parsed !== "object" || parsed === null) {
-        setBackupErr("This file is not valid JSON.");
-        return;
-      }
-      const bundle = parsed as ConfigurationBundle;
-      // Only check that this looks like a bundle at all. Which format versions are
-      // supported is the server's to decide, and it answers 400 with a reason for one it
-      // cannot take (ConfigurationBundleStore.FormatVersion). Restating the number here is
-      // what broke this: the client insisted on 1 while the server had moved to 4, so every
-      // real export was rejected before it was ever sent.
-      if (typeof bundle.format_version !== "number") {
-        setBackupErr("This file is not a Weir configuration export.");
-        return;
-      }
-      if (
-        !window.confirm(
-          "Replace the settings on this server from this file? This cannot be undone.",
-        )
-      ) {
-        return;
-      }
-      setBackupBusy(true);
-      await putConfigurationBundle(bundle);
-      await queryClient.invalidateQueries();
-      const refreshed = await settingsQ.refetch();
-      if (refreshed.data) {
-        const tz = refreshed.data.app_timezone || "";
-        setAppTimezone(CURATED_TIMEZONE_ID_SET.has(tz) ? tz : null);
-        setLogRetentionDaysDraft(null);
-        setActivityRetentionDaysDraft(null);
-      }
-      setBackupMsg("Configuration restored.");
-    } catch (e) {
-      setBackupErr(e instanceof Error ? e.message : "Could not restore.");
-    } finally {
-      setBackupBusy(false);
-    }
-  }
-
-  if (loadingAny) {
-    return <PageLoading label="Loading settings" />;
-  }
-
-  if (settingsQ.isError) {
-    const err = settingsQ.error;
-    return (
-      <div className="mm-page" data-testid="suite-settings-page">
-        <header className="mm-page__intro">
-          <h1 className="mm-page__title">Settings</h1>
-          <p className="mm-page__lead">
-            {isLikelyNetworkFailure(err)
-              ? "Could not reach the Weir API. Check that the backend is running."
-              : isHttpErrorFromApi(err)
-                ? "The server refused this request. Sign in again, then try back here."
-                : "Something went wrong loading settings."}
-          </p>
-        </header>
-      </div>
-    );
-  }
-
-  if (!settingsQ.data) {
-    return null;
-  }
-
-  const normalizedLogRetentionDraft =
-    logRetentionDaysDraft !== null
-      ? logRetentionDaysDraft
-      : String(settingsQ.data.log_retention_days);
-  const finalizeLogRetentionDays = (): number => {
-    const raw = normalizedLogRetentionDraft.trim();
-    if (raw === "") {
-      return 30;
-    }
-    const n = Number(raw);
-    if (!Number.isFinite(n)) {
-      return settingsQ.data.log_retention_days;
-    }
-    return Math.min(Math.max(Math.trunc(n), 1), 3650);
-  };
-
-  const serverActivityRetention = settingsQ.data.activity_retention_days;
-  const normalizedActivityRetentionDraft =
-    activityRetentionDaysDraft !== null
-      ? activityRetentionDaysDraft
-      : String(serverActivityRetention ?? "");
-  /** 0 keeps Activity history until it is cleared; blank or invalid keeps the saved value. */
-  const finalizeActivityRetentionDays = (): number | undefined => {
-    const raw = normalizedActivityRetentionDraft.trim();
-    const n = Number(raw);
-    if (raw === "" || !Number.isFinite(n)) {
-      return serverActivityRetention;
-    }
-    return Math.min(Math.max(Math.trunc(n), 0), 3650);
-  };
-
-  const buildSuitePutBody = (): SuiteSettingsPutBody => {
-    const d = settingsQ.data;
-    const name = (d.product_display_name || "Weir").trim() || "Weir";
-    const tz = (appTimezone ?? d.app_timezone ?? "UTC").trim() || "UTC";
-    const retention = Math.min(
-      3650,
-      Math.max(1, Math.trunc(Number(finalizeLogRetentionDays()))),
-    );
-    const body: SuiteSettingsPutBody = {
-      product_display_name: name,
-      signed_in_home_notice: d.signed_in_home_notice,
-      setup_wizard_state: d.setup_wizard_state,
-      app_timezone: tz,
-      log_retention_days: Number.isFinite(retention)
-        ? retention
-        : d.log_retention_days,
-
-      ...(finalizeActivityRetentionDays() !== undefined
-        ? { activity_retention_days: finalizeActivityRetentionDays() }
-        : {}),
-      configuration_backup_enabled: Boolean(configurationBackupEnabled),
-      configuration_backup_interval_hours: Math.min(
-        720,
-        Math.max(1, Math.trunc(Number(configurationBackupIntervalHours))),
-      ),
-      configuration_backup_preferred_time:
-        configurationBackupPreferredTime.trim() || "02:00",
-    };
-    return body;
-  };
-
-  async function handleSaveTimezone() {
-    if (!settingsQ.data) {
-      return;
-    }
-    setLastSuiteSaveTarget("timezone");
-    save.reset();
-    try {
-      await save.mutateAsync(buildSuitePutBody());
-      setLastSuiteSaveTarget(null);
-    } catch {
-      /* surfaced via save.isError */
-    }
-  }
-
-  async function handleSaveLogs() {
-    if (!settingsQ.data) {
-      return;
-    }
-    setLastSuiteSaveTarget("logs");
-    save.reset();
-    try {
-      await save.mutateAsync(buildSuitePutBody());
-      setLastSuiteSaveTarget(null);
-    } catch {
-      /* surfaced via save.isError */
-    }
-  }
-
-  async function handleSaveBackupSchedule() {
-    if (!settingsQ.data) {
-      return;
-    }
-    setBackupErr(null);
-    setBackupMsg(null);
-    setLastSuiteSaveTarget("backup");
-    save.reset();
-    try {
-      await save.mutateAsync(buildSuitePutBody());
-      setLastSuiteSaveTarget(null);
-      setBackupMsg("Backup schedule saved.");
-      await queryClient.invalidateQueries({
-        queryKey: suiteConfigurationBackupsQueryKey,
-      });
-    } catch (e) {
-      setBackupErr(
-        e instanceof Error ? e.message : "Could not save backup schedule.",
-      );
-    }
-  }
-
-  async function handleDownloadStoredBackup(id: number, fileLabel: string) {
-    setBackupErr(null);
-    setBackupMsg(null);
-    setBackupBusy(true);
-    try {
-      const blob = await fetchStoredConfigurationBackupBlob(id);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileLabel.replace(/[^\w.-]+/g, "_").slice(0, 120);
-      a.click();
-      URL.revokeObjectURL(url);
-      setBackupMsg("Download started.");
-    } catch (e) {
-      setBackupErr(
-        e instanceof Error ? e.message : "Could not download snapshot.",
-      );
-    } finally {
-      setBackupBusy(false);
-    }
-  }
-
-  async function handleResetOperationalHistory() {
-    setResetHistoryMsg(null);
-    try {
-      const result = await resetHistory.mutateAsync(resetHistoryConfirm);
-      setResetHistoryConfirm("");
-      setResetHistoryMsg(
-        `History reset. Removed ${result.total_deleted} old history ${result.total_deleted === 1 ? "item" : "items"}.`,
-      );
-    } catch {
-      /* surfaced below */
-    }
   }
 
   return (
     <WorkspacePage
       title="Settings"
       dataTestId="suite-settings-page"
-      description={
-        <>
-          How Weir itself runs: time zone, history, security, backups, updates
-          and connections. Libraries and processing rules are on the Processing
-          page.
-        </>
-      }
+      description="How Weir treats your media. Work down the tabs and it is set up."
     >
       <WorkspaceTabList
-        tabs={settingsTabs(showSupportTab)}
+        tabs={SETTINGS_TABS}
         activeId={tab}
         onSelect={setSettingsTab}
         ariaLabel="Settings sections"
@@ -516,74 +113,23 @@ export function SettingsPage() {
         dataTestId="settings-section-tabs"
       />
       <WorkspacePanel id="settings-panel" labelledBy={`settings-tab-${tab}`}>
-        {tab === "general" ? (
-          <SettingsGeneralTab
-            editable={editable}
-            settingsData={settingsQ.data}
-            save={save}
-            appTimezone={appTimezone}
-            setAppTimezone={setAppTimezone}
-            timezoneDirty={timezoneDirty}
-            setLogRetentionDaysDraft={setLogRetentionDaysDraft}
-            normalizedLogRetentionDraft={normalizedLogRetentionDraft}
-            finalizeLogRetentionDays={finalizeLogRetentionDays}
-            logsDirty={logsDirty || activityRetentionDirty}
-            normalizedActivityRetentionDraft={normalizedActivityRetentionDraft}
-            setActivityRetentionDaysDraft={setActivityRetentionDaysDraft}
-            finalizeActivityRetentionDays={finalizeActivityRetentionDays}
-            lastSuiteSaveTarget={lastSuiteSaveTarget}
-            displayDensity={displayDensity}
-            setDisplayDensity={setDisplayDensity}
-            resetHistoryConfirm={resetHistoryConfirm}
-            setResetHistoryConfirm={setResetHistoryConfirm}
-            resetHistory={resetHistory}
-            resetHistoryMsg={resetHistoryMsg}
-            onSaveTimezone={() => void handleSaveTimezone()}
-            onSaveLogs={() => void handleSaveLogs()}
-            onResetOperationalHistory={() =>
-              void handleResetOperationalHistory()
-            }
-          />
-        ) : tab === "backup" ? (
-          <SettingsBackupTab
-            editable={editable}
-            settingsData={settingsQ.data}
-            save={save}
-            backupScheduleDirty={backupScheduleDirty}
-            lastSuiteSaveTarget={lastSuiteSaveTarget}
-            configurationBackupEnabled={configurationBackupEnabled}
-            setConfigurationBackupEnabled={setConfigurationBackupEnabled}
-            configurationBackupIntervalHours={configurationBackupIntervalHours}
-            setConfigurationBackupIntervalHours={
-              setConfigurationBackupIntervalHours
-            }
-            configurationBackupPreferredTime={configurationBackupPreferredTime}
-            setConfigurationBackupPreferredTime={
-              setConfigurationBackupPreferredTime
-            }
-            backupsQ={backupsQ}
-            backupBusy={backupBusy}
-            backupMsg={backupMsg}
-            backupErr={backupErr}
-            onSaveBackupSchedule={() => void handleSaveBackupSchedule()}
-            onDownloadConfiguration={() => void handleDownloadConfiguration()}
-            onRestoreFileChange={(e) => void handleRestoreFileChange(e)}
-            onDownloadStoredBackup={(id, fileLabel) =>
-              void handleDownloadStoredBackup(id, fileLabel)
-            }
-          />
-        ) : tab === "upgrade" ? (
-          <SettingsUpgradeTab updateStatusQ={updateStatusQ} />
-        ) : tab === "security" ? (
-          <SettingsSecurityTab />
+        {tab === "libraries" ? (
+          <ProcessingLibrariesSection />
+        ) : tab === "rules" ? (
+          <ProcessingRemuxSection />
         ) : tab === "media-managers" ? (
           <SettingsMediaManagersTab />
-        ) : tab === "notifications" ? (
-          <SettingsNotificationsTab />
-        ) : tab === "support" ? (
-          <SettingsSupportTab />
+        ) : tab === "performance" ? (
+          <div className="mm-quiet-stack">
+            <ProcessingProcessSettingsSection />
+            <ProcessingDirectPlaySection />
+          </div>
+        ) : tab === "cleanup" ? (
+          <ProcessingMaintenanceSection />
+        ) : tab === "schedule" ? (
+          <ProcessingSchedulesSection />
         ) : (
-          <SettingsLogsTab />
+          <SettingsNotificationsTab />
         )}
       </WorkspacePanel>
     </WorkspacePage>

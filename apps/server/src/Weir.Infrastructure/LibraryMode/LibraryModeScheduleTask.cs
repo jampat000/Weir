@@ -1,0 +1,112 @@
+using Microsoft.Extensions.Logging;
+using Weir.Core.Jobs;
+using Weir.Core.LibraryMode;
+using Weir.Core.Processing;
+using Weir.Infrastructure.Jobs;
+using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Scheduling;
+using Weir.Infrastructure.Settings;
+using Weir.Infrastructure.Sqlite;
+
+namespace Weir.Infrastructure.LibraryMode;
+
+/// <summary>When one library's scheduled scan and clean next runs, from what is stored; shared by the timer and the API.</summary>
+public static class LibraryModeScheduling
+{
+    /// <summary>
+    /// Null when it will not run: the schedule is off, the library has no library folders to scan, the library is
+    /// switched off, or its window never opens. May be in the past, which means it is due now.
+    /// </summary>
+    public static async Task<DateTimeOffset?> NextRunAsync(UnitOfWork uow, ProcessingLibraryRecord library, LibrarySettings settings, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        ArgumentNullException.ThrowIfNull(library);
+        ArgumentNullException.ThrowIfNull(settings);
+        if (!settings.ScheduleEnabled || settings.Folders.Count == 0)
+        {
+            return null;
+        }
+
+        var suite = await SuiteSettingsStore.GetAsync(uow).ConfigureAwait(false);
+        var timezone = suite?.AppTimezone is { } zone && !string.IsNullOrWhiteSpace(zone) ? zone.Trim() : "UTC";
+        var last = await LibraryScanStore.LastScheduledRunAtAsync(uow, library.Id).ConfigureAwait(false);
+        var window = new LibraryAdmissionSnapshot(
+            library.Id, library.Enabled, library.ScheduleEnabled, library.ScheduleGrid, library.ScheduleHoursLimited,
+            library.ScheduleDays, library.ScheduleStart, library.ScheduleEnd, library.MaxConcurrentFiles);
+        return LibraryModeSchedule.NextRunAt(last, window, timezone, now);
+    }
+}
+
+/// <summary>
+/// <c>processing-library-mode-schedule</c>: runs library mode's "Scheduled scan and clean" (James, 23 Sep 2026: it must run
+/// on its schedule). Until this existed the switch was saved and shown, and nothing ever read it.
+/// </summary>
+/// <remarks>
+/// Every half minute it asks each library whether its scheduled run is due (<see cref="LibraryModeScheduling"/>) and, when
+/// it is, queues a scan with the <see cref="LibraryModeSchedule.Trigger"/> trigger. The scan queues the clean itself when it
+/// finishes (<see cref="LibraryScanHandler"/>), because only then does Weir know what the files hold. A library already
+/// being scanned is left to finish first. The scan and every clean are ordinary library jobs, so the worker still only
+/// starts them while the library's window is open and processing is not paused.
+/// </remarks>
+public sealed partial class LibraryModeScheduleTask : IPeriodicTask
+{
+    /// <summary>How late a run may start and still count as the one that was due, keeping the next a day after it.</summary>
+    private static readonly TimeSpan OnTime = TimeSpan.FromMinutes(5);
+
+    private readonly SqliteDatabase _database;
+    private readonly ProcessingJobStore _jobs;
+    private readonly TimeProvider _time;
+    private readonly ILogger<LibraryModeScheduleTask> _logger;
+
+    public LibraryModeScheduleTask(SqliteDatabase database, ProcessingJobStore jobs, TimeProvider time, ILogger<LibraryModeScheduleTask> logger)
+    {
+        _database = database ?? throw new ArgumentNullException(nameof(database));
+        _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+        _time = time ?? throw new ArgumentNullException(nameof(time));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public string Name => "processing-library-mode-schedule";
+
+    public TimeSpan Interval => TimeSpan.FromSeconds(30);
+
+    public bool RunAtStart => true;
+
+    public TimeSpan? FailureCooldown => null;
+
+    public string FailureMessage => "Library mode's scheduled scan and clean failed to check its libraries.";
+
+    public async Task RunOnceAsync(CancellationToken cancellationToken)
+    {
+        var now = _time.GetUtcNow();
+        var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
+        await using (uow.ConfigureAwait(false))
+        {
+            foreach (var library in await LibraryStore.ListAsync(uow, enabledOnly: true).ConfigureAwait(false))
+            {
+                var settings = await LibrarySettingsStore.GetAsync(uow, library.Id).ConfigureAwait(false);
+                if (await LibraryModeScheduling.NextRunAsync(uow, library, settings, now).ConfigureAwait(false) is not { } due || due > now)
+                {
+                    continue;
+                }
+
+                if (await LibraryScanStore.ActiveScanAsync(uow, library.Id).ConfigureAwait(false) is not null)
+                {
+                    // A scan someone asked for is already under way; the scheduled one follows once it is done.
+                    continue;
+                }
+
+                // On time, the run keeps the time it was due so the next is exactly a day later; a run that was missed
+                // (Weir was off) starts the day again from now rather than queueing one scan per missed day.
+                var scheduledAt = now - due <= OnTime ? due : now;
+                await LibraryScanStore.RequestScanAsync(uow, _jobs, library.Id, LibraryModeSchedule.Trigger, scheduledAt).ConfigureAwait(false);
+                LogScheduledScanQueued(library.Name);
+            }
+
+            await uow.CommitAsync().ConfigureAwait(false);
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Scheduled scan and clean: checking {Library} now.")]
+    private partial void LogScheduledScanQueued(string library);
+}

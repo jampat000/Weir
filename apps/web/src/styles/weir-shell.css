@@ -35,6 +35,10 @@ html {
   background: var(--mm-bg);
   /* Root rem: Tailwind `text-*` scales with display density (rem is relative to html, not body). */
   font-size: calc(16px * var(--mm-density-font-scale));
+  /* Keep the scrollbar's space whether or not there is a scrollbar. Without this, choosing a
+     filter that shortens the page takes the scrollbar away and everything jumps sideways by
+     its width — most visible switching between the filters on the first screen. */
+  scrollbar-gutter: stable;
 }
 
 body.mm-body {
@@ -78,13 +82,132 @@ body.mm-body {
   background: var(--mm-bg);
 }
 
+/* Phones only: holds the menu button. Pause and the theme switch live in each page's title
+   row (.mm-page-head) since 3.2, so on a desktop this bar has nothing left to carry. */
 .mm-shell-toolbar {
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: flex-end;
   gap: calc(8px * var(--mm-density-ui-scale));
   min-height: var(--mm-control-height);
   margin: 0 0 calc(12px * var(--mm-density-ui-scale));
+}
+
+/* Every page's title row (components/shell/page-header.tsx): the title on the left, Pause
+   and the theme switch on the right. The two controls are one class so they are exactly the
+   same height, which was the condition James set when he chose this layout. */
+.mm-page-head {
+  display: flex;
+  flex-direction: column;
+  gap: calc(6px * var(--mm-density-ui-scale));
+  margin: 0 0 calc(18px * var(--mm-density-ui-scale));
+}
+
+.mm-page-head__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: calc(12px * var(--mm-density-ui-scale))
+    calc(20px * var(--mm-density-ui-scale));
+}
+
+.mm-page-head__title-wrap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: calc(12px * var(--mm-density-ui-scale));
+  min-width: 0;
+}
+
+.mm-page-head__title {
+  margin: 0;
+  font-size: clamp(1.55rem, 3.2vw, 2rem);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--mm-text);
+}
+
+.mm-page-head__actions {
+  display: flex;
+  align-items: center;
+  gap: calc(8px * var(--mm-density-ui-scale));
+  margin-left: auto;
+  min-width: 0;
+}
+
+/* Top-aligned, so the lead sits straight under the title on every page. Bottom-aligned, a taller aside
+   (Processing's figures, Library's scan) pulled the lead down to meet it, and the same line sat at a
+   different height on each screen (James, 23 Sep 2026). */
+.mm-page-head__sub {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: calc(10px * var(--mm-density-ui-scale))
+    calc(24px * var(--mm-density-ui-scale));
+}
+
+.mm-page-head__lead {
+  margin: 0;
+  max-width: min(100%, 62rem);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--mm-text2);
+}
+
+.mm-page-head__aside {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: calc(24px * var(--mm-density-ui-scale));
+  margin-left: auto;
+}
+
+.mm-head-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: calc(36px * var(--mm-density-ui-scale));
+  box-sizing: border-box;
+  padding: 0 calc(14px * var(--mm-density-ui-scale));
+  border: 1px solid var(--mm-line);
+  border-radius: calc(10px * var(--mm-density-ui-scale));
+  background: var(--mm-button-secondary-bg);
+  color: var(--mm-text);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease;
+}
+
+.mm-head-control:hover {
+  border-color: var(--mm-accent-ring);
+}
+
+.mm-head-control:focus-visible {
+  outline: 2px solid var(--mm-accent-ring);
+  outline-offset: 2px;
+}
+
+.mm-head-control:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.mm-head-control--icon {
+  width: calc(36px * var(--mm-density-ui-scale));
+  padding: 0;
+}
+
+.mm-pause-menu .mm-head-control {
+  justify-content: flex-start;
 }
 
 .mm-workspace-page {
@@ -100,9 +223,6 @@ body.mm-body {
   width: 100%;
   margin: 0.9rem 0 1.25rem;
   padding: 0.3rem;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-  scrollbar-width: thin;
   border: 1px solid color-mix(in srgb, var(--mm-border) 82%, var(--mm-gold) 18%);
   border-radius: 14px;
   background:
@@ -117,10 +237,12 @@ body.mm-body {
     0 10px 28px rgba(0, 0, 0, 0.1);
 }
 
+/* Wraps onto a second line when the row is too narrow. It used to scroll sideways, and
+   nothing in Weir may scroll left to right at any width (sign-off condition, 2026-09-22). */
 .mm-workspace-tabs__list {
   display: flex;
-  width: max-content;
-  min-width: 100%;
+  flex-wrap: wrap;
+  width: 100%;
   gap: 0.2rem;
 }
 
@@ -558,7 +680,7 @@ body.mm-body {
   display: flex;
   align-items: center;
   gap: calc(8px * var(--mm-density-ui-scale));
-  margin-right: auto;
+  min-width: 0;
 }
 
 .mm-pause-badge {
@@ -574,6 +696,11 @@ body.mm-body {
 }
 
 .mm-pause-reason {
+  min-width: 0;
+  max-width: 22rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 0.8125rem;
   color: var(--mm-text2);
 }
@@ -581,7 +708,7 @@ body.mm-body {
 .mm-pause-menu {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
+  right: 0;
   z-index: 20;
   display: flex;
   flex-direction: column;
@@ -681,6 +808,8 @@ html[data-mm-theme="light"] .mm-theme-toggle {
 .mm-sidebar {
   width: var(--mm-sidebar-w);
   flex-shrink: 0;
+  /* The collapse handle sits on the seam between the menu and the page, so it needs an origin. */
+  position: relative;
   background:
     linear-gradient(
       180deg,
@@ -716,6 +845,8 @@ html[data-mm-theme="light"] .mm-theme-toggle {
   padding: calc(14px * var(--mm-density-ui-scale)) 0
     calc(14px * var(--mm-density-ui-scale));
   overflow-y: auto;
+  /* The menu may scroll down when it is long; it never scrolls sideways (James, 23 Sep 2026). */
+  overflow-x: clip;
 }
 
 /* AppHydrateFallback (app/hydrate-fallback.tsx) stands in for the real sidebar while a route's
@@ -779,24 +910,27 @@ html[data-mm-theme="light"] .mm-theme-toggle {
   opacity: 0.98;
 }
 
+/* On the divider, at the top: the handle sits centred on the line between the menu and the page
+   (James, 23 Sep 2026, pointing at the spot). It is outside .mm-sidebar-inner, the part that
+   scrolls, so straddling the edge cannot give the menu a sideways scrollbar. */
 .mm-sidebar-collapse {
+  position: absolute;
+  top: 0.85rem;
+  right: -0.875rem;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
-  width: auto;
-  min-width: 40px;
-  height: 32px;
-  margin: 0 0.8rem 0.55rem auto;
-  padding: 0 0.65rem;
-  border: 1px solid var(--mm-border);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--mm-surface-2) 72%, transparent);
+  width: 1.625rem;
+  height: 1.625rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--mm-border-sidebar);
+  border-radius: 50%;
+  background: var(--mm-bg-main);
   color: var(--mm-text3);
   cursor: pointer;
   font: inherit;
-  font-size: 0.72rem;
-  white-space: nowrap;
   transition:
     color 0.16s ease,
     border-color 0.16s ease,
@@ -809,7 +943,6 @@ html[data-mm-theme="light"] .mm-theme-toggle {
   color: var(--mm-accent-bright);
   border-color: var(--mm-accent-ring);
   background: var(--mm-accent-soft);
-  transform: translateY(-1px);
 }
 
 .mm-sidebar-collapse:focus-visible {
@@ -822,20 +955,15 @@ html[data-mm-theme="light"] .mm-theme-toggle {
   align-items: stretch;
 }
 
+/* Collapsing hides the words beside the mark; it does not move the mark. The brand keeps the
+   inset it has when open, so the one thing on screen in both states stays exactly where it was
+   (James, 23 Sep 2026). Only the room to the right of the mark goes, because there is none in a
+   rail this narrow — keeping it made the brand 9px wider than the rail. */
 .mm-sidebar--collapsed .mm-sidebar-brand {
-  align-items: center;
-  justify-content: center;
   width: auto;
-  min-height: calc(70px * var(--mm-density-ui-scale));
-  margin: 0 calc(12px * var(--mm-density-ui-scale))
-    calc(14px * var(--mm-density-ui-scale));
-  padding: 0;
+  margin-right: 0;
+  padding-right: 0;
   border-bottom-color: color-mix(in srgb, var(--mm-stone) 10%, transparent);
-}
-
-.mm-sidebar--collapsed .mm-sidebar-brand-logo {
-  align-self: center;
-  margin: 0;
 }
 
 .mm-sidebar--collapsed .mm-sidebar-tagline,
@@ -846,6 +974,7 @@ html[data-mm-theme="light"] .mm-theme-toggle {
 }
 
 .mm-sidebar--collapsed .mm-sidebar-link {
+  position: relative;
   justify-content: center;
   width: calc(58px * var(--mm-density-ui-scale));
   min-height: calc(54px * var(--mm-density-ui-scale));
@@ -854,17 +983,32 @@ html[data-mm-theme="light"] .mm-theme-toggle {
   border-radius: 16px;
 }
 
-.mm-sidebar--collapsed .mm-sidebar-collapse__label {
+/* "● 2 working" beside Live; just the pulsing dot, on the icon's corner, when the menu is icons. */
+.mm-sidebar-link-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 0.71875rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  white-space: nowrap;
+  color: var(--mm-accent-bright);
+}
+
+.mm-sidebar--collapsed .mm-sidebar-link-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  margin: 0;
+}
+
+.mm-sidebar--collapsed .mm-sidebar-link-badge__text {
   display: none;
 }
 
-.mm-sidebar--collapsed .mm-sidebar-collapse {
-  align-self: center;
-  width: 40px;
-  min-width: 40px;
-  margin: 0 auto calc(10px * var(--mm-density-ui-scale));
-  padding-inline: 0;
-}
+/* The handle is the same handle whether the panel is open or shut — it used to be widened to 40px
+   when collapsed while its height stayed put, which made a circle into an egg (James, 23 Sep 2026). */
 
 .mm-sidebar-collapse__icon {
   display: inline-flex;
@@ -1193,41 +1337,6 @@ html[data-mm-theme="light"] .mm-theme-toggle {
   padding-right: 2px;
   position: relative;
   z-index: 1;
-}
-
-.mm-processing-file-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.85rem;
-}
-
-.mm-processing-files > ul > li {
-  content-visibility: auto;
-  contain-intrinsic-size: 18rem;
-}
-
-.mm-processing-file-content {
-  display: grid;
-  gap: 0.9rem;
-}
-
-.mm-processing-file-main {
-  display: grid;
-  min-width: 0;
-}
-
-.mm-processing-file-select {
-  display: inline-flex;
-  padding-top: 0.2rem;
-}
-
-.mm-processing-file-select input {
-  accent-color: var(--mm-accent);
-}
-
-.mm-processing-file-actions {
-  width: 100%;
-  justify-content: flex-end;
 }
 
 /* Desktop (Material "expanded" and up): first typography step before large / extra-large tiers. */
@@ -1891,21 +2000,69 @@ select.mm-input {
   -moz-appearance: none;
   appearance: none;
   cursor: pointer;
-  padding: 0.625rem 2.35rem 0.625rem 0.75rem;
+  padding: 0.625rem 3rem 0.625rem 0.75rem;
+  /* The mark is the accent colour and it stands in a tinted well behind a hairline, so a control
+     that opens is told apart from one you type into at a glance, not by looking for a 11px grey
+     chevron (James, 23 Sep 2026: "things need to be made obvious and look obvious"). */
   background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' viewBox='0 0 14 14'%3E%3Cpath stroke='%23aeb4bf' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.65' d='m3.5 5.5 3.5 3.5 3.5-3.5'/%3E%3C/svg%3E"),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018) 0%, transparent 52%);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' viewBox='0 0 14 14'%3E%3Cpath stroke='%233ED7C8' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m3.5 5.5 3.5 3.5 3.5-3.5'/%3E%3C/svg%3E"),
+    linear-gradient(
+      to right,
+      var(--mm-border) 0,
+      var(--mm-border) 1px,
+      var(--mm-accent-soft) 1px,
+      var(--mm-accent-soft) 100%
+    );
   background-repeat: no-repeat, no-repeat;
   background-position:
-    right 0.65rem center,
-    0 0;
+    right 0.82rem center,
+    right 0 center;
   background-size:
-    0.7rem auto,
-    auto;
+    0.85rem auto,
+    2.4rem 100%;
+}
+
+html[data-mm-theme="light"] select.mm-input {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' viewBox='0 0 14 14'%3E%3Cpath stroke='%230D6F68' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m3.5 5.5 3.5 3.5 3.5-3.5'/%3E%3C/svg%3E"),
+    linear-gradient(
+      to right,
+      var(--mm-border) 0,
+      var(--mm-border) 1px,
+      var(--mm-accent-soft) 1px,
+      var(--mm-accent-soft) 100%
+    );
+}
+
+/* The anchored listbox trigger draws its own chevron in markup, so it takes the well on its own. */
+.mm-input--opens {
+  background-image: linear-gradient(
+    to right,
+    var(--mm-border) 0,
+    var(--mm-border) 1px,
+    var(--mm-accent-soft) 1px,
+    var(--mm-accent-soft) 100%
+  );
+  background-repeat: no-repeat;
+  background-position: right 0 center;
+  background-size: 2.4rem 100%;
 }
 
 select.mm-input::-ms-expand {
   display: none;
+}
+
+/* The open list is drawn by the browser. On Windows Chrome it took a white background from the OS while the
+   options kept the field's pale dark-theme text, so every choice but the highlighted one was unreadable
+   (James, 23 Sep 2026). The options carry the theme's own surface and text, on every select, whatever its class. */
+select option,
+select optgroup {
+  background-color: var(--mm-surface-2);
+  color: var(--mm-text1);
+}
+
+select option:disabled {
+  color: var(--mm-text3);
 }
 
 .mm-auth-input {
@@ -2116,18 +2273,20 @@ select.mm-input::-ms-expand {
     display: initial;
   }
 
-  .mm-sidebar--collapsed .mm-sidebar-brand {
-    align-items: flex-start;
-    padding-inline: calc(16px * var(--mm-density-ui-scale));
-  }
-
-  .mm-sidebar--collapsed .mm-sidebar-brand-logo {
-    align-self: flex-start;
-  }
+  /* The brand needs no restoring here any more: it keeps its open box in both states. */
 
   .mm-sidebar--collapsed .mm-sidebar-link {
     justify-content: flex-start;
     padding-inline: calc(14px * var(--mm-density-ui-scale));
+  }
+
+  .mm-sidebar--collapsed .mm-sidebar-link-badge {
+    position: static;
+    margin-left: auto;
+  }
+
+  .mm-sidebar--collapsed .mm-sidebar-link-badge__text {
+    display: inline;
   }
 
   .mm-sidebar-collapse {
@@ -2157,6 +2316,7 @@ select.mm-input::-ms-expand {
   }
 
   .mm-shell-toolbar {
+    display: flex;
     position: sticky;
     top: 0;
     z-index: 10;
@@ -2192,10 +2352,6 @@ select.mm-input::-ms-expand {
 }
 
 @media (max-width: 640px) {
-  .mm-processing-file-actions {
-    justify-content: flex-start;
-  }
-
   .mm-main {
     padding-top: clamp(10px, 3.5vw, 16px);
   }
@@ -2798,64 +2954,6 @@ html[data-mm-theme="light"] .bg-black\/20 {
    border is the radio's hit target and its selected state, not a panel around content.
    The Settings > General cards that used to box them in went with that tab's conversion
    to the content language (docs/design/content-language.md, rule 3). */
-.mm-density-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-
-.mm-density-option {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  gap: 0.6rem;
-  padding: 0.55rem 0.7rem;
-  border: 1px solid var(--mm-border);
-  border-radius: var(--mm-radius-sm);
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background-color 0.15s ease;
-}
-
-.mm-density-option:hover {
-  border-color: var(--mm-input-border-hover);
-}
-
-.mm-density-option--selected {
-  border-color: var(--mm-accent);
-  background: var(--mm-accent-soft);
-}
-
-.mm-density-option:focus-within {
-  outline: 2px solid var(--mm-accent-ring);
-  outline-offset: 2px;
-}
-
-.mm-density-option__input {
-  width: 1rem;
-  height: 1rem;
-  margin-top: 0.15rem;
-  flex-shrink: 0;
-  accent-color: var(--mm-accent);
-}
-
-.mm-density-option__label {
-  display: block;
-  color: var(--mm-text1);
-  font-size: 0.875rem;
-  font-weight: 500;
-  line-height: 1.3;
-}
-
-.mm-density-option__hint {
-  display: block;
-  color: var(--mm-text3);
-  font-size: var(--mm-type-caption);
-  line-height: 1.35;
-}
-
 @media (max-width: 360px) {
   .mm-density-options {
     grid-template-columns: minmax(0, 1fr);

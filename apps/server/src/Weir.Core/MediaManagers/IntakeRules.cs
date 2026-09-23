@@ -24,8 +24,11 @@ public static partial class IntakeRules
     public const string NeedsSecretDetail = "Set a webhook secret in Weir so a media manager can ask about hand-offs.";
     public const string NeverReceivedDetail = "Weir has never received this hand-off.";
 
-    /// <summary><c>HANDOFF_CAPABILITIES</c>.</summary>
-    public static readonly IReadOnlyList<string> HandoffCapabilities = ["handoff-status", "handoff-cancel"];
+    /// <summary>
+    /// <c>HANDOFF_CAPABILITIES</c>, plus <c>handoff-outcome</c> (#652, agreed with Deluno on 23 Sep 2026): a manager may tell
+    /// Weir what became of a file Weir handed back, at <c>POST /api/v1/intake/handoffs/{source}/{id}/outcome</c>.
+    /// </summary>
+    public static readonly IReadOnlyList<string> HandoffCapabilities = ["handoff-status", "handoff-cancel", HandbackRules.OutcomeCapability];
 
     /// <summary><c>remux_dedupe_key</c>: the remux job's key for a hand-off, exactly as intake writes it.</summary>
     public static string RemuxDedupeKey(string sourceKey, string handoffId) => $"{RemuxPassJobKind}:{sourceKey}:handoff:{handoffId}";

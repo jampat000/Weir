@@ -21,9 +21,26 @@ public sealed record ProcessingOperatorSettingsRecord
     public bool RunnerBudgetEnabled { get; init; }
     public bool WorkTempStaleSweepEnabled { get; init; } = true;
     public bool FailureCleanupEnabled { get; init; }
+
+    /// <summary>How often the leftover-work-file sweep runs, set in Settings › Cleanup; null keeps the environment's interval.</summary>
+    public long? WorkTempStaleSweepIntervalSeconds { get; init; }
+
+    /// <summary>How often the failed-download cleanup runs, set in Settings › Cleanup; null keeps the environment's interval.</summary>
+    public long? FailureCleanupIntervalSeconds { get; init; }
+
+    /// <summary>
+    /// Whether the Cleanup job removes Weir's own hand-back copies nobody claimed (#652). Off until a person switches it on
+    /// (James, 23 Sep 2026).
+    /// </summary>
+    public bool UnclaimedHandbackCleanupEnabled { get; init; }
+
+    /// <summary>How many days an unclaimed hand-back copy waits before that job may remove it.</summary>
+    public long UnclaimedHandbackWindowDays { get; init; } = 14;
+
+    /// <summary>How often that job runs, set in Settings › Cleanup; null keeps the built-in six hours.</summary>
+    public long? UnclaimedHandbackCleanupIntervalSeconds { get; init; }
     public bool KeepFailedWorkFiles { get; init; }
     public long FileLogRetentionDays { get; init; } = 90;
-    public bool VerboseDetectionLogging { get; init; }
     public long MinFileAgeSeconds { get; init; } = 60;
     public long ProcessingMinInputFileSizeMb { get; init; } = 50;
     public long MinimumFreeDiskSpaceMb { get; init; } = 5120;
@@ -144,6 +161,12 @@ public static class OperatorSettingsRules
     /// <summary>The most files Weir runs at once, and so the most worker slots a server starts (#633).</summary>
     public const int MaxFilesAtOnce = 10;
 
+    /// <summary>The shortest interval Settings › Cleanup offers: a sweep more often than every 15 minutes finds nothing new.</summary>
+    public const int MinCleanupIntervalSeconds = 15 * 60;
+
+    /// <summary>The longest interval Settings › Cleanup offers.</summary>
+    public const int MaxCleanupIntervalSeconds = 30 * 24 * 3600;
+
     /// <summary>A library's own limit meaning "the same as Files at once" (#633).</summary>
     public const long LibraryFollowsFilesAtOnce = 0;
 
@@ -168,4 +191,8 @@ public static class OperatorSettingsRules
     public static long ClampRunnerCost(long raw) => Math.Clamp(raw, 0, 64);
 
     public static long ClampFileLogRetentionDays(long raw) => Math.Clamp(raw, 0, 3650);
+
+    /// <summary>The unclaimed hand-back wait, 1 to 365 days.</summary>
+    public static long ClampUnclaimedHandbackWindowDays(long raw) =>
+        Math.Clamp(raw, Weir.Core.MediaManagers.HandbackRules.MinUnclaimedWindowDays, Weir.Core.MediaManagers.HandbackRules.MaxUnclaimedWindowDays);
 }

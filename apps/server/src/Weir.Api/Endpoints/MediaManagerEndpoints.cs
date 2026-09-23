@@ -24,15 +24,6 @@ public static class MediaManagerEndpoints
 
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(15);
 
-    /// <summary>Where each kind answers a liveness check.</summary>
-    private static readonly Dictionary<string, string> HealthPaths = new(StringComparer.Ordinal)
-    {
-        ["radarr"] = "/api/v3/system/status",
-        ["sonarr"] = "/api/v3/system/status",
-        ["deluno"] = "/api/integrations/external/health",
-        ["native"] = "/api/integrations/external/health",
-    };
-
     /// <summary><c>weir.platform.reconciliation.router</c> (registered after local browse, as in Python).</summary>
     public static IEndpointRouteBuilder MapReconciliationEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -49,6 +40,7 @@ public static class MediaManagerEndpoints
         endpoints.MapV1("GET", "/intake/capabilities", GetIntakeCapabilitiesAsync);
         endpoints.MapV1("GET", "/intake/handoffs/{source_key}/{handoff_id}", GetHandoffAsync);
         endpoints.MapV1("DELETE", "/intake/handoffs/{source_key}/{handoff_id}", DeleteHandoffAsync);
+        endpoints.MapV1("POST", "/intake/handoffs/{source_key}/{handoff_id}/outcome", PostHandoffOutcomeAsync);
 
         // weir.platform.media_managers.connections_api
         endpoints.MapV1("GET", "/media-managers/connections", ListConnectionsAsync);
@@ -318,32 +310,10 @@ public static class MediaManagerEndpoints
         return ApiRoutes.Ok(saved.ToOut());
     }
 
-    /// <summary><c>_probe</c>: ask the manager whether it is there, and say what happened in plain words.</summary>
-    private static async Task<(bool Ok, string Detail)> ProbeAsync(ApiRequest request, string name, string kind, string baseUrl, string? apiKey)
-    {
-        var path = HealthPaths.GetValueOrDefault(kind, "/api/integrations/external/health");
-        try
-        {
-            var client = new MediaManagerHttpClient(baseUrl, apiKey ?? string.Empty, request.Service<IManagerHttpHandlerFactory>(), TestTimeout);
-            await client.HealthOkAsync(path, request.Context.RequestAborted).ConfigureAwait(false);
-        }
-        catch (MediaManagerHttpException exception)
-        {
-            var detail = exception.Message;
-            if (detail.Contains("HTTP 401", StringComparison.Ordinal) || detail.Contains("HTTP 403", StringComparison.Ordinal))
-            {
-                return (false, $"Weir reached {name}, but the API key was refused. Check the key and save it again.");
-            }
-
-            return (false, $"Weir reached {name} but did not get the answer it expected. Check the address points at the app itself, not a page inside it.");
-        }
-        catch (MediaManagerUnreachableException)
-        {
-            return (false, $"Weir could not reach {name} at {baseUrl}. Check the address is right, and that the app is running and reachable from this machine.");
-        }
-
-        return (true, $"Connected. Weir can reach {name}.");
-    }
+    /// <summary><c>_probe</c>, shared with the heartbeat (<see cref="ManagerHealthProbe"/>).</summary>
+    private static Task<(bool Ok, string Detail)> ProbeAsync(ApiRequest request, string name, string kind, string baseUrl, string? apiKey) =>
+        ManagerHealthProbe.ProbeAsync(
+            request.Service<IManagerHttpHandlerFactory>(), name, kind, baseUrl, apiKey, TestTimeout, request.Context.RequestAborted);
 
     private static async Task<ApiResult> PostConnectionTestAsync(ApiRequest request)
     {
@@ -425,11 +395,7 @@ public static class MediaManagerEndpoints
         var dialect = ImportEvents.DialectForSource(sourceKey)
             ?? throw new ApiException(StatusCodes.Status404NotFound, IntakeRules.UnknownSourceDetail(sourceKey));
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await RefusalsAsApiErrors(async () =>
-        {
-            await Intake(request).AuthoriseAsync(uow, dialect.Key, presented).ConfigureAwait(false);
-            return 0;
-        }).ConfigureAwait(false);
+        var signed = await RefusalsAsApiErrors(() => Intake(request).AuthoriseAsync(uow, dialect.Key, presented)).ConfigureAwait(false);
 
         var importEvent = dialect.Normalize(payload);
         if (importEvent is null)
@@ -439,7 +405,23 @@ public static class MediaManagerEndpoints
 
         if (importEvent.EventKind == MediaManagerImportEvent.Imported)
         {
-            return ApiRoutes.Ok(new PyDict().Set("status", "ignored").Set("source", dialect.Key).Set("event", importEvent.EventKind));
+            // #652: Sonarr's and Radarr's "imported" is heard now. A file Weir handed back is recorded, and Weir's copy
+            // released when that is safe; anything else is answered as before and changes nothing.
+            var imported = await request.Service<HandbackOutcomes>()
+                .RecordManagerImportAsync(uow, importEvent, ManagerName(dialect.Key), signed).ConfigureAwait(false);
+            if (!imported.Matched)
+            {
+                return ApiRoutes.Ok(new PyDict().Set("status", "ignored").Set("source", dialect.Key).Set("event", importEvent.EventKind));
+            }
+
+            await request.CommitAsync().ConfigureAwait(false);
+            return ApiRoutes.Ok(new PyDict()
+                .Set("status", "ok")
+                .Set("source", dialect.Key)
+                .Set("event", importEvent.EventKind)
+                .Set("matched", true)
+                .Set("released", imported.Released)
+                .Set("message", imported.Message));
         }
 
         var enqueued = await RefusalsAsApiErrors(() => Intake(request).EnqueueRefineAsync(uow, importEvent)).ConfigureAwait(false);
@@ -517,6 +499,84 @@ public static class MediaManagerEndpoints
             return Task.CompletedTask;
         });
     }
+
+    /// <summary>The manager's name as History and Activity say it: Sonarr, Radarr, Deluno.</summary>
+    private static string ManagerName(string sourceKey) =>
+        ImportEvents.DialectForSource(sourceKey) is { Key: not "native" } dialect ? dialect.DisplayName : "Your media manager";
+
+    /// <summary>
+    /// <c>POST /intake/handoffs/{source_key}/{handoff_id}/outcome</c> (#652, agreed with Deluno on 23 Sep 2026): the manager
+    /// says what became of the file Weir handed back. <c>imported</c> records it and releases Weir's copy when that is safe;
+    /// <c>not-imported</c> is final, and records it and keeps the copy. The same outcome sent again gets the same 200; a
+    /// hand-off never received is 404; one not finished, or with a different outcome already recorded, is 409; a body
+    /// that cannot be read is 422. Authenticated by <c>X-Webhook-Secret</c>, like the other hand-off routes.
+    /// </summary>
+    private static async Task<ApiResult> PostHandoffOutcomeAsync(ApiRequest request)
+    {
+        var body = await request.ReadBodyAsync().ConfigureAwait(false);
+        var issues = new ValidationIssues();
+        var model = new BodyModel(body, issues);
+        var outcome = model.Literal("outcome", HandbackRules.Outcomes);
+        var occurred = model.OptionalDateTime("occurredUtc");
+        var importedPath = model.OptionalStr("importedPath", maxLength: 4000);
+        var reason = model.OptionalStr("reason", maxLength: 2000);
+        model.Finish(ExtraFields.Ignore);
+        if (body is PyDict dict)
+        {
+            if (!dict.TryGetValue("occurredUtc", out var raw))
+            {
+                issues.Add(PydanticRules.Missing(["body", "occurredUtc"], dict));
+            }
+            else if (raw is PyNull)
+            {
+                issues.Add(new ValidationIssue("datetime_type", ["body", "occurredUtc"], "Input should be a valid datetime", raw));
+            }
+            else if (occurred is { IsAware: false })
+            {
+                issues.Add(new ValidationIssue("timezone_aware", ["body", "occurredUtc"], "Input should have timezone info", raw));
+            }
+        }
+
+        issues.ThrowIfAny();
+
+        var (uow, key, row) = await RequireHandoffAsync(request).ConfigureAwait(false);
+        var manager = ManagerName(key);
+        if (row.Outcome is { } recorded)
+        {
+            if (recorded != outcome)
+            {
+                throw new ApiException(
+                    StatusCodes.Status409Conflict,
+                    recorded == HandbackRules.Imported
+                        ? $"{manager} already said it imported this file, so Weir kept that answer."
+                        : $"{manager} already said it will not import this file, so Weir kept that answer.");
+            }
+
+            return ApiRoutes.Ok(OutcomeOut(row.HandoffId, recorded, row.OutcomeReleased, row.OutcomeMessage ?? string.Empty));
+        }
+
+        var status = await Intake(request).Ledger.CurrentStatusAsync(uow, row).ConfigureAwait(false);
+        if (status.State is not (HandoffLedgerRules.Completed or HandoffLedgerRules.PassedThrough))
+        {
+            await request.CommitAsync().ConfigureAwait(false);
+            throw new ApiException(
+                StatusCodes.Status409Conflict,
+                HandoffLedgerRules.TerminalStates.Contains(status.State)
+                    ? $"This hand-off ended {status.State}, so Weir handed back no file to import."
+                    : $"Weir has not finished this hand-off yet (it is {status.State}), so there is no file to import.");
+        }
+
+        var result = await request.Service<HandbackOutcomes>().RecordHandoffOutcomeAsync(
+            uow, row, manager, outcome, occurred!.Value.AsUtc, importedPath, reason).ConfigureAwait(false);
+        await request.CommitAsync().ConfigureAwait(false);
+        return ApiRoutes.Ok(OutcomeOut(row.HandoffId, outcome, result.Released, result.Message));
+    }
+
+    private static PyDict OutcomeOut(string handoffId, string outcome, bool released, string message) => new PyDict()
+        .Set("handoffId", handoffId)
+        .Set("outcome", outcome)
+        .Set("released", released)
+        .Set("message", message);
 
     // --- reconciliation ------------------------------------------------------------------------
 

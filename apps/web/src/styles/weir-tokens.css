@@ -2,8 +2,9 @@
 
 :root {
   color-scheme: dark;
-  /* Display density: overridden on `html[data-mm-density="…"]` (see below). */
-  --mm-density-font-scale: 1.08;
+  /* Kept as variables because every stylesheet multiplies by them. The setting that changed them was a
+     zoom of the whole interface in four near-identical steps, which the browser's own zoom already does. */
+  --mm-density-font-scale: 0.9375;
   --mm-density-ui-scale: 1;
   --mm-main-max-cap: 2400px;
   --mm-charcoal: #0b1418;
@@ -68,6 +69,13 @@
      and the eye had nowhere to land. Sizes are in rem so they follow the density font scale. */
   --mm-type-eyebrow: 0.6875rem; /* 11px, uppercase, tracked — labels and eyebrows */
   --mm-type-caption: 0.78125rem; /* 12.5px — secondary detail under a value */
+
+  /* How wide a control is, decided by what goes in it rather than by whichever max-w-* class
+     the file happened to use. Settings had eight different control widths — 370px beside 367px,
+     752px beside 726px — which is what "not aligned, not uniform" looks like from a foot away. */
+  --mm-field-short: 9rem; /* a number, a time, a count */
+  --mm-field-medium: 22rem; /* a choice, a short name */
+  --mm-field-wide: 40rem; /* a path, a template, a sentence */
   --mm-type-body: 0.84375rem; /* 13.5px — rows and body copy */
   --mm-type-panel: 1rem; /* 16px — panel and card headings */
   --mm-type-title: 1.5rem; /* 24px — page title */
@@ -77,6 +85,8 @@
      Layout-only, set per instance from React; no colour or font is introduced here. */
   --mm-flow-share: 1; /* one lead-band segment's share of the band's width */
   --mm-meter-fill: 0%; /* how full a figure tile's meter is */
+  --mm-live-fill: 0%; /* how far a Live working card's pass has got (weir-processing.css) */
+  --mm-live-bar: 0%; /* one Live throughput bar's height against the tallest */
   /* 0 while the lead band is one proportional row, 1 once it has restacked into a
      labelled list. Set by weir-content.css alone — never inline, never by a page — and
      every difference between the two states is a calc on it, so the band has one switch
@@ -94,10 +104,13 @@
   --mm-shadow-card-inner: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
   --mm-shadow-shell: 0 22px 60px rgba(2, 12, 16, 0.55);
   /* Inset field wells — slightly below card plane; tuned for quiet premium (not deep black wells). */
-  --mm-input-bg: rgba(11, 20, 24, 0.92);
-  --mm-input-bg-hover: rgba(9, 17, 20, 0.94);
-  --mm-input-border: rgba(232, 241, 244, 0.11);
-  --mm-input-border-hover: rgba(232, 241, 244, 0.17);
+  /* A field lifts off the page rather than sinking into it: at 0.92 alpha over the same colour as
+     the background, a control was invisible but for an 11% border (James, 23 Sep 2026: the boxes
+     "dont fit the theme anymore"). */
+  --mm-input-bg: rgba(232, 241, 244, 0.055);
+  --mm-input-bg-hover: rgba(232, 241, 244, 0.085);
+  --mm-input-border: rgba(232, 241, 244, 0.22);
+  --mm-input-border-hover: rgba(62, 215, 200, 0.45);
   --mm-input-border-focus: rgba(62, 215, 200, 0.45);
   /* Focus halo for `.mm-input` / picker triggers — calmer than global `--mm-accent-soft` fills. */
   --mm-input-focus-ring: rgba(62, 215, 200, 0.18);
@@ -165,8 +178,8 @@ html[data-mm-theme="light"] {
   --mm-shadow-shell: 0 22px 60px rgba(16, 54, 64, 0.14);
   --mm-input-bg: rgba(255, 255, 255, 0.96);
   --mm-input-bg-hover: rgba(255, 255, 255, 1);
-  --mm-input-border: rgba(17, 36, 43, 0.18);
-  --mm-input-border-hover: rgba(17, 36, 43, 0.26);
+  --mm-input-border: rgba(17, 36, 43, 0.28);
+  --mm-input-border-hover: rgba(13, 111, 104, 0.5);
   --mm-input-border-focus: rgba(13, 111, 104, 0.55);
   --mm-input-focus-ring: rgba(13, 111, 104, 0.18);
   --mm-eyebrow-color: var(--mm-stone-muted);
@@ -176,22 +189,4 @@ html[data-mm-theme="light"] {
   /* packaging/brand/weir-mark-light.svg; wordmark #11242b is 14.4:1 on the light page. */
   --mm-brand-water: #0d6f68;
   --mm-brand-wordmark: #11242b;
-}
-
-html[data-mm-density="comfortable"] {
-  --mm-density-font-scale: 1.2;
-  --mm-density-ui-scale: 1.12;
-  --mm-main-max-cap: 2600px;
-}
-
-html[data-mm-density="expanded"] {
-  --mm-density-font-scale: 1.32;
-  --mm-density-ui-scale: 1.22;
-  --mm-main-max-cap: 2800px;
-}
-
-html[data-mm-density="compact"] {
-  --mm-density-font-scale: 0.94;
-  --mm-density-ui-scale: 0.84;
-  --mm-main-max-cap: 2800px;
 }

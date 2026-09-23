@@ -11,16 +11,50 @@ namespace Weir.Core.Processing;
 public static class RuleSetConversion
 {
     /// <summary>
-    /// The planner's own reading of a stored subtitle mode (<c>_normalize_subtitle_mode</c>). The stored
-    /// server default is <c>keep_all</c>, which is not one of the two modes the planner implements; it
-    /// asks only whether the value is <c>remove_all</c> and treats everything else as keep-selected.
+    /// A stored subtitle mode as the planner reads it. <c>remove_all</c> removes every subtitle;
+    /// <c>keep_listed</c> (what Settings › Rules saves) and <c>keep_selected</c> keep the listed languages;
+    /// anything else, including the stored default <c>keep_all</c>, keeps every subtitle. This used to map
+    /// everything but <c>remove_all</c> to keep-selected, so "Keep all subtitles" — with its language list
+    /// hidden and empty — removed every subtitle track. An unknown value now errs towards keeping.
     /// </summary>
     public static string NormalizeSubtitleMode(string? raw) =>
-        string.Equals((raw ?? string.Empty).Trim(), RemuxRuleValues.SubtitleModeRemoveAll, StringComparison.OrdinalIgnoreCase)
-            ? RemuxRuleValues.SubtitleModeRemoveAll
-            : RemuxRuleValues.SubtitleModeKeepSelected;
+        (raw ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            RemuxRuleValues.SubtitleModeRemoveAll => RemuxRuleValues.SubtitleModeRemoveAll,
+            "keep_listed" or RemuxRuleValues.SubtitleModeKeepSelected => RemuxRuleValues.SubtitleModeKeepSelected,
+            _ => RemuxRuleValues.SubtitleModeKeepAll,
+        };
 
     /// <summary>One rule set as the config the planner takes. A missing rule set yields the shipped defaults.</summary>
+    /// <summary>
+    /// A profile holding exactly the rules Weir used for a library with none (<see cref="RemuxRules.DefaultConfig"/>), so
+    /// giving such a library a profile changes nothing about what happens to its files (James, 23 Sep 2026: every library
+    /// has a profile, made from today's behaviour).
+    /// </summary>
+    public static ProcessingRuleSetRecord BuiltInDefaults(string name)
+    {
+        var rules = RemuxRules.DefaultConfig();
+        return new ProcessingRuleSetRecord
+        {
+            Name = name,
+            PrimaryAudioLang = rules.PrimaryAudioLang,
+            SecondaryAudioLang = rules.SecondaryAudioLang,
+            TertiaryAudioLang = rules.TertiaryAudioLang,
+            DefaultAudioSlot = rules.DefaultAudioSlot,
+            RemoveCommentary = rules.RemoveCommentary,
+            SubtitleMode = rules.SubtitleMode,
+            SubtitleLangsCsv = string.Join(",", rules.SubtitleLangs),
+            PreserveForcedSubs = rules.PreserveForcedSubs,
+            PreserveDefaultSubs = rules.PreserveDefaultSubs,
+            AudioPreferenceMode = rules.AudioPreferenceMode,
+            AudioSortersJson = rules.AudioSortersJson,
+            RemoveHearingImpairedSubs = rules.RemoveHearingImpairedSubs,
+            AudioKeepMode = rules.AudioKeepMode,
+            SubtitleMaxPerLanguage = rules.SubtitleMaxPerLanguage,
+            SubtitleQualityStrategy = rules.SubtitleQualityStrategy,
+        };
+    }
+
     public static ProcessingRulesConfig ToRulesConfig(ProcessingRuleSetRecord? row)
     {
         if (row is null)
@@ -41,6 +75,7 @@ public static class RuleSetConversion
             PreserveDefaultSubs = row.PreserveDefaultSubs,
             AudioPreferenceMode = RemuxRules.NormalizeAudioPreferenceMode(row.AudioPreferenceMode),
             AudioSortersJson = row.AudioSortersJson ?? string.Empty,
+            SubtitleSortersJson = row.SubtitleSortersJson ?? string.Empty,
             RemoveHearingImpairedSubs = row.RemoveHearingImpairedSubs,
             AudioKeepMode = RemuxRules.NormalizeAudioKeepMode(row.AudioKeepMode),
             SubtitleMaxPerLanguage = row.SubtitleMaxPerLanguage,

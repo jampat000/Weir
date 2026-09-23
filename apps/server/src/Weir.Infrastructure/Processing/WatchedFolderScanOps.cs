@@ -194,6 +194,34 @@ public static class WatchedFolderScanOps
     }
 
     /// <summary>
+    /// When a pending remux pass for this file is held back to a later time, that time; otherwise null. A pass is held back
+    /// for another look at a file that would not read to the end (#646) or a hand-off waiting out its minimum age (#632).
+    /// </summary>
+    public static async Task<DateTimeOffset?> HeldBackRemuxPassStartsAtAsync(
+        UnitOfWork uow, string relativePosix, string mediaScope, long? libraryId, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        var wantScope = ProcessingMediaScopes.Normalize(mediaScope);
+        var rows = await uow.QueryAsync(
+            "SELECT payload_json, not_before FROM jobs WHERE job_kind = @kind AND status = 'pending' " +
+            "AND not_before IS NOT NULL AND julianday(not_before) > julianday(@now)",
+            reader => (PayloadJson: reader.IsDBNull(0) ? null : reader.GetString(0), StartsAt: PythonTimestamps.Parse(reader.GetValue(1))),
+            ("@kind", RequeueStore.RemuxPassJobKind),
+            ("@now", PythonTimestamps.Orm(now))).ConfigureAwait(false);
+
+        DateTimeOffset? earliest = null;
+        foreach (var (payloadJson, startsAt) in rows)
+        {
+            if (startsAt is { } at && (earliest is null || at < earliest) && PayloadNamesFile(payloadJson, relativePosix, wantScope, libraryId))
+            {
+                earliest = at;
+            }
+        }
+
+        return earliest;
+    }
+
+    /// <summary>
     /// The pending or leased remux pass for this file, if any, read inside the caller's write transaction — the
     /// one identity every automatic enqueue path agrees on (library, relative path, scope), so a check and the
     /// insert that depends on it cannot be split by another writer. Oldest first.

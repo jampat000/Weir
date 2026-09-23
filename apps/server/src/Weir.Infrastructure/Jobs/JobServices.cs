@@ -65,6 +65,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         LastReport = await StartupRecovery.RunAsync(_store, _options.WeirHome, _time.GetUtcNow(), _logger, cancellationToken).ConfigureAwait(false);
+        await GiveEveryLibraryAProfileAsync(cancellationToken).ConfigureAwait(false);
 
         // #506's startup sweep runs after the existing recovery above and before any worker starts claiming jobs (this
         // hosted service is registered ahead of the worker lane) — see apps/server/README.md, "Library mode: safe swap".
@@ -81,6 +82,31 @@ public sealed class JobsStartupRecoveryService : IHostedService
             {
                 _logger.LogWarning(exception, "Library mode's startup sweep could not run; interrupted swaps, if any, are picked up at the next start.");
             }
+        }
+    }
+
+    /// <summary>
+    /// Every library has a profile (3.2): one left without, by an older Weir or an import, gets the one it was using,
+    /// before any worker starts. It changes no rule a file is cleaned by.
+    /// </summary>
+    private async Task GiveEveryLibraryAProfileAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var uow = await UnitOfWork.OpenAsync(_store.Database, cancellationToken).ConfigureAwait(false);
+            await using (uow.ConfigureAwait(false))
+            {
+                var given = await Weir.Infrastructure.Processing.LibraryStore.GiveEveryLibraryAProfileAsync(uow).ConfigureAwait(false);
+                await uow.CommitAsync().ConfigureAwait(false);
+                if (given > 0)
+                {
+                    _logger.LogInformation("Gave {Count} libraries the profile they were already using.", given);
+                }
+            }
+        }
+        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or InvalidOperationException)
+        {
+            _logger.LogWarning(exception, "Could not give every library a profile; this is tried again at the next start.");
         }
     }
 
@@ -309,10 +335,17 @@ public interface IPeriodicEnqueuer
     /// <summary>The job kind it enqueues; the timer runs only when this server has a handler for it.</summary>
     string JobKind { get; }
 
+    /// <summary>The interval the environment gives: what <see cref="IntervalAsync"/> falls back to.</summary>
     TimeSpan Interval { get; }
 
-    /// <summary>Whether the family is switched on, read once at startup as Python does.</summary>
+    /// <summary>
+    /// Whether the family is switched on. Read on every check, so switching a family on or off in Settings › Cleanup
+    /// applies within <see cref="PeriodicEnqueueService.DefaultRecheck"/>; Python read it once at startup.
+    /// </summary>
     Task<bool> IsEnabledAsync(CancellationToken cancellationToken);
+
+    /// <summary>How often the family runs now: the interval saved in Settings › Cleanup, else <see cref="Interval"/>.</summary>
+    Task<TimeSpan> IntervalAsync(CancellationToken cancellationToken) => Task.FromResult(Interval);
 
     Task EnqueueOnceAsync(CancellationToken cancellationToken);
 }
@@ -323,8 +356,12 @@ public interface IPeriodicEnqueuer
 /// seconds and try again.
 /// </summary>
 /// <remarks>
-/// A family is only timed when this server can run its job kind, for the same reason unported kinds
-/// are not claimed: a .NET server must not fill the queue with work only another backend can do.
+/// <para>A family is only timed when this server can run its job kind, for the same reason unported kinds
+/// are not claimed: a .NET server must not fill the queue with work only another backend can do.</para>
+/// <para>Python read each family's switch once at startup, and its interval only from the environment, so switching
+/// Cleanup on in the app did nothing until a restart (James's review, 23 Sep 2026). Each timer now checks the switch
+/// and the interval every <see cref="DefaultRecheck"/>: a family switched on runs at once, one switched off stops,
+/// and a new interval counts from its last run.</para>
 /// </remarks>
 public sealed class PeriodicEnqueueService : BackgroundService
 {
@@ -332,17 +369,26 @@ public sealed class PeriodicEnqueueService : BackgroundService
     private readonly JobHandlerRegistry _handlers;
     private readonly TimeProvider _time;
     private readonly ILogger<PeriodicEnqueueService> _logger;
+    private readonly PeriodicEnqueueClock _clock;
+    private readonly TimeSpan _recheck;
+
+    /// <summary>How often a timer looks at its family's switch and interval again.</summary>
+    public static readonly TimeSpan DefaultRecheck = TimeSpan.FromSeconds(30);
 
     public PeriodicEnqueueService(
         IEnumerable<IPeriodicEnqueuer> enqueuers,
         JobHandlerRegistry handlers,
         TimeProvider time,
-        ILogger<PeriodicEnqueueService> logger)
+        ILogger<PeriodicEnqueueService> logger,
+        PeriodicEnqueueClock? clock = null,
+        TimeSpan? recheck = null)
     {
         _enqueuers = [.. enqueuers];
         _handlers = handlers;
         _time = time;
         _logger = logger;
+        _clock = clock ?? new PeriodicEnqueueClock();
+        _recheck = recheck ?? DefaultRecheck;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -356,43 +402,112 @@ public sealed class PeriodicEnqueueService : BackgroundService
                 continue;
             }
 
-            bool enabled;
-            try
-            {
-                enabled = await enqueuer.IsEnabledAsync(stoppingToken).ConfigureAwait(false);
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                _logger.LogError(exception, "Could not read whether {Name} is enabled; leaving it off.", enqueuer.Name);
-                enabled = false;
-            }
-
-            if (enabled && enqueuer.Interval > TimeSpan.Zero)
-            {
-                running.Add(Task.Run(() => RunAsync(enqueuer, stoppingToken), CancellationToken.None));
-            }
+            running.Add(Task.Run(() => RunAsync(enqueuer, stoppingToken), CancellationToken.None));
         }
 
         await Task.WhenAll(running).ConfigureAwait(false);
     }
 
-    internal Task RunAsync(IPeriodicEnqueuer enqueuer, CancellationToken stoppingToken) =>
-        PeriodicTaskRunner.RunAsync(new EnqueueTask(enqueuer), _time, _logger, stoppingToken);
-
-    /// <summary>One family as a periodic task: enqueue at once, then every interval; two seconds after a failure.</summary>
-    private sealed class EnqueueTask(IPeriodicEnqueuer enqueuer) : IPeriodicTask
+    /// <summary>
+    /// One family's timer: while switched on, enqueue when due (at once the first time), then every interval; two seconds
+    /// after a failure. The switch and the interval are read again before every wait, and no wait is longer than the
+    /// recheck, so a change in Settings › Cleanup applies without a restart.
+    /// </summary>
+    internal async Task RunAsync(IPeriodicEnqueuer enqueuer, CancellationToken stoppingToken)
     {
-        public string Name => enqueuer.Name;
+        DateTimeOffset? lastRun = null;
+        DateTimeOffset? retryAt = null;
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            var (enabled, interval) = await ReadSwitchAsync(enqueuer, stoppingToken).ConfigureAwait(false);
+            if (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
 
-        public TimeSpan Interval => enqueuer.Interval;
+            var wait = _recheck;
+            if (!enabled || interval <= TimeSpan.Zero)
+            {
+                _clock.Forget(enqueuer.Name);
+                retryAt = null;
+            }
+            else
+            {
+                var now = _time.GetUtcNow();
+                var due = retryAt ?? (lastRun is { } last ? last + interval : now);
+                if (due <= now)
+                {
+                    if (await TryEnqueueAsync(enqueuer, stoppingToken).ConfigureAwait(false))
+                    {
+                        lastRun = now;
+                        retryAt = null;
+                    }
+                    else if (stoppingToken.IsCancellationRequested)
+                    {
+                        return;
+                    }
+                    else
+                    {
+                        retryAt = now + PeriodicSchedule.FailureCooldown;
+                    }
 
-        public bool RunAtStart => true;
+                    due = retryAt ?? now + interval;
+                }
 
-        public TimeSpan? FailureCooldown => PeriodicSchedule.FailureCooldown;
+                _clock.Record(enqueuer.Name, enqueuer.JobKind, due, interval);
+                var untilDue = due - _time.GetUtcNow();
+                wait = untilDue >= _recheck ? _recheck : untilDue > TimeSpan.Zero ? untilDue : TimeSpan.Zero;
+            }
 
-        public string FailureMessage => $"Periodic enqueue failed ({enqueuer.Name})";
+            try
+            {
+                await Task.Delay(wait, _time, stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+        }
+    }
 
-        public Task RunOnceAsync(CancellationToken cancellationToken) => enqueuer.EnqueueOnceAsync(cancellationToken);
+    private async Task<(bool Enabled, TimeSpan Interval)> ReadSwitchAsync(IPeriodicEnqueuer enqueuer, CancellationToken stoppingToken)
+    {
+        try
+        {
+            var enabled = await enqueuer.IsEnabledAsync(stoppingToken).ConfigureAwait(false);
+            return (enabled, enabled ? await enqueuer.IntervalAsync(stoppingToken).ConfigureAwait(false) : TimeSpan.Zero);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            return (false, TimeSpan.Zero);
+        }
+#pragma warning disable CA1031 // An unreadable switch leaves the family off until the next check; the loop must survive it.
+        catch (Exception exception)
+#pragma warning restore CA1031
+        {
+            _logger.LogError(exception, "Could not read whether {Name} is enabled; leaving it off.", enqueuer.Name);
+            return (false, TimeSpan.Zero);
+        }
+    }
+
+    private async Task<bool> TryEnqueueAsync(IPeriodicEnqueuer enqueuer, CancellationToken stoppingToken)
+    {
+        try
+        {
+            await enqueuer.EnqueueOnceAsync(stoppingToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            return false;
+        }
+#pragma warning disable CA1031 // A failed run is logged and retried after the cooldown; the loop must survive it.
+        catch (Exception exception)
+#pragma warning restore CA1031
+        {
+            _logger.LogError(exception, "Periodic enqueue failed ({Name})", enqueuer.Name);
+            return false;
+        }
     }
 }
 
@@ -406,6 +521,47 @@ public static class PeriodicJobKinds
     public const string TvFailureCleanupSweep = "processing.tv_failure_cleanup_sweep.v1";
     public const string MovieFailureCleanupSweepDedupeKey = "processing.movie_failure_cleanup_sweep:v1";
     public const string TvFailureCleanupSweepDedupeKey = "processing.tv_failure_cleanup_sweep:v1";
+
+    /// <summary>Removes hand-back copies nobody claimed (#652). .NET only: the Python backend never had it.</summary>
+    public const string UnclaimedHandbackCleanup = "processing.unclaimed_handback_cleanup.v1";
+    public const string UnclaimedHandbackCleanupDedupeKeyMovie = "processing.unclaimed_handback_cleanup:v1:movie";
+    public const string UnclaimedHandbackCleanupDedupeKeyTv = "processing.unclaimed_handback_cleanup:v1:tv";
+}
+
+/// <summary>
+/// The unclaimed hand-back cleanup on a timer (#652): one row per scope, deduped per scope, like the work file sweep.
+/// Enabled by <c>operator_settings.unclaimed_handback_cleanup_enabled</c>, which is off until a person switches it on; the
+/// interval is the one saved in Settings › Cleanup, or six hours.
+/// </summary>
+public sealed class UnclaimedHandbackCleanupEnqueuer : IPeriodicEnqueuer
+{
+    private readonly ProcessingJobStore _store;
+    private readonly string _scope;
+
+    public UnclaimedHandbackCleanupEnqueuer(ProcessingJobStore store, string mediaScope)
+    {
+        _store = store;
+        _scope = ProcessingLibraryFolders.NormalizeMediaScope(mediaScope);
+    }
+
+    public string Name => $"unclaimed hand-back cleanup ({_scope})";
+
+    public string JobKind => PeriodicJobKinds.UnclaimedHandbackCleanup;
+
+    public TimeSpan Interval => TimeSpan.FromSeconds(Weir.Core.MediaManagers.HandbackRules.DefaultUnclaimedIntervalSeconds);
+
+    public Task<bool> IsEnabledAsync(CancellationToken cancellationToken) =>
+        WorkTempStaleSweepEnqueuer.OperatorSettingFlagAsync(_store, "unclaimed_handback_cleanup_enabled", defaultValue: false, cancellationToken);
+
+    public Task<TimeSpan> IntervalAsync(CancellationToken cancellationToken) =>
+        WorkTempStaleSweepEnqueuer.OperatorSettingIntervalAsync(_store, "unclaimed_handback_cleanup_interval_seconds", Interval, cancellationToken);
+
+    public Task EnqueueOnceAsync(CancellationToken cancellationToken) =>
+        _store.EnqueueOrGetAsync(
+            _scope == "tv" ? PeriodicJobKinds.UnclaimedHandbackCleanupDedupeKeyTv : PeriodicJobKinds.UnclaimedHandbackCleanupDedupeKeyMovie,
+            PeriodicJobKinds.UnclaimedHandbackCleanup,
+            PyJsonWriter.Dumps(new PyDict().Set("media_scope", _scope).Set("trigger", "scheduled"), PyJsonFormat.Compact),
+            cancellationToken: cancellationToken);
 }
 
 /// <summary>
@@ -436,12 +592,25 @@ public sealed class WorkTempStaleSweepEnqueuer : IPeriodicEnqueuer
     public Task<bool> IsEnabledAsync(CancellationToken cancellationToken) =>
         _killSwitch ? Task.FromResult(false) : OperatorSettingFlagAsync(_store, "work_temp_stale_sweep_enabled", defaultValue: true, cancellationToken);
 
+    public Task<TimeSpan> IntervalAsync(CancellationToken cancellationToken) =>
+        OperatorSettingIntervalAsync(_store, "work_temp_stale_sweep_interval_seconds", Interval, cancellationToken);
+
     public Task EnqueueOnceAsync(CancellationToken cancellationToken) =>
         _store.EnqueueOrGetAsync(
             _scope == "tv" ? PeriodicJobKinds.WorkTempStaleSweepDedupeKeyTv : PeriodicJobKinds.WorkTempStaleSweepDedupeKeyMovie,
             PeriodicJobKinds.WorkTempStaleSweep,
             PyJsonWriter.Dumps(new PyDict().Set("media_scope", _scope).Set("trigger", "scheduled"), PyJsonFormat.Compact),
             cancellationToken: cancellationToken);
+
+    /// <summary>An interval column of the operator settings row (seconds), or <paramref name="fallback"/> when it is not set.</summary>
+    internal static Task<TimeSpan> OperatorSettingIntervalAsync(ProcessingJobStore store, string column, TimeSpan fallback, CancellationToken cancellationToken) =>
+        store.InTransactionAsync(
+            (connection, transaction) =>
+            {
+                var value = ProcessingJobStore.Scalar(connection, transaction, $"SELECT {column} FROM operator_settings WHERE id = 1");
+                return value is long seconds && seconds > 0 ? TimeSpan.FromSeconds(seconds) : fallback;
+            },
+            cancellationToken);
 
     /// <summary>A boolean column of the operator settings row; Python creates the row with its defaults when missing.</summary>
     internal static Task<bool> OperatorSettingFlagAsync(ProcessingJobStore store, string column, bool defaultValue, CancellationToken cancellationToken) =>
@@ -482,6 +651,9 @@ public sealed class FailureCleanupSweepEnqueuer : IPeriodicEnqueuer
         _killSwitch
             ? Task.FromResult(false)
             : WorkTempStaleSweepEnqueuer.OperatorSettingFlagAsync(_store, "failure_cleanup_enabled", defaultValue: false, cancellationToken);
+
+    public Task<TimeSpan> IntervalAsync(CancellationToken cancellationToken) =>
+        WorkTempStaleSweepEnqueuer.OperatorSettingIntervalAsync(_store, "failure_cleanup_interval_seconds", Interval, cancellationToken);
 
     public Task EnqueueOnceAsync(CancellationToken cancellationToken) =>
         _store.InTransactionAsync(
@@ -557,6 +729,8 @@ public static class WeirJobs
             sp.GetRequiredService<SqliteDatabase>(), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<IJobQueueMetrics>()));
         services.TryAddSingleton(sp => new JobHandlerRegistry(sp.GetServices<IJobHandler>()));
         services.TryAddSingleton<ProcessingJobProcessor>();
+        // The work file sweep is queued below; without a handler its jobs waited in the queue for ever.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHandler, WorkTempStaleSweepHandler>());
 
         // Kill switches: an explicitly set variable that reads as off wins over the saved setting.
         const string sweepVariable = "WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MOVIE_SCHEDULE_ENABLED";
@@ -572,11 +746,18 @@ public static class WeirJobs
         services.AddSingleton<IPeriodicEnqueuer>(sp => new FailureCleanupSweepEnqueuer(
             sp.GetRequiredService<ProcessingJobStore>(), "tv", TimeSpan.FromSeconds(options.ProcessingTvFailureCleanupScheduleIntervalSeconds), cleanupKilled));
 
+        // #652: hand-back copies nobody claimed. Off until a person switches it on in Settings › Cleanup.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHandler, UnclaimedHandbackCleanupHandler>());
+        services.AddSingleton<IPeriodicEnqueuer>(sp => new UnclaimedHandbackCleanupEnqueuer(sp.GetRequiredService<ProcessingJobStore>(), "movie"));
+        services.AddSingleton<IPeriodicEnqueuer>(sp => new UnclaimedHandbackCleanupEnqueuer(sp.GetRequiredService<ProcessingJobStore>(), "tv"));
+
         // Hosted services start in this order: recovery completes before any worker claims.
         services.AddSingleton<JobsStartupRecoveryService>();
         services.AddHostedService(sp => sp.GetRequiredService<JobsStartupRecoveryService>());
         services.AddSingleton<IPeriodicTask, JobRowsRetentionTask>();
         services.AddWeirPeriodicTasks();
+        // When each Cleanup family next runs, for Settings › Cleanup.
+        services.AddSingleton<PeriodicEnqueueClock>();
         services.AddHostedService<PeriodicEnqueueService>();
         if (options.ProcessingWorkerCount > 0)
         {

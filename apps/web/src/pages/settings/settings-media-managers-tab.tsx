@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 
 import {
   MEDIA_MANAGER_KIND_LABELS,
@@ -14,16 +15,12 @@ import {
   useUpdateMediaManagerConnection,
 } from "../../lib/media-managers/queries";
 import { ConfirmRemovalDialog } from "../../components/ui/confirm-removal-dialog";
+import { Field } from "../../components/shared/field";
 import {
   mmActionButtonClass,
-  mmEditableTextFieldClass,
   mmTechnicalMonoSmallClass,
 } from "../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
-import {
-  mmModuleTabBlurbBandClass,
-  mmModuleTabBlurbTextClass,
-} from "../../lib/ui/mm-module-tab-blurb";
 import {
   QuietFieldGroup,
   quietActionRowClass,
@@ -80,12 +77,16 @@ function ConnectionStatusPanel({
   // unchecked rather than borrowing the success colour.
   const result = connection.last_test_at ? connection.last_test_ok : null;
 
+  // Weir checks every enabled manager each minute (the heartbeat), so this is how it is now, not when someone
+  // last pressed Test.
   const headline =
     result === null
-      ? "Not checked yet"
+      ? connection.enabled
+        ? "Checking…"
+        : "Off"
       : result
-        ? "Connected"
-        : "Connection failed";
+        ? "Answering"
+        : "Not answering";
 
   // The site's own status colours, so the headline reads the same in light and dark
   // as every other good/bad word in Weir, not a raw palette green and red.
@@ -107,15 +108,16 @@ function ConnectionStatusPanel({
         <span className="font-medium text-[var(--mm-text)]">
           {connection.last_test_at ? fmt(connection.last_test_at) : "never"}
         </span>
+        {connection.enabled ? " · Weir checks every minute" : ""}
       </p>
       {result === false && connection.last_test_detail ? (
         <p className="mm-status-text--failed mt-1 text-xs">
           {connection.last_test_detail}
         </p>
       ) : null}
-      {result === null ? (
+      {result === null && connection.enabled ? (
         <p className="mt-2 text-xs text-[var(--mm-text2)]">
-          Run a test to check Weir can reach it.
+          Weir checks it within a minute, or press Test connection.
         </p>
       ) : null}
     </div>
@@ -134,66 +136,64 @@ function AddConnectionForm({ onCancel }: { onCancel: () => void }) {
   return (
     <form onSubmit={submit}>
       <QuietFieldGroup title="Add an app">
-        <div className="grid max-w-xl gap-3">
-          <label className="grid gap-1 text-sm">
-            <span className="text-[var(--mm-text2)]">Which app is it?</span>
-            <select
-              data-testid="media-manager-kind"
-              className={mmEditableTextFieldClass}
-              value={form.kind}
-              onChange={(e) =>
-                setForm({ ...form, kind: e.target.value as MediaManagerKind })
-              }
+        <div className="mm-quiet-stack">
+          <div className="mm-field-row">
+            <Field
+              label="Which app is it?"
+              hint={KIND_BLURBS[form.kind]}
+              width="medium"
             >
-              {KINDS.map((kind) => (
-                <option key={kind} value={kind}>
-                  {MEDIA_MANAGER_KIND_LABELS[kind]}
-                </option>
-              ))}
-            </select>
-            <span className="text-xs text-[var(--mm-text2)]">
-              {KIND_BLURBS[form.kind]}
-            </span>
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            <span className="text-[var(--mm-text2)]">Name</span>
-            <input
-              data-testid="media-manager-name"
-              className={mmEditableTextFieldClass}
-              value={form.name}
-              placeholder="Deluno"
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            <span className="text-[var(--mm-text2)]">Where to find it</span>
+              <select
+                data-testid="media-manager-kind"
+                className="mm-input"
+                value={form.kind}
+                onChange={(e) =>
+                  setForm({ ...form, kind: e.target.value as MediaManagerKind })
+                }
+              >
+                {KINDS.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {MEDIA_MANAGER_KIND_LABELS[kind]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Name" width="medium">
+              <input
+                data-testid="media-manager-name"
+                className="mm-input"
+                value={form.name}
+                placeholder="Deluno"
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </Field>
+          </div>
+          <Field
+            label="Where to find it"
+            hint="The address you use to open it in a browser."
+            width="wide"
+          >
             <input
               data-testid="media-manager-base-url"
-              className={mmEditableTextFieldClass}
+              className="mm-input"
               value={form.base_url}
               placeholder="http://192.0.2.10:5099"
               onChange={(e) => setForm({ ...form, base_url: e.target.value })}
             />
-            <span className="text-xs text-[var(--mm-text2)]">
-              The address you use to open it in a browser.
-            </span>
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            <span className="text-[var(--mm-text2)]">API key</span>
+          </Field>
+          <Field
+            label="API key"
+            hint="Weir stores this safely and never shows it again."
+            width="medium"
+          >
             <input
               data-testid="media-manager-api-key"
               type="password"
-              className={mmEditableTextFieldClass}
+              className="mm-input"
               value={form.api_key}
               onChange={(e) => setForm({ ...form, api_key: e.target.value })}
             />
-            <span className="text-xs text-[var(--mm-text2)]">
-              Weir stores this safely and never shows it again.
-            </span>
-          </label>
+          </Field>
         </div>
 
         {create.isError ? (
@@ -255,6 +255,7 @@ function ConnectionCard({
       </div>
       <div className="mm-quiet-section__body">
         <ConnectionStatusPanel connection={connection} fmt={fmt} />
+        <LinkedLibraries connectionId={connection.id} />
 
         <div className="mt-3 flex flex-wrap gap-2">
           <button
@@ -354,9 +355,27 @@ function ConnectionCard({
               >
                 {connection.name} picks up what Weir cleans through a remote
                 path mapping from a library&apos;s watched folder to its output
-                folder. Open that library under Processing → Libraries: its
-                editor shows the exact values to enter and checks that{" "}
+                folder. Open that library under Settings → Libraries: its editor
+                shows the exact values to enter and checks that{" "}
                 {connection.name} has them.
+              </p>
+            ) : null}
+            {connection.kind === "sonarr" || connection.kind === "radarr" ? (
+              // #652: Sonarr and Radarr already say when they import a file. With this set up Weir marks the file
+              // "Imported by …" in History and tidies its own copy away when that is safe.
+              <p
+                className="mb-3 text-[var(--mm-text2)]"
+                data-testid="media-manager-import-webhook"
+              >
+                So Weir hears when {connection.name} imports a file: in{" "}
+                {connection.name}, open Settings → Connect, add a{" "}
+                <strong>Webhook</strong>, tick <strong>On Import</strong> and{" "}
+                <strong>On Upgrade</strong>, and use the address below with
+                method POST. Add a header named <code>X-Webhook-Secret</code>{" "}
+                holding the secret. History then says &ldquo;Imported by{" "}
+                {connection.name}&rdquo;, and Weir removes its own hand-back
+                copy once {connection.name} has taken it, only when that copy is
+                still exactly as Weir wrote it.
               </p>
             ) : null}
             <p className="text-[var(--mm-text2)]">
@@ -418,12 +437,14 @@ export function SettingsMediaManagersTab() {
 
   return (
     <div className="mm-quiet-stack" data-testid="suite-settings-media-managers">
-      <div className={mmModuleTabBlurbBandClass}>
-        <p className={mmModuleTabBlurbTextClass}>
-          The apps that send files to Weir. Connect one so Weir knows when there
-          is something to work on.
-        </p>
-      </div>
+      <p className="mm-quiet-note">
+        The apps that send files to Weir. Weir asks each one when a download is
+        really finished, hands cleaned files back to it, and can ask it for a
+        different release when one is bad. Libraries imported from an app are
+        linked to it; link a library you made yourself in its editor under
+        Libraries. Weir checks every app each minute and says here when one
+        stops answering.
+      </p>
 
       {connections.isLoading ? <p className="mm-quiet-note">Loading…</p> : null}
 
@@ -453,5 +474,31 @@ export function SettingsMediaManagersTab() {
         </div>
       )}
     </div>
+  );
+}
+
+/** The libraries linked to this app, so it is plain what depends on it. */
+function LinkedLibraries({ connectionId }: { connectionId: number }) {
+  const libraries = useProcessingLibrariesQuery();
+  const linked = (libraries.data ?? []).filter((library) =>
+    library.manager_connection_ids.includes(connectionId),
+  );
+  if (!libraries.data) return null;
+  return (
+    <p
+      className="mt-2 text-xs text-[var(--mm-text2)]"
+      data-testid="media-manager-libraries"
+    >
+      {linked.length > 0 ? (
+        <>
+          Libraries:{" "}
+          <span className="font-medium text-[var(--mm-text)]">
+            {linked.map((library) => library.name).join(", ")}
+          </span>
+        </>
+      ) : (
+        "No library uses it yet. Link one in Settings › Libraries."
+      )}
+    </p>
   );
 }

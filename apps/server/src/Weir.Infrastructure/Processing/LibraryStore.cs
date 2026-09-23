@@ -151,6 +151,12 @@ public static class LibraryStore
         var row = LibraryRules.ApplyFields(new ProcessingLibraryRecord { Name = name, MediaType = scope, DisplayOrder = displayOrder }, body, ruleSetExists);
         LibraryRules.ValidateFolders(row.WatchedFolder, row.WorkFolder, row.OutputFolder, others);
 
+        // A library made without a profile gets its kind's default, so no library runs on rules nobody can see.
+        if (row.RuleSetId is null)
+        {
+            row = row with { RuleSetId = await DefaultProfileIdAsync(uow, scope).ConfigureAwait(false) };
+        }
+
         await InsertAsync(uow, row).ConfigureAwait(false);
         var created = await GetByNameAsync(uow, name).ConfigureAwait(false) ?? throw new InvalidOperationException("Library insert race.");
         await SetManagerLinksAsync(uow, created.Id, body.ManagerConnectionIds).ConfigureAwait(false);
@@ -181,11 +187,27 @@ public static class LibraryStore
     /// <c>session.add</c>/<c>flush</c> on a row built from a handful of fields, every other column keeping its
     /// schema default (mirrored by <see cref="ProcessingLibraryRecord"/>'s own property defaults).
     /// </summary>
+    /// <summary>
+    /// A library imported from a media manager, linked to that manager as it is created (#651). Before, the link was
+    /// never written, so no library had a manager: Weir could not reject a bad download through it, and every library
+    /// read "No upstream signal".
+    /// </summary>
     public static async Task<ProcessingLibraryRecord> CreateDiscoveredAsync(UnitOfWork uow, ProcessingLibraryRecord row)
     {
+        if (row.RuleSetId is null)
+        {
+            row = row with { RuleSetId = await DefaultProfileIdAsync(uow, row.MediaType).ConfigureAwait(false) };
+        }
+
         await InsertAsync(uow, row).ConfigureAwait(false);
-        return await GetByNameAsync(uow, row.Name).ConfigureAwait(false)
+        var created = await GetByNameAsync(uow, row.Name).ConfigureAwait(false)
             ?? throw new InvalidOperationException("Discovered library insert race.");
+        if (row.DiscoveredFromConnectionId is { } connectionId)
+        {
+            await SetManagerLinksAsync(uow, created.Id, [connectionId]).ConfigureAwait(false);
+        }
+
+        return created;
     }
 
     /// <summary><c>unlink_library</c>: forget where a library came from, keeping the library itself untouched.</summary>
@@ -272,6 +294,53 @@ public static class LibraryStore
 
     public static Task<ProcessingRuleSetRecord?> GetRuleSetByNameAsync(UnitOfWork uow, string name) =>
         uow.QuerySingleAsync($"SELECT {RuleSetColumns} FROM rule_sets WHERE name = @name", ReadRuleSet, ("@name", name));
+
+    /// <summary>The profile a library of <paramref name="mediaScope"/> gets when none is chosen: "Movies default" or "TV default".</summary>
+    public static string DefaultProfileName(string mediaScope) =>
+        ProcessingMediaScopes.Normalize(mediaScope) == ProcessingMediaScopes.Tv ? "TV default" : "Movies default";
+
+    /// <summary>
+    /// The profile a library of <paramref name="mediaScope"/> should have when it has none, matching what Weir did for it
+    /// until 3.2: new downloads followed the first library of the kind's profile when it had one, and otherwise Weir's
+    /// built-in rules, which become the "Movies default" or "TV default" profile (made once, then reused).
+    /// </summary>
+    public static async Task<long> DefaultProfileIdAsync(UnitOfWork uow, string mediaScope)
+    {
+        if (await SeededForScopeAsync(uow, mediaScope).ConfigureAwait(false) is { RuleSetId: { } followed }
+            && await GetRuleSetAsync(uow, followed).ConfigureAwait(false) is not null)
+        {
+            return followed;
+        }
+
+        var name = DefaultProfileName(mediaScope);
+        if (await GetRuleSetByNameAsync(uow, name).ConfigureAwait(false) is { } existing)
+        {
+            return existing.Id;
+        }
+
+        await InsertRuleSetAsync(uow, RuleSetConversion.BuiltInDefaults(name)).ConfigureAwait(false);
+        return (await GetRuleSetByNameAsync(uow, name).ConfigureAwait(false) ?? throw new InvalidOperationException("Default profile insert race.")).Id;
+    }
+
+    /// <summary>
+    /// Every library has a profile (James, 23 Sep 2026): give each one without a profile the one it was in effect using.
+    /// Libraries are handled in display order, so the first of each kind settles the rest the way it did before. Returns
+    /// how many libraries got one.
+    /// </summary>
+    public static async Task<int> GiveEveryLibraryAProfileAsync(UnitOfWork uow)
+    {
+        var given = 0;
+        foreach (var library in (await ListAsync(uow).ConfigureAwait(false)).Where(l => l.RuleSetId is null))
+        {
+            var profile = await DefaultProfileIdAsync(uow, library.MediaType).ConfigureAwait(false);
+            await uow.ExecuteAsync(
+                "UPDATE libraries SET rule_set_id = @profile, updated_at = CURRENT_TIMESTAMP WHERE id = @id AND rule_set_id IS NULL",
+                ("@profile", profile), ("@id", library.Id)).ConfigureAwait(false);
+            given += 1;
+        }
+
+        return given;
+    }
 
     public static async Task<int> RuleSetUsageCountAsync(UnitOfWork uow, long ruleSetId) =>
         (int)await uow.CountAsync("SELECT COUNT(*) FROM libraries WHERE rule_set_id = @id", ("@id", ruleSetId)).ConfigureAwait(false);

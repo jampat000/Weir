@@ -41,10 +41,10 @@
       ],
       "subtitles": [
         {
-          "input_index": 6,
-          "lang_label": "fre",
+          "input_index": 5,
+          "lang_label": "eng",
           "commentary": false,
-          "forced": true,
+          "forced": false,
           "default": false,
           "channels": 0,
           "lossless": false,
@@ -54,10 +54,10 @@
           "kind": "subtitle"
         },
         {
-          "input_index": 5,
-          "lang_label": "eng",
+          "input_index": 6,
+          "lang_label": "fre",
           "commentary": false,
-          "forced": false,
+          "forced": true,
           "default": false,
           "channels": 0,
           "lossless": false,
@@ -97,7 +97,7 @@
       "audio_before": "English 7.1 TrueHD · English 5.1 AC-3 · English 2.0 AAC · French 5.1 DTS",
       "audio_after": "English 7.1 TrueHD",
       "subtitle_before": "English · French",
-      "subtitle_after": "French · English",
+      "subtitle_after": "English · French",
       "metadata_removed": "—"
     },
     "metadata_argv": []
@@ -107,5 +107,8 @@
       3
     ],
     "reason": "Default audio sorters now rank content tier (main > dub/audio description > commentary) first, replacing the plain commentary key; wording-only for this case (no track-selection change)."
+  },
+  "keep_all": {
+    "reason": "\"Keep all subtitles\" now keeps every subtitle language in the file's own order; it used to be read as keep-selected, ordering by the stored list and removing every subtitle when that list was empty (the mode the Rules screen shows with its list hidden)."
   }
 }

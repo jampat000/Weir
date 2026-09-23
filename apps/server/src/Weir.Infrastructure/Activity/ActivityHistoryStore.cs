@@ -171,6 +171,18 @@ public static class ActivityHistoryStore
             parameters.Add(("@library_id", libraryId));
         }
 
+        // System › Logs shows Weir's own events and History shows the files (James, 23 Sep 2026): "weir" keeps the
+        // events that are not about one file, "files" keeps the ones that are. Anything else filters nothing.
+        switch (Core.Json.PyStrings.Strip(filter.About ?? string.Empty).ToLowerInvariant())
+        {
+            case "weir":
+                where.Add("(activity_events.relative_path IS NULL OR activity_events.relative_path = '')");
+                break;
+            case "files":
+                where.Add("(activity_events.relative_path IS NOT NULL AND activity_events.relative_path <> '')");
+                break;
+        }
+
         if (!string.IsNullOrEmpty(filter.File))
         {
             // A file's whole history: its path, or its name anywhere in a path.
