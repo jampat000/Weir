@@ -19,8 +19,8 @@ using Weir.Infrastructure.Processing.RemuxPass;
 namespace Weir.Api.Endpoints;
 
 /// <summary>
-/// Library mode (#505): library-folder settings, scanning, the file list and Clean, and the schedule toggle. New surface —
-/// there is no Python router to port — see <c>apps/server/README.md</c>, "Library mode", for the storage decision behind it.
+/// Library mode (#505): library-folder settings, scanning, the file list and Clean, and the schedule toggle. See
+/// <c>apps/server/README.md</c>, "Library mode", for the storage decision behind it.
 /// </summary>
 public static class LibraryModeEndpoints
 {

@@ -15,11 +15,11 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Endpoints;
 
-/// <summary>Processing libraries and rule sets — <c>/api/v1/processing/libraries</c>, <c>/processing/rule-sets</c>
-/// (port of <c>libraries_api.py</c>). Manager coverage now reads the linked connections' saved
-/// test results (#520). The opt-in Reject failure policy's support gate (<c>GET /processing/reject-support</c>,
-/// and the same check on save) is ported (#522 part 4). Media-manager library discovery (discover/drift/
-/// import) and library unlink are ported in #554, backed by <see cref="LibraryDiscoveryService"/>.</summary>
+/// <summary>Processing libraries and rule sets — <c>/api/v1/processing/libraries</c>, <c>/processing/rule-sets</c>.
+/// Manager coverage reads the linked connections' saved test results (#520). Also the opt-in Reject failure
+/// policy's support gate (<c>GET /processing/reject-support</c>, and the same check on save; #522 part 4), and
+/// media-manager library discovery (discover/drift/import) and library unlink (#554), backed by
+/// <see cref="LibraryDiscoveryService"/>.</summary>
 public static class ProcessingLibraryEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingLibraryEndpoints(this IEndpointRouteBuilder endpoints)
@@ -47,7 +47,7 @@ public static class ProcessingLibraryEndpoints
         await LibraryStore.GetAsync(uow, id).ConfigureAwait(false)
         ?? throw new ApiException(StatusCodes.Status404NotFound, "That library does not exist.");
 
-    /// <summary><c>_require_connection</c>: <c>int = Path(ge=1)</c>.</summary>
+    /// <summary>The <c>connection_id</c> path parameter: an integer of at least 1, else a validation issue.</summary>
     private static long ConnectionId(ApiRequest request, ValidationIssues issues)
     {
         var raw = request.RouteValue("connection_id") ?? string.Empty;
@@ -69,8 +69,8 @@ public static class ProcessingLibraryEndpoints
         var managerIds = await LibraryStore.ManagerConnectionIdsAsync(uow, row.Id).ConfigureAwait(false);
         var activeJobs = await LibraryStore.ActiveJobCountAsync(uow, row).ConfigureAwait(false);
 
-        // Port of _library_out's manager_coverage: the linked connections' last saved connection-test
-        // result (no live call — a listing must not depend on every linked manager answering right now).
+        // manager_coverage: the linked connections' last saved connection-test result (no live call — a
+        // listing must not depend on every linked manager answering right now).
         var managerRows = new List<MediaManagerConnectionRecord?>(managerIds.Count);
         foreach (var connectionId in managerIds)
         {
@@ -296,7 +296,7 @@ public static class ProcessingLibraryEndpoints
     }
 
     /// <summary>
-    /// <c>_refuse_unsupported_reject</c>: <c>reject</c> deletes downloads, so it cannot be saved for a library no manager
+    /// <c>reject</c> deletes downloads, so it cannot be saved for a library no manager
     /// can take one for. Called after the row is written (so the manager links it was just given are the ones checked)
     /// but before the transaction commits.
     /// </summary>
@@ -431,9 +431,9 @@ public static class ProcessingLibraryEndpoints
     }
 
     /// <summary>
-    /// <c>detection_window_requires_timezone</c> (a <c>field_validator</c>) and
-    /// <c>detection_windows_are_ordered</c> (a <c>model_validator</c>), both surfaced as pydantic
-    /// <c>value_error</c> issues so the 422 body matches FastAPI's shape rather than a flat detail string.
+    /// A detection window needs a timezone, and its windows must be in order. Both are reported as
+    /// <c>value_error</c> validation issues so the 422 body has the issue-list shape existing clients read,
+    /// not a flat detail string.
     /// </summary>
     private static void ValidateDetectionWindows(ProcessingLibraryInput body, ValidationIssues issues)
     {
@@ -639,7 +639,7 @@ public static class ProcessingLibraryEndpoints
         issues.ThrowIfAny();
 
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
-        // Python's <c>_verify_csrf</c> (shared by every route in this file) refuses with this exact wording.
+        // Every route in this file refuses a bad token with this exact wording, which clients match on.
         request.RequireConfirmationToken(csrfToken, "Invalid or expired CSRF token.");
 
         var uow = await request.DbAsync().ConfigureAwait(false);
@@ -704,7 +704,7 @@ public static class ProcessingLibraryEndpoints
         issues.ThrowIfAny();
 
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
-        // Python's <c>_verify_csrf</c> (shared by every route in this file) refuses with this exact wording.
+        // Every route in this file refuses a bad token with this exact wording, which clients match on.
         request.RequireConfirmationToken(csrfToken, "Invalid or expired CSRF token.");
 
         var uow = await request.DbAsync().ConfigureAwait(false);

@@ -17,10 +17,8 @@ namespace Weir.Api.Endpoints;
 
 /// <summary>
 /// "Try on a file": preview what a library's saved or unsaved rules would do to a real media file,
-/// without processing, queueing or writing anything (issue #502). Port has no Python original — there
-/// is no preview endpoint in <c>libraries_api.py</c> today; this is new C#-only surface built
-/// on the already-ported rules engine (<see cref="RemuxRules.PlanRemux"/>) and ffprobe layer
-/// (<see cref="MediaTools"/>).
+/// without processing, queueing or writing anything (issue #502). Built on the rules engine
+/// (<see cref="RemuxRules.PlanRemux"/>) and the ffprobe layer (<see cref="MediaTools"/>).
 /// </summary>
 public static class ProcessingRulesPreviewEndpoints
 {

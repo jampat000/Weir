@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace Weir.Api.Http;
 
-/// <summary>FastAPI's error body: <c>{"detail": "..."}</c>.</summary>
+/// <summary>The error body existing clients read: <c>{"detail": "..."}</c>.</summary>
 public sealed record ErrorDetail([property: JsonPropertyName("detail")] string Detail);
 
 public sealed record HealthResponse(
@@ -46,7 +46,7 @@ internal sealed partial class ApiJsonContext : JsonSerializerContext;
 
 internal static class ApiJson
 {
-    /// <summary>Write a JSON body the way FastAPI does: compact, <c>Content-Type: application/json</c>.</summary>
+    /// <summary>Write a compact JSON body with <c>Content-Type: application/json</c>, as existing clients expect.</summary>
     public static async Task WriteAsync<T>(HttpContext context, int statusCode, T value, JsonTypeInfo<T> typeInfo)
     {
         context.Response.StatusCode = statusCode;

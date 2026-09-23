@@ -87,7 +87,7 @@ public static class WeirServer
         builder.Services.AddSingleton(logFile);
         builder.Logging.ClearProviders();
         builder.Logging.SetMinimumLevel(minimumLevel);
-        // Kestrel and routing chatter at INFO would drown Weir's own lines; uvicorn's access log is off too.
+        // Kestrel and routing chatter at INFO would drown Weir's own lines, and there is no per-request access log.
         builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
         builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", minimumLevel);
         builder.Logging.AddConsole(console => console.FormatterName = WeirConsoleFormatter.FormatterName)
@@ -133,7 +133,7 @@ public static class WeirServer
         return app;
     }
 
-    /// <summary>Port of <c>_warn_startup_misconfigurations</c>.</summary>
+    /// <summary>Logs a warning for each risky or incomplete setting at startup; none of them stops the server.</summary>
     internal static void WarnStartupMisconfigurations(WeirOptions options, ILogger logger)
     {
         if (string.IsNullOrEmpty(options.SessionSecret))
@@ -195,7 +195,7 @@ public static class WeirServer
 
         app.Services.GetRequiredService<ServerLifecycle>().MarkDatabaseOpened();
 
-        // Non-essential, as in Python: a failed prune is logged and startup continues.
+        // Non-essential: a failed prune is logged and startup continues.
         try
         {
             var keepDays = LogRetentionTask.ReadKeepDaysAsync(database).GetAwaiter().GetResult();

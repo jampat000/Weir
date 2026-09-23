@@ -16,10 +16,8 @@ using Weir.Infrastructure.Processing;
 namespace Weir.Api.Endpoints;
 
 /// <summary>
-/// Read-only <c>jobs</c> inspection and pending-only cancel/recover (port of
-/// <c>jobs_inspection_api.py</c>), plus the "why is this file held?" diagnostic (port of
-/// <c>processing_hold_diagnostic_api.py</c> — see <see cref="HoldDiagnosticStore"/> for what is and is not
-/// live without the media-manager port).
+/// Read-only <c>jobs</c> inspection and pending-only cancel/recover, plus the "why is this file held?"
+/// diagnostic (see <see cref="HoldDiagnosticStore"/> for what it can and cannot report).
 /// </summary>
 public static class ProcessingJobsEndpoints
 {

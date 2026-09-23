@@ -14,8 +14,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Api.Endpoints;
 
 /// <summary>
-/// Media manager connections and capabilities, the intake webhook and hand-off status, and system reconciliation
-/// (ports of <c>media_managers.connections_api</c>, <c>media_managers.intake_api</c> and <c>reconciliation.router</c>).
+/// Media manager connections and capabilities, the intake webhook and hand-off status, and system reconciliation.
 /// </summary>
 public static class MediaManagerEndpoints
 {
@@ -24,7 +23,7 @@ public static class MediaManagerEndpoints
 
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(15);
 
-    /// <summary><c>weir.platform.reconciliation.router</c> (registered after local browse, as in Python).</summary>
+    /// <summary>System reconciliation: the report and its repair.</summary>
     public static IEndpointRouteBuilder MapReconciliationEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapV1("GET", "/system/reconciliation", GetReconciliationAsync);
@@ -32,17 +31,17 @@ public static class MediaManagerEndpoints
         return endpoints;
     }
 
-    /// <summary>The intake router, then the connections router, in Python's order.</summary>
+    /// <summary>The intake routes, then the connection routes.</summary>
     public static IEndpointRouteBuilder MapMediaManagerEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        // weir.platform.media_managers.intake_api
+        // Intake: the webhook and hand-off status.
         endpoints.MapV1("POST", "/intake/webhook/{source_key}", PostWebhookAsync);
         endpoints.MapV1("GET", "/intake/capabilities", GetIntakeCapabilitiesAsync);
         endpoints.MapV1("GET", "/intake/handoffs/{source_key}/{handoff_id}", GetHandoffAsync);
         endpoints.MapV1("DELETE", "/intake/handoffs/{source_key}/{handoff_id}", DeleteHandoffAsync);
         endpoints.MapV1("POST", "/intake/handoffs/{source_key}/{handoff_id}/outcome", PostHandoffOutcomeAsync);
 
-        // weir.platform.media_managers.connections_api
+        // Connections.
         endpoints.MapV1("GET", "/media-managers/connections", ListConnectionsAsync);
         endpoints.MapV1("POST", "/media-managers/connections", CreateConnectionAsync);
         endpoints.MapV1("GET", "/media-managers/capabilities", GetCapabilitiesAsync);
@@ -57,7 +56,7 @@ public static class MediaManagerEndpoints
 
     // --- connections ---------------------------------------------------------------------------
 
-    /// <summary><c>_verify_csrf</c>.</summary>
+    /// <summary>Browser origin, session secret, then a session-bound CSRF token; 400 on a bad token.</summary>
     private static void VerifyCsrf(ApiRequest request, string? token)
     {
         request.ValidateBrowserPostOrigin();
@@ -272,8 +271,7 @@ public static class MediaManagerEndpoints
             throw new ApiException(StatusCodes.Status400BadRequest, exception.Message);
         }
 
-        // #544 item 2: Python lets a ValueError from normalize_hhmm escape as a 500; a bad time (`25:00`, `9`)
-        // now answers 400 naming the field that could not be read, instead of crashing.
+        // #544 item 2: a bad time (`25:00`, `9`) answers 400 naming the field that could not be read, not a 500.
         string start;
         try
         {
@@ -310,7 +308,7 @@ public static class MediaManagerEndpoints
         return ApiRoutes.Ok(saved.ToOut());
     }
 
-    /// <summary><c>_probe</c>, shared with the heartbeat (<see cref="ManagerHealthProbe"/>).</summary>
+    /// <summary>The connection test, shared with the heartbeat (<see cref="ManagerHealthProbe"/>).</summary>
     private static Task<(bool Ok, string Detail)> ProbeAsync(ApiRequest request, string name, string kind, string baseUrl, string? apiKey) =>
         ManagerHealthProbe.ProbeAsync(
             request.Service<IManagerHttpHandlerFactory>(), name, kind, baseUrl, apiKey, TestTimeout, request.Context.RequestAborted);
@@ -434,7 +432,7 @@ public static class MediaManagerEndpoints
             .Set("enqueued", enqueued));
     }
 
-    /// <summary><c>_source</c>: the dialect key, or 404.</summary>
+    /// <summary>The dialect key for a source, or 404.</summary>
     private static string Source(string sourceKey) =>
         ImportEvents.DialectForSource(sourceKey)?.Key
         ?? throw new ApiException(StatusCodes.Status404NotFound, IntakeRules.UnknownSourceShortDetail(sourceKey));
@@ -505,7 +503,7 @@ public static class MediaManagerEndpoints
         ImportEvents.DialectForSource(sourceKey) is { Key: not "native" } dialect ? dialect.DisplayName : "Your media manager";
 
     /// <summary>
-    /// <c>POST /intake/handoffs/{source_key}/{handoff_id}/outcome</c> (#652, agreed with Deluno on 23 Sep 2026): the manager
+    /// <c>POST /intake/handoffs/{source_key}/{handoff_id}/outcome</c> (#652, agreed with Deluno): the manager
     /// says what became of the file Weir handed back. <c>imported</c> records it and releases Weir's copy when that is safe;
     /// <c>not-imported</c> is final, and records it and keeps the copy. The same outcome sent again gets the same 200; a
     /// hand-off never received is 404; one not finished, or with a different outcome already recorded, is 409; a body
@@ -588,9 +586,9 @@ public static class MediaManagerEndpoints
     }
 
     /// <summary>
-    /// <c>post_reconciliation_repair</c>. Deliberate fix (#527): Python accepted this with only the session cookie; it now
-    /// requires the browser origin check and a session-bound <c>csrf_token</c> like every other operator POST, answering
-    /// 403 for a bad origin and 400 <c>Invalid or expired CSRF token.</c> for a missing or wrong token.
+    /// Runs a reconciliation repair. Like every other operator POST it requires the browser origin check and a
+    /// session-bound <c>csrf_token</c> (#527), answering 403 for a bad origin and 400
+    /// <c>Invalid or expired CSRF token.</c> for a missing or wrong token.
     /// </summary>
     private static async Task<ApiResult> PostReconciliationRepairAsync(ApiRequest request)
     {

@@ -21,10 +21,8 @@ using Weir.Infrastructure.Processing.RemuxPass;
 namespace Weir.Api.Endpoints;
 
 /// <summary>
-/// The Files screen — <c>/api/v1/processing/files</c> (port of <c>files_api.py</c>).
-/// Implements the fix for #530: <c>passed_through</c> and <c>rejected</c> are valid statuses in both the
-/// response and the <c>file_status</c> filter — the previous status vocabulary omitted them, which 500'd a
-/// response containing either status and 422'd a filter naming one.
+/// The Files screen — <c>/api/v1/processing/files</c>. <c>passed_through</c> and <c>rejected</c> are valid
+/// statuses in both the response and the <c>file_status</c> filter (#530).
 /// </summary>
 public static class ProcessingFilesEndpoints
 {
@@ -207,10 +205,10 @@ public static class ProcessingFilesEndpoints
         }
 
         var jobStore = request.Service<ProcessingJobStore>();
-        // This commit used to sit after MoveToTopAsync, which deadlocked the request against the store's own
-        // connection: RequireUserAsync may have refreshed user_sessions.last_seen_at, and that write holds
-        // SQLite's single write lock until this commit runs, while the store's BEGIN IMMEDIATE waits for it.
-        // Everything above is a read apart from that session touch, so committing here changes nothing else.
+        // Commit before MoveToTopAsync, or the request deadlocks against the store's own connection:
+        // RequireUserAsync may have refreshed user_sessions.last_seen_at, and that write holds SQLite's single
+        // write lock until this commit runs, while the store's BEGIN IMMEDIATE waits for it. Everything above is
+        // a read apart from that session touch, so committing here changes nothing else.
         await request.CommitAsync().ConfigureAwait(false);
         var outcome = await jobStore.MoveToTopAsync(job.Value.Id).ConfigureAwait(false);
         if (outcome != Weir.Core.Jobs.JobActionOutcome.Ok)
@@ -221,7 +219,7 @@ public static class ProcessingFilesEndpoints
         return ApiRoutes.Ok(new PyDict().Set("moved", true).Set("detail", "Moved to the front of the queue. It starts as soon as there is capacity for it."));
     }
 
-    /// <summary><c>pending_remux_job_for_relative_path</c>: the oldest pending remux job for this path.</summary>
+    /// <summary>The oldest pending remux job for this path.</summary>
     private static async Task<(long Id, string PayloadJson)?> FindPendingRemuxJobAsync(Weir.Infrastructure.Sqlite.UnitOfWork uow, string relativePath)
     {
         var rows = await uow.QueryAsync(

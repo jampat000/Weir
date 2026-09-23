@@ -14,8 +14,8 @@ namespace Weir.Api.Http;
 internal static class ResponseMarkers
 {
     /// <summary>
-    /// Set when the outermost error handler answers 500: Starlette's <c>ServerErrorMiddleware</c> sits outside
-    /// every other middleware, so its response carries none of their headers.
+    /// Set when the outermost error handler answers 500. That handler sits outside every other middleware, so
+    /// the other middleware check this and add none of their headers to its response.
     /// </summary>
     public const string ServerError = "weir.server_error";
 
@@ -26,8 +26,9 @@ internal static class ResponseMarkers
 }
 
 /// <summary>
-/// Starlette's <c>ServerErrorMiddleware</c>: an unhandled exception is answered with a plain
-/// <c>Internal Server Error</c> (the exception was already logged by the request context).
+/// The outermost error handler: an unhandled exception is answered with a plain-text 500
+/// <c>Internal Server Error</c>, the exact body existing clients expect (the exception was already logged by the
+/// request context).
 /// </summary>
 public sealed class ServerErrorMiddleware
 {
@@ -58,8 +59,7 @@ public sealed class ServerErrorMiddleware
 /// Forwarded headers, honoured only from a peer inside <c>WEIR_TRUSTED_PROXY_IPS</c> (none by default).
 /// </summary>
 /// <remarks>
-/// Deliberate fix (#528): the Python server runs under uvicorn, whose default <c>forwarded_allow_ips</c>
-/// trusts 127.0.0.1 even when no proxy is configured, so any local process could rotate
+/// Loopback is not trusted by default (#528): otherwise any local process could rotate
 /// <c>X-Forwarded-For</c> past the login rate limit or claim HTTPS.
 /// </remarks>
 public static class TrustedForwardedHeaders
@@ -97,7 +97,10 @@ public static class TrustedForwardedHeaders
     }
 }
 
-/// <summary>Starlette's <c>CORSMiddleware</c> as the Python app configures it when <c>WEIR_CORS_ORIGINS</c> is set.</summary>
+/// <summary>
+/// CORS for the origins in <c>WEIR_CORS_ORIGINS</c>, when set. Preflight answers, header lists and the
+/// <c>Disallowed CORS …</c> 400 body are kept exactly as existing clients and the contract suite expect.
+/// </summary>
 public sealed class CorsMiddleware
 {
     private static readonly string[] AllowMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
@@ -289,7 +292,7 @@ public sealed class HeadMirrorsGetMiddleware
     }
 }
 
-/// <summary><c>XRequestedWithCsrfMiddleware</c>: a browser's mutating API call must send <c>X-Requested-With: XMLHttpRequest</c>.</summary>
+/// <summary>CSRF guard: a browser's mutating API call must send <c>X-Requested-With: XMLHttpRequest</c>.</summary>
 public sealed class XRequestedWithMiddleware
 {
     private static readonly HashSet<string> Mutating = new(StringComparer.Ordinal) { "POST", "PUT", "PATCH", "DELETE" };
@@ -322,7 +325,7 @@ public sealed class XRequestedWithMiddleware
     }
 }
 
-/// <summary>Counts log records by level for the metrics endpoints (the Python log filter's <c>record_log_record</c>).</summary>
+/// <summary>Counts log records by level for the metrics endpoints.</summary>
 public sealed class MetricsLoggerProvider : ILoggerProvider
 {
     private readonly Core.Metrics.RuntimeMetricsStore _metrics;

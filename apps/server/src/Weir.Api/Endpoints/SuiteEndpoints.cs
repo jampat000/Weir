@@ -26,27 +26,20 @@ namespace Weir.Api.Endpoints;
 
 /// <summary>
 /// Suite-wide settings, configuration bundles and snapshots, logs, metrics, updates and operational
-/// history (ports of <c>weir.platform.suite_settings.router</c>, <c>system_configuration.router</c>,
-/// <c>pause.api</c> and <c>local_browse.router</c>).
+/// history, the global pause, the local directory browser and the media-tools report.
 /// </summary>
 public static class SuiteEndpoints
 {
     public static IEndpointRouteBuilder MapSuiteEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        // weir.platform.local_browse.router
+        // Local directory browser.
         endpoints.MapV1("GET", "/system/directories", GetDirectoriesAsync);
 
-        // #548: the external media tools this install actually has. No Python counterpart.
+        // #548: the external media tools this install actually has.
         endpoints.MapV1("GET", "/system/media-tools", GetMediaToolsAsync);
 
-        // weir.platform.suite_settings.router
-        //
-        // One URL per handler. The Python suite had the configuration bundle, the snapshot list and
-        // the update check on two or three addresses each — the `/system/suite-configuration-*` pair
-        // from `system_configuration.router` plus a `/suite/settings/...` spelling — and the port kept
-        // all of them so older browser bundles and hand-tuned reverse proxies would still find one.
-        // 3.0.0 drops the aliases: there is one install, the shipped web app is built from this repo,
-        // and a second address for the same handler is a second thing to secure, document and test.
+        // Suite settings. One URL per handler, with no alias spellings: the shipped web app is built from
+        // this repo, and a second address for the same handler is a second thing to secure, document and test.
         endpoints.MapV1("GET", "/suite/settings", GetSettingsAsync);
         endpoints.MapV1("PUT", "/suite/settings", PutSettingsAsync);
         endpoints.MapV1("GET", "/suite/configuration-bundle", GetBundleAsync);
@@ -64,7 +57,7 @@ public static class SuiteEndpoints
         endpoints.MapV1("GET", "/suite/logs", GetLogsAsync);
         endpoints.MapV1("GET", "/suite/metrics", GetMetricsAsync);
 
-        // weir.platform.pause.api
+        // Global pause.
         endpoints.MapV1("GET", "/pause", GetPauseAsync);
         endpoints.MapV1("PUT", "/pause", PutPauseAsync);
         return endpoints;
@@ -121,8 +114,8 @@ public static class SuiteEndpoints
     }
 
     /// <summary>
-    /// Deliberate fix (#536): the settings are already saved, so a log that cannot be pruned (Python fails on
-    /// invalid UTF-8) is logged and never turns the response into a 500.
+    /// The settings are already saved, so a log that cannot be pruned (for example one holding invalid UTF-8)
+    /// is logged and never turns the response into a 500 (#536).
     /// </summary>
     private static void PruneLog(ApiRequest request, int keepDays)
     {
@@ -212,14 +205,17 @@ public static class SuiteEndpoints
         return new CustomApiResult(context => WriteFileAsync(context, path, row.FileName, "application/json"));
     }
 
-    /// <summary>Starlette's <c>FileResponse</c> headers: disposition, length, last-modified and its md5 ETag.</summary>
+    /// <summary>
+    /// A file download with disposition, length, last-modified and an MD5 ETag of mtime and size, the headers
+    /// existing clients and the contract suite expect.
+    /// </summary>
     internal static async Task WriteFileAsync(HttpContext context, string path, string fileName, string mediaType)
     {
         var info = new FileInfo(path);
         var bytes = await File.ReadAllBytesAsync(path, context.RequestAborted).ConfigureAwait(false);
         var mtimeTicks = info.LastWriteTimeUtc.Ticks - DateTime.UnixEpoch.Ticks;
         var mtime = (mtimeTicks / TimeSpan.TicksPerSecond) + ((mtimeTicks % TimeSpan.TicksPerSecond) * 100 * 1e-9);
-#pragma warning disable CA5351 // Starlette's ETag is an MD5 of mtime and size; it is not a security control.
+#pragma warning disable CA5351 // The ETag is an MD5 of mtime and size; it is not a security control.
         var etag = Convert.ToHexStringLower(MD5.HashData(Encoding.UTF8.GetBytes(PyJsonWriter.FloatRepr(mtime) + "-" + info.Length.ToString(CultureInfo.InvariantCulture))));
 #pragma warning restore CA5351
         var quoted = Uri.EscapeDataString(fileName);
@@ -236,10 +232,9 @@ public static class SuiteEndpoints
     /// <summary>
     /// #548: which external media tools this install has, and what they say they are. Weir bundles both in the
     /// Windows package (<c>server\bin\ffmpeg</c>, <c>server\bin\mkvtoolnix</c>) and the Docker image, but a
-    /// source install provides its own, and until this endpoint existed there was no way for an operator to see
-    /// whether the one that matters most for a library's writer setting — mkvmerge — had actually been found.
-    /// That mattered: the writer setting defaults to "best", and "best" silently means ffmpeg wherever mkvmerge
-    /// is missing, so an install with no mkvmerge looked identical to one that was using it.
+    /// source install provides its own. This lets an operator see whether mkvmerge, the one that matters most for a
+    /// library's writer setting, was found: the writer defaults to "best", and "best" silently means ffmpeg wherever
+    /// mkvmerge is missing, so without this an install with no mkvmerge looks identical to one that uses it.
     ///
     /// <para>
     /// Always 200. <c>mkvmerge: "not installed"</c> is the correct answer for an install without it, not a
@@ -493,7 +488,7 @@ public static class SuiteEndpoints
         return ApiRoutes.Ok(await PauseOutAsync(request).ConfigureAwait(false));
     }
 
-    /// <summary><c>_out</c>: resolve the pause, clearing a lapsed one so the row and the screen agree.</summary>
+    /// <summary>Resolve the pause, clearing a lapsed one so the row and the screen agree.</summary>
     private static async Task<PyDict> PauseOutAsync(ApiRequest request)
     {
         var uow = await request.DbAsync().ConfigureAwait(false);

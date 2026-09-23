@@ -6,15 +6,16 @@ using Weir.Core.Validation;
 
 namespace Weir.Api.Http;
 
-/// <summary>Maps API routes with FastAPI's request lifecycle.</summary>
+/// <summary>Maps API routes with a shared request lifecycle: one unit of work, and the error bodies existing clients expect.</summary>
 public static class ApiRoutes
 {
     public const string V1Prefix = "/api/v1";
 
     /// <summary>
-    /// A route under <c>/api/v1</c>. <paramref name="path"/> is the path in the Python router (also the metrics
+    /// A route under <c>/api/v1</c>. <paramref name="path"/> is the path below the prefix (also the metrics
     /// label). The handler runs with a unit of work that is committed when it returns a result; an
-    /// <see cref="ApiException"/> or validation error discards uncommitted work and is answered as FastAPI does.
+    /// <see cref="ApiException"/> or validation error discards uncommitted work and is answered with a
+    /// <c>{"detail": …}</c> body (422 for validation errors), the shape existing clients read.
     /// </summary>
     public static IEndpointConventionBuilder MapV1(this IEndpointRouteBuilder endpoints, string method, string path, Func<ApiRequest, Task<ApiResult>> handler) =>
         endpoints.MapApi(method, V1Prefix + path, path, handler);

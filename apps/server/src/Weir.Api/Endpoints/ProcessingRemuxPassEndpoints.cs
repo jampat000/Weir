@@ -8,7 +8,7 @@ using Weir.Infrastructure.Processing.RemuxPass;
 
 namespace Weir.Api.Endpoints;
 
-/// <summary>Manual enqueue of one per-file pass (port of <c>file_remux_pass/api.py</c>).</summary>
+/// <summary>Manual enqueue of one per-file pass.</summary>
 public static class ProcessingRemuxPassEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingRemuxPassEndpoints(this IEndpointRouteBuilder endpoints)
