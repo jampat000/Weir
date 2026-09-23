@@ -9,6 +9,7 @@ using Weir.Core.Processing;
 using Weir.Core.Rules;
 using Weir.Core.Text;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
@@ -20,7 +21,8 @@ namespace Weir.Infrastructure.LibraryMode;
 /// <summary>
 /// Worker handler for <see cref="LibraryModeJobKinds.ScanKind"/> (#505 point 2): walks a library's library folders,
 /// probes new or changed files (cached by path, size and mtime), and classifies each against the library's rules with the
-/// exact same engine the download pipeline plans with. Read-only: no file is written, moved or queued for cleaning by a scan.
+/// exact same engine the download pipeline plans with. Read-only: no file is written or moved by a scan, and only a scheduled
+/// scan (the "Scheduled scan and clean" switch) queues cleans, once it knows what the files hold.
 /// </summary>
 /// <remarks>
 /// Title matching (#551, "Blade Runner 2049 (Radarr)"): for every enabled connection covering the library's media scope,
@@ -36,6 +38,8 @@ public sealed class LibraryScanHandler : IJobHandler
     private readonly MediaTools _tools;
     private readonly MediaManagerConnectionService _connections;
     private readonly IHardlinkInspector _hardlinks;
+    private readonly ProcessingJobStore _jobs;
+    private readonly RedownloadRiskChecker _riskChecker;
     private readonly TimeProvider _time;
 
     public LibraryScanHandler(
@@ -43,6 +47,8 @@ public sealed class LibraryScanHandler : IJobHandler
         MediaTools tools,
         MediaManagerConnectionService connections,
         IHardlinkInspector hardlinks,
+        ProcessingJobStore jobs,
+        RedownloadRiskChecker riskChecker,
         TimeProvider time,
         ILogger<LibraryScanHandler> logger)
     {
@@ -50,6 +56,8 @@ public sealed class LibraryScanHandler : IJobHandler
         _tools = tools ?? throw new ArgumentNullException(nameof(tools));
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
         _hardlinks = hardlinks ?? throw new ArgumentNullException(nameof(hardlinks));
+        _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+        _riskChecker = riskChecker ?? throw new ArgumentNullException(nameof(riskChecker));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         // Kept in the constructor for DI symmetry with LibraryCleanHandler; nothing here logs yet.
         ArgumentNullException.ThrowIfNull(logger);
@@ -126,21 +134,83 @@ public sealed class LibraryScanHandler : IJobHandler
         var wouldChange = entries.Count(e => e.Classification == LibraryFileClassification.WouldChange);
         var cannotProcess = entries.Count(e => e.Classification == LibraryFileClassification.CannotProcess);
 
+        // "Scheduled scan and clean": a scheduled scan goes on to clean what it found, judged exactly as Clean on the
+        // Library screen judges a selection. The preflight asks media managers over the network, so it runs here, before
+        // the write below, never while holding it.
+        var scheduled = trigger == LibraryModeSchedule.Trigger && settings.ScheduleEnabled;
+        var toClean = new List<LibraryScanFileEntry>();
+        var preflight = new List<LibraryFilePreflightResult>();
+        if (scheduled)
+        {
+            IReadOnlyDictionary<string, LibraryFileMark> marks;
+            await using (var marksUow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false))
+            {
+                marks = await LibraryFileMarksStore.ForLibraryAsync(marksUow, libraryId).ConfigureAwait(false);
+            }
+
+            toClean = entries
+                .Where(e => e.Classification == LibraryFileClassification.WouldChange && !(marks.TryGetValue(e.Path, out var mark) && mark.LeaveAlone))
+                .ToList();
+            var connectionsById = connections.Where(c => c.ConnectionId is not null).DistinctBy(c => c.ConnectionId).ToDictionary(c => c.ConnectionId!.Value);
+            preflight = await LibraryCleanPreflightRunner.RunAsync(
+                    toClean, settings, rules, library.MediaType, _hardlinks, _riskChecker, connectionsById, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         await using (var recordUow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false))
         {
             await LibraryScanStore.RecordResultAsync(recordUow, context.Id, snapshot, true, null).ConfigureAwait(false);
+            var queued = scheduled ? await QueueScheduledCleansAsync(recordUow, libraryId, toClean, preflight).ConfigureAwait(false) : 0;
+            var title = $"Scanned {library.Name}: {Plural.Of(entries.Count, "file")}, {wouldChange} would change, {cannotProcess} could not be processed";
+            if (scheduled)
+            {
+                title += $"; {Plural.Of(queued, "file")} queued to be cleaned";
+            }
+
             await SqliteActivityWriter.RecordAsync(
                     recordUow,
                     new ActivityEventDraft(
                         LibraryActivityEventTypes.ScanCompleted,
                         "library",
-                        $"Scanned {library.Name}: {Plural.Of(entries.Count, "file")}, {wouldChange} would change, {cannotProcess} could not be processed",
+                        title,
                         PyJsonWriter.Dumps(
-                            new PyDict().Set("trigger", trigger).Set("library_id", libraryId).Set("result", "success"),
+                            new PyDict().Set("trigger", trigger).Set("library_id", libraryId).Set("result", "success").Set("queued_to_clean", queued),
                             PyJsonFormat.Compact)))
                 .ConfigureAwait(false);
             await recordUow.CommitAsync().ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Queues a clean for each file a scheduled scan found that the rules would change, has not been set aside, and passed
+    /// the preflight. The removal was confirmed when the schedule was turned on (#505 point 7), which is why the jobs carry
+    /// that confirmation; a file still shared with a download, or that a manager would download again, is never queued,
+    /// exactly as with Clean. Nothing is queued if the schedule was turned off while the scan ran. Returns how many were.
+    /// </summary>
+    private async Task<int> QueueScheduledCleansAsync(
+        UnitOfWork uow, long libraryId, List<LibraryScanFileEntry> toClean, List<LibraryFilePreflightResult> preflight)
+    {
+        if (!(await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false)).ScheduleEnabled)
+        {
+            return 0;
+        }
+
+        // What the preflight found is recorded for the Problems view, as Clean records it.
+        foreach (var result in preflight)
+        {
+            await LibraryViewStore.RecordPreflightProblemAsync(uow, libraryId, result.FilePath, result.ProblemKind).ConfigureAwait(false);
+        }
+
+        var skipped = preflight.Where(r => r.Skip).Select(r => r.FilePath).ToHashSet(StringComparer.Ordinal);
+        var queued = 0;
+        foreach (var entry in toClean.Where(e => !skipped.Contains(e.Path)))
+        {
+            await LibraryScanStore.EnqueueCleanAsync(uow, _jobs, libraryId, entry.Path, LibraryModeSchedule.Trigger, confirmFinalRemoval: true)
+                .ConfigureAwait(false);
+            queued++;
+        }
+
+        return queued;
     }
 
     private async Task<LibraryScanFileEntry> ClassifyOneAsync(

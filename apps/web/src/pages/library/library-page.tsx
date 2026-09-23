@@ -23,6 +23,7 @@ import {
   type LibraryFile,
   type LibraryFileClassification,
   type LibraryFileFilters,
+  type LibraryModeSchedule,
   type LibraryProblemKind,
 } from "../../lib/processing/library-api";
 import {
@@ -33,6 +34,7 @@ import {
   useTriggerLibraryScan,
 } from "../../lib/processing/library-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
+import { parseAppDate, useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { LibraryFileDrawer } from "./library-file-drawer";
 import { LibraryPicker } from "./library-picker";
 
@@ -139,6 +141,24 @@ function fileName(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
 }
 
+/**
+ * When "Scheduled scan and clean" next runs, beside when the library was last checked; nothing while it is off.
+ * A run that is due reads as starting now: the server's timer picks it up within half a minute.
+ */
+function nextScheduled(
+  schedule: LibraryModeSchedule | undefined,
+  now: number,
+  formatDate: (iso: string) => string,
+): string | null {
+  if (!schedule?.enabled) return null;
+  if (!schedule.next_run_at) {
+    return "scheduled check and clean cannot run: no library folders, or a schedule window that never opens";
+  }
+  return parseAppDate(schedule.next_run_at).getTime() <= now
+    ? "scheduled check and clean starting now"
+    : `next scheduled check and clean ${formatDate(schedule.next_run_at)}`;
+}
+
 /** How long ago the scan that these numbers come from ran. */
 function scanned(generatedAt: number | null, now: number): string {
   if (!generatedAt) return "not scanned yet";
@@ -166,6 +186,7 @@ export function LibraryPage(): React.ReactElement {
   const [outcome, setOutcome] = useState<LibraryCleanResult | null>(null);
   const [compact, setCompact] = useState(readCompact);
   const [now] = useState(() => Date.now());
+  const formatDate = useAppDateFormatter();
   const searchTimer = useRef<number | null>(null);
   const [query, setQuery] = useState(params.get("q") ?? "");
 
@@ -261,6 +282,7 @@ export function LibraryPage(): React.ReactElement {
 
   const totals = overview.data?.totals;
   const scan = overview.data?.scan ?? files.data?.scan ?? null;
+  const scheduleLine = nextScheduled(overview.data?.schedule, now, formatDate);
   const shown = files.data?.filtered;
   const problems = overview.data?.problems ?? [];
   const selectedFiles = (files.data?.files ?? []).filter((f) =>
@@ -318,6 +340,9 @@ export function LibraryPage(): React.ReactElement {
                 <span>{scanned(scan?.generated_at ?? null, now)}</span>
               </>
             )}
+            {scheduleLine ? (
+              <span data-testid="library-schedule">· {scheduleLine}</span>
+            ) : null}
             <button
               type="button"
               className="mm-head-control"

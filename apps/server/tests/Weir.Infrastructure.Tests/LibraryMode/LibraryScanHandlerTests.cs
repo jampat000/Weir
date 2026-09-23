@@ -33,6 +33,8 @@ public sealed class LibraryScanHandlerTests : IDisposable
         new MediaTools(_media, new FixedResolver(), new ListLogger<MediaTools>(), TimeProvider.System),
         _fixture.Connections,
         PhysicalHardlinkInspector.Instance,
+        _fixture.Jobs,
+        new RedownloadRiskChecker(new ArrRedownloadRiskGateway(_fixture.Http)),
         _fixture.Store.Clock,
         NullLogger<LibraryScanHandler>.Instance);
 
@@ -137,6 +139,77 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library), commit: false);
         Assert.NotNull(snapshot);
         Assert.Empty(snapshot!.Files);
+    }
+
+    // --- Scheduled scan and clean --------------------------------------------------------------------
+
+    private Task<List<string>> CleanPayloadsAsync() =>
+        _fixture.Db(uow => uow.QueryAsync(
+            "SELECT payload_json FROM jobs WHERE job_kind = @kind ORDER BY id",
+            reader => SqliteValues.GetString(reader, 0),
+            ("@kind", LibraryModeJobKinds.CleanKind)), commit: false);
+
+    private async Task<(string Changing, string SetAside)> ScheduledLibraryFilesAsync(long library)
+    {
+        await _fixture.Db(async uow => { await LibrarySettingsStore.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], ScheduleEnabled: true)); return true; });
+        var matching = _libraryFolder.Join("english-only.mkv");
+        var changing = _libraryFolder.Join("changing.mkv");
+        var setAside = _libraryFolder.Join("set-aside.mkv");
+        await File.WriteAllBytesAsync(matching, [1]);
+        await File.WriteAllBytesAsync(changing, [2]);
+        await File.WriteAllBytesAsync(setAside, [3]);
+        _media.Probes["english-only.mkv"] = FakeMediaRunner.EnglishOnly;
+        _media.Probes["changing.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+        _media.Probes["set-aside.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+        await _fixture.Db(async uow => { await LibraryFileMarksStore.SetLeaveAloneAsync(uow, library, setAside, true, _fixture.Store.Clock.GetUtcNow()); return true; });
+        return (changing, setAside);
+    }
+
+    [Fact]
+    public async Task A_scheduled_scan_queues_a_confirmed_clean_for_each_file_that_would_change_and_is_not_set_aside()
+    {
+        var library = await LibraryAsync();
+        var (changing, _) = await ScheduledLibraryFilesAsync(library);
+
+        var jobId = await _fixture.Store.WithUnitOfWork(async uow =>
+            (await LibraryScanStore.RequestScanAsync(uow, _fixture.Jobs, library, LibraryModeSchedule.Trigger, _fixture.Store.Clock.GetUtcNow())).Id);
+        await RunScanAsync(jobId);
+
+        // The file that matches has nothing to clean and the one set aside is never cleaned; only one clean is queued,
+        // carrying the confirmation given when the schedule was turned on.
+        var payload = Assert.Single(await CleanPayloadsAsync());
+        Assert.Contains($"\"path\":{System.Text.Json.JsonSerializer.Serialize(changing)}", payload, StringComparison.Ordinal);
+        Assert.Contains("\"trigger\":\"schedule\"", payload, StringComparison.Ordinal);
+        Assert.Contains("\"confirm_final_removal\":true", payload, StringComparison.Ordinal);
+        Assert.Equal(
+            "Scanned Movies library: 3 files, 2 would change, 0 could not be processed; 1 file queued to be cleaned",
+            (await ScanActivityTitlesAsync())[^1]);
+    }
+
+    [Fact]
+    public async Task A_scan_someone_asked_for_never_cleans_even_with_the_schedule_on()
+    {
+        var library = await LibraryAsync();
+        await ScheduledLibraryFilesAsync(library);
+
+        await RunScanAsync(await EnqueueScanAsync(library));
+
+        Assert.Empty(await CleanPayloadsAsync());
+        Assert.Equal("Scanned Movies library: 3 files, 2 would change, 0 could not be processed", (await ScanActivityTitlesAsync())[^1]);
+    }
+
+    [Fact]
+    public async Task A_scheduled_scan_whose_schedule_has_since_been_turned_off_only_scans()
+    {
+        var library = await LibraryAsync();
+        await ScheduledLibraryFilesAsync(library);
+        var jobId = await _fixture.Store.WithUnitOfWork(async uow =>
+            (await LibraryScanStore.RequestScanAsync(uow, _fixture.Jobs, library, LibraryModeSchedule.Trigger, _fixture.Store.Clock.GetUtcNow())).Id);
+        await _fixture.Db(async uow => { await LibrarySettingsStore.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], ScheduleEnabled: false)); return true; });
+
+        await RunScanAsync(jobId);
+
+        Assert.Empty(await CleanPayloadsAsync());
     }
 
     // --- #551: manager title matching --------------------------------------------------------------

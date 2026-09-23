@@ -52,6 +52,9 @@ public static class LibraryModeServices
         services.TryAddSingleton<LibraryCleanHandler>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHandler, LibraryScanHandler>(sp => sp.GetRequiredService<LibraryScanHandler>()));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHandler, LibraryCleanHandler>(sp => sp.GetRequiredService<LibraryCleanHandler>()));
+
+        // "Scheduled scan and clean": the timer that queues each library's daily scheduled scan.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Scheduling.IPeriodicTask, LibraryModeScheduleTask>());
         return services;
     }
 }

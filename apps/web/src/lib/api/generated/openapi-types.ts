@@ -2604,6 +2604,19 @@ export interface components {
       path: string;
     };
     /**
+     * LibraryModeScheduleOut
+     * @description "Scheduled scan and clean": whether it is on and when it next runs. It runs once a day, inside the library's own schedule window.
+     */
+    LibraryModeScheduleOut: {
+      /** Enabled */
+      enabled: boolean;
+      /**
+       * Next Run At
+       * @description When it next runs; now when it is due. Null when it is off or cannot run: no library folders, the library switched off, or a schedule window that never opens.
+       */
+      next_run_at: string | null;
+    };
+    /**
      * LibraryOverviewOut
      * @description Issue #568: what the library holds and its state, aggregated in SQL rather than in the browser.
      */
@@ -2617,6 +2630,7 @@ export interface components {
       problems: components["schemas"]["LibraryProblemGroupOut"][];
       /** Scan */
       scan: components["schemas"]["LibraryScanStateOut"] | null;
+      schedule: components["schemas"]["LibraryModeScheduleOut"];
       totals: components["schemas"]["LibraryTotalsOut"];
     };
     /**

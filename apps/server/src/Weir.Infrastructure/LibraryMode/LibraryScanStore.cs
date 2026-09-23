@@ -26,11 +26,20 @@ public static class LibraryScanStore
     /// endpoint's write <see cref="UnitOfWork"/> is still open, as here — can deadlock against it, exactly the trap
     /// <see cref="Weir.Infrastructure.Processing.RequeueStore"/> already documents for the same reason.
     /// </summary>
-    public static Task<ProcessingJob> RequestScanAsync(UnitOfWork uow, ProcessingJobStore jobs, long libraryId, string trigger)
+    /// <remarks>
+    /// <paramref name="scheduledAt"/> is the time a scheduled scan was due, recorded on the row so the next one is worked
+    /// out from it (<see cref="LastScheduledRunAtAsync"/>); a scan someone asked for has none.
+    /// </remarks>
+    public static Task<ProcessingJob> RequestScanAsync(UnitOfWork uow, ProcessingJobStore jobs, long libraryId, string trigger, DateTimeOffset? scheduledAt = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(jobs);
         var payload = new PyDict().Set("library_id", libraryId).Set("trigger", trigger);
+        if (scheduledAt is { } due)
+        {
+            payload.Set("scheduled_at", due.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        }
+
         var job = jobs.EnqueueOrGet(
             uow.Connection,
             uow.WriteTransaction(),
@@ -115,6 +124,30 @@ public static class LibraryScanStore
             reader => new LibraryScanJobView(reader.GetInt64(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2)),
             ("@kind", LibraryModeJobKinds.ScanKind),
             ("@prefix", EscapeLike(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%")).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// When the library's most recent scheduled scan was due, whatever became of it, or null when it has never had one
+    /// (or job-row retention has since pruned it, which only makes the next one due straight away).
+    /// </summary>
+    public static async Task<DateTimeOffset?> LastScheduledRunAtAsync(UnitOfWork uow, long libraryId)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        var text = await uow.QuerySingleAsync(
+            "SELECT json_extract(payload_json, '$.scheduled_at') FROM jobs WHERE job_kind = @kind AND dedupe_key LIKE @prefix ESCAPE '\\' " +
+            "AND json_extract(payload_json, '$.trigger') = @trigger AND json_extract(payload_json, '$.scheduled_at') IS NOT NULL " +
+            "ORDER BY id DESC LIMIT 1",
+            reader => reader.GetString(0),
+            ("@kind", LibraryModeJobKinds.ScanKind),
+            ("@prefix", EscapeLike(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%"),
+            ("@trigger", LibraryModeSchedule.Trigger)).ConfigureAwait(false);
+        return DateTimeOffset.TryParse(
+            text,
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.RoundtripKind,
+            out var parsed)
+            ? parsed
+            : null;
     }
 
     /// <summary>The most recently created scan row for a library, whatever its status, for "what did the last scan say / do".</summary>
