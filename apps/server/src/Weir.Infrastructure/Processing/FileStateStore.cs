@@ -5,8 +5,8 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
 
-/// <summary>SQLite access for <c>files</c> (port of <c>processing_file_state_service.py</c>: the
-/// read/list/forget parts, plus the upsert/mark-status writes the watched-folder scan performs).</summary>
+/// <summary>SQLite access for <c>files</c>: read, list and forget, plus the upsert and mark-status writes the
+/// watched-folder scan performs.</summary>
 public static class FileStateStore
 {
     private const string Columns =
@@ -24,7 +24,7 @@ public static class FileStateStore
             $"SELECT {Columns} FROM files WHERE library_id = @lib AND relative_path = @path",
             Read, ("@lib", libraryId), ("@path", relativePath));
 
-    /// <summary><c>list_files</c>.</summary>
+    /// <summary>The files matching <paramref name="filter"/>.</summary>
     public static Task<List<ProcessingFileRecord>> ListAsync(UnitOfWork uow, ProcessingFileListFilter filter)
     {
         var clauses = new List<string>();
@@ -60,7 +60,7 @@ public static class FileStateStore
 
     private static string EscapeLike(string value) => value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
 
-    /// <summary><c>status_counts</c>: a count per known status, zero-filled.</summary>
+    /// <summary>A count per known status, zero-filled.</summary>
     public static async Task<Dictionary<string, long>> StatusCountsAsync(UnitOfWork uow, long? libraryId)
     {
         var counts = ProcessingFileStatuses.All.ToDictionary(s => s, _ => 0L, StringComparer.Ordinal);
@@ -79,7 +79,7 @@ public static class FileStateStore
         return counts;
     }
 
-    /// <summary><c>forget_file</c>: removes Weir's record; never touches the file on disk.</summary>
+    /// <summary>Removes Weir's record; never touches the file on disk.</summary>
     public static Task ForgetAsync(UnitOfWork uow, long id) => uow.ExecuteAsync("DELETE FROM files WHERE id = @id", ("@id", id));
 
     /// <summary>
@@ -105,13 +105,13 @@ public static class FileStateStore
             ("@failed", ProcessingFileStatuses.ProcessingFailed));
     }
 
-    /// <summary><c>existing_file_row</c>: the row a previous scan left, or <see langword="null"/>. Settling
-    /// compares against this. An alias for <see cref="FindAsync"/> under the Python name callers expect.</summary>
+    /// <summary>The row a previous scan left, or <see langword="null"/>. Settling compares against this. Same as
+    /// <see cref="FindAsync"/>.</summary>
     public static Task<ProcessingFileRecord?> ExistingFileRowAsync(UnitOfWork uow, long libraryId, string relativePath) =>
         FindAsync(uow, libraryId, relativePath);
 
     /// <summary>
-    /// <c>record_file_state</c>: upsert one file's state. Safe to call on every scan. <paramref name="sizeBytes"/>
+    /// Upserts one file's state. Safe to call on every scan. <paramref name="sizeBytes"/>
     /// and <paramref name="sizeChangedAt"/> of <see langword="null"/> mean "not supplied" (leave the
     /// stored value alone), distinct from a genuine zero.
     /// </summary>
@@ -193,8 +193,8 @@ public static class FileStateStore
         return id;
     }
 
-    /// <summary><c>mark_file_status</c>: move a file Weir has already seen into a new state. No-op when the
-    /// row does not exist (matches Python returning <see langword="null"/> silently).</summary>
+    /// <summary>Moves a file Weir has already seen into a new state. Does nothing when the row does not
+    /// exist.</summary>
     public static async Task MarkFileStatusAsync(UnitOfWork uow, long libraryId, string relativePath, string status, string reason)
     {
         ArgumentNullException.ThrowIfNull(uow);

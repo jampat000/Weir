@@ -32,7 +32,7 @@ public sealed class RemuxPassEnqueueException : Exception
     public int StatusCode { get; } = 400;
 }
 
-/// <summary>The work behind <c>POST /processing/jobs/file-remux-pass/enqueue</c> (port of <c>file_remux_pass/api.py</c>).</summary>
+/// <summary>The work behind <c>POST /processing/jobs/file-remux-pass/enqueue</c>.</summary>
 public static class RemuxPassEnqueue
 {
     /// <summary>Enqueue one pass, or convert a pending one in place when the operator asks for pass-through. Commits nothing.</summary>
@@ -108,7 +108,7 @@ public static class RemuxPassEnqueue
             0);
     }
 
-    /// <summary><c>pending_remux_job_for_relative_path</c>: the oldest pending pass for this path.</summary>
+    /// <summary>The oldest pending pass for this path.</summary>
     public static async Task<ProcessingJob?> PendingJobForPathAsync(UnitOfWork uow, string relativePath, long? libraryId)
     {
         ArgumentNullException.ThrowIfNull(uow);

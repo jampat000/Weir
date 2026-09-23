@@ -7,10 +7,8 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing;
 
 /// <summary>
-/// SQLite access for Processing libraries and rule sets (port of <c>processing_library_service.py</c> and
-/// <c>processing_library_crud.py</c>'s persistence), plus the row IO <c>LibraryDiscoveryService</c> (#554,
-/// port of <c>processing_library_discovery.py</c>) needs for a discovered library's create and unlink. The
-/// reject-support gate is not ported here: it lives in <c>RejectSupportEvaluator</c>.
+/// SQLite access for Processing libraries and rule sets, plus the row IO <c>LibraryDiscoveryService</c> (#554)
+/// needs for a discovered library's create and unlink. The reject-support gate lives in <c>RejectSupportEvaluator</c>.
 /// </summary>
 public static class LibraryStore
 {
@@ -50,7 +48,7 @@ public static class LibraryStore
     public static Task<ProcessingLibraryRecord?> GetByNameAsync(UnitOfWork uow, string name) =>
         uow.QuerySingleAsync($"SELECT {LibraryColumns} FROM libraries WHERE name = @name", ReadLibrary, ("@name", name));
 
-    /// <summary><c>seeded_library_for_scope</c>: the oldest library covering a scope.</summary>
+    /// <summary>The first library covering a scope, in display order.</summary>
     public static Task<ProcessingLibraryRecord?> SeededForScopeAsync(UnitOfWork uow, string mediaScope) =>
         uow.QuerySingleAsync(
             $"SELECT {LibraryColumns} FROM libraries WHERE media_type = @scope ORDER BY display_order, id LIMIT 1",
@@ -79,7 +77,7 @@ public static class LibraryStore
         return [.. rows];
     }
 
-    /// <summary><c>active_job_count_for_library</c>: queued or leased Processing jobs belonging to this library.</summary>
+    /// <summary>How many queued or leased Processing jobs belong to this library.</summary>
     public static async Task<int> ActiveJobCountAsync(UnitOfWork uow, ProcessingLibraryRecord library)
     {
         var libraries = await ListAsync(uow).ConfigureAwait(false);
@@ -181,17 +179,15 @@ public static class LibraryStore
     }
 
     /// <summary>
-    /// <c>import_libraries</c>'s row creation: a library made from a manager's own descriptor rather than an
-    /// operator's request body, so <c>LibraryRules.ApplyFields</c>/<c>ValidateFolders</c> (folder-overlap and
-    /// full-field validation) never runs — Python's version does not call <c>create_library</c> either, only
-    /// <c>session.add</c>/<c>flush</c> on a row built from a handful of fields, every other column keeping its
-    /// schema default (mirrored by <see cref="ProcessingLibraryRecord"/>'s own property defaults).
+    /// Creates a library imported from a media manager and links it to that manager as it is created, so Weir can
+    /// reject a bad download through it (#651).
     /// </summary>
-    /// <summary>
-    /// A library imported from a media manager, linked to that manager as it is created (#651). Before, the link was
-    /// never written, so no library had a manager: Weir could not reject a bad download through it, and every library
-    /// read "No upstream signal".
-    /// </summary>
+    /// <remarks>
+    /// The row is built from the manager's own descriptor rather than an operator's request body, so
+    /// <c>LibraryRules.ApplyFields</c>/<c>ValidateFolders</c> (folder-overlap and full-field validation) does not run.
+    /// Columns the descriptor does not set keep their schema defaults, mirrored by
+    /// <see cref="ProcessingLibraryRecord"/>'s own property defaults.
+    /// </remarks>
     public static async Task<ProcessingLibraryRecord> CreateDiscoveredAsync(UnitOfWork uow, ProcessingLibraryRecord row)
     {
         if (row.RuleSetId is null)
@@ -210,7 +206,7 @@ public static class LibraryStore
         return created;
     }
 
-    /// <summary><c>unlink_library</c>: forget where a library came from, keeping the library itself untouched.</summary>
+    /// <summary>Forgets where a library came from, keeping the library itself untouched.</summary>
     public static async Task<ProcessingLibraryRecord> UnlinkAsync(UnitOfWork uow, ProcessingLibraryRecord row)
     {
         await uow.ExecuteAsync(
@@ -323,9 +319,9 @@ public static class LibraryStore
     }
 
     /// <summary>
-    /// Every library has a profile (James, 23 Sep 2026): give each one without a profile the one it was in effect using.
-    /// Libraries are handled in display order, so the first of each kind settles the rest the way it did before. Returns
-    /// how many libraries got one.
+    /// Every library has a profile: gives each one without a profile the one it was in effect using. Libraries are
+    /// handled in display order, so each gets the same profile its rules already came from. Returns how many libraries
+    /// got one.
     /// </summary>
     public static async Task<int> GiveEveryLibraryAProfileAsync(UnitOfWork uow)
     {

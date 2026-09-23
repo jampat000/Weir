@@ -12,7 +12,7 @@ using Weir.Infrastructure.Media;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
-/// <summary>One pass's inputs (the keyword arguments of <c>run_processing_file_remux_pass</c>).</summary>
+/// <summary>One pass's inputs.</summary>
 public sealed record RemuxPassRequest
 {
     public required ProcessingPathRuntime Runtime { get; init; }
@@ -48,16 +48,15 @@ public sealed record RemuxPassRequest
 }
 
 /// <summary>
-/// Per-file ffprobe, plan, optional ffmpeg remux, publish and post-success cleanup (port of <c>file_remux_pass/run.py</c>).
-/// Returns the result dictionary the handler records, in the reference's key order.
+/// Per-file ffprobe, plan, optional ffmpeg remux, publish and post-success cleanup.
+/// Returns the result dictionary the handler records; its keys keep a fixed order because it is stored as JSON.
 /// </summary>
 /// <remarks>
-/// Deliberate differences from the reference, each tied to an issue:
 /// <list type="bullet">
-/// <item>#539 item 5: the full-read integrity check runs on every platform, not only off Windows, with the probed duration so a
-/// truncated Matroska file is caught (#539 item 3).</item>
-/// <item>#539 item 2: the acceleration flags decided here reach the executed ffmpeg command, not only the recorded argv.</item>
-/// <item>#537 item 4: when the rule set keeps the original language, the metadata lookup decides the preferred audio.</item>
+/// <item>The full-read integrity check runs on every platform, with the probed duration so a truncated Matroska file is
+/// caught (#539).</item>
+/// <item>The acceleration flags decided here reach the executed ffmpeg command, not only the recorded argv (#539).</item>
+/// <item>When the rule set keeps the original language, the metadata lookup decides the preferred audio (#537).</item>
 /// </list>
 /// </remarks>
 public sealed class RemuxPassRunner
@@ -102,13 +101,13 @@ public sealed class RemuxPassRunner
         _outputCleanup = new OutputFolderCleanup(cleanupData, time, logger, settings.MovieOutputCleanupMinAgeSeconds, settings.TvOutputCleanupMinAgeSeconds);
     }
 
-    /// <summary>Test seam: whether the Windows hard-link fast path is used (<c>_hardlink_fast_path_supported</c>).</summary>
+    /// <summary>Test seam: whether the Windows hard-link fast path is used.</summary>
     internal bool HardlinkFastPathSupported { get; init; } = OperatingSystem.IsWindows();
 
     /// <summary>Test seam: free bytes on the volume holding a path.</summary>
     internal Func<string, long>? FreeBytes { get; init; }
 
-    /// <summary><c>run_processing_file_remux_pass</c>: reserve the source against writers for the complete pass, then run it.</summary>
+    /// <summary>Reserves the source against writers for the complete pass, then runs it.</summary>
     public async Task<PyDict> RunAsync(RemuxPassRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -240,12 +239,11 @@ public sealed class RemuxPassRunner
 
             if (age < minAge)
             {
-                // Not a failure: the guardrail is a wait, and it ends by itself (#632). This used to be FailBefore, which
-                // classifies as "preflight" - "retrying reaches the same conclusion" - so nothing retried and the
-                // library's failure policy ran at once. A media manager hands a file over within seconds of the
-                // download finishing, so every such file was passed through unprocessed, and under "reject" a good
-                // release would have been reported bad. The guardrail itself is unchanged; the handler looks again
-                // once the file is old enough (RemuxPassHandler.DeferUntilOldEnoughAsync).
+                // Not a failure: the guardrail is a wait, and it ends by itself (#632). A preflight failure is never
+                // retried and runs the library's failure policy at once, yet a media manager hands a file over within
+                // seconds of the download finishing, so a good release would be passed through unprocessed or, under
+                // "reject", reported bad. The handler looks again once the file is old enough
+                // (RemuxPassHandler.DeferUntilOldEnoughAsync).
                 var known = Math.Max(0, age);
                 var remaining = (long)Math.Ceiling(minAge - known);
                 var waiting = SourceNotReady(
@@ -328,7 +326,7 @@ public sealed class RemuxPassRunner
 
         try
         {
-            // Deliberate divergence (#539 item 5): read the whole primary video on every platform, not only off Windows.
+            // Read the whole primary video on every platform, so a truncated file is caught (#539).
             await _tools.ValidateMediaIntegrityAsync(src, duration, cancellationToken).ConfigureAwait(false);
             AssertSourceUnchanged(src, expected);
         }
@@ -352,8 +350,8 @@ public sealed class RemuxPassRunner
         RemuxPlan? plan;
         if (request.ManualPlan is { } manualChoice)
         {
-            // Issue #501: the operator's choice is authoritative. A stale fingerprint or an index that no longer
-            // exists (or changed type) both mean the same thing to the operator, so both fail with the same sentence.
+            // Issue #501: the operator's choice is authoritative. A stale fingerprint or an index that is gone
+            // (or changed type) both mean the same thing to the operator, so both fail with the same sentence.
             var splitForManual = new SplitProbeStreams(video, audio, subtitles);
             var kinds = ManualTrackPlan.ClassifyIndices(splitForManual);
             var stillValid = request.ManualPlanFingerprint is { } expectedManualFingerprint
@@ -802,7 +800,7 @@ public sealed class RemuxPassRunner
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(final)!);
-            // A collision used to be silent; the policy and the decision are both recorded now (#349).
+            // The collision policy and the decision are both recorded, so a collision is never silent (#349).
             collision = OutputCollision.Decide(final, src, tmp, collisionPolicy);
             replacedExisting = collision.ReplacedExisting;
             if (collision.Wrote)
@@ -925,7 +923,7 @@ public sealed class RemuxPassRunner
             .Set("speed", update.Speed)
             .Set("progress", update.Progress);
 
-    /// <summary><c>_copy_unchanged_source_to_output</c>: the Windows hard link when it can be one, else a validated copy.</summary>
+    /// <summary>Publishes an unchanged source: the Windows hard link when it can be one, else a validated copy.</summary>
     private async Task<(bool ReplacedExisting, string Method)> CopyUnchangedSourceToOutputAsync(PassContext context, string final, Action<long, long> progress, CancellationToken cancellationToken)
     {
         var src = context.Source;
@@ -956,7 +954,7 @@ public sealed class RemuxPassRunner
     }
 
     /// <summary>
-    /// <c>_detach_hardlinked_output_if_source_remains</c>: when a safety gate kept the watched source, break the shared file so a
+    /// When a safety gate kept the watched source, breaks the shared file so a
     /// later writer cannot change the published output through the watched name.
     /// </summary>
     private async Task<string> DetachHardlinkedOutputIfSourceRemainsAsync(PassContext context, string final, string method, Action<long, long> progress)
@@ -979,7 +977,7 @@ public sealed class RemuxPassRunner
         return "validated_hardlink_detached_copy";
     }
 
-    /// <summary><c>_migrate_sidecars_before_cleanup</c>.</summary>
+    /// <summary>Copies the source's sidecars to the output before any source cleanup can delete them.</summary>
     private async Task MigrateSidecarsBeforeCleanupAsync(string src, string? finalOutputFile, IReadOnlyList<string> patterns, bool preserveTimestamps, PyDict output)
     {
         OutputFolderCleanup.SetDefault(output, "sidecars_migrated", new PyList());
@@ -1027,7 +1025,7 @@ public sealed class RemuxPassRunner
     }
 
     /// <summary>
-    /// <c>_handle_processing_cleanup_after_success</c>: Movies may remove the whole release folder and its empty parents; TV hands
+    /// Source cleanup after a successful pass: Movies may remove the whole release folder and its empty parents; TV hands
     /// over to the season-folder cleanup.
     /// </summary>
     private async Task HandleCleanupAfterSuccessAsync(PassContext context, PyDict output, string? finalOutputFile, CancellationToken cancellationToken)
@@ -1143,7 +1141,7 @@ public sealed class RemuxPassRunner
         output.Set("cascade_folders_deleted", cascade);
     }
 
-    /// <summary><c>_check_output_file_completeness</c>: exists, not empty, not under 1% of the source.</summary>
+    /// <summary>Checks the output exists, is not empty and is not under 1% of the source.</summary>
     public static PyDict CheckOutputFileCompleteness(string outputFile, string sourceFile, bool tv = false)
     {
         if (!File.Exists(outputFile))
@@ -1231,7 +1229,8 @@ public sealed class RemuxPassRunner
         return (config.WithOriginalLanguage(outcome), record);
     }
 
-    /// <summary><c>_assert_source_unchanged</c>.</summary>
+    /// <summary>Throws when the source's fingerprint changed during the pass, so a staged output is never published from
+    /// a source that moved underneath it.</summary>
     private static void AssertSourceUnchanged(string path, SourceFingerprint expected)
     {
         SourceFingerprint current;
@@ -1254,7 +1253,7 @@ public sealed class RemuxPassRunner
         }
     }
 
-    /// <summary><c>_fail_before</c>.</summary>
+    /// <summary>The result of a pass that failed before execution.</summary>
     public static PyDict FailBefore(string relativeMediaPath, string reason, string? inspectedSourcePath = null, PyDict? extra = null)
     {
         var result = new PyDict()
@@ -1283,7 +1282,7 @@ public sealed class RemuxPassRunner
     /// <summary><c>not_ready_kind</c> of a file Weir could not read from start to finish (#646).</summary>
     public const string UnreadableWait = "unreadable";
 
-    /// <summary><c>_source_not_ready</c>: an expected wait, not a failure.</summary>
+    /// <summary>The result of a source that is not ready yet: an expected wait, not a failure.</summary>
     public static PyDict SourceNotReady(string relativeMediaPath, string reason, string? inspectedSourcePath = null)
     {
         var result = new PyDict()
@@ -1302,7 +1301,7 @@ public sealed class RemuxPassRunner
         return result;
     }
 
-    /// <summary><c>_skip_guardrail</c>.</summary>
+    /// <summary>The result of a pass a guardrail skipped.</summary>
     public static PyDict SkipGuardrail(string relativeMediaPath, string reason, string guardrail, string? inspectedSourcePath, PyDict extra)
     {
         ArgumentNullException.ThrowIfNull(extra);
@@ -1327,7 +1326,7 @@ public sealed class RemuxPassRunner
         return result;
     }
 
-    /// <summary><c>_normalize_media_scope_for_cleanup</c>.</summary>
+    /// <summary><c>tv</c> for a TV scope, <c>movie</c> for anything else.</summary>
     public static string NormalizeScope(string? raw) => string.Equals(PyStrings.Strip(raw ?? "movie"), "tv", StringComparison.OrdinalIgnoreCase) ? "tv" : "movie";
 
     private static PyList StringList(IEnumerable<string> values) => new(values.Select(value => (PyJson)new PyStr(value)));

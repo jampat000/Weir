@@ -19,7 +19,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
 /// <summary>
-/// The worker handler for <c>processing.file.remux_pass.v1</c> (port of <c>file_remux_pass/handlers.py</c>): claim the file, run
+/// The worker handler for <c>processing.file.remux_pass.v1</c>: claim the file, run
 /// the pass outside any transaction, keep the Files row and Activity in step with the result, apply the library's failure
 /// policy, and report back to the manager that handed the file over.
 /// </summary>
@@ -212,8 +212,8 @@ public sealed class RemuxPassHandler : IJobHandler
     /// <remarks>
     /// Reading a file to the end is how Weir tells a download that is still arriving from one that is damaged, and it cannot
     /// tell them apart from one look. So the look is repeated, further apart each time, while the file is still changing or
-    /// might be. Before this, every scan read the whole file again for ever: gigabytes of disk reads every few minutes for a
-    /// file nobody was ever told about. Once the file has sat unchanged through <see cref="UnreadableWaitMinutes"/>, it is
+    /// might be, and not for ever: otherwise every scan would reread the whole file, gigabytes of disk reads every few
+    /// minutes for a file nobody is ever told about. Once the file has sat unchanged through <see cref="UnreadableWaitMinutes"/>, it is
     /// damaged, so this hands it to the library's failure policy with the evidence a reject needs (#471) — the same place a
     /// file whose contents cannot be read at all ends up. A file that changes starts the count again.
     /// </remarks>
@@ -417,7 +417,7 @@ public sealed class RemuxPassHandler : IJobHandler
             "claim processing file",
             cancellationToken);
 
-    /// <summary><c>resolve_library</c>: by id when the payload carries one, else the seeded library for its scope.</summary>
+    /// <summary>The pass's library: by id when the payload carries one, else the seeded library for its scope.</summary>
     public static async Task<ProcessingLibraryRecord?> ResolveLibraryAsync(UnitOfWork uow, long? libraryId, string? mediaScope)
     {
         if (libraryId is { } id && await LibraryStore.GetAsync(uow, id).ConfigureAwait(false) is { } found)
@@ -433,7 +433,7 @@ public sealed class RemuxPassHandler : IJobHandler
             ? RemuxPassPaths.RulesConfigFor(ruleSet)
             : null;
 
-    /// <summary><c>load_processing_remux_rules_config</c>: the seeded library's rule set for the scope, or the shipped defaults.</summary>
+    /// <summary>The seeded library's rule set for the scope, or the shipped defaults.</summary>
     private static async Task<ProcessingRulesConfig> LoadScopeRulesConfigAsync(UnitOfWork uow, string mediaScope)
     {
         var seeded = await LibraryStore.SeededForScopeAsync(uow, mediaScope).ConfigureAwait(false);
@@ -478,7 +478,7 @@ public sealed class RemuxPassHandler : IJobHandler
         }
     }
 
-    /// <summary><c>_apply_file_outcome_state</c>: keep the durable Files row in step with the result shown in Activity.</summary>
+    /// <summary>Keeps the durable Files row in step with the result shown in Activity.</summary>
     internal async Task ApplyFileOutcomeStateAsync(PyDict result, long? libraryId, string mediaScope, PyDict? origin)
     {
         if (result.Get("relative_media_path") is not PyStr relValue || PyStrings.Strip(relValue.Value).Length == 0)
@@ -607,7 +607,7 @@ public sealed class RemuxPassHandler : IJobHandler
         }
     }
 
-    /// <summary><c>_record_failed_result</c>: preflight failures through the same Files/Activity contract as a run result.</summary>
+    /// <summary>Records a preflight failure through the same Files/Activity contract as a run result.</summary>
     private async Task RecordFailedResultAsync(PyDict payload, long? libraryId, string mediaScope, PyDict? origin)
     {
         await ApplyFileOutcomeStateAsync(payload, libraryId, mediaScope, origin).ConfigureAwait(false);
@@ -615,7 +615,7 @@ public sealed class RemuxPassHandler : IJobHandler
     }
 
     /// <summary>
-    /// <c>_record</c>: the processing record and the Activity row, written together so they cannot disagree. A progress row
+    /// Writes the processing record and the Activity row together so they cannot disagree. A progress row
     /// already started for the pass becomes the completed row.
     /// </summary>
     internal async Task RecordAsync(PyDict payload, long? activityId = null)
@@ -663,7 +663,7 @@ public sealed class RemuxPassHandler : IJobHandler
         }
     }
 
-    /// <summary><c>_finish_rejected_input_cleanup</c>: an opt-in rejection deletion, applied after the rejection was recorded.</summary>
+    /// <summary>Applies an opt-in rejection deletion, after the rejection was recorded.</summary>
     private async Task FinishRejectedInputCleanupAsync(PyDict result, long? libraryId, string mediaScope)
     {
         if (result.Get("rejection_kind") is not { IsTruthy: true } || result.Get("rejected_file_action") is not PyStr { Value: "delete_file" })
@@ -696,7 +696,7 @@ public sealed class RemuxPassHandler : IJobHandler
             "rejected file cleanup record").ConfigureAwait(false);
     }
 
-    /// <summary><c>_report_back</c>: tell the originating manager how the pass went. Best effort; never throws.</summary>
+    /// <summary>Tells the originating manager how the pass went. Best effort; never throws.</summary>
     private async Task ReportBackAsync(string? payloadJson, PyDict result)
     {
         if (_reporter is null)

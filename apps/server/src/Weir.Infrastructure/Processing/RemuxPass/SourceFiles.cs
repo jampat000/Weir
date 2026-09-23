@@ -6,16 +6,16 @@ using Weir.Core.Processing;
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
 /// <summary>
-/// A file's identity and content state (<c>_source_fingerprint</c>: <c>st_dev, st_ino, st_size, st_mtime_ns</c>).
+/// A file's identity and content state: device, inode, size and modification time in nanoseconds.
 /// </summary>
 /// <remarks>
-/// The device and inode come from <c>GetFileInformationByHandle</c> on Windows (what CPython reports as <c>st_dev</c> and
-/// <c>st_ino</c> there). .NET exposes no portable inode, so elsewhere they are 0 and a replaced file is caught by its size and
-/// modification time alone.
+/// The device and inode come from <c>GetFileInformationByHandle</c> on Windows (the volume serial number and file index).
+/// .NET exposes no portable inode, so elsewhere they are 0 and a replaced file is caught by its size and modification time
+/// alone.
 /// </remarks>
 public readonly record struct SourceFingerprint(ulong Device, ulong Inode, long SizeBytes, long ModifiedTimeNs);
 
-/// <summary>A held source handle that permits readers but prevents writers (<c>SourceReadGuard</c>).</summary>
+/// <summary>A held source handle that permits readers but prevents writers.</summary>
 public sealed class SourceReadGuard : IDisposable
 {
     private FileStream? _handle;
@@ -32,14 +32,14 @@ public sealed class SourceReadGuard : IDisposable
     }
 }
 
-/// <summary>Reading, reserving and checking the source of a pass (port of the IO half of <c>processing_file_settling.py</c>).</summary>
+/// <summary>Reading, reserving and checking the source of a pass.</summary>
 public static partial class SourceFiles
 {
     private const int ErrorSharingViolation = 32;
     private const int ErrorLockViolation = 33;
 
     /// <summary>
-    /// <c>acquire_source_read_guard</c>: reserve a source for read-only processing, or explain why Processing must wait. The
+    /// Reserves a source for read-only processing, or explains why Processing must wait. The
     /// handle shares reading and deletion but not writing, so it both detects a writer and keeps one from starting.
     /// </summary>
     public static (SourceReadGuard? Guard, string? Problem) AcquireReadGuard(string path)
@@ -60,7 +60,7 @@ public static partial class SourceFiles
         }
     }
 
-    /// <summary><c>source_writer_problem</c>.</summary>
+    /// <summary>Why another program's writer keeps this source from being reserved, or null when it can be.</summary>
     public static string? SourceWriterProblem(string path)
     {
         var (guard, problem) = AcquireReadGuard(path);
@@ -69,7 +69,7 @@ public static partial class SourceFiles
     }
 
     /// <summary>
-    /// <c>check_file_access</c>: the source opens for reading and the output folder accepts a write. Null when both hold.
+    /// Checks the source opens for reading and the output folder accepts a write. Null when both hold.
     /// </summary>
     public static string? CheckFileAccess(ProcessingLibraryRecord library, string filePath, string? outputFolder)
     {
@@ -117,7 +117,7 @@ public static partial class SourceFiles
         return null;
     }
 
-    /// <summary><c>_source_fingerprint</c>. Throws <see cref="IOException"/> when the file cannot be read.</summary>
+    /// <summary>The file's current fingerprint. Throws <see cref="IOException"/> when the file cannot be read.</summary>
     public static SourceFingerprint Fingerprint(string path)
     {
         var info = new FileInfo(path);
@@ -150,7 +150,7 @@ public static partial class SourceFiles
     }
 
     /// <summary>
-    /// Issue #545 item 2: a short, stable tag for a dedupe key so a pass-through or reject job for a since-replaced file
+    /// A short, stable tag for a dedupe key (#545) so a pass-through or reject job for a since-replaced file
     /// (same relative path, different content — e.g. a re-download with the same name) queues again instead of being
     /// silently absorbed by a finished or failed row still sitting under the old key. Built from the fingerprint's size
     /// and modification time (not the device/inode, which are 0 off Windows); a file that cannot be read yet (already

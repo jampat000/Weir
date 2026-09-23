@@ -14,7 +14,7 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
 
-/// <summary>Activity writes for a Pass 4 failure-cleanup sweep (port of <c>processing_failure_cleanup_activity.py</c>).</summary>
+/// <summary>Activity writes for a Pass 4 failure-cleanup sweep.</summary>
 public static class ProcessingFailureCleanupActivity
 {
     private static string Label(string mediaScope) => mediaScope == "tv" ? "TV" : "Movies";
@@ -62,15 +62,14 @@ public static class ProcessingFailureCleanupActivity
 }
 
 /// <summary>
-/// Processing Pass 4: the periodic cleanup sweep for terminal failed remux jobs (port of <c>processing_failure_cleanup.py</c>).
+/// Processing Pass 4: the periodic cleanup sweep for terminal failed remux jobs.
 /// Deletes source (and, for Movies, output) folders left behind by a remux that used up its retries, once no media
 /// manager still holds the file open. This sweep deletes folders, so an import check it could not make is a stop, not a
 /// shrug: every manager covering the scope has to answer before anything is removed.
 /// </summary>
 /// <remarks>
 /// The queue-block check (<c>HeldByManager</c>) uses <see cref="QueueRowMapping"/>'s exact output-path match
-/// only, matching Python's <c>_held_by_manager</c> — it does not (yet) fall back to the title/year anchor the watched-folder
-/// scan port uses elsewhere, since that needs pieces the scan port (#522 part 5) has not landed yet.
+/// only; it does not fall back to the title/year anchor the watched-folder scan uses (#522).
 /// </remarks>
 public sealed class ProcessingFailureCleanupSweep
 {
@@ -90,9 +89,8 @@ public sealed class ProcessingFailureCleanupSweep
     }
 
     /// <summary>Exposed so the job handler can write its started/completed Activity rows in their own short
-    /// transactions, rather than holding one open across the sweep's filesystem work (deliberately unlike Python's
-    /// single enclosing transaction — see the class remarks in <c>RemuxPassHandler</c> for why this codebase never
-    /// holds a write transaction across slow I/O).</summary>
+    /// transactions, rather than holding one open across the sweep's filesystem work (see the class remarks in
+    /// <c>RemuxPassHandler</c> for why this codebase never holds a write transaction across slow I/O).</summary>
     public SqliteDatabase Database => _database;
 
     public Microsoft.Extensions.Logging.ILogger Logger => _logger;
@@ -371,7 +369,7 @@ public sealed class ProcessingFailureCleanupSweep
         }
     }
 
-    /// <summary><c>_held_by_manager</c>: the connection whose queue still names this exact file, or null. Path equality only.</summary>
+    /// <summary>The connection whose queue still names this exact file, or null. Path equality only.</summary>
     private static string? HeldByManager(IReadOnlyList<ManagerQueueSignal> signals, string mediaScope, string mediaFile)
     {
         var dialect = QueueRowMapping.DialectForScope(mediaScope);
@@ -402,7 +400,7 @@ public sealed class ProcessingFailureCleanupSweep
 
     private sealed record SignalReport(int Consulted, bool AllReported, IReadOnlyList<string> SilentDetails);
 
-    /// <summary><c>report_for_signals</c>.</summary>
+    /// <summary>How many managers were consulted, whether all of them answered, and what the silent ones said.</summary>
     private static SignalReport ReportForSignals(IReadOnlyList<ManagerQueueSignal> signals)
     {
         var silentDetails = new List<string>();
@@ -554,7 +552,7 @@ public sealed class ProcessingFailureCleanupSweep
         return (NormRel(relStr.Value), scope, legacyDryRun);
     }
 
-    /// <summary><c>_norm_rel</c>.</summary>
+    /// <summary>A relative path with forward slashes and no empty or <c>.</c> segments.</summary>
     private static string NormRel(string raw)
     {
         var trimmed = PyStrings.Strip(raw).Replace('\\', '/');
@@ -562,7 +560,7 @@ public sealed class ProcessingFailureCleanupSweep
         return parts.Length == 0 ? string.Empty : string.Join('/', parts);
     }
 
-    /// <summary><c>_job_temp_candidates</c>.</summary>
+    /// <summary>Work-folder temp files (<c>.processing.</c> in the name) that belong to this file's stem.</summary>
     private static List<string> JobTempCandidates(string workRoot, string relNorm)
     {
         var result = new List<string>();
@@ -599,7 +597,7 @@ public sealed class ProcessingFailureCleanupSweep
         return result;
     }
 
-    /// <summary><c>_cascade_under_root</c>: remove now-empty ancestor folders, up to (not including) the root.</summary>
+    /// <summary>Removes now-empty ancestor folders, up to (not including) the root.</summary>
     private static void CascadeUnderRoot(string firstParent, string root, PyList deletedOut)
     {
         var current = RemuxPassPaths.Resolve(firstParent);

@@ -8,9 +8,8 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
 /// <summary>
-/// The Files-row and processing-record writes a pass makes (ports of <c>mark_file_status</c>, <c>record_failure</c>,
-/// <c>record_measured_media_facts</c>, <c>record_output_collision</c> and <c>record_file_log</c>), each inside the caller's
-/// unit of work.
+/// The Files-row and processing-record writes a pass makes (status, failure, measured media facts, output collision and
+/// file log), each inside the caller's unit of work.
 /// </summary>
 public static class RemuxPassFileState
 {
@@ -23,7 +22,7 @@ public static class RemuxPassFileState
             ("$library", libraryId),
             ("$path", relativePath));
 
-    /// <summary><c>mark_file_status</c>: move a file Weir has already seen into a new state. False when there is no row.</summary>
+    /// <summary>Moves a file Weir has already seen into a new state. False when there is no row.</summary>
     public static async Task<bool> MarkFileStatusAsync(UnitOfWork uow, long libraryId, string relativePath, string status, string reason, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -59,9 +58,8 @@ public static class RemuxPassFileState
     }
 
     /// <summary>
-    /// Fix #532: a rejection always upserts a Files row, whether or not a scan had already seen the file. Python's
-    /// <c>mark_file_status</c> is a no-op with no existing row, so a hand-off rejected before any watched-folder scan never
-    /// appeared on the Files screen. Sets status <c>rejected</c>, the reason and the failure class; clears
+    /// A rejection always upserts a Files row, whether or not a scan had already seen the file, so a hand-off rejected
+    /// before any watched-folder scan still appears on the Files screen (#532). Sets status <c>rejected</c>, the reason and the failure class; clears
     /// <c>blocked_by_connection</c> and <c>hold_until</c> the same way <see cref="MarkFileStatusAsync"/> does for any status
     /// that is neither <c>blocked_upstream</c> nor <c>on_hold</c>.
     /// </summary>
@@ -99,7 +97,7 @@ public static class RemuxPassFileState
     }
 
     /// <summary>
-    /// <c>record_failure</c>: mark a file failed, classify it and apply the retry policy. The decision's sentence becomes the
+    /// Marks a file failed, classifies it and applies the retry policy. The decision's sentence becomes the
     /// reason on the record, so the screen says whether a retry is coming.
     /// </summary>
     public static async Task<RetryDecision> RecordFailureAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string failureClass, string reason, DateTimeOffset now)
@@ -164,10 +162,9 @@ public static class RemuxPassFileState
     }
 
     /// <summary>
-    /// <c>record_measured_media_facts</c>: matched on the path within the pass's own library (issue #545 item 5 — the
-    /// reference matched on the path alone, across every library that happened to share it); a value not measured leaves
-    /// the column alone. A null <see cref="MeasuredMediaFacts.LibraryId"/> updates nothing, rather than falling back to
-    /// the old cross-library match.
+    /// Records measured media facts on the row matched by path within the pass's own library, not on every library that
+    /// shares the path (#545); a value not measured leaves the column alone. A null
+    /// <see cref="MeasuredMediaFacts.LibraryId"/> updates nothing rather than matching across libraries.
     /// </summary>
     public static Task RecordMeasuredMediaFactsAsync(UnitOfWork uow, MeasuredMediaFacts facts)
     {
@@ -211,9 +208,8 @@ public static class RemuxPassFileState
     }
 
     /// <summary>
-    /// <c>record_output_collision</c>: the decision kept on the pass's own library's row for the path (issue #545 item 5 —
-    /// the reference matched on the path alone, across every library that happened to share it). A null
-    /// <paramref name="libraryId"/> updates nothing.
+    /// Keeps the output-collision decision on the pass's own library's row for the path, not on every library that
+    /// shares the path (#545). A null <paramref name="libraryId"/> updates nothing.
     /// </summary>
     public static Task RecordOutputCollisionAsync(UnitOfWork uow, string relativePath, CollisionDecision decision, long? libraryId)
     {
@@ -234,7 +230,7 @@ public static class RemuxPassFileState
             ("$library", library));
     }
 
-    /// <summary><c>record_file_log</c>: one completed pass, bounded, beside the file and library it belongs to.</summary>
+    /// <summary>Records one completed pass in the file log, bounded, beside the file and library it belongs to.</summary>
     public static async Task RecordFileLogAsync(UnitOfWork uow, string relativePath, string title, PyDict detail, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(uow);

@@ -15,7 +15,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
 /// <summary>
-/// <c>_record_unhandled_processing_failure</c>'s file half: a handler crash is still a failure, recorded against the file with the
+/// A handler crash is still a failure, recorded against the file with the
 /// retry policy applied, and the library's failure policy acts on it so the file is not stranded (#465).
 /// </summary>
 public sealed class RemuxPassFailureRecorder : IUnhandledJobFailureRecorder
@@ -83,7 +83,7 @@ public static class RemuxPassServices
         services.TryAddSingleton<IRemuxPassFileFacts>(sp => sp.GetRequiredService<SqliteRemuxPassData>());
         services.TryAddSingleton<IPostSuccessCleanupData>(sp => sp.GetRequiredService<SqliteRemuxPassData>());
         services.TryAddSingleton<ITvSeasonFolderCleanup, TvSeasonFolderCleanup>();
-        // Seam for work ported separately: the failure policy's follow-up handlers (pass-through and reject) are
+        // Seam: the failure policy's follow-up handlers (pass-through and reject) are
         // registered by AddWeirProcessingFailureFollowUps, which calls this method rather than duplicating it.
         services.TryAddSingleton<IFailurePolicy, QueueingFailurePolicy>();
         services.TryAddSingleton<IOriginalLanguageLookup, MetadataProviderOriginalLanguageLookup>();
@@ -117,7 +117,7 @@ public static class RemuxPassServices
             sp.GetService<HandoffCompletionReporter>(),
             sp.GetService<ProcessingJobStore>()));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHandler, RemuxPassHandler>(sp => sp.GetRequiredService<RemuxPassHandler>()));
-        // Replaces the jobs port's placeholder, whichever registration runs first.
+        // Replaces the jobs module's no-op recorder, whichever registration runs first.
         services.Replace(ServiceDescriptor.Singleton<IUnhandledJobFailureRecorder, RemuxPassFailureRecorder>());
         return services;
     }

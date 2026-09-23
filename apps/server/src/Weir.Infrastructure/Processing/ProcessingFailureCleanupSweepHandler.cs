@@ -5,7 +5,7 @@ using Weir.Infrastructure.Processing.RemuxPass;
 namespace Weir.Infrastructure.Processing;
 
 /// <summary>
-/// Worker handler for a Pass 4 failure-cleanup sweep job (port of <c>make_processing_failure_cleanup_handler</c>). One
+/// Worker handler for a Pass 4 failure-cleanup sweep job. One
 /// subclass is registered per scope (<see cref="MovieFailureCleanupSweepHandler"/>, <see cref="TvFailureCleanupSweepHandler"/>),
 /// since <c>processing.movie_failure_cleanup_sweep.v1</c> and <c>processing.tv_failure_cleanup_sweep.v1</c> are distinct job
 /// kinds with a fixed default scope each — kept as distinct types (rather than one class parameterized by string) so
@@ -50,7 +50,7 @@ public abstract class ProcessingFailureCleanupSweepHandler : IJobHandler
             cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary><c>_parse_payload</c>: the scope and provenance trigger, tolerant of a missing or malformed payload.</summary>
+    /// <summary>The scope and provenance trigger, tolerant of a missing or malformed payload.</summary>
     private static (string MediaScope, string? Trigger) ParsePayload(string? payloadJson, string defaultScope)
     {
         if (string.IsNullOrWhiteSpace(payloadJson))

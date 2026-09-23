@@ -13,23 +13,22 @@ public sealed record ActiveRemuxJob(long Id, string? PayloadJson);
 /// <summary>What the post-success cleanups need from the database and the managers, so the file logic stays testable.</summary>
 public interface IPostSuccessCleanupData
 {
-    /// <summary><c>collect_library_truth</c> for the scope.</summary>
+    /// <summary>What each media manager covering the scope reports about its library files.</summary>
     Task<IReadOnlyList<ManagerLibraryTruth>> CollectLibraryTruthAsync(string mediaScope, CancellationToken cancellationToken);
 
     /// <summary>Every pending or leased <c>processing.file.remux_pass.v1</c> row.</summary>
     Task<IReadOnlyList<ActiveRemuxJob>> ActiveRemuxJobsAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// Issue #545 item 1: whether the hand-off ledger already recorded this origin's outcome as delivered
+    /// Whether the hand-off ledger already recorded this origin's outcome as delivered
     /// (<c>completed</c> or <c>passed-through</c>) to the manager that asked for it. False for no origin, an origin the
-    /// ledger has never heard of, or one still short of that terminal state.
+    /// ledger has never heard of, or one still short of that terminal state (#545).
     /// </summary>
     Task<bool> HandoffOutcomeAcknowledgedAsync(HandoffOrigin? origin, CancellationToken cancellationToken);
 }
 
 /// <summary>
-/// Output-folder cleanup after a successful pass: Movies' per-title folder (Pass 3a, <c>processing_movie_output_cleanup.py</c>)
-/// and TV's season folder (Pass 3b, <c>processing_tv_output_cleanup.py</c>), each deleted only when every covering manager
+/// Output-folder cleanup after a successful pass: Movies' per-title folder and TV's season folder, each deleted only when every covering manager
 /// answered and none keeps a library file inside it, nothing under it is too new, and no other pass is heading there.
 /// </summary>
 public sealed class OutputFolderCleanup
@@ -49,7 +48,7 @@ public sealed class OutputFolderCleanup
         _tvMinAgeSeconds = tvMinAgeSeconds;
     }
 
-    /// <summary><c>normalize_relative_media_path_for_match</c>: a stable posix path for comparing job payloads.</summary>
+    /// <summary>A stable posix path for comparing job payloads.</summary>
     public static string NormalizeRelativeForMatch(string rel)
     {
         var parts = PyStrings.Strip(rel ?? string.Empty).Replace('\\', '/').Split('/').Where(part => part is not ("." or "")).ToList();
@@ -61,7 +60,7 @@ public sealed class OutputFolderCleanup
         return string.Join('/', parts);
     }
 
-    /// <summary><c>maybe_run_movie_output_folder_cleanup_after_remux</c>.</summary>
+    /// <summary>Deletes the movie's output folder after a successful pass when every cleanup gate allows it.</summary>
     public async Task RunMovieAsync(PyDict output, ProcessingPathRuntime runtime, string watchedRoot, string source, string? finalOutputFile, string relativeMediaPath, long? currentJobId, string mediaScope, HandoffOrigin? origin, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(output);
@@ -115,7 +114,7 @@ public sealed class OutputFolderCleanup
             .ConfigureAwait(false);
     }
 
-    /// <summary><c>maybe_run_tv_output_season_folder_cleanup_after_remux</c>.</summary>
+    /// <summary>Deletes the episode's output season folder after a successful pass when every cleanup gate allows it.</summary>
     public async Task RunTvAsync(PyDict output, ProcessingPathRuntime runtime, string watchedRoot, string source, string? finalOutputFile, long? currentJobId, string mediaScope, HandoffOrigin? origin, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(output);
@@ -292,7 +291,7 @@ public sealed class OutputFolderCleanup
         output.Set(cascadeKey, cascade);
     }
 
-    /// <summary><c>_cascade_delete_empty_parents*</c>: remove empty parents up to, never including, <paramref name="root"/>.</summary>
+    /// <summary>Removes empty parents up to, never including, <paramref name="root"/>.</summary>
     public static void CascadeDeleteEmptyParents(string firstParent, string root, PyList deleted, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(deleted);
@@ -447,7 +446,7 @@ public sealed class OutputFolderCleanup
     private static string NormalizeScope(PyJson? raw) =>
         raw is PyStr text && string.Equals(PyStrings.Strip(text.Value), "tv", StringComparison.OrdinalIgnoreCase) ? "tv" : "movie";
 
-    /// <summary><c>iter_direct_child_processing_media_candidates</c>, in name order.</summary>
+    /// <summary>The media files directly inside <paramref name="folder"/>, in name order.</summary>
     public static IReadOnlyList<string> DirectChildMediaCandidates(string folder)
     {
         try
@@ -462,7 +461,7 @@ public sealed class OutputFolderCleanup
         }
     }
 
-    /// <summary><c>newest_mtime_seconds_under_tree</c>.</summary>
+    /// <summary>The newest file modification time under <paramref name="root"/>, in Unix seconds, or null when none can be read.</summary>
     public static double? NewestModifiedUnderTree(string root)
     {
         double? newest = null;

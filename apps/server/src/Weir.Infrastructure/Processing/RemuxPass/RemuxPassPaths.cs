@@ -4,7 +4,7 @@ using Weir.Core.Rules;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
-/// <summary>Resolved folders and output-side settings for one pass (<c>ProcessingPathRuntime</c>).</summary>
+/// <summary>Resolved folders and output-side settings for one pass.</summary>
 public sealed record ProcessingPathRuntime
 {
     public required string WatchedFolder { get; init; }
@@ -29,13 +29,12 @@ public sealed record ProcessingPathRuntime
     public bool RemoveOriginalAfterSuccess { get; init; } = true;
 }
 
-/// <summary>The rejected-file deletion's outcome (<c>RejectedFileCleanupResult</c>).</summary>
+/// <summary>The rejected-file deletion's outcome.</summary>
 public sealed record RejectedFileCleanupResult(bool Deleted, string Detail);
 
 /// <summary>
-/// Paths for a pass: the safe join under the watched folder (<c>file_remux_pass/paths.py</c>), the library's folders
-/// (<c>processing_path_settings_service.py</c>), its rules (<c>rules_config_for</c>) and the rejected-file primitive
-/// (<c>processing_rejected_file_cleanup.py</c>).
+/// Paths for a pass: the safe join under the watched folder, the library's folders, its rules and the rejected-file
+/// cleanup.
 /// </summary>
 public static class RemuxPassPaths
 {
@@ -100,8 +99,8 @@ public static class RemuxPassPaths
     }
 
     /// <summary>
-    /// <c>resolve_media_file_under_processing_root</c>: <c>(root / relative).resolve()</c>, only when it stays under the watched
-    /// folder. Throws <see cref="ArgumentException"/> with the reference's sentence otherwise.
+    /// The full path of <paramref name="relativePath"/> under the watched folder, only when it stays under that folder.
+    /// Throws <see cref="ArgumentException"/> otherwise, so a crafted relative path can never reach a file outside it.
     /// </summary>
     public static string ResolveMediaFileUnderRoot(string mediaRoot, string relativePath)
     {
@@ -131,19 +130,18 @@ public static class RemuxPassPaths
         return candidate;
     }
 
-    /// <summary><c>resolved_default_processing_work_folder</c> / <c>resolved_default_processing_tv_work_folder</c>.</summary>
+    /// <summary>The default work folder for a scope, under the Weir home folder.</summary>
     public static string DefaultWorkFolder(string weirHome, string mediaType) =>
         Path.Join(Resolve(weirHome), "processing", mediaType == "tv" ? "processing-tv-work" : "processing-movie-work");
 
     /// <summary>
-    /// <c>effective_library_work_folder</c>: the library's own, or the per-scope default when it has
-    /// none. <c>IsDefault</c> says which, and callers use it to decide whether a folder that is not on
-    /// disk is an error (a custom path) or something to create (the default).
+    /// The library's own work folder, or the per-scope default when it has none. <c>IsDefault</c> says which,
+    /// and callers use it to decide whether a folder that is not on disk is an error (a custom path) or
+    /// something to create (the default).
     /// </summary>
     /// <remarks>
-    /// This carried the same two hard-coded MediaMop-era Windows paths as
-    /// <see cref="Jobs.ProcessingLibraryFolders.EffectiveWorkFolder"/> and for the same reason; 3.0.0
-    /// removed both copies. See that method for what changes for a row still holding one.
+    /// There are no hard-coded Windows default paths here; see
+    /// <see cref="Jobs.ProcessingLibraryFolders.EffectiveWorkFolder"/> for how a row still holding one is treated.
     /// </remarks>
     public static (string WorkFolder, bool IsDefault) EffectiveWorkFolder(ProcessingLibraryRecord library, string weirHome)
     {
@@ -158,7 +156,7 @@ public static class RemuxPassPaths
     }
 
     /// <summary>
-    /// <c>resolve_processing_path_runtime_for_library</c>: one library's folders, or the sentence saying why they cannot be used.
+    /// One library's folders, or the sentence saying why they cannot be used.
     /// </summary>
     public static (ProcessingPathRuntime? Runtime, string? Problem) RuntimeForLibrary(ProcessingLibraryRecord library, string weirHome)
     {
@@ -237,7 +235,7 @@ public static class RemuxPassPaths
     private static bool SameOrNested(string a, string b) => IsUnder(a, b) || IsUnder(b, a);
 
     /// <summary>
-    /// <c>rules_config_for</c>: a library's rule set, including the original-language and metadata options the plain
+    /// A library's rule set, including the original-language and metadata options the plain
     /// conversion (<see cref="RuleSetConversion.ToRulesConfig"/>, the fallback for a library without one) leaves out.
     /// </summary>
     public static ProcessingRulesConfig RulesConfigFor(ProcessingRuleSetRecord ruleSet)
@@ -250,8 +248,7 @@ public static class RemuxPassPaths
             TertiaryAudioLang = ruleSet.TertiaryAudioLang,
             DefaultAudioSlot = ruleSet.DefaultAudioSlot,
             RemoveCommentary = ruleSet.RemoveCommentary,
-            // #545 item 4: rules_config_for used to pass the stored mode through unchanged while the fallback path
-            // (RuleSetConversion.ToRulesConfig) normalized it; both paths now agree on the same normalization.
+            // Normalized the same way as the fallback path (RuleSetConversion.ToRulesConfig) so both agree (#545).
             SubtitleMode = RuleSetConversion.NormalizeSubtitleMode(ruleSet.SubtitleMode),
             SubtitleLangs = [.. (ruleSet.SubtitleLangsCsv ?? string.Empty).Split(',').Select(PyStrings.Strip).Where(x => x.Length > 0)],
             PreserveForcedSubs = ruleSet.PreserveForcedSubs,
@@ -286,7 +283,7 @@ public static class RemuxPassPaths
         };
     }
 
-    /// <summary><c>cleanup_rejected_file</c>: delete one regular file under the watched folder, never a populated folder.</summary>
+    /// <summary>Deletes one regular file under the watched folder, never a populated folder.</summary>
     public static RejectedFileCleanupResult CleanupRejectedFile(string watchedRoot, string filePath, string? action)
     {
         if (!string.Equals(PyStrings.Strip(action ?? "leave"), "delete_file", StringComparison.OrdinalIgnoreCase))

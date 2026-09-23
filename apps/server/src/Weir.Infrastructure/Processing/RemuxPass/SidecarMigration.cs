@@ -3,10 +3,10 @@ using Weir.Infrastructure.MediaManagers;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
-/// <summary>One sidecar that travelled (<c>MigratedSidecar</c>).</summary>
+/// <summary>One sidecar that travelled.</summary>
 public sealed record MigratedSidecar(string Source, string Destination);
 
-/// <summary>What travelled, what did not, and whether deletion may proceed (<c>SidecarMigrationResult</c>).</summary>
+/// <summary>What travelled, what did not, and whether deletion may proceed.</summary>
 public sealed class SidecarMigrationResult
 {
     public List<MigratedSidecar> Migrated { get; } = [];
@@ -26,15 +26,14 @@ public sealed class SidecarMigrationResult
 }
 
 /// <summary>
-/// Carry sidecar files to the output before the source folder is deleted (port of <c>processing_sidecar_migration.py</c>). A
-/// sidecar that is not there is not a failure; one that exists and could not be copied blocks the deletion.
+/// Carry sidecar files to the output before the source folder is deleted. A sidecar that is not there is not a failure; one that exists and could not be copied blocks the deletion.
 /// </summary>
 public static class SidecarMigration
 {
-    /// <summary><c>DEFAULT_SIDECAR_PATTERNS</c>.</summary>
+    /// <summary>The sidecar patterns used when a library sets none.</summary>
     public static readonly IReadOnlyList<string> DefaultPatterns = [".srt", ".ass", ".ssa", ".sub", ".idx", ".vtt", ".nfo", ".jpg", ".png"];
 
-    /// <summary><c>parse_sidecar_patterns</c>: lower-cased, dotted, de-duplicated. Empty means migrate nothing.</summary>
+    /// <summary>Parses a pattern list: lower-cased, dotted, de-duplicated. Empty means migrate nothing.</summary>
     public static IReadOnlyList<string> ParsePatterns(string? csv)
     {
         var output = new List<string>();
@@ -61,7 +60,7 @@ public static class SidecarMigration
     }
 
     /// <summary>
-    /// <c>find_sidecars</c>: files beside the video whose name starts with its stem and ends with a pattern, in case-insensitive
+    /// Files beside the video whose name starts with its stem and ends with a pattern, in case-insensitive
     /// name order. Matching the stem keeps one film's subtitles from being handed to another in the same folder.
     /// </summary>
     public static IReadOnlyList<string> FindSidecars(string sourceMedia, IReadOnlyList<string> patterns)
@@ -105,7 +104,7 @@ public static class SidecarMigration
         return found;
     }
 
-    /// <summary><c>destination_for_sidecar</c>: renamed to the output video's stem, keeping the trailing part (<c>.en.srt</c>).</summary>
+    /// <summary>Where a sidecar goes: renamed to the output video's stem, keeping the trailing part (<c>.en.srt</c>).</summary>
     public static string DestinationFor(string sidecar, string sourceMedia, string outputMedia)
     {
         var sidecarName = Path.GetFileName(sidecar);
@@ -114,7 +113,7 @@ public static class SidecarMigration
         return Path.Join(Path.GetDirectoryName(outputMedia), Stem(Path.GetFileName(outputMedia)) + trailing);
     }
 
-    /// <summary><c>migrate_sidecars</c>: copy, never move, so a refused deletion loses nothing.</summary>
+    /// <summary>Copies the sidecars to the output, never moves them, so a refused deletion loses nothing.</summary>
     public static async Task<SidecarMigrationResult> MigrateAsync(string sourceMedia, string outputMedia, IReadOnlyList<string> patterns, bool preserveTimestamps = false)
     {
         var result = new SidecarMigrationResult();
@@ -156,7 +155,7 @@ public static class SidecarMigration
         return result;
     }
 
-    /// <summary><c>apply_original_timestamps</c>: the output gets the source's times. Returns a problem, or null. Never fatal.</summary>
+    /// <summary>The output gets the source's times. Returns a problem, or null. Never fatal.</summary>
     public static string? ApplyOriginalTimestamps(string sourceMedia, string outputMedia)
     {
         DateTime accessed;

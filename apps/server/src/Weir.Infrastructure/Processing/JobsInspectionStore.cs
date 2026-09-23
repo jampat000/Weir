@@ -3,7 +3,7 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
 
-/// <summary>Read-only <c>jobs</c> listing for operators (port of <c>jobs_inspection_service.py</c>).</summary>
+/// <summary>Read-only <c>jobs</c> listing for operators.</summary>
 public static class JobsInspectionStore
 {
     private static readonly HashSet<string> AllowedStatuses = new(StringComparer.Ordinal)
@@ -12,7 +12,7 @@ public static class JobsInspectionStore
         ProcessingJobStatus.Failed, ProcessingJobStatus.HandlerOkFinalizeFailed, ProcessingJobStatus.Cancelled,
     };
 
-    /// <summary><c>validate_processing_inspection_statuses</c>.</summary>
+    /// <summary>Throws <see cref="ArgumentException"/> naming any status filter value that is not a known job status.</summary>
     public static void ValidateStatuses(IReadOnlyList<string> statuses)
     {
         var unknown = statuses.Where(s => !AllowedStatuses.Contains(s)).ToList();
@@ -24,7 +24,7 @@ public static class JobsInspectionStore
     }
 
     /// <summary>
-    /// <c>list_jobs_for_inspection</c>: up to <paramref name="limit"/> rows, newest <c>updated_at</c>
+    /// Up to <paramref name="limit"/> rows, newest <c>updated_at</c>
     /// first. With no status filter, excludes completed watched-folder scan-dispatch rows so frequent,
     /// successful periodic checks do not crowd out real work.
     /// </summary>
