@@ -46,6 +46,8 @@ public static class ProcessingApi
         services.AddSingleton<ProcessingWatchedFolderScanDispatchJobHandler>();
         services.AddSingleton<IJobHandler>(sp => sp.GetRequiredService<ProcessingWatchedFolderScanDispatchJobHandler>());
         services.AddSingleton<IPeriodicTask, ProcessingWatchedFolderScanDispatchScheduleTask>();
+        // Forgets the rows of files that left a watched folder even when that library's scan is off (3.2.4).
+        services.AddSingleton<IPeriodicTask, VanishedFileSweepTask>();
 
         // Watched-folder filesystem watcher (#552): FileSystemWatcher per enabled/watched library, feeding
         // the same scan-dispatch enqueue above. Runs independently of the periodic scheduler — see
