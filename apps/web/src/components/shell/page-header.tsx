@@ -18,7 +18,7 @@ type PageHeaderProps = {
  *
  * Until 3.2 those two controls had a bar of their own above every title. James chose to put
  * them in the title's row instead (2026-09-22, the "top menus" board), so a page starts with
- * what it is rather than with a toolbar. See docs/exec-plans/active/live-and-library.md.
+ * what it is rather than with a toolbar. See docs/archive/live-and-library.md.
  */
 export function PageHeader({
   title,

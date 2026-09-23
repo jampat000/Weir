@@ -1,6 +1,8 @@
+*Historical record; not current documentation.*
+
 # What the content redesign breaks in the docs
 
-An inventory of every documentation asset the [content-language](content-language.md)
+An inventory of every documentation asset the [content-language](../design/content-language.md)
 redesign makes wrong or stale, plus the product-blurb wording that predates library
 mode. Written while several page conversions are still in flight, so it separates what
 is wrong *now*, what will become wrong *once a specific PR merges*, and what cannot be
@@ -38,18 +40,18 @@ As of this writing, against `origin/main`:
 | Settings (all tabs) | ~~Uncommitted work in progress~~ **Converted, merged (#599)** — applied sparingly; the action cards in Backup and restore were deliberately left alone |
 
 > **Status note, 2026-09-18.** Every row above except Settings has since merged
-> (#596, #597, #600, #601). Settings did not: the owner rejected the converted result,
-> and Settings → General is being rebuilt on `design/settings-general-content`. A
+> (#596, #597, #600, #601). Settings did not: the converted result was rejected,
+> and Settings → General was rebuilt on `design/settings-general-content`. A
 > design-QA pass (`design/site-qa`) is running across the other screens for the same
 > class of defect — ragged multi-column grids, an orphaned card in a last row, bordered
 > things nested inside bordered things, cards a conversion missed, and pages that
-> disagree with each other. ~~**So the reshoot in §4 is on hold**~~ **Done: the README
+> disagree with each other. The reshoot in §4 was then **done: the README
 > screenshot refresh landed on `main` with the 3.0.0 release (#583), and `library.png` was
 > re-shot again in #615 after its problem-count and "(s)" copy fixes.** As first written:
 > `processing.png` and
 > `settings.png` are near-certain to change again, and anything captured before that
-> pass settles would be obsolete within the hour. Re-read this document before shooting;
-> the layouts will have moved.
+> pass settles would be obsolete within the hour.
+> the layouts would have moved.
 
 Separately, a recent PR changed the sidebar's product blurb from "Cleans every download
 before your media manager imports it" to "Cleans new downloads, and files already in
@@ -135,13 +137,12 @@ above.
 | `docs/visual-identity.md:8` | "Slate `#1F232A` \| Sidebar, cards, surfaces" | Ambiguous rather than false: Slate still colors the frozen sidebar and still appears in dialogs and figure tiles, just not most page bodies any more | **Deferred / needs verification** — rewording this confidently requires knowing which surfaces still use Slate once every page converts; listing rather than guessing |
 | `README.md:31,35,39,43,49` (screenshot captions) | "Existing library" caption over `existing-library.png` | The tab was renamed to "Library" in #568 | **Deferred** — see note below: fixing the caption without fixing the image it sits above would make the mismatch worse, since the screenshot itself has "Existing library" printed in its tab strip. Bundle this with the screenshot refresh, not this PR. |
 
-I did not find the literal old product blurb ("Cleans every download before your media
-manager imports it") anywhere in `docs/` or `docs-site/docs/` prose — only baked into
+The literal old product blurb ("Cleans every download before your media
+manager imports it") was not found anywhere in `docs/` or `docs-site/docs/` prose — only baked into
 the screenshots (§1) and, until this PR, in one piece of website copy (§3).
 
-I did not find `document.documentElement.scrollWidth === document.documentElement.clientWidth`
-or any other horizontal-overflow check written down anywhere in `docs/` or
-`README.md`. If one exists, it is not in this repository's documentation.
+No `document.documentElement.scrollWidth === document.documentElement.clientWidth` or other
+horizontal-overflow check was written down anywhere in `docs/` or `README.md`.
 
 ## 3. Product purpose described in pre-library-mode terms
 
@@ -186,7 +187,7 @@ stale.
    to state library mode, mirroring the sidebar's already-corrected blurb.
 5. **`docs/README.md`** — added a link to this document under Product And UX Rules.
 
-I looked for, and did not change, anything under `apps/`.
+Nothing under `apps/` was changed.
 
 ## Deferred — needs a shipped screen to word correctly
 
@@ -215,9 +216,6 @@ I looked for, and did not change, anything under `apps/`.
 
 ## Needs verification, not guessed
 
-Per the constraint against inventing product behaviour, these are flagged rather than
-answered:
-
 **Both answered (2026-09-18), against merged `main`.**
 
 - `docs/ux-polish.md:37` ("Processing activity can show before/after file details, size savings,
@@ -238,134 +236,16 @@ answered:
 
 ---
 
-## 4. Screenshot refresh plan
+## 4. Screenshot refresh
 
-Run this **after** the four in-flight conversions (`design/activity-content`,
-`design/processing-library-tab`, `design/processing-config-tabs`,
-`design/processing-data-tabs`, `design/settings-content`) have all merged to `main` —
-not before, or the new screenshots will be stale within the hour, same as the ones
-this document describes.
+The refresh ran after every conversion above had merged. `scripts/screenshot-site.py` captures
+every screen in both themes, at desktop and narrow widths, empty and seeded, for review. The images
+the README publishes are captured by [`scripts/capture-readme-screenshots.py`](../../scripts/capture-readme-screenshots.py),
+which reuses the harness's bring-up and seed but shoots viewport-only frames at the published sizes,
+and also opens and seeds the processing record the harness cannot reach.
 
-### What the harness covers
+While preparing the refresh, `seed_representative_data()` was extended so the seeded finished
+passes carry the real `processing.file_remux_pass_completed` event and envelope. Before that, a
+seeded install reported 0 files handed back beside a band saying two had been.
 
-`scripts/screenshot-site.py` captures all 19 screens (`GATED_SCREENS` +
-`NORMAL_SCREENS` in that file), in both themes (`dark`, `light`) and both widths
-(`desktop` 1440×1000, `narrow` 390×844), twice — once against an empty install, once
-seeded with representative data — and writes
-`<index>-<slug>--<empty|seeded>--<theme>--<desktop|narrow>.png` plus a
-`contact-sheet.html` and `manifest.txt`.
-
-`seed_representative_data()` was extended while preparing the refresh: Processing →
-Overview's "last 30 days" figures are not read off the activity rows' text but by
-re-parsing the detail of `processing.file_remux_pass_completed` events as the JSON
-envelope `RemuxPassHandler` writes (`OverviewStatsStore.BuildAsync`). The seed's two
-finished passes were plain `job_completed` lines, so they appeared in the feed and in
-none of the figures, and a fully seeded install reported **0 files handed back and a 0%
-success rate** directly beside a band saying it had handed back two. Both now carry the
-real event type and the real envelope.
-
-From the repository root, one time, before running it:
-
-```powershell
-cd apps\web
-npm ci
-npm run build
-cd ..\..
-dotnet build apps\server\src\Weir.Host
-python -m playwright install chromium   # once per machine
-```
-
-Then, from the repository root:
-
-```powershell
-python scripts/screenshot-site.py .\screenshot-refresh
-```
-
-> **Verified 2026-09-18, and this is no longer the right command for the README.**
-> The screen numbering and slugs below still match `scripts/screenshot-site.py` on
-> `main` (`04-in-hand`, `05-activity`, `06-processing-overview`,
-> `11-processing-library-overview`, `18-settings`) — the five conversions that have
-> landed since did not renumber anything. What does not match is the **frame**. The
-> harness shoots `full_page=True` at `device_scale_factor=2`, from a 1440×1000 desktop
-> viewport and a 390×844 narrow one. Every image this repo publishes is viewport-only
-> at `device_scale_factor=1`, 1440×900 on the desktop and 400×860 on the phone (read
-> straight out of the PNG headers). Publishing a harness frame would change the size of
-> every image in the README gallery and reflow it.
->
-> So the README's set is now captured by
-> [`scripts/capture-readme-screenshots.py`](../../scripts/capture-readme-screenshots.py),
-> which imports the harness and reuses its bring-up wholesale — the disposable
-> `WEIR_HOME`, the server process, `seed_representative_data()`, the theme mechanism and
-> the throwaway admin bootstrapped over the API — and replaces only the viewport, the
-> device scale factor, and the list of shots. It captures all eight published images,
-> including the processing record below, in one pass:
->
-> ```powershell
-> python scripts/capture-readme-screenshots.py .
-eadme-shots
-> ```
->
-> The harness stays exactly what it is for: reviewing every screen, both themes, both
-> widths, empty and seeded. Use it for that, and the table below to know which harness
-> frame corresponds to which published image.
-
-That produces every frame this document's screenshots need. The mapping from the
-harness's output to the seven images this repo actually publishes:
-
-| Publish as | Take from |
-| --- | --- |
-| `screenshots/in-hand.png` (and the identical `docs-site/static/img/in-hand.png`) | `screenshot-refresh/04-in-hand--seeded--dark--desktop.png` |
-| `screenshots/in-hand-light.png` | `screenshot-refresh/04-in-hand--seeded--light--desktop.png` |
-| `screenshots/in-hand-mobile.png` | `screenshot-refresh/04-in-hand--seeded--dark--narrow.png` |
-| `screenshots/activity.png` (and `docs-site/static/img/activity.png` if it starts being referenced) | `screenshot-refresh/05-activity--seeded--dark--desktop.png` |
-| `screenshots/processing.png` (and `docs-site/static/img/processing.png`) | `screenshot-refresh/06-processing-overview--seeded--dark--desktop.png` |
-| `screenshots/existing-library.png` → **rename to `screenshots/library.png`** and update `README.md`'s caption from "Existing library" to "Library" in the same commit | `screenshot-refresh/11-processing-library-overview--seeded--dark--desktop.png` |
-| `screenshots/settings.png` | `screenshot-refresh/18-settings--seeded--dark--desktop.png` |
-
-Use the `seeded` scenario for all of the above — every one of today's screenshots
-shows non-empty data (files in hand, processed counts, activity rows, a configured
-library), and the harness's `empty` pass exists for reviewing empty states, not for
-the README gallery.
-
-### What the harness cannot give you
-
-- **`screenshots/processing-detail.png`** ("Processing record detail"). The harness
-  only opens each screen's default state; it never presses a button. This panel is
-  behind **Processing record** on a file's row in Processing → Files
-  (`processing-file-log-{id}` opens `processing-file-log-panel`) — not an expanded
-  history row, which is what this document assumed before the Files conversion landed.
-  `scripts/capture-readme-screenshots.py` now drives it.
-- **A processing record to open.** `seed_representative_data()` seeds files, jobs,
-  library rows and activity, but no `file_logs` rows at all, so the panel opens saying
-  "0 record(s)" against an otherwise well-seeded install. The capture script seeds one
-  `file_logs` row for the file the harness already marks `processed`, shaped like the
-  payload `RemuxPassRunner` writes for a successful live remux, and fails the run rather
-  than shoot an empty panel.
-- **Confirming `processing-detail.png` no longer says "Refiner" anywhere.** Read the
-  new capture, not just the class names, since this is exactly the kind of leftover
-  string a purely structural review would miss. For what it is worth, the source is
-  already clean: the only `refiner` left in `apps/web/src` is a legacy route redirect
-  and two regression tests that assert the name is absent. The stale pixels came from
-  the record's own stored JSON key, `refiner_watched_folder_resolved`, which migration
-  `0009_drop_the_refiner_name.sql` renamed to `processing_watched_folder_resolved`; a
-  record written by today's server cannot carry the old spelling.
-
-### Cleanup once the refresh lands
-
-Delete the four unreferenced duplicates under `docs-site/static/img/` instead of
-refreshing them, unless a future PR starts referencing them from a `docs-site` page:
-
-**Done** — all six unreferenced duplicates were removed ahead of the reshoot, since
-nothing referenced them and nothing about the redesign changes that:
-
-```powershell
-git rm docs-site/static/img/activity.png
-git rm docs-site/static/img/existing-library.png
-git rm docs-site/static/img/in-hand-light.png
-git rm docs-site/static/img/in-hand-mobile.png
-git rm docs-site/static/img/processing-detail.png
-git rm docs-site/static/img/settings.png
-```
-
-(`docs-site/static/img/in-hand.png` and `docs-site/static/img/processing.png` stay —
-`docs-site/src/pages/index.tsx` references both.)
+The six unreferenced duplicates under `docs-site/static/img/` were deleted ahead of the reshoot.

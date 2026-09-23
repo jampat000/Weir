@@ -1,3 +1,5 @@
+*Historical record; not current documentation.*
+
 # Processing / FileFlows parity audit
 
 Audit date: 2026-09-01
@@ -108,6 +110,4 @@ through a shared inode after the watched name is removed.
 
 No unimplemented FileFlows-audit feature remains hidden behind a closed issue. The
 one runtime regression found by this audit—the disconnected same-volume unchanged
-fast path—was remediated and covered by validation-before-publication tests. Future
-parity claims must update this document when they change the matrix or its safety
-rationale.
+fast path—was remediated and covered by validation-before-publication tests.

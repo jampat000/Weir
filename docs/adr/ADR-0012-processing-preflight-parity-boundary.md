@@ -19,7 +19,7 @@ Without an explicit boundary, parity work risks either:
    - Processing preflight now supports bounded ffprobe controls:
      - `WEIR_PROCESSING_PROBE_SIZE_MB` (default `10`, clamp `1..1024`)
      - `WEIR_PROCESSING_ANALYZE_DURATION_SECONDS` (default `10`, clamp `1..300`)
-   - These settings are loaded at API startup via `WeirSettings`.
+   - These settings are loaded once at server startup into `WeirOptions` (`ProcessingProbeSizeMb`, `ProcessingAnalyzeDurationSeconds`) by `WeirOptionsLoader`.
    - Remux pass results include stable preflight fields:
      - `preflight_status`
      - `preflight_reason`

@@ -45,8 +45,9 @@ still only exposes it under its real name once that copy is complete.
 
 If Weir can't produce a usable result — the release turns out to have no tracks worth keeping, for
 example — it doesn't leave a broken file behind or silently drop your download. It hands the
-original file back unchanged and tells you why in Activity, so you (or your media manager) can
-decide what to do next.
+original file back unchanged and tells you why in History, so you (or your media manager) can
+decide what to do next. That is the default. The library's **When retries run out** setting can
+keep the file on hold or reject the release instead.
 
 ## Subtitles and other extra files travel too, safely
 
@@ -62,7 +63,7 @@ rather than overwriting something you may have already edited.
 Weir only deletes the original file (or the source folder it came from) after the cleaned copy
 exists at its final path and any sidecars that needed to travel have been copied successfully. A
 file that's missing is treated as already gone, not as a completed deletion with something hidden
-behind it — and a file that's locked or in use produces a message you can read in Activity, not a
+behind it — and a file that's locked or in use produces a message you can read in History, not a
 silent skip.
 
 ## Library mode: cleaning files you already have

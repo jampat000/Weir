@@ -68,7 +68,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
         await GiveEveryLibraryAProfileAsync(cancellationToken).ConfigureAwait(false);
 
         // #506's startup sweep runs after the existing recovery above and before any worker starts claiming jobs (this
-        // hosted service is registered ahead of the worker lane) — see apps/server/README.md, "Library mode: safe swap".
+        // hosted service is registered ahead of the worker lane) — see docs/archive/server-port-notes.md, "Library mode: safe swap".
         if (_swapSweep is not null)
         {
             var folders = await LibraryFoldersForSweepAsync(cancellationToken).ConfigureAwait(false);

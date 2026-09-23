@@ -1,50 +1,68 @@
 ---
 sidebar_position: 4
-title: Releases
+title: Versions and updates
 ---
 
-# Releases
+# Versions and updates
 
-Weir ships three deliverables from each tagged release:
+## Version numbers
 
-| Deliverable | Description |
-|-------------|-------------|
-| GitHub Release | Canonical source snapshot for the tag |
-| `Weir-win-Setup.exe` | Windows desktop installer with tray host and the bundled .NET server |
-| Docker image | `ghcr.io/jampat000/weir:X.Y.Z` and `:latest`, for linux/amd64 and linux/arm64 |
+Weir versions have three numbers, major.minor.patch, for example `3.2.4`. Each release is tagged
+`vX.Y.Z` on GitHub. The Windows installer and the Docker image of a release always carry the same
+version.
 
-Additional artifact: `weir-web-dist.zip` — static production build of the frontend (the server is still required).
+To see which version you're running, open **System › About**. The **Updates** section shows the
+installed version, the latest release and a **Release notes** link.
 
-## Release process
+## Release notes
 
-1. Update version in both files via a normal PR:
-   - `<WeirVersion>` in `apps/server/Directory.Build.props`
-   - `version` in `apps/web/package.json`
+Every release has notes describing what changed for users:
 
-   The release workflow checks that the tag `vX.Y.Z` matches both.
-2. Merge to `main` after CI passes
-3. Create release notes at `docs/release-notes/vX.Y.Z.md`
-4. Create and push an annotated tag:
+- on the [GitHub Releases page](https://github.com/jampat000/Weir/releases)
+- in the repository, under [`docs/release-notes`](https://github.com/jampat000/Weir/tree/main/docs/release-notes)
+
+## Updating on Windows
+
+The tray app installs updates itself. To check now, right-click the tray icon and choose **Check
+for updates**, or open **System › About** in Weir. How updates are handled is set by **Update
+mode** in **System › About**:
+
+| Mode | What happens |
+| --- | --- |
+| **Auto** (default) | Downloads updates on its own and installs them the next time Weir restarts |
+| **Download only** | Downloads updates in the background, then tells you one is ready; you choose when to restart |
+| **Notify only** | Tells you an update is available and downloads nothing |
+
+Updates don't need admin rights, and Weir restarts afterwards without opening a browser window.
+See [Windows installer](../deployment/windows#updates) for more.
+
+## Updating on Docker
+
+With `image: ghcr.io/jampat000/weir:latest`, pull the new image and recreate the container:
 
 ```bash
-git fetch origin
-git checkout main
-git pull origin main
-git tag -a vX.Y.Z -m "Weir vX.Y.Z"
-git push origin vX.Y.Z
+docker compose pull
+docker compose up -d
 ```
 
-Pushing a `v*` tag triggers the release workflow.
+Your data lives in the `/data/weir` volume, so it carries over. Keep the same volume and the same
+`WEIR_SESSION_SECRET` so you stay signed in.
 
-## What the release workflow does
+### Pinning a version
 
-- Reruns server tests, web build, and E2E auth smoke on Linux
-- Builds `Weir-win-Setup.exe` on Windows
-- Publishes `weir-web-dist.zip`
-- Builds and pushes Docker tags (versioned + `latest`)
-- Verifies Docker manifest and runs container health check
-- Creates the GitHub Release with release notes
+Each release is also published under its version number. To stay on one release until you choose
+to move, pin it:
 
-## License
+```yaml
+image: ghcr.io/jampat000/weir:3.2.4
+```
 
-All release artifacts are licensed under AGPL-3.0-or-later.
+To update, change the number to the new version and run the two commands above. Images are
+published for linux/amd64 and linux/arm64.
+
+## For maintainers
+
+A release doesn't re-run the test suite. Its `ci-passed` job checks that CI already passed on the
+exact commit being tagged, and nothing is published until that job, the Windows package smoke test
+and the Docker image checks have all passed. The full process is in
+[`docs/release.md`](https://github.com/jampat000/Weir/blob/main/docs/release.md).

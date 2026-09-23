@@ -9485,7 +9485,7 @@
   },
   "info": {
     "title": "Weir API",
-    "version": "2.6.6"
+    "version": "3.2.4"
   },
   "openapi": "3.1.0",
   "paths": {

@@ -2,8 +2,8 @@
 
 ## Status
 
-Proposed — applies to every Processing path, rule, guardrail, schedule and job payload
-that currently partitions on `media_scope`.
+Accepted — applies to every Processing path, rule, guardrail, schedule and job payload
+that partitioned on `media_scope`.
 
 ## Context
 
@@ -172,7 +172,7 @@ prefix, or a queue. Everything stays on `jobs` under `processing.*`.
 - [ADR-0009](ADR-0009-suite-wide-timing-isolation.md) — suite-wide timing isolation
 - [ADR-0012](ADR-0012-processing-preflight-parity-boundary.md) — preflight parity boundary
 - [ADR-0013](ADR-0013-media-managers-are-kinds-not-products.md) — a media manager is a kind
-- Execution plan: [`docs/exec-plans/completed/processing-library-model.md`](../exec-plans/completed/processing-library-model.md)
+- Execution plan (archived): [`docs/archive/processing-library-model.md`](../archive/processing-library-model.md)
 
 [#350]: https://github.com/jampat000/Weir/issues/350
 [#351]: https://github.com/jampat000/Weir/issues/351

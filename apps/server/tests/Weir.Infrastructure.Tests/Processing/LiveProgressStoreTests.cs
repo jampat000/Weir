@@ -8,7 +8,7 @@ using Weir.Infrastructure.Tests.Platform;
 namespace Weir.Infrastructure.Tests.Processing;
 
 /// <summary>
-/// What Live reads about a file being worked on (docs/exec-plans/active/live-and-library.md), written by
+/// What Live reads about a file being worked on (docs/archive/live-and-library.md), written by
 /// <see cref="ActivityProgressReporter"/> and read back by <see cref="LiveProgressStore"/>.
 /// </summary>
 public sealed class LiveProgressStoreTests

@@ -12,8 +12,8 @@ Images are published for `linux/amd64` and `linux/arm64`:
 - `ghcr.io/jampat000/weir:X.Y.Z` (the Git tag is `vX.Y.Z`; the image tag has no `v`)
 
 This page is the full reference — every variable Weir reads, plus the recipes for common setups.
-For a shorter walkthrough, see the [Quickstart](https://jampat000.github.io/Weir/quickstart) and
-[Docker deployment](https://jampat000.github.io/Weir/deployment/docker) pages on the docs site.
+For a shorter walkthrough, see the [Quickstart](https://jampat000.github.io/Weir/docs/quickstart) and
+[Docker deployment](https://jampat000.github.io/Weir/docs/deployment/docker) pages on the docs site.
 
 ## The quickest way
 
@@ -180,8 +180,8 @@ If you want to override defaults with an env file instead of inline `environment
 
 | Variable | Purpose |
 |---|---|
-| `WEIR_SESSION_COOKIE_SECURE` | Whether the session cookie requires HTTPS. Defaults to `false` in the image, so plain `http://localhost` or LAN access works out of the box. Set to `true` only once every browser reaches Weir over HTTPS (typically through a reverse proxy). |
-| `WEIR_TRUSTED_PROXY_IPS` | The IP or CIDR of your immediate reverse proxy. Needed before Weir will trust `X-Forwarded-For` for client IPs — set it alongside `WEIR_SESSION_COOKIE_SECURE=true` when you put Weir behind a proxy. |
+| `WEIR_SESSION_COOKIE_SECURE` | Whether the session cookie is marked HTTPS-only. Defaults to `auto`: the cookie is HTTPS-only when the request arrives over HTTPS (directly, or through a proxy listed in `WEIR_TRUSTED_PROXY_IPS`), so plain `http://` LAN access keeps working. Set `true` to always require HTTPS, or `false` to never require it. |
+| `WEIR_TRUSTED_PROXY_IPS` | The IP or CIDR of your immediate reverse proxy. Weir only trusts `X-Forwarded-For` and `X-Forwarded-Proto` from these addresses. Set it when you put Weir behind a proxy. |
 | `WEIR_CORS_ORIGINS` | Allowed browser origins for credentialed cross-origin requests. Weir refuses to start with `WEIR_CORS_ORIGINS=*` — list real origins instead. |
 
 ### File ownership
@@ -220,8 +220,6 @@ that can already write to them.
   credentials
 - changing `WEIR_SESSION_SECRET` can require re-entering any credentials that were still encrypted
   with the old session secret
-- `WEIR_SESSION_COOKIE_SECURE=false` is the default in the image so plain `http://localhost` works
-- set `WEIR_SESSION_COOKIE_SECURE=true` only when all browser traffic is HTTPS
 
 ## Health
 
@@ -285,8 +283,8 @@ That step stays `ready`. Falling back is slower, not broken, and failing readine
 working instance out of a load balancer over a delay.
 
 If you would rather not be told about it for a given library, switch off **Watch this folder for
-changes** on the Processing Libraries tab. To turn the watcher off for the whole instance, set
-`WEIR_PROCESSING_WATCHER_ENABLED=0`.
+changes** in that library's editor under **Settings › Libraries**. To turn the watcher off for every
+library, set `WEIR_PROCESSING_WATCHER_ENABLED=0`.
 
 When events *do* work, `WEIR_PROCESSING_WATCHER_DEBOUNCE_SECONDS` (default 3) controls how long
 the tree must be quiet before a burst of writes becomes one scan.
