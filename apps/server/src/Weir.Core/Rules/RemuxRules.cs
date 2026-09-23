@@ -79,6 +79,12 @@ public sealed record ProcessingRulesConfig
     public string AudioSortersJson { get; init; } = string.Empty;
 
     /// <summary>
+    /// The profile's "Subtitle order": how the kept subtitle tracks are ranked. Empty (no order saved) keeps today's order:
+    /// the file's own for keep-all, the languages-to-keep list for keep-selected. Until 3.2 this was saved and never read.
+    /// </summary>
+    public string SubtitleSortersJson { get; init; } = string.Empty;
+
+    /// <summary>
     /// Issue #495: remove a subtitle track whose <see cref="TrackFlags.HearingImpaired"/> flag is
     /// set (SDH/CC), from its disposition or its name. Off by default, so an upgrade changes nothing.
     /// </summary>
@@ -1388,6 +1394,17 @@ public static partial class RemuxRules
                 : [.. keptSubtitles
                     .OrderBy(t => t.Variant is not null && rank.TryGetValue(t.Variant, out var vr) ? vr : rank.GetValueOrDefault(t.LangLabel, 99))
                     .ThenBy(t => t.InputIndex)];
+
+            // Subtitle order (James, 23 Sep 2026: make it work): the profile's saved ranking orders the kept subtitles. The
+            // order above is where a tie falls, because the key ends in the position a track already has.
+            if (SubtitleOrder(config) is { Count: > 0 } subtitleSorters)
+            {
+                var position = keptSubtitles.Select((t, i) => (t.InputIndex, i)).ToDictionary(p => p.InputIndex, p => p.i);
+                keptSubtitles = [.. keptSubtitles.OrderBy(
+                    t => SubtitleSortKey(subtitleSorters, t, keepAll ? null : rank, position[t.InputIndex]),
+                    SortKeyComparer.Instance)];
+                notes.Add($"Subtitle order: {TrackSorters.Describe(subtitleSorters)}.");
+            }
         }
 
         return new RemuxPlan
@@ -1405,6 +1422,47 @@ public static partial class RemuxRules
             MetadataNotes = MetadataStreams.RemovalNotes(rules, droppedImages, droppedAttachments),
             Metadata = rules,
         };
+    }
+
+    /// <summary>The saved subtitle order, or none: unlike audio, no saved order means "keep today's order", not a default one.</summary>
+    private static IReadOnlyList<TrackSorter> SubtitleOrder(ProcessingRulesConfig config) =>
+        PyStrings.Strip(config.SubtitleSortersJson).Length == 0 ? [] : TrackSorters.Parse(config.SubtitleSortersJson);
+
+    /// <summary>
+    /// One kept subtitle's place under the saved order. A "language" criterion with no value ranks by the languages-to-keep
+    /// list (the order a person put them in), not by the alphabet; under keep-all every language ties there.
+    /// </summary>
+    private static List<long> SubtitleSortKey(
+        IReadOnlyList<TrackSorter> sorters, PlannedTrack track, Dictionary<string, int>? languageRank, int position)
+    {
+        var sortable = new SortableTrack
+        {
+            Index = track.InputIndex,
+            Language = track.LangLabel,
+            Forced = track.Forced,
+            Default = track.Default,
+            Codec = track.CodecName,
+            CodecRank = track.CodecRank,
+        };
+        var parts = new List<long>();
+        foreach (var sorter in sorters)
+        {
+            if (sorter.Field == "language" && sorter.Value is null)
+            {
+                var place = languageRank is null
+                    ? 0
+                    : track.Variant is not null && languageRank.TryGetValue(track.Variant, out var variantPlace)
+                        ? variantPlace
+                        : languageRank.GetValueOrDefault(track.LangLabel, 99);
+                parts.Add(sorter.Reversed ? -place : place);
+                continue;
+            }
+
+            parts.AddRange(TrackSorters.SorterKeyComponent(sorter, sortable));
+        }
+
+        parts.Add(position);
+        return parts;
     }
 
     /// <summary>Sane defaults for remux planning (<c>default_processing_remux_rules_config</c>).</summary>

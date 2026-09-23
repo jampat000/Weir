@@ -218,6 +218,25 @@ public sealed class MediaToolsTests : IDisposable
     }
 
     [Fact]
+    public async Task A_failed_write_is_kept_in_the_work_folder_when_keep_failed_work_files_is_on()
+    {
+        var source = WriteFile("source.mkv", "source"u8.ToArray());
+        var workDir = Path.Combine(_root, "work-kept");
+        var plan = new RemuxPlan { VideoIndices = [0], Audio = [new PlannedTrack { InputIndex = 1, LangLabel = "eng", Default = true }], Subtitles = [] };
+        var runner = new ScriptedRunner(request => request.Argv[0] == "ffprobe"
+            ? new ScriptedRun { Stdout = Encoding.UTF8.GetBytes(StructurallyMatchingButShortOutputJson) }
+            : new ScriptedRun());
+        var tools = new MediaTools(runner, new FixedResolver(), new ListLogger<MediaTools>(), TimeProvider.System, p => new MediaFileState(p, true, true, 100, 0));
+        using var sourceDocument = JsonDocument.Parse(SourceWithKeptStreamDurationsJson);
+
+        await Assert.ThrowsAsync<MediaCompletenessException>(() => tools.RemuxToTempFileAsync(
+            source, workDir, plan, sourceDocument.RootElement, [], durationSeconds: 100.0, keepOnFailure: true));
+
+        var kept = Assert.Single(Directory.EnumerateFiles(workDir));
+        Assert.StartsWith("source.processing.", Path.GetFileName(kept), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Progress_run_stops_absurd_projected_runtime_without_piping_stderr()
     {
         var runner = new ScriptedRunner(_ => new ScriptedRun { Lines = ["out_time_ms=1000000", "speed=0.006x", "progress=continue"] });

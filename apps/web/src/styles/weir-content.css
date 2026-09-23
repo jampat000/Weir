@@ -1530,3 +1530,18 @@
   font-size: 0.8125rem;
   overflow-wrap: anywhere;
 }
+
+/* Settings › Rules: which profile, its name, and who uses it, on one line (canvas board 5A). */
+.mm-profile-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 20px;
+  margin-top: 4px;
+}
+
+.mm-profile-bar__used {
+  margin: 0 0 9px;
+  font-size: 0.8125rem;
+  color: var(--mm-text2);
+}

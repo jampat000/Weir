@@ -157,6 +157,7 @@ public sealed class RemuxPassHandler : IJobHandler
                 MinFileAgeSeconds = claim.Operator!.MinFileAgeSeconds,
                 MinInputFileSizeMb = Math.Max(claim.Operator.ProcessingMinInputFileSizeMb, claim.Library?.MinFileSizeMb ?? 0),
                 MinimumFreeDiskSpaceMb = claim.Operator.MinimumFreeDiskSpaceMb,
+                KeepFailedWorkFiles = claim.Operator.KeepFailedWorkFiles,
                 MediaScope = mediaScope,
                 CurrentJobId = context.Id,
                 ProgressReporter = progress.Report,

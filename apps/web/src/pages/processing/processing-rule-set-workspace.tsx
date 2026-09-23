@@ -16,6 +16,7 @@ import {
 import {
   useCreateProcessingRuleSet,
   useDeleteProcessingRuleSet,
+  useProcessingLibrariesQuery,
   useProcessingRuleSetsQuery,
   useUpdateProcessingRuleSet,
 } from "../../lib/processing/libraries-queries";
@@ -53,6 +54,8 @@ const SORTER_FIELDS = [
   "default",
   "forced",
   "commentary",
+  // The server's own addition (#497). The page used to leave it out, so saving a profile quietly dropped it.
+  "content_tier",
 ];
 
 const SORTER_LABELS: Record<string, string> = {
@@ -64,6 +67,7 @@ const SORTER_LABELS: Record<string, string> = {
   default: "Default flag",
   forced: "Forced flag",
   commentary: "Commentary flag",
+  content_tier: "Main, then dubs, then commentary",
 };
 
 const LANGUAGE_OPTIONS = PROCESSING_STREAM_LANGUAGE_OPTIONS.map((option) => ({
@@ -506,6 +510,7 @@ function SorterEditor({
 export function ProcessingRuleSetWorkspace() {
   const me = useMeQuery();
   const ruleSets = useProcessingRuleSetsQuery();
+  const libraries = useProcessingLibrariesQuery();
   const createRuleSet = useCreateProcessingRuleSet();
   const updateRuleSet = useUpdateProcessingRuleSet();
   const deleteRuleSet = useDeleteProcessingRuleSet();
@@ -650,6 +655,12 @@ export function ProcessingRuleSetWorkspace() {
     }
   };
 
+  const usedBy = (libraries.data ?? [])
+    .filter(
+      (library) => selectedId !== null && library.rule_set_id === selectedId,
+    )
+    .map((library) => library.name);
+
   const textField = (
     label: string,
     key: keyof ProcessingRuleSetWrite,
@@ -695,7 +706,7 @@ export function ProcessingRuleSetWorkspace() {
     <div className="mm-quiet-stack" data-testid="processing-rule-set-workspace">
       <QuietSection
         headingId="processing-rule-set-profiles-heading"
-        heading="Audio & subtitle profiles"
+        heading="Profiles"
         aside={
           !creating ? (
             <button
@@ -715,36 +726,50 @@ export function ProcessingRuleSetWorkspace() {
           ) : null
         }
       >
-        <p className="mm-quiet-note">
-          Save a profile once, then assign it to one or more libraries.
-        </p>
+        {/* One line: which profile, its name, and who uses it (canvas board 5A). The picker and the name used to
+            stack with a paragraph above them, which James circled as empty space. */}
+        <div className="mm-profile-bar" data-testid="rule-set-profile-bar">
+          {(ruleSets.data?.length ?? 0) > 0 && !creating ? (
+            <label className="mm-field mm-field--medium">
+              <span className="mm-field__label">Profile</span>
+              <select
+                className="mm-input"
+                value={selectedId ?? ""}
+                onChange={(event) => {
+                  const id = Number(event.target.value);
+                  const selected = ruleSets.data?.find((row) => row.id === id);
+                  setSelectedId(id);
+                  setDraft(
+                    selected ? writeFromProcessingRuleSet(selected) : null,
+                  );
+                  setNotice(null);
+                  setAdvancedOrderingOpen(false);
+                }}
+              >
+                {(ruleSets.data ?? []).map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.name} · {row.used_by_library_count}{" "}
+                    {row.used_by_library_count === 1 ? "library" : "libraries"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
-        {(ruleSets.data?.length ?? 0) > 0 && !creating ? (
-          <label className="mm-field mm-field--medium mt-5">
-            <span className="mm-field__label">Profile to edit</span>
-            <select
-              className="mm-input"
-              value={selectedId ?? ""}
-              onChange={(event) => {
-                const id = Number(event.target.value);
-                const selected = ruleSets.data?.find((row) => row.id === id);
-                setSelectedId(id);
-                setDraft(
-                  selected ? writeFromProcessingRuleSet(selected) : null,
-                );
-                setNotice(null);
-                setAdvancedOrderingOpen(false);
-              }}
-            >
-              {(ruleSets.data ?? []).map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.name} · {row.used_by_library_count}{" "}
-                  {row.used_by_library_count === 1 ? "library" : "libraries"}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
+          {draft ? textField("Name", "name", "English feature films") : null}
+          {draft && !creating ? (
+            <p className="mm-profile-bar__used" data-testid="rule-set-used-by">
+              {usedBy.length > 0
+                ? `Used by ${usedBy.join(", ")}`
+                : "No library uses it yet. Choose it in a library's editor."}
+            </p>
+          ) : creating ? (
+            <p className="mm-profile-bar__used">
+              A new profile. Choose it in a library&rsquo;s editor once it is
+              saved.
+            </p>
+          ) : null}
+        </div>
 
         {!draft ? (
           <div className="mt-5">
@@ -756,10 +781,9 @@ export function ProcessingRuleSetWorkspace() {
             </p>
           </div>
         ) : (
-          <div className="mt-6 space-y-5 border-t border-[var(--mm-border)] pt-6">
-            <div className="max-w-2xl">
-              {textField("Profile name", "name", "English feature films")}
-            </div>
+          <div className="mt-4 space-y-5 border-t border-[var(--mm-border)] pt-5">
+            {/* The live example sits first, so a file's result is on screen while the rules below change it. */}
+            <ProcessingRulesPreviewPanel rules={draft} disabled={!editable} />
 
             {/* Five numbered groups ran down one 42rem column inside a panel over 1500px wide, which made
                 the rules a 2830px scroll with half the width empty. Two columns where there is room, in the
@@ -1199,8 +1223,6 @@ export function ProcessingRuleSetWorkspace() {
                 </div>
               ) : null}
             </section>
-
-            <ProcessingRulesPreviewPanel rules={draft} disabled={!editable} />
 
             {notice ? (
               <p

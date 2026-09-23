@@ -915,9 +915,7 @@ export function ProcessingLibrariesSection() {
                 </select>
               </label>
               <label className="mm-field mm-field--medium">
-                <span className="mm-field__label">
-                  Audio, subtitle and metadata rules
-                </span>
+                <span className="mm-field__label">Rules profile</span>
                 <select
                   className="mm-input"
                   value={form.rule_set_id}
@@ -926,7 +924,15 @@ export function ProcessingLibrariesSection() {
                   }
                   disabled={!editable}
                 >
-                  <option value="">Use scope defaults</option>
+                  {/* Every library has a profile (3.2). A new one left on this gets its kind's default profile. */}
+                  {form.rule_set_id === "" ? (
+                    <option value="">
+                      {form.media_type === "tv"
+                        ? "TV default"
+                        : "Movies default"}{" "}
+                      (the default for its kind)
+                    </option>
+                  ) : null}
                   {(ruleSets.data ?? []).map((ruleSet) => (
                     <option key={ruleSet.id} value={ruleSet.id}>
                       {ruleSet.name}

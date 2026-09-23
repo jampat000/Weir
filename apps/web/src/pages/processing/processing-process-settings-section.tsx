@@ -289,7 +289,7 @@ export function ProcessingProcessSettingsSection() {
           >
             <SettingRow
               label="Keep the half-written copy"
-              hint="Left in the work folder so you can look at it. Cleanup's leftover-work-file sweep leaves it alone."
+              hint="Left in the work folder so you can look at it. Cleanup's leftover-work-file sweep removes it once it is a day old."
             >
               <MmOnOffSwitch
                 id={`${ids}-keep-failed`}

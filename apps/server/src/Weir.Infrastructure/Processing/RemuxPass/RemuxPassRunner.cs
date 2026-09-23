@@ -30,6 +30,9 @@ public sealed record RemuxPassRequest
     public long MinimumFreeDiskSpaceMb { get; init; }
     public bool PassThroughUnchanged { get; init; }
 
+    /// <summary>Settings › Performance "Keep the half-written copy": a failed write stays in the work folder.</summary>
+    public bool KeepFailedWorkFiles { get; init; }
+
     /// <summary>The hand-off this file came from, when it did: its release name feeds the original-language lookup.</summary>
     public HandoffOrigin? Origin { get; init; }
 
@@ -761,6 +764,7 @@ public sealed class RemuxPassRunner
                 hardware,
                 writer,
                 request.Runtime.RewriteWithFfmpeg,
+                request.KeepFailedWorkFiles,
                 cancellationToken).ConfigureAwait(false);
             try
             {

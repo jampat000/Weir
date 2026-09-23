@@ -26,6 +26,35 @@ public static class RuleSetConversion
         };
 
     /// <summary>One rule set as the config the planner takes. A missing rule set yields the shipped defaults.</summary>
+    /// <summary>
+    /// A profile holding exactly the rules Weir used for a library with none (<see cref="RemuxRules.DefaultConfig"/>), so
+    /// giving such a library a profile changes nothing about what happens to its files (James, 23 Sep 2026: every library
+    /// has a profile, made from today's behaviour).
+    /// </summary>
+    public static ProcessingRuleSetRecord BuiltInDefaults(string name)
+    {
+        var rules = RemuxRules.DefaultConfig();
+        return new ProcessingRuleSetRecord
+        {
+            Name = name,
+            PrimaryAudioLang = rules.PrimaryAudioLang,
+            SecondaryAudioLang = rules.SecondaryAudioLang,
+            TertiaryAudioLang = rules.TertiaryAudioLang,
+            DefaultAudioSlot = rules.DefaultAudioSlot,
+            RemoveCommentary = rules.RemoveCommentary,
+            SubtitleMode = rules.SubtitleMode,
+            SubtitleLangsCsv = string.Join(",", rules.SubtitleLangs),
+            PreserveForcedSubs = rules.PreserveForcedSubs,
+            PreserveDefaultSubs = rules.PreserveDefaultSubs,
+            AudioPreferenceMode = rules.AudioPreferenceMode,
+            AudioSortersJson = rules.AudioSortersJson,
+            RemoveHearingImpairedSubs = rules.RemoveHearingImpairedSubs,
+            AudioKeepMode = rules.AudioKeepMode,
+            SubtitleMaxPerLanguage = rules.SubtitleMaxPerLanguage,
+            SubtitleQualityStrategy = rules.SubtitleQualityStrategy,
+        };
+    }
+
     public static ProcessingRulesConfig ToRulesConfig(ProcessingRuleSetRecord? row)
     {
         if (row is null)
@@ -46,6 +75,7 @@ public static class RuleSetConversion
             PreserveDefaultSubs = row.PreserveDefaultSubs,
             AudioPreferenceMode = RemuxRules.NormalizeAudioPreferenceMode(row.AudioPreferenceMode),
             AudioSortersJson = row.AudioSortersJson ?? string.Empty,
+            SubtitleSortersJson = row.SubtitleSortersJson ?? string.Empty,
             RemoveHearingImpairedSubs = row.RemoveHearingImpairedSubs,
             AudioKeepMode = RemuxRules.NormalizeAudioKeepMode(row.AudioKeepMode),
             SubtitleMaxPerLanguage = row.SubtitleMaxPerLanguage,

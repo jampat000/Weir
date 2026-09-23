@@ -65,6 +65,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         LastReport = await StartupRecovery.RunAsync(_store, _options.WeirHome, _time.GetUtcNow(), _logger, cancellationToken).ConfigureAwait(false);
+        await GiveEveryLibraryAProfileAsync(cancellationToken).ConfigureAwait(false);
 
         // #506's startup sweep runs after the existing recovery above and before any worker starts claiming jobs (this
         // hosted service is registered ahead of the worker lane) — see apps/server/README.md, "Library mode: safe swap".
@@ -81,6 +82,31 @@ public sealed class JobsStartupRecoveryService : IHostedService
             {
                 _logger.LogWarning(exception, "Library mode's startup sweep could not run; interrupted swaps, if any, are picked up at the next start.");
             }
+        }
+    }
+
+    /// <summary>
+    /// Every library has a profile (3.2): one left without, by an older Weir or an import, gets the one it was using,
+    /// before any worker starts. It changes no rule a file is cleaned by.
+    /// </summary>
+    private async Task GiveEveryLibraryAProfileAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var uow = await UnitOfWork.OpenAsync(_store.Database, cancellationToken).ConfigureAwait(false);
+            await using (uow.ConfigureAwait(false))
+            {
+                var given = await Weir.Infrastructure.Processing.LibraryStore.GiveEveryLibraryAProfileAsync(uow).ConfigureAwait(false);
+                await uow.CommitAsync().ConfigureAwait(false);
+                if (given > 0)
+                {
+                    _logger.LogInformation("Gave {Count} libraries the profile they were already using.", given);
+                }
+            }
+        }
+        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or InvalidOperationException)
+        {
+            _logger.LogWarning(exception, "Could not give every library a profile; this is tried again at the next start.");
         }
     }
 
