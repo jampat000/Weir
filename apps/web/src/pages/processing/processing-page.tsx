@@ -820,34 +820,56 @@ export function ProcessingPage(): React.ReactElement {
       <PageHeader
         title="Processing"
         lead="Every file Weir is working on, from the moment it lands to the moment your media manager has it back."
-        aside={
-          <>
-            <div className="mm-live-figure">
-              <span className="mm-live-figure__label">Handed back today</span>
-              <span
-                className="mm-live-figure__value"
-                data-testid="live-done-today"
-              >
-                {stats ? stats.files_processed.toLocaleString() : "…"}
-              </span>
-            </div>
-            <div className="mm-live-figure">
-              <span className="mm-live-figure__label">Saved today</span>
-              <span className="mm-live-figure__value">
-                {stats
-                  ? formatBytes(stats.net_space_saved_bytes) || "0 B"
-                  : "…"}
-              </span>
-            </div>
-            <HandedBackFigure
-              handed={handed}
-              total={handedTotal}
-              partial={handedPartial}
-              now={now}
-            />
-          </>
-        }
       />
+
+      {/* The bar where every other page has its tabs: what to show, and today's figures (canvas board 1). */}
+      <div className="mm-live-toolbar">
+        <div className="mm-live-seg" role="group" aria-label="Show work from">
+          {(
+            [
+              ["all", "Everything"],
+              ["download", "New downloads"],
+              ["library", "Library cleaning"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={filter === id}
+              onClick={() => setFilter(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="mm-live-toolbar__figures">
+          <div className="mm-live-figure">
+            <span className="mm-live-figure__label">Handed back today</span>
+            <span
+              className="mm-live-figure__value"
+              data-testid="live-done-today"
+            >
+              {stats ? stats.files_processed.toLocaleString() : "…"}
+            </span>
+          </div>
+          <div className="mm-live-figure">
+            <span className="mm-live-figure__label">Saved today</span>
+            <span className="mm-live-figure__value">
+              {stats ? formatBytes(stats.net_space_saved_bytes) || "0 B" : "…"}
+            </span>
+          </div>
+          <HandedBackFigure
+            handed={handed}
+            total={handedTotal}
+            partial={handedPartial}
+            now={now}
+          />
+        </div>
+      </div>
+      <p className="mm-live-toolbar__note">
+        {toolbarNote ? `${toolbarNote} · ` : ""}
+        <Link to="/settings?tab=performance">change in Settings</Link>
+      </p>
 
       {pause.data?.paused ? (
         <p className="mm-live-paused" role="status" data-testid="live-paused">
@@ -871,31 +893,6 @@ export function ProcessingPage(): React.ReactElement {
           ))}
         </ul>
       ) : null}
-
-      <div className="mm-live-toolbar">
-        <div className="mm-live-seg" role="group" aria-label="Show work from">
-          {(
-            [
-              ["all", "Everything"],
-              ["download", "New downloads"],
-              ["library", "Library cleaning"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={filter === id}
-              onClick={() => setFilter(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <p className="mm-live-toolbar__note">
-          {toolbarNote ? `${toolbarNote} · ` : ""}
-          <Link to="/settings?tab=performance">change in Settings</Link>
-        </p>
-      </div>
 
       {/* Arriving and Waiting share a column below five-lane width, as do Handing back and Just
           finished; on a wide screen the two wrappers dissolve and all five sit side by side. */}

@@ -42,7 +42,7 @@ import { SettingsLogsTab } from "../settings/settings-logs-tab";
 import { SettingsSupportTab } from "../settings/settings-support-tab";
 import { ActivityPage } from "../activity/activity-page";
 import { ProcessingJobsInspectionSection } from "../processing/processing-jobs-inspection-section";
-import { ProcessingRuntimeFactsSection } from "../processing/processing-maintenance-section";
+import { AboutFacts } from "./about-facts";
 
 function canEditSuiteGlobal(role: string | undefined): boolean {
   return role === "operator" || role === "admin";
@@ -192,8 +192,10 @@ export function SystemPage() {
   }, [settingsQ.data]);
 
   const editable = canEditSuiteGlobal(me.data?.role);
+  // Read on Backups, where the list is shown. It was asked for only on This instance, so Backups showed an
+  // empty list until you had visited the other tab first.
   const backupsQ = useSuiteConfigurationBackupsQuery(
-    editable && tab === "about" && Boolean(settingsQ.data),
+    editable && tab === "backups" && Boolean(settingsQ.data),
   );
   const updateStatusQ = useSuiteUpdateStatusQuery(
     tab === "about" && Boolean(settingsQ.data),
@@ -520,9 +522,10 @@ export function SystemPage() {
       />
       <WorkspacePanel id="system-panel" labelledBy={`system-tab-${tab}`}>
         {tab === "about" ? (
-          <div className="mm-quiet-stack mm-quiet-stack--columns">
+          <div className="mm-about-grid">
             {/* What it is, before anything you can change about it. */}
-            <ProcessingRuntimeFactsSection />
+            <AboutFacts />
+            <SettingsUpgradeTab updateStatusQ={updateStatusQ} />
             <SettingsInstanceSection
               editable={editable}
               settingsData={settingsQ.data}
@@ -533,11 +536,10 @@ export function SystemPage() {
               lastSuiteSaveTarget={lastSuiteSaveTarget}
               onSaveTimezone={() => void handleSaveTimezone()}
             />
-            <SettingsUpgradeTab updateStatusQ={updateStatusQ} />
             {showSupport ? <SettingsSupportTab /> : null}
           </div>
         ) : tab === "backups" ? (
-          <div className="mm-quiet-stack mm-quiet-stack--columns">
+          <div className="mm-quiet-stack">
             <SettingsBackupTab
               editable={editable}
               settingsData={settingsQ.data}
@@ -571,7 +573,7 @@ export function SystemPage() {
             />
           </div>
         ) : tab === "security" ? (
-          <div className="mm-quiet-stack mm-quiet-stack--columns">
+          <div className="mm-quiet-stack">
             <SettingsSecurityTab />
           </div>
         ) : (

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { QuietDisclosure } from "../../components/shared/quiet-section";
 import { useNavigate } from "react-router-dom";
 import {
   useChangePasswordMutation,
@@ -290,252 +291,254 @@ export function SettingsSecurityTab() {
         )}
       </SettingsQuietSection>
 
-      <SettingsQuietSection
-        headingId="suite-security-change-username-heading"
-        heading="Change username"
-      >
-        <p className="mm-quiet-note">
-          Weir has one account. Signing in ignores capitalisation, so{" "}
-          <code>admin</code> and <code>Admin</code> are the same name.
-        </p>
-        <div className="mt-4 max-w-xl space-y-3">
-          <label className="block">
-            <span className="text-sm text-[var(--mm-text2)]">New username</span>
-            <div className="mt-1 flex flex-wrap gap-2">
-              <input
-                type="text"
-                className={SUITE_PASSWORD_FIELD_CLASS}
-                placeholder="Enter a new username"
-                value={newUsername}
-                disabled={changeUsername.isPending}
-                onChange={(e) => setNewUsername(e.target.value)}
-                autoComplete="username"
-              />
-            </div>
-          </label>
-          <label className="block">
-            <span className="text-sm text-[var(--mm-text2)]">
-              Current password
-            </span>
-            <div className="mt-1 flex flex-wrap gap-2">
-              <input
-                type="password"
-                className={SUITE_PASSWORD_FIELD_CLASS}
-                placeholder="Confirm it is you"
-                value={usernamePassword}
-                disabled={changeUsername.isPending}
-                onChange={(e) => setUsernamePassword(e.target.value)}
-                autoComplete="current-password"
-              />
-            </div>
-          </label>
-          {changeUsername.isError ? (
-            <p className="mm-status-text--failed text-sm" role="alert">
-              {changeUsername.error instanceof Error
-                ? changeUsername.error.message
-                : "Could not change the username."}
-            </p>
-          ) : null}
-          {changeUsername.isSuccess ? (
-            <p className="text-sm text-[var(--mm-text2)]" role="status">
-              {changeUsername.data.message}
-            </p>
-          ) : null}
-          <button
-            type="button"
-            className={mmActionButtonClass({ variant: "secondary" })}
-            disabled={
-              changeUsername.isPending ||
-              newUsername.trim() === "" ||
-              usernamePassword === ""
-            }
-            onClick={() => {
-              changeUsername.mutate(
-                {
-                  currentPassword: usernamePassword,
-                  newUsername: newUsername.trim(),
-                },
-                {
-                  onSuccess: () => {
-                    setNewUsername("");
-                    setUsernamePassword("");
+      {/* Two short forms, side by side, instead of one long column (canvas board 13). */}
+      <div className="mm-security-pair">
+        <SettingsQuietSection
+          headingId="suite-security-change-username-heading"
+          heading="Change username"
+        >
+          <p className="mm-quiet-note">
+            Weir has one account. Signing in ignores capitalisation, so{" "}
+            <code>admin</code> and <code>Admin</code> are the same name.
+          </p>
+          <div className="mt-4 max-w-xl space-y-3">
+            <label className="block">
+              <span className="text-sm text-[var(--mm-text2)]">
+                New username
+              </span>
+              <div className="mt-1 flex flex-wrap gap-2">
+                <input
+                  type="text"
+                  className={SUITE_PASSWORD_FIELD_CLASS}
+                  placeholder="Enter a new username"
+                  value={newUsername}
+                  disabled={changeUsername.isPending}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  autoComplete="username"
+                />
+              </div>
+            </label>
+            <label className="block">
+              <span className="text-sm text-[var(--mm-text2)]">
+                Current password
+              </span>
+              <div className="mt-1 flex flex-wrap gap-2">
+                <input
+                  type="password"
+                  className={SUITE_PASSWORD_FIELD_CLASS}
+                  placeholder="Confirm it is you"
+                  value={usernamePassword}
+                  disabled={changeUsername.isPending}
+                  onChange={(e) => setUsernamePassword(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </div>
+            </label>
+            {changeUsername.isError ? (
+              <p className="mm-status-text--failed text-sm" role="alert">
+                {changeUsername.error instanceof Error
+                  ? changeUsername.error.message
+                  : "Could not change the username."}
+              </p>
+            ) : null}
+            {changeUsername.isSuccess ? (
+              <p className="text-sm text-[var(--mm-text2)]" role="status">
+                {changeUsername.data.message}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              className={mmActionButtonClass({ variant: "secondary" })}
+              disabled={
+                changeUsername.isPending ||
+                newUsername.trim() === "" ||
+                usernamePassword === ""
+              }
+              onClick={() => {
+                changeUsername.mutate(
+                  {
+                    currentPassword: usernamePassword,
+                    newUsername: newUsername.trim(),
                   },
-                },
-              );
-            }}
-          >
-            {changeUsername.isPending ? "Saving…" : "Change username"}
-          </button>
-        </div>
-      </SettingsQuietSection>
-
-      <SettingsQuietSection
-        headingId="suite-security-change-password-heading"
-        heading="Change password"
-      >
-        <p className="mm-quiet-note">
-          Update your sign-in password. After saving, Weir requires a fresh
-          sign-in.
-        </p>
-        <div className="mt-4 max-w-xl space-y-3">
-          <label className="block">
-            <span className="text-sm text-[var(--mm-text2)]">
-              Current password
-            </span>
-            <div className="mt-1 flex flex-wrap gap-2">
-              <input
-                type={showCurrentPassword ? "text" : "password"}
-                className={SUITE_PASSWORD_FIELD_CLASS}
-                placeholder="Enter current password"
-                value={currentPassword}
-                disabled={changePasswordBusy}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setCurrentPassword(v);
-                  if (v.trim() === "") {
-                    setShowCurrentPassword(false);
-                  }
-                }}
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                className={mmActionButtonClass({ variant: "tertiary" })}
-                disabled={changePasswordBusy}
-                onClick={() => setShowCurrentPassword((prev) => !prev)}
-              >
-                {showCurrentPassword ? "Hide" : "Show"}
-              </button>
-            </div>
-          </label>
-          <label className="block">
-            <span className="text-sm text-[var(--mm-text2)]">
-              New password (min. 8 characters)
-            </span>
-            <div className="mt-1 flex flex-wrap gap-2">
-              <input
-                type={showNewPassword ? "text" : "password"}
-                className={SUITE_PASSWORD_FIELD_CLASS}
-                placeholder="Enter new password"
-                value={newPassword}
-                disabled={changePasswordBusy}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setNewPassword(v);
-                  if (v.trim() === "") {
-                    setShowNewPassword(false);
-                  }
-                }}
-                autoComplete="new-password"
-              />
-              <button
-                type="button"
-                className={mmActionButtonClass({ variant: "tertiary" })}
-                disabled={changePasswordBusy}
-                onClick={() => setShowNewPassword((prev) => !prev)}
-              >
-                {showNewPassword ? "Hide" : "Show"}
-              </button>
-            </div>
-          </label>
-          <label className="block">
-            <span className="text-sm text-[var(--mm-text2)]">
-              Confirm new password
-            </span>
-            <div className="mt-1 flex flex-wrap gap-2">
-              <input
-                type={showConfirmPassword ? "text" : "password"}
-                className={SUITE_PASSWORD_FIELD_CLASS}
-                placeholder="Re-enter new password"
-                value={confirmPassword}
-                disabled={changePasswordBusy}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setConfirmPassword(v);
-                  if (v.trim() === "") {
-                    setShowConfirmPassword(false);
-                  }
-                }}
-                autoComplete="new-password"
-              />
-              <button
-                type="button"
-                className={mmActionButtonClass({ variant: "tertiary" })}
-                disabled={changePasswordBusy}
-                onClick={() => setShowConfirmPassword((prev) => !prev)}
-              >
-                {showConfirmPassword ? "Hide" : "Show"}
-              </button>
-            </div>
-          </label>
-          {changePassword.isError ? (
-            <p className="mm-status-text--failed text-sm" role="alert">
-              {formatChangePasswordMutationError(changePassword.error)}
-            </p>
-          ) : null}
-          {changePasswordStatus ? (
-            <p className="text-sm text-[var(--mm-text2)]" role="status">
-              {typeof changePasswordStatus === "string"
-                ? changePasswordStatus
-                : "Password change finished."}
-            </p>
-          ) : null}
-          <button
-            type="button"
-            className={mmActionButtonClass({ variant: "primary" })}
-            disabled={
-              changePasswordBusy ||
-              currentPassword.trim() === "" ||
-              newPassword.trim() === "" ||
-              confirmPassword.trim() === ""
-            }
-            onClick={async () => {
-              setChangePasswordStatus(null);
-              if (newPassword !== confirmPassword) {
-                setChangePasswordStatus("New passwords do not match.");
-                return;
-              }
-              try {
-                await changePassword.mutateAsync({
-                  currentPassword,
-                  newPassword,
-                });
-                setCurrentPassword("");
-                setNewPassword("");
-                setConfirmPassword("");
-                setShowCurrentPassword(false);
-                setShowNewPassword(false);
-                setShowConfirmPassword(false);
-                setChangePasswordStatus(
-                  "Password changed. Sign in again with your new password.",
+                  {
+                    onSuccess: () => {
+                      setNewUsername("");
+                      setUsernamePassword("");
+                    },
+                  },
                 );
-                void navigate("/login", { replace: true });
-              } catch {
-                setShowCurrentPassword(false);
-                setShowNewPassword(false);
-                setShowConfirmPassword(false);
-                /* surfaced above */
-              }
-            }}
-          >
-            {changePassword.isPending ? "Saving..." : "Change password"}
-          </button>
-        </div>
-      </SettingsQuietSection>
+              }}
+            >
+              {changeUsername.isPending ? "Saving…" : "Change username"}
+            </button>
+          </div>
+        </SettingsQuietSection>
 
-      <SettingsQuietSection
-        headingId="suite-security-posture-heading"
-        heading="Security posture"
-        aside={
-          securityOverview?.restart_required_note ? (
-            <span className="mm-quiet-badge">Startup configuration</span>
-          ) : null
+        <SettingsQuietSection
+          headingId="suite-security-change-password-heading"
+          heading="Change password"
+        >
+          <p className="mm-quiet-note">
+            Update your sign-in password. After saving, Weir requires a fresh
+            sign-in.
+          </p>
+          <div className="mt-4 max-w-xl space-y-3">
+            <label className="block">
+              <span className="text-sm text-[var(--mm-text2)]">
+                Current password
+              </span>
+              <div className="mt-1 flex flex-wrap gap-2">
+                <input
+                  type={showCurrentPassword ? "text" : "password"}
+                  className={SUITE_PASSWORD_FIELD_CLASS}
+                  placeholder="Enter current password"
+                  value={currentPassword}
+                  disabled={changePasswordBusy}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setCurrentPassword(v);
+                    if (v.trim() === "") {
+                      setShowCurrentPassword(false);
+                    }
+                  }}
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  className={mmActionButtonClass({ variant: "tertiary" })}
+                  disabled={changePasswordBusy}
+                  onClick={() => setShowCurrentPassword((prev) => !prev)}
+                >
+                  {showCurrentPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+            </label>
+            <label className="block">
+              <span className="text-sm text-[var(--mm-text2)]">
+                New password (min. 8 characters)
+              </span>
+              <div className="mt-1 flex flex-wrap gap-2">
+                <input
+                  type={showNewPassword ? "text" : "password"}
+                  className={SUITE_PASSWORD_FIELD_CLASS}
+                  placeholder="Enter new password"
+                  value={newPassword}
+                  disabled={changePasswordBusy}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setNewPassword(v);
+                    if (v.trim() === "") {
+                      setShowNewPassword(false);
+                    }
+                  }}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  className={mmActionButtonClass({ variant: "tertiary" })}
+                  disabled={changePasswordBusy}
+                  onClick={() => setShowNewPassword((prev) => !prev)}
+                >
+                  {showNewPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+            </label>
+            <label className="block">
+              <span className="text-sm text-[var(--mm-text2)]">
+                Confirm new password
+              </span>
+              <div className="mt-1 flex flex-wrap gap-2">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  className={SUITE_PASSWORD_FIELD_CLASS}
+                  placeholder="Re-enter new password"
+                  value={confirmPassword}
+                  disabled={changePasswordBusy}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setConfirmPassword(v);
+                    if (v.trim() === "") {
+                      setShowConfirmPassword(false);
+                    }
+                  }}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  className={mmActionButtonClass({ variant: "tertiary" })}
+                  disabled={changePasswordBusy}
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                >
+                  {showConfirmPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+            </label>
+            {changePassword.isError ? (
+              <p className="mm-status-text--failed text-sm" role="alert">
+                {formatChangePasswordMutationError(changePassword.error)}
+              </p>
+            ) : null}
+            {changePasswordStatus ? (
+              <p className="text-sm text-[var(--mm-text2)]" role="status">
+                {typeof changePasswordStatus === "string"
+                  ? changePasswordStatus
+                  : "Password change finished."}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              className={mmActionButtonClass({ variant: "primary" })}
+              disabled={
+                changePasswordBusy ||
+                currentPassword.trim() === "" ||
+                newPassword.trim() === "" ||
+                confirmPassword.trim() === ""
+              }
+              onClick={async () => {
+                setChangePasswordStatus(null);
+                if (newPassword !== confirmPassword) {
+                  setChangePasswordStatus("New passwords do not match.");
+                  return;
+                }
+                try {
+                  await changePassword.mutateAsync({
+                    currentPassword,
+                    newPassword,
+                  });
+                  setCurrentPassword("");
+                  setNewPassword("");
+                  setConfirmPassword("");
+                  setShowCurrentPassword(false);
+                  setShowNewPassword(false);
+                  setShowConfirmPassword(false);
+                  setChangePasswordStatus(
+                    "Password changed. Sign in again with your new password.",
+                  );
+                  void navigate("/login", { replace: true });
+                } catch {
+                  setShowCurrentPassword(false);
+                  setShowNewPassword(false);
+                  setShowConfirmPassword(false);
+                  /* surfaced above */
+                }
+              }}
+            >
+              {changePassword.isPending ? "Saving..." : "Change password"}
+            </button>
+          </div>
+        </SettingsQuietSection>
+      </div>
+
+      <QuietDisclosure
+        title="How sign-in is protected"
+        detail="Read-only here: these come from Weir's startup configuration and change only with a restart."
+        summaryWhenClosed={
+          securityOverview
+            ? `${postureFacts.length} protections in force`
+            : undefined
         }
+        data-testid="suite-security-posture"
       >
-        <p className="mm-quiet-note">
-          These values describe the protections currently active in the running
-          server. They are read-only here and take effect after a restart.
-        </p>
         {securityOverview ? (
           <div className="mm-quiet-table-wrap mt-4">
             <table className="mm-quiet-table">
@@ -577,7 +580,7 @@ export function SettingsSecurityTab() {
             {securityOverview.restart_required_note}
           </p>
         ) : null}
-      </SettingsQuietSection>
+      </QuietDisclosure>
     </div>
   );
 }

@@ -1121,7 +1121,7 @@ export function ActivityPage({
               id="activity-filters-heading"
               className="mm-quiet-section__title"
             >
-              Filter activity
+              {about === "weir" ? "Filter events" : "Filter activity"}
             </h2>
             <div className="mm-quiet-section__aside">
               <button
@@ -1237,41 +1237,49 @@ export function ActivityPage({
                   )}
                 </select>
               </label>
-              <label
-                className={`${FIELD_LABEL_CLASS} mm-activity-filters__extra`}
-              >
-                Library
-                <select
-                  className="mm-input"
-                  value={filters.libraryId}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      libraryId: e.target.value,
-                    }))
-                  }
-                >
-                  <option value="">All libraries</option>
-                  {(libraries.data ?? []).map((library) => (
-                    <option key={library.id} value={String(library.id)}>
-                      {library.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label
-                className={`${FIELD_LABEL_CLASS} mm-activity-filters__extra`}
-              >
-                File
-                <input
-                  className="mm-input"
-                  value={filters.file}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, file: e.target.value }))
-                  }
-                  placeholder="Part of a file path"
-                />
-              </label>
+              {/* Logs keeps Weir's own events, which belong to no library and no file. */}
+              {about === "weir" ? null : (
+                <>
+                  <label
+                    className={`${FIELD_LABEL_CLASS} mm-activity-filters__extra`}
+                  >
+                    Library
+                    <select
+                      className="mm-input"
+                      value={filters.libraryId}
+                      onChange={(e) =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          libraryId: e.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">All libraries</option>
+                      {(libraries.data ?? []).map((library) => (
+                        <option key={library.id} value={String(library.id)}>
+                          {library.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label
+                    className={`${FIELD_LABEL_CLASS} mm-activity-filters__extra`}
+                  >
+                    File
+                    <input
+                      className="mm-input"
+                      value={filters.file}
+                      onChange={(e) =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          file: e.target.value,
+                        }))
+                      }
+                      placeholder="Part of a file path"
+                    />
+                  </label>
+                </>
+              )}
               <label
                 className={`${FIELD_LABEL_CLASS} mm-activity-filters__extra`}
               >
@@ -1332,7 +1340,7 @@ export function ActivityPage({
               id="activity-history-heading"
               className="mm-quiet-section__title"
             >
-              History
+              {about === "weir" ? "Events" : "History"}
             </h2>
             <div className="mm-quiet-section__aside">
               <button

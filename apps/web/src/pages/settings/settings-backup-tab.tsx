@@ -1,5 +1,6 @@
 import type { ChangeEvent } from "react";
 import { useRef } from "react";
+import { SettingRow } from "../../components/shared/settings-group";
 import type { SuiteSettingsOut } from "../../lib/suite/types";
 import type {
   useSuiteConfigurationBackupsQuery,
@@ -66,8 +67,9 @@ export function SettingsBackupTab({
   return (
     <div data-testid="suite-settings-backup-tab" className="mm-quiet-stack">
       {editable ? (
+        // What to back up and when on the left, the backups on this machine on the right (canvas board 12).
         <div
-          className="mm-quiet-stack"
+          className="mm-backups-grid"
           data-testid="suite-settings-backup-restore"
         >
           <SettingsQuietSection
@@ -75,8 +77,9 @@ export function SettingsBackupTab({
             heading="Backup and restore"
           >
             <p className="mm-quiet-note">
-              Keep a clean copy of Weir settings and restore them if something
-              goes wrong.
+              A backup is Weir&rsquo;s settings: libraries, rules, media
+              managers, schedule, alerts and sign-in. Not your media, and not
+              file history.
             </p>
 
             {/* Two distinct actions, each with its own scope and its own Save row.
@@ -88,25 +91,30 @@ export function SettingsBackupTab({
                 title="Scheduled snapshots"
                 detail="Weir keeps the latest five configuration snapshots using the same restore-safe JSON format."
               >
-                <div className="max-w-xl space-y-4">
-                  <label className="flex cursor-pointer items-start gap-2.5 text-sm text-[var(--mm-text2)]">
+                <div className="mm-setgroup__rows">
+                  <SettingRow
+                    label="Back up by itself"
+                    hint="Keeps the latest five, in the same file you can download below."
+                    htmlFor="backup-scheduled"
+                  >
                     <input
+                      id="backup-scheduled"
                       type="checkbox"
-                      className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--mm-accent)]"
+                      className="h-4 w-4 accent-[var(--mm-accent)]"
                       checked={configurationBackupEnabled}
                       disabled={!editable || save.isPending}
                       onChange={(e) =>
                         setConfigurationBackupEnabled(e.target.checked)
                       }
                     />
-                    <span>Run scheduled configuration backups</span>
-                  </label>
-                  <label className="block text-sm text-[var(--mm-text2)]">
-                    <span className="mb-1.5 block text-sm text-[var(--mm-text2)]">
-                      Minimum time between runs
-                    </span>
+                  </SettingRow>
+                  <SettingRow
+                    label="Minimum time between runs"
+                    htmlFor="backup-interval"
+                  >
                     <select
-                      className="mm-input w-full max-w-xs"
+                      id="backup-interval"
+                      className="mm-input mm-cleanup-every"
                       value={configurationBackupIntervalHours}
                       disabled={!editable || save.isPending}
                       onChange={(e) =>
@@ -117,20 +125,19 @@ export function SettingsBackupTab({
                     >
                       {CONFIGURATION_BACKUP_INTERVAL_HOURS.map((h) => (
                         <option key={h} value={h}>
-                          {h === 168
-                            ? "Every 7 days (168 h)"
-                            : `Every ${h} hours`}
+                          {h === 168 ? "Every 7 days" : `Every ${h} hours`}
                         </option>
                       ))}
                     </select>
-                  </label>
-                  <label className="block text-sm text-[var(--mm-text2)]">
-                    <span className="mb-1.5 block text-sm text-[var(--mm-text2)]">
-                      Preferred backup time
-                    </span>
+                  </SettingRow>
+                  <SettingRow
+                    label="Preferred backup time"
+                    htmlFor="backup-time"
+                  >
                     <input
+                      id="backup-time"
                       type="time"
-                      className="mm-input w-full max-w-xs"
+                      className="mm-input mm-cleanup-every"
                       value={configurationBackupPreferredTime}
                       disabled={!editable || save.isPending}
                       onChange={(e) =>
@@ -139,19 +146,14 @@ export function SettingsBackupTab({
                         )
                       }
                     />
-                  </label>
-                  <p className="text-xs text-[var(--mm-text3)]">
-                    <span className="font-medium text-[var(--mm-text2)]">
-                      Last automatic run:
-                    </span>{" "}
-                    {formatDate(settingsData.configuration_backup_last_run_at)}
-                  </p>
-                  <p className="text-xs text-[var(--mm-text3)]">
-                    <span className="font-medium text-[var(--mm-text2)]">
-                      Target time:
-                    </span>{" "}
-                    {configurationBackupPreferredTime}
-                  </p>
+                  </SettingRow>
+                  <SettingRow label="Last automatic backup">
+                    <span className="text-sm text-[var(--mm-text2)]">
+                      {formatDate(
+                        settingsData.configuration_backup_last_run_at,
+                      )}
+                    </span>
+                  </SettingRow>
                 </div>
                 <div className={quietActionRowClass}>
                   <button
@@ -215,7 +217,7 @@ export function SettingsBackupTab({
           {/* A list of what is on disk: display content, so it loses its box. */}
           <SettingsQuietSection
             headingId="suite-settings-backup-snapshots-heading"
-            heading="Recent automatic snapshots"
+            heading="Backups on this machine"
             aside={<span className="mm-quiet-badge">Keeps latest 5</span>}
           >
             {backupsQ.data ? (
@@ -281,12 +283,18 @@ export function SettingsBackupTab({
           </SettingsQuietSection>
 
           {backupMsg ? (
-            <p className="mm-status-text--healthy text-sm" role="status">
+            <p
+              className="mm-status-text--healthy mm-backups-grid__wide text-sm"
+              role="status"
+            >
               {backupMsg}
             </p>
           ) : null}
           {backupErr ? (
-            <p className="mm-status-text--failed text-sm" role="alert">
+            <p
+              className="mm-status-text--failed mm-backups-grid__wide text-sm"
+              role="alert"
+            >
               {backupErr}
             </p>
           ) : null}

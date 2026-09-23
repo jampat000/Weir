@@ -737,7 +737,7 @@ class LiveAudit:
             self.page.get_by_text("Time zone", exact=True), "time zone control"
         )
         self.require(
-            self.page.get_by_text("What this instance is running with", exact=True).count()
+            self.page.get_by_text("What Weir works with", exact=True).count()
             > 0,
             "runtime facts are missing from About",
         )
@@ -840,7 +840,7 @@ class LiveAudit:
             "System security panel",
         )
         self.visible(
-            self.page.get_by_text("Security posture", exact=True), "security posture"
+            self.page.get_by_text("How sign-in is protected", exact=True), "how sign-in is protected"
         )
         self.visible(
             self.page.get_by_text("Active sessions", exact=True), "active sessions"
@@ -888,7 +888,7 @@ class LiveAudit:
             existing.first.wait_for(state="detached", timeout=TIMEOUT_MS)
         self.click(
             self.page.get_by_role(
-                "button", name="Add notification channel →", exact=True
+                "button", name="Add a channel →", exact=True
             ),
             "open notification channel form",
         )

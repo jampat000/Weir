@@ -113,30 +113,44 @@
   color: var(--mm-accent-bright);
 }
 
-/* Filter and the files-at-once read-out. */
+/* The bar under the title, where every other page has its tabs: what to show on the left, today's figures on
+   the right. Drawn like the tab bar, so Processing's title, lead and bar sit exactly where Settings' do. */
 .mm-live-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px 16px;
+  gap: 10px 24px;
+  padding: 0.3rem 1rem 0.3rem 0.3rem;
+  border: 1px solid color-mix(in srgb, var(--mm-border) 82%, var(--mm-gold) 18%);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--mm-surface) 92%, transparent);
+}
+
+.mm-live-toolbar__figures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 32px;
+  padding: 4px 0;
+}
+
+.mm-live-toolbar__figures .mm-live-figure__value {
+  font-size: 1.25rem;
 }
 
 .mm-live-seg {
   display: inline-flex;
   flex-wrap: wrap;
   max-width: 100%;
-  padding: 3px;
-  border-radius: 18px;
-  border: 1px solid var(--mm-border);
-  background: var(--mm-button-secondary-bg);
+  gap: 2px;
 }
 
 .mm-live-seg button {
-  height: calc(30px * var(--mm-density-ui-scale));
+  height: calc(34px * var(--mm-density-ui-scale));
   padding: 0 14px;
-  border: 0;
-  border-radius: var(--mm-radius-pill);
+  border: 1px solid transparent;
+  border-radius: 10px;
   background: transparent;
   color: var(--mm-text2);
   font: 500 0.8125rem var(--mm-font);
@@ -150,6 +164,7 @@
 
 .mm-live-seg button[aria-pressed="true"] {
   background: var(--mm-accent-soft);
+  border-color: var(--mm-accent-ring);
   color: var(--mm-text1);
 }
 
@@ -837,7 +852,7 @@
 
 /* Today's figures line up by their tops here: Last 2 hours carries a legend under its chart, and
    bottom-aligned figures would sink the other two numbers to meet it. */
-.mm-live .mm-page-head__aside {
+.mm-live-toolbar__figures {
   align-items: flex-start;
 }
 

@@ -9,20 +9,22 @@ import {
 } from "../../lib/suite/queries";
 import { ConfirmRemovalDialog } from "../../components/ui/confirm-removal-dialog";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
-import {
-  mmModuleTabBlurbBandClass,
-  mmModuleTabBlurbTextClass,
-} from "../../lib/ui/mm-module-tab-blurb";
 import { QuietFieldGroup } from "../../components/shared/quiet-section";
 import { Field } from "../../components/shared/field";
 import { SettingsQuietSection } from "./settings-shared";
 
+/**
+ * What each event means, in the order the columns read. "Anything" covers files and Weir's own jobs alike: a file's
+ * pass is a job, and Weir's own jobs (backups, cleanup, scans) only ever alert when they fail for good.
+ */
 const EVENT_LABELS: Record<string, string> = {
-  job_completed: "Any job completed",
-  job_failed: "Any job permanently failed",
-  processing_job_completed: "File processing finished",
-  processing_job_failed: "File processing failed for good",
+  processing_job_completed: "A file finished",
+  processing_job_failed: "A file failed for good",
+  job_failed: "Anything failed for good",
+  job_completed: "Anything finished",
 };
+
+const EVENT_ORDER = Object.keys(EVENT_LABELS);
 
 type NotificationFormData = {
   label: string;
@@ -173,6 +175,9 @@ function ChannelForm({
 
 type ChannelRowProps = {
   channel: NotificationChannelOut;
+  events: string[];
+  onToggleEvent: (event: string) => void;
+  toggling: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onTest: () => void;
@@ -185,6 +190,9 @@ type ChannelRowProps = {
  *  belongs to this channel and not its neighbour. */
 function ChannelRow({
   channel,
+  events,
+  onToggleEvent,
+  toggling,
   onEdit,
   onDelete,
   onTest,
@@ -202,11 +210,22 @@ function ChannelRow({
         ) : null}
         <span className="mm-quiet-table__sub font-mono">{channel.url}</span>
       </th>
-      <td data-label="Events">
-        {channel.events.length > 0
-          ? channel.events.map((e) => EVENT_LABELS[e] ?? e).join(", ")
-          : "None"}
-      </td>
+      {events.map((event) => (
+        <td
+          key={event}
+          data-label={EVENT_LABELS[event] ?? event}
+          className="mm-alerts-cell"
+        >
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-[var(--mm-accent)]"
+            aria-label={`${channel.label}: ${EVENT_LABELS[event] ?? event}`}
+            checked={channel.events.includes(event)}
+            disabled={toggling}
+            onChange={() => onToggleEvent(event)}
+          />
+        </td>
+      ))}
       <td data-label="">
         <div className="flex flex-wrap gap-2">
           <button
@@ -274,8 +293,48 @@ export function SettingsNotificationsTab() {
     Record<number, { ok: boolean; error: string | null }>
   >({});
 
-  const supportedEvents =
-    channelsQ.data?.supported_events ?? Object.keys(EVENT_LABELS);
+  const supportedEvents = [
+    ...EVENT_ORDER.filter((e) =>
+      (channelsQ.data?.supported_events ?? EVENT_ORDER).includes(e),
+    ),
+    ...(channelsQ.data?.supported_events ?? []).filter(
+      (e) => !EVENT_ORDER.includes(e),
+    ),
+  ];
+  const [toggleError, setToggleError] = useState<string | null>(null);
+
+  // A channel with no events would never send anything, so the last one stays ticked.
+  const handleToggle = async (
+    channel: NotificationChannelOut,
+    event: string,
+  ) => {
+    const events = channel.events.includes(event)
+      ? channel.events.filter((e) => e !== event)
+      : [...channel.events, event];
+    if (events.length === 0) {
+      setToggleError(
+        `${channel.label} needs at least one event. Switch the channel off in Edit instead.`,
+      );
+      return;
+    }
+    setToggleError(null);
+    try {
+      await updateMutation.mutateAsync({
+        id: channel.id,
+        data: {
+          label: channel.label,
+          provider: channel.provider,
+          url: channel.url,
+          events,
+          enabled: channel.enabled,
+        },
+      });
+    } catch (err) {
+      setToggleError(
+        err instanceof Error ? err.message : "That change could not be saved.",
+      );
+    }
+  };
 
   const handleCreate = async (data: NotificationFormData) => {
     await createMutation.mutateAsync(data);
@@ -329,16 +388,30 @@ export function SettingsNotificationsTab() {
 
   return (
     <div data-testid="suite-settings-notifications" className="mm-quiet-stack">
-      <div className={mmModuleTabBlurbBandClass}>
-        <p className={mmModuleTabBlurbTextClass}>
-          Send outbound webhook notifications when jobs complete or permanently
-          fail. Supports generic JSON webhooks and Discord.
-        </p>
-      </div>
+      <p className="mm-quiet-note">
+        An alert is a message Weir posts to Discord, or to any address that
+        takes a webhook, when something happens you would want to know about
+        without opening Weir. Nothing is sent until you add a channel.
+      </p>
+      <ol className="mm-alert-steps" aria-label="How an alert is sent">
+        <li>
+          <b>Something happens.</b> A file finishes or fails for good, or one of
+          Weir&rsquo;s own jobs fails for good. A failure Weir will retry is not
+          sent until the last try.
+        </li>
+        <li>
+          <b>Weir checks each channel.</b> Only channels ticked for that event,
+          and switched on, get it.
+        </li>
+        <li>
+          <b>It posts the message.</b> If a channel does not answer, Weir notes
+          it in System › Logs, under Server log.
+        </li>
+      </ol>
 
       <SettingsQuietSection
         headingId="suite-settings-notifications-heading"
-        heading="Notification channels"
+        heading="Channels"
         aside={
           !showAddForm && editingId === null ? (
             <button
@@ -346,15 +419,20 @@ export function SettingsNotificationsTab() {
               className="mm-quiet-link"
               onClick={() => setShowAddForm(true)}
             >
-              Add notification channel →
+              Add a channel →
             </button>
           ) : null
         }
       >
         <p className="mm-quiet-note">
-          Each channel routes job events to a webhook URL. Use &ldquo;Send
-          test&rdquo; to verify a channel before relying on it.
+          Tick what each channel should hear about; a change saves straight
+          away. Use &ldquo;Send test&rdquo; before relying on a new channel.
         </p>
+        {toggleError ? (
+          <p className="mm-status-text--failed mt-2 text-sm" role="alert">
+            {toggleError}
+          </p>
+        ) : null}
 
         {channelsQ.isLoading ? (
           <p className="mm-quiet-note mt-4">Loading channels...</p>
@@ -380,7 +458,11 @@ export function SettingsNotificationsTab() {
                   <thead>
                     <tr>
                       <th scope="col">Channel</th>
-                      <th scope="col">Events</th>
+                      {supportedEvents.map((event) => (
+                        <th key={event} scope="col" className="mm-alerts-cell">
+                          {EVENT_LABELS[event] ?? event}
+                        </th>
+                      ))}
                       <th scope="col">
                         <span className="sr-only">Actions</span>
                       </th>
@@ -390,7 +472,10 @@ export function SettingsNotificationsTab() {
                     {channels.map((channel) =>
                       editingId === channel.id ? (
                         <tr key={channel.id}>
-                          <td colSpan={3} data-label="">
+                          <td
+                            colSpan={supportedEvents.length + 2}
+                            data-label=""
+                          >
                             <QuietFieldGroup title="Edit channel">
                               <ChannelForm
                                 initial={{
@@ -421,6 +506,11 @@ export function SettingsNotificationsTab() {
                         <ChannelRow
                           key={channel.id}
                           channel={channel}
+                          events={supportedEvents}
+                          onToggleEvent={(event) =>
+                            void handleToggle(channel, event)
+                          }
+                          toggling={updateMutation.isPending}
                           onEdit={() => setEditingId(channel.id)}
                           onDelete={() => {
                             setDeleteError(null);

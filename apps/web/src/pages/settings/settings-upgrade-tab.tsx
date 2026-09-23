@@ -10,11 +10,7 @@ import type { UpdateMode } from "../../lib/suite/types";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { quietActionRowClass } from "../../components/shared/quiet-section";
 import { mmStatusPillClass } from "../../lib/ui/mm-status-tone";
-import {
-  SettingsFactTable,
-  SettingsQuietSection,
-  type SettingsFact,
-} from "./settings-shared";
+import { SettingsQuietSection, type SettingsFact } from "./settings-shared";
 
 /** "up to date" -> "Up to date": status pills across Weir are sentence case. */
 function sentenceCase(text: string): string {
@@ -114,20 +110,13 @@ export function SettingsUpgradeTab({ updateStatusQ }: SettingsUpgradeTabProps) {
           label: "Latest",
           value: updateStatusQ.data.latest_version || "Unknown",
         },
-        { label: "Install type", value: updateStatusQ.data.install_type },
-        {
-          label: "Status",
-          value: updateStatusQ.data.status.replaceAll("_", " "),
-        },
+        { label: "Installed from", value: updateStatusQ.data.install_type },
       ]
     : [];
 
   return (
     <div data-testid="suite-settings-upgrade-tab" className="mm-quiet-stack">
       <div className="mm-quiet-stack" data-testid="suite-settings-upgrade">
-        <p className="mm-quiet-note">
-          On Windows, the Weir tray app installs its own updates.
-        </p>
         {updateStatusQ.isPending ? (
           <p className="mm-quiet-note">Checking for updates...</p>
         ) : !updateStatusQ.data ? (
@@ -141,36 +130,6 @@ export function SettingsUpgradeTab({ updateStatusQ }: SettingsUpgradeTabProps) {
           </p>
         ) : (
           <>
-            {/* The one thing on this tab that wants attention. It stays a filled,
-                colour-coded strip: the colour is functional, not decoration. */}
-            <div
-              className={`rounded-xl border border-[var(--mm-border)] p-4 ${
-                updateStatusQ.data.status === "update_available"
-                  ? "bg-[var(--mm-status-warning-bg)]"
-                  : "bg-[var(--mm-status-healthy-bg)]"
-              }`}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold tracking-[0.14em] text-[var(--mm-gold)] uppercase">
-                    Release status
-                  </p>
-                  <h4 className="mt-1 text-base font-semibold text-[var(--mm-text1)]">
-                    {updateStatusQ.data.summary}
-                  </h4>
-                </div>
-                <span
-                  className={mmStatusPillClass(
-                    updateStatusQ.data.status === "update_available"
-                      ? "warning"
-                      : "healthy",
-                  )}
-                >
-                  {sentenceCase(updateStatusQ.data.status.replaceAll("_", " "))}
-                </span>
-              </div>
-            </div>
-
             {isWindows && updateStateQ.data?.downloaded && (
               <div className="flex items-start justify-between gap-4 rounded-xl border border-[var(--mm-border)] bg-[var(--mm-status-healthy-bg)] px-4 py-3">
                 <div className="min-w-0">
@@ -213,7 +172,7 @@ export function SettingsUpgradeTab({ updateStatusQ }: SettingsUpgradeTabProps) {
 
             <SettingsQuietSection
               headingId="suite-settings-upgrade-heading"
-              heading="Upgrade"
+              heading="Updates"
               aside={
                 <>
                   <button
@@ -247,16 +206,34 @@ export function SettingsUpgradeTab({ updateStatusQ }: SettingsUpgradeTabProps) {
                 </>
               }
             >
-              <p className="mm-quiet-note">
-                Check the running Weir version and see the latest release for
-                this install type.
+              <p
+                className={`mt-1 flex items-center gap-2 text-base font-semibold text-[var(--mm-text1)]`}
+                data-testid="suite-settings-release-status"
+              >
+                <span
+                  className={mmStatusPillClass(
+                    updateStatusQ.data.status === "update_available"
+                      ? "warning"
+                      : "healthy",
+                  )}
+                >
+                  {sentenceCase(updateStatusQ.data.status.replaceAll("_", " "))}
+                </span>
+                {updateStatusQ.data.summary}
               </p>
-              <div className="mt-4">
-                <SettingsFactTable
-                  caption="This Weir install"
-                  facts={installFacts}
-                />
-              </div>
+              <dl className="mm-kv mt-2" aria-label="This Weir install">
+                {installFacts.map((fact) => (
+                  <div key={fact.label}>
+                    <dt>{fact.label}</dt>
+                    <dd>{fact.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {isWindows ? (
+                <p className="mm-quiet-note mt-2">
+                  On Windows, the Weir tray app installs updates itself.
+                </p>
+              ) : null}
             </SettingsQuietSection>
 
             {/* An input group with its own Save scope. Rule 3: the scope is the

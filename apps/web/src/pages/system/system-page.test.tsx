@@ -579,7 +579,7 @@ describe("SystemPage", () => {
       screen.getByRole("heading", { name: "Change password" }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("heading", { name: "Security posture" }),
+      screen.queryByRole("heading", { name: "How sign-in is protected" }),
     ).toBeInTheDocument();
   });
 

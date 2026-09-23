@@ -9,7 +9,6 @@ import type {
 import {
   processingMaintenanceKey,
   useProcessingMaintenanceQuery,
-  useProcessingRuntimeSettingsQuery,
   useRunProcessingMaintenance,
 } from "../../lib/processing/maintenance-queries";
 import {
@@ -331,49 +330,5 @@ export function ProcessingMaintenanceSection() {
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * What this instance is running with: worker mode, the file types it accepts, and the note about where
- * those come from. Read-only — they come from the environment and a restart — so a tab can open with
- * them without offering anything the screen cannot deliver.
- */
-export function ProcessingRuntimeFactsSection() {
-  const runtime = useProcessingRuntimeSettingsQuery();
-  return (
-    <>
-      {runtime.data ? (
-        <section
-          className="mm-quiet-section"
-          aria-labelledby="processing-runtime-settings-heading"
-          data-testid="processing-runtime-settings"
-        >
-          <div className="mm-quiet-section__head">
-            <h2
-              id="processing-runtime-settings-heading"
-              className="mm-quiet-section__title"
-            >
-              What this instance is running with
-            </h2>
-          </div>
-          {/* Read-only. These come from the environment and a restart, so showing them
-              as editable would promise something the screen cannot deliver. */}
-          <div className="mm-quiet-section__body">
-            <ul className="grid gap-1.5 text-[length:var(--mm-type-body)] leading-relaxed text-[var(--mm-text2)]">
-              <li>{runtime.data.worker_mode_summary}</li>
-              <li>{runtime.data.sqlite_throughput_note}</li>
-              <li>
-                File types accepted:{" "}
-                {runtime.data.processing_media_extensions.join(", ")}
-              </li>
-            </ul>
-            <p className="mm-quiet-note mt-3">
-              {runtime.data.configuration_note}
-            </p>
-          </div>
-        </section>
-      ) : null}
-    </>
   );
 }
