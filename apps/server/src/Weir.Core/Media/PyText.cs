@@ -133,8 +133,4 @@ internal static class PyText
 
     /// <summary>A bracketed, comma-separated list of quoted strings, e.g. <c>['ffprobe', '-v']</c>.</summary>
     public static string ListRepr(IEnumerable<string> items) => "[" + string.Join(", ", items.Select(Py.Repr)) + "]";
-
-    /// <summary>A timeout as text: a whole number, or with a decimal point (<c>10.0</c>) when <paramref name="isFloat"/>.</summary>
-    public static string NumberText(double value, bool isFloat) =>
-        isFloat ? PyConvert.FloatRepr(value) : ((long)value).ToString(CultureInfo.InvariantCulture);
 }

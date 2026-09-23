@@ -253,13 +253,6 @@ public static class ManagerQueueSignals
         return null;
     }
 
-    /// <summary>Plain-language reason naming the connection, not the vendor.</summary>
-    public static string? UpstreamBlockReason(IReadOnlyList<AttributedQueueRow> rows, FileAnchorCandidate? candidate = null)
-    {
-        var label = BlockingConnectionLabel(rows, candidate);
-        return label is null ? null : $"{label} is still importing this file, so Weir left it alone for now.";
-    }
-
     /// <summary>Summarise which connections reported their queue and which stayed silent.</summary>
     public static QueueSignalReport ReportForSignals(IReadOnlyList<ManagerQueueSignal> signals)
     {

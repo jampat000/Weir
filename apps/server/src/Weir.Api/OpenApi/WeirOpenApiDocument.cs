@@ -24,9 +24,6 @@ public static class WeirOpenApiDocument
 
     private static readonly Lazy<JsonObject> PythonDocument = new(LoadEmbeddedDocument);
 
-    /// <summary>A fresh, independent copy of the embedded committed document, unmodified. For tests only.</summary>
-    public static JsonObject LoadPythonDocumentForTests() => Clone(PythonDocument.Value);
-
     /// <summary>
     /// The committed document, pruned to the <paramref name="implementedRoutes"/> (a <see cref="Http.RouteTable"/>
     /// snapshot: each route's mounted path, which matches the document's path exactly, and the HTTP methods mapped

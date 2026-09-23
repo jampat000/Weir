@@ -108,18 +108,6 @@ public sealed class MediaManagerHttpClient
         return SendAsync(request, allowEmpty: false, cancellationToken, acceptedStatuses);
     }
 
-    /// <summary>PUT the body as JSON; an empty answer is fine.</summary>
-    public async Task PutJsonAsync(string path, PyDict body, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(body);
-        var request = new HttpRequestMessage(HttpMethod.Put, Url(path))
-        {
-            Content = JsonContent(body),
-        };
-        request.Headers.TryAddWithoutValidation("X-Api-Key", _apiKey);
-        await SendAsync(request, allowEmpty: true, cancellationToken).ConfigureAwait(false);
-    }
-
     /// <summary>DELETE: success is the status code alone. Booleans are sent as <c>true</c>/<c>false</c>, which is how ASP.NET binds them.</summary>
     public async Task DeleteAsync(string path, IReadOnlyList<KeyValuePair<string, object>>? parameters = null, CancellationToken cancellationToken = default)
     {
