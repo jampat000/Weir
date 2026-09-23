@@ -9,8 +9,14 @@ import {
   fileFacts,
   finishedLine,
   prettyName,
+  readRate,
+  ringLabel,
+  runningFor,
   secondsLeft,
-  throughput,
+  speedWords,
+  clock,
+  handedBack,
+  handedBackSince,
   timeLeft,
 } from "./processing-model";
 
@@ -287,11 +293,14 @@ describe("buildLanes", () => {
   });
 });
 
-describe("throughput", () => {
-  const finished = (at: string): FinishedFile => ({
+describe("handedBack", () => {
+  const finished = (
+    at: string,
+    kind: FinishedFile["kind"] = "cleaned",
+  ): FinishedFile => ({
     id: Math.random(),
     source: "download",
-    kind: "cleaned",
+    kind,
     relativePath: "x.mkv",
     libraryId: 2,
     savedBytes: null,
@@ -300,21 +309,63 @@ describe("throughput", () => {
     sentence: null,
     finishedAt: at,
   });
+  // 10:02, so the five minutes happening now started at 10:00.
+  const at = NOW + 2 * 60_000;
 
-  it("counts files per five minutes over the last two hours, oldest first", () => {
-    const bars = throughput(
+  it("counts files per five minutes on clock boundaries, oldest first, the last being now", () => {
+    const result = handedBack(
       [
-        finished("2026-09-22T09:59:00"),
-        finished("2026-09-22T09:58:00"),
-        finished("2026-09-22T09:52:00"),
-        finished("2026-09-22T07:00:00"),
+        finished("2026-09-22T10:01:00"),
+        finished("2026-09-22T10:00:00"),
+        finished("2026-09-22T09:57:00"),
+        finished("2026-09-22T08:05:00"),
+        finished("2026-09-22T08:04:59"),
       ],
-      NOW,
+      at,
     );
-    expect(bars).toHaveLength(24);
-    expect(bars.at(-1)).toBe(2);
-    expect(bars.at(-2)).toBe(1);
-    expect(bars.reduce((a, b) => a + b, 0)).toBe(3);
+    expect(result.buckets).toHaveLength(24);
+    expect(new Date(result.buckets[0].from).toISOString()).toBe(
+      "2026-09-22T08:05:00.000Z",
+    );
+    expect(result.buckets.at(-1)?.total).toBe(2);
+    expect(result.buckets.at(-2)?.total).toBe(1);
+    expect(result.buckets[0].total).toBe(1);
+    expect(result.totals.all).toBe(4);
+    expect(result.peak).toBe(2);
+  });
+
+  it("splits each bucket by how the file turned out, in Just finished's three tones", () => {
+    const result = handedBack(
+      [
+        finished("2026-09-22T10:01:00", "cleaned"),
+        finished("2026-09-22T10:01:10", "already"),
+        finished("2026-09-22T10:01:20", "passed"),
+        finished("2026-09-22T10:01:30", "failed"),
+      ],
+      at,
+    );
+    expect(result.buckets.at(-1)).toMatchObject({
+      ok: 1,
+      same: 1,
+      warn: 2,
+      total: 4,
+    });
+    expect(result.totals).toEqual({ ok: 1, same: 1, warn: 2, all: 4 });
+  });
+
+  it("keeps a scale of at least one when nothing was handed back", () => {
+    const result = handedBack([], at);
+    expect(result.totals.all).toBe(0);
+    expect(result.peak).toBe(1);
+  });
+
+  it("starts the window 23 buckets before the current one, and holds it for five minutes", () => {
+    expect(new Date(handedBackSince(at)).toISOString()).toBe(
+      "2026-09-22T08:05:00.000Z",
+    );
+    expect(handedBackSince(NOW + 4 * 60_000 + 59_000)).toBe(
+      handedBackSince(at),
+    );
   });
 });
 
@@ -356,5 +407,42 @@ describe("words and numbers", () => {
     expect(timeLeft(41)).toBe("41 s left");
     expect(timeLeft(720)).toBe("12 min left");
     expect(timeLeft(null)).toBe("");
+  });
+});
+
+describe("the numbers on a file being written", () => {
+  it("reads ffmpeg's speed the way a person would, never in scientific notation", () => {
+    expect(speedWords("1.26e+03x")).toBe("1,260×");
+    expect(speedWords("35.2x")).toBe("35×");
+    expect(speedWords("2.46x")).toBe("2.5×");
+    expect(speedWords("1.0x")).toBe("1×");
+    expect(speedWords("N/A")).toBeNull();
+    expect(speedWords(null)).toBeNull();
+    expect(speedWords("0x")).toBeNull();
+  });
+
+  it("works out how fast the file is being read from how far through it is", () => {
+    // 45% of 2 GB in 60 s.
+    expect(readRate(2_000_000_000, 45, 60)).toBe(15_000_000);
+    expect(readRate(2_000_000_000, null, 60)).toBeNull();
+    expect(readRate(2_000_000_000, 45, 0)).toBeNull();
+    expect(readRate(null, 45, 60)).toBeNull();
+  });
+
+  it("shows a running length and a running time in their own shapes", () => {
+    expect(clock(245)).toBe("4:05");
+    expect(clock(1120)).toBe("18:40");
+    expect(clock(3723)).toBe("1:02:03");
+    expect(runningFor(41)).toBe("41 s");
+    expect(runningFor(134)).toBe("2 min 14 s");
+    expect(runningFor(120)).toBe("2 min");
+    expect(runningFor(3900)).toBe("1 h 5 min");
+  });
+
+  it("fits a countdown inside its ring", () => {
+    expect(ringLabel(58)).toBe("58s");
+    expect(ringLabel(582)).toBe("10m");
+    expect(ringLabel(2680)).toBe("45m");
+    expect(ringLabel(7200)).toBe("2h");
   });
 });

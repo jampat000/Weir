@@ -104,6 +104,10 @@ vi.mock("../../lib/activity/queries", () => ({
   useActivityRecentQuery: (filters: { event_type: string }) => ({
     data: activity[filters.event_type] ?? { items: [] },
   }),
+  useActivityWindowQuery: (filters: { event_type: string }) => {
+    const items = activity[filters.event_type]?.items ?? [];
+    return { data: { items, total: items.length, complete: true } };
+  },
 }));
 
 function file(overrides: Partial<ProcessingFile>): ProcessingFile {
@@ -221,6 +225,65 @@ describe("ProcessingPage", () => {
     expect(screen.getByTestId("live-lane-working")).toHaveTextContent(
       "of 2 lanes",
     );
+  });
+
+  it("lights up only the lanes that hold a file right now, and never Just finished", () => {
+    files.files = [
+      file({ id: 1, status: "unprocessed" }),
+      file({
+        id: 2,
+        status: "processing",
+        relative_path: "Glass.Orchard.S01E04.2160p.WEB-DL.mkv",
+        progress_percent: 10,
+      }),
+    ];
+    activity["processing.file_remux_pass_completed"] = {
+      items: [
+        {
+          id: 701,
+          created_at: "2026-09-22T09:58:00",
+          event_type: "processing.file_remux_pass_completed",
+          title: "x",
+          library_id: 1,
+          relative_path: "Northbound.S04E10.mkv",
+          detail: JSON.stringify({ outcome: "live_output_written", ok: true }),
+        },
+      ],
+    };
+    renderLive();
+
+    const lit = (id: string) =>
+      screen
+        .getByTestId(`live-lane-${id}`)
+        .classList.contains("mm-live-lane--active");
+    expect(lit("waiting")).toBe(true);
+    expect(lit("working")).toBe(true);
+    expect(lit("arriving")).toBe(false);
+    expect(lit("handing")).toBe(false);
+    expect(lit("finished")).toBe(false);
+  });
+
+  it("puts the numbers of a file being written on its card, in words a person reads", () => {
+    files.files = [
+      file({
+        id: 3,
+        status: "processing",
+        relative_path: "Glass.Orchard.S01E04.2160p.WEB-DL.mkv",
+        size_bytes: 2_000_000_000,
+        duration_seconds: 2700,
+        progress_percent: 45,
+        progress_elapsed_seconds: 60,
+        progress_speed: "1.26e+03x",
+      }),
+    ];
+    renderLive();
+
+    const stats = screen.getByTestId("live-working-stats");
+    expect(stats).toHaveTextContent("Speed1,260× real time");
+    expect(stats).toHaveTextContent("Reading14.3 MB/s");
+    expect(stats).toHaveTextContent("Through the file20:15 of 45:00");
+    expect(stats).toHaveTextContent("Running for1 min");
+    expect(stats).not.toHaveTextContent("e+03");
   });
 
   it("shows a library clean as work of its own, and the filter narrows to one kind", () => {
@@ -348,5 +411,56 @@ describe("ProcessingPage", () => {
     );
     expect(finished).toHaveTextContent("2 min ago");
     expect(screen.getByTestId("live-done-today")).toHaveTextContent("38");
+  });
+
+  it("says in words what the last two hours handed back, split the way Just finished colours it", () => {
+    activity["processing.file_remux_pass_completed"] = {
+      items: [
+        {
+          id: 601,
+          created_at: "2026-09-22T09:40:00",
+          event_type: "processing.file_remux_pass_completed",
+          title: "x",
+          library_id: 1,
+          relative_path: "Starlit.Relay.S02E04.mkv",
+          detail: JSON.stringify({
+            outcome: "live_output_written",
+            ok: true,
+            relative_media_path: "Starlit.Relay.S02E04.mkv",
+            removed_subtitles: ["a"],
+          }),
+        },
+        {
+          id: 602,
+          created_at: "2026-09-22T09:35:00",
+          event_type: "processing.file_remux_pass_completed",
+          title: "x",
+          library_id: 1,
+          relative_path: "Ember.and.Ash.S02E01.mkv",
+          detail: JSON.stringify({
+            outcome: "live_skipped_not_required",
+            ok: true,
+            relative_media_path: "Ember.and.Ash.S02E01.mkv",
+          }),
+        },
+      ],
+    };
+    renderLive();
+
+    const sum = screen.getByTestId("live-handed-back-sum");
+    expect(sum).toHaveTextContent("2 files");
+    expect(sum).toHaveTextContent("1 cleaned");
+    expect(sum).toHaveTextContent("1 already right");
+    expect(sum).not.toHaveTextContent("need a look");
+  });
+
+  it("says nothing was handed back rather than drawing a row of empty bars", () => {
+    renderLive();
+
+    const figure = screen.getByTestId("live-handed-back");
+    expect(screen.getByTestId("live-handed-back-sum")).toHaveTextContent(
+      "Nothing handed back in the last 2 hours.",
+    );
+    expect(figure.querySelector(".mm-live-spark__bar")).toBeNull();
   });
 });

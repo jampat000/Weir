@@ -294,28 +294,77 @@ export function buildLanes(
   return lanes;
 }
 
-/** Files handed back per `bucketMinutes`, oldest first, over the last `windowMinutes`. */
-export function throughput(
-  finished: FinishedFile[],
-  now: number,
-  windowMinutes = 120,
-  bucketMinutes = 5,
-): number[] {
-  const buckets = Array.from(
-    { length: Math.ceil(windowMinutes / bucketMinutes) },
-    () => 0,
+/** How a handed-back file turned out, in the three tones Just finished uses for its dots. */
+export type HandedBackTone = "ok" | "same" | "warn";
+
+export function handedBackTone(item: FinishedFile): HandedBackTone {
+  if (item.kind === "passed" || item.kind === "failed") return "warn";
+  return item.kind === "already" ? "same" : "ok";
+}
+
+export type HandedBackBucket = Record<HandedBackTone, number> & {
+  /** Start of the five minutes, in ms since the epoch. */
+  from: number;
+  total: number;
+};
+
+export type HandedBack = {
+  /** Oldest first; the last one is the five minutes happening now. */
+  buckets: HandedBackBucket[];
+  totals: Record<HandedBackTone, number> & { all: number };
+  /** The fullest five minutes, never below 1 so a scale can be drawn from it. */
+  peak: number;
+};
+
+export const HANDED_BACK_BUCKET_MS = 5 * 60_000;
+export const HANDED_BACK_BUCKETS = 24;
+
+/**
+ * The first instant the chart covers: 24 five-minute buckets on clock boundaries, the last one being
+ * the five minutes happening now. Stable for five minutes, so a query keyed on it is not refetched
+ * every second.
+ */
+export function handedBackSince(now: number): number {
+  const current =
+    Math.floor(now / HANDED_BACK_BUCKET_MS) * HANDED_BACK_BUCKET_MS;
+  return current - (HANDED_BACK_BUCKETS - 1) * HANDED_BACK_BUCKET_MS;
+}
+
+/** Files handed back per five minutes over the last two hours, split by how each turned out. */
+export function handedBack(finished: FinishedFile[], now: number): HandedBack {
+  const since = handedBackSince(now);
+  const buckets: HandedBackBucket[] = Array.from(
+    { length: HANDED_BACK_BUCKETS },
+    (_, index) => ({
+      from: since + index * HANDED_BACK_BUCKET_MS,
+      ok: 0,
+      same: 0,
+      warn: 0,
+      total: 0,
+    }),
   );
-  const start = now - windowMinutes * 60_000;
+  const totals = { ok: 0, same: 0, warn: 0, all: 0 };
   for (const item of finished) {
     const at = parseTime(item.finishedAt);
-    if (at == null || at < start || at > now) continue;
-    const index = Math.min(
-      buckets.length - 1,
-      Math.floor((at - start) / (bucketMinutes * 60_000)),
-    );
-    buckets[index] += 1;
+    if (at == null || at < since || at > now) continue;
+    const bucket =
+      buckets[
+        Math.min(
+          buckets.length - 1,
+          Math.floor((at - since) / HANDED_BACK_BUCKET_MS),
+        )
+      ];
+    const tone = handedBackTone(item);
+    bucket[tone] += 1;
+    bucket.total += 1;
+    totals[tone] += 1;
+    totals.all += 1;
   }
-  return buckets;
+  return {
+    buckets,
+    totals,
+    peak: Math.max(1, ...buckets.map((bucket) => bucket.total)),
+  };
 }
 
 /** "Saved 318 MB · removed 4 audio, 6 subtitles", in the words each outcome deserves. */
@@ -364,4 +413,65 @@ export function timeLeft(seconds: number | null): string {
   return minutes < 90
     ? `${minutes} min left`
     : `${Math.round(minutes / 60)} h left`;
+}
+
+/**
+ * ffmpeg's speed ("1.26e+03x", "35.2x", "0.8x") as a person reads it: "1,260×", "35×", "0.8×". ffmpeg
+ * switches to scientific notation past 999, which reached the screen as it was.
+ */
+export function speedWords(raw: string | null | undefined): string | null {
+  const value = Number.parseFloat((raw ?? "").trim().replace(/x$/i, ""));
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const shown =
+    value >= 10
+      ? Math.round(value).toLocaleString("en-US")
+      : value.toFixed(1).replace(/\.0$/, "");
+  return `${shown}×`;
+}
+
+/** How fast the source is being read, from how far through it the pass is: bytes a second, or null. */
+export function readRate(
+  sizeBytes: number | null | undefined,
+  percent: number | null | undefined,
+  elapsedSeconds: number | null | undefined,
+): number | null {
+  if (!sizeBytes || percent == null || !elapsedSeconds || elapsedSeconds < 1)
+    return null;
+  const rate =
+    (sizeBytes * Math.min(100, Math.max(0, percent))) / 100 / elapsedSeconds;
+  return rate > 0 && Number.isFinite(rate) ? rate : null;
+}
+
+/** A running length as a player shows it: "4:05", "18:40", "1:02:03". */
+export function clock(seconds: number | null | undefined): string {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return "";
+  const whole = Math.floor(seconds);
+  const h = Math.floor(whole / 3600);
+  const m = Math.floor((whole % 3600) / 60);
+  const sec = String(whole % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
+}
+
+/** How long something has been running: "41 s", "2 min 14 s", "1 h 5 min". */
+export function runningFor(seconds: number | null | undefined): string {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return "";
+  const whole = Math.floor(seconds);
+  if (whole < 60) return `${whole} s`;
+  if (whole < 3600) {
+    const rest = whole % 60;
+    return rest
+      ? `${Math.floor(whole / 60)} min ${rest} s`
+      : `${whole / 60} min`;
+  }
+  const minutes = Math.floor((whole % 3600) / 60);
+  return minutes
+    ? `${Math.floor(whole / 3600)} h ${minutes} min`
+    : `${whole / 3600} h`;
+}
+
+/** The few characters that fit inside a countdown ring: "58s", "9m", "2h". */
+export function ringLabel(seconds: number): string {
+  if (seconds < 100) return `${Math.round(seconds)}s`;
+  if (seconds < 100 * 60) return `${Math.round(seconds / 60)}m`;
+  return `${Math.round(seconds / 3600)}h`;
 }

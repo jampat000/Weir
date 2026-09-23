@@ -29,6 +29,7 @@ import {
 import {
   activityRecentKey,
   useActivityRecentQuery,
+  useActivityWindowQuery,
 } from "../../lib/activity/queries";
 import { useActivityStreamInvalidations } from "../../lib/activity/use-activity-stream-invalidation";
 import { usePauseQuery } from "../../lib/pause/pause-queries";
@@ -56,8 +57,17 @@ import {
   buildLanes,
   finishedLine,
   prettyName,
+  handedBack,
+  handedBackSince,
+  HANDED_BACK_BUCKET_MS,
+  readRate,
+  ringLabel,
+  runningFor,
   secondsLeft,
-  throughput,
+  speedWords,
+  clock,
+  type HandedBack,
+  type HandedBackTone,
   timeLeft,
   type ArrivingItem,
   type HandingItem,
@@ -71,10 +81,12 @@ const FAILED_JOBS_LIMIT = 100;
 const ACTIVE_JOBS_LIMIT = 50;
 // How many cards a lane shows before it says how many more there are. Working is never cut short:
 // it holds at most as many files as the files-at-once setting allows, and that tops out at 10.
-const ARRIVING_SHOWN = 6;
-const WAITING_SHOWN = 8;
-const HANDING_SHOWN = 6;
-const FINISHED_SHOWN = 8;
+const ARRIVING_SHOWN = 3;
+const WAITING_SHOWN = 5;
+const HANDING_SHOWN = 4;
+// Six one-line rows keep the lane inside the board's height, so Handed back stays on screen
+// (James, 23 Sep 2026). History → has the rest.
+const FINISHED_SHOWN = 5;
 
 // A running pass rewrites its progress row several times a second and every write reaches the
 // stream, so the lanes follow it closely and the totals, which only change when a file finishes,
@@ -154,7 +166,7 @@ function Ring({ item, now }: { item: ArrivingItem; now: number }) {
         }
       />
       <text x="19" y="23" textAnchor="middle" className="mm-live-ring__text">
-        {left != null && left > 0 ? `${left}s` : "…"}
+        {left != null && left > 0 ? ringLabel(left) : "…"}
       </text>
     </svg>
   );
@@ -210,6 +222,27 @@ function WorkingCard({
       `${item.removedSubtitles} ${item.removedSubtitles === 1 ? "subtitle" : "subtitles"}`,
     );
   const file = item.file;
+  // What the pass is doing, in numbers: all from the server's own progress and the file's own size and
+  // running length (James, 23 Sep 2026: "we should see more data or stats when it is processing").
+  const speed = speedWords(item.speed);
+  const rate = readRate(
+    file?.size_bytes,
+    item.percent,
+    file?.progress_elapsed_seconds,
+  );
+  const duration = file?.duration_seconds ?? null;
+  const through =
+    duration && item.percent != null
+      ? `${clock((duration * Math.min(100, item.percent)) / 100)} of ${clock(duration)}`
+      : "";
+  const elapsed = file?.progress_elapsed_seconds ?? 0;
+  const running = elapsed >= 1 ? runningFor(elapsed) : "";
+  const stats = [
+    speed ? ["Speed", `${speed} real time`] : null,
+    rate ? ["Reading", `${formatBytes(rate)}/s`] : null,
+    through ? ["Through the file", through] : null,
+    running ? ["Running for", running] : null,
+  ].filter((stat): stat is [string, string] => stat !== null);
   const title = file ? (
     <button
       type="button"
@@ -276,22 +309,29 @@ function WorkingCard({
             return (
               <li key={step} className={`mm-live-step mm-live-step--${state}`}>
                 {state === "now" && !writing ? "Checking" : step}
-                {state === "done" ? " ✓" : ""}
+                {state === "done" ? (
+                  <span className="sr-only"> (done)</span>
+                ) : null}
               </li>
             );
           })}
         </ol>
       ) : null}
-      {removed.length || item.speed ? (
+      {writing && stats.length ? (
+        <dl className="mm-live-work__stats" data-testid="live-working-stats">
+          {stats.map(([label, value]) => (
+            <div key={label} className="mm-live-work__stat">
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+      {removed.length ? (
         <p className="mm-live-work__facts">
-          {removed.length ? (
-            <span>
-              Removing <b>{removed.join(", ")}</b>
-            </span>
-          ) : null}
-          {item.speed ? (
-            <span>{item.speed.replace(/x$/i, "×")} real time</span>
-          ) : null}
+          <span>
+            Removing <b>{removed.join(", ")}</b>
+          </span>
         </p>
       ) : null}
     </li>
@@ -332,20 +372,21 @@ function FinishedRow({
     <li className="mm-live-done" data-testid="live-finished">
       <i className={`mm-live-dot mm-live-dot--${tone}`} aria-hidden="true" />
       <div className="mm-live-card__names">
-        <button
-          type="button"
-          className="mm-live-card__open mm-live-card__title"
-          onClick={() => onOpen(item)}
-        >
-          {prettyName(item.relativePath)}
-        </button>
-        <span className="mm-live-card__sub mm-live-card__sub--wrap">
+        <span className="mm-live-done__top">
+          <button
+            type="button"
+            className="mm-live-card__open mm-live-card__title"
+            title={prettyName(item.relativePath)}
+            onClick={() => onOpen(item)}
+          >
+            {prettyName(item.relativePath)}
+          </button>
+          <span className="mm-live-done__ago">{ago(item.finishedAt, now)}</span>
+        </span>
+        <span className="mm-live-card__sub" title={finishedLine(item)}>
           {finishedLine(item)}
         </span>
       </div>
-      <span className="mm-live-card__sub mm-live-done__ago">
-        {ago(item.finishedAt, now)}
-      </span>
     </li>
   );
 }
@@ -356,6 +397,7 @@ function Lane({
   count,
   hint,
   live,
+  active,
   children,
   aside,
 }: {
@@ -364,12 +406,14 @@ function Lane({
   count: string | number | null;
   hint: string;
   live?: boolean;
+  /** Holding a file right now. Lit lanes show where the work is; an empty one stays quiet. */
+  active?: boolean;
   children: React.ReactNode;
   aside?: React.ReactNode;
 }) {
   return (
     <section
-      className={`mm-live-lane mm-live-lane--${id}`}
+      className={`mm-live-lane mm-live-lane--${id}${active ? " mm-live-lane--active" : ""}`}
       aria-labelledby={`live-lane-${id}`}
       data-testid={`live-lane-${id}`}
     >
@@ -386,6 +430,127 @@ function Lane({
       <p className="mm-live-lane__hint">{hint}</p>
       {children}
     </section>
+  );
+}
+
+// Five pages of 100 per kind: far more than two hours of work on any install seen so far.
+const HANDED_BACK_PAGES = 5;
+
+const TONE_WORDS: Record<HandedBackTone, string> = {
+  ok: "cleaned",
+  same: "already right",
+  warn: "need a look",
+};
+
+/** When a bar's five minutes were, in words: "Just now", "35–40 min ago". */
+function bucketWhen(from: number, now: number): string {
+  const newest = Math.max(
+    0,
+    Math.round((now - from - HANDED_BACK_BUCKET_MS) / 60_000),
+  );
+  const oldest = Math.round((now - from) / 60_000);
+  return newest === 0
+    ? "In the last " + oldest + " min"
+    : `${newest}–${oldest} min ago`;
+}
+
+/** "3 cleaned, 1 already right" for a bucket or the whole two hours. */
+function toneCounts(counts: Record<HandedBackTone, number>): string {
+  return (["ok", "same", "warn"] as const)
+    .filter((tone) => counts[tone] > 0)
+    .map((tone) => `${counts[tone].toLocaleString()} ${TONE_WORDS[tone]}`)
+    .join(", ");
+}
+
+/**
+ * The last two hours beside today's figures, where it is always on screen. The count, five minutes
+ * to a bar split by how the files turned out (Just finished's three colours), and under it the same
+ * split in words, so nothing needs a hover. Pointing at a bar puts that bar's five minutes in the
+ * same line instead of a tooltip (James, 23 Sep 2026: "you have to hover over to get the details").
+ */
+function HandedBackFigure({
+  handed,
+  total,
+  partial,
+  now,
+}: {
+  handed: HandedBack;
+  total: number;
+  partial: boolean;
+  now: number;
+}) {
+  const [pointed, setPointed] = useState<number | null>(null);
+  const tones = (["ok", "same", "warn"] as const).filter(
+    (tone) => handed.totals[tone] > 0,
+  );
+  const words =
+    total === 0
+      ? "Nothing handed back in the last 2 hours."
+      : `${total.toLocaleString()} ${total === 1 ? "file" : "files"} handed back in the last 2 hours: ${toneCounts(handed.totals)}${partial ? ". The oldest of them are not in the bars." : "."}`;
+  const bucket = pointed == null ? null : handed.buckets[pointed];
+  return (
+    <div
+      className="mm-live-figure mm-live-figure--trend"
+      data-testid="live-handed-back"
+    >
+      <span className="mm-live-figure__label">Last 2 hours</span>
+      <span className="mm-live-figure__value" aria-hidden="true">
+        {total.toLocaleString()}
+      </span>
+      {total > 0 ? (
+        <span
+          className="mm-live-spark__bars"
+          aria-hidden="true"
+          onMouseLeave={() => setPointed(null)}
+        >
+          {handed.buckets.map((b, index) => (
+            <span
+              key={b.from}
+              className="mm-live-spark__slot"
+              onMouseEnter={() => setPointed(index)}
+            >
+              <span
+                className="mm-live-spark__bar"
+                style={{ height: `${(b.total / handed.peak) * 100}%` }}
+              >
+                {(["warn", "same", "ok"] as const).map((tone) =>
+                  b[tone] > 0 ? (
+                    <span
+                      key={tone}
+                      className={`mm-live-spark__seg mm-live-spark__seg--${tone}`}
+                      style={{ flexGrow: b[tone] }}
+                    />
+                  ) : null,
+                )}
+              </span>
+            </span>
+          ))}
+        </span>
+      ) : null}
+      <p className="mm-live-trend__legend" aria-hidden="true">
+        {total === 0 ? (
+          "Nothing handed back in the last 2 hours."
+        ) : bucket ? (
+          <span className="mm-live-trend__pointed">
+            {bucketWhen(bucket.from, now)} ·{" "}
+            {bucket.total === 0 ? "nothing" : toneCounts(bucket)}
+          </span>
+        ) : (
+          tones.map((tone) => (
+            <span key={tone} className="mm-live-trend__part">
+              <i
+                className={`mm-live-dot mm-live-dot--${tone}`}
+                aria-hidden="true"
+              />
+              {handed.totals[tone].toLocaleString()} {TONE_WORDS[tone]}
+            </span>
+          ))
+        )}
+      </p>
+      <span className="sr-only" data-testid="live-handed-back-sum">
+        {words}
+      </span>
+    </div>
   );
 }
 
@@ -431,6 +596,16 @@ export function ProcessingPage(): React.ReactElement {
     limit: 12,
     event_type: LIBRARY_FILE_CLEANED_EVENT,
   });
+  const since = handedBackSince(now);
+  const sinceParam = new Date(since).toISOString().replace("Z", "+00:00");
+  const passesWindow = useActivityWindowQuery(
+    { event_type: REMUX_PASS_COMPLETED_EVENT, date_from: sinceParam },
+    HANDED_BACK_PAGES,
+  );
+  const cleansWindow = useActivityWindowQuery(
+    { event_type: LIBRARY_FILE_CLEANED_EVENT, date_from: sinceParam },
+    HANDED_BACK_PAGES,
+  );
   const fileLog = useProcessingFileLog();
   const navigate = useNavigate();
   const [storyFile, setStoryFile] = useState<{
@@ -513,8 +688,24 @@ export function ProcessingPage(): React.ReactElement {
   const finishedShown = finished
     .filter((i) => shows(i.source))
     .slice(0, FINISHED_SHOWN);
-  const bars = throughput(finished, now);
-  const tallest = Math.max(1, ...bars);
+  const windowResponses = [
+    ...(filter === "library" ? [] : [passesWindow.data]),
+    ...(filter === "download" ? [] : [cleansWindow.data]),
+  ];
+  const handed = handedBack(
+    windowResponses
+      .flatMap((response) => response?.items ?? [])
+      .map(finishedFileFromEvent)
+      .filter((item): item is FinishedFile => item !== null),
+    now,
+  );
+  // More than a page of either kind: the totals are the server's count, the bars the latest page.
+  const handedPartial = windowResponses.some(
+    (response) => response != null && !response.complete,
+  );
+  const handedTotal = handedPartial
+    ? windowResponses.reduce((sum, response) => sum + (response?.total ?? 0), 0)
+    : handed.totals.all;
   const lanesAtOnce = filesAtOnce.data?.effective_files_at_once ?? null;
   const stats = today.data;
 
@@ -529,7 +720,6 @@ export function ProcessingPage(): React.ReactElement {
     lanesAtOnce != null
       ? `${lanesAtOnce} ${lanesAtOnce === 1 ? "file" : "files"} at once`
       : "",
-    filesAtOnce.data?.message ?? "",
     ages.size === 1 && [...ages][0] > 0
       ? `a download is left alone for ${[...ages][0]} s after it stops changing`
       : "",
@@ -605,6 +795,12 @@ export function ProcessingPage(): React.ReactElement {
                   : "…"}
               </span>
             </div>
+            <HandedBackFigure
+              handed={handed}
+              total={handedTotal}
+              partial={handedPartial}
+              now={now}
+            />
           </>
         }
       />
@@ -664,9 +860,10 @@ export function ProcessingPage(): React.ReactElement {
           <div className="mm-live-col mm-live-col--next">
             <Lane
               id="arriving"
+              active={arriving.length > 0}
               label="Arriving"
               count={arriving.length}
-              hint="Making sure the downloader has finished writing"
+              hint="Not ready yet: still being written, or held back for a while"
             >
               {arriving.length ? (
                 <ul className="mm-live-lane__body">
@@ -687,9 +884,10 @@ export function ProcessingPage(): React.ReactElement {
 
             <Lane
               id="waiting"
+              active={waiting.length > 0}
               label="Waiting"
               count={waiting.length}
-              hint="Ready, waiting for a free lane"
+              hint="Ready, queued for the next free lane"
             >
               {waiting.length ? (
                 <ul className="mm-live-lane__body">
@@ -706,6 +904,7 @@ export function ProcessingPage(): React.ReactElement {
 
           <Lane
             id="working"
+            active={working.length > 0}
             label="Working"
             live={working.length > 0}
             count={null}
@@ -722,24 +921,29 @@ export function ProcessingPage(): React.ReactElement {
               </span>
             }
           >
-            {working.length ? (
-              <ul className="mm-live-lane__body mm-live-lane__body--work">
-                {working.map((item) => (
-                  <WorkingCard key={item.key} item={item} onOpen={openFile} />
-                ))}
-              </ul>
-            ) : (
-              <EmptyLane>
-                {pause.data?.paused
-                  ? "Paused. Nothing new starts until you resume."
-                  : "A lane is free. The next file starts as soon as it is ready."}
-              </EmptyLane>
-            )}
+            {/* The cards measure this, not the lane: a lane that is a size container cannot also
+                share the board's rows (subgrid), and sharing them is what lines the lanes up. */}
+            <div className="mm-live-work-area">
+              {working.length ? (
+                <ul className="mm-live-lane__body mm-live-lane__body--work">
+                  {working.map((item) => (
+                    <WorkingCard key={item.key} item={item} onOpen={openFile} />
+                  ))}
+                </ul>
+              ) : (
+                <EmptyLane>
+                  {pause.data?.paused
+                    ? "Paused. Nothing new starts until you resume."
+                    : "A lane is free. The next file starts as soon as it is ready."}
+                </EmptyLane>
+              )}
+            </div>
           </Lane>
 
           <div className="mm-live-col mm-live-col--done">
             <Lane
               id="handing"
+              active={handing.length > 0}
               label="Handing back"
               count={handing.length}
               hint="Final checks, then back to your media manager"
@@ -788,34 +992,6 @@ export function ProcessingPage(): React.ReactElement {
           </div>
         </div>
       </div>
-
-      <section
-        className="mm-live-spark"
-        aria-label="Files handed back, every 5 minutes, over the last 2 hours"
-      >
-        <p className="mm-live-spark__label">
-          Handed back, every 5 minutes, last 2 hours
-        </p>
-        <div className="mm-live-spark__bars" aria-hidden="true">
-          {bars.map((value, index) => (
-            <span
-              key={index}
-              className={`mm-live-spark__bar${index === bars.length - 1 ? " mm-live-spark__bar--now" : ""}`}
-              style={
-                {
-                  "--mm-live-bar": `${Math.max(4, (value / tallest) * 100)}%`,
-                } as CSSProperties
-              }
-              title={`${value} ${value === 1 ? "file" : "files"}`}
-            />
-          ))}
-        </div>
-        <p className="mm-live-spark__note">
-          {
-            "Every number here comes from Weir itself: ffmpeg’s own progress, the file’s size on disk, and when each file went back."
-          }
-        </p>
-      </section>
 
       <FileStoryPanel
         open={storyFile !== null}
