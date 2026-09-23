@@ -62,8 +62,11 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
         Directory.CreateDirectory(Path.Combine(mo, "Title"));
         File.WriteAllBytes(Path.Combine(mw, "Title", "Film.mkv"), "a"u8.ToArray());
         File.WriteAllBytes(Path.Combine(mo, "Title", "Film.mkv"), "b"u8.ToArray());
-        var temp = Path.Combine(mwork, "Film.processing.tmp.mkv");
+        var temp = Path.Combine(mwork, "Film.processing.a1b2c3d4.mkv");
         File.WriteAllBytes(temp, "c"u8.ToArray());
+        // An operator's own file that only looks like a temp name stays.
+        var notes = Path.Combine(mwork, "Film.processing.notes.txt");
+        File.WriteAllBytes(notes, "d"u8.ToArray());
         await AddFailedJobAsync(rel, "movie");
         var connection = await _fixture.AddConnectionAsync("radarr", "Radarr", "http://10.0.0.5:7878", "k");
         _fixture.Http.Json(HttpMethod.Get, "/api/v3/queue", """{"records":[]}""");
@@ -80,6 +83,8 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(mw, "Title")));
         Assert.False(Directory.Exists(Path.Combine(mo, "Title")));
         Assert.False(File.Exists(temp));
+        Assert.True(File.Exists(notes));
+        Assert.DoesNotContain(notes, ((PyList)job["movie_failure_cleanup_temp_files_deleted"]).Items.Select(PyConvert.Str));
     }
 
     [Fact]

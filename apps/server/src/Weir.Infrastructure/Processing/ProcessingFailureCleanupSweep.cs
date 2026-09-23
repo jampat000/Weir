@@ -560,16 +560,18 @@ public sealed class ProcessingFailureCleanupSweep
         return parts.Length == 0 ? string.Empty : string.Join('/', parts);
     }
 
-    /// <summary>Work-folder temp files (<c>.processing.</c> in the name) that belong to this file's stem.</summary>
+    /// <summary>The work-folder temp files Weir created for this source, matched by <see cref="WeirTempFiles.RemuxTempNameFor"/>.</summary>
     private static List<string> JobTempCandidates(string workRoot, string relNorm)
     {
         var result = new List<string>();
-        if (!Directory.Exists(workRoot))
+        if (relNorm.Length == 0 || !Directory.Exists(workRoot))
         {
             return result;
         }
 
-        var stem = Path.GetFileNameWithoutExtension(relNorm).ToLowerInvariant();
+        // Only the exact temp names Weir creates for this source (#534); an operator's own "Film.processing.notes.txt"
+        // beside a failed "Film.mkv" is not Weir's to delete.
+        var ownTempName = WeirTempFiles.RemuxTempNameFor(relNorm);
         List<string> files;
         try
         {
@@ -582,13 +584,7 @@ public sealed class ProcessingFailureCleanupSweep
 
         foreach (var child in files.OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase))
         {
-            var name = Path.GetFileName(child).ToLowerInvariant();
-            if (!name.Contains(".processing.", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            if (stem.Length > 0 && name.Contains(stem, StringComparison.Ordinal))
+            if (ownTempName.IsMatch(Path.GetFileName(child)))
             {
                 result.Add(child);
             }
