@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Weir.Core.Json;
 
-/// <summary>A Python <c>ValueError</c> raised by a builtin conversion, with Python's message.</summary>
+/// <summary>A value that cannot be converted; callers treat it as bad input. The message wording is fixed because clients see it.</summary>
 public sealed class PyValueErrorException : Exception
 {
     public PyValueErrorException()
@@ -22,7 +22,10 @@ public sealed class PyValueErrorException : Exception
     }
 }
 
-/// <summary>A Python <c>TypeError</c>: not caught by the handlers that catch <c>ValueError</c>, so it surfaces as a 500.</summary>
+/// <summary>
+/// A value of the wrong type: not caught by the handlers that catch <see cref="PyValueErrorException"/>,
+/// so it surfaces as a 500.
+/// </summary>
 public sealed class PyTypeErrorException : Exception
 {
     public PyTypeErrorException()
@@ -40,17 +43,20 @@ public sealed class PyTypeErrorException : Exception
     }
 }
 
-/// <summary>Python builtins applied to JSON values: <c>str()</c>, <c>repr()</c>, <c>int()</c>, <c>bool()</c>.</summary>
+/// <summary>
+/// Text, integer and truthiness conversions of JSON values. Their output (<c>None</c>, <c>True</c>,
+/// quoted reprs) appears in stored data and API messages, so it is kept exactly as earlier releases wrote it.
+/// </summary>
 public static class PyConvert
 {
-    /// <summary><c>str(value)</c>.</summary>
+    /// <summary>A string as itself; anything else as <see cref="Repr"/>.</summary>
     public static string Str(PyJson value) => value switch
     {
         PyStr s => s.Value,
         _ => Repr(value),
     };
 
-    /// <summary><c>repr(value)</c>.</summary>
+    /// <summary>The display form: <c>None</c>, <c>True</c>/<c>False</c>, quoted strings, <c>[a, b]</c> and <c>{'k': v}</c>.</summary>
     public static string Repr(PyJson value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -67,11 +73,14 @@ public static class PyConvert
         };
     }
 
-    /// <summary><c>repr(float)</c>: shortest round-trip digits, and <c>nan</c>, <c>inf</c>, <c>-inf</c>.</summary>
+    /// <summary>A float's display form: shortest round-trip digits, and <c>nan</c>, <c>inf</c>, <c>-inf</c>.</summary>
     public static string FloatRepr(double value) =>
         double.IsNaN(value) ? "nan" : double.IsInfinity(value) ? (value > 0 ? "inf" : "-inf") : PyJsonWriter.FloatRepr(value);
 
-    /// <summary><c>int(value)</c>.</summary>
+    /// <summary>
+    /// A JSON value as an integer: booleans are 0/1, floats truncate toward zero, strings parse with
+    /// <see cref="TryParseIntLiteral"/>; anything else throws.
+    /// </summary>
     public static BigInteger ToInt(PyJson value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -106,7 +115,7 @@ public static class PyConvert
         }
     }
 
-    /// <summary><c>int(str)</c> in base 10: surrounding whitespace, a sign, digits with single underscores between them.</summary>
+    /// <summary>A base-10 integer literal: surrounding whitespace, a sign, digits with single underscores between them.</summary>
     public static bool TryParseIntLiteral(string raw, out BigInteger value)
     {
         ArgumentNullException.ThrowIfNull(raw);
@@ -154,14 +163,14 @@ public static class PyConvert
         return true;
     }
 
-    /// <summary><c>bool(value)</c>.</summary>
+    /// <summary>Whether the value counts as set (<see cref="PyJson.IsTruthy"/>).</summary>
     public static bool Bool(PyJson value)
     {
         ArgumentNullException.ThrowIfNull(value);
         return value.IsTruthy;
     }
 
-    /// <summary>A SQLite storage value as the Python value SQLAlchemy would hand back for an untyped column.</summary>
+    /// <summary>A SQLite storage value from an untyped column as a JSON value; blobs are read as UTF-8 text.</summary>
     public static PyJson FromDatabase(object? value) => value switch
     {
         null or DBNull => PyNull.Instance,

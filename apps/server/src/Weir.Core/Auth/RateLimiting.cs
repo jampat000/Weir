@@ -3,7 +3,7 @@ using Weir.Core.Net;
 namespace Weir.Core.Auth;
 
 /// <summary>
-/// In-process sliding-window limiter (port of <c>SlidingWindowLimiter</c>): at most
+/// In-process sliding-window limiter: at most
 /// <see cref="MaxEvents"/> events per key within the window, with the least recently used keys
 /// evicted beyond <see cref="MaxKeys"/>.
 /// </summary>
@@ -128,7 +128,10 @@ public sealed class SlidingWindowLimiter
     }
 }
 
-/// <summary>Port of <c>client_rate_limit_key</c>.</summary>
+/// <summary>
+/// The client address a rate limit counts against. <c>X-Forwarded-For</c> is honoured only when the direct
+/// peer is a trusted proxy; then the right-most address that is not itself a trusted proxy is used.
+/// </summary>
 public static class ClientRateLimitKey
 {
     /// <param name="peer">The request's client host (after the server's own proxy handling), or <see langword="null"/>.</param>

@@ -4,7 +4,7 @@ using Weir.Core.Time;
 
 namespace Weir.Core.Jobs;
 
-/// <summary>The pure rules behind <c>weir.processing.jobs_ops</c>: retry backoff, dedupe tombstones and audit wording.</summary>
+/// <summary>The pure rules behind the job queue: retry backoff, dedupe tombstones and audit wording.</summary>
 public static class JobQueueRules
 {
     public const int DedupeKeyMaxLength = 512;
@@ -18,12 +18,11 @@ public static class JobQueueRules
     public const string CancelledByOperatorError = "Cancelled by operator before a worker claimed this job.";
 
     /// <summary>
-    /// Seconds before a failed attempt may be claimed again: <c>min(30 * 2 ** (attempt_count - 1), 1800)</c>.
+    /// Seconds before a failed attempt may be claimed again: 30 × 2^(<c>attempt_count</c> − 1), at most 1800.
     /// </summary>
     /// <remarks>
-    /// Python raises on a negative exponent only through float maths it never reaches (the claim has
-    /// already incremented <c>attempt_count</c> to at least one); a zero or negative count yields 15 s
-    /// and less there, which is reproduced exactly.
+    /// The claim has already incremented <c>attempt_count</c> to at least one; a zero or negative count
+    /// still yields a value (15 s and less) rather than throwing.
     /// </remarks>
     public static double RetryBackoffSeconds(int attemptCount)
     {
@@ -36,7 +35,7 @@ public static class JobQueueRules
         return Math.Min(30 * Math.Pow(2, exponent), 1800);
     }
 
-    /// <summary><c>_tombstone_cancelled_dedupe_key</c>: frees the original key for a new enqueue.</summary>
+    /// <summary>Rewrites a cancelled job's dedupe key so the original key is free for a new enqueue.</summary>
     public static string TombstoneCancelledDedupeKey(string original, long jobId)
     {
         var suffix = $":cancelled:{jobId.ToString(CultureInfo.InvariantCulture)}";
@@ -46,7 +45,9 @@ public static class JobQueueRules
         return PyStrings.Slice(baseText + suffix, DedupeKeyMaxLength);
     }
 
-    /// <summary>The <c>last_error</c> that <c>recover_handler_ok_finalize_failed_to_completed</c> writes.</summary>
+    /// <summary>
+    /// The <c>last_error</c> written when an operator marks a <c>handler_ok_finalize_failed</c> row completed.
+    /// </summary>
     public static string RecoveredFinalizeFailureError(string? previousError, DateTimeOffset when, string recoveredByLabel)
     {
         var previous = (previousError ?? string.Empty).Trim();
@@ -59,16 +60,16 @@ public static class JobQueueRules
     }
 }
 
-/// <summary>What startup recovery did (port of <c>StartupJobRecoveryResult</c>).</summary>
+/// <summary>What startup recovery did.</summary>
 public sealed record StartupJobRecoveryResult(int ProcessingRequeued, int ProcessingFailed)
 {
     public int TotalRecovered => ProcessingRequeued + ProcessingFailed;
 }
 
-/// <summary>The status and error a leased row gets when a restart finds it (port of <c>_recover_table</c>).</summary>
+/// <summary>The status and error a leased row gets when a restart finds it.</summary>
 public sealed record StartupRecoveryDecision(string Status, string LastError, bool Requeued);
 
-/// <summary>Pure rules of <c>recover_incomplete_jobs_after_startup</c>.</summary>
+/// <summary>Pure rules for recovering jobs a restart left leased.</summary>
 public static class StartupJobRecovery
 {
     public const string ModuleName = "Weir";

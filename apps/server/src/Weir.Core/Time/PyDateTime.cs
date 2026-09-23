@@ -4,17 +4,17 @@ using System.Text;
 namespace Weir.Core.Time;
 
 /// <summary>
-/// A Python <c>datetime</c>: a wall-clock value with microsecond precision and an optional UTC
-/// offset (naive when <see cref="Offset"/> is <see langword="null"/>).
+/// A date-time as the database and API carry it: a wall-clock value with microsecond precision and an
+/// optional UTC offset (naive when <see cref="Offset"/> is <see langword="null"/>).
 /// </summary>
 public readonly record struct PyDateTime(DateTime Clock, TimeSpan? Offset)
 {
-    /// <summary>SQLAlchemy's SQLite <c>DATETIME</c> storage format.</summary>
+    /// <summary>The <c>DATETIME</c> text format stored in SQLite; existing rows use it, so it stays fixed.</summary>
     public const string SqliteFormat = "yyyy-MM-dd HH:mm:ss.ffffff";
 
     public bool IsAware => Offset is not null;
 
-    /// <summary><c>datetime.now(UTC)</c>.</summary>
+    /// <summary>The current instant as an aware UTC value.</summary>
     public static PyDateTime UtcNow(TimeProvider time)
     {
         ArgumentNullException.ThrowIfNull(time);
@@ -27,17 +27,17 @@ public readonly record struct PyDateTime(DateTime Clock, TimeSpan? Offset)
 
     public static DateTime TruncateToMicroseconds(DateTime value) => new(value.Ticks - (value.Ticks % 10), value.Kind);
 
-    /// <summary>Truncate to whole microseconds, the resolution Python and the database keep.</summary>
+    /// <summary>Truncate to whole microseconds, the resolution the database and API keep.</summary>
     public static DateTimeOffset TruncateToMicroseconds(DateTimeOffset value) => new(value.Ticks - (value.Ticks % 10), value.Offset);
 
     /// <summary>An aware value with <paramref name="value"/>'s wall clock and offset.</summary>
     public static PyDateTime FromDateTimeOffset(DateTimeOffset value) =>
         new(TruncateToMicroseconds(DateTime.SpecifyKind(value.DateTime, DateTimeKind.Unspecified)), value.Offset);
 
-    /// <summary>The instant, treating a naive value as UTC (<c>as_utc</c>).</summary>
+    /// <summary>The instant, treating a naive value as UTC.</summary>
     public DateTime AsUtc => Offset is { } offset ? DateTime.SpecifyKind(Clock - offset, DateTimeKind.Utc) : DateTime.SpecifyKind(Clock, DateTimeKind.Utc);
 
-    /// <summary><c>value.astimezone(UTC)</c>: a naive value is taken as the machine's local time, as Python does.</summary>
+    /// <summary>Converts to UTC; unlike <see cref="AsUtc"/>, a naive value is taken as the machine's local time.</summary>
     public PyDateTime AstimezoneUtc()
     {
         if (Offset is { } offset)
@@ -49,16 +49,16 @@ public readonly record struct PyDateTime(DateTime Clock, TimeSpan? Offset)
         return new PyDateTime(DateTime.SpecifyKind(utc, DateTimeKind.Unspecified), TimeSpan.Zero);
     }
 
-    /// <summary>How SQLAlchemy writes it to SQLite: the wall clock only, offset dropped.</summary>
+    /// <summary>The SQLite text form: the wall clock only, offset dropped.</summary>
     public string ToSqlite() => Clock.ToString(SqliteFormat, CultureInfo.InvariantCulture);
 
-    /// <summary><c>datetime.isoformat()</c>.</summary>
+    /// <summary>ISO 8601 with a <c>T</c> separator: microseconds only when non-zero, offset as <c>±HH:MM</c>.</summary>
     public string IsoFormat() => IsoFormat('T');
 
-    /// <summary><c>datetime.isoformat(sep)</c>.</summary>
+    /// <summary>ISO 8601 with the given date-time separator.</summary>
     public string IsoFormat(char separator) => ClockText(separator) + OffsetText(zeroAsZ: false);
 
-    /// <summary>Pydantic's JSON form: like <c>isoformat()</c> but a zero offset is written <c>Z</c>.</summary>
+    /// <summary>The API's JSON form: like <see cref="IsoFormat()"/> but a zero offset is written <c>Z</c>, as existing clients expect.</summary>
     public string PydanticJson() => ClockText('T') + OffsetText(zeroAsZ: true);
 
     private string ClockText(char separator)
@@ -99,7 +99,7 @@ public readonly record struct PyDateTime(DateTime Clock, TimeSpan? Offset)
     }
 
     /// <summary>
-    /// <c>datetime.fromisoformat</c> (Python 3.11) for the forms Weir meets: <c>YYYY-MM-DD</c> or
+    /// Parses the ISO 8601 forms Weir meets, including timestamps written by earlier releases: <c>YYYY-MM-DD</c> or
     /// <c>YYYYMMDD</c>, optionally a one-character separator and <c>HH[:MM[:SS[.fraction]]]</c>, and an
     /// optional <c>Z</c> or <c>±HH[:MM[:SS[.ffffff]]]</c> offset.
     /// </summary>

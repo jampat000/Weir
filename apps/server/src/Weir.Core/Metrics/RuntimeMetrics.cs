@@ -5,8 +5,7 @@ using Weir.Core.Json;
 namespace Weir.Core.Metrics;
 
 /// <summary>
-/// In-memory runtime metrics for the dashboard and the Prometheus scrape (port of
-/// <c>weir.platform.metrics.service.RuntimeMetricsStore</c>).
+/// In-memory runtime metrics for the dashboard and the Prometheus scrape.
 /// </summary>
 public sealed class RuntimeMetricsStore
 {
@@ -174,7 +173,7 @@ public sealed class RuntimeMetricsStore
                 .Set("average_response_ms", route.AverageResponseMs))));
     }
 
-    /// <summary>The Prometheus text exposition (<c>render_prometheus</c>).</summary>
+    /// <summary>The Prometheus text exposition.</summary>
     public string RenderPrometheus()
     {
         var summary = GetSummary();

@@ -6,7 +6,7 @@ using Weir.Core.Time;
 
 namespace Weir.Core.Activity;
 
-/// <summary>One persisted <c>activity_events</c> row (<c>weir.platform.activity.models.ActivityEvent</c>).</summary>
+/// <summary>One persisted <c>activity_events</c> row.</summary>
 public sealed record ActivityEventRow(
     long Id,
     PyDateTime CreatedAt,
@@ -21,8 +21,8 @@ public sealed record ActivityEventRow(
     string? RunKey);
 
 /// <summary>
-/// The history filters of <c>_filtered_activity_stmt</c>. Each is applied when it is present and non-empty,
-/// exactly as Python tests it (so a value of spaces is applied, stripped to nothing).
+/// The Activity history filters. Each is applied when it is present and non-empty before trimming, so a
+/// value of only spaces is still applied, as the empty string it trims to.
 /// </summary>
 public sealed record ActivityFilter(
     string? Module = null,
@@ -42,26 +42,26 @@ public sealed record ActivityFilter(
 /// <summary>What removing one file's history would delete, or did delete.</summary>
 public sealed record FileHistoryCounts(string RelativePath, long ActivityEvents, long ProcessingRecords);
 
-/// <summary>The response shapes and export formats of <c>weir.platform.activity.router</c> and <c>schemas</c>.</summary>
+/// <summary>The Activity API's response shapes and export formats.</summary>
 public static class ActivityHistory
 {
-    /// <summary><c>RECENT_DEFAULT_LIMIT</c>.</summary>
+    /// <summary>How many events the recent list returns when no limit is given.</summary>
     public const int RecentDefaultLimit = 50;
 
-    /// <summary><c>EXPORT_MAX_ROWS</c>.</summary>
+    /// <summary>The most rows one export returns.</summary>
     public const int ExportMaxRows = 50_000;
 
-    /// <summary><c>_SYSTEM_MODULES</c>: <c>module=system</c> means every module but these.</summary>
+    /// <summary><c>module=system</c> means every module but these.</summary>
     public static readonly IReadOnlyList<string> SystemModules = ["processing"];
 
-    /// <summary><c>_EXPORT_COLUMNS</c>.</summary>
+    /// <summary>The export columns, in order.</summary>
     public static readonly IReadOnlyList<string> ExportColumns =
         ["id", "created_at", "module", "event_type", "trigger", "result", "library_id", "relative_path", "title", "detail"];
 
-    /// <summary><c>json.dumps(records, ensure_ascii=False, indent=2)</c>.</summary>
+    /// <summary>JSON export: two-space indent, non-ASCII written as-is.</summary>
     public static readonly PyJsonFormat ExportJsonFormat = new(false, ",", ": ", 2, false);
 
-    /// <summary><c>ActivityEventItemOut</c>.</summary>
+    /// <summary>One event as the API returns it.</summary>
     public static PyDict ItemOut(ActivityEventRow row)
     {
         ArgumentNullException.ThrowIfNull(row);
@@ -80,8 +80,8 @@ public static class ActivityHistory
     }
 
     /// <summary>
-    /// <c>ActivityRecentOut</c> as <c>get_activity_recent</c> builds it: the total is never smaller than the
-    /// page, and <c>has_more</c> compares the unclamped count with the page.
+    /// The recent-events response: the total is never smaller than the page, and <c>has_more</c> compares
+    /// the unclamped count with the page.
     /// </summary>
     public static PyDict RecentOut(IReadOnlyList<ActivityEventRow> rows, long total, long systemEvents, long retentionDays, PyDateTime? oldestEventAt)
     {
@@ -95,7 +95,7 @@ public static class ActivityHistory
             .Set("oldest_event_at", oldestEventAt?.PydanticJson());
     }
 
-    /// <summary>One export record: <c>created_at</c> is <c>isoformat()</c>, every other column as stored.</summary>
+    /// <summary>One export record: <c>created_at</c> in ISO 8601, every other column as stored.</summary>
     public static PyDict ExportRecord(ActivityEventRow row)
     {
         ArgumentNullException.ThrowIfNull(row);
@@ -118,7 +118,7 @@ public static class ActivityHistory
         return PyJsonWriter.Dumps(new PyList(rows.Select(row => (PyJson)ExportRecord(row))), ExportJsonFormat);
     }
 
-    /// <summary><c>csv.DictWriter</c> with the <c>excel</c> dialect: a header, then one line per row, <c>\r\n</c> after each.</summary>
+    /// <summary>CSV export: a header, then one line per row, <c>\r\n</c> after each.</summary>
     public static string ExportCsv(IReadOnlyList<ActivityEventRow> rows)
     {
         ArgumentNullException.ThrowIfNull(rows);
@@ -145,11 +145,11 @@ public static class ActivityHistory
         return builder.ToString();
     }
 
-    /// <summary><c>weir-activity-{stamp}.{extension}</c> with the local time, as <c>datetime.now().strftime("%Y%m%d-%H%M%S")</c>.</summary>
+    /// <summary><c>weir-activity-{stamp}.{extension}</c>, the stamp being local time as <c>yyyyMMdd-HHmmss</c>.</summary>
     public static string ExportFileName(DateTimeOffset localNow, string extension) =>
         string.Create(CultureInfo.InvariantCulture, $"weir-activity-{localNow:yyyyMMdd-HHmmss}.{extension}");
 
-    /// <summary><c>ActivityFileHistoryCountOut</c>.</summary>
+    /// <summary>What removing one file's history would delete, with a sentence for the confirmation.</summary>
     public static PyDict FileHistoryCountOut(FileHistoryCounts counts)
     {
         ArgumentNullException.ThrowIfNull(counts);
@@ -165,7 +165,7 @@ public static class ActivityHistory
                 "It does not touch the file itself, its current status on the Files screen, or anything else's history.");
     }
 
-    /// <summary><c>ActivityFileHistoryRemoveOut</c>.</summary>
+    /// <summary>What removing one file's history deleted.</summary>
     public static PyDict FileHistoryRemoveOut(FileHistoryCounts deleted)
     {
         ArgumentNullException.ThrowIfNull(deleted);
@@ -182,8 +182,8 @@ public static class ActivityHistory
             $"event: activity.latest\ndata: {{\"latest_event_id\":{latestEventId},\"activity_revision\":{activityRevision}}}\n\n");
 
     /// <summary>
-    /// CPython's <c>_csv</c> writer with <c>QUOTE_MINIMAL</c>: a field is quoted when it holds the delimiter,
-    /// the quote character, <c>\r</c> or <c>\n</c>; quotes inside are doubled.
+    /// Minimal quoting: a field is quoted only when it holds the delimiter, the quote character, <c>\r</c>
+    /// or <c>\n</c>; quotes inside are doubled.
     /// </summary>
     private static void AppendCsvLine(StringBuilder builder, IReadOnlyList<string> fields)
     {

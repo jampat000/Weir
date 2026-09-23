@@ -3,12 +3,12 @@ using Weir.Core.Json;
 
 namespace Weir.Core.Observability;
 
-/// <summary>Shared diagnostics vocabulary (port of <c>weir.platform.observability.diagnostics</c>).</summary>
+/// <summary>Shared diagnostics vocabulary: secret redaction and result severities.</summary>
 public static partial class Diagnostics
 {
     public static readonly IReadOnlyList<string> SecretFieldFragments = ["api_key", "apikey", "authorization", "cookie", "password", "secret", "token"];
 
-    /// <summary><c>sanitize_diagnostic_value</c> for text values.</summary>
+    /// <summary>Redacts a text value: all of it when the key looks secret, otherwise any <c>key=value</c> secret assignment inside it.</summary>
     public static string SanitizeText(string key, string value)
     {
         ArgumentNullException.ThrowIfNull(key);
@@ -21,7 +21,7 @@ public static partial class Diagnostics
         return SecretAssignment().Replace(value, match => match.Groups[1].Value + "[redacted]");
     }
 
-    /// <summary><c>severity_for_result</c>.</summary>
+    /// <summary>The severity for a result: failed is an error, warning or retrying a warning, anything else info.</summary>
     public static string SeverityForResult(string result) => (result ?? string.Empty).ToLowerInvariant() switch
     {
         "failed" => "error",
@@ -33,7 +33,7 @@ public static partial class Diagnostics
     private static partial Regex SecretAssignment();
 }
 
-/// <summary>One diagnostics event in the shared vocabulary (port of <c>DiagnosticEvent</c>).</summary>
+/// <summary>One diagnostics event in the shared vocabulary.</summary>
 public sealed record DiagnosticEvent(
     string Module,
     string Action,
@@ -47,7 +47,7 @@ public sealed record DiagnosticEvent(
     string? NextAction = null,
     IReadOnlyList<KeyValuePair<string, long>>? Counts = null)
 {
-    /// <summary><c>as_safe_dict</c>: optional fields only when set, secret-looking values redacted.</summary>
+    /// <summary>The event as a payload: optional fields only when set, secret-looking values redacted.</summary>
     public PyDict AsSafeDict()
     {
         var payload = new PyDict()
@@ -83,7 +83,7 @@ public sealed record DiagnosticEvent(
     }
 }
 
-/// <summary>Plain-language operator labels (port of <c>weir.platform.observability.operator_messages</c>).</summary>
+/// <summary>Plain-language operator labels and the Activity detail envelope.</summary>
 public static class OperatorMessages
 {
     private static readonly Dictionary<string, string> ProviderLabels = new(StringComparer.Ordinal)
@@ -118,7 +118,7 @@ public static class OperatorMessages
         return ScopeLabels.TryGetValue(value.ToLowerInvariant(), out var label) ? label : value;
     }
 
-    /// <summary><c>count_summary</c>: numeric counts only (booleans and nulls dropped), never negative.</summary>
+    /// <summary>Numeric counts only (nulls dropped), never negative.</summary>
     public static PyDict CountSummary(IReadOnlyList<KeyValuePair<string, long?>> counts)
     {
         ArgumentNullException.ThrowIfNull(counts);
@@ -134,7 +134,7 @@ public static class OperatorMessages
         return summary;
     }
 
-    /// <summary><c>activity_detail_envelope</c>.</summary>
+    /// <summary>The structured detail an Activity event carries: who, what, result, severity, and the optional labels, counts and messages.</summary>
     public static PyDict ActivityDetailEnvelope(
         string module,
         string action,
@@ -186,7 +186,7 @@ public static class OperatorMessages
     }
 }
 
-/// <summary>The failure kinds operators see (port of <c>FailureKind</c>).</summary>
+/// <summary>The failure kinds operators see.</summary>
 public enum FailureKind
 {
     Auth,
@@ -199,28 +199,31 @@ public enum FailureKind
     Internal,
 }
 
-/// <summary>What happened to an exception, in the terms <c>classify_exception</c> uses.</summary>
-/// <param name="TypeName">Python's exception class name (<c>type(exc).__name__</c>).</param>
-/// <param name="Message"><c>str(exc)</c>.</param>
-/// <param name="Category">Which Python exception family it belongs to.</param>
+/// <summary>A failure as the classifier sees it: a stable type name, the message and its family.</summary>
+/// <param name="TypeName">
+/// The stable failure type name (for example <c>PermissionError</c>), written into <c>technical_detail</c> and
+/// searched by the classifier; the names stay fixed so stored details and classification stay consistent.
+/// </param>
+/// <param name="Message">The failure message.</param>
+/// <param name="Category">Which failure family it belongs to.</param>
 public sealed record FailureSubject(string TypeName, string Message, ExceptionCategory Category);
 
-/// <summary>The Python exception families <c>classify_exception</c> checks with <c>isinstance</c>.</summary>
+/// <summary>The failure families <see cref="FailureMessages.Classify"/> distinguishes.</summary>
 public enum ExceptionCategory
 {
     Other,
 
-    /// <summary>FileNotFoundError, FileExistsError, IsADirectoryError, NotADirectoryError, PermissionError.</summary>
+    /// <summary>A missing, clashing, wrong-kind or forbidden file or folder.</summary>
     Filesystem,
 
-    /// <summary>ConnectionError, TimeoutError, socket.timeout, or any other OSError.</summary>
+    /// <summary>A connection failure, a timeout, or any other I/O error.</summary>
     NetworkOrOs,
 
-    /// <summary>ValueError or TypeError.</summary>
+    /// <summary>An invalid value or type.</summary>
     Validation,
 }
 
-/// <summary>An operator-facing failure (port of <c>OperatorFailure</c>).</summary>
+/// <summary>An operator-facing failure: what failed, why, and what happens next.</summary>
 public sealed record OperatorFailure(
     string Module,
     string Action,
@@ -255,7 +258,7 @@ public sealed record OperatorFailure(
     }
 }
 
-/// <summary>Port of <c>weir.platform.observability.failure_messages</c>.</summary>
+/// <summary>Classifies failures and words them for operators.</summary>
 public static class FailureMessages
 {
     public static string KindText(FailureKind kind) => kind switch
@@ -270,7 +273,7 @@ public static class FailureMessages
         _ => "internal",
     };
 
-    /// <summary><c>classify_exception</c>.</summary>
+    /// <summary>The failure kind: keywords in <c>"{type}: {message}"</c> first, then the failure family.</summary>
     public static FailureKind Classify(FailureSubject exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
@@ -313,7 +316,6 @@ public static class FailureMessages
 
     public static string WhyForKind(FailureKind kind, string? provider)
     {
-        // Python: f" from {provider_label(provider)}" if provider else "".
         var where = string.IsNullOrEmpty(provider) ? string.Empty : $" from {OperatorMessages.ProviderLabel(provider)}";
         return kind switch
         {
@@ -330,10 +332,8 @@ public static class FailureMessages
 
     public static string? NextActionForKind(FailureKind kind, string? provider, bool recoverable)
     {
-        // #540 item 7: Python's fallback is provider_label(provider) or "the provider", combined
-        // into templates that already say "the {provider_s}" — so an unknown provider produced
-        // "Re-enter the the provider credentials..." (and the same "the the" in the network message).
-        // The fallback here is just "provider", so the templates' own "the " is the only one.
+        // The fallback is "provider", not "the provider": the templates already say "the ...", and an
+        // unknown provider must not read "the the provider" (#540).
         var providerText = OperatorMessages.ProviderLabel(provider) is { Length: > 0 } label ? label : "provider";
         return kind switch
         {
@@ -347,7 +347,7 @@ public static class FailureMessages
         };
     }
 
-    /// <summary><c>operator_failure_from_exception</c>.</summary>
+    /// <summary>Builds the operator-facing failure for an exception, with its technical detail redacted and capped at 1000 characters.</summary>
     public static OperatorFailure FromException(
         string module,
         string action,
@@ -374,14 +374,13 @@ public static class FailureMessages
             PyStrings.Slice(detail, 1000));
     }
 
-    /// <summary>A <c>RuntimeError(message)</c>, which Weir's own refusals raise in the Python code.</summary>
+    /// <summary>A <c>RuntimeError</c> subject: the type name Weir's own refusals are recorded under.</summary>
     public static FailureSubject RuntimeError(string message) => new("RuntimeError", message, ExceptionCategory.Other);
 
     /// <summary>
-    /// The Python exception a .NET exception stands for, as <c>classify_exception</c> sees it. The class
-    /// name matters as well as the family: the classifier searches <c>"{type}: {message}"</c>, so
-    /// <c>UnauthorizedAccessException</c> would read as an auth failure where Python's
-    /// <c>PermissionError</c> reads as a file problem.
+    /// Maps a .NET exception to its stable failure type name and family. The name matters as well as the
+    /// family: the classifier searches <c>"{type}: {message}"</c>, so <c>UnauthorizedAccessException</c>
+    /// would read as an auth failure where <c>PermissionError</c> reads as a file problem.
     /// </summary>
     public static FailureSubject FromDotNet(Exception exception)
     {
@@ -402,7 +401,7 @@ public static class FailureMessages
     }
 }
 
-/// <summary>Port of <c>weir.platform.observability.metrics_truth</c>.</summary>
+/// <summary>Guards for reported metric counts: never negative.</summary>
 public static class MetricsTruth
 {
     public static void RequireNonNegative(IReadOnlyDictionary<string, long> counts)

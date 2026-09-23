@@ -8,7 +8,7 @@ namespace Weir.Core.Updates;
 /// <summary>One asset of a GitHub release.</summary>
 public sealed record GitHubReleaseAsset(string Name, string ApiUrl, string BrowserDownloadUrl, long SizeBytes, string? ContentType);
 
-/// <summary>A GitHub release (port of <c>GitHubReleaseRecord</c>).</summary>
+/// <summary>A GitHub release.</summary>
 public sealed record GitHubReleaseRecord(
     string TagName,
     string Version,
@@ -30,7 +30,7 @@ public sealed record GitHubReleaseRecord(
         AssetNamed(ReleaseCatalog.WindowsInstallerAssetName) ?? AssetNamed(ReleaseCatalog.LegacyWindowsInstallerAssetName);
 }
 
-/// <summary>Where a GitHub request failed: an HTTP status (<c>HTTPStatusError</c>) or anything else.</summary>
+/// <summary>A failed GitHub release request; <see cref="ReleaseFetchException.StatusCode"/> is set when GitHub answered with an HTTP error.</summary>
 public sealed class ReleaseFetchException : Exception
 {
     public ReleaseFetchException()
@@ -56,7 +56,7 @@ public sealed class ReleaseFetchException : Exception
     public int? StatusCode { get; }
 }
 
-/// <summary>Port of <c>weir.platform.suite_settings.release_catalog</c>.</summary>
+/// <summary>Weir's GitHub releases: where they live, how versions compare, and reading the release API's payload.</summary>
 public static class ReleaseCatalog
 {
     public const string Owner = "jampat000";
@@ -88,7 +88,7 @@ public static class ReleaseCatalog
         return "v" + normalized;
     }
 
-    /// <summary><c>parse_version_key</c>: leading numeric parts, each piece's digits concatenated.</summary>
+    /// <summary>A comparable version key: leading numeric parts, each piece's digits concatenated.</summary>
     public static IReadOnlyList<BigInteger>? ParseVersionKey(string? raw)
     {
         var normalized = NormalizeReleaseVersion(raw);
@@ -112,7 +112,7 @@ public static class ReleaseCatalog
         return parts.Count > 0 ? parts : null;
     }
 
-    /// <summary>Python tuple ordering.</summary>
+    /// <summary>Part by part; when one key is a prefix of the other, the shorter sorts first.</summary>
     public static int CompareVersionKeys(IReadOnlyList<BigInteger> left, IReadOnlyList<BigInteger> right)
     {
         ArgumentNullException.ThrowIfNull(left);
@@ -129,7 +129,7 @@ public static class ReleaseCatalog
         return left.Count.CompareTo(right.Count);
     }
 
-    /// <summary><c>_coerce_release_payload</c>. Throws <see cref="PyValueErrorException"/> for an unusable payload.</summary>
+    /// <summary>Reads the release API's JSON into a <see cref="GitHubReleaseRecord"/>. Throws <see cref="PyValueErrorException"/> for an unusable payload.</summary>
     public static GitHubReleaseRecord CoerceReleasePayload(PyJson payload)
     {
         if (payload is not PyDict dict)
@@ -181,7 +181,7 @@ public static class ReleaseCatalog
     private static string OrText(PyJson? value) => value is null || !value.IsTruthy ? string.Empty : PyConvert.Str(value);
 }
 
-/// <summary>Port of <c>weir.platform.suite_settings.update_service</c>'s pure parts.</summary>
+/// <summary>The update status and update-settings payloads, and the tray's settings and state files.</summary>
 public static class UpdateStatus
 {
     public const string DockerImage = "ghcr.io/jampat000/weir";
@@ -200,7 +200,7 @@ public static class UpdateStatus
             .Set("in_app_upgrade_supported", installType == "windows")
             .Set("in_app_upgrade_summary", (string?)null);
 
-    /// <summary><c>_build_release_status</c> once a release was fetched.</summary>
+    /// <summary>The update status once a release was fetched.</summary>
     public static PyDict FromRelease(string currentVersion, string installType, GitHubReleaseRecord release)
     {
         ArgumentNullException.ThrowIfNull(release);
@@ -250,9 +250,9 @@ public static class UpdateStatus
     public static readonly PyDict UnreadableUpdateSettings = UpdateSettingsOut("NotifyOnly", true, 60);
 
     /// <summary>
-    /// <c>get_update_settings</c> for the file's text; <see langword="null"/> when it cannot be read and the
-    /// notify-only fallback applies. Throws <see cref="PyTypeErrorException"/> where Python raises outside its
-    /// handled exceptions (a JSON value that is not an object).
+    /// Reads <c>update-settings.json</c>'s text; <see langword="null"/> when it cannot be read and the
+    /// notify-only fallback applies. Throws <see cref="PyTypeErrorException"/> for valid JSON that is not an
+    /// object.
     /// </summary>
     public static PyDict? ParseUpdateSettings(string text)
     {
@@ -291,13 +291,13 @@ public static class UpdateStatus
         return interval < 1 || interval > 10080 ? null : UpdateSettingsOut(mode, checkOnStartup, (long)interval);
     }
 
-    /// <summary>The <c>update-settings.json</c> the tray reads: <c>json.dumps(payload, indent=2)</c>.</summary>
+    /// <summary>The <c>update-settings.json</c> the tray reads, as JSON indented by two spaces.</summary>
     public static string SerializeUpdateSettings(string mode, bool checkOnStartup, long checkIntervalMinutes) =>
         PyJsonWriter.Dumps(
             new PyDict().Set("mode", mode).Set("checkOnStartup", checkOnStartup).Set("checkIntervalMinutes", checkIntervalMinutes),
             PyJsonFormat.Indented);
 
-    /// <summary><c>get_update_state</c> for the file's text.</summary>
+    /// <summary>Reads the tray's update state file: whether an update is downloaded and its version, with a not-downloaded fallback.</summary>
     public static PyDict ParseUpdateState(string? text)
     {
         var fallback = new PyDict().Set("downloaded", false).Set("pending_version", (string?)null);

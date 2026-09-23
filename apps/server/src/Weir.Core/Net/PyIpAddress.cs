@@ -5,7 +5,10 @@ using System.Numerics;
 
 namespace Weir.Core.Net;
 
-/// <summary>An address as Python's <c>ipaddress</c> module parses and classifies it.</summary>
+/// <summary>
+/// An IPv4 or IPv6 address with strict parsing and private/reserved classification from the IANA
+/// special-purpose ranges, so configured proxy lists and address checks keep matching the same addresses.
+/// </summary>
 public sealed record PyIpAddress(bool IsV6, BigInteger Value)
 {
     private static readonly PyIpNetwork[] V4Private =
@@ -37,7 +40,7 @@ public sealed record PyIpAddress(bool IsV6, BigInteger Value)
 
     public int Bits => IsV6 ? 128 : 32;
 
-    /// <summary><c>ipaddress.ip_address(text)</c>: strict dotted-quad IPv4, or IPv6 (an optional <c>%scope</c> is kept out of the value).</summary>
+    /// <summary>Parses strict dotted-quad IPv4, or IPv6 (an optional <c>%scope</c> is kept out of the value).</summary>
     public static bool TryParse(string? text, out PyIpAddress address)
     {
         address = new PyIpAddress(false, BigInteger.Zero);
@@ -136,7 +139,7 @@ public sealed record PyIpAddress(bool IsV6, BigInteger Value)
     }
 }
 
-/// <summary><c>ipaddress.ip_network(text, strict=...)</c>.</summary>
+/// <summary>An IPv4 or IPv6 network in CIDR form.</summary>
 public sealed record PyIpNetwork(bool IsV6, BigInteger NetworkAddress, int PrefixLength)
 {
     public static PyIpNetwork ParseV4(string address, int prefix) =>

@@ -3,7 +3,7 @@ using Weir.Core.Time;
 
 namespace Weir.Core.Logs;
 
-/// <summary>One parsed line of <c>weir.log</c> (port of <c>ParsedLogEntry</c>).</summary>
+/// <summary>One parsed line of <c>weir.log</c>.</summary>
 public sealed record ParsedLogEntry(
     string Timestamp,
     string Level,
@@ -19,7 +19,7 @@ public sealed record ParsedLogEntry(
 /// <summary>The result of reading the log for the Logs screen.</summary>
 public sealed record SuiteLogsResult(IReadOnlyList<ParsedLogEntry> Items, long Total, long Errors, long Warnings, long Information);
 
-/// <summary>Port of <c>weir.platform.suite_settings.logs_service</c> reading and filtering.</summary>
+/// <summary>Filters parsed log lines for the Logs screen and counts them by level.</summary>
 public sealed class SuiteLogFilter
 {
     private readonly string? _level;
@@ -104,7 +104,7 @@ public sealed class SuiteLogFilter
 
     public SuiteLogsResult Result() => new([.. _rows.Reverse()], _total, _errors, _warnings, _information);
 
-    /// <summary><c>_parse_log_line</c>.</summary>
+    /// <summary>One JSON log line, or <see langword="null"/> when it does not parse or has no timestamp or message.</summary>
     public static ParsedLogEntry? Parse(string raw)
     {
         PyJson payload;
@@ -155,7 +155,7 @@ public sealed class SuiteLogFilter
             CleanOptional(dict.Get("job_id")));
     }
 
-    /// <summary>The <c>SuiteLogEntryOut</c> JSON, or <see langword="null"/> when the timestamp does not parse.</summary>
+    /// <summary>The entry as the Logs API returns it, or <see langword="null"/> when the timestamp does not parse.</summary>
     public static PyDict? ToOut(ParsedLogEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);

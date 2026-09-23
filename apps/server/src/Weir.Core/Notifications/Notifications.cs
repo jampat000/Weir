@@ -17,14 +17,14 @@ public sealed record NotificationChannelRecord(
     PyDateTime CreatedAt,
     PyDateTime UpdatedAt);
 
-/// <summary>Port of <c>weir.platform.notifications.model</c>, <c>ops</c> validation and <c>dispatch</c> payloads.</summary>
+/// <summary>Notification channels: supported events and providers, validation, API shapes and delivery payloads.</summary>
 public static class NotificationRules
 {
     public static readonly IReadOnlyList<string> SupportedEvents = ["job_completed", "job_failed", "processing_job_completed", "processing_job_failed"];
 
     public static readonly IReadOnlyList<string> SupportedProviders = ["webhook", "discord"];
 
-    /// <summary><c>_parse_events</c>: the string items of the stored JSON list; anything unreadable is empty.</summary>
+    /// <summary>The events in the stored JSON: a list's string items (an object's keys, a string's characters); anything unreadable is empty.</summary>
     public static List<string> ParseEvents(string eventsJson)
     {
         try
@@ -43,11 +43,11 @@ public static class NotificationRules
         }
     }
 
-    /// <summary><c>json.dumps(events)</c>.</summary>
+    /// <summary>The events as the stored JSON list.</summary>
     public static string SerializeEvents(IEnumerable<string> events) =>
         PyJsonWriter.Dumps(new PyList(events.Select(e => (PyJson)new PyStr(e))), PyJsonFormat.Default);
 
-    /// <summary><c>_validate_channel_input</c>. Throws <see cref="PyValueErrorException"/> with the operator message.</summary>
+    /// <summary>Validates a channel's label, provider, URL and events. Throws <see cref="PyValueErrorException"/> with the operator message.</summary>
     public static void Validate(string label, string provider, string url, IReadOnlyList<string> events)
     {
         ArgumentNullException.ThrowIfNull(events);
@@ -93,7 +93,7 @@ public static class NotificationRules
         .Set("supported_events", new PyList(SupportedEvents.Select(e => (PyJson)new PyStr(e))))
         .Set("supported_providers", new PyList(SupportedProviders.Select(p => (PyJson)new PyStr(p))));
 
-    /// <summary><c>_build_webhook_payload</c>.</summary>
+    /// <summary>The JSON body posted to a generic webhook.</summary>
     public static byte[] WebhookPayload(string jobEvent, string module, long jobId, string jobKind, string title, string detail, PyDateTime now) =>
         PyJsonWriter.DumpsUtf8(
             new PyDict()
@@ -107,7 +107,7 @@ public static class NotificationRules
                 .Set("app", "Weir"),
             PyJsonFormat.Default);
 
-    /// <summary><c>_build_discord_payload</c>.</summary>
+    /// <summary>The JSON body posted to a Discord webhook: one embed, green for completed, red otherwise.</summary>
     public static byte[] DiscordPayload(string title, string detail, string jobEvent, string module, long jobId, PyDateTime now)
     {
         var color = jobEvent.Contains("completed", StringComparison.Ordinal) ? 0x2ECC71 : 0xE74C3C;
@@ -127,8 +127,8 @@ public static class NotificationRules
 
     /// <summary>
     /// Display names for module keys whose plain capitalization would not read as a person expects. The
-    /// "processing" module key is unchanged (it feeds the stored <c>{module}_job_{eventKind}</c> event name),
-    /// but the app that runs it is just called Weir now.
+    /// "processing" module key stays as it is (it feeds the stored <c>{module}_job_{eventKind}</c> event name),
+    /// but operators know the app that runs it as Weir.
     /// </summary>
     private static readonly Dictionary<string, string> ModuleDisplayNames = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -136,15 +136,13 @@ public static class NotificationRules
     };
 
     /// <summary>
-    /// The title and detail <c>dispatch_job_notification</c> sends. <paramref name="willRetry"/> is
+    /// The event name, title and detail of a job notification. <paramref name="willRetry"/> is
     /// meaningless for <c>completed</c> and defaults to <see langword="false"/> for every other caller.
     /// </summary>
     /// <remarks>
-    /// #540 item 6: Python always says "exhausted all retry attempts" for a failed event, even for the
-    /// attempt that is about to retry (the permanently-failed check in <c>DispatchJobNotification</c>
-    /// keeps that wrong wording from actually reaching a channel today, but the text itself was still
-    /// wrong on its own terms). This reuses the retry-aware vocabulary <c>WorkerFailures</c> already has
-    /// from #488, so the wording is correct independently of that guard.
+    /// A failure that will be retried says so, with the retry wording <see cref="WorkerFailures"/> uses (#488),
+    /// instead of claiming retries are exhausted (#540), so the text is right even without the
+    /// permanently-failed check the dispatcher applies.
     /// </remarks>
     public static (string Event, string Title, string Detail) JobNotification(string module, string eventKind, long jobId, string jobKind, bool willRetry = false)
     {
@@ -164,10 +162,10 @@ public static class NotificationRules
     }
 }
 
-/// <summary>The parts of <c>urllib.parse.urlsplit</c> Weir reads.</summary>
+/// <summary>A URL split into scheme, network location, path, query and fragment, with the host parts Weir reads.</summary>
 public sealed record SplitUrl(string Scheme, string Netloc, string Path, string Query, string Fragment)
 {
-    /// <summary><c>.hostname</c>: lower-cased, brackets removed, <see langword="null"/> when empty.</summary>
+    /// <summary>The host: lower-cased, brackets removed, <see langword="null"/> when empty.</summary>
     public string? Hostname
     {
         get
@@ -224,7 +222,7 @@ public sealed record SplitUrl(string Scheme, string Netloc, string Path, string 
         }
     }
 
-    /// <summary><c>.port</c>. Throws <see cref="PyValueErrorException"/> for a port that is not a number in range.</summary>
+    /// <summary>The explicit port, or <see langword="null"/>. Throws <see cref="PyValueErrorException"/> for a port that is not a number in range.</summary>
     public int? Port
     {
         get
@@ -261,7 +259,10 @@ public sealed record SplitUrl(string Scheme, string Netloc, string Path, string 
         }
     }
 
-    /// <summary>Python 3.11 <c>urlsplit</c>.</summary>
+    /// <summary>
+    /// Splits a URL: leading control characters and spaces are dropped, tabs and line breaks removed, and
+    /// malformed IPv6 brackets rejected with <see cref="PyValueErrorException"/>.
+    /// </summary>
     public static SplitUrl Parse(string raw)
     {
         ArgumentNullException.ThrowIfNull(raw);
@@ -331,10 +332,10 @@ public sealed record SplitUrl(string Scheme, string Netloc, string Path, string 
     }
 }
 
-/// <summary>Port of the URL policy in <c>weir.platform.outbound_http</c>.</summary>
+/// <summary>Which URLs Weir may call out to, and the operator messages for the ones it refuses.</summary>
 public static class ExternalUrlPolicy
 {
-    /// <summary><c>validate_external_provider_url</c>: refuses localhost and private addresses written literally.</summary>
+    /// <summary>Refuses non-HTTP schemes, localhost, and private addresses written literally.</summary>
     public static string ValidateExternalProviderUrl(string raw)
     {
         ArgumentNullException.ThrowIfNull(raw);
@@ -368,7 +369,7 @@ public static class ExternalUrlPolicy
         return raw;
     }
 
-    /// <summary><c>normalize_local_service_base_url</c>.</summary>
+    /// <summary>A local service's base URL without trailing slashes; refuses credentials, query strings and fragments.</summary>
     public static string NormalizeLocalServiceBaseUrl(string raw)
     {
         ArgumentNullException.ThrowIfNull(raw);

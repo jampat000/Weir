@@ -1,15 +1,15 @@
 using System.Security.Cryptography;
 using System.Text;
 
-// itsdangerous signs with HMAC-SHA1 and derives its key with SHA1; tokens must verify on both servers.
+// The token format signs with HMAC-SHA1 and derives its key with SHA1; it stays fixed so tokens already issued keep verifying.
 #pragma warning disable CA5350
 
 namespace Weir.Core.Security;
 
 /// <summary>
-/// itsdangerous 2.x <c>TimestampSigner</c> with its defaults: HMAC-SHA1, <c>django-concat</c> key
-/// derivation (<c>SHA1(salt + "signer" + secret)</c>), <c>.</c> separator, URL-safe base64 without
-/// padding for the timestamp and the signature.
+/// Timestamped signatures: <c>value.timestamp.signature</c> with HMAC-SHA1, the key derived as
+/// <c>SHA1(salt + "signer" + secret)</c>, and URL-safe base64 without padding for the timestamp and the
+/// signature. The format stays fixed so CSRF tokens already issued keep verifying.
 /// </summary>
 public sealed class TimestampSigner
 {
@@ -34,7 +34,7 @@ public sealed class TimestampSigner
     }
 
     /// <summary>
-    /// <c>unsign(token, max_age)</c>: the payload when the signature matches and the token is no older
+    /// The payload when the signature matches and the token is no older
     /// than <paramref name="maxAgeSeconds"/> (and not from the future); otherwise <see langword="null"/>.
     /// </summary>
     public byte[]? Unsign(string token, long maxAgeSeconds)
@@ -104,8 +104,8 @@ public sealed class TimestampSigner
         Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
     /// <summary>
-    /// itsdangerous <c>base64_decode</c>: non-ASCII dropped, padding added, then Python's non-strict
-    /// <c>urlsafe_b64decode</c>, which skips characters outside the alphabet.
+    /// Lenient URL-safe base64 decode: non-ASCII and any other characters outside the alphabet are
+    /// skipped and padding is added; <see langword="null"/> when what remains is not valid base64.
     /// </summary>
     internal static byte[]? UrlSafeB64Decode(ReadOnlySpan<byte> raw)
     {
@@ -141,7 +141,7 @@ public sealed class TimestampSigner
     }
 }
 
-/// <summary>Port of <c>weir.platform.auth.csrf</c> token issue and verification.</summary>
+/// <summary>CSRF token issue and verification, bound to the session when there is one.</summary>
 public static class CsrfTokens
 {
     public const string SignerSalt = "weir-csrf-v1";
@@ -201,10 +201,10 @@ public static class CsrfTokens
     private static string SessionSubject(string rawSessionToken) => SubjectSession + ":" + SessionTokens.Hash(rawSessionToken.Trim());
 }
 
-/// <summary>Opaque session tokens (port of <c>weir.platform.auth.sessions</c>).</summary>
+/// <summary>Opaque session tokens.</summary>
 public static class SessionTokens
 {
-    /// <summary><c>secrets.token_urlsafe(32)</c>.</summary>
+    /// <summary>32 random bytes as URL-safe base64 without padding.</summary>
     public static string Generate() => TimestampSigner.UrlSafeB64Encode(RandomNumberGenerator.GetBytes(32));
 
     /// <summary>The SHA-256 hex digest stored in <c>user_sessions.token_hash</c>.</summary>

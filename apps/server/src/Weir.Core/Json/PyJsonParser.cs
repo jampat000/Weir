@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Weir.Core.Json;
 
-/// <summary><c>json.JSONDecodeError</c>: the C scanner's message and the character position.</summary>
+/// <summary>JSON that does not parse: the error detail and the character position it was found at.</summary>
 public sealed class PyJsonDecodeException : Exception
 {
     public PyJsonDecodeException()
@@ -37,7 +37,7 @@ public sealed class PyJsonDecodeException : Exception
     public int Position { get; }
 }
 
-/// <summary>Bytes that are not text in the detected encoding (Python raises <c>UnicodeDecodeError</c>).</summary>
+/// <summary>Bytes that are not valid text in the detected encoding.</summary>
 public sealed class PyJsonEncodingException : Exception
 {
     public PyJsonEncodingException()
@@ -56,14 +56,18 @@ public sealed class PyJsonEncodingException : Exception
 }
 
 /// <summary>
-/// <c>json.loads</c> with CPython 3.11's C scanner behaviour: the same accepted input (including
-/// <c>NaN</c> and <c>Infinity</c>), the same error messages and positions.
+/// A JSON parser with fixed acceptance rules (including <c>NaN</c> and <c>Infinity</c>), error messages and
+/// positions, so request bodies and data written by earlier releases parse the same way and clients and the
+/// contract suite see the same validation errors.
 /// </summary>
 public static class PyJsonParser
 {
     private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
-    /// <summary><c>json.loads(bytes)</c>: detect the encoding the way <c>json.detect_encoding</c> does, then parse.</summary>
+    /// <summary>
+    /// Parses bytes: the encoding (UTF-8, UTF-16 or UTF-32, with or without a byte-order mark) is detected
+    /// from the BOM or the pattern of zero bytes at the start, then the text is parsed.
+    /// </summary>
     public static PyJson ParseBytes(ReadOnlySpan<byte> bytes) => Parse(DecodeBytes(bytes));
 
     public static string DecodeBytes(ReadOnlySpan<byte> b)
@@ -126,7 +130,7 @@ public static class PyJsonParser
         }
     }
 
-    /// <summary><c>json.loads(str)</c>.</summary>
+    /// <summary>Parses one JSON value; surrounding whitespace is allowed, a leading BOM or trailing data is not.</summary>
     public static PyJson Parse(string s)
     {
         ArgumentNullException.ThrowIfNull(s);
@@ -162,7 +166,7 @@ public static class PyJsonParser
         return value ?? throw new PyJsonDecodeException("Expecting value", idx);
     }
 
-    /// <summary>Returns <see langword="null"/> where the C scanner raises <c>StopIteration(idx)</c>.</summary>
+    /// <summary>Returns <see langword="null"/> when no value starts at <paramref name="idx"/>, so the caller chooses the error.</summary>
     private static PyJson? ScanOnce(string s, int idx, out int end)
     {
         end = idx;
@@ -339,7 +343,9 @@ public static class PyJsonParser
         }
     }
 
-    /// <summary><c>scanstring_unicode</c> with <c>strict=True</c>; <paramref name="start"/> is just after the opening quote.</summary>
+    /// <summary>
+    /// Scans a string body, refusing raw control characters; <paramref name="start"/> is just after the opening quote.
+    /// </summary>
     private static string ScanString(string s, int start, out int end)
     {
         var begin = start - 1;

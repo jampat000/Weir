@@ -4,15 +4,15 @@ using System.Numerics;
 namespace Weir.Core.Configuration;
 
 /// <summary>
-/// The few Python standard-library behaviours that <c>weir.core.config</c> leans on, reproduced
-/// so the same environment produces the same settings: <c>int()</c> parsing,
-/// <c>urllib.parse.urlparse</c> host/port splitting and <c>pathlib</c> path resolution.
+/// The parsing rules the configuration loader applies to environment and config values: integer
+/// parsing, URL host/port splitting and path expansion/normalization. They are fixed so values that
+/// existing installs already set keep producing the same settings.
 /// </summary>
 internal static class PythonCompat
 {
     /// <summary>
-    /// <c>int(raw)</c> for an already-stripped string: optional sign, ASCII digits, single
-    /// underscores between digits. Values beyond <see cref="long"/> saturate.
+    /// Parses an already-trimmed integer: optional sign, ASCII digits, single underscores between
+    /// digits (so 1_000 reads as 1000). Values beyond <see cref="long"/> saturate.
     /// </summary>
     public static bool TryParseInt(string raw, out long value)
     {
@@ -64,12 +64,12 @@ internal static class PythonCompat
         return true;
     }
 
-    /// <summary>The parts of <c>urlparse(raw)</c> that the loopback-origin expansion reads.</summary>
+    /// <summary>The parts of a URL that the loopback-origin expansion reads.</summary>
     public sealed record ParsedUrl(string Scheme, string? Hostname, int? Port);
 
     /// <summary>
-    /// <c>urlparse(raw)</c> reduced to scheme, lower-cased hostname and port. Like Python, reading
-    /// an invalid port raises, which fails startup.
+    /// Splits a URL into scheme, lower-cased hostname and port. A non-numeric or out-of-range port
+    /// throws, which fails startup rather than silently dropping a configured origin.
     /// </summary>
     public static ParsedUrl ParseUrl(string raw)
     {
@@ -133,7 +133,7 @@ internal static class PythonCompat
         char.IsAsciiLetter(candidate[0]) &&
         candidate.All(c => char.IsAsciiLetterOrDigit(c) || c is '+' or '-' or '.');
 
-    /// <summary><c>Path(raw).expanduser()</c> for the <c>~</c> and <c>~/…</c> forms.</summary>
+    /// <summary>Expands the <c>~</c> and <c>~/…</c> forms to the user's home directory.</summary>
     public static string ExpandUser(string path, RuntimeEnvironment runtime)
     {
         if (path == "~")
@@ -150,13 +150,13 @@ internal static class PythonCompat
         return path;
     }
 
-    /// <summary><c>path.resolve()</c>: absolute against the working directory, normalized, no trailing separator.</summary>
+    /// <summary>Makes a path absolute against the working directory, normalized, with no trailing separator.</summary>
     public static string Resolve(string path, RuntimeEnvironment runtime) =>
         Path.TrimEndingDirectorySeparator(Path.GetFullPath(path, runtime.CurrentDirectory));
 
     /// <summary>
-    /// <c>str(Path(raw))</c>: <c>pathlib</c>'s lexical normalization without resolving
-    /// (separators unified, duplicate separators and <c>.</c> segments dropped, no trailing separator).
+    /// Lexical normalization without touching the file system: separators unified, duplicate
+    /// separators and <c>.</c> segments dropped, no trailing separator; an empty path becomes <c>.</c>.
     /// </summary>
     public static string NormalizeLexically(string path, RuntimeEnvironment runtime)
     {

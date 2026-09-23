@@ -3,13 +3,12 @@ using Weir.Core.Json;
 namespace Weir.Core.Jobs;
 
 /// <summary>
-/// Which <c>job_kind</c> strings may sit in <c>jobs</c> and be run by its workers
-/// (port of <c>weir.processing.job_kind_guard</c>).
+/// Which <c>job_kind</c> strings may sit in <c>jobs</c> and be run by its workers.
 /// </summary>
 /// <remarks>
 /// Every durable job is a <c>processing.*</c> kind. Retired prefixes are listed by name so a queue row
-/// left by an older install is refused instead of being claimed by a worker that no longer knows
-/// what it is. Matching is ordinal and case-sensitive, like Python's <c>str.startswith</c>.
+/// left by an older install is refused instead of being claimed by a worker that does not know
+/// what it is. Matching is ordinal and case-sensitive.
 /// </remarks>
 public static class JobKindGuard
 {
@@ -39,7 +38,7 @@ public static class JobKindGuard
         RetiredCandidateGatePrefix,
     ];
 
-    /// <summary><c>job_kind_is_retired</c>: the kind belongs to a retired family and must never run.</summary>
+    /// <summary>The kind belongs to a retired family and must never run.</summary>
     public static bool IsRetired(string jobKind)
     {
         ArgumentNullException.ThrowIfNull(jobKind);
@@ -54,11 +53,11 @@ public static class JobKindGuard
 
     /// <summary>
     /// A kind no worker may run: retired, or missing the <c>processing.</c> prefix. Workers claim these
-    /// only to refuse them, exactly as the Python worker does.
+    /// only to refuse them, so the row is failed with a reason rather than left in the queue.
     /// </summary>
     public static bool IsRefused(string jobKind) => IsRetired(jobKind) || !HasProcessingPrefix(jobKind);
 
-    /// <summary><c>validate_processing_enqueue_job_kind</c>: queue rows must be live <c>processing.*</c> kinds.</summary>
+    /// <summary>Checks an enqueue: queue rows must be live <c>processing.*</c> kinds.</summary>
     /// <exception cref="ArgumentException">The kind is retired or not a <c>processing.*</c> kind.</exception>
     public static void ValidateEnqueueJobKind(string jobKind)
     {
@@ -76,7 +75,7 @@ public static class JobKindGuard
         }
     }
 
-    /// <summary><c>validate_processing_worker_handler_registry</c>: handlers only for live <c>processing.*</c> kinds.</summary>
+    /// <summary>Checks the worker's handler registry: handlers only for live <c>processing.*</c> kinds.</summary>
     /// <exception cref="ArgumentException">A key is retired or not a <c>processing.*</c> kind.</exception>
     public static void ValidateHandlerRegistry(IEnumerable<string> jobKinds)
     {

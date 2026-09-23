@@ -13,13 +13,12 @@ public sealed record RemovedTrackFileKey(long? LibraryId, string RelativePath)
 }
 
 /// <summary>
-/// Where the removed tracks a Processing pass recorded for a file are kept (#509, step 1 — "store removed
-/// tracks per file"). This was built while ADR-0017 froze the SQLite schema, so it is not a new table
-/// (the freeze ended with #523; the records can move to a proper table in a later migration): an implementation either keeps the
-/// records in memory (fine until the process restarts — see <c>InMemoryRemovedTrackStore</c>) or reads them
-/// back out of a JSON-capable column a pass already writes into, such as <c>file_logs.detail_json</c>
-/// (see <c>Weir.Infrastructure.Library.FileLogRemovedTrackStore</c>'s remarks for why that one was chosen
-/// and what is still missing before it is real).
+/// Where the removed tracks a Processing pass recorded for a file are kept (#509). There is no table of
+/// its own (the records can move to one in a later migration): an implementation either keeps the records
+/// in memory (lost when the process restarts — see <c>InMemoryRemovedTrackStore</c>) or reads them back out
+/// of a JSON column a pass already writes into, such as <c>file_logs.detail_json</c> (see
+/// <c>Weir.Infrastructure.Library.FileLogRemovedTrackStore</c>'s remarks for why that one was chosen and
+/// what it lacks).
 /// </summary>
 public interface IRemovedTrackStore
 {
