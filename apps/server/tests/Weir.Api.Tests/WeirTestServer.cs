@@ -93,6 +93,11 @@ internal sealed class WeirTestServer : IAsyncDisposable
                 File.Delete(dbPath + "-wal");
                 File.Delete(dbPath + "-shm");
                 Directory.CreateDirectory(dbPath);
+                // Clear the pool again: on Linux a deleted database stays open for anyone already holding it, and a
+                // background timer (the manager heartbeat, library mode's schedule) can open a connection between the
+                // first clear and the delete. Pooled, that handle let the next request read the deleted file and
+                // answer 200 instead of 503 (main's CI for v3.2.1).
+                database.ClearPool();
                 return;
             }
             catch (IOException) when (attempt < 50)
