@@ -504,7 +504,9 @@ if (-not $velopackCliVersion) {
   throw "Velopack package version was not found in $trayPackagesPath."
 }
 
-$vpkListLine = @(Invoke-Native -FilePath dotnet -ArgumentList @("tool", "list", "-g", "vpk")) |
+# Every global tool, then filtered here: `dotnet tool list -g vpk` exits 1 when vpk is not installed yet, which is
+# exactly the case this has to handle.
+$vpkListLine = @(Invoke-Native -FilePath dotnet -ArgumentList @("tool", "list", "-g")) |
   Where-Object { $_ -match "^\s*vpk\s+" } |
   Select-Object -First 1
 $installedVpkVersion = if ($vpkListLine) { ($vpkListLine.Trim() -split "\s+")[1] } else { $null }
