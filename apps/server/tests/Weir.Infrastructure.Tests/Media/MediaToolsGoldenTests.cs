@@ -13,16 +13,16 @@ using Weir.Infrastructure.Processes;
 namespace Weir.Infrastructure.Tests.Media;
 
 /// <summary>
-/// <see cref="MediaTools"/> end to end against the Python reference, with processes and file state replaced by
-/// what <c>scripts/generate-ffmpeg-golden.py</c> fed the Python functions: the same log lines at the same levels,
-/// the same exception types and messages, the same progress reports and the same detection reports.
+/// <see cref="MediaTools"/> end to end against the golden files, with processes and file state replaced by the
+/// recorded inputs: the same log lines at the same levels, the same exception types and messages, the same
+/// progress reports and the same detection reports as the recorded output.
 /// </summary>
 public sealed class MediaToolsGoldenTests
 {
     private static readonly string GoldenDirectory = Path.Combine(AppContext.BaseDirectory, "Media", "golden");
 
     [Fact]
-    public async Task Ffprobe_runs_log_and_fail_exactly_as_the_python_layer_does()
+    public async Task Ffprobe_runs_log_and_fail_exactly_as_the_golden_files_record()
     {
         using var document = Load("ffprobe.json");
         var cases = document.RootElement.EnumerateArray().ToList();
@@ -89,7 +89,7 @@ public sealed class MediaToolsGoldenTests
     }
 
     [Fact]
-    public async Task Quiet_ffmpeg_runs_fail_as_the_python_layer_does()
+    public async Task Quiet_ffmpeg_runs_fail_as_the_golden_files_record()
     {
         using var document = Load("ffmpeg-run.json");
         foreach (var item in document.RootElement.GetProperty("quiet").EnumerateArray())
@@ -118,7 +118,7 @@ public sealed class MediaToolsGoldenTests
     }
 
     [Fact]
-    public async Task Progress_runs_report_and_stop_as_the_python_layer_does()
+    public async Task Progress_runs_report_and_stop_as_the_golden_files_record()
     {
         using var document = Load("ffmpeg-run.json");
         var cases = document.RootElement.GetProperty("progress").EnumerateArray().ToList();
@@ -175,7 +175,7 @@ public sealed class MediaToolsGoldenTests
     }
 
     [Fact]
-    public async Task Hardware_detection_matches_the_python_layer_including_failures()
+    public async Task Hardware_detection_matches_the_golden_files_including_failures()
     {
         using var document = Load("hardware.json");
         foreach (var item in document.RootElement.GetProperty("detection").EnumerateArray())
@@ -205,7 +205,7 @@ public sealed class MediaToolsGoldenTests
     }
 
     [Fact]
-    public async Task Integrity_checks_fail_as_the_python_layer_does()
+    public async Task Integrity_checks_fail_as_the_golden_files_record()
     {
         using var document = Load("validation.json");
         foreach (var item in document.RootElement.GetProperty("integrity").EnumerateArray())
@@ -227,7 +227,7 @@ public sealed class MediaToolsGoldenTests
     }
 
     [Fact]
-    public async Task Remux_output_validation_through_ffprobe_matches_the_python_layer()
+    public async Task Remux_output_validation_through_ffprobe_matches_the_golden_files()
     {
         using var document = Load("validation.json");
         foreach (var item in document.RootElement.GetProperty("remux_output").EnumerateArray())
@@ -301,7 +301,7 @@ public sealed class MediaToolsGoldenTests
 
     private static List<string> Strings(JsonElement array) => array.EnumerateArray().Select(e => e.GetString()!).ToList();
 
-    /// <summary>Equal as Python sees parsed JSON: same keys in the same order, numbers by value.</summary>
+    /// <summary>Equal as parsed JSON: same keys in the same order, numbers by value.</summary>
     private static bool JsonEquivalent(JsonElement expected, JsonElement actual)
     {
         if (expected.ValueKind != actual.ValueKind)
@@ -337,20 +337,19 @@ public sealed class MediaToolsGoldenTests
 
 /// <summary>
 /// Deliberate divergences from the golden fixtures in <c>tests/Weir.Core.Tests/Media/golden</c> (shared with
-/// <c>Weir.Core.Tests</c>, which has its own copy of this patch for the argv-level fixtures): fixing a bug on
-/// purpose makes the .NET port log differently from the Python code the fixtures were captured from. See
-/// apps/server/README.md, "ffmpeg parity", for the mechanism.
+/// <c>Weir.Core.Tests</c>, which has its own copy of this patch for the argv-level fixtures): a deliberate bug fix
+/// makes the logs differ from the recorded output, and the fixtures stay as recorded. apps/server/README.md
+/// describes the mechanism.
 /// </summary>
 internal static class GoldenDivergences
 {
     /// <summary>
     /// #539 item 1: two places embed the ffprobe argv literally and so carry "-v error" where the golden fixture
-    /// has Python's "-v quiet" — the REFERENCE_FFPROBE_CALL debug log (JSON, double-quoted) and a timeout's
-    /// <c>Command '[...]' timed out after N seconds</c> message (Python <c>repr()</c>, single-quoted). Every other
-    /// field of either is unaffected by this fix, so a plain substring patch on the one changed token is enough
-    /// to reuse the rest of the fixture unmodified. #498 patches the same two places again: both now also carry
-    /// "-show_chapters" (see <see cref="Weir.Core.Media.FfmpegCommands.BuildFfprobeArgv"/>), absent from fixtures
-    /// captured before that option existed.
+    /// records "-v quiet" — the REFERENCE_FFPROBE_CALL debug log (JSON, double-quoted) and a timeout's
+    /// <c>Command '[...]' timed out after N seconds</c> message (single-quoted list). Every other field of either
+    /// is unaffected by this fix, so a plain substring patch on the one changed token is enough to reuse the rest
+    /// of the fixture unmodified. #498 patches the same two places: both also carry "-show_chapters" (see
+    /// <see cref="Weir.Core.Media.FfmpegCommands.BuildFfprobeArgv"/>), which the recorded fixtures lack.
     /// </summary>
     public static string FfprobeCallLog(string message) =>
         message

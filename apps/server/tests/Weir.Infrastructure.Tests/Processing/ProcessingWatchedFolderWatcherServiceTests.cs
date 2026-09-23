@@ -10,10 +10,9 @@ using Weir.Infrastructure.Tests.Platform;
 namespace Weir.Infrastructure.Tests.Processing;
 
 /// <summary>
-/// Real-temp-folder, real-<see cref="FileSystemWatcher"/> port of the assertions in
-/// <c>test_processing_watched_folder_watcher.py</c>, plus the two behaviours issue #552 asks for beyond
-/// Python parity: an overflow/error restarts the watcher and forces an immediate scan, and readiness
-/// reports the watched libraries. Real filesystem events need real wall-clock time, so these use
+/// The watched-folder watcher on real temp folders and a real <see cref="FileSystemWatcher"/>, including the
+/// two behaviours issue #552 asks for: an overflow/error restarts the watcher and forces an immediate scan, and
+/// readiness reports the watched libraries. Real filesystem events need real wall-clock time, so these use
 /// <see cref="TimeProvider.System"/> and generous timeouts rather than a movable fake clock.
 /// </summary>
 public sealed class ProcessingWatchedFolderWatcherServiceTests
@@ -260,7 +259,7 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
     // --- readiness fields ----------------------------------------------------------------------------
 
     [Fact]
-    public async Task Readiness_lists_the_watched_library_with_the_same_fields_as_python()
+    public async Task Readiness_lists_the_watched_library_with_the_documented_fields()
     {
         using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "watcher-tests-secret-6"));
         var watched = store.Home.Join("watch");

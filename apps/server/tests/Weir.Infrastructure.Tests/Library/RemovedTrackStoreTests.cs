@@ -7,11 +7,9 @@ namespace Weir.Infrastructure.Tests.Library;
 
 /// <summary>
 /// Both <see cref="IRemovedTrackStore"/> implementations (#509 step 1): in-memory and the durable
-/// <c>removed_tracks</c>-table-backed store. Before #557's migration this store read
-/// <c>file_logs.detail_json</c> directly and fell back to parsing legacy free-text
-/// <c>removed_audio</c>/<c>removed_subtitles</c> lists on read; that fallback is now a one-time migration
-/// concern instead (see <c>Migrations/RemovedTracksMigrationTests</c>), since <see cref="FileLogRemovedTrackStore"/>
-/// only ever reads/writes the table now.
+/// <c>removed_tracks</c>-table-backed store. <see cref="FileLogRemovedTrackStore"/> only reads and writes the
+/// table; converting legacy free-text <c>removed_audio</c>/<c>removed_subtitles</c> lists is #557's one-time
+/// migration (see <c>Migrations/RemovedTracksMigrationTests</c>).
 /// </summary>
 public sealed class RemovedTrackStoreTests
 {

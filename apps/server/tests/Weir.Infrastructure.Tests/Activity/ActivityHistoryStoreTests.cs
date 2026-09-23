@@ -11,9 +11,8 @@ using Weir.Infrastructure.Tests.Platform;
 namespace Weir.Infrastructure.Tests.Activity;
 
 /// <summary>
-/// Activity history reads, commit-time notification and processing-record retention (ports of
-/// <c>test_activity_stream.py</c> and <c>test_processing_file_log.py</c>'s pruning), plus byte-for-byte
-/// comparisons with the Python router on the same database.
+/// Activity history reads, commit-time notification, processing-record retention and the paging and
+/// date-filter rules of the history endpoints.
 /// </summary>
 public sealed class ActivityHistoryStoreTests
 {
@@ -122,7 +121,7 @@ public sealed class ActivityHistoryStoreTests
         Assert.Equal(1, await PruneOnceAsync(now));
         Assert.Equal(2, db.Count("SELECT count(*) FROM file_logs"));
 
-        // No settings row: Python creates it with 90 days.
+        // No settings row: it is created with the 90-day default.
         db.Execute("DELETE FROM operator_settings");
         Assert.Equal(0, await PruneOnceAsync(now));
         Assert.Equal(1, await PruneOnceAsync(now.AddDays(1)));
@@ -139,7 +138,7 @@ public sealed class ActivityHistoryStoreTests
             ActivityHistory.ExportCsv([row]));
     }
 
-    /// <summary>#543 item 1: Python's dropped-FROM count query always counts one row with no filter; .NET counts them all.</summary>
+    /// <summary>#543 item 1: the count covers every row even with no filter, not one row.</summary>
     [Fact]
     public async Task Count_activity_events_counts_every_row_even_unfiltered()
     {
@@ -168,7 +167,7 @@ public sealed class ActivityHistoryStoreTests
     /// <summary>
     /// #543 item 3: ordered by <c>(created_at DESC, id DESC)</c>, and <c>before_id</c> pages by that same key.
     /// Row 2 is chronologically the oldest despite its small id, and rows 1 and 3 tie — an arrangement plain
-    /// <c>id &lt; before_id</c> paging (Python's, and .NET's before #543) gets wrong: it would repeat row 4 on
+    /// <c>id &lt; before_id</c> paging gets wrong: it would repeat row 4 on
     /// a later page (its id is small, but it was already returned) or lose rows entirely.
     /// </summary>
     [Fact]
@@ -191,7 +190,7 @@ public sealed class ActivityHistoryStoreTests
         Assert.Equal(4, first.Concat(second).Select(r => r.Id).Distinct().Count());
     }
 
-    /// <summary>A cursor row that no longer exists (deleted since the page it came from was read) still pages, by id alone.</summary>
+    /// <summary>A cursor row that is gone (deleted since the page it came from was read) still pages, by id alone.</summary>
     [Fact]
     public async Task List_recent_before_a_missing_cursor_row_falls_back_to_id_only_paging()
     {
@@ -213,7 +212,7 @@ public sealed class ActivityHistoryStoreTests
     public async Task Date_filters_normalize_to_utc_and_compare_stored_shapes_not_raw_text()
     {
         using var fixture = new StoreFixture();
-        // Stored with no fractional part: the shape SQLAlchemy (and Weir) write for an exact second.
+        // Stored with no fractional part: the shape Weir, and databases from earlier releases, hold for an exact second.
         await fixture.Execute(
             "INSERT INTO activity_events (created_at, event_type, module, title) VALUES ('2026-01-02 03:04:05', 'a.1', 'processing', 'exact')");
 
@@ -234,9 +233,9 @@ public sealed class ActivityHistoryStoreTests
     }
 
     /// <summary>
-    /// #543 item 4: <c>_file_history_filter</c> (Activity events) already matches a row that never recorded a
-    /// library id even when one is given; processing records now get the same fallback, so removing one
-    /// file's history with a library id cleans up both consistently instead of leaving old records behind.
+    /// #543 item 4: the Activity events filter matches a row that never recorded a library id even when one
+    /// is given; processing records get the same fallback, so removing one file's history with a library id
+    /// cleans up both consistently instead of leaving old records behind.
     /// </summary>
     [Fact]
     public async Task File_history_removal_gives_processing_records_the_same_library_null_fallback_as_events()

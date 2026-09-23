@@ -5,8 +5,8 @@ using Weir.Infrastructure.Jobs;
 namespace Weir.Infrastructure.Tests.Jobs;
 
 /// <summary>
-/// Ports of <c>test_startup_crash_recovery.py</c>, and the #534 fix: a crash leaves Weir's remux temp
-/// output in the work folder, and recovery removes it without touching anything else.
+/// Startup crash recovery of leased jobs, and #534: a crash leaves Weir's remux temp output in the work
+/// folder, and recovery removes it without touching anything else.
 /// </summary>
 public sealed class StartupRecoveryTests : IDisposable
 {
@@ -206,9 +206,8 @@ public sealed class StartupRecoveryTests : IDisposable
     }
 
     /// <summary>
-    /// Only an empty <c>work_folder</c> gets the per-scope default. The old MediaMop-era Windows
-    /// defaults used to be recognised here and mapped to it as well; 3.0.0 removed that, so they are
-    /// now ordinary custom paths and are returned unchanged. That is the behaviour change, pinned.
+    /// Only an empty <c>work_folder</c> gets the per-scope default. Any other value, including paths that
+    /// look like an old default install location, is an ordinary custom path and is returned unchanged.
     /// </summary>
     [Fact]
     public void Only_an_empty_work_folder_falls_back_to_the_scope_default()
@@ -219,8 +218,8 @@ public sealed class StartupRecoveryTests : IDisposable
         Assert.Equal(ProcessingLibraryFolders.DefaultTvWorkFolder(_db.Home), ProcessingLibraryFolders.EffectiveWorkFolder(row with { MediaType = "TV", WorkFolder = " " }, _db.Home));
         Assert.Equal("/data/work", ProcessingLibraryFolders.EffectiveWorkFolder(row with { WorkFolder = " /data/work " }, _db.Home));
 
-        // The two paths that used to be treated as "unset" are now taken literally, trailing
-        // separator and all, exactly as any other path a person typed in would be.
+        // Paths shaped like the old default locations are taken literally, trailing separator and all,
+        // exactly as any other path a person typed in would be.
         Assert.Equal(
             @"C:\ProgramData\Media\processing-movie-work\",
             ProcessingLibraryFolders.EffectiveWorkFolder(row with { WorkFolder = @"C:\ProgramData\Media\processing-movie-work\" }, _db.Home));

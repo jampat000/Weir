@@ -323,8 +323,8 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var library = await LibraryAsync();
         await _fixture.Db(async uow => { await LibrarySettingsStore.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
         await _fixture.AddConnectionAsync("radarr", "Radarr");
-        // No /api/v3/movie route is scripted: the fake HTTP client refuses the connection, which the port
-        // reports as SignalStatus.Unreachable rather than throwing out of ListLibraryFilesAsync.
+        // No /api/v3/movie route is scripted: the fake HTTP client refuses the connection, which the manager
+        // adapter reports as SignalStatus.Unreachable rather than throwing out of ListLibraryFilesAsync.
 
         var path = _libraryFolder.Join("film.mkv");
         await File.WriteAllBytesAsync(path, [1, 2, 3]);

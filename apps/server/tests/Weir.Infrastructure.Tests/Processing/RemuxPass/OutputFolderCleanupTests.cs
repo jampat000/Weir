@@ -6,8 +6,7 @@ using Weir.Infrastructure.Processing.RemuxPass;
 namespace Weir.Infrastructure.Tests.Processing.RemuxPass;
 
 /// <summary>
-/// Ported from <c>apps/backend/tests/test_processing_movie_output_cleanup.py</c> and <c>test_processing_tv_output_cleanup.py</c>, on real
-/// folders with the managers' answers and the job queue stated directly.
+/// Movie and TV output folder cleanup on real folders, with the managers' answers and the job queue stated directly.
 /// </summary>
 public sealed class OutputFolderCleanupTests : IDisposable
 {

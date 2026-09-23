@@ -12,9 +12,8 @@ using Weir.Infrastructure.Tests.Platform;
 namespace Weir.Infrastructure.Tests.Jobs;
 
 /// <summary>
-/// Real-temp-dir, real-SQLite port of the key assertions in
-/// <c>test_processing_watched_folder_remux_scan_dispatch_lane.py</c>: the handler enqueues
-/// <c>processing.file.remux_pass.v1</c> with Python's exact payload shape, honours
+/// Real-temp-dir, real-SQLite tests of the scan dispatch handler: it enqueues
+/// <c>processing.file.remux_pass.v1</c> with the exact payload shape the remux pass reads, honours
 /// <c>enqueue_remux_jobs</c>, skips a relative path already covered by an active pass, and applies a
 /// library's rejected-file cleanup policy.
 /// </summary>
@@ -28,7 +27,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         var connections = new MediaManagerConnectionService(store.Options, cipher, ports);
         var jobs = new ProcessingJobStore(store.Database, store.Clock);
         var handler = new ProcessingWatchedFolderScanDispatchJobHandler(store.Database, store.Clock, store.Options, jobs, connections);
-        // Match the Python fixture: zero out the operator-wide minimum age/size so these tests assert scan
+        // Zero out the operator-wide minimum age/size so these tests assert scan
         // dispatch itself, not the settling/hold-timer gates a freshly written test file would otherwise trip.
         await store.Execute(
             "INSERT INTO operator_settings (id, min_file_age_seconds, min_input_file_size_mb, minimum_free_disk_space_mb) " +
@@ -67,7 +66,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
     }
 
     [Fact]
-    public async Task The_handler_enqueues_a_remux_pass_job_with_pythons_exact_payload_shape()
+    public async Task The_handler_enqueues_a_remux_pass_job_with_the_exact_payload_shape()
     {
         var (store, jobs, handler) = await BuildAsync();
         using var _ = store;

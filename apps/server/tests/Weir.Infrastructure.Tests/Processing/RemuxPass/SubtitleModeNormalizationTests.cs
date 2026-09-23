@@ -5,11 +5,11 @@ using Weir.Infrastructure.Processing.RemuxPass;
 namespace Weir.Infrastructure.Tests.Processing.RemuxPass;
 
 /// <summary>
-/// Issue #545 item 4: <c>rules_config_for</c> (the path a live remux job takes) used to pass the stored subtitle mode
-/// through unchanged, while the fallback path (<see cref="RuleSetConversion.ToRulesConfig"/>) normalized it, so both must
-/// agree. The mapping itself changed later: <c>keep_all</c> — the stored default, and "Keep all subtitles" on the Rules
-/// screen — used to normalize to keep-selected and so removed every subtitle when no language was listed. It now keeps
-/// every subtitle, and an unknown value errs towards keeping rather than removing.
+/// Issue #545 item 4: <see cref="RemuxPassPaths.RulesConfigFor"/> (the path a live remux job takes) and the fallback
+/// path (<see cref="RuleSetConversion.ToRulesConfig"/>) must normalize the stored subtitle mode the same way.
+/// <c>keep_all</c> — the stored default, and "Keep all subtitles" on the Rules screen — keeps every subtitle rather than
+/// normalizing to keep-selected (which removes every subtitle when no language is listed), and an unknown value errs
+/// towards keeping rather than removing.
 /// </summary>
 public sealed class SubtitleModeNormalizationTests
 {

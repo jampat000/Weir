@@ -5,8 +5,7 @@ using Weir.Infrastructure.Tests.Jobs;
 
 namespace Weir.Infrastructure.Tests.Processing;
 
-/// <summary>Real-temp-dir, real-SQLite port of the assertions in
-/// <c>test_processing_watched_folder_remux_scan_dispatch_ops.py</c>.</summary>
+/// <summary>Real-temp-dir, real-SQLite tests of the watched-folder scan dispatch operations.</summary>
 public sealed class WatchedFolderScanOpsTests
 {
     [Fact]
@@ -131,7 +130,7 @@ public sealed class WatchedFolderScanOpsTests
         File.WriteAllBytes(source, "replacement-source"u8.ToArray());
         File.WriteAllBytes(output, "old-output"u8.ToArray());
 
-        // Recorded size (8, "original") no longer matches the file now on disk.
+        // Recorded size (8, "original") does not match the file now on disk.
         var detail = $$"""
             {"ok":true,"relative_media_path":"Movie/Movie.mkv","media_scope":"movie","output_file":"{{output.Replace("\\", "\\\\")}}",
             "source_deleted_after_success":false,"inspected_source_path":"{{source.Replace("\\", "\\\\")}}","source_size_bytes":8}

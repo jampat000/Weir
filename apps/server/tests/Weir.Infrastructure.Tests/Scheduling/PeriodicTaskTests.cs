@@ -7,7 +7,7 @@ using Weir.Infrastructure.Scheduling;
 
 namespace Weir.Infrastructure.Tests.Scheduling;
 
-/// <summary>The periodic loop the Python lifespan's asyncio tasks run, and its host.</summary>
+/// <summary>The periodic background task loop and its host.</summary>
 public sealed class PeriodicTaskTests
 {
     [Fact]
@@ -29,7 +29,7 @@ public sealed class PeriodicTaskTests
     public async Task A_task_that_does_not_run_at_start_waits_one_interval_first()
     {
         // auth-session-cleanup: the first cleanup is an interval after start; startup has just cleaned up.
-        // A fake clock makes this deterministic (it used to race real wall-clock timing under load, #557):
+        // A fake clock makes this deterministic (real wall-clock timing races under load, #557):
         // PeriodicTaskRunner's very first statement awaits Task.Delay(task.Interval, time, ...), whose timer
         // is registered on `time` synchronously before that await yields, so by the time RunAsync returns
         // the task to us the timer already exists and advancing the fake clock is race-free.

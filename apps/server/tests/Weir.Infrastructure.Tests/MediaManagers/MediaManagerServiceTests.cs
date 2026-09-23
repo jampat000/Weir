@@ -10,8 +10,7 @@ using Weir.Infrastructure.Processing;
 namespace Weir.Infrastructure.Tests.MediaManagers;
 
 /// <summary>
-/// Ports of <c>test_media_manager_binding.py</c>, <c>test_credentials_secret_crypto.py</c>, the reporting half of
-/// <c>test_media_manager_completion_callback.py</c>, the provider tests in <c>test_processing_original_language.py</c>, and the
+/// Media manager binding, credential encryption, completion reporting, original-language providers, and the
 /// intake, ledger and reconciliation behaviour behind the HTTP routes.
 /// </summary>
 public sealed class MediaManagerServiceTests
@@ -81,7 +80,8 @@ public sealed class MediaManagerServiceTests
     /// <summary>
     /// #544 item 1: a manager answering 2xx with a body that is not JSON (an HTML login page from a reverse
     /// proxy, most often) is classified as an unreachable answer with a plain message, not a 500 from an
-    /// uncaught JSON-decode exception. Exercised through <c>describe_connections</c>, the same path
+    /// uncaught JSON-decode exception. Exercised through
+    /// <see cref="MediaManagerConnectionService.DescribeConnectionsAsync"/>, the same path
     /// <c>GET /media-managers/capabilities</c> uses.
     /// </summary>
     [Fact]
@@ -97,8 +97,8 @@ public sealed class MediaManagerServiceTests
     }
 
     /// <summary>
-    /// #544 item 3: <c>create_connection</c>/<c>update_connection</c> let a plain <c>PyValueErrorException</c> from
-    /// encrypting the API key escape uncaught when no secret is configured; it now becomes the same
+    /// #544 item 3: creating or updating a connection when no secret is configured must not let the
+    /// <c>PyValueErrorException</c> from encrypting the API key escape; it becomes the same
     /// <see cref="MediaManagerConnectionException"/> (a 400) any other operator mistake here does, still naming
     /// the env var to set.
     /// </summary>
@@ -126,8 +126,8 @@ public sealed class MediaManagerServiceTests
     }
 
     /// <summary>
-    /// #544 item 5: matching is an exact prefix comparison, not the SQL <c>LIKE</c> Python's
-    /// <c>.startswith()</c> compiled to — so <c>_</c> and <c>%</c> in a folder name are plain characters, and a
+    /// #544 item 5: matching is an exact prefix comparison, not a SQL <c>LIKE</c> pattern — so <c>_</c> and
+    /// <c>%</c> in a folder name are plain characters, and a
     /// sibling folder whose name merely resembles this one is not folded into the hand-off's files.
     /// </summary>
     [Fact]
@@ -192,8 +192,8 @@ public sealed class MediaManagerServiceTests
     }
 
     /// <summary>
-    /// #544 item 7: Python's <c>secrets.compare_digest</c> raises <c>TypeError</c> for a non-ASCII <c>str</c>; the
-    /// .NET port compares UTF-8 bytes (a deliberate difference kept from the original port), so it never crashes.
+    /// #544 item 7: secrets are compared as UTF-8 bytes in constant time, so a non-ASCII secret compares
+    /// correctly instead of raising an error.
     /// </summary>
     [Fact]
     public void Non_ascii_secrets_compare_by_bytes_without_crashing()

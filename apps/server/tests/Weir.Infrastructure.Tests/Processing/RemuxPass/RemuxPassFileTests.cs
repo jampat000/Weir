@@ -3,7 +3,7 @@ using Weir.Infrastructure.Processing.RemuxPass;
 
 namespace Weir.Infrastructure.Tests.Processing.RemuxPass;
 
-/// <summary>Ported from <c>apps/backend/tests/test_processing_output_collision.py</c>, on real temporary folders.</summary>
+/// <summary>Output name collisions, on real temporary folders.</summary>
 public sealed class OutputCollisionTests : IDisposable
 {
     private readonly TempDirectory _root = new();
@@ -135,7 +135,7 @@ public sealed class OutputCollisionTests : IDisposable
     }
 }
 
-/// <summary>Ported from <c>apps/backend/tests/test_processing_sidecar_migration.py</c>.</summary>
+/// <summary>Moving a source's sidecar files alongside the published output.</summary>
 public sealed class SidecarMigrationTests : IDisposable
 {
     private readonly TempDirectory _root = new();
@@ -306,7 +306,7 @@ public sealed class SidecarMigrationTests : IDisposable
     }
 }
 
-/// <summary>Ported from the access and writer tests of <c>apps/backend/tests/test_processing_file_settling.py</c>, plus the pass's read guard.</summary>
+/// <summary>Source file access and open-writer checks used for settling, plus the pass's read guard.</summary>
 public sealed class SourceFilesTests : IDisposable
 {
     private readonly TempDirectory _root = new();
@@ -398,7 +398,7 @@ public sealed class SourceFilesTests : IDisposable
     }
 }
 
-/// <summary>Ported from <c>apps/backend/tests/test_processing_file_remux_pass_paths.py</c> and the library-folder rules.</summary>
+/// <summary>Remux pass path resolution and the library-folder rules.</summary>
 public sealed class RemuxPassPathsTests : IDisposable
 {
     private readonly TempDirectory _root = new();
@@ -476,7 +476,7 @@ public sealed class RemuxPassPathsTests : IDisposable
     }
 }
 
-/// <summary>The guarded writes of <c>platform/file_lifecycle/mutations.py</c> the pass publishes through.</summary>
+/// <summary>The guarded file lifecycle writes the pass publishes through.</summary>
 public sealed class FileLifecycleTests : IDisposable
 {
     private readonly TempDirectory _root = new();

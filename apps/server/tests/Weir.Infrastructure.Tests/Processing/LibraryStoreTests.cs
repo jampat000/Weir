@@ -5,8 +5,7 @@ using Weir.Infrastructure.Tests.Jobs;
 
 namespace Weir.Infrastructure.Tests.Processing;
 
-/// <summary>Real-SQLite proof of <c>LibraryStore</c> (port of the persistence half of
-/// <c>processing_library_crud.py</c>/<c>processing_library_service.py</c>, ADR-0014).</summary>
+/// <summary>Real-SQLite proof of <c>LibraryStore</c>, the library persistence layer (ADR-0014).</summary>
 public sealed class LibraryStoreTests
 {
     private static ProcessingLibraryInput NewLibrary(string name, string watched = "", string output = "", string mediaType = "movie") => new()

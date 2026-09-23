@@ -3,8 +3,7 @@ using Weir.Infrastructure.Processing.DirectPlay;
 
 namespace Weir.Infrastructure.Tests.Processing;
 
-/// <summary>Ported from <c>apps/backend/tests/test_direct_play.py</c> (#467): the shipped device list and
-/// the answers it gives for a handful of concrete files, against the real embedded <c>devices.json</c>.</summary>
+/// <summary>Direct play (#467): the shipped device list and the answers it gives for a handful of concrete files, against the real embedded <c>devices.json</c>.</summary>
 public sealed class DirectPlayEvaluationTests
 {
     private static readonly IReadOnlyList<DeviceProfile> Profiles = DeviceProfileLoader.Load(null);

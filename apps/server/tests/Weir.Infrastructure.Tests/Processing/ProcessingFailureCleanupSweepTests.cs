@@ -6,8 +6,7 @@ using Weir.Infrastructure.Tests.MediaManagers;
 namespace Weir.Infrastructure.Tests.Processing;
 
 /// <summary>
-/// Ported from <c>apps/backend/tests/test_processing_failure_cleanup.py</c>: <see cref="ProcessingFailureCleanupSweep"/>
-/// against a real database and real temporary folders, with each media manager's queue behind
+/// <see cref="ProcessingFailureCleanupSweep"/> against a real database and real temporary folders, with each media manager's queue behind
 /// <see cref="FakeManagerHttp"/>.
 /// </summary>
 public sealed class ProcessingFailureCleanupSweepTests : IDisposable
@@ -26,8 +25,7 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
 
     private string P(string relative) => Directory.CreateDirectory(_root.Join(relative)).FullName;
 
-    /// <summary>Seeds both the Movies and TV libraries with their own watched/output/work folders, mirroring
-    /// Python's <c>seed_libraries</c>.</summary>
+    /// <summary>Seeds both the Movies and TV libraries with their own watched/output/work folders.</summary>
     private async Task SeedLibrariesAsync(string movieWatched, string movieOutput, string movieWork, string tvWatched, string tvOutput, string tvWork)
     {
         await _fixture.Store.Execute("DELETE FROM libraries");

@@ -5,9 +5,8 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Tests.Jobs;
 
-/// <summary>Real-SQLite port of the assertions in
-/// <c>test_processing_watched_folder_remux_scan_dispatch_periodic_enqueue.py</c> that exercise
-/// <c>processing_watched_folder_remux_scan_dispatch_enqueue.py</c> directly.</summary>
+/// <summary>Real-SQLite tests of enqueuing the periodic watched-folder scan dispatch job and its
+/// prerequisite checks.</summary>
 public sealed class ProcessingWatchedFolderScanDispatchEnqueueTests
 {
     /// <summary>Inserts a library row directly, bypassing <see cref="LibraryRules.ValidateFolders"/> — the

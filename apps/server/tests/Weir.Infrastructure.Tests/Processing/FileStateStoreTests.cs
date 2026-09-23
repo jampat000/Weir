@@ -6,10 +6,9 @@ using Weir.Infrastructure.Tests.Jobs;
 namespace Weir.Infrastructure.Tests.Processing;
 
 /// <summary>
-/// Real-SQLite proof of the fix for #530: a <c>files</c> row at <c>passed_through</c> or
-/// <c>rejected</c> lists, filters and counts exactly like any other status — the Python response/query
-/// schema (<c>ProcessingFileStatusName</c>) omitted both, which 500'd a list containing one and 422'd a
-/// filter naming one.
+/// Real-SQLite proof for #530: a <c>files</c> row at <c>passed_through</c> or <c>rejected</c> lists, filters
+/// and counts exactly like any other status, so a list containing one does not fail and a filter naming one
+/// is accepted.
 /// </summary>
 public sealed class FileStateStoreTests
 {

@@ -217,7 +217,7 @@ internal sealed class PassFolders : IDisposable
 }
 
 /// <summary>
-/// Ported from <c>apps/backend/tests/test_processing_file_remux_pass_run.py</c> on real temporary folders, with ffprobe and ffmpeg
+/// A remux pass run on real temporary folders, with ffprobe and ffmpeg
 /// replaced by a fake process runner rather than by patching the pass.
 /// </summary>
 public sealed class RemuxPassRunnerTests : IDisposable
@@ -319,7 +319,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
         Assert.Equal(_folders.Watched, Str(result, "processing_watched_folder_resolved"));
         Assert.Empty(_media.Remuxes);
         Assert.False(File.Exists(_folders.Out("audio-disguised-as-video.mpg")));
-        // The keys in the reference's order: extras first, then the inspected path.
+        // The keys in the order existing readers of this detail see: extras first, then the inspected path.
         Assert.Equal(["ok", "outcome", "preflight_status", "preflight_reason", "reason", "relative_media_path", "rejection_kind", "media_scope", "processing_watched_folder_resolved", "inspected_source_path"], result.Keys);
     }
 

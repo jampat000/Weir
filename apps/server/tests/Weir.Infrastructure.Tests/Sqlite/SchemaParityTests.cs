@@ -3,11 +3,10 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Tests.Sqlite;
 
 /// <summary>
-/// The .NET baseline migration creates exactly the database the retired Python backend's Alembic head
-/// created. The reference, <c>schema/alembic-head.sql</c>, is <c>sqlite_master</c> plus seeded rows dumped
-/// from a real <c>alembic upgrade head</c> before the Python backend was deleted (#523). It is frozen and
-/// never edited: issue #557 deliberately diverges the *current* head from this shape (rule-set extra
-/// columns, library-mode tables, ...), so this test builds the .NET side at
+/// The baseline migration creates exactly the database that existing installs were created with. The
+/// reference, <c>schema/alembic-head.sql</c>, is <c>sqlite_master</c> plus seeded rows dumped from a real
+/// <c>alembic upgrade head</c> (#523). It is frozen and never edited: issue #557 deliberately diverges the
+/// *current* head from this shape (rule-set extra columns, library-mode tables, ...), so this test builds at
 /// <see cref="SchemaMigrator.BaselineRevision"/> — the one migration that must always match the reference
 /// exactly — rather than at the moving <see cref="SchemaMigrator.HeadRevision"/> (see
 /// apps/server/README.md, "Schema"). Each migration after the baseline is proved by its own test instead
