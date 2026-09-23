@@ -257,6 +257,53 @@ export function sizesFromRecord(detail: Record<string, unknown>): {
   return { before, after, saved: Math.max(0, before - after) };
 }
 
+/** A file's sizes as History shows them: always all three, with "not written" rather than a gap (James, 23 Sep 2026). */
+export type DetailSizes = {
+  before: number | null;
+  /** Null when Weir wrote no new copy of the file. */
+  after: number | null;
+  saved: number | null;
+  /** Why After is what it is, when that is not obvious. */
+  note: string | null;
+};
+
+/**
+ * Before, After and Saved for the open file, whatever happened to it. A pass that measured both sizes gives them; a file
+ * Weir finished without changing it ("already right", passed through) is the same size after, and saved nothing; a file
+ * Weir has not written a copy of shows its size and says so.
+ */
+export function detailSizes(
+  file: Pick<ProcessingFile, "status" | "size_bytes">,
+  detail: Record<string, unknown> | null,
+): DetailSizes {
+  const measured = detail ? sizesFromRecord(detail) : null;
+  if (measured) return { ...measured, note: null };
+  const recorded = detail?.source_size_bytes;
+  const before =
+    typeof recorded === "number" && recorded > 0
+      ? recorded
+      : file.size_bytes > 0
+        ? file.size_bytes
+        : null;
+  if (
+    file.status === "passed_through" ||
+    (detail && file.status === "processed")
+  ) {
+    return {
+      before,
+      after: before,
+      saved: before == null ? null : 0,
+      note: "Weir handed the file back as it was, so its size did not change.",
+    };
+  }
+  return {
+    before,
+    after: null,
+    saved: null,
+    note: "Weir has not written a new copy of this file.",
+  };
+}
+
 /** What became of the copy Weir handed back, as History tells it. */
 export type HandbackStory = {
   heading: string;

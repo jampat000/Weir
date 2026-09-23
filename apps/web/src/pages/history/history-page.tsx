@@ -30,7 +30,7 @@ import {
   latestPass,
   newestFirst,
   sizeWords,
-  sizesFromRecord,
+  detailSizes,
   tookWords,
   tracksFromRecord,
   type HistoryGroup,
@@ -332,7 +332,9 @@ function HistoryDetail({
   });
   const pass = latestPass(record.data?.entries ?? []);
   const tracks = pass ? tracksFromRecord(pass.detail) : [];
-  const sizes = pass ? sizesFromRecord(pass.detail) : null;
+  const sizes = detailSizes(file, pass?.detail ?? null);
+  const keptCount = tracks.filter((t) => t.kept).length;
+  const removedCount = tracks.length - keptCount;
   const took = pass
     ? tookWords(pass.detail.elapsed_seconds as number | undefined)
     : null;
@@ -412,22 +414,34 @@ function HistoryDetail({
             ) : null}
           </dl>
         </div>
-      ) : sizes ? (
-        <dl className="mm-history-figures">
-          <div>
-            <dt>Before</dt>
-            <dd>{sizeWords(sizes.before)}</dd>
-          </div>
-          <div>
-            <dt>After</dt>
-            <dd>{sizeWords(sizes.after)}</dd>
-          </div>
-          <div>
-            <dt>Saved</dt>
-            <dd className="mm-history-saved">{sizeWords(sizes.saved)}</dd>
-          </div>
-        </dl>
-      ) : null}
+      ) : (
+        // Always all three, even when nothing changed (James, 23 Sep 2026): a gap read as "Weir does not know".
+        <div className="mm-history-sizes" data-testid="history-sizes">
+          <dl className="mm-history-figures">
+            <div>
+              <dt>Before</dt>
+              <dd>{sizes.before == null ? "—" : sizeWords(sizes.before)}</dd>
+            </div>
+            <div>
+              <dt>After</dt>
+              <dd>
+                {sizes.after == null ? "Not written" : sizeWords(sizes.after)}
+              </dd>
+            </div>
+            <div>
+              <dt>Saved</dt>
+              <dd className="mm-history-saved">
+                {sizes.saved == null
+                  ? "—"
+                  : sizes.saved === 0
+                    ? "0 B"
+                    : sizeWords(sizes.saved)}
+              </dd>
+            </div>
+          </dl>
+          {sizes.note ? <p className="mm-history-note">{sizes.note}</p> : null}
+        </div>
+      )}
 
       {record.isLoading ? (
         <p className="mm-history-note">Reading this file&rsquo;s record…</p>
@@ -444,29 +458,58 @@ function HistoryDetail({
       ) : (
         <>
           {tracks.length > 0 ? (
-            <table className="mm-history-tracks">
-              <caption>
-                {tracks.filter((t) => t.kept).length} tracks kept,{" "}
-                {tracks.filter((t) => !t.kept).length} removed
-              </caption>
-              <tbody>
-                {tracks.map((track, index) => (
-                  <tr key={`${track.kind}-${index}`}>
-                    <th scope="row">{track.kind}</th>
-                    <td className={track.kept ? undefined : "is-removed"}>
-                      {track.what}
-                    </td>
-                    <td
-                      className={
-                        track.kept ? "mm-history-kept" : "mm-history-gone"
-                      }
+            // What Weir kept and removed is the point of the page, so it reads first and plainly: a heading with the
+            // two counts, each track in full text with a Kept or Removed label, and why a track went under its name
+            // (James, 23 Sep 2026: "we need to show whats been kept or removed better").
+            <section
+              className="mm-history-trackset"
+              aria-labelledby="history-tracks-heading"
+              data-testid="history-tracks"
+            >
+              <h3
+                id="history-tracks-heading"
+                className="mm-history-trackset__head"
+              >
+                Tracks
+                <span className="mm-history-count is-kept">
+                  {keptCount} kept
+                </span>
+                <span
+                  className={`mm-history-count ${removedCount > 0 ? "is-removed" : "is-none"}`}
+                >
+                  {removedCount} removed
+                </span>
+              </h3>
+              <table className="mm-history-tracks">
+                <tbody>
+                  {tracks.map((track, index) => (
+                    <tr
+                      key={`${track.kind}-${index}`}
+                      className={track.kept ? "is-kept" : "is-removed"}
                     >
-                      {track.kept ? "Kept" : track.why || "Removed"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <th scope="row">{track.kind}</th>
+                      <td className="mm-history-track">
+                        <span className="mm-history-track__what">
+                          {track.what}
+                        </span>
+                        {!track.kept && track.why ? (
+                          <span className="mm-history-track__why">
+                            {track.why}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="mm-history-track__verdict">
+                        <span
+                          className={`mm-history-verdict ${track.kept ? "is-kept" : "is-removed"}`}
+                        >
+                          {track.kept ? "Kept" : "Removed"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
           ) : null}
           {pass.story.length > 0 ? (
             <ol className="mm-history-story" aria-label="What happened">

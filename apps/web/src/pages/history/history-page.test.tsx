@@ -178,9 +178,10 @@ describe("HistoryPage", () => {
     });
     renderPage("/history?file=1");
     const detail = await screen.findByTestId("history-detail");
-    expect(
-      await within(detail).findByText("2 tracks kept, 2 removed"),
-    ).toBeInTheDocument();
+    const trackset = await within(detail).findByTestId("history-tracks");
+    expect(within(trackset).getByText("2 kept")).toBeInTheDocument();
+    expect(within(trackset).getByText("2 removed")).toBeInTheDocument();
+    expect(within(trackset).getAllByText("Removed")).toHaveLength(2);
     expect(
       within(detail).getByText(
         "Commentary excluded — remove commentary enabled",

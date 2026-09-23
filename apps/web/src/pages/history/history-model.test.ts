@@ -6,6 +6,7 @@ import {
   historyGroupOf,
   importedLabel,
   readableTrack,
+  detailSizes,
   sizesFromRecord,
   tracksFromRecord,
 } from "./history-model";
@@ -122,6 +123,28 @@ describe("tracks from a pass record", () => {
       saved: 40,
     });
     expect(sizesFromRecord({ source_size_bytes: 100 })).toBeNull();
+  });
+
+  it("always has Before, After and Saved to show, even when nothing changed", () => {
+    expect(
+      detailSizes(file({ status: "processed", size_bytes: 100 }), {
+        source_size_bytes: 100,
+        output_size_bytes: 60,
+      }),
+    ).toEqual({ before: 100, after: 60, saved: 40, note: null });
+    // Handed back as it was: the same size after, and nothing saved.
+    expect(
+      detailSizes(file({ status: "passed_through", size_bytes: 100 }), null),
+    ).toMatchObject({ before: 100, after: 100, saved: 0 });
+    // Never written: its size, and "not written" rather than a gap.
+    expect(
+      detailSizes(file({ status: "cancelled", size_bytes: 100 }), null),
+    ).toMatchObject({
+      before: 100,
+      after: null,
+      saved: null,
+      note: "Weir has not written a new copy of this file.",
+    });
   });
 });
 
