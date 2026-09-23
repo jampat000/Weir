@@ -433,9 +433,12 @@ public static class WatchedFolderScanOps
         return false;
     }
 
-    /// <summary>Retries removing a completed movie's source folder. Only the immediate parent folder of a
-    /// file under the watched root is removed, never the watched root itself.</summary>
-    public static (bool Ok, string? Reason) RetryCompletedMovieSourceCleanup(string watchedRoot, string filePath)
+    /// <summary>
+    /// Retries removing a completed movie's source. Only the file's own folder under the watched root is removed, never
+    /// the watched root itself, and only when it holds no other video (<see cref="ReleaseFolderRemoval"/>); otherwise
+    /// just the file goes. <c>FolderRemoved</c> says which happened.
+    /// </summary>
+    public static (bool Ok, bool FolderRemoved, string? Reason) RetryCompletedMovieSourceCleanup(string watchedRoot, string filePath, string? mediaExtensionsCsv)
     {
         string root, src;
         try
@@ -445,41 +448,37 @@ public static class WatchedFolderScanOps
         }
         catch (ArgumentException exception)
         {
-            return (false, $"Source cleanup retry skipped because the path was not safely under the watched folder ({exception.Message}).");
+            return (false, false, $"Source cleanup retry skipped because the path was not safely under the watched folder ({exception.Message}).");
         }
 
         if (!PathContainment.IsUnder(root, src))
         {
-            return (false, "Source cleanup retry skipped because the path was not safely under the watched folder.");
+            return (false, false, "Source cleanup retry skipped because the path was not safely under the watched folder.");
         }
 
         // The file is strictly inside the root, so its folder is either the root itself or a release folder inside it.
         var movieFolder = Path.GetDirectoryName(src);
         if (movieFolder is null || !PathContainment.IsUnder(root, movieFolder))
         {
-            return (false, "Source cleanup retry skipped because the file sits directly in the watched folder root.");
+            return (false, false, "Source cleanup retry skipped because the file sits directly in the watched folder root.");
         }
 
         try
         {
-            if (Directory.Exists(movieFolder))
-            {
-                Directory.Delete(movieFolder, recursive: true);
-            }
-
-            return (true, null);
+            var removal = ReleaseFolderRemoval.Remove(root, src, mediaExtensionsCsv);
+            return (removal.FileRemoved, removal.FolderRemoved, removal.Reason);
         }
         catch (DirectoryNotFoundException)
         {
-            return (true, null);
+            return (true, true, null);
         }
         catch (IOException exception)
         {
-            return (false, $"Source cleanup retry could not remove the release folder because this path is still locked or blocked ({exception.Message}).");
+            return (false, false, $"Source cleanup retry could not remove the release folder because this path is still locked or blocked ({exception.Message}).");
         }
         catch (UnauthorizedAccessException exception)
         {
-            return (false, $"Source cleanup retry could not remove the release folder because this path is still locked or blocked ({exception.Message}).");
+            return (false, false, $"Source cleanup retry could not remove the release folder because this path is still locked or blocked ({exception.Message}).");
         }
     }
 

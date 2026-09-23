@@ -29,6 +29,9 @@ public sealed record ProcessingPathRuntime
 
     /// <summary>The library's <c>remove_original_after_success</c>: false leaves the source where it is after a successful pass.</summary>
     public bool RemoveOriginalAfterSuccess { get; init; } = true;
+
+    /// <summary>The library's own media extensions, so removing a source never takes another video with it.</summary>
+    public string MediaExtensionsCsv { get; init; } = string.Empty;
 }
 
 /// <summary>The rejected-file deletion's outcome.</summary>
@@ -231,6 +234,7 @@ public static class RemuxPassPaths
             RemuxWriter = RemuxWriterChoice.Normalize(library.RemuxWriter),
             RewriteWithFfmpeg = library.RewriteWithFfmpeg,
             RemoveOriginalAfterSuccess = library.RemoveOriginalAfterSuccess,
+            MediaExtensionsCsv = library.MediaExtensionsCsv ?? string.Empty,
         }, null);
     }
 

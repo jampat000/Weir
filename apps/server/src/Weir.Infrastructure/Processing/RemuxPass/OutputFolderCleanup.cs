@@ -5,6 +5,7 @@ using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Rules;
+using Weir.Infrastructure.IO;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
@@ -270,6 +271,14 @@ public sealed class OutputFolderCleanup
             return;
         }
 
+        if (FolderKeptReason(scope, place) is { } kept)
+        {
+            output.Set(skipKey, kept);
+            output.Set(deletedKey, false);
+            _logger.LogInformation("{Label} output cleanup: kept {Folder} — {Reason}", logLabel, place.Folder, kept);
+            return;
+        }
+
         try
         {
             Directory.Delete(place.Folder, recursive: true);
@@ -290,6 +299,34 @@ public sealed class OutputFolderCleanup
         var cascade = output.Get(cascadeKey) as PyList ?? new PyList();
         CascadeDeleteEmptyParents(Path.GetDirectoryName(place.Folder)!, place.OutputRoot, cascade, _logger);
         output.Set(cascadeKey, cascade);
+    }
+
+    /// <summary>
+    /// Why an output folder the manager has finished with still stays: it sits behind a link, or (for a movie) it also
+    /// holds other films' outputs, as a collection pack's folder does. Null when it can go.
+    /// </summary>
+    private static string? FolderKeptReason(string scope, TitleFolder place)
+    {
+        if (PathContainment.HasLinkBelowRoot(place.OutputRoot, place.Folder))
+        {
+            return ReleaseFolderRemoval.LinkedFolderReason;
+        }
+
+        if (scope == ProcessingMediaScopes.Tv)
+        {
+            return null;
+        }
+
+        try
+        {
+            return ReleaseFolderRemoval.HoldsOtherVideos(place.Folder, place.MediaOutputFile, ReleaseFolderRemoval.VideoExtensions(null))
+                ? ReleaseFolderRemoval.OtherVideosFolderKeptReason
+                : null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return ReleaseFolderRemoval.OtherVideosFolderKeptReason;
+        }
     }
 
     /// <summary>Removes empty parents up to, never including, <paramref name="root"/>.</summary>

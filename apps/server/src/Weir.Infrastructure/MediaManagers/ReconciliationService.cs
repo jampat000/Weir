@@ -125,7 +125,7 @@ public static class ReconciliationService
             IEnumerable<string> entries;
             try
             {
-                entries = Directory.EnumerateFileSystemEntries(root, "*", new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = 0, IgnoreInaccessible = true });
+                entries = Directory.EnumerateFileSystemEntries(root, "*", new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint, IgnoreInaccessible = true });
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {

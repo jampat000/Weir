@@ -171,7 +171,7 @@ public sealed class WatchedFolderScanOpsTests
         File.WriteAllBytes(media, "source"u8.ToArray());
         File.WriteAllText(Path.Combine(release, "extra.nfo"), "metadata");
 
-        var (ok, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media);
+        var (ok, _, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media, null);
 
         Assert.True(ok);
         Assert.Null(reason);
@@ -187,11 +187,32 @@ public sealed class WatchedFolderScanOpsTests
         var media = Path.Combine(watched, "Loose Movie 2026.mkv");
         File.WriteAllBytes(media, "source"u8.ToArray());
 
-        var (ok, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media);
+        var (ok, _, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media, null);
 
         Assert.False(ok);
         Assert.Contains("watched folder root", reason ?? string.Empty, StringComparison.Ordinal);
         Assert.True(File.Exists(media));
+    }
+
+    [Fact]
+    public void Retry_completed_movie_source_cleanup_in_a_pack_removes_only_the_finished_film()
+    {
+        using var dir = new TempDirectory();
+        var watched = dir.Join("watch");
+        var pack = Path.Combine(watched, "Collection");
+        Directory.CreateDirectory(pack);
+        var media = Path.Combine(pack, "Part One.mkv");
+        var sibling = Path.Combine(pack, "Part Two.mkv");
+        File.WriteAllBytes(media, "source"u8.ToArray());
+        File.WriteAllBytes(sibling, "another film"u8.ToArray());
+
+        var (ok, folderRemoved, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media, null);
+
+        Assert.True(ok);
+        Assert.False(folderRemoved);
+        Assert.Equal(ReleaseFolderRemoval.OtherVideosReason, reason);
+        Assert.False(File.Exists(media));
+        Assert.True(File.Exists(sibling));
     }
 
     [Fact]
@@ -205,7 +226,7 @@ public sealed class WatchedFolderScanOpsTests
         var media = Path.Combine(release, "Movie 2026.mkv");
         File.WriteAllBytes(media, "source"u8.ToArray());
 
-        var (ok, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media);
+        var (ok, _, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media, null);
 
         Assert.False(ok);
         Assert.Contains("not safely under the watched folder", reason ?? string.Empty, StringComparison.Ordinal);

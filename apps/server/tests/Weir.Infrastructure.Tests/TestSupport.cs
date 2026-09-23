@@ -47,6 +47,29 @@ internal sealed class TempDirectory : IDisposable
     }
 }
 
+/// <summary>Folder links for tests of code that must never follow one.</summary>
+internal static class FolderLinks
+{
+    /// <summary>A directory junction on Windows (no privilege needed) or a symbolic link elsewhere.</summary>
+    public static void Create(string link, string target)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Directory.CreateSymbolicLink(link, target);
+            return;
+        }
+
+        var start = new System.Diagnostics.ProcessStartInfo("cmd.exe", ["/c", "mklink", "/J", link, target])
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+        };
+        using var process = System.Diagnostics.Process.Start(start)!;
+        process.WaitForExit();
+        Assert.Equal(0, process.ExitCode);
+    }
+}
+
 internal static class RepositoryPaths
 {
     /// <summary>

@@ -185,7 +185,8 @@ public static class StartupRecovery
                 {
                     RecurseSubdirectories = true,
                     IgnoreInaccessible = true,
-                    AttributesToSkip = 0,
+                    // Hidden files are Weir's too; a link is never followed, so nothing outside the root is swept.
+                    AttributesToSkip = FileAttributes.ReparsePoint,
                     ReturnSpecialDirectories = false,
                 }).ToList();
             }

@@ -29,4 +29,44 @@ public static class PathContainment
         var prefix = Path.EndsInDirectorySeparator(fullRoot) ? fullRoot : fullRoot + Path.DirectorySeparatorChar;
         return fullPath.StartsWith(prefix, Comparison);
     }
+
+    /// <summary>
+    /// True when <paramref name="path"/>, or any folder between it and <paramref name="root"/> (the root itself not
+    /// included), is a junction or symbolic link. A recursive delete through a link would remove files that live
+    /// somewhere else, so callers refuse it. A path that cannot be inspected counts as a link.
+    /// </summary>
+    public static bool HasLinkBelowRoot(string root, string path)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        ArgumentNullException.ThrowIfNull(path);
+        var current = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        while (IsUnder(root, current))
+        {
+            try
+            {
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                {
+                    return true;
+                }
+            }
+            catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+            {
+                // Nothing there to follow; the folders above it still decide.
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                return true;
+            }
+
+            var parent = Path.GetDirectoryName(current);
+            if (parent is null)
+            {
+                break;
+            }
+
+            current = parent;
+        }
+
+        return false;
+    }
 }

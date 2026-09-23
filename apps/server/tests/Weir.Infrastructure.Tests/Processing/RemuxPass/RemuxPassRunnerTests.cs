@@ -7,6 +7,7 @@ using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Rules;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.Processes;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Tests.Media;
 
@@ -367,6 +368,53 @@ public sealed class RemuxPassRunnerTests : IDisposable
         // #539 item 5: the integrity read runs on every platform, Windows included.
         Assert.Contains(_media.Calls, argv => argv.Contains("null"));
         Assert.Equal("{\"device\"", PyJsonWriter.Dumps(result["source_fingerprint"], PyJsonFormat.Compact)[..9]);
+    }
+
+    [Fact]
+    public async Task A_finished_film_in_a_collection_pack_removes_only_itself()
+    {
+        var source = _folders.Source(Path.Join("Trilogy.Pack", "Part.One.mkv"));
+        var sibling = _folders.Source(Path.Join("Trilogy.Pack", "Part.Two.mkv"));
+        var nested = _folders.Source(Path.Join("Trilogy.Pack", "Extras", "Part.Three.mkv"));
+
+        var result = await Run("Trilogy.Pack/Part.One.mkv");
+
+        Assert.True(Bool(result, "ok"));
+        Assert.False(File.Exists(source));
+        Assert.True(File.Exists(sibling), "the other film in the pack is not this file's to delete");
+        Assert.True(File.Exists(nested), "a film in a subfolder of the pack is kept too");
+        Assert.True(Bool(result, "source_deleted_after_success"));
+        Assert.False(Bool(result, "source_folder_deleted"));
+        Assert.Equal(ReleaseFolderRemoval.OtherVideosReason, Str(result, "source_folder_skip_reason"));
+    }
+
+    [Fact]
+    public async Task A_finished_film_in_a_category_folder_leaves_its_neighbours()
+    {
+        var source = _folders.Source(Path.Join("movies", "Film.mkv"));
+        var neighbour = _folders.Source(Path.Join("movies", "Another.Film.mp4"));
+
+        var result = await Run("movies/Film.mkv");
+
+        Assert.True(Bool(result, "ok"));
+        Assert.False(File.Exists(source));
+        Assert.True(File.Exists(neighbour));
+        Assert.True(Directory.Exists(Path.Join(_folders.Watched, "movies")));
+    }
+
+    [Fact]
+    public async Task A_single_release_with_its_sample_and_nfo_is_still_removed_whole()
+    {
+        _folders.Source(Path.Join("Film.2024", "Film.2024.mkv"));
+        _folders.Source(Path.Join("Film.2024", "Sample", "film.2024.mkv"));
+        _folders.Source(Path.Join("Film.2024", "film.2024-sample.mkv"));
+        File.WriteAllText(Path.Join(_folders.Watched, "Film.2024", "Film.2024.nfo"), "info");
+
+        var result = await Run("Film.2024/Film.2024.mkv");
+
+        Assert.True(Bool(result, "ok"));
+        Assert.True(Bool(result, "source_folder_deleted"));
+        Assert.False(Directory.Exists(Path.Join(_folders.Watched, "Film.2024")));
     }
 
     [Fact]

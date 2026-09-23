@@ -227,7 +227,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
                     !await WatchedFolderScanOps.ActiveRemuxPassExistsForRelativePathAsync(uow, rel, mediaScope, library.Id).ConfigureAwait(false) &&
                     await WatchedFolderScanOps.CompletedRemuxOutputExistsForRelativePathAsync(uow, rel, mediaScope, library.Id, runtime.OutputFolder, filePath).ConfigureAwait(false))
                 {
-                    await RetryCompletedMovieCleanupAsync(uow, library.Id, runtime.WatchedFolder, filePath, rel, observedSize, settling, now).ConfigureAwait(false);
+                    await RetryCompletedMovieCleanupAsync(uow, library, runtime.WatchedFolder, filePath, rel, observedSize, settling, now).ConfigureAwait(false);
                 }
                 else
                 {
@@ -279,7 +279,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             if (mediaScope == ProcessingMediaScopes.Movie && cleanupRetryReady && noActivePass && !keepsOriginals &&
                 await WatchedFolderScanOps.CompletedRemuxOutputExistsForRelativePathAsync(uow, rel, mediaScope, library.Id, runtime.OutputFolder, filePath).ConfigureAwait(false))
             {
-                await RetryCompletedMovieCleanupAsync(uow, library.Id, runtime.WatchedFolder, filePath, rel, observedSize, settling, now).ConfigureAwait(false);
+                await RetryCompletedMovieCleanupAsync(uow, library, runtime.WatchedFolder, filePath, rel, observedSize, settling, now).ConfigureAwait(false);
                 continue;
             }
 
@@ -324,7 +324,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             {
                 if (mediaScope == ProcessingMediaScopes.Movie && !keepsOriginals)
                 {
-                    await RetryCompletedMovieCleanupAsync(uow, library.Id, runtime.WatchedFolder, filePath, rel, observedSize, settling, now).ConfigureAwait(false);
+                    await RetryCompletedMovieCleanupAsync(uow, library, runtime.WatchedFolder, filePath, rel, observedSize, settling, now).ConfigureAwait(false);
                 }
 
                 continue;
@@ -445,10 +445,19 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
     }
 
     private static async Task RetryCompletedMovieCleanupAsync(
-        UnitOfWork uow, long libraryId, string watchedRoot, string filePath, string rel, long observedSize, SettlingObservation settling, DateTimeOffset now)
+        UnitOfWork uow, ProcessingLibraryRecord library, string watchedRoot, string filePath, string rel, long observedSize, SettlingObservation settling, DateTimeOffset now)
     {
-        var (cleanupOk, cleanupReason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watchedRoot, filePath);
-        if (cleanupOk)
+        var libraryId = library.Id;
+        var (cleanupOk, folderRemoved, cleanupReason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watchedRoot, filePath, library.MediaExtensionsCsv);
+        if (cleanupOk && !folderRemoved)
+        {
+            // The folder also holds other videos: only this file went, and the other files keep their own state.
+            await FileStateStore.RecordFileStateAsync(
+                uow, libraryId, rel,
+                new FileStateVerdict(ProcessingFileStatuses.Processed, $"The output was already complete. {cleanupReason}"),
+                observedSize, settling.SizeChangedAt, now).ConfigureAwait(false);
+        }
+        else if (cleanupOk)
         {
             var releaseParent = PosixParent(rel);
             var siblings = await uow.QueryAsync(

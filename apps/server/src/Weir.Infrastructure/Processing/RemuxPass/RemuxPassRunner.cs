@@ -1129,9 +1129,10 @@ public sealed class RemuxPassRunner
             return;
         }
 
+        ReleaseRemoval removal;
         try
         {
-            Directory.Delete(movieFolder, recursive: true);
+            removal = ReleaseFolderRemoval.Remove(watched, src, context.Request.Runtime.MediaExtensionsCsv);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -1139,6 +1140,16 @@ public sealed class RemuxPassRunner
             _logger.LogWarning("Movies cleanup: {Message}", message);
             output.Set("source_folder_skip_reason", message);
             output.Set("source_deleted_after_success", false);
+            output.Set("source_folder_deleted", false);
+            return;
+        }
+
+        if (!removal.FolderRemoved)
+        {
+            // A pack or category folder keeps its other videos; a linked folder is left alone entirely.
+            _logger.LogInformation("Movies cleanup: kept the release folder {Folder} — {Reason}", movieFolder, removal.Reason);
+            output.Set("source_folder_skip_reason", removal.Reason);
+            output.Set("source_deleted_after_success", removal.FileRemoved);
             output.Set("source_folder_deleted", false);
             return;
         }

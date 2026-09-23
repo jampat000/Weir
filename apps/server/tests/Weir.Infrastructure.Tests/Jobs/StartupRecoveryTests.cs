@@ -84,6 +84,24 @@ public sealed class StartupRecoveryTests : IDisposable
     }
 
     [Fact]
+    public async Task Startup_recovery_never_follows_a_link_out_of_the_output_folder()
+    {
+        var output = _db.Join("output");
+        Directory.CreateDirectory(output);
+        var elsewhere = _db.Join("elsewhere");
+        Directory.CreateDirectory(elsewhere);
+        var foreign = Path.Join(elsewhere, ".someone-elses.mkv.abc.partial");
+        await File.WriteAllTextAsync(foreign, "not Weir's");
+        FolderLinks.Create(Path.Join(output, "Linked"), elsewhere);
+        _db.AddLibrary(outputFolder: output);
+
+        var report = await RunAsync();
+
+        Assert.Equal(0, report.PartialOutputsRemoved);
+        Assert.True(File.Exists(foreign));
+    }
+
+    [Fact]
     public async Task Partial_outputs_under_the_default_output_root_are_removed_with_no_libraries()
     {
         var root = Path.Join(_db.Home, "processing-output", "x");

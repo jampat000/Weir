@@ -88,6 +88,55 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
     }
 
     [Fact]
+    public async Task A_failed_movie_in_a_pack_leaves_the_other_films_in_place()
+    {
+        var mw = P("mw");
+        var mo = P("mo");
+        await SeedLibrariesAsync(mw, mo, P("mwork"), P("tw"), P("to"), P("twork"));
+        Directory.CreateDirectory(Path.Combine(mw, "Pack"));
+        Directory.CreateDirectory(Path.Combine(mo, "Pack"));
+        var failed = Path.Combine(mw, "Pack", "Broken.mkv");
+        var sibling = Path.Combine(mw, "Pack", "Fine.mkv");
+        var siblingOutput = Path.Combine(mo, "Pack", "Fine.mkv");
+        File.WriteAllBytes(failed, "a"u8.ToArray());
+        File.WriteAllBytes(sibling, "b"u8.ToArray());
+        File.WriteAllBytes(siblingOutput, "c"u8.ToArray());
+        await AddFailedJobAsync("Pack/Broken.mkv", "movie");
+        var connection = await _fixture.AddConnectionAsync("radarr", "Radarr", "http://10.0.0.5:7878", "k");
+        _fixture.Http.Json(HttpMethod.Get, "/api/v3/queue", """{"records":[]}""");
+        await LinkAllLibrariesAsync(connection);
+
+        var result = await Sweep().RunForScopeAsync("movie", CancellationToken.None);
+
+        var job = (PyDict)((PyList)result["jobs"]).Items[0];
+        Assert.False(((PyBool)job["movie_failure_cleanup_source_folder_deleted"]).Value);
+        Assert.Equal(ReleaseFolderRemoval.OtherVideosReason, PyConvert.Str(job["movie_failure_cleanup_source_folder_kept_reason"]));
+        Assert.False(File.Exists(failed));
+        Assert.True(File.Exists(sibling));
+        Assert.True(File.Exists(siblingOutput), "another film's finished output is not the failed file's to delete");
+    }
+
+    [Fact]
+    public async Task A_failed_job_whose_path_climbs_out_of_the_watched_folder_removes_nothing()
+    {
+        var mw = P("mw");
+        await SeedLibrariesAsync(mw, P("mo"), P("mwork"), P("tw"), P("to"), P("twork"));
+        var outside = P(Path.Join("elsewhere", "Title"));
+        var victim = Path.Combine(outside, "Film.mkv");
+        File.WriteAllBytes(victim, "a"u8.ToArray());
+        await AddFailedJobAsync("../elsewhere/Title/Film.mkv", "movie");
+        var connection = await _fixture.AddConnectionAsync("radarr", "Radarr", "http://10.0.0.5:7878", "k");
+        _fixture.Http.Json(HttpMethod.Get, "/api/v3/queue", """{"records":[]}""");
+        await LinkAllLibrariesAsync(connection);
+
+        var result = await Sweep().RunForScopeAsync("movie", CancellationToken.None);
+
+        var job = (PyDict)((PyList)result["jobs"]).Items[0];
+        Assert.Equal(ProcessingFailureCleanupSweep.OutsideWatchedFolderReason, PyConvert.Str(job["movie_failure_cleanup_skip_reason"]));
+        Assert.True(File.Exists(victim));
+    }
+
+    [Fact]
     public async Task A_failed_movie_still_held_by_a_manager_skips()
     {
         var mw = P("mw");

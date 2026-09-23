@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 
 namespace Weir.Infrastructure.Tests.Processing.RemuxPass;
@@ -76,6 +77,22 @@ public sealed class OutputFolderCleanupTests : IDisposable
         Assert.Equal("failed", Str(output, "movie_output_truth_check"));
         Assert.False(((PyBool)output["movie_output_folder_deleted"]).Value);
         Assert.True(File.Exists(final));
+    }
+
+    [Fact]
+    public async Task An_output_folder_that_also_holds_another_films_output_is_kept()
+    {
+        var final = MovieOutput("Pack");
+        var otherOutput = _folders.Out(Path.Join("Pack", "Other Film.mkv"));
+        File.WriteAllText(otherOutput, "y");
+        File.SetLastWriteTimeUtc(otherOutput, DateTime.UtcNow.AddDays(-3));
+        _data.Truth.Add(Reported(_folders.Out(Path.Join("ManagerLibrary", "m.mkv"))));
+
+        var output = await RunMovie(final, "Pack/m.mkv");
+
+        Assert.False(((PyBool)output["movie_output_folder_deleted"]).Value);
+        Assert.Equal(ReleaseFolderRemoval.OtherVideosFolderKeptReason, Str(output, "movie_output_folder_skip_reason"));
+        Assert.True(File.Exists(otherOutput));
     }
 
     [Fact]

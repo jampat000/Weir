@@ -5,6 +5,7 @@ using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
+using Weir.Infrastructure.IO;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Sqlite;
 
@@ -225,6 +226,14 @@ public sealed class TvSeasonFolderCleanup : ITvSeasonFolderCleanup
             }
 
             AddSummary(string.Join(" ", lineParts));
+        }
+
+        if (PathContainment.HasLinkBelowRoot(watchedResolved, seasonFolder))
+        {
+            output.Set("tv_season_folder_skip_reason", ReleaseFolderRemoval.LinkedFolderReason);
+            AddSummary(ReleaseFolderRemoval.LinkedFolderReason);
+            _logger.LogWarning("TV cleanup: left {Folder} alone because it sits behind a link.", seasonFolder);
+            return;
         }
 
         try
