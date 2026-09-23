@@ -12,10 +12,6 @@ import {
 import { ScheduleGridEditor } from "./schedule-grid-editor";
 import { LibraryManagerSetup } from "./library/library-manager-setup";
 import { useMeQuery } from "../../lib/auth/queries";
-import {
-  mmStatusPillClass,
-  type MmStatusTone,
-} from "../../lib/ui/mm-status-tone";
 import { useMediaManagerConnectionsQuery } from "../../lib/media-managers/queries";
 import {
   PROCESSING_MEDIA_TYPE_LABELS,
@@ -24,6 +20,7 @@ import {
   type ProcessingLibrary,
   type ProcessingLibraryWrite,
   type ProcessingMediaType,
+  type RemuxWriter,
 } from "../../lib/processing/libraries-api";
 import {
   useCreateProcessingLibrary,
@@ -89,6 +86,9 @@ type FormState = {
   failure_policy: ProcessingFailurePolicy;
   schedule_grid: string;
   rule_set_id: string;
+  /** The one media manager this library is linked to, as its connection id; "" for none. */
+  manager_connection_id: string;
+  remux_writer: RemuxWriter;
 };
 
 type BooleanFormKey = {
@@ -139,6 +139,8 @@ const EMPTY_FORM: FormState = {
   failure_policy: "pass_through",
   schedule_grid: "",
   rule_set_id: "",
+  manager_connection_id: "",
+  remux_writer: "best",
 };
 
 function localDateTimeValue(value: string | null): string {
@@ -205,6 +207,11 @@ function formFrom(library: ProcessingLibrary): FormState {
     schedule_grid: library.schedule_grid,
     rule_set_id:
       library.rule_set_id === null ? "" : String(library.rule_set_id),
+    manager_connection_id:
+      library.manager_connection_ids.length > 0
+        ? String(library.manager_connection_ids[0])
+        : "",
+    remux_writer: library.remux_writer ?? "best",
   };
 }
 
@@ -268,7 +275,15 @@ function writeFrom(
     schedule_start: library?.schedule_start ?? "00:00",
     schedule_end: library?.schedule_end ?? "23:59",
     rule_set_id: form.rule_set_id ? Number(form.rule_set_id) : null,
-    manager_connection_ids: library?.manager_connection_ids ?? [],
+    // One manager per library from the editor (#651); a library linked to more than one through the API keeps the
+    // others, so saving here never drops a link nobody chose to remove.
+    manager_connection_ids: form.manager_connection_id
+      ? [
+          Number(form.manager_connection_id),
+          ...(library?.manager_connection_ids ?? []).slice(1),
+        ].filter((id, i, all) => all.indexOf(id) === i)
+      : [],
+    remux_writer: form.remux_writer,
   };
 }
 
@@ -280,18 +295,6 @@ function errorText(error: unknown, fallback: string): string {
     if (message) return message;
   }
   return fallback;
-}
-
-function managerCoverageLabel(value: string): string {
-  if (value === "connected") return "Connected";
-  if (value === "unreachable") return "Unreachable";
-  return "No upstream signal";
-}
-
-function managerCoverageTone(value: string): MmStatusTone {
-  if (value === "connected") return "healthy";
-  if (value === "unreachable") return "failed";
-  return "warning";
 }
 
 /**
@@ -325,8 +328,10 @@ export function ProcessingLibrariesSection() {
 
   const editable = canEdit(me.data?.role);
   const rows = libraries.data ?? [];
-  const editingConnectionIds =
-    rows.find((r) => r.id === editingId)?.manager_connection_ids ?? [];
+  // Reject is offered for the manager chosen in the editor, saved or not.
+  const editingConnectionIds = form.manager_connection_id
+    ? [Number(form.manager_connection_id)]
+    : [];
   const rejectSupport = useProcessingRejectSupportQuery(
     editingConnectionIds,
     adding || editingId !== null,
@@ -563,8 +568,10 @@ export function ProcessingLibrariesSection() {
         }
       >
         <p className="mm-quiet-note">
-          Each library has its own folders, file types and schedule. Add as many
-          as you need — a 4K library and a kids library are separate libraries.
+          A library is a folder Weir watches and a folder it hands clean files
+          back to. A library from a media manager is kept in step with it; one
+          made here is yours alone, and can still be linked to a manager in its
+          editor. A 4K library and a kids library are separate libraries.
         </p>
         {rows.length === 0 ? (
           <p className="mm-quiet-note mt-4">
@@ -576,9 +583,13 @@ export function ProcessingLibrariesSection() {
               <thead>
                 <tr>
                   <th scope="col">Library</th>
-                  <th scope="col">Watched folder</th>
-                  <th scope="col">Manager</th>
-                  <th scope="col">Controls</th>
+                  <th scope="col">Source</th>
+                  <th scope="col">Watches, hands back to</th>
+                  <th scope="col">Rules</th>
+                  <th scope="col">On</th>
+                  <th scope="col">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -597,48 +608,53 @@ export function ProcessingLibrariesSection() {
                           </span>
                         ) : null}
                       </th>
-                      <td data-label="Watched folder">
-                        <span className="mm-quiet-table__strong">
-                          {library.watched_folder || "no watched folder yet"}
+                      <td data-label="Source">
+                        <LibrarySource
+                          library={library}
+                          connections={connections.data ?? []}
+                        />
+                      </td>
+                      <td data-label="Watches, hands back to">
+                        <span className="mm-quiet-table__strong mm-library-path">
+                          {library.watched_folder || "No watched folder yet"}
                         </span>
+                        {library.output_folder ? (
+                          <span className="mm-quiet-table__sub mm-library-path">
+                            hands back to {library.output_folder}
+                          </span>
+                        ) : (
+                          <span className="mm-quiet-table__sub mm-status-text--warning">
+                            Needs a folder to hand files back to
+                            {library.enabled ? "" : ", so it is off"}
+                          </span>
+                        )}
                         {library.active_job_count > 0 ? (
                           <span className="mm-quiet-table__sub">
                             {library.active_job_count} in progress
                           </span>
                         ) : null}
-                        {library.discovered_from_connection_id ? (
+                      </td>
+                      <td data-label="Rules">
+                        {(ruleSets.data ?? []).find(
+                          (set) => set.id === library.rule_set_id,
+                        )?.name ?? (
                           <span className="mm-quiet-table__sub">
-                            Linked to{" "}
-                            {connections.data?.find(
-                              (item) =>
-                                item.id ===
-                                library.discovered_from_connection_id,
-                            )?.name ||
-                              `manager #${library.discovered_from_connection_id}`}
+                            Default rules
                           </span>
-                        ) : null}
+                        )}
                       </td>
-                      <td data-label="Manager">
-                        <span
-                          className={mmStatusPillClass(
-                            managerCoverageTone(library.manager_coverage),
-                          )}
-                        >
-                          {managerCoverageLabel(library.manager_coverage)}
-                        </span>
-                        <span className="mm-quiet-table__sub">
-                          {library.manager_coverage_detail}
-                        </span>
+                      <td data-label="On">
+                        <MmOnOffSwitch
+                          id={`processing-library-enabled-${library.id}`}
+                          label={`${library.name} enabled`}
+                          enabled={library.enabled}
+                          disabled={!editable}
+                          onChange={() => void toggleEnabled(library)}
+                          layout="control"
+                        />
                       </td>
-                      <td data-label="Controls">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <MmOnOffSwitch
-                            id={`processing-library-enabled-${library.id}`}
-                            label={`${library.name} enabled`}
-                            enabled={library.enabled}
-                            disabled={!editable}
-                            onChange={() => void toggleEnabled(library)}
-                          />
+                      <td data-label="">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
                           <button
                             type="button"
                             className={mmActionButtonClass({
@@ -919,6 +935,56 @@ export function ProcessingLibrariesSection() {
                 </select>
                 <span className="mm-field__hint">
                   Create and edit reusable rule sets under Rules.
+                </span>
+              </label>
+              <label className="mm-field mm-field--medium">
+                <span className="mm-field__label">Media manager</span>
+                <select
+                  className="mm-input"
+                  value={form.manager_connection_id}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      manager_connection_id: event.target.value,
+                    })
+                  }
+                  disabled={!editable}
+                  data-testid="library-manager-choice"
+                >
+                  <option value="">None</option>
+                  {(connections.data ?? []).map((connection) => (
+                    <option key={connection.id} value={connection.id}>
+                      {connection.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="mm-field__hint">
+                  The app that sends this library its downloads. Weir waits for
+                  it to finish with a download, hands the cleaned file back, and
+                  can ask it for a different release when one is bad.
+                </span>
+              </label>
+              <label className="mm-field mm-field--medium">
+                <span className="mm-field__label">Writes files with</span>
+                <select
+                  className="mm-input"
+                  value={form.remux_writer}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      remux_writer: event.target.value as RemuxWriter,
+                    })
+                  }
+                  disabled={!editable}
+                  data-testid="library-writer-choice"
+                >
+                  <option value="best">The best tool for each file</option>
+                  <option value="ffmpeg">FFmpeg only</option>
+                </select>
+                <span className="mm-field__hint">
+                  {form.remux_writer === "best"
+                    ? "mkvmerge writes MKV files when it is installed, FFmpeg writes the rest, and FFmpeg writes again if mkvmerge's copy fails Weir's checks."
+                    : "FFmpeg writes every file, as every Weir before 3.0 did."}
                 </span>
               </label>
               {field(
@@ -1327,5 +1393,50 @@ export function ProcessingLibrariesSection() {
         </div>
       </SidePanel>
     </div>
+  );
+}
+
+/**
+ * Where a library comes from, said plainly (canvas board 4A): from a media manager and kept in step with it, or made
+ * here and linked to one (or not). The manager's own last word shows when it did not answer.
+ */
+function LibrarySource({
+  library,
+  connections,
+}: {
+  library: ProcessingLibrary;
+  connections: { id: number; name: string; last_test_detail?: string | null }[];
+}) {
+  const nameOf = (id: number) =>
+    connections.find((c) => c.id === id)?.name ?? `manager #${id}`;
+  const linked = library.manager_connection_ids;
+  const quiet = library.manager_coverage === "unreachable";
+  const quietDetail = linked
+    .map((id) => connections.find((c) => c.id === id)?.last_test_detail)
+    .find((detail) => detail);
+  return (
+    <>
+      {library.discovered_from_connection_id ? (
+        <span className="mm-quiet-table__strong mm-library-source mm-library-source--synced">
+          From {nameOf(library.discovered_from_connection_id)}
+        </span>
+      ) : (
+        <span className="mm-quiet-table__strong mm-library-source">
+          Made here
+        </span>
+      )}
+      <span className="mm-quiet-table__sub">
+        {library.discovered_from_connection_id
+          ? "kept in step with it"
+          : linked.length > 0
+            ? `linked to ${linked.map(nameOf).join(", ")}`
+            : "no media manager"}
+      </span>
+      {quiet ? (
+        <span className="mm-quiet-table__sub mm-status-text--failed">
+          {quietDetail ?? "Its media manager did not answer the last check."}
+        </span>
+      ) : null}
+    </>
   );
 }

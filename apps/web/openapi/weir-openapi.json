@@ -4903,6 +4903,16 @@
             "description": "After a successful pass, remove the original download from the watched folder. Off keeps the file, its folder and its sidecars where the download client put them, so a torrent keeps seeding.",
             "title": "Remove Original After Success",
             "type": "boolean"
+          },
+          "remux_writer": {
+            "default": "best",
+            "description": "Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
+            "enum": [
+              "best",
+              "ffmpeg"
+            ],
+            "title": "Remux Writer",
+            "type": "string"
           }
         },
         "required": [
@@ -5273,6 +5283,16 @@
             "description": "After a successful pass, remove the original download from the watched folder. Off keeps the file, its folder and its sidecars where the download client put them, so a torrent keeps seeding.",
             "title": "Remove Original After Success",
             "type": "boolean"
+          },
+          "remux_writer": {
+            "default": "best",
+            "description": "Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
+            "enum": [
+              "best",
+              "ffmpeg"
+            ],
+            "title": "Remux Writer",
+            "type": "string"
           }
         },
         "required": [
@@ -5729,6 +5749,16 @@
             "description": "After a successful pass, remove the original download from the watched folder. Off keeps the file, its folder and its sidecars where the download client put them, so a torrent keeps seeding.",
             "title": "Remove Original After Success",
             "type": "boolean"
+          },
+          "remux_writer": {
+            "default": "best",
+            "description": "Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
+            "enum": [
+              "best",
+              "ffmpeg"
+            ],
+            "title": "Remux Writer",
+            "type": "string"
           }
         },
         "required": [

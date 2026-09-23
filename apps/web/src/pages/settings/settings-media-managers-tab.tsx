@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 
 import {
   MEDIA_MANAGER_KIND_LABELS,
@@ -20,10 +21,6 @@ import {
   mmTechnicalMonoSmallClass,
 } from "../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
-import {
-  mmModuleTabBlurbBandClass,
-  mmModuleTabBlurbTextClass,
-} from "../../lib/ui/mm-module-tab-blurb";
 import {
   QuietFieldGroup,
   quietActionRowClass,
@@ -80,12 +77,16 @@ function ConnectionStatusPanel({
   // unchecked rather than borrowing the success colour.
   const result = connection.last_test_at ? connection.last_test_ok : null;
 
+  // Weir checks every enabled manager each minute (the heartbeat), so this is how it is now, not when someone
+  // last pressed Test.
   const headline =
     result === null
-      ? "Not checked yet"
+      ? connection.enabled
+        ? "Checking…"
+        : "Off"
       : result
-        ? "Connected"
-        : "Connection failed";
+        ? "Answering"
+        : "Not answering";
 
   // The site's own status colours, so the headline reads the same in light and dark
   // as every other good/bad word in Weir, not a raw palette green and red.
@@ -107,15 +108,16 @@ function ConnectionStatusPanel({
         <span className="font-medium text-[var(--mm-text)]">
           {connection.last_test_at ? fmt(connection.last_test_at) : "never"}
         </span>
+        {connection.enabled ? " · Weir checks every minute" : ""}
       </p>
       {result === false && connection.last_test_detail ? (
         <p className="mm-status-text--failed mt-1 text-xs">
           {connection.last_test_detail}
         </p>
       ) : null}
-      {result === null ? (
+      {result === null && connection.enabled ? (
         <p className="mt-2 text-xs text-[var(--mm-text2)]">
-          Run a test to check Weir can reach it.
+          Weir checks it within a minute, or press Test connection.
         </p>
       ) : null}
     </div>
@@ -253,6 +255,7 @@ function ConnectionCard({
       </div>
       <div className="mm-quiet-section__body">
         <ConnectionStatusPanel connection={connection} fmt={fmt} />
+        <LinkedLibraries connectionId={connection.id} />
 
         <div className="mt-3 flex flex-wrap gap-2">
           <button
@@ -416,12 +419,14 @@ export function SettingsMediaManagersTab() {
 
   return (
     <div className="mm-quiet-stack" data-testid="suite-settings-media-managers">
-      <div className={mmModuleTabBlurbBandClass}>
-        <p className={mmModuleTabBlurbTextClass}>
-          The apps that send files to Weir. Connect one so Weir knows when there
-          is something to work on.
-        </p>
-      </div>
+      <p className="mm-quiet-note">
+        The apps that send files to Weir. Weir asks each one when a download is
+        really finished, hands cleaned files back to it, and can ask it for a
+        different release when one is bad. Libraries imported from an app are
+        linked to it; link a library you made yourself in its editor under
+        Libraries. Weir checks every app each minute and says here when one
+        stops answering.
+      </p>
 
       {connections.isLoading ? <p className="mm-quiet-note">Loading…</p> : null}
 
@@ -451,5 +456,31 @@ export function SettingsMediaManagersTab() {
         </div>
       )}
     </div>
+  );
+}
+
+/** The libraries linked to this app, so it is plain what depends on it. */
+function LinkedLibraries({ connectionId }: { connectionId: number }) {
+  const libraries = useProcessingLibrariesQuery();
+  const linked = (libraries.data ?? []).filter((library) =>
+    library.manager_connection_ids.includes(connectionId),
+  );
+  if (!libraries.data) return null;
+  return (
+    <p
+      className="mt-2 text-xs text-[var(--mm-text2)]"
+      data-testid="media-manager-libraries"
+    >
+      {linked.length > 0 ? (
+        <>
+          Libraries:{" "}
+          <span className="font-medium text-[var(--mm-text)]">
+            {linked.map((library) => library.name).join(", ")}
+          </span>
+        </>
+      ) : (
+        "No library uses it yet. Link one in Settings › Libraries."
+      )}
+    </p>
   );
 }

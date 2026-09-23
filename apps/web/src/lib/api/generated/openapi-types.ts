@@ -4277,6 +4277,13 @@ export interface components {
        * @default true
        */
       remove_original_after_success: boolean;
+      /**
+       * Remux Writer
+       * @description Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
+       * @default best
+       * @enum {string}
+       */
+      remux_writer: "best" | "ffmpeg";
     };
     /** ProcessingLibraryDeleteIn */
     ProcessingLibraryDeleteIn: {
@@ -4439,6 +4446,13 @@ export interface components {
        * @default true
        */
       remove_original_after_success: boolean;
+      /**
+       * Remux Writer
+       * @description Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
+       * @default best
+       * @enum {string}
+       */
+      remux_writer: "best" | "ffmpeg";
     };
     /** ProcessingLibraryReorderIn */
     ProcessingLibraryReorderIn: {
@@ -4721,6 +4735,13 @@ export interface components {
        * @default true
        */
       remove_original_after_success: boolean;
+      /**
+       * Remux Writer
+       * @description Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
+       * @default best
+       * @enum {string}
+       */
+      remux_writer: "best" | "ffmpeg";
     };
     /**
      * ProcessingManualPlanIn

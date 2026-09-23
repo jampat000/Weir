@@ -7,6 +7,7 @@ using Weir.Core.Security;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Library;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Scheduling;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
@@ -23,6 +24,8 @@ public static class MediaManagerServices
         services.TryAddSingleton<IManagerHttpHandlerFactory, SocketsManagerHttpHandlerFactory>();
         services.TryAddSingleton<IMediaManagerPorts, HttpMediaManagerPorts>();
         services.TryAddSingleton<MediaManagerConnectionService>();
+        // Every minute, each manager's connection test, so Weir knows within a minute when one goes quiet (23 Sep 2026).
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IPeriodicTask, ManagerHeartbeatTask>());
         services.TryAddSingleton<LibraryDiscoveryService>();
         services.TryAddSingleton<ManagerSetupCheck>();
         services.TryAddSingleton<HandoffLedgerStore>();

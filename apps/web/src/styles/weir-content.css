@@ -1515,3 +1515,18 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Settings › Libraries: where a library comes from, and its folders in the code face they are typed in. */
+.mm-library-source {
+  display: block;
+}
+
+.mm-library-source--synced {
+  color: var(--mm-accent-bright);
+}
+
+.mm-library-path {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}

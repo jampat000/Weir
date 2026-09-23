@@ -223,9 +223,12 @@ public sealed class LibraryDiscoveryService
             var name = UniqueName(existingNames, wantedName);
             existingNames.Add(name);
 
+            // A library with nowhere to hand files back arrives switched off (James, 23 Sep 2026): on, it would pick up
+            // downloads it could never deliver. Settings › Libraries says what it needs.
             var row = new ProcessingLibraryRecord
             {
                 Name = name,
+                Enabled = usableOutput.Length > 0,
                 MediaType = string.IsNullOrEmpty(descriptor.MediaScope) ? ProcessingMediaScopes.Movie : descriptor.MediaScope,
                 DisplayOrder = order,
                 WatchedFolder = usableRoot,

@@ -181,11 +181,22 @@ public static class LibraryStore
     /// <c>session.add</c>/<c>flush</c> on a row built from a handful of fields, every other column keeping its
     /// schema default (mirrored by <see cref="ProcessingLibraryRecord"/>'s own property defaults).
     /// </summary>
+    /// <summary>
+    /// A library imported from a media manager, linked to that manager as it is created (#651). Before, the link was
+    /// never written, so no library had a manager: Weir could not reject a bad download through it, and every library
+    /// read "No upstream signal".
+    /// </summary>
     public static async Task<ProcessingLibraryRecord> CreateDiscoveredAsync(UnitOfWork uow, ProcessingLibraryRecord row)
     {
         await InsertAsync(uow, row).ConfigureAwait(false);
-        return await GetByNameAsync(uow, row.Name).ConfigureAwait(false)
+        var created = await GetByNameAsync(uow, row.Name).ConfigureAwait(false)
             ?? throw new InvalidOperationException("Discovered library insert race.");
+        if (row.DiscoveredFromConnectionId is { } connectionId)
+        {
+            await SetManagerLinksAsync(uow, created.Id, [connectionId]).ConfigureAwait(false);
+        }
+
+        return created;
     }
 
     /// <summary><c>unlink_library</c>: forget where a library came from, keeping the library itself untouched.</summary>

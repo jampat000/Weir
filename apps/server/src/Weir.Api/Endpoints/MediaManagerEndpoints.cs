@@ -24,15 +24,6 @@ public static class MediaManagerEndpoints
 
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(15);
 
-    /// <summary>Where each kind answers a liveness check.</summary>
-    private static readonly Dictionary<string, string> HealthPaths = new(StringComparer.Ordinal)
-    {
-        ["radarr"] = "/api/v3/system/status",
-        ["sonarr"] = "/api/v3/system/status",
-        ["deluno"] = "/api/integrations/external/health",
-        ["native"] = "/api/integrations/external/health",
-    };
-
     /// <summary><c>weir.platform.reconciliation.router</c> (registered after local browse, as in Python).</summary>
     public static IEndpointRouteBuilder MapReconciliationEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -318,32 +309,10 @@ public static class MediaManagerEndpoints
         return ApiRoutes.Ok(saved.ToOut());
     }
 
-    /// <summary><c>_probe</c>: ask the manager whether it is there, and say what happened in plain words.</summary>
-    private static async Task<(bool Ok, string Detail)> ProbeAsync(ApiRequest request, string name, string kind, string baseUrl, string? apiKey)
-    {
-        var path = HealthPaths.GetValueOrDefault(kind, "/api/integrations/external/health");
-        try
-        {
-            var client = new MediaManagerHttpClient(baseUrl, apiKey ?? string.Empty, request.Service<IManagerHttpHandlerFactory>(), TestTimeout);
-            await client.HealthOkAsync(path, request.Context.RequestAborted).ConfigureAwait(false);
-        }
-        catch (MediaManagerHttpException exception)
-        {
-            var detail = exception.Message;
-            if (detail.Contains("HTTP 401", StringComparison.Ordinal) || detail.Contains("HTTP 403", StringComparison.Ordinal))
-            {
-                return (false, $"Weir reached {name}, but the API key was refused. Check the key and save it again.");
-            }
-
-            return (false, $"Weir reached {name} but did not get the answer it expected. Check the address points at the app itself, not a page inside it.");
-        }
-        catch (MediaManagerUnreachableException)
-        {
-            return (false, $"Weir could not reach {name} at {baseUrl}. Check the address is right, and that the app is running and reachable from this machine.");
-        }
-
-        return (true, $"Connected. Weir can reach {name}.");
-    }
+    /// <summary><c>_probe</c>, shared with the heartbeat (<see cref="ManagerHealthProbe"/>).</summary>
+    private static Task<(bool Ok, string Detail)> ProbeAsync(ApiRequest request, string name, string kind, string baseUrl, string? apiKey) =>
+        ManagerHealthProbe.ProbeAsync(
+            request.Service<IManagerHttpHandlerFactory>(), name, kind, baseUrl, apiKey, TestTimeout, request.Context.RequestAborted);
 
     private static async Task<ApiResult> PostConnectionTestAsync(ApiRequest request)
     {
