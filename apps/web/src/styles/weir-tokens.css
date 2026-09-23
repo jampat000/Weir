@@ -69,6 +69,13 @@
      and the eye had nowhere to land. Sizes are in rem so they follow the density font scale. */
   --mm-type-eyebrow: 0.6875rem; /* 11px, uppercase, tracked — labels and eyebrows */
   --mm-type-caption: 0.78125rem; /* 12.5px — secondary detail under a value */
+
+  /* How wide a control is, decided by what goes in it rather than by whichever max-w-* class
+     the file happened to use. Settings had eight different control widths — 370px beside 367px,
+     752px beside 726px — which is what "not aligned, not uniform" looks like from a foot away. */
+  --mm-field-short: 9rem; /* a number, a time, a count */
+  --mm-field-medium: 22rem; /* a choice, a short name */
+  --mm-field-wide: 40rem; /* a path, a template, a sentence */
   --mm-type-body: 0.84375rem; /* 13.5px — rows and body copy */
   --mm-type-panel: 1rem; /* 16px — panel and card headings */
   --mm-type-title: 1.5rem; /* 24px — page title */

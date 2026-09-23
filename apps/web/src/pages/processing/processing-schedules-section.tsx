@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { PageLoading } from "../../components/shared/page-loading";
 import {
-  QuietDisclosure,
   QuietSection,
   quietActionRowClass,
 } from "../../components/shared/quiet-section";
@@ -284,24 +283,8 @@ export function ProcessingSchedulesSection() {
     (x, y) => x.display_order - y.display_order,
   );
 
-  // Both windows are optional and off on a fresh install, and between them they were 1150px of
-  // schedule controls sitting above the libraries they belong to — the Libraries tab read as being
-  // mostly about schedules (James, 23 Sep 2026: "everything feels like its just dumped"). One fold,
-  // holding both windows and the scan you can start by hand, under the list it acts on.
-  const windowsLimited = [movieHoursLimited, tvHoursLimited].filter(
-    Boolean,
-  ).length;
-
   return (
-    <QuietDisclosure
-      title="When Weir may scan"
-      detail="Weir watches these folders all the time unless you give it a window. Starting a scan by hand ignores the window."
-      summaryWhenClosed={
-        windowsLimited === 0 ? "Any time" : `${windowsLimited} limited`
-      }
-      defaultOpen={windowsLimited > 0}
-      data-testid="processing-schedules-section"
-    >
+    <div className="mm-quiet-stack" data-testid="processing-schedules-section">
       <div className="grid min-w-0 gap-10 xl:grid-cols-2 xl:gap-x-14">
         {/* Movies, then TV: the order Libraries, the Overview table and Run now below all use. */}
         <ScheduleWindow
@@ -417,6 +400,6 @@ export function ProcessingSchedulesSection() {
             : "Save Movies schedule window failed."}
         </p>
       ) : null}
-    </QuietDisclosure>
+    </div>
   );
 }

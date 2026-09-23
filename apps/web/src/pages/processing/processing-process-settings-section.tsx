@@ -21,10 +21,6 @@ import {
 } from "../../lib/processing/queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 
-/** One column of a `sm:grid-cols-2 gap-4` row, so a field on a line of its own lines
- *  up with the paired fields above it instead of stretching to the form's width. */
-const HALF_WIDTH_FIELD_CLASS = "sm:max-w-[calc(50%_-_0.5rem)]";
-
 function canEdit(role: string | undefined): boolean {
   return role === "operator" || role === "admin";
 }
@@ -181,8 +177,9 @@ export function ProcessingProcessSettingsSection() {
     setValue: (next: string) => void,
     options: { min?: number; max?: number; step?: number; hint?: string } = {},
   ) => (
-    <label className="block min-w-0">
-      <span className="text-sm text-[var(--mm-text2)]">{label}</span>
+    // Two or three digits never needed half the page: the standard short field (.mm-field--short).
+    <label className="mm-field mm-field--short">
+      <span className="mm-field__label">{label}</span>
       <input
         type="number"
         min={options.min ?? 0}
@@ -191,12 +188,10 @@ export function ProcessingProcessSettingsSection() {
         value={value}
         disabled={!editable || save.isPending}
         onChange={(event) => setValue(event.target.value)}
-        className="mm-input mt-1 w-full"
+        className="mm-input"
       />
       {options.hint ? (
-        <span className="mt-1 block text-xs leading-5 text-[var(--mm-text3)]">
-          {options.hint}
-        </span>
+        <span className="mm-field__hint">{options.hint}</span>
       ) : null}
     </label>
   );
@@ -266,7 +261,7 @@ export function ProcessingProcessSettingsSection() {
             title="Files at once"
             detail="How many files Weir works on at the same time, however they arrived. More at once clears a burst of imports sooner; it is mostly disk work, so a slow disk gains little past two or three."
           >
-            <div className={HALF_WIDTH_FIELD_CLASS}>
+            <div className="mm-field-row">
               <div className="block min-w-0">
                 <span
                   id={filesAtOnceLabelId}
@@ -306,7 +301,7 @@ export function ProcessingProcessSettingsSection() {
               )}
             </div>
             {runnerBudgetEnabled ? (
-              <div className={HALF_WIDTH_FIELD_CLASS}>
+              <div className="mm-field-row">
                 {numberField(
                   "Budget (units)",
                   runnerCapacity,
@@ -336,7 +331,7 @@ export function ProcessingProcessSettingsSection() {
               })}
             </div>
             <div
-              className={`${HALF_WIDTH_FIELD_CLASS} ${runnerBudgetEnabled ? "" : "hidden"}`}
+              className={`mm-field-row ${runnerBudgetEnabled ? "" : "hidden"}`}
             >
               {numberField(
                 "Unknown-resolution cost",
@@ -354,7 +349,7 @@ export function ProcessingProcessSettingsSection() {
             title="Admission safety"
             detail="Final guardrails before Weir probes or writes a file. Keep downloader limits too; these protect the processing host."
           >
-            <div className={`grid gap-4 ${HALF_WIDTH_FIELD_CLASS}`}>
+            <div className="mm-field-row">
               {numberField(
                 "Minimum unchanged age (seconds)",
                 minFileAgeSeconds,
@@ -382,7 +377,7 @@ export function ProcessingProcessSettingsSection() {
             title="Records and cleanup"
             detail="Choose how much diagnostic history to keep and how Weir treats its own temporary data after work finishes or fails."
           >
-            <div className={HALF_WIDTH_FIELD_CLASS}>
+            <div className="mm-field-row">
               {numberField(
                 "Processing-record retention (days)",
                 fileLogRetentionDays,

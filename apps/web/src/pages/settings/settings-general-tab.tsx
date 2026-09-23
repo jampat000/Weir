@@ -10,10 +10,7 @@ import {
   QuietDisclosure,
   quietActionRowClass,
 } from "../../components/shared/quiet-section";
-import {
-  mmActionButtonClass,
-  mmEditableTextFieldClass,
-} from "../../lib/ui/mm-control-roles";
+import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { SettingsQuietSection } from "./settings-shared";
 
 /** The field caption, spelled exactly as the deleted `.mm-settings-field-label` rule
@@ -204,16 +201,14 @@ export function SettingsHistoryRetentionSection({
         <p className="mm-quiet-note">
           How long Weir keeps its system log and how far back Activity goes.
         </p>
-        <div className="mt-4 grid max-w-2xl gap-5 sm:grid-cols-2">
-          <label className="block min-w-0">
-            <span className={FIELD_LABEL_CLASS}>
-              System log retention (days)
-            </span>
+        <div className="mm-field-row mt-4">
+          <label className="mm-field mm-field--short">
+            <span className="mm-field__label">System log retention (days)</span>
             <input
               type="number"
               min={1}
               max={3650}
-              className={`${mmEditableTextFieldClass} mt-1`}
+              className="mm-input"
               value={normalizedLogRetentionDraft}
               disabled={!editable || save.isPending}
               onFocus={() =>
@@ -229,21 +224,21 @@ export function SettingsHistoryRetentionSection({
             />
             <span
               id="suite-general-log-retention-hint"
-              className={`mt-1 block ${FIELD_HINT_CLASS}`}
+              className="mm-field__hint"
             >
               1 to 3650 days. Older entries are removed while Weir runs.
             </span>
           </label>
           {settingsData.activity_retention_days !== undefined ? (
-            <label className="block min-w-0" id="activity-retention">
-              <span className={FIELD_LABEL_CLASS}>
+            <label className="mm-field mm-field--short" id="activity-retention">
+              <span className="mm-field__label">
                 Keep Activity history for (days)
               </span>
               <input
                 type="number"
                 min={0}
                 max={3650}
-                className={`${mmEditableTextFieldClass} mt-1`}
+                className="mm-input"
                 value={normalizedActivityRetentionDraft}
                 disabled={!editable || save.isPending}
                 data-testid="suite-settings-activity-retention"
@@ -257,7 +252,7 @@ export function SettingsHistoryRetentionSection({
               />
               <span
                 id="suite-general-activity-retention-hint"
-                className={`mt-1 block ${FIELD_HINT_CLASS}`}
+                className="mm-field__hint"
               >
                 0 keeps it until you clear it. Media files are never touched.
               </span>

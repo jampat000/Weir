@@ -1139,3 +1139,54 @@
     transition: none;
   }
 }
+
+/* ── 3e · One shape for a setting ────────────────────────────────────────────
+ * A label, its control, and the line under it that explains the control. Every setting in
+ * Settings is this shape, and a control is one of three widths chosen by what goes in it, so
+ * two fields that do the same job are the same size on every screen (James, 23 Sep 2026: "its
+ * not aligned, its not uniform, its not standardised").
+ */
+.mm-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.mm-field__label {
+  font-size: var(--mm-type-caption);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--mm-text2);
+}
+
+.mm-field__hint {
+  font-size: var(--mm-type-caption);
+  line-height: 1.45;
+  color: var(--mm-text3);
+}
+
+/* The control inside takes the field's width rather than stretching to the column. */
+.mm-field--short .mm-input,
+.mm-field--short > .mm-input {
+  width: min(100%, var(--mm-field-short));
+}
+
+.mm-field--medium .mm-input,
+.mm-field--medium > .mm-input {
+  width: min(100%, var(--mm-field-medium));
+}
+
+.mm-field--wide .mm-input,
+.mm-field--wide > .mm-input {
+  width: min(100%, var(--mm-field-wide));
+}
+
+/* A row of settings that belong together, on one baseline. */
+.mm-field-row {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.1rem 1.5rem;
+}

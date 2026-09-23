@@ -70,6 +70,7 @@ type TabId =
   | "rules"
   | "media-managers"
   | "running"
+  | "schedule"
   | "alerts"
   | "security"
   | "history"
@@ -88,6 +89,7 @@ const SETTINGS_TABS: readonly WorkspaceTabOption<TabId>[] = [
   { id: "rules", label: "Rules" },
   { id: "media-managers", label: "Media managers" },
   { id: "running", label: "Running" },
+  { id: "schedule", label: "Schedule" },
   { id: "alerts", label: "Alerts" },
   { id: "security", label: "Security" },
   { id: "system", label: "System" },
@@ -106,6 +108,9 @@ function normalizeSettingsTab(candidate: string | null | undefined): TabId {
     case "running":
     case "processing":
       return "running";
+    case "schedule":
+    case "schedules":
+      return "schedule";
     case "alerts":
     case "notifications":
       return "alerts";
@@ -557,10 +562,7 @@ export function SettingsPage() {
       />
       <WorkspacePanel id="settings-panel" labelledBy={`settings-tab-${tab}`}>
         {tab === "libraries" ? (
-          <div className="mm-quiet-stack">
-            <ProcessingLibrariesSection />
-            <ProcessingSchedulesSection />
-          </div>
+          <ProcessingLibrariesSection />
         ) : tab === "rules" ? (
           <ProcessingRemuxSection />
         ) : tab === "media-managers" ? (
@@ -570,6 +572,8 @@ export function SettingsPage() {
             <ProcessingProcessSettingsSection />
             <ProcessingDirectPlaySection />
           </div>
+        ) : tab === "schedule" ? (
+          <ProcessingSchedulesSection />
         ) : tab === "alerts" ? (
           <SettingsNotificationsTab />
         ) : tab === "security" ? (
