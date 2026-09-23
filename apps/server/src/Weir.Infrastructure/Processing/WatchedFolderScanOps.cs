@@ -3,6 +3,7 @@ using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Processing;
 using Weir.Core.Rules;
+using Weir.Infrastructure.IO;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
 
@@ -446,20 +447,16 @@ public static class WatchedFolderScanOps
             return (false, $"Source cleanup retry skipped because the path was not safely under the watched folder ({exception.Message}).");
         }
 
-        if (!src.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        if (!PathContainment.IsUnder(root, src))
         {
             return (false, "Source cleanup retry skipped because the path was not safely under the watched folder.");
         }
 
+        // The file is strictly inside the root, so its folder is either the root itself or a release folder inside it.
         var movieFolder = Path.GetDirectoryName(src);
-        if (movieFolder is null || string.Equals(movieFolder, root, StringComparison.OrdinalIgnoreCase))
+        if (movieFolder is null || !PathContainment.IsUnder(root, movieFolder))
         {
             return (false, "Source cleanup retry skipped because the file sits directly in the watched folder root.");
-        }
-
-        if (!movieFolder.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-        {
-            return (false, "Source cleanup retry skipped because the release folder is outside the watched folder.");
         }
 
         try
@@ -483,68 +480,6 @@ public static class WatchedFolderScanOps
         {
             return (false, $"Source cleanup retry could not remove the release folder because this path is still locked or blocked ({exception.Message}).");
         }
-    }
-
-    /// <summary>Applies the library's rejected-file cleanup action without ever deleting a populated
-    /// folder.</summary>
-    public static (bool Deleted, string Detail) CleanupRejectedFile(string watchedRoot, string filePath, string action)
-    {
-        if (!string.Equals((action ?? "leave").Trim(), "delete_file", StringComparison.OrdinalIgnoreCase))
-        {
-            return (false, "Weir left the rejected file in place because this library's cleanup action is Leave in place.");
-        }
-
-        string root, source;
-        try
-        {
-            root = Path.GetFullPath(watchedRoot);
-            source = Path.GetFullPath(filePath);
-        }
-        catch (ArgumentException exception)
-        {
-            return (false, $"Weir did not delete the rejected file because it was not safely inside the watched folder ({exception.Message}).");
-        }
-
-        if (!source.StartsWith(root, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(source, root, StringComparison.OrdinalIgnoreCase) ||
-            !File.Exists(source))
-        {
-            return (false, "Weir did not delete the rejected path because it is not a regular file inside the watched folder.");
-        }
-
-        try
-        {
-            File.Delete(source);
-        }
-        catch (IOException exception)
-        {
-            return (false, $"Weir could not delete the rejected file because it is locked or unavailable ({exception.Message}).");
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            return (false, $"Weir could not delete the rejected file because it is locked or unavailable ({exception.Message}).");
-        }
-
-        var parent = Path.GetDirectoryName(source);
-        while (parent is not null && !string.Equals(parent, root, StringComparison.OrdinalIgnoreCase))
-        {
-            try
-            {
-                Directory.Delete(parent);
-            }
-            catch (IOException)
-            {
-                break;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                break;
-            }
-
-            parent = Path.GetDirectoryName(parent);
-        }
-
-        return (true, "Weir deleted the rejected file because this library's cleanup action is Delete rejected file.");
     }
 
     /// <summary>

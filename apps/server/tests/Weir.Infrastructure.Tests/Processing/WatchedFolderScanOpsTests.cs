@@ -1,5 +1,6 @@
 using Weir.Core.Processing;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Sqlite;
 using Weir.Infrastructure.Tests.Jobs;
 
@@ -194,6 +195,56 @@ public sealed class WatchedFolderScanOpsTests
     }
 
     [Fact]
+    public void Retry_completed_movie_source_cleanup_never_removes_a_sibling_folder_that_shares_the_prefix()
+    {
+        using var dir = new TempDirectory();
+        var watched = dir.Join("watch");
+        Directory.CreateDirectory(watched);
+        var release = Path.Combine(dir.Join("watch-old"), "Movie 2026");
+        Directory.CreateDirectory(release);
+        var media = Path.Combine(release, "Movie 2026.mkv");
+        File.WriteAllBytes(media, "source"u8.ToArray());
+
+        var (ok, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media);
+
+        Assert.False(ok);
+        Assert.Contains("not safely under the watched folder", reason ?? string.Empty, StringComparison.Ordinal);
+        Assert.True(File.Exists(media));
+    }
+
+    [Fact]
+    public void Cleanup_rejected_file_never_deletes_from_a_sibling_folder_that_shares_the_prefix()
+    {
+        using var dir = new TempDirectory();
+        var watched = dir.Join("watch");
+        Directory.CreateDirectory(watched);
+        var sibling = dir.Join("watch-old");
+        Directory.CreateDirectory(sibling);
+        var media = Path.Combine(sibling, "bad.mkv");
+        File.WriteAllBytes(media, [1]);
+
+        var (deleted, detail) = RemuxPassPaths.CleanupRejectedFile(watched, media, "delete_file");
+
+        Assert.False(deleted);
+        Assert.Contains("not safely inside the watched folder", detail, StringComparison.Ordinal);
+        Assert.True(File.Exists(media));
+    }
+
+    [Fact]
+    public void Cleanup_rejected_file_reports_a_missing_file_in_plain_words()
+    {
+        using var dir = new TempDirectory();
+        var watched = dir.Join("watch");
+        Directory.CreateDirectory(watched);
+        var media = Path.Combine(watched, "gone.mkv");
+
+        var (deleted, detail) = RemuxPassPaths.CleanupRejectedFile(watched, media, "delete_file");
+
+        Assert.False(deleted);
+        Assert.Equal($"Weir did not delete the rejected file because {media} could not be found.", detail);
+    }
+
+    [Fact]
     public void Cleanup_rejected_file_leaves_the_file_alone_under_the_leave_policy()
     {
         using var dir = new TempDirectory();
@@ -202,7 +253,7 @@ public sealed class WatchedFolderScanOpsTests
         var media = Path.Combine(watched, "bad.mkv");
         File.WriteAllBytes(media, [1]);
 
-        var (deleted, detail) = WatchedFolderScanOps.CleanupRejectedFile(watched, media, "leave");
+        var (deleted, detail) = RemuxPassPaths.CleanupRejectedFile(watched, media, "leave");
 
         Assert.False(deleted);
         Assert.Contains("Leave in place", detail, StringComparison.Ordinal);
@@ -219,7 +270,7 @@ public sealed class WatchedFolderScanOpsTests
         var media = Path.Combine(release, "bad.mkv");
         File.WriteAllBytes(media, [1]);
 
-        var (deleted, detail) = WatchedFolderScanOps.CleanupRejectedFile(watched, media, "delete_file");
+        var (deleted, detail) = RemuxPassPaths.CleanupRejectedFile(watched, media, "delete_file");
 
         Assert.True(deleted);
         Assert.Contains("Delete rejected file", detail, StringComparison.Ordinal);

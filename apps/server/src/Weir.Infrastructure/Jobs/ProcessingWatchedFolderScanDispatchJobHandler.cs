@@ -367,8 +367,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         // two, the source remains and the next scan safely retries.
         foreach (var (relativePath, filePath, reason, action) in pendingRejectedCleanups)
         {
-            var (deleted, detail) = WatchedFolderScanOps.CleanupRejectedFile(runtime.WatchedFolder, filePath, action);
-            _ = deleted;
+            var (_, detail) = RemuxPassPaths.CleanupRejectedFile(runtime.WatchedFolder, filePath, action);
             await using var cleanupUow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
             await FileStateStore.MarkFileStatusAsync(cleanupUow, library.Id, relativePath, ProcessingFileStatuses.Skipped, $"{reason} {detail}").ConfigureAwait(false);
             await cleanupUow.CommitAsync().ConfigureAwait(false);

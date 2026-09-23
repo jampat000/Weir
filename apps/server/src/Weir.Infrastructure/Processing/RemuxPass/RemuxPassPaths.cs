@@ -1,6 +1,7 @@
 using Weir.Core.Json;
 using Weir.Core.Processing;
 using Weir.Core.Rules;
+using Weir.Infrastructure.IO;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
@@ -297,27 +298,28 @@ public static class RemuxPassPaths
         {
             root = Resolve(watchedRoot);
             source = Resolve(filePath);
-            if (!Directory.Exists(root) && !File.Exists(root))
-            {
-                throw new FileNotFoundException($"[Errno 2] No such file or directory: '{watchedRoot}'");
-            }
-
-            if (!Directory.Exists(source) && !File.Exists(source))
-            {
-                throw new FileNotFoundException($"[Errno 2] No such file or directory: '{filePath}'");
-            }
-
-            if (RelativeTo(source, root) is null)
-            {
-                throw new ArgumentException($"'{source}' is not in the subpath of '{root}'");
-            }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
         {
             return new RejectedFileCleanupResult(false, $"Weir did not delete the rejected file because it was not safely inside the watched folder ({exception.Message}).");
         }
 
-        if (SamePath(source, root) || !File.Exists(source))
+        if (!Directory.Exists(root) && !File.Exists(root))
+        {
+            return new RejectedFileCleanupResult(false, $"Weir did not delete the rejected file because the watched folder {watchedRoot} could not be found.");
+        }
+
+        if (!Directory.Exists(source) && !File.Exists(source))
+        {
+            return new RejectedFileCleanupResult(false, $"Weir did not delete the rejected file because {filePath} could not be found.");
+        }
+
+        if (!PathContainment.IsUnder(root, source))
+        {
+            return new RejectedFileCleanupResult(false, $"Weir did not delete the rejected file because it was not safely inside the watched folder ({source} is not inside {root}).");
+        }
+
+        if (!File.Exists(source))
         {
             return new RejectedFileCleanupResult(false, "Weir did not delete the rejected path because it is not a regular file inside the watched folder.");
         }
@@ -331,8 +333,9 @@ public static class RemuxPassPaths
             return new RejectedFileCleanupResult(false, $"Weir could not delete the rejected file because it is locked or unavailable ({exception.Message}).");
         }
 
+        // Empty folders left behind are removed up to, never including, the watched folder.
         var parent = Path.GetDirectoryName(source);
-        while (parent is not null && !SamePath(parent, root))
+        while (parent is not null && PathContainment.IsUnder(root, parent))
         {
             try
             {

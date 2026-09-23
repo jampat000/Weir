@@ -1,5 +1,6 @@
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
+using Weir.Infrastructure.IO;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
@@ -62,16 +63,14 @@ public static class ReconciliationService
         throw new PyValueErrorException($"Unknown reconciliation repair action: {action}");
     }
 
-    /// <summary>Delete only a path that normalises under one of the roots.</summary>
+    /// <summary>Deletes a file only when it lies strictly inside one of the roots (never a root itself).</summary>
     public static bool SafeUnlinkUnderRoots(string path, IReadOnlyList<string> allowedRoots)
     {
         ArgumentNullException.ThrowIfNull(allowedRoots);
         var target = Path.GetFullPath(path);
-        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         foreach (var rawRoot in allowedRoots)
         {
-            var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(rawRoot));
-            if (string.Equals(target, root, comparison) || target.StartsWith(root + Path.DirectorySeparatorChar, comparison))
+            if (PathContainment.IsUnder(rawRoot, target))
             {
                 try
                 {
