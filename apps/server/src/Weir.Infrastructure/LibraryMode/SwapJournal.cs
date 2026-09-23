@@ -12,7 +12,7 @@ public enum SwapJournalState
     /// <summary>Validated and unchanged; about to rename the original aside.</summary>
     Committing,
 
-    /// <summary><c>swap_committed</c>: the cleaned copy has the original's name. The backup may still exist.</summary>
+    /// <summary>The cleaned copy has the original's name (the row's <c>committed</c> flag). The backup may still exist.</summary>
     Committed,
 
     /// <summary>Committed and the backup is gone.</summary>
@@ -40,10 +40,9 @@ public interface ISwapJournal
 }
 
 /// <summary>
-/// Records each swap in the <c>library_swaps</c> table, one row per job (upserted by <c>job_id</c>): #557's
-/// migration (0040_library_swaps) moved this off <c>jobs.payload_json</c>'s <c>library_swap</c>
-/// object and <c>swap_committed</c> flag, which <c>ProcessingJobSwapJournal</c> used to pack in there while
-/// ADR-0017 froze the schema and both backends needed to open the same database.
+/// Records each swap in the <c>library_swaps</c> table, one row per job (upserted by <c>job_id</c>). Migration
+/// 0040_library_swaps (#557) copies older records into it from <c>jobs.payload_json</c>'s <c>library_swap</c>
+/// object and <c>swap_committed</c> flag.
 /// </summary>
 public sealed class ProcessingJobSwapJournal : ISwapJournal
 {

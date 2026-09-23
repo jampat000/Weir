@@ -14,8 +14,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Api.Endpoints;
 
 /// <summary>
-/// <c>GET /health</c>, <c>GET /ready</c> and <c>GET /api/v1/system/readiness</c>
-/// (ports of <c>weir.platform.health</c> and <c>weir.platform.readiness</c>). Each also answers HEAD.
+/// <c>GET /health</c>, <c>GET /ready</c> and <c>GET /api/v1/system/readiness</c>. Each also answers HEAD.
 /// </summary>
 public static class SystemEndpoints
 {

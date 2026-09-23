@@ -5,13 +5,11 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Http;
 
 /// <summary>
-/// Job notifications delivered to the channels on Settings › Alerts. Until this existed only
-/// <see cref="NoJobNotifications"/> was registered, so channels could be saved and "Send test" worked, but no real
-/// job ever produced an alert.
+/// Delivers job notifications to the channels on Settings › Alerts.
 /// </summary>
 /// <remarks>
-/// Every job reports itself as module <c>processing</c>, which made "File processing finished" and "Any job completed"
-/// the same event, fired by folder scans every few minutes as much as by files. Here a file's own work — cleaning a
+/// Every job reports itself as module <c>processing</c>, which would make "File processing finished" and "Any job
+/// completed" the same event, fired by folder scans every few minutes as much as by files. Here a file's own work — cleaning a
 /// download, passing it through, rejecting it, cleaning a library file — is file processing, and alerts as such (and
 /// under "Any job" too). Background work (scans, sweeps) alerts only when it has failed for good, under "Any job
 /// permanently failed"; a routine scan finishing is not news.

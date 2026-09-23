@@ -1,13 +1,13 @@
+using Weir.Core.Processing;
 namespace Weir.Core.Configuration;
 
 /// <summary>
-/// Port of <c>WeirSettings.load()</c> and <c>weir.core.runtime_paths</c> path resolution.
+/// Builds <see cref="WeirOptions"/> from environment variables and resolves the runtime paths.
 /// Pure: it reads only the <see cref="RuntimeEnvironment"/> it is given. Creating the runtime
 /// directories and checking the database location happen at startup, in Infrastructure.
 /// </summary>
 /// <remarks>
-/// Not ported: Python also loads <c>apps/backend/.env</c> for local development. The .NET server
-/// reads only the real environment.
+/// Only the real environment is read; no <c>.env</c> file is loaded.
 /// </remarks>
 public static class WeirOptionsLoader
 {
@@ -18,7 +18,7 @@ public static class WeirOptionsLoader
     private const int SevenDaysSeconds = 7 * 24 * 3600;
     private const int ThirtyDaysSeconds = 30 * 24 * 3600;
 
-    /// <summary>Python's <c>DEFAULT_PROCESSING_JOB_LEASE_SECONDS</c> (#540 item 1).</summary>
+    /// <summary>The job lease length when <c>WEIR_PROCESSING_JOB_LEASE_SECONDS</c> is unset (#540).</summary>
     public const int DefaultProcessingJobLeaseSeconds = 300;
 
     public static WeirOptions Load(RuntimeEnvironment runtime)
@@ -41,7 +41,7 @@ public static class WeirOptionsLoader
             _ => CookieSameSite.Lax,
         };
         // Tri-state, not a bool: a Secure cookie on a plain-HTTP LAN install is discarded by the
-        // browser and locks the operator out. Legacy boolish values keep their old meaning.
+        // browser and locks the operator out. Boolean spellings map to always/never so existing values keep working.
         var secureMode = (runtime.Get("WEIR_SESSION_COOKIE_SECURE") ?? string.Empty).Trim().ToLowerInvariant() switch
         {
             "1" or "true" or "yes" or "on" or "always" => CookieSecureMode.Always,
@@ -71,24 +71,20 @@ public static class WeirOptionsLoader
         var bootstrapWindow = Math.Max(1, EnvInt(runtime, "WEIR_BOOTSTRAP_RATE_WINDOW_SECONDS", 3600));
         var enableHsts = EnvBool(runtime, "WEIR_SECURITY_ENABLE_HSTS", false);
         var metricsBearerToken = NullIfEmpty(runtime.Get("WEIR_METRICS_BEARER_TOKEN")?.Trim());
-        // v2.4.3 renamed this from WEIR_SUBBER_WEBHOOK_SECRET and kept reading the old name so an
-        // install that never renamed it would keep authenticating. 3.0.0 reads the current name only:
-        // the release notes gave the rename, and a second accepted spelling for a shared secret is a
-        // second place to look when the webhook starts returning 401.
+        // Only this name is read, not the older WEIR_SUBBER_WEBHOOK_SECRET: a second accepted spelling
+        // for a shared secret is a second place to look when the webhook starts returning 401.
         var webhookSecret = NullIfEmpty((runtime.Get("WEIR_MEDIA_MANAGER_WEBHOOK_SECRET") ?? string.Empty).Trim());
 
         var paths = RuntimePaths.Resolve(runtime);
 
-        var processingWorkers = ClampProcessingWorkerCount(EnvInt(runtime, "WEIR_PROCESSING_WORKER_COUNT", Weir.Core.Processing.OperatorSettingsRules.MaxFilesAtOnce));
+        var processingWorkers = ClampProcessingWorkerCount(EnvInt(runtime, "WEIR_PROCESSING_WORKER_COUNT", OperatorSettingsRules.MaxFilesAtOnce));
         var processingJobLeaseSeconds = ClampProcessingJobLeaseSeconds(EnvInt(runtime, "WEIR_PROCESSING_JOB_LEASE_SECONDS", DefaultProcessingJobLeaseSeconds));
         var watcherEnabled = EnvBool(runtime, "WEIR_PROCESSING_WATCHER_ENABLED", true);
         var watcherDebounce = Math.Max(0.25, Math.Min(300.0, EnvInt(runtime, "WEIR_PROCESSING_WATCHER_DEBOUNCE_SECONDS", 3)));
 
-        // Per-scope only. The temp sweep used to be one shared schedule
-        // (WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_SCHEDULE_ENABLED / _INTERVAL_SECONDS); when it was
-        // split per media scope the shared pair stayed readable as a fallback for installs that had
-        // set it. 3.0.0 drops it, so what is set is what runs and the movie and TV schedules cannot
-        // silently inherit a value from a variable that no longer appears anywhere else.
+        // Per-scope only: the shared WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_SCHEDULE_ENABLED /
+        // _INTERVAL_SECONDS pair is not read as a fallback, so what is set is what runs and the movie
+        // and TV schedules cannot silently inherit a value from a variable documented nowhere else.
         bool SweepEnabled(string key) => runtime.IsSet(key) && EnvBool(runtime, key, false);
 
         int SweepInterval(string key) =>
@@ -181,21 +177,23 @@ public static class WeirOptionsLoader
         };
     }
 
-    /// <summary><c>clamp_processing_worker_count</c>: 0..10 slots (8 before #633); negative values mean 1.</summary>
+    /// <summary>
+    /// 0 .. <see cref="Weir.Core.Processing.OperatorSettingsRules.MaxFilesAtOnce"/> slots (#633); negative values mean 1.
+    /// </summary>
     public static int ClampProcessingWorkerCount(long raw) =>
-        raw < 0 ? 1 : (int)Math.Min(Weir.Core.Processing.OperatorSettingsRules.MaxFilesAtOnce, raw);
+        raw < 0 ? 1 : (int)Math.Min(OperatorSettingsRules.MaxFilesAtOnce, raw);
 
     /// <summary>
-    /// #540 item 1: 30 s .. 1 day. Below 30 s the lease-renewal heartbeat (every ~lease/3) would fire
+    /// 30 s .. 1 day (#540). Below 30 s the lease-renewal heartbeat (every ~lease/3) would fire
     /// so often it could swamp the database; above a day, a crashed worker's row would sit unclaimed
     /// for an unreasonable time before startup recovery or a reclaim picks it up.
     /// </summary>
     public static int ClampProcessingJobLeaseSeconds(long raw) => Clamp(raw, 30, 86_400);
 
-    /// <summary><c>clamp_processing_schedule_interval_seconds</c>: 60 s .. 7 days.</summary>
+    /// <summary>A periodic schedule interval: 60 s .. 7 days.</summary>
     public static int ClampProcessingScheduleIntervalSeconds(long raw) => Clamp(raw, 60, SevenDaysSeconds);
 
-    /// <summary><c>clamp_processing_min_file_age_seconds</c>: 0 .. 7 days.</summary>
+    /// <summary>The minimum age before a watched file is picked up: 0 .. 7 days.</summary>
     public static int ClampProcessingMinFileAgeSeconds(long raw) => Clamp(raw, 0, SevenDaysSeconds);
 
     /// <summary>
@@ -319,7 +317,7 @@ public static class WeirOptionsLoader
     private static long SaturatingMultiply(long value, long factor) =>
         value > long.MaxValue / factor ? long.MaxValue : value * factor;
 
-    /// <summary>Python's <c>a or b</c> for strings: only an unset or empty value falls through.</summary>
+    /// <summary>The fallback only when the value is unset or empty; whitespace is kept.</summary>
     private static string Or(string? value, string fallback) => string.IsNullOrEmpty(value) ? fallback : value;
 
     private static string? NullIfEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;

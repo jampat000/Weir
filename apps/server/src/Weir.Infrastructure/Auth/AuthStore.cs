@@ -5,7 +5,7 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Auth;
 
-/// <summary>The <c>users</c> and <c>user_sessions</c> tables, with the queries <c>weir.platform.auth</c> runs.</summary>
+/// <summary>The <c>users</c> and <c>user_sessions</c> tables and the queries sign-in, sessions and recovery run on them.</summary>
 public static class AuthStore
 {
     private const string UserColumns = "id, username, password_hash, role, is_active";
@@ -21,7 +21,7 @@ public static class AuthStore
     public static Task<UserRecord?> GetUserAsync(UnitOfWork uow, long id) =>
         Checked(uow).QuerySingleAsync($"SELECT {UserColumns} FROM users WHERE users.id = $id", ReadUser, ("$id", id));
 
-    /// <summary><c>func.lower(User.username) == folded</c>, first match.</summary>
+    /// <summary>The first user whose lower-cased username equals <paramref name="folded"/>.</summary>
     public static Task<UserRecord?> FindUserByLowerUsernameAsync(UnitOfWork uow, string folded) =>
         Checked(uow).QuerySingleAsync(
             $"SELECT {UserColumns} FROM users WHERE lower(users.username) = $folded LIMIT 1 OFFSET 0",
@@ -61,12 +61,12 @@ public static class AuthStore
             ("$active", isActive ? 1 : 0),
             ("$id", userId));
 
-    /// <summary><c>_list_accounts</c>: every account, alphabetically.</summary>
+    /// <summary>Every account, alphabetically.</summary>
     public static Task<List<UserRecord>> ListUsersByUsernameAsync(UnitOfWork uow) =>
         Checked(uow).QueryAsync($"SELECT {UserColumns} FROM users ORDER BY users.username", ReadUser);
 
     /// <summary>
-    /// <c>_load_account</c>: the named account (case-insensitive), or — when no username is given — the
+    /// The account to recover: the named account (case-insensitive), or — when no username is given — the
     /// very first account by id (only meaningful when exactly one exists, the caller's job to check).
     /// </summary>
     public static Task<UserRecord?> FindAccountForRecoveryAsync(UnitOfWork uow, string? username)
@@ -125,7 +125,7 @@ public static class AuthStore
             ("$at", at.ToSqlite()),
             ("$id", sessionHexId));
 
-    /// <summary><c>revoke_active_sessions_for_user</c>.</summary>
+    /// <summary>Revokes every unrevoked session of the user.</summary>
     public static Task<int> RevokeActiveSessionsForUserAsync(UnitOfWork uow, long userId, PyDateTime at) =>
         Checked(uow).ExecuteAsync(
             "UPDATE user_sessions SET revoked_at=$at WHERE user_sessions.user_id = $user AND user_sessions.revoked_at IS NULL",
@@ -164,7 +164,7 @@ public static class AuthStore
             ("$user", userId),
             ("$now", now.ToSqlite()));
 
-    /// <summary><c>cleanup_inactive_sessions</c>.</summary>
+    /// <summary>Deletes sessions that are revoked, past their absolute expiry, or idle past their cutoff.</summary>
     public static Task<int> DeleteInactiveSessionsAsync(UnitOfWork uow, PyDateTime now, PyDateTime idleCutoff, PyDateTime trustedIdleCutoff) =>
         Checked(uow).ExecuteAsync(
             "DELETE FROM user_sessions WHERE user_sessions.revoked_at IS NOT NULL OR user_sessions.absolute_expires_at <= $now " +

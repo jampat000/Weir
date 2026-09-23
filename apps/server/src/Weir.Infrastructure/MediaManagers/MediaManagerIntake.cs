@@ -3,13 +3,14 @@ using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
+using Weir.Core.Processing;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
 
-/// <summary>An intake request refused with a status and a detail (FastAPI's <c>HTTPException</c> inside <c>intake_api</c>).</summary>
+/// <summary>An intake request refused with an HTTP status and a detail.</summary>
 public sealed class IntakeRefusedException : Exception
 {
     public IntakeRefusedException()
@@ -36,7 +37,7 @@ public sealed class IntakeRefusedException : Exception
 }
 
 /// <summary>
-/// The intake webhook's work (port of <c>intake_api</c>): who may post, which library a hand-off belongs to, which files
+/// The intake webhook's work: who may post, which library a hand-off belongs to, which files
 /// it means, and the remux jobs and ledger row it leaves behind.
 /// </summary>
 public sealed class MediaManagerIntake
@@ -64,13 +65,11 @@ public sealed class MediaManagerIntake
     public ProcessingJobStore Jobs => _jobs;
 
     /// <summary>
-    /// <c>_authorise</c>: this source's own connection secret when it has one, else the instance-wide secret, else no check.
-    /// #544 item 6: Python (and the first cut of this port) resolved only the first enabled connection of the kind,
-    /// so a second connection of the same kind — a 4K Radarr next to a 1080p one, each with its own secret — could
-    /// never authenticate: its secret was never even considered. The presented secret is now matched against every
-    /// enabled connection of the kind, and the event is authorised (attributed) as coming from whichever one
-    /// matches. The instance-wide secret remains the fallback only when none of them has a secret configured at
-    /// all — once any connection of this kind is using its own secret, that connection's callers must present it.
+    /// Authorise a webhook: this source's own connection secret when it has one, else the instance-wide secret, else no
+    /// check. The presented secret is matched against every enabled connection of the kind (#544 item 6), so a second
+    /// connection of the same kind (a 4K Radarr next to a 1080p one, each with its own secret) can authenticate too, and
+    /// the event is attributed to whichever one matches. The instance-wide secret is the fallback only when none of them
+    /// has a secret configured; once any connection of this kind uses its own secret, its callers must present it.
     /// </summary>
     /// <remarks>
     /// True when the caller proved itself with a secret, false when no secret is set anywhere and the event was let in
@@ -106,7 +105,7 @@ public sealed class MediaManagerIntake
     }
 
     /// <summary>
-    /// <c>_require_secret</c>: the hand-off routes reveal file paths, so unlike the webhook they never run unauthenticated.
+    /// Require a secret: the hand-off routes reveal file paths, so unlike the webhook they never run unauthenticated.
     /// </summary>
     public async Task RequireSecretAsync(UnitOfWork uow, string? presented, string? sourceKey)
     {
@@ -139,7 +138,7 @@ public sealed class MediaManagerIntake
         throw new IntakeRefusedException(401, IntakeRules.MissingSecretDetail);
     }
 
-    /// <summary>Every library's id, media type and watched folder, in display order (<c>list_libraries</c>).</summary>
+    /// <summary>Every library's id, media type and watched folder, in display order.</summary>
     public static Task<List<IntakeLibrary>> ListLibrariesAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -148,7 +147,7 @@ public sealed class MediaManagerIntake
             reader => new IntakeLibrary(SqliteValues.GetInt64(reader, 0), SqliteValues.GetString(reader, 1), SqliteValues.GetString(reader, 2)));
     }
 
-    /// <summary><c>_library_for_handoff</c>: chosen by folder; nothing containing it explains against the scope's seeded library.</summary>
+    /// <summary>The library a hand-off belongs to, chosen by folder; nothing containing it explains against the scope's seeded library.</summary>
     public static async Task<(IntakeLibrary? Library, HandoffPathResult Resolved)> LibraryForHandoffAsync(UnitOfWork uow, MediaManagerImportEvent importEvent)
     {
         ArgumentNullException.ThrowIfNull(importEvent);
@@ -158,13 +157,13 @@ public sealed class MediaManagerIntake
             return (chosen.Library, chosen.Resolved);
         }
 
-        var scope = ProcessingLibraryFolders.NormalizeMediaScope(importEvent.MediaScope);
+        var scope = ProcessingMediaScopes.Normalize(importEvent.MediaScope);
         var fallback = libraries.FirstOrDefault(library => library.MediaType == scope);
         return (fallback, HandoffPaths.RelativeMediaPathForHandoff(fallback?.WatchedFolder ?? string.Empty, importEvent.FilePath));
     }
 
     /// <summary>
-    /// <c>_handoff_media_files</c>: a file names itself; a folder means the videos inside it with samples left out.
+    /// The media files a hand-off means: a file names itself; a folder means the videos inside it with samples left out.
     /// </summary>
     public static List<string> HandoffMediaFiles(IntakeLibrary? library, string relativePath)
     {
@@ -207,7 +206,7 @@ public sealed class MediaManagerIntake
         return [.. chosen.Select(parts => string.Join('/', new[] { prefix }.Concat(parts).Where(part => part.Length > 0 && part != ".")))];
     }
 
-    /// <summary><c>_enqueue_refine</c>: the remux jobs for a hand-off, its ledger row, and (#531) the fingerprint of each file.</summary>
+    /// <summary>Take in a hand-off: its remux jobs, its ledger row, and (#531) the fingerprint of each file.</summary>
     public async Task<string> EnqueueRefineAsync(UnitOfWork uow, MediaManagerImportEvent importEvent)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -230,7 +229,7 @@ public sealed class MediaManagerIntake
 
             // Folder detection may already have queued (or started) this very file under its own random key. One file
             // gets one pass: the hand-off takes over that pass rather than adding a second one. A resend of this same
-            // hand-off still lands on its own row through EnqueueOrGet below, exactly as before.
+            // hand-off still lands on its own row through EnqueueOrGet below.
             if (library is not null &&
                 ProcessingJobStore.GetByDedupeKey(connection, transaction, dedupeKey) is null &&
                 WatchedFolderScanOps.ActiveRemuxPassForRelativePath(connection, transaction, target, library.MediaType, library.Id) is { } active)
@@ -302,10 +301,10 @@ public sealed class MediaManagerIntake
     }
 
     /// <summary>
-    /// Deliberate fix (#531): record a handed-over file's size when it arrives. Python first saw the size at the next
-    /// watched-folder scan, which read the zero a failure had left on the row as a change and reset the failure count,
-    /// so the retry limit and the hold after repeated failures never applied. A file that is missing, or a row that
-    /// already has a size, is left alone; a later scan still sees a genuinely changed file as changed.
+    /// Record a handed-over file's size when it arrives (#531). Otherwise the next watched-folder scan would read the zero
+    /// a failure left on the row as a change and reset the failure count, so the retry limit and the hold after repeated
+    /// failures would never apply. A file that is missing, or a row that already has a size, is left alone; a later scan
+    /// still sees a genuinely changed file as changed.
     /// </summary>
     private async Task RecordFingerprintAsync(UnitOfWork uow, IntakeLibrary library, string relativePath)
     {

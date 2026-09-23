@@ -4,7 +4,7 @@ using Weir.Core.Rules;
 
 namespace Weir.Infrastructure.Media;
 
-/// <summary>Today's writer: ffmpeg writes every container (<see cref="FfmpegCommands.BuildRemuxArgv"/>).</summary>
+/// <summary>The default writer: ffmpeg writes every container (<see cref="FfmpegCommands.BuildRemuxArgv"/>).</summary>
 public sealed class FfmpegRemuxWriter(MediaTools tools) : IRemuxWriter
 {
     public string Name => "ffmpeg";
@@ -69,14 +69,13 @@ public sealed class MkvmergeRemuxWriter(MediaTools tools, IMediaToolResolver res
     /// The two writers genuinely disagree about what kept cover art is. ffmpeg maps it as an output video
     /// stream, so it lands in <see cref="RemuxPlan.VideoIndices"/> order, second after the real video. mkvmerge
     /// writes it as the Matroska attachment it actually is, which ffprobe then reports <i>after</i> every real
-    /// stream. #500's <see cref="RemuxOutputValidation"/> checks output positions against the plan and is
-    /// deliberately not changed by #548, so it reads mkvmerge's (correct) output as "planned position 1 to be
-    /// video, output has audio".
+    /// stream. <see cref="RemuxOutputValidation"/> (#500) checks output positions against the plan, so it reads
+    /// mkvmerge's (correct) output as "planned position 1 to be video, output has audio".
     /// </para>
     /// <para>
-    /// Rather than weaken the validation that guards the shipping ffmpeg path, mkvmerge declines these files
-    /// and ffmpeg writes them exactly as it does today. Deciding whether validation should treat cover art as
-    /// non-positional — which would let mkvmerge take these too — is its own change, on its own evidence.
+    /// Rather than weaken the validation that guards the ffmpeg path, mkvmerge declines these files and ffmpeg
+    /// writes them. Treating cover art as non-positional in validation, which would let mkvmerge take these too,
+    /// would be a separate change.
     /// </para>
     /// </summary>
     private static void RefuseKeptCoverArt(RemuxPlan plan, IReadOnlyDictionary<int, int> trackIds)

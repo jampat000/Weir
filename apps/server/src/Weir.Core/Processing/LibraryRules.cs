@@ -1,9 +1,10 @@
 using Weir.Core.Jobs;
+using Weir.Core.Media;
 using Weir.Core.Rules;
 
 namespace Weir.Core.Processing;
 
-/// <summary>A library or rule set could not be saved or removed (<c>ProcessingLibraryError</c>).</summary>
+/// <summary>A library or rule set could not be saved or removed.</summary>
 public sealed class ProcessingLibraryException : Exception
 {
     public ProcessingLibraryException(string message)
@@ -12,7 +13,7 @@ public sealed class ProcessingLibraryException : Exception
     }
 }
 
-/// <summary>The fields a library create/update request carries (mirrors <c>ProcessingLibraryCreateIn</c>).</summary>
+/// <summary>The fields a library create/update request carries.</summary>
 public sealed record ProcessingLibraryInput
 {
     public required string Name { get; init; }
@@ -42,7 +43,7 @@ public sealed record ProcessingLibraryInput
     public string HardwareDevice { get; init; } = string.Empty;
     public string HardwareDisabledVendorsCsv { get; init; } = string.Empty;
     public string FfmpegStrictness { get; init; } = "normal";
-    public string RemuxWriter { get; init; } = Weir.Core.Media.RemuxWriterChoice.Best;
+    public string RemuxWriter { get; init; } = RemuxWriterChoice.Best;
     public bool RewriteWithFfmpeg { get; init; } = true;
     public long ScanIntervalSeconds { get; init; } = 300;
     public long HoldMinutes { get; init; }
@@ -70,16 +71,16 @@ public sealed record ProcessingLibraryInput
     public bool RemoveOriginalAfterSuccess { get; init; } = true;
 }
 
-/// <summary>One other library's folders, for the overlap check (<c>_validate_folders</c>).</summary>
+/// <summary>One other library's folders, for the overlap check.</summary>
 public sealed record OtherLibraryFolders(long Id, string Name, string WatchedFolder, string OutputFolder);
 
 /// <summary>
-/// Pure Processing library/rule-set validation (port of <c>processing_library_crud.py</c>'s non-persistence logic).
+/// Pure Processing library/rule-set validation.
 /// The store applies these to rows and does the actual reads/writes.
 /// </summary>
 public static class LibraryRules
 {
-    /// <summary><c>_validate_scope</c>.</summary>
+    /// <summary>A known media scope, trimmed and lower-cased.</summary>
     public static string ValidateScope(string? mediaType)
     {
         var scope = (mediaType ?? string.Empty).Trim().ToLowerInvariant();
@@ -91,7 +92,7 @@ public static class LibraryRules
         return scope;
     }
 
-    /// <summary><c>_validate_name</c>: the caller has already excluded the row being saved from <paramref name="existingNames"/>.</summary>
+    /// <summary>A non-empty, unique library name. The caller has already excluded the row being saved from <paramref name="existingNames"/>.</summary>
     public static string ValidateName(string? name, IReadOnlyCollection<string> existingNames)
     {
         var label = (name ?? string.Empty).Trim();
@@ -108,7 +109,7 @@ public static class LibraryRules
         return label;
     }
 
-    /// <summary>A library's folder path, normalized for the overlap check (<c>_folder</c>).</summary>
+    /// <summary>A library's folder path, normalized for the overlap check.</summary>
     public static string? NormalizeFolder(string? raw)
     {
         var text = (raw ?? string.Empty).Trim();
@@ -121,7 +122,7 @@ public static class LibraryRules
         return slashed.Length == 0 ? "/" : slashed;
     }
 
-    /// <summary><c>_overlaps</c>: equal, or one a path-segment ancestor of the other.</summary>
+    /// <summary>Equal, or one a path-segment ancestor of the other.</summary>
     public static bool FoldersOverlap(string a, string b)
     {
         if (string.Equals(a, b, StringComparison.Ordinal))
@@ -138,7 +139,7 @@ public static class LibraryRules
         (ancestor == "/" || descendant[ancestor.Length] == '/');
 
     /// <summary>
-    /// <c>_validate_folders</c>: a library's own three folders must be distinct, and its watched/output
+    /// A library's own three folders must be distinct, and its watched/output
     /// folders must not overlap any other library's watched/output folders.
     /// </summary>
     public static void ValidateFolders(
@@ -188,7 +189,7 @@ public static class LibraryRules
         }
     }
 
-    /// <summary><c>_validate_manager_connections</c>: unique, ascending ids; all must exist.</summary>
+    /// <summary>Linked manager connections as unique, ascending ids; all must exist.</summary>
     public static IReadOnlyList<long> ValidateManagerConnections(IReadOnlyList<long> connectionIds, IReadOnlySet<long> knownConnectionIds)
     {
         var unique = connectionIds.Distinct().Order().ToList();
@@ -206,7 +207,7 @@ public static class LibraryRules
         return unique;
     }
 
-    /// <summary><c>_validate_rule_set</c>.</summary>
+    /// <summary>The rule set id, if any, provided it exists.</summary>
     public static long? ValidateRuleSet(long? ruleSetId, bool exists)
     {
         if (ruleSetId is null)
@@ -222,7 +223,7 @@ public static class LibraryRules
         return ruleSetId;
     }
 
-    /// <summary>Applies validated fields onto a library record (<c>_apply_fields</c>, minus persistence).</summary>
+    /// <summary>Applies validated fields onto a library record, without persisting it.</summary>
     public static ProcessingLibraryRecord ApplyFields(ProcessingLibraryRecord row, ProcessingLibraryInput body, bool ruleSetExists)
     {
         string grid;
@@ -286,7 +287,7 @@ public static class LibraryRules
         };
     }
 
-    /// <summary>The fields a rule-set create/update request carries (mirrors <c>ProcessingRuleSetIn</c>).</summary>
+    /// <summary>The fields a rule-set create/update request carries.</summary>
     public sealed record RuleSetInput
     {
         public required string Name { get; init; }
@@ -341,7 +342,7 @@ public static class LibraryRules
         public bool RemoveChapters { get; init; }
     }
 
-    /// <summary><c>_apply_rule_set_fields</c> + <c>_apply_sorter_fields</c>.</summary>
+    /// <summary>Applies validated rule-set fields, including the audio and subtitle sorters, onto a rule-set record.</summary>
     public static ProcessingRuleSetRecord ApplyRuleSetFields(ProcessingRuleSetRecord row, RuleSetInput body)
     {
         string audioSorters;
@@ -381,10 +382,8 @@ public static class LibraryRules
             throw new ProcessingLibraryException(exception.Message);
         }
 
-        // Python fills an empty audio list from the chosen policy's preset here, but
-        // TrackSorters.Validate (validate_sorters) never returns an empty string — empty input
-        // already becomes the default sorter dump — so that fallback is unreachable from the HTTP
-        // request model (whose audio_sorters_json defaults to "", never None) and is not reproduced.
+        // No preset fallback for an empty audio sorter list is needed: TrackSorters.Validate never
+        // returns an empty string, because empty input already becomes the default sorter list.
         return row with
         {
             PrimaryAudioLang = body.PrimaryAudioLang,

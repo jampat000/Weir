@@ -11,7 +11,7 @@ namespace Weir.Api.Tests;
 public sealed class SystemEndpointsTests
 {
     [Fact]
-    public async Task Health_is_ok_with_the_python_body_and_headers()
+    public async Task Health_is_ok_with_the_documented_body_and_headers()
     {
         await using var server = await WeirTestServer.StartAsync();
 
@@ -30,7 +30,7 @@ public sealed class SystemEndpointsTests
     }
 
     [Fact]
-    public async Task Health_answers_head_and_refuses_other_methods_with_fastapi_bodies()
+    public async Task Health_answers_head_and_refuses_other_methods_with_json_detail_bodies()
     {
         await using var server = await WeirTestServer.StartAsync();
 

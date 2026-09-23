@@ -67,7 +67,7 @@ public sealed record SwapResult(SwapOutcome Outcome, string Message, bool Backup
 /// <item>Copy the original's permissions to the copy (best effort; never the mtime).</item>
 /// <item>Journal <c>committing</c>; rename original → <c>&lt;name&gt;.weir-bak&lt;ext&gt;</c>; check the backup is still the fingerprinted file.</item>
 /// <item>Rename copy → original name. <b>This rename is the commit.</b></item>
-/// <item>Journal <c>committed</c> (<c>swap_committed</c>); delete the backup (a failure is logged, the sweep retries); journal <c>finished</c>.</item>
+/// <item>Journal <c>committed</c>; delete the backup (a failure is logged, the sweep retries); journal <c>finished</c>.</item>
 /// </list>
 /// <para>
 /// Any failure before the commit rolls back by looking at the files, not at how far the code got: if the original name is
@@ -213,7 +213,9 @@ public sealed class SafeSwap
         {
             await _journal.RecordAsync(new SwapJournalEntry(jobId, originalPath, SwapJournalState.Writing), cancellationToken).ConfigureAwait(false);
         }
+#pragma warning disable CA1031 // No swap starts without its journal entry; any failure to write it stops here.
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             _logger.LogWarning(exception, "Library swap not started: the journal could not be written job_id={JobId} path={Path}", jobId, originalPath);
             return new SwapResult(SwapOutcome.Failed, SafeSwapRules.FailedMessage(stage, exception.Message), false, warnings);
@@ -291,7 +293,9 @@ public sealed class SafeSwap
             _logger.LogInformation("Library swap postponed: the file is in use job_id={JobId} path={Path} stage={Stage} detail={Detail}", jobId, originalPath, stage, exception.Message);
             return await Abandon(SwapOutcome.InUse, SafeSwapRules.InUseMessage);
         }
+#pragma warning disable CA1031 // Any failure before the commit rolls back to the original file.
         catch (Exception exception)
+#pragma warning restore CA1031
         {
             _logger.LogWarning(exception, "Library swap rolled back job_id={JobId} path={Path} stage={Stage}", jobId, originalPath, stage);
             return await Abandon(SwapOutcome.Failed, SafeSwapRules.FailedMessage(stage, exception.Message));
@@ -303,7 +307,9 @@ public sealed class SafeSwap
         {
             await _journal.RecordAsync(new SwapJournalEntry(jobId, originalPath, SwapJournalState.Committed), CancellationToken.None).ConfigureAwait(false);
         }
+#pragma warning disable CA1031 // The swap is committed; nothing below may undo it, so a failed record is only a warning.
         catch (Exception exception)
+#pragma warning restore CA1031
         {
             _logger.LogWarning(exception, "Library swap committed but not recorded job_id={JobId} path={Path}", jobId, originalPath);
             warnings.Add($"Weir replaced the file but could not record it on the job: {exception.Message}");
@@ -315,7 +321,9 @@ public sealed class SafeSwap
             _files.Delete(backup);
             backupRemoved = true;
         }
+#pragma warning disable CA1031 // A backup that cannot be deleted is left for the startup sweep; the swap stands.
         catch (Exception exception)
+#pragma warning restore CA1031
         {
             _logger.LogWarning(exception, "Library swap left its backup for the startup sweep job_id={JobId} backup={Backup}", jobId, backup);
             warnings.Add($"Weir replaced the file but could not delete the backup copy ({backup}); it will try again when it next starts.");
@@ -327,7 +335,9 @@ public sealed class SafeSwap
             {
                 await _journal.RecordAsync(new SwapJournalEntry(jobId, originalPath, SwapJournalState.Finished), CancellationToken.None).ConfigureAwait(false);
             }
+#pragma warning disable CA1031 // The swap is finished; a failed record is logged, never undoes it.
             catch (Exception exception)
+#pragma warning restore CA1031
             {
                 _logger.LogWarning(exception, "Library swap finished but not recorded job_id={JobId} path={Path}", jobId, originalPath);
             }
@@ -368,7 +378,9 @@ public sealed class SafeSwap
         {
             await _journal.RecordAsync(new SwapJournalEntry(jobId, originalPath, SwapJournalState.RolledBack), CancellationToken.None).ConfigureAwait(false);
         }
+#pragma warning disable CA1031 // A rolled-back swap already left the original in place; a failed record only loses the note.
         catch (Exception exception)
+#pragma warning restore CA1031
         {
             _logger.LogWarning(exception, "Library swap rolled back but not recorded job_id={JobId} path={Path}", jobId, originalPath);
         }

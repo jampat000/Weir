@@ -4,8 +4,8 @@ using Weir.Api.Tests.Platform;
 namespace Weir.Api.Tests.Processing;
 
 /// <summary>
-/// Every library has a profile (James, 23 Sep 2026): "Use scope defaults" meant one thing for new downloads and another
-/// for library cleaning. A library left without one is given the one it was using when Weir starts, and a library made
+/// Every library has a profile, because "Use scope defaults" would mean one thing for new downloads and another for
+/// library cleaning. A library left without one is given the one it was using when Weir starts, and a library made
 /// without one gets its kind's.
 /// </summary>
 public sealed class EveryLibraryHasAProfileTests

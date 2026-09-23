@@ -4,8 +4,7 @@ namespace Weir.Core.Processing.RemuxPass;
 
 /// <summary>
 /// The title and year a metadata lookup should ask about, read from a release or file name
-/// (<c>The.Terror.1963.1080p.WEB-DL.DDP5.1.H.264-DELUNO</c> is "the terror", 1963). New for #537 item 4: the reference never
-/// looked a title up during a pass.
+/// (<c>The.Terror.1963.1080p.WEB-DL.DDP5.1.H.264-DELUNO</c> is "the terror", 1963) (#537).
 /// </summary>
 public static class ReleaseTitle
 {

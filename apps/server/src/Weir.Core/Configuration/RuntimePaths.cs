@@ -1,8 +1,7 @@
 namespace Weir.Core.Configuration;
 
 /// <summary>
-/// Where Weir keeps its files, resolved the way <c>weir.core.paths</c> and
-/// <c>weir.core.runtime_paths</c> do:
+/// Where Weir keeps its files, resolved in this order so existing installs keep finding their data:
 /// <list type="bullet">
 /// <item><c>WEIR_HOME</c>, else <c>%PROGRAMDATA%\Weir</c> on Windows, else <c>$XDG_DATA_HOME/weir</c>, else <c>~/.local/share/weir</c>;</item>
 /// <item><c>{home}/data/weir.sqlite3</c> unless <c>WEIR_DB_PATH</c>;</item>
@@ -27,7 +26,7 @@ public sealed record RuntimePaths(string Home, string DbPath, string BackupDir, 
             ResolveUnderHome(runtime, home, "WEIR_TEMP_DIR", "temp"));
     }
 
-    /// <summary><c>default_weir_home()</c>: the OS default when <c>WEIR_HOME</c> is unset.</summary>
+    /// <summary>The OS default home when <c>WEIR_HOME</c> is unset.</summary>
     public static string DefaultHome(RuntimeEnvironment runtime)
     {
         ArgumentNullException.ThrowIfNull(runtime);

@@ -1,4 +1,5 @@
 using Weir.Core.Jobs;
+using Weir.Core.MediaManagers;
 using Weir.Core.Time;
 
 namespace Weir.Core.Processing;
@@ -29,8 +30,8 @@ public sealed record ProcessingOperatorSettingsRecord
     public long? FailureCleanupIntervalSeconds { get; init; }
 
     /// <summary>
-    /// Whether the Cleanup job removes Weir's own hand-back copies nobody claimed (#652). Off until a person switches it on
-    /// (James, 23 Sep 2026).
+    /// Whether the Cleanup job removes Weir's own hand-back copies nobody claimed (#652). Off until an operator switches
+    /// it on, because it deletes files.
     /// </summary>
     public bool UnclaimedHandbackCleanupEnabled { get; init; }
 
@@ -57,7 +58,7 @@ public sealed record ProcessingOperatorSettingsRecord
     public PyDateTime UpdatedAt { get; init; }
 }
 
-/// <summary>A schedule-window setting is not usable (<c>ValueError</c> from <c>schedule_csv_validate</c>).</summary>
+/// <summary>A schedule-window setting is not usable; the message is written for the operator.</summary>
 public sealed class ScheduleWindowException : Exception
 {
     public ScheduleWindowException(string message)
@@ -68,12 +69,11 @@ public sealed class ScheduleWindowException : Exception
 
 /// <summary>
 /// Weekday-CSV and HH:MM validation, and wall-clock window evaluation, shared by Processing's Movies/TV
-/// schedule pair (port of <c>weir.platform.media_managers.schedule_csv_validate</c> and
-/// <c>schedule_wall_clock</c> — small enough to live with Processing rather than wait on the media-manager port).
+/// schedule pair.
 /// </summary>
 public static class ScheduleWindow
 {
-    /// <summary><c>validate_schedule_days_csv</c>.</summary>
+    /// <summary>Validate a weekday CSV such as <c>Mon,Tue</c>; empty means every day.</summary>
     public static string ValidateDaysCsv(string? raw)
     {
         var text = (raw ?? string.Empty).Trim();
@@ -91,7 +91,7 @@ public static class ScheduleWindow
         return string.Join(",", tokens);
     }
 
-    /// <summary><c>normalize_hhmm</c>.</summary>
+    /// <summary>Validate an HH:MM time and write it zero-padded; empty gives <paramref name="fallback"/>.</summary>
     public static string NormalizeHhmm(string? raw, string fallback)
     {
         var text = (raw ?? string.Empty).Trim();
@@ -122,7 +122,7 @@ public static class ScheduleWindow
         return fallback;
     }
 
-    /// <summary><c>schedule_time_window_active</c>: true when the current wall clock is inside the window.</summary>
+    /// <summary>True when the current wall clock is inside the window, or when the schedule is off.</summary>
     public static bool IsActive(bool scheduleEnabled, string? scheduleDays, string? scheduleStart, string? scheduleEnd, string? timezoneName, DateTimeOffset nowUtc, ITimeZoneResolver zones)
     {
         ArgumentNullException.ThrowIfNull(zones);
@@ -133,7 +133,7 @@ public static class ScheduleWindow
 
         var zone = zones.TryFind((timezoneName ?? "UTC").Trim() is { Length: > 0 } name ? name : "UTC", out var found) ? found : TimeZoneInfo.Utc;
         var local = TimeZoneInfo.ConvertTime(nowUtc, zone);
-        var day = ScheduleGrid.DayNames[ScheduleGrid.PythonWeekday(local.DayOfWeek)];
+        var day = ScheduleGrid.DayNames[ScheduleGrid.MondayFirstDayIndex(local.DayOfWeek)];
         var allowedDays = (scheduleDays ?? string.Empty).Trim() is { Length: > 0 } daysText
             ? daysText.Split(',').Select(t => t.Trim()).Where(t => ScheduleGrid.DayNames.Contains(t, StringComparer.Ordinal)).ToHashSet(StringComparer.Ordinal)
             : [];
@@ -154,8 +154,7 @@ public static class ScheduleWindow
     }
 }
 
-/// <summary>Clamping and normalization for <c>operator_settings</c> (port of the module-level helpers
-/// in <c>operator_settings_service.py</c>).</summary>
+/// <summary>Clamping and normalization for <c>operator_settings</c>.</summary>
 public static class OperatorSettingsRules
 {
     /// <summary>The most files Weir runs at once, and so the most worker slots a server starts (#633).</summary>
@@ -194,5 +193,5 @@ public static class OperatorSettingsRules
 
     /// <summary>The unclaimed hand-back wait, 1 to 365 days.</summary>
     public static long ClampUnclaimedHandbackWindowDays(long raw) =>
-        Math.Clamp(raw, Weir.Core.MediaManagers.HandbackRules.MinUnclaimedWindowDays, Weir.Core.MediaManagers.HandbackRules.MaxUnclaimedWindowDays);
+        Math.Clamp(raw, HandbackRules.MinUnclaimedWindowDays, HandbackRules.MaxUnclaimedWindowDays);
 }

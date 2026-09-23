@@ -4,8 +4,7 @@ namespace Weir.Core.Activity;
 public readonly record struct ActivityLatest(long? LatestId, long Version);
 
 /// <summary>
-/// Commit-time Activity freshness broadcaster for the live stream (port of
-/// <c>weir.platform.activity.live_stream.ActivityLatestNotifier</c>). Writers call <see cref="Notify"/>
+/// Commit-time Activity freshness broadcaster for the live stream. Writers call <see cref="Notify"/>
 /// after a transaction that recorded or updated Activity commits; each open stream waits for a change.
 /// </summary>
 public sealed class ActivityLatestNotifier
@@ -15,7 +14,7 @@ public sealed class ActivityLatestNotifier
     private long? _latestId;
     private long _version;
 
-    /// <summary><c>snapshot</c>.</summary>
+    /// <summary>The current latest id and version.</summary>
     public ActivityLatest Snapshot()
     {
         lock (_lock)
@@ -24,7 +23,7 @@ public sealed class ActivityLatestNotifier
         }
     }
 
-    /// <summary><c>notify</c>: record <paramref name="latestId"/>, bump the version and wake every waiter.</summary>
+    /// <summary>Records <paramref name="latestId"/>, bumps the version and wakes every waiter.</summary>
     public void Notify(long latestId)
     {
         TaskCompletionSource<ActivityLatest>[] waiters;
@@ -44,7 +43,7 @@ public sealed class ActivityLatestNotifier
     }
 
     /// <summary>
-    /// <c>wait_for_change</c>: the current state at once when the version already differs from
+    /// The current state at once when the version already differs from
     /// <paramref name="previousVersion"/>, otherwise the next notification, or <see langword="null"/> after
     /// <paramref name="timeout"/>.
     /// </summary>
@@ -79,7 +78,7 @@ public sealed class ActivityLatestNotifier
         }
     }
 
-    /// <summary><c>waiter_count_for_tests</c>.</summary>
+    /// <summary>How many streams are waiting; for tests.</summary>
     public int WaiterCount
     {
         get

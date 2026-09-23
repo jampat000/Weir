@@ -4,7 +4,7 @@ using Weir.Core.Text;
 
 namespace Weir.Core.Processing.RemuxPass;
 
-/// <summary>Whether a folder is clear of every manager's kept library files, and why (<c>LibraryTruthVerdict</c>).</summary>
+/// <summary>Whether a folder is clear of every manager's kept library files, and why.</summary>
 public sealed record LibraryTruthVerdict(string Check, string Note, IReadOnlyList<string> MatchedPaths)
 {
     public const string Passed = "passed";
@@ -15,30 +15,30 @@ public sealed record LibraryTruthVerdict(string Check, string Note, IReadOnlyLis
 }
 
 /// <summary>
-/// The gate in front of an output-folder delete (port of <c>manager_library_truth.py</c>): only a manager that actually
+/// The gate in front of an output-folder delete: only a manager that actually
 /// answered can clear a folder, and any one of them keeping a library file inside it stops the delete.
 /// </summary>
 public static class LibraryTruthGate
 {
-    /// <summary><c>evaluate_library_truth_for_folder</c>.</summary>
+    /// <summary>Decide whether <paramref name="folder"/> may be deleted, given every manager's library answer.</summary>
     /// <param name="answers">Every manager's answer for the scope.</param>
     /// <param name="folder">The folder about to be deleted.</param>
     /// <param name="mediaScope"><c>movie</c> or <c>tv</c>.</param>
-    /// <param name="resolve">Path resolution (<c>Path(raw).expanduser().resolve()</c>); null when a path cannot be resolved.</param>
+    /// <param name="resolve">Resolves a path to its absolute, home-expanded form; null when a path cannot be resolved.</param>
     /// <param name="ignoreCase">Whether path comparison ignores case (Windows).</param>
     /// <param name="expectedOutputFile">
-    /// Issue #545 item 1: the file this pass just published under <paramref name="folder"/>. A manager that reports no
+    /// The file this pass just published under <paramref name="folder"/>. A manager that reports no
     /// library files inside the folder is not, by itself, evidence the folder is safe to remove — it may simply not have
     /// scanned or imported yet (or it imports by copy and scans later). When given, at least one reporting manager must
     /// show positive evidence this exact release has been picked up: either the exact output path anywhere in its
     /// reported library, or the same title (file-name stem) at a different path, which is how several managers record an
-    /// import they then renamed. Without that evidence the folder is left in place, never deleted, regardless of age.
+    /// import they then renamed. Without that evidence the folder is left in place, never deleted, regardless of age (#545).
     /// </param>
     /// <param name="handoffOutcomeAcknowledged">
-    /// Issue #545 item 1, second way to be "confirmed": the hand-off ledger already recorded this pass's outcome as
+    /// The second way to be "confirmed" (#545): the hand-off ledger already recorded this pass's outcome as
     /// delivered (<c>completed</c> or <c>passed-through</c>) to the manager that asked for it. When true, the
-    /// <paramref name="expectedOutputFile"/> check is skipped — the manager has already been told the file is ready, so
-    /// the "no evidence yet" caution no longer applies. A hand-off that has not reached that terminal state (or that
+    /// <paramref name="expectedOutputFile"/> check is skipped: the manager has already been told the file is ready, so
+    /// the "no evidence yet" caution does not apply. A hand-off that has not reached that terminal state (or that
     /// names no manager at all) leaves this false and the ordinary evidence check runs.
     /// </param>
     public static LibraryTruthVerdict EvaluateForFolder(
@@ -121,7 +121,7 @@ public static class LibraryTruthGate
     }
 
     /// <summary>
-    /// Issue #545 item 1: positive evidence a manager picked up this exact release — its output path appears anywhere in
+    /// Positive evidence (#545) a manager picked up this exact release — its output path appears anywhere in
     /// a reporting manager's library (not only inside the folder being considered), or the same title (file-name stem)
     /// appears at a different path, which is how a manager that renames on import would record it.
     /// </summary>
@@ -150,11 +150,11 @@ public static class LibraryTruthGate
         return false;
     }
 
-    /// <summary>The file-name stem, used to recognise the same release at a different path (a manager's own rename).</summary>
+    /// <summary>The file-name stem, which recognises the same release at a different path (a manager's own rename).</summary>
     private static string TitleKey(string path) =>
         System.IO.Path.GetFileNameWithoutExtension(path.Replace('\\', '/'));
 
-    /// <summary><c>Path.relative_to</c>: whether <paramref name="path"/> is <paramref name="root"/> or sits under it.</summary>
+    /// <summary>Whether <paramref name="path"/> is <paramref name="root"/> or sits under it, compared segment by segment.</summary>
     public static bool IsSameOrUnder(string path, string root, bool ignoreCase)
     {
         ArgumentNullException.ThrowIfNull(path);

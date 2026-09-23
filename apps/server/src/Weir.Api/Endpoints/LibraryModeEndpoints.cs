@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Logging;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
@@ -15,12 +16,14 @@ using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
+using Weir.Infrastructure.Sqlite;
+using static Weir.Api.Endpoints.EndpointLookups;
 
 namespace Weir.Api.Endpoints;
 
 /// <summary>
-/// Library mode (#505): library-folder settings, scanning, the file list and Clean, and the schedule toggle. New surface —
-/// there is no Python router to port — see <c>docs/archive/server-port-notes.md</c>, "Library mode", for the storage decision behind it.
+/// Library mode (#505): library-folder settings, scanning, the file list and Clean, and the schedule toggle. See
+/// <c>docs/archive/server-port-notes.md</c>, "Library mode", for the storage decision behind it.
 /// </summary>
 public static class LibraryModeEndpoints
 {
@@ -40,9 +43,10 @@ public static class LibraryModeEndpoints
         return endpoints;
     }
 
-    private static async Task<ProcessingLibraryRecord> RequireLibraryAsync(Weir.Infrastructure.Sqlite.UnitOfWork uow, long id) =>
-        await LibraryStore.GetAsync(uow, id).ConfigureAwait(false)
-        ?? throw new ApiException(StatusCodes.Status404NotFound, "No library with that id.");
+    /// <summary>The 404 detail for these routes, kept as it is because clients may match on it.</summary>
+    private const string NoLibraryWithThatId = "No library with that id.";
+
+    private static ILogger Logger(ApiRequest request) => request.LoggerFactory.CreateLogger("weir.library_mode.router");
 
     private static PyDict SettingsOut(LibrarySettings settings) => new PyDict()
         .Set("library_folders", new PyList(settings.Folders.Select(f => (PyJson)new PyStr(f))))
@@ -58,7 +62,7 @@ public static class LibraryModeEndpoints
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await RequireLibraryAsync(uow, libraryId).ConfigureAwait(false);
+        await RequireLibraryAsync(uow, libraryId, NoLibraryWithThatId).ConfigureAwait(false);
         var settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
         return ApiRoutes.Ok(SettingsOut(settings));
     }
@@ -80,7 +84,7 @@ public static class LibraryModeEndpoints
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await RequireLibraryAsync(uow, libraryId).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, libraryId, NoLibraryWithThatId).ConfigureAwait(false);
         IReadOnlyList<string> validated;
         try
         {
@@ -117,7 +121,7 @@ public static class LibraryModeEndpoints
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await RequireLibraryAsync(uow, libraryId).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, libraryId, NoLibraryWithThatId).ConfigureAwait(false);
         var settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
         if (settings.Folders.Count == 0)
         {
@@ -165,10 +169,10 @@ public static class LibraryModeEndpoints
     /// The scan's own state for the header: which job, what it is doing, when it last finished and anything it
     /// could not do. <c>running</c> is what the "Scan now" button and its progress read.
     /// </summary>
-    private static async Task<PyJson> ScanOutAsync(Weir.Infrastructure.Sqlite.UnitOfWork uow, long libraryId)
+    private static async Task<PyJson> ScanOutAsync(UnitOfWork uow, long libraryId, ILogger logger)
     {
         var latest = await LibraryScanStore.LatestAsync(uow, libraryId).ConfigureAwait(false);
-        var snapshot = await LibraryScanStore.LatestSnapshotAsync(uow, libraryId).ConfigureAwait(false);
+        var snapshot = await LibraryScanStore.LatestSnapshotAsync(uow, libraryId, logger).ConfigureAwait(false);
         if (latest is null)
         {
             return snapshot is null
@@ -236,7 +240,7 @@ public static class LibraryModeEndpoints
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await RequireLibraryAsync(uow, libraryId).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, libraryId, NoLibraryWithThatId).ConfigureAwait(false);
         var settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
         var totals = await LibraryViewStore.TotalsAsync(uow, libraryId).ConfigureAwait(false);
         var breakdowns = await LibraryViewStore.AllBreakdownsAsync(uow, libraryId).ConfigureAwait(false);
@@ -252,7 +256,7 @@ public static class LibraryModeEndpoints
         return ApiRoutes.Ok(new PyDict()
             .Set("library_id", libraryId)
             .Set("folders_configured", settings.Folders.Count)
-            .Set("scan", await ScanOutAsync(uow, libraryId).ConfigureAwait(false))
+            .Set("scan", await ScanOutAsync(uow, libraryId, Logger(request)).ConfigureAwait(false))
             .Set("schedule", await ScheduleOutAsync(uow, library, settings, request.Time.GetUtcNow()).ConfigureAwait(false))
             .Set("totals", TotalsOut(totals))
             .Set("breakdowns", breakdownsOut)
@@ -265,7 +269,7 @@ public static class LibraryModeEndpoints
     /// reported as now, since the timer starts it within half a minute.
     /// </summary>
     private static async Task<PyDict> ScheduleOutAsync(
-        Weir.Infrastructure.Sqlite.UnitOfWork uow, ProcessingLibraryRecord library, LibrarySettings settings, DateTimeOffset now)
+        UnitOfWork uow, ProcessingLibraryRecord library, LibrarySettings settings, DateTimeOffset now)
     {
         var next = await LibraryModeScheduling.NextRunAsync(uow, library, settings, now).ConfigureAwait(false);
         return new PyDict()
@@ -309,12 +313,12 @@ public static class LibraryModeEndpoints
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await RequireLibraryAsync(uow, libraryId).ConfigureAwait(false);
+        await RequireLibraryAsync(uow, libraryId, NoLibraryWithThatId).ConfigureAwait(false);
         var settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
         var groups = await LibraryViewStore.ProblemsAsync(uow, libraryId, settings.CleanHardlinkedFiles).ConfigureAwait(false);
         return ApiRoutes.Ok(new PyDict()
             .Set("library_id", libraryId)
-            .Set("scan", await ScanOutAsync(uow, libraryId).ConfigureAwait(false))
+            .Set("scan", await ScanOutAsync(uow, libraryId, Logger(request)).ConfigureAwait(false))
             .Set("groups", new PyList(groups.Select(group => (PyJson)ProblemGroupOut(group))))
             .Set("total", groups.Sum(group => group.Files)));
     }
@@ -334,7 +338,7 @@ public static class LibraryModeEndpoints
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await RequireLibraryAsync(uow, libraryId).ConfigureAwait(false);
+        await RequireLibraryAsync(uow, libraryId, NoLibraryWithThatId).ConfigureAwait(false);
 
         var query = QueryFrom(request);
         var overall = await LibraryViewStore.TotalsAsync(uow, libraryId).ConfigureAwait(false);
@@ -343,7 +347,7 @@ public static class LibraryModeEndpoints
 
         return ApiRoutes.Ok(new PyDict()
             .Set("library_id", libraryId)
-            .Set("scan", await ScanOutAsync(uow, libraryId).ConfigureAwait(false))
+            .Set("scan", await ScanOutAsync(uow, libraryId, Logger(request)).ConfigureAwait(false))
             .Set("summary", TotalsOut(overall))
             .Set("filtered", TotalsOut(filtered))
             .Set("files", new PyList(rows.Select(row => (PyJson)FileOut(row))))
@@ -440,7 +444,7 @@ public static class LibraryModeEndpoints
             .Set("warnings", new PyList(warnings.Select(w => (PyJson)new PyStr(w)))));
 
     /// <summary>The library's rules, exactly as the scan and clean handlers resolve them (no rule set = the defaults).</summary>
-    private static async Task<ProcessingRulesConfig> RulesForAsync(Weir.Infrastructure.Sqlite.UnitOfWork uow, ProcessingLibraryRecord library)
+    private static async Task<ProcessingRulesConfig> RulesForAsync(UnitOfWork uow, ProcessingLibraryRecord library)
     {
         var ruleSet = library.RuleSetId is { } ruleSetId ? await LibraryStore.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) : null;
         return ruleSet is not null ? RemuxPassPaths.RulesConfigFor(ruleSet) : RuleSetConversion.ToRulesConfig(null);
@@ -448,7 +452,7 @@ public static class LibraryModeEndpoints
 
     /// <summary>Every distinct manager connection a set of scanned files was matched to, resolved once for a preflight pass.</summary>
     private static async Task<Dictionary<long, ManagerConnection>> ConnectionsForFilesAsync(
-        Weir.Infrastructure.Sqlite.UnitOfWork uow, MediaManagerConnectionService connections, IEnumerable<LibraryScanFileEntry> files)
+        UnitOfWork uow, MediaManagerConnectionService connections, IEnumerable<LibraryScanFileEntry> files)
     {
         var ids = files.Select(f => f.ManagerConnectionId).OfType<long>().Distinct().ToList();
         var resolved = await connections.ConnectionsByIdAsync(uow, ids).ConfigureAwait(false);
@@ -478,8 +482,8 @@ public static class LibraryModeEndpoints
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await RequireLibraryAsync(uow, libraryId).ConfigureAwait(false);
-        var snapshot = await LibraryScanStore.LatestSnapshotAsync(uow, libraryId).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, libraryId, NoLibraryWithThatId).ConfigureAwait(false);
+        var snapshot = await LibraryScanStore.LatestSnapshotAsync(uow, libraryId, Logger(request)).ConfigureAwait(false);
         var byPath = (snapshot?.Files ?? []).ToDictionary(f => f.Path, StringComparer.Ordinal);
         var selected = paths.Select(p => byPath.GetValueOrDefault(p)).OfType<LibraryScanFileEntry>().ToList();
         if (selected.Count == 0)
@@ -601,7 +605,7 @@ public static class LibraryModeEndpoints
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         request.RequireConfirmationToken(csrfToken);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await RequireLibraryAsync(uow, libraryId).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, libraryId, NoLibraryWithThatId).ConfigureAwait(false);
         await LibraryFileMarksStore.SetLeaveAloneAsync(uow, library.Id, filePath!, leaveAlone, request.Time.GetUtcNow()).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(new PyDict().Set("path", filePath).Set("leave_alone", leaveAlone));
@@ -623,13 +627,13 @@ public static class LibraryModeEndpoints
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await RequireLibraryAsync(uow, libraryId).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, libraryId, NoLibraryWithThatId).ConfigureAwait(false);
         var settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
 
         if (enabled && !settings.ScheduleEnabled)
         {
             // #505 point 7: turning the schedule on shows the same final-removal warning once, using whatever the last scan found.
-            var snapshot = await LibraryScanStore.LatestSnapshotAsync(uow, libraryId).ConfigureAwait(false);
+            var snapshot = await LibraryScanStore.LatestSnapshotAsync(uow, libraryId, Logger(request)).ConfigureAwait(false);
             var files = snapshot?.Files ?? [];
             var (removingFiles, removingTracks, bytesSaved) = RemovalTotals(files);
             if (removingFiles > 0 && !confirmed)
@@ -672,7 +676,7 @@ public static class LibraryModeEndpoints
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await RequireLibraryAsync(uow, libraryId).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, libraryId, NoLibraryWithThatId).ConfigureAwait(false);
         var rules = await RulesForAsync(uow, library).ConfigureAwait(false);
 
         var removedTrackStore = request.Service<IRemovedTrackStore>();
@@ -680,7 +684,7 @@ public static class LibraryModeEndpoints
         var forLibrary = allRemoved.Where(kv => kv.Key.LibraryId == libraryId).ToDictionary(kv => kv.Key, kv => kv.Value);
         var affected = RemovedTrackDiff.AffectedFiles(rules, forLibrary);
 
-        var snapshot = await LibraryScanStore.LatestSnapshotAsync(uow, libraryId).ConfigureAwait(false);
+        var snapshot = await LibraryScanStore.LatestSnapshotAsync(uow, libraryId, Logger(request)).ConfigureAwait(false);
         var scannedByPath = (snapshot?.Files ?? []).ToDictionary(f => f.Path, StringComparer.Ordinal);
 
         var items = affected.Select(result =>
@@ -739,8 +743,8 @@ public static class LibraryModeEndpoints
         }
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await RequireLibraryAsync(uow, libraryId).ConfigureAwait(false);
-        var snapshot = await LibraryScanStore.LatestSnapshotAsync(uow, libraryId).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, libraryId, NoLibraryWithThatId).ConfigureAwait(false);
+        var snapshot = await LibraryScanStore.LatestSnapshotAsync(uow, libraryId, Logger(request)).ConfigureAwait(false);
         var scanned = (snapshot?.Files ?? []).FirstOrDefault(f => string.Equals(f.Path, path, StringComparison.Ordinal));
 
         if (!ManagerRedownloadRules.CanRedownload(scanned?.ManagerKind, scanned?.ManagerConnectionId, scanned?.ManagerTitleId))

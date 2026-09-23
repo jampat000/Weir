@@ -5,8 +5,7 @@ using Weir.Infrastructure.Tests.Jobs;
 
 namespace Weir.Infrastructure.Tests.Processing;
 
-/// <summary>Real-SQLite proof of <c>LibraryStore</c> (port of the persistence half of
-/// <c>processing_library_crud.py</c>/<c>processing_library_service.py</c>, ADR-0014).</summary>
+/// <summary>Real-SQLite proof of <c>LibraryStore</c>, the library persistence layer (ADR-0014).</summary>
 public sealed class LibraryStoreTests
 {
     private static ProcessingLibraryInput NewLibrary(string name, string watched = "", string output = "", string mediaType = "movie") => new()
@@ -187,7 +186,7 @@ public sealed class LibraryStoreTests
     }
 
     [Fact]
-    public async Task Creating_and_updating_a_rule_set_round_trips_every_495_497_498_field()
+    public async Task Creating_and_updating_a_rule_set_round_trips_every_sorter_and_naming_field()
     {
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
@@ -250,7 +249,7 @@ public sealed class LibraryStoreTests
     }
 
     [Fact]
-    public async Task A_pre_495_497_498_row_with_a_plain_sorter_array_column_reads_back_every_new_field_at_its_default()
+    public async Task A_row_from_before_sorters_and_naming_with_a_plain_sorter_array_column_reads_back_every_new_field_at_its_default()
     {
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);

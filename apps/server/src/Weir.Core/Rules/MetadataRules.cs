@@ -2,7 +2,7 @@ using Weir.Core.Json;
 
 namespace Weir.Core.Rules;
 
-/// <summary>What to strip (<c>processing_metadata_rules.MetadataRules</c>). All off by default, so an upgrade changes nothing.</summary>
+/// <summary>What to strip. All off by default, so an upgrade changes nothing.</summary>
 public sealed record MetadataRules
 {
     public bool RemoveImages { get; init; }
@@ -11,7 +11,7 @@ public sealed record MetadataRules
     public bool RemoveLanguageTags { get; init; }
     public bool RemoveOtherMetadata { get; init; }
 
-    /// <summary>#498 (muxarr-inspired): write a standard <see cref="TrackNameTemplate"/> title on every kept audio and subtitle track.</summary>
+    /// <summary>#498 (Muxarr-inspired): write a standard <see cref="TrackNameTemplate"/> title on every kept audio and subtitle track.</summary>
     public bool StandardizeTrackNames { get; init; }
 
     /// <summary>The template rendered by <see cref="TrackNaming"/> when <see cref="StandardizeTrackNames"/> is on and no <see cref="TrackNameOverrides"/> entry matches.</summary>
@@ -32,7 +32,7 @@ public sealed record MetadataRules
 }
 
 /// <summary>
-/// Embedded images, attachments and container metadata (<c>processing_metadata_rules.py</c>).
+/// Embedded images, attachments and container metadata.
 /// An embedded poster is an mjpeg video stream, so the planner separates it from the picture.
 /// </summary>
 public static class MetadataStreams
@@ -121,7 +121,7 @@ public static class MetadataStreams
         return name.Length > 0 ? $"attachment ({name})" : "attachment";
     }
 
-    /// <summary>The ffmpeg flags for container-level stripping, in the order the reference emits them.</summary>
+    /// <summary>The ffmpeg flags for container-level stripping, in the order the golden files record.</summary>
     public static IReadOnlyList<string> ArgvFlags(MetadataRules rules)
     {
         ArgumentNullException.ThrowIfNull(rules);

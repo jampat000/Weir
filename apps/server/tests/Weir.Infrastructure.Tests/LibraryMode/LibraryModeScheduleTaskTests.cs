@@ -7,8 +7,7 @@ using Weir.Infrastructure.Tests.MediaManagers;
 namespace Weir.Infrastructure.Tests.LibraryMode;
 
 /// <summary>
-/// "Scheduled scan and clean" runs on its schedule (James, 23 Sep 2026). Before the timer existed the switch was saved
-/// and shown, and nothing read it.
+/// "Scheduled scan and clean" runs on its schedule: the saved switch and window are what the timer reads.
 /// </summary>
 public sealed class LibraryModeScheduleTaskTests : IDisposable
 {
@@ -131,7 +130,7 @@ public sealed class LibraryModeScheduleTaskTests : IDisposable
     public async Task A_library_waits_for_its_window_to_open()
     {
         var library = await LibraryAsync();
-        // The fixture's clock is Thursday 15 January 2026, 10:00 UTC; this library may only work from 02:00 to 04:00.
+        // The fixture's clock reads a Thursday at 10:00 UTC; this library may only work from 02:00 to 04:00.
         var grid = Weir.Core.Jobs.ScheduleGrid.FromDaysAndTimes("Mon,Tue,Wed,Thu,Fri,Sat,Sun", "02:00", "04:00");
         await _fixture.Db(async uow =>
         {

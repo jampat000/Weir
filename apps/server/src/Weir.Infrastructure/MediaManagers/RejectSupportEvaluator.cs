@@ -3,7 +3,7 @@ using Weir.Core.MediaManagers;
 namespace Weir.Infrastructure.MediaManagers;
 
 /// <summary>
-/// <c>reject_support</c>: whether the opt-in <c>reject</c> failure policy can be offered for a library linked to a set of
+/// Whether the opt-in <c>reject</c> failure policy can be offered for a library linked to a set of
 /// manager connections. A manager whose port removes queue items can always be asked (the safety rules are applied per
 /// file at run time); any other manager must advertise <see cref="RejectSupportRules.RejectCapability"/>.
 /// </summary>

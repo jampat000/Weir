@@ -217,7 +217,7 @@ public static class ArrLanguageCatalog
         ["Mongolian"] = "mon",
     };
 
-    /// <summary>Weir's canonical code for a manager's language id, or <see langword="null"/> when this port cannot place it.</summary>
+    /// <summary>Weir's canonical code for a manager's language id, or <see langword="null"/> when Weir cannot place it.</summary>
     public static string? CanonicalCodeFor(string managerKind, int languageId)
     {
         var names = managerKind switch

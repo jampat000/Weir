@@ -13,8 +13,8 @@ namespace Weir.Infrastructure.Settings;
 public sealed record ConfigurationBackupRecord(long Id, PyDateTime CreatedAt, string FileName, long SizeBytes);
 
 /// <summary>
-/// Automatic configuration snapshots on disk (port of <c>suite_configuration_backup_service</c> and the
-/// tick in <c>suite_configuration_backup_periodic</c>).
+/// Automatic configuration snapshots on disk: writing, listing and pruning them, and the scheduled tick
+/// that writes one when it is due. The newest <see cref="MaxFiles"/> are kept.
 /// </summary>
 public sealed class ConfigurationBackups
 {
@@ -53,7 +53,10 @@ public sealed class ConfigurationBackups
             .Set("size_bytes", row.SizeBytes);
     }
 
-    /// <summary><c>get_suite_configuration_backup_file_path</c>. Throws <see cref="PyValueErrorException"/> (answered as 404).</summary>
+    /// <summary>
+    /// The snapshot's file on disk, refusing a stored name that is not a plain snapshot file name inside the backup
+    /// directory. Throws <see cref="PyValueErrorException"/> (answered as 404).
+    /// </summary>
     public async Task<(string Path, ConfigurationBackupRecord Row)> GetFileAsync(UnitOfWork uow, long backupId)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -82,7 +85,7 @@ public sealed class ConfigurationBackups
         return (path, row);
     }
 
-    /// <summary><c>create_suite_configuration_backup</c>.</summary>
+    /// <summary>Write a snapshot of the configuration bundle, record it, and prune past <see cref="MaxFiles"/>.</summary>
     public async Task<ConfigurationBackupRecord> CreateAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -110,7 +113,7 @@ public sealed class ConfigurationBackups
         return new ConfigurationBackupRecord(Convert.ToInt64(id, CultureInfo.InvariantCulture), now, fileName, payload.LongLength);
     }
 
-    /// <summary><c>run_suite_configuration_backup_tick</c>: 1 when a snapshot was written.</summary>
+    /// <summary>One scheduled check: 1 when a snapshot was due and written, else 0.</summary>
     public async Task<int> RunTickAsync(SqliteDatabase database, DateTime? nowUtc = null, CancellationToken cancellationToken = default)
     {
         var when = nowUtc ?? _time.GetUtcNow().UtcDateTime;
@@ -169,11 +172,11 @@ public sealed class ConfigurationBackups
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            // contextlib.suppress(OSError), as in Python.
+            // Best effort: a file that cannot be deleted now is retried on the next prune.
         }
     }
 
-    /// <summary><c>Path(name).name</c>.</summary>
+    /// <summary>The last path component of <paramref name="name"/>, without a drive prefix on Windows.</summary>
     private static string PurePathName(string name)
     {
         var separators = OperatingSystem.IsWindows() ? new[] { '/', '\\' } : ['/'];

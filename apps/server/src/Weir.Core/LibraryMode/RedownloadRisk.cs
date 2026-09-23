@@ -9,7 +9,7 @@ namespace Weir.Core.LibraryMode;
 /// same shape at openapi.json:9006, develop). <see cref="LanguageCode"/> is Weir's canonical form
 /// (<see cref="OriginalLanguage.CanonicalLanguage"/>) of the specification's language <c>Value</c> field, resolved
 /// by the caller through <see cref="ArrLanguageCatalog"/>; it is <see langword="null"/> for a non-language
-/// specification, and also for a language specification whose <c>Value</c> this port cannot confidently place
+/// specification, and also for a language specification whose <c>Value</c> Weir cannot confidently place
 /// (an id outside the curated table, or the dynamic "Original" / "Unknown" / "Any" entries, which depend on the
 /// title's own metadata rather than a fixed language).
 /// </summary>
@@ -43,7 +43,7 @@ public sealed record QualityProfileSnapshot(bool UpgradeAllowed, int CutoffForma
 /// <summary>One format the manager would stop matching, in the exact wording issue #508 specifies.</summary>
 public sealed record RedownloadRiskWarning(string ManagerLabel, string TitleName, string FormatName, int FormatScore)
 {
-    /// <summary>e.g. "Radarr may download Blade Runner 2049 again: its 'Multi-Audio' format (+50) would no longer match."</summary>
+    /// <summary>The warning sentence: the manager may download the title again because the named format, with its signed score, would stop matching.</summary>
     public string Message
     {
         get
@@ -224,13 +224,13 @@ public static class RedownloadRiskEvaluator
         {
             if (spec.LanguageCode is null)
             {
-                // An id this port could not place (outside the curated table, or "Original"/"Unknown"/"Any",
+                // An id Weir could not place (outside the curated table, or "Original"/"Unknown"/"Any",
                 // which need title metadata this evaluator does not have).
                 return FormatOutcome.CantTell;
             }
 
             // The format was matched today, so every specification (this one included) was satisfied before the
-            // removal; a specification that would no longer be satisfied loses the whole format, since Sonarr and
+            // removal; a specification that would stop being satisfied loses the whole format, since Sonarr and
             // Radarr require every specification to pass.
             if (!SatisfiedAfterRemoval(spec, remainingLanguages))
             {

@@ -2,8 +2,8 @@ using Weir.Core.Activity;
 using Weir.Core.Json;
 using Weir.Core.Media;
 using Weir.Core.MediaManagers;
+using Weir.Core.Processing;
 using Weir.Infrastructure.Activity;
-using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
@@ -193,8 +193,8 @@ public sealed class HandbackOutcomes
             return candidates.FirstOrDefault();
         }
 
-        var scope = ProcessingLibraryFolders.NormalizeMediaScope(mediaScope);
-        var ofScope = candidates.Where(row => ProcessingLibraryFolders.NormalizeMediaScope(row.MediaType) == scope).ToList();
+        var scope = ProcessingMediaScopes.Normalize(mediaScope);
+        var ofScope = candidates.Where(row => ProcessingMediaScopes.Normalize(row.MediaType) == scope).ToList();
         return (ofScope.Count > 0 ? ofScope : candidates)
             .OrderBy(row => row.SettledAt is null ? 0 : 1)
             .ThenByDescending(row => row.WrittenAt ?? DateTimeOffset.MinValue)

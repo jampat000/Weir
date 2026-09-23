@@ -33,11 +33,11 @@ public sealed record UserSessionRecord(
     PyDateTime? RevokedAt,
     string ClientLabel)
 {
-    /// <summary><c>str(uuid)</c>: the hyphenated form the API shows.</summary>
+    /// <summary>The hyphenated UUID form the API shows.</summary>
     public string PublicId => Guid.TryParseExact(Id, "N", out var guid) ? guid.ToString("D") : Id;
 }
 
-/// <summary>Why a session no longer authenticates.</summary>
+/// <summary>Why a session does not authenticate.</summary>
 public enum SessionInvalidReason
 {
     Revoked,
@@ -45,7 +45,7 @@ public enum SessionInvalidReason
     IdleExpired,
 }
 
-/// <summary>Port of the pure rules in <c>weir.platform.auth.sessions</c> and <c>service</c>.</summary>
+/// <summary>Pure rules for sign-in sessions: timeouts, validity, client labels and cookie flags.</summary>
 public static class SessionRules
 {
     public const int MaxActiveSessionsPerUser = 5;
@@ -85,7 +85,7 @@ public static class SessionRules
         return nowUtc > SafeAdd(row.LastSeenAt.AsUtc, idle) ? SessionInvalidReason.IdleExpired : null;
     }
 
-    /// <summary><c>_session_last_seen_touch_gap</c>: at most 60 s, at most half the idle window.</summary>
+    /// <summary>How stale <c>last_seen_at</c> may get before a request rewrites it: at most 60 s, at most half the idle window.</summary>
     public static TimeSpan LastSeenTouchGap(TimeSpan idle)
     {
         var half = TimeSpan.FromTicks(idle.Ticks / 2);
@@ -105,7 +105,7 @@ public static class SessionRules
     public static DateTime SafeSubtract(DateTime value, TimeSpan span) =>
         span.Ticks > value.Ticks ? DateTime.MinValue : value - span;
 
-    /// <summary><c>client_label_from_user_agent</c>: a coarse, non-identifying label.</summary>
+    /// <summary>A coarse, non-identifying label from the user agent, such as "Chrome on Windows".</summary>
     public static string ClientLabelFromUserAgent(string? userAgent)
     {
         var value = (userAgent ?? string.Empty).ToLowerInvariant();
@@ -156,7 +156,7 @@ public static class SessionRules
         return PyStrings.Slice($"{browser} on {platform}", 80);
     }
 
-    /// <summary><c>resolve_cookie_secure</c>.</summary>
+    /// <summary>Whether the session cookie gets <c>Secure</c>: in auto mode, only for a request that arrived over HTTPS.</summary>
     public static bool ResolveCookieSecure(string? requestScheme, CookieSecureMode mode) => mode switch
     {
         CookieSecureMode.Always => true,

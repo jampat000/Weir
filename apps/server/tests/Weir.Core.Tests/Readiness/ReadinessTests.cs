@@ -56,7 +56,7 @@ public sealed class ReadinessTests
     [InlineData("processing", "Processing")]
     [InlineData("media_managers", "Media_Managers")]
     [InlineData("PROCESSING", "Processing")]
-    public void Module_titles_follow_python_title(string module, string expected) =>
+    public void Module_titles_capitalise_each_word_after_a_non_letter(string module, string expected) =>
         Assert.Equal(expected, WorkerHeartbeats.TitleCase(module));
 
     [Fact]

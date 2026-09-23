@@ -1,10 +1,12 @@
 using Weir.Core.Json;
+using Weir.Core.Media;
 using Weir.Core.MediaManagers;
+using Weir.Infrastructure.IO;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
 
-/// <summary>A guarded filesystem mutation could not complete safely (<c>FileLifecycleError</c>).</summary>
+/// <summary>A guarded filesystem mutation could not complete safely.</summary>
 public sealed class FileLifecycleException : Exception
 {
     public FileLifecycleException()
@@ -22,16 +24,16 @@ public sealed class FileLifecycleException : Exception
     }
 }
 
-/// <summary>Safe filesystem/database reconciliation checks and repairs (port of <c>weir.platform.reconciliation.service</c>).</summary>
+/// <summary>Safe filesystem/database reconciliation checks and repairs.</summary>
 public static class ReconciliationService
 {
     private sealed record LibraryFolders(long Id, string Name, string WatchedFolder, string OutputFolder, string WorkFolder);
 
-    /// <summary><c>build_reconciliation_report</c>.</summary>
+    /// <summary>The reconciliation report over every library's processing folders.</summary>
     public static async Task<PyDict> BuildReportAsync(UnitOfWork uow) =>
         ReconciliationRules.Report(await ScanProcessingPathsAsync(uow).ConfigureAwait(false));
 
-    /// <summary><c>repair_reconciliation_issue</c>. Throws <see cref="PyValueErrorException"/> with the operator's sentence.</summary>
+    /// <summary>Apply one repair action. Throws <see cref="PyValueErrorException"/> with the operator's sentence.</summary>
     public static async Task<PyDict> RepairAsync(UnitOfWork uow, string action, long? dbId, string? path, bool confirm)
     {
         _ = dbId;
@@ -62,16 +64,14 @@ public static class ReconciliationService
         throw new PyValueErrorException($"Unknown reconciliation repair action: {action}");
     }
 
-    /// <summary><c>safe_unlink_under_roots</c>: delete only a path that normalises under one of the roots.</summary>
+    /// <summary>Deletes a file only when it lies strictly inside one of the roots (never a root itself).</summary>
     public static bool SafeUnlinkUnderRoots(string path, IReadOnlyList<string> allowedRoots)
     {
         ArgumentNullException.ThrowIfNull(allowedRoots);
         var target = Path.GetFullPath(path);
-        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         foreach (var rawRoot in allowedRoots)
         {
-            var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(rawRoot));
-            if (string.Equals(target, root, comparison) || target.StartsWith(root + Path.DirectorySeparatorChar, comparison))
+            if (PathContainment.IsUnder(rawRoot, target))
             {
                 try
                 {
@@ -125,7 +125,7 @@ public static class ReconciliationService
             IEnumerable<string> entries;
             try
             {
-                entries = Directory.EnumerateFileSystemEntries(root, "*", new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = 0, IgnoreInaccessible = true });
+                entries = Directory.EnumerateFileSystemEntries(root, "*", new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint, IgnoreInaccessible = true });
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
@@ -156,7 +156,7 @@ public static class ReconciliationService
         return issues;
     }
 
-    /// <summary><c>_configured_processing_work_roots</c>: every library's work folder that exists, resolved.</summary>
+    /// <summary>Every library's work folder that exists, resolved.</summary>
     private static List<string> WorkRoots(IEnumerable<LibraryFolders> libraries)
     {
         var roots = new List<string>();
@@ -177,7 +177,7 @@ public static class ReconciliationService
             }
             catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException)
             {
-                // Python: OSError from resolve() skips the folder.
+                // A folder that cannot be resolved is skipped.
             }
         }
 
@@ -196,7 +196,7 @@ public static class ReconciliationService
         }
     }
 
-    private static string PurePathName(string path) => Weir.Core.Media.MediaPathNames.Name(path, OperatingSystem.IsWindows());
+    private static string PurePathName(string path) => MediaPathNames.Name(path, OperatingSystem.IsWindows());
 
     private static Task<List<LibraryFolders>> ListLibrariesAsync(UnitOfWork uow)
     {

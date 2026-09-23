@@ -5,7 +5,7 @@ using Weir.Core.Text;
 
 namespace Weir.Core.Media;
 
-/// <summary>What ffmpeg on this machine says it can do (<c>AccelerationReport</c>).</summary>
+/// <summary>What ffmpeg on this machine says it can do.</summary>
 public sealed record AccelerationReport
 {
     /// <summary>Methods ffmpeg was compiled with, sorted. Not proof a device is present or working.</summary>
@@ -25,10 +25,10 @@ public sealed record AccelerationReport
             .ToList();
 }
 
-/// <summary>What the library asked for (<c>HardwareSettings</c>).</summary>
+/// <summary>What the library asked for.</summary>
 public sealed record HardwareSettings
 {
-    /// <summary><c>off</c>, <c>auto</c> or <c>device</c>; kept as text because the reference compares it un-normalized.</summary>
+    /// <summary><c>off</c>, <c>auto</c> or <c>device</c>; kept as text because it is compared un-normalized.</summary>
     public string Mode { get; init; } = HardwareAcceleration.ModeOff;
 
     /// <summary>The named method when <see cref="Mode"/> is <c>device</c>: <c>cuda</c>, <c>qsv</c>, <c>vaapi</c>.</summary>
@@ -41,7 +41,7 @@ public sealed record HardwareSettings
     public bool WantsHardware => Mode is HardwareAcceleration.ModeAuto or HardwareAcceleration.ModeDevice;
 }
 
-/// <summary>What Weir will actually ask ffmpeg for, and why (<c>AccelerationDecision</c>).</summary>
+/// <summary>What Weir will actually ask ffmpeg for, and why.</summary>
 public sealed record AccelerationDecision
 {
     public string Method { get; init; } = string.Empty;
@@ -57,7 +57,7 @@ public sealed record AccelerationDecision
 }
 
 /// <summary>
-/// Hardware acceleration (<c>processing_hardware_acceleration.py</c>): reading <c>ffmpeg -hwaccels</c>, and
+/// Hardware acceleration: reading <c>ffmpeg -hwaccels</c>, and
 /// choosing a decode method that always degrades to software with a reason rather than failing a file.
 /// </summary>
 public static class HardwareAcceleration
@@ -70,8 +70,8 @@ public static class HardwareAcceleration
     public const string DefaultStrictness = "normal";
 
     /// <summary>
-    /// Vendors an operator can switch off, and the ffmpeg hwaccel names each covers, in the reference's
-    /// order (which decides the vendor of a method two vendors share, such as <c>d3d11va</c>).
+    /// Vendors an operator can switch off, and the ffmpeg hwaccel names each covers. The order decides the
+    /// vendor of a method two vendors share, such as <c>d3d11va</c>.
     /// </summary>
     public static IReadOnlyList<KeyValuePair<string, IReadOnlyList<string>>> VendorMethods { get; } =
     [
@@ -88,7 +88,7 @@ public static class HardwareAcceleration
     /// <summary>Auto mode's preference order, so the same machine picks the same device every run.</summary>
     public static IReadOnlyList<string> AutoPreference { get; } = ["cuda", "qsv", "vaapi", "videotoolbox", "d3d11va", "amf"];
 
-    /// <summary>The report when ffmpeg could not be run at all (an <c>OSError</c> or <c>SubprocessError</c>).</summary>
+    /// <summary>The report when ffmpeg could not be run at all.</summary>
     public static AccelerationReport ReportForRunError(string errorText) => new()
     {
         Detected = false,
@@ -141,7 +141,7 @@ public static class HardwareAcceleration
         };
     }
 
-    /// <summary><c>decide_acceleration</c>: every path ends in a usable answer.</summary>
+    /// <summary>Chooses the decode method; every path ends in a usable answer.</summary>
     public static AccelerationDecision Decide(HardwareSettings settings, AccelerationReport report)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -237,7 +237,7 @@ public static class HardwareAcceleration
         };
     }
 
-    /// <summary><c>parse_disabled_vendors</c>: known vendors only, first occurrence kept.</summary>
+    /// <summary>Known vendors only, first occurrence kept.</summary>
     public static IReadOnlyList<string> ParseDisabledVendors(string? csv)
     {
         var result = new List<string>();
@@ -253,14 +253,14 @@ public static class HardwareAcceleration
         return result;
     }
 
-    /// <summary><c>normalize_strictness</c>: unknown values mean ffmpeg's default.</summary>
+    /// <summary>Unknown values mean ffmpeg's default.</summary>
     public static string NormalizeStrictness(string? raw)
     {
         var value = Py.Lower(PyStrings.Strip(raw ?? string.Empty));
         return StrictnessLevels.Contains(value, StringComparer.Ordinal) ? value : DefaultStrictness;
     }
 
-    /// <summary><c>normalize_decode_mode</c>: unknown values mean off.</summary>
+    /// <summary>Unknown values mean off.</summary>
     public static string NormalizeDecodeMode(string? raw)
     {
         var value = Py.Lower(PyStrings.Strip(raw ?? string.Empty));

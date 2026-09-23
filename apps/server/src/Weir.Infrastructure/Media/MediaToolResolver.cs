@@ -2,7 +2,7 @@ using Weir.Core.Media;
 
 namespace Weir.Infrastructure.Media;
 
-/// <summary>Finds ffprobe and ffmpeg (<c>resolve_ffprobe_ffmpeg</c>).</summary>
+/// <summary>Finds ffprobe and ffmpeg, and mkvmerge when it is installed.</summary>
 public interface IMediaToolResolver
 {
     /// <summary>(ffprobe, ffmpeg) paths. Throws <see cref="MediaToolException"/> when either is missing.</summary>
@@ -18,7 +18,8 @@ public interface IMediaToolResolver
 
 /// <summary>
 /// Prefers <c>WEIR_FFMPEG_DIR</c>, then the tools bundled under the Weir home, then (packaged builds only) the
-/// tools next to the executable, then PATH. The environment is read on every call, as the reference does.
+/// tools next to the executable, then PATH. The environment is read on every call, so a tool installed or a
+/// variable changed while the server runs is picked up without a restart.
 /// </summary>
 public sealed class MediaToolResolver : IMediaToolResolver
 {
@@ -40,8 +41,7 @@ public sealed class MediaToolResolver : IMediaToolResolver
     }
 
     /// <summary>
-    /// The resolver for this process: a single-file publish (the Windows package and the Docker image, .NET's
-    /// equivalent of a frozen build) also looks in <c>&lt;app&gt;/bin/ffmpeg</c>, where the Windows package
+    /// The resolver for this process: a single-file publish (the Windows package and the Docker image) also looks in <c>&lt;app&gt;/bin/ffmpeg</c>, where the Windows package
     /// bundles ffmpeg and ffprobe.
     /// </summary>
     public static MediaToolResolver ForCurrentProcess(string weirHome) =>
@@ -113,7 +113,7 @@ public sealed class MediaToolResolver : IMediaToolResolver
             IsExecutableFile);
     }
 
-    /// <summary><c>shutil._access_check</c>: exists, is not a directory, and (off Windows) is executable.</summary>
+    /// <summary>A PATH candidate counts when it exists, is not a directory, and (off Windows) is executable.</summary>
     private bool IsExecutableFile(string candidate)
     {
         if (!File.Exists(candidate))

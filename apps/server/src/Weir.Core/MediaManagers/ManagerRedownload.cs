@@ -8,7 +8,7 @@ public enum RedownloadOutcome
 
     /// <summary>
     /// The existing file was deleted, but dispatching the search itself failed. The most dangerous
-    /// outcome this port can report: the file is already gone and no replacement was ever requested.
+    /// outcome this interface can report: the file is already gone and no replacement was ever requested.
     /// The caller should mark the title waiting and tell the operator plainly, not just log it.
     /// </summary>
     DeletedButSearchFailed,
@@ -35,7 +35,7 @@ public sealed record RedownloadResult(
 
 /// <summary>
 /// Asks a manager to redownload one title's file after Weir removed a track for good (issue #509): the
-/// honest alternative to restoring a track that no longer exists. Only implemented where the product's own
+/// honest alternative to restoring a track that is gone. Only implemented where the product's own
 /// behaviour has been verified from source (Sonarr/Radarr — see <c>Weir.Infrastructure.MediaManagers
 /// .ArrManagerRedownload</c>'s remarks for the citations); every other kind, and no manager at all, answers
 /// <see cref="RedownloadOutcome.Unsupported"/> rather than guessing at an unverified API.

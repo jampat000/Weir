@@ -7,7 +7,7 @@ using Weir.Infrastructure.Scheduling;
 namespace Weir.Api.Tests.MediaManagers;
 
 /// <summary>
-/// The media manager heartbeat (23 Sep 2026): each run saves every enabled manager's connection test, so a manager
+/// The media manager heartbeat: each run saves every enabled manager's connection test, so a manager
 /// going quiet, or coming back, shows without anyone pressing Test.
 /// </summary>
 public sealed class ManagerHeartbeatTests

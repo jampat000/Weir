@@ -4,11 +4,11 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
 
-/// <summary>The singleton <c>operator_settings</c> row (port of <c>operator_settings_service.py</c>).</summary>
+/// <summary>The singleton <c>operator_settings</c> row.</summary>
 /// <remarks>
-/// <c>verbose_detection_logging</c> is still a column but nothing reads or writes it: the setting was removed on 23 Sep 2026
-/// because nothing ever acted on it. Dropping it would buy nothing and cost a migration, so it stays with its default
-/// filling it on a new row; a configuration backup carries it and restores it like any other column.
+/// <c>verbose_detection_logging</c> is a column that nothing reads or writes, because nothing acted on the setting.
+/// Dropping it would buy nothing and cost a migration, so it keeps its default on a new row; a configuration backup
+/// carries it and restores it like any other column.
 /// </remarks>
 public static class OperatorSettingsStore
 {
@@ -25,7 +25,7 @@ public static class OperatorSettingsStore
     public static Task<ProcessingOperatorSettingsRecord?> GetAsync(UnitOfWork uow) =>
         uow.QuerySingleAsync($"SELECT {Columns} FROM operator_settings WHERE id = 1", Read);
 
-    /// <summary><c>ensure_operator_settings_row</c>.</summary>
+    /// <summary>The settings row, created with its defaults when it does not exist yet.</summary>
     public static async Task<ProcessingOperatorSettingsRecord> EnsureAsync(UnitOfWork uow)
     {
         var row = await GetAsync(uow).ConfigureAwait(false);

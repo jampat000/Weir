@@ -1,13 +1,17 @@
 using System.Text.Json;
+using Weir.Core.Processing;
 using Weir.Core.Settings;
 using Weir.Core.Time;
 
 namespace Weir.Core.Jobs;
 
-/// <summary>Wall-clock schedule windows in an IANA zone (port of <c>schedule_wall_clock</c>).</summary>
+/// <summary>Wall-clock schedule windows in an IANA zone.</summary>
 public static class ScheduleWallClock
 {
-    /// <summary><c>schedule_time_window_active</c>.</summary>
+    /// <summary>
+    /// Whether the day/start/end window is open at <paramref name="now"/>; always true when the schedule is off.
+    /// A window whose end is before its start runs past midnight.
+    /// </summary>
     public static bool TimeWindowActive(
         bool scheduleEnabled,
         string? scheduleDays,
@@ -22,7 +26,7 @@ public static class ScheduleWallClock
         }
 
         var local = TimeZones.ToLocal(now, timezoneName);
-        var day = ScheduleGrid.DayNames[ScheduleGrid.PythonWeekday(local.DayOfWeek)];
+        var day = ScheduleGrid.DayNames[ScheduleGrid.MondayFirstDayIndex(local.DayOfWeek)];
         if (!ParseDays(scheduleDays).Contains(day))
         {
             return false;
@@ -38,8 +42,8 @@ public static class ScheduleWallClock
     {
         var parts = (text ?? string.Empty).Trim().Split(':');
         if (parts.Length != 2 ||
-            !ScheduleGrid.TryPythonInt(parts[0], out var hour) ||
-            !ScheduleGrid.TryPythonInt(parts[1], out var minute) ||
+            !ScheduleGrid.TryParseInt(parts[0], out var hour) ||
+            !ScheduleGrid.TryParseInt(parts[1], out var minute) ||
             hour is < 0 or > 23 || minute is < 0 or > 59)
         {
             return fallback;
@@ -64,13 +68,13 @@ public static class ScheduleWallClock
     }
 }
 
-/// <summary>Total runner capacity and what each resolution class costs (port of <c>RunnerBudget</c>).</summary>
+/// <summary>Total runner capacity and what each resolution class costs.</summary>
 public sealed record RunnerBudget(int Capacity, IReadOnlyDictionary<string, int> Costs)
 {
     /// <summary>The budget when the operator settings row does not exist.</summary>
     public static RunnerBudget Default { get; } = new(4, new Dictionary<string, int>(StringComparer.Ordinal));
 
-    /// <summary><c>budget_from_settings</c>: zero capacity means the default of four, like Python's <c>or 4</c>.</summary>
+    /// <summary>The budget from stored settings: a capacity of zero means the default of four, and costs are never negative.</summary>
     public static RunnerBudget FromSettings(long capacity, long costSd, long cost720p, long cost1080p, long cost4k, long costUndetermined) =>
         new(
             (int)Math.Clamp(capacity == 0 ? 4 : capacity, 1, int.MaxValue),
@@ -122,7 +126,7 @@ public sealed record LibraryAdmissionSnapshot(
 /// <summary>A leased job as admission counts it.</summary>
 public sealed record LeasedJobSnapshot(long RunnerCost, string? PayloadJson);
 
-/// <summary>What a worker is allowed to pick up on this pass (port of <c>WorkAdmission</c>).</summary>
+/// <summary>What a worker is allowed to pick up on this pass.</summary>
 public sealed record WorkAdmission(
     PauseState Pause,
     IReadOnlySet<long> BlockedLibraryIds,
@@ -138,7 +142,7 @@ public sealed record WorkAdmission(
         !Pause.Paused || (WorkAdmissionRules.IsDetectionJobKind(jobKind) && Pause.ScanWhilePaused);
 }
 
-/// <summary>Pure rules of <c>weir.processing.processing_work_admission</c>.</summary>
+/// <summary>Pure rules deciding which libraries and job kinds a worker pass may admit.</summary>
 public static class WorkAdmissionRules
 {
     /// <summary>Detection job kinds keep running through a pause when "scan while paused" is on.</summary>
@@ -150,7 +154,7 @@ public static class WorkAdmissionRules
         return DetectionJobKindPrefixes.Any(prefix => jobKind.StartsWith(prefix, StringComparison.Ordinal));
     }
 
-    /// <summary><c>library_window_open</c>: the grid wins when drawn, else the day/start/end trio.</summary>
+    /// <summary>Whether a library's schedule is open: the grid wins when drawn, else the day/start/end trio.</summary>
     public static bool LibraryWindowOpen(LibraryAdmissionSnapshot library, string? timezoneName, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(library);
@@ -179,7 +183,7 @@ public static class WorkAdmissionRules
             now);
     }
 
-    /// <summary><c>library_window_reopens_at</c>: only knowable from a grid.</summary>
+    /// <summary>When a library's schedule next opens; only knowable from a grid.</summary>
     public static DateTimeOffset? LibraryWindowReopensAt(LibraryAdmissionSnapshot library, string? timezoneName, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(library);
@@ -188,8 +192,8 @@ public static class WorkAdmissionRules
     }
 
     /// <summary>
-    /// <c>evaluate_work_admission</c>: the pause, every library window and the runner budget, once per
-    /// worker pass. <paramref name="libraries"/> must be ordered by id.
+    /// Evaluates the pause, every library window and the runner budget, once per worker pass.
+    /// <paramref name="libraries"/> must be ordered by id.
     /// </summary>
     public static WorkAdmission Evaluate(
         SuitePauseSettings? suite,
@@ -204,8 +208,8 @@ public static class WorkAdmissionRules
         ArgumentNullException.ThrowIfNull(libraries);
         if (suite is null)
         {
-            // #540 item 4: a missing suite_settings row must not starve every job kind of runner
-            // capacity; nothing is running yet, so the whole default budget is free.
+            // A missing suite_settings row must not starve every job kind of runner capacity; nothing
+            // is running yet, so the whole default budget is free (#540).
             return new WorkAdmission(
                 new PauseState(false, null, ScanWhilePaused: true),
                 new HashSet<long>(),
@@ -243,9 +247,8 @@ public static class WorkAdmissionRules
             }
 
             // A per-library cap so one library cannot occupy every slot and starve the others. A library that has not
-            // been given its own number follows "Files at once" (#633); it used to mean 1, which silently undercut
-            // that setting for every install that had never opened the library's own field.
-            var cap = Weir.Core.Processing.OperatorSettingsRules.EffectiveLibraryLimit(library.MaxConcurrentFiles, filesAtOnce);
+            // been given its own number follows "Files at once" (#633), so an unset field never undercuts that setting.
+            var cap = OperatorSettingsRules.EffectiveLibraryLimit(library.MaxConcurrentFiles, filesAtOnce);
             if (runningPerLibrary.GetValueOrDefault(library.Id) >= cap)
             {
                 blocked.Add(library.Id);
@@ -264,16 +267,15 @@ public static class WorkAdmissionRules
     private static string OrDefault(string? value, string fallback) => string.IsNullOrEmpty(value) ? fallback : value;
 }
 
-/// <summary>Reads job payload fields the way the Python worker does.</summary>
+/// <summary>Reads typed fields from a job's JSON payload.</summary>
 public static class JobPayload
 {
     /// <summary>
-    /// <c>_library_id_of</c>: the payload's <c>library_id</c> when it is a JSON integer, not a boolean.
+    /// The payload's <c>library_id</c> when it is a JSON integer, not a boolean.
     /// </summary>
     /// <remarks>
-    /// #540 item 5: Python's <c>isinstance(value, int)</c> also accepts a bool (a bool is an int in
-    /// Python), so <c>library_id: true</c> counted as library 1 when tallying jobs running per
-    /// library. Fixed here to reject booleans and only accept a genuine JSON integer literal.
+    /// Booleans are rejected so <c>library_id: true</c> is never counted as library 1 when tallying
+    /// jobs running per library (#540).
     /// </remarks>
     public static long? LibraryIdForAdmission(string? payloadJson) => StrictInteger(ParseObject(payloadJson), "library_id");
 
@@ -304,8 +306,7 @@ public static class JobPayload
             : null;
 
     /// <summary>
-    /// An integer property that is not a boolean (<c>isinstance(x, int) and not isinstance(x, bool)</c>
-    /// as the activity classifier reads it), or null.
+    /// An integer property that is not a boolean (as the activity classifier reads it), or null.
     /// </summary>
     public static long? StrictInteger(JsonElement? payload, string name) =>
         payload is { } element && element.TryGetProperty(name, out var value) &&
@@ -313,7 +314,7 @@ public static class JobPayload
             ? number
             : null;
 
-    /// <summary>An integer property where a JSON boolean also counts (plain <c>isinstance(x, int)</c>).</summary>
+    /// <summary>An integer property where a JSON boolean also counts (<c>true</c> is 1, <c>false</c> is 0), or null.</summary>
     public static long? LooseInteger(JsonElement? payload, string name)
     {
         if (payload is not { } element || !element.TryGetProperty(name, out var value))
@@ -330,7 +331,7 @@ public static class JobPayload
         };
     }
 
-    /// <summary>Python's <c>json.loads</c> makes <c>1.0</c> a float, so only literals without a fraction or exponent are ints.</summary>
+    /// <summary>Only literals without a fraction or exponent count as integers, so <c>1.0</c> is not an id.</summary>
     private static bool IsIntegerLiteral(JsonElement value)
     {
         var text = value.GetRawText();

@@ -8,27 +8,26 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
 /// <summary>
-/// Seam: what happens once Weir gives up processing a file (<c>apply_failure_policy</c> and <c>reject_bad_release</c> in
-/// <c>processing_pass_through.py</c>). Both run inside the caller's unit of work and may only queue follow-up work; the copy,
+/// Seam: what happens once Weir gives up processing a file. Both methods run inside the caller's unit of work and may only queue follow-up work; the copy,
 /// the report and any deletion belong to the pass-through and reject handlers.
 /// </summary>
 public interface IFailurePolicy
 {
     /// <summary>
-    /// <c>reject_bad_release</c>: under <c>reject</c>, queue a reject for a file whose content was found unusable. True when
+    /// Under <c>reject</c>, queues a reject for a file whose content was found unusable. True when
     /// one was queued.
     /// </summary>
     Task<bool> RejectBadReleaseAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string reason, PyDict? origin);
 
     /// <summary>
-    /// <c>apply_failure_policy</c>: act on a recorded failure once no retry is coming. Returns the follow-up queued,
+    /// Acts on a recorded failure once no retry is coming. Returns the follow-up queued,
     /// <c>pass_through</c> or <c>reject</c>, or null.
     /// </summary>
     Task<string?> ApplyFailurePolicyAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, bool willRetry, PyDict? origin, bool badRelease);
 }
 
 /// <summary>
-/// The reference's policy (the default): <c>hold</c> does nothing, a content rejection under <c>reject</c> queues
+/// The default policy: <c>hold</c> does nothing, a content rejection under <c>reject</c> queues
 /// <c>processing.file.reject.v1</c>, and anything else queues <c>processing.file.pass_through.v1</c>, each carrying the hand-off
 /// origin. The handlers for those two kinds (<see cref="ProcessingRejectHandler"/>, <see cref="ProcessingPassThroughHandler"/>)
 /// are registered by <c>AddWeirProcessingFailureFollowUps</c> (#522 part 4).
@@ -118,7 +117,7 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
             (int)Math.Clamp(library.Priority, int.MinValue, int.MaxValue));
 
     /// <summary>
-    /// Issue #545 item 2: the source's own fingerprint, folded into the dedupe key so a later failure of a since-replaced
+    /// The source's own fingerprint (#545), folded into the dedupe key so a later failure of a since-replaced
     /// file (same relative path, different content) queues a fresh pass-through or reject instead of being absorbed by a
     /// row still sitting under the old key — while a repeat enqueue for the very same, unchanged file still dedupes.
     /// </summary>

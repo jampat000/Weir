@@ -6,8 +6,7 @@ namespace Weir.Infrastructure.Processing.DirectPlay;
 
 /// <summary>
 /// Loads the Direct Play device list: the operator's <c>WEIR_HOME/direct-play-devices.json</c> override
-/// when present and readable, otherwise the shipped <c>devices.json</c> embedded resource (port of
-/// <c>processing/direct_play/__init__.py</c>'s <c>load_device_profiles</c>).
+/// when present and readable, otherwise the shipped <c>devices.json</c> embedded resource.
 /// </summary>
 public static class DeviceProfileLoader
 {

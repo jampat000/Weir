@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net.Http.Headers;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Activity;
@@ -15,8 +16,8 @@ namespace Weir.Infrastructure.MediaManagers;
 public sealed record HandoffReportTarget(ManagerConnection Connection, string Url, IReadOnlyDictionary<string, string> Headers);
 
 /// <summary>
-/// Reports a finished hand-off to the manager that asked for it (port of <c>completion_callback</c>). The processing
-/// port calls <see cref="ReportHandoffCompletionAsync"/> when a pass ends; the reject policy uses the parts.
+/// Reports a finished hand-off to the manager that asked for it. Processing calls
+/// <see cref="ReportHandoffCompletionAsync"/> when a pass ends; the reject policy uses the parts.
 /// </summary>
 public sealed partial class HandoffCompletionReporter
 {
@@ -40,7 +41,7 @@ public sealed partial class HandoffCompletionReporter
         _logger = (ILogger?)logger ?? NullLogger.Instance;
     }
 
-    /// <summary><c>resolve_handoff_target</c>: the manager to report to, or a sentence saying why there is none.</summary>
+    /// <summary>The manager to report to, or a sentence saying why there is none.</summary>
     public async Task<(HandoffReportTarget? Target, string? Reason)> ResolveHandoffTargetAsync(UnitOfWork uow, HandoffOrigin origin)
     {
         ArgumentNullException.ThrowIfNull(origin);
@@ -75,7 +76,7 @@ public sealed partial class HandoffCompletionReporter
             null);
     }
 
-    /// <summary><c>post_handoff_report</c>: one POST, no redirects, never throws.</summary>
+    /// <summary>Send the report: one POST, no redirects, never throws.</summary>
     public async Task<HandoffReportDelivery> PostHandoffReportAsync(HandoffReportTarget target, PyDict body, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(target);
@@ -87,7 +88,7 @@ public sealed partial class HandoffCompletionReporter
             using var client = new HttpClient(_handlers.Handler(followRedirects: false), disposeHandler: false) { Timeout = CompletionReports.Timeout };
             using var request = new HttpRequestMessage(HttpMethod.Post, target.Url)
             {
-                // httpx 0.28's json= encoding: compact, UTF-8, no ASCII escaping.
+                // Compact, UTF-8, no ASCII escaping: the body bytes managers already receive.
                 Content = new ByteArrayContent(PyJsonWriter.DumpsUtf8(body, PyJsonFormat.Response)),
             };
             request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
@@ -117,7 +118,7 @@ public sealed partial class HandoffCompletionReporter
         return new HandoffReportDelivery(false, $"failed: {name} answered HTTP {status.ToString(CultureInfo.InvariantCulture)}");
     }
 
-    /// <summary><c>record_handoff_report</c>: the report in Activity, in plain words, accepted or not.</summary>
+    /// <summary>Record the report in Activity, in plain words, accepted or not.</summary>
     public static Task RecordHandoffReportAsync(UnitOfWork uow, HandoffReportTarget target, PyDict body, HandoffReportDelivery delivery, string? relativePath)
     {
         ArgumentNullException.ThrowIfNull(target);
@@ -168,9 +169,9 @@ public sealed partial class HandoffCompletionReporter
     }
 
     /// <summary>
-    /// <c>report_handoff_completion</c>: post the outcome back to the originating manager and record that it did. Returns a
-    /// short status for logging and never throws: a manager being unreachable must not fail a pass that succeeded on disk.
-    /// Commits <paramref name="uow"/> (or rolls it back when recording fails), as the Python session does.
+    /// Post the outcome back to the originating manager and record that it did. Returns a short status for logging and
+    /// never throws: a manager being unreachable must not fail a pass that succeeded on disk.
+    /// Commits <paramref name="uow"/> (or rolls it back when recording fails).
     /// </summary>
     public async Task<string> ReportHandoffCompletionAsync(UnitOfWork uow, string? payloadJson, PyDict result, CancellationToken cancellationToken = default)
     {
@@ -239,7 +240,7 @@ public sealed partial class HandoffCompletionReporter
     /// <summary>
     /// Send every report Weir still owes a manager of this kind because it was not answering when the pass ended (item 5 of
     /// #652). The heartbeat calls this once the manager answers its connection test. A report the manager answers, accepted
-    /// or refused, is no longer owed, and the file's History stops saying Weir is waiting; one it still does not answer
+    /// or refused, stops being owed, and the file's History stops saying Weir is waiting; one it still does not answer
     /// stays owed. Each report is committed on its own. Returns how many the manager answered.
     /// </summary>
     public async Task<int> SendWaitingReportsAsync(UnitOfWork uow, string sourceKey, CancellationToken cancellationToken = default)
@@ -349,7 +350,7 @@ public sealed partial class HandoffCompletionReporter
     private static partial void LogWaitingReportSent(ILogger logger, string manager, string handoffId, string status);
 
     /// <summary>
-    /// <c>translate_output_path</c>: <paramref name="outputFile"/> rebuilt under the manager's output folder, or null when it is
+    /// <paramref name="outputFile"/> rebuilt under the manager's output folder, or null when it is
     /// not under ours.
     /// </summary>
     public static string? TranslateOutputPath(string outputFile, string localOutputFolder, string managerOutputFolder)
@@ -377,7 +378,7 @@ public sealed partial class HandoffCompletionReporter
         return CompletionReports.ManagerPathJoin(managerOutputFolder, fileParts.Skip(folderParts.Count));
     }
 
-    /// <summary><c>_manager_output_path</c>: the output as the manager will see it, or null to fall back to the local path.</summary>
+    /// <summary>The output as the manager will see it, or null to fall back to the local path.</summary>
     private async Task<string?> ManagerOutputPathAsync(ManagerConnection connection, HandoffOrigin origin, PyDict result, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(origin.LibraryId) || result.Get("output_file") is not PyStr outputFile || result.Get("processing_output_folder_resolved") is not PyStr localFolder)
@@ -395,7 +396,9 @@ public sealed partial class HandoffCompletionReporter
         {
             description = await port.DescribeAsync(connection, cancellationToken).ConfigureAwait(false);
         }
+#pragma warning disable CA1031 // An unreadable library list only means the output path cannot be placed; the report still goes out.
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             _logger.LogWarning(exception, "Could not read {Label}'s libraries to place the output path.", connection.Label);
             return null;
@@ -413,7 +416,7 @@ public sealed partial class HandoffCompletionReporter
     }
 
     /// <summary>
-    /// <c>_record_outcome</c>: keep the ledger and Activity in step with a final outcome, then commit. Never throws. A report
+    /// Keep the ledger and Activity in step with a final outcome, then commit. Never throws. A report
     /// the manager did not answer is kept on the hand-off for the heartbeat to send once it answers, and the file's
     /// History says Weir is waiting for it, in plain words (#652).
     /// </summary>
@@ -460,7 +463,7 @@ public sealed partial class HandoffCompletionReporter
 
             await uow.CommitAsync().ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or InvalidOperationException or IOException)
+        catch (Exception exception) when (exception is SqliteException or InvalidOperationException or IOException)
         {
             await uow.RollbackAsync().ConfigureAwait(false);
             _logger.LogWarning(exception, "Could not record the hand-off outcome.");

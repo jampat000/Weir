@@ -5,17 +5,17 @@ using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
+using Weir.Infrastructure.IO;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
 /// <summary>
-/// TV-only post-success watched-folder season cleanup (port of <c>processing_tv_season_folder_cleanup.py</c>'s
-/// <c>handle_tv_cleanup_after_success</c>). Movies release-folder cleanup lives only in
-/// <see cref="RemuxPassRunner"/>; the two paths are not merged, matching Python's own module note. Deleting
+/// TV-only post-success watched-folder season cleanup. Movies release-folder cleanup lives only in
+/// <see cref="RemuxPassRunner"/>; the two paths are kept apart. Deleting
 /// a whole season folder is not something to do on a guess: this refuses to run when any manager covering
-/// TV could not answer (<see cref="ManagerQueueSignals"/>, already ported for #522's queue-signal work), and
+/// TV could not answer (<see cref="ManagerQueueSignals"/>, #522), and
 /// checks every direct-child episode against the same manager queue signals, any other pending/running
 /// Processing TV job, and either the pass that just finished or a prior recorded success, before removing
 /// anything.
@@ -35,7 +35,7 @@ public sealed class TvSeasonFolderCleanup : ITvSeasonFolderCleanup
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <summary><c>get_tv_episode_set_media_files</c>: direct-child media candidates only, in filename order.</summary>
+    /// <summary>The season folder's episode files: direct-child media candidates only, in filename order.</summary>
     public static List<string> GetTvEpisodeSetMediaFiles(string seasonFolder)
     {
         if (!Directory.Exists(seasonFolder))
@@ -228,6 +228,14 @@ public sealed class TvSeasonFolderCleanup : ITvSeasonFolderCleanup
             AddSummary(string.Join(" ", lineParts));
         }
 
+        if (PathContainment.HasLinkBelowRoot(watchedResolved, seasonFolder))
+        {
+            output.Set("tv_season_folder_skip_reason", ReleaseFolderRemoval.LinkedFolderReason);
+            AddSummary(ReleaseFolderRemoval.LinkedFolderReason);
+            _logger.LogWarning("TV cleanup: left {Folder} alone because it sits behind a link.", seasonFolder);
+            return;
+        }
+
         try
         {
             Directory.Delete(seasonFolder, recursive: true);
@@ -284,8 +292,8 @@ public sealed class TvSeasonFolderCleanup : ITvSeasonFolderCleanup
     }
 
     /// <summary>
-    /// <c>_episode_held_by_any_manager</c>: the connection still holding this episode, or null. Ownership only
-    /// (not <c>is_upstream_active</c>) — deleting a whole season is more consequential than blocking one
+    /// The connection still holding this episode, or null. Ownership only (not whether the row is upstream-active):
+    /// deleting a whole season is more consequential than blocking one
     /// file, so any queue presence at all is enough to hold off.
     /// </summary>
     private static string? EpisodeHeldByAnyManager(IReadOnlyList<ManagerQueueSignal> signals, string episodePath)
@@ -305,7 +313,7 @@ public sealed class TvSeasonFolderCleanup : ITvSeasonFolderCleanup
     }
 
     /// <summary>
-    /// <c>_activity_documents_tv_live_success</c>: true when Activity retains a completed TV live pass with a
+    /// True when Activity retains a completed TV live pass with a
     /// successful terminal outcome for this path. <c>jobs</c> rows only carry the enqueue payload;
     /// terminal outcomes live in <c>activity_events.detail</c> JSON.
     /// </summary>

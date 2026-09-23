@@ -3,10 +3,10 @@ using Weir.Core.Time;
 namespace Weir.Core.Processing;
 
 /// <summary>
-/// The vocabulary an operator sees on the Files screen (<c>ProcessingFileStatus</c>).
-/// Fixes #530: <see cref="PassedThrough"/> and <see cref="Rejected"/> are valid statuses in both
-/// responses and filters, matching the Python enum in full — the earlier response/query schema
-/// omitted them, which turned a file in either state into a 500 on read and a 422 on filter.
+/// The vocabulary an operator sees on the Files screen.
+/// Every status here, including <see cref="PassedThrough"/> and <see cref="Rejected"/>, must be valid in both
+/// responses and filters; a schema that omits one turns a file in that state into a 500 on read and a 422 on
+/// filter (#530).
 /// </summary>
 public static class ProcessingFileStatuses
 {
@@ -32,7 +32,7 @@ public static class ProcessingFileStatuses
     /// changes or someone queues it again.</summary>
     public const string Cancelled = "cancelled";
 
-    /// <summary>Every persisted status value: the Python <c>StrEnum</c>'s, in its order, then <see cref="Cancelled"/> (#643).</summary>
+    /// <summary>Every persisted status value, in the order clients see them, with <see cref="Cancelled"/> last (#643).</summary>
     public static readonly IReadOnlyList<string> All =
     [
         Unprocessed, Processing, Processed, ProcessingFailed, Skipped, Disabled, OnHold,
@@ -103,7 +103,7 @@ public sealed record ProcessingFileRecord
     public PyDateTime UpdatedAt { get; init; }
 }
 
-/// <summary>Filters for <c>list_files</c>.</summary>
+/// <summary>Filters for listing <c>files</c> rows.</summary>
 public sealed record ProcessingFileListFilter
 {
     public long? LibraryId { get; init; }
@@ -112,7 +112,7 @@ public sealed record ProcessingFileListFilter
     public PyDateTime? Since { get; init; }
     public int Limit { get; init; } = 200;
 
-    /// <summary><c>max(1, min(limit, 1000))</c>.</summary>
+    /// <summary><see cref="Limit"/> clamped to 1..1000.</summary>
     public int ClampedLimit => Math.Max(1, Math.Min(Limit, 1000));
 }
 

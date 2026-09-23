@@ -7,7 +7,6 @@ using Weir.Core.Media;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Settings;
-using Weir.Core.Time;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
@@ -18,10 +17,9 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Jobs;
 
 /// <summary>
-/// In-process worker handler for <c>processing.watched_folder.remux_scan_dispatch.v1</c> (port of
-/// <c>processing_watched_folder_remux_scan_dispatch_handlers.py</c>'s <c>_run</c>): scan the library's watched
-/// folder, decide each candidate file's state, and — when asked — enqueue
-/// <c>processing.file.remux_pass.v1</c> jobs for it with payload JSON and dedupe keys identical to Python's.
+/// In-process worker handler for <c>processing.watched_folder.remux_scan_dispatch.v1</c>: scan the library's
+/// watched folder, decide each candidate file's state, and, when asked, enqueue
+/// <c>processing.file.remux_pass.v1</c> jobs for it.
 /// </summary>
 /// <remarks>
 /// Per-file attribution to a specific media-manager queue row (path/id/title-year matching a manager's
@@ -85,9 +83,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         }
 
         // Manager queue signals: ask every manager linked to this library, and note who did not answer.
-        // Always the library's own linked connections (even when that is none): Python passes
-        // manager_connection_ids_for(...) — an empty tuple, not None, when the library links nothing —
-        // and an empty selector must mean "ask nobody", not "fall back to every connection for the scope".
+        // Always the library's own linked connections, even when that is none: an empty selector means
+        // "ask nobody", not "fall back to every connection for the scope".
         var connectionIds = await LibraryStore.ManagerConnectionIdsAsync(uow, library.Id).ConfigureAwait(false);
         var signals = await _managerConnections.CollectQueueSignalsAsync(uow, mediaScope, connectionIds, cancellationToken).ConfigureAwait(false);
 
@@ -131,8 +128,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             }
 
             var rel = WatchedFolderScanOps.RelativePosixPathUnderWatched(runtime.WatchedFolder, filePath);
-            // `evaluate_watched_media_file_for_dispatch`: the candidate anchor is this file's own stem
-            // (not the library's name), so anchor matching only ever compares one release title to another.
+            // The candidate anchor is this file's own stem (not the library's name), so anchor matching only
+            // ever compares one release title to another.
             var candidate = new FileAnchorCandidate(Path.GetFileNameWithoutExtension(filePath));
             var attributedRows = ManagerQueueSignals.AttributedRowsForFile(signals, mediaScope, Path.GetFullPath(filePath));
             var outcome = WatchedFileDispatch.Evaluate(attributedRows, candidate);
@@ -144,16 +141,14 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             // finished: note that it was seen and move on, so it is never queued again. That holds for a library that keeps
             // originals (#627) and for one that removes them but had to leave this one in place (#644): TV season cleanup skips
             // a season while an episode is still queued or its manager cannot be asked, and a Movies removal can be
-            // interrupted. Without this, every scan cleaned such a file again and handed it back again. A new or replaced file
+            // interrupted. Otherwise every scan would clean such a file again and hand it back again. A new or replaced file
             // at the same path differs in one of the two and is processed as usual. A movie whose removal was interrupted
             // goes on below, so that removal can still be finished.
             var keepsOriginals = !library.RemoveOriginalAfterSuccess;
             var alreadyCleaned = ProcessedSourceRules.IsSameCleanedFile(previous, observedSize, ModifiedTimeNs(filePath));
             if (alreadyCleaned && (keepsOriginals || mediaScope != ProcessingMediaScopes.Movie))
             {
-                await uow.ExecuteAsync(
-                    "UPDATE files SET last_seen_at = @seen WHERE id = @id",
-                    ("@seen", SqliteValues.ToSqlite(PyDateTime.FromDateTimeOffset(now))), ("@id", previous!.Id)).ConfigureAwait(false);
+                await FileStateStore.TouchLastSeenAsync(uow, previous!.Id, now).ConfigureAwait(false);
                 continue;
             }
 
@@ -164,7 +159,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             if (previous is not null && previous.SizeBytes != observedSize)
             {
                 // A changed source is a new processing opportunity: do not carry a failure/quarantine
-                // counter from the old bytes into the new file. Applied on the next record_file_state.
+                // counter from the old bytes into the new file.
                 previous = previous with
                 {
                     FailureClass = null,
@@ -182,9 +177,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             {
                 if (previous.Status is ProcessingFileStatuses.PassedThrough or ProcessingFileStatuses.Rejected or ProcessingFileStatuses.Cancelled)
                 {
-                    await uow.ExecuteAsync(
-                        "UPDATE files SET last_seen_at = @seen WHERE id = @id",
-                        ("@seen", SqliteValues.ToSqlite(PyDateTime.FromDateTimeOffset(now))), ("@id", previous.Id)).ConfigureAwait(false);
+                    await FileStateStore.TouchLastSeenAsync(uow, previous.Id, now).ConfigureAwait(false);
                     continue;
                 }
 
@@ -193,31 +186,24 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
                     var retryAt = previous.NextRetryAt?.AsUtc;
                     if (retryAt is { } r && r <= now.UtcDateTime)
                     {
-                        // Automatic retry: enqueue the same way a fresh candidate would, not through
-                        // RequeueStore — that store's reset (failure_attempts back to 0, backoff cleared)
-                        // is deliberately for a human's "retry now"; RequeueStore's own docs say the
-                        // automatic, policy-governed half belongs to record_failure/RetryPolicy alone. Using
-                        // it here wiped the counter every scan cycle, so a file could never accumulate
-                        // enough consecutive failures to quarantine — RecordFailureAsync (run when the new
-                        // attempt's own outcome comes back) is the only thing that should touch these fields.
-                        // Same cross-connection deadlock hazard as the fresh-candidate path below: release
-                        // uow's write lock before ProcessingJobStore opens its own connection.
+                        // Automatic retry: enqueue the way a fresh candidate is, not through RequeueStore, whose
+                        // reset (failure_attempts back to 0, backoff cleared) is for a person's "retry now". Used
+                        // here it would wipe the counter every scan, so a file could never fail often enough to be
+                        // quarantined; only RecordFailureAsync, when the attempt's outcome comes back, touches
+                        // these fields. Release uow's write lock before ProcessingJobStore opens its own
+                        // connection, or the two connections deadlock.
                         await uow.CommitAsync().ConfigureAwait(false);
                         await EnqueueRemuxPassAsync(uow, context, library, mediaScope, rel, scanTrigger, previous).ConfigureAwait(false);
                         continue;
                     }
 
-                    await uow.ExecuteAsync(
-                        "UPDATE files SET last_seen_at = @seen WHERE id = @id",
-                        ("@seen", SqliteValues.ToSqlite(PyDateTime.FromDateTimeOffset(now))), ("@id", previous.Id)).ConfigureAwait(false);
+                    await FileStateStore.TouchLastSeenAsync(uow, previous.Id, now).ConfigureAwait(false);
                     continue;
                 }
 
-                if (previous.Status == ProcessingFileStatuses.OnHold && previous.FailureAttempts >= 3)
+                if (previous.Status == ProcessingFileStatuses.OnHold && previous.FailureAttempts >= RetryPolicy.QuarantineAfterFailures)
                 {
-                    await uow.ExecuteAsync(
-                        "UPDATE files SET last_seen_at = @seen WHERE id = @id",
-                        ("@seen", SqliteValues.ToSqlite(PyDateTime.FromDateTimeOffset(now))), ("@id", previous.Id)).ConfigureAwait(false);
+                    await FileStateStore.TouchLastSeenAsync(uow, previous.Id, now).ConfigureAwait(false);
                     continue;
                 }
             }
@@ -241,13 +227,11 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
                     !await WatchedFolderScanOps.ActiveRemuxPassExistsForRelativePathAsync(uow, rel, mediaScope, library.Id).ConfigureAwait(false) &&
                     await WatchedFolderScanOps.CompletedRemuxOutputExistsForRelativePathAsync(uow, rel, mediaScope, library.Id, runtime.OutputFolder, filePath).ConfigureAwait(false))
                 {
-                    await RetryCompletedMovieCleanupAsync(uow, library.Id, runtime.WatchedFolder, filePath, rel, observedSize, settling, now).ConfigureAwait(false);
+                    await RetryCompletedMovieCleanupAsync(uow, library, runtime.WatchedFolder, filePath, rel, observedSize, settling, now).ConfigureAwait(false);
                 }
                 else
                 {
-                    await uow.ExecuteAsync(
-                        "UPDATE files SET last_seen_at = @seen WHERE id = @id",
-                        ("@seen", SqliteValues.ToSqlite(PyDateTime.FromDateTimeOffset(now))), ("@id", previous!.Id)).ConfigureAwait(false);
+                    await FileStateStore.TouchLastSeenAsync(uow, previous!.Id, now).ConfigureAwait(false);
                 }
 
                 continue;
@@ -268,9 +252,9 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
                 effectiveMinAgeSeconds,
                 now);
 
-            // A pass for this file booked for later is not a file waiting for a free lane. Calling it ready put it first in
-            // line on Processing while a lane stood empty, for as long as Weir was deliberately leaving it alone. It is on
-            // hold until the booked look, for the reason the last pass gave; the pass itself is already queued.
+            // A pass for this file booked for later is not a file waiting for a free lane; calling it ready would put it
+            // first in line on Processing while a lane stood empty. It is on hold until the booked look, for the reason the
+            // last pass gave; the pass itself is already queued.
             if (verdict.Eligible &&
                 await WatchedFolderScanOps.HeldBackRemuxPassStartsAtAsync(uow, rel, mediaScope, library.Id, now).ConfigureAwait(false) is { } lookAgainAt)
             {
@@ -295,7 +279,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             if (mediaScope == ProcessingMediaScopes.Movie && cleanupRetryReady && noActivePass && !keepsOriginals &&
                 await WatchedFolderScanOps.CompletedRemuxOutputExistsForRelativePathAsync(uow, rel, mediaScope, library.Id, runtime.OutputFolder, filePath).ConfigureAwait(false))
             {
-                await RetryCompletedMovieCleanupAsync(uow, library.Id, runtime.WatchedFolder, filePath, rel, observedSize, settling, now).ConfigureAwait(false);
+                await RetryCompletedMovieCleanupAsync(uow, library, runtime.WatchedFolder, filePath, rel, observedSize, settling, now).ConfigureAwait(false);
                 continue;
             }
 
@@ -340,7 +324,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             {
                 if (mediaScope == ProcessingMediaScopes.Movie && !keepsOriginals)
                 {
-                    WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(runtime.WatchedFolder, filePath);
+                    await RetryCompletedMovieCleanupAsync(uow, library, runtime.WatchedFolder, filePath, rel, observedSize, settling, now).ConfigureAwait(false);
                 }
 
                 continue;
@@ -372,8 +356,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         // two, the source remains and the next scan safely retries.
         foreach (var (relativePath, filePath, reason, action) in pendingRejectedCleanups)
         {
-            var (deleted, detail) = WatchedFolderScanOps.CleanupRejectedFile(runtime.WatchedFolder, filePath, action);
-            _ = deleted;
+            var (_, detail) = RemuxPassPaths.CleanupRejectedFile(runtime.WatchedFolder, filePath, action);
             await using var cleanupUow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
             await FileStateStore.MarkFileStatusAsync(cleanupUow, library.Id, relativePath, ProcessingFileStatuses.Skipped, $"{reason} {detail}").ConfigureAwait(false);
             await cleanupUow.CommitAsync().ConfigureAwait(false);
@@ -394,16 +377,14 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
     /// <summary>
     /// #645: a row still waiting, held, failed or cancelled whose file has not been on disk for <see cref="VanishedFileGrace"/>.
     /// The download client removed it, a person deleted it, or the manager took it. The scan walks only files on disk, so nothing
-    /// else would ever judge that row again, and it stayed listed for ever. It is forgotten, as Forget does, with one Activity
+    /// else would ever judge that row again, and it would stay listed for ever. It is forgotten, as Forget does, with one Activity
     /// entry saying why. A file with a pass queued or running is left to that pass, and a path that is now a folder on disk is
     /// kept. Outcomes Weir reached (processed, passed through, rejected, skipped) stay as history.
     /// </summary>
     /// <remarks>
-    /// 3.2.3 (the Deluno soak, 23 Sep 2026): a row a scan never saw was left alone, and cancelled rows were kept. But a media
-    /// manager's hand-off records its file on receipt, before any scan sees it, and a cancelled hand-off is one Weir never
-    /// started. When those files were then deleted, their rows sat on Processing and History for good: "stuck", "waiting", or
-    /// "cancelled, queue it again", for files that no longer exist. A row no scan has seen now counts from when it was last
-    /// written, so it still gets the same grace before it is judged.
+    /// Rows no scan has seen are included, and so are cancelled ones: a media manager's hand-off records its file on receipt,
+    /// before any scan sees it, and a cancelled hand-off is one Weir never started. Such a row counts from when it was last
+    /// written, so it gets the same grace before it is judged.
     /// </remarks>
     /// <returns>The relative paths of the rows it forgot.</returns>
     internal static async Task<List<string>> ForgetVanishedFilesAsync(UnitOfWork uow, long libraryId, string watchedRoot, string mediaScope, DateTimeOffset now, string trigger = "scan")
@@ -464,10 +445,19 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
     }
 
     private static async Task RetryCompletedMovieCleanupAsync(
-        UnitOfWork uow, long libraryId, string watchedRoot, string filePath, string rel, long observedSize, SettlingObservation settling, DateTimeOffset now)
+        UnitOfWork uow, ProcessingLibraryRecord library, string watchedRoot, string filePath, string rel, long observedSize, SettlingObservation settling, DateTimeOffset now)
     {
-        var (cleanupOk, cleanupReason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watchedRoot, filePath);
-        if (cleanupOk)
+        var libraryId = library.Id;
+        var (cleanupOk, folderRemoved, cleanupReason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watchedRoot, filePath, library.MediaExtensionsCsv);
+        if (cleanupOk && !folderRemoved)
+        {
+            // The folder also holds other videos: only this file went, and the other files keep their own state.
+            await FileStateStore.RecordFileStateAsync(
+                uow, libraryId, rel,
+                new FileStateVerdict(ProcessingFileStatuses.Processed, $"The output was already complete. {cleanupReason}"),
+                observedSize, settling.SizeChangedAt, now).ConfigureAwait(false);
+        }
+        else if (cleanupOk)
         {
             var releaseParent = PosixParent(rel);
             var siblings = await uow.QueryAsync(
@@ -496,8 +486,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         else
         {
             // The file is cleaned; only removing its original is waiting. It stays processed, so the fingerprint above keeps
-            // recognising it and no scan cleans it again once the manager has imported the output (#644). It read "on hold"
-            // before, and a held file looks unfinished everywhere.
+            // recognising it and no scan cleans it again once the manager has imported the output (#644). It is not "on hold":
+            // a held file looks unfinished everywhere.
             var retryReason = cleanupReason ?? "The source release folder is still locked.";
             await FileStateStore.RecordFileStateAsync(
                 uow, libraryId, rel,
@@ -515,10 +505,9 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             .Set("trigger", ActivityProvenance.ScanTriggerToTrigger.GetValueOrDefault(scanTrigger, "manual"))
             .Set("run_id", $"scan-{context.Id.ToString(CultureInfo.InvariantCulture)}")
             .Set("library_id", library.Id);
-        // Deliberate fix (#531 item 2): a scan-driven retry (this is also how a failed hand-off's file gets
-        // requeued automatically, not just a fresh candidate) keeps the hand-off's origin, so a pass-through
-        // or reject reached after such a retry still has an output path to report and a callback to send —
-        // same fix as RequeueStore.RequeueFileAsync's manual half.
+        // A scan-driven retry (also how a failed hand-off's file is requeued automatically) keeps the hand-off's
+        // origin, so a pass-through or reject reached after the retry still has an output path to report and a
+        // callback to send, as RequeueStore.RequeueFileAsync does for a manual requeue (#531 item 2).
         if (await HandoffOriginCarry.FindAsync(uow, library.Id, rel).ConfigureAwait(false) is { } origin)
         {
             payload.Set("origin", origin);
@@ -538,7 +527,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         // BEGIN IMMEDIATE transaction. The caller's earlier ActiveRemuxPassExists check ran on uow, which it had to
         // commit before this (see the deadlock note at the call site), so a hand-off — or another scan — could slip a
         // pass in between the two; this re-check under the write lock closes that window. It also covers the
-        // automatic-retry branch, which had no active-pass check at all.
+        // automatic-retry branch, which has no active-pass check of its own.
         var payloadJson = PyJsonWriter.Dumps(payload, PyJsonFormat.Compact);
         var runnerCost = budget.CostFor(resolutionClass);
         await _jobStore.InTransactionAsync(

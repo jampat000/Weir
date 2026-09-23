@@ -3,7 +3,7 @@ namespace Weir.Infrastructure.Tests;
 /// <summary>
 /// A temporary directory removed after the test. A caller that opened a <c>SqliteDatabase</c> inside it
 /// must release that database's own pooled connections itself (<c>SqliteDatabase.ClearPool()</c>) before
-/// this runs; deleting no longer clears every pool in the process, which would race with any other
+/// this runs; deleting does not clear every pool in the process, because that would race with any other
 /// test's connections still open at the same time.
 /// </summary>
 internal sealed class TempDirectory : IDisposable
@@ -47,12 +47,35 @@ internal sealed class TempDirectory : IDisposable
     }
 }
 
+/// <summary>Folder links for tests of code that must never follow one.</summary>
+internal static class FolderLinks
+{
+    /// <summary>A directory junction on Windows (no privilege needed) or a symbolic link elsewhere.</summary>
+    public static void Create(string link, string target)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Directory.CreateSymbolicLink(link, target);
+            return;
+        }
+
+        var start = new System.Diagnostics.ProcessStartInfo("cmd.exe", ["/c", "mklink", "/J", link, target])
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+        };
+        using var process = System.Diagnostics.Process.Start(start)!;
+        process.WaitForExit();
+        Assert.Equal(0, process.ExitCode);
+    }
+}
+
 internal static class RepositoryPaths
 {
     /// <summary>
-    /// The checked-in schema reference, copied next to the test assembly: the schema and seed rows the
-    /// retired Python backend's last Alembic migration created, which the .NET migrations were proven to
-    /// reproduce exactly. It is frozen history now; the .NET migrations are the schema's only source.
+    /// The checked-in schema reference, copied next to the test assembly: the schema and seed rows of the
+    /// last Alembic head, which the baseline migration reproduces exactly. It is frozen; the migrations are
+    /// the schema's only source.
     /// </summary>
     public static string AlembicHeadReference => Path.Join(AppContext.BaseDirectory, "schema", "alembic-head.sql");
 
@@ -85,10 +108,9 @@ internal static class RepositoryPaths
 /// <remarks>
 /// <c>DisableParallelization</c> only serializes the members of <em>this</em> collection against each
 /// other; xUnit still runs every other (default, per-class) collection in the assembly concurrently with
-/// it, so this alone does not give these tests exclusive use of the process. The cross-test flakiness
-/// that used to surface here (an unrelated test's teardown calling the process-wide
-/// <c>SqliteConnection.ClearAllPools()</c> while these tests had connections mid-transaction) is fixed at
-/// its source instead: every test now releases only its own database's pool
+/// it, so this alone does not give these tests exclusive use of the process. Cross-test flakiness (an
+/// unrelated test's teardown calling the process-wide <c>SqliteConnection.ClearAllPools()</c> while these
+/// tests had connections mid-transaction) is prevented at its source instead: every test releases only its own database's pool
 /// (<see cref="Weir.Infrastructure.Sqlite.SqliteDatabase.ClearPool"/>), so no test's teardown can disturb
 /// another test's live connection regardless of what runs alongside it.
 /// </remarks>

@@ -4,6 +4,7 @@ using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
+using Weir.Core.Time;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
@@ -34,7 +35,7 @@ public sealed record HandoffLedgerRow(
 public sealed record HandoffFileRow(long Id, string RelativePath, string Status, string StatusReason, long FailureAttempts, DateTimeOffset? NextRetryAt, DateTimeOffset? UpdatedAt);
 
 /// <summary>
-/// The hand-off ledger (port of <c>handoff_ledger</c>): state is worked out live from the job queue and the Files rows
+/// The hand-off ledger: state is worked out live from the job queue and the Files rows
 /// while they exist, and the row keeps the last answer so it survives job-row pruning.
 /// </summary>
 public sealed class HandoffLedgerStore
@@ -43,10 +44,6 @@ public sealed class HandoffLedgerStore
         "id, source_key, handoff_id, library_id, relative_path, state, output_path, message, last_changed_at, outcome, outcome_message, " +
         "outcome_released, download_id, created_at";
 
-    private const string JobColumns =
-        "id, dedupe_key, job_kind, payload_json, status, lease_owner, lease_expires_at, attempt_count, " +
-        "max_attempts, last_error, not_before, runner_cost, priority, created_at, updated_at";
-
     private readonly TimeProvider _time;
 
     public HandoffLedgerStore(TimeProvider time)
@@ -54,7 +51,7 @@ public sealed class HandoffLedgerStore
         _time = time ?? throw new ArgumentNullException(nameof(time));
     }
 
-    /// <summary><c>find_handoff</c>.</summary>
+    /// <summary>The ledger row for a manager's hand-off id, or null.</summary>
     public static Task<HandoffLedgerRow?> FindAsync(UnitOfWork uow, string sourceKey, string handoffId)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -66,7 +63,7 @@ public sealed class HandoffLedgerStore
     }
 
     /// <summary>
-    /// <c>record_handoff_received</c>: at intake. A repeat of a finished hand-off starts it over, and so forgets what the
+    /// Record a hand-off at intake. A repeat of a finished hand-off starts it over, and so forgets what the
     /// manager said about the last copy (#652). The manager's download id, when it sent one, is kept so a Sonarr or Radarr
     /// import can be matched by it.
     /// </summary>
@@ -152,7 +149,7 @@ public sealed class HandoffLedgerStore
             ("$source", sourceKey));
     }
 
-    /// <summary><c>record_handoff_outcome</c>: a result Weir reached. Unknown and cancelled hand-offs are left alone.</summary>
+    /// <summary>Record a result Weir reached. Unknown and cancelled hand-offs are left alone.</summary>
     public async Task RecordOutcomeAsync(UnitOfWork uow, string sourceKey, string? handoffId, string state, string? outputPath = null, string? message = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -180,16 +177,12 @@ public sealed class HandoffLedgerStore
     }
 
     /// <summary>
-    /// <c>_file_rows</c>: the file, or every file under the folder, this hand-off covers.
-    /// #544 item 5: Python's SQLAlchemy <c>.startswith()</c> (and the SQL <c>LIKE</c> it ported to here) treats an
-    /// unescaped <c>_</c> or <c>%</c> in the hand-off's path as a wildcard, so a sibling folder whose name merely
-    /// resembles this one (<c>Foo_Bar</c> matching a folder literally named <c>FooXBar</c>) is wrongly folded into
-    /// this hand-off's status, and SQLite's default <c>LIKE</c> also ignores case regardless of platform. Matching
-    /// is exact prefix comparison instead — a plain string compare, so no character needs escaping — with case
-    /// handled per OS path semantics, the same decision already used for filesystem-path comparisons elsewhere in
-    /// this codebase (<see cref="ReconciliationService.SafeUnlinkUnderRoots"/>,
-    /// <see cref="HandoffCompletionReporter.TranslateOutputPath"/>): case-insensitive on Windows, case-sensitive
-    /// everywhere else. Filtering happens in .NET rather than in SQL so no escaping scheme is needed at all.
+    /// The file, or every file under the folder, this hand-off covers.
+    /// Matching is an exact prefix compare in .NET, not SQL <c>LIKE</c> (#544 item 5): <c>LIKE</c> treats <c>_</c> and
+    /// <c>%</c> in the path as wildcards, so a sibling folder whose name merely resembles this one would be folded into
+    /// this hand-off's status, and it ignores case on every platform. Case follows OS path semantics, as elsewhere
+    /// (<see cref="ReconciliationService.SafeUnlinkUnderRoots"/>, <see cref="HandoffCompletionReporter.TranslateOutputPath"/>):
+    /// case-insensitive on Windows, case-sensitive everywhere else.
     /// </summary>
     public static async Task<List<HandoffFileRow>> FileRowsAsync(UnitOfWork uow, HandoffLedgerRow row)
     {
@@ -220,13 +213,10 @@ public sealed class HandoffLedgerStore
     }
 
     /// <summary>
-    /// <c>_jobs_for</c>: pending or leased jobs keyed to this hand-off, or the failure-policy jobs for its files.
-    /// #544 item 5: the same <c>LIKE</c>-as-prefix-match defect as <see cref="FileRowsAsync"/>, here over
-    /// <c>dedupe_key</c> — a hand-off id containing <c>_</c> or <c>%</c> could match another hand-off's jobs. A job
-    /// dedupe key is an opaque identifier rather than a filesystem path, so unlike the file-path comparison this
-    /// one is always case-sensitive (ordinal), matching Python's own <c>str.startswith</c> semantics; the exact
-    /// comparison is still done in SQL (<c>substr(...) =</c>, SQLite's default <c>BINARY</c>/case-sensitive
-    /// collation for <c>=</c>) since it can stay parameterised alongside this query's other conditions.
+    /// Pending or leased jobs keyed to this hand-off, or the failure-policy jobs for its files.
+    /// The hand-off's own <c>dedupe_key</c> prefix is matched with <c>substr(...) =</c>, not <c>LIKE</c> (#544 item 5), so a
+    /// hand-off id containing <c>_</c> or <c>%</c> cannot match another hand-off's jobs. A dedupe key is an opaque
+    /// identifier, not a path, so this match is always case-sensitive (SQLite's default <c>BINARY</c> collation for <c>=</c>).
     /// </summary>
     public static async Task<List<ProcessingJob>> JobsForAsync(UnitOfWork uow, HandoffLedgerRow row)
     {
@@ -246,15 +236,18 @@ public sealed class HandoffLedgerStore
             var index = 0;
             foreach (var path in paths)
             {
-                // #545 item 2: pass-through and reject dedupe keys now carry the source's fingerprint as a trailing
-                // segment (so a later failure of a since-replaced file queues again), so the ledger matches the base
-                // "{kind}:{library}:{path}" either exactly (older rows written before the fix) or as a prefix.
+                // #545 item 2: pass-through and reject dedupe keys carry the source's fingerprint as a trailing segment
+                // (so a later failure of a since-replaced file queues again), so the ledger matches the base
+                // "{kind}:{library}:{path}" either exactly (rows written by earlier releases) or as a prefix. The prefix is
+                // compared as plain text, not a LIKE pattern, so "_" or "%" in a path never matches another file (#544 item 5).
                 var passBase = $"{IntakeRules.PassThroughJobKind}:{libraryId.ToString(CultureInfo.InvariantCulture)}:{path}";
                 var rejectBase = $"{IntakeRules.RejectJobKind}:{libraryId.ToString(CultureInfo.InvariantCulture)}:{path}";
-                conditions.Add($"(dedupe_key = $pass_{index} OR dedupe_key LIKE $pass_{index} || ':%')");
+                conditions.Add($"(dedupe_key = $pass_{index} OR substr(dedupe_key, 1, length($pass_prefix_{index})) = $pass_prefix_{index})");
                 parameters.Add(($"$pass_{index}", passBase));
-                conditions.Add($"(dedupe_key = $reject_{index} OR dedupe_key LIKE $reject_{index} || ':%')");
+                parameters.Add(($"$pass_prefix_{index}", passBase + ":"));
+                conditions.Add($"(dedupe_key = $reject_{index} OR substr(dedupe_key, 1, length($reject_prefix_{index})) = $reject_prefix_{index})");
                 parameters.Add(($"$reject_{index}", rejectBase));
+                parameters.Add(($"$reject_prefix_{index}", rejectBase + ":"));
                 index++;
             }
         }
@@ -268,16 +261,16 @@ public sealed class HandoffLedgerStore
         // is still an undelivered outcome the manager needs to hear about (as failed, with the reason) rather than
         // silently vanishing from the ledger's view.
         return await uow.QueryAsync(
-            $"SELECT {JobColumns} FROM jobs WHERE ({string.Join(" OR ", conditions)}) AND " +
+            $"SELECT {ProcessingJobStore.JobColumns} FROM jobs WHERE ({string.Join(" OR ", conditions)}) AND " +
             "(status IN ($pending, $leased) OR (status = $failed AND job_kind IN ($pass_kind, $reject_kind)))",
-            ReadJob,
+            ProcessingJobStore.ReadJob,
             [.. parameters]).ConfigureAwait(false);
     }
 
     /// <summary>
-    /// <c>_queue_position</c>: files waiting ahead of this one, plus one. Only file work counts — another file's pass or a
-    /// library clean — because that is what a manager is waiting behind. Background jobs (folder scans, the work file
-    /// sweep) are quick and are not files, and counting them told a manager it was third in line behind two sweeps.
+    /// Files waiting ahead of this one, plus one. Only file work counts (another file's pass or a library clean), because
+    /// that is what a manager is waiting behind. Background jobs (folder scans, the work file sweep) are quick and are not
+    /// files; counting them would tell a manager it was third in line behind two sweeps.
     /// </summary>
     public static async Task<long> QueuePositionAsync(UnitOfWork uow, ProcessingJob job)
     {
@@ -293,7 +286,7 @@ public sealed class HandoffLedgerStore
         return ahead + 1;
     }
 
-    /// <summary><c>current_status</c>: work the state out from what exists now, and keep the ledger row in step with it.</summary>
+    /// <summary>Work the state out from what exists now, and keep the ledger row in step with it.</summary>
     public async Task<HandoffStatus> CurrentStatusAsync(UnitOfWork uow, HandoffLedgerRow row)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -330,8 +323,8 @@ public sealed class HandoffLedgerStore
                 {
                     // A failed pass-through or reject job is found by the file's path, not by the hand-off, so one left
                     // by an earlier hand-off of the same release belongs to that hand-off, not this one. Counting it
-                    // turned a hand-off Weir had just completed into "failed", and Weir then refused the manager's
-                    // "imported" for it (the rig, 23 Sep 2026: Tears of Steel, two older hand-offs of the same path).
+                    // would turn a hand-off Weir had just completed into "failed", and Weir would then refuse the
+                    // manager's "imported" for it.
                     if (IsFromEarlierHandoff(row, job.CreatedAt))
                     {
                         continue;
@@ -395,8 +388,7 @@ public sealed class HandoffLedgerStore
                 var (state, when) = HandoffLedgerRules.FileState(file.Status, file.NextRetryAt, file.FailureAttempts);
 
                 // The same for a file row: a failure recorded before this hand-off arrived, and not touched since, is
-                // what became of an earlier hand-off of the path (the rig's Tears of Steel had a failed row for its
-                // folder from four days before). A success from before still counts, as it always has.
+                // what became of an earlier hand-off of the path. A success from before still counts.
                 if (state is HandoffLedgerRules.Failed or HandoffLedgerRules.Rejected or HandoffLedgerRules.Cancelled &&
                     IsFromEarlierHandoff(row, file.UpdatedAt))
                 {
@@ -481,7 +473,7 @@ public sealed class HandoffLedgerStore
     }
 
     /// <summary>
-    /// <c>cancel_handoff</c>: drop a hand-off that has not started. Never touches a file and never stops running work.
+    /// Drop a hand-off that has not started. Never touches a file and never stops running work.
     /// </summary>
     public async Task<(bool Cancelled, string Sentence)> CancelAsync(UnitOfWork uow, ProcessingJobStore jobs, HandoffLedgerRow row)
     {
@@ -571,8 +563,8 @@ public sealed class HandoffLedgerStore
     }
 
     /// <summary>
-    /// The <c>relative_media_path</c> a job payload names, as <c>str(... or "")</c>; null for unreadable JSON (suppressed in
-    /// Python). A payload that is not an object fails as in Python.
+    /// The <c>relative_media_path</c> a job payload names, as a string (empty when missing or falsy); null for unreadable
+    /// JSON. A payload that is not a JSON object throws.
     /// </summary>
     private static string? PayloadRelativePath(string? payloadJson)
     {
@@ -588,13 +580,13 @@ public sealed class HandoffLedgerStore
 
         if (parsed is not PyDict dict)
         {
-            throw new InvalidOperationException($"'{parsed.PythonTypeName}' object has no attribute 'get'");
+            throw new InvalidOperationException("A job's payload is not a JSON object.");
         }
 
         return dict.Get("relative_media_path") is { IsTruthy: true } value ? PyConvert.Str(value) : string.Empty;
     }
 
-    private DateTimeOffset PyDateTimeNow() => Weir.Core.Time.PyDateTime.TruncateToMicroseconds(_time.GetUtcNow());
+    private DateTimeOffset PyDateTimeNow() => PyDateTime.TruncateToMicroseconds(_time.GetUtcNow());
 
     private static DateTimeOffset Min(DateTimeOffset a, DateTimeOffset b) => a <= b ? a : b;
 
@@ -624,21 +616,4 @@ public sealed class HandoffLedgerStore
         SqliteValues.GetBool(reader, 11),
         SqliteValues.GetStringOrNull(reader, 12),
         PythonTimestamps.Parse(reader.GetValue(13)));
-
-    internal static ProcessingJob ReadJob(SqliteDataReader reader) => new(
-        reader.GetInt64(0),
-        reader.GetString(1),
-        reader.GetString(2),
-        reader.IsDBNull(3) ? null : reader.GetString(3),
-        reader.GetString(4),
-        reader.IsDBNull(5) ? null : reader.GetString(5),
-        PythonTimestamps.Parse(reader.GetValue(6)),
-        (int)reader.GetInt64(7),
-        (int)reader.GetInt64(8),
-        reader.IsDBNull(9) ? null : reader.GetString(9),
-        PythonTimestamps.Parse(reader.GetValue(10)),
-        (int)reader.GetInt64(11),
-        (int)reader.GetInt64(12),
-        PythonTimestamps.Parse(reader.GetValue(13)) ?? DateTimeOffset.MinValue,
-        PythonTimestamps.Parse(reader.GetValue(14)) ?? DateTimeOffset.MinValue);
 }

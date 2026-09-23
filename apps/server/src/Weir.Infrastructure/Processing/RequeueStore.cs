@@ -6,21 +6,20 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
 
-/// <summary>What a requeue attempt did (<c>RequeueResult</c>).</summary>
+/// <summary>What a requeue attempt did.</summary>
 public sealed record RequeueResult(int Requeued, int Skipped, string Detail);
 
 /// <summary>
-/// Putting a failed file back to work by hand (port of the manual half of <c>processing_requeue_service.py</c>).
-/// The automatic, policy-governed half (<c>decide_retry</c>, <c>record_failure</c>) is only ever reached from
-/// the remux-pass failure handler, which is out of scope here.
+/// Putting a failed file back to work by hand. Automatic, policy-governed retries are decided by the remux-pass
+/// failure handling, not here.
 /// </summary>
 public sealed class RequeueStore(ProcessingJobStore jobStore)
 {
-    /// <summary>Job kind of a manual remux requeue (<c>PROCESSING_FILE_REMUX_PASS_JOB_KIND</c>), run by
+    /// <summary>Job kind of a manual remux requeue, run by
     /// <see cref="RemuxPass.RemuxPassHandler"/>.</summary>
     public const string RemuxPassJobKind = "processing.file.remux_pass.v1";
 
-    /// <summary><c>requeue_file</c>: manual reset — attempt count cleared, backoff ignored.</summary>
+    /// <summary>Manual reset: attempt count cleared, backoff ignored.</summary>
     public async Task<RequeueResult> RequeueFileAsync(UnitOfWork uow, ProcessingFileRecord row)
     {
         var library = await LibraryStore.GetAsync(uow, row.LibraryId).ConfigureAwait(false);
@@ -34,7 +33,7 @@ public sealed class RequeueStore(ProcessingJobStore jobStore)
             .Set("media_scope", library.MediaType == "tv" ? "tv" : "movie")
             .Set("library_id", library.Id)
             .Set("trigger", "manual");
-        // Deliberate fix (#531 item 2): a requeued hand-off keeps its origin, so its outcome still reaches the manager.
+        // A requeued hand-off keeps its origin, so its outcome still reaches the manager (#531).
         if (await RemuxPass.HandoffOriginCarry.FindAsync(uow, library.Id, row.RelativePath).ConfigureAwait(false) is { } origin)
         {
             payload.Set("origin", origin);
@@ -66,7 +65,7 @@ public sealed class RequeueStore(ProcessingJobStore jobStore)
         return new RequeueResult(1, 0, detail);
     }
 
-    /// <summary><c>requeue_files</c>: bulk-by-hand, reporting a total rather than stopping at the first problem.</summary>
+    /// <summary>Requeues many files by hand, reporting a total rather than stopping at the first problem.</summary>
     public async Task<RequeueResult> RequeueFilesAsync(UnitOfWork uow, IReadOnlyList<ProcessingFileRecord> rows)
     {
         var requeued = 0;

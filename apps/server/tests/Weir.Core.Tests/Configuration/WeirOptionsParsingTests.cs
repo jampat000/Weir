@@ -131,7 +131,7 @@ public sealed class WeirOptionsParsingTests
     [InlineData("ten", 10)]
     [InlineData("", 10)]
     [InlineData("1__0", 10)]
-    public void Integers_parse_like_python_int_and_fall_back_to_the_default(string raw, int expected) =>
+    public void Integers_parse_strictly_and_fall_back_to_the_default(string raw, int expected) =>
         Assert.Equal(expected, TestRuntime.Load(("WEIR_PROCESSING_PROBE_SIZE_MB", raw)).ProcessingProbeSizeMb);
 
     [Fact]
@@ -139,14 +139,14 @@ public sealed class WeirOptionsParsingTests
     {
         Assert.Equal("new", TestRuntime.Load(("WEIR_MEDIA_MANAGER_WEBHOOK_SECRET", " new ")).MediaManagerWebhookSecret);
         Assert.Null(TestRuntime.Load(("WEIR_MEDIA_MANAGER_WEBHOOK_SECRET", "  ")).MediaManagerWebhookSecret);
-        // WEIR_SUBBER_WEBHOOK_SECRET was the pre-v2.4.3 name and was read as a fallback until 3.0.0
-        // dropped it. Asserted here so the fallback cannot creep back in unnoticed: an install still
-        // setting the old name is now unauthenticated rather than quietly authenticated.
+        // WEIR_SUBBER_WEBHOOK_SECRET is a retired name. Asserted here so a fallback to it cannot creep
+        // back in unnoticed: an install still setting the old name is unauthenticated rather than
+        // quietly authenticated.
         Assert.Null(TestRuntime.Load(("WEIR_SUBBER_WEBHOOK_SECRET", "old")).MediaManagerWebhookSecret);
     }
 
     [Fact]
-    public void Cors_wildcard_is_refused_with_the_python_message()
+    public void Cors_wildcard_is_refused_with_the_documented_message()
     {
         var error = Assert.Throws<WeirConfigurationException>(() => TestRuntime.Load(("WEIR_ENV", "production"), ("WEIR_CORS_ORIGINS", "https://a.example, *")));
         Assert.Equal(
@@ -175,7 +175,7 @@ public sealed class WeirOptionsParsingTests
     }
 
     [Fact]
-    public void Development_expansion_fails_on_an_invalid_port_like_python()
+    public void Development_expansion_refuses_a_non_numeric_or_out_of_range_origin()
     {
         var notNumber = Assert.Throws<WeirConfigurationException>(() => TestRuntime.Load(("WEIR_CORS_ORIGINS", "http://localhost:abc")));
         Assert.Equal("Port could not be cast to integer value as 'abc'", notNumber.Message);
@@ -296,9 +296,9 @@ public sealed class WeirOptionsParsingTests
     [Fact]
     public void Temp_sweep_schedule_reads_only_the_per_scope_variables()
     {
-        // The shared WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_SCHEDULE_* pair was the fallback for
-        // installs configured before the sweep was split per media scope; 3.0.0 removed it. Setting
-        // only the shared pair now changes nothing, which is the assertion worth keeping.
+        // The shared WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_SCHEDULE_* pair is retired in favour of the
+        // per-scope variables. Setting only the shared pair changes nothing, which is the assertion
+        // worth keeping.
         var shared = TestRuntime.Load(
             ("WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_SCHEDULE_ENABLED", "true"),
             ("WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_SCHEDULE_INTERVAL_SECONDS", "7200"));

@@ -4,7 +4,7 @@ using Weir.Core.Rules;
 
 namespace Weir.Core.Media;
 
-/// <summary>One progress report from <c>run_ffmpeg</c> (the dict handed to <c>progress_callback</c>).</summary>
+/// <summary>One progress report from an ffmpeg run.</summary>
 public sealed record FfmpegProgressUpdate
 {
     /// <summary>0..99 while running, 100 at the end; null when the duration is unknown.</summary>
@@ -24,9 +24,9 @@ public sealed record FfmpegProgressUpdate
 }
 
 /// <summary>
-/// The line-by-line logic of <c>run_ffmpeg</c>'s progress loop: <c>-progress pipe:1</c> output is
+/// The line-by-line logic of an ffmpeg run's progress loop: <c>-progress pipe:1</c> output is
 /// <c>key=value</c> lines, and each <c>progress=</c> line closes a block. Time is supplied by the
-/// caller as seconds since the process started, read once per line exactly where the reference reads it.
+/// caller as seconds since the process started, read once per line.
 /// </summary>
 public sealed class FfmpegProgressTracker
 {
@@ -42,7 +42,7 @@ public sealed class FfmpegProgressTracker
 
     /// <summary>
     /// Feeds one raw stdout line. Returns the update to report, or null. Throws <see cref="MediaToolException"/>
-    /// where the reference kills ffmpeg: past the time limit, or projecting more than twelve hours remaining.
+    /// when ffmpeg must be stopped: past the time limit, or projecting more than twelve hours remaining.
     /// </summary>
     public FfmpegProgressUpdate? Feed(string rawLine, double secondsSinceStart)
     {
@@ -112,29 +112,29 @@ public sealed class FfmpegProgressTracker
         };
     }
 
-    /// <summary><c>max(a, b)</c>: the first argument unless the second is strictly greater.</summary>
+    /// <summary>The first argument unless the second is strictly greater (so a NaN second argument never wins).</summary>
     private static double PyMax(double a, double b) => b > a ? b : a;
 
-    /// <summary><c>min(a, b)</c>: the first argument unless the second is strictly smaller.</summary>
+    /// <summary>The first argument unless the second is strictly smaller.</summary>
     private static double PyMin(double a, double b) => b < a ? b : a;
 
-    /// <summary><c>int(float)</c>: truncates; raises where Python raises, or where the result will not fit a long.</summary>
+    /// <summary>Truncates toward zero; throws for NaN, infinity, or a result that will not fit a long.</summary>
     private static double PyInt(double value)
     {
         if (double.IsNaN(value))
         {
-            throw new RulesInputException("ValueError", "cannot convert float NaN to integer");
+            throw new RulesInputException("ValueError", "An ffmpeg progress time is not a number.");
         }
 
         if (double.IsInfinity(value))
         {
-            throw new RulesInputException("OverflowError", "cannot convert float infinity to integer");
+            throw new RulesInputException("OverflowError", "An ffmpeg progress time is infinite.");
         }
 
         var truncated = Math.Truncate(value);
         if (truncated is >= 9.2233720368547758e18 or < -9.2233720368547758e18)
         {
-            throw new RulesInputException("OverflowError", string.Create(CultureInfo.InvariantCulture, $"{value} is outside the range the .NET port supports"));
+            throw new RulesInputException("OverflowError", string.Create(CultureInfo.InvariantCulture, $"The ffmpeg progress time {value} is too large to use."));
         }
 
         return truncated;

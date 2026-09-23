@@ -4,7 +4,7 @@ using Weir.Core.Processing;
 
 namespace Weir.Core.Tests.Processing;
 
-/// <summary>Ported from <c>apps/backend/tests/test_processing_queue_adapter.py</c> (movie/TV dialect mapping).</summary>
+/// <summary>Queue row mapping for the movie and TV dialects.</summary>
 public sealed class QueueRowMappingTests
 {
     private static PyDict Row(string json) => (PyDict)PyJsonParser.Parse(json);
@@ -196,7 +196,7 @@ public sealed class QueueRowMappingTests
         Assert.Throws<ArgumentException>(() => QueueRowMapping.DialectForScope("music"));
 }
 
-/// <summary>Ported from <c>apps/backend/tests/test_processing_candidate_gate_evaluate.py</c> (domain evaluation, no HTTP).</summary>
+/// <summary>The candidate gate's domain evaluation, without HTTP.</summary>
 public sealed class CandidateGateEvaluateTests
 {
     private static PyDict Row(string json) => (PyDict)PyJsonParser.Parse(json);

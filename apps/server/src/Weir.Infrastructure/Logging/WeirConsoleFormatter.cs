@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging.Console;
 
 namespace Weir.Infrastructure.Logging;
 
-/// <summary>Console lines in the Python backend's format (<see cref="PythonLogFormat.ConsoleLine"/>).</summary>
+/// <summary>Console lines in Weir's plain log format: local time, level, logger name and message.</summary>
 public sealed class WeirConsoleFormatter : ConsoleFormatter
 {
     public const string FormatterName = "weir";

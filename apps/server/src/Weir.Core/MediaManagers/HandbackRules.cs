@@ -171,7 +171,7 @@ public static class HandbackRules
 }
 
 /// <summary>
-/// The plain words for work held up because a linked media manager is not answering (James, 23 Sep 2026). The heartbeat
+/// The plain words for work held up because a linked media manager is not answering. The heartbeat
 /// (<c>ManagerHeartbeatTask</c>) is what notices it answering again.
 /// </summary>
 public static class ManagerWaitMessages

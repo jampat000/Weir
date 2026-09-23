@@ -7,10 +7,10 @@ using Weir.Core.Rules;
 
 namespace Weir.Core.Processing.RemuxPass;
 
-/// <summary>The job kind and outcomes of one per-file pass (<c>file_remux_pass/job_kinds.py</c> and <c>visibility.py</c>).</summary>
+/// <summary>The job kind and outcomes of one per-file pass.</summary>
 public static class RemuxPassOutcomes
 {
-    /// <summary><c>PROCESSING_FILE_REMUX_PASS_JOB_KIND</c>.</summary>
+    /// <summary>Durable job kind for one per-file remux pass.</summary>
     public const string JobKind = "processing.file.remux_pass.v1";
 
     public const string LiveOutputWritten = "live_output_written";
@@ -21,12 +21,12 @@ public static class RemuxPassOutcomes
     public const string FailedDuringExecution = "failed_during_execution";
 }
 
-/// <summary>Operator-facing strings for a pass (port of <c>file_remux_pass/visibility.py</c>).</summary>
+/// <summary>Operator-facing strings for a pass.</summary>
 public static class RemuxPassVisibility
 {
     private const int MaxArgvForActivity = 64;
 
-    /// <summary><c>summarize_remux_plan</c>: a compact plan summary, not a full ffmpeg command.</summary>
+    /// <summary>A compact plan summary, not a full ffmpeg command.</summary>
     public static string SummarizeRemuxPlan(RemuxPlan plan, int maxLength = 600)
     {
         ArgumentNullException.ThrowIfNull(plan);
@@ -67,11 +67,11 @@ public static class RemuxPassVisibility
             $"#{track.InputIndex.ToString(CultureInfo.InvariantCulture)} {(track.LangLabel.Length > 0 ? track.LangLabel : "und")}";
     }
 
-    /// <summary>Python's <c>repr</c> of a list of ints: <c>[0, 2]</c>.</summary>
+    /// <summary>A list of ints written as <c>[0, 2]</c>, the form stored plan summaries already use.</summary>
     public static string PythonIntList(IEnumerable<int> values) =>
         "[" + string.Join(", ", values.Select(v => v.ToString(CultureInfo.InvariantCulture))) + "]";
 
-    /// <summary><c>remux_pass_activity_title</c>: one plain line, with the file name when there is one.</summary>
+    /// <summary>One plain line, with the file name when there is one.</summary>
     public static string ActivityTitle(PyDict payload)
     {
         ArgumentNullException.ThrowIfNull(payload);
@@ -97,7 +97,7 @@ public static class RemuxPassVisibility
     }
 
     /// <summary>
-    /// <c>clip_remux_pass_payload_for_activity</c>: the diagnostic envelope, and the ffmpeg argv bounded so Activity JSON
+    /// The diagnostic envelope, and the ffmpeg argv bounded so Activity JSON
     /// stays under typical row limits.
     /// </summary>
     public static PyDict ClipForActivity(PyDict payload)
@@ -130,7 +130,7 @@ public static class RemuxPassVisibility
         if (result == "failed" && !(Truthy(output.Get("pass_through_queued")) || Truthy(output.Get("reject_queued"))))
         {
             // The reason stays in the detail; an action is something the operator can do.
-            nextAction = "Open this file's processing record for what went wrong, fix the cause, then use Try again on the Files screen.";
+            nextAction = "Open this file on the History screen for what went wrong, fix the cause, then use Try again there.";
         }
 
         var envelope = OperatorMessages.ActivityDetailEnvelope(
@@ -162,14 +162,14 @@ public static class RemuxPassVisibility
         return output;
     }
 
-    /// <summary><c>remux_pass_result_to_activity_detail</c>: the clipped payload as ASCII JSON, cut at 10,000 characters.</summary>
+    /// <summary>The clipped payload as ASCII JSON, cut at 10,000 characters.</summary>
     public static string ActivityDetail(PyDict payload, int maxChars = 10_000) =>
         PyStrings.Slice(PyJsonWriter.Dumps(ClipForActivity(payload), PyJsonFormat.Compact), maxChars);
 
-    /// <summary>Python truthiness of an optional value (<c>bool(d.get(key))</c>).</summary>
+    /// <summary>True when the value is present and not null, false, zero or empty.</summary>
     public static bool Truthy(PyJson? value) => value is not null && value.IsTruthy;
 
-    /// <summary><c>len(value or [])</c> for a list-valued key.</summary>
+    /// <summary>The length of a list, string or object value; 0 for anything else, including a missing key.</summary>
     private static long ListLength(PyJson? value) => value switch
     {
         PyList list => list.Items.Count,

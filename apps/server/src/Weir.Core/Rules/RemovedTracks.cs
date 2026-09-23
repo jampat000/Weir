@@ -15,10 +15,9 @@ public enum RemovedTrackType
 ///
 /// <para><see cref="Variant"/> is the same regional/script variant identifier <c>LanguageVariants.Detect</c>
 /// (issue #496) reads from the track's name or an explicit BCP 47 tag — e.g. "fre-CA" kept distinct from
-/// plain "fre" — or null when the track carries no variant. #509's own base predated #496, so this used to
-/// be always null; it is now filled from the same <c>AudioCandidate</c>/subtitle variant every other rule
-/// here already computes, so "started keeping Japanese audio (Kansai dub)" can be judged at the variant
-/// level, not only the base-language level.</para>
+/// plain "fre" — or null when the track carries no variant. It is filled from the same
+/// <c>AudioCandidate</c>/subtitle variant every other rule here computes, so "started keeping Japanese audio
+/// (Kansai dub)" can be judged at the variant level, not only the base-language level.</para>
 /// </summary>
 public sealed record RemovedTrackRecord
 {

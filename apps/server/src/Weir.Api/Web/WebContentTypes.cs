@@ -3,16 +3,10 @@ using Microsoft.AspNetCore.StaticFiles;
 namespace Weir.Api.Web;
 
 /// <summary>
-/// Content types for web app files, matching what the Python server sends: Python 3.11's
-/// <c>mimetypes</c> maps <c>.js</c> to <c>application/javascript</c>, and Starlette appends
-/// <c>; charset=utf-8</c> to every <c>text/*</c> type.
+/// Content types for web app files: .NET's registered types, except that <c>.js</c> is
+/// <c>application/javascript</c> and every <c>text/*</c> type gets <c>; charset=utf-8</c>, the headers
+/// existing clients and the contract suite expect.
 /// </summary>
-/// <remarks>
-/// Not matched: Python's table is platform dependent for some types (<c>.ico</c> is
-/// <c>image/x-icon</c> on Windows, <c>image/vnd.microsoft.icon</c> on Linux) and has no entry for
-/// <c>.woff</c>, <c>.woff2</c> or <c>.webp</c> on Windows, where it sends
-/// <c>application/octet-stream</c> or <c>text/plain</c>. Here those use .NET's registered types.
-/// </remarks>
 public static class WebContentTypes
 {
     public static FileExtensionContentTypeProvider CreateProvider()

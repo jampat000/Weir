@@ -7,8 +7,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing;
 
 /// <summary>
-/// Create Processing libraries from what a connected media manager already knows (port of
-/// <c>processing_library_discovery.py</c>, #554).
+/// Create Processing libraries from what a connected media manager already knows (#554).
 ///
 /// The operator typing a watched folder into Weir is re-entering information the manager holds and keeps
 /// current. Deluno publishes a manifest built for exactly this, and the arr products expose a cruder
@@ -53,7 +52,7 @@ public sealed class LibraryDiscoveryService
     }
 
     /// <summary>
-    /// <c>local_path_problem</c>: why a manager-reported root cannot be used locally, or <see langword="null"/>
+    /// Why a manager-reported root cannot be used locally, or <see langword="null"/>
     /// if it can. Deliberately not a filesystem check first: a share that is simply not mounted yet should
     /// read as "not visible here", not as a crash. The existence check comes last and only sharpens the message.
     /// </summary>
@@ -81,7 +80,7 @@ public sealed class LibraryDiscoveryService
         return null;
     }
 
-    /// <summary><c>_descriptors_for</c>.</summary>
+    /// <summary>The libraries the manager describes; throws with an operator-facing sentence when it cannot be asked or does not answer.</summary>
     private async Task<IReadOnlyList<ManagerLibraryDescriptor>> DescriptorsForAsync(
         UnitOfWork uow, MediaManagerConnectionRecord connectionRow, CancellationToken cancellationToken)
     {
@@ -107,7 +106,7 @@ public sealed class LibraryDiscoveryService
         return described.Libraries;
     }
 
-    /// <summary><c>discoverable_libraries</c>: what this manager reports, marked up with what Weir already has.</summary>
+    /// <summary>What this manager reports, marked up with what Weir already has.</summary>
     public async Task<List<DiscoverableLibrary>> DiscoverableLibrariesAsync(
         UnitOfWork uow, MediaManagerConnectionRecord connectionRow, CancellationToken cancellationToken = default)
     {
@@ -142,7 +141,7 @@ public sealed class LibraryDiscoveryService
         return result;
     }
 
-    /// <summary><c>_unique_name</c>.</summary>
+    /// <summary><paramref name="wanted"/>, or the first numbered variant of it not already in <paramref name="existing"/>.</summary>
     private static string UniqueName(HashSet<string> existing, string wanted)
     {
         if (!existing.Contains(wanted))
@@ -163,7 +162,7 @@ public sealed class LibraryDiscoveryService
     }
 
     /// <summary>
-    /// <c>import_libraries</c>: create a Processing library per selected manager library.
+    /// Creates a Processing library per selected manager library.
     ///
     /// The manager's id is stored as a durable integration reference, which is what Deluno's own guidance
     /// asks external tools to keep. Everything else is an ordinary library: editable afterwards, and
@@ -223,7 +222,7 @@ public sealed class LibraryDiscoveryService
             var name = UniqueName(existingNames, wantedName);
             existingNames.Add(name);
 
-            // A library with nowhere to hand files back arrives switched off (James, 23 Sep 2026): on, it would pick up
+            // A library with nowhere to hand files back arrives switched off: on, it would pick up
             // downloads it could never deliver. Settings › Libraries says what it needs.
             var row = new ProcessingLibraryRecord
             {
@@ -243,7 +242,7 @@ public sealed class LibraryDiscoveryService
         return created;
     }
 
-    /// <summary><c>resync_drift</c>: differences between the manager and Weir. Reported only, never applied.</summary>
+    /// <summary>Differences between the manager and Weir. Reported only, never applied.</summary>
     public async Task<List<LibraryDrift>> ResyncDriftAsync(
         UnitOfWork uow, MediaManagerConnectionRecord connectionRow, CancellationToken cancellationToken = default)
     {
@@ -326,7 +325,7 @@ public sealed class LibraryDiscoveryService
         return drift;
     }
 
-    /// <summary><c>unlink_library</c>: forget where a library came from, keeping the library itself untouched.</summary>
+    /// <summary>Forgets where a library came from, keeping the library itself untouched.</summary>
     public static Task<ProcessingLibraryRecord> UnlinkLibraryAsync(UnitOfWork uow, ProcessingLibraryRecord row) =>
         LibraryStore.UnlinkAsync(uow, row);
 }

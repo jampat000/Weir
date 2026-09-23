@@ -7,7 +7,7 @@ using Weir.Core.Validation;
 
 namespace Weir.Api.Http;
 
-/// <summary>FastAPI's <c>HTTPException</c>: answered with <c>{"detail": …}</c>, this status and these headers.</summary>
+/// <summary>An error answered with <c>{"detail": …}</c>, this status and these headers: the body shape existing clients read.</summary>
 public sealed class ApiException : Exception
 {
     public ApiException()
@@ -48,7 +48,7 @@ public sealed class ApiException : Exception
     public string? Code { get; init; }
 }
 
-/// <summary>Writing responses the way Starlette's <c>JSONResponse</c> and <c>PlainTextResponse</c> do.</summary>
+/// <summary>Writes JSON and plain-text responses with the exact bytes, content type and length existing clients expect.</summary>
 public static class PyResponses
 {
     public static async Task WriteJsonAsync(HttpContext context, int statusCode, PyJson body)
@@ -95,7 +95,7 @@ public static class PyResponses
         return WriteJsonAsync(context, StatusCodes.Status422UnprocessableEntity, exception.ToBody());
     }
 
-    /// <summary>A 204 the way FastAPI answers a <c>status_code=204</c> route that returns nothing: JSON media type, no body.</summary>
+    /// <summary>A 204 with the JSON media type and no body, for a route that returns nothing (existing clients see this exact response).</summary>
     public static void NoContentJson(HttpContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -104,7 +104,7 @@ public static class PyResponses
     }
 }
 
-/// <summary>How FastAPI reads a request body before validating it.</summary>
+/// <summary>Reads a request body before validating it, with the error statuses and bodies existing clients expect.</summary>
 public static class PyRequestBody
 {
     /// <summary>
@@ -185,7 +185,7 @@ public static class PyRequestBody
         return buffer.ToArray();
     }
 
-    /// <summary><c>email.message.Message().get_content_maintype/subtype</c>: <c>application/json</c> or <c>application/*+json</c>.</summary>
+    /// <summary>Whether the media type, parameters ignored, is <c>application/json</c> or <c>application/*+json</c>.</summary>
     internal static bool IsJsonContentType(string contentType)
     {
         var main = contentType.Split(';')[0].Trim().ToLowerInvariant();
@@ -201,10 +201,10 @@ public static class PyRequestBody
     }
 }
 
-/// <summary>Cookies as Starlette parses and writes them.</summary>
+/// <summary>Cookie parsing and <c>Set-Cookie</c> headers, byte-identical to what existing clients and the contract suite expect.</summary>
 public static class PyCookies
 {
-    /// <summary><c>starlette.requests.cookie_parser</c>: split on <c>;</c>, last value for a name wins, quoted values unquoted.</summary>
+    /// <summary>Splits on <c>;</c>; the last value for a name wins and quoted values are unquoted.</summary>
     public static Dictionary<string, string> Parse(StringValues cookieHeaders)
     {
         var cookies = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -244,7 +244,7 @@ public static class PyCookies
         return Parse(context.Request.Headers.Cookie).TryGetValue(name, out var value) ? value : null;
     }
 
-    /// <summary><c>http.cookies._unquote</c>.</summary>
+    /// <summary>Strips the surrounding quotes and decodes backslash and three-digit octal escapes.</summary>
     internal static string Unquote(string value)
     {
         if (value.Length < 2 || value[0] != '"' || value[^1] != '"')
@@ -280,8 +280,8 @@ public static class PyCookies
     private static bool IsOctal(char c) => c is >= '0' and <= '7';
 
     /// <summary>
-    /// <c>Response.set_cookie</c>'s header: <c>SimpleCookie</c> output with attributes in sorted order
-    /// (<c>expires, HttpOnly, Max-Age, Path, SameSite, Secure</c>).
+    /// The <c>Set-Cookie</c> value with attributes in a fixed sorted order
+    /// (<c>expires, HttpOnly, Max-Age, Path, SameSite, Secure</c>) so the header stays byte-identical for existing clients.
     /// </summary>
     public static string SetCookieHeader(string name, string value, long? maxAge, DateTimeOffset? expires, bool httpOnly, bool secure, string sameSite, string path = "/")
     {
@@ -312,7 +312,7 @@ public static class PyCookies
         return builder.ToString();
     }
 
-    /// <summary><c>http.cookies._quote</c>: values outside the legal set are quoted and escaped.</summary>
+    /// <summary>Values outside the legal cookie character set are quoted, with octal escapes for the rest.</summary>
     private static string QuoteIfNeeded(string value)
     {
         const string legal = "!#$%&'*+-.^_`|~:";

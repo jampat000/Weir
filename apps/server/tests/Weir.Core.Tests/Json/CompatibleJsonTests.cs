@@ -3,8 +3,11 @@ using Weir.Core.Validation;
 
 namespace Weir.Core.Tests.Json;
 
-/// <summary>JSON read and written the way CPython's <c>json</c> module and pydantic do (values taken from the Python backend).</summary>
-public sealed class PythonCompatibleJsonTests
+/// <summary>
+/// JSON read and written byte for byte as existing clients and stored data expect, and request validation errors
+/// in the documented 422 body shape.
+/// </summary>
+public sealed class CompatibleJsonTests
 {
     [Theory]
     [InlineData("{bad", "Expecting property name enclosed in double quotes", 1)]
@@ -20,7 +23,7 @@ public sealed class PythonCompatibleJsonTests
     [InlineData("[1,]", "Expecting value", 3)]
     [InlineData("01", "Extra data", 1)]
     [InlineData("\uFEFF{}", "Unexpected UTF-8 BOM (decode using utf-8-sig)", 0)]
-    public void Decode_errors_carry_the_c_scanner_message_and_position(string text, string message, int position)
+    public void Decode_errors_carry_the_exact_message_and_position(string text, string message, int position)
     {
         var error = Assert.Throws<PyJsonDecodeException>(() => PyJsonParser.Parse(text));
         Assert.Equal(message, error.Detail);
@@ -28,7 +31,7 @@ public sealed class PythonCompatibleJsonTests
     }
 
     [Fact]
-    public void Values_keep_python_types_order_and_duplicate_key_rules()
+    public void Values_keep_their_types_key_order_and_the_last_duplicate()
     {
         var value = Assert.IsType<PyDict>(PyJsonParser.Parse("{\"b\": 1, \"a\": 2.0, \"b\": 3, \"n\": NaN, \"big\": 123456789012345678901234567890, \"s\": \"\\ud83d\\ude00\"}"));
         Assert.Equal(["b", "a", "n", "big", "s"], value.Keys);
@@ -49,10 +52,10 @@ public sealed class PythonCompatibleJsonTests
     [InlineData(0.0001, "0.0001")]
     [InlineData(1234567890123456.0, "1234567890123456.0")]
     [InlineData(-3.25, "-3.25")]
-    public void Floats_are_written_as_python_repr(double value, string expected) => Assert.Equal(expected, PyJsonWriter.FloatRepr(value));
+    public void Floats_are_written_in_the_shortest_round_trip_form(double value, string expected) => Assert.Equal(expected, PyJsonWriter.FloatRepr(value));
 
     [Fact]
-    public void Response_json_is_compact_and_keeps_non_ascii_while_json_dumps_escapes_it()
+    public void Response_json_is_compact_and_keeps_non_ascii_while_the_default_format_escapes_it()
     {
         var value = new PyDict().Set("a", "é\u2028<>&'\u007f\u0001\"\\/").Set("n", PyJson.Null).Set("l", new PyList([PyJson.Of(1), PyJson.Of(true)]));
         Assert.Equal("{\"a\":\"é\u2028<>&'\u007f\\u0001\\\"\\\\/\",\"n\":null,\"l\":[1,true]}", PyJsonWriter.Dumps(value, PyJsonFormat.Response));
@@ -70,7 +73,7 @@ public sealed class PythonCompatibleJsonTests
     [InlineData("", false, 0)]
     [InlineData("0x1f", false, 0)]
     [InlineData("\u0663", false, 0)]
-    public void Integer_strings_follow_pydantic(string raw, bool ok, int expected)
+    public void Integer_strings_accept_whitespace_signs_underscores_and_whole_decimals(string raw, bool ok, int expected)
     {
         var issues = new ValidationIssues();
         Assert.Equal(ok, PydanticRules.TryInt(new PyStr(raw), ["body", "i"], null, null, issues, out var value));
@@ -85,7 +88,7 @@ public sealed class PythonCompatibleJsonTests
     }
 
     [Fact]
-    public void Pydantic_error_shapes_match_fastapi_422_bodies()
+    public void Validation_errors_have_the_documented_422_body_shape()
     {
         var issues = new ValidationIssues();
         var model = new BodyModel(PyJsonParser.Parse("{\"password\": 5, \"csrf_token\": \"\", \"zzz\": 1}"), issues);
@@ -113,7 +116,7 @@ public sealed class PythonCompatibleJsonTests
     [InlineData("null", null, "bool_type")]
     [InlineData("[]", null, "bool_type")]
     [InlineData("1.5", null, "bool_type")]
-    public void Booleans_follow_pydantic_lax_mode(string json, bool? expected, string? errorType)
+    public void Booleans_accept_the_lax_spellings_and_reject_the_rest(string json, bool? expected, string? errorType)
     {
         var issues = new ValidationIssues();
         var ok = PydanticRules.TryBool(PyJsonParser.Parse(json), ["b"], issues, out var value);
@@ -137,7 +140,7 @@ public sealed class PythonCompatibleJsonTests
     [InlineData("{6f1c2a8e-0000-4000-8000-000000000000}", null)]
     [InlineData("urn:uuid:6f1c2a8e-0000-4000-8000-000000000000", null)]
     [InlineData("6F1C2A8E000040008000000000000000", null)]
-    public void Uuids_follow_pydantic(string raw, string? error)
+    public void Uuids_accept_braced_urn_and_simple_forms_with_exact_errors(string raw, string? error)
     {
         Assert.Equal(error, PydanticRules.UuidError(raw, out var value));
         if (error is null)

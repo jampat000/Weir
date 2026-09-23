@@ -4,7 +4,7 @@ using Weir.Core.Text;
 
 namespace Weir.Core.Processing;
 
-/// <summary>How a story step should read (not a severity) — <c>Tone</c> in <c>processing_file_story.py</c>.</summary>
+/// <summary>How a story step should read (not a severity).</summary>
 public enum StoryTone
 {
     Neutral,
@@ -13,11 +13,11 @@ public enum StoryTone
     Bad,
 }
 
-/// <summary>One plain-language step in what happened to a file (<c>StoryStep</c>).</summary>
+/// <summary>One plain-language step in what happened to a file.</summary>
 public sealed record StoryStep(string Heading, string Sentence, StoryTone Tone = StoryTone.Neutral);
 
 /// <summary>
-/// Tell the story of what happened to a file, in plain language (port of <c>processing_file_story.py</c>, #468).
+/// Tell the story of what happened to a file, in plain language (#468).
 /// Narrated at read time from the stored <c>file_logs.detail_json</c> payload; never raises on a
 /// partial or malformed record.
 /// </summary>

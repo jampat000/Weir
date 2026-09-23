@@ -7,6 +7,7 @@ using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.IO;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing.RemuxPass;
@@ -14,7 +15,7 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
 
-/// <summary>Activity writes for a Pass 4 failure-cleanup sweep (port of <c>processing_failure_cleanup_activity.py</c>).</summary>
+/// <summary>Activity writes for a Pass 4 failure-cleanup sweep.</summary>
 public static class ProcessingFailureCleanupActivity
 {
     private static string Label(string mediaScope) => mediaScope == "tv" ? "TV" : "Movies";
@@ -62,18 +63,20 @@ public static class ProcessingFailureCleanupActivity
 }
 
 /// <summary>
-/// Processing Pass 4: the periodic cleanup sweep for terminal failed remux jobs (port of <c>processing_failure_cleanup.py</c>).
+/// Processing Pass 4: the periodic cleanup sweep for terminal failed remux jobs.
 /// Deletes source (and, for Movies, output) folders left behind by a remux that used up its retries, once no media
 /// manager still holds the file open. This sweep deletes folders, so an import check it could not make is a stop, not a
 /// shrug: every manager covering the scope has to answer before anything is removed.
 /// </summary>
 /// <remarks>
 /// The queue-block check (<c>HeldByManager</c>) uses <see cref="QueueRowMapping"/>'s exact output-path match
-/// only, matching Python's <c>_held_by_manager</c> — it does not (yet) fall back to the title/year anchor the watched-folder
-/// scan port uses elsewhere, since that needs pieces the scan port (#522 part 5) has not landed yet.
+/// only; it does not fall back to the title/year anchor the watched-folder scan uses (#522).
 /// </remarks>
 public sealed class ProcessingFailureCleanupSweep
 {
+    /// <summary>A failed job whose recorded path resolves outside the watched folder is never acted on.</summary>
+    public const string OutsideWatchedFolderReason = "The failed file's recorded path is outside the watched folder, so nothing was removed.";
+
     private readonly SqliteDatabase _database;
     private readonly WeirOptions _options;
     private readonly MediaManagerConnectionService _connections;
@@ -90,9 +93,8 @@ public sealed class ProcessingFailureCleanupSweep
     }
 
     /// <summary>Exposed so the job handler can write its started/completed Activity rows in their own short
-    /// transactions, rather than holding one open across the sweep's filesystem work (deliberately unlike Python's
-    /// single enclosing transaction — see the class remarks in <c>RemuxPassHandler</c> for why this codebase never
-    /// holds a write transaction across slow I/O).</summary>
+    /// transactions, rather than holding one open across the sweep's filesystem work (see the class remarks in
+    /// <c>RemuxPassHandler</c> for why this codebase never holds a write transaction across slow I/O).</summary>
     public SqliteDatabase Database => _database;
 
     public Microsoft.Extensions.Logging.ILogger Logger => _logger;
@@ -195,12 +197,19 @@ public sealed class ProcessingFailureCleanupSweep
                 continue;
             }
 
-            var srcFile = RemuxPassPaths.Resolve(Path.Combine(watchedRoot, relNorm));
+            // Path.Join, not Path.Combine: a rooted path in a job payload must not replace the watched folder.
+            var srcFile = RemuxPassPaths.Resolve(Path.Join(watchedRoot, relNorm));
+            if (!PathContainment.IsUnder(watchedRoot, srcFile))
+            {
+                detail.Set($"{scope}_failure_cleanup_skip_reason", OutsideWatchedFolderReason);
+                continue;
+            }
+
             var srcFolder = Path.GetDirectoryName(srcFile) ?? watchedRoot;
 
             if (scope == "movie")
             {
-                ProcessMovie(detail, srcFile, srcFolder, relNorm, watchedRoot, outputRoot, workRoot, signals);
+                ProcessMovie(detail, srcFile, relNorm, watchedRoot, outputRoot, workRoot, library?.MediaExtensionsCsv, signals);
             }
             else
             {
@@ -215,13 +224,15 @@ public sealed class ProcessingFailureCleanupSweep
     }
 
     private void ProcessMovie(
-        PyDict detail, string srcFile, string srcFolder, string relNorm, string watchedRoot, string outputRoot, string workRoot,
+        PyDict detail, string srcFile, string relNorm, string watchedRoot, string outputRoot, string workRoot, string? mediaExtensionsCsv,
         IReadOnlyList<ManagerQueueSignal> signals)
     {
+        var srcFolder = Path.GetDirectoryName(srcFile) ?? watchedRoot;
         detail.Set("movie_failure_cleanup_source_folder_deleted", false);
         detail.Set("movie_failure_cleanup_source_folder_path", srcFolder);
         detail.Set("movie_failure_cleanup_output_folder_deleted", false);
-        var outFolder = Path.GetDirectoryName(RemuxPassPaths.Resolve(Path.Combine(outputRoot, relNorm))) ?? outputRoot;
+        var outFile = RemuxPassPaths.Resolve(Path.Join(outputRoot, relNorm));
+        var outFolder = Path.GetDirectoryName(outFile) ?? outputRoot;
         detail.Set("movie_failure_cleanup_output_folder_path", outFolder);
 
         var holder = HeldByManager(signals, "movie", srcFile);
@@ -235,23 +246,32 @@ public sealed class ProcessingFailureCleanupSweep
         detail.Set("movie_failure_cleanup_queue_check", "passed_not_in_queue");
         detail.Set("movie_failure_cleanup_ran", true);
 
-        if (RemuxPassPaths.RelativeTo(srcFolder, watchedRoot) is not null && !RemuxPassPaths.SamePath(srcFolder, watchedRoot) && Directory.Exists(srcFolder))
+        var cascade = (PyList)detail.Get("movie_failure_cleanup_cascade_folders_deleted")!;
+        if (PathContainment.IsUnder(watchedRoot, srcFolder) && Directory.Exists(srcFolder))
         {
-            var (ok, _) = SafeRmTree(srcFolder);
-            detail.Set("movie_failure_cleanup_source_folder_deleted", ok);
-            if (ok)
+            var removal = RemoveRelease(watchedRoot, srcFile, mediaExtensionsCsv);
+            detail.Set("movie_failure_cleanup_source_folder_deleted", removal.FolderRemoved);
+            if (removal.FolderRemoved)
             {
-                CascadeUnderRoot(Path.GetDirectoryName(srcFolder) ?? watchedRoot, watchedRoot, (PyList)detail.Get("movie_failure_cleanup_cascade_folders_deleted")!);
+                CascadeUnderRoot(Path.GetDirectoryName(srcFolder) ?? watchedRoot, watchedRoot, cascade);
+            }
+            else if (removal.Reason is { } kept)
+            {
+                detail.Set("movie_failure_cleanup_source_folder_kept_reason", kept);
             }
         }
 
-        if (RemuxPassPaths.RelativeTo(outFolder, outputRoot) is not null && !RemuxPassPaths.SamePath(outFolder, outputRoot) && Directory.Exists(outFolder))
+        if (PathContainment.IsUnder(outputRoot, outFolder) && Directory.Exists(outFolder))
         {
-            var (ok, _) = SafeRmTree(outFolder);
-            detail.Set("movie_failure_cleanup_output_folder_deleted", ok);
-            if (ok)
+            var removal = RemoveRelease(outputRoot, outFile, mediaExtensionsCsv);
+            detail.Set("movie_failure_cleanup_output_folder_deleted", removal.FolderRemoved);
+            if (removal.FolderRemoved)
             {
-                CascadeUnderRoot(Path.GetDirectoryName(outFolder) ?? outputRoot, outputRoot, (PyList)detail.Get("movie_failure_cleanup_cascade_folders_deleted")!);
+                CascadeUnderRoot(Path.GetDirectoryName(outFolder) ?? outputRoot, outputRoot, cascade);
+            }
+            else if (removal.Reason is { } kept)
+            {
+                detail.Set("movie_failure_cleanup_output_folder_kept_reason", kept);
             }
         }
 
@@ -274,7 +294,7 @@ public sealed class ProcessingFailureCleanupSweep
         detail.Set("tv_failure_cleanup_output_season_deleted", false);
         detail.Set("tv_failure_cleanup_season_folder_path", srcSeason);
         var relDirectory = Path.GetDirectoryName(relNorm.Replace('/', Path.DirectorySeparatorChar)) ?? string.Empty;
-        var outSeason = RemuxPassPaths.Resolve(relDirectory.Length == 0 ? outputRoot : Path.Combine(outputRoot, relDirectory));
+        var outSeason = RemuxPassPaths.Resolve(relDirectory.Length == 0 ? outputRoot : Path.Join(outputRoot, relDirectory));
         detail.Set("tv_failure_cleanup_output_season_path", outSeason);
 
         var episodes = new List<string>();
@@ -342,7 +362,7 @@ public sealed class ProcessingFailureCleanupSweep
 
         if (RemuxPassPaths.RelativeTo(srcSeason, watchedRoot) is not null && !RemuxPassPaths.SamePath(srcSeason, watchedRoot) && Directory.Exists(srcSeason))
         {
-            var (ok, _) = SafeRmTree(srcSeason);
+            var (ok, _) = SafeRmTree(watchedRoot, srcSeason);
             detail.Set("tv_failure_cleanup_season_folder_deleted", ok);
             if (ok)
             {
@@ -352,7 +372,7 @@ public sealed class ProcessingFailureCleanupSweep
 
         if (RemuxPassPaths.RelativeTo(outSeason, outputRoot) is not null && !RemuxPassPaths.SamePath(outSeason, outputRoot) && Directory.Exists(outSeason))
         {
-            var (ok, _) = SafeRmTree(outSeason);
+            var (ok, _) = SafeRmTree(outputRoot, outSeason);
             detail.Set("tv_failure_cleanup_output_season_deleted", ok);
             if (ok)
             {
@@ -371,7 +391,7 @@ public sealed class ProcessingFailureCleanupSweep
         }
     }
 
-    /// <summary><c>_held_by_manager</c>: the connection whose queue still names this exact file, or null. Path equality only.</summary>
+    /// <summary>The connection whose queue still names this exact file, or null. Path equality only.</summary>
     private static string? HeldByManager(IReadOnlyList<ManagerQueueSignal> signals, string mediaScope, string mediaFile)
     {
         var dialect = QueueRowMapping.DialectForScope(mediaScope);
@@ -402,7 +422,7 @@ public sealed class ProcessingFailureCleanupSweep
 
     private sealed record SignalReport(int Consulted, bool AllReported, IReadOnlyList<string> SilentDetails);
 
-    /// <summary><c>report_for_signals</c>.</summary>
+    /// <summary>How many managers were consulted, whether all of them answered, and what the silent ones said.</summary>
     private static SignalReport ReportForSignals(IReadOnlyList<ManagerQueueSignal> signals)
     {
         var silentDetails = new List<string>();
@@ -554,7 +574,7 @@ public sealed class ProcessingFailureCleanupSweep
         return (NormRel(relStr.Value), scope, legacyDryRun);
     }
 
-    /// <summary><c>_norm_rel</c>.</summary>
+    /// <summary>A relative path with forward slashes and no empty or <c>.</c> segments.</summary>
     private static string NormRel(string raw)
     {
         var trimmed = PyStrings.Strip(raw).Replace('\\', '/');
@@ -562,16 +582,18 @@ public sealed class ProcessingFailureCleanupSweep
         return parts.Length == 0 ? string.Empty : string.Join('/', parts);
     }
 
-    /// <summary><c>_job_temp_candidates</c>.</summary>
+    /// <summary>The work-folder temp files Weir created for this source, matched by <see cref="WeirTempFiles.RemuxTempNameFor"/>.</summary>
     private static List<string> JobTempCandidates(string workRoot, string relNorm)
     {
         var result = new List<string>();
-        if (!Directory.Exists(workRoot))
+        if (relNorm.Length == 0 || !Directory.Exists(workRoot))
         {
             return result;
         }
 
-        var stem = Path.GetFileNameWithoutExtension(relNorm).ToLowerInvariant();
+        // Only the exact temp names Weir creates for this source (#534); an operator's own "Film.processing.notes.txt"
+        // beside a failed "Film.mkv" is not Weir's to delete.
+        var ownTempName = WeirTempFiles.RemuxTempNameFor(relNorm);
         List<string> files;
         try
         {
@@ -584,13 +606,7 @@ public sealed class ProcessingFailureCleanupSweep
 
         foreach (var child in files.OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase))
         {
-            var name = Path.GetFileName(child).ToLowerInvariant();
-            if (!name.Contains(".processing.", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            if (stem.Length > 0 && name.Contains(stem, StringComparison.Ordinal))
+            if (ownTempName.IsMatch(Path.GetFileName(child)))
             {
                 result.Add(child);
             }
@@ -599,7 +615,7 @@ public sealed class ProcessingFailureCleanupSweep
         return result;
     }
 
-    /// <summary><c>_cascade_under_root</c>: remove now-empty ancestor folders, up to (not including) the root.</summary>
+    /// <summary>Removes now-empty ancestor folders, up to (not including) the root.</summary>
     private static void CascadeUnderRoot(string firstParent, string root, PyList deletedOut)
     {
         var current = RemuxPassPaths.Resolve(firstParent);
@@ -643,8 +659,28 @@ public sealed class ProcessingFailureCleanupSweep
         }
     }
 
-    private (bool Ok, string? Error) SafeRmTree(string path)
+    /// <summary>A failed movie's source or output release, removed by <see cref="ReleaseFolderRemoval"/>; a locked folder is logged, not thrown.</summary>
+    private ReleaseRemoval RemoveRelease(string root, string file, string? mediaExtensionsCsv)
     {
+        try
+        {
+            return ReleaseFolderRemoval.Remove(root, file, mediaExtensionsCsv);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(exception, "Failure cleanup could not remove the release of {File}; it is in use or blocked.", file);
+            return new ReleaseRemoval(ReleaseRemovalKind.NothingRemoved, null);
+        }
+    }
+
+    private (bool Ok, string? Error) SafeRmTree(string root, string path)
+    {
+        if (PathContainment.HasLinkBelowRoot(root, path))
+        {
+            _logger.LogWarning("Failure cleanup left {Path} alone: it, or a folder above it, is a link to another place.", path);
+            return (false, ReleaseFolderRemoval.LinkedFolderReason);
+        }
+
         try
         {
             Directory.Delete(path, recursive: true);

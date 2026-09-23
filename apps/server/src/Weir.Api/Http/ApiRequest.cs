@@ -26,10 +26,13 @@ public sealed record JsonApiResult(int StatusCode, PyJson Body) : ApiResult
 /// <summary>A response the handler writes itself (files, plain text, empty bodies).</summary>
 public sealed record CustomApiResult(Func<HttpContext, Task> Write) : ApiResult;
 
-/// <summary>The metrics label of a route: its path in the Python router that declared it.</summary>
+/// <summary>The metrics label of a route: its path below the API prefix, so labels stay stable for existing dashboards.</summary>
 public sealed record RouteLabel(string Label);
 
-/// <summary>Every API route in registration order, for Starlette's partial matches (405 and its <c>Allow</c> header).</summary>
+/// <summary>
+/// Every API route in registration order, for path-only matches: a known path with the wrong method gets a 405
+/// whose <c>Allow</c> header names the methods of the first matching route, as existing clients expect.
+/// </summary>
 public sealed class RouteTable
 {
     private readonly List<(string Template, TemplateMatcher Matcher, string[] Methods, string Label)> _routes = [];
@@ -63,9 +66,9 @@ public sealed class RouteTable
     }
 
     /// <summary>
-    /// Every route's actual mounted path (matching Python's path exactly — see <see cref="ApiRoutes.MapApi"/>)
-    /// and the HTTP methods mapped to it, for the OpenAPI document builder to know which of Python's
-    /// operations the .NET server actually answers.
+    /// Every route's actual mounted path (matching the committed OpenAPI document's path exactly — see
+    /// <see cref="ApiRoutes.MapApi"/>) and the HTTP methods mapped to it, so the OpenAPI document builder knows
+    /// which documented operations the server answers.
     /// </summary>
     public IReadOnlyList<(string Path, IReadOnlyList<string> Methods)> Snapshot()
     {
@@ -76,7 +79,7 @@ public sealed class RouteTable
     }
 }
 
-/// <summary>Per-process abuse controls (<c>app.state.auth_login_rate_limiter</c> and <c>bootstrap_rate_limiter</c>).</summary>
+/// <summary>Per-process abuse controls: the sign-in and bootstrap rate limiters.</summary>
 public sealed class AuthRateLimiters
 {
     private int _forwardedWarned;
@@ -92,13 +95,13 @@ public sealed class AuthRateLimiters
 
     public SlidingWindowLimiter Bootstrap { get; }
 
-    /// <summary><c>_warn_forwarded_headers_ignored</c>: once per process.</summary>
+    /// <summary>True the first time only: the ignored-forwarded-headers warning is logged once per process.</summary>
     public bool ShouldWarnForwardedIgnored() => Interlocked.Exchange(ref _forwardedWarned, 1) == 0;
 }
 
 /// <summary>
 /// One API request: its database work (committed when the handler succeeds), the signed-in user once
-/// resolved, and the checks Python's routes share (session secret, CSRF, browser origin, rate limits).
+/// resolved, and the checks routes share (session secret, CSRF, browser origin, rate limits).
 /// </summary>
 public sealed class ApiRequest : IAsyncDisposable
 {
@@ -167,7 +170,7 @@ public sealed class ApiRequest : IAsyncDisposable
         }
     }
 
-    /// <summary><c>current_raw_session_token</c>.</summary>
+    /// <summary>The trimmed session cookie value, <see langword="null"/> when absent or blank.</summary>
     public string? RawSessionToken
     {
         get
@@ -183,14 +186,14 @@ public sealed class ApiRequest : IAsyncDisposable
         return values.Count == 0 ? null : string.Join(", ", values.ToArray());
     }
 
-    /// <summary>Starlette's <c>request.headers.get(name)</c>: the first occurrence.</summary>
+    /// <summary>The first occurrence of a header, <see langword="null"/> when absent.</summary>
     public string? FirstHeader(string name)
     {
         var values = Context.Request.Headers[name];
         return values.Count == 0 ? null : values[0];
     }
 
-    /// <summary>Starlette's <c>request.query_params.get(name)</c>: the last value, <see langword="null"/> when absent.</summary>
+    /// <summary>A query parameter: the last value when repeated, <see langword="null"/> when absent.</summary>
     public string? Query(string name)
     {
         var values = Context.Request.Query[name];
@@ -199,7 +202,7 @@ public sealed class ApiRequest : IAsyncDisposable
 
     public string? RouteValue(string name) => Context.Request.RouteValues.TryGetValue(name, out var value) ? value as string : null;
 
-    /// <summary>The client address after trusted forwarded headers were applied (<c>request.client.host</c>).</summary>
+    /// <summary>The client address after trusted forwarded headers were applied.</summary>
     public string? ClientHost => DefaultClientHost(Context);
 
     public static string? DefaultClientHost(HttpContext context)
@@ -214,7 +217,10 @@ public sealed class ApiRequest : IAsyncDisposable
         return (address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address).ToString();
     }
 
-    /// <summary><c>get_current_user_public</c>, then <c>require_roles</c> when <paramref name="allowedRoles"/> is given.</summary>
+    /// <summary>
+    /// The signed-in user (401 when there is no valid session, 403 for an unknown role), then a 403 unless the role is
+    /// in <paramref name="allowedRoles"/> when that is given.
+    /// </summary>
     public async Task<SignedInSession> RequireUserAsync(IReadOnlySet<string>? allowedRoles = null)
     {
         if (_user is null)
@@ -237,7 +243,7 @@ public sealed class ApiRequest : IAsyncDisposable
         return _user;
     }
 
-    /// <summary><c>require_session_secret</c>.</summary>
+    /// <summary>The session secret, or a 503 when it is not configured.</summary>
     public string RequireSessionSecret()
     {
         var secret = (Options.SessionSecret ?? string.Empty).Trim();
@@ -246,7 +252,10 @@ public sealed class ApiRequest : IAsyncDisposable
             : throw new ApiException(StatusCodes.Status503ServiceUnavailable, "WEIR_SESSION_SECRET must be set for auth endpoints.");
     }
 
-    /// <summary><c>validate_browser_post_origin</c>.</summary>
+    /// <summary>
+    /// When trusted browser origins are configured, a POST must carry an <c>Origin</c> (or failing that a <c>Referer</c>)
+    /// from one of them; otherwise 403.
+    /// </summary>
     public void ValidateBrowserPostOrigin()
     {
         var trusted = Options.TrustedBrowserOrigins;
@@ -283,7 +292,7 @@ public sealed class ApiRequest : IAsyncDisposable
         throw new ApiException(StatusCodes.Status403Forbidden, "Missing Origin or Referer for browser POST.");
     }
 
-    /// <summary><c>verify_csrf_token</c> against this request's session cookie.</summary>
+    /// <summary>Verifies a CSRF token against this request's session cookie.</summary>
     public bool VerifyCsrf(string secret, string? token, bool allowAnonymous) =>
         CsrfTokens.Verify(secret, token, RawSessionToken, allowAnonymous, Time);
 
@@ -298,7 +307,7 @@ public sealed class ApiRequest : IAsyncDisposable
         }
     }
 
-    /// <summary><c>client_rate_limit_key</c>.</summary>
+    /// <summary>The rate-limit key for this client; <c>X-Forwarded-For</c> counts only from a trusted proxy.</summary>
     public string RateLimitKey()
     {
         var limiters = Service<AuthRateLimiters>();
@@ -317,7 +326,10 @@ public sealed class ApiRequest : IAsyncDisposable
             });
     }
 
-    /// <summary>Read the body now (FastAPI reads and decodes it before running dependencies).</summary>
+    /// <summary>
+    /// Read and decode the body now. Handlers call this before their other checks, so a malformed body is
+    /// answered with its 400 or 422 first, the order existing clients and the contract suite expect.
+    /// </summary>
     public Task<PyJson?> ReadBodyAsync() => PyRequestBody.ReadAsync(Context);
 
     /// <summary>An <c>int</c> path parameter.</summary>

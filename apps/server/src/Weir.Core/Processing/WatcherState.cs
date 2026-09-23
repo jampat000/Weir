@@ -2,7 +2,7 @@ using Weir.Core.Text;
 
 namespace Weir.Core.Processing;
 
-/// <summary>How a library's watched folder is being monitored (port of <c>processing_watcher_state.WatcherStatus</c>).</summary>
+/// <summary>How a library's watched folder is being monitored.</summary>
 public enum WatcherStatus
 {
     /// <summary>Filesystem events are arriving. The periodic scan still runs as the backstop.</summary>
@@ -16,7 +16,7 @@ public enum WatcherStatus
     Disabled,
 }
 
-/// <summary>One library's watcher state and the sentence explaining it (port of <c>WatcherReport</c>).</summary>
+/// <summary>One library's watcher state and the sentence explaining it.</summary>
 public sealed record WatcherReport(long LibraryId, string LibraryName, string WatchedFolder, WatcherStatus Status, string Detail)
 {
     /// <summary>
@@ -27,8 +27,8 @@ public sealed record WatcherReport(long LibraryId, string LibraryName, string Wa
 }
 
 /// <summary>
-/// In-memory registry of what the filesystem watcher is actually doing, for readiness to report (port of
-/// <c>processing_watcher_state.py</c>). Process-local on purpose: this is the state of *this* process's
+/// In-memory registry of what the filesystem watcher is actually doing, for readiness to report.
+/// Process-local on purpose: this is the state of *this* process's
 /// watchers, so persisting it would make a stale row from a previous run look like the current answer.
 /// </summary>
 public sealed class WatcherStateStore

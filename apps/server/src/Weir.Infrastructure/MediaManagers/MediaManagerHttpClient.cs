@@ -13,13 +13,13 @@ namespace Weir.Infrastructure.MediaManagers;
 public interface IManagerHttpHandlerFactory
 {
     /// <summary>
-    /// A handler the caller does not dispose. <paramref name="followRedirects"/> mirrors the Python client in use:
-    /// <c>urllib</c> follows redirects, <c>httpx.post</c> does not.
+    /// A handler the caller does not dispose. <paramref name="followRedirects"/> is true for manager API and metadata
+    /// provider calls, and false for a hand-off completion report, which posts once to the exact callback URL.
     /// </summary>
     HttpMessageHandler Handler(bool followRedirects);
 }
 
-/// <summary>Two shared <see cref="SocketsHttpHandler"/>s, one following redirects (as urllib does, up to ten) and one not.</summary>
+/// <summary>Two shared <see cref="SocketsHttpHandler"/>s, one following up to ten redirects and one not.</summary>
 public sealed class SocketsManagerHttpHandlerFactory : IManagerHttpHandlerFactory, IDisposable
 {
     private readonly SocketsHttpHandler _following = new() { AllowAutoRedirect = true, MaxAutomaticRedirections = 10, PooledConnectionLifetime = TimeSpan.FromMinutes(2) };
@@ -35,7 +35,7 @@ public sealed class SocketsManagerHttpHandlerFactory : IManagerHttpHandlerFactor
 }
 
 /// <summary>
-/// A narrow JSON client for one media manager (port of <c>manager_http.MediaManagerHttpClient</c>). The base URL must
+/// A narrow JSON client for one media manager. The base URL must
 /// be a plain http(s) address with no credentials, query or fragment, and request paths must be relative, so a saved
 /// connection cannot be turned into a request against an arbitrary host (ADR-0015).
 /// </summary>
@@ -64,7 +64,7 @@ public sealed class MediaManagerHttpClient
         _timeout = timeout ?? TimeSpan.FromSeconds(30);
     }
 
-    /// <summary><c>_url</c>: refuses an absolute path, prefixes a slash, appends urlencoded parameters.</summary>
+    /// <summary>The request URL: refuses an absolute path, prefixes a slash, appends urlencoded parameters.</summary>
     public string Url(string path, IReadOnlyList<KeyValuePair<string, string>>? parameters = null)
     {
         ArgumentNullException.ThrowIfNull(path);
@@ -77,7 +77,7 @@ public sealed class MediaManagerHttpClient
         return parameters is { Count: > 0 } ? url + "?" + TmdbResponses.UrlEncode(parameters) : url;
     }
 
-    /// <summary><c>get_json</c>. Booleans in <paramref name="parameters"/> are sent as <c>1</c>/<c>0</c>, as Python does here.</summary>
+    /// <summary>GET and parse JSON. Booleans in <paramref name="parameters"/> are sent as <c>1</c>/<c>0</c>.</summary>
     public Task<PyJson?> GetJsonAsync(string path, IReadOnlyList<KeyValuePair<string, object>>? parameters = null, CancellationToken cancellationToken = default)
     {
         var flat = parameters?.Select(pair => new KeyValuePair<string, string>(pair.Key, pair.Value switch
@@ -93,9 +93,9 @@ public sealed class MediaManagerHttpClient
     }
 
     /// <summary>
-    /// <c>post_json</c>: the body as <c>json.dumps(body)</c>. <paramref name="acceptedStatuses"/> widens the
-    /// success set beyond 200/201/204 for an endpoint verified to answer differently (Deluno's file-changed
-    /// answers 202 Accepted, #507); every other caller keeps Python's exact three.
+    /// POST the body as JSON and parse the answer. <paramref name="acceptedStatuses"/> widens the success set
+    /// beyond 200/201/204 for an endpoint verified to answer differently (Deluno's file-changed answers 202
+    /// Accepted, #507); every other caller accepts only those three.
     /// </summary>
     public Task<PyJson?> PostJsonAsync(string path, PyDict body, IReadOnlyCollection<int>? acceptedStatuses = null, CancellationToken cancellationToken = default)
     {
@@ -108,19 +108,7 @@ public sealed class MediaManagerHttpClient
         return SendAsync(request, allowEmpty: false, cancellationToken, acceptedStatuses);
     }
 
-    /// <summary><c>put_json</c>.</summary>
-    public async Task PutJsonAsync(string path, PyDict body, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(body);
-        var request = new HttpRequestMessage(HttpMethod.Put, Url(path))
-        {
-            Content = JsonContent(body),
-        };
-        request.Headers.TryAddWithoutValidation("X-Api-Key", _apiKey);
-        await SendAsync(request, allowEmpty: true, cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <summary><c>delete</c>: success is the status code alone. Booleans are sent as <c>true</c>/<c>false</c>, which is how ASP.NET binds them.</summary>
+    /// <summary>DELETE: success is the status code alone. Booleans are sent as <c>true</c>/<c>false</c>, which is how ASP.NET binds them.</summary>
     public async Task DeleteAsync(string path, IReadOnlyList<KeyValuePair<string, object>>? parameters = null, CancellationToken cancellationToken = default)
     {
         var flat = parameters?.Select(pair => new KeyValuePair<string, string>(pair.Key, pair.Value switch
@@ -135,7 +123,7 @@ public sealed class MediaManagerHttpClient
         await SendAsync(request, allowEmpty: true, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary><c>health_ok</c>.</summary>
+    /// <summary>A GET that only has to succeed: it throws on an unreachable manager, a bad status or a non-JSON answer.</summary>
     public Task HealthOkAsync(string path, CancellationToken cancellationToken = default) => GetJsonAsync(path, cancellationToken: cancellationToken);
 
     private static ByteArrayContent JsonContent(PyDict body)
@@ -147,7 +135,7 @@ public sealed class MediaManagerHttpClient
 
     private static readonly int[] DefaultAcceptedStatuses = [200, 201, 204];
 
-    /// <summary><c>_read_json</c>.</summary>
+    /// <summary>Send the request and read the answer as JSON, classifying transport, status and parse failures.</summary>
     private async Task<PyJson?> SendAsync(HttpRequestMessage request, bool allowEmpty, CancellationToken cancellationToken, IReadOnlyCollection<int>? acceptedStatuses = null)
     {
         using (request)
@@ -204,9 +192,9 @@ public sealed class MediaManagerHttpClient
                     return null;
                 }
 
-                // #544 item 1: Python's json.loads raises ValueError here, uncaught, so a 2xx answer that is not
-                // JSON (an HTML login page from a reverse proxy, most often) surfaced as a 500. Classified instead,
-                // so a connection test and the capabilities list report a plain "this is not that API" message.
+                // #544 item 1: a 2xx answer that is not JSON (an HTML login page from a reverse proxy, most often)
+                // is classified rather than left to surface as a 500, so a connection test and the capabilities list
+                // report a plain "this is not that API" message.
                 try
                 {
                     return PyJsonParser.Parse(new UTF8Encoding(false, true).GetString(raw));
@@ -222,7 +210,7 @@ public sealed class MediaManagerHttpClient
         }
     }
 
-    /// <summary><c>_retry_after_seconds</c>: a non-negative delay in seconds, or null (an HTTP-date is not acted on).</summary>
+    /// <summary>The <c>Retry-After</c> header as a non-negative delay in seconds, or null (an HTTP-date is not acted on).</summary>
     public static double? RetryAfterSeconds(string? raw)
     {
         if (raw is null)

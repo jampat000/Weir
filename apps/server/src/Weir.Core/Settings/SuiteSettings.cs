@@ -24,7 +24,7 @@ public sealed record SuiteSettingsRecord
     public PyDateTime? ProcessingPausedUntil { get; init; }
     public bool ScanWhilePaused { get; init; } = true;
 
-    /// <summary>Processing's optional metadata provider (<c>processing_metadata_provider_api.py</c>). Empty means none configured.</summary>
+    /// <summary>Processing's optional metadata provider. Empty means none configured.</summary>
     public string MetadataProvider { get; init; } = string.Empty;
     public string MetadataProviderBaseUrl { get; init; } = string.Empty;
 
@@ -46,16 +46,16 @@ public sealed record SuiteSettingsUpdate(
     long? ConfigurationBackupIntervalHours = null,
     string? ConfigurationBackupPreferredTime = null);
 
-/// <summary>Port of <c>weir.platform.suite_settings.service</c>: validation, normalisation and the response shape.</summary>
+/// <summary>Suite settings validation, normalisation and the response shape.</summary>
 public static class SuiteSettingsRules
 {
     private static readonly HashSet<string> WizardStates = new(StringComparer.Ordinal) { "pending", "skipped", "completed" };
 
-    /// <summary><c>_default_setup_wizard_state</c>.</summary>
+    /// <summary>The setup wizard's starting state: skipped when users already exist, otherwise pending.</summary>
     public static string DefaultSetupWizardState(long existingUsers) => existingUsers > 0 ? "skipped" : "pending";
 
     /// <summary>
-    /// <c>apply_suite_settings_put</c> validation. Returns the normalised values, or throws
+    /// Validates a settings update. Returns the normalised values, or throws
     /// <see cref="PyValueErrorException"/> with the operator message.
     /// </summary>
     public static SuiteSettingsUpdate Normalize(SuiteSettingsUpdate update, ITimeZoneResolver zones)
@@ -130,7 +130,7 @@ public static class SuiteSettingsRules
         };
     }
 
-    /// <summary>The row after <c>apply_suite_settings_put</c> assigns the normalised values.</summary>
+    /// <summary>The row with the normalised values assigned; optional fields left null keep their stored values.</summary>
     public static SuiteSettingsRecord Apply(SuiteSettingsRecord row, SuiteSettingsUpdate normalized)
     {
         ArgumentNullException.ThrowIfNull(row);
@@ -149,7 +149,7 @@ public static class SuiteSettingsRules
         };
     }
 
-    /// <summary><c>_normalize_backup_preferred_time</c>: <c>H:M</c> → <c>HH:MM</c>.</summary>
+    /// <summary>Normalises the backup time: <c>H:M</c> → <c>HH:MM</c>.</summary>
     public static string NormalizeBackupPreferredTime(string? raw)
     {
         if (TryParseTime(raw, out var hour, out var minute))
@@ -160,7 +160,7 @@ public static class SuiteSettingsRules
         throw new PyValueErrorException("Backup time must use HH:MM in 24-hour time.");
     }
 
-    /// <summary>Python's <c>time(hour=int(hh), minute=int(mm))</c> after splitting on the first colon.</summary>
+    /// <summary>Splits on the first colon and reads an integer hour (0-23) and minute (0-59); empty means 02:00.</summary>
     public static bool TryParseTime(string? raw, out int hour, out int minute)
     {
         hour = 0;
@@ -185,7 +185,7 @@ public static class SuiteSettingsRules
         return true;
     }
 
-    /// <summary><c>build_suite_settings_out</c>.</summary>
+    /// <summary>The settings as the API returns them, with out-of-range stored values clamped.</summary>
     public static PyDict BuildOut(SuiteSettingsRecord row)
     {
         ArgumentNullException.ThrowIfNull(row);
@@ -224,7 +224,7 @@ public static class SuiteSettingsRules
     }
 }
 
-/// <summary>Port of <c>build_suite_security_overview</c>.</summary>
+/// <summary>The read-only security overview: the startup security options in plain language.</summary>
 public static class SecurityOverview
 {
     public static PyDict Build(WeirOptions options)
@@ -251,7 +251,7 @@ public static class SecurityOverview
                 "To change them, ask whoever runs the server to edit that file and restart the app.");
     }
 
-    /// <summary><c>_plain_duration</c>.</summary>
+    /// <summary>A duration in the largest whole unit that fits: seconds, minutes, hours or days.</summary>
     public static string PlainDuration(long seconds)
     {
         var s = Math.Max(1, seconds);
@@ -293,7 +293,7 @@ public static class SecurityOverview
     private static long Saturating(long value, long factor) => value > long.MaxValue / factor ? long.MaxValue : value * factor;
 }
 
-/// <summary>The suite-wide pause, resolved against the clock (port of <c>resolve_pause_state</c>).</summary>
+/// <summary>The suite-wide pause, resolved against the clock.</summary>
 public sealed record PauseState(bool Paused, PyDateTime? PausedUntil, bool ScanWhilePaused, bool Expired = false)
 {
     public const string InFlightPolicy = "Work already running finishes. Pausing stops Weir starting anything new.";
@@ -321,7 +321,7 @@ public sealed record PauseState(bool Paused, PyDateTime? PausedUntil, bool ScanW
     }
 
     /// <summary>
-    /// <c>resolve_pause_state</c>: expiry is applied on read, so a pause set before a restart still lapses.
+    /// Expiry is applied on read, so a pause set before a restart still lapses.
     /// A naive until time is UTC.
     /// </summary>
     public static PauseState Resolve(bool processingPaused, PyDateTime? pausedUntil, bool scanWhilePaused, DateTime nowUtc)
@@ -348,7 +348,7 @@ public sealed record PauseState(bool Paused, PyDateTime? PausedUntil, bool ScanW
         .Set("in_flight_policy", InFlightPolicy);
 }
 
-/// <summary>When the automatic configuration snapshot is due (port of <c>run_suite_configuration_backup_tick</c>'s decision).</summary>
+/// <summary>When the automatic configuration snapshot is due.</summary>
 public static class ConfigurationBackupSchedule
 {
     public static bool IsDue(SuiteSettingsRecord suite, DateTime nowUtc, ITimeZoneResolver zones)

@@ -11,7 +11,7 @@ namespace Weir.Infrastructure.Auth;
 /// <summary>A signed-in request: its session row (as held in memory) and its user.</summary>
 public sealed record SignedInSession(UserSessionRecord Session, UserRecord User);
 
-/// <summary>Port of <c>weir.platform.auth.service</c> and <c>bootstrap</c>: credentials, server-side sessions and logout.</summary>
+/// <summary>Credentials, first-admin bootstrap, server-side sessions and logout.</summary>
 public sealed class AuthService
 {
     public const string BootstrapNotAllowedMessage = "bootstrap not allowed: an admin user already exists";
@@ -32,7 +32,7 @@ public sealed class AuthService
 
     public PyDateTime Now() => PyDateTime.UtcNow(_time);
 
-    /// <summary><c>load_valid_session_for_request</c>: look up by token hash, enforce revocation and timeouts, and touch <c>last_seen_at</c> at most once a minute.</summary>
+    /// <summary>The request's session: look up by token hash, enforce revocation and timeouts, and touch <c>last_seen_at</c> at most once a minute.</summary>
     public async Task<SignedInSession?> LoadValidSessionAsync(UnitOfWork uow, string? rawCookieToken)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -77,8 +77,8 @@ public sealed class AuthService
     }
 
     /// <summary>
-    /// Deliberate fix (#529): Python marks the expired session revoked inside the request's own session, which
-    /// the 401 then rolls back. Here the revoke is committed on its own, whatever the request's outcome.
+    /// Commits the revoke of an expired session on its own, whatever the request's outcome, so the 401 that
+    /// follows cannot roll it back (#529).
     /// </summary>
     private async Task RevokeExpiredAsync(UnitOfWork uow, string sessionId, PyDateTime now)
     {
@@ -97,7 +97,7 @@ public sealed class AuthService
         }
     }
 
-    /// <summary><c>authenticate_user</c>, padding a missing or inactive account with a dummy verify.</summary>
+    /// <summary>Checks a username and password, padding a missing or inactive account with a dummy verify so timing does not reveal which accounts exist.</summary>
     public async Task<UserRecord?> AuthenticateAsync(UnitOfWork uow, string username, string password)
     {
         var user = await AuthStore.FindUserByLowerUsernameAsync(uow, (username ?? string.Empty).Trim().ToLowerInvariant()).ConfigureAwait(false);
@@ -110,7 +110,7 @@ public sealed class AuthService
         return VerifyPassword(password, user.PasswordHash) ? user : null;
     }
 
-    /// <summary><c>verify_password</c>.</summary>
+    /// <summary>Verifies a password against a stored hash, logging a hash that cannot be read.</summary>
     public bool VerifyPassword(string plain, string passwordHash)
     {
         var result = PasswordHasher.Verify(plain, passwordHash);
@@ -122,7 +122,7 @@ public sealed class AuthService
         return result == PasswordVerification.Match;
     }
 
-    /// <summary><c>login_user</c>.</summary>
+    /// <summary>Signs a user in: checks the credentials and creates a session.</summary>
     public async Task<(UserRecord User, UserSessionRecord Session, string RawToken)?> LoginAsync(
         UnitOfWork uow, string username, string password, bool trustedDevice, string clientLabel)
     {
@@ -136,7 +136,7 @@ public sealed class AuthService
         return (user, row, raw);
     }
 
-    /// <summary><c>create_user_session</c>.</summary>
+    /// <summary>Creates a session and its raw token, then enforces the per-user session cap.</summary>
     public async Task<(UserSessionRecord Row, string RawToken)> CreateSessionAsync(UnitOfWork uow, UserRecord user, bool trustedDevice, string clientLabel)
     {
         ArgumentNullException.ThrowIfNull(user);
@@ -165,7 +165,7 @@ public sealed class AuthService
         return (row, raw);
     }
 
-    /// <summary><c>enforce_session_limit_for_user</c>: keep the newest five active sessions.</summary>
+    /// <summary>Keeps the newest five active sessions and revokes the rest.</summary>
     public async Task<int> EnforceSessionLimitAsync(UnitOfWork uow, long userId, int maxActiveSessions = SessionRules.MaxActiveSessionsPerUser)
     {
         var cap = Math.Max(1, maxActiveSessions);
@@ -186,7 +186,7 @@ public sealed class AuthService
         return rows.Count;
     }
 
-    /// <summary><c>logout_by_cookie</c>.</summary>
+    /// <summary>Revokes the session the cookie names, if it is still valid.</summary>
     public async Task<bool> LogoutByCookieAsync(UnitOfWork uow, string? rawCookieToken)
     {
         var pair = await LoadValidSessionAsync(uow, rawCookieToken).ConfigureAwait(false);
@@ -199,7 +199,7 @@ public sealed class AuthService
         return true;
     }
 
-    /// <summary><c>cleanup_inactive_sessions</c>.</summary>
+    /// <summary>Deletes sessions that are revoked, expired or idle past their timeout.</summary>
     public Task<int> CleanupInactiveSessionsAsync(UnitOfWork uow, PyDateTime? now = null)
     {
         var moment = now ?? Now();
@@ -208,7 +208,7 @@ public sealed class AuthService
         return AuthStore.DeleteInactiveSessionsAsync(uow, moment, idleCutoff, trustedCutoff);
     }
 
-    /// <summary><c>session_public</c>.</summary>
+    /// <summary>The session as the API shows it.</summary>
     public PyDict SessionPublic(UserSessionRecord session, bool current)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -231,7 +231,7 @@ public sealed class AuthService
         return new PyDict().Set("id", user.Id).Set("username", user.Username).Set("role", user.Role);
     }
 
-    /// <summary><c>list_active_sessions</c>, with the request's own session as it is held in memory.</summary>
+    /// <summary>The user's active sessions, newest first, with the request's own session as it is held in memory.</summary>
     public async Task<List<PyJson>> ListActiveSessionsAsync(UnitOfWork uow, long userId, UserSessionRecord? current)
     {
         var moment = Now();
@@ -252,7 +252,7 @@ public sealed class AuthService
         return output;
     }
 
-    /// <summary><c>revoke_user_session</c>.</summary>
+    /// <summary>Revokes one of the user's sessions; false when it does not exist or is already revoked.</summary>
     public async Task<bool> RevokeUserSessionAsync(UnitOfWork uow, long userId, Guid sessionId)
     {
         var row = await AuthStore.FindUserSessionAsync(uow, userId, sessionId.ToString("N")).ConfigureAwait(false);
@@ -265,7 +265,7 @@ public sealed class AuthService
         return true;
     }
 
-    /// <summary><c>revoke_other_user_sessions</c>.</summary>
+    /// <summary>Revokes every active session of the user except the current one.</summary>
     public async Task<int> RevokeOtherUserSessionsAsync(UnitOfWork uow, long userId, string? currentSessionId)
     {
         var moment = Now();
@@ -284,7 +284,7 @@ public sealed class AuthService
         return count;
     }
 
-    /// <summary><c>change_username_for_user</c>. Throws <see cref="PyValueErrorException"/> with the operator message.</summary>
+    /// <summary>Changes the username after checking the current password. Throws <see cref="PyValueErrorException"/> with the operator message.</summary>
     public async Task<string> ChangeUsernameAsync(UnitOfWork uow, long userId, string currentPassword, string newUsername)
     {
         var user = await AuthStore.GetUserAsync(uow, userId).ConfigureAwait(false);
@@ -319,7 +319,7 @@ public sealed class AuthService
         return candidate;
     }
 
-    /// <summary><c>change_password_for_user</c>: rotate the hash and revoke every active session.</summary>
+    /// <summary>Changes the password: rotate the hash and revoke every active session.</summary>
     public async Task ChangePasswordAsync(UnitOfWork uow, long userId, string currentPassword, string newPassword)
     {
         var user = await AuthStore.GetUserAsync(uow, userId).ConfigureAwait(false);
@@ -347,12 +347,12 @@ public sealed class AuthService
         await AuthStore.RevokeActiveSessionsForUserAsync(uow, user.Id, Now()).ConfigureAwait(false);
     }
 
-    /// <summary><c>bootstrap_allowed</c>: no usable (active) admin exists.</summary>
+    /// <summary>Bootstrap is allowed while no usable (active) admin exists.</summary>
     public static async Task<bool> BootstrapAllowedAsync(UnitOfWork uow) =>
         await AuthStore.CountActiveAdminsAsync(uow).ConfigureAwait(false) == 0;
 
     /// <summary>
-    /// <c>create_initial_admin</c>: validate the password, clear any inactive admin rows and insert the
+    /// Creates the first admin: validate the password, clear any inactive admin rows and insert the
     /// admin. A username clash surfaces as a <see cref="Microsoft.Data.Sqlite.SqliteException"/> constraint error.
     /// </summary>
     public static async Task<UserRecord> CreateInitialAdminAsync(UnitOfWork uow, string username, string password)

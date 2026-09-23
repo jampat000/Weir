@@ -2,7 +2,7 @@ using Weir.Core.Json;
 
 namespace Weir.Core.MediaManagers;
 
-/// <summary>One filesystem/database finding (<c>ReconciliationIssue</c>).</summary>
+/// <summary>One filesystem/database finding.</summary>
 public sealed record ReconciliationIssue(
     string Kind,
     string Module,
@@ -26,16 +26,16 @@ public sealed record ReconciliationIssue(
         .Set("requires_confirmation", RequiresConfirmation);
 }
 
-/// <summary>The pure parts of <c>weir.platform.reconciliation.service</c>.</summary>
+/// <summary>The reconciliation rules that do not touch the database or filesystem.</summary>
 public static class ReconciliationRules
 {
     public const string RemoveTempArtifactAction = "remove_processing_temp_artifact";
     public const int MaxIssuesPerCategory = 200;
 
-    /// <summary><c>TEMP_ARTIFACT_SUFFIXES</c>.</summary>
+    /// <summary>Suffixes that mark a leftover temporary file.</summary>
     public static readonly IReadOnlyList<string> TempArtifactSuffixes = [".partial", ".part", ".tmp", ".link"];
 
-    /// <summary><c>_is_temp_artifact</c> on a file name.</summary>
+    /// <summary>Whether a file name is a leftover temporary file: hidden, or one of <see cref="TempArtifactSuffixes"/>.</summary>
     public static bool IsTempArtifactName(string name)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -43,7 +43,7 @@ public static class ReconciliationRules
         return lower.StartsWith('.') || TempArtifactSuffixes.Any(suffix => lower.EndsWith(suffix, StringComparison.Ordinal));
     }
 
-    /// <summary><c>build_reconciliation_report</c>'s shape.</summary>
+    /// <summary>The reconciliation report's JSON shape.</summary>
     public static PyDict Report(IReadOnlyList<ReconciliationIssue> issues)
     {
         ArgumentNullException.ThrowIfNull(issues);

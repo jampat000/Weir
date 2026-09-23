@@ -96,8 +96,8 @@ public sealed class ProcessRunnerTests
     [Fact]
     public async Task A_progress_run_that_never_writes_a_line_is_still_stopped_by_the_timer()
     {
-        // #539 item 4: Python's progress loop ("for raw in proc.stdout: ...") only checks its timeout as a line
-        // arrives, so a process that never writes one - stuck reading its input, for instance - hangs forever.
+        // #539 item 4: a progress loop that only checks its timeout as a line arrives would hang forever on a
+        // process that never writes one - stuck reading its input, for instance.
         // Here the child (ping/sleep, redirected to NUL/dev-null) writes nothing until well after "echo done",
         // which never runs within the timeout; the timeout is still enforced, on the wall-clock timer alone.
         var lines = new List<string>();

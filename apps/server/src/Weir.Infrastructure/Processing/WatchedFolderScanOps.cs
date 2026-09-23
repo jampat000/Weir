@@ -1,24 +1,24 @@
 using Microsoft.Data.Sqlite;
+using Weir.Core.Activity;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Processing;
 using Weir.Core.Rules;
+using Weir.Infrastructure.IO;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
 
-/// <summary>What a watched-folder walk found, and what it decided not to look at (<c>WatchedFolderScanCandidates</c>).</summary>
+/// <summary>What a watched-folder walk found, and what it decided not to look at.</summary>
 public sealed record WatchedFolderScanCandidates(
     IReadOnlyList<string> Files,
     int IgnoredUnsupportedType,
     IReadOnlyList<string> IgnoredUnsupportedExtensions);
 
 /// <summary>
-/// Filesystem scan helpers and duplicate guards for watched-folder remux scan dispatch (port of the
-/// disk-touching parts of <c>processing_watched_folder_remux_scan_dispatch_ops.py</c> — the parts the rules
-/// port (#537) deliberately deferred: <c>is_processing_media_candidate</c>'s own file check, and walking a
-/// real directory tree for <c>collect_media_files_under_path</c>/<c>iter_watched_folder_media_candidates</c>).
+/// Filesystem scan helpers and duplicate guards for watched-folder remux scan dispatch: the disk-touching
+/// half of the scan rules (#537), such as checking a candidate file exists and walking the watched folder tree.
 /// </summary>
 public static class WatchedFolderScanOps
 {
@@ -36,8 +36,8 @@ public static class WatchedFolderScanOps
         ".sabnzbd", "__admin__", "_failed_", "_unpack_", "_repair_", "incomplete",
     };
 
-    /// <summary><c>is_processing_media_candidate</c>: the disk-touching half (the extension allowlist itself
-    /// is <see cref="RemuxRules.MediaExtensions"/>, already ported by the rules engine).</summary>
+    /// <summary>Whether the path is an existing file with a media extension (the allowlist itself is
+    /// <see cref="RemuxRules.MediaExtensions"/>).</summary>
     public static bool IsProcessingMediaCandidate(string path)
     {
         try
@@ -54,7 +54,8 @@ public static class WatchedFolderScanOps
         }
     }
 
-    /// <summary><c>is_transient_download_artifact_media_path</c>.</summary>
+    /// <summary>Whether the path looks like a download client's in-progress artifact: a hash-named file, or a
+    /// file under a folder named by one of the exclude markers.</summary>
     public static bool IsTransientDownloadArtifactMediaPath(string path, IReadOnlyCollection<string>? excludeMarkers)
     {
         var stem = Path.GetFileNameWithoutExtension(path).Trim();
@@ -71,7 +72,7 @@ public static class WatchedFolderScanOps
         return parts.Overlaps(markers);
     }
 
-    /// <summary><c>iter_watched_folder_media_candidates</c>: candidate files under <paramref name="watchedRoot"/>,
+    /// <summary>Candidate files under <paramref name="watchedRoot"/>,
     /// plus a count of what the allowlist rejected. Files only; directories are never returned.</summary>
     public static WatchedFolderScanCandidates IterWatchedFolderMediaCandidates(
         string watchedRoot,
@@ -163,11 +164,11 @@ public static class WatchedFolderScanOps
         return new WatchedFolderScanCandidates(found, rejected, [.. rejectedSuffixes]);
     }
 
-    /// <summary><c>relative_posix_path_under_watched</c>.</summary>
+    /// <summary>The file's path relative to the watched folder, with forward slashes.</summary>
     public static string RelativePosixPathUnderWatched(string watchedRoot, string filePath) =>
         Path.GetRelativePath(Path.GetFullPath(watchedRoot), Path.GetFullPath(filePath)).Replace('\\', '/');
 
-    /// <summary><c>processing_active_remux_pass_exists_for_relative_path</c>.</summary>
+    /// <summary>Whether a pending or leased remux pass already names this file.</summary>
     public static async Task<bool> ActiveRemuxPassExistsForRelativePathAsync(
         UnitOfWork uow, string relativePosix, string mediaScope, long? libraryId, long? excludeJobId = null)
     {
@@ -300,7 +301,8 @@ public static class WatchedFolderScanOps
         return relative.StartsWith("..", StringComparison.Ordinal) ? null : candidate;
     }
 
-    /// <summary><c>processing_completed_remux_output_exists_for_relative_path</c>.</summary>
+    /// <summary>Whether a completed remux pass for this file left an output that is still on disk. When
+    /// <paramref name="sourcePath"/> is given, the completion record must also match the current source.</summary>
     public static async Task<bool> CompletedRemuxOutputExistsForRelativePathAsync(
         UnitOfWork uow,
         string relativePosix,
@@ -315,7 +317,7 @@ public static class WatchedFolderScanOps
             "ORDER BY id DESC LIMIT 50",
             reader => reader.IsDBNull(0) ? null : reader.GetString(0),
             ("@module", "processing"),
-            ("@type", Weir.Core.Activity.ActivityEventTypes.ProcessingFileRemuxPassCompleted),
+            ("@type", ActivityEventTypes.ProcessingFileRemuxPassCompleted),
             ("@needle", relativePosix)).ConfigureAwait(false);
 
         foreach (var raw in rows)
@@ -413,8 +415,8 @@ public static class WatchedFolderScanOps
             return false;
         }
 
-        // Weir's port does not have a POSIX inode/device fingerprint on Windows; fall back to the
-        // path+size check every build (including private builds before fingerprints existed) recorded.
+        // There is no inode/device fingerprint on Windows, so match on the path and size every
+        // completion record carries.
         if (data.Get("inspected_source_path") is PyStr inspected && data.Get("source_size_bytes") is PyInt recordedSize)
         {
             try
@@ -431,9 +433,12 @@ public static class WatchedFolderScanOps
         return false;
     }
 
-    /// <summary><c>retry_completed_movie_source_cleanup</c>: conservative — only the immediate parent
-    /// folder of a candidate file under the watched root, never the watched root itself.</summary>
-    public static (bool Ok, string? Reason) RetryCompletedMovieSourceCleanup(string watchedRoot, string filePath)
+    /// <summary>
+    /// Retries removing a completed movie's source. Only the file's own folder under the watched root is removed, never
+    /// the watched root itself, and only when it holds no other video (<see cref="ReleaseFolderRemoval"/>); otherwise
+    /// just the file goes. <c>FolderRemoved</c> says which happened.
+    /// </summary>
+    public static (bool Ok, bool FolderRemoved, string? Reason) RetryCompletedMovieSourceCleanup(string watchedRoot, string filePath, string? mediaExtensionsCsv)
     {
         string root, src;
         try
@@ -443,116 +448,45 @@ public static class WatchedFolderScanOps
         }
         catch (ArgumentException exception)
         {
-            return (false, $"Source cleanup retry skipped because the path was not safely under the watched folder ({exception.Message}).");
+            return (false, false, $"Source cleanup retry skipped because the path was not safely under the watched folder ({exception.Message}).");
         }
 
-        if (!src.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        if (!PathContainment.IsUnder(root, src))
         {
-            return (false, "Source cleanup retry skipped because the path was not safely under the watched folder.");
+            return (false, false, "Source cleanup retry skipped because the path was not safely under the watched folder.");
         }
 
+        // The file is strictly inside the root, so its folder is either the root itself or a release folder inside it.
         var movieFolder = Path.GetDirectoryName(src);
-        if (movieFolder is null || string.Equals(movieFolder, root, StringComparison.OrdinalIgnoreCase))
+        if (movieFolder is null || !PathContainment.IsUnder(root, movieFolder))
         {
-            return (false, "Source cleanup retry skipped because the file sits directly in the watched folder root.");
-        }
-
-        if (!movieFolder.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-        {
-            return (false, "Source cleanup retry skipped because the release folder is outside the watched folder.");
+            return (false, false, "Source cleanup retry skipped because the file sits directly in the watched folder root.");
         }
 
         try
         {
-            if (Directory.Exists(movieFolder))
-            {
-                Directory.Delete(movieFolder, recursive: true);
-            }
-
-            return (true, null);
+            var removal = ReleaseFolderRemoval.Remove(root, src, mediaExtensionsCsv);
+            return (removal.FileRemoved, removal.FolderRemoved, removal.Reason);
         }
         catch (DirectoryNotFoundException)
         {
-            return (true, null);
+            return (true, true, null);
         }
         catch (IOException exception)
         {
-            return (false, $"Source cleanup retry could not remove the release folder because this path is still locked or blocked ({exception.Message}).");
+            return (false, false, $"Source cleanup retry could not remove the release folder because this path is still locked or blocked ({exception.Message}).");
         }
         catch (UnauthorizedAccessException exception)
         {
-            return (false, $"Source cleanup retry could not remove the release folder because this path is still locked or blocked ({exception.Message}).");
+            return (false, false, $"Source cleanup retry could not remove the release folder because this path is still locked or blocked ({exception.Message}).");
         }
-    }
-
-    /// <summary><c>cleanup_rejected_file</c>: apply the saved rejection policy without ever deleting a
-    /// populated folder.</summary>
-    public static (bool Deleted, string Detail) CleanupRejectedFile(string watchedRoot, string filePath, string action)
-    {
-        if (!string.Equals((action ?? "leave").Trim(), "delete_file", StringComparison.OrdinalIgnoreCase))
-        {
-            return (false, "Weir left the rejected file in place because this library's cleanup action is Leave in place.");
-        }
-
-        string root, source;
-        try
-        {
-            root = Path.GetFullPath(watchedRoot);
-            source = Path.GetFullPath(filePath);
-        }
-        catch (ArgumentException exception)
-        {
-            return (false, $"Weir did not delete the rejected file because it was not safely inside the watched folder ({exception.Message}).");
-        }
-
-        if (!source.StartsWith(root, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(source, root, StringComparison.OrdinalIgnoreCase) ||
-            !File.Exists(source))
-        {
-            return (false, "Weir did not delete the rejected path because it is not a regular file inside the watched folder.");
-        }
-
-        try
-        {
-            File.Delete(source);
-        }
-        catch (IOException exception)
-        {
-            return (false, $"Weir could not delete the rejected file because it is locked or unavailable ({exception.Message}).");
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            return (false, $"Weir could not delete the rejected file because it is locked or unavailable ({exception.Message}).");
-        }
-
-        var parent = Path.GetDirectoryName(source);
-        while (parent is not null && !string.Equals(parent, root, StringComparison.OrdinalIgnoreCase))
-        {
-            try
-            {
-                Directory.Delete(parent);
-            }
-            catch (IOException)
-            {
-                break;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                break;
-            }
-
-            parent = Path.GetDirectoryName(parent);
-        }
-
-        return (true, "Weir deleted the rejected file because this library's cleanup action is Delete rejected file.");
     }
 
     /// <summary>
-    /// <c>check_file_access</c>: confirm the source opens for reading and the output folder accepts a
-    /// write. Ported using .NET's own file-share enforcement (equivalent to the Win32
-    /// <c>CreateFileW(FILE_SHARE_READ|FILE_SHARE_DELETE)</c> probe on Windows) rather than the raw P/Invoke
-    /// Python uses; the POSIX advisory <c>flock</c> half is not reproduced; it is advisory in Python too
-    /// and does not catch an unrelated writer that never calls <c>flock</c> itself.
+    /// Confirms the source opens for reading and the output folder accepts a write. The read uses .NET's
+    /// file-share enforcement (the Win32 <c>CreateFileW(FILE_SHARE_READ|FILE_SHARE_DELETE)</c> probe on Windows).
+    /// There is no POSIX <c>flock</c> check: it is advisory and does not catch a writer that never calls
+    /// <c>flock</c> itself.
     /// </summary>
     public static (bool Ok, string? Problem) CheckFileAccess(bool skipAccessTests, string filePath, string? outputFolder)
     {
@@ -588,11 +522,11 @@ public static class WatchedFolderScanOps
         return (true, null);
     }
 
-    /// <summary>Resolved folders for one scan (<c>ProcessingPathRuntime</c>, the fields the scan itself reads).</summary>
+    /// <summary>Resolved folders for one scan.</summary>
     public sealed record ProcessingScanPathRuntime(string WatchedFolder, string OutputFolder, string WorkFolderEffective);
 
     /// <summary>
-    /// <c>resolve_processing_path_runtime_for_library</c>: resolve one library's folders, or say why they
+    /// Resolves one library's folders, or says why they
     /// cannot be used. Reads <c>libraries</c> directly (ADR-0014); no environment path fallback.
     /// </summary>
     public static (ProcessingScanPathRuntime? Runtime, string? Error) ResolvePathRuntimeForLibrary(ProcessingLibraryRecord library, string weirHome)
@@ -656,7 +590,7 @@ public static class WatchedFolderScanOps
         return b.StartsWith(aWithSep, StringComparison.OrdinalIgnoreCase) || a.StartsWith(bWithSep, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary><c>_validate_path_separation</c>.</summary>
+    /// <summary>Why the watched, work and output folders cannot be used together, or null when none overlaps another.</summary>
     private static string? ValidatePathSeparation(string? watched, string work, string? output)
     {
         if (output is not null)

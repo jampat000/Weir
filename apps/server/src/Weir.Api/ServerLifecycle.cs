@@ -1,8 +1,8 @@
 namespace Weir.Api;
 
 /// <summary>
-/// Startup facts that health and readiness report (Python keeps them on <c>app.state</c>:
-/// <c>startup_started_at</c>, <c>startup_ready</c>, and whether an engine exists).
+/// Startup facts that health and readiness report: when startup began, whether it finished, and whether the
+/// database was opened.
 /// </summary>
 public sealed class ServerLifecycle
 {

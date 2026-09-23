@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
@@ -22,7 +23,7 @@ public static class ManagerHealthProbe
         ["native"] = "/api/integrations/external/health",
     };
 
-    /// <summary><c>_probe</c>.</summary>
+    /// <summary>Call the kind's health endpoint and describe the answer in plain words.</summary>
     public static async Task<(bool Ok, string Detail)> ProbeAsync(
         IManagerHttpHandlerFactory handlers, string name, string kind, string baseUrl, string? apiKey, TimeSpan timeout, CancellationToken cancellationToken)
     {
@@ -58,11 +59,10 @@ public static class ManagerHealthProbe
 }
 
 /// <summary>
-/// The media manager heartbeat (James, 23 Sep 2026): every minute Weir runs each enabled manager's connection test and
-/// saves the answer, so everything that depends on a manager — the Libraries list, the Media managers screen, and the
-/// work that waits for a manager's word — knows within a minute that one has gone quiet or come back, and can say so
-/// in plain words. Before this the saved answer was only as fresh as the last time someone pressed Test.
-/// A manager that answers is also sent any hand-off report Weir could not deliver while it was not answering (#652).
+/// The media manager heartbeat: every minute Weir runs each enabled manager's connection test and saves the answer, so
+/// everything that depends on a manager (the Libraries list, the Media managers screen, and the work that waits for a
+/// manager's word) knows within a minute that one has gone quiet or come back, and can say so in plain words, rather
+/// than relying on the last time someone pressed Test. A manager that answers is also sent any hand-off report Weir could not deliver while it was not answering (#652).
 /// </summary>
 public sealed partial class ManagerHeartbeatTask(
     SqliteDatabase database,
@@ -131,7 +131,7 @@ public sealed partial class ManagerHeartbeatTask(
                 await sender.SendWaitingReportsAsync(uow, row.Kind, cancellationToken).ConfigureAwait(false);
             }
         }
-        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or InvalidOperationException or IOException)
+        catch (Exception exception) when (exception is SqliteException or InvalidOperationException or IOException)
         {
             LogWaitingReportsFailed(logger, exception, row.Name);
         }

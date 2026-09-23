@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -7,33 +8,35 @@ using Weir.Core.Activity;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
+using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Workers;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.LibraryMode;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Scheduling;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Jobs;
 
-/// <summary>Worker loop timings (Python's module constants), adjustable for tests.</summary>
+/// <summary>Worker loop timings, adjustable for tests.</summary>
 public sealed record WorkerLoopTimings
 {
-    /// <summary><c>PROCESSING_WORKER_IDLE_SLEEP_SECONDS</c>.</summary>
+    /// <summary>How long an idle slot waits before looking for work again.</summary>
     public TimeSpan IdleSleep { get; init; } = TimeSpan.FromSeconds(5);
 
-    /// <summary><c>PROCESSING_WORKER_TICK_ERROR_BACKOFF_SECONDS</c>.</summary>
+    /// <summary>How long a slot waits after a crashed tick.</summary>
     public TimeSpan TickErrorBackoff { get; init; } = TimeSpan.FromSeconds(1);
 
-    /// <summary><c>_CONCURRENT_FILES_CACHE_TTL</c>: how long a slot trusts the saved files-at-once value.</summary>
+    /// <summary>How long a slot trusts the saved files-at-once value.</summary>
     public TimeSpan ConcurrencyCacheTtl { get; init; } = TimeSpan.FromSeconds(30);
 
-    /// <summary><c>DEFAULT_PROCESSING_JOB_LEASE_SECONDS</c>.</summary>
+    /// <summary>How long a claim leases a job, in seconds.</summary>
     public int LeaseSeconds { get; init; } = ProcessingJobProcessor.DefaultLeaseSeconds;
 }
 
 /// <summary>
-/// Startup crash recovery, run before any worker starts (the synchronous part of Python's lifespan).
-/// A failure stops startup, as in Python.
+/// Startup crash recovery, run before any worker starts. A failure stops startup.
 /// </summary>
 public sealed class JobsStartupRecoveryService : IHostedService
 {
@@ -41,14 +44,14 @@ public sealed class JobsStartupRecoveryService : IHostedService
     private readonly WeirOptions _options;
     private readonly TimeProvider _time;
     private readonly ILogger<JobsStartupRecoveryService> _logger;
-    private readonly Weir.Infrastructure.LibraryMode.SwapRecoverySweep? _swapSweep;
+    private readonly SwapRecoverySweep? _swapSweep;
 
     public JobsStartupRecoveryService(
         ProcessingJobStore store,
         WeirOptions options,
         TimeProvider time,
         ILogger<JobsStartupRecoveryService> logger,
-        Weir.Infrastructure.LibraryMode.SwapRecoverySweep? swapSweep = null)
+        SwapRecoverySweep? swapSweep = null)
     {
         _store = store;
         _options = options;
@@ -60,7 +63,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
     public StartupRecoveryReport? LastReport { get; private set; }
 
     /// <summary>The #506 startup sweep's last report, when library mode is registered; null otherwise.</summary>
-    public Weir.Infrastructure.LibraryMode.SwapRecoveryReport? LastSwapSweepReport { get; private set; }
+    public SwapRecoveryReport? LastSwapSweepReport { get; private set; }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -86,7 +89,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
     }
 
     /// <summary>
-    /// Every library has a profile (3.2): one left without, by an older Weir or an import, gets the one it was using,
+    /// Every library has a profile: one without (from an older database or an import) gets the one it was using,
     /// before any worker starts. It changes no rule a file is cleaned by.
     /// </summary>
     private async Task GiveEveryLibraryAProfileAsync(CancellationToken cancellationToken)
@@ -96,7 +99,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
             var uow = await UnitOfWork.OpenAsync(_store.Database, cancellationToken).ConfigureAwait(false);
             await using (uow.ConfigureAwait(false))
             {
-                var given = await Weir.Infrastructure.Processing.LibraryStore.GiveEveryLibraryAProfileAsync(uow).ConfigureAwait(false);
+                var given = await LibraryStore.GiveEveryLibraryAProfileAsync(uow).ConfigureAwait(false);
                 await uow.CommitAsync().ConfigureAwait(false);
                 if (given > 0)
                 {
@@ -104,7 +107,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
                 }
             }
         }
-        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or InvalidOperationException)
+        catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
         {
             _logger.LogWarning(exception, "Could not give every library a profile; this is tried again at the next start.");
         }
@@ -117,10 +120,10 @@ public sealed class JobsStartupRecoveryService : IHostedService
             var uow = await UnitOfWork.OpenAsync(_store.Database, cancellationToken).ConfigureAwait(false);
             await using (uow.ConfigureAwait(false))
             {
-                return await Weir.Infrastructure.LibraryMode.LibrarySettingsStore.AllFoldersAsync(uow).ConfigureAwait(false);
+                return await LibrarySettingsStore.AllFoldersAsync(uow).ConfigureAwait(false);
             }
         }
-        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or InvalidOperationException)
+        catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
         {
             _logger.LogWarning(exception, "Could not read library folders for the startup sweep; it will only look at paths recorded on job rows.");
             return [];
@@ -131,9 +134,8 @@ public sealed class JobsStartupRecoveryService : IHostedService
 }
 
 /// <summary>
-/// The Processing worker lane (port of <c>processing_worker_run_forever</c> and
-/// <c>start_processing_worker_background_tasks</c>): <c>WEIR_PROCESSING_WORKER_COUNT</c> slots, of which the
-/// saved "Files at once" value decides how many take work. Each slot reports heartbeats for readiness.
+/// The Processing worker lane: <c>WEIR_PROCESSING_WORKER_COUNT</c> slots, of which the saved "Files at once"
+/// value decides how many take work. Each slot reports heartbeats for readiness.
 /// </summary>
 public sealed class ProcessingWorkerService : BackgroundService
 {
@@ -165,7 +167,7 @@ public sealed class ProcessingWorkerService : BackgroundService
         _logger = logger;
     }
 
-    /// <summary><c>_lease_owner</c>: <c>{hostname}-{pid}-w{index}</c>.</summary>
+    /// <summary>The <c>lease_owner</c> a slot claims as: <c>{hostname}-{pid}-w{index}</c>.</summary>
     public static string LeaseOwner(int workerIndex) =>
         string.Create(CultureInfo.InvariantCulture, $"{System.Net.Dns.GetHostName()}-{Environment.ProcessId}-w{workerIndex}");
 
@@ -182,6 +184,9 @@ public sealed class ProcessingWorkerService : BackgroundService
         await Task.WhenAll(slots).ConfigureAwait(false);
     }
 
+    /// <summary>How often a slot repeats the same "could not read the files-at-once setting" warning.</summary>
+    internal static readonly TimeSpan SettingsReadFailureLogInterval = TimeSpan.FromMinutes(1);
+
     /// <summary>One slot: repeatedly process jobs until stopping.</summary>
     internal async Task RunSlotAsync(int workerIndex, CancellationToken stoppingToken)
     {
@@ -190,6 +195,8 @@ public sealed class ProcessingWorkerService : BackgroundService
         var cachedMaxConcurrent = OperatorSettingsRules.MaxFilesAtOnce;
         long cacheExpires = 0;
         var cacheValid = false;
+        string? lastReadFailure = null;
+        long? lastReadFailureLoggedAt = null;
         try
         {
             while (!stoppingToken.IsCancellationRequested)
@@ -203,9 +210,23 @@ public sealed class ProcessingWorkerService : BackgroundService
                         cacheExpires = _time.GetTimestamp() + (long)(_timings.ConcurrencyCacheTtl.TotalSeconds * _time.TimestampFrequency);
                         cacheValid = true;
                     }
+#pragma warning disable CA1031 // The slot keeps its previous value and tries again next pass; a settings read must not stop it.
                     catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
                     {
-                        // Python: keep the previous value and try again next pass.
+                        // The read is retried on every pass until it works, so the warning is written only when the
+                        // problem changes or once a minute, never once per pass.
+                        if (exception.Message != lastReadFailure || lastReadFailureLoggedAt is null ||
+                            _time.GetElapsedTime(lastReadFailureLoggedAt.Value) >= SettingsReadFailureLogInterval)
+                        {
+                            _logger.LogWarning(
+                                exception,
+                                "Worker slot {WorkerIndex} could not read the files-at-once setting; keeping {FilesAtOnce}.",
+                                workerIndex,
+                                cachedMaxConcurrent);
+                            lastReadFailure = exception.Message;
+                            lastReadFailureLoggedAt = _time.GetTimestamp();
+                        }
                     }
                 }
 
@@ -283,8 +304,8 @@ public sealed class ProcessingWorkerService : BackgroundService
 }
 
 /// <summary>
-/// <c>platform-job-rows-retention</c> (port of <c>_run_job_rows_retention_forever</c>): prune on start,
-/// then every <c>WEIR_JOB_ROWS_RETENTION_SCHEDULE_INTERVAL_SECONDS</c>.
+/// <c>platform-job-rows-retention</c>: prune on start, then every
+/// <c>WEIR_JOB_ROWS_RETENTION_SCHEDULE_INTERVAL_SECONDS</c>.
 /// </summary>
 public sealed class JobRowsRetentionTask : IPeriodicTask
 {
@@ -340,7 +361,7 @@ public interface IPeriodicEnqueuer
 
     /// <summary>
     /// Whether the family is switched on. Read on every check, so switching a family on or off in Settings › Cleanup
-    /// applies within <see cref="PeriodicEnqueueService.DefaultRecheck"/>; Python read it once at startup.
+    /// applies within <see cref="PeriodicEnqueueService.DefaultRecheck"/>, without a restart.
     /// </summary>
     Task<bool> IsEnabledAsync(CancellationToken cancellationToken);
 
@@ -351,17 +372,15 @@ public interface IPeriodicEnqueuer
 }
 
 /// <summary>
-/// Runs every registered <see cref="IPeriodicEnqueuer"/> on its own timer (port of the
-/// <c>_run_periodic_scope_enqueue</c> loops): enqueue, then wait the interval; after a failure, wait two
-/// seconds and try again.
+/// Runs every registered <see cref="IPeriodicEnqueuer"/> on its own timer: enqueue, then wait the interval;
+/// after a failure, wait two seconds and try again.
 /// </summary>
 /// <remarks>
-/// <para>A family is only timed when this server can run its job kind, for the same reason unported kinds
-/// are not claimed: a .NET server must not fill the queue with work only another backend can do.</para>
-/// <para>Python read each family's switch once at startup, and its interval only from the environment, so switching
-/// Cleanup on in the app did nothing until a restart (James's review, 23 Sep 2026). Each timer now checks the switch
-/// and the interval every <see cref="DefaultRecheck"/>: a family switched on runs at once, one switched off stops,
-/// and a new interval counts from its last run.</para>
+/// <para>A family is only timed when this server has a handler for its job kind, so the queue never fills with
+/// work no worker here can run.</para>
+/// <para>Each timer checks the family's switch and interval every <see cref="DefaultRecheck"/>, so a change in
+/// Settings › Cleanup applies without a restart: a family switched on runs at once, one switched off stops, and a
+/// new interval counts from its last run.</para>
 /// </remarks>
 public sealed class PeriodicEnqueueService : BackgroundService
 {
@@ -511,7 +530,7 @@ public sealed class PeriodicEnqueueService : BackgroundService
     }
 }
 
-/// <summary>Job kinds and dedupe keys of the periodic families (<c>*_job_kinds.py</c>).</summary>
+/// <summary>Job kinds and dedupe keys of the periodic families.</summary>
 public static class PeriodicJobKinds
 {
     public const string WorkTempStaleSweep = "processing.work_temp_stale_sweep.v1";
@@ -522,7 +541,7 @@ public static class PeriodicJobKinds
     public const string MovieFailureCleanupSweepDedupeKey = "processing.movie_failure_cleanup_sweep:v1";
     public const string TvFailureCleanupSweepDedupeKey = "processing.tv_failure_cleanup_sweep:v1";
 
-    /// <summary>Removes hand-back copies nobody claimed (#652). .NET only: the Python backend never had it.</summary>
+    /// <summary>Removes hand-back copies nobody claimed (#652).</summary>
     public const string UnclaimedHandbackCleanup = "processing.unclaimed_handback_cleanup.v1";
     public const string UnclaimedHandbackCleanupDedupeKeyMovie = "processing.unclaimed_handback_cleanup:v1:movie";
     public const string UnclaimedHandbackCleanupDedupeKeyTv = "processing.unclaimed_handback_cleanup:v1:tv";
@@ -541,14 +560,14 @@ public sealed class UnclaimedHandbackCleanupEnqueuer : IPeriodicEnqueuer
     public UnclaimedHandbackCleanupEnqueuer(ProcessingJobStore store, string mediaScope)
     {
         _store = store;
-        _scope = ProcessingLibraryFolders.NormalizeMediaScope(mediaScope);
+        _scope = ProcessingMediaScopes.Normalize(mediaScope);
     }
 
     public string Name => $"unclaimed hand-back cleanup ({_scope})";
 
     public string JobKind => PeriodicJobKinds.UnclaimedHandbackCleanup;
 
-    public TimeSpan Interval => TimeSpan.FromSeconds(Weir.Core.MediaManagers.HandbackRules.DefaultUnclaimedIntervalSeconds);
+    public TimeSpan Interval => TimeSpan.FromSeconds(HandbackRules.DefaultUnclaimedIntervalSeconds);
 
     public Task<bool> IsEnabledAsync(CancellationToken cancellationToken) =>
         WorkTempStaleSweepEnqueuer.OperatorSettingFlagAsync(_store, "unclaimed_handback_cleanup_enabled", defaultValue: false, cancellationToken);
@@ -565,7 +584,7 @@ public sealed class UnclaimedHandbackCleanupEnqueuer : IPeriodicEnqueuer
 }
 
 /// <summary>
-/// <c>enqueue_processing_work_temp_stale_sweep_job</c> on a timer: one row per scope, deduped per scope.
+/// The work file sweep on a timer: one row per scope, deduped per scope.
 /// Enabled by <c>operator_settings.work_temp_stale_sweep_enabled</c>; an explicit
 /// <c>WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MOVIE_SCHEDULE_ENABLED=0</c> is a kill switch.
 /// </summary>
@@ -578,7 +597,7 @@ public sealed class WorkTempStaleSweepEnqueuer : IPeriodicEnqueuer
     public WorkTempStaleSweepEnqueuer(ProcessingJobStore store, string mediaScope, TimeSpan interval, bool killSwitch)
     {
         _store = store;
-        _scope = ProcessingLibraryFolders.NormalizeMediaScope(mediaScope);
+        _scope = ProcessingMediaScopes.Normalize(mediaScope);
         Interval = interval;
         _killSwitch = killSwitch;
     }
@@ -612,7 +631,7 @@ public sealed class WorkTempStaleSweepEnqueuer : IPeriodicEnqueuer
             },
             cancellationToken);
 
-    /// <summary>A boolean column of the operator settings row; Python creates the row with its defaults when missing.</summary>
+    /// <summary>A boolean column of the operator settings row, or <paramref name="defaultValue"/> when the row or value is missing.</summary>
     internal static Task<bool> OperatorSettingFlagAsync(ProcessingJobStore store, string column, bool defaultValue, CancellationToken cancellationToken) =>
         store.InTransactionAsync(
             (connection, transaction) =>
@@ -624,7 +643,7 @@ public sealed class WorkTempStaleSweepEnqueuer : IPeriodicEnqueuer
 }
 
 /// <summary>
-/// <c>enqueue_processing_failure_cleanup_sweep_job</c> on a timer. A sweep still queued or running is not
+/// The failure cleanup sweep on a timer. A sweep still queued or running is not
 /// duplicated; a skipped Activity entry says so instead.
 /// </summary>
 public sealed class FailureCleanupSweepEnqueuer : IPeriodicEnqueuer
@@ -636,7 +655,7 @@ public sealed class FailureCleanupSweepEnqueuer : IPeriodicEnqueuer
     public FailureCleanupSweepEnqueuer(ProcessingJobStore store, string mediaScope, TimeSpan interval, bool killSwitch)
     {
         _store = store;
-        _scope = string.Equals(mediaScope.Trim(), "tv", StringComparison.OrdinalIgnoreCase) ? "tv" : "movie";
+        _scope = ProcessingMediaScopes.Normalize(mediaScope);
         Interval = interval;
         _killSwitch = killSwitch;
     }
@@ -681,8 +700,8 @@ public sealed class FailureCleanupSweepEnqueuer : IPeriodicEnqueuer
             cancellationToken);
 
     internal static (ProcessingJob Job, bool Inserted) EnqueueSweep(
-        Microsoft.Data.Sqlite.SqliteConnection connection,
-        Microsoft.Data.Sqlite.SqliteTransaction transaction,
+        SqliteConnection connection,
+        SqliteTransaction transaction,
         ProcessingJobStore store,
         string scope,
         string trigger)
@@ -692,9 +711,7 @@ public sealed class FailureCleanupSweepEnqueuer : IPeriodicEnqueuer
         var active = ProcessingJobStore.Query(
             connection,
             transaction,
-            "SELECT id, dedupe_key, job_kind, payload_json, status, lease_owner, lease_expires_at, attempt_count, max_attempts, " +
-            "last_error, not_before, runner_cost, priority, created_at, updated_at FROM jobs " +
-            "WHERE job_kind = @kind AND status IN (@pending, @leased) ORDER BY id ASC LIMIT 1",
+            $"SELECT {ProcessingJobStore.JobColumns} FROM jobs WHERE job_kind = @kind AND status IN (@pending, @leased) ORDER BY id ASC LIMIT 1",
             ("@kind", jobKind),
             ("@pending", ProcessingJobStatus.Pending),
             ("@leased", ProcessingJobStatus.Leased)).FirstOrDefault();
@@ -713,8 +730,8 @@ public sealed class FailureCleanupSweepEnqueuer : IPeriodicEnqueuer
 public static class WeirJobs
 {
     /// <summary>
-    /// Adds everything #521 ports. Job handlers are added separately as <see cref="IJobHandler"/>
-    /// singletons by the areas that port them; with none registered, the workers only refuse retired rows.
+    /// Adds the job queue and its services. Job handlers are added separately as <see cref="IJobHandler"/>
+    /// singletons by the areas that own them; with none registered, the workers only refuse retired rows.
     /// </summary>
     public static IServiceCollection AddWeirJobs(this IServiceCollection services, WeirOptions options, RuntimeEnvironment runtime)
     {
@@ -725,11 +742,10 @@ public static class WeirJobs
         services.TryAddSingleton<IJobNotifications, NoJobNotifications>();
         services.TryAddSingleton<IUnhandledJobFailureRecorder, NoUnhandledJobFailureRecorder>();
         services.TryAddSingleton(new WorkerLoopTimings { LeaseSeconds = options.ProcessingJobLeaseSeconds });
-        services.TryAddSingleton(sp => new ProcessingJobStore(
-            sp.GetRequiredService<SqliteDatabase>(), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<IJobQueueMetrics>()));
+        services.AddWeirJobStore();
         services.TryAddSingleton(sp => new JobHandlerRegistry(sp.GetServices<IJobHandler>()));
         services.TryAddSingleton<ProcessingJobProcessor>();
-        // The work file sweep is queued below; without a handler its jobs waited in the queue for ever.
+        // The work file sweep is queued below, so it needs a handler or its jobs would wait in the queue for ever.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHandler, WorkTempStaleSweepHandler>());
 
         // Kill switches: an explicitly set variable that reads as off wins over the saved setting.

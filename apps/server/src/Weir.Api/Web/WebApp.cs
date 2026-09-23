@@ -11,20 +11,20 @@ namespace Weir.Api.Web;
 /// <param name="Root">Absolute path, or <see langword="null"/> when <c>WEIR_WEB_DIST</c> is unset.</param>
 public sealed record WebDist(string? Root)
 {
-    /// <summary>Checked per request, as Python does: the directory can appear or disappear while running.</summary>
+    /// <summary>Checked per request: the directory can appear or disappear while running.</summary>
     public string? IndexFile =>
         Root is not null && Directory.Exists(Root) && File.Exists(Path.Join(Root, "index.html"))
             ? Path.Join(Root, "index.html")
             : null;
 
-    /// <summary>Whether the app was servable at startup (Python mounts static files only then).</summary>
+    /// <summary>Whether the app was servable at startup; static files and asset middleware are wired only then.</summary>
     public bool MountedAtStartup { get; init; }
 }
 
 /// <summary>
-/// Serves the React app the way <c>weir.api.factory</c> does: <c>/</c> and <c>/index.html</c> with
-/// no-cache headers, other files from the dist directory, the app shell for browser refreshes on
-/// client-side routes, and FastAPI's JSON 404 for everything else.
+/// Serves the React app: <c>/</c> and <c>/index.html</c> with no-cache headers, other files from the dist
+/// directory, the app shell for browser refreshes on client-side routes, and a JSON
+/// <c>{"detail": "Not Found"}</c> 404 for everything else.
 /// </summary>
 public static class WebApp
 {
@@ -72,8 +72,8 @@ public static class WebApp
     }
 
     /// <summary>
-    /// The end of the pipeline: nothing else answered. Mirrors the FastAPI 404 handler and the
-    /// static mount's method check.
+    /// The end of the pipeline: nothing else answered. Answers the JSON 404, or a 405 for a non-GET/HEAD
+    /// request outside <c>/api</c> while the web app is served, as existing clients expect.
     /// </summary>
     public static async Task HandleUnmatchedAsync(HttpContext context)
     {
@@ -83,7 +83,7 @@ public static class WebApp
         var isGet = HttpMethods.IsGet(request.Method);
         var isHead = HttpMethods.IsHead(request.Method);
 
-        // Deliberate fix (#535): an /api path never falls through to the web app. Known API paths with the
+        // An /api path never falls through to the web app (#535). Known API paths with the
         // wrong method are answered 405 by routing; anything else under /api is a JSON 404.
         var isApi = request.Path.StartsWithSegments("/api", StringComparison.Ordinal);
         if (webDist.MountedAtStartup && !isGet && !isHead && !isApi)
@@ -139,7 +139,7 @@ public static class WebApp
             PathSuffix(path).Length == 0;
     }
 
-    /// <summary><c>pathlib.PurePath(path).suffix</c>.</summary>
+    /// <summary>The last dot-suffix of the final path component; none for a dot file such as <c>.env</c>.</summary>
     internal static string PathSuffix(string path)
     {
         var name = path.TrimEnd('/');

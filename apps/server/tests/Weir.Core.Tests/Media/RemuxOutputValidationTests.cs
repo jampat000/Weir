@@ -153,8 +153,8 @@ public sealed class RemuxOutputValidationTests
     [Fact]
     public void A_short_clip_missing_a_few_seconds_is_caught_by_the_tightened_tolerance_floor()
     {
-        // At 60s, 1% is 0.6s. The reference's old max(5s, 1%) tolerance would have let 3 seconds go missing from a
-        // short clip unnoticed (3 < 5); #500's max(0.5s, 1%) does not (3 > 0.6).
+        // At 60s, 1% is 0.6s. A max(5s, 1%) tolerance would let 3 seconds go missing from a short clip
+        // unnoticed (3 < 5); #500's max(0.5s, 1%) does not (3 > 0.6).
         var plan = MakePlan([0], [Track(1, "eng", @default: true)], []);
         var output = Probe(
             """{"format":{"duration":"57.0"},"streams":[{"codec_type":"video"},{"codec_type":"audio","disposition":{"default":1},"tags":{"language":"eng"}}]}""");

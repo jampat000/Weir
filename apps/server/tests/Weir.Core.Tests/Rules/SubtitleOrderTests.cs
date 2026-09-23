@@ -3,8 +3,8 @@ using Weir.Core.Rules;
 namespace Weir.Core.Tests.Rules;
 
 /// <summary>
-/// A profile's "Subtitle order" orders the subtitle tracks Weir keeps (James, 23 Sep 2026: make the settings that did
-/// nothing work). It was saved on every profile and never read. With no order saved, the order is today's.
+/// A profile's "Subtitle order" orders the subtitle tracks Weir keeps. With no order saved, tracks keep the default
+/// order.
 /// </summary>
 public sealed class SubtitleOrderTests
 {

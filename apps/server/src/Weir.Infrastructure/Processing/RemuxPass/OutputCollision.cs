@@ -3,14 +3,14 @@ using Weir.Core.Json;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
-/// <summary>What to do, where to write, and the sentence explaining it (<c>CollisionDecision</c>).</summary>
+/// <summary>What to do, where to write, and the sentence explaining it.</summary>
 public sealed record CollisionDecision(string Policy, string Action, string Destination, bool ReplacedExisting, string Reason)
 {
     public bool Wrote => Action == "write";
 }
 
 /// <summary>
-/// What to do when an output already exists at the path Processing is about to write (port of <c>processing_output_collision.py</c>).
+/// What to do when an output already exists at the path Processing is about to write.
 /// <c>replace</c> stays the default; the other policies fall back to not replacing when a comparison cannot be made.
 /// </summary>
 public static class OutputCollision
@@ -21,17 +21,17 @@ public static class OutputCollision
     public const string ReplaceIfLarger = "replace_if_larger";
     public const string ReplaceIfNewer = "replace_if_newer";
 
-    /// <summary><c>COLLISION_POLICIES</c>.</summary>
+    /// <summary>Every recognised collision policy.</summary>
     public static readonly IReadOnlyList<string> Policies = [Replace, Skip, KeepBoth, ReplaceIfLarger, ReplaceIfNewer];
 
-    /// <summary><c>normalize_collision_policy</c>: anything unrecognised is the current behaviour, <c>replace</c>.</summary>
+    /// <summary>Anything unrecognised is the default policy, <c>replace</c>.</summary>
     public static string NormalizePolicy(string? raw)
     {
         var value = PyStrings.Strip(raw ?? string.Empty).ToLowerInvariant();
         return Policies.Contains(value, StringComparer.Ordinal) ? value : Replace;
     }
 
-    /// <summary><c>_next_free_path</c>: <c>Film (2001).mkv</c> becomes <c>Film (2001) (2).mkv</c>, then <c>(3)</c>, bounded.</summary>
+    /// <summary>The next free numbered name: <c>Film (2001).mkv</c> becomes <c>Film (2001) (2).mkv</c>, then <c>(3)</c>, bounded.</summary>
     public static string NextFreePath(string final, int limit = 999)
     {
         var directory = Path.GetDirectoryName(final) ?? string.Empty;
@@ -48,7 +48,7 @@ public static class OutputCollision
         return Path.Join(directory, $"{stem} ({limit.ToString(CultureInfo.InvariantCulture)}){suffix}");
     }
 
-    /// <summary><c>decide_output_collision</c>.</summary>
+    /// <summary>Decides, under the collision policy, whether and where the output is written when a file may already be at <paramref name="final"/>.</summary>
     public static CollisionDecision Decide(string final, string? source = null, string? staged = null, string? policy = null)
     {
         ArgumentNullException.ThrowIfNull(final);

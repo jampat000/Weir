@@ -4,14 +4,13 @@ using Weir.Core.MediaManagers;
 namespace Weir.Core.Tests.MediaManagers;
 
 /// <summary>
-/// Ports of <c>test_media_manager_handoff_paths.py</c>, the dialect assertions of <c>test_media_manager_port_dialects.py</c>,
-/// the body assertions of <c>test_media_manager_completion_callback.py</c>, and the pure intake and ledger rules.
+/// Hand-off paths, manager dialects, completion callback bodies, and the pure intake and ledger rules.
 /// </summary>
 public sealed class MediaManagerRulesTests
 {
     private static PyDict Dict(string json) => (PyDict)PyJsonParser.Parse(json);
 
-    // --- handoff_paths -------------------------------------------------------------------------
+    // --- hand-off paths ------------------------------------------------------------------------
 
     [Theory]
     [InlineData("/srv/handoff", "/srv/handoff/Film/film.mkv", "Film/film.mkv")]
@@ -60,7 +59,7 @@ public sealed class MediaManagerRulesTests
             HandoffPaths.RelativeMediaPathForHandoff("/srv", "/x/y.mkv").Problem);
     }
 
-    // --- import_events -------------------------------------------------------------------------
+    // --- import events -------------------------------------------------------------------------
 
     [Fact]
     public void Dialects_unwrap_each_managers_phrasing()
@@ -83,7 +82,7 @@ public sealed class MediaManagerRulesTests
         Assert.Equal(["deluno", "native", "radarr", "sonarr"], ImportEvents.KnownSourceKeys());
     }
 
-    // --- manager_port / manager_dialects -------------------------------------------------------
+    // --- manager dialects ----------------------------------------------------------------------
 
     [Fact]
     public void The_label_names_the_connection_not_just_the_vendor()
@@ -150,9 +149,8 @@ public sealed class MediaManagerRulesTests
         Assert.Equal(["movie"], ManagerDialectRules.ArrQueueRows(PyJsonParser.Parse("""{"records":[{"status":"downloading"},"junk"]}"""), "movie").Select(r => r.Scope));
         Assert.Equal(["/media/Solaris/f.mkv"], ManagerDialectRules.ArrLibraryFilePaths(PyJsonParser.Parse("""[{"movieFile":{"path":"/media/Solaris/f.mkv"}},{"movieFile":null},{}]"""), "movieFile"));
         Assert.Equal(["/tv/Show/S01/e.mkv"], ManagerDialectRules.ArrLibraryFilePaths(PyJsonParser.Parse("""[{"path":"/tv/Show/S01/e.mkv"}]"""), null));
-        // #544 item 4: a root folder with a null path is skipped, not reported as a root literally called "None"
-        // (`str(row.get("path", ""))` in Python turns a JSON null into the text "None" — the `dict.get` default
-        // only applies when the key is missing, never when it is present and null).
+        // #544 item 4: a root folder with a null path is skipped, not reported as a root literally called "None".
+        // A default for a missing key does not cover a key that is present and null.
         var (roots, libraries) = ManagerDialectRules.ArrRootFolders(PyJsonParser.Parse("""[{"id":3,"path":"/m"},{"id":0,"path":"/z"},{"path":null}]"""), "movie");
         Assert.Equal(["/m", "/z"], roots);
         Assert.Equal(["3", "/z"], libraries.Select(l => l.Key));
@@ -180,7 +178,7 @@ public sealed class MediaManagerRulesTests
         Assert.Same(silent, ManagerDialectRules.OnlyRowsForScope(silent, "movie"));
     }
 
-    // --- completion_callback -------------------------------------------------------------------
+    // --- completion callback -------------------------------------------------------------------
 
     private static readonly HandoffOrigin Origin = new("deluno", "handoff-1", "/api/integrations/processors/events", "Blade.Runner.2049");
     private static readonly HandoffOrigin DelunoOrigin = new("deluno", "handoff-1", "/api/integrations/processors/events", null, "lib-movies");
@@ -245,11 +243,11 @@ public sealed class MediaManagerRulesTests
     public void Output_paths_are_rebuilt_in_the_managers_own_style(string folder, string expected)
     {
         var joined = CompletionReports.ManagerPathJoin(folder, ["Blade.Runner.2049", "film.mkv"]);
-        // "E:/..." has a drive letter, so it is a Windows path and Python writes it with backslashes.
+        // "E:/..." has a drive letter, so it is a Windows path and is written with backslashes.
         Assert.Equal(folder.StartsWith("E:/", StringComparison.Ordinal) ? expected.Replace('/', '\\') : expected, joined);
     }
 
-    // --- handoff_ledger ------------------------------------------------------------------------
+    // --- hand-off ledger -----------------------------------------------------------------------
 
     [Theory]
     [InlineData("processed", "completed")]
@@ -272,7 +270,7 @@ public sealed class MediaManagerRulesTests
     }
 
     [Fact]
-    public void Issue_531_a_failure_with_a_retry_owed_is_scheduled_even_after_the_backoff_ends()
+    public void A_failure_with_a_retry_owed_is_scheduled_even_after_the_backoff_ends()
     {
         var future = new DateTimeOffset(2026, 9, 17, 12, 0, 0, TimeSpan.Zero);
         Assert.Equal(("scheduled", future), HandoffLedgerRules.FileState("processing_failed", future, 1));
@@ -292,7 +290,7 @@ public sealed class MediaManagerRulesTests
     }
 
     [Fact]
-    public void Issue_643_a_cancelled_file_ends_its_hand_off_only_when_nothing_else_was_delivered()
+    public void A_cancelled_file_ends_its_hand_off_only_when_nothing_else_was_delivered()
     {
         Assert.Equal(("cancelled", (DateTimeOffset?)null), HandoffLedgerRules.FileState("cancelled", null, 0));
         Assert.Equal("cancelled", HandoffLedgerRules.Combine(["cancelled"]));
@@ -329,7 +327,7 @@ public sealed class MediaManagerRulesTests
     };
 
     [Fact]
-    public void The_job_payload_is_written_as_python_writes_it()
+    public void The_job_payload_is_written_byte_for_byte()
     {
         var importEvent = Handoff("/w/Blade.Runner.2049/film.mkv");
         var payload = IntakeRules.Payload(importEvent, new IntakeLibrary(4, "movie", "/w"), "Blade.Runner.2049", "Blade.Runner.2049/film é.mkv");
@@ -342,7 +340,7 @@ public sealed class MediaManagerRulesTests
     }
 
     [Fact]
-    public void Dedupe_keys_match_the_python_keys()
+    public void Dedupe_keys_keep_their_stored_shape()
     {
         var baseKey = IntakeRules.BaseDedupeKey(Handoff("/w/x.mkv"), () => Guid.Empty);
         Assert.Equal("processing.file.remux_pass.v1:deluno:handoff:handoff-1", baseKey);
@@ -400,7 +398,7 @@ public sealed class MediaManagerRulesTests
         Assert.StartsWith("https://", TmdbResponses.DefaultBaseUrl, StringComparison.Ordinal);
     }
 
-    // --- list_library_files / file_changed (#507) -----------------------------------------------
+    // --- library files and file changes (#507) -------------------------------------------------
 
     [Fact]
     public void Movie_library_files_carry_the_movies_own_id_and_title()

@@ -17,17 +17,17 @@ namespace Weir.Api.Endpoints;
 
 /// <summary>
 /// The Activity feed: recent history with filters, export, one file's history and its removal, and the
-/// live freshness stream (port of <c>weir.platform.activity.router</c>).
+/// live freshness stream.
 /// </summary>
 public static class ActivityEndpoints
 {
-    /// <summary><c>_STREAM_RETRY_MS</c>.</summary>
+    /// <summary>The reconnect delay the stream sends as its <c>retry:</c> hint.</summary>
     public const int StreamRetryMilliseconds = 5000;
 
-    /// <summary><c>_STREAM_KEEPALIVE_EVERY_POLLS</c>.</summary>
+    /// <summary>Quiet polls between keepalive comments on the stream.</summary>
     public const int StreamKeepaliveEveryPolls = 8;
 
-    /// <summary><c>_STREAM_POLL_SECONDS</c>.</summary>
+    /// <summary>How often the stream checks for a new latest id.</summary>
     public static readonly TimeSpan StreamPoll = TimeSpan.FromSeconds(2);
 
     private const string FormatPattern = "^(csv|json)$";
@@ -164,7 +164,7 @@ public static class ActivityEndpoints
     }
 
     /// <summary>
-    /// <c>get_activity_stream</c>: authenticate once with a short-lived connection, then stream
+    /// Authenticate once with a short-lived connection, then stream
     /// <c>activity.latest</c> frames and keepalives without holding the database.
     /// </summary>
     private static async Task<ApiResult> GetStreamAsync(ApiRequest request)
@@ -205,7 +205,7 @@ public static class ActivityEndpoints
     }
 
     /// <summary>
-    /// <c>iter_activity_latest_sse</c>: the retry hint, then a frame whenever the latest id or the notifier's
+    /// The retry hint, then a frame whenever the latest id or the notifier's
     /// revision changes, and a keepalive comment after <paramref name="keepaliveEveryPolls"/> quiet polls.
     /// </summary>
     public static async IAsyncEnumerable<string> LatestFramesAsync(
@@ -232,7 +232,9 @@ public static class ActivityEndpoints
             {
                 latestId = await readLatestId(cancellationToken).ConfigureAwait(false);
             }
+#pragma warning disable CA1031 // A failed read must not end the live stream; it backs off and tries again.
             catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
             {
                 logger.LogWarning("SSE activity stream: read_latest_id failed, retrying after back-off");
                 await Task.Delay(poll, time, cancellationToken).ConfigureAwait(false);
@@ -269,7 +271,7 @@ public static class ActivityEndpoints
         }
     }
 
-    /// <summary><c>datetime.fromisoformat</c> of a date query, or 400 <c>Invalid {name}.</c> (an empty value is no filter).</summary>
+    /// <summary>An ISO 8601 date query, or 400 <c>Invalid {name}.</c> (an empty value is no filter).</summary>
     private static PyDateTime? ParseWhen(string? raw, string name)
     {
         if (string.IsNullOrEmpty(raw))

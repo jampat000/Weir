@@ -4,18 +4,17 @@ using System.Text;
 namespace Weir.Core.Json;
 
 /// <summary>
-/// Python <c>str</c> behaviour that differs from .NET's: code-point length and slicing,
-/// <c>str.isspace()</c>/<c>str.strip()</c> and <c>repr(str)</c>. Every port uses these, so a string
-/// reads, trims and prints the same whichever backend handled it.
+/// String rules that differ from .NET's defaults: code-point length and slicing, the Unicode whitespace
+/// set used for trimming, and the quoted display form. Length limits, trimmed values and quoted text in
+/// messages and stored data depend on them, so they stay the same as earlier releases wrote them.
 /// </summary>
 /// <remarks>
-/// A Python string is a sequence of code points; a .NET string is UTF-16. A surrogate pair counts as
-/// one code point here, and a lone surrogate (which Python strings can hold) counts as one too and is
-/// kept as it is.
+/// Lengths and slices count code points, not UTF-16 units: a surrogate pair counts as one code point,
+/// and a lone surrogate counts as one too and is kept as it is.
 /// </remarks>
 public static class PyStrings
 {
-    /// <summary><c>str.isspace()</c> for one UTF-16 unit (every Python whitespace character is in the BMP).</summary>
+    /// <summary>Whether one UTF-16 unit is whitespace (every whitespace code point in the set is in the BMP).</summary>
     public static bool IsSpace(char c) => c switch
     {
         '\t' or '\n' or '\v' or '\f' or '\r' or ' ' => true,
@@ -25,7 +24,7 @@ public static class PyStrings
         _ => false,
     };
 
-    /// <summary><c>str.strip()</c>.</summary>
+    /// <summary>Trims <see cref="IsSpace"/> whitespace from both ends.</summary>
     public static string Strip(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -44,7 +43,7 @@ public static class PyStrings
         return value[start..end];
     }
 
-    /// <summary><c>len(text)</c>: code points, not UTF-16 units.</summary>
+    /// <summary>The length in code points, not UTF-16 units.</summary>
     public static int Length(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -62,7 +61,7 @@ public static class PyStrings
         return count;
     }
 
-    /// <summary><c>text[:count]</c>, counted in code points.</summary>
+    /// <summary>The first <paramref name="count"/> code points, never splitting a surrogate pair.</summary>
     public static string Slice(string value, int count)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -88,7 +87,7 @@ public static class PyStrings
     }
 
     /// <summary>
-    /// <c>repr(text)</c>: single quotes unless the text holds a single quote and no double quote;
+    /// The quoted display form: single quotes unless the text holds a single quote and no double quote;
     /// non-printable code points escaped as <c>\xhh</c>, <c>\uhhhh</c> or <c>\Uhhhhhhhh</c>.
     /// </summary>
     public static string Repr(string value)
@@ -158,7 +157,7 @@ public static class PyStrings
         return builder.ToString();
     }
 
-    /// <summary><c>str.isprintable()</c> for one code point: space is the only printable separator.</summary>
+    /// <summary>Whether a code point is printed as-is: space is the only printable separator.</summary>
     private static bool IsPrintable(Rune rune) => Rune.GetUnicodeCategory(rune) switch
     {
         UnicodeCategory.Control or UnicodeCategory.Format or UnicodeCategory.Surrogate or UnicodeCategory.PrivateUse

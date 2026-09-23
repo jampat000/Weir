@@ -3,26 +3,25 @@ using Weir.Core.Json;
 namespace Weir.Core.Activity;
 
 /// <summary>
-/// The queryable facts about an activity event, lifted into columns when it is written
-/// (port of <c>weir.platform.activity.classify.ActivityFacts</c>, #469).
+/// The queryable facts about an activity event, lifted into columns when it is written (#469).
 /// </summary>
 public sealed record ActivityFacts(string? Trigger, string? Result, long? LibraryId, string? RelativePath, string? RunKey);
 
-/// <summary>Port of <c>weir.platform.activity.classify.classify_activity</c>.</summary>
+/// <summary>Derives an activity event's trigger, result, library, path and run key from its type and detail.</summary>
 /// <remarks>
-/// The detail is read with <see cref="PyJsonParser"/>, so it parses exactly what <c>json.loads</c> parses
+/// The detail is read with <see cref="PyJsonParser"/>, so details written by earlier releases parse the same
 /// (<c>NaN</c>, integers of any size, the last duplicate key winning), and text is trimmed with
-/// Python's <c>str.strip()</c>.
+/// <see cref="PyStrings.Strip"/>.
 /// </remarks>
 public static class ActivityClassifier
 {
-    /// <summary><c>TRIGGERS</c>: <c>docs/operator-messaging-standard.md</c>, plus <c>webhook</c> and <c>folder_change</c>.</summary>
+    /// <summary>Allowed triggers: <c>docs/operator-messaging-standard.md</c>, plus <c>webhook</c> and <c>folder_change</c>.</summary>
     public static readonly IReadOnlySet<string> Triggers = new HashSet<string>(StringComparer.Ordinal)
     {
         "manual", "scheduled", "startup", "worker", "retry", "system", "webhook", "folder_change",
     };
 
-    /// <summary><c>RESULTS</c>.</summary>
+    /// <summary>Allowed results.</summary>
     public static readonly IReadOnlySet<string> Results = new HashSet<string>(StringComparer.Ordinal)
     {
         "success", "skipped", "warning", "retrying", "running", "failed",
@@ -49,7 +48,7 @@ public static class ActivityClassifier
         ("cancelled", "success"),
     ];
 
-    /// <summary><c>classify_activity</c>.</summary>
+    /// <summary>The facts for one event; a value the detail does not give, or gives invalidly, is <see langword="null"/>.</summary>
     public static ActivityFacts Classify(string eventType, string? detail)
     {
         var data = DetailDict(detail) ?? new PyDict();
@@ -71,17 +70,14 @@ public static class ActivityClassifier
         if (result is null)
         {
             var lowered = type.ToLowerInvariant();
-            // #540 item 8: Python scans for the first word that occurs anywhere in the event type, so
-            // "processing.failure_cleanup_sweep_completed" reads as "failed" because "failure" is checked
-            // before "completed" ever gets a look in, even though "completed" is the type's actual
-            // terminal verb. An event type's own name always ends in its terminal verb, so a suffix
-            // match is checked first and wins; only when nothing is a suffix does the old substring
-            // scan run, matching Python for the handful of odd names that will not benefit.
+            // An event type ends in its terminal verb, so a suffix match is checked first and wins:
+            // "processing.failure_cleanup_sweep_completed" is a success, not a failure because it
+            // contains "failure" (#540). Only when nothing is a suffix does the ordered substring scan run.
             result = ResultByTypeWord.FirstOrDefault(pair => lowered.EndsWith(pair.Word, StringComparison.Ordinal)).Result
                 ?? ResultByTypeWord.FirstOrDefault(pair => lowered.Contains(pair.Word, StringComparison.Ordinal)).Result;
         }
 
-        // isinstance(x, int) and not isinstance(x, bool); a value beyond SQLite's INTEGER is left out.
+        // A JSON integer only (not a boolean); a value beyond SQLite's INTEGER is left out.
         long? libraryId = data.Get("library_id") is PyInt i && i.Value >= long.MinValue && i.Value <= long.MaxValue ? (long)i.Value : null;
 
         string? relativePath = null;
@@ -90,9 +86,8 @@ public static class ActivityClassifier
             relativePath = PyStrings.Slice(stripped, 2000);
         }
 
-        // #540 item 5: strict payload parsing. Python's isinstance(run_id, (str, int)) also accepts a
-        // bool (a bool is an int in Python), so run_id: true became the literal run key "run:True".
-        // Booleans are rejected here instead, the same as library_id below.
+        // A string or integer run_id only: booleans are rejected, as for library_id above, so
+        // run_id: true never becomes the run key "run:True" (#540).
         string? runKey = null;
         if (data.Get("run_id") is (PyStr or PyInt) and var runId && PyStrings.Strip(PyConvert.Str(runId)).Length > 0)
         {
@@ -113,7 +108,7 @@ public static class ActivityClassifier
         return allowed.Contains(normalized) ? normalized : null;
     }
 
-    /// <summary><c>_detail_dict</c>.</summary>
+    /// <summary>The detail as a JSON object, or <see langword="null"/> when it is not one or does not parse.</summary>
     private static PyDict? DetailDict(string? detail)
     {
         var text = PyStrings.Strip(detail ?? string.Empty);

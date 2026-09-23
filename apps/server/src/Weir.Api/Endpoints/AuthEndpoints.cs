@@ -16,7 +16,7 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Endpoints;
 
-/// <summary>Cookie-session auth under <c>/api/v1/auth</c> (port of <c>weir.platform.auth.router</c>).</summary>
+/// <summary>Cookie-session auth under <c>/api/v1/auth</c>.</summary>
 public static class AuthEndpoints
 {
     private const string InvalidCsrf = "Invalid or expired CSRF token.";
@@ -146,7 +146,9 @@ public static class AuthEndpoints
 
             throw new ApiException(StatusCodes.Status503ServiceUnavailable, queryFailed);
         }
+#pragma warning disable CA1031 // Any failure reading bootstrap status becomes a 503 with a next step, never a bare 500.
         catch (Exception exception) when (exception is not ApiException and not OperationCanceledException)
+#pragma warning restore CA1031
         {
             request.LoggerFactory.CreateLogger("weir.platform.auth.router").LogError(exception, "bootstrap status: unexpected failure");
             throw new ApiException(
@@ -313,7 +315,7 @@ public static class AuthEndpoints
         var uow = await request.DbAsync().ConfigureAwait(false);
         var pair = await request.Auth.LoadValidSessionAsync(uow, request.RawSessionToken).ConfigureAwait(false)
             ?? throw new ApiException(StatusCodes.Status401Unauthorized, "Not authenticated.");
-        // Python's session hands back the row the dependency already loaded (and may have touched).
+        // Prefer the row RequireUserAsync already loaded: it may carry this request's last-seen touch.
         var current = user.Session.Id == pair.Session.Id ? user.Session : pair.Session;
         var items = await request.Auth.ListActiveSessionsAsync(uow, user.User.Id, current).ConfigureAwait(false);
         return ApiRoutes.Ok(new PyDict().Set("items", new PyList(items)));

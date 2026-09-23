@@ -10,6 +10,7 @@ using Weir.Core.Metrics;
 using Weir.Infrastructure;
 using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.Http;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing.RemuxPass;
@@ -19,7 +20,7 @@ using Weir.Infrastructure.Settings;
 
 namespace Weir.Api;
 
-/// <summary>Registers the HTTP surface and builds its pipeline in the Python server's order.</summary>
+/// <summary>Registers the HTTP surface and builds its middleware pipeline.</summary>
 public static class WeirApi
 {
     public static IServiceCollection AddWeirApi(this IServiceCollection services, WeirOptions options)
@@ -40,7 +41,7 @@ public static class WeirApi
         services.AddSingleton<IExternalJsonPoster, ExternalJsonPoster>();
         services.AddSingleton<NotificationDispatcher>();
         // Registered before AddWeirJobs, whose TryAdd would otherwise install the version that sends nothing.
-        services.AddSingleton<Weir.Infrastructure.Jobs.IJobNotifications, WebhookJobNotifications>();
+        services.AddSingleton<IJobNotifications, WebhookJobNotifications>();
         services.AddWeirMediaManagers(options);
         services.AddWeirProcessingApis();
         services.AddWeirProcessingFailureFollowUps(options);
@@ -58,7 +59,7 @@ public static class WeirApi
     }
 
     /// <summary>
-    /// Python's stack, outermost first: the server's error response, forwarded headers (trusted proxies only), compressed
+    /// The middleware, outermost first: the server's error response, forwarded headers (trusted proxies only), compressed
     /// assets, CORS (when origins are configured), the trusted-proxy scheme, HEAD-as-GET, the
     /// X-Requested-With check, request context, security headers, then routes, the static mount and the
     /// 404 handler.
@@ -87,8 +88,8 @@ public static class WeirApi
         app.UseMiddleware<SecurityHeadersMiddleware>();
         app.UseMiddleware<MethodNotAllowedBodyMiddleware>();
         app.UseRouting();
-        // Static files run between routing and endpoints so matched routes win over files (Python's
-        // routes are checked before its static mount), and the 404 handler runs only after both.
+        // Static files run between routing and endpoints so matched routes win over files, and the 404
+        // handler runs only after both.
         // That ordering needs explicit UseEndpoints instead of top-level route registration.
 #pragma warning disable ASP0014
         app.UseWebAppStaticFiles(webDist);

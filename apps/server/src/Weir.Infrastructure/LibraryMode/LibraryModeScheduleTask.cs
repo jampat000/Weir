@@ -38,8 +38,8 @@ public static class LibraryModeScheduling
 }
 
 /// <summary>
-/// <c>processing-library-mode-schedule</c>: runs library mode's "Scheduled scan and clean" (James, 23 Sep 2026: it must run
-/// on its schedule). Until this existed the switch was saved and shown, and nothing ever read it.
+/// <c>processing-library-mode-schedule</c>: runs library mode's "Scheduled scan and clean" for every library whose
+/// schedule switch is on.
 /// </summary>
 /// <remarks>
 /// Every half minute it asks each library whether its scheduled run is due (<see cref="LibraryModeScheduling"/>) and, when

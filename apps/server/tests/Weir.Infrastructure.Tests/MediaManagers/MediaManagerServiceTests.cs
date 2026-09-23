@@ -10,8 +10,7 @@ using Weir.Infrastructure.Processing;
 namespace Weir.Infrastructure.Tests.MediaManagers;
 
 /// <summary>
-/// Ports of <c>test_media_manager_binding.py</c>, <c>test_credentials_secret_crypto.py</c>, the reporting half of
-/// <c>test_media_manager_completion_callback.py</c>, the provider tests in <c>test_processing_original_language.py</c>, and the
+/// Media manager binding, credential encryption, completion reporting, original-language providers, and the
 /// intake, ledger and reconciliation behaviour behind the HTTP routes.
 /// </summary>
 public sealed class MediaManagerServiceTests
@@ -81,7 +80,8 @@ public sealed class MediaManagerServiceTests
     /// <summary>
     /// #544 item 1: a manager answering 2xx with a body that is not JSON (an HTML login page from a reverse
     /// proxy, most often) is classified as an unreachable answer with a plain message, not a 500 from an
-    /// uncaught JSON-decode exception. Exercised through <c>describe_connections</c>, the same path
+    /// uncaught JSON-decode exception. Exercised through
+    /// <see cref="MediaManagerConnectionService.DescribeConnectionsAsync"/>, the same path
     /// <c>GET /media-managers/capabilities</c> uses.
     /// </summary>
     [Fact]
@@ -97,8 +97,8 @@ public sealed class MediaManagerServiceTests
     }
 
     /// <summary>
-    /// #544 item 3: <c>create_connection</c>/<c>update_connection</c> let a plain <c>PyValueErrorException</c> from
-    /// encrypting the API key escape uncaught when no secret is configured; it now becomes the same
+    /// #544 item 3: creating or updating a connection when no secret is configured must not let the
+    /// <c>PyValueErrorException</c> from encrypting the API key escape; it becomes the same
     /// <see cref="MediaManagerConnectionException"/> (a 400) any other operator mistake here does, still naming
     /// the env var to set.
     /// </summary>
@@ -126,8 +126,8 @@ public sealed class MediaManagerServiceTests
     }
 
     /// <summary>
-    /// #544 item 5: matching is an exact prefix comparison, not the SQL <c>LIKE</c> Python's
-    /// <c>.startswith()</c> compiled to — so <c>_</c> and <c>%</c> in a folder name are plain characters, and a
+    /// #544 item 5: matching is an exact prefix comparison, not a SQL <c>LIKE</c> pattern — so <c>_</c> and
+    /// <c>%</c> in a folder name are plain characters, and a
     /// sibling folder whose name merely resembles this one is not folded into the hand-off's files.
     /// </summary>
     [Fact]
@@ -166,6 +166,25 @@ public sealed class MediaManagerServiceTests
         Assert.Equal(["processing.file.remux_pass.v1:deluno:handoff:h_1:part1"], jobs.Select(j => j.DedupeKey));
     }
 
+    /// <summary>The same defect over a file's pass-through and reject jobs, whose keys carry a fingerprint after the path.</summary>
+    [Fact]
+    public async Task Pass_through_and_reject_keys_for_a_hand_off_match_its_path_exactly_not_as_a_sql_wildcard()
+    {
+        using var fixture = new MediaManagerFixture();
+        var libraryId = await fixture.LibraryAsync("movie", fixture.Store.Home.Join("movies"));
+        await fixture.Store.Execute(
+            "INSERT INTO jobs (dedupe_key, job_kind) VALUES " +
+            $"('{IntakeRules.PassThroughJobKind}:{libraryId}:Film_2024/film.mkv:fp1', '{IntakeRules.PassThroughJobKind}'), " +
+            // Under SQL LIKE, "Film_2024" wildcards the "_" and "film" matches "FILM" in any case: neither is this file.
+            $"('{IntakeRules.PassThroughJobKind}:{libraryId}:FilmX2024/film.mkv:fp2', '{IntakeRules.PassThroughJobKind}'), " +
+            $"('{IntakeRules.RejectJobKind}:{libraryId}:Film_2024/FILM.mkv:fp3', '{IntakeRules.RejectJobKind}')");
+
+        var row = new HandoffLedgerRow(1, "deluno", "h1", libraryId, "Film_2024/film.mkv", HandoffLedgerRules.Queued, null, null, null);
+        var jobs = await fixture.Db(uow => HandoffLedgerStore.JobsForAsync(uow, row));
+
+        Assert.Equal([$"{IntakeRules.PassThroughJobKind}:{libraryId}:Film_2024/film.mkv:fp1"], jobs.Select(j => j.DedupeKey));
+    }
+
     /// <summary>
     /// #544 item 6: the presented secret is matched against every enabled connection of the kind, so a second
     /// connection of the same kind (a 4K Radarr next to a 1080p one) authenticates with its own secret instead
@@ -192,8 +211,8 @@ public sealed class MediaManagerServiceTests
     }
 
     /// <summary>
-    /// #544 item 7: Python's <c>secrets.compare_digest</c> raises <c>TypeError</c> for a non-ASCII <c>str</c>; the
-    /// .NET port compares UTF-8 bytes (a deliberate difference kept from the original port), so it never crashes.
+    /// #544 item 7: secrets are compared as UTF-8 bytes in constant time, so a non-ASCII secret compares
+    /// correctly instead of raising an error.
     /// </summary>
     [Fact]
     public void Non_ascii_secrets_compare_by_bytes_without_crashing()
@@ -376,7 +395,7 @@ public sealed class MediaManagerServiceTests
     public async Task A_lookup_returns_the_original_language_and_repeats_come_from_the_cache()
     {
         var http = new FakeManagerHttp().Json(HttpMethod.Get, "/3/search/movie", SearchPayload);
-        var provider = new TmdbMetadataProvider("k", http, cache: new MetadataLookupCache());
+        var provider = new TmdbMetadataProvider("k", http, TimeProvider.System, cache: new MetadataLookupCache());
         var result = await provider.LookupMovieAsync("Film", 2001);
         Assert.True(result.Matched);
         Assert.Equal(("fr", 2001), (result.Metadata!.OriginalLanguage, result.Metadata.Year!.Value));
@@ -388,25 +407,25 @@ public sealed class MediaManagerServiceTests
     public async Task Provider_failures_are_statuses_never_exceptions()
     {
         var empty = new FakeManagerHttp().Json(HttpMethod.Get, "/3/search/movie", """{"results":[]}""");
-        var cached = new TmdbMetadataProvider("k", empty, cache: new MetadataLookupCache());
+        var cached = new TmdbMetadataProvider("k", empty, TimeProvider.System, cache: new MetadataLookupCache());
         Assert.Equal(LookupResult.StatusNoMatch, (await cached.LookupMovieAsync("Unknown", 1999)).Status);
         await cached.LookupMovieAsync("Unknown", 1999);
         Assert.Single(empty.Requests);
 
         var none = new FakeManagerHttp();
-        Assert.Equal(LookupResult.StatusNotConfigured, (await new TmdbMetadataProvider(string.Empty, none, cache: new MetadataLookupCache()).LookupMovieAsync("Film", 2001)).Status);
-        var down = await new TmdbMetadataProvider("k", none, cache: new MetadataLookupCache()).LookupMovieAsync("Film", 2001);
+        Assert.Equal(LookupResult.StatusNotConfigured, (await new TmdbMetadataProvider(string.Empty, none, TimeProvider.System, cache: new MetadataLookupCache()).LookupMovieAsync("Film", 2001)).Status);
+        var down = await new TmdbMetadataProvider("k", none, TimeProvider.System, cache: new MetadataLookupCache()).LookupMovieAsync("Film", 2001);
         Assert.Equal(LookupResult.StatusUnreachable, down.Status);
         Assert.Contains("could not reach", down.Detail, StringComparison.Ordinal);
 
         var rejected = new FakeManagerHttp().Json(HttpMethod.Get, "/3/search/movie", string.Empty, HttpStatusCode.Unauthorized);
-        var refusal = await new TmdbMetadataProvider("wrong", rejected, cache: new MetadataLookupCache()).LookupMovieAsync("Film", 2001);
+        var refusal = await new TmdbMetadataProvider("wrong", rejected, TimeProvider.System, cache: new MetadataLookupCache()).LookupMovieAsync("Film", 2001);
         Assert.Equal(LookupResult.StatusNotConfigured, refusal.Status);
         Assert.Contains("rejected the configured key", refusal.Detail, StringComparison.Ordinal);
 
         var gateway = new FakeManagerHttp().Json(HttpMethod.Get, "/search/movie", SearchPayload);
-        Assert.True((await new TmdbMetadataProvider("k", gateway, "https://metadata.example.workers.dev", new MetadataLookupCache()).LookupMovieAsync("Film", 2001)).Matched);
-        var internalAddress = await new TmdbMetadataProvider("k", gateway, "http://169.254.169.254/latest", new MetadataLookupCache()).LookupMovieAsync("Film", 2001);
+        Assert.True((await new TmdbMetadataProvider("k", gateway, TimeProvider.System, "https://metadata.example.workers.dev", new MetadataLookupCache()).LookupMovieAsync("Film", 2001)).Matched);
+        var internalAddress = await new TmdbMetadataProvider("k", gateway, TimeProvider.System, "http://169.254.169.254/latest", new MetadataLookupCache()).LookupMovieAsync("Film", 2001);
         Assert.Equal(LookupResult.StatusNotConfigured, internalAddress.Status);
         Assert.Contains("not usable", internalAddress.Detail, StringComparison.Ordinal);
     }
@@ -415,7 +434,7 @@ public sealed class MediaManagerServiceTests
     public async Task The_saved_provider_is_built_from_suite_settings()
     {
         using var fixture = new MediaManagerFixture();
-        var service = new MetadataProviderService(fixture.Cipher, fixture.Http);
+        var service = new MetadataProviderService(fixture.Cipher, fixture.Http, fixture.Store.Clock);
         Assert.Equal(LookupResult.StatusNotConfigured, (await fixture.Db(uow => service.TestProviderAsync(uow))).Status);
         var ciphertext = service.StoreProviderKey("tmdb-key");
         await fixture.Db(uow => uow.ExecuteAsync("UPDATE suite_settings SET metadata_provider = 'TMDB', metadata_provider_key_ciphertext = $c WHERE id = 1", ("$c", ciphertext)));
@@ -514,7 +533,7 @@ public sealed class MediaManagerServiceTests
     }
 
     [Fact]
-    public async Task Issue_545_item_3_the_ledger_reports_a_pass_through_jobs_own_state_and_its_final_failure()
+    public async Task The_ledger_reports_a_pass_through_jobs_own_state_and_its_final_failure()
     {
         // #545 item 3: a pass-through or reject job that is queued (but not yet delivered) must still be visible to
         // the manager polling the status API — as scheduled or working, never silently dropped — and one that
@@ -581,7 +600,7 @@ public sealed class MediaManagerServiceTests
     }
 
     [Fact]
-    public async Task Issue_643_cancelling_a_hand_offs_job_in_weir_ends_the_hand_off_and_the_file_reads_cancelled()
+    public async Task Cancelling_a_hand_offs_job_in_weir_ends_the_hand_off_and_the_file_reads_cancelled()
     {
         using var fixture = new MediaManagerFixture();
         var watched = fixture.Store.Home.Join("movies");
@@ -608,7 +627,7 @@ public sealed class MediaManagerServiceTests
     }
 
     [Fact]
-    public async Task Issue_643_a_later_hand_off_of_a_processed_path_answers_for_itself_not_the_earlier_result()
+    public async Task A_later_hand_off_of_a_processed_path_answers_for_itself_not_the_earlier_result()
     {
         using var fixture = new MediaManagerFixture();
         var watched = fixture.Store.Home.Join("movies");
@@ -636,7 +655,7 @@ public sealed class MediaManagerServiceTests
     }
 
     [Fact]
-    public async Task Issue_643_a_pack_goes_on_while_other_episodes_are_queued_and_the_managers_own_cancel_marks_files_cancelled()
+    public async Task A_pack_goes_on_while_other_episodes_are_queued_and_the_managers_own_cancel_marks_files_cancelled()
     {
         using var fixture = new MediaManagerFixture();
         var watched = fixture.Store.Home.Join("tv");

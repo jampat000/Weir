@@ -5,7 +5,7 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Settings;
 
-/// <summary>The <c>suite_settings</c> singleton (port of <c>ensure_suite_settings_row</c> and the ORM updates to it).</summary>
+/// <summary>The <c>suite_settings</c> singleton row: reading it, creating it with defaults, and updating it.</summary>
 public static class SuiteSettingsStore
 {
     private const string Columns =
@@ -20,7 +20,7 @@ public static class SuiteSettingsStore
         return uow.QuerySingleAsync($"SELECT {Columns} FROM suite_settings WHERE suite_settings.id = 1", Read);
     }
 
-    /// <summary><c>ensure_suite_settings_row</c>.</summary>
+    /// <summary>The row, created with its defaults first when it does not exist yet.</summary>
     public static async Task<SuiteSettingsRecord> EnsureAsync(UnitOfWork uow)
     {
         var row = await GetAsync(uow).ConfigureAwait(false);
@@ -40,7 +40,7 @@ public static class SuiteSettingsStore
 
     /// <summary>
     /// Write the columns that differ between <paramref name="before"/> and <paramref name="after"/>, bumping
-    /// <c>updated_at</c> when anything changed (SQLAlchemy's <c>onupdate=func.now()</c>).
+    /// <c>updated_at</c> only when anything changed.
     /// </summary>
     public static async Task UpdateAsync(UnitOfWork uow, SuiteSettingsRecord before, SuiteSettingsRecord after)
     {

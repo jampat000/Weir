@@ -5,11 +5,11 @@ namespace Weir.Core.Jobs;
 
 /// <summary>
 /// The handler already wrote this failure to Activity; the worker still fails the job but does not
-/// write a second entry (port of <c>AlreadyRecordedFailure</c>, #488).
+/// write a second entry (#488).
 /// </summary>
 public sealed class AlreadyRecordedFailureException : Exception
 {
-    /// <summary>The Python class name, which appears in the stored technical detail.</summary>
+    /// <summary>The type name written into the stored technical detail, kept stable so stored errors read the same.</summary>
     public const string PythonTypeName = "AlreadyRecordedFailure";
 
     public AlreadyRecordedFailureException()
@@ -28,7 +28,7 @@ public sealed class AlreadyRecordedFailureException : Exception
 }
 
 /// <summary>
-/// What a worker says when a job fails (port of <c>weir.platform.jobs.worker_failures</c>, #488).
+/// What a worker says when a job fails (#488).
 /// </summary>
 /// <remarks>
 /// The words match what happens next: a failed attempt is put back in the queue until it has used
@@ -42,10 +42,10 @@ public static class WorkerFailures
     public const string WillRetryContinuation = "Weir will try this job again shortly.";
     public const string MarkedFailedContinuation = "This job is marked failed so it does not look successful.";
 
-    /// <summary><c>retry_coming</c>: another attempt follows this one.</summary>
+    /// <summary>Whether another attempt follows this one.</summary>
     public static bool RetryComing(int attemptCount, int maxAttempts) => attemptCount < maxAttempts;
 
-    /// <summary><c>job_failure</c>.</summary>
+    /// <summary>The operator failure for a job, ending with whether it will be retried or is marked failed.</summary>
     public static OperatorFailure JobFailure(string module, FailureSubject cause, bool willRetry) =>
         FailureMessages.FromException(
             module,
@@ -53,7 +53,7 @@ public static class WorkerFailures
             cause,
             continuation: willRetry ? WillRetryContinuation : MarkedFailedContinuation);
 
-    /// <summary><c>stored_error</c>: the sentence a person reads first, then what to do, then the technical detail.</summary>
+    /// <summary>The stored error text: the sentence a person reads first, then what to do, then the technical detail.</summary>
     public static string StoredError(OperatorFailure failure)
     {
         ArgumentNullException.ThrowIfNull(failure);
@@ -71,11 +71,11 @@ public static class WorkerFailures
         return PyStrings.Slice(text, ErrorLimit);
     }
 
-    /// <summary><c>refused_job_error</c>: a job this worker cannot run.</summary>
+    /// <summary>The stored error for a job this worker cannot run.</summary>
     public static string RefusedJobError(string module, string technicalReason, bool willRetry) =>
         StoredError(JobFailure(module, FailureMessages.RuntimeError(technicalReason), willRetry));
 
-    /// <summary>The worker's refusal of a retired kind, worded as <c>process_one_processing_job</c> words it.</summary>
+    /// <summary>The worker's refusal of a retired kind.</summary>
     public static string RetiredKindReason(string jobKind, long jobId) =>
         "worker refused a retired job_kind: " +
         $"{PyStrings.Repr(jobKind)} (row id={jobId}); nothing runs this kind any more";
@@ -85,7 +85,7 @@ public static class WorkerFailures
         "worker refused job_kind missing required processing.* prefix: " +
         $"{PyStrings.Repr(jobKind)} (row id={jobId}); enqueue only processing-owned kinds";
 
-    /// <summary><c>ProcessingNoHandlerForJobKind</c> as a failure cause.</summary>
+    /// <summary>A job kind with no registered handler, as a failure cause.</summary>
     public static FailureSubject NoHandler(string jobKind) =>
         new("ProcessingNoHandlerForJobKind", $"no job handler registered for job_kind={PyStrings.Repr(jobKind)}", ExceptionCategory.Other);
 }

@@ -4,9 +4,10 @@ using System.Numerics;
 namespace Weir.Core.Json;
 
 /// <summary>
-/// A JSON value as Python's <c>json</c> module and pydantic see it: integers of any size stay
+/// A JSON value with the distinctions the API and stored data depend on: integers of any size stay
 /// integers, floats stay floats, and objects keep their key order (a later duplicate key replaces
-/// the value but keeps the first key's position, as <c>dict(pairs)</c> does).
+/// the value but keeps the first key's position). Kept so API JSON stays byte-identical for existing
+/// clients and data written by earlier releases reads back the same.
 /// </summary>
 public abstract class PyJson
 {
@@ -26,10 +27,13 @@ public abstract class PyJson
 
     public static PyJson Of(double value) => new PyFloat(value);
 
-    /// <summary>Python's <c>bool(value)</c> for a JSON value.</summary>
+    /// <summary>Whether the value counts as set: false for null, <c>false</c>, zero, and empty strings, lists and objects.</summary>
     public abstract bool IsTruthy { get; }
 
-    /// <summary>Python's <c>type(value).__name__</c>.</summary>
+    /// <summary>
+    /// The type name used in error messages (<c>NoneType</c>, <c>int</c>, <c>dict</c> and so on), fixed so
+    /// the error wording clients see stays the same.
+    /// </summary>
     public abstract string PythonTypeName { get; }
 }
 
@@ -94,8 +98,8 @@ public sealed class PyFloat : PyJson
 }
 
 /// <summary>
-/// A <c>datetime</c> held in memory (for example an attribute Python's ORM session keeps). It is not a
-/// JSON type: convert it to text before writing.
+/// A <c>datetime</c> held in memory (for example a column value read before it is serialized). It is not
+/// a JSON type: convert it to text before writing.
 /// </summary>
 public sealed class PyDateTimeValue : PyJson
 {
@@ -145,7 +149,7 @@ public sealed class PyList : PyJson
     public override string PythonTypeName => "list";
 }
 
-/// <summary>An insertion-ordered JSON object with Python <c>dict</c> semantics.</summary>
+/// <summary>An insertion-ordered JSON object: setting an existing key replaces its value in place.</summary>
 public sealed class PyDict : PyJson
 {
     private readonly List<string> _keys = [];
@@ -192,7 +196,7 @@ public sealed class PyDict : PyJson
 
     public bool ContainsKey(string key) => _values.ContainsKey(key);
 
-    /// <summary>Python's <c>d.pop(key, None)</c>: remove the key when present.</summary>
+    /// <summary>Removes the key when present; returns whether it was.</summary>
     public bool Remove(string key)
     {
         if (!_values.Remove(key))
@@ -216,7 +220,7 @@ public sealed class PyDict : PyJson
         return false;
     }
 
-    /// <summary>Python's <c>d.get(key)</c>: <see langword="null"/> when absent.</summary>
+    /// <summary>The value for the key, or <see langword="null"/> when absent.</summary>
     public PyJson? Get(string key) => _values.TryGetValue(key, out var found) ? found : null;
 
     public PyDict Copy()

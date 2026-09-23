@@ -63,7 +63,7 @@ public sealed class LibraryFilePlannerTests
         """{"format":{"duration":"120.0"},"streams":[{"index":0,"codec_type":"video","codec_name":"h264"},{"index":1,"codec_type":"audio","codec_name":"eac3","channels":6,"tags":{"language":"eng"},"disposition":{"default":1}},{"index":2,"codec_type":"audio","codec_name":"aac","channels":2,"tags":{"language":"jpn"}}]}""";
 
     [Fact]
-    public void Issue_648_a_matroska_track_is_measured_by_its_own_tags_before_any_arithmetic()
+    public void A_matroska_track_is_measured_by_its_own_tags_before_any_arithmetic()
     {
         var exact = LibraryFilePlanner.Classify(ProbeResult.Parse(MatroskaWithStatisticsTags), EnglishOnlyRules());
         // The dropped Japanese track says exactly how many bytes it is, so nothing is worked out from a bit rate.
@@ -110,7 +110,7 @@ public sealed class LibraryFilePlannerTests
     };
 
     [Fact]
-    public void Issue_648_an_mkvmerge_file_is_measured_exactly_from_its_byte_counts()
+    public void An_mkvmerge_file_is_measured_exactly_from_its_byte_counts()
     {
         var result = LibraryFilePlanner.Classify(ProbeResult.Parse(MkvmergeEpisode), EnglishAudioAndSubtitleRules());
 

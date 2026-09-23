@@ -4,7 +4,7 @@ using Weir.Core.Json;
 namespace Weir.Core.MediaManagers;
 
 /// <summary>
-/// A file a media manager wants Weir to act on (port of <c>import_events.MediaManagerImportEvent</c>).
+/// A file a media manager wants Weir to act on.
 /// <c>imported</c> is a manager saying it imported a file (#652): when that file is one Weir handed back, Weir records it
 /// and may release its copy. <c>handoff</c> is Processing's cue and the only kind with a callback.
 /// </summary>
@@ -45,10 +45,10 @@ public sealed record MediaManagerImportEvent
 /// <summary>How one manager phrases an inbound event.</summary>
 public sealed record MediaManagerDialect(string Key, string DisplayName, Func<PyDict, MediaManagerImportEvent?> Normalize);
 
-/// <summary>The inbound dialects (port of <c>weir.platform.media_managers.import_events</c>).</summary>
+/// <summary>The inbound dialects.</summary>
 public static class ImportEvents
 {
-    /// <summary><c>MEDIA_MANAGER_DIALECTS</c>, in declaration order.</summary>
+    /// <summary>Every dialect by source key.</summary>
     public static IReadOnlyDictionary<string, MediaManagerDialect> Dialects { get; } = new[]
     {
         new MediaManagerDialect("radarr", "Radarr", NormalizeRadarr),
@@ -57,11 +57,11 @@ public static class ImportEvents
         new MediaManagerDialect("native", "Generic (Weir native payload)", NormalizeNative),
     }.ToDictionary(d => d.Key, StringComparer.Ordinal);
 
-    /// <summary><c>dialect_for_source</c>: case- and whitespace-insensitive.</summary>
+    /// <summary>The dialect for a source key, case- and whitespace-insensitive.</summary>
     public static MediaManagerDialect? DialectForSource(string? sourceKey) =>
         Dialects.GetValueOrDefault(PyStrings.Strip(sourceKey ?? string.Empty).ToLowerInvariant());
 
-    /// <summary><c>known_source_keys</c>: sorted.</summary>
+    /// <summary>Every source key, sorted.</summary>
     public static IReadOnlyList<string> KnownSourceKeys() => [.. Dialects.Keys.Order(StringComparer.Ordinal)];
 
     private static PyDict? Mapping(PyDict body, string key) => body.Get(key) as PyDict;
@@ -138,7 +138,7 @@ public static class ImportEvents
         };
     }
 
-    /// <summary>The inbound <c>_scope_from_media_type</c> (fewer spellings than the outbound one).</summary>
+    /// <summary>The scope an inbound media type names (<c>movie</c> or <c>tv</c>), or null for a spelling it does not accept.</summary>
     public static string? ScopeFromMediaType(PyJson? raw)
     {
         var value = (PyValues.Text(raw) ?? string.Empty).ToLowerInvariant();

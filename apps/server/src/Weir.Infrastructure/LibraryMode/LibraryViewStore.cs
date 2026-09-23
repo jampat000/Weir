@@ -347,7 +347,7 @@ public static class LibraryViewStore
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             clauses.Add("(f.path LIKE @search ESCAPE '\\' OR COALESCE(f.manager_title, '') LIKE @search ESCAPE '\\')");
-            parameters.Add(("@search", "%" + EscapeLike(filter.Search) + "%"));
+            parameters.Add(("@search", "%" + SqliteLike.Escape(filter.Search) + "%"));
         }
 
         if (string.Equals(filter.State, "cleaned", StringComparison.Ordinal))
@@ -401,9 +401,4 @@ public static class LibraryViewStore
     }
 
     private static string BuildWhereText(List<string> clauses) => "WHERE " + string.Join(" AND ", clauses);
-
-    private static string EscapeLike(string value) =>
-        value.Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("%", "\\%", StringComparison.Ordinal)
-            .Replace("_", "\\_", StringComparison.Ordinal);
 }

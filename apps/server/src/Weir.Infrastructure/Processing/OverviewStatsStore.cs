@@ -5,7 +5,7 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
 
-/// <summary>The custody-screen overview counters (<c>ProcessingOverviewStatsOut</c>).</summary>
+/// <summary>The custody-screen overview counters.</summary>
 public sealed record ProcessingOverviewStats(
     int WindowDays,
     long FilesProcessed,
@@ -16,7 +16,7 @@ public sealed record ProcessingOverviewStats(
     long NetSpaceSavedBytes,
     double NetSpaceSavedPercent);
 
-/// <summary>Port of <c>processing_overview_stats_service.py</c>.</summary>
+/// <summary>The Processing overview's statistics.</summary>
 public static class OverviewStatsStore
 {
     private const string RemuxPassJobKind = "processing.file.remux_pass.v1";

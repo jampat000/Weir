@@ -7,6 +7,7 @@ using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Validation;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
@@ -16,9 +17,7 @@ namespace Weir.Api.Endpoints;
 
 /// <summary>
 /// Operator-editable automation settings, the read-only runtime snapshot, the hardware-acceleration
-/// report and the metadata-provider connection (ports of <c>operator_settings_api.py</c>,
-/// <c>processing_runtime_settings_api.py</c>, <c>processing_hardware_api.py</c> and
-/// <c>processing_metadata_provider_api.py</c> — the settings half only; see <see cref="MetadataProviderStore"/>).
+/// report and the metadata-provider connection (the settings half only; see <see cref="MetadataProviderStore"/>).
 /// </summary>
 public static class ProcessingSettingsEndpoints
 {
@@ -107,8 +106,8 @@ public static class ProcessingSettingsEndpoints
             "unclaimed_handback_cleanup_interval_seconds", ge: OperatorSettingsRules.MinCleanupIntervalSeconds, le: OperatorSettingsRules.MaxCleanupIntervalSeconds);
         var keepFailedWorkFiles = model.OptionalBool("keep_failed_work_files");
         var fileLogRetentionDays = model.OptionalInt("file_log_retention_days", ge: 0, le: 3650);
-        // Removed on 23 Sep 2026 (nothing ever acted on it). Still read, and then ignored, so an older client that sends it
-        // is not refused: the body forbids fields it does not know.
+        // Retired setting (nothing acts on it). Read and ignored so an older client that sends it is not refused:
+        // the body forbids fields it does not know.
         var retiredVerboseDetectionLogging = model.OptionalBool("verbose_detection_logging");
         var minFileAgeSeconds = model.OptionalInt("min_file_age_seconds", ge: 0, le: 7 * 24 * 3600);
         var processingMinInputFileSizeMb = model.OptionalInt("min_input_file_size_mb", ge: 0, le: 1024 * 1024);
@@ -302,13 +301,13 @@ public static class ProcessingSettingsEndpoints
     private static async Task<ApiResult> GetFilesAtOnceAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
-        var store = request.Service<Weir.Infrastructure.Jobs.ProcessingJobStore>();
+        var store = request.Service<ProcessingJobStore>();
         var now = request.Service<TimeProvider>().GetUtcNow();
         var slots = request.Options.ProcessingWorkerCount;
         // A read, so never the queue's write transaction (#636): under several remuxes that queued behind the workers
         // until it timed out with "database is locked".
         var readout = await store.ReadAsync(
-            (connection, transaction) => Weir.Infrastructure.Jobs.WorkAdmissionReader.ReadFilesAtOnce(connection, transaction, now, slots)).ConfigureAwait(false);
+            (connection, transaction) => WorkAdmissionReader.ReadFilesAtOnce(connection, transaction, now, slots)).ConfigureAwait(false);
         return ApiRoutes.Ok(new PyDict()
             .Set("files_at_once", readout.FilesAtOnce)
             .Set("worker_slots", readout.WorkerSlots)

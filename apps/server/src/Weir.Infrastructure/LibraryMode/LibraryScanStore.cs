@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.LibraryMode;
@@ -123,7 +124,7 @@ public static class LibraryScanStore
             "AND status IN ('pending', 'leased') ORDER BY id DESC LIMIT 1",
             reader => new LibraryScanJobView(reader.GetInt64(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2)),
             ("@kind", LibraryModeJobKinds.ScanKind),
-            ("@prefix", EscapeLike(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%")).ConfigureAwait(false);
+            ("@prefix", SqliteLike.Escape(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%")).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -139,7 +140,7 @@ public static class LibraryScanStore
             "ORDER BY id DESC LIMIT 1",
             reader => reader.GetString(0),
             ("@kind", LibraryModeJobKinds.ScanKind),
-            ("@prefix", EscapeLike(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%"),
+            ("@prefix", SqliteLike.Escape(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%"),
             ("@trigger", LibraryModeSchedule.Trigger)).ConfigureAwait(false);
         return DateTimeOffset.TryParse(
             text,
@@ -159,18 +160,17 @@ public static class LibraryScanStore
             "ORDER BY id DESC LIMIT 1",
             reader => new LibraryScanJobRow(reader.GetInt64(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2)),
             ("@kind", LibraryModeJobKinds.ScanKind),
-            ("@prefix", EscapeLike(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%")).ConfigureAwait(false);
+            ("@prefix", SqliteLike.Escape(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%")).ConfigureAwait(false);
     }
 
     /// <summary>
     /// The latest completed scan's snapshot (the file index / plan cache), or null when nothing has ever
-    /// been scanned. The job payload only carries <c>generated_at</c>/<c>errors</c> now (#557 moved the
-    /// file list to <c>library_files</c>), so those two come from the latest completed job's payload when
-    /// it still exists, but <c>library_files</c> itself is read unconditionally: job-row retention can
-    /// prune the tracking job long after a scan completed, and the whole point of #557 is that doing so no
-    /// longer loses the file index that scan produced.
+    /// been scanned. The job payload carries only <c>generated_at</c>/<c>errors</c> (the file list lives in
+    /// <c>library_files</c>, #557), so those two come from the latest completed job's payload when it still
+    /// exists, but <c>library_files</c> itself is read unconditionally: job-row retention can prune the
+    /// tracking job long after a scan completed, and that must not lose the file index the scan produced.
     /// </summary>
-    public static async Task<LibraryScanSnapshot?> LatestSnapshotAsync(UnitOfWork uow, long libraryId)
+    public static async Task<LibraryScanSnapshot?> LatestSnapshotAsync(UnitOfWork uow, long libraryId, ILogger logger)
     {
         var files = await FilesForLibraryAsync(uow, libraryId).ConfigureAwait(false);
         var latest = await LatestAsync(uow, libraryId).ConfigureAwait(false);
@@ -194,8 +194,10 @@ public static class LibraryScanStore
                     errors = parsed.Errors;
                 }
             }
-            catch (PyJsonDecodeException)
+            catch (PyJsonDecodeException exception)
             {
+                // The file index still comes from library_files; only the scan time and its errors are lost.
+                logger.LogWarning(exception, "Library scan job_id={JobId} has an unreadable payload; showing its files without the scan time or errors.", latest.JobId);
             }
         }
 
@@ -203,10 +205,9 @@ public static class LibraryScanStore
     }
 
     /// <summary>
-    /// The library's current file index, used to seed the next scan's ffprobe cache: since #557,
-    /// <c>library_files</c> always holds whatever the previous scan recorded (a scan in progress has not
-    /// written its own new rows yet), so this is simply the table's current contents for the library —
-    /// no need to single out "the previous job" any more.
+    /// The library's current file index, which seeds the next scan's ffprobe cache. <c>library_files</c>
+    /// always holds whatever the previous scan recorded (a scan in progress has not written its own new rows
+    /// yet, #557), so this is simply the table's current contents for the library.
     /// </summary>
     public static async Task<IReadOnlyList<LibraryScanFileEntry>> PreviousFilesForCacheAsync(UnitOfWork uow, long libraryId) =>
         await FilesForLibraryAsync(uow, libraryId).ConfigureAwait(false);
@@ -214,8 +215,8 @@ public static class LibraryScanStore
     /// <summary>
     /// Records the job's own small outcome (<c>ok</c>/<c>reason</c>/<c>generated_at</c>/<c>errors</c>) on its
     /// payload, keeping every other key, and replaces the library's <c>library_files</c> rows with
-    /// <paramref name="snapshot"/>'s file list (#557: the file list itself is no longer part of the job
-    /// payload, so job-row retention can no longer delete it).
+    /// <paramref name="snapshot"/>'s file list (#557: the file list is kept out of the job payload, so job-row
+    /// retention cannot delete it).
     /// </summary>
     public static async Task RecordResultAsync(UnitOfWork uow, long jobId, LibraryScanSnapshot snapshot, bool ok, string? reason)
     {
@@ -351,7 +352,4 @@ public static class LibraryScanStore
         "would_change" => LibraryFileClassification.WouldChange,
         _ => LibraryFileClassification.CannotProcess,
     };
-
-    private static string EscapeLike(string value) =>
-        value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
 }

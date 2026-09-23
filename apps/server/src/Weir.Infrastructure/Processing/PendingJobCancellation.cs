@@ -16,10 +16,10 @@ public sealed record PendingJobCancelResult(JobActionOutcome Outcome, HandoffLed
 /// Cancelling one queued job from the Jobs screen (<c>POST /processing/jobs/{id}/cancel-pending</c>). Only a pending job can
 /// be cancelled, and its dedupe key becomes a tombstone so a later enqueue may reuse it.
 /// <para>
-/// #643: this used to change the job row and nothing else. The file then read "Waiting" for ever, or the next scan queued it
-/// again. A hand-off the job belonged to kept answering "queued" to the media manager, which could never end it. Now a
-/// remux pass's file reads cancelled, and a hand-off with nothing else left to run ends the way the manager's own cancel ends
-/// it. All of this happens in the caller's unit of work, in one transaction.
+/// Cancelling changes more than the job row (#643): otherwise the file would read "Waiting" for ever or be queued again by
+/// the next scan, and a hand-off would keep answering "queued" to the media manager. A remux pass's file reads cancelled,
+/// and a hand-off with nothing else left to run ends the way the manager's own cancel ends it. All of this happens in the
+/// caller's unit of work, in one transaction.
 /// </para>
 /// </summary>
 public static class PendingJobCancellation

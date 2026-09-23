@@ -5,7 +5,7 @@ using Weir.Core.Text;
 namespace Weir.Core.Processing.RemuxPass;
 
 /// <summary>
-/// Why a file failed, in the terms a retry policy can act on (port of <c>processing_failure_classes.py</c>).
+/// Why a file failed, in the terms a retry policy can act on.
 /// </summary>
 public static class ProcessingFailureClasses
 {
@@ -21,7 +21,7 @@ public static class ProcessingFailureClasses
     /// <summary>Something Weir could not attribute. Terminal.</summary>
     public const string Unknown = "unknown";
 
-    /// <summary><c>classify_failure</c>: a pass outcome onto the retry vocabulary.</summary>
+    /// <summary>Map a pass outcome onto the retry vocabulary.</summary>
     public static string Classify(string? outcome) => PyStrings.Strip(outcome ?? string.Empty).ToLowerInvariant() switch
     {
         RemuxPassOutcomes.FailedBeforeExecution => Preflight,
@@ -30,7 +30,7 @@ public static class ProcessingFailureClasses
         _ => Unknown,
     };
 
-    /// <summary><c>is_retryable</c>: guardrail and unknown never are.</summary>
+    /// <summary>Whether the library retries this class; guardrail and unknown never are.</summary>
     public static bool IsRetryable(string failureClass, bool retryPreflightFailures, bool retryExecutionFailures)
     {
         var value = PyStrings.Strip(failureClass ?? string.Empty).ToLowerInvariant();
@@ -42,7 +42,7 @@ public static class ProcessingFailureClasses
         };
     }
 
-    /// <summary><c>backoff_seconds_for_attempt</c>: doubling from the base, capped at an hour.</summary>
+    /// <summary>Retry delay: doubling from the base, capped at an hour.</summary>
     public static long BackoffSecondsForAttempt(long attempt, long baseSeconds)
     {
         var @base = Math.Max(1, baseSeconds);
@@ -56,16 +56,16 @@ public static class ProcessingFailureClasses
     }
 }
 
-/// <summary>Whether this failure will be retried, and the sentence explaining it (<c>RetryDecision</c>).</summary>
+/// <summary>Whether this failure will be retried, and the sentence explaining it.</summary>
 public sealed record RetryDecision(bool WillRetry, DateTimeOffset? NextRetryAt, string Reason, bool Quarantined = false);
 
-/// <summary>The automatic half of <c>processing_requeue_service.py</c>: the library's retry policy applied to one failure.</summary>
+/// <summary>The library's automatic retry policy applied to one failure.</summary>
 public static class RetryPolicy
 {
-    /// <summary><c>PROCESSING_QUARANTINE_AFTER_FAILURES</c>.</summary>
+    /// <summary>Consecutive failures of the same class after which a file is held rather than retried.</summary>
     public const int QuarantineAfterFailures = 3;
 
-    /// <summary><c>decide_retry</c>.</summary>
+    /// <summary>Retry or stop, based on the failure class and the library's attempt limit.</summary>
     public static RetryDecision DecideRetry(ProcessingLibraryRecord library, string failureClass, long attemptsSoFar, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(library);
@@ -96,7 +96,7 @@ public static class RetryPolicy
     }
 
     /// <summary>
-    /// The part of <c>record_failure</c> after the row is found: the decision, with a quarantine after repeated failures of
+    /// The decision for a failure being recorded against a known file row, with a quarantine after repeated failures of
     /// the same class.
     /// </summary>
     public static RetryDecision DecideForRecordedFailure(ProcessingLibraryRecord library, string failureClass, long previousAttempts, string? previousFailureClass, DateTimeOffset now)

@@ -8,7 +8,7 @@ public sealed record ManagerKindProfile(string Kind, ManagerCapabilities Capabil
     public bool IsArr => ArrScope is not null;
 }
 
-/// <summary>The four kinds' profiles (the <c>_PORTS</c> table of <c>manager_dialects</c>).</summary>
+/// <summary>The four kinds' profiles.</summary>
 public static class ManagerKindProfiles
 {
     private static readonly Dictionary<string, ManagerKindProfile> Profiles = new(StringComparer.Ordinal)
@@ -19,14 +19,14 @@ public static class ManagerKindProfiles
         ["native"] = External("native"),
     };
 
-    /// <summary><c>port_for_kind</c>'s lookup: case- and whitespace-insensitive.</summary>
+    /// <summary>The profile for a kind, case- and whitespace-insensitive.</summary>
     public static ManagerKindProfile? ForKind(string? kind) =>
         Profiles.GetValueOrDefault(PyStrings.Strip(kind ?? string.Empty).ToLowerInvariant());
 
-    /// <summary><c>capabilities_for_kind</c>.</summary>
+    /// <summary>What a kind can do, or null for an unknown kind.</summary>
     public static ManagerCapabilities? CapabilitiesForKind(string? kind) => ForKind(kind)?.Capabilities;
 
-    /// <summary><c>kinds_serving_scope</c>: sorted.</summary>
+    /// <summary>The kinds that serve a media scope, sorted.</summary>
     public static IReadOnlyList<string> KindsServingScope(string mediaScope) =>
         [.. Profiles.Where(pair => pair.Value.Capabilities.Scopes.Contains(mediaScope)).Select(pair => pair.Key).Order(StringComparer.Ordinal)];
 

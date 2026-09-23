@@ -4,10 +4,9 @@ using Weir.Core.Json;
 namespace Weir.Core.Rules;
 
 /// <summary>
-/// ffprobe data the rules engine could not read, raised where the Python reference raises.
-/// <see cref="PythonError"/> names the Python exception (<c>KeyError</c>, <c>ValueError</c>,
-/// <c>TypeError</c>, <c>AttributeError</c>, <c>OverflowError</c>) so callers and the parity
-/// tests can tell the cases apart the same way.
+/// ffprobe data the rules engine could not read. <see cref="PythonError"/> names the error class the
+/// golden files record (<c>KeyError</c>, <c>ValueError</c>, <c>TypeError</c>, <c>AttributeError</c>,
+/// <c>OverflowError</c>) so callers and the golden-file tests can tell the cases apart.
 /// </summary>
 public sealed class RulesInputException : Exception
 {
@@ -42,9 +41,9 @@ public sealed class RulesInputException : Exception
 /// </summary>
 /// <remarks>
 /// ffprobe's values are loosely typed (bit rates and frame counts arrive as strings, a
-/// disposition flag can be a string), and the reference reads them with Python's own
-/// conversions. The raw object stays available as <see cref="Json"/>; the typed properties
-/// below are lenient readings for callers, and the rules use the exact conversions internally.
+/// disposition flag can be a string), and the rules read them with the exact conversions in
+/// <see cref="Py"/>. The raw object stays available as <see cref="Json"/>; the typed properties
+/// below are lenient readings for callers.
 /// </remarks>
 public sealed record ProbeStreamInfo
 {
@@ -67,7 +66,7 @@ public sealed record ProbeStreamInfo
         return new ProbeStreamInfo(document.RootElement);
     }
 
-    /// <summary><c>stream.get(name)</c>: null when absent; a JSON <c>null</c> is returned as an element.</summary>
+    /// <summary>The value under <paramref name="name"/>: null when absent; a JSON <c>null</c> is returned as an element.</summary>
     public JsonElement? Get(string name) => Py.Get(Json, name);
 
     /// <summary><c>index</c> when it reads as an integer.</summary>
@@ -80,12 +79,10 @@ public sealed record ProbeStreamInfo
     public string CodecName => Py.StrOr(Get("codec_name"), string.Empty);
 
     /// <summary>
-    /// The tags as the rules read them, string-valued entries only. Issue #537 item 5: the port
-    /// originally ran every value through <c>str()</c>, so a JSON <c>null</c> language became the
-    /// text <c>"none"</c> (read as a real, if bogus, language code) and a list- or dict-valued
-    /// title could still match a "commentary" substring test after being stringified. ffprobe never
-    /// legitimately puts a non-string value in a tag, so a non-string value is now treated the same
-    /// as an absent key; empty when tags are not an object.
+    /// The tags as the rules read them, string-valued entries only; empty when tags are not an object.
+    /// ffprobe never legitimately puts a non-string value in a tag, so one is treated as an absent key
+    /// (#537 item 5): stringifying it would turn a JSON <c>null</c> language into a bogus code
+    /// <c>"none"</c>, and let a list- or dict-valued title match a "commentary" substring test.
     /// </summary>
     public IReadOnlyDictionary<string, string> Tags
     {
@@ -111,8 +108,8 @@ public sealed record ProbeStreamInfo
     }
 
     /// <summary>
-    /// The disposition flags as the reference reads them (<c>_stream_disposition</c>): each value
-    /// through <c>int()</c>, skipping values that do not convert.
+    /// The disposition flags: each value read as an integer (<see cref="Py.TryInt"/>), skipping values
+    /// that do not convert.
     /// </summary>
     public IReadOnlyDictionary<string, long> Disposition
     {
@@ -137,7 +134,7 @@ public sealed record ProbeStreamInfo
         }
     }
 
-    /// <summary><c>tags.get(name)</c> after <see cref="Tags"/>, or null.</summary>
+    /// <summary>One entry of <see cref="Tags"/>, or null.</summary>
     public string? Tag(string name) => Tags.TryGetValue(name, out var value) ? value : null;
 }
 
@@ -159,7 +156,7 @@ public sealed record ProbeResult
 
     /// <summary>
     /// The entries of <c>streams</c> that are objects, in file order; empty when the document has
-    /// no stream list. Entries that are not objects are skipped, as the reference skips them.
+    /// no stream list. Entries that are not objects are skipped.
     /// </summary>
     public IReadOnlyList<ProbeStreamInfo> Streams
     {

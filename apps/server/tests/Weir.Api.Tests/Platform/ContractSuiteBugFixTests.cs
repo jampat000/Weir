@@ -7,10 +7,10 @@ using static Weir.Api.Tests.Platform.ApiTestClient;
 namespace Weir.Api.Tests.Platform;
 
 /// <summary>
-/// Deliberate deviations from the Python backend: bugs the contract suite found (#528, #529, #535, #536),
-/// fixed in the .NET server instead of ported.
+/// Bugs the contract suite found (#528, #529, #535, #536): forwarded headers, expired sessions, API paths
+/// and invalid UTF-8 in logs.
 /// </summary>
-public sealed class PythonBugFixTests
+public sealed class ContractSuiteBugFixTests
 {
     /// <summary>A login request from a chosen TCP peer, with extra headers.</summary>
     private static async Task<HttpContext> LoginFromPeerAsync(WeirTestServer server, string peer, IReadOnlyDictionary<string, string> headers)
@@ -52,7 +52,7 @@ public sealed class PythonBugFixTests
     }
 
     [Fact]
-    public async Task Issue_528_forwarded_headers_from_an_untrusted_peer_are_ignored()
+    public async Task Forwarded_headers_from_an_untrusted_peer_are_ignored()
     {
         await using var server = await StartServerAsync(("WEIR_AUTH_LOGIN_RATE_MAX_ATTEMPTS", "1"));
         await TestDatabase.SeedAdminAsync(server);
@@ -70,7 +70,7 @@ public sealed class PythonBugFixTests
     }
 
     [Fact]
-    public async Task Issue_528_forwarded_headers_from_a_trusted_proxy_are_honoured()
+    public async Task Forwarded_headers_from_a_trusted_proxy_are_honoured()
     {
         await using var server = await StartServerAsync(("WEIR_AUTH_LOGIN_RATE_MAX_ATTEMPTS", "1"), ("WEIR_TRUSTED_PROXY_IPS", "10.0.0.0/24"));
         await TestDatabase.SeedAdminAsync(server);
@@ -88,7 +88,7 @@ public sealed class PythonBugFixTests
     }
 
     [Fact]
-    public async Task Issue_529_an_expired_session_is_revoked_and_answers_401()
+    public async Task An_expired_session_is_revoked_and_answers_401()
     {
         await using var server = await StartServerAsync();
         await TestDatabase.SeedAdminAsync(server);
@@ -103,7 +103,7 @@ public sealed class PythonBugFixTests
     }
 
     [Fact]
-    public async Task Issue_535_api_paths_never_fall_back_to_the_web_app()
+    public async Task Api_paths_never_fall_back_to_the_web_app()
     {
         await using var withDist = await WeirTestServer.StartAsync(
             [("WEIR_SESSION_SECRET", Secret), ("WEIR_PROCESSING_WORKER_COUNT", "0"), ("WEIR_WEB_DIST", "{home}/web")],
@@ -136,7 +136,7 @@ public sealed class PythonBugFixTests
     }
 
     [Fact]
-    public async Task Issue_536_logs_with_invalid_utf8_are_read_and_settings_still_save()
+    public async Task Logs_with_invalid_utf8_are_read_and_settings_still_save()
     {
         await using var server = await StartServerAsync();
         await TestDatabase.SeedAdminAsync(server);

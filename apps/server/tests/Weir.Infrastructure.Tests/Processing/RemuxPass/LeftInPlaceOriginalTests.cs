@@ -289,6 +289,27 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     }
 
     [WindowsFact("Needs Windows' mandatory file locks.")]
+    public async Task Every_retried_movie_removal_records_its_result_on_the_file()
+    {
+        await SetUpAsync("movie");
+        var source = _folders.Source(Path.Join("Film.2024", "Film.2024.mkv"));
+        File.SetLastWriteTimeUtc(source, DateTime.UtcNow.AddDays(-3));
+
+        using (new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            await ScanAndDrainAsync("movie");
+            await ScanAsync("movie");
+            Assert.Contains("removing the original download is waiting", await ReasonAsync("Film.2024/Film.2024.mkv"), StringComparison.Ordinal);
+        }
+
+        await ScanAsync("movie");
+
+        Assert.False(Directory.Exists(Path.Join(_folders.Watched, "Film.2024")));
+        Assert.Equal("processed", await StatusAsync("Film.2024/Film.2024.mkv"));
+        Assert.Contains("finished removing the source release folder", await ReasonAsync("Film.2024/Film.2024.mkv"), StringComparison.Ordinal);
+    }
+
+    [WindowsFact("Needs Windows' mandatory file locks.")]
     public async Task An_interrupted_movie_removal_is_not_cleaned_again_after_the_output_is_imported()
     {
         await SetUpAsync("movie");
@@ -377,8 +398,8 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     [Fact]
     public async Task A_hand_off_row_no_scan_saw_is_forgotten_once_its_file_has_been_gone_a_while()
     {
-        // The Deluno soak, 23 Sep 2026: hand-off rows (recorded on receipt, never seen by a scan) and a failed row for a
-        // release folder stayed listed for good after their files were deleted.
+        // #668: hand-off rows (recorded on receipt, never seen by a scan) and a failed row for a release folder must
+        // not stay listed for good after their files are deleted.
         await SetUpAsync("movie");
         await InsertRowAsync("Film.1/Film.mkv", ProcessingFileStatuses.Unprocessed, lastSeenMinutesAgo: null);
         await InsertRowAsync("Film.2/Film.mkv", ProcessingFileStatuses.Cancelled, lastSeenMinutesAgo: null);
@@ -395,8 +416,8 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     [Fact]
     public async Task The_sweep_forgets_gone_files_in_a_library_whose_scan_never_runs()
     {
-        // The soak rig after 3.2.3: periodic scans are off for libraries fed by Deluno's hand-offs, so the rows the scan
-        // would have cleared stayed. The sweep runs the same rule on its own clock, without queueing any work.
+        // #670: a library fed only by a media manager's hand-offs can have periodic scans off, so nothing would clear
+        // rows the scan would have. The sweep runs the same rule on its own clock, without queueing any work.
         await SetUpAsync("movie");
         await InsertRowAsync("Film.1/Film.mkv", ProcessingFileStatuses.Unprocessed, lastSeenMinutesAgo: null);
         await InsertRowAsync("Film", ProcessingFileStatuses.ProcessingFailed, lastSeenMinutesAgo: null, writtenMinutesAgo: 60 * 24 * 4);

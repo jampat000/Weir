@@ -3,7 +3,7 @@ using static Weir.Api.Tests.Platform.ApiTestClient;
 
 namespace Weir.Api.Tests.Platform;
 
-/// <summary>Ports of <c>test_auth_api.py</c>, <c>test_auth_username.py</c>, <c>test_auth_cookie_secure_mode.py</c> and friends.</summary>
+/// <summary>Sign-in, sessions, usernames and the secure-cookie mode over real HTTP.</summary>
 public sealed class AuthApiTests
 {
     [Fact]

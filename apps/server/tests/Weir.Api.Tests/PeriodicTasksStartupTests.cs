@@ -6,11 +6,11 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Tests;
 
-/// <summary>The loops Python's lifespan starts are hosted by the real server.</summary>
+/// <summary>The real server hosts every periodic loop, started after crash recovery.</summary>
 public sealed class PeriodicTasksStartupTests
 {
     [Fact]
-    public async Task The_server_hosts_the_python_lifespan_loops_after_startup_recovery()
+    public async Task The_server_hosts_every_periodic_loop_after_startup_recovery()
     {
         await using var server = await WeirTestServer.StartAsync();
 

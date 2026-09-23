@@ -5,7 +5,7 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
 
-/// <summary>One maintenance family's current state (<c>MaintenanceFamilyStateOut</c>).</summary>
+/// <summary>One maintenance family's current state.</summary>
 public sealed record MaintenanceFamilyState(
     string Family,
     bool Enabled,
@@ -16,7 +16,7 @@ public sealed record MaintenanceFamilyState(
     PyDateTime? LastFailedAt,
     string? LastError);
 
-/// <summary>Port of <c>processing_maintenance_api.py</c>'s read model and manual trigger.</summary>
+/// <summary>The Processing maintenance jobs' read model and manual triggers.</summary>
 public static class MaintenanceStore
 {
     private static readonly Dictionary<string, IReadOnlyList<string>> FamilyJobKinds = new(StringComparer.Ordinal)
@@ -61,7 +61,7 @@ public static class MaintenanceStore
             failed.Status is null ? null : failed.LastError);
     }
 
-    /// <summary><c>enqueue_processing_work_temp_stale_sweep_job</c>: single-flight per scope, ignores the schedule toggle.</summary>
+    /// <summary>Queues the stale work-temp sweep now: single-flight per scope, ignores the schedule toggle.</summary>
     public static Task EnqueueWorkTempStaleSweepAsync(ProcessingJobStore jobStore, string mediaScope, string trigger)
     {
         var scope = mediaScope == "tv" ? "tv" : "movie";
@@ -81,7 +81,7 @@ public static class MaintenanceStore
     }
 
     /// <summary>
-    /// <c>enqueue_processing_failure_cleanup_sweep_job</c>: returns the existing row when one is already queued
+    /// Queues the failure-cleanup sweep now: returns the existing row when one is already queued
     /// or running, else inserts a new one — in the same transaction as the caller's other work, unlike the
     /// periodic <see cref="FailureCleanupSweepEnqueuer"/> in <c>JobServices.cs</c>, whose helper is internal
     /// to that file and runs on its own <see cref="ProcessingJobStore"/> connection.

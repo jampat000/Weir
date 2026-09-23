@@ -3,7 +3,7 @@ using Weir.Core.Json;
 
 namespace Weir.Core.Processing;
 
-/// <summary>Discovery could not run, with an operator-readable reason (<c>ProcessingDiscoveryError</c>).</summary>
+/// <summary>Discovery could not run, with an operator-readable reason.</summary>
 public sealed class ProcessingDiscoveryException : Exception
 {
     public ProcessingDiscoveryException(string message)
@@ -12,7 +12,7 @@ public sealed class ProcessingDiscoveryException : Exception
     }
 }
 
-/// <summary>The four kinds of difference <see cref="LibraryDrift"/> can report (<c>DriftKind</c>).</summary>
+/// <summary>The four kinds of difference <see cref="LibraryDrift"/> can report.</summary>
 public static class LibraryDriftKinds
 {
     public const string RootMoved = "root_moved";
@@ -22,7 +22,7 @@ public static class LibraryDriftKinds
 }
 
 /// <summary>
-/// One library a manager reports, and whether Weir already has it (<c>DiscoverableLibrary</c>).
+/// One library a manager reports, and whether Weir already has it.
 /// <paramref name="OutputPath"/> is where the manager expects processed output, when it processes before
 /// importing — shown before the import so the operator sees what will be filled in, rather than discovering
 /// it afterwards.
@@ -38,8 +38,7 @@ public sealed record DiscoverableLibrary(
     bool ProcessesBeforeImport = false,
     string? OutputPathProblem = null);
 
-/// <summary>A difference between what the manager says and what Weir has saved (<c>LibraryDrift</c>). Reported,
-/// never applied.</summary>
+/// <summary>A difference between what the manager says and what Weir has saved. Reported, never applied.</summary>
 public sealed record LibraryDrift(
     string Kind,
     long? LibraryId,
@@ -49,20 +48,19 @@ public sealed record LibraryDrift(
     string Detail);
 
 /// <summary>
-/// The pure, path-shape half of <c>processing_library_discovery</c> (port). The filesystem check
-/// (<c>Path.is_dir()</c>) is direct IO and lives in Weir.Infrastructure, next to every other
-/// <c>Directory.Exists</c> call in this codebase.
+/// The pure, path-shape half of library discovery. The filesystem check is direct IO and lives in
+/// Weir.Infrastructure, next to every other <c>Directory.Exists</c> call in this codebase.
 /// </summary>
 public static class LibraryDiscoveryRules
 {
     private static readonly Regex DriveLetter = new("^[A-Za-z]:/", RegexOptions.Compiled);
 
-    /// <summary><c>_comparable</c>: case- and separator-insensitive, matching <c>HandoffPaths</c>.</summary>
+    /// <summary>A path for comparison: case- and separator-insensitive, matching <c>HandoffPaths</c>.</summary>
     public static string Comparable(string path) =>
         PyStrings.Strip(path.Replace('\\', '/')).TrimEnd('/').ToLowerInvariant();
 
     /// <summary>
-    /// <c>_looks_absolute</c>: absolute on *any* host, judged textually. <c>Path.IsPathRooted</c> answers for
+    /// Absolute on *any* host, judged textually. <c>Path.IsPathRooted</c> answers for
     /// the host running this code, so a perfectly good POSIX root reported by a Linux manager reads as
     /// relative on Windows. The manager's path is not this host's path, so only the shape is checked here.
     /// </summary>
