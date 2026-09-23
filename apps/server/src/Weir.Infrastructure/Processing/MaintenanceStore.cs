@@ -27,9 +27,12 @@ public static class MaintenanceStore
 
     private static readonly Dictionary<string, string> FamilyDescriptions = new(StringComparer.Ordinal)
     {
-        ["work_temp_stale_sweep"] = "Reclaims Weir's own stale working files. Safe, and switched on by default.",
-        ["failure_cleanup"] = "Removes the source release folder after a file has failed terminally. This deletes the original, so it stays switched off until you choose it.",
+        ["work_temp_stale_sweep"] = "Deletes half-written copies Weir left in its work folders once they are old. Never touches a file being written, or the copy of a file that failed while you keep failed work files.",
+        ["failure_cleanup"] = "Deletes the download a file came from once Weir has given up on it for good and no media manager still has it. This removes the original, so it stays off until you switch it on.",
     };
+
+    /// <summary>The job kinds a family's timers queue, for asking the clock when it next runs.</summary>
+    public static IReadOnlyList<string> JobKindsFor(string family) => FamilyJobKinds[family];
 
     public static async Task<MaintenanceFamilyState> StateForAsync(UnitOfWork uow, string family, bool enabled)
     {

@@ -74,6 +74,9 @@ export type ProcessingOperatorSettingsOut = {
   runner_cost_undetermined: number;
   work_temp_stale_sweep_enabled: boolean;
   failure_cleanup_enabled: boolean;
+  /** Seconds; null keeps the interval the environment gives. Settings › Cleanup reads the one in force from maintenance. */
+  work_temp_stale_sweep_interval_seconds?: number | null;
+  failure_cleanup_interval_seconds?: number | null;
   keep_failed_work_files: boolean;
   file_log_retention_days: number;
   verbose_detection_logging: boolean;
@@ -107,6 +110,9 @@ export type ProcessingOperatorSettingsPutBody = {
   runner_budget_enabled?: boolean;
   work_temp_stale_sweep_enabled?: boolean;
   failure_cleanup_enabled?: boolean;
+  /** 900 (15 minutes) to 2592000 (30 days). */
+  work_temp_stale_sweep_interval_seconds?: number;
+  failure_cleanup_interval_seconds?: number;
   keep_failed_work_files?: boolean;
   file_log_retention_days?: number;
   verbose_detection_logging?: boolean;

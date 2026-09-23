@@ -21,6 +21,12 @@ public sealed record ProcessingOperatorSettingsRecord
     public bool RunnerBudgetEnabled { get; init; }
     public bool WorkTempStaleSweepEnabled { get; init; } = true;
     public bool FailureCleanupEnabled { get; init; }
+
+    /// <summary>How often the leftover-work-file sweep runs, set in Settings › Cleanup; null keeps the environment's interval.</summary>
+    public long? WorkTempStaleSweepIntervalSeconds { get; init; }
+
+    /// <summary>How often the failed-download cleanup runs, set in Settings › Cleanup; null keeps the environment's interval.</summary>
+    public long? FailureCleanupIntervalSeconds { get; init; }
     public bool KeepFailedWorkFiles { get; init; }
     public long FileLogRetentionDays { get; init; } = 90;
     public bool VerboseDetectionLogging { get; init; }
@@ -143,6 +149,12 @@ public static class OperatorSettingsRules
 {
     /// <summary>The most files Weir runs at once, and so the most worker slots a server starts (#633).</summary>
     public const int MaxFilesAtOnce = 10;
+
+    /// <summary>The shortest interval Settings › Cleanup offers: a sweep more often than every 15 minutes finds nothing new.</summary>
+    public const int MinCleanupIntervalSeconds = 15 * 60;
+
+    /// <summary>The longest interval Settings › Cleanup offers.</summary>
+    public const int MaxCleanupIntervalSeconds = 30 * 24 * 3600;
 
     /// <summary>A library's own limit meaning "the same as Files at once" (#633).</summary>
     public const long LibraryFollowsFilesAtOnce = 0;

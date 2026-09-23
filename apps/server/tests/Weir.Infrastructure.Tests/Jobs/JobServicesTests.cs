@@ -175,6 +175,43 @@ public sealed class JobServicesTests : IDisposable
     }
 
     [Fact]
+    public async Task A_family_switched_on_while_weir_runs_starts_without_a_restart()
+    {
+        _db.Execute("UPDATE operator_settings SET work_temp_stale_sweep_enabled = 0");
+        var registry = new JobHandlerRegistry([new DelegateHandler(PeriodicJobKinds.WorkTempStaleSweep, _ => { })]);
+        var clock = new PeriodicEnqueueClock();
+        var sweep = new WorkTempStaleSweepEnqueuer(_db.Store, "movie", TimeSpan.FromHours(1), killSwitch: false);
+        var service = new PeriodicEnqueueService([sweep], registry, TimeProvider.System, NullLogger<PeriodicEnqueueService>.Instance, clock, TimeSpan.FromMilliseconds(50));
+
+        await service.StartAsync(CancellationToken.None);
+        await Task.Delay(300);
+        Assert.Equal(0, _db.Count("SELECT count(*) FROM jobs"));
+        Assert.Null(clock.NextRunFor([PeriodicJobKinds.WorkTempStaleSweep]));
+
+        _db.Execute("UPDATE operator_settings SET work_temp_stale_sweep_enabled = 1");
+        await WaitUntilAsync(() => Task.FromResult(_db.Count("SELECT count(*) FROM jobs") == 1));
+        await service.StopAsync(CancellationToken.None);
+
+        var next = clock.NextRunFor([PeriodicJobKinds.WorkTempStaleSweep]);
+        Assert.NotNull(next);
+        Assert.Equal(TimeSpan.FromHours(1), next.Value.Interval);
+        Assert.InRange(next.Value.NextRunAt, DateTimeOffset.UtcNow.AddMinutes(59), DateTimeOffset.UtcNow.AddMinutes(61));
+    }
+
+    [Fact]
+    public async Task A_saved_interval_replaces_the_environments()
+    {
+        var sweep = new WorkTempStaleSweepEnqueuer(_db.Store, "movie", TimeSpan.FromHours(1), killSwitch: false);
+        var cleanup = new FailureCleanupSweepEnqueuer(_db.Store, "tv", TimeSpan.FromHours(1), killSwitch: false);
+        Assert.Equal(TimeSpan.FromHours(1), await sweep.IntervalAsync(CancellationToken.None));
+
+        _db.Execute("UPDATE operator_settings SET work_temp_stale_sweep_interval_seconds = 900, failure_cleanup_interval_seconds = 86400");
+
+        Assert.Equal(TimeSpan.FromMinutes(15), await sweep.IntervalAsync(CancellationToken.None));
+        Assert.Equal(TimeSpan.FromDays(1), await cleanup.IntervalAsync(CancellationToken.None));
+    }
+
+    [Fact]
     public async Task A_failure_cleanup_sweep_still_queued_is_not_duplicated_and_says_so()
     {
         var enqueuer = new FailureCleanupSweepEnqueuer(_db.Store, "tv", TimeSpan.FromMinutes(1), killSwitch: false);

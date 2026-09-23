@@ -44,6 +44,9 @@ public static class ProcessingSettingsEndpoints
         .Set("runner_budget_enabled", row.RunnerBudgetEnabled)
         .Set("work_temp_stale_sweep_enabled", row.WorkTempStaleSweepEnabled)
         .Set("failure_cleanup_enabled", row.FailureCleanupEnabled)
+        // Null: the interval the environment gives. Settings › Cleanup shows the one in force from /processing/maintenance.
+        .Set("work_temp_stale_sweep_interval_seconds", row.WorkTempStaleSweepIntervalSeconds is { } sweepEvery ? PyJson.Of(sweepEvery) : PyJson.Null)
+        .Set("failure_cleanup_interval_seconds", row.FailureCleanupIntervalSeconds is { } cleanupEvery ? PyJson.Of(cleanupEvery) : PyJson.Null)
         .Set("keep_failed_work_files", row.KeepFailedWorkFiles)
         .Set("file_log_retention_days", OperatorSettingsRules.ClampFileLogRetentionDays(row.FileLogRetentionDays))
         .Set("verbose_detection_logging", row.VerboseDetectionLogging)
@@ -89,6 +92,10 @@ public static class ProcessingSettingsEndpoints
         var runnerBudgetEnabled = model.OptionalBool("runner_budget_enabled");
         var workTempStaleSweepEnabled = model.OptionalBool("work_temp_stale_sweep_enabled");
         var failureCleanupEnabled = model.OptionalBool("failure_cleanup_enabled");
+        var workTempStaleSweepIntervalSeconds = model.OptionalInt(
+            "work_temp_stale_sweep_interval_seconds", ge: OperatorSettingsRules.MinCleanupIntervalSeconds, le: OperatorSettingsRules.MaxCleanupIntervalSeconds);
+        var failureCleanupIntervalSeconds = model.OptionalInt(
+            "failure_cleanup_interval_seconds", ge: OperatorSettingsRules.MinCleanupIntervalSeconds, le: OperatorSettingsRules.MaxCleanupIntervalSeconds);
         var keepFailedWorkFiles = model.OptionalBool("keep_failed_work_files");
         var fileLogRetentionDays = model.OptionalInt("file_log_retention_days", ge: 0, le: 3650);
         var verboseDetectionLogging = model.OptionalBool("verbose_detection_logging");
@@ -124,6 +131,7 @@ public static class ProcessingSettingsEndpoints
         var hasProcessField = maxConcurrentFiles is not null || runnerCapacity is not null || runnerCostSd is not null ||
                                runnerCost720P is not null || runnerCost1080P is not null || runnerCost4K is not null ||
                                runnerCostUndetermined is not null || runnerBudgetEnabled is not null || workTempStaleSweepEnabled is not null || failureCleanupEnabled is not null ||
+                               workTempStaleSweepIntervalSeconds is not null || failureCleanupIntervalSeconds is not null ||
                                keepFailedWorkFiles is not null || fileLogRetentionDays is not null || verboseDetectionLogging is not null ||
                                minFileAgeSeconds is not null || processingMinInputFileSizeMb is not null || minimumFreeDiskSpaceMb is not null;
         if (!hasProcessField && movieScheduleEnabled is null && tvScheduleEnabled is null)
@@ -192,6 +200,16 @@ public static class ProcessingSettingsEndpoints
         if (failureCleanupEnabled is { } fc)
         {
             after = after with { FailureCleanupEnabled = fc };
+        }
+
+        if (workTempStaleSweepIntervalSeconds is { } sweepEvery)
+        {
+            after = after with { WorkTempStaleSweepIntervalSeconds = sweepEvery };
+        }
+
+        if (failureCleanupIntervalSeconds is { } cleanupEvery)
+        {
+            after = after with { FailureCleanupIntervalSeconds = cleanupEvery };
         }
 
         if (keepFailedWorkFiles is { } kf)

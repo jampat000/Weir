@@ -120,7 +120,7 @@ export function SettingsPage() {
         ) : tab === "media-managers" ? (
           <SettingsMediaManagersTab />
         ) : tab === "performance" ? (
-          <div className="mm-quiet-stack mm-quiet-stack--columns">
+          <div className="mm-quiet-stack">
             <ProcessingProcessSettingsSection />
             <ProcessingDirectPlaySection />
           </div>

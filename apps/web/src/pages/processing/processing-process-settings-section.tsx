@@ -1,14 +1,11 @@
 import { useEffect, useId, useState } from "react";
-import {
-  MmListboxPicker,
-  type MmListboxOption,
-} from "../../components/ui/mm-listbox-picker";
 import { PageLoading } from "../../components/shared/page-loading";
 import {
-  QuietFieldGroup,
-  QuietSection,
-  quietActionRowClass,
-} from "../../components/shared/quiet-section";
+  NumberWithUnit,
+  SettingRow,
+  SettingsGroup,
+} from "../../components/shared/settings-group";
+import { MmOnOffSwitch } from "../../components/ui/mm-on-off-switch";
 import {
   isHttpErrorFromApi,
   isLikelyNetworkFailure,
@@ -25,25 +22,23 @@ function canEdit(role: string | undefined): boolean {
   return role === "operator" || role === "admin";
 }
 
-/** One file, two files ... up to ten (#633). */
-const FILES_AT_ONCE_OPTIONS: MmListboxOption[] = Array.from(
-  { length: 10 },
-  (_, i) => ({
-    value: String(i + 1),
-    label: i === 0 ? "1 file" : `${i + 1} files`,
-  }),
-);
+/** Files at once goes from one to ten (#633). */
+const FILES_AT_ONCE = Array.from({ length: 10 }, (_, i) => i + 1);
 
-/** Throughput and file-age gates (not paths or poll intervals — those live under Libraries). */
+/**
+ * Settings › Performance (was Running; canvas board 7, 23 Sep 2026): how hard Weir works, what it checks before it
+ * starts a file, and what it keeps when one fails. The cleanup switches that used to sit here are on Cleanup, each
+ * beside its own timer, and "Verbose file-detection records" is gone because nothing ever read it.
+ */
 export function ProcessingProcessSettingsSection() {
   const me = useMeQuery();
   const q = useProcessingOperatorSettingsQuery();
   const save = useProcessingOperatorSettingsSaveMutation();
   const filesAtOnce = useProcessingFilesAtOnceQuery();
-  const filesAtOnceLabelId = useId();
+  const ids = useId();
   const editable = canEdit(me.data?.role);
 
-  const [maxConcurrentFiles, setMaxConcurrentFiles] = useState("1");
+  const [maxConcurrentFiles, setMaxConcurrentFiles] = useState(1);
   const [runnerCapacity, setRunnerCapacity] = useState("4");
   const [runnerCostSd, setRunnerCostSd] = useState("1");
   const [runnerCost720p, setRunnerCost720p] = useState("1");
@@ -54,18 +49,11 @@ export function ProcessingProcessSettingsSection() {
   const [minFileAgeSeconds, setMinFileAgeSeconds] = useState("60");
   const [minInputFileSizeMb, setMinInputFileSizeMb] = useState("50");
   const [minimumFreeDiskSpaceGb, setMinimumFreeDiskSpaceGb] = useState("5");
-  const [fileLogRetentionDays, setFileLogRetentionDays] = useState("90");
-  const [workTempStaleSweepEnabled, setWorkTempStaleSweepEnabled] =
-    useState(true);
-  const [failureCleanupEnabled, setFailureCleanupEnabled] = useState(false);
   const [keepFailedWorkFiles, setKeepFailedWorkFiles] = useState(false);
-  const [verboseDetectionLogging, setVerboseDetectionLogging] = useState(false);
 
   useEffect(() => {
-    if (!q.data) {
-      return;
-    }
-    setMaxConcurrentFiles(String(q.data.max_concurrent_files));
+    if (!q.data) return;
+    setMaxConcurrentFiles(q.data.max_concurrent_files);
     setRunnerCapacity(String(q.data.runner_capacity));
     setRunnerCostSd(String(q.data.runner_cost_sd));
     setRunnerCost720p(String(q.data.runner_cost_720p));
@@ -78,26 +66,19 @@ export function ProcessingProcessSettingsSection() {
     setMinimumFreeDiskSpaceGb(
       String(Math.max(0, q.data.minimum_free_disk_space_mb / 1024)),
     );
-    setFileLogRetentionDays(String(q.data.file_log_retention_days));
-    setWorkTempStaleSweepEnabled(q.data.work_temp_stale_sweep_enabled);
-    setFailureCleanupEnabled(q.data.failure_cleanup_enabled);
     setKeepFailedWorkFiles(q.data.keep_failed_work_files);
-    setVerboseDetectionLogging(q.data.verbose_detection_logging);
   }, [q.data]);
 
   if (q.isPending || me.isPending) {
-    return <PageLoading label="Loading processing settings" />;
+    return <PageLoading label="Loading performance settings" />;
   }
   if (q.isError) {
     return (
-      // Something broken, in the language's own shape for it: a sentence with the
-      // interrupt marker, not a red box. Raw red-200 on a red-950 wash was also
-      // unreadable in the light theme.
       <ul className="mm-interrupt" role="alert">
         <li className="mm-interrupt__item">
           <span className="mm-interrupt__text">
             <strong className="font-semibold">
-              Could not load processing settings.
+              Could not load performance settings.
             </strong>{" "}
             {isLikelyNetworkFailure(q.error)
               ? "Check that the Weir API is running."
@@ -109,52 +90,33 @@ export function ProcessingProcessSettingsSection() {
       </ul>
     );
   }
-  if (!q.data) {
-    return null;
-  }
+  if (!q.data) return null;
 
-  const draftConcurrent = Number.parseInt(maxConcurrentFiles, 10);
-  const draftRunnerCapacity = Number.parseInt(runnerCapacity, 10);
-  const draftRunnerCostSd = Number.parseInt(runnerCostSd, 10);
-  const draftRunnerCost720p = Number.parseInt(runnerCost720p, 10);
-  const draftRunnerCost1080p = Number.parseInt(runnerCost1080p, 10);
-  const draftRunnerCost4k = Number.parseInt(runnerCost4k, 10);
-  const draftRunnerCostUndetermined = Number.parseInt(
-    runnerCostUndetermined,
-    10,
-  );
-  const draftMinAge = Number.parseInt(minFileAgeSeconds, 10);
-  const draftMinInputSize = Number.parseInt(minInputFileSizeMb, 10);
-  const draftMinimumFreeGb = Number.parseFloat(minimumFreeDiskSpaceGb);
-  const draftMinimumFreeMb = Math.round(draftMinimumFreeGb * 1024);
-  const draftFileLogRetentionDays = Number.parseInt(fileLogRetentionDays, 10);
-  const runnerNumbers = [
-    draftRunnerCapacity,
-    draftRunnerCostSd,
-    draftRunnerCost720p,
-    draftRunnerCost1080p,
-    draftRunnerCost4k,
-    draftRunnerCostUndetermined,
+  const int = (raw: string) => Number.parseInt(raw, 10);
+  const costs = [
+    int(runnerCapacity),
+    int(runnerCostSd),
+    int(runnerCost720p),
+    int(runnerCost1080p),
+    int(runnerCost4k),
+    int(runnerCostUndetermined),
   ];
-  const draftValid =
-    Number.isFinite(draftConcurrent) &&
-    draftConcurrent >= 1 &&
-    draftConcurrent <= 8 &&
-    runnerNumbers.every(
+  const minimumFreeMb = Math.round(
+    Number.parseFloat(minimumFreeDiskSpaceGb) * 1024,
+  );
+  const valid =
+    maxConcurrentFiles >= 1 &&
+    maxConcurrentFiles <= FILES_AT_ONCE.length &&
+    costs.every(
       (value, index) =>
         Number.isFinite(value) && value >= (index === 0 ? 1 : 0) && value <= 64,
     ) &&
-    Number.isFinite(draftMinAge) &&
-    draftMinAge >= 0 &&
-    Number.isFinite(draftMinInputSize) &&
-    draftMinInputSize >= 0 &&
-    Number.isFinite(draftMinimumFreeGb) &&
-    draftMinimumFreeGb >= 0 &&
-    Number.isFinite(draftFileLogRetentionDays) &&
-    draftFileLogRetentionDays >= 0 &&
-    draftFileLogRetentionDays <= 3650;
+    int(minFileAgeSeconds) >= 0 &&
+    int(minInputFileSizeMb) >= 0 &&
+    Number.isFinite(minimumFreeMb) &&
+    minimumFreeMb >= 0;
   const dirty =
-    maxConcurrentFiles !== String(q.data.max_concurrent_files) ||
+    maxConcurrentFiles !== q.data.max_concurrent_files ||
     runnerCapacity !== String(q.data.runner_capacity) ||
     runnerCostSd !== String(q.data.runner_cost_sd) ||
     runnerCost720p !== String(q.data.runner_cost_720p) ||
@@ -164,288 +126,218 @@ export function ProcessingProcessSettingsSection() {
     runnerBudgetEnabled !== q.data.runner_budget_enabled ||
     minFileAgeSeconds !== String(q.data.min_file_age_seconds) ||
     minInputFileSizeMb !== String(q.data.min_input_file_size_mb) ||
-    draftMinimumFreeMb !== q.data.minimum_free_disk_space_mb ||
-    fileLogRetentionDays !== String(q.data.file_log_retention_days) ||
-    workTempStaleSweepEnabled !== q.data.work_temp_stale_sweep_enabled ||
-    failureCleanupEnabled !== q.data.failure_cleanup_enabled ||
-    keepFailedWorkFiles !== q.data.keep_failed_work_files ||
-    verboseDetectionLogging !== q.data.verbose_detection_logging;
+    minimumFreeMb !== q.data.minimum_free_disk_space_mb ||
+    keepFailedWorkFiles !== q.data.keep_failed_work_files;
+  const locked = !editable || save.isPending;
 
-  const numberField = (
-    label: string,
-    value: string,
-    setValue: (next: string) => void,
-    options: { min?: number; max?: number; step?: number; hint?: string } = {},
-  ) => (
-    // Two or three digits never needed half the page: the standard short field (.mm-field--short).
-    <label className="mm-field mm-field--short">
-      <span className="mm-field__label">{label}</span>
-      <input
-        type="number"
-        min={options.min ?? 0}
-        max={options.max}
-        step={options.step}
+  const cost = (label: string, value: string, set: (v: string) => void) => (
+    <SettingRow label={label} htmlFor={`${ids}-${label}`}>
+      <NumberWithUnit
+        id={`${ids}-${label}`}
         value={value}
-        disabled={!editable || save.isPending}
-        onChange={(event) => setValue(event.target.value)}
-        className="mm-input"
+        unit="units"
+        min={0}
+        max={64}
+        disabled={locked}
+        onChange={set}
       />
-      {options.hint ? (
-        <span className="mm-field__hint">{options.hint}</span>
-      ) : null}
-    </label>
+    </SettingRow>
   );
 
-  const toggleField = (
-    label: string,
-    detail: string,
-    checked: boolean,
-    setChecked: (next: boolean) => void,
-    warning = false,
-  ) => {
-    const flagged = warning && checked;
-    return (
-      <label
-        className={`flex items-start gap-3 border-b border-[var(--mm-border)] py-3 last:border-b-0 ${
-          flagged ? "border-l-2 border-l-[var(--mm-warning-border)] pl-3" : ""
-        }`}
-      >
-        <input
-          type="checkbox"
-          className="mt-1 h-4 w-4 shrink-0 accent-[var(--mm-accent)]"
-          checked={checked}
-          disabled={!editable || save.isPending}
-          onChange={(event) => setChecked(event.target.checked)}
-        />
-        <span>
-          <span
-            className={`block font-medium ${
-              flagged
-                ? "text-[var(--mm-status-warning-text)]"
-                : "text-[var(--mm-text1)]"
-            }`}
-          >
-            {label}
-          </span>
-          <span
-            className={`mt-0.5 block text-xs leading-5 ${
-              flagged
-                ? "text-[var(--mm-status-warning-text)]"
-                : "text-[var(--mm-text3)]"
-            }`}
-          >
-            {detail}
-          </span>
-        </span>
-      </label>
-    );
-  };
-
   return (
-    // "Processing, safety and records" was a heading that listed three unrelated things, which is
-    // what a dumping ground sounds like when you try to name it. The three groups beneath it already
-    // say what they are, so the section says the one thing they have in common instead.
-    <QuietSection
-      headingId="processing-process-settings-heading"
-      heading="How hard Weir works"
-    >
+    <div data-testid="processing-process-settings">
       <p className="mm-quiet-note">
-        These defaults apply to every library. Each library can still narrow its
-        own intake and schedule, and hold itself below Files at once.
+        How hard Weir works, what it checks before it starts a file, and what it
+        keeps when one fails. The defaults suit most machines.
       </p>
-      <div className="mt-6 text-sm leading-relaxed text-[var(--mm-text2)]">
-        {/* Three short groups of small fields ran down one 48rem column and made Running a 2.5-screen
-            scroll with most of the page empty beside them. Side by side where there is room. */}
-        <div className="grid max-w-3xl gap-10 xl:max-w-none xl:grid-cols-2 xl:gap-x-14">
-          <QuietFieldGroup
-            title="Files at once"
-            detail="How many files Weir works on at the same time, however they arrived. More at once clears a burst of imports sooner; it is mostly disk work, so a slow disk gains little past two or three."
+      <div className="mm-setgroups mm-setgroups--columns">
+        <div>
+          <SettingsGroup
+            title="How much at once"
+            detail="More at once finishes a queue sooner but works the disks harder. Past two or three, a slow disk gains little."
           >
-            <div className="mm-field-row">
-              <div className="mm-field mm-field--medium">
-                <span id={filesAtOnceLabelId} className="mm-field__label">
-                  Files at once
-                </span>
-                <MmListboxPicker
-                  className="w-full min-w-0"
-                  options={FILES_AT_ONCE_OPTIONS}
-                  value={maxConcurrentFiles}
-                  disabled={!editable || save.isPending}
-                  onChange={setMaxConcurrentFiles}
-                  ariaLabelledBy={filesAtOnceLabelId}
-                  placeholder="Select…"
-                />
-              </div>
-            </div>
-            {filesAtOnce.data ? (
-              <p
-                className="mm-quiet-note"
-                data-testid="processing-files-at-once-readout"
+            <SettingRow
+              label="Files at once"
+              hint={
+                filesAtOnce.data ? (
+                  <span data-testid="processing-files-at-once-readout">
+                    {filesAtOnce.data.running} running now.{" "}
+                    {filesAtOnce.data.message || "Nothing is waiting."}
+                  </span>
+                ) : undefined
+              }
+              stacked
+            >
+              <div
+                className="mm-choice-row"
+                role="group"
+                aria-label="Files at once"
               >
-                {filesAtOnce.data.running} running now.{" "}
-                {filesAtOnce.data.message || "Nothing is waiting."}
-                {filesAtOnce.data.slots_note
-                  ? ` ${filesAtOnce.data.slots_note}`
-                  : ""}
-              </p>
-            ) : null}
-            <div>
-              {toggleField(
-                "Also weigh files by resolution",
-                "For a machine that copes with several small files but only one 4K file. Each file then also needs units from a shared budget, so fewer than the number above may run. Leave off for the number above to mean exactly that.",
-                runnerBudgetEnabled,
-                setRunnerBudgetEnabled,
-              )}
-            </div>
-            {runnerBudgetEnabled ? (
-              <div className="mm-field-row">
-                {numberField(
-                  "Budget (units)",
-                  runnerCapacity,
-                  setRunnerCapacity,
-                  {
-                    min: 1,
-                    max: 64,
-                    hint: "A file starts only while its cost fits in what is left. A cost above the budget never starts.",
-                  },
-                )}
+                {FILES_AT_ONCE.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    aria-pressed={n === maxConcurrentFiles}
+                    disabled={locked}
+                    onClick={() => setMaxConcurrentFiles(n)}
+                  >
+                    {n}
+                  </button>
+                ))}
               </div>
+            </SettingRow>
+            <SettingRow
+              label="Also weigh files by resolution"
+              hint="For a machine that copes with several small files but only one 4K file. Off, the number above means exactly that."
+            >
+              <MmOnOffSwitch
+                id={`${ids}-budget`}
+                label="Also weigh files by resolution"
+                enabled={runnerBudgetEnabled}
+                disabled={locked}
+                onChange={setRunnerBudgetEnabled}
+                layout="control"
+              />
+            </SettingRow>
+            {runnerBudgetEnabled ? (
+              <>
+                <SettingRow
+                  label="Budget"
+                  hint="A file starts only while its cost fits in what is left."
+                  htmlFor={`${ids}-capacity`}
+                >
+                  <NumberWithUnit
+                    id={`${ids}-capacity`}
+                    value={runnerCapacity}
+                    unit="units"
+                    min={1}
+                    max={64}
+                    disabled={locked}
+                    onChange={setRunnerCapacity}
+                  />
+                </SettingRow>
+                {cost("An SD file costs", runnerCostSd, setRunnerCostSd)}
+                {cost("A 720p file costs", runnerCost720p, setRunnerCost720p)}
+                {cost(
+                  "A 1080p file costs",
+                  runnerCost1080p,
+                  setRunnerCost1080p,
+                )}
+                {cost("A 4K file costs", runnerCost4k, setRunnerCost4k)}
+                {cost(
+                  "A file of unknown size costs",
+                  runnerCostUndetermined,
+                  setRunnerCostUndetermined,
+                )}
+              </>
             ) : null}
-            <div
-              className={`grid grid-cols-2 gap-4 sm:grid-cols-4 ${runnerBudgetEnabled ? "" : "hidden"}`}
-            >
-              {numberField("SD cost", runnerCostSd, setRunnerCostSd, {
-                max: 64,
-              })}
-              {numberField("720p cost", runnerCost720p, setRunnerCost720p, {
-                max: 64,
-              })}
-              {numberField("1080p cost", runnerCost1080p, setRunnerCost1080p, {
-                max: 64,
-              })}
-              {numberField("4K cost", runnerCost4k, setRunnerCost4k, {
-                max: 64,
-              })}
-            </div>
-            <div
-              className={`mm-field-row ${runnerBudgetEnabled ? "" : "hidden"}`}
-            >
-              {numberField(
-                "Unknown-resolution cost",
-                runnerCostUndetermined,
-                setRunnerCostUndetermined,
-                {
-                  max: 64,
-                  hint: "0 admits an unmeasured file without consuming units.",
-                },
-              )}
-            </div>
-          </QuietFieldGroup>
+          </SettingsGroup>
 
-          <QuietFieldGroup
-            title="Admission safety"
-            detail="Final guardrails before Weir probes or writes a file. Keep downloader limits too; these protect the processing host."
+          <SettingsGroup
+            title="Before a file starts"
+            detail="Checks that stop Weir touching a file that is not ready. Keep your downloader's own limits too."
           >
-            <div className="mm-field-row">
-              {numberField(
-                "Minimum unchanged age (seconds)",
-                minFileAgeSeconds,
-                setMinFileAgeSeconds,
-              )}
-              {numberField(
-                "Minimum file size (MB)",
-                minInputFileSizeMb,
-                setMinInputFileSizeMb,
-                { hint: "Smaller files are skipped before probing." },
-              )}
-              {numberField(
-                "Minimum free output space (GB)",
-                minimumFreeDiskSpaceGb,
-                setMinimumFreeDiskSpaceGb,
-                {
-                  step: 0.1,
-                  hint: "No new write starts below this threshold.",
-                },
-              )}
-            </div>
-          </QuietFieldGroup>
-
-          <QuietFieldGroup
-            title="Records and cleanup"
-            detail="Choose how much diagnostic history to keep and how Weir treats its own temporary data after work finishes or fails."
-          >
-            <div className="mm-field-row">
-              {numberField(
-                "Processing-record retention (days)",
-                fileLogRetentionDays,
-                setFileLogRetentionDays,
-                { max: 3650, hint: "0 keeps file records forever." },
-              )}
-            </div>
-            <div>
-              {toggleField(
-                "Reclaim stale temporary files",
-                "Safely removes old files from Weir's private work area. Recommended and enabled by default.",
-                workTempStaleSweepEnabled,
-                setWorkTempStaleSweepEnabled,
-              )}
-              {toggleField(
-                "Keep failed work files",
-                "Leaves failed temporary outputs available for inspection; the stale sweep will not remove them.",
-                keepFailedWorkFiles,
-                setKeepFailedWorkFiles,
-              )}
-              {toggleField(
-                "Verbose file-detection records",
-                "Adds noisy intake diagnostics while troubleshooting. Turn it off again after the cause is clear.",
-                verboseDetectionLogging,
-                setVerboseDetectionLogging,
-              )}
-              {toggleField(
-                "Delete source after a terminal failure",
-                "High risk: removes the original release folder after Weir gives up. Successful processing cleanup is separate and remains automatic.",
-                failureCleanupEnabled,
-                setFailureCleanupEnabled,
-                true,
-              )}
-            </div>
-          </QuietFieldGroup>
+            <SettingRow
+              label="Wait until it stops changing for"
+              htmlFor={`${ids}-age`}
+            >
+              <NumberWithUnit
+                id={`${ids}-age`}
+                value={minFileAgeSeconds}
+                unit="seconds"
+                min={0}
+                disabled={locked}
+                onChange={setMinFileAgeSeconds}
+              />
+            </SettingRow>
+            <SettingRow
+              label="Skip files smaller than"
+              hint="Samples and extras."
+              htmlFor={`${ids}-size`}
+            >
+              <NumberWithUnit
+                id={`${ids}-size`}
+                value={minInputFileSizeMb}
+                unit="MB"
+                min={0}
+                disabled={locked}
+                onChange={setMinInputFileSizeMb}
+              />
+            </SettingRow>
+            <SettingRow
+              label="Keep free on the output drive"
+              hint="No new file starts below this."
+              htmlFor={`${ids}-free`}
+            >
+              <NumberWithUnit
+                id={`${ids}-free`}
+                value={minimumFreeDiskSpaceGb}
+                unit="GB"
+                min={0}
+                step={0.1}
+                disabled={locked}
+                onChange={setMinimumFreeDiskSpaceGb}
+              />
+            </SettingRow>
+          </SettingsGroup>
         </div>
-        {save.isError ? (
-          <p className="mm-status-text--failed mt-3 text-sm" role="alert">
-            {save.error instanceof Error ? save.error.message : "Save failed."}
-          </p>
-        ) : null}
+
+        <div>
+          <SettingsGroup
+            title="When a file fails"
+            detail="What Weir leaves behind for you to look at. Deleting the download of a failed file is a Cleanup job."
+          >
+            <SettingRow
+              label="Keep the half-written copy"
+              hint="Left in the work folder so you can look at it. Cleanup's leftover-work-file sweep leaves it alone."
+            >
+              <MmOnOffSwitch
+                id={`${ids}-keep-failed`}
+                label="Keep the half-written copy"
+                enabled={keepFailedWorkFiles}
+                disabled={locked}
+                onChange={setKeepFailedWorkFiles}
+                layout="control"
+              />
+            </SettingRow>
+          </SettingsGroup>
+        </div>
       </div>
-      <div className={`${quietActionRowClass} mt-8`}>
+
+      {save.isError ? (
+        <p className="mm-status-text--failed mt-3 text-sm" role="alert">
+          {save.error instanceof Error ? save.error.message : "Save failed."}
+        </p>
+      ) : null}
+      <div className="mt-4 flex justify-end">
         <button
           type="button"
           className={mmActionButtonClass({ variant: "primary" })}
-          disabled={!editable || !dirty || !draftValid || save.isPending}
+          disabled={!editable || !dirty || !valid || save.isPending}
           onClick={() =>
             save.mutate({
-              max_concurrent_files: draftConcurrent,
-              runner_capacity: draftRunnerCapacity,
-              runner_cost_sd: draftRunnerCostSd,
-              runner_cost_720p: draftRunnerCost720p,
-              runner_cost_1080p: draftRunnerCost1080p,
-              runner_cost_4k: draftRunnerCost4k,
-              runner_cost_undetermined: draftRunnerCostUndetermined,
+              max_concurrent_files: maxConcurrentFiles,
+              runner_capacity: costs[0],
+              runner_cost_sd: costs[1],
+              runner_cost_720p: costs[2],
+              runner_cost_1080p: costs[3],
+              runner_cost_4k: costs[4],
+              runner_cost_undetermined: costs[5],
               runner_budget_enabled: runnerBudgetEnabled,
-              work_temp_stale_sweep_enabled: workTempStaleSweepEnabled,
-              failure_cleanup_enabled: failureCleanupEnabled,
               keep_failed_work_files: keepFailedWorkFiles,
-              file_log_retention_days: draftFileLogRetentionDays,
-              verbose_detection_logging: verboseDetectionLogging,
-              min_file_age_seconds: draftMinAge,
-              min_input_file_size_mb: draftMinInputSize,
-              minimum_free_disk_space_mb: draftMinimumFreeMb,
+              min_file_age_seconds: int(minFileAgeSeconds),
+              min_input_file_size_mb: int(minInputFileSizeMb),
+              minimum_free_disk_space_mb: minimumFreeMb,
             })
           }
         >
-          {save.isPending ? "Saving…" : "Save processing settings"}
+          {save.isPending
+            ? "Saving…"
+            : dirty
+              ? "Save performance settings"
+              : "No changes to save"}
         </button>
       </div>
-    </QuietSection>
+    </div>
   );
 }

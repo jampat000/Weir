@@ -2880,6 +2880,11 @@ export interface components {
        * @enum {string}
        */
       family: "work_temp_stale_sweep" | "failure_cleanup";
+      /**
+       * Interval Seconds
+       * @description How often this job runs: the interval saved in Settings › Cleanup, else the environment's.
+       */
+      interval_seconds?: number;
       /** Last Completed At */
       last_completed_at?: string | null;
       /**
@@ -2887,6 +2892,11 @@ export interface components {
        * @description The most recent failure reason, when the last run failed.
        */
       last_error?: string | null;
+      /**
+       * Next Run At
+       * @description When the job next runs by itself. Null while it is switched off.
+       */
+      next_run_at?: string | null;
       /** Last Failed At */
       last_failed_at?: string | null;
       /**
@@ -4763,6 +4773,11 @@ export interface components {
        */
       failure_cleanup_enabled: boolean;
       /**
+       * Failure Cleanup Interval Seconds
+       * @description How often the failed-download cleanup runs, set in Settings › Cleanup. Null keeps the environment's interval.
+       */
+      failure_cleanup_interval_seconds?: number | null;
+      /**
        * File Log Retention Days
        * @description How long to keep the per-file processing record. 0 keeps it forever.
        */
@@ -4849,6 +4864,11 @@ export interface components {
        * @description Reclaim Weir's own stale working files. Safe, and on by default.
        */
       work_temp_stale_sweep_enabled: boolean;
+      /**
+       * Work Temp Stale Sweep Interval Seconds
+       * @description How often the leftover-work-file sweep runs, set in Settings › Cleanup. Null keeps the environment's interval.
+       */
+      work_temp_stale_sweep_interval_seconds?: number | null;
     };
     /**
      * ProcessingOperatorSettingsPutIn
@@ -4859,6 +4879,8 @@ export interface components {
       csrf_token: string;
       /** Failure Cleanup Enabled */
       failure_cleanup_enabled?: boolean | null;
+      /** Failure Cleanup Interval Seconds */
+      failure_cleanup_interval_seconds?: number | null;
       /** File Log Retention Days */
       file_log_retention_days?: number | null;
       /** Keep Failed Work Files */
@@ -4909,6 +4931,8 @@ export interface components {
       verbose_detection_logging?: boolean | null;
       /** Work Temp Stale Sweep Enabled */
       work_temp_stale_sweep_enabled?: boolean | null;
+      /** Work Temp Stale Sweep Interval Seconds */
+      work_temp_stale_sweep_interval_seconds?: number | null;
     };
     /** ProcessingOverviewStatsOut */
     ProcessingOverviewStatsOut: {
