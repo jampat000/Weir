@@ -166,6 +166,25 @@ public sealed class MediaManagerServiceTests
         Assert.Equal(["processing.file.remux_pass.v1:deluno:handoff:h_1:part1"], jobs.Select(j => j.DedupeKey));
     }
 
+    /// <summary>The same defect over a file's pass-through and reject jobs, whose keys carry a fingerprint after the path.</summary>
+    [Fact]
+    public async Task Pass_through_and_reject_keys_for_a_hand_off_match_its_path_exactly_not_as_a_sql_wildcard()
+    {
+        using var fixture = new MediaManagerFixture();
+        var libraryId = await fixture.LibraryAsync("movie", fixture.Store.Home.Join("movies"));
+        await fixture.Store.Execute(
+            "INSERT INTO jobs (dedupe_key, job_kind) VALUES " +
+            $"('{IntakeRules.PassThroughJobKind}:{libraryId}:Film_2024/film.mkv:fp1', '{IntakeRules.PassThroughJobKind}'), " +
+            // Under SQL LIKE, "Film_2024" wildcards the "_" and "film" matches "FILM" in any case: neither is this file.
+            $"('{IntakeRules.PassThroughJobKind}:{libraryId}:FilmX2024/film.mkv:fp2', '{IntakeRules.PassThroughJobKind}'), " +
+            $"('{IntakeRules.RejectJobKind}:{libraryId}:Film_2024/FILM.mkv:fp3', '{IntakeRules.RejectJobKind}')");
+
+        var row = new HandoffLedgerRow(1, "deluno", "h1", libraryId, "Film_2024/film.mkv", HandoffLedgerRules.Queued, null, null, null);
+        var jobs = await fixture.Db(uow => HandoffLedgerStore.JobsForAsync(uow, row));
+
+        Assert.Equal([$"{IntakeRules.PassThroughJobKind}:{libraryId}:Film_2024/film.mkv:fp1"], jobs.Select(j => j.DedupeKey));
+    }
+
     /// <summary>
     /// #544 item 6: the presented secret is matched against every enabled connection of the kind, so a second
     /// connection of the same kind (a 4K Radarr next to a 1080p one) authenticates with its own secret instead

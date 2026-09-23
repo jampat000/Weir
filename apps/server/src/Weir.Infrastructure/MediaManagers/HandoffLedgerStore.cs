@@ -237,13 +237,16 @@ public sealed class HandoffLedgerStore
             {
                 // #545 item 2: pass-through and reject dedupe keys carry the source's fingerprint as a trailing segment
                 // (so a later failure of a since-replaced file queues again), so the ledger matches the base
-                // "{kind}:{library}:{path}" either exactly (rows written by earlier releases) or as a prefix.
+                // "{kind}:{library}:{path}" either exactly (rows written by earlier releases) or as a prefix. The prefix is
+                // compared as plain text, not a LIKE pattern, so "_" or "%" in a path never matches another file (#544 item 5).
                 var passBase = $"{IntakeRules.PassThroughJobKind}:{libraryId.ToString(CultureInfo.InvariantCulture)}:{path}";
                 var rejectBase = $"{IntakeRules.RejectJobKind}:{libraryId.ToString(CultureInfo.InvariantCulture)}:{path}";
-                conditions.Add($"(dedupe_key = $pass_{index} OR dedupe_key LIKE $pass_{index} || ':%')");
+                conditions.Add($"(dedupe_key = $pass_{index} OR substr(dedupe_key, 1, length($pass_prefix_{index})) = $pass_prefix_{index})");
                 parameters.Add(($"$pass_{index}", passBase));
-                conditions.Add($"(dedupe_key = $reject_{index} OR dedupe_key LIKE $reject_{index} || ':%')");
+                parameters.Add(($"$pass_prefix_{index}", passBase + ":"));
+                conditions.Add($"(dedupe_key = $reject_{index} OR substr(dedupe_key, 1, length($reject_prefix_{index})) = $reject_prefix_{index})");
                 parameters.Add(($"$reject_{index}", rejectBase));
+                parameters.Add(($"$reject_prefix_{index}", rejectBase + ":"));
                 index++;
             }
         }
@@ -576,7 +579,7 @@ public sealed class HandoffLedgerStore
 
         if (parsed is not PyDict dict)
         {
-            throw new InvalidOperationException($"'{parsed.PythonTypeName}' object has no attribute 'get'");
+            throw new InvalidOperationException("A job's payload is not a JSON object.");
         }
 
         return dict.Get("relative_media_path") is { IsTruthy: true } value ? PyConvert.Str(value) : string.Empty;
