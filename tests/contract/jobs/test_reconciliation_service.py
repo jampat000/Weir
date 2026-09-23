@@ -1,4 +1,4 @@
-"""Contract port of the retired Python backend's tests/test_reconciliation_service.py (report and safe repairs over HTTP)."""
+"""Reconciliation: the report and its safe repairs, over HTTP."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def test_reconciliation_temp_artifact_repair_requires_confirmation(admin: WeirCl
         assert report.status_code == 200, report.text
         issue = next(item for item in report.json()["issues"] if item["kind"] == "partial_temp_artifact")
 
-        # The CSRF token is required on .NET (#527); Python ignores the extra field.
+        # A repair needs a CSRF token (#527).
         refused = admin.post_csrf(
             f"{REPORT}/repair",
             json={"action": issue["repair_action"], "path": issue["path"], "confirm": False},

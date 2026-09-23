@@ -1,4 +1,5 @@
-"""Port of the retired Python backend's tests/test_operator_settings_api.py."""
+"""Processing operator settings: schedules per media type, validation, files at once and the
+resolution budget."""
 
 from __future__ import annotations
 

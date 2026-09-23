@@ -2,25 +2,32 @@
 // The release gate's judgement of a CI run, on hand-built runs. The polling loop is exercised against
 // the real API instead (see the script's --run-id mode).
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { evaluateRun, expandEvidence, requiredContractAreas } from "./verify-ci-for-release.mjs";
+import { evaluateRun, REQUIRED_EVIDENCE } from "./verify-ci-for-release.mjs";
 
-const areas = ["auth", "processing"];
-const evidence = expandEvidence(areas);
+const evidence = REQUIRED_EVIDENCE;
 
 function passingJobs() {
-  return evidence.map((want) => ({
-    name: want.job,
-    conclusion: "success",
-    steps: want.steps.map((name) => ({ name, conclusion: "success" })),
-  }));
+  return [
+    ...evidence.map((want) => ({
+      name: want.job,
+      conclusion: "success",
+      steps: want.steps.map((name) => ({ name, conclusion: "success" })),
+    })),
+    // Jobs the verdict already judged; the gate does not look at them itself.
+    { name: "server-linux", conclusion: "skipped", steps: [] },
+    { name: "server-windows", conclusion: "success", steps: [] },
+  ];
 }
 
 const pushRun = { id: 1, event: "push", status: "completed", conclusion: "success", run_attempt: 1 };
 
-test("a completed push run where every required job and step passed qualifies", () => {
+test("the evidence is ci.yml's single verdict", () => {
+  assert.deepEqual(evidence, [{ job: "ci-passed", steps: ["Every job that was due passed"] }]);
+});
+
+test("a completed push run whose verdict passed qualifies, whatever path filtering skipped", () => {
   assert.deepEqual(evaluateRun(pushRun, passingJobs(), evidence), []);
 });
 
@@ -44,25 +51,14 @@ test("a failed, cancelled or unfinished run does not qualify", () => {
   assert.match(evaluateRun({ ...pushRun, status: "in_progress", conclusion: null }, passingJobs(), evidence)[0], /in_progress/);
 });
 
-test("a path-filtered skip is not proof: a skipped step or job fails the gate", () => {
+test("a verdict that failed, was skipped or is missing does not qualify", () => {
+  const failed = passingJobs().map((job) => (job.name === "ci-passed" ? { ...job, conclusion: "failure" } : job));
+  assert.match(evaluateRun(pushRun, failed, evidence).join("\n"), /"ci-passed" concluded failure/);
+
   const skippedStep = passingJobs();
-  skippedStep.find((job) => job.name === "weir").steps.find((step) => step.name === "Test Weir server").conclusion =
-    "skipped";
-  assert.match(evaluateRun(pushRun, skippedStep, evidence).join("\n"), /"Test Weir server" concluded skipped/);
+  skippedStep.find((job) => job.name === "ci-passed").steps[0].conclusion = "skipped";
+  assert.match(evaluateRun(pushRun, skippedStep, evidence).join("\n"), /"Every job that was due passed" concluded skipped/);
 
-  const skippedLeg = passingJobs().map((job) => (job.name === "contract (processing)" ? { ...job, conclusion: "skipped" } : job));
-  assert.match(evaluateRun(pushRun, skippedLeg, evidence).join("\n"), /"contract \(processing\)" concluded skipped/);
-});
-
-test("every required area needs its own passing leg; the aggregate alone is not enough", () => {
-  const missingLeg = passingJobs().filter((job) => job.name !== "contract (auth)");
-  assert.match(evaluateRun(pushRun, missingLeg, evidence).join("\n"), /"contract \(auth\)" is missing/);
-});
-
-test("the required areas come from areas.json, and an empty list is refused", () => {
-  const real = JSON.parse(readFileSync(new URL("../tests/contract/areas.json", import.meta.url), "utf8"));
-  const expected = real.areas.filter((area) => (area.required || []).includes("dotnet")).map((area) => area.name);
-  assert.ok(expected.length > 0);
-  assert.deepEqual(requiredContractAreas(real), expected);
-  assert.throws(() => requiredContractAreas({ areas: [{ name: "auth", required: [] }] }));
+  const missing = passingJobs().filter((job) => job.name !== "ci-passed");
+  assert.match(evaluateRun(pushRun, missing, evidence).join("\n"), /"ci-passed" is missing/);
 });

@@ -1,29 +1,10 @@
-#!/usr/bin/env bash
-# Pre-push hook — delegates to scripts/pre-push-check.ps1 on Windows.
+#!/usr/bin/env sh
+# Runs the local pre-push checks (scripts/pre-push.mjs). One-time setup: git config core.hooksPath .githooks
 set -e
-REPO=$(git rev-parse --show-toplevel)
-if command -v powershell.exe &>/dev/null; then
-    exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$REPO/scripts/pre-push-check.ps1"
-else
-    # Linux/macOS fallback (CI skips hooks, so this is for local Linux dev only)
-    PRETTIER="$REPO/apps/web/node_modules/prettier/bin/prettier.cjs"
-    if command -v ruff >/dev/null 2>&1; then
-        echo "[pre-push] ruff..."
-        (cd "$REPO" && ruff check tests/contract && ruff format --check tests/contract)
-    fi
-    if [ -f "$PRETTIER" ]; then
-        echo "[pre-push] prettier..."
-        (cd "$REPO/apps/web" && node "$PRETTIER" --check --end-of-line auto 'src/**/*.{ts,tsx,css}' index.html vite.config.ts)
-        echo "[pre-push] dead-code guard..."
-        node "$REPO/scripts/check-dead-code.mjs"
-        echo "[pre-push] api:types drift..."
-        (cd "$REPO/apps/web" && npm run api:types:generate)
-        if ! git -C "$REPO" diff --quiet -- apps/web/src/lib/api/generated/openapi-types.ts; then
-            echo "[pre-push] ERROR: generated API types out of sync with apps/web/openapi/weir-openapi.json - commit them first"
-            git -C "$REPO" diff -- apps/web/src/lib/api/generated/openapi-types.ts
-            git -C "$REPO" restore -- apps/web/src/lib/api/generated/openapi-types.ts
-            exit 1
-        fi
-    fi
-    echo "[pre-push] All checks passed."
+root="$(git rev-parse --show-toplevel)"
+if [ -f "$root/scripts/pre-push.mjs" ]; then
+    exec node "$root/scripts/pre-push.mjs"
 fi
+# core.hooksPath is shared by every worktree of a clone, so this hook also runs for branches cut before
+# scripts/pre-push.mjs existed. Those branches still carry the PowerShell checks.
+exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$root/scripts/pre-push-check.ps1"

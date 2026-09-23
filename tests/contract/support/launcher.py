@@ -1,10 +1,10 @@
 """Start, stop, restart and kill the Weir server under test.
 
 The suite never imports Weir. It starts the server as a separate process, talks to it over HTTP,
-and reads the SQLite file only while the server is stopped. The server is the .NET server
-(``WEIR_CONTRACT_SERVER=dotnet``, the only kind): ``dotnet run --project apps/server/src/Weir.Host --no-build --
---host 127.0.0.1 --port N``, or the published executable named by ``WEIR_CONTRACT_DOTNET_EXE``. It owns its
-own migrations, so "migrate" means one start-and-stop.
+and reads the SQLite file only while the server is stopped. The server runs as
+``dotnet run --project apps/server/src/Weir.Host --no-build -- --host 127.0.0.1 --port N``, or as the
+published executable named by ``WEIR_CONTRACT_DOTNET_EXE``. It owns its own migrations, so "migrate"
+means one start-and-stop.
 
 Process-tree teardown, the port guard, and the ledger that reaps servers an aborted run left
 behind all come from the E2E runtime helpers (#462). The contract suite keeps its own ledger file
@@ -33,8 +33,6 @@ WEB_DIST = REPO_ROOT / "apps" / "web" / "dist"
 DOTNET_PROJECT = REPO_ROOT / "apps" / "server" / "src" / "Weir.Host"
 
 DEFAULT_SESSION_SECRET = "contract-suite-session-secret-at-least-32-chars"
-# The kinds of server the suite can judge. The Python backend was retired in #523.
-SERVER_KINDS = ("dotnet",)
 
 
 def _load_runtime() -> ModuleType:
@@ -53,7 +51,7 @@ def _load_runtime() -> ModuleType:
 
 
 def _default_ledger_name() -> str:
-    """Per-checkout ledger filename: several worktrees on one machine (parallel agents, each with its
+    """Per-checkout ledger filename: several worktrees on one machine (each with its
     own clone of this repo) must not reap each other's contract servers through one shared ledger file,
     so the default path is salted with a short hash of this checkout's root."""
 
@@ -62,13 +60,6 @@ def _default_ledger_name() -> str:
 
 
 runtime = _load_runtime()
-
-
-def server_kind() -> str:
-    kind = (os.environ.get("WEIR_CONTRACT_SERVER") or "dotnet").strip().lower()
-    if kind not in SERVER_KINDS:
-        raise RuntimeError(f"WEIR_CONTRACT_SERVER must be one of {', '.join(SERVER_KINDS)}; got {kind!r}.")
-    return kind
 
 
 def dotnet_unavailable_reason() -> str | None:
@@ -90,7 +81,6 @@ class ServerUnderTest:
 
     home: Path
     env_overrides: dict[str, str] = field(default_factory=dict)
-    kind: str = field(default_factory=server_kind)
     port: int = 0
     process: object | None = None  # runtime.Server while running
     starts: int = 0
@@ -172,7 +162,7 @@ class ServerUnderTest:
         env["ASPNETCORE_URLS"] = self.base_url
         self.starts += 1
         server = runtime.start_server(
-            f"Weir {self.kind} server",
+            "Weir server",
             command,
             cwd=cwd,
             env=env,
@@ -190,7 +180,7 @@ class ServerUnderTest:
         self._wait_ready(timeout_s=timeout_s)
 
     def _wait_ready(self, *, timeout_s: float) -> None:
-        """``/health`` answers before the lifespan finishes on some servers; ``/ready`` is the gate."""
+        """``/health`` can answer before startup finishes; ``/ready`` is the gate."""
 
         import httpx
 

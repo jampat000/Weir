@@ -1,4 +1,4 @@
-"""Port of the retired Python backend's tests/test_alembic_revision_startup.py (schema revision checks at startup)."""
+"""Schema checks at startup: the migrated schema's tables, and a server that refuses an unmigrated database."""
 
 from __future__ import annotations
 
@@ -39,11 +39,10 @@ def test_ensure_database_at_application_head_ok_on_migrated_db(server, client_fa
 
 
 def test_head_schema_no_longer_carries_the_processing_singleton_settings_tables(head_schema) -> None:
-    """The libraries are the only store now (#363).
+    """The libraries are the only store for these settings (#363).
 
-    Asserted rather than assumed, because the whole point of dropping them was to end the
-    two-stores drift hazard, and a table quietly recreated by a later migration would put
-    it straight back.
+    Asserted rather than assumed: a table recreated by a later migration would bring back two stores
+    that drift apart.
     """
 
     assert "processing_path_settings" not in head_schema

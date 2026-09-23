@@ -216,6 +216,20 @@ def jobs(admin: WeirClient, *, kind: str | None = None) -> list[dict[str, Any]]:
     return [row for row in rows if kind is None or row["job_kind"] == kind]
 
 
+def wait_for_job_finished(admin: WeirClient, job_id: int, *, timeout_s: float = 60.0) -> dict[str, Any]:
+    """The job's inspection row once it has left ``pending`` and ``leased``."""
+
+    # Named explicitly: the default inspection list leaves out completed scan jobs.
+    finished = ("completed", "failed", "handler_ok_finalize_failed", "cancelled")
+
+    def probe() -> dict[str, Any] | None:
+        r = admin.get(f"{API}/processing/jobs/inspection", params=[("limit", 100), *(("status", s) for s in finished)])
+        assert r.status_code == 200, r.text
+        return next((row for row in r.json()["jobs"] if row["id"] == job_id), None)
+
+    return wait_until(probe, timeout_s=timeout_s, what=f"job {job_id} to finish")
+
+
 def files(admin: WeirClient, *, library_id: int | None = None) -> list[dict[str, Any]]:
     params: dict[str, Any] = {"limit": 1000}
     if library_id is not None:
@@ -254,11 +268,9 @@ def enqueue_scan(admin: WeirClient, library: dict[str, Any], *, enqueue_remux_jo
 def detect_without_queueing(admin: WeirClient, library: dict[str, Any], relative_path: str) -> dict[str, Any]:
     """Let a scan notice the file (recording its size) without queueing it, as a periodic scan would have.
 
-    Needed before a hand-off whose retries a scenario counts: a file Weir has only ever seen through a
-    hand-off has no recorded size, so the first scan after a failure treats it as a changed source and
-    starts its failure count again (#531 item 1; the correct behaviour — a hand-off's fingerprint is
-    recorded up front, so a scan never resets it — is asserted in
-    ``tests/contract/processing/test_handoff_retry_correctness.py``).
+    Scenarios that count retries use this so the file is known before the hand-off, as in normal use.
+    The hand-off-only case (#531 item 1) is covered in
+    ``tests/contract/processing/test_handoff_retry_correctness.py``.
     """
 
     enqueue_scan(admin, library, enqueue_remux_jobs=False)
@@ -330,12 +342,10 @@ def _scan_pending(admin: WeirClient) -> bool:
 
 
 def file_state_after_stop(server: ServerUnderTest, library_id: int, relative_path: str) -> dict[str, Any]:
-    """The ``files`` row, read from SQLite with the server stopped (and started again).
+    """The ``files`` row as stored, read from SQLite with the server stopped (and started again).
 
-    Used where ``GET /processing/files`` cannot answer: it fails with HTTP 500 for any page that contains a
-    ``passed_through`` or ``rejected`` row, because its response schema does not list those statuses
-    (#530; the correct behaviour is asserted in
-    ``tests/contract/processing/test_files_pass_through_reject_status.py``).
+    ``GET /processing/files`` listing ``passed_through`` and ``rejected`` rows (#530) is asserted in
+    ``tests/contract/libraries/test_processing_files_pass_through_reject_status.py``.
     """
 
     with seed.stopped(server) as conn:
@@ -350,15 +360,6 @@ def file_state_after_stop(server: ServerUnderTest, library_id: int, relative_pat
 
 def callbacks(fake: FakeManager, handoff_id: str) -> list[dict[str, Any]]:
     return [r.json for r in fake.requests_to("POST", EVENTS_PATH) if (r.json or {}).get("handoffId") == handoff_id]
-
-
-def never_within(check: Callable[[], bool], *, seconds: float, what: str) -> None:
-    """Assert ``check`` stays false for ``seconds`` (polling), for "this must not happen" claims."""
-
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        assert not check(), f"{what} happened, but it must not"
-        time.sleep(0.25)
 
 
 def deluno_setup(

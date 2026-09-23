@@ -1,4 +1,4 @@
-"""Contract port of the retired Python backend's tests/test_head_mirrors_get.py (HEAD answers like GET, without a body)."""
+"""HEAD answers like GET, without a body."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ def test_head_on_the_readiness_probe_answers(client: WeirClient) -> None:
 def test_head_on_a_post_only_route_says_method_not_allowed(server_factory, client_factory) -> None:
     """A POST-only webhook has nothing for HEAD to describe: 405, not 404.
 
-    Like the original, this runs without a bundled web app. With ``WEIR_WEB_DIST`` set, the web
+    This runs without a bundled web app. With ``WEIR_WEB_DIST`` set, the web
     app's catch-all mount answers GET and HEAD on this path with 404 instead.
     """
 

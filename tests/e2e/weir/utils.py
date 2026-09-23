@@ -1,4 +1,4 @@
-"""Plain-SQL resets and seeds for the E2E suite. Nothing here imports Weir (the server is the .NET server).
+"""Plain-SQL resets and seeds for the E2E suite. Nothing here imports Weir.
 
 Writes happen while the server runs, the same way an operator's second process would; the server does
 not cache the rows touched here.

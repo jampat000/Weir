@@ -1,4 +1,4 @@
-"""HTTP-observable parts of the retired Python backend's tests/test_rate_limit_trusted_proxy.py.
+"""Sign-in rate limiting behind a trusted proxy.
 
 With ``WEIR_TRUSTED_PROXY_IPS`` covering the peer, the login rate limit is keyed on the rightmost
 untrusted ``X-Forwarded-For`` address, so clients behind one proxy do not share a bucket.

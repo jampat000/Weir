@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Weir.Tray/Weir.Tray.csproj" />
+  <Project Path="Weir.Tray.Tests/Weir.Tray.Tests.csproj" />
+</Solution>

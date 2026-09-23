@@ -35,7 +35,7 @@ def test_saved_state_persists_across_settings_and_processing(
             ensure_signed_in(page, base)
 
             # The setup wizard reopens from System › About, where it folds away because it
-            # is run once. Display density was removed in 3.2: not in the wizard, not on the page.
+            # is run once. There is no display density setting, in the wizard or on the page.
             open_sidebar(page, "System")
             expect(page.get_by_test_id("suite-settings-global")).to_be_visible()
             page.get_by_role("heading", name="Setup wizard", exact=True).click()

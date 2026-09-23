@@ -1,8 +1,7 @@
 """Starting and stopping the servers an E2E run needs, so that runs cannot affect each other (#462).
 
-The suite used to fail intermittently in a full run and pass in isolation. The cause was almost
-always an API or Vite process left behind by an earlier aborted run, still holding that run's data
-folder, and the symptom arrived three steps later as a mystery sign-in failure. The rules here:
+An API or Vite process left behind by an aborted run, still holding that run's data folder, makes a
+later run fail intermittently, three steps later, as an unexplained sign-in failure. The rules here:
 
 - **Every run gets its own data folder**, even when ``WEIR_E2E_HOME`` names a parent.
 - **Servers are started in their own process group and stopped as a tree**, and every server is

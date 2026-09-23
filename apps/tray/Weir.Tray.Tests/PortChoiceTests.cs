@@ -6,29 +6,17 @@ using Xunit;
 namespace Weir.Tray.Tests;
 
 /// <summary>
-/// The tray used to re-pick a free port on every start, so a user whose port was busy once
-/// got a different address the next time and their bookmark broke. These pin the rules that
-/// replace it: chosen once, saved, reused, never moved without asking — and never a dialog
-/// with nobody at a desktop to answer it.
+/// A port that moved on its own would break every bookmark to Weir. These pin the rules: chosen
+/// once, saved, reused, never moved without asking — and never a dialog with nobody at a desktop
+/// to answer it.
 /// </summary>
 public sealed class PortChoiceTests : IDisposable
 {
-    private readonly string _home;
-    private readonly string? _previousHome;
+    private readonly TempDirectory _temp = TempDirectory.AsWeirHome();
 
-    public PortChoiceTests()
-    {
-        _home = Path.Combine(Path.GetTempPath(), "weir-tray-tests", Guid.NewGuid().ToString("n"));
-        Directory.CreateDirectory(_home);
-        _previousHome = Environment.GetEnvironmentVariable("WEIR_HOME");
-        Environment.SetEnvironmentVariable("WEIR_HOME", _home);
-    }
+    public void Dispose() => _temp.Dispose();
 
-    public void Dispose()
-    {
-        Environment.SetEnvironmentVariable("WEIR_HOME", _previousHome);
-        try { Directory.Delete(_home, recursive: true); } catch { }
-    }
+    private string Home => _temp.Path;
 
     private static Func<int, bool> Busy(params int[] ports) => p => ports.Contains(p);
 
@@ -236,25 +224,25 @@ public sealed class PortChoiceTests : IDisposable
     [Fact]
     public void Nothing_saved_is_null()
     {
-        Assert.Null(PortChoice.LoadSaved(_home));
+        Assert.Null(PortChoice.LoadSaved(Home));
     }
 
     [Fact]
     public void A_saved_port_round_trips()
     {
-        PortChoice.Save(_home, 9400);
+        PortChoice.Save(Home, 9400);
 
-        Assert.Equal(9400, PortChoice.LoadSaved(_home));
-        Assert.Equal("9400", File.ReadAllText(Path.Combine(_home, "port.txt")));
-        Assert.Empty(Directory.GetFiles(_home, "*.tmp"));
+        Assert.Equal(9400, PortChoice.LoadSaved(Home));
+        Assert.Equal("9400", File.ReadAllText(Path.Combine(Home, "port.txt")));
+        Assert.Empty(Directory.GetFiles(Home, "*.tmp"));
     }
 
     [Fact]
     public void A_damaged_saved_port_reads_as_not_chosen()
     {
-        File.WriteAllText(Path.Combine(_home, "port.txt"), "not a port");
+        File.WriteAllText(Path.Combine(Home, "port.txt"), "not a port");
 
-        Assert.Null(PortChoice.LoadSaved(_home));
+        Assert.Null(PortChoice.LoadSaved(Home));
     }
 
     // -- The machine -------------------------------------------------------------

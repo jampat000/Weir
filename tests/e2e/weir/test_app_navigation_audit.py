@@ -16,7 +16,7 @@ pytestmark = [
     ),
 ]
 
-# Settings tab -> what it shows (3.2). Settings is about your media; Weir itself is System.
+# Settings tab -> what it shows. Settings is about your media; Weir itself is System.
 SETTINGS_TABS = (
     ("Libraries", "processing-libraries-section"),
     ("Rules", "processing-rule-set-workspace"),
@@ -38,7 +38,7 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
 
             ensure_signed_in(page, base)
 
-            # Five places since 3.2: Processing (the landing screen), History, Library, Settings and System.
+            # Five places: Processing (the landing screen), History, Library, Settings and System.
             primary = page.get_by_role("navigation", name="Primary")
             # The labels, not the links: the Processing link also carries its "1 working" badge while a file runs.
             expect(primary.locator(".mm-sidebar-link-label")).to_have_text(
@@ -51,7 +51,7 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
             expect(page).to_have_url(re.compile(r".*/(?:$|[?#])"))
             expect(page.get_by_test_id("processing-page")).to_be_visible()
             expect(page.get_by_role("heading", name="Processing", exact=True)).to_be_visible()
-            # Older than 3.1 gets the not-found page, not a hidden alias.
+            # A retired address gets the not-found page, not a hidden alias.
             page.goto(f"{base}/dashboard", wait_until="domcontentloaded")
             expect(page.get_by_role("heading", name="Page not found", exact=True)).to_be_visible()
             page.goto(base + "/", wait_until="domcontentloaded")
@@ -84,10 +84,10 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
             )
             expect(page.get_by_test_id("suite-settings-global")).to_be_visible()
             expect(page.get_by_text("Setup wizard", exact=True)).to_be_visible()
-            # The time zone lives in Settings › Schedule now, beside the times it governs.
+            # The time zone lives in Settings › Schedule, beside the times it governs.
             expect(page.get_by_text("Time zone", exact=True)).to_have_count(0)
             expect(page.get_by_text("Updates", exact=True)).to_be_visible()
-            # Display density was removed in 3.2 and must not come back.
+            # There is no display density setting.
             expect(page.get_by_text("Display density", exact=False)).to_have_count(0)
             expect(page.locator("html")).not_to_have_attribute("data-mm-density", re.compile(".*"))
 
@@ -112,7 +112,8 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
             expect(page.get_by_text("Server diagnostics", exact=True)).to_be_visible()
             expect(page.get_by_text("System events", exact=True)).to_be_visible()
 
-            # 3.1 has been installed, so its addresses land on the same thing in its new place.
+            # Addresses users may have saved (/activity and the Processing tabs) land on the same thing
+            # in its current place.
             page.goto(f"{base}/activity", wait_until="domcontentloaded")
             expect(page).to_have_url(re.compile(r".*/system\?tab=logs$"))
             expect(page.get_by_test_id("activity-feed")).to_be_visible()

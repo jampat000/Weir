@@ -1,10 +1,9 @@
 """Black-box processing: per-title output-folder cleanup after a successful pass.
 
-Issue #545 item 1: cleanup used to treat "the manager reports no library files inside this
-folder" as proof the folder is safe to remove, even when that is exactly what a manager that has
-not scanned or finished importing yet looks like (or one that imports by copy and scans later).
-The correct behaviour never deletes the folder until a manager has positive evidence of the
-release, or the hand-off ledger already recorded the outcome as delivered.
+#545 item 1: "the manager reports no library files inside this folder" is not proof the folder is
+safe to remove, because that is exactly what a manager that has not scanned or finished importing yet
+looks like (or one that imports by copy and scans later). The folder is deleted only once a manager
+has positive evidence of the release, or the hand-off ledger has recorded the outcome as delivered.
 """
 
 from __future__ import annotations
@@ -48,9 +47,8 @@ def _enqueue_pass_through_unchanged(admin, *, relative_media_path: str, library_
 
 
 def _wait_for_the_pass_to_finish(admin) -> None:
-    # A manual enqueue with no prior scan leaves no Files row for GET /processing/files to report on
-    # (mark_file_status is a no-op with nothing to update), so this watches the job itself — the
-    # same reason the Radarr-queue scenario in test_failure_policies.py does the same.
+    # A manual enqueue with no prior scan may leave no Files row for GET /processing/files to report
+    # on, so this watches the job itself, as the Radarr-queue scenario in test_failure_policies.py does.
     wait_until(
         lambda: any(j["status"] == "completed" for j in h.jobs(admin, kind=h.REMUX_KIND)) or None,
         timeout_s=60,
@@ -97,7 +95,7 @@ def test_output_folder_is_removed_once_the_manager_confirms_the_import(
 ) -> None:
     """Same shape as above, but the manager's library now names this release (moved to its own
     path, as a manager that renames or reorganises on import would record it) — the positive
-    evidence the folder-cleanup gate looks for, so the folder is removed as before.
+    evidence the folder-cleanup gate looks for, so the folder is removed.
     """
 
     _server, admin = _signed_in_working_server(server_factory, client_factory, fake_ffmpeg)

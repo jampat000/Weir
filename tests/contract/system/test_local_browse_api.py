@@ -1,4 +1,4 @@
-"""Port of the retired Python backend's tests/test_local_browse_api.py (GET ``/api/v1/system/directories``)."""
+"""Directory browsing for folder pickers (GET ``/api/v1/system/directories``)."""
 
 from __future__ import annotations
 

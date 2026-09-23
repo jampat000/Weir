@@ -1,16 +1,5 @@
-"""Correct behaviour for #530: GET /api/v1/processing/files must not 500 on a page containing a
-``passed_through`` or ``rejected`` row, and filtering by either status must work.
-
-On Python, ``ProcessingFileOut.status`` (``schemas_files.py``) does not list ``passed_through``
-or ``rejected`` even though #471 added both as file statuses, so pydantic response validation raises
-and the endpoint answers 500 for any page containing one. ``file_status=passed_through`` (or
-``rejected``) as a *filter* is refused for the same reason: it is outside the ``Literal``.
-
-``tests/contract/processing/_helpers.py``'s ``file_state_after_stop`` reads SQLite directly today
-because of this bug on Python; see the comment there.
-
-.NET's ``ProcessingFilesEndpoints`` (port/processing-apis, #522) already lists both statuses and both
-filter values, so this passes there.
+"""#530: GET /api/v1/processing/files must not 500 on a page containing a ``passed_through`` or
+``rejected`` row (both file statuses since #471), and filtering by either status must work.
 """
 
 from __future__ import annotations

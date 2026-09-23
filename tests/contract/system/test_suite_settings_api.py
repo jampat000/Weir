@@ -1,4 +1,5 @@
-"""Port of the retired Python backend's tests/test_suite_settings_api.py."""
+"""Suite settings (``/suite/settings``): access, defaults, validation, the setup wizard state, log
+retention and the configuration backup tick."""
 
 from __future__ import annotations
 

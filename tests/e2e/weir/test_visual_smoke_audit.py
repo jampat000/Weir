@@ -3,9 +3,8 @@
 Run with WEIR_E2E=1. Screenshots are saved to artifacts/screenshots/ for
 visual inspection. The artifacts/ directory is .gitignored so no pixel-exact
 baselines are committed; these are informational smoke checks. What is asserted is
-the structure of each screen, rebaselined for the 3.2 screens: Processing at "/"
-(it replaced Home), Settings and System as two rows of tabs, and System › Logs
-(the 3.1 Activity page) with its history statement.
+the structure of each screen: Processing at "/", Settings and System as two rows of
+tabs, and System › Logs with its history statement.
 
 Usage:
     WEIR_E2E=1 pytest tests/e2e/weir/test_visual_smoke_audit.py -v
@@ -101,9 +100,9 @@ def _assert_tab_workspace(page, *, page_test_id: str, tabs_test_id: str) -> None
 
 
 def test_old_dashboard_address_is_not_found(weir_shell: str) -> None:
-    """Addresses older than 3.1 get the not-found page, which offers the way to Processing.
+    """A retired address such as /dashboard gets the not-found page, which offers the way to Processing.
 
-    3.0.0 dropped the /dashboard redirect; 3.2 redirects only what a 3.1 user could have saved.
+    Only addresses a user could still have saved are redirected; /dashboard is not one of them.
     """
     base = weir_shell.rstrip("/")
     with sync_playwright() as p:
@@ -130,7 +129,7 @@ def test_old_dashboard_address_is_not_found(weir_shell: str) -> None:
 
 
 def test_processing_is_the_landing_page(weir_shell: str) -> None:
-    """3.2 lands on Processing at "/": every file Weir is working on. It replaced Home."""
+    """Weir lands on Processing at "/": every file Weir is working on. There is no Home page."""
     base = weir_shell.rstrip("/")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -154,7 +153,7 @@ def test_processing_is_the_landing_page(weir_shell: str) -> None:
 
 
 def test_history_says_how_far_back_it_goes(weir_shell: str) -> None:
-    """System › Logs (the 3.1 Activity page) states its history horizon plainly (#469)."""
+    """System › Logs states its history horizon plainly (#469)."""
     base = weir_shell.rstrip("/")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -284,7 +283,7 @@ def test_rules_editor_renders(weir_shell: str) -> None:
             open_tab(page, "Settings", "Rules")
             expect(page.get_by_test_id("processing-rule-set-workspace")).to_be_visible()
             page.get_by_role("button", name="New profile →", exact=True).click()
-            # The profile bar (3.2): the picker, the name and who uses it on one line; the field is "Name".
+            # The profile bar: the picker, the name and who uses it on one line; the field is "Name".
             expect(page.get_by_test_id("rule-set-profile-bar").get_by_label("Name", exact=True)).to_be_visible()
             expect(page.get_by_text("Audio order", exact=True)).not_to_be_visible()
 
@@ -297,8 +296,10 @@ def test_rules_editor_renders(weir_shell: str) -> None:
                 full_page=True,
             )
             page.set_viewport_size({"width": 390, "height": 844})
+            # At phone width the side menu slides out; it turns hidden only once the slide has finished.
+            expect(page.get_by_test_id("shell-nav-toggle")).to_be_visible()
+            expect(page.locator("#mm-primary-sidebar")).to_be_hidden()
             _scroll_to_top(page)
-            page.wait_for_timeout(300)
             _save_screenshot(page, "settings-rules-mobile")
         finally:
             browser.close()
