@@ -1307,8 +1307,16 @@
   color: var(--mm-text2);
 }
 
+/* Every number in a group lines up: the box is one width and its unit sits in a fixed column after it, so
+   "seconds", "MB" and "GB" do not push the boxes to different places. */
 .mm-setrow__number {
-  width: var(--mm-field-short);
+  width: 6.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-setrow__unit > span {
+  min-width: 3.75rem;
 }
 
 /* A row of numbered choices (Files at once): one press, no dropdown to open. */
