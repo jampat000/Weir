@@ -1,5 +1,4 @@
-"""A deactivated sole admin must not brick the install (#456): sign-in rejects it, so bootstrap reopens.
-"""
+"""A deactivated sole admin must not brick the install (#456): sign-in rejects it, so bootstrap reopens."""
 
 from __future__ import annotations
 
