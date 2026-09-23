@@ -101,7 +101,7 @@ public sealed class RemuxPassVisibilityTests
 
         var failed = RemuxPassVisibility.ClipForActivity(new PyDict().Set("ok", false).Set("outcome", RemuxPassOutcomes.FailedDuringExecution));
         Assert.Equal("failed", PyConvert.Str(failed["result"]));
-        Assert.Contains("Try again on the Files screen", PyConvert.Str(failed["next_action"]), StringComparison.Ordinal);
+        Assert.Contains("use Try again there", PyConvert.Str(failed["next_action"]), StringComparison.Ordinal);
 
         var handedBack = RemuxPassVisibility.ClipForActivity(new PyDict().Set("ok", false).Set("outcome", RemuxPassOutcomes.FailedDuringExecution).Set("pass_through_queued", true));
         Assert.False(handedBack.ContainsKey("next_action"));

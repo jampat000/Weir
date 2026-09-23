@@ -123,7 +123,7 @@ public static partial class SourceFiles
         var info = new FileInfo(path);
         if (!info.Exists)
         {
-            throw new FileNotFoundException($"[Errno 2] No such file or directory: '{path}'", path);
+            throw new FileNotFoundException($"{path} could not be found.", path);
         }
 
         var modifiedNs = (info.LastWriteTimeUtc - DateTime.UnixEpoch).Ticks * 100;

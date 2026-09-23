@@ -124,7 +124,7 @@ public static class ManagerDialectRules
             PyDict dict => dict.Get("records"),
             // Any other truthy shape is not a queue answer: throw, and the caller answers with a 500.
             _ when !payload.IsTruthy => null,
-            _ => throw new InvalidOperationException($"'{payload.PythonTypeName}' object has no attribute 'get'"),
+            _ => throw new InvalidOperationException("The media manager's queue answer was neither a list nor an object with records."),
         };
         return [.. PyValues.Dicts(records).Select(row => new ManagerQueueRow(scope, row))];
     }

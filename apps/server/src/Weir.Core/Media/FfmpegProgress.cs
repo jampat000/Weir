@@ -123,18 +123,18 @@ public sealed class FfmpegProgressTracker
     {
         if (double.IsNaN(value))
         {
-            throw new RulesInputException("ValueError", "cannot convert float NaN to integer");
+            throw new RulesInputException("ValueError", "An ffmpeg progress time is not a number.");
         }
 
         if (double.IsInfinity(value))
         {
-            throw new RulesInputException("OverflowError", "cannot convert float infinity to integer");
+            throw new RulesInputException("OverflowError", "An ffmpeg progress time is infinite.");
         }
 
         var truncated = Math.Truncate(value);
         if (truncated is >= 9.2233720368547758e18 or < -9.2233720368547758e18)
         {
-            throw new RulesInputException("OverflowError", string.Create(CultureInfo.InvariantCulture, $"{value} is outside the range the .NET port supports"));
+            throw new RulesInputException("OverflowError", string.Create(CultureInfo.InvariantCulture, $"The ffmpeg progress time {value} is too large to use."));
         }
 
         return truncated;

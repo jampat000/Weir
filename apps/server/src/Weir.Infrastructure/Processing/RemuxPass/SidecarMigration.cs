@@ -1,3 +1,4 @@
+using Weir.Core.Json;
 using Weir.Core.Text;
 using Weir.Infrastructure.MediaManagers;
 
@@ -39,7 +40,7 @@ public static class SidecarMigration
         var output = new List<string>();
         foreach (var raw in (csv ?? string.Empty).Split(','))
         {
-            var text = Weir.Core.Json.PyStrings.Strip(raw).ToLowerInvariant();
+            var text = PyStrings.Strip(raw).ToLowerInvariant();
             if (text.Length == 0)
             {
                 continue;
@@ -164,7 +165,7 @@ public static class SidecarMigration
         {
             if (!File.Exists(sourceMedia))
             {
-                throw new FileNotFoundException($"[Errno 2] No such file or directory: '{sourceMedia}'");
+                throw new FileNotFoundException($"{sourceMedia} could not be found");
             }
 
             accessed = File.GetLastAccessTimeUtc(sourceMedia);
@@ -179,7 +180,7 @@ public static class SidecarMigration
         {
             if (!File.Exists(outputMedia))
             {
-                throw new FileNotFoundException($"[Errno 2] No such file or directory: '{outputMedia}'");
+                throw new FileNotFoundException($"{outputMedia} could not be found");
             }
 
             File.SetLastAccessTimeUtc(outputMedia, accessed);

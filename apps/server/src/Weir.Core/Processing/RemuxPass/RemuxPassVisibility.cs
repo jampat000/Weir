@@ -130,7 +130,7 @@ public static class RemuxPassVisibility
         if (result == "failed" && !(Truthy(output.Get("pass_through_queued")) || Truthy(output.Get("reject_queued"))))
         {
             // The reason stays in the detail; an action is something the operator can do.
-            nextAction = "Open this file's processing record for what went wrong, fix the cause, then use Try again on the Files screen.";
+            nextAction = "Open this file on the History screen for what went wrong, fix the cause, then use Try again there.";
         }
 
         var envelope = OperatorMessages.ActivityDetailEnvelope(

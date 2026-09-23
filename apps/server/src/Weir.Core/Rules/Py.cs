@@ -107,7 +107,7 @@ internal static class Py
 
         if (!IsStr(value))
         {
-            throw new RulesInputException("AttributeError", $"'{TypeName(value)}' object has no attribute 'strip'");
+            throw new RulesInputException("AttributeError", $"Expected text but found {KindText(value)}.");
         }
 
         return value!.Value.GetString()!;
@@ -121,7 +121,7 @@ internal static class Py
     {
         if (value is not { } v || v.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
         {
-            throw new RulesInputException("TypeError", "int() argument must be a string, a bytes-like object or a real number, not 'NoneType'");
+            throw new RulesInputException("TypeError", "Expected a whole number but found nothing.");
         }
 
         switch (v.ValueKind)
@@ -137,7 +137,7 @@ internal static class Py
             case JsonValueKind.String:
                 return IntFromText(v.GetString()!);
             default:
-                throw new RulesInputException("TypeError", $"int() argument must be a string, a bytes-like object or a real number, not '{TypeName(v)}'");
+                throw new RulesInputException("TypeError", $"Expected a whole number but found {KindText(v)}.");
         }
     }
 
@@ -161,7 +161,7 @@ internal static class Py
     {
         if (!PythonCompat.TryParseInt(PyStrings.Strip(text), out var parsed))
         {
-            throw new RulesInputException("ValueError", $"invalid literal for int() with base 10: {Repr(text)}");
+            throw new RulesInputException("ValueError", $"{Repr(text)} is not a whole number.");
         }
 
         return parsed;
@@ -322,15 +322,15 @@ internal static class Py
     /// <summary>The quoted repr form of a string.</summary>
     public static string Repr(string text) => PyStrings.Repr(text);
 
-    private static string TypeName(JsonElement? value) => value?.ValueKind switch
+    private static string KindText(JsonElement? value) => value?.ValueKind switch
     {
-        null or JsonValueKind.Null or JsonValueKind.Undefined => "NoneType",
-        JsonValueKind.True or JsonValueKind.False => "bool",
-        JsonValueKind.String => "str",
-        JsonValueKind.Number when IsFloatNumber(value.Value) => "float",
-        JsonValueKind.Number => "int",
-        JsonValueKind.Array => "list",
-        JsonValueKind.Object => "dict",
-        _ => "object",
+        null or JsonValueKind.Null or JsonValueKind.Undefined => "nothing",
+        JsonValueKind.True or JsonValueKind.False => "true or false",
+        JsonValueKind.String => "text",
+        JsonValueKind.Number when IsFloatNumber(value.Value) => "a decimal number",
+        JsonValueKind.Number => "a whole number",
+        JsonValueKind.Array => "a list",
+        JsonValueKind.Object => "an object",
+        _ => "an unknown value",
     };
 }
