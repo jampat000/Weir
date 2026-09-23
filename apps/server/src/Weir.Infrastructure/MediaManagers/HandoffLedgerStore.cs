@@ -14,6 +14,8 @@ namespace Weir.Infrastructure.MediaManagers;
 /// <summary>
 /// One <c>media_manager_handoffs</c> row. <see cref="Outcome"/> is the manager's own word on what became of the file
 /// (<c>imported</c> or <c>not-imported</c>, #652), with what Weir answered and whether it released its copy.
+/// <see cref="ConnectionId"/> is the connection this hand-off belongs to when that was unambiguous at intake; a
+/// hand-off route that reveals file paths requires that connection's own secret, never another same-kind one (H3).
 /// </summary>
 public sealed record HandoffLedgerRow(
     long Id,
@@ -29,7 +31,8 @@ public sealed record HandoffLedgerRow(
     string? OutcomeMessage = null,
     bool OutcomeReleased = false,
     string? DownloadId = null,
-    DateTimeOffset? ReceivedAt = null);
+    DateTimeOffset? ReceivedAt = null,
+    long? ConnectionId = null);
 
 /// <summary>The <c>files</c> columns the ledger reads.</summary>
 public sealed record HandoffFileRow(long Id, string RelativePath, string Status, string StatusReason, long FailureAttempts, DateTimeOffset? NextRetryAt, DateTimeOffset? UpdatedAt);
@@ -42,7 +45,7 @@ public sealed class HandoffLedgerStore
 {
     private const string LedgerColumns =
         "id, source_key, handoff_id, library_id, relative_path, state, output_path, message, last_changed_at, outcome, outcome_message, " +
-        "outcome_released, download_id, created_at";
+        "outcome_released, download_id, created_at, connection_id";
 
     private readonly TimeProvider _time;
 
@@ -65,9 +68,12 @@ public sealed class HandoffLedgerStore
     /// <summary>
     /// Record a hand-off at intake. A repeat of a finished hand-off starts it over, and so forgets what the
     /// manager said about the last copy (#652). The manager's download id, when it sent one, is kept so a Sonarr or Radarr
-    /// import can be matched by it.
+    /// import can be matched by it. <paramref name="connectionId"/> is who the intake webhook attributed the event to
+    /// (<see cref="MediaManagerIntake.AuthoriseAsync"/>); it is recorded once, at first receipt, and never overwritten by
+    /// a resend, so a hand-off keeps the same owner across its whole lifetime.
     /// </summary>
-    public async Task RecordReceivedAsync(UnitOfWork uow, string sourceKey, string handoffId, long? libraryId, string relativePath, string? downloadId = null)
+    public async Task RecordReceivedAsync(
+        UnitOfWork uow, string sourceKey, string handoffId, long? libraryId, string relativePath, long? connectionId = null, string? downloadId = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var now = PythonTimestamps.Orm(_time.GetUtcNow());
@@ -75,27 +81,29 @@ public sealed class HandoffLedgerStore
         if (row is null)
         {
             await uow.ExecuteAsync(
-                "INSERT INTO media_manager_handoffs (source_key, handoff_id, library_id, relative_path, state, output_path, message, created_at, last_changed_at, download_id) " +
-                "VALUES ($source, $id, $library, $path, $state, NULL, NULL, $now, $now, $download)",
+                "INSERT INTO media_manager_handoffs (source_key, handoff_id, library_id, relative_path, state, output_path, message, created_at, last_changed_at, download_id, connection_id) " +
+                "VALUES ($source, $id, $library, $path, $state, NULL, NULL, $now, $now, $download, $connection)",
                 ("$source", sourceKey),
                 ("$id", handoffId),
                 ("$library", libraryId),
                 ("$path", relativePath),
                 ("$state", HandoffLedgerRules.Queued),
                 ("$now", now),
-                ("$download", string.IsNullOrWhiteSpace(downloadId) ? null : downloadId.Trim())).ConfigureAwait(false);
+                ("$download", string.IsNullOrWhiteSpace(downloadId) ? null : downloadId.Trim()),
+                ("$connection", connectionId)).ConfigureAwait(false);
         }
         else if (HandoffLedgerRules.TerminalStates.Contains(row.State))
         {
             await uow.ExecuteAsync(
                 "UPDATE media_manager_handoffs SET library_id = $library, relative_path = $path, state = $state, output_path = NULL, " +
                 "message = NULL, last_changed_at = $now, outcome = NULL, outcome_at = NULL, outcome_message = NULL, outcome_released = 0, " +
-                "pending_report_json = NULL, download_id = coalesce($download, download_id) WHERE id = $row",
+                "pending_report_json = NULL, download_id = coalesce($download, download_id), connection_id = coalesce($connection, connection_id) WHERE id = $row",
                 ("$library", libraryId),
                 ("$path", relativePath),
                 ("$state", HandoffLedgerRules.Queued),
                 ("$now", now),
                 ("$download", string.IsNullOrWhiteSpace(downloadId) ? null : downloadId.Trim()),
+                ("$connection", connectionId),
                 ("$row", row.Id)).ConfigureAwait(false);
         }
     }
@@ -615,5 +623,23 @@ public sealed class HandoffLedgerStore
         SqliteValues.GetStringOrNull(reader, 10),
         SqliteValues.GetBool(reader, 11),
         SqliteValues.GetStringOrNull(reader, 12),
-        PythonTimestamps.Parse(reader.GetValue(13)));
+        PythonTimestamps.Parse(reader.GetValue(13)),
+        reader.IsDBNull(14) ? null : SqliteValues.GetInt64(reader, 14));
+
+    internal static ProcessingJob ReadJob(SqliteDataReader reader) => new(
+        reader.GetInt64(0),
+        reader.GetString(1),
+        reader.GetString(2),
+        reader.IsDBNull(3) ? null : reader.GetString(3),
+        reader.GetString(4),
+        reader.IsDBNull(5) ? null : reader.GetString(5),
+        PythonTimestamps.Parse(reader.GetValue(6)),
+        (int)reader.GetInt64(7),
+        (int)reader.GetInt64(8),
+        reader.IsDBNull(9) ? null : reader.GetString(9),
+        PythonTimestamps.Parse(reader.GetValue(10)),
+        (int)reader.GetInt64(11),
+        (int)reader.GetInt64(12),
+        PythonTimestamps.Parse(reader.GetValue(13)) ?? DateTimeOffset.MinValue,
+        PythonTimestamps.Parse(reader.GetValue(14)) ?? DateTimeOffset.MinValue);
 }

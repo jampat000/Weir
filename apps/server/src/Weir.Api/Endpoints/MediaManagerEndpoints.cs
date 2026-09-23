@@ -380,7 +380,7 @@ public static class MediaManagerEndpoints
         var dialect = ImportEvents.DialectForSource(sourceKey)
             ?? throw new ApiException(StatusCodes.Status404NotFound, IntakeRules.UnknownSourceDetail(sourceKey));
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var signed = await RefusalsAsApiErrors(() => Intake(request).AuthoriseAsync(uow, dialect.Key, presented)).ConfigureAwait(false);
+        var identity = await RefusalsAsApiErrors(() => Intake(request).AuthoriseAsync(uow, dialect.Key, presented)).ConfigureAwait(false);
 
         var importEvent = dialect.Normalize(payload);
         if (importEvent is null)
@@ -393,7 +393,7 @@ public static class MediaManagerEndpoints
             // #652: Sonarr's and Radarr's "imported" is heard now. A file Weir handed back is recorded, and Weir's copy
             // released when that is safe; anything else is answered as before and changes nothing.
             var imported = await request.Service<HandbackOutcomes>()
-                .RecordManagerImportAsync(uow, importEvent, ManagerName(dialect.Key), signed).ConfigureAwait(false);
+                .RecordManagerImportAsync(uow, importEvent, ManagerName(dialect.Key), identity.Authenticated).ConfigureAwait(false);
             if (!imported.Matched)
             {
                 return ApiRoutes.Ok(new PyDict().Set("status", "ignored").Set("source", dialect.Key).Set("event", importEvent.EventKind));
@@ -409,7 +409,7 @@ public static class MediaManagerEndpoints
                 .Set("message", imported.Message));
         }
 
-        var enqueued = await RefusalsAsApiErrors(() => Intake(request).EnqueueRefineAsync(uow, importEvent)).ConfigureAwait(false);
+        var enqueued = await RefusalsAsApiErrors(() => Intake(request).EnqueueRefineAsync(uow, importEvent, identity.ConnectionId)).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(new PyDict()
             .Set("status", "ok")
@@ -428,11 +428,7 @@ public static class MediaManagerEndpoints
     {
         var presented = request.FirstHeader("X-Webhook-Secret");
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await RefusalsAsApiErrors(async () =>
-        {
-            await Intake(request).RequireSecretAsync(uow, presented, null).ConfigureAwait(false);
-            return 0;
-        }).ConfigureAwait(false);
+        await RefusalsAsApiErrors(() => Intake(request).RequireSecretAsync(uow, presented, null)).ConfigureAwait(false);
         return ApiRoutes.Ok(new PyDict().Set("capabilities", new PyList(IntakeRules.HandoffCapabilities.Select(c => (PyJson)new PyStr(c)))));
     }
 
@@ -443,13 +439,19 @@ public static class MediaManagerEndpoints
         var presented = request.FirstHeader("X-Webhook-Secret");
         var key = Source(sourceKey);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await RefusalsAsApiErrors(async () =>
-        {
-            await Intake(request).RequireSecretAsync(uow, presented, key).ConfigureAwait(false);
-            return 0;
-        }).ConfigureAwait(false);
+        var identity = await RefusalsAsApiErrors(() => Intake(request).RequireSecretAsync(uow, presented, key)).ConfigureAwait(false);
         var row = await HandoffLedgerStore.FindAsync(uow, key, handoffId).ConfigureAwait(false)
             ?? throw new ApiException(StatusCodes.Status404NotFound, IntakeRules.NeverReceivedDetail);
+
+        // H3: a secret that proves a specific, different connection must not unlock this hand-off. A secret that
+        // proved nothing more specific than "the instance-wide secret" is the pre-existing, weaker tier this
+        // hand-off already accepted (its own connection, if it has one, never bothered to set its own secret
+        // either) and stays accepted, matching AuthoriseAsync's own fallback.
+        if (row.ConnectionId is { } owner && identity.ConnectionId is { } matched && matched != owner)
+        {
+            throw new ApiException(StatusCodes.Status401Unauthorized, IntakeRules.MissingSecretDetail);
+        }
+
         return (uow, key, row);
     }
 

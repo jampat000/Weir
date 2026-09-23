@@ -37,6 +37,15 @@ public sealed class IntakeRefusedException : Exception
 }
 
 /// <summary>
+/// Who an intake caller proved itself as. <see cref="ConnectionId"/> is the specific connection whose own secret
+/// matched, when one did; it is <see langword="null"/> when the caller proved itself only through the instance-wide
+/// secret (or, for a single unambiguous connection with no secret, is left unauthenticated but still attributable).
+/// A hand-off route that reveals file paths must accept only the secret of the connection its own row names as
+/// owner, never any other connection's secret of the same kind.
+/// </summary>
+public readonly record struct MediaManagerIntakeIdentity(bool Authenticated, long? ConnectionId);
+
+/// <summary>
 /// The intake webhook's work: who may post, which library a hand-off belongs to, which files
 /// it means, and the remux jobs and ledger row it leaves behind.
 /// </summary>
@@ -72,27 +81,38 @@ public sealed class MediaManagerIntake
     /// has a secret configured; once any connection of this kind uses its own secret, its callers must present it.
     /// </summary>
     /// <remarks>
-    /// True when the caller proved itself with a secret, false when no secret is set anywhere and the event was let in
-    /// unchecked. An unchecked "imported" is still recorded, but it never removes a file (#652).
+    /// An unchecked "imported" is still recorded, but it never removes a file (#652). The connection-less native
+    /// source has no address of its own to prove who is calling, so unlike a real manager connection it is refused
+    /// once nobody has ever configured a secret for it, rather than left open (audit report findings H3/M1; the
+    /// proof-of-concept queued real work through this exact, unscoped source).
     /// </remarks>
-    public async Task<bool> AuthoriseAsync(UnitOfWork uow, string sourceKey, string? presented)
+    public async Task<MediaManagerIntakeIdentity> AuthoriseAsync(UnitOfWork uow, string sourceKey, string? presented)
     {
         var connections = await MediaManagerConnectionStore.ListEnabledForKindAsync(uow, sourceKey).ConfigureAwait(false);
         var withSecret = connections.Where(connection => !string.IsNullOrEmpty(connection.WebhookSecretCiphertext)).ToList();
         if (withSecret.Count > 0)
         {
-            if (!withSecret.Any(connection => _connections.WebhookSecretMatches(connection, presented)))
+            var matched = withSecret.FirstOrDefault(connection => _connections.WebhookSecretMatches(connection, presented));
+            if (matched is null)
             {
                 throw new IntakeRefusedException(401, IntakeRules.MissingSecretDetail);
             }
 
-            return true;
+            return new MediaManagerIntakeIdentity(Authenticated: true, matched.Id);
         }
 
+        // Attributable even when unchecked: exactly one connection of the kind is the only one this event could be
+        // for, whether or not it has bothered to rotate its own secret.
+        var soleConnectionId = connections.Count == 1 ? connections[0].Id : (long?)null;
         var configured = _options.MediaManagerWebhookSecret;
         if (string.IsNullOrEmpty(configured))
         {
-            return false;
+            if (sourceKey == MediaManagerKinds.Native)
+            {
+                throw new IntakeRefusedException(401, IntakeRules.NativeNeedsSecretDetail);
+            }
+
+            return new MediaManagerIntakeIdentity(Authenticated: false, soleConnectionId);
         }
 
         var provided = PyStrings.Strip(presented ?? string.Empty);
@@ -101,13 +121,15 @@ public sealed class MediaManagerIntake
             throw new IntakeRefusedException(401, IntakeRules.MissingSecretDetail);
         }
 
-        return true;
+        return new MediaManagerIntakeIdentity(Authenticated: true, soleConnectionId);
     }
 
     /// <summary>
     /// Require a secret: the hand-off routes reveal file paths, so unlike the webhook they never run unauthenticated.
+    /// Returns who the secret proved, exactly as <see cref="AuthoriseAsync"/> does, so a caller with a specific
+    /// hand-off in hand can refuse a secret that proves the wrong connection.
     /// </summary>
-    public async Task RequireSecretAsync(UnitOfWork uow, string? presented, string? sourceKey)
+    public async Task<MediaManagerIntakeIdentity> RequireSecretAsync(UnitOfWork uow, string? presented, string? sourceKey)
     {
         var provided = PyStrings.Strip(presented ?? string.Empty);
         var rows = await MediaManagerConnectionStore.ListEnabledWithWebhookSecretAsync(uow).ConfigureAwait(false);
@@ -124,14 +146,14 @@ public sealed class MediaManagerIntake
 
         if (provided.Length > 0)
         {
-            if (rows.Any(row => _connections.WebhookSecretMatches(row, provided)))
+            if (rows.FirstOrDefault(row => _connections.WebhookSecretMatches(row, provided)) is { } matched)
             {
-                return;
+                return new MediaManagerIntakeIdentity(Authenticated: true, matched.Id);
             }
 
             if (!string.IsNullOrEmpty(configured) && MediaManagerConnectionService.CompareDigest(provided, configured))
             {
-                return;
+                return new MediaManagerIntakeIdentity(Authenticated: true, ConnectionId: null);
             }
         }
 
@@ -206,11 +228,20 @@ public sealed class MediaManagerIntake
         return [.. chosen.Select(parts => string.Join('/', new[] { prefix }.Concat(parts).Where(part => part.Length > 0 && part != ".")))];
     }
 
-    /// <summary>Take in a hand-off: its remux jobs, its ledger row, and (#531) the fingerprint of each file.</summary>
-    public async Task<string> EnqueueRefineAsync(UnitOfWork uow, MediaManagerImportEvent importEvent)
+    /// <summary>
+    /// Take in a hand-off: its remux jobs, its ledger row, and (#531) the fingerprint of each file.
+    /// <paramref name="ownerConnectionId"/> is who <see cref="AuthoriseAsync"/> attributed the event to, recorded on
+    /// the ledger row so a later hand-off route can require that connection's own secret, not any same-kind one.
+    /// </summary>
+    public async Task<string> EnqueueRefineAsync(UnitOfWork uow, MediaManagerImportEvent importEvent, long? ownerConnectionId = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(importEvent);
+        if (!string.IsNullOrEmpty(importEvent.CallbackPath) && !IntakeRules.IsValidCallbackPath(importEvent.CallbackPath))
+        {
+            throw new IntakeRefusedException(422, IntakeRules.InvalidCallbackPathDetail(importEvent.CallbackPath));
+        }
+
         var (library, resolved) = await LibraryForHandoffAsync(uow, importEvent).ConfigureAwait(false);
         if (!resolved.Ok)
         {
@@ -243,7 +274,7 @@ public sealed class MediaManagerIntake
 
         if (!string.IsNullOrEmpty(importEvent.HandoffId))
         {
-            await _ledger.RecordReceivedAsync(uow, importEvent.SourceKey, importEvent.HandoffId, library?.Id, relativePath, importEvent.DownloadId).ConfigureAwait(false);
+            await _ledger.RecordReceivedAsync(uow, importEvent.SourceKey, importEvent.HandoffId, library?.Id, relativePath, ownerConnectionId, importEvent.DownloadId).ConfigureAwait(false);
         }
 
         if (library is not null)

@@ -51,6 +51,12 @@ public sealed record MediaManagerConnectionRecord(
     /// <summary>The path a manager of this kind posts its webhook to.</summary>
     public string WebhookUrlPath => $"/api/v1/intake/webhook/{Kind}";
 
+    /// <summary>
+    /// With no secret of its own, this connection's kind still accepts an unsigned webhook (upgrades must not
+    /// break), so the web app needs a way to tell the operator that is happening.
+    /// </summary>
+    public bool AcceptsUnsignedWebhooks => string.IsNullOrEmpty(WebhookSecretCiphertext);
+
     /// <summary>The connection as the API returns it: secrets are reported only as saved or not.</summary>
     public PyDict ToOut() => new PyDict()
         .Set("id", Id)
@@ -61,6 +67,11 @@ public sealed record MediaManagerConnectionRecord(
         .Set("api_key_is_saved", !string.IsNullOrEmpty(ApiKeyCiphertext))
         .Set("webhook_secret_is_set", !string.IsNullOrEmpty(WebhookSecretCiphertext))
         .Set("webhook_url_path", WebhookUrlPath)
+        .Set(
+            "unsigned_webhook_warning",
+            AcceptsUnsignedWebhooks
+                ? $"This connection accepts webhooks without a secret. Create a secret and add it to {MediaManagerKinds.LabelForConnection(Kind, Name)}."
+                : null)
         .Set("last_test_ok", LastTestOk is { } ok ? PyJson.Of(ok) : PyJson.Null)
         .Set("last_test_at", LastTestAt is { } at ? at.PydanticJson() : null)
         .Set("last_test_detail", LastTestDetail)
