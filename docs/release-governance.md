@@ -12,8 +12,8 @@ This is the canonical governance checklist for keeping Weir releases controlled 
   - `weir`
   - `docker-smoke`
   - `windows-package-smoke`
-- `contract` (the contract suite's aggregate verdict: every required area passed) is not a required
-  check yet. It is the name to add; the per-area `contract (<area>)` jobs follow `areas.json`.
+- `contract` is the contract suite's aggregate verdict (every required area passed). It is not a
+  required status check; the per-area `contract (<area>)` jobs follow `areas.json`.
 - The repo Wiki is disabled. Public docs live in the repository.
 - Issues are enabled and use structured templates.
 - Releases are tag-driven from `v*` tags.

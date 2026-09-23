@@ -2,6 +2,13 @@
 
 Trial date: 2026-09-17. Answers [#503](https://github.com/jampat000/Weir/issues/503).
 
+**Outcome.** Adopted in [#548](https://github.com/jampat000/Weir/issues/548). A library's writer is
+`best` by default: mkvmerge writes Matroska when it is installed and ffmpeg writes everything else,
+and a write that fails to run or fails output validation is rewritten by ffmpeg and validated again
+(`apps/server/src/Weir.Core/Media/RemuxWriterChoice.cs`). `ffmpeg` is the other choice. ffmpeg's own
+remux argv now maps attachment streams where the output container accepts them (finding 1). The
+report below is the trial as run.
+
 ## Question
 
 Does mkvmerge (MKVToolNix) produce measurably better, safe Matroska output than
@@ -50,8 +57,8 @@ Nothing under `<scratch>` is committed; `<scratch>/out/summary.md` and
 The bundled ffmpeg build is `--disable-libx264 --disable-libx265`: there is no
 software encoder with 10-bit support (`libkvazaar`, the only software HEVC
 encoder present, is 8-bit `yuv420p` only; `hevc_mf`/`hevc_qsv`/`hevc_vaapi`/
-`hevc_nvenc`/`hevc_amf` all need hardware this rig doesn't have and failed or
-weren't attempted). That constrains the corpus more than the issue's plan
+`hevc_nvenc`/`hevc_amf` all need hardware the trial machine did not have and
+failed or were not attempted). That constrains the corpus more than the issue's plan
 assumed:
 
 | # | File | Covers | Gap, if any |
@@ -72,14 +79,14 @@ assumed:
 | 14 | `14_embedded_poster` | Second video stream (intended as an attached-picture poster) | Could not force the Matroska-equivalent of MP4's `attached_pic` disposition from the ffmpeg CLI, nor get a fallback frame rate of `0/0` from a single still frame — `MetadataStreams.IsImageStream`'s heuristics were not exercised. Needs a real sample with a genuine embedded poster track. |
 | 15 | `15_webvtt_and_srt` | WebVTT + SRT | — |
 
-**Not achievable at all in this environment** (documented per the issue's own
-ask, not worked around):
+**Not achievable at all in this environment** (documented as the issue asked,
+not worked around):
 
 - **Dolby Vision (profile 7/8) and HDR10+.** No encoder, no RPU injection tool
   (`dovi_tool` explicitly excluded from this trial). Needs real Dolby Vision
   samples plus `dovi_tool info` on both tools' output, exactly as the issue
-  specifies — this is the single largest untested risk given the issue's own
-  motivating concern ("Dolby Vision configuration records").
+  specifies — this is the single largest untested risk, given that Dolby Vision
+  configuration records were the issue's main concern.
 - **TrueHD Atmos object audio.** ffmpeg's `truehd` encoder is core-only
   (experimental, no joint-object-coding metadata); a real Atmos sample is
   needed to test whether either muxer disturbs the Atmos metadata blocks.
@@ -155,7 +162,7 @@ This is a real, currently-shipping defect, independent of the mkvmerge
 decision: **any Weir library with ASS/SSA subtitles carrying a custom font
 attachment loses that font on every remux**, which silently degrades to a
 fallback font (or squares/tofu) in players that don't ship the same font.
-Matches the issue's own suspicion ("ffmpeg ... attachments").
+The issue suspected exactly this.
 
 ### 2. ffmpeg's output carries stale per-track statistics tags; mkvmerge's doesn't
 
@@ -182,10 +189,9 @@ the source's `ENCODER`/`DURATION` tags from whatever *originally* produced
 those streams, unchanged. Reproduced with a completely default, flagless
 `mkvmerge -o out.mkv in.mkv` on the same source: mkvmerge drops those tags
 outright rather than propagate stale ones. Neither behaviour is strictly
-"correct" — mkvmerge's is cleaner (no misleading lineage metadata survives a
+correct. mkvmerge's is cleaner (no misleading lineage metadata survives a
 copy); ffmpeg's at least preserves *some* record of how the elementary stream
-was made. This is exactly the "track statistics tags" edge case the issue text
-names.
+was made. The issue named track statistics tags as an edge case to check.
 
 ### 3. HDR-relevant colorimetry is bitstream-level and copies identically either way
 
@@ -217,9 +223,9 @@ ffmpeg  output mkvinfo:   Duration: 00:00:02.066000000  (exit 0, stderr: "File e
 mkvmerge output mkvinfo:  Duration: 00:00:02.066000000  (exit 0, stderr: empty)
 ```
 
-mkvmerge's stderr didn't even mention the truncation; ffmpeg at least printed
-"File ended prematurely" (suppressed at `-loglevel error`... it's actually an
-error-level line, so it does surface — but as a message, not a failure).
+mkvmerge's stderr did not mention the truncation. ffmpeg printed
+"File ended prematurely" at error level, so it does surface, but as a message,
+not a failure.
 **Conclusion: whichever muxer Weir uses, `ValidateRemuxOutputAsync` /
 `ValidateMediaIntegrityAsync` (the #539 fix) stays load-bearing.** Adopting
 mkvmerge does not let Weir remove or weaken that safety net.
@@ -330,7 +336,7 @@ long the follow-up takes.
 
 Total follow-up estimate: roughly 1.5–2 weeks including the blocking
 real-sample step, which cannot start until real DV/Atmos/PGS media is
-available to the team.
+available.
 
 ## Done-when checklist (from #503)
 

@@ -1,24 +1,39 @@
 # Weir — ports (canonical)
 
-**Single source of numeric defaults:** [`scripts/dev-ports.json`](../scripts/dev-ports.json)  
-Vite reads it from [`apps/web/vite.config.ts`](../apps/web/vite.config.ts). PowerShell dev scripts read the same file.
+## Installed Weir
+
+Weir listens on **9347** by default, on every interface
+(`ServerListenOptions.DefaultPort` in `apps/server/src/Weir.Core/Configuration/ServerListenOptions.cs`).
+The web app and the API share that one port: the API is `/api/v1` on the same origin.
+
+| Install | How the port is chosen | Change it |
+|---------|------------------------|-----------|
+| Windows (tray) | The tray starts the server with `--port`. It uses 9347, or asks for another port when 9347 is taken. Without a desktop to ask, it takes the first free port above 9347. | Tray menu › `Change port` |
+| Docker | The entrypoint passes `PORT`, default 9347. The image `EXPOSE`s 9347 and its health check calls `/health` on that port. | Set `PORT`, or map a different host port (`-p 8080:9347`) |
+
+Behind a reverse proxy, clients use the proxy's normal HTTPS port (443) and the proxy forwards to
+Weir's port.
 
 ## Development (local machine)
 
+**Single source of numeric defaults:** [`scripts/dev-ports.json`](../scripts/dev-ports.json)  
+Vite reads it from [`apps/web/vite.config.ts`](../apps/web/vite.config.ts). The dev scripts read the same file.
+
 | Role | Host | Port | URL example |
 |------|------|------|-------------|
-| Web shell (Vite **dev** and **preview**) | all interfaces (`host: true` in `vite.config.ts`) | **8782** | `http://127.0.0.1:8782` or `http://localhost:8782` |
-| API (the .NET server, `dotnet watch run` per `scripts/dev-backend.ps1`) | `127.0.0.1` (from `dev-ports.json`) | **18788** | `http://127.0.0.1:18788` |
+| Web app (Vite **dev** and **preview**) | all interfaces (`host: true` in `vite.config.ts`) | **8782** | `http://127.0.0.1:8782` or `http://localhost:8782` |
+| API (the .NET server, `dotnet watch run` via `npm run dev` or `scripts/dev-backend.ps1`) | `127.0.0.1` | **18788** | `http://127.0.0.1:18788` |
 
 The browser should use the **web** URL. `/api` is proxied to the API origin above (same-origin cookies).
 
-**The dev API port is deliberately not the installed/production default** (see below). A
-machine that also has Weir installed — every real dev machine, eventually — must never have
-`npm run dev`'s port collide with it: `npm run dev:stop-api` stops the dev API by the PID it
-recorded when it started that process (`.dev-api.pid` at the repo root, read by
-`scripts/stop-dev-api-port.mjs`), never by scanning the port for whatever is listening, so a
-same-numbered installed instance is never at risk either way — but a *different* number is the
-first line of defense and avoids the ambiguity entirely.
+**The dev API port is deliberately not the installed default.** A machine that also has Weir
+installed must never have `npm run dev`'s port collide with it. `npm run dev:stop-api` also stops
+the dev API only by the PID it recorded when it started that process (`.dev-api.pid` at the repo
+root, read by `scripts/stop-dev-api-port.mjs`), never by scanning the port, so an installed instance
+is never at risk.
+
+If a port is busy when `npm run dev` starts, `apps/web/scripts/run-dev-stack.mjs` moves to the next
+free port and prints the URL it used. `npm run dev:stop-web` frees the default web port.
 
 **Windows / `ERR_CONNECTION_REFUSED`:** Vite listens on **all interfaces** so both **`127.0.0.1`** and **`localhost`** work. If `localhost` resolved to IPv6 (`::1`) while Vite listened only on IPv4, the browser showed connection refused; that mismatch is what the `host: true` dev bind fixes.
 
@@ -29,18 +44,12 @@ first line of defense and avoids the ambiguity entirely.
 
 **Changing defaults:** edit `scripts/dev-ports.json` and restart dev servers.
 
-## Production
+`dev-ports.json` also records `production.containerApiBindPort` (9347) and `production.publicHttpsPort`
+(443) for reference; the server's own default is in code, as above.
 
-There is **no fixed “production port” in application code**. Deployments use normal HTTPS:
+## Database
 
-- **Clients** talk to **`https://<your-domain>` on port 443** (standard TLS).
-- The API is usually **the same origin** (`https://<your-domain>/api/...` behind a reverse proxy) or a **separate hostname**, still on **443**.
-
-For **containers** (Docker/Kubernetes), the API process bind port is an implementation detail. The shipped Weir image listens on **9347**. `dev-ports.json` includes **`production.containerApiBindPort`** as a documented convention for examples only—set the real port in your orchestration layer and reverse proxy.
-
-## Database (local dev)
-
-The Weir server (**`apps/server`**) uses **file-backed SQLite** under **`WEIR_HOME`** — there is **no** extra listen port for the database. An optional **developer-only** compose file may expose PostgreSQL on **5433** for experiments; the shipped Weir container path is **SQLite-only** (see **`docs/local-development.md`**).
+The server uses **file-backed SQLite** under **`WEIR_HOME`**. There is no database port.
 
 ## CI / E2E
 

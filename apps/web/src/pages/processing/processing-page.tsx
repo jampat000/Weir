@@ -1,6 +1,6 @@
 /**
  * Live — the first screen since 3.2. Every file Weir is working on, from the moment it lands to the
- * moment the media manager has it back, moving without a reload (docs/exec-plans/active/live-and-library.md,
+ * moment the media manager has it back, moving without a reload (docs/archive/live-and-library.md,
  * signed off by James on 2026-09-22 against the design canvas).
  *
  * Five lanes on a wide screen: Arriving, Waiting, Working, Handing back, Just finished. On a laptop the

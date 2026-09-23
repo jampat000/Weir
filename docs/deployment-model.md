@@ -11,7 +11,7 @@ Horizontal scaling and multiple Weir server processes are not supported unless a
 
 ## Workers
 
-The Processing worker count controls in-process job slots inside the single application process. It does not make Weir multi-node safe. (Weir has one jobs table and one worker pool since #459 removed the module layer — the "module worker settings", plural, that this section used to describe no longer exist.)
+The Processing worker count controls in-process job slots inside the single application process. It does not make Weir multi-node safe. There is one jobs table and one worker pool.
 
 Docker and Windows packaged runtimes start one .NET server process. Do not start a second server process or run multiple Weir containers against the same SQLite database.
 
@@ -46,8 +46,8 @@ location / {
 
 Set `WEIR_SESSION_COOKIE_SECURE=true` and, only when every browser reaches
 the proxy over HTTPS, `WEIR_SECURITY_ENABLE_HSTS=1`. Plain HTTP localhost
-development may explicitly set `WEIR_SESSION_COOKIE_SECURE=false`; the
-Security settings screen reports this trade-off.
+development may explicitly set `WEIR_SESSION_COOKIE_SECURE=false`; System ›
+Security reports this trade-off.
 
 ## CORS
 

@@ -6,7 +6,7 @@
  * many need no second menu. Under it, one row of chips holds the numbers and the filters together — how many
  * files would change, how many already match, how many Weir will not touch — because a count nobody can act
  * on is decoration. The table groups a library the way a person thinks of it, by title and season, and a file
- * opens a panel that says track by track what would go and why (docs/exec-plans/active/live-and-library.md).
+ * opens a panel that says track by track what would go and why (docs/archive/live-and-library.md).
  *
  * Every number here comes from the library scan on the server; nothing is counted in the browser.
  */

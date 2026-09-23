@@ -1,3 +1,5 @@
+*Historical record; not current documentation.*
+
 # Plan: Processing library model
 
 ## Goal
@@ -7,7 +9,7 @@ admission rules, remux rules, schedule, guardrails and media manager — instead
 movie folder and one TV folder. Upgrading an existing install changes nothing an
 operator can observe until they choose to add a library.
 
-Decision record: [ADR-0014](../../adr/ADR-0014-processing-libraries-replace-fixed-scopes.md).
+Decision record: [ADR-0014](../adr/ADR-0014-processing-libraries-replace-fixed-scopes.md).
 Tracking epic: [#347](https://github.com/jampat000/Weir/issues/347).
 
 ## Current State
