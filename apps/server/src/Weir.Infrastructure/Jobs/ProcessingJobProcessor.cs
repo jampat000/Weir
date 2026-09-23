@@ -245,7 +245,7 @@ public sealed class ProcessingJobProcessor
                     context.LeaseOwner);
             }
         }
-#pragma warning disable CA1031
+#pragma warning disable CA1031 // The last resort after a failed completion is logged; the worker carries on and the lease expires.
         catch (Exception exception)
 #pragma warning restore CA1031
         {

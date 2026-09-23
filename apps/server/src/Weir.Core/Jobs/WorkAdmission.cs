@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Weir.Core.Processing;
 using Weir.Core.Settings;
 using Weir.Core.Time;
 
@@ -247,7 +248,7 @@ public static class WorkAdmissionRules
 
             // A per-library cap so one library cannot occupy every slot and starve the others. A library that has not
             // been given its own number follows "Files at once" (#633), so an unset field never undercuts that setting.
-            var cap = Weir.Core.Processing.OperatorSettingsRules.EffectiveLibraryLimit(library.MaxConcurrentFiles, filesAtOnce);
+            var cap = OperatorSettingsRules.EffectiveLibraryLimit(library.MaxConcurrentFiles, filesAtOnce);
             if (runningPerLibrary.GetValueOrDefault(library.Id) >= cap)
             {
                 blocked.Add(library.Id);

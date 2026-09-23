@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
 
@@ -88,7 +89,7 @@ public static class LibraryFileMarksStore
             ("@path", path));
     }
 
-    private static LibraryFileMark Read(Microsoft.Data.Sqlite.SqliteDataReader reader) => new(
+    private static LibraryFileMark Read(SqliteDataReader reader) => new(
         SqliteValues.GetString(reader, 0),
         PythonTimestamps.Parse(reader.GetValue(1)),
         SqliteValues.GetBool(reader, 2));

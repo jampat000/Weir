@@ -70,11 +70,11 @@ public static class LibrarySettingsStore
         await uow.ExecuteAsync(
             "DELETE FROM jobs WHERE job_kind = @scanKind AND dedupe_key LIKE @prefix ESCAPE '\\'",
             ("@scanKind", LibraryModeJobKinds.ScanKind),
-            ("@prefix", EscapeLike(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%")).ConfigureAwait(false);
+            ("@prefix", SqliteLike.Escape(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%")).ConfigureAwait(false);
         await uow.ExecuteAsync(
             "DELETE FROM jobs WHERE job_kind = @cleanKind AND dedupe_key LIKE @prefix ESCAPE '\\'",
             ("@cleanKind", LibraryModeJobKinds.CleanKind),
-            ("@prefix", EscapeLike($"{LibraryModeJobKinds.CleanKind}:{libraryId}:") + "%")).ConfigureAwait(false);
+            ("@prefix", SqliteLike.Escape($"{LibraryModeJobKinds.CleanKind}:{libraryId}:") + "%")).ConfigureAwait(false);
     }
 
     private static async Task<List<string>> FoldersForAsync(UnitOfWork uow, long libraryId) =>
@@ -82,7 +82,4 @@ public static class LibrarySettingsStore
             "SELECT folder FROM library_folders WHERE library_id = @id ORDER BY position, id",
             reader => reader.GetString(0),
             ("@id", libraryId)).ConfigureAwait(false);
-
-    private static string EscapeLike(string value) =>
-        value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
 }

@@ -1,3 +1,4 @@
+using Weir.Core.Processing;
 namespace Weir.Core.Configuration;
 
 /// <summary>
@@ -76,7 +77,7 @@ public static class WeirOptionsLoader
 
         var paths = RuntimePaths.Resolve(runtime);
 
-        var processingWorkers = ClampProcessingWorkerCount(EnvInt(runtime, "WEIR_PROCESSING_WORKER_COUNT", Weir.Core.Processing.OperatorSettingsRules.MaxFilesAtOnce));
+        var processingWorkers = ClampProcessingWorkerCount(EnvInt(runtime, "WEIR_PROCESSING_WORKER_COUNT", OperatorSettingsRules.MaxFilesAtOnce));
         var processingJobLeaseSeconds = ClampProcessingJobLeaseSeconds(EnvInt(runtime, "WEIR_PROCESSING_JOB_LEASE_SECONDS", DefaultProcessingJobLeaseSeconds));
         var watcherEnabled = EnvBool(runtime, "WEIR_PROCESSING_WATCHER_ENABLED", true);
         var watcherDebounce = Math.Max(0.25, Math.Min(300.0, EnvInt(runtime, "WEIR_PROCESSING_WATCHER_DEBOUNCE_SECONDS", 3)));
@@ -180,7 +181,7 @@ public static class WeirOptionsLoader
     /// 0 .. <see cref="Weir.Core.Processing.OperatorSettingsRules.MaxFilesAtOnce"/> slots (#633); negative values mean 1.
     /// </summary>
     public static int ClampProcessingWorkerCount(long raw) =>
-        raw < 0 ? 1 : (int)Math.Min(Weir.Core.Processing.OperatorSettingsRules.MaxFilesAtOnce, raw);
+        raw < 0 ? 1 : (int)Math.Min(OperatorSettingsRules.MaxFilesAtOnce, raw);
 
     /// <summary>
     /// 30 s .. 1 day (#540). Below 30 s the lease-renewal heartbeat (every ~lease/3) would fire

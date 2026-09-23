@@ -3,7 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
-using Weir.Core;
+using Microsoft.Data.Sqlite;
 using Weir.Core.Json;
 using Weir.Core.Net;
 using Weir.Core.Notifications;
@@ -241,14 +241,13 @@ public sealed class NotificationDispatcher
         {
             return exception.Message;
         }
+#pragma warning disable CA1031 // A test delivery that fails for any reason reads as the generic delivery error, never an exception page.
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+#pragma warning restore CA1031
         {
             return ExternalUrlPolicy.GenericDeliveryError;
         }
     }
-
-    /// <summary>The version string a request's <c>User-Agent</c> names.</summary>
-    public static string UserAgentVersion(string? versionOverride) => WeirVersion.Resolve(versionOverride);
 
     /// <summary>
     /// Sends <c>{module}_job_{eventKind}</c> to every enabled channel subscribed
@@ -303,7 +302,7 @@ public sealed class NotificationDispatcher
                     }
                 }
             }
-            catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or IOException or InvalidOperationException)
+            catch (Exception exception) when (exception is SqliteException or IOException or InvalidOperationException)
             {
                 warn($"Notification dispatch: failed to read channels for event={jobEvent}", exception);
                 return;

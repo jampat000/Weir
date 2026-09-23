@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.LibraryMode;
@@ -123,7 +124,7 @@ public static class LibraryScanStore
             "AND status IN ('pending', 'leased') ORDER BY id DESC LIMIT 1",
             reader => new LibraryScanJobView(reader.GetInt64(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2)),
             ("@kind", LibraryModeJobKinds.ScanKind),
-            ("@prefix", EscapeLike(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%")).ConfigureAwait(false);
+            ("@prefix", SqliteLike.Escape(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%")).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -139,7 +140,7 @@ public static class LibraryScanStore
             "ORDER BY id DESC LIMIT 1",
             reader => reader.GetString(0),
             ("@kind", LibraryModeJobKinds.ScanKind),
-            ("@prefix", EscapeLike(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%"),
+            ("@prefix", SqliteLike.Escape(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%"),
             ("@trigger", LibraryModeSchedule.Trigger)).ConfigureAwait(false);
         return DateTimeOffset.TryParse(
             text,
@@ -159,7 +160,7 @@ public static class LibraryScanStore
             "ORDER BY id DESC LIMIT 1",
             reader => new LibraryScanJobRow(reader.GetInt64(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2)),
             ("@kind", LibraryModeJobKinds.ScanKind),
-            ("@prefix", EscapeLike(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%")).ConfigureAwait(false);
+            ("@prefix", SqliteLike.Escape(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%")).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -169,7 +170,7 @@ public static class LibraryScanStore
     /// exists, but <c>library_files</c> itself is read unconditionally: job-row retention can prune the
     /// tracking job long after a scan completed, and that must not lose the file index the scan produced.
     /// </summary>
-    public static async Task<LibraryScanSnapshot?> LatestSnapshotAsync(UnitOfWork uow, long libraryId)
+    public static async Task<LibraryScanSnapshot?> LatestSnapshotAsync(UnitOfWork uow, long libraryId, ILogger logger)
     {
         var files = await FilesForLibraryAsync(uow, libraryId).ConfigureAwait(false);
         var latest = await LatestAsync(uow, libraryId).ConfigureAwait(false);
@@ -193,8 +194,10 @@ public static class LibraryScanStore
                     errors = parsed.Errors;
                 }
             }
-            catch (PyJsonDecodeException)
+            catch (PyJsonDecodeException exception)
             {
+                // The file index still comes from library_files; only the scan time and its errors are lost.
+                logger.LogWarning(exception, "Library scan job_id={JobId} has an unreadable payload; showing its files without the scan time or errors.", latest.JobId);
             }
         }
 
@@ -349,7 +352,4 @@ public static class LibraryScanStore
         "would_change" => LibraryFileClassification.WouldChange,
         _ => LibraryFileClassification.CannotProcess,
     };
-
-    private static string EscapeLike(string value) =>
-        value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
 }

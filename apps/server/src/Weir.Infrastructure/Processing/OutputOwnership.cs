@@ -107,7 +107,6 @@ public sealed class OutputOwnership : IOutputOwnership
             return;
         }
 
-#pragma warning disable CA1031 // #555: never fail the job that just finished writing the file over an ownership/mode policy failure.
         try
         {
             if (_options.OutputOwnershipChownEnabled)
@@ -120,10 +119,11 @@ public sealed class OutputOwnership : IOutputOwnership
                 _tools.SetMode(path, mode.Value);
             }
         }
+#pragma warning disable CA1031 // #555: an ownership or mode failure never fails the job that just wrote the file.
         catch (Exception exception)
+#pragma warning restore CA1031
         {
             _logger.LogWarning(exception, "Weir could not apply the output ownership policy to {Path}.", path);
         }
-#pragma warning restore CA1031
     }
 }
