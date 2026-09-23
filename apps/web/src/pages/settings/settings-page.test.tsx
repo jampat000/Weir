@@ -40,7 +40,10 @@ vi.mock("./settings-notifications-tab", () => ({
 
 function renderAt(entry: string) {
   const router = createMemoryRouter(
-    [{ path: "/settings", element: <SettingsPage /> }],
+    [
+      { path: "/settings", element: <SettingsPage /> },
+      { path: "/system", element: <div>System page</div> },
+    ],
     { initialEntries: [entry] },
   );
   render(<RouterProvider router={router} />);
@@ -54,6 +57,19 @@ function selectedTab(): string | null {
 afterEach(() => cleanup());
 
 describe("SettingsPage", () => {
+  it.each([
+    ["upgrade", "?tab=about"],
+    ["support", "?tab=about"],
+    ["backup", "?tab=backups"],
+    ["security", "?tab=security"],
+    ["logs", "?tab=logs"],
+  ])("sends the 3.1 %s tab to its place on System", (oldTab, systemSearch) => {
+    const router = renderAt(`/settings?tab=${oldTab}`);
+    expect(router.state.location.pathname).toBe("/system");
+    expect(router.state.location.search).toBe(systemSearch);
+    expect(screen.getByText("System page")).toBeTruthy();
+  });
+
   it("opens on the tab the address names, including the names 3.1 used", () => {
     renderAt("/settings?tab=schedules");
     expect(selectedTab()).toBe("Schedule");
