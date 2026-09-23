@@ -1619,3 +1619,73 @@
   color: var(--mm-text1);
   font-weight: 600;
 }
+
+/* Library editor › Files already in your library: the folders, then one switch per row. */
+.mm-library-cleaning {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.mm-library-cleaning__folders {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mm-library-cleaning__folders li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--mm-border);
+  overflow-wrap: anywhere;
+}
+
+.mm-library-cleaning__folders li:last-child {
+  border-bottom: 0;
+}
+
+.mm-library-cleaning__empty {
+  color: var(--mm-text3);
+}
+
+.mm-library-cleaning__add {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.mm-library-cleaning__add .mm-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 28rem;
+}
+
+.mm-library-cleaning__switches {
+  display: grid;
+  gap: 0.6rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--mm-border);
+}
+
+.mm-library-cleaning__hint {
+  margin: -0.3rem 0 0;
+  color: var(--mm-text3);
+  font-size: var(--mm-type-caption);
+}
+
+.mm-library-cleaning__confirm {
+  padding: 0.75rem 0 0.75rem 0.9rem;
+  border-left: 2px solid var(--mm-status-warning-text);
+  color: var(--mm-text2);
+}
+
+.mm-library-cleaning__confirm p {
+  margin: 0 0 0.6rem;
+}
+
+.mm-library-cleaning__confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+}

@@ -11,6 +11,7 @@ import {
   quietActionRowClass,
 } from "../../components/shared/quiet-section";
 import { effectiveGrid, windowNow } from "./schedule-model";
+import { LibraryCleaningSettings } from "./library/library-cleaning-settings";
 import { LibraryManagerSetup } from "./library/library-manager-setup";
 import { useMeQuery } from "../../lib/auth/queries";
 import { useMediaManagerConnectionsQuery } from "../../lib/media-managers/queries";
@@ -1372,6 +1373,19 @@ export function ProcessingLibrariesSection() {
               </label>
             </div>
           </details>
+          <QuietFieldGroup title="Files already in your library">
+            {editingId !== null ? (
+              <LibraryCleaningSettings
+                libraryId={editingId}
+                editable={editable}
+              />
+            ) : (
+              <p className="mm-quiet-note">
+                Save the library first, then add the folders its existing files
+                sit in.
+              </p>
+            )}
+          </QuietFieldGroup>
           {/* The hours are drawn in Settings › Schedule, beside every other library's week (canvas board 6). One
               editor, so the two can never disagree. */}
           <QuietFieldGroup title="When this library may run">
