@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Weir.Core.Jobs;
+using Weir.Infrastructure.Http;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
 
@@ -8,6 +9,28 @@ namespace Weir.Api.Tests;
 /// <summary>The jobs area wired into the real server: crash recovery on start, and workers that leave unported kinds alone.</summary>
 public sealed class JobsStartupTests
 {
+    [Fact]
+    public async Task Every_job_kind_weir_queues_on_a_timer_has_a_handler()
+    {
+        // The work file sweep was queued every hour with no handler, so it waited in the queue for ever.
+        await using var server = await WeirTestServer.StartAsync();
+        var handled = server.Services.GetServices<IJobHandler>().Select(h => h.JobKind).ToHashSet(StringComparer.Ordinal);
+
+        foreach (var enqueuer in server.Services.GetServices<IPeriodicEnqueuer>())
+        {
+            Assert.Contains(enqueuer.JobKind, handled);
+        }
+    }
+
+    [Fact]
+    public async Task The_workers_deliver_job_alerts_to_the_channels_on_Settings_Alerts()
+    {
+        // Only a notifier that sends nothing used to be registered, so no real job ever produced an alert.
+        await using var server = await WeirTestServer.StartAsync();
+
+        Assert.IsType<WebhookJobNotifications>(server.Services.GetRequiredService<IJobNotifications>());
+    }
+
     [Fact]
     public async Task Startup_recovers_a_job_a_killed_server_left_leased_and_removes_its_temp_output()
     {

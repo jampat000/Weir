@@ -557,6 +557,8 @@ public static class WeirJobs
             sp.GetRequiredService<SqliteDatabase>(), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<IJobQueueMetrics>()));
         services.TryAddSingleton(sp => new JobHandlerRegistry(sp.GetServices<IJobHandler>()));
         services.TryAddSingleton<ProcessingJobProcessor>();
+        // The work file sweep is queued below; without a handler its jobs waited in the queue for ever.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHandler, WorkTempStaleSweepHandler>());
 
         // Kill switches: an explicitly set variable that reads as off wins over the saved setting.
         const string sweepVariable = "WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MOVIE_SCHEDULE_ENABLED";

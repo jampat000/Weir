@@ -208,16 +208,22 @@ public sealed class HandoffLedgerStore
             [.. parameters]).ConfigureAwait(false);
     }
 
-    /// <summary><c>_queue_position</c>: pending jobs ahead of this one, plus one.</summary>
+    /// <summary>
+    /// <c>_queue_position</c>: files waiting ahead of this one, plus one. Only file work counts — another file's pass or a
+    /// library clean — because that is what a manager is waiting behind. Background jobs (folder scans, the work file
+    /// sweep) are quick and are not files, and counting them told a manager it was third in line behind two sweeps.
+    /// </summary>
     public static async Task<long> QueuePositionAsync(UnitOfWork uow, ProcessingJob job)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(job);
         var ahead = await uow.CountAsync(
-            "SELECT count(id) FROM jobs WHERE status = $pending AND (priority > $priority OR (priority = $priority AND id < $id))",
+            "SELECT count(id) FROM jobs WHERE status = $pending AND (priority > $priority OR (priority = $priority AND id < $id)) " +
+            "AND (job_kind LIKE 'processing.file.%' OR job_kind = $library_clean)",
             ("$pending", ProcessingJobStatus.Pending),
             ("$priority", job.Priority),
-            ("$id", job.Id)).ConfigureAwait(false);
+            ("$id", job.Id),
+            ("$library_clean", "processing.library.clean.v1")).ConfigureAwait(false);
         return ahead + 1;
     }
 
