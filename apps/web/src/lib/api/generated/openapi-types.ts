@@ -3164,6 +3164,11 @@ export interface components {
       /** Name */
       name: string;
       /**
+       * Unsigned Webhook Warning
+       * @description Set when this connection has no secret of its own, so its webhook is accepted unsigned.
+       */
+      unsigned_webhook_warning?: string | null;
+      /**
        * Webhook Secret Is Set
        * @description Whether this manager must present a secret when it posts to the intake webhook.
        */
