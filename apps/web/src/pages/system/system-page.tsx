@@ -35,14 +35,14 @@ import {
   SettingsHistoryRetentionSection,
   SettingsInstanceSection,
 } from "../settings/settings-general-tab";
-import { SettingsBackupTab } from "../settings/settings-backup-tab";
-import { SettingsUpgradeTab } from "../settings/settings-upgrade-tab";
-import { SettingsSecurityTab } from "../settings/settings-security-tab";
-import { SettingsLogsTab } from "../settings/settings-logs-tab";
-import { SettingsSupportTab } from "../settings/settings-support-tab";
+import { BackupsTab } from "./tabs/backups/backups-tab";
+import { UpdateSection } from "./tabs/about/update-section";
+import { SecurityTab } from "./tabs/security/security-tab";
+import { ServerLog } from "./tabs/logs/server-log";
+import { SupportSection } from "./tabs/about/support-section";
 import { ActivityLog } from "./tabs/logs/activity-log";
-import { ProcessingJobsInspectionSection } from "../processing/processing-jobs-inspection-section";
-import { AboutFacts } from "./about-facts";
+import { JobsSection } from "./tabs/logs/jobs-section";
+import { AboutFacts } from "./tabs/about/about-facts";
 import { errorMessage } from "../../lib/api/error-message";
 
 /**
@@ -489,13 +489,13 @@ export function SystemPage() {
           <div className="mm-about-grid">
             {/* What it is, before anything you can change about it. */}
             <AboutFacts />
-            <SettingsUpgradeTab updateStatusQ={updateStatusQ} />
+            <UpdateSection updateStatusQ={updateStatusQ} />
             <SettingsInstanceSection settingsData={settingsQ.data} />
-            {showSupport ? <SettingsSupportTab /> : null}
+            {showSupport ? <SupportSection /> : null}
           </div>
         ) : tab === "backups" ? (
           <div className="mm-quiet-stack">
-            <SettingsBackupTab
+            <BackupsTab
               editable={editable}
               settingsData={settingsQ.data}
               save={save}
@@ -529,7 +529,7 @@ export function SystemPage() {
           </div>
         ) : tab === "security" ? (
           <div className="mm-quiet-stack">
-            <SettingsSecurityTab />
+            <SecurityTab />
           </div>
         ) : (
           <div className="mm-quiet-stack" data-testid="settings-history">
@@ -553,9 +553,9 @@ export function SystemPage() {
             {historyView === "activity" ? (
               <ActivityLog />
             ) : historyView === "jobs" ? (
-              <ProcessingJobsInspectionSection />
+              <JobsSection />
             ) : (
-              <SettingsLogsTab />
+              <ServerLog />
             )}
             {/* How long what you are looking at is kept, and how to empty it — beside the thing it governs. */}
             <SettingsHistoryRetentionSection

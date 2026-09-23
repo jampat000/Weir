@@ -7,14 +7,14 @@ import {
   WorkspaceTabList,
   type WorkspaceTabOption,
 } from "../../components/shared/workspace-shell";
-import { SettingsMediaManagersTab } from "./settings-media-managers-tab";
-import { SettingsNotificationsTab } from "./settings-notifications-tab";
-import { ProcessingDirectPlaySection } from "../processing/processing-direct-play-section";
-import { ProcessingLibrariesSection } from "../processing/processing-libraries-section";
-import { ProcessingMaintenanceSection } from "../processing/processing-maintenance-section";
-import { ProcessingProcessSettingsSection } from "../processing/processing-process-settings-section";
-import { ProcessingRemuxSection } from "../processing/processing-remux-section";
-import { ProcessingSchedulesSection } from "../processing/processing-schedules-section";
+import { MediaManagersTab } from "./tabs/media-managers-tab";
+import { AlertsTab } from "./tabs/alerts-tab";
+import { DirectPlaySection } from "./tabs/performance/direct-play-section";
+import { LibrariesTab } from "./tabs/libraries/libraries-tab";
+import { CleanupTab } from "./tabs/cleanup-tab";
+import { ProcessSettingsSection } from "./tabs/performance/process-settings-section";
+import { RulesTab } from "./tabs/rules/rules-tab";
+import { ScheduleTab } from "./tabs/schedule/schedule-tab";
 
 /**
  * Settings: how Weir treats your media. Where it lives, what to keep, who to tell about it, how hard
@@ -120,22 +120,22 @@ export function SettingsPage() {
       />
       <WorkspacePanel id="settings-panel" labelledBy={`settings-tab-${tab}`}>
         {tab === "libraries" ? (
-          <ProcessingLibrariesSection />
+          <LibrariesTab />
         ) : tab === "rules" ? (
-          <ProcessingRemuxSection />
+          <RulesTab />
         ) : tab === "media-managers" ? (
-          <SettingsMediaManagersTab />
+          <MediaManagersTab />
         ) : tab === "performance" ? (
           <div className="mm-quiet-stack">
-            <ProcessingProcessSettingsSection />
-            <ProcessingDirectPlaySection />
+            <ProcessSettingsSection />
+            <DirectPlaySection />
           </div>
         ) : tab === "cleanup" ? (
-          <ProcessingMaintenanceSection />
+          <CleanupTab />
         ) : tab === "schedule" ? (
-          <ProcessingSchedulesSection />
+          <ScheduleTab />
         ) : (
-          <SettingsNotificationsTab />
+          <AlertsTab />
         )}
       </WorkspacePanel>
     </WorkspacePage>

@@ -13,29 +13,29 @@ import { SettingsPage } from "./settings-page";
 vi.mock("../../components/shell/pause-control", () => ({
   PauseControl: () => null,
 }));
-vi.mock("../processing/processing-libraries-section", () => ({
-  ProcessingLibrariesSection: () => <div>Libraries content</div>,
+vi.mock("./tabs/libraries/libraries-tab", () => ({
+  LibrariesTab: () => <div>Libraries content</div>,
 }));
-vi.mock("../processing/processing-remux-section", () => ({
-  ProcessingRemuxSection: () => <div>Rules content</div>,
+vi.mock("./tabs/rules/rules-tab", () => ({
+  RulesTab: () => <div>Rules content</div>,
 }));
-vi.mock("./settings-media-managers-tab", () => ({
-  SettingsMediaManagersTab: () => <div>Media managers content</div>,
+vi.mock("./tabs/media-managers-tab", () => ({
+  MediaManagersTab: () => <div>Media managers content</div>,
 }));
-vi.mock("../processing/processing-process-settings-section", () => ({
-  ProcessingProcessSettingsSection: () => <div>Running content</div>,
+vi.mock("./tabs/performance/process-settings-section", () => ({
+  ProcessSettingsSection: () => <div>Running content</div>,
 }));
-vi.mock("../processing/processing-direct-play-section", () => ({
-  ProcessingDirectPlaySection: () => null,
+vi.mock("./tabs/performance/direct-play-section", () => ({
+  DirectPlaySection: () => null,
 }));
-vi.mock("../processing/processing-maintenance-section", () => ({
-  ProcessingMaintenanceSection: () => <div>Housekeeping content</div>,
+vi.mock("./tabs/cleanup-tab", () => ({
+  CleanupTab: () => <div>Housekeeping content</div>,
 }));
-vi.mock("../processing/processing-schedules-section", () => ({
-  ProcessingSchedulesSection: () => <div>Schedule content</div>,
+vi.mock("./tabs/schedule/schedule-tab", () => ({
+  ScheduleTab: () => <div>Schedule content</div>,
 }));
-vi.mock("./settings-notifications-tab", () => ({
-  SettingsNotificationsTab: () => <div>Alerts content</div>,
+vi.mock("./tabs/alerts-tab", () => ({
+  AlertsTab: () => <div>Alerts content</div>,
 }));
 
 function renderAt(entry: string) {

@@ -9,7 +9,7 @@ import {
   quietActionRowClass,
 } from "../../components/shared/quiet-section";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
-import { SettingsQuietSection } from "./settings-shared";
+import { SettingsQuietSection } from "../system/tabs/system-shared";
 import { errorMessage } from "../../lib/api/error-message";
 
 /** The field caption, spelled exactly as the deleted `.mm-settings-field-label` rule
