@@ -30,6 +30,11 @@ if (args.Contains("--version"))
     return 0;
 }
 
+if (args.Contains("--healthcheck"))
+{
+    return await HealthCheckCommand.RunAsync(args, WeirServer.CurrentRuntime(), Console.Error).ConfigureAwait(false);
+}
+
 WebApplication app;
 try
 {
