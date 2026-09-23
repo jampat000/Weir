@@ -335,8 +335,8 @@ jobs:
     with:
       areas: ${{ needs.changes.outputs.contract_areas }}
 
-  # The tray's unit tests: port choice, update settings and menu state, the health wait, the session secret's
-  # access list, and which processes the installer may stop.
+  # The tray's unit tests: port choice, update settings and menu state, the health wait, the access lists of the
+  # data folder and the secrets, and which processes the installer may stop.
   tray:
     needs: changes
     if: needs.changes.outputs.run_tray == 'true'
