@@ -126,16 +126,30 @@ public static class LibraryFilePlanner
             return LibraryFilePlanResult.Matches();
         }
 
-        var keptAudioIndices = plan.Audio.Select(t => t.InputIndex).ToHashSet();
-        var keptSubtitleIndices = plan.Subtitles.Select(t => t.InputIndex).ToHashSet();
-        var estimatedBytesSaved =
-            EstimateRemovedBytes(probe, split.Audio, keptAudioIndices) +
-            EstimateRemovedBytes(probe, split.Subtitles, keptSubtitleIndices);
-        return LibraryFilePlanResult.WouldChange(plan, estimatedBytesSaved);
+        return LibraryFilePlanResult.WouldChange(plan, EstimateSavings(probe, split, plan));
     }
 
-    /// <summary>Sum of (bit rate × duration) for every probed stream not kept in the plan, skipping any stream ffprobe gave no
-    /// numeric bit rate for — an honest under-estimate rather than a guess.</summary>
+    /// <summary>
+    /// What this plan would reclaim from this file. Public because a plan a person chose themselves is measured the
+    /// same way as one the rules chose: the estimate describes the file and the plan, not who decided.
+    /// </summary>
+    public static long EstimateSavings(ProbeResult probe, SplitProbeStreams split, RemuxPlan plan)
+    {
+        ArgumentNullException.ThrowIfNull(probe);
+        ArgumentNullException.ThrowIfNull(split);
+        ArgumentNullException.ThrowIfNull(plan);
+        var keptAudioIndices = plan.Audio.Select(t => t.InputIndex).ToHashSet();
+        var keptSubtitleIndices = plan.Subtitles.Select(t => t.InputIndex).ToHashSet();
+        return EstimateRemovedBytes(probe, split.Audio, keptAudioIndices) +
+            EstimateRemovedBytes(probe, split.Subtitles, keptSubtitleIndices);
+    }
+
+    /// <summary>
+    /// What the tracks a plan drops are taking up, added together (#648). Each track is measured by the best evidence the
+    /// file offers, in this order: the exact byte count Matroska records per track, the per-track bit rate it records,
+    /// then ffprobe's own <c>bit_rate</c>, which Matroska rarely reports. A track that offers none of those adds nothing,
+    /// so this stays an honest under-estimate rather than a guess.
+    /// </summary>
     private static long EstimateRemovedBytes(ProbeResult probe, IReadOnlyList<ProbeStreamInfo> streams, HashSet<int> keptInputIndices)
     {
         var durationSeconds = 0.0;
@@ -147,11 +161,6 @@ public static class LibraryFilePlanner
             durationSeconds = parsedDuration;
         }
 
-        if (durationSeconds <= 0)
-        {
-            return 0;
-        }
-
         long total = 0;
         foreach (var stream in streams)
         {
@@ -160,12 +169,61 @@ public static class LibraryFilePlanner
                 continue;
             }
 
-            if (stream.Get("bit_rate") is { } bitRateValue && Py.TryInt(bitRateValue, out var bitsPerSecond) && bitsPerSecond > 0)
-            {
-                total += (long)(bitsPerSecond * durationSeconds / 8.0);
-            }
+            total += RemovedStreamBytes(stream, durationSeconds);
         }
 
         return total;
+    }
+
+    /// <summary>One dropped track's size, or 0 when the file does not say.</summary>
+    private static long RemovedStreamBytes(ProbeStreamInfo stream, double durationSeconds)
+    {
+        // mkvmerge writes the exact byte count of each track; nothing beats being told.
+        if (StatisticsTag(stream, "NUMBER_OF_BYTES") is { } bytes)
+        {
+            return bytes;
+        }
+
+        if (durationSeconds <= 0)
+        {
+            return 0;
+        }
+
+        if (StatisticsTag(stream, "BPS") is { } bitsPerSecondTag)
+        {
+            return (long)(bitsPerSecondTag * durationSeconds / 8.0);
+        }
+
+        return stream.Get("bit_rate") is { } bitRateValue && Py.TryInt(bitRateValue, out var bitsPerSecond) && bitsPerSecond > 0
+            ? (long)(bitsPerSecond * durationSeconds / 8.0)
+            : 0;
+    }
+
+    /// <summary>
+    /// A Matroska statistics tag, with or without the language suffix mkvmerge adds (<c>BPS</c>, <c>BPS-eng</c>). Tag
+    /// names are matched without regard to case, as ffprobe has reported them both ways.
+    /// </summary>
+    private static long? StatisticsTag(ProbeStreamInfo stream, string name)
+    {
+        foreach (var (key, value) in stream.Tags)
+        {
+            if (!key.StartsWith(name, StringComparison.OrdinalIgnoreCase) ||
+                (key.Length != name.Length && key[name.Length] != '-'))
+            {
+                continue;
+            }
+
+            if (long.TryParse(
+                    value.Trim(),
+                    System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var parsed) &&
+                parsed > 0)
+            {
+                return parsed;
+            }
+        }
+
+        return null;
     }
 }

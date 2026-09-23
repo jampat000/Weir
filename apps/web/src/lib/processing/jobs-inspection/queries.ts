@@ -14,7 +14,9 @@ export type ProcessingJobsInspectionFilter =
   | "failed"
   | "handler_ok_finalize_failed"
   | "cancelled"
-  | "terminal";
+  | "terminal"
+  /** Queued or running: what Live shows as waiting and working. */
+  | "active";
 
 export const processingJobsInspectionQueryKey = (
   filter: ProcessingJobsInspectionFilter,
@@ -29,6 +31,9 @@ function statusesForFilter(
   }
   if (filter === "terminal") {
     return ["completed", "failed", "handler_ok_finalize_failed"];
+  }
+  if (filter === "active") {
+    return ["pending", "leased"];
   }
   return [filter];
 }

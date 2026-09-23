@@ -170,6 +170,15 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
         return Convert.ToString(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture) ?? string.Empty;
     }
 
+    private async Task<DateTimeOffset?> HoldUntilAsync(string relative)
+    {
+        using var connection = _fixture.Store.Database.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT hold_until FROM files WHERE relative_path = $p";
+        command.Parameters.AddWithValue("$p", relative);
+        return PythonTimestamps.Parse(await command.ExecuteScalarAsync());
+    }
+
     private Task<long> LeftActivityAsync() =>
         _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.file_left_watched_folder'");
 
@@ -409,6 +418,32 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
 
         Assert.Equal(1, IntegrityReads());
         Assert.Equal(2, await RemuxJobsAsync());
+    }
+
+    [Fact]
+    public async Task A_file_waiting_for_its_next_look_stays_on_hold_until_then_and_keeps_saying_why()
+    {
+        await SetUpAsync("movie");
+        _media.IntegrityError = "incomplete media data";
+        _folders.Source(Path.Join("Film.2024", "Film.2024.mkv"));
+
+        await ScanAndDrainAsync("movie");
+        var reason = await ReasonAsync("Film.2024/Film.2024.mkv");
+        var booked = await HoldUntilAsync("Film.2024/Film.2024.mkv");
+
+        // The look is booked for five minutes from now, and the file says so.
+        Assert.NotNull(booked);
+        var expected = _fixture.Store.Clock.GetUtcNow().AddMinutes(RemuxPassHandler.UnreadableWaitMinutes[0]);
+        Assert.InRange(booked.Value, expected.AddSeconds(-2), expected.AddSeconds(2));
+
+        // Scans meanwhile find it present and settled. It is still not ready for the next free lane: calling it ready put it
+        // first in line on Processing while a lane stood empty.
+        await ScanAndDrainAsync("movie");
+        await ScanAndDrainAsync("movie");
+
+        Assert.Equal("on_hold", await StatusAsync("Film.2024/Film.2024.mkv"));
+        Assert.Equal(reason, await ReasonAsync("Film.2024/Film.2024.mkv"));
+        Assert.Equal(booked, await HoldUntilAsync("Film.2024/Film.2024.mkv"));
     }
 
     [Fact]

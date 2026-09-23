@@ -108,7 +108,7 @@ describe("SettingsMediaManagersTab", () => {
     expect(screen.getByText(/will not show it again/i)).toBeInTheDocument();
   });
 
-  it("says Connected, not what the endpoint replied", async () => {
+  it("says Answering, not what the endpoint replied", async () => {
     vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([
       connection({
         last_test_ok: true,
@@ -119,7 +119,7 @@ describe("SettingsMediaManagersTab", () => {
     render(<SettingsMediaManagersTab />, { wrapper });
 
     const status = await screen.findByTestId("media-manager-status");
-    expect(status).toHaveTextContent("Connected");
+    expect(status).toHaveTextContent("Answering");
     // The headline already says it. Repeating the backend's sentence underneath
     // would be the same fact twice.
     expect(status).not.toHaveTextContent("Weir can reach");
@@ -137,7 +137,7 @@ describe("SettingsMediaManagersTab", () => {
     render(<SettingsMediaManagersTab />, { wrapper });
 
     const status = await screen.findByTestId("media-manager-status");
-    expect(status).toHaveTextContent("Connection failed");
+    expect(status).toHaveTextContent("Not answering");
     expect(status).toHaveTextContent(/API key was refused/i);
   });
 
@@ -148,11 +148,11 @@ describe("SettingsMediaManagersTab", () => {
     render(<SettingsMediaManagersTab />, { wrapper });
 
     const status = await screen.findByTestId("media-manager-status");
-    expect(status).toHaveTextContent("Not checked yet");
+    expect(status).toHaveTextContent("Checking…");
     expect(status).toHaveTextContent("never");
   });
 
-  it("never says Connected when there is no check time behind it", async () => {
+  it("never says Answering when there is no check time behind it", async () => {
     vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([
       connection({
         last_test_ok: true,
@@ -165,8 +165,8 @@ describe("SettingsMediaManagersTab", () => {
     const status = await screen.findByTestId("media-manager-status");
     // "Connected" above "Last checked: never" is two statements that cannot both
     // be true. Without a time, nothing has established the connection.
-    expect(status).not.toHaveTextContent("Connected");
-    expect(status).toHaveTextContent("Not checked yet");
+    expect(status).not.toHaveTextContent("Answering");
+    expect(status).toHaveTextContent("Checking…");
     expect(status).toHaveTextContent("never");
     expect(status.querySelector(".mm-status-text--healthy")).toBeNull();
   });

@@ -49,6 +49,12 @@ public static class ActivityEventTypes
 
     /// <summary>A file left the watched folder before Weir finished with it, so it is no longer listed (#645).</summary>
     public const string ProcessingFileLeftWatchedFolder = "processing.file_left_watched_folder";
+
+    /// <summary>A media manager said it imported, or will not import, a file Weir handed back, and what Weir did with its copy (#652).</summary>
+    public const string ProcessingHandbackOutcome = "processing.handback_outcome";
+
+    /// <summary>The Cleanup job for hand-back copies nobody claimed finished a run (#652).</summary>
+    public const string ProcessingUnclaimedHandbackCleanupCompleted = "processing.unclaimed_handback_cleanup_completed";
 }
 
 /// <summary>

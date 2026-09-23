@@ -301,6 +301,9 @@ public sealed class ProcessingLibraryDiscoveryApiTests
 
             Assert.Equal(watched, created["watched_folder"]!.GetValue<string>());
             Assert.Equal(output, created["output_folder"]!.GetValue<string>());
+            // #651: an imported library is linked to the manager it came from, and on, since it can hand files back.
+            Assert.Equal([connectionId], created["manager_connection_ids"]!.AsArray().Select(id => id!.GetValue<long>()));
+            Assert.True(created["enabled"]!.GetValue<bool>());
         }
         finally
         {
@@ -359,6 +362,9 @@ public sealed class ProcessingLibraryDiscoveryApiTests
             var created = (await ImportAsync(client, connectionId, "8")).AsArray()[0]!;
 
             Assert.Equal(string.Empty, created["output_folder"]!.GetValue<string>());
+            // With nowhere to hand files back it arrives off, still linked to its manager (23 Sep 2026).
+            Assert.False(created["enabled"]!.GetValue<bool>());
+            Assert.Equal([connectionId], created["manager_connection_ids"]!.AsArray().Select(id => id!.GetValue<long>()));
         }
         finally
         {

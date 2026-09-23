@@ -53,21 +53,21 @@ Everything Weir needs comes with it, including ffmpeg and MKVToolNix. There's no
 
 ## Screenshots
 
-| Home | Activity |
+| Processing: every file as it is worked on | History: what Weir did to a file, track by track |
 | --- | --- |
-| ![Home](screenshots/home.png) | ![Activity](screenshots/activity.png) |
+| ![Processing](screenshots/processing.png) | ![History of one file](screenshots/history-detail.png) |
 
-| Processing | Library |
+| History | Library: the files already on your storage |
 | --- | --- |
-| ![Processing](screenshots/processing.png) | ![Library](screenshots/library.png) |
+| ![History](screenshots/history.png) | ![Library](screenshots/library.png) |
 
-| Settings | A processed file |
+| Settings › Rules | Settings › Schedule |
 | --- | --- |
-| ![Settings](screenshots/settings.png) | ![Processing record detail](screenshots/processing-detail.png) |
+| ![Rules](screenshots/settings.png) | ![Schedule](screenshots/schedule.png) |
 
 | Light mode | On your phone |
 | --- | --- |
-| ![Home in light mode](screenshots/home-light.png) | ![Home on a phone](screenshots/home-mobile.png) |
+| ![Processing in light mode](screenshots/processing-light.png) | ![Processing on a phone](screenshots/processing-mobile.png) |
 
 ## Install with Docker
 
@@ -223,7 +223,7 @@ More in the [Windows guide](docs-site/docs/deployment/windows.md).
 3. **Choose what to keep.** On **Processing**, set each library's audio and subtitle languages.
 4. **Try it.** Put a file in a watched folder. Weir usually notices within seconds. On network shares
    and in Docker it can take up to five minutes, because Weir falls back to checking on a timer.
-   The file shows up on **Home** while it's being worked on, and in **Activity** once it's done.
+   The file shows up on **Processing** while it's being worked on, and in **History** once it's done.
 
 To clean a library you already have, open **Processing → Library**, pick the library and press
 **Scan now**. Weir shows you what it would remove and how much space that frees before it changes
@@ -271,7 +271,7 @@ every minute and imports the cleaned file as soon as it appears.
 ## Updating
 
 - **Docker:** `docker compose pull && docker compose up -d`. Your data carries over.
-- **Windows:** right-click the tray icon and choose **Check for updates**, or go to **Settings → Upgrade** in Weir.
+- **Windows:** right-click the tray icon and choose **Check for updates**, or go to **System → About** in Weir.
 
 Weir updates its database itself when it starts. Before a big upgrade, it's worth taking a backup
 in **Settings → Backup and restore**.
@@ -283,7 +283,7 @@ What changed in each version: [release notes](https://github.com/jampat000/Weir/
 | Problem | Try this |
 | --- | --- |
 | Files sit in the watched folder and nothing happens | Check the path in Weir is the path **inside the container** (`/media/...`, not `/srv/media/...`). In Docker, Weir may take up to five minutes to notice a file. |
-| "Permission denied" in Activity | Set `WEIR_PUID` / `WEIR_PGID` to the user that owns your media folders |
+| "Permission denied" in a file's History | Set `WEIR_PUID` / `WEIR_PGID` to the user that owns your media folders |
 | Can't open Weir | Check the container is running (`docker ps`) and you're using the right port. Weir's health check is at `http://your-server-ip:9347/health` |
 | Logged out after every restart | You're setting `WEIR_SESSION_SECRET` to a different value each time. Remove it and let Weir manage it |
 

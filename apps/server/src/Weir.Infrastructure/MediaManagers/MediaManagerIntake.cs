@@ -72,7 +72,11 @@ public sealed class MediaManagerIntake
     /// matches. The instance-wide secret remains the fallback only when none of them has a secret configured at
     /// all — once any connection of this kind is using its own secret, that connection's callers must present it.
     /// </summary>
-    public async Task AuthoriseAsync(UnitOfWork uow, string sourceKey, string? presented)
+    /// <remarks>
+    /// True when the caller proved itself with a secret, false when no secret is set anywhere and the event was let in
+    /// unchecked. An unchecked "imported" is still recorded, but it never removes a file (#652).
+    /// </remarks>
+    public async Task<bool> AuthoriseAsync(UnitOfWork uow, string sourceKey, string? presented)
     {
         var connections = await MediaManagerConnectionStore.ListEnabledForKindAsync(uow, sourceKey).ConfigureAwait(false);
         var withSecret = connections.Where(connection => !string.IsNullOrEmpty(connection.WebhookSecretCiphertext)).ToList();
@@ -83,13 +87,13 @@ public sealed class MediaManagerIntake
                 throw new IntakeRefusedException(401, IntakeRules.MissingSecretDetail);
             }
 
-            return;
+            return true;
         }
 
         var configured = _options.MediaManagerWebhookSecret;
         if (string.IsNullOrEmpty(configured))
         {
-            return;
+            return false;
         }
 
         var provided = PyStrings.Strip(presented ?? string.Empty);
@@ -97,6 +101,8 @@ public sealed class MediaManagerIntake
         {
             throw new IntakeRefusedException(401, IntakeRules.MissingSecretDetail);
         }
+
+        return true;
     }
 
     /// <summary>
@@ -238,7 +244,7 @@ public sealed class MediaManagerIntake
 
         if (!string.IsNullOrEmpty(importEvent.HandoffId))
         {
-            await _ledger.RecordReceivedAsync(uow, importEvent.SourceKey, importEvent.HandoffId, library?.Id, relativePath).ConfigureAwait(false);
+            await _ledger.RecordReceivedAsync(uow, importEvent.SourceKey, importEvent.HandoffId, library?.Id, relativePath, importEvent.DownloadId).ConfigureAwait(false);
         }
 
         if (library is not null)

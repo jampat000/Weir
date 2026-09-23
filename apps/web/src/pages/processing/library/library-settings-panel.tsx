@@ -110,10 +110,7 @@ export function LibrarySettingsPanel({
             />
             <button
               type="button"
-              className={mmActionButtonClass({
-                variant: "secondary",
-                disabled: savingFolders || newFolder.trim() === "",
-              })}
+              className={mmActionButtonClass({ variant: "secondary" })}
               disabled={savingFolders || newFolder.trim() === ""}
               onClick={add}
             >

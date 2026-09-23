@@ -299,6 +299,10 @@ public sealed partial class MediaTools
     /// write the file again with ffmpeg and validate that instead. On by default, and the reason a writer other
     /// than ffmpeg is safe to prefer: the result can only match or beat what ffmpeg alone would have produced.
     /// </param>
+    /// <param name="keepOnFailure">
+    /// Settings › Performance "Keep failed work files": a copy that fails is left in the work folder to look at, not
+    /// deleted. A cancelled write is removed either way.
+    /// </param>
     /// <param name="cancellationToken">Cancellation.</param>
     public async Task<string> RemuxToTempFileAsync(
         string src,
@@ -311,6 +315,7 @@ public sealed partial class MediaTools
         AccelerationDecision? acceleration = null,
         IRemuxWriter? writer = null,
         bool rewriteWithFfmpegOnFailure = true,
+        bool keepOnFailure = false,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(src);
@@ -348,8 +353,16 @@ public sealed partial class MediaTools
 
             LogWriterUsed(usedWriter, tmpPath);
         }
-        catch
+        catch (Exception failure)
         {
+            // "Keep failed work files" (Settings › Performance): a copy that failed stays in the work folder for a person
+            // to look at, until the leftover-work-file sweep finds it a day later. A cancelled write is never kept.
+            if (keepOnFailure && failure is not OperationCanceledException && File.Exists(tmpPath))
+            {
+                LogFailedWorkFileKept(tmpPath);
+                throw;
+            }
+
             try
             {
                 if (File.Exists(tmpPath))
@@ -791,6 +804,9 @@ public sealed partial class MediaTools
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not remove temp file {Path}")]
     private partial void LogTempRemoveFailed(Exception error, string path);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Kept the failed work file {Path} to look at; the leftover-work-file sweep removes it once it is a day old.")]
+    private partial void LogFailedWorkFileKept(string path);
 
     /// <summary>
     /// #548: whether a failed write by <paramref name="chosen"/> should be attempted again with ffmpeg.

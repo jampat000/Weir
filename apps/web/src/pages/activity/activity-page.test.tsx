@@ -415,7 +415,7 @@ describe("ActivityPage", () => {
     );
     expect(
       screen.getByRole("link", { name: "Change how long history is kept" }),
-    ).toHaveAttribute("href", "/settings#activity-retention");
+    ).toHaveAttribute("href", "/system?tab=history#activity-retention");
   });
 
   it("says history is kept until cleared when retention is 0", () => {

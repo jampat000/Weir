@@ -454,10 +454,7 @@ export function ChooseTracksPanel({
                 </button>
                 <button
                   type="button"
-                  className={mmActionButtonClass({
-                    variant: "primary",
-                    disabled: submitting || Boolean(validationError),
-                  })}
+                  className={mmActionButtonClass({ variant: "primary" })}
                   onClick={submit}
                   disabled={submitting || Boolean(validationError)}
                   data-testid="choose-tracks-submit"

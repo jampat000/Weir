@@ -5,10 +5,6 @@ import {
 } from "../../lib/suite/queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { mmEditableTextFieldClass } from "../../lib/ui/mm-control-roles";
-import {
-  mmModuleTabBlurbBandClass,
-  mmModuleTabBlurbTextClass,
-} from "../../lib/ui/mm-module-tab-blurb";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import {
   formatAverageMs,
@@ -104,14 +100,6 @@ export function SettingsLogsTab() {
 
   return (
     <div data-testid="suite-settings-logs" className="mm-quiet-stack w-full">
-      <div className={mmModuleTabBlurbBandClass}>
-        <p className={mmModuleTabBlurbTextClass}>
-          System event logs from the Weir runtime. Use filters to narrow down
-          warnings, failures, and tracebacks. Advanced server diagnostics are
-          available here when troubleshooting.
-        </p>
-      </div>
-
       <SettingsFactTable
         caption="Log summary"
         facts={logCounts}

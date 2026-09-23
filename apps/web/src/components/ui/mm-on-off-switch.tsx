@@ -15,8 +15,8 @@ export function MmOnOffSwitch({
   enabled: boolean;
   disabled: boolean;
   onChange: (v: boolean) => void;
-  /** `inline`: label left, On/Off control right (single row). */
-  layout?: "default" | "inline";
+  /** `inline`: label left, On/Off control right (single row). `control`: the control alone, for a row that names it already. */
+  layout?: "default" | "inline" | "control";
 }) {
   const control = (
     <div
@@ -51,6 +51,17 @@ export function MmOnOffSwitch({
       })}
     </div>
   );
+
+  if (layout === "control") {
+    return (
+      <>
+        <span className="sr-only" id={id}>
+          {label}
+        </span>
+        {control}
+      </>
+    );
+  }
 
   if (layout === "inline") {
     return (

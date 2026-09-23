@@ -26,11 +26,20 @@ public static class LibraryScanStore
     /// endpoint's write <see cref="UnitOfWork"/> is still open, as here — can deadlock against it, exactly the trap
     /// <see cref="Weir.Infrastructure.Processing.RequeueStore"/> already documents for the same reason.
     /// </summary>
-    public static Task<ProcessingJob> RequestScanAsync(UnitOfWork uow, ProcessingJobStore jobs, long libraryId, string trigger)
+    /// <remarks>
+    /// <paramref name="scheduledAt"/> is the time a scheduled scan was due, recorded on the row so the next one is worked
+    /// out from it (<see cref="LastScheduledRunAtAsync"/>); a scan someone asked for has none.
+    /// </remarks>
+    public static Task<ProcessingJob> RequestScanAsync(UnitOfWork uow, ProcessingJobStore jobs, long libraryId, string trigger, DateTimeOffset? scheduledAt = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(jobs);
         var payload = new PyDict().Set("library_id", libraryId).Set("trigger", trigger);
+        if (scheduledAt is { } due)
+        {
+            payload.Set("scheduled_at", due.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        }
+
         var job = jobs.EnqueueOrGet(
             uow.Connection,
             uow.WriteTransaction(),
@@ -48,7 +57,20 @@ public static class LibraryScanStore
     /// transaction for the same reason <see cref="RequestScanAsync"/> does. Public so the API layer (a different assembly)
     /// can request a clean without risking the same-connection deadlock.
     /// </summary>
-    public static Task<ProcessingJob> EnqueueCleanAsync(UnitOfWork uow, ProcessingJobStore jobs, long libraryId, string path, string trigger, bool confirmFinalRemoval)
+    /// <remarks>
+    /// <paramref name="manualPlan"/> is one person's own choice of tracks for this one file (#501 shape); the
+    /// library's rules decide when it is null. <paramref name="expectedSizeBytes"/> is the size the file had when
+    /// they chose, so a file that changed in between is refused rather than cleaned to a stale plan.
+    /// </remarks>
+    public static async Task<ProcessingJob> EnqueueCleanAsync(
+        UnitOfWork uow,
+        ProcessingJobStore jobs,
+        long libraryId,
+        string path,
+        string trigger,
+        bool confirmFinalRemoval,
+        PyDict? manualPlan = null,
+        long? expectedSizeBytes = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(jobs);
@@ -57,16 +79,39 @@ public static class LibraryScanStore
             .Set("path", path)
             .Set("trigger", trigger)
             .Set("confirm_final_removal", confirmFinalRemoval);
-        var job = jobs.EnqueueOrGet(
+        if (manualPlan is not null)
+        {
+            payload.Set("manual_plan", manualPlan);
+            if (expectedSizeBytes is { } chosenAgainst)
+            {
+                payload.Set("expected_size_bytes", chosenAgainst);
+            }
+        }
+
+        // One clean job per (library, path) keeps a second request from queueing the same work twice while the
+        // first is still waiting or running. A *finished* row must not do that: it would mean a file could only ever
+        // be cleaned once (until job rows are pruned days later), with the caller told it was queued. Clearing the
+        // finished row first keeps the dedupe key meaning "one clean outstanding". Nothing reads a terminal clean
+        // row — what happened to the file is in Activity.
+        var dedupeKey = LibraryModeJobKinds.CleanDedupeKey(libraryId, path);
+        var terminal = ProcessingJobStatus.Terminal;
+        var names = terminal.Select((_, index) => $"@s{index}").ToArray();
+        var parameters = terminal.Select((status, index) => ($"@s{index}", (object?)status))
+            .Append(("@dedupe", dedupeKey))
+            .ToArray();
+        await uow.ExecuteAsync(
+            $"DELETE FROM jobs WHERE dedupe_key = @dedupe AND status IN ({string.Join(", ", names)})",
+            parameters).ConfigureAwait(false);
+
+        return jobs.EnqueueOrGet(
             uow.Connection,
             uow.WriteTransaction(),
-            LibraryModeJobKinds.CleanDedupeKey(libraryId, path),
+            dedupeKey,
             LibraryModeJobKinds.CleanKind,
             PyJsonWriter.Dumps(payload, PyJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
             0,
             LibraryModePriority.Low);
-        return Task.FromResult(job);
     }
 
     /// <summary>Whether a scan for this library is already queued or running, so callers do not pile up duplicate requests.</summary>
@@ -79,6 +124,30 @@ public static class LibraryScanStore
             reader => new LibraryScanJobView(reader.GetInt64(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2)),
             ("@kind", LibraryModeJobKinds.ScanKind),
             ("@prefix", EscapeLike(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%")).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// When the library's most recent scheduled scan was due, whatever became of it, or null when it has never had one
+    /// (or job-row retention has since pruned it, which only makes the next one due straight away).
+    /// </summary>
+    public static async Task<DateTimeOffset?> LastScheduledRunAtAsync(UnitOfWork uow, long libraryId)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        var text = await uow.QuerySingleAsync(
+            "SELECT json_extract(payload_json, '$.scheduled_at') FROM jobs WHERE job_kind = @kind AND dedupe_key LIKE @prefix ESCAPE '\\' " +
+            "AND json_extract(payload_json, '$.trigger') = @trigger AND json_extract(payload_json, '$.scheduled_at') IS NOT NULL " +
+            "ORDER BY id DESC LIMIT 1",
+            reader => reader.GetString(0),
+            ("@kind", LibraryModeJobKinds.ScanKind),
+            ("@prefix", EscapeLike(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%"),
+            ("@trigger", LibraryModeSchedule.Trigger)).ConfigureAwait(false);
+        return DateTimeOffset.TryParse(
+            text,
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.RoundtripKind,
+            out var parsed)
+            ? parsed
+            : null;
     }
 
     /// <summary>The most recently created scan row for a library, whatever its status, for "what did the last scan say / do".</summary>

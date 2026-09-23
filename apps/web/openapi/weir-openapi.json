@@ -800,6 +800,92 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HandoffOutcomeIn": {
+        "description": "What a media manager says became of a file Weir handed back (agreed with Deluno, 23 Sep 2026).",
+        "properties": {
+          "outcome": {
+            "description": "imported, or not-imported. not-imported is final: never sent for a failure the manager will retry.",
+            "enum": [
+              "imported",
+              "not-imported"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "occurredUtc": {
+            "description": "When it happened, with a time zone.",
+            "format": "date-time",
+            "title": "Occurredutc",
+            "type": "string"
+          },
+          "importedPath": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where the manager put the file in its library.",
+            "title": "Importedpath"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the manager will not import it.",
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "outcome",
+          "occurredUtc"
+        ],
+        "title": "HandoffOutcomeIn",
+        "type": "object"
+      },
+      "HandoffOutcomeOut": {
+        "properties": {
+          "handoffId": {
+            "title": "Handoffid",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "imported",
+              "not-imported"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "released": {
+            "description": "Weir removed its copy from the hand-back folder.",
+            "title": "Released",
+            "type": "boolean"
+          },
+          "message": {
+            "description": "What Weir did, in plain words.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "handoffId",
+          "outcome",
+          "released",
+          "message"
+        ],
+        "title": "HandoffOutcomeOut",
+        "type": "object"
+      },
       "HealthResponse": {
         "description": "Minimal liveness payload for load balancers and ops.",
         "properties": {
@@ -916,6 +1002,30 @@
             "minLength": 1,
             "title": "Csrf Token",
             "type": "string"
+          },
+          "expected_size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The file's size when those tracks were chosen. A file that changed since is left alone rather than cleaned to a stale choice.",
+            "title": "Expected Size Bytes"
+          },
+          "manual_plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcessingManualPlanIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Your own choice of tracks for this one file, instead of the library's rules. Only valid with exactly one path.",
+            "title": "Manual Plan"
           },
           "paths": {
             "items": {
@@ -1139,9 +1249,26 @@
             "title": "Classification",
             "type": "string"
           },
+          "cleaned_at": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When Weir last cleaned this file (unix seconds), or null if it never has.",
+            "title": "Cleaned At"
+          },
           "estimated_bytes_saved": {
             "title": "Estimated Bytes Saved",
             "type": "integer"
+          },
+          "leave_alone": {
+            "description": "You asked Weir to leave this file alone; nothing cleans it until you say otherwise.",
+            "title": "Leave Alone",
+            "type": "boolean"
           },
           "link_count": {
             "anyOf": [
@@ -1292,7 +1419,9 @@
           "subtitle_summary",
           "subtitle_track_count",
           "video_codec",
-          "video_height"
+          "video_height",
+          "cleaned_at",
+          "leave_alone"
         ],
         "title": "LibraryFileOut",
         "type": "object"
@@ -1421,6 +1550,82 @@
         "title": "LibraryFilesSummaryOut",
         "type": "object"
       },
+      "LibraryLeaveAloneIn": {
+        "additionalProperties": false,
+        "description": "Library mode: set one file aside so nothing cleans it, or bring it back. Weir server (.NET) only.",
+        "properties": {
+          "csrf_token": {
+            "minLength": 1,
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "leave_alone": {
+            "default": true,
+            "title": "Leave Alone",
+            "type": "boolean"
+          },
+          "path": {
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token",
+          "path"
+        ],
+        "title": "LibraryLeaveAloneIn",
+        "type": "object"
+      },
+      "LibraryLeaveAloneOut": {
+        "additionalProperties": false,
+        "description": "Library mode: what that file is now. Weir server (.NET) only.",
+        "properties": {
+          "leave_alone": {
+            "title": "Leave Alone",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "leave_alone",
+          "path"
+        ],
+        "title": "LibraryLeaveAloneOut",
+        "type": "object"
+      },
+      "LibraryModeScheduleOut": {
+        "additionalProperties": false,
+        "description": "\"Scheduled scan and clean\": whether it is on and when it next runs. It runs once a day, inside the library's own schedule window.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it next runs; now when it is due. Null when it is off or cannot run: no library folders, the library switched off, or a schedule window that never opens.",
+            "title": "Next Run At"
+          }
+        },
+        "required": [
+          "enabled",
+          "next_run_at"
+        ],
+        "title": "LibraryModeScheduleOut",
+        "type": "object"
+      },
       "LibraryOverviewOut": {
         "additionalProperties": false,
         "description": "Issue #568: what the library holds and its state, aggregated in SQL rather than in the browser.",
@@ -1454,6 +1659,9 @@
             ],
             "title": "Scan"
           },
+          "schedule": {
+            "$ref": "#/components/schemas/LibraryModeScheduleOut"
+          },
           "totals": {
             "$ref": "#/components/schemas/LibraryTotalsOut"
           }
@@ -1464,6 +1672,7 @@
           "library_id",
           "problems",
           "scan",
+          "schedule",
           "totals"
         ],
         "title": "LibraryOverviewOut",
@@ -1895,12 +2104,20 @@
             "title": "Cannot Process",
             "type": "integer"
           },
+          "cleaned": {
+            "title": "Cleaned",
+            "type": "integer"
+          },
           "estimated_bytes_saved": {
             "title": "Estimated Bytes Saved",
             "type": "integer"
           },
           "files": {
             "title": "Files",
+            "type": "integer"
+          },
+          "left_alone": {
+            "title": "Left Alone",
             "type": "integer"
           },
           "matches": {
@@ -1932,7 +2149,9 @@
           "size_bytes",
           "total_removed_audio_tracks",
           "total_removed_subtitle_tracks",
-          "would_change"
+          "would_change",
+          "cleaned",
+          "left_alone"
         ],
         "title": "LibraryTotalsOut",
         "type": "object"
@@ -2017,10 +2236,21 @@
           "family": {
             "enum": [
               "work_temp_stale_sweep",
-              "failure_cleanup"
+              "failure_cleanup",
+              "unclaimed_handbacks"
             ],
             "title": "Family",
             "type": "string"
+          },
+          "window_days": {
+            "description": "Unclaimed hand-backs only: how many days a copy waits before the job may remove it.",
+            "title": "Window Days",
+            "type": "integer"
+          },
+          "interval_seconds": {
+            "description": "How often this job runs: the interval saved in Settings › Cleanup, else the environment's.",
+            "title": "Interval Seconds",
+            "type": "integer"
           },
           "last_completed_at": {
             "anyOf": [
@@ -2045,6 +2275,19 @@
             ],
             "description": "The most recent failure reason, when the last run failed.",
             "title": "Last Error"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the job next runs by itself. Null while it is switched off.",
+            "title": "Next Run At"
           },
           "last_failed_at": {
             "anyOf": [
@@ -2106,7 +2349,8 @@
           "family": {
             "enum": [
               "work_temp_stale_sweep",
-              "failure_cleanup"
+              "failure_cleanup",
+              "unclaimed_handbacks"
             ],
             "title": "Family",
             "type": "string"
@@ -3554,6 +3798,18 @@
             "description": "Why, written for the person asking why there is no new output for this file.",
             "title": "Output Collision Reason"
           },
+          "progress_elapsed_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long the running pass has been writing, in seconds.",
+            "title": "Progress Elapsed Seconds"
+          },
           "progress_eta_seconds": {
             "anyOf": [
               {
@@ -3589,6 +3845,60 @@
             ],
             "description": "How far the current pass has got, when one is running. Null when nothing is in flight.",
             "title": "Progress Percent"
+          },
+          "progress_removed_audio": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The audio tracks the running pass is taking out, as its plan describes each one. Null when nothing is in flight.",
+            "title": "Progress Removed Audio"
+          },
+          "progress_removed_subtitles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The subtitle tracks the running pass is taking out. Null when nothing is in flight.",
+            "title": "Progress Removed Subtitles"
+          },
+          "progress_speed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The running pass's speed as ffmpeg reports it, for example 148x.",
+            "title": "Progress Speed"
+          },
+          "progress_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "processing while the file is written; finishing during the final checks and hand-back. Null when nothing is in flight.",
+            "title": "Progress Status"
           },
           "quarantined": {
             "default": false,
@@ -3693,6 +4003,18 @@
             ],
             "description": "Measured width in pixels.",
             "title": "Video Width"
+          },
+          "handback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcessingFileHandbackOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The copy Weir handed back for a media manager to import, and what became of it. Null when Weir wrote none.",
+            "title": "Handback"
           }
         },
         "required": [
@@ -3707,6 +4029,139 @@
           "updated_at"
         ],
         "title": "ProcessingFileOut",
+        "type": "object"
+      },
+      "ProcessingFileHandbackOut": {
+        "description": "The copy Weir handed back, what a media manager said about it, and whether Weir removed it.",
+        "properties": {
+          "output_path": {
+            "description": "Where Weir wrote the copy.",
+            "title": "Output Path",
+            "type": "string"
+          },
+          "written_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Written At"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "imported",
+                  "not-imported"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What a media manager said. Null while none has said anything.",
+            "title": "Outcome"
+          },
+          "outcome_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which media manager said it: Sonarr, Radarr, Deluno.",
+            "title": "Outcome By"
+          },
+          "outcome_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome At"
+          },
+          "imported_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where the media manager put the file in its library, as it said.",
+            "title": "Imported Path"
+          },
+          "outcome_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the media manager will not import it, when it said.",
+            "title": "Outcome Reason"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When Weir removed its copy. Null while the copy is there or Weir left it.",
+            "title": "Released At"
+          },
+          "settled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When Weir stopped looking after the copy.",
+            "title": "Settled At"
+          },
+          "release_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What happened to the copy, in plain words.",
+            "title": "Release Note"
+          }
+        },
+        "required": [
+          "output_path",
+          "outcome",
+          "outcome_by",
+          "released_at",
+          "release_note"
+        ],
+        "title": "ProcessingFileHandbackOut",
         "type": "object"
       },
       "ProcessingFileRemuxPassManualEnqueueIn": {
@@ -4719,6 +5174,16 @@
             "description": "After a successful pass, remove the original download from the watched folder. Off keeps the file, its folder and its sidecars where the download client put them, so a torrent keeps seeding.",
             "title": "Remove Original After Success",
             "type": "boolean"
+          },
+          "remux_writer": {
+            "default": "best",
+            "description": "Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
+            "enum": [
+              "best",
+              "ffmpeg"
+            ],
+            "title": "Remux Writer",
+            "type": "string"
           }
         },
         "required": [
@@ -4967,6 +5432,20 @@
             "title": "Name",
             "type": "string"
           },
+          "next_look_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "When Weir next looks at this library's watched folder: the next periodic scan, or sooner when a held file's wait ends. Null when no look is scheduled (the library is off, or only folder events trigger a look).",
+            "title": "Next Look At"
+          },
           "output_collision_policy": {
             "title": "Output Collision Policy",
             "type": "string"
@@ -5075,6 +5554,16 @@
             "description": "After a successful pass, remove the original download from the watched folder. Off keeps the file, its folder and its sidecars where the download client put them, so a torrent keeps seeding.",
             "title": "Remove Original After Success",
             "type": "boolean"
+          },
+          "remux_writer": {
+            "default": "best",
+            "description": "Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
+            "enum": [
+              "best",
+              "ffmpeg"
+            ],
+            "title": "Remux Writer",
+            "type": "string"
           }
         },
         "required": [
@@ -5531,6 +6020,16 @@
             "description": "After a successful pass, remove the original download from the watched folder. Off keeps the file, its folder and its sidecars where the download client put them, so a torrent keeps seeding.",
             "title": "Remove Original After Success",
             "type": "boolean"
+          },
+          "remux_writer": {
+            "default": "best",
+            "description": "Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
+            "enum": [
+              "best",
+              "ffmpeg"
+            ],
+            "title": "Remux Writer",
+            "type": "string"
           }
         },
         "required": [
@@ -5635,6 +6134,18 @@
             "description": "Delete the source release folder after a file fails terminally. Off by default: this removes the original, so it stays off until you choose it.",
             "title": "Failure Cleanup Enabled",
             "type": "boolean"
+          },
+          "failure_cleanup_interval_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How often the failed-download cleanup runs, set in Settings › Cleanup. Null keeps the environment's interval.",
+            "title": "Failure Cleanup Interval Seconds"
           },
           "file_log_retention_days": {
             "description": "How long to keep the per-file processing record. 0 keeps it forever.",
@@ -5773,15 +6284,46 @@
             "title": "Updated At",
             "type": "string"
           },
-          "verbose_detection_logging": {
-            "description": "Record extra detail from the file-detection stage. Turn this on while working out why a file is or is not being picked up, and turn it off again afterwards — it is loud.",
-            "title": "Verbose Detection Logging",
-            "type": "boolean"
-          },
           "work_temp_stale_sweep_enabled": {
             "description": "Reclaim Weir's own stale working files. Safe, and on by default.",
             "title": "Work Temp Stale Sweep Enabled",
             "type": "boolean"
+          },
+          "work_temp_stale_sweep_interval_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How often the leftover-work-file sweep runs, set in Settings › Cleanup. Null keeps the environment's interval.",
+            "title": "Work Temp Stale Sweep Interval Seconds"
+          },
+          "unclaimed_handback_cleanup_enabled": {
+            "description": "Remove Weir's own hand-back copies no media manager claimed in time. Off by default.",
+            "title": "Unclaimed Handback Cleanup Enabled",
+            "type": "boolean"
+          },
+          "unclaimed_handback_window_days": {
+            "description": "How many days an unclaimed hand-back copy waits before the cleanup may remove it.",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Unclaimed Handback Window Days",
+            "type": "integer"
+          },
+          "unclaimed_handback_cleanup_interval_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How often the unclaimed hand-back cleanup runs, set in Settings › Cleanup. Null keeps six hours.",
+            "title": "Unclaimed Handback Cleanup Interval Seconds"
           }
         },
         "required": [
@@ -5794,9 +6336,10 @@
           "runner_budget_enabled",
           "work_temp_stale_sweep_enabled",
           "failure_cleanup_enabled",
+          "unclaimed_handback_cleanup_enabled",
+          "unclaimed_handback_window_days",
           "keep_failed_work_files",
           "file_log_retention_days",
-          "verbose_detection_logging",
           "runner_cost_undetermined",
           "min_file_age_seconds",
           "min_input_file_size_mb",
@@ -5836,6 +6379,19 @@
               }
             ],
             "title": "Failure Cleanup Enabled"
+          },
+          "failure_cleanup_interval_seconds": {
+            "anyOf": [
+              {
+                "maximum": 2592000,
+                "minimum": 900,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Cleanup Interval Seconds"
           },
           "file_log_retention_days": {
             "anyOf": [
@@ -6127,6 +6683,8 @@
                 "type": "null"
               }
             ],
+            "deprecated": true,
+            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused.",
             "title": "Verbose Detection Logging"
           },
           "work_temp_stale_sweep_enabled": {
@@ -6139,6 +6697,56 @@
               }
             ],
             "title": "Work Temp Stale Sweep Enabled"
+          },
+          "work_temp_stale_sweep_interval_seconds": {
+            "anyOf": [
+              {
+                "maximum": 2592000,
+                "minimum": 900,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Temp Stale Sweep Interval Seconds"
+          },
+          "unclaimed_handback_cleanup_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unclaimed Handback Cleanup Enabled"
+          },
+          "unclaimed_handback_window_days": {
+            "anyOf": [
+              {
+                "maximum": 365,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unclaimed Handback Window Days"
+          },
+          "unclaimed_handback_cleanup_interval_seconds": {
+            "anyOf": [
+              {
+                "maximum": 2592000,
+                "minimum": 900,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unclaimed Handback Cleanup Interval Seconds"
           }
         },
         "required": [
@@ -9053,6 +9661,25 @@
               ],
               "title": "File"
             }
+          },
+          {
+            "description": "\"weir\" keeps Weir's own events (not about one file); \"files\" keeps the events about a file.",
+            "in": "query",
+            "name": "about",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "About"
+            }
           }
         ],
         "responses": {
@@ -9374,6 +10001,25 @@
                 }
               ],
               "title": "File"
+            }
+          },
+          {
+            "description": "\"weir\" keeps Weir's own events (not about one file); \"files\" keeps the events about a file.",
+            "in": "query",
+            "name": "about",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "About"
             }
           }
         ],
@@ -10054,6 +10700,88 @@
           }
         },
         "summary": "Get Intake Handoff",
+        "tags": [
+          "media-manager-intake"
+        ]
+      }
+    },
+    "/api/v1/intake/handoffs/{source_key}/{handoff_id}/outcome": {
+      "post": {
+        "description": "The manager says what became of the file Weir handed back. imported records it and releases Weir's copy when it is still exactly the file Weir wrote; not-imported records it and keeps the copy. 200 again for the same outcome; 404 never received; 409 not finished or a different outcome already recorded.",
+        "operationId": "post_intake_handoff_outcome_api_v1_intake_handoffs__source_key___handoff_id__outcome_post",
+        "parameters": [
+          {
+            "description": "The manager that gave Weir the hand-off.",
+            "in": "path",
+            "name": "source_key",
+            "required": true,
+            "schema": {
+              "description": "The manager that gave Weir the hand-off.",
+              "title": "Source Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The manager's own hand-off id.",
+            "in": "path",
+            "name": "handoff_id",
+            "required": true,
+            "schema": {
+              "description": "The manager's own hand-off id.",
+              "title": "Handoff Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Webhook-Secret",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Webhook-Secret"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoffOutcomeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffOutcomeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Intake Handoff Outcome",
         "tags": [
           "media-manager-intake"
         ]
@@ -12074,6 +12802,27 @@
             }
           },
           {
+            "description": "Narrow to files Weir has cleaned, or files you have set aside.",
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "cleaned",
+                    "left_alone"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
             "in": "query",
             "name": "sort",
             "required": false,
@@ -12216,6 +12965,60 @@
           }
         },
         "summary": "Post Library Files Clean",
+        "tags": [
+          "library-mode"
+        ]
+      }
+    },
+    "/api/v1/processing/libraries/{library_id}/library-files/leave-alone": {
+      "post": {
+        "description": "Library mode. Sets one file aside so nothing cleans it — a rescan does not forget it — or brings it back with leave_alone: false.",
+        "operationId": "post_library_files_leave_alone",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "library_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Library Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LibraryLeaveAloneIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryLeaveAloneOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Library Files Leave Alone",
         "tags": [
           "library-mode"
         ]

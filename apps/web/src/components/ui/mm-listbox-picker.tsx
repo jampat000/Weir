@@ -114,7 +114,8 @@ export function MmListboxPicker({
         <svg
           aria-hidden
           className={[
-            "h-4 w-4 shrink-0 text-[var(--mm-text3)] transition-transform",
+            // The same accent mark a native select draws, so an anchored listbox and a select read alike.
+            "h-4 w-4 shrink-0 text-[var(--mm-accent)] transition-transform",
             open ? "rotate-180" : "",
           ].join(" ")}
           viewBox="0 0 20 20"

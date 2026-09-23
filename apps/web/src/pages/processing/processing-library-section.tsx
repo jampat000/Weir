@@ -319,10 +319,7 @@ export function ProcessingLibrarySection() {
         {editable ? (
           <button
             type="button"
-            className={mmActionButtonClass({
-              variant: "primary",
-              disabled: scanning || settings.data?.library_folders.length === 0,
-            })}
+            className={mmActionButtonClass({ variant: "primary" })}
             disabled={scanning || settings.data?.library_folders.length === 0}
             onClick={() => scanMutation.mutate()}
           >
@@ -370,11 +367,7 @@ export function ProcessingLibrarySection() {
           {editable ? (
             <button
               type="button"
-              className={mmActionButtonClass({
-                variant: "secondary",
-                disabled:
-                  scanning || settings.data?.library_folders.length === 0,
-              })}
+              className={mmActionButtonClass({ variant: "secondary" })}
               disabled={scanning || settings.data?.library_folders.length === 0}
               onClick={() => scanMutation.mutate()}
               data-testid="library-scan-button"

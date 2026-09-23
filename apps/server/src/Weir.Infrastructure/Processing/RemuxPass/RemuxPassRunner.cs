@@ -30,6 +30,9 @@ public sealed record RemuxPassRequest
     public long MinimumFreeDiskSpaceMb { get; init; }
     public bool PassThroughUnchanged { get; init; }
 
+    /// <summary>Settings › Performance "Keep the half-written copy": a failed write stays in the work folder.</summary>
+    public bool KeepFailedWorkFiles { get; init; }
+
     /// <summary>The hand-off this file came from, when it did: its release name feeds the original-language lookup.</summary>
     public HandoffOrigin? Origin { get; init; }
 
@@ -728,6 +731,9 @@ public sealed class RemuxPassRunner
                 .Set("media_scope", context.Scope)
                 .Set("stream_counts", output["stream_counts"])
                 .Set("duration_seconds", NullableFloat(context.Duration))
+                // What comes out, so Live can say it while the file is being written, not only afterwards.
+                .Set("removed_audio", output["removed_audio"])
+                .Set("removed_subtitles", output["removed_subtitles"])
                 .Set("message", "Weir has started writing the cleaned-up file."));
             // #548: the library's writer choice. The staged output keeps the source's own extension
             // (RemuxToTempFileAsync), so the source path is what decides whether mkvmerge can take it.
@@ -750,12 +756,15 @@ public sealed class RemuxPassRunner
                             .Set("media_scope", context.Scope)
                             .Set("stream_counts", output["stream_counts"])
                             .Set("duration_seconds", NullableFloat(context.Duration))
+                            .Set("removed_audio", output["removed_audio"])
+                            .Set("removed_subtitles", output["removed_subtitles"])
                             .Set("message", "Weir is writing the cleaned-up file."),
                         update)),
                 context.Duration,
                 hardware,
                 writer,
                 request.Runtime.RewriteWithFfmpeg,
+                request.KeepFailedWorkFiles,
                 cancellationToken).ConfigureAwait(false);
             try
             {
@@ -888,6 +897,8 @@ public sealed class RemuxPassRunner
             .Set("inspected_source_path", context.Inspected)
             .Set("output_file", resolvedFinal)
             .Set("media_scope", context.Scope)
+            .Set("removed_audio", output["removed_audio"])
+            .Set("removed_subtitles", output["removed_subtitles"])
             .Set("message", "The cleaned-up file was written. Weir is doing final safety checks."));
         await MigrateSidecarsBeforeCleanupAsync(src, final, sidecarPatterns, request.Runtime.PreserveOriginalTimestamps, output).ConfigureAwait(false);
         await HandleCleanupAfterSuccessAsync(context, output, final, cancellationToken).ConfigureAwait(false);

@@ -328,7 +328,7 @@ def test_maintenance_state_shape(viewer) -> None:
     r = viewer.get(MAINTENANCE)
     assert r.status_code == 200, r.text
     families = r.json()["families"]
-    assert [f["family"] for f in families] == ["work_temp_stale_sweep", "failure_cleanup"]
+    assert [f["family"] for f in families] == ["work_temp_stale_sweep", "failure_cleanup", "unclaimed_handbacks"]
     for family in families:
         assert set(family) >= {
             "family",

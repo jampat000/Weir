@@ -415,10 +415,7 @@ export function LibraryFilesView({
         >
           <button
             type="button"
-            className={mmActionButtonClass({
-              variant: "tertiary",
-              disabled: page <= 1,
-            })}
+            className={mmActionButtonClass({ variant: "tertiary" })}
             disabled={page <= 1}
             onClick={() => onFiltersChange({ ...filters, page: page - 1 })}
           >
@@ -429,10 +426,7 @@ export function LibraryFilesView({
           </span>
           <button
             type="button"
-            className={mmActionButtonClass({
-              variant: "tertiary",
-              disabled: page >= lastPage,
-            })}
+            className={mmActionButtonClass({ variant: "tertiary" })}
             disabled={page >= lastPage}
             onClick={() => onFiltersChange({ ...filters, page: page + 1 })}
           >
@@ -444,10 +438,7 @@ export function LibraryFilesView({
       {editable ? (
         <button
           type="button"
-          className={mmActionButtonClass({
-            variant: "primary",
-            disabled: selectedCount === 0 || cleaning,
-          })}
+          className={mmActionButtonClass({ variant: "primary" })}
           disabled={selectedCount === 0 || cleaning}
           onClick={onClean}
           data-testid="library-clean-button"

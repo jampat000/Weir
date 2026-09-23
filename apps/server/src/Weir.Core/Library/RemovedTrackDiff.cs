@@ -55,7 +55,7 @@ public static class RemovedTrackDiff
     private static HashSet<string> KeptSubtitleLangs(ProcessingRulesConfig rules)
     {
         ArgumentNullException.ThrowIfNull(rules);
-        if (rules.SubtitleMode == RemuxRuleValues.SubtitleModeRemoveAll || rules.SubtitleLangs.Count == 0)
+        if (rules.RemovesEverySubtitle)
         {
             return new HashSet<string>(StringComparer.Ordinal);
         }
@@ -71,6 +71,12 @@ public static class RemovedTrackDiff
     {
         ArgumentNullException.ThrowIfNull(rules);
         ArgumentNullException.ThrowIfNull(removed);
+
+        // Keep-all wants every subtitle language back, whatever it was.
+        if (removed.Type == RemovedTrackType.Subtitle && rules.KeepsEverySubtitleLanguage)
+        {
+            return true;
+        }
 
         var configuredLangs = removed.Type switch
         {

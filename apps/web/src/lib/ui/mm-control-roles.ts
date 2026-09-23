@@ -32,8 +32,10 @@ const mmNativeFieldShell =
 /** Native dropdown / listbox-style ``<select>`` — use under a field label (includes top spacing). */
 export const mmSelectFieldClass = `${mmNativeFieldShell} mt-1 cursor-pointer`;
 
-/** Anchored picker button (custom listbox) — visually aligned with {@link mmSelectFieldClass}. */
-export const mmPickerTriggerClass = `${mmNativeFieldShell} mt-1 cursor-pointer text-left`;
+/** Anchored picker button (custom listbox) — visually aligned with {@link mmSelectFieldClass}.
+ *  `mm-input--opens` gives it the same tinted well a native select has, so everything that opens
+ *  something looks alike; it draws its own chevron in markup, so the well comes without the mark. */
+export const mmPickerTriggerClass = `${mmNativeFieldShell} mm-input--opens mt-1 cursor-pointer text-left`;
 
 /** Checkbox control — used for multi-option rows and standalone toggles. */
 export const mmCheckboxControlClass =
@@ -69,55 +71,56 @@ export function mmSectionTabClass(active: boolean): string {
   ].join(" ");
 }
 
+/**
+ * The classes for one action button.
+ *
+ * A disabled button looks disabled because it *is* disabled: the `disabled:` rules below read the element's own
+ * state, so `<button disabled>` is the whole story and there is no second flag to keep in step. It used to take a
+ * `disabled` option instead, and 138 of 145 call sites never passed it — every one of those buttons refused the
+ * click while still showing a gold border, a shadow and a pointer cursor.
+ *
+ * `disabled:hover:*` repeats each hover property that would otherwise still fire: CSS `:hover` matches a disabled
+ * button, and `.disabled\:hover\:x:disabled:hover` outranks `.hover\:y:hover` on specificity, so the outcome does
+ * not depend on the order Tailwind happens to emit its variants in.
+ *
+ * Only form controls have a disabled state. The one `<a>` styled this way (a log download) is never disabled.
+ */
 export function mmActionButtonClass(opts: {
   variant: "primary" | "secondary" | "tertiary";
-  disabled?: boolean;
 }): string {
-  const { variant, disabled } = opts;
+  const { variant } = opts;
 
   if (variant === "tertiary") {
-    if (disabled) {
-      return [
-        tertiaryBase,
-        "cursor-not-allowed border-[var(--mm-border)] bg-transparent text-[var(--mm-text3)] opacity-60",
-      ].join(" ");
-    }
     return [
       tertiaryBase,
       "cursor-pointer border-[var(--mm-border)] bg-transparent text-[var(--mm-text2)]",
       "hover:border-[var(--mm-border)] hover:bg-[var(--mm-card-bg)]/55 hover:text-[var(--mm-text1)]",
       "active:brightness-[0.98]",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mm-accent-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--mm-card-bg)]",
+      "disabled:cursor-not-allowed disabled:border-[var(--mm-border)] disabled:bg-transparent disabled:text-[var(--mm-text3)] disabled:opacity-60",
+      "disabled:hover:border-[var(--mm-border)] disabled:hover:bg-transparent disabled:hover:text-[var(--mm-text3)]",
     ].join(" ");
   }
 
   if (variant === "primary") {
-    if (disabled) {
-      return [
-        actionBase,
-        "cursor-not-allowed border-[var(--mm-border)] bg-[var(--mm-button-quiet-bg)] text-[var(--mm-text3)] opacity-80",
-      ].join(" ");
-    }
     return [
       actionBase,
       "cursor-pointer border-[var(--mm-gold)] bg-[color-mix(in_srgb,var(--mm-gold)_20%,transparent)] text-[var(--mm-text)] shadow-[0_2px_14px_color-mix(in_srgb,var(--mm-gold)_14%,transparent)]",
       "hover:border-[var(--mm-gold-bright)] hover:bg-[color-mix(in_srgb,var(--mm-gold)_28%,transparent)] hover:shadow-[0_4px_20px_color-mix(in_srgb,var(--mm-gold)_22%,transparent)] hover:-translate-y-px",
       "active:translate-y-0 active:brightness-[0.97]",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mm-accent-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--mm-card-bg)]",
+      "disabled:cursor-not-allowed disabled:border-[var(--mm-border)] disabled:bg-[var(--mm-button-quiet-bg)] disabled:text-[var(--mm-text3)] disabled:opacity-80 disabled:shadow-none",
+      "disabled:hover:border-[var(--mm-border)] disabled:hover:bg-[var(--mm-button-quiet-bg)] disabled:hover:shadow-none disabled:hover:translate-y-0",
     ].join(" ");
   }
 
-  if (disabled) {
-    return [
-      actionBase,
-      "cursor-not-allowed border-[var(--mm-border)] bg-transparent text-[var(--mm-text3)] opacity-70",
-    ].join(" ");
-  }
   return [
     actionBase,
     "cursor-pointer border-[var(--mm-border)] bg-[var(--mm-button-secondary-bg)] text-[var(--mm-text)]",
     "hover:border-[color-mix(in_srgb,var(--mm-gold)_55%,transparent)] hover:bg-[var(--mm-accent-soft)] hover:shadow-sm",
     "active:brightness-[0.97]",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mm-accent-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--mm-card-bg)]",
+    "disabled:cursor-not-allowed disabled:border-[var(--mm-border)] disabled:bg-transparent disabled:text-[var(--mm-text3)] disabled:opacity-70 disabled:shadow-none",
+    "disabled:hover:border-[var(--mm-border)] disabled:hover:bg-transparent disabled:hover:shadow-none",
   ].join(" ");
 }

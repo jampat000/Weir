@@ -5,7 +5,8 @@ namespace Weir.Core.MediaManagers;
 
 /// <summary>
 /// A file a media manager wants Weir to act on (port of <c>import_events.MediaManagerImportEvent</c>).
-/// <c>imported</c> is accepted and ignored; <c>handoff</c> is Processing's cue and the only kind with a callback.
+/// <c>imported</c> is a manager saying it imported a file (#652): when that file is one Weir handed back, Weir records it
+/// and may release its copy. <c>handoff</c> is Processing's cue and the only kind with a callback.
 /// </summary>
 public sealed record MediaManagerImportEvent
 {
@@ -29,6 +30,16 @@ public sealed record MediaManagerImportEvent
 
     /// <summary>The manager's own library id; Deluno refuses a processor event without it.</summary>
     public string? LibraryId { get; init; }
+
+    /// <summary>
+    /// For an <c>imported</c> event, the file the manager imported from, as the manager sees it (Sonarr's
+    /// <c>episodeFile.sourcePath</c>, Radarr's <c>movieFile.sourcePath</c>). When Weir handed the file back, this is Weir's
+    /// copy in the output folder. <see cref="FilePath"/> is where the file ended up in the manager's library.
+    /// </summary>
+    public string? SourcePath { get; init; }
+
+    /// <summary>The download client's id for the download, when the manager sent one (Sonarr's and Radarr's <c>downloadId</c>).</summary>
+    public string? DownloadId { get; init; }
 }
 
 /// <summary>How one manager phrases an inbound event.</summary>
@@ -88,6 +99,8 @@ public static class ImportEvents
             EpisodeNumber = PyValues.WholeNumber(episode.Get("episodeNumber")),
             EpisodeTitle = PyValues.Text(episode.Get("title")),
             SourceEntityId = PyValues.WholeNumber(episode.Get("id")),
+            SourcePath = PyValues.Text(episodeFile!.Get("sourcePath")),
+            DownloadId = PyValues.Text(body.Get("downloadId")),
         };
     }
 
@@ -120,6 +133,8 @@ public static class ImportEvents
             Title = PyValues.Text(movie.Get("title")),
             Year = PyValues.WholeNumber(movie.Get("year")),
             SourceEntityId = PyValues.WholeNumber(movie.Get("id")),
+            SourcePath = PyValues.Text(movieFile!.Get("sourcePath")),
+            DownloadId = PyValues.Text(body.Get("downloadId")),
         };
     }
 
@@ -161,6 +176,7 @@ public static class ImportEvents
             HandoffId = PyValues.Text(body.Get("handoffId")),
             CallbackPath = PyValues.Text(body.Get("callbackPath")),
             LibraryId = PyValues.Text(body.Get("libraryId")),
+            DownloadId = PyValues.Text(body.Get("downloadId")),
         };
     }
 
@@ -197,6 +213,8 @@ public static class ImportEvents
             CallbackPath = PyValues.Text(Either("callbackPath", "callback_path")),
             ReleaseName = PyValues.Text(Either("releaseName", "release_name")),
             LibraryId = PyValues.Text(Either("libraryId", "library_id")),
+            SourcePath = PyValues.Text(Either("sourcePath", "source_path")),
+            DownloadId = PyValues.Text(Either("downloadId", "download_id")),
         };
     }
 }
