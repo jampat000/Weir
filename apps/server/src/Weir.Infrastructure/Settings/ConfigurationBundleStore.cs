@@ -39,6 +39,14 @@ public static class ConfigurationBundleStore
         ArgumentNullException.ThrowIfNull(uow);
         await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
         var suite = await ReadRowsAsync(uow, SuiteTable, "WHERE id = 1").ConfigureAwait(false);
+        // The ciphertext is portable and, without a dedicated WEIR_CREDENTIALS_SECRET, keyed by the on-disk session
+        // secret — a leaked bundle plus a leaked session secret would recover the metadata provider key (#L1 of the
+        // audit report). Import already leaves an existing key alone when a bundle omits it.
+        if (suite.Count > 0 && suite[0] is PyDict suiteSettings)
+        {
+            suiteSettings.Remove("metadata_provider_key_ciphertext");
+        }
+
         var arr = await ReadRowsAsync(uow, ArrTable, "WHERE id = 1").ConfigureAwait(false);
         var processingOperator = await ReadRowsAsync(uow, ProcessingOperatorTable, "WHERE id = 1").ConfigureAwait(false);
         var libraries = await ReadRowsAsync(uow, LibrariesTable, "ORDER BY id").ConfigureAwait(false);
