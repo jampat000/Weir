@@ -1,0 +1,86 @@
+/* Settings › Libraries: the library editor's switches, date windows and folds, and the import list. */
+
+.mm-library-toggles {
+  display: grid;
+  column-gap: 2.5rem;
+}
+
+@media (min-width: 1024px) {
+  .mm-library-toggles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.mm-library-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid var(--mm-border);
+  color: var(--mm-text2);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.mm-library-toggle__label {
+  display: block;
+  color: var(--mm-text1);
+}
+
+.mm-library-toggle__hint {
+  display: block;
+  margin-top: 0.125rem;
+  color: var(--mm-text3);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.mm-library-window__title {
+  color: var(--mm-text1);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+}
+
+.mm-library-window__detail {
+  color: var(--mm-text3);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.mm-library-fold__summary {
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--mm-line);
+  color: var(--mm-text3);
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 600;
+  letter-spacing: var(--mm-tracking-eyebrow);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.mm-library-fold__detail {
+  max-width: 65ch;
+  margin-top: 0.75rem;
+  color: var(--mm-text3);
+  font-size: var(--mm-type-caption);
+  line-height: 1.25rem;
+}
+
+/* One library a manager reported: a checkbox row that shows where the keyboard is. */
+.mm-discovered-library {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin: 0 -0.5rem;
+  padding: 0.625rem 0.5rem;
+  border-bottom: 1px solid var(--mm-border);
+}
+
+.mm-discovered-library:hover {
+  background: var(--mm-card-bg);
+}
+
+.mm-discovered-library:focus-within {
+  outline: 2px solid var(--mm-accent-ring);
+}
