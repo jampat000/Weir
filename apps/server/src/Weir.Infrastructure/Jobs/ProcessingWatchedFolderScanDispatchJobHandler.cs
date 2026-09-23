@@ -335,7 +335,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             {
                 if (mediaScope == ProcessingMediaScopes.Movie && !keepsOriginals)
                 {
-                    WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(runtime.WatchedFolder, filePath);
+                    await RetryCompletedMovieCleanupAsync(uow, library.Id, runtime.WatchedFolder, filePath, rel, observedSize, settling, now).ConfigureAwait(false);
                 }
 
                 continue;

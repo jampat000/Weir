@@ -289,6 +289,27 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     }
 
     [WindowsFact("Needs Windows' mandatory file locks.")]
+    public async Task Every_retried_movie_removal_records_its_result_on_the_file()
+    {
+        await SetUpAsync("movie");
+        var source = _folders.Source(Path.Join("Film.2024", "Film.2024.mkv"));
+        File.SetLastWriteTimeUtc(source, DateTime.UtcNow.AddDays(-3));
+
+        using (new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            await ScanAndDrainAsync("movie");
+            await ScanAsync("movie");
+            Assert.Contains("removing the original download is waiting", await ReasonAsync("Film.2024/Film.2024.mkv"), StringComparison.Ordinal);
+        }
+
+        await ScanAsync("movie");
+
+        Assert.False(Directory.Exists(Path.Join(_folders.Watched, "Film.2024")));
+        Assert.Equal("processed", await StatusAsync("Film.2024/Film.2024.mkv"));
+        Assert.Contains("finished removing the source release folder", await ReasonAsync("Film.2024/Film.2024.mkv"), StringComparison.Ordinal);
+    }
+
+    [WindowsFact("Needs Windows' mandatory file locks.")]
     public async Task An_interrupted_movie_removal_is_not_cleaned_again_after_the_output_is_imported()
     {
         await SetUpAsync("movie");
