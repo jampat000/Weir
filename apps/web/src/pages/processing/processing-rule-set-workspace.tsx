@@ -1264,6 +1264,9 @@ export function ProcessingRuleSetWorkspace() {
         )}
       </QuietSection>
 
+      {/* Only the original-language rule uses this, and that rule is itself folded away, so a
+          provider nobody has configured no longer sits at the bottom of the page looking like
+          part of the profile you were editing. */}
       <QuietSection
         headingId="processing-rule-set-provider-heading"
         heading="Metadata provider"

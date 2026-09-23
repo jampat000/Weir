@@ -6,7 +6,10 @@ import type {
 } from "../../lib/suite/queries";
 import { curatedTimezoneOptionsSorted } from "../../lib/suite/timezone-options";
 import { MmListboxPicker } from "../../components/ui/mm-listbox-picker";
-import { quietActionRowClass } from "../../components/shared/quiet-section";
+import {
+  QuietDisclosure,
+  quietActionRowClass,
+} from "../../components/shared/quiet-section";
 import {
   mmActionButtonClass,
   mmEditableTextFieldClass,
@@ -123,10 +126,9 @@ export function SettingsInstanceSection({
         </div>
       </SettingsQuietSection>
 
-      <SettingsQuietSection
-        headingId="suite-settings-wizard-heading"
-        heading="Setup wizard"
-      >
+      {/* Opened once, if ever, so it does not take a heading's worth of the page from the
+          things you came here to change. */}
+      <QuietDisclosure title="Setup wizard" summaryWhenClosed="Run once">
         <p className="mm-quiet-note">
           Go through the first-run steps again: time zone, backups and library
           folders. You can leave at any point.
@@ -148,7 +150,7 @@ export function SettingsInstanceSection({
             Open setup wizard
           </button>
         </div>
-      </SettingsQuietSection>
+      </QuietDisclosure>
     </div>
   );
 }

@@ -177,62 +177,6 @@ export function SettingsSecurityTab() {
       </SettingsQuietSection>
 
       <SettingsQuietSection
-        headingId="suite-security-posture-heading"
-        heading="Security posture"
-        aside={
-          securityOverview?.restart_required_note ? (
-            <span className="mm-quiet-badge">Startup configuration</span>
-          ) : null
-        }
-      >
-        <p className="mm-quiet-note">
-          These values describe the protections currently active in the running
-          server. They are read-only here and take effect after a restart.
-        </p>
-        {securityOverview ? (
-          <div className="mm-quiet-table-wrap mt-4">
-            <table className="mm-quiet-table">
-              <thead>
-                <tr>
-                  <th scope="col">Protection</th>
-                  <th scope="col">Setting</th>
-                </tr>
-              </thead>
-              <tbody>
-                {postureFacts.map((fact) => (
-                  <tr key={fact.label}>
-                    <th scope="row" className="mm-quiet-table__name">
-                      {fact.label}
-                    </th>
-                    <td data-label="Setting" className={fact.toneClass}>
-                      {fact.value}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : securityOverviewQ.isError ? (
-          <p
-            className="mt-4 text-sm text-[var(--mm-status-failed-text)]"
-            role="alert"
-          >
-            Could not load the server security overview. Check the server logs
-            and try again.
-          </p>
-        ) : (
-          <p className="mm-quiet-note mt-4">
-            Loading server security overview…
-          </p>
-        )}
-        {securityOverview?.restart_required_note ? (
-          <p className="mm-quiet-note mt-4">
-            {securityOverview.restart_required_note}
-          </p>
-        ) : null}
-      </SettingsQuietSection>
-
-      <SettingsQuietSection
         headingId="suite-security-sessions-heading"
         heading="Active sessions"
         aside={
@@ -424,6 +368,7 @@ export function SettingsSecurityTab() {
           </button>
         </div>
       </SettingsQuietSection>
+
       <SettingsQuietSection
         headingId="suite-security-change-password-heading"
         heading="Change password"
@@ -576,6 +521,62 @@ export function SettingsSecurityTab() {
             {changePassword.isPending ? "Saving..." : "Change password"}
           </button>
         </div>
+      </SettingsQuietSection>
+
+      <SettingsQuietSection
+        headingId="suite-security-posture-heading"
+        heading="Security posture"
+        aside={
+          securityOverview?.restart_required_note ? (
+            <span className="mm-quiet-badge">Startup configuration</span>
+          ) : null
+        }
+      >
+        <p className="mm-quiet-note">
+          These values describe the protections currently active in the running
+          server. They are read-only here and take effect after a restart.
+        </p>
+        {securityOverview ? (
+          <div className="mm-quiet-table-wrap mt-4">
+            <table className="mm-quiet-table">
+              <thead>
+                <tr>
+                  <th scope="col">Protection</th>
+                  <th scope="col">Setting</th>
+                </tr>
+              </thead>
+              <tbody>
+                {postureFacts.map((fact) => (
+                  <tr key={fact.label}>
+                    <th scope="row" className="mm-quiet-table__name">
+                      {fact.label}
+                    </th>
+                    <td data-label="Setting" className={fact.toneClass}>
+                      {fact.value}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : securityOverviewQ.isError ? (
+          <p
+            className="mt-4 text-sm text-[var(--mm-status-failed-text)]"
+            role="alert"
+          >
+            Could not load the server security overview. Check the server logs
+            and try again.
+          </p>
+        ) : (
+          <p className="mm-quiet-note mt-4">
+            Loading server security overview…
+          </p>
+        )}
+        {securityOverview?.restart_required_note ? (
+          <p className="mm-quiet-note mt-4">
+            {securityOverview.restart_required_note}
+          </p>
+        ) : null}
       </SettingsQuietSection>
     </div>
   );

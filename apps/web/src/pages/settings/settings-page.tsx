@@ -638,6 +638,7 @@ export function SettingsPage() {
               lastSuiteSaveTarget={lastSuiteSaveTarget}
               onSaveTimezone={() => void handleSaveTimezone()}
             />
+            <SettingsUpgradeTab updateStatusQ={updateStatusQ} />
             <SettingsBackupTab
               editable={editable}
               settingsData={settingsQ.data}
@@ -669,7 +670,6 @@ export function SettingsPage() {
                 void handleDownloadStoredBackup(id, fileLabel)
               }
             />
-            <SettingsUpgradeTab updateStatusQ={updateStatusQ} />
             <ProcessingMaintenanceSection />
             {showSupport ? <SettingsSupportTab /> : null}
           </div>

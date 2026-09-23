@@ -3,16 +3,17 @@ import {
   SHOW_SUPPORT_URL_PLACEHOLDER,
   SUPPORT_URL,
 } from "../../lib/support";
-import { SettingsQuietSection } from "./settings-shared";
+import { QuietDisclosure } from "../../components/shared/quiet-section";
 
 export { SHOW_SUPPORT_CARD };
 
 export function SettingsSupportTab() {
   return (
     <div data-testid="suite-settings-support-tab" className="mm-quiet-stack">
-      <SettingsQuietSection
-        headingId="suite-settings-support-heading"
-        heading="Support Weir"
+      {/* Optional, and nothing here changes how Weir works, so it stays closed. */}
+      <QuietDisclosure
+        title="Support Weir"
+        summaryWhenClosed="Optional"
         data-testid="suite-settings-support"
       >
         <p className="mm-quiet-note">
@@ -41,7 +42,7 @@ export function SettingsSupportTab() {
             support button.
           </p>
         ) : null}
-      </SettingsQuietSection>
+      </QuietDisclosure>
     </div>
   );
 }
