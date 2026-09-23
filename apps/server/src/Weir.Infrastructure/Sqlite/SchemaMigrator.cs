@@ -109,6 +109,7 @@ public sealed class SchemaMigrator
         new(12, "0047_library_file_marks", "Weir.Infrastructure.Migrations.0012_library_file_marks.sql"),
         new(13, "0048_cleanup_intervals", "Weir.Infrastructure.Migrations.0013_cleanup_intervals.sql"),
         new(14, "0049_link_imported_libraries", "Weir.Infrastructure.Migrations.0014_link_imported_libraries.sql"),
+        new(15, "0050_handback_outcomes", "Weir.Infrastructure.Migrations.0015_handback_outcomes.sql"),
     ];
 
     /// <summary>

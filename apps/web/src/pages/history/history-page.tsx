@@ -22,7 +22,9 @@ import {
   HISTORY_GROUPS,
   agoWords,
   fileName,
+  handbackStory,
   historyGroupOf,
+  importedLabel,
   inGroup,
   latestPass,
   newestFirst,
@@ -239,7 +241,11 @@ function whatWeirDid(file: ProcessingFile): string {
       : "Working on it";
   }
   if (file.quarantined) return "Held after repeated failures";
-  return PROCESSING_FILE_STATUS_LABELS[file.status] ?? file.status;
+  return (
+    importedLabel(file) ??
+    PROCESSING_FILE_STATUS_LABELS[file.status] ??
+    file.status
+  );
 }
 
 function HistoryList({
@@ -328,6 +334,7 @@ function HistoryDetail({
   const took = pass
     ? tookWords(pass.detail.elapsed_seconds as number | undefined)
     : null;
+  const handedBack = handbackStory(file.handback, now);
 
   return (
     <section
@@ -349,6 +356,15 @@ function HistoryDetail({
         <div className="mm-history-next">
           <p className="mm-history-next__title">{guidance.title}</p>
           <p className="mm-history-note">{guidance.next}</p>
+        </div>
+      ) : null}
+      {handedBack ? (
+        <div
+          className={`mm-history-next mm-history-handback is-${handedBack.tone}`}
+          data-testid="history-handback"
+        >
+          <p className="mm-history-next__title">{handedBack.heading}</p>
+          <p className="mm-history-note">{handedBack.sentence}</p>
         </div>
       ) : null}
       <DirectPlayLine

@@ -24,14 +24,18 @@ function canEdit(role: string | undefined): boolean {
   return role === "admin" || role === "operator";
 }
 
-/** The two cleanup jobs Weir times, in words a person uses, with the setting each one's switch and timer save to. */
+/** The cleanup jobs Weir times, in words a person uses, with the setting each one's switch and timer save to. */
 export const CLEANUP_JOBS: {
   family: MaintenanceFamily;
   name: string;
-  enabledField: "work_temp_stale_sweep_enabled" | "failure_cleanup_enabled";
+  enabledField:
+    | "work_temp_stale_sweep_enabled"
+    | "failure_cleanup_enabled"
+    | "unclaimed_handback_cleanup_enabled";
   intervalField:
     | "work_temp_stale_sweep_interval_seconds"
-    | "failure_cleanup_interval_seconds";
+    | "failure_cleanup_interval_seconds"
+    | "unclaimed_handback_cleanup_interval_seconds";
   /** It deletes something a person cannot get back, so its description is painted in the warning colour. */
   destructive: boolean;
 }[] = [
@@ -49,7 +53,19 @@ export const CLEANUP_JOBS: {
     intervalField: "failure_cleanup_interval_seconds",
     destructive: true,
   },
+  {
+    // #652: Weir's own cleaned copies that no media manager imported in time. Off until a person switches it on.
+    family: "unclaimed_handbacks",
+    name: "Unclaimed hand-backs",
+    enabledField: "unclaimed_handback_cleanup_enabled",
+    intervalField: "unclaimed_handback_cleanup_interval_seconds",
+    destructive: true,
+  },
 ];
+
+/** The wait before an unclaimed hand-back copy may be removed, as Settings › Cleanup offers it. */
+const WINDOW_MIN_DAYS = 1;
+const WINDOW_MAX_DAYS = 365;
 
 const EVERY: { seconds: number; label: string }[] = [
   { seconds: 900, label: "15 minutes" },
@@ -98,6 +114,7 @@ export function ProcessingMaintenanceSection() {
   const ids = useId();
   const [notice, setNotice] = useState<string | null>(null);
   const [retention, setRetention] = useState<string | null>(null);
+  const [handbackWait, setHandbackWait] = useState<string | null>(null);
 
   const editable = canEdit(me.data?.role);
   const families = maintenance.data?.families ?? [];
@@ -138,6 +155,14 @@ export function ProcessingMaintenanceSection() {
     settings.data !== undefined &&
     retention !== null &&
     retentionValue !== settings.data.file_log_retention_days;
+
+  const windowDays =
+    handbackWait ?? String(settings.data?.unclaimed_handback_window_days ?? 14);
+  const windowValue = Number.parseInt(windowDays, 10);
+  const windowDirty =
+    settings.data !== undefined &&
+    handbackWait !== null &&
+    windowValue !== (settings.data.unclaimed_handback_window_days ?? 14);
 
   return (
     <div
@@ -275,6 +300,56 @@ export function ProcessingMaintenanceSection() {
                   </tr>
                 );
               })}
+              <tr data-testid="processing-maintenance-handback-window">
+                <th scope="row" className="mm-quiet-table__name">
+                  <span>Unclaimed hand-backs wait</span>
+                  <span className="mm-cleanup-what">
+                    How long a copy Weir handed back waits for a media manager
+                    before Unclaimed hand-backs may remove it.
+                  </span>
+                </th>
+                <td data-label="On" colSpan={2}>
+                  <span className="mm-setrow__unit">
+                    <label className="sr-only" htmlFor={`${ids}-window`}>
+                      Unclaimed hand-backs wait for
+                    </label>
+                    <input
+                      id={`${ids}-window`}
+                      className="mm-input mm-setrow__number"
+                      type="number"
+                      min={WINDOW_MIN_DAYS}
+                      max={WINDOW_MAX_DAYS}
+                      value={windowDays}
+                      disabled={!editable || save.isPending}
+                      onChange={(event) => setHandbackWait(event.target.value)}
+                    />
+                    days
+                    {windowDirty &&
+                    windowValue >= WINDOW_MIN_DAYS &&
+                    windowValue <= WINDOW_MAX_DAYS ? (
+                      <button
+                        type="button"
+                        className={mmActionButtonClass({
+                          variant: "secondary",
+                        })}
+                        onClick={() =>
+                          void change(
+                            { unclaimed_handback_window_days: windowValue },
+                            `Unclaimed hand-backs now wait ${windowValue} ${
+                              windowValue === 1 ? "day" : "days"
+                            }.`,
+                          ).then(() => setHandbackWait(null))
+                        }
+                      >
+                        Save
+                      </button>
+                    ) : null}
+                  </span>
+                </td>
+                <td data-label="Last run" />
+                <td data-label="Next run" />
+                {editable ? <td /> : null}
+              </tr>
               <tr data-testid="processing-maintenance-file-history">
                 <th scope="row" className="mm-quiet-table__name">
                   <span>Old file history</span>

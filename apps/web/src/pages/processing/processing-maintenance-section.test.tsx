@@ -264,6 +264,64 @@ it("surfaces the reason a run failed", async () => {
   ).toHaveTextContent("The work folder was missing.");
 });
 
+it("lists unclaimed hand-backs, off, and saves how long a copy waits", async () => {
+  setup(
+    state({
+      families: [
+        ...state().families,
+        {
+          family: "unclaimed_handbacks",
+          enabled: false,
+          description:
+            "Deletes Weir's own cleaned copy from a hand-back folder when no media manager imported it in time.",
+          pending: 0,
+          running: 0,
+          last_completed_at: null,
+          last_failed_at: null,
+          last_error: null,
+          interval_seconds: 21600,
+          next_run_at: null,
+          window_days: 14,
+        },
+      ],
+    }),
+  );
+  saveSettings.mockResolvedValue({});
+
+  render(<ProcessingMaintenanceSection />, { wrapper });
+
+  const unclaimed = await screen.findByTestId(
+    "processing-maintenance-unclaimed_handbacks",
+  );
+  expect(unclaimed).toHaveTextContent("Unclaimed hand-backs");
+  expect(within(unclaimed).getByRole("radio", { name: "Off" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  expect(
+    within(unclaimed).getByRole("combobox", {
+      name: "How often Unclaimed hand-backs runs",
+    }),
+  ).toHaveValue("21600");
+
+  const wait = screen.getByLabelText("Unclaimed hand-backs wait for");
+  expect(wait).toHaveValue(14);
+  fireEvent.change(wait, { target: { value: "30" } });
+  fireEvent.click(
+    within(
+      screen.getByTestId("processing-maintenance-handback-window"),
+    ).getByRole("button", { name: "Save" }),
+  );
+  await waitFor(() =>
+    expect(saveSettings).toHaveBeenCalledWith({
+      unclaimed_handback_window_days: 30,
+    }),
+  );
+  expect(
+    await screen.findByTestId("processing-maintenance-notice"),
+  ).toHaveTextContent("Unclaimed hand-backs now wait 30 days.");
+});
+
 it("does not offer a viewer the run buttons", async () => {
   setup(state(), "viewer");
 

@@ -27,6 +27,18 @@ public sealed record ProcessingOperatorSettingsRecord
 
     /// <summary>How often the failed-download cleanup runs, set in Settings › Cleanup; null keeps the environment's interval.</summary>
     public long? FailureCleanupIntervalSeconds { get; init; }
+
+    /// <summary>
+    /// Whether the Cleanup job removes Weir's own hand-back copies nobody claimed (#652). Off until a person switches it on
+    /// (James, 23 Sep 2026).
+    /// </summary>
+    public bool UnclaimedHandbackCleanupEnabled { get; init; }
+
+    /// <summary>How many days an unclaimed hand-back copy waits before that job may remove it.</summary>
+    public long UnclaimedHandbackWindowDays { get; init; } = 14;
+
+    /// <summary>How often that job runs, set in Settings › Cleanup; null keeps the built-in six hours.</summary>
+    public long? UnclaimedHandbackCleanupIntervalSeconds { get; init; }
     public bool KeepFailedWorkFiles { get; init; }
     public long FileLogRetentionDays { get; init; } = 90;
     public long MinFileAgeSeconds { get; init; } = 60;
@@ -179,4 +191,8 @@ public static class OperatorSettingsRules
     public static long ClampRunnerCost(long raw) => Math.Clamp(raw, 0, 64);
 
     public static long ClampFileLogRetentionDays(long raw) => Math.Clamp(raw, 0, 3650);
+
+    /// <summary>The unclaimed hand-back wait, 1 to 365 days.</summary>
+    public static long ClampUnclaimedHandbackWindowDays(long raw) =>
+        Math.Clamp(raw, Weir.Core.MediaManagers.HandbackRules.MinUnclaimedWindowDays, Weir.Core.MediaManagers.HandbackRules.MaxUnclaimedWindowDays);
 }

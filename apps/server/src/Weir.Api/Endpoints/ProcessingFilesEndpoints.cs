@@ -13,6 +13,7 @@ using Weir.Core.Validation;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
+using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.DirectPlay;
 using Weir.Infrastructure.Processing.RemuxPass;
@@ -126,6 +127,7 @@ public static class ProcessingFilesEndpoints
         var knownDevices = DeviceProfileLoader.Load(request.Options.WeirHome);
         var devices = await DirectPlayService.SelectedProfilesAsync(uow, knownDevices).ConfigureAwait(false);
         var progressByPath = await LiveProgressStore.ByPathAsync(uow, request.Time).ConfigureAwait(false);
+        var handbacks = await HandbackStore.ForLibrariesAsync(uow, rows.Select(row => row.LibraryId)).ConfigureAwait(false);
 
         var files = new List<PyJson>();
         foreach (var row in rows)
@@ -133,7 +135,9 @@ public static class ProcessingFilesEndpoints
             var libraryName = libraryNames.GetValueOrDefault(row.LibraryId, "Unknown library");
             var directPlay = DirectPlayService.ForRow(row, devices);
             progressByPath.TryGetValue(row.RelativePath, out var progress);
-            files.Add(FileOut(row, libraryName, directPlay, progress));
+            // #652: the copy Weir handed back, and what a media manager said about it, for History.
+            handbacks.TryGetValue((row.LibraryId, row.RelativePath), out var handback);
+            files.Add(FileOut(row, libraryName, directPlay, progress).Set("handback", HandbackStore.ToOut(handback)));
         }
 
         var counts = await FileStateStore.StatusCountsAsync(uow, libraryId).ConfigureAwait(false);

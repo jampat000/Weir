@@ -19,7 +19,8 @@ public static class OperatorSettingsStore
         "minimum_free_disk_space_mb, movie_schedule_enabled, movie_schedule_hours_limited, movie_schedule_days, " +
         "movie_schedule_start, movie_schedule_end, tv_schedule_enabled, tv_schedule_hours_limited, tv_schedule_days, " +
         "tv_schedule_start, tv_schedule_end, updated_at, runner_budget_enabled, work_temp_stale_sweep_interval_seconds, " +
-        "failure_cleanup_interval_seconds";
+        "failure_cleanup_interval_seconds, unclaimed_handback_cleanup_enabled, unclaimed_handback_window_days, " +
+        "unclaimed_handback_cleanup_interval_seconds";
 
     public static Task<ProcessingOperatorSettingsRecord?> GetAsync(UnitOfWork uow) =>
         uow.QuerySingleAsync($"SELECT {Columns} FROM operator_settings WHERE id = 1", Read);
@@ -69,6 +70,9 @@ public static class OperatorSettingsStore
         Compare("failure_cleanup_enabled", before.FailureCleanupEnabled, after.FailureCleanupEnabled, v => v ? 1 : 0);
         Compare("work_temp_stale_sweep_interval_seconds", before.WorkTempStaleSweepIntervalSeconds, after.WorkTempStaleSweepIntervalSeconds, v => v);
         Compare("failure_cleanup_interval_seconds", before.FailureCleanupIntervalSeconds, after.FailureCleanupIntervalSeconds, v => v);
+        Compare("unclaimed_handback_cleanup_enabled", before.UnclaimedHandbackCleanupEnabled, after.UnclaimedHandbackCleanupEnabled, v => v ? 1 : 0);
+        Compare("unclaimed_handback_window_days", before.UnclaimedHandbackWindowDays, after.UnclaimedHandbackWindowDays, v => v);
+        Compare("unclaimed_handback_cleanup_interval_seconds", before.UnclaimedHandbackCleanupIntervalSeconds, after.UnclaimedHandbackCleanupIntervalSeconds, v => v);
         Compare("keep_failed_work_files", before.KeepFailedWorkFiles, after.KeepFailedWorkFiles, v => v ? 1 : 0);
         Compare("file_log_retention_days", before.FileLogRetentionDays, after.FileLogRetentionDays, v => v);
         Compare("min_file_age_seconds", before.MinFileAgeSeconds, after.MinFileAgeSeconds, v => v);
@@ -123,5 +127,8 @@ public static class OperatorSettingsStore
         RunnerBudgetEnabled = SqliteValues.GetBool(reader, 25),
         WorkTempStaleSweepIntervalSeconds = reader.IsDBNull(26) ? null : reader.GetInt64(26),
         FailureCleanupIntervalSeconds = reader.IsDBNull(27) ? null : reader.GetInt64(27),
+        UnclaimedHandbackCleanupEnabled = SqliteValues.GetBool(reader, 28),
+        UnclaimedHandbackWindowDays = SqliteValues.GetInt64(reader, 29),
+        UnclaimedHandbackCleanupIntervalSeconds = reader.IsDBNull(30) ? null : reader.GetInt64(30),
     };
 }

@@ -800,6 +800,92 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HandoffOutcomeIn": {
+        "description": "What a media manager says became of a file Weir handed back (agreed with Deluno, 23 Sep 2026).",
+        "properties": {
+          "outcome": {
+            "description": "imported, or not-imported. not-imported is final: never sent for a failure the manager will retry.",
+            "enum": [
+              "imported",
+              "not-imported"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "occurredUtc": {
+            "description": "When it happened, with a time zone.",
+            "format": "date-time",
+            "title": "Occurredutc",
+            "type": "string"
+          },
+          "importedPath": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where the manager put the file in its library.",
+            "title": "Importedpath"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the manager will not import it.",
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "outcome",
+          "occurredUtc"
+        ],
+        "title": "HandoffOutcomeIn",
+        "type": "object"
+      },
+      "HandoffOutcomeOut": {
+        "properties": {
+          "handoffId": {
+            "title": "Handoffid",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "imported",
+              "not-imported"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "released": {
+            "description": "Weir removed its copy from the hand-back folder.",
+            "title": "Released",
+            "type": "boolean"
+          },
+          "message": {
+            "description": "What Weir did, in plain words.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "handoffId",
+          "outcome",
+          "released",
+          "message"
+        ],
+        "title": "HandoffOutcomeOut",
+        "type": "object"
+      },
       "HealthResponse": {
         "description": "Minimal liveness payload for load balancers and ops.",
         "properties": {
@@ -2150,10 +2236,16 @@
           "family": {
             "enum": [
               "work_temp_stale_sweep",
-              "failure_cleanup"
+              "failure_cleanup",
+              "unclaimed_handbacks"
             ],
             "title": "Family",
             "type": "string"
+          },
+          "window_days": {
+            "description": "Unclaimed hand-backs only: how many days a copy waits before the job may remove it.",
+            "title": "Window Days",
+            "type": "integer"
           },
           "interval_seconds": {
             "description": "How often this job runs: the interval saved in Settings › Cleanup, else the environment's.",
@@ -2257,7 +2349,8 @@
           "family": {
             "enum": [
               "work_temp_stale_sweep",
-              "failure_cleanup"
+              "failure_cleanup",
+              "unclaimed_handbacks"
             ],
             "title": "Family",
             "type": "string"
@@ -3910,6 +4003,18 @@
             ],
             "description": "Measured width in pixels.",
             "title": "Video Width"
+          },
+          "handback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcessingFileHandbackOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The copy Weir handed back for a media manager to import, and what became of it. Null when Weir wrote none.",
+            "title": "Handback"
           }
         },
         "required": [
@@ -3924,6 +4029,139 @@
           "updated_at"
         ],
         "title": "ProcessingFileOut",
+        "type": "object"
+      },
+      "ProcessingFileHandbackOut": {
+        "description": "The copy Weir handed back, what a media manager said about it, and whether Weir removed it.",
+        "properties": {
+          "output_path": {
+            "description": "Where Weir wrote the copy.",
+            "title": "Output Path",
+            "type": "string"
+          },
+          "written_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Written At"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "imported",
+                  "not-imported"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What a media manager said. Null while none has said anything.",
+            "title": "Outcome"
+          },
+          "outcome_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which media manager said it: Sonarr, Radarr, Deluno.",
+            "title": "Outcome By"
+          },
+          "outcome_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome At"
+          },
+          "imported_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where the media manager put the file in its library, as it said.",
+            "title": "Imported Path"
+          },
+          "outcome_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the media manager will not import it, when it said.",
+            "title": "Outcome Reason"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When Weir removed its copy. Null while the copy is there or Weir left it.",
+            "title": "Released At"
+          },
+          "settled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When Weir stopped looking after the copy.",
+            "title": "Settled At"
+          },
+          "release_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What happened to the copy, in plain words.",
+            "title": "Release Note"
+          }
+        },
+        "required": [
+          "output_path",
+          "outcome",
+          "outcome_by",
+          "released_at",
+          "release_note"
+        ],
+        "title": "ProcessingFileHandbackOut",
         "type": "object"
       },
       "ProcessingFileRemuxPassManualEnqueueIn": {
@@ -6062,6 +6300,30 @@
             ],
             "description": "How often the leftover-work-file sweep runs, set in Settings › Cleanup. Null keeps the environment's interval.",
             "title": "Work Temp Stale Sweep Interval Seconds"
+          },
+          "unclaimed_handback_cleanup_enabled": {
+            "description": "Remove Weir's own hand-back copies no media manager claimed in time. Off by default.",
+            "title": "Unclaimed Handback Cleanup Enabled",
+            "type": "boolean"
+          },
+          "unclaimed_handback_window_days": {
+            "description": "How many days an unclaimed hand-back copy waits before the cleanup may remove it.",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Unclaimed Handback Window Days",
+            "type": "integer"
+          },
+          "unclaimed_handback_cleanup_interval_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How often the unclaimed hand-back cleanup runs, set in Settings › Cleanup. Null keeps six hours.",
+            "title": "Unclaimed Handback Cleanup Interval Seconds"
           }
         },
         "required": [
@@ -6074,6 +6336,8 @@
           "runner_budget_enabled",
           "work_temp_stale_sweep_enabled",
           "failure_cleanup_enabled",
+          "unclaimed_handback_cleanup_enabled",
+          "unclaimed_handback_window_days",
           "keep_failed_work_files",
           "file_log_retention_days",
           "runner_cost_undetermined",
@@ -6446,6 +6710,43 @@
               }
             ],
             "title": "Work Temp Stale Sweep Interval Seconds"
+          },
+          "unclaimed_handback_cleanup_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unclaimed Handback Cleanup Enabled"
+          },
+          "unclaimed_handback_window_days": {
+            "anyOf": [
+              {
+                "maximum": 365,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unclaimed Handback Window Days"
+          },
+          "unclaimed_handback_cleanup_interval_seconds": {
+            "anyOf": [
+              {
+                "maximum": 2592000,
+                "minimum": 900,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unclaimed Handback Cleanup Interval Seconds"
           }
         },
         "required": [
@@ -10399,6 +10700,88 @@
           }
         },
         "summary": "Get Intake Handoff",
+        "tags": [
+          "media-manager-intake"
+        ]
+      }
+    },
+    "/api/v1/intake/handoffs/{source_key}/{handoff_id}/outcome": {
+      "post": {
+        "description": "The manager says what became of the file Weir handed back. imported records it and releases Weir's copy when it is still exactly the file Weir wrote; not-imported records it and keeps the copy. 200 again for the same outcome; 404 never received; 409 not finished or a different outcome already recorded.",
+        "operationId": "post_intake_handoff_outcome_api_v1_intake_handoffs__source_key___handoff_id__outcome_post",
+        "parameters": [
+          {
+            "description": "The manager that gave Weir the hand-off.",
+            "in": "path",
+            "name": "source_key",
+            "required": true,
+            "schema": {
+              "description": "The manager that gave Weir the hand-off.",
+              "title": "Source Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The manager's own hand-off id.",
+            "in": "path",
+            "name": "handoff_id",
+            "required": true,
+            "schema": {
+              "description": "The manager's own hand-off id.",
+              "title": "Handoff Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Webhook-Secret",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Webhook-Secret"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoffOutcomeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffOutcomeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Intake Handoff Outcome",
         "tags": [
           "media-manager-intake"
         ]

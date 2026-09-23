@@ -521,6 +521,47 @@ public static class PeriodicJobKinds
     public const string TvFailureCleanupSweep = "processing.tv_failure_cleanup_sweep.v1";
     public const string MovieFailureCleanupSweepDedupeKey = "processing.movie_failure_cleanup_sweep:v1";
     public const string TvFailureCleanupSweepDedupeKey = "processing.tv_failure_cleanup_sweep:v1";
+
+    /// <summary>Removes hand-back copies nobody claimed (#652). .NET only: the Python backend never had it.</summary>
+    public const string UnclaimedHandbackCleanup = "processing.unclaimed_handback_cleanup.v1";
+    public const string UnclaimedHandbackCleanupDedupeKeyMovie = "processing.unclaimed_handback_cleanup:v1:movie";
+    public const string UnclaimedHandbackCleanupDedupeKeyTv = "processing.unclaimed_handback_cleanup:v1:tv";
+}
+
+/// <summary>
+/// The unclaimed hand-back cleanup on a timer (#652): one row per scope, deduped per scope, like the work file sweep.
+/// Enabled by <c>operator_settings.unclaimed_handback_cleanup_enabled</c>, which is off until a person switches it on; the
+/// interval is the one saved in Settings › Cleanup, or six hours.
+/// </summary>
+public sealed class UnclaimedHandbackCleanupEnqueuer : IPeriodicEnqueuer
+{
+    private readonly ProcessingJobStore _store;
+    private readonly string _scope;
+
+    public UnclaimedHandbackCleanupEnqueuer(ProcessingJobStore store, string mediaScope)
+    {
+        _store = store;
+        _scope = ProcessingLibraryFolders.NormalizeMediaScope(mediaScope);
+    }
+
+    public string Name => $"unclaimed hand-back cleanup ({_scope})";
+
+    public string JobKind => PeriodicJobKinds.UnclaimedHandbackCleanup;
+
+    public TimeSpan Interval => TimeSpan.FromSeconds(Weir.Core.MediaManagers.HandbackRules.DefaultUnclaimedIntervalSeconds);
+
+    public Task<bool> IsEnabledAsync(CancellationToken cancellationToken) =>
+        WorkTempStaleSweepEnqueuer.OperatorSettingFlagAsync(_store, "unclaimed_handback_cleanup_enabled", defaultValue: false, cancellationToken);
+
+    public Task<TimeSpan> IntervalAsync(CancellationToken cancellationToken) =>
+        WorkTempStaleSweepEnqueuer.OperatorSettingIntervalAsync(_store, "unclaimed_handback_cleanup_interval_seconds", Interval, cancellationToken);
+
+    public Task EnqueueOnceAsync(CancellationToken cancellationToken) =>
+        _store.EnqueueOrGetAsync(
+            _scope == "tv" ? PeriodicJobKinds.UnclaimedHandbackCleanupDedupeKeyTv : PeriodicJobKinds.UnclaimedHandbackCleanupDedupeKeyMovie,
+            PeriodicJobKinds.UnclaimedHandbackCleanup,
+            PyJsonWriter.Dumps(new PyDict().Set("media_scope", _scope).Set("trigger", "scheduled"), PyJsonFormat.Compact),
+            cancellationToken: cancellationToken);
 }
 
 /// <summary>
@@ -704,6 +745,11 @@ public static class WeirJobs
             sp.GetRequiredService<ProcessingJobStore>(), "movie", TimeSpan.FromSeconds(options.ProcessingMovieFailureCleanupScheduleIntervalSeconds), cleanupKilled));
         services.AddSingleton<IPeriodicEnqueuer>(sp => new FailureCleanupSweepEnqueuer(
             sp.GetRequiredService<ProcessingJobStore>(), "tv", TimeSpan.FromSeconds(options.ProcessingTvFailureCleanupScheduleIntervalSeconds), cleanupKilled));
+
+        // #652: hand-back copies nobody claimed. Off until a person switches it on in Settings › Cleanup.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHandler, UnclaimedHandbackCleanupHandler>());
+        services.AddSingleton<IPeriodicEnqueuer>(sp => new UnclaimedHandbackCleanupEnqueuer(sp.GetRequiredService<ProcessingJobStore>(), "movie"));
+        services.AddSingleton<IPeriodicEnqueuer>(sp => new UnclaimedHandbackCleanupEnqueuer(sp.GetRequiredService<ProcessingJobStore>(), "tv"));
 
         // Hosted services start in this order: recovery completes before any worker claims.
         services.AddSingleton<JobsStartupRecoveryService>();

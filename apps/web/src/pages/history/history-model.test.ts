@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { ProcessingFile } from "../../lib/processing/files-api";
 import {
   agoWords,
+  handbackStory,
   historyGroupOf,
+  importedLabel,
   readableTrack,
   sizesFromRecord,
   tracksFromRecord,
@@ -120,6 +122,66 @@ describe("tracks from a pass record", () => {
       saved: 40,
     });
     expect(sizesFromRecord({ source_size_bytes: 100 })).toBeNull();
+  });
+});
+
+describe("what became of the copy Weir handed back", () => {
+  const now = Date.parse("2026-09-23T04:06:00Z");
+  const copy = {
+    output_path: "/hand-back/Show/Show.S01E01.mkv",
+    written_at: "2026-09-23T03:00:00",
+    outcome: null,
+    outcome_by: null,
+    outcome_at: null,
+    imported_path: null,
+    outcome_reason: null,
+    released_at: null,
+    settled_at: null,
+    release_note: null,
+  } as const;
+
+  it("says who imported it, when, where it went and what Weir did with its copy", () => {
+    const handback = {
+      ...copy,
+      outcome: "imported" as const,
+      outcome_by: "Sonarr",
+      outcome_at: "2026-09-23T04:00:00",
+      imported_path: "/tv/Show/Season 01/Show - S01E01.mkv",
+      released_at: "2026-09-23T04:00:00",
+      settled_at: "2026-09-23T04:00:00",
+      release_note:
+        "Weir removed its copy from the hand-back folder, because Sonarr has the file now.",
+    };
+    expect(handbackStory(handback, now)).toEqual({
+      heading: "Imported by Sonarr",
+      sentence:
+        "Sonarr imported it 6 min ago. It is in the library at /tv/Show/Season 01/Show - S01E01.mkv. Weir removed its copy from the hand-back folder, because Sonarr has the file now.",
+      tone: "good",
+    });
+    expect(importedLabel(file({ handback }))).toBe("Imported by Sonarr");
+  });
+
+  it("says when a media manager will not import it, and that Weir kept its copy", () => {
+    const story = handbackStory(
+      {
+        ...copy,
+        outcome: "not-imported",
+        outcome_by: "Deluno",
+        release_note:
+          "Deluno will not import this file: The release is a sample. Weir kept its copy in the hand-back folder.",
+      },
+      now,
+    );
+    expect(story?.heading).toBe("Deluno will not import it");
+    expect(story?.tone).toBe("warn");
+  });
+
+  it("says Weir is still waiting when no media manager has said anything", () => {
+    expect(handbackStory(copy, now)?.sentence).toBe(
+      "Weir put the cleaned copy at /hand-back/Show/Show.S01E01.mkv 1 h ago for your media manager to import. No media manager has said it imported it yet.",
+    );
+    expect(handbackStory(null, now)).toBeNull();
+    expect(importedLabel(file({ handback: copy }))).toBeNull();
   });
 });
 
