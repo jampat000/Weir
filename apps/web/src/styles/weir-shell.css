@@ -137,9 +137,12 @@ body.mm-body {
   min-width: 0;
 }
 
+/* Top-aligned, so the lead sits straight under the title on every page. Bottom-aligned, a taller aside
+   (Processing's figures, Library's scan) pulled the lead down to meet it, and the same line sat at a
+   different height on each screen (James, 23 Sep 2026). */
 .mm-page-head__sub {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: calc(10px * var(--mm-density-ui-scale))

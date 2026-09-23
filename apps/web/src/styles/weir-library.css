@@ -25,6 +25,9 @@
   gap: calc(10px * var(--mm-density-ui-scale));
   font-size: clamp(1.35rem, 2.8vw, 1.75rem);
   font-weight: 600;
+  /* The title's own line height: a taller picker stretched the header row and dropped the title
+     5px below where every other page has it, so switching screens made Library jump (James, 23 Sep). */
+  line-height: 1.25;
   letter-spacing: -0.02em;
   color: var(--mm-text1);
 }
@@ -38,12 +41,13 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 2px 8px;
+  padding: 0 8px;
   border: 1px solid transparent;
   border-radius: var(--mm-radius-sm);
   background: none;
   color: inherit;
   font: inherit;
+  line-height: inherit;
   cursor: pointer;
 }
 

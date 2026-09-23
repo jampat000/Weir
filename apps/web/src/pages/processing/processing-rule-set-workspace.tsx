@@ -36,8 +36,6 @@ import {
 import {
   mmActionButtonClass,
   mmCheckboxControlClass,
-  mmEditableTextFieldClass,
-  mmSelectFieldClass,
 } from "../../lib/ui/mm-control-roles";
 
 type TrackSorter = {
@@ -214,10 +212,10 @@ function LanguageSelectField({
   );
   const isCustom = value.length > 0 && !known.has(value);
   return (
-    <label className="block text-sm">
-      <span className="text-[var(--mm-text2)]">{label}</span>
+    <label className="mm-field mm-field--medium">
+      <span className="mm-field__label">{label}</span>
       <select
-        className={mmSelectFieldClass}
+        className="mm-input"
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
@@ -264,8 +262,8 @@ function LanguageMultiField({
   const labelId = useId();
   const values = csvValues(value);
   return (
-    <div className="block text-sm">
-      <span id={labelId} className="text-[var(--mm-text2)]">
+    <div className="mm-field mm-field--medium">
+      <span id={labelId} className="mm-field__label">
         {label}
       </span>
       <MmMultiListboxPicker
@@ -306,30 +304,26 @@ function TrackNameTemplateField({
       ? previewTrackName(value, { ...SAMPLE_TRACK, flags: sampleFlags })
       : null;
   return (
-    <label className="block text-sm">
-      <span className="text-[var(--mm-text2)]">{label}</span>
+    <label className="mm-field mm-field--wide">
+      <span className="mm-field__label">{label}</span>
       <input
-        className={mmEditableTextFieldClass}
+        className="mm-input"
         value={value}
         placeholder={DEFAULT_TRACK_NAME_TEMPLATE}
         disabled={disabled}
         aria-invalid={error !== null}
         onChange={(event) => onChange(event.target.value)}
       />
-      {detail ? (
-        <span className="mt-1 block text-xs leading-5 text-[var(--mm-text3)]">
-          {detail}
-        </span>
-      ) : null}
+      {detail ? <span className="mm-field__hint">{detail}</span> : null}
       {error ? (
         <span
           role="alert"
-          className="mt-1 block text-xs text-[var(--mm-status-failed-text)]"
+          className="mm-field__hint text-[var(--mm-status-failed-text)]"
         >
           {error}
         </span>
       ) : (
-        <span className="mt-1 block text-xs leading-5 text-[var(--mm-text3)]">
+        <span className="mm-field__hint">
           Preview: <span className="font-medium">{preview}</span>
         </span>
       )}
@@ -419,7 +413,7 @@ function SorterEditor({
             <label className="text-xs text-[var(--mm-text3)]">
               Criterion
               <select
-                className={mmSelectFieldClass}
+                className="mm-input"
                 value={row.field}
                 disabled={disabled}
                 onChange={(event) =>
@@ -436,7 +430,7 @@ function SorterEditor({
             <label className="text-xs text-[var(--mm-text3)]">
               Match value (optional)
               <input
-                className={mmEditableTextFieldClass}
+                className="mm-input"
                 value={row.value}
                 placeholder="eng, >=5.1, dts, commentary…"
                 disabled={disabled}
@@ -661,10 +655,10 @@ export function ProcessingRuleSetWorkspace() {
     key: keyof ProcessingRuleSetWrite,
     placeholder = "",
   ) => (
-    <label className="block text-sm">
-      <span className="text-[var(--mm-text2)]">{label}</span>
+    <label className="mm-field mm-field--medium">
+      <span className="mm-field__label">{label}</span>
       <input
-        className={mmEditableTextFieldClass}
+        className="mm-input"
         value={String(draft?.[key] ?? "")}
         placeholder={placeholder}
         disabled={disabled}
@@ -726,10 +720,10 @@ export function ProcessingRuleSetWorkspace() {
         </p>
 
         {(ruleSets.data?.length ?? 0) > 0 && !creating ? (
-          <label className="mt-5 block max-w-2xl text-sm">
-            <span className="text-[var(--mm-text2)]">Profile to edit</span>
+          <label className="mm-field mm-field--medium mt-5">
+            <span className="mm-field__label">Profile to edit</span>
             <select
-              className={mmSelectFieldClass}
+              className="mm-input"
               value={selectedId ?? ""}
               onChange={(event) => {
                 const id = Number(event.target.value);
@@ -776,12 +770,10 @@ export function ProcessingRuleSetWorkspace() {
                 title="Audio"
                 detail="Choose the language priority and which retained track becomes default."
               >
-                <label className="block text-sm">
-                  <span className="text-[var(--mm-text2)]">
-                    Selection strategy
-                  </span>
+                <label className="mm-field mm-field--medium">
+                  <span className="mm-field__label">Selection strategy</span>
                   <select
-                    className={mmSelectFieldClass}
+                    className="mm-input"
                     value={draft.audio_preference_mode}
                     disabled={disabled}
                     onChange={(event) => {
@@ -810,7 +802,7 @@ export function ProcessingRuleSetWorkspace() {
                     </option>
                   </select>
                 </label>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="mm-field-row">
                   <LanguageSelectField
                     label="First choice"
                     value={draft.primary_audio_lang}
@@ -831,12 +823,10 @@ export function ProcessingRuleSetWorkspace() {
                     disabled={disabled}
                     onChange={(value) => change("tertiary_audio_lang", value)}
                   />
-                  <label className="block text-sm">
-                    <span className="text-[var(--mm-text2)]">
-                      Mark as default
-                    </span>
+                  <label className="mm-field mm-field--medium">
+                    <span className="mm-field__label">Mark as default</span>
                     <select
-                      className={mmSelectFieldClass}
+                      className="mm-input"
                       value={draft.default_audio_slot}
                       disabled={disabled}
                       onChange={(event) =>
@@ -854,12 +844,10 @@ export function ProcessingRuleSetWorkspace() {
                   "Exclude commentary before selecting the preferred audio.",
                   "remove_commentary",
                 )}
-                <label className="block text-sm">
-                  <span className="text-[var(--mm-text2)]">
-                    Audio tracks kept
-                  </span>
+                <label className="mm-field mm-field--medium">
+                  <span className="mm-field__label">Audio tracks kept</span>
                   <select
-                    className={mmSelectFieldClass}
+                    className="mm-input"
                     value={draft.audio_keep_mode}
                     disabled={disabled}
                     onChange={(event) =>
@@ -873,7 +861,7 @@ export function ProcessingRuleSetWorkspace() {
                       Best track of each configured language
                     </option>
                   </select>
-                  <span className="mt-1 block text-xs leading-5 text-[var(--mm-text3)]">
+                  <span className="mm-field__hint">
                     &quot;Best track of each configured language&quot; keeps the
                     original alongside a dub, e.g. Japanese plus an English dub,
                     each the best available track of its language. Never keeps
@@ -887,12 +875,10 @@ export function ProcessingRuleSetWorkspace() {
                 title="Subtitles"
                 detail="Choose what is retained and which tracks keep their flags."
               >
-                <label className="block text-sm">
-                  <span className="text-[var(--mm-text2)]">
-                    Subtitle handling
-                  </span>
+                <label className="mm-field mm-field--medium">
+                  <span className="mm-field__label">Subtitle handling</span>
                   <select
-                    className={mmSelectFieldClass}
+                    className="mm-input"
                     value={draft.subtitle_mode}
                     disabled={disabled}
                     onChange={(event) =>
@@ -929,15 +915,15 @@ export function ProcessingRuleSetWorkspace() {
                       'Drop a subtitle track detected as SDH/CC, from its flag or its name (e.g. "English (SDH)").',
                       "remove_hearing_impaired_subs",
                     )}
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <label className="block text-sm">
-                        <span className="text-[var(--mm-text2)]">
+                    <div className="mm-field-row">
+                      <label className="mm-field mm-field--short">
+                        <span className="mm-field__label">
                           Limit subtitles kept per language
                         </span>
                         <input
                           type="number"
                           min={0}
-                          className={mmEditableTextFieldClass}
+                          className="mm-input"
                           value={draft.subtitle_max_per_language}
                           disabled={disabled}
                           onChange={(event) =>
@@ -947,17 +933,17 @@ export function ProcessingRuleSetWorkspace() {
                             )
                           }
                         />
-                        <span className="mt-1 block text-xs leading-5 text-[var(--mm-text3)]">
+                        <span className="mm-field__hint">
                           0 means unlimited (today&apos;s behavior). A forced
                           track kept above doesn&apos;t count toward this cap.
                         </span>
                       </label>
-                      <label className="block text-sm">
-                        <span className="text-[var(--mm-text2)]">
+                      <label className="mm-field mm-field--medium">
+                        <span className="mm-field__label">
                           How to pick the best subtitle
                         </span>
                         <select
-                          className={mmSelectFieldClass}
+                          className="mm-input"
                           value={draft.subtitle_quality_strategy}
                           disabled={
                             disabled || draft.subtitle_max_per_language === 0
@@ -979,7 +965,7 @@ export function ProcessingRuleSetWorkspace() {
                             Hearing-impaired (SDH) first
                           </option>
                         </select>
-                        <span className="mt-1 block text-xs leading-5 text-[var(--mm-text3)]">
+                        <span className="mm-field__hint">
                           Only used while the cap above is set.
                         </span>
                       </label>
@@ -1105,7 +1091,7 @@ export function ProcessingRuleSetWorkspace() {
                       Overrides for flagged tracks (checked in this order; leave
                       blank to fall back to the template above)
                     </p>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="mm-field-row">
                       <TrackNameTemplateField
                         label="Forced tracks"
                         value={draft.track_name_overrides.forced}
@@ -1181,7 +1167,7 @@ export function ProcessingRuleSetWorkspace() {
                   <span className="block font-semibold text-[var(--mm-text1)]">
                     Advanced track ordering
                   </span>
-                  <span className="mt-1 block text-xs leading-5 text-[var(--mm-text3)]">
+                  <span className="mm-field__hint">
                     Override the profile defaults with ordered codec, channel,
                     bitrate, and flag criteria.
                   </span>
@@ -1295,11 +1281,11 @@ export function ProcessingRuleSetWorkspace() {
 
         {providerEditorOpen ? (
           <div className="mt-5 border-t border-[var(--mm-border)] pt-5">
-            <div className="grid gap-3 lg:grid-cols-3">
-              <label className="block text-sm">
-                <span className="text-[var(--mm-text2)]">Provider</span>
+            <div className="mm-field-row">
+              <label className="mm-field mm-field--medium">
+                <span className="mm-field__label">Provider</span>
                 <select
-                  className={mmSelectFieldClass}
+                  className="mm-input"
                   value={providerName}
                   disabled={!editable}
                   onChange={(event) =>
@@ -1310,22 +1296,20 @@ export function ProcessingRuleSetWorkspace() {
                   <option value="tmdb">TMDb</option>
                 </select>
               </label>
-              <label className="block text-sm lg:col-span-2">
-                <span className="text-[var(--mm-text2)]">
-                  Provider or gateway URL
-                </span>
+              <label className="mm-field mm-field--wide">
+                <span className="mm-field__label">Provider or gateway URL</span>
                 <input
-                  className={mmEditableTextFieldClass}
+                  className="mm-input"
                   value={providerBaseUrl}
                   disabled={!editable || providerName === ""}
                   onChange={(event) => setProviderBaseUrl(event.target.value)}
                 />
               </label>
-              <label className="block text-sm lg:col-span-2">
-                <span className="text-[var(--mm-text2)]">API key</span>
+              <label className="mm-field mm-field--medium">
+                <span className="mm-field__label">API key</span>
                 <input
                   type="password"
-                  className={mmEditableTextFieldClass}
+                  className="mm-input"
                   value={providerKey}
                   disabled={
                     !editable || providerName === "" || clearProviderKey

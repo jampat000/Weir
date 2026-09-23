@@ -14,9 +14,9 @@ import {
   useUpdateMediaManagerConnection,
 } from "../../lib/media-managers/queries";
 import { ConfirmRemovalDialog } from "../../components/ui/confirm-removal-dialog";
+import { Field } from "../../components/shared/field";
 import {
   mmActionButtonClass,
-  mmEditableTextFieldClass,
   mmTechnicalMonoSmallClass,
 } from "../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
@@ -134,66 +134,64 @@ function AddConnectionForm({ onCancel }: { onCancel: () => void }) {
   return (
     <form onSubmit={submit}>
       <QuietFieldGroup title="Add an app">
-        <div className="grid max-w-xl gap-3">
-          <label className="grid gap-1 text-sm">
-            <span className="text-[var(--mm-text2)]">Which app is it?</span>
-            <select
-              data-testid="media-manager-kind"
-              className={mmEditableTextFieldClass}
-              value={form.kind}
-              onChange={(e) =>
-                setForm({ ...form, kind: e.target.value as MediaManagerKind })
-              }
+        <div className="mm-quiet-stack">
+          <div className="mm-field-row">
+            <Field
+              label="Which app is it?"
+              hint={KIND_BLURBS[form.kind]}
+              width="medium"
             >
-              {KINDS.map((kind) => (
-                <option key={kind} value={kind}>
-                  {MEDIA_MANAGER_KIND_LABELS[kind]}
-                </option>
-              ))}
-            </select>
-            <span className="text-xs text-[var(--mm-text2)]">
-              {KIND_BLURBS[form.kind]}
-            </span>
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            <span className="text-[var(--mm-text2)]">Name</span>
-            <input
-              data-testid="media-manager-name"
-              className={mmEditableTextFieldClass}
-              value={form.name}
-              placeholder="Deluno"
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            <span className="text-[var(--mm-text2)]">Where to find it</span>
+              <select
+                data-testid="media-manager-kind"
+                className="mm-input"
+                value={form.kind}
+                onChange={(e) =>
+                  setForm({ ...form, kind: e.target.value as MediaManagerKind })
+                }
+              >
+                {KINDS.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {MEDIA_MANAGER_KIND_LABELS[kind]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Name" width="medium">
+              <input
+                data-testid="media-manager-name"
+                className="mm-input"
+                value={form.name}
+                placeholder="Deluno"
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </Field>
+          </div>
+          <Field
+            label="Where to find it"
+            hint="The address you use to open it in a browser."
+            width="wide"
+          >
             <input
               data-testid="media-manager-base-url"
-              className={mmEditableTextFieldClass}
+              className="mm-input"
               value={form.base_url}
               placeholder="http://192.0.2.10:5099"
               onChange={(e) => setForm({ ...form, base_url: e.target.value })}
             />
-            <span className="text-xs text-[var(--mm-text2)]">
-              The address you use to open it in a browser.
-            </span>
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            <span className="text-[var(--mm-text2)]">API key</span>
+          </Field>
+          <Field
+            label="API key"
+            hint="Weir stores this safely and never shows it again."
+            width="medium"
+          >
             <input
               data-testid="media-manager-api-key"
               type="password"
-              className={mmEditableTextFieldClass}
+              className="mm-input"
               value={form.api_key}
               onChange={(e) => setForm({ ...form, api_key: e.target.value })}
             />
-            <span className="text-xs text-[var(--mm-text2)]">
-              Weir stores this safely and never shows it again.
-            </span>
-          </label>
+          </Field>
         </div>
 
         {create.isError ? (
@@ -354,8 +352,8 @@ function ConnectionCard({
               >
                 {connection.name} picks up what Weir cleans through a remote
                 path mapping from a library&apos;s watched folder to its output
-                folder. Open that library under Processing → Libraries: its
-                editor shows the exact values to enter and checks that{" "}
+                folder. Open that library under Settings → Libraries: its editor
+                shows the exact values to enter and checks that{" "}
                 {connection.name} has them.
               </p>
             ) : null}

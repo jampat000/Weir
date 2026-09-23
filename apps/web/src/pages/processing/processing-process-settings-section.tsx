@@ -262,11 +262,8 @@ export function ProcessingProcessSettingsSection() {
             detail="How many files Weir works on at the same time, however they arrived. More at once clears a burst of imports sooner; it is mostly disk work, so a slow disk gains little past two or three."
           >
             <div className="mm-field-row">
-              <div className="block min-w-0">
-                <span
-                  id={filesAtOnceLabelId}
-                  className="text-sm text-[var(--mm-text2)]"
-                >
+              <div className="mm-field mm-field--medium">
+                <span id={filesAtOnceLabelId} className="mm-field__label">
                   Files at once
                 </span>
                 <MmListboxPicker

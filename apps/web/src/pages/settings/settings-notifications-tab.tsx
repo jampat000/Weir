@@ -8,15 +8,13 @@ import {
   useUpdateNotificationChannelMutation,
 } from "../../lib/suite/queries";
 import { ConfirmRemovalDialog } from "../../components/ui/confirm-removal-dialog";
-import {
-  mmActionButtonClass,
-  mmEditableTextFieldClass,
-} from "../../lib/ui/mm-control-roles";
+import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import {
   mmModuleTabBlurbBandClass,
   mmModuleTabBlurbTextClass,
 } from "../../lib/ui/mm-module-tab-blurb";
 import { QuietFieldGroup } from "../../components/shared/quiet-section";
+import { Field } from "../../components/shared/field";
 import { SettingsQuietSection } from "./settings-shared";
 
 const EVENT_LABELS: Record<string, string> = {
@@ -74,54 +72,46 @@ function ChannelForm({
 
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
-      <label className="block text-sm text-[var(--mm-text2)]">
-        <span className="mb-1 block text-sm text-[var(--mm-text2)]">Label</span>
-        <input
-          type="text"
-          className={mmEditableTextFieldClass}
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder="e.g. Discord alerts"
-          required
-          maxLength={255}
-          disabled={saving}
-        />
-      </label>
+      <div className="mm-field-row">
+        <Field label="Label" width="medium">
+          <input
+            type="text"
+            className="mm-input"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="e.g. Discord alerts"
+            required
+            maxLength={255}
+            disabled={saving}
+          />
+        </Field>
+        <Field label="Provider" width="medium">
+          <select
+            className="mm-input"
+            value={provider}
+            onChange={(e) => setProvider(e.target.value)}
+            disabled={saving}
+          >
+            <option value="webhook">Generic webhook (JSON POST)</option>
+            <option value="discord">Discord webhook</option>
+          </select>
+        </Field>
+      </div>
 
-      <label className="block text-sm text-[var(--mm-text2)]">
-        <span className="mb-1 block text-sm text-[var(--mm-text2)]">
-          Provider
-        </span>
-        <select
-          className={`${mmEditableTextFieldClass} w-full max-w-xs`}
-          value={provider}
-          onChange={(e) => setProvider(e.target.value)}
-          disabled={saving}
-        >
-          <option value="webhook">Generic webhook (JSON POST)</option>
-          <option value="discord">Discord webhook</option>
-        </select>
-      </label>
-
-      <label className="block text-sm text-[var(--mm-text2)]">
-        <span className="mb-1 block text-sm text-[var(--mm-text2)]">
-          Webhook URL
-        </span>
+      <Field label="Webhook URL" width="wide">
         <input
           type="url"
-          className={mmEditableTextFieldClass}
+          className="mm-input"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://..."
           required
           disabled={saving}
         />
-      </label>
+      </Field>
 
       <fieldset>
-        <legend className="mb-2 text-sm text-[var(--mm-text2)]">
-          Trigger events
-        </legend>
+        <legend className="mm-field__label mb-2">Trigger events</legend>
         <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
           {supportedEvents.map((event) => (
             <label

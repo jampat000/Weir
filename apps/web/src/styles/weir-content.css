@@ -1166,20 +1166,22 @@
   color: var(--mm-text3);
 }
 
-/* The control inside takes the field's width rather than stretching to the column. */
-.mm-field--short .mm-input,
-.mm-field--short > .mm-input {
-  width: min(100%, var(--mm-field-short));
+/* The control inside takes the field's width rather than stretching to the column. A fixed width,
+   capped at the room there is: `min(100%, …)` resolved against nothing inside a row of fields, so
+   each dropdown sized itself to its own text and a row of "medium" fields came out three widths. */
+.mm-field--short .mm-input {
+  width: var(--mm-field-short);
+  max-width: 100%;
 }
 
-.mm-field--medium .mm-input,
-.mm-field--medium > .mm-input {
-  width: min(100%, var(--mm-field-medium));
+.mm-field--medium .mm-input {
+  width: var(--mm-field-medium);
+  max-width: 100%;
 }
 
-.mm-field--wide .mm-input,
-.mm-field--wide > .mm-input {
-  width: min(100%, var(--mm-field-wide));
+.mm-field--wide .mm-input {
+  width: var(--mm-field-wide);
+  max-width: 100%;
 }
 
 /* A row of settings that belong together, on one baseline. */

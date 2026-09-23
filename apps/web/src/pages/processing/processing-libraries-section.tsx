@@ -3,6 +3,7 @@ import { useState } from "react";
 import { MmOnOffSwitch } from "../../components/ui/mm-on-off-switch";
 import { PageLoading } from "../../components/shared/page-loading";
 import { SidePanel } from "../../components/shared/side-panel";
+import { Field, type FieldWidth } from "../../components/shared/field";
 import {
   QuietFieldGroup,
   QuietSection,
@@ -37,11 +38,7 @@ import {
   useUnlinkDiscoveredProcessingLibrary,
   useUpdateProcessingLibrary,
 } from "../../lib/processing/libraries-queries";
-import {
-  mmActionButtonClass,
-  mmEditableTextFieldClass,
-  mmSelectFieldClass,
-} from "../../lib/ui/mm-control-roles";
+import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 
 function canEdit(role: string | undefined): boolean {
   return role === "operator" || role === "admin";
@@ -487,24 +484,19 @@ export function ProcessingLibrariesSection() {
   const field = (
     label: string,
     key: keyof FormState,
+    width: FieldWidth,
     placeholder = "",
     hint?: string,
   ) => (
-    <label className="block text-sm" key={key}>
-      <span className="text-[var(--mm-text2)]">{label}</span>
+    <Field label={label} hint={hint} width={width} key={key}>
       <input
-        className={mmEditableTextFieldClass}
+        className="mm-input"
         value={String(form[key])}
         placeholder={placeholder}
         onChange={(e) => setForm({ ...form, [key]: e.target.value })}
         disabled={!editable}
       />
-      {hint ? (
-        <span className="mt-1 block text-xs text-[var(--mm-text3)]">
-          {hint}
-        </span>
-      ) : null}
-    </label>
+    </Field>
   );
 
   const toggle = (label: string, key: BooleanFormKey, hint?: string) => (
@@ -531,16 +523,15 @@ export function ProcessingLibrariesSection() {
   );
 
   const dateTimeField = (label: string, key: keyof FormState) => (
-    <label className="block text-sm" key={key}>
-      <span className="text-[var(--mm-text2)]">{label}</span>
+    <Field label={label} width="medium" key={key}>
       <input
         type="datetime-local"
-        className={mmEditableTextFieldClass}
+        className="mm-input"
         value={String(form[key])}
         onChange={(event) => setForm({ ...form, [key]: event.target.value })}
         disabled={!editable}
       />
-    </label>
+    </Field>
   );
 
   return (
@@ -723,10 +714,10 @@ export function ProcessingLibrariesSection() {
             path differences and never change an existing watched folder.
           </p>
           <div className="mt-5 flex flex-wrap items-end gap-2">
-            <label className="min-w-64 flex-1 text-sm">
-              <span className="text-[var(--mm-text2)]">Media manager</span>
+            <label className="mm-field mm-field--medium">
+              <span className="mm-field__label">Media manager</span>
               <select
-                className={mmSelectFieldClass}
+                className="mm-input"
                 value={selectedConnectionId}
                 onChange={(event) => {
                   setSelectedConnectionId(event.target.value);
@@ -885,12 +876,12 @@ export function ProcessingLibrariesSection() {
             title="Identity and folders"
             detail="One watched folder, one safe work area, and one finished output."
           >
-            <div className="grid gap-4 lg:grid-cols-2">
-              {field("Name", "name", "Movies 4K")}
-              <label className="block text-sm">
-                <span className="text-[var(--mm-text2)]">Media type</span>
+            <div className="mm-field-row">
+              {field("Name", "name", "medium", "Movies 4K")}
+              <label className="mm-field mm-field--medium">
+                <span className="mm-field__label">Media type</span>
                 <select
-                  className={mmSelectFieldClass}
+                  className="mm-input"
                   value={form.media_type}
                   onChange={(event) =>
                     setForm({
@@ -907,12 +898,12 @@ export function ProcessingLibrariesSection() {
                   ))}
                 </select>
               </label>
-              <label className="block text-sm">
-                <span className="text-[var(--mm-text2)]">
+              <label className="mm-field mm-field--medium">
+                <span className="mm-field__label">
                   Audio, subtitle and metadata rules
                 </span>
                 <select
-                  className={mmSelectFieldClass}
+                  className="mm-input"
                   value={form.rule_set_id}
                   onChange={(event) =>
                     setForm({ ...form, rule_set_id: event.target.value })
@@ -926,23 +917,26 @@ export function ProcessingLibrariesSection() {
                     </option>
                   ))}
                 </select>
-                <span className="mt-1 block text-xs text-[var(--mm-text3)]">
+                <span className="mm-field__hint">
                   Create and edit reusable rule sets under Rules.
                 </span>
               </label>
               {field(
                 "Watched folder",
                 "watched_folder",
+                "wide",
                 "/srv/media/movies-4k",
               )}
               {field(
                 "Output folder",
                 "output_folder",
+                "wide",
                 "/srv/media/movies-4k-out",
               )}
               {field(
                 "Work folder",
                 "work_folder",
+                "wide",
                 "",
                 "Leave empty to use Weir's private temporary folder.",
               )}
@@ -968,29 +962,47 @@ export function ProcessingLibrariesSection() {
             title="Intake rules"
             detail="Decide which files belong here before Weir spends time probing or processing them. A maximum of 0 means no limit."
           >
-            <div className="grid gap-4 lg:grid-cols-2">
-              {field("File types", "media_extensions_csv", ".mkv,.mp4")}
+            <div className="mm-field-row">
+              {field(
+                "File types",
+                "media_extensions_csv",
+                "medium",
+                ".mkv,.mp4",
+              )}
               {field(
                 "Downloader folders to ignore",
                 "exclude_markers_csv",
+                "medium",
                 "__admin__,incomplete",
                 "Comma-separated folder names used while a download is incomplete.",
               )}
               {field(
                 "Path must match",
                 "include_patterns_csv",
+                "medium",
                 "*feature*,Movies/*",
                 "Optional comma-separated wildcards. Empty accepts every path.",
               )}
               {field(
                 "Path must not match",
                 "exclude_patterns_csv",
+                "medium",
                 "*sample*,*trailer*",
                 "Optional comma-separated wildcards.",
               )}
-              {field("Minimum file size (MB)", "min_file_size_mb", "0")}
-              {field("Maximum file size (MB)", "max_file_size_mb", "0")}
-              <div className="space-y-2 lg:col-span-2">
+              {field(
+                "Minimum file size (MB)",
+                "min_file_size_mb",
+                "short",
+                "0",
+              )}
+              {field(
+                "Maximum file size (MB)",
+                "max_file_size_mb",
+                "short",
+                "0",
+              )}
+              <div className="w-full space-y-2">
                 <div>
                   <p className="text-sm font-medium text-[var(--mm-text1)]">
                     Created and modified windows
@@ -1002,19 +1014,17 @@ export function ProcessingLibrariesSection() {
                     filesystem birth/change time available.
                   </p>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="mm-field-row">
                   {dateTimeField("Created after", "created_after")}
                   {dateTimeField("Created before", "created_before")}
                   {dateTimeField("Modified after", "modified_after")}
                   {dateTimeField("Modified before", "modified_before")}
                 </div>
               </div>
-              <label className="block text-sm">
-                <span className="text-[var(--mm-text2)]">
-                  When a file is rejected
-                </span>
+              <label className="mm-field mm-field--medium">
+                <span className="mm-field__label">When a file is rejected</span>
                 <select
-                  className={mmSelectFieldClass}
+                  className="mm-input"
                   value={form.rejected_file_action}
                   onChange={(event) =>
                     setForm({
@@ -1030,7 +1040,7 @@ export function ProcessingLibrariesSection() {
                     Delete only the rejected file
                   </option>
                 </select>
-                <span className="mt-1 block text-xs text-[var(--mm-text3)]">
+                <span className="mm-field__hint">
                   Applies after readiness checks to size and path-rule
                   rejections. Weir never deletes a populated parent folder here.
                 </span>
@@ -1046,16 +1056,22 @@ export function ProcessingLibrariesSection() {
             title="File readiness"
             detail="These checks prevent Weir from starting while a downloader, recorder, or media manager still owns the file."
           >
-            <div className="grid gap-4 lg:grid-cols-2">
-              {field("Minimum unchanged age (seconds)", "min_file_age_seconds")}
-              {field("Hold every new file (minutes)", "hold_minutes")}
+            <div className="mm-field-row">
+              {field(
+                "Minimum unchanged age (seconds)",
+                "min_file_age_seconds",
+                "short",
+              )}
+              {field("Hold every new file (minutes)", "hold_minutes", "short")}
               {field(
                 "Size must stay stable (seconds)",
                 "file_detection_interval_seconds",
+                "short",
               )}
               {field(
                 "Fallback scan interval (seconds)",
                 "scan_interval_seconds",
+                "short",
               )}
             </div>
             <div className="grid gap-x-10 lg:grid-cols-2">
@@ -1081,16 +1097,17 @@ export function ProcessingLibrariesSection() {
             title="Output safety"
             detail="Control sidecars, timestamps, and what happens when the destination already exists."
           >
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="mm-field-row">
               {field(
                 "Sidecar file types",
                 "sidecar_patterns_csv",
+                "medium",
                 ".srt,.nfo,.jpg",
               )}
-              <label className="block text-sm">
-                <span className="text-[var(--mm-text2)]">Existing output</span>
+              <label className="mm-field mm-field--medium">
+                <span className="mm-field__label">Existing output</span>
                 <select
-                  className={mmSelectFieldClass}
+                  className="mm-input"
                   value={form.output_collision_policy}
                   onChange={(event) =>
                     setForm({
@@ -1129,11 +1146,11 @@ export function ProcessingLibrariesSection() {
             title="Capacity and recovery"
             detail="Priority is relative: higher-numbered libraries are offered work first."
           >
-            <div className="grid gap-4 lg:grid-cols-2">
-              <label className="block text-sm">
-                <span className="text-[var(--mm-text2)]">Files at once</span>
+            <div className="mm-field-row">
+              <label className="mm-field mm-field--medium">
+                <span className="mm-field__label">Files at once</span>
                 <select
-                  className={mmSelectFieldClass}
+                  className="mm-input"
                   value={form.max_concurrent_files}
                   onChange={(event) =>
                     setForm({
@@ -1150,16 +1167,22 @@ export function ProcessingLibrariesSection() {
                     </option>
                   ))}
                 </select>
-                <span className="mt-1 block text-xs text-[var(--mm-text3)]">
+                <span className="mm-field__hint">
                   Only to hold this library below Files at once in Process
                   settings, so it cannot take every slot.
                 </span>
               </label>
-              {field("Queue priority", "priority", "0")}
-              {field("Maximum automatic attempts", "max_attempts", "3")}
+              {field("Queue priority", "priority", "short", "0")}
+              {field(
+                "Maximum automatic attempts",
+                "max_attempts",
+                "short",
+                "3",
+              )}
               {field(
                 "First retry delay (seconds)",
                 "retry_backoff_seconds",
+                "short",
                 "300",
               )}
             </div>
@@ -1171,12 +1194,10 @@ export function ProcessingLibrariesSection() {
                 "Usually leave this off: retrying does not repair an unsupported or malformed file.",
               )}
             </div>
-            <label className="block space-y-1">
-              <span className="text-sm text-[var(--mm-text2)]">
-                When retries run out
-              </span>
+            <label className="mm-field mm-field--medium">
+              <span className="mm-field__label">When retries run out</span>
               <select
-                className={mmSelectFieldClass}
+                className="mm-input"
                 value={form.failure_policy}
                 onChange={(event) =>
                   setForm({
@@ -1200,17 +1221,14 @@ export function ProcessingLibrariesSection() {
                   Reject the release so a different one is found
                 </option>
               </select>
-              <span className="block text-xs text-[var(--mm-text3)]">
+              <span className="mm-field__hint">
                 {form.failure_policy === "pass_through"
                   ? "Your media manager still gets the file, exactly as it arrived. The original stays in the watched folder."
                   : form.failure_policy === "hold"
                     ? "The file stays with Weir and will not reach your media manager until you deal with it."
                     : "Weir tells your media manager the release is bad and removes the download once the manager accepts, so it can find a different one. If that cannot be done safely, the original is handed back unchanged instead."}
               </span>
-              <span
-                className="block text-xs text-[var(--mm-text3)]"
-                data-testid="reject-support"
-              >
+              <span className="mm-field__hint" data-testid="reject-support">
                 {rejectSupport.isLoading
                   ? "Checking whether Reject is available…"
                   : rejectSupport.data
@@ -1228,13 +1246,11 @@ export function ProcessingLibrariesSection() {
               Software processing is the safest default. Hardware failures fall
               back to software and are recorded.
             </p>
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
-              <label className="block text-sm">
-                <span className="text-[var(--mm-text2)]">
-                  Hardware decoding
-                </span>
+            <div className="mm-field-row mt-4">
+              <label className="mm-field mm-field--medium">
+                <span className="mm-field__label">Hardware decoding</span>
                 <select
-                  className={mmSelectFieldClass}
+                  className="mm-input"
                   value={form.hardware_decode_mode}
                   onChange={(event) =>
                     setForm({
@@ -1249,18 +1265,22 @@ export function ProcessingLibrariesSection() {
                   <option value="device">Use a specific method</option>
                 </select>
               </label>
-              {field("Hardware method", "hardware_device", "cuda, qsv, vaapi")}
+              {field(
+                "Hardware method",
+                "hardware_device",
+                "medium",
+                "cuda, qsv, vaapi",
+              )}
               {field(
                 "Never use these vendors",
                 "hardware_disabled_vendors_csv",
+                "medium",
                 "nvidia,intel",
               )}
-              <label className="block text-sm">
-                <span className="text-[var(--mm-text2)]">
-                  FFmpeg compatibility
-                </span>
+              <label className="mm-field mm-field--medium">
+                <span className="mm-field__label">FFmpeg compatibility</span>
                 <select
-                  className={mmSelectFieldClass}
+                  className="mm-input"
                   value={form.ffmpeg_strictness}
                   onChange={(event) =>
                     setForm({
