@@ -2,9 +2,7 @@
 
 A test suite that judges a **running** Weir server from the outside. It starts the server as its own
 process, talks to it only over HTTP, and reads or writes the SQLite file only while the server is
-stopped. It never imports Weir. It was first written against the retired Python backend to prove the .NET
-server matched it area by area (ADR-0017). It now judges the .NET server only, and every area in
-`areas.json` is required.
+stopped. It never imports Weir (epic #514, this suite is #516, decision record ADR-0017).
 
 ## Running it
 
@@ -16,7 +14,7 @@ serves `apps/web/dist`):
 python -m pip install --require-hashes -r tests/requirements.txt
 dotnet build apps/server/Weir.slnx
 cd apps/web && npm ci && npm run build && cd ../..
-python -m pytest tests/contract -q --contract-required-only
+python -m pytest tests/contract -q
 ```
 
 Useful options and variables:
@@ -24,15 +22,16 @@ Useful options and variables:
 | What | How |
 | --- | --- |
 | Only some areas | `--contract-area auth,system` (repeatable) |
-| Only the areas the server under test must pass | `--contract-required-only` |
-| Which server | `WEIR_CONTRACT_SERVER=dotnet` (the default and only kind) |
 | A published .NET executable instead of `dotnet run` | `WEIR_CONTRACT_DOTNET_EXE=/path/to/Weir` |
 | Real ffmpeg for `real_ffmpeg` tests | on `PATH`, or `WEIR_CONTRACT_REAL_FFMPEG_DIR` |
 | Separate leftover-server ledger (parallel runs) | `WEIR_CONTRACT_LEDGER=/tmp/ledger.json` |
 
+`--contract-area` refuses an unknown or blank area name, and an area with no collected tests, so a
+CI leg can never pass by running nothing.
+
 Without `WEIR_CONTRACT_LEDGER`, the default ledger path already includes a short hash of the checkout's
 own root (`weir-contract-servers-<hash>.json` in the OS temp dir), so two worktrees of this repo on one
-machine (parallel agents, say) get separate ledgers and never reap each other's contract servers.
+machine get separate ledgers and never reap each other's contract servers.
 
 The end of every run prints a pass/fail line per area.
 
@@ -43,41 +42,24 @@ The suite runs `dotnet run --project apps/server/src/Weir.Host --no-build -- --h
 settings below, and `ASPNETCORE_URLS`. The server must answer `GET /health` and `GET /ready` with
 `{"ready": true}` once it can take requests, and must create or migrate its own database on start.
 
-A test that describes behaviour only some server kinds have on purpose is marked with the kinds it
-applies to, and is skipped with the reason on the others (with a single kind this is rarely needed):
+### Known bugs: pinning the correct behaviour
+
+For a filed issue whose fix is still pending, write a test that asserts the *correct* behaviour and
+mark it with pytest's own strict xfail, naming the issue:
 
 ```python
-@pytest.mark.backends("dotnet", reason="...the ADR or issue that decided it...")
-def test_something_only_one_kind_does(...): ...
-```
-
-Use it only for a decision recorded in an ADR or issue, never to hide unfinished work.
-
-### Known bugs: proving a fix, not just describing today
-
-Some contract tests currently assert today's *buggy* behaviour so the suite stays green (the README
-entry for the bug says so, and points at the correct-behaviour test). For a filed issue whose fix is
-still pending, add a **separate** test that asserts the *correct* behaviour and mark it
-`known_bug`, which applies `pytest.xfail(strict=True)` on the listed backends:
-
-```python
-@pytest.mark.known_bug(issue=530)
+@pytest.mark.xfail(strict=True, reason="#530: /processing/files fails on passed_through rows")
 def test_files_lists_passed_through_and_rejected_rows(...): ...
 ```
 
-- `issue` is the GitHub issue number; `backends` (default: every server kind) lists which servers still
-  get it wrong.
-- `strict=True` is automatic: once the fix lands, the test unexpectedly **passes** (XPASS),
-  which `strict` turns into a failure. That failure is the signal to delete the `known_bug` marker —
-  the test then just asserts correct behaviour like any other.
-- Leave the old test that asserts today's behaviour in place with a comment pointing at the issue and
-  the new test, so both the workaround and the fix are visible until the marker comes off.
+Once the fix lands, the test unexpectedly **passes** (XPASS), which `strict=True` turns into a
+failure. That failure is the signal to delete the marker; the test then asserts correct behaviour like
+any other.
 
-Areas are listed in [`areas.json`](areas.json). Each has a `required` list of server kinds that must
-pass it. CI runs each required area as its own job, `contract (<area>)`, in parallel
-(`--contract-required-only --contract-area <area>`), and the `contract` job fails unless every one of
-them passed. Every area requires `dotnet`. The leg list is read from `areas.json`, so a new area gets
-its own job without a workflow change.
+Areas are listed in [`areas.json`](areas.json). CI runs every area as its own job, `contract (<area>)`,
+in parallel (`--contract-area <area>`, `.github/workflows/ci-contract.yml`), and CI's `ci-passed` verdict
+fails unless every one of them passed. The leg list is read from `areas.json`, so a new area gets its own
+job without a workflow change.
 
 ## How it works
 
@@ -105,8 +87,10 @@ its own job without a workflow change.
   remux_delay_seconds=..., probe_error=..., integrity_error=...)` scripts failures and slowness; every call
   is logged for assertions (`calls(tool=, step=)`). On Windows the tools are real `.exe` launchers (pip's
   distlib launcher plus a zipped script), because Weir runs them without a shell.
-- **`support/polling.py`** — `wait_until`. Tests poll for an outcome with a timeout; they never sleep
-  for a fixed time to let something happen.
+- **`support/polling.py`** — `wait_until` and `never_within`. Tests poll for an outcome with a timeout;
+  they never sleep for a fixed time to let something happen. To show something does *not* happen, prefer
+  state the API reports (a finished scan with no remux job queued, a file on hold with no retry time)
+  over `never_within`, which can only watch for a while.
 
 ## Adding a test
 
@@ -119,7 +103,8 @@ its own job without a workflow change.
    fake manager received, calls the fake ffmpeg received.
 4. Use the module `server` when tests can share a database, `server_factory` when they cannot.
 5. Wait with `wait_until`/`never_within`, with timeouts that fail with a sentence.
-6. When the server's behaviour looks wrong, write the correct-behaviour test with a `known_bug` marker
-   and raise an issue for the fix, rather than asserting the bug.
+6. When the server's behaviour looks wrong, write the correct-behaviour test with
+   `@pytest.mark.xfail(strict=True, reason="#<issue>: ...")` and raise an issue for the fix, rather than
+   asserting the bug.
 7. Lint: `ruff check tests/contract` and `ruff format --check tests/contract` (rules in
    `tests/contract/ruff.toml`; `ruff` comes with `tests/requirements.txt`).

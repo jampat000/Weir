@@ -1,7 +1,5 @@
-"""Basic contract coverage (auth, status codes, shapes) for system endpoints no original HTTP test covered.
-
-Not a port of one backend test file: the logs, metrics, notification channel, configuration backup,
-readiness, pause, security overview and update status routes in the retired Python backend's weir/platform/.
+"""Basic contract coverage (auth, status codes, shapes) for the system endpoints: logs, metrics,
+notification channels, configuration backup, readiness, pause, security overview and update status.
 """
 
 from __future__ import annotations
@@ -317,8 +315,7 @@ def test_update_status_requires_auth(client) -> None:
 
 
 def test_the_retired_update_status_alias_is_not_served(admin) -> None:
-    """``/suite/settings/update-status`` was a second address for this handler, kept so an older
-    web build would still find the update check. 3.0.0 serves ``/suite/update-status`` only."""
+    """One address per handler: the update check is served at ``/suite/update-status`` only."""
 
     assert admin.get(f"{API}/suite/settings/update-status").status_code == 404
 

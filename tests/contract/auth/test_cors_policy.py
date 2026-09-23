@@ -1,4 +1,4 @@
-"""Contract port of the retired Python backend's tests/test_cors_policy.py."""
+"""CORS preflight: only the methods and headers the Weir web app needs are allowed."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Port of the retired Python backend's tests/test_health.py (smoke tests for the backend spine)."""
+"""Health, readiness, request ids, and how unknown paths and app routes are answered."""
 
 from __future__ import annotations
 

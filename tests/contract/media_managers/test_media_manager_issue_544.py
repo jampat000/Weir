@@ -1,6 +1,5 @@
-"""Correct-behaviour contract tests for issue #544 (media manager defects found while porting).
-
-Each test proves the *fixed* behaviour, which the .NET server implements.
+"""#544: media manager edge cases — non-JSON 2xx answers, lane time validation, exact hand-off ledger
+matching, and per-connection secrets.
 """
 
 from __future__ import annotations

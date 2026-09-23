@@ -4,8 +4,8 @@ namespace Weir.Tray.Tests;
 
 /// <summary>
 /// The dialog's two options live in different layout containers, which WinForms does not make
-/// mutually exclusive on its own: before this was pinned, typing a port left "Use Weir's default
-/// port" ticked too, and the dialog quietly used the default. Found by driving the real window.
+/// mutually exclusive on its own: without the dialog's own handling, typing a port leaves "Use Weir's
+/// default port" ticked too, and the dialog quietly uses the default.
 /// </summary>
 public sealed class PortDialogTests
 {
@@ -22,7 +22,10 @@ public sealed class PortDialogTests
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         thread.Join();
-        if (failure is not null) throw new Xunit.Sdk.XunitException(failure.ToString());
+        if (failure is not null)
+        {
+            throw new Xunit.Sdk.XunitException(failure.ToString());
+        }
     }
 
     [Fact]

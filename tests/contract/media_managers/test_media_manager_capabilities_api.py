@@ -1,4 +1,4 @@
-"""Contract port of the retired Python backend's tests/test_media_manager_capabilities_api.py."""
+"""Media manager capabilities: what each reachable manager manages, and what an unreachable one says."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def test_capabilities_requires_an_operator(client: WeirClient) -> None:
 
 
 def test_capabilities_reports_what_a_reachable_manager_manages(operator: WeirClient, fake_managers) -> None:
-    # The original stubbed the manager port; here a fake Deluno answers its manifest.
+    # A fake Deluno answers its manifest.
     fake = fake_managers(
         "deluno",
         libraries=[

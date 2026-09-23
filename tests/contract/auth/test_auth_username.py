@@ -1,4 +1,4 @@
-"""Contract port of the retired Python backend's tests/test_auth_username.py (case-insensitive usernames, renaming, #455)."""
+"""Usernames are case-insensitive and can be renamed (#455)."""
 
 from __future__ import annotations
 
@@ -40,15 +40,17 @@ def test_username_can_be_changed(own_alice: WeirClient) -> None:
     c = own_alice
     assert h.post_login(c, "alice").status_code == 200
 
-    response = c.post_csrf(f"{API}/auth/change-username", {"current_password": ADMIN_PASSWORD, "new_username": "james"})
+    response = c.post_csrf(
+        f"{API}/auth/change-username", {"current_password": ADMIN_PASSWORD, "new_username": "operator2"}
+    )
     assert response.status_code == 200, response.text
-    assert response.json()["username"] == "james"
+    assert response.json()["username"] == "operator2"
 
     # The session survives a rename: its authority is the token, not the name.
-    assert c.get(f"{API}/auth/me").json()["user"]["username"] == "james"
+    assert c.get(f"{API}/auth/me").json()["user"]["username"] == "operator2"
 
     h.logout_with_body(c)
-    assert h.post_login(c, "JAMES").status_code == 200
+    assert h.post_login(c, "OPERATOR2").status_code == 200
     assert h.post_login(c, "alice").status_code == 401
 
 
@@ -58,7 +60,7 @@ def test_changing_the_username_needs_the_current_password(alice: WeirClient) -> 
     assert h.post_login(alice, "alice").status_code == 200
 
     response = alice.post_csrf(
-        f"{API}/auth/change-username", {"current_password": "wrong-password", "new_username": "james"}
+        f"{API}/auth/change-username", {"current_password": "wrong-password", "new_username": "operator2"}
     )
     assert response.status_code == 400
     assert alice.get(f"{API}/auth/me").json()["user"]["username"] == "alice"
@@ -89,6 +91,6 @@ def test_an_unchanged_username_is_refused(alice: WeirClient) -> None:
 
 def test_signed_out_callers_cannot_rename_anyone(alice: WeirClient) -> None:
     response = alice.post_csrf(
-        f"{API}/auth/change-username", {"current_password": ADMIN_PASSWORD, "new_username": "james"}
+        f"{API}/auth/change-username", {"current_password": ADMIN_PASSWORD, "new_username": "operator2"}
     )
     assert response.status_code == 401

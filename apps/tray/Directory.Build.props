@@ -1,0 +1,15 @@
+<Project>
+  <!--
+    The tray builds under the server's rules (ADR-0017: nullable, warnings as errors, latest analyzers, lock-file
+    restore) and carries the product version, WeirVersion, from the same file. Imported rather than copied so the
+    two cannot drift apart.
+  -->
+  <Import Project="$(MSBuildThisFileDirectory)../server/Directory.Build.props" />
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- A desktop app shows dates and messages to a person, so it keeps the machine's culture data. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+</Project>

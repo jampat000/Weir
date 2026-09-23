@@ -1,7 +1,7 @@
-"""Contract port of the retired Python backend's tests/test_bootstrap_status_router.py.
+"""The bootstrap status probe when the database fails.
 
-The original injects database errors into ``bootstrap_allowed``. Black-box, the one failure a
-running server can be put into is a database whose ``users`` table is missing.
+Black-box, the one failure a running server can be put into is a database whose ``users`` table is
+missing.
 """
 
 from __future__ import annotations

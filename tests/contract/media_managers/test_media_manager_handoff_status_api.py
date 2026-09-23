@@ -1,4 +1,4 @@
-"""Contract port of the retired Python backend's tests/test_media_manager_handoff_status_api.py."""
+"""Hand-off status for media managers: states, retries, cancelling, folder hand-offs and pruning."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ from tests.contract.support.polling import wait_until
 SECRET_VALUE = "s3cret"
 SECRET = {"X-Webhook-Secret": SECRET_VALUE}
 SECRET_ENV = {**NO_WEBHOOK_SECRET, "WEIR_MEDIA_MANAGER_WEBHOOK_SECRET": SECRET_VALUE}
-#: Hand-off answers are kept this long once finished (``LEDGER_RETENTION_DAYS`` in the backend).
+#: Hand-off answers are kept this long once finished (the server's ledger retention).
 LEDGER_RETENTION_DAYS = 90
 
 
@@ -238,14 +238,12 @@ def test_a_retry_still_owed_after_its_backoff_is_scheduled_not_failed(
     assert body["scheduledFor"].startswith(retry_at.strftime("%Y-%m-%dT%H:%M"))
 
 
-# #531 item 3: an overdue-but-pending retry reads "scheduled" (fixed in the .NET server).
 def test_an_overdue_retry_still_reads_scheduled_not_failed(server: ServerUnderTest, movies: LibraryFolders) -> None:
-    """#531 item 3: once the backoff has elapsed but no scan has picked the file up yet,
+    """#531 item 3: once the backoff has elapsed but no scan has picked the file up yet, the hand-off
+    still reads ``scheduled``.
 
-    ``_file_state`` (``platform/media_managers/handoff_ledger.py``) only reports ``scheduled`` while
-    ``next_retry_at > now``; the moment that timestamp is in the past it falls through to ``failed``,
-    even though a retry is still coming (a scan can be up to five minutes away by default). Deluno
-    treats ``failed`` as final and would give up on a hand-off about to succeed.
+    A retry is still coming (a scan can be up to five minutes away by default), and Deluno treats
+    ``failed`` as final, so reporting ``failed`` would make it give up on a hand-off about to succeed.
     """
 
     hid = _new_id()
@@ -408,7 +406,7 @@ def test_a_running_pass_is_working(server_factory, client_factory, fake_managers
 def test_the_report_records_the_output_path(
     server_factory, client_factory, fake_managers, fake_ffmpeg, tmp_path
 ) -> None:
-    # The original called the completion report directly; here a worker finishes the file and reports.
+    # A worker finishes the file and reports.
     fake_ffmpeg.set_file_rule("*.mkv", probe=probe())
     working, deluno = _working_server(server_factory, client_factory, fake_managers, fake_ffmpeg, tmp_path)
     _hand_off(working.server, "h1", working.folders.watched / "Film" / "film.mkv")
@@ -481,7 +479,7 @@ def test_a_manager_resending_a_cancelled_hand_off_starts_it_again(
 
 
 def test_only_old_finished_hand_offs_are_pruned(server: ServerUnderTest) -> None:
-    # The original called the prune function; here the retention tick that runs at startup does it.
+    # The retention tick that runs at startup does the pruning.
     old = seed.utc_text(datetime.now(UTC) - timedelta(days=LEDGER_RETENTION_DAYS + 1))
     done, waiting = _new_id(), _new_id()
     with seed.stopped(server) as conn:

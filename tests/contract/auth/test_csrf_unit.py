@@ -1,7 +1,5 @@
-"""Contract port of the HTTP-observable parts of the retired Python backend's tests/test_csrf_unit.py.
-
-The original's only HTTP test is the 503 without a session secret. Its Origin/Referer and loopback
-pairing unit tests are expressed here through ``POST /auth/login`` on configured servers.
+"""CSRF: the token endpoint needs a session secret, and browser posts are checked against the trusted
+origins (Origin, then Referer, with localhost and 127.0.0.1 paired), seen through ``POST /auth/login``.
 """
 
 from __future__ import annotations

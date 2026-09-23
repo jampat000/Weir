@@ -1,0 +1,19 @@
+<Project>
+  <!--
+    The tray's own pins, kept apart from apps/server/Directory.Packages.props so a server package bump never leaves
+    the tray's lock files stale (Dependabot updates each directory on its own). The test packages match the
+    server's versions.
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- packaging/windows/build-velopack.ps1 installs the vpk CLI at this same version. -->
+    <PackageVersion Include="Velopack" Version="1.2.0" />
+    <!-- Tests -->
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
+  </ItemGroup>
+</Project>

@@ -1,4 +1,4 @@
-"""Contract port of the retired Python backend's tests/test_media_manager_connections_api.py."""
+"""Media manager connections: create, update, delete, test, lanes, webhook secrets and access."""
 
 from __future__ import annotations
 
@@ -97,7 +97,7 @@ def test_a_connection_can_be_deleted(operator: WeirClient) -> None:
 
 
 def test_an_unreachable_connection_is_a_normal_test_result(operator: WeirClient) -> None:
-    # The original stubbed the probe; here the address really has nothing listening.
+    # The address really has nothing listening.
     _, row = _create(operator, base_url=closed_port_url())
 
     response = operator.post_csrf(f"{API}/media-managers/connections/{row['id']}/test")

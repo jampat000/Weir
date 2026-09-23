@@ -89,10 +89,9 @@ $ffmpegChecksumsUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/l
 # somebody choosing it. Bumping means editing both lines below together — the checksum is the one
 # upstream publishes at
 # https://mkvtoolnix.download/windows/releases/<version>/mkvtoolnix-64-bit-<version>.zip.sha256
-# (also listed in that directory's sha256sums.txt). v102.0 is the current stable, released
-# 2026-09-14. Note the #503 trial (docs/engineering/503-mkvmerge-vs-ffmpeg.md) measured v100.0; Weir uses
-# only mkvmerge's long-stable CLI surface (`-o`, `--identification-format json`, per-track
-# selection — see Weir.Core.Media.MkvmergeCommands), so the pin is not tied to the trial's build.
+# (also listed in that directory's sha256sums.txt). Weir uses only mkvmerge's long-stable CLI surface
+# (`-o`, `--identification-format json`, per-track selection — see Weir.Core.Media.MkvmergeCommands),
+# so any current stable release serves.
 $mkvtoolnixVersion = "102.0"
 $mkvtoolnixArchiveSha256 = "c02e918900f6d945d9307b426237e456378b79a200589ac6928de39064409a44"
 $mkvtoolnixVendorDir = Join-Path $PSScriptRoot "vendor\\mkvtoolnix"
@@ -351,19 +350,23 @@ Ensure-WindowsMkvtoolnixRuntime
 #    that empty string ON PURPOSE, to detect single-file mode. Weir.Host.csproj's own
 #    RID-conditioned PropertyGroup (and the .pubxml profiles built on top of it) set the same
 #    properties, but scoped to the Weir.Host project only, which is what the analyzer actually
-#    expects; publishing this way never triggers IL3000. Verified locally (see
-#    apps/server/README.md) — do not "simplify" this back to explicit -p: flags.
+#    expects; publishing this way never triggers IL3000 (see apps/server/README.md), so it stays a
+#    profile rather than explicit -p: flags.
 Start-BuildPhase ".NET server publish"
 if (-not $SkipDotnetPublish) {
   Write-Host "Publishing .NET server..."
   if (Test-Path $serverPublishDir) {
     Remove-Item -LiteralPath $serverPublishDir -Recurse -Force
   }
+  # The committed packages.lock.json files record the plain restore CI checks with --locked-mode. A win-x64
+  # publish restores more (the runtime's packages and the single-file tooling), so it keeps its own lock file
+  # under each project's obj folder instead of rewriting the committed one.
   Invoke-Native -FilePath dotnet -ArgumentList @(
     "publish", $serverProjectDir,
     "-p:PublishProfile=win-x64",
     "-p:Version=$buildVersion",
-    "-p:PublishDir=$serverPublishDir\"
+    "-p:PublishDir=$serverPublishDir\",
+    "-p:NuGetLockFilePath=obj/publish.packages.lock.json"
   )
 }
 $publishedServerExe = Join-Path $serverPublishDir "Weir.exe"
@@ -455,7 +458,7 @@ New-Item -ItemType Directory -Path $packDir | Out-Null
 Write-Host "Assembling Velopack pack directory..."
 Copy-Item -Path (Join-Path $trayPublishDir "*") -Destination $packDir -Recurse -Force
 
-# The tray app looks for "server\WeirServer.exe" (Program.cs, FindServerExeDirectory). Weir.Host's own
+# The tray app looks for "server\WeirServer.exe" (apps/tray/Weir.Tray/ServerHost.cs, FindServerExeDirectory). Weir.Host's own
 # AssemblyName is "Weir" (it would collide with the tray's own Weir.exe at the pack root if copied under
 # its published name), so the publish output is renamed on the way in.
 $serverDestDir = Join-Path $packDir "server"
@@ -469,8 +472,7 @@ if (Test-Path -LiteralPath $serverPdb) {
   Move-Item -LiteralPath $serverPdb -Destination (Join-Path $serverDestDir "WeirServer.pdb") -Force
 }
 
-# Falls back to "server\web-dist" when "server\_internal\web-dist" is absent (Program.cs,
-# PrepareEnvironment) — always true here, since a .NET single-file publish has no "_internal".
+# The tray points WEIR_WEB_DIST at "server\web-dist" (apps/tray/Weir.Tray/ServerHost.cs, PrepareEnvironment).
 Copy-Item -Path $webDistDir -Destination (Join-Path $serverDestDir "web-dist") -Recurse -Force
 
 # Matches the <packaged-app-dir>\bin\ffmpeg candidate in
@@ -481,10 +483,9 @@ Copy-Item -Path (Join-Path $ffmpegVendorDir "ffmpeg.exe") -Destination $serverFf
 Copy-Item -Path (Join-Path $ffmpegVendorDir "ffprobe.exe") -Destination $serverFfmpegDir -Force
 
 # #548: matches the <packaged-app-dir>\bin\mkvtoolnix candidate in
-# MediaToolLocations.MkvtoolnixCandidateDirectories (MkvtoolnixBundleDirectory). Until this landed,
-# MediaToolResolver.ResolveMkvmerge always returned null in a packaged install, so the per-library
-# writer setting's "best" default (RemuxWriterChoice) silently fell through to ffmpeg for every
-# write and the mkvmerge writer shipped inert.
+# MediaToolLocations.MkvtoolnixCandidateDirectories (MkvtoolnixBundleDirectory). Without it
+# MediaToolResolver.ResolveMkvmerge finds nothing in a packaged install, and the per-library writer
+# setting's "best" default (RemuxWriterChoice) quietly falls back to ffmpeg for every write.
 $serverMkvtoolnixDir = Join-Path $serverDestDir "bin\\mkvtoolnix"
 New-Item -ItemType Directory -Path $serverMkvtoolnixDir -Force | Out-Null
 Copy-Item -Path (Join-Path $mkvtoolnixVendorDir "mkvmerge.exe") -Destination $serverMkvtoolnixDir -Force
@@ -492,17 +493,20 @@ Copy-Item -Path (Join-Path $mkvtoolnixVendorDir "mkvmerge.exe") -Destination $se
 # ── vpk pack (packId Weir, mainExe Weir.exe: the install identity every release keeps) ──
 Start-BuildPhase "vpk pack"
 Write-Host "Running vpk pack..."
-$trayProjectPath = Join-Path $trayDir "Weir.Tray.csproj"
-[xml]$trayProject = Get-Content -LiteralPath $trayProjectPath -Raw
-$velopackReference = @($trayProject.Project.ItemGroup.PackageReference) |
+# The vpk CLI must match the Velopack library the tray was built with, pinned in the tray's central package file.
+$trayPackagesPath = Join-Path $repoRoot "apps\\tray\\Directory.Packages.props"
+[xml]$trayPackages = Get-Content -LiteralPath $trayPackagesPath -Raw
+$velopackPackage = @($trayPackages.Project.ItemGroup.PackageVersion) |
   Where-Object { $_.Include -eq "Velopack" } |
   Select-Object -First 1
-$velopackCliVersion = [string]$velopackReference.Version
+$velopackCliVersion = [string]$velopackPackage.Version
 if (-not $velopackCliVersion) {
-  throw "Velopack package version was not found in $trayProjectPath."
+  throw "Velopack package version was not found in $trayPackagesPath."
 }
 
-$vpkListLine = @(Invoke-Native -FilePath dotnet -ArgumentList @("tool", "list", "-g", "vpk")) |
+# Every global tool, then filtered here: `dotnet tool list -g vpk` exits 1 when vpk is not installed yet, which is
+# exactly the case this has to handle.
+$vpkListLine = @(Invoke-Native -FilePath dotnet -ArgumentList @("tool", "list", "-g")) |
   Where-Object { $_ -match "^\s*vpk\s+" } |
   Select-Object -First 1
 $installedVpkVersion = if ($vpkListLine) { ($vpkListLine.Trim() -split "\s+")[1] } else { $null }

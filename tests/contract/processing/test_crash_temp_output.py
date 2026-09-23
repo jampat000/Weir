@@ -2,9 +2,8 @@
 
 The fake ffmpeg writes a partial output into the work folder before its delay, exactly where Weir's
 remux temp file lives (``{stem}.processing.XXXXXXXX{suffix}``), so killing the server during that
-delay reproduces the orphan. Python's startup recovery only removes ``.partial`` files from the
-output folder, so the temp file survives there; the .NET server removes Weir's own temp names for
-interrupted jobs and leaves every other file in the work folder alone.
+delay reproduces the orphan. Startup recovery removes Weir's own temp names for interrupted jobs and
+leaves every other file in the work folder alone.
 """
 
 from __future__ import annotations

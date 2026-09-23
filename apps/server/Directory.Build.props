@@ -16,6 +16,7 @@
     <!-- Symbols inside the assemblies, so a single-file publish is one file. -->
     <DebugType>embedded</DebugType>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <InvariantGlobalization>true</InvariantGlobalization>
     <Company>Weir</Company>
     <Product>Weir</Product>

@@ -1,4 +1,4 @@
-"""Port of the retired Python backend's tests/test_configuration_bundle_api.py."""
+"""The configuration bundle (``/suite/configuration-bundle``): access, its one address, and round trips."""
 
 from __future__ import annotations
 
@@ -24,12 +24,8 @@ def test_configuration_bundle_get_requires_operator(server, client_factory) -> N
 
 
 def test_the_retired_bundle_url_aliases_are_not_served(admin) -> None:
-    """One address per handler since 3.0.0.
-
-    The bundle used to answer on three URLs — this one plus ``/suite/settings/configuration-bundle``
-    and ``/system/suite-configuration-bundle`` — so an older web build or a proxy forwarding only
-    part of the API would still find it. The aliases are gone; this proves they stay gone.
-    """
+    """One address per handler: ``/suite/settings/configuration-bundle`` and the ``/system/...`` bundle
+    and backup paths are not served, so nothing comes to depend on a second address."""
 
     for path in (
         f"{API}/suite/settings/configuration-bundle",

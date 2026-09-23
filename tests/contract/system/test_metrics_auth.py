@@ -1,4 +1,4 @@
-"""Port of the retired Python backend's tests/test_metrics_auth.py."""
+"""Who may read ``/metrics``: operator and admin sessions, or a configured bearer token."""
 
 from __future__ import annotations
 

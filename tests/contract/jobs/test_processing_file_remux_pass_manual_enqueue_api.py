@@ -1,4 +1,4 @@
-"""Contract port of the retired Python backend's tests/test_processing_file_remux_pass_manual_enqueue_api.py."""
+"""Manually queueing a remux pass for one file: the job payload, a missing watched folder, and pass-through."""
 
 from __future__ import annotations
 

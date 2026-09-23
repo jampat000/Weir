@@ -40,12 +40,6 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         metavar="AREA[,AREA]",
         help=f"Run only these contract areas ({', '.join(AREA_NAMES)}). Repeatable or comma-separated.",
     )
-    group.addoption(
-        "--contract-required-only",
-        action="store_true",
-        default=False,
-        help="Run only the areas areas.json marks required for the backend under test (WEIR_CONTRACT_SERVER).",
-    )
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -53,17 +47,6 @@ def pytest_configure(config: pytest.Config) -> None:
         config.addinivalue_line("markers", f"{area['name']}: contract area - {area['description']}")
     config.addinivalue_line(
         "markers", "real_ffmpeg: uses the real ffmpeg/ffprobe on tiny generated files; skipped when they are missing"
-    )
-    config.addinivalue_line(
-        "markers",
-        f"backends(*kinds, reason): runs only against these servers ({', '.join(launcher.SERVER_KINDS)}); "
-        "skipped with the reason on others",
-    )
-    config.addinivalue_line(
-        "markers",
-        "known_bug(issue, backends=(...)): the test asserts CORRECT behaviour for a filed GitHub issue "
-        "that a listed backend still gets wrong; xfail(strict=True) there so a fix flips it to a failing "
-        "XPASS, which is the prompt to delete the marker. Omit backends to mean every server kind.",
     )
 
 
@@ -76,20 +59,20 @@ def _area_of(item: pytest.Item) -> str | None:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    raw_areas: list[str] = config.getoption("--contract-area") or []
     wanted: set[str] = set()
-    for raw in config.getoption("--contract-area") or []:
+    for raw in raw_areas:
         wanted.update(part.strip() for part in raw.split(",") if part.strip())
+    if raw_areas and not wanted:
+        # An empty --contract-area (a CI leg whose area variable is blank) would otherwise run everything.
+        raise pytest.UsageError(f"--contract-area was given without an area name. Known: {', '.join(AREA_NAMES)}")
     unknown = wanted.difference(AREA_NAMES)
     if unknown:
         raise pytest.UsageError(
             f"Unknown contract area(s): {', '.join(sorted(unknown))}. Known: {', '.join(AREA_NAMES)}"
         )
-    kind = launcher.server_kind()
-    if config.getoption("--contract-required-only"):
-        required = {a["name"] for a in AREAS if kind in a.get("required", [])}
-        wanted = wanted & required if wanted else required
 
-    dotnet_reason = launcher.dotnet_unavailable_reason() if kind == "dotnet" else None
+    dotnet_reason = launcher.dotnet_unavailable_reason()
     ffmpeg_missing = real_ffmpeg_dir() is None
     selected: list[pytest.Item] = []
     deselected: list[pytest.Item] = []
@@ -108,48 +91,18 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             continue
         if dotnet_reason is not None:
             item.add_marker(pytest.mark.skip(reason=dotnet_reason))
-        backends = item.get_closest_marker("backends")
-        if backends is not None:
-            unknown_kinds = set(backends.args).difference(launcher.SERVER_KINDS)
-            if not backends.args or unknown_kinds:
-                raise pytest.UsageError(
-                    f"{item.nodeid}: @pytest.mark.backends needs server kinds from {', '.join(launcher.SERVER_KINDS)}; "
-                    f"got {backends.args!r}"
-                )
-            if kind not in backends.args:
-                reason = backends.kwargs.get("reason") or f"runs only against {', '.join(backends.args)}"
-                item.add_marker(pytest.mark.skip(reason=reason))
         if ffmpeg_missing and item.get_closest_marker("real_ffmpeg") is not None:
             item.add_marker(
                 pytest.mark.skip(reason="ffmpeg and ffprobe are not on PATH (or WEIR_CONTRACT_REAL_FFMPEG_DIR)")
             )
-        for known_bug in item.iter_markers(name="known_bug"):
-            issue = known_bug.kwargs.get("issue")
-            if issue is None and known_bug.args:
-                issue = known_bug.args[0]
-            if issue is None:
-                raise pytest.UsageError(f"{item.nodeid}: @pytest.mark.known_bug needs issue=<GitHub issue number>")
-            bug_backends = known_bug.kwargs.get("backends") or tuple(launcher.SERVER_KINDS)
-            unknown_bug_kinds = set(bug_backends).difference(launcher.SERVER_KINDS)
-            if unknown_bug_kinds:
-                raise pytest.UsageError(
-                    f"{item.nodeid}: @pytest.mark.known_bug backends needs server kinds from "
-                    f"{', '.join(launcher.SERVER_KINDS)}; got {bug_backends!r}"
-                )
-            if kind in bug_backends:
-                item.add_marker(
-                    pytest.mark.xfail(
-                        reason=(
-                            f"known bug: https://github.com/jampat000/Weir/issues/{issue} — this test asserts "
-                            f"the correct behaviour, which {kind} does not implement yet"
-                        ),
-                        strict=True,
-                    )
-                )
         selected.append(item)
     if deselected:
         config.hook.pytest_deselected(items=deselected)
         items[:] = selected
+    # A CI leg runs one area; if that area has no tests here, the leg must fail rather than pass empty.
+    empty = wanted.difference(_area_of(item) for item in selected)
+    if empty:
+        raise pytest.UsageError(f"No tests were collected for contract area(s): {', '.join(sorted(empty))}")
 
 
 _area_results: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
@@ -169,18 +122,16 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) ->
 def pytest_terminal_summary(terminalreporter: Any) -> None:
     if not _area_results:
         return
-    kind = launcher.server_kind()
-    terminalreporter.section(f"Weir contract areas ({kind})")
+    terminalreporter.section("Weir contract areas")
     for area in AREAS:
         counts = _area_results.get(area["name"])
         if not counts:
             continue
         failed = counts.get("failed", 0)
         verdict = "FAIL" if failed else "PASS"
-        required = "required" if kind in area.get("required", []) else "not yet required"
         terminalreporter.write_line(
             f"{verdict:4}  {area['name']:15} passed={counts.get('passed', 0)} failed={failed} "
-            f"skipped={counts.get('skipped', 0)}  ({required}, port #{area.get('port_issue')})"
+            f"skipped={counts.get('skipped', 0)}  (port #{area.get('port_issue')})"
         )
 
 
@@ -323,8 +274,3 @@ def fake_managers() -> Iterator[Callable[..., FakeManager]]:
     finally:
         for fake in made:
             fake.stop()
-
-
-@pytest.fixture(scope="session")
-def contract_backend() -> str:
-    return launcher.server_kind()

@@ -1,4 +1,4 @@
-"""Contract port of the retired Python backend's tests/test_jobs_inspection_api.py (inspection + cancel-pending)."""
+"""Job inspection (filters, operator guidance, what the default list hides) and cancelling a pending job."""
 
 from __future__ import annotations
 

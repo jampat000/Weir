@@ -15,6 +15,8 @@ for (const relative of workflowFiles) {
   const text = readFileSync(path.resolve(root, relative), "utf8");
   for (const match of text.matchAll(/\buses:\s*([^\s#]+)/g)) {
     const reference = match[1];
+    // A local reusable workflow or action is part of the same commit, so the commit itself pins it.
+    if (reference.startsWith("./")) continue;
     const at = reference.lastIndexOf("@");
     if (at < 1 || !/^[0-9a-f]{40}$/i.test(reference.slice(at + 1))) {
       failures.push(`${relative}: ${reference}`);
