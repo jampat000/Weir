@@ -35,6 +35,18 @@ validate_uint() {
   esac
 }
 
+# Running the server as root defeats the point of gosu-dropping to `weir` in the first place: a
+# compromised request handler would then be able to touch anything on the host that the container
+# can reach, not just WEIR_HOME. There is no supported reason to opt into that, so it is refused
+# rather than warned about.
+validate_not_root_id() {
+  value="$1"
+  name="$2"
+  if [ "$value" = "0" ]; then
+    fail "$name must not be 0: Weir refuses to run its server as root. Pick a non-root uid/gid, or leave $name unset to use the image default (1000)."
+  fi
+}
+
 validate_boolish() {
   value="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
   name="$2"
@@ -92,9 +104,21 @@ update_runtime_identity() {
   fi
 }
 
+# /opt/weir is owned by root and read-only for weir (see Dockerfile); it is never chowned here.
+# WEIR_HOME's own ownership is checked once, cheaply, by stat-ing just the top-level directory
+# rather than walking it — the walk (and the chown that used to follow it unconditionally on
+# every start) is what was slow, and actively harmful if an operator ever points WEIR_HOME at a
+# large media library. Only recurse into it when that one check says ownership is actually wrong:
+# a bind mount created by the host, or a WEIR_PUID/WEIR_PGID remap since the last start, either of
+# which would otherwise leave the server unable to read its own database and logs.
 ensure_runtime_home_ownership() {
   mkdir -p "$WEIR_HOME"
-  chown -R weir:weir "$WEIR_HOME" /opt/weir /home/weir
+  current_owner="$(stat -c '%u:%g' "$WEIR_HOME")"
+  target_owner="$WEIR_PUID:$WEIR_PGID"
+  if [ "$current_owner" != "$target_owner" ]; then
+    log_info "WEIR_HOME is owned by $current_owner, not $target_owner; fixing ownership"
+    chown -R weir:weir "$WEIR_HOME"
+  fi
 }
 
 warn_unported_processing_permissions() {
@@ -122,6 +146,8 @@ run_app() {
 
 validate_uint "$WEIR_PUID" "WEIR_PUID"
 validate_uint "$WEIR_PGID" "WEIR_PGID"
+validate_not_root_id "$WEIR_PUID" "WEIR_PUID"
+validate_not_root_id "$WEIR_PGID" "WEIR_PGID"
 validate_boolish "$WEIR_CHOWN_WATCHED" "WEIR_CHOWN_WATCHED"
 validate_boolish "$WEIR_CHOWN_TEMP" "WEIR_CHOWN_TEMP"
 validate_boolish "$WEIR_CHOWN_OUTPUT" "WEIR_CHOWN_OUTPUT"
