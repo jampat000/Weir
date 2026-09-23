@@ -9,9 +9,11 @@ import {
 } from "../../../lib/settings/queries";
 import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
 import { mmActionButtonClass } from "../../../lib/ui/mm-control-roles";
-import { QuietFieldGroup } from "../../../components/shared/quiet-section";
+import {
+  QuietFieldGroup,
+  QuietSection,
+} from "../../../components/shared/quiet-section";
 import { Field } from "../../../components/shared/field";
-import { SettingsQuietSection } from "../../system/tabs/system-shared";
 import { errorMessage } from "../../../lib/api/error-message";
 
 /**
@@ -406,7 +408,8 @@ export function AlertsTab() {
         </li>
       </ol>
 
-      <SettingsQuietSection
+      <QuietSection
+        level={3}
         headingId="suite-settings-notifications-heading"
         heading="Channels"
         aside={
@@ -547,7 +550,7 @@ export function AlertsTab() {
             />
           </QuietFieldGroup>
         ) : null}
-      </SettingsQuietSection>
+      </QuietSection>
 
       {pendingDelete ? (
         <ConfirmDialog

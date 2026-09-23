@@ -1,0 +1,109 @@
+/* System › About: updates. */
+
+.mm-update-ready {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--mm-border);
+  border-radius: 0.75rem;
+  background: var(--mm-status-healthy-bg);
+}
+
+.mm-update-mode {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.625rem 0;
+  color: var(--mm-text2);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  cursor: pointer;
+}
+
+.mm-update-mode--chosen {
+  color: var(--mm-text);
+}
+
+.mm-update-command {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--mm-border);
+  border-radius: var(--mm-radius-sm);
+  color: var(--mm-text3);
+  font-family: var(--mm-font-mono);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+/* System › Security: a sign-in field shares its row with its Show button. */
+
+.mm-security-field {
+  flex: 1;
+}
+
+/* System › Logs: history retention and reset, the server log's search row and its diagnostics. */
+
+.mm-history-reset__label {
+  color: var(--mm-text2);
+  font-size: var(--mm-type-caption);
+  font-weight: 600;
+}
+
+.mm-history-reset__outcome {
+  max-width: 28rem;
+  margin-top: 1rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--mm-border);
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.mm-history-reset__outcome--done {
+  background: var(--mm-status-healthy-bg);
+  color: var(--mm-status-healthy-text);
+}
+
+.mm-history-reset__outcome--failed {
+  background: var(--mm-status-failed-bg);
+  color: var(--mm-status-failed-text);
+}
+
+.mm-log-search {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .mm-log-search {
+    grid-template-columns: minmax(0, 2fr) 220px auto;
+  }
+}
+
+.mm-log-diagnostics__summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.mm-log-diagnostics__summary::-webkit-details-marker {
+  display: none;
+}
+
+.mm-log-diagnostics[open] .mm-log-diagnostics__show,
+.mm-log-diagnostics:not([open]) .mm-log-diagnostics__hide {
+  display: none;
+}
+
+.mm-log-traceback {
+  overflow: auto;
+  padding: 0.75rem;
+  border: 1px solid var(--mm-border);
+  border-radius: 0.375rem;
+  color: var(--mm-text2);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  white-space: pre-wrap;
+}

@@ -1,303 +1,99 @@
-import type { ChangeEvent } from "react";
-import { useRef } from "react";
-import { SettingRow } from "../../../../components/shared/settings-group";
-import type { AppSettings } from "../../../../lib/settings/types";
-import type {
-  useConfigurationBackupsQuery,
-  useAppSettingsSaveMutation,
-} from "../../../../lib/settings/queries";
-import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
-import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
-import {
-  QuietFieldGroup,
-  quietActionRowClass,
-} from "../../../../components/shared/quiet-section";
-import {
-  CONFIGURATION_BACKUP_INTERVAL_HOURS,
-  SettingsQuietSection,
-} from "../system-shared";
+import { useQueryClient } from "@tanstack/react-query";
+
+import { ConfirmDialog } from "../../../../components/ui/confirm-dialog";
 import { errorMessage } from "../../../../lib/api/error-message";
-import { formatBytes } from "../../../../lib/format/bytes";
+import { useConfigurationBackupsQuery } from "../../../../lib/settings/queries";
+import { settingsKeys } from "../../../../lib/settings/query-keys";
+import type { AppSettings } from "../../../../lib/settings/types";
+import type { SystemSettingsForm } from "../../use-system-settings-form";
+import { BackupListSection } from "./backup-list-section";
+import { BackupSettingsSection } from "./backup-settings-section";
+import { useBackupActions } from "./use-backup-actions";
 
-type SettingsBackupTabProps = {
-  editable: boolean;
-  settingsData: AppSettings;
-  save: ReturnType<typeof useAppSettingsSaveMutation>;
-  backupScheduleDirty: boolean;
-  lastSaveTarget: "timezone" | "logs" | "backup" | null;
-  configurationBackupEnabled: boolean;
-  setConfigurationBackupEnabled: (v: boolean) => void;
-  configurationBackupIntervalHours: number;
-  setConfigurationBackupIntervalHours: (v: number) => void;
-  configurationBackupPreferredTime: string;
-  setConfigurationBackupPreferredTime: (v: string) => void;
-  backupsQ: ReturnType<typeof useConfigurationBackupsQuery>;
-  backupBusy: boolean;
-  backupMsg: string | null;
-  backupErr: string | null;
-  onSaveBackupSchedule: () => void;
-  onDownloadConfiguration: () => void;
-  onRestoreFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onDownloadStoredBackup: (id: number, fileLabel: string) => void;
-};
-
+/** System › Backups: what to back up and when on the left, the backups on this machine on the right. */
 export function BackupsTab({
+  form,
   editable,
-  settingsData,
-  save,
-  backupScheduleDirty,
-  lastSaveTarget,
-  configurationBackupEnabled,
-  setConfigurationBackupEnabled,
-  configurationBackupIntervalHours,
-  setConfigurationBackupIntervalHours,
-  configurationBackupPreferredTime,
-  setConfigurationBackupPreferredTime,
-  backupsQ,
-  backupBusy,
-  backupMsg,
-  backupErr,
-  onSaveBackupSchedule,
-  onDownloadConfiguration,
-  onRestoreFileChange,
-  onDownloadStoredBackup,
-}: SettingsBackupTabProps) {
-  const restoreInputRef = useRef<HTMLInputElement>(null);
-  const formatDate = useAppDateFormatter();
+  settings,
+}: {
+  form: SystemSettingsForm;
+  editable: boolean;
+  settings: AppSettings;
+}) {
+  const queryClient = useQueryClient();
+  const backupsQ = useConfigurationBackupsQuery(editable);
+  const actions = useBackupActions();
+  const blocked = actions.busy || form.save.isPending;
+
+  const saveSchedule = () => {
+    actions.setProblem(null);
+    actions.setMessage(null);
+    form.saveFrom("backup", {
+      onSaved: () => {
+        actions.setMessage("Backup schedule saved.");
+        void queryClient.invalidateQueries({
+          queryKey: settingsKeys.configurationBackups,
+        });
+      },
+      onFailed: (error) =>
+        actions.setProblem(
+          errorMessage(error, "Could not save backup schedule."),
+        ),
+    });
+  };
 
   return (
-    <div data-testid="suite-settings-backup-tab" className="mm-quiet-stack">
-      {editable ? (
-        // What to back up and when on the left, the backups on this machine on the right (canvas board 12).
-        <div
-          className="mm-backups-grid"
-          data-testid="suite-settings-backup-restore"
-        >
-          <SettingsQuietSection
-            headingId="suite-settings-backup-heading"
-            heading="Backup and restore"
+    <div className="mm-quiet-stack">
+      <div data-testid="suite-settings-backup-tab" className="mm-quiet-stack">
+        {editable ? (
+          <div
+            className="mm-backups-grid"
+            data-testid="suite-settings-backup-restore"
           >
-            <p className="mm-quiet-note">
-              A backup is Weir&rsquo;s settings: libraries, rules, media
-              managers, schedule, alerts and sign-in. Not your media, and not
-              file history.
-            </p>
-
-            {/* Two distinct actions, each with its own scope and its own Save row.
-                Rule 3: what says which button belongs to which is the eyebrow and the
-                hairline over each group, not a box around it — and stacking them means
-                a short group beside a long one can no longer leave a ragged column. */}
-            <div className="mt-6 grid gap-10">
-              <QuietFieldGroup
-                title="Scheduled snapshots"
-                detail="Weir keeps the latest five configuration snapshots using the same restore-safe JSON format."
-              >
-                <div className="mm-setgroup__rows">
-                  <SettingRow
-                    label="Back up by itself"
-                    hint="Keeps the latest five, in the same file you can download below."
-                    htmlFor="backup-scheduled"
-                  >
-                    <input
-                      id="backup-scheduled"
-                      type="checkbox"
-                      className="h-4 w-4 accent-[var(--mm-accent)]"
-                      checked={configurationBackupEnabled}
-                      disabled={!editable || save.isPending}
-                      onChange={(e) =>
-                        setConfigurationBackupEnabled(e.target.checked)
-                      }
-                    />
-                  </SettingRow>
-                  <SettingRow
-                    label="Minimum time between runs"
-                    htmlFor="backup-interval"
-                  >
-                    <select
-                      id="backup-interval"
-                      className="mm-input mm-cleanup-every"
-                      value={configurationBackupIntervalHours}
-                      disabled={!editable || save.isPending}
-                      onChange={(e) =>
-                        setConfigurationBackupIntervalHours(
-                          Number(e.target.value),
-                        )
-                      }
-                    >
-                      {CONFIGURATION_BACKUP_INTERVAL_HOURS.map((h) => (
-                        <option key={h} value={h}>
-                          {h === 168 ? "Every 7 days" : `Every ${h} hours`}
-                        </option>
-                      ))}
-                    </select>
-                  </SettingRow>
-                  <SettingRow
-                    label="Preferred backup time"
-                    htmlFor="backup-time"
-                  >
-                    <input
-                      id="backup-time"
-                      type="time"
-                      className="mm-input mm-cleanup-every"
-                      value={configurationBackupPreferredTime}
-                      disabled={!editable || save.isPending}
-                      onChange={(e) =>
-                        setConfigurationBackupPreferredTime(
-                          e.target.value || "02:00",
-                        )
-                      }
-                    />
-                  </SettingRow>
-                  <SettingRow label="Last automatic backup">
-                    <span className="text-sm text-[var(--mm-text2)]">
-                      {formatDate(
-                        settingsData.configuration_backup_last_run_at,
-                      )}
-                    </span>
-                  </SettingRow>
-                </div>
-                <div className={quietActionRowClass}>
-                  <button
-                    type="button"
-                    className={mmActionButtonClass({ variant: "secondary" })}
-                    disabled={
-                      !editable || !backupScheduleDirty || save.isPending
-                    }
-                    onClick={() => onSaveBackupSchedule()}
-                  >
-                    {save.isPending ? "Saving..." : "Save backup schedule"}
-                  </button>
-                  {save.isError && lastSaveTarget === "backup" ? (
-                    <p
-                      className="mm-status-text--failed text-sm"
-                      role="alert"
-                      data-testid="suite-settings-backup-save-error"
-                    >
-                      {errorMessage(save.error, "Could not save.")}
-                    </p>
-                  ) : null}
-                </div>
-              </QuietFieldGroup>
-
-              <QuietFieldGroup
-                title="Export or restore now"
-                detail="Download a full settings file, or restore a Weir configuration JSON from disk."
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    className={mmActionButtonClass({ variant: "secondary" })}
-                    disabled={backupBusy || save.isPending}
-                    onClick={() => onDownloadConfiguration()}
-                  >
-                    Download configuration now
-                  </button>
-                  <button
-                    type="button"
-                    className={mmActionButtonClass({ variant: "tertiary" })}
-                    disabled={backupBusy || save.isPending}
-                    onClick={() => restoreInputRef.current?.click()}
-                  >
-                    Restore from file...
-                  </button>
-                  <input
-                    ref={restoreInputRef}
-                    type="file"
-                    accept="application/json,.json"
-                    className="hidden"
-                    aria-label="Choose configuration JSON file to restore"
-                    onChange={(e) => onRestoreFileChange(e)}
-                  />
-                </div>
-              </QuietFieldGroup>
-            </div>
-          </SettingsQuietSection>
-
-          {/* A list of what is on disk: display content, so it loses its box. */}
-          <SettingsQuietSection
-            headingId="suite-settings-backup-snapshots-heading"
-            heading="Backups on this machine"
-            aside={<span className="mm-quiet-badge">Keeps latest 5</span>}
-          >
-            {backupsQ.data ? (
+            <BackupSettingsSection
+              form={form}
+              lastRunAt={settings.configuration_backup_last_run_at}
+              busy={actions.busy}
+              onSaveSchedule={saveSchedule}
+              onDownload={() => void actions.downloadConfiguration()}
+              onChooseFile={(file) => void actions.chooseRestoreFile(file)}
+            />
+            <BackupListSection
+              backupsQ={backupsQ}
+              disabled={blocked}
+              onDownload={(id, fileName) =>
+                void actions.downloadSnapshot(id, fileName)
+              }
+            />
+            {actions.message ? (
               <p
-                className="mm-quiet-table__sub font-mono break-all"
-                data-testid="suite-configuration-backup-directory"
+                className="mm-status-text--healthy mm-backups-grid__wide text-sm"
+                role="status"
               >
-                {backupsQ.data.directory}
+                {actions.message}
               </p>
             ) : null}
-            <div className="mt-3">
-              {backupsQ.isLoading ? (
-                <p className="mm-quiet-note">Loading snapshot list...</p>
-              ) : backupsQ.isError ? (
-                <p
-                  className="text-sm text-[var(--mm-status-failed-text)]"
-                  role="alert"
-                >
-                  {errorMessage(backupsQ.error, "Could not load backups.")}
-                </p>
-              ) : (backupsQ.data?.items.length ?? 0) === 0 ? (
-                <p className="mm-quiet-note">No automatic snapshots yet.</p>
-              ) : (
-                <div className="mm-quiet-table-wrap">
-                  <table className="mm-quiet-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Taken</th>
-                        <th scope="col">Size</th>
-                        <th scope="col">
-                          <span className="sr-only">Download</span>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {backupsQ.data!.items.map((row) => (
-                        <tr key={row.id}>
-                          <th scope="row" className="mm-quiet-table__name">
-                            {formatDate(row.created_at)}
-                          </th>
-                          <td data-label="Size">
-                            {formatBytes(row.size_bytes)}
-                          </td>
-                          <td data-label="">
-                            <button
-                              type="button"
-                              className="mm-quiet-link"
-                              disabled={backupBusy || save.isPending}
-                              onClick={() =>
-                                onDownloadStoredBackup(row.id, row.file_name)
-                              }
-                            >
-                              Download snapshot →
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </SettingsQuietSection>
-
-          {backupMsg ? (
-            <p
-              className="mm-status-text--healthy mm-backups-grid__wide text-sm"
-              role="status"
-            >
-              {backupMsg}
-            </p>
-          ) : null}
-          {backupErr ? (
-            <p
-              className="mm-status-text--failed mm-backups-grid__wide text-sm"
-              role="alert"
-            >
-              {backupErr}
-            </p>
-          ) : null}
-        </div>
+            {actions.problem ? (
+              <p
+                className="mm-status-text--failed mm-backups-grid__wide text-sm"
+                role="alert"
+              >
+                {actions.problem}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+      {actions.pendingRestore ? (
+        <ConfirmDialog
+          title="Replace the settings on this server from this file?"
+          description="This cannot be undone."
+          confirmLabel="Replace settings"
+          cancelLabel="Keep current settings"
+          testId="restore-configuration-dialog"
+          onCancel={actions.cancelRestore}
+          onConfirm={actions.confirmRestore}
+        />
       ) : null}
     </div>
   );

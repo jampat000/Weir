@@ -91,6 +91,9 @@
   --mm-control-pad-x: calc(11px * var(--mm-density-ui-scale));
   --mm-control-pad-y: calc(7px * var(--mm-density-ui-scale));
   --mm-font: "Outfit", system-ui, -apple-system, sans-serif;
+  --mm-font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
   --mm-shadow-card: 0 16px 48px rgba(2, 12, 16, 0.55);
   --mm-shadow-card-inner: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
   --mm-shadow-shell: 0 22px 60px rgba(2, 12, 16, 0.55);

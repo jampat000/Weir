@@ -1,16 +1,13 @@
 import {
-  SHOW_SUPPORT_CARD,
   SHOW_SUPPORT_URL_PLACEHOLDER,
   SUPPORT_URL,
 } from "../../../../lib/support";
 import { QuietDisclosure } from "../../../../components/shared/quiet-section";
 
-export { SHOW_SUPPORT_CARD };
-
+/** Supporting Weir: optional, and nothing here changes how it works, so it stays closed. */
 export function SupportSection() {
   return (
     <div data-testid="suite-settings-support-tab" className="mm-quiet-stack">
-      {/* Optional, and nothing here changes how Weir works, so it stays closed. */}
       <QuietDisclosure
         title="Support Weir"
         summaryWhenClosed="Optional"
@@ -37,7 +34,7 @@ export function SupportSection() {
           </p>
         ) : null}
         {SHOW_SUPPORT_URL_PLACEHOLDER ? (
-          <p className="mt-3 text-[length:var(--mm-type-caption)] leading-[1.45] text-[var(--mm-text3)]">
+          <p className="mm-caption-note mt-3">
             Development note: set <code>VITE_SUPPORT_URL</code> to show the
             support button.
           </p>

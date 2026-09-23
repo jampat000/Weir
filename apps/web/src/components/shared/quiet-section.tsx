@@ -1,36 +1,39 @@
 import { useId, type ReactNode } from "react";
 
 /**
- * The quiet body of a page, as rule 3 of docs/design/content-language.md draws it:
- * a heading on the left, its links on the right, a hairline under both, then the
- * content. No cards, no panels, no wells.
- *
- * Lifted unchanged out of processing-overview-tab.tsx — the reference implementation
- * the design was approved on — so every page spells the same shape the same way.
+ * The quiet body of a page (docs/design/content-language.md, rule 3): a heading on the left,
+ * its links on the right, a hairline under both, then the content. No cards, no panels, no wells.
+ * A section inside a tab panel is one level down, so it takes `level={3}`.
  */
 export function QuietSection({
   headingId,
   heading,
+  level = 2,
   aside,
   children,
+  id,
   "data-testid": dataTestId,
 }: {
   headingId: string;
   heading: string;
+  level?: 2 | 3;
   aside?: ReactNode;
   children: ReactNode;
+  id?: string;
   "data-testid"?: string;
 }) {
+  const Heading = level === 2 ? "h2" : "h3";
   return (
     <section
       className="mm-quiet-section"
       aria-labelledby={headingId}
+      id={id}
       data-testid={dataTestId}
     >
       <div className="mm-quiet-section__head">
-        <h2 id={headingId} className="mm-quiet-section__title">
+        <Heading id={headingId} className="mm-quiet-section__title">
           {heading}
-        </h2>
+        </Heading>
         {aside ? <div className="mm-quiet-section__aside">{aside}</div> : null}
       </div>
       <div className="mm-quiet-section__body">{children}</div>

@@ -159,6 +159,17 @@
   border-top: 1px solid var(--mm-border);
 }
 
+/* A filter above a list: its label, then the control, stacked. */
+.mm-filter-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: var(--mm-text2);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
 /* The only control the quiet body carries: a text link, never a button chrome. */
 .mm-quiet-link {
   padding: 0;
@@ -519,7 +530,9 @@
   color: var(--mm-text2);
 }
 
-.mm-field__hint {
+/* The quiet line that explains something, under a field or on its own. */
+.mm-field__hint,
+.mm-caption-note {
   font-size: var(--mm-type-caption);
   line-height: 1.45;
   color: var(--mm-text3);

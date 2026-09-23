@@ -28,7 +28,7 @@ function Choice({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="mm-activity-filters__field mm-activity-filters__extra">
+    <label className="mm-filter-field mm-activity-filters__extra">
       {label}
       <select
         className="mm-input"
@@ -110,7 +110,7 @@ export function ActivityLogFiltersSection({
       </div>
       <div className="mm-quiet-section__body">
         <div className="mm-activity-filters__grid">
-          <label className="mm-activity-filters__field mm-activity-filters__search">
+          <label className="mm-filter-field mm-activity-filters__search">
             Search
             <input
               className="mm-input"
@@ -144,7 +144,7 @@ export function ActivityLogFiltersSection({
             options={Object.entries(ACTIVITY_TRIGGER_LABELS)}
             onChange={set("trigger")}
           />
-          <label className="mm-activity-filters__field mm-activity-filters__extra">
+          <label className="mm-filter-field mm-activity-filters__extra">
             From
             <input
               type="datetime-local"
@@ -153,7 +153,7 @@ export function ActivityLogFiltersSection({
               onChange={(e) => set("from")(e.target.value)}
             />
           </label>
-          <label className="mm-activity-filters__field mm-activity-filters__extra">
+          <label className="mm-filter-field mm-activity-filters__extra">
             To
             <input
               type="datetime-local"

@@ -666,16 +666,6 @@ html[data-mm-theme="light"] .mm-activity-item__structured {
   grid-column: span 2;
 }
 
-.mm-activity-filters__field {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 0.25rem;
-  color: var(--mm-text2);
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-}
-
 .mm-activity-filters__toggle {
   display: none;
 }
