@@ -25,7 +25,7 @@ public static class ScheduleWallClock
         }
 
         var local = TimeZones.ToLocal(now, timezoneName);
-        var day = ScheduleGrid.DayNames[ScheduleGrid.PythonWeekday(local.DayOfWeek)];
+        var day = ScheduleGrid.DayNames[ScheduleGrid.MondayFirstDayIndex(local.DayOfWeek)];
         if (!ParseDays(scheduleDays).Contains(day))
         {
             return false;
@@ -41,8 +41,8 @@ public static class ScheduleWallClock
     {
         var parts = (text ?? string.Empty).Trim().Split(':');
         if (parts.Length != 2 ||
-            !ScheduleGrid.TryPythonInt(parts[0], out var hour) ||
-            !ScheduleGrid.TryPythonInt(parts[1], out var minute) ||
+            !ScheduleGrid.TryParseInt(parts[0], out var hour) ||
+            !ScheduleGrid.TryParseInt(parts[1], out var minute) ||
             hour is < 0 or > 23 || minute is < 0 or > 59)
         {
             return fallback;

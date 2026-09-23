@@ -133,7 +133,7 @@ public static class ScheduleWindow
 
         var zone = zones.TryFind((timezoneName ?? "UTC").Trim() is { Length: > 0 } name ? name : "UTC", out var found) ? found : TimeZoneInfo.Utc;
         var local = TimeZoneInfo.ConvertTime(nowUtc, zone);
-        var day = ScheduleGrid.DayNames[ScheduleGrid.PythonWeekday(local.DayOfWeek)];
+        var day = ScheduleGrid.DayNames[ScheduleGrid.MondayFirstDayIndex(local.DayOfWeek)];
         var allowedDays = (scheduleDays ?? string.Empty).Trim() is { Length: > 0 } daysText
             ? daysText.Split(',').Select(t => t.Trim()).Where(t => ScheduleGrid.DayNames.Contains(t, StringComparer.Ordinal)).ToHashSet(StringComparer.Ordinal)
             : [];

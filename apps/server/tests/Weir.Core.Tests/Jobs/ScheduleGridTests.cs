@@ -87,6 +87,15 @@ public sealed class ScheduleGridTests
     }
 
     [Fact]
+    public void A_time_with_spaces_around_its_numbers_reads_like_the_plain_time()
+    {
+        var spaced = ScheduleGrid.FromDaysAndTimes("mon", " 09 : 30 ", "17:00");
+
+        Assert.NotEqual(string.Empty, spaced);
+        Assert.Equal(ScheduleGrid.FromDaysAndTimes("mon", "09:30", "17:00"), spaced);
+    }
+
+    [Fact]
     public void Days_that_cannot_be_parsed_become_no_restriction_not_a_wrong_window()
     {
         Assert.Equal(string.Empty, ScheduleGrid.FromDaysAndTimes(string.Empty, "09:00", "17:00"));
@@ -122,8 +131,8 @@ public sealed class ScheduleGridTests
     [Fact]
     public void Weekday_numbering_starts_at_zero_on_monday()
     {
-        Assert.Equal(0, ScheduleGrid.PythonWeekday(DayOfWeek.Monday));
-        Assert.Equal(6, ScheduleGrid.PythonWeekday(DayOfWeek.Sunday));
+        Assert.Equal(0, ScheduleGrid.MondayFirstDayIndex(DayOfWeek.Monday));
+        Assert.Equal(6, ScheduleGrid.MondayFirstDayIndex(DayOfWeek.Sunday));
         Assert.Equal(2 * 96 + 14 * 4 + 3, ScheduleGrid.SlotIndex(2, 14, 45));
     }
 

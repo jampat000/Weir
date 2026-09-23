@@ -1,3 +1,4 @@
+using Weir.Core.Configuration;
 using Weir.Core.Time;
 
 namespace Weir.Core.Jobs;
@@ -37,7 +38,7 @@ public static class ScheduleGrid
     /// <summary>Validates and canonicalises stored grid text.</summary>
     public static string Normalize(string? raw)
     {
-        var text = PythonStrip(raw ?? string.Empty);
+        var text = (raw ?? string.Empty).Trim();
         if (text.Length == 0)
         {
             return string.Empty;
@@ -60,7 +61,7 @@ public static class ScheduleGrid
 
     /// <summary>The grid position of a weekday, hour and minute; Monday is weekday 0.</summary>
     public static int SlotIndex(int weekday, int hour, int minute) =>
-        (PythonMod(weekday, 7) * SlotsPerDay) + (hour * SlotsPerHour) + PythonFloorDiv(minute, SlotMinutes);
+        (FloorMod(weekday, 7) * SlotsPerDay) + (hour * SlotsPerHour) + FloorDiv(minute, SlotMinutes);
 
     /// <summary>
     /// An empty grid allows everything, and so does one that fails to parse, so a display bug never
@@ -84,15 +85,15 @@ public static class ScheduleGrid
         }
 
         var local = TimeZones.ToLocal(now, timezoneName);
-        return text[SlotIndex(PythonWeekday(local.DayOfWeek), local.Hour, local.Minute)] == '1';
+        return text[SlotIndex(MondayFirstDayIndex(local.DayOfWeek), local.Hour, local.Minute)] == '1';
     }
 
     /// <summary>The grid a day/start/end window describes, or no restriction.</summary>
     public static string FromDaysAndTimes(string? days, string? start, string? end)
     {
         var wanted = (days ?? string.Empty).Split(',')
-            .Where(d => PythonStrip(d).Length > 0)
-            .Select(d => Prefix3(PythonStrip(d).ToLowerInvariant()))
+            .Where(d => d.Trim().Length > 0)
+            .Select(d => Prefix3(d.Trim().ToLowerInvariant()))
             .ToHashSet(StringComparer.Ordinal);
         if (wanted.Count == 0)
         {
@@ -105,8 +106,8 @@ public static class ScheduleGrid
             return string.Empty;
         }
 
-        var startSlot = (startHour * SlotsPerHour) + PythonFloorDiv(startMinute, SlotMinutes);
-        var endSlot = (endHour * SlotsPerHour) + PythonFloorDiv(endMinute, SlotMinutes);
+        var startSlot = (startHour * SlotsPerHour) + FloorDiv(startMinute, SlotMinutes);
+        var endSlot = (endHour * SlotsPerHour) + FloorDiv(endMinute, SlotMinutes);
         if (startSlot is < 0 or >= SlotsPerDay || endSlot is < 0 or >= SlotsPerDay)
         {
             return string.Empty;
@@ -165,7 +166,7 @@ public static class ScheduleGrid
 
         var zone = TimeZones.Find(timezoneName);
         var local = TimeZoneInfo.ConvertTime(now, zone);
-        var start = SlotIndex(PythonWeekday(local.DayOfWeek), local.Hour, local.Minute);
+        var start = SlotIndex(MondayFirstDayIndex(local.DayOfWeek), local.Hour, local.Minute);
         for (var ahead = 1; ahead <= SlotsPerWeek; ahead++)
         {
             if (text[(start + ahead) % SlotsPerWeek] != '1')
@@ -184,10 +185,7 @@ public static class ScheduleGrid
     }
 
     /// <summary>The Monday-first day index the grid uses: Monday is 0, Sunday is 6.</summary>
-    public static int PythonWeekday(DayOfWeek day) => ((int)day + 6) % 7;
-
-    // Trims surrounding whitespace before a grid or day name is read.
-    internal static string PythonStrip(string value) => value.Trim();
+    public static int MondayFirstDayIndex(DayOfWeek day) => ((int)day + 6) % 7;
 
     private static string Prefix3(string value) => value.Length <= 3 ? value : value[..3];
 
@@ -198,16 +196,18 @@ public static class ScheduleGrid
         // "HH:MM": split on the first colon only, and both sides must parse as integers.
         var parts = text.Split(':', 2);
         return parts.Length == 2 &&
-               TryPythonInt(parts[0], out hour) &&
-               TryPythonInt(parts[1], out minute);
+               TryParseInt(parts[0], out hour) &&
+               TryParseInt(parts[1], out minute);
     }
 
-    // Integer parse with the configuration rules: optional sign, ASCII digits, single underscores
-    // between digits, no surrounding whitespace; fails outside the int range.
-    internal static bool TryPythonInt(string raw, out int value)
+    /// <summary>
+    /// An integer with the configuration rules (optional sign, ASCII digits, single underscores between digits),
+    /// ignoring surrounding whitespace so a time typed as <c>09 : 30</c> still reads; fails outside the int range.
+    /// </summary>
+    internal static bool TryParseInt(string raw, out int value)
     {
         value = 0;
-        if (!PythonCompatInt(raw, out var parsed) || parsed is < int.MinValue or > int.MaxValue)
+        if (!PythonCompat.TryParseInt(raw.Trim(), out var parsed) || parsed is < int.MinValue or > int.MaxValue)
         {
             return false;
         }
@@ -216,12 +216,9 @@ public static class ScheduleGrid
         return true;
     }
 
-    private static bool PythonCompatInt(string raw, out long value) =>
-        Configuration.PythonCompat.TryParseInt(raw, out value);
-
     // Floor modulo: the result takes the divisor's sign, so -1 mod 7 is 6.
-    private static int PythonMod(int value, int divisor) => ((value % divisor) + divisor) % divisor;
+    private static int FloorMod(int value, int divisor) => ((value % divisor) + divisor) % divisor;
 
     // Floor division: rounds toward negative infinity, so -1 / 15 is -1.
-    private static int PythonFloorDiv(int value, int divisor) => (int)Math.Floor(value / (double)divisor);
+    private static int FloorDiv(int value, int divisor) => (int)Math.Floor(value / (double)divisor);
 }
