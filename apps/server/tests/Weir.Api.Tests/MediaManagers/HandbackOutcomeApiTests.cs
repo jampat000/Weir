@@ -308,6 +308,80 @@ public sealed class HandbackOutcomeApiTests : IDisposable
             await response.Content.ReadAsStringAsync());
     }
 
+    /// <summary>A pass-through job for the film that ran out of retries, queued at <paramref name="createdAt"/>.</summary>
+    private static async Task FailedPassThroughAsync(WeirTestServer server, string createdAt)
+    {
+        var library = await TestDatabase.ScalarAsync(server, "SELECT id FROM libraries WHERE media_type = 'movie' ORDER BY id LIMIT 1");
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status, last_error, created_at, updated_at) " +
+            "VALUES ($key, 'processing.file.pass_through.v1', '{}', 'failed', 'Deluno stopped waiting for this file.', $at, $at)",
+            ("$key", $"processing.file.pass_through.v1:{library}:Film/film.mkv:old-fingerprint"),
+            ("$at", createdAt));
+    }
+
+    [Fact]
+    public async Task A_failed_job_left_by_an_earlier_hand_off_of_the_same_file_does_not_fail_this_one()
+    {
+        // The rig, 23 Sep 2026: Tears of Steel had two earlier hand-offs that ended badly, one with a pass-through that
+        // ran out of retries. That job is found by the file's path, so the new hand-off, which Weir had just completed,
+        // read "failed", and Weir refused Deluno's "imported" with 409.
+        await using var server = await StartAsync();
+        await FailedPassThroughAsync(server, "2026-09-22 09:00:00.000000");
+        await FinishedHandoffAsync(server);
+
+        using (var status = await new ApiTestClient(server).GetAsync("/api/v1/intake/handoffs/deluno/h1", SecretHeader))
+        {
+            Assert.Equal("completed", (await Json(status))["state"]!.GetValue<string>());
+        }
+
+        using var response = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_failed_row_left_for_the_release_folder_by_an_earlier_hand_off_does_not_fail_this_one()
+    {
+        // The rig's other half of the same story: a row for the release folder itself, failed four days before, sat
+        // under the new hand-off's path and was counted with the file Weir had just finished inside it.
+        await using var server = await StartAsync();
+        var library = await MoviesAsync(server);
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO files (library_id, relative_path, status, status_reason, updated_at) " +
+            "VALUES ($l, 'Film', 'processing_failed', 'Weir could not find this file under the saved watched folder.', '2026-09-19 14:48:21.000000')",
+            ("$l", library));
+        Directory.CreateDirectory(Path.Join(Watched, "Film"));
+        await File.WriteAllTextAsync(Path.Join(Watched, "Film", "film.mkv"), "the original download");
+        var handoff = new { eventType = "deluno.processor-handoff", handoffId = "h2", libraryId = "lib-1", mediaType = "movies", sourcePath = Path.Join(Watched, "Film"), callbackPath = "/api/integrations/processors/events" };
+        using (var queued = await new ApiTestClient(server).PostAsync("/api/v1/intake/webhook/deluno", handoff, SecretHeader))
+        {
+            Assert.Equal(HttpStatusCode.OK, queued.StatusCode);
+        }
+
+        await TestDatabase.ExecuteAsync(server, "UPDATE jobs SET status = 'completed' WHERE job_kind = 'processing.file.remux_pass.v1'");
+        await HandedBackAsync(server, library, "Film/film.mkv");
+
+        using (var status = await new ApiTestClient(server).GetAsync("/api/v1/intake/handoffs/deluno/h2", SecretHeader))
+        {
+            Assert.Equal("completed", (await Json(status))["state"]!.GetValue<string>());
+        }
+
+        using var response = await PostOutcomeAsync(server, "h2", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_failed_job_queued_for_this_hand_off_still_fails_it()
+    {
+        await using var server = await StartAsync();
+        await FinishedHandoffAsync(server);
+        await FailedPassThroughAsync(server, "2099-01-01 00:00:00.000000");
+
+        using var status = await new ApiTestClient(server).GetAsync("/api/v1/intake/handoffs/deluno/h1", SecretHeader);
+        Assert.Equal("failed", (await Json(status))["state"]!.GetValue<string>());
+    }
+
     [Fact]
     public async Task The_outcome_endpoint_answers_404_409_422_and_401_as_agreed()
     {

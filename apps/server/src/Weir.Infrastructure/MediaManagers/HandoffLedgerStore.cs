@@ -27,7 +27,8 @@ public sealed record HandoffLedgerRow(
     string? Outcome = null,
     string? OutcomeMessage = null,
     bool OutcomeReleased = false,
-    string? DownloadId = null);
+    string? DownloadId = null,
+    DateTimeOffset? ReceivedAt = null);
 
 /// <summary>The <c>files</c> columns the ledger reads.</summary>
 public sealed record HandoffFileRow(long Id, string RelativePath, string Status, string StatusReason, long FailureAttempts, DateTimeOffset? NextRetryAt, DateTimeOffset? UpdatedAt);
@@ -40,7 +41,7 @@ public sealed class HandoffLedgerStore
 {
     private const string LedgerColumns =
         "id, source_key, handoff_id, library_id, relative_path, state, output_path, message, last_changed_at, outcome, outcome_message, " +
-        "outcome_released, download_id";
+        "outcome_released, download_id, created_at";
 
     private const string JobColumns =
         "id, dedupe_key, job_kind, payload_json, status, lease_owner, lease_expires_at, attempt_count, " +
@@ -327,6 +328,15 @@ public sealed class HandoffLedgerStore
                 // once it drops out of pending/leased (JobsForAsync still returns it for exactly this reason).
                 if (job.Status == ProcessingJobStatus.Failed)
                 {
+                    // A failed pass-through or reject job is found by the file's path, not by the hand-off, so one left
+                    // by an earlier hand-off of the same release belongs to that hand-off, not this one. Counting it
+                    // turned a hand-off Weir had just completed into "failed", and Weir then refused the manager's
+                    // "imported" for it (the rig, 23 Sep 2026: Tears of Steel, two older hand-offs of the same path).
+                    if (IsFromEarlierHandoff(row, job))
+                    {
+                        continue;
+                    }
+
                     states.Add(HandoffLedgerRules.Failed);
                     message ??= string.IsNullOrEmpty(job.LastError) ? "Weir could not hand this file back to your media manager." : job.LastError;
                     continue;
@@ -383,6 +393,16 @@ public sealed class HandoffLedgerStore
                 }
 
                 var (state, when) = HandoffLedgerRules.FileState(file.Status, file.NextRetryAt, file.FailureAttempts);
+
+                // The same for a file row: a failure recorded before this hand-off arrived, and not touched since, is
+                // what became of an earlier hand-off of the path (the rig's Tears of Steel had a failed row for its
+                // folder from four days before). A success from before still counts, as it always has.
+                if (state is HandoffLedgerRules.Failed or HandoffLedgerRules.Rejected or HandoffLedgerRules.Cancelled &&
+                    row.ReceivedAt is { } received && file.UpdatedAt is { } touched && touched < received)
+                {
+                    continue;
+                }
+
                 states.Add(state);
                 if (when is { } whenValue)
                 {
@@ -578,6 +598,13 @@ public sealed class HandoffLedgerStore
 
     private static DateTimeOffset Min(DateTimeOffset a, DateTimeOffset b) => a <= b ? a : b;
 
+    /// <summary>
+    /// Whether a job was queued before this hand-off was received, and so belongs to an earlier hand-off of the same
+    /// file. The hand-off's time is whole seconds (the column's default), so a job from the same second still counts.
+    /// </summary>
+    internal static bool IsFromEarlierHandoff(HandoffLedgerRow row, ProcessingJob job) =>
+        row.ReceivedAt is { } received && job.CreatedAt < received;
+
     private static HandoffLedgerRow ReadLedger(SqliteDataReader reader) => new(
         SqliteValues.GetInt64(reader, 0),
         SqliteValues.GetString(reader, 1),
@@ -591,7 +618,8 @@ public sealed class HandoffLedgerStore
         SqliteValues.GetStringOrNull(reader, 9),
         SqliteValues.GetStringOrNull(reader, 10),
         SqliteValues.GetBool(reader, 11),
-        SqliteValues.GetStringOrNull(reader, 12));
+        SqliteValues.GetStringOrNull(reader, 12),
+        PythonTimestamps.Parse(reader.GetValue(13)));
 
     internal static ProcessingJob ReadJob(SqliteDataReader reader) => new(
         reader.GetInt64(0),
