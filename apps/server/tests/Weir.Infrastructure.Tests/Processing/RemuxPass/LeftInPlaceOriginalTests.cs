@@ -403,13 +403,16 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
         _folders.Source(Path.Join("Still.Here", "Still.Here.mkv"));
         await InsertRowAsync("Still.Here/Still.Here.mkv", ProcessingFileStatuses.Unprocessed, lastSeenMinutesAgo: null);
 
-        await new VanishedFileSweepTask(_fixture.Store.Database, _fixture.Store.Options, _fixture.Store.Clock).RunOnceAsync(CancellationToken.None);
+        var log = new ListLogger<VanishedFileSweepTask>();
+        await new VanishedFileSweepTask(_fixture.Store.Database, _fixture.Store.Options, _fixture.Store.Clock, log).RunOnceAsync(CancellationToken.None);
 
         Assert.Null(await StatusAsync("Film.1/Film.mkv"));
         Assert.Null(await StatusAsync("Film"));
         Assert.Equal("unprocessed", await StatusAsync("Still.Here/Still.Here.mkv"));
         Assert.Equal(2, await LeftActivityAsync());
         Assert.Equal(0, await RemuxJobsAsync());
+        // Said in the server log too, for a machine where nobody signs in to read Activity.
+        Assert.Contains(log.Entries, e => e.Message.Contains("Forgot 2 file(s) that left the watched folder", StringComparison.Ordinal));
     }
 
     [Fact]

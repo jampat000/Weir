@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Processing;
@@ -17,17 +18,19 @@ namespace Weir.Infrastructure.Jobs;
 /// This runs the same rule on its own clock. It only forgets; it never queues work, so it cannot pick up a stray file a scan
 /// would have processed. A library whose watched folder cannot be read is skipped, so an unmounted share never empties the list.
 /// </remarks>
-public sealed class VanishedFileSweepTask : IPeriodicTask
+public sealed partial class VanishedFileSweepTask : IPeriodicTask
 {
     private readonly SqliteDatabase _database;
     private readonly WeirOptions _options;
     private readonly TimeProvider _time;
+    private readonly ILogger<VanishedFileSweepTask> _logger;
 
-    public VanishedFileSweepTask(SqliteDatabase database, WeirOptions options, TimeProvider time)
+    public VanishedFileSweepTask(SqliteDatabase database, WeirOptions options, TimeProvider time, ILogger<VanishedFileSweepTask> logger)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _time = time ?? throw new ArgumentNullException(nameof(time));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public string Name => "processing-vanished-file-sweep";
@@ -52,10 +55,18 @@ public sealed class VanishedFileSweepTask : IPeriodicTask
                 continue;
             }
 
-            await ProcessingWatchedFolderScanDispatchJobHandler.ForgetVanishedFilesAsync(
-                uow, library.Id, runtime.WatchedFolder, ProcessingMediaScopes.Normalize(library.MediaType), now).ConfigureAwait(false);
+            var forgotten = await ProcessingWatchedFolderScanDispatchJobHandler.ForgetVanishedFilesAsync(
+                uow, library.Id, runtime.WatchedFolder, ProcessingMediaScopes.Normalize(library.MediaType), now, "sweep").ConfigureAwait(false);
+            if (forgotten.Count > 0)
+            {
+                // In the server log as well as Activity, so it can be checked on a machine where nobody signs in.
+                LogForgotten(forgotten.Count, library.Name, string.Join(", ", forgotten));
+            }
         }
 
         await uow.CommitAsync().ConfigureAwait(false);
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Forgot {Count} file(s) that left the watched folder of library {Library}: {Paths}")]
+    private partial void LogForgotten(int count, string library, string paths);
 }
