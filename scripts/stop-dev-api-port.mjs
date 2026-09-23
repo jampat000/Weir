@@ -3,15 +3,11 @@
  * Stops **this worktree's** dev API process — the one `apps/web/scripts/run-api-dev.mjs`
  * spawned and recorded in `.dev-api.pid` at the repo root — and nothing else.
  *
- * This used to stop whatever process was *listening on the dev API port*, full stop. That is
- * unsafe: the dev API port and an installed Weir's port can be the same number (they both
- * default to the same value — see `scripts/dev-ports.json` and `docs/ports.md`), so on any
- * machine that also has Weir installed, this command would silently kill the installed
- * instance instead of (or as well as) the dev one. The installer had the equivalent bug —
- * killing every process merely *named* Weir — and was fixed by matching on the install's own
- * folder (`apps/tray/Weir.Tray/InstallProcesses.cs`, `InstallProcesses.IsInside`). This script
- * applies the same principle: identify the exact process before touching it, never infer it
- * from what happens to hold a port.
+ * It never stops whatever happens to be *listening on the dev API port*: the dev API port and an
+ * installed Weir's port can be the same number (see `scripts/dev-ports.json` and `docs/ports.md`),
+ * so on a machine that also has Weir installed that would kill the installed instance. Like the
+ * installer's hooks (`apps/tray/Weir.Tray/InstallProcesses.cs`, `InstallProcesses.IsInside`), it
+ * identifies the exact process before touching it.
  *
  * Use when an old dev API process from *this* worktree is still bound (a current route
  * returns 404) or the port is stuck. Then run `npm run dev` from `apps/web` again.

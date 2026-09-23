@@ -1,8 +1,6 @@
 #!/usr/bin/env node
-// Dead-code guard for Weir.
-//
-// Three refactors landed their behaviour change and left the old code in the tree
-// (#328). Nothing caught it, because nothing was looking. This looks.
+// Dead-code guard for Weir (#328): a refactor that changes behaviour must not leave the code it
+// replaced in the tree.
 //
 //   web    — `ts-prune` for exports nothing imports (this script).
 //   web    — phantom `mm-*` class names: markup styled by nothing (this script). The mirror

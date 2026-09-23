@@ -12,6 +12,7 @@ dist/
 
 # Python test runners (tests/contract, tests/e2e)
 .pytest_cache/
+playwright-report/
 pytest-cache-files-*/
 .ruff_cache/
 
@@ -24,7 +25,10 @@ Thumbs.db
 
 .idea/
 .vscode/
+.vs/
 *.code-workspace
+*.user
+*.suo
 
 # Local-only working files (never commit)
 .local/
@@ -32,29 +36,28 @@ Thumbs.db
 .local-dev-home*/
 .tmp/
 
-# Script-generated UI captures (see scripts/capture-overview-sections.cjs)
+# Evidence and captures written by CI and scripts (live audits, contract server logs, screenshots)
 artifacts/
 
 # Local scratch (screenshots, one-off captures, ad-hoc Playwright installs)
 tmp/
 scripts/node_modules/
-apps/web/tmp-*.cjs
 
 # Build-time downloaded Windows FFmpeg runtime
 packaging/windows/vendor/
 
-# Claude Code local settings (machine-specific, never commit)
+# Claude Code local settings and agent worktrees (machine-specific, never commit)
 .claude/settings.local.json
+.claude/worktrees/
 
-# .NET build output. apps/tray/Weir.Tray had bin/ and obj/ committed — 29 files,
-# Debug binaries and caches — so any `dotnet build` dirtied the tree and put compiled
-# artifacts in review diffs. Nothing reads them: build-velopack.ps1 runs `dotnet publish`
-# from source, in Release, into its own output directory.
+# .NET build output and test results. build-velopack.ps1 publishes from source into dist/.
 apps/tray/*/bin/
 apps/tray/*/obj/
 apps/server/**/bin/
 apps/server/**/obj/
 apps/server/**/TestResults/
+TestResults/
+*.trx
 apps/server/artifacts/
 
 # Docusaurus

@@ -2,7 +2,7 @@
 
 The SVGs are the source of truth. This renders them with Playwright's Chromium (already a test
 dependency: tests/requirements.txt) and writes PNG-framed .ico files, the format Windows has read
-since Vista and the format the previous icons used.
+since Vista.
 
     python scripts/generate-brand-icons.py
 
@@ -11,20 +11,19 @@ Outputs (all committed):
   packaging/windows/assets/weir-tray-icon.ico      (tray and installer icon)
   docs-site/static/img/favicon.ico, logo.svg, logo-dark.svg
 
-## Two optical sizes in one .ico (James's three-stream request, reopening #582)
+## Two optical sizes in one .ico (#582)
 
-`weir-app-icon.svg` carries the three-stream primary mark and is the source for every frame
-24px and above, same as every other asset here. But a multi-resolution .ico is exactly the one
-place two different drawings of "the same icon" have to live side by side in a single file, and
-at 16px three streams cannot survive: a 1.85-unit band on a 24-unit grid is 1.23 device pixels
-there, sub-pixel by construction, so the arcs fuse into a smear. The 16px frame therefore
-renders from `weir-app-icon-small.svg` — the same tile with the two-stream fallback geometry —
-and every larger frame uses the three-stream `weir-app-icon.svg`. An earlier revision put the
-cutoff at 32px as well, on the theory that the crest softened under anti-aliasing there; the
-real rasters in `design-options/logos-round4/gate-16px.png` do not bear that out at 24 or 32 in
-any of the three renderings, and it cost the mark two of the three sizes a person actually sees. `favicon.svg` itself (the SVG
-favicon, not the .ico) is unaffected: browsers scale one vector for it, at whatever size they
-show it, so it is always the three-stream primary mark like every other SVG in this repo.
+The three-stream primary mark is the product's icon at every size a person reads it at, so
+`weir-app-icon.svg` is the source for every frame 24px and above, same as every other asset here.
+But a multi-resolution .ico is the one place two different drawings of "the same icon" have to
+live side by side in a single file, and at 16px three streams cannot survive: a 1.85-unit band on
+a 24-unit grid is 1.23 device pixels there, sub-pixel by construction, so the arcs fuse into a
+smear. The 16px frame therefore renders from `weir-app-icon-small.svg` — the same tile with the
+two-stream fallback geometry. At 24 and 32 the three streams stay distinct in all three
+renderings (`design-options/logos-round4/gate-16px.png`), so the cutoff is 16px only.
+`favicon.svg` itself (the SVG favicon, not the .ico) is unaffected: browsers scale one vector for
+it, at whatever size they show it, so it is always the three-stream primary mark like every other
+SVG in this repo.
 """
 
 from __future__ import annotations

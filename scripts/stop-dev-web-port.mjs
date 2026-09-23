@@ -1,206 +1,106 @@
 #!/usr/bin/env node
 /**
- * Stops processes **listening** on the dev **Vite** port from ``scripts/dev-ports.json``
- * (override with ``WEIR_DEV_WEB_PORT``).
+ * Stops **this worktree's** dev web server (Vite) and nothing else.
  *
- * Use when ``npm run dev`` fails with **Port 8782 is already in use** (leftover Node/Vite).
+ * Like stop-dev-api-port.mjs, it identifies the exact process before touching it, and never stops
+ * something merely because it holds the port: another worktree's Vite, or any other program, can be
+ * listening on the same number. The process `npm run dev` starts for the web app runs this worktree's
+ * `apps/web/node_modules/vite/bin/vite.js` (apps/web/scripts/run-dev-stack.mjs), so a listener on the dev
+ * web port is stopped only when its command line names that file.
+ *
+ * Use when `npm run dev` fails with "Port 8782 is already in use" (a leftover Vite from this worktree).
+ * The port comes from scripts/dev-ports.json, or WEIR_DEV_WEB_PORT.
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { platform } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { platform } from "node:os";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.join(__dirname, "..");
-const devPortsPath = path.join(repoRoot, "scripts", "dev-ports.json");
+const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const viteEntry = path.join(repoRoot, "apps", "web", "node_modules", "vite", "bin", "vite.js");
+const isWindows = platform() === "win32";
 
 function readWebPort() {
   const forced = (process.env.WEIR_DEV_WEB_PORT || "").trim();
-  if (forced) {
-    return Number(forced);
+  const raw = forced || JSON.parse(readFileSync(path.join(repoRoot, "scripts", "dev-ports.json"), "utf8")).development.webPort;
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Not a port: ${raw}`);
   }
-  const raw = JSON.parse(readFileSync(devPortsPath, "utf8"));
-  return Number(raw.development.webPort);
+  return port;
 }
 
-function listeningPidsWindowsNetTcp(port) {
-  const p = Number(port);
-  if (!Number.isFinite(p) || p < 1 || p > 65535) {
-    return new Set();
-  }
-  const ps = [
-    "Get-NetTCPConnection",
-    "-LocalPort",
-    String(p),
-    "-State",
-    "Listen",
-    "-ErrorAction",
-    "SilentlyContinue",
-    "|",
-    "Select-Object",
-    "-ExpandProperty",
-    "OwningProcess",
-    "-Unique",
-  ].join(" ");
+function output(command, args) {
   try {
-    const out = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", ps], {
-      encoding: "utf8",
-      windowsHide: true,
-    });
-    return new Set(
-      out
-        .split(/\r?\n/)
-        .map((s) => s.trim())
-        .filter((s) => /^\d+$/.test(s)),
-    );
+    return execFileSync(command, args, { encoding: "utf8", windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
   } catch {
-    return new Set();
+    // No listener (lsof exits 1) or the tool is missing: either way, nothing identified.
+    return "";
   }
 }
 
-function listeningPidsWindowsNetstat(port) {
-  const out = execFileSync("netstat", ["-ano"], { encoding: "utf8" });
-  const pids = new Set();
-  const suffix = `:${port}`;
-  for (const line of out.split("\n")) {
-    const parts = line.trim().split(/\s+/);
-    if (parts.length < 5 || parts[0] !== "TCP") {
-      continue;
-    }
-    const local = parts[1];
-    if (!local.endsWith(suffix) && !local.endsWith(`]:${port}`)) {
-      continue;
-    }
-    const stateIdx = parts.indexOf("LISTENING");
-    if (stateIdx === -1) {
-      continue;
-    }
-    const pid = parts[stateIdx + 1];
-    if (pid && /^\d+$/.test(pid)) {
-      pids.add(pid);
-    }
-  }
-  return pids;
+function powershell(script) {
+  return output("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script]);
 }
 
-function listeningPidsUnix(port) {
-  try {
-    const out = execFileSync("lsof", ["-i", `TCP:${port}`, "-sTCP:LISTEN", "-t"], {
-      encoding: "utf8",
-    });
-    return new Set(
-      out
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    );
-  } catch {
-    return new Set();
-  }
+/** Process ids listening on the port. */
+function listeners(port) {
+  const out = isWindows
+    ? powershell(`Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique`)
+    : output("lsof", ["-i", `TCP:${port}`, "-sTCP:LISTEN", "-t"]);
+  return [...new Set(out.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^\d+$/.test(line)))].map(Number);
 }
 
-function stopListenersWindowsPowerShell(port) {
-  const p = Number(port);
-  const script = `
-$ErrorActionPreference = 'SilentlyContinue'
-$pids = @(Get-NetTCPConnection -LocalPort ${p} -State Listen | Select-Object -ExpandProperty OwningProcess -Unique)
-$n = 0
-foreach ($id in $pids) {
-  if (-not $id) { continue }
-  try {
-    Stop-Process -Id $id -Force -ErrorAction Stop
-    $n = $n + 1
-  } catch { }
-}
-Write-Output $n
-exit 0
-`.trim();
-  try {
-    const out = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
-      encoding: "utf8",
-      windowsHide: true,
-    });
-    const n = Number.parseInt(String(out).trim(), 10);
-    return Number.isFinite(n) && n >= 0 ? n : 0;
-  } catch {
-    return 0;
-  }
+/** The full command line of a running process, or "" when it is gone or unreadable. */
+function commandLine(pid) {
+  return isWindows
+    ? powershell(`(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}" -ErrorAction SilentlyContinue).CommandLine`).trim()
+    : output("ps", ["-p", String(pid), "-o", "command="]).trim();
 }
 
-function killPidWindows(pid) {
+/** Compares paths the way the platform does: case-insensitive with either slash on Windows. */
+function mentions(line, file) {
+  if (!isWindows) return line.includes(file);
+  const normalize = (text) => text.replaceAll("/", "\\").toLowerCase();
+  return normalize(line).includes(normalize(file));
+}
+
+function stop(pid) {
   try {
-    execFileSync("taskkill", ["/F", "/PID", pid], { stdio: "inherit" });
+    if (isWindows) {
+      execFileSync("taskkill", ["/T", "/F", "/PID", String(pid)], { stdio: "inherit" });
+    } else {
+      process.kill(pid, "SIGTERM");
+    }
     return true;
   } catch {
     return false;
   }
 }
 
-function killPidUnix(pid) {
-  try {
-    process.kill(Number(pid), "SIGTERM");
-    return true;
-  } catch {
-    try {
-      execFileSync("kill", ["-9", pid], { stdio: "inherit" });
-      return true;
-    } catch {
-      return false;
-    }
-  }
-}
-
 const port = readWebPort();
-
-if (platform() === "win32") {
-  const netTcp = listeningPidsWindowsNetTcp(port);
-  if (netTcp.size > 0) {
-    console.error(
-      `[stop-dev-web-port] Stopping listener(s) on port ${port} via PowerShell (PIDs: ${[...netTcp].join(", ")}).`,
-    );
-    let stopped = stopListenersWindowsPowerShell(port);
-    if (stopped === 0) {
-      console.error("[stop-dev-web-port] PowerShell Stop-Process had no effect — trying taskkill…");
-      for (const pid of netTcp) {
-        if (killPidWindows(pid)) {
-          stopped += 1;
-        }
-      }
-    }
-    if (stopped > 0) {
-      console.error(`[stop-dev-web-port] Stopped ${stopped} process(es).`);
-    } else {
-      console.error(
-        "[stop-dev-web-port] Could not stop listener(s) — close the stray Vite terminal or run from an elevated PowerShell.",
-      );
-    }
-    process.exit(0);
-  }
-}
-
-const pids = platform() === "win32" ? listeningPidsWindowsNetstat(port) : listeningPidsUnix(port);
-
-if (pids.size === 0) {
-  console.error(`[stop-dev-web-port] No LISTENING process on TCP port ${port}.`);
+const pids = listeners(port);
+if (pids.length === 0) {
+  console.error(`[stop-dev-web-port] Nothing is listening on port ${port}.`);
   process.exit(0);
 }
 
-console.error(`[stop-dev-web-port] Stopping ${pids.size} process(es) on port ${port}: ${[...pids].join(", ")}`);
-
-let ok = 0;
 for (const pid of pids) {
-  const killed = platform() === "win32" ? killPidWindows(pid) : killPidUnix(pid);
-  if (killed) {
-    ok += 1;
+  const line = commandLine(pid);
+  if (!line) {
+    console.error(`[stop-dev-web-port] PID ${pid} on port ${port} is gone or its command line cannot be read; leaving it.`);
+    continue;
+  }
+  if (!mentions(line, viteEntry)) {
+    console.error(
+      `[stop-dev-web-port] PID ${pid} on port ${port} is not this worktree's dev web server (its command line does not ` +
+        `run ${viteEntry}); leaving it alone. Stop it yourself, or set WEIR_DEV_WEB_PORT to use another port.`,
+    );
+    continue;
+  }
+  console.error(`[stop-dev-web-port] Stopping this worktree's dev web server (PID ${pid}, port ${port}).`);
+  if (!stop(pid)) {
+    console.error(`[stop-dev-web-port] Could not stop PID ${pid}; close the terminal running Vite, or use an elevated shell.`);
   }
 }
-
-if (ok === 0 && pids.size > 0) {
-  console.error(
-    "[stop-dev-web-port] No processes were stopped (PIDs from netstat were already gone or taskkill failed).",
-  );
-} else {
-  console.error(`[stop-dev-web-port] Done (${ok}/${pids.size}).`);
-}
-process.exit(0);

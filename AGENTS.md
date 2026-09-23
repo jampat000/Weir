@@ -14,6 +14,7 @@ This file is the short entry point for coding agents. Keep detailed rules in lin
 - Architecture map: [`ARCHITECTURE.md`](ARCHITECTURE.md)
 - Local development: [`docs/local-development.md`](docs/local-development.md)
 - Documentation index: [`docs/README.md`](docs/README.md)
+- Repository scripts and which language each uses: [`scripts/README.md`](scripts/README.md)
 - Agent operating model: [`docs/agent-harness.md`](docs/agent-harness.md)
 - Issue triage: [`docs/triage.md`](docs/triage.md)
 - Release governance: [`docs/release-governance.md`](docs/release-governance.md)
@@ -29,6 +30,7 @@ This file is the short entry point for coding agents. Keep detailed rules in lin
 
 - Server: `dotnet build apps/server/Weir.slnx -warnaserror` and `dotnet test apps/server/Weir.slnx`.
 - Frontend: from `apps/web`, run `npm run lint`, `npm run build` and `npm run test`.
+- Tray (Windows): `dotnet build apps/tray/Weir.Tray.slnx` and `dotnet test apps/tray/Weir.Tray.slnx`.
 - Contract suite (judges a running server over HTTP): see [`tests/contract/README.md`](tests/contract/README.md).
 - E2E and packaging smoke checks are documented in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - Docs map validation: `node scripts/check-agent-docs.mjs`.
