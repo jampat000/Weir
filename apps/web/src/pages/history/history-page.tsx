@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { FileName } from "../../components/shared/file-name";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { DirectPlayLine } from "../../components/processing/direct-play-line";
@@ -284,9 +285,10 @@ function HistoryList({
                   onClick={() => onPick(file.id)}
                   title={file.relative_path}
                 >
-                  <span className="mm-history-file__name">
-                    {fileName(file.relative_path)}
-                  </span>
+                  <FileName
+                    path={file.relative_path}
+                    className="mm-history-file__name"
+                  />
                   <span className="mm-history-file__sub">
                     {[file.library_name, sizeWords(file.size_bytes)]
                       .filter(Boolean)

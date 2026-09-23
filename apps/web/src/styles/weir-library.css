@@ -340,8 +340,8 @@
   color: var(--mm-text1);
   font: 500 var(--mm-type-body) var(--mm-font);
   text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* The whole name, wrapping between its parts (FileName), never cut to "…". */
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 
