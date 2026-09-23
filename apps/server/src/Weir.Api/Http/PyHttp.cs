@@ -40,6 +40,12 @@ public sealed class ApiException : Exception
     public string Detail { get; }
 
     public IReadOnlyDictionary<string, string>? Headers { get; }
+
+    /// <summary>
+    /// A stable, machine-readable name for this error, sent as <c>code</c> beside <c>detail</c>. Set only where a client
+    /// needs to act on which error it got; <c>detail</c> is wording for people and may change.
+    /// </summary>
+    public string? Code { get; init; }
 }
 
 /// <summary>Writing responses the way Starlette's <c>JSONResponse</c> and <c>PlainTextResponse</c> do.</summary>
@@ -74,7 +80,13 @@ public static class PyResponses
             context.Response.Headers[name] = value;
         }
 
-        return WriteJsonAsync(context, exception.StatusCode, new PyDict().Set("detail", exception.Detail));
+        var body = new PyDict().Set("detail", exception.Detail);
+        if (exception.Code is { } code)
+        {
+            body.Set("code", code);
+        }
+
+        return WriteJsonAsync(context, exception.StatusCode, body);
     }
 
     public static Task WriteValidationErrorAsync(HttpContext context, RequestValidationException exception)

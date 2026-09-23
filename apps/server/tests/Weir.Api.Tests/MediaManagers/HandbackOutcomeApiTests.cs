@@ -277,6 +277,52 @@ public sealed class HandbackOutcomeApiTests : IDisposable
     }
 
     [Fact]
+    public async Task A_409_says_in_its_code_whether_the_answer_is_final_or_worth_sending_again()
+    {
+        await using var server = await StartAsync();
+        await FinishedHandoffAsync(server);
+        using (var first = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null)))
+        {
+            Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        }
+
+        using (var different = await PostOutcomeAsync(server, "h1", DelunoOutcome("not-imported", null, "Changed its mind.")))
+        {
+            Assert.Equal((HttpStatusCode.Conflict, "outcome_already_recorded"), (different.StatusCode, await Code(different)));
+        }
+
+        var source = Path.Join(Watched, "Queued", "queued.mkv");
+        Directory.CreateDirectory(Path.GetDirectoryName(source)!);
+        await File.WriteAllTextAsync(source, "a download still waiting");
+        var handoff = new { eventType = "deluno.processor-handoff", handoffId = "h2", libraryId = "lib-1", mediaType = "movies", sourcePath = source, callbackPath = "/cb" };
+        using (var queued = await new ApiTestClient(server).PostAsync("/api/v1/intake/webhook/deluno", handoff, SecretHeader))
+        {
+            Assert.Equal(HttpStatusCode.OK, queued.StatusCode);
+        }
+
+        using (var early = await PostOutcomeAsync(server, "h2", DelunoOutcome("imported", null, null)))
+        {
+            Assert.Equal((HttpStatusCode.Conflict, "handoff_not_finished"), (early.StatusCode, await Code(early)));
+        }
+
+    }
+
+    [Fact]
+    public async Task A_409_for_a_hand_off_that_ended_says_so_in_its_code()
+    {
+        await using var server = await StartAsync();
+        await FinishedHandoffAsync(server);
+        await FailedPassThroughAsync(server, "2099-01-01 00:00:00.000000");
+
+        using var failed = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", null, null));
+        Assert.Equal(
+            (HttpStatusCode.Conflict, "This hand-off ended failed, so Weir handed back no file to import.", "handoff_ended"),
+            (failed.StatusCode, await Detail(failed), await Code(failed)));
+    }
+
+    private static async Task<string?> Code(HttpResponseMessage response) => (await Json(response))["code"]?.GetValue<string>();
+
+    [Fact]
     public async Task Not_imported_is_final_records_the_reason_and_keeps_the_copy()
     {
         await using var server = await StartAsync();

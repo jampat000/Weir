@@ -10707,7 +10707,7 @@
     },
     "/api/v1/intake/handoffs/{source_key}/{handoff_id}/outcome": {
       "post": {
-        "description": "The manager says what became of the file Weir handed back. imported records it and releases Weir's copy when it is still exactly the file Weir wrote; not-imported records it and keeps the copy. 200 again for the same outcome; 404 never received; 409 not finished or a different outcome already recorded.",
+        "description": "The manager says what became of the file Weir handed back. imported records it and releases Weir's copy when it is still exactly the file Weir wrote; not-imported records it and keeps the copy. 200 again for the same outcome; 404 never received; 409 not finished or a different outcome already recorded, with a code: outcome_already_recorded (final), handoff_not_finished or handoff_ended (worth sending again).",
         "operationId": "post_intake_handoff_outcome_api_v1_intake_handoffs__source_key___handoff_id__outcome_post",
         "parameters": [
           {
