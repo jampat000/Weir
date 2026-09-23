@@ -1,7 +1,9 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Weir.Core.Activity;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
+using Weir.Core.Library;
 using Weir.Core.LibraryMode;
 using Weir.Core.Media;
 using Weir.Core.MediaManagers;
@@ -31,7 +33,7 @@ public sealed class LibraryCleanHandler : IJobHandler
     private readonly SafeSwap _swap;
     private readonly ILibraryFileChangeNotifier _notifier;
     private readonly IHardlinkInspector _hardlinkInspector;
-    private readonly Weir.Core.Library.IRemovedTrackStore _removedTrackStore;
+    private readonly IRemovedTrackStore _removedTrackStore;
     private readonly TimeProvider _time;
     private readonly ILogger<LibraryCleanHandler> _logger;
 
@@ -41,7 +43,7 @@ public sealed class LibraryCleanHandler : IJobHandler
         SafeSwap swap,
         ILibraryFileChangeNotifier notifier,
         IHardlinkInspector hardlinkInspector,
-        Weir.Core.Library.IRemovedTrackStore removedTrackStore,
+        IRemovedTrackStore removedTrackStore,
         TimeProvider time,
         ILogger<LibraryCleanHandler> logger)
     {
@@ -224,10 +226,10 @@ public sealed class LibraryCleanHandler : IJobHandler
 
         switch (result.Outcome)
         {
-            case Weir.Core.LibraryMode.SwapOutcome.Committed:
+            case SwapOutcome.Committed:
                 await OnCommittedAsync(library, path, plan, result, cancellationToken).ConfigureAwait(false);
                 return;
-            case Weir.Core.LibraryMode.SwapOutcome.InUse:
+            case SwapOutcome.InUse:
                 await OnInUseAsync(context, payload, libraryId, path, trigger, inUseAttempts).ConfigureAwait(false);
                 return;
             default:
@@ -299,7 +301,7 @@ public sealed class LibraryCleanHandler : IJobHandler
         {
             try
             {
-                var key = new Weir.Core.Library.RemovedTrackFileKey(library.Id, path);
+                var key = new RemovedTrackFileKey(library.Id, path);
                 await _removedTrackStore.RecordAsync(key, committedPlan.RemovedTrackRecords, cancellationToken).ConfigureAwait(false);
             }
 #pragma warning disable CA1031 // Best-effort, like the notify step below: recording removed tracks must never fail a committed clean.
@@ -353,10 +355,10 @@ public sealed class LibraryCleanHandler : IJobHandler
     private async Task OnInUseAsync(JobWorkContext context, PyDict payload, long libraryId, string path, string trigger, int inUseAttempts)
     {
         var attempt = inUseAttempts + 1;
-        var delay = Weir.Core.LibraryMode.SafeSwapRules.InUseRetryDelay(attempt);
+        var delay = SafeSwapRules.InUseRetryDelay(attempt);
         if (delay is null)
         {
-            await RecordAsync(libraryId, path, trigger, LibraryActivityEventTypes.FileFailed, Weir.Core.LibraryMode.SafeSwapRules.InUseGaveUpMessage).ConfigureAwait(false);
+            await RecordAsync(libraryId, path, trigger, LibraryActivityEventTypes.FileFailed, SafeSwapRules.InUseGaveUpMessage).ConfigureAwait(false);
             return;
         }
 
@@ -395,7 +397,7 @@ public sealed class LibraryCleanHandler : IJobHandler
                 .ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or InvalidOperationException)
+        catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
         {
             _logger.LogWarning(exception, "Library mode could not record its activity entry; the outcome remains only in the job row.");
         }

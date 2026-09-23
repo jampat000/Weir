@@ -2,7 +2,7 @@ using TimeZoneConverter;
 
 namespace Weir.Core.Time;
 
-/// <summary>Looks up IANA time zone names the way <c>zoneinfo.ZoneInfo</c> does.</summary>
+/// <summary>Looks up IANA time zone names.</summary>
 public interface ITimeZoneResolver
 {
     bool TryFind(string name, out TimeZoneInfo zone);
@@ -14,16 +14,17 @@ public sealed class IanaTimeZoneResolver : ITimeZoneResolver
     public bool TryFind(string name, out TimeZoneInfo zone) => TimeZones.TryFind(name, out zone);
 }
 
-/// <summary>IANA time zones as Python's <c>ZoneInfo</c> (with the <c>tzdata</c> package) resolves them.</summary>
+/// <summary>IANA time zones, resolved the same way on every platform.</summary>
 /// <remarks>
 /// Weir runs with invariant globalization, and on Windows that leaves .NET unable to convert an IANA
 /// id (the registry holds only Windows ids and the conversion needs ICU). TimeZoneConverter carries the
 /// CLDR mapping and the IANA links, so the same names resolve on every platform. Only IANA names are
-/// accepted, as with <c>ZoneInfo</c>: a Windows id such as <c>Eastern Standard Time</c> is unknown.
+/// accepted: a Windows id such as <c>Eastern Standard Time</c> is unknown, so a saved setting means the
+/// same zone wherever the server runs.
 /// </remarks>
 public static class TimeZones
 {
-    /// <summary><c>ZoneInfo(name)</c>: false where Python raises.</summary>
+    /// <summary>The zone for an exact IANA name; false for an unknown or malformed name.</summary>
     public static bool TryFind(string? name, out TimeZoneInfo zone)
     {
         zone = TimeZoneInfo.Utc;
@@ -42,8 +43,8 @@ public static class TimeZones
     }
 
     /// <summary>
-    /// <c>ZoneInfo((name or "UTC").strip() or "UTC")</c>, falling back to UTC where that raises, as the
-    /// schedule code does.
+    /// The zone for a trimmed name, with a missing, empty or unknown name meaning UTC, so a bad setting
+    /// never stops a schedule.
     /// </summary>
     public static TimeZoneInfo Find(string? name)
     {
@@ -60,7 +61,7 @@ public static class TimeZones
 
     /// <summary>
     /// A wall-clock time in <paramref name="zone"/> as an instant. For an ambiguous or skipped time
-    /// this takes the first offset (Python's <c>fold=0</c>).
+    /// this takes the first offset, the one in force before the transition.
     /// </summary>
     public static DateTimeOffset FromWallClock(DateTime wall, TimeZoneInfo zone)
     {

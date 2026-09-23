@@ -2,7 +2,7 @@ using Weir.Core.Json;
 
 namespace Weir.Core.Rules;
 
-/// <summary>What a metadata provider knows about one title (<c>provider_port.TitleMetadata</c>).</summary>
+/// <summary>What a metadata provider knows about one title.</summary>
 public sealed record TitleMetadata
 {
     /// <summary>ISO 639-1 as providers report it (<c>fr</c>).</summary>
@@ -16,9 +16,8 @@ public sealed record TitleMetadata
 }
 
 /// <summary>
-/// A lookup outcome (<c>provider_port.LookupResult</c>), including the outcomes that are not
-/// answers. The provider that produces one does network IO and is ported with the media managers;
-/// this is only the value the rules read.
+/// A lookup outcome, including the outcomes that are not answers. The provider that produces one
+/// does network IO and lives with the media managers; this is only the value the rules read.
 /// </summary>
 public sealed record LookupResult
 {
@@ -34,7 +33,7 @@ public sealed record LookupResult
     public bool Matched => Status == StatusMatched && Metadata is not null;
 }
 
-/// <summary>The five original-language options, all off by default (<c>OriginalLanguageRules</c>).</summary>
+/// <summary>The five original-language options; the feature itself is off by default.</summary>
 public sealed record OriginalLanguageRules
 {
     public bool Enabled { get; init; }
@@ -65,9 +64,8 @@ public sealed record OriginalLanguageOutcome
 public sealed record OriginalLanguageTrack(int Index, string Language);
 
 /// <summary>
-/// Original-language audio selection (<c>processing_original_language.py</c>): the pure mapping and
-/// selection. The lookup that feeds it calls a metadata provider over the network and belongs to
-/// a later port.
+/// Original-language audio selection: the pure mapping and selection. The lookup that feeds it calls a
+/// metadata provider over the network and lives outside the rules engine.
 /// </summary>
 public static class OriginalLanguage
 {

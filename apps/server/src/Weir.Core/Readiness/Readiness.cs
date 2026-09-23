@@ -37,7 +37,7 @@ public sealed record ReadinessInputs(
     IReadOnlyList<WorkerLaneHealth>? WorkerHealth,
     (bool Ok, string Detail) WatcherSummary);
 
-/// <summary>Port of <c>weir.platform.readiness.service.build_readiness</c>.</summary>
+/// <summary>Builds the readiness report from the database, startup, worker and watcher state.</summary>
 public static class ReadinessBuilder
 {
     /// <summary>What the watcher reports when no library is being watched.</summary>

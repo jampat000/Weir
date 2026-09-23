@@ -10,14 +10,14 @@ public enum PasswordVerification
     Match,
     Mismatch,
 
-    /// <summary>The stored value is not an Argon2 hash this build can read (argon2-cffi's <c>InvalidHashError</c>).</summary>
+    /// <summary>The stored value is not an Argon2 hash this build can read.</summary>
     InvalidHash,
 }
 
 /// <summary>
-/// Argon2id password hashes in argon2-cffi's PHC string format (port of
-/// <c>weir.platform.auth.password</c>): <c>PasswordHasher(time_cost=3, memory_cost=65536,
-/// parallelism=1, hash_len=32, salt_len=16)</c>.
+/// Argon2id password hashes in the PHC string format, with time cost 3, memory 65536 KiB, parallelism 1,
+/// a 32-byte hash and a 16-byte salt. The format and parameters stay fixed so existing password hashes
+/// keep verifying.
 /// </summary>
 public static class PasswordHasher
 {
@@ -56,7 +56,7 @@ public static class PasswordHasher
             $"${name}{versionPart}$m={memoryKib},t={timeCost},p={parallelism}${EncodeB64(salt)}${EncodeB64(tag)}");
     }
 
-    /// <summary><c>verify_password</c>: parameters come from the stored hash.</summary>
+    /// <summary>Verifies a password; the Argon2 parameters come from the stored hash.</summary>
     public static PasswordVerification Verify(string plain, string encoded)
     {
         ArgumentNullException.ThrowIfNull(plain);
@@ -87,7 +87,7 @@ public static class PasswordHasher
 
     internal sealed record DecodedHash(Argon2Type Type, int Version, int MemoryKib, int TimeCost, int Parallelism, byte[] Salt, byte[] Tag);
 
-    /// <summary>The reference <c>decode_string</c>: <c>$type[$v=V]$m=M,t=T,p=P$salt$hash</c>.</summary>
+    /// <summary>Parses the PHC string <c>$type[$v=V]$m=M,t=T,p=P$salt$hash</c> as the Argon2 reference implementation does.</summary>
     internal static bool TryDecode(string encoded, out DecodedHash decoded)
     {
         decoded = null!;
@@ -183,7 +183,7 @@ public static class PasswordHasher
     }
 }
 
-/// <summary>Port of <c>validate_password_strength</c>: the same rules and messages.</summary>
+/// <summary>Password strength rules; the refusal messages are shown to the operator as written.</summary>
 public static class PasswordPolicy
 {
     public const int MinPasswordLength = 8;

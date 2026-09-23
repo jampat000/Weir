@@ -5,8 +5,8 @@ using Weir.Core.Rules;
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
 /// <summary>
-/// What a pass measured about the source, for the scheduler and the Files screen (<c>record_measured_media_facts</c>).
-/// <c>LibraryId</c> (issue #545 item 5) says which library's row to update; null only when a pass ran with no library
+/// What a pass measured about the source, for the scheduler and the Files screen.
+/// <c>LibraryId</c> (#545) says which library's row to update; null only when a pass ran with no library
 /// resolved (which the handler never does in practice), and the write is then skipped rather than touching every
 /// library's row for the path.
 /// </summary>
@@ -27,11 +27,11 @@ public interface IRemuxPassFileFacts
 {
     Task RecordMeasuredMediaFactsAsync(MeasuredMediaFacts facts, CancellationToken cancellationToken);
 
-    /// <summary><paramref name="libraryId"/>: issue #545 item 5 — scopes the write to this library's row for the path.</summary>
+    /// <summary><paramref name="libraryId"/> scopes the write to this library's row for the path (#545).</summary>
     Task RecordOutputCollisionAsync(string relativePath, CollisionDecision decision, long? libraryId, CancellationToken cancellationToken);
 }
 
-/// <summary>Everything the TV season-folder cleanup (<c>handle_tv_cleanup_after_success</c>) is handed.</summary>
+/// <summary>Everything the TV season-folder cleanup is handed.</summary>
 public sealed record TvSeasonCleanupContext(
     PyDict Output,
     ProcessingPathRuntime Runtime,
@@ -43,9 +43,9 @@ public sealed record TvSeasonCleanupContext(
     string? FinalOutputFile);
 
 /// <summary>
-/// Seam: the TV watched-folder season cleanup after a successful pass (<c>processing_tv_season_folder_cleanup.py</c>), ported
-/// as <see cref="TvSeasonFolderCleanup"/> using the manager queue-row mapping (<c>queue_adapter.py</c> /
-/// <see cref="Weir.Core.Processing.ManagerQueueSignals"/>) that the watched-folder scan port brought.
+/// Seam: the TV watched-folder season cleanup after a successful pass, implemented by
+/// <see cref="TvSeasonFolderCleanup"/> using the manager queue-row mapping in
+/// <see cref="Weir.Core.Processing.ManagerQueueSignals"/>.
 /// </summary>
 public interface ITvSeasonFolderCleanup
 {
@@ -54,7 +54,7 @@ public interface ITvSeasonFolderCleanup
 
 /// <summary>
 /// A no-op double for tests that exercise other remux-pass behaviour without the TV season cleanup's own gates: records
-/// the season-cleanup fields as a skip and removes nothing, which is the outcome Python reaches whenever one of its gates
+/// the season-cleanup fields as a skip and removes nothing, the same outcome as when one of the real cleanup's gates
 /// cannot be checked.
 /// </summary>
 public sealed class SkippedTvSeasonFolderCleanup : ITvSeasonFolderCleanup
@@ -71,7 +71,7 @@ public sealed class SkippedTvSeasonFolderCleanup : ITvSeasonFolderCleanup
         return Task.CompletedTask;
     }
 
-    /// <summary><c>init_tv_season_cleanup_activity_fields</c>.</summary>
+    /// <summary>Sets every TV season-cleanup Activity field to its default unless a value is already present.</summary>
     public static void InitFields(PyDict output)
     {
         OutputFolderCleanup.SetDefault(output, "tv_season_folder_deleted", PyBool.False);

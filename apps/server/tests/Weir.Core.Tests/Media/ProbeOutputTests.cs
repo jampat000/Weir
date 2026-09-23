@@ -4,9 +4,8 @@ using Weir.Core.Media;
 namespace Weir.Core.Tests.Media;
 
 /// <summary>
-/// Ports of the pure assertions in <c>test_processing_remux_mux_validation.py</c>, <c>test_processing_probe_controls.py</c>
-/// and <c>test_processing_ffprobe_log_levels.py</c>: staged-output duration checks, the integrity command line and
-/// failure, probe controls, unreadable-media classification and the twelve-hour projection stop.
+/// Staged-output duration checks, the integrity command line and failure, probe controls, ffprobe log levels,
+/// unreadable-media classification and the twelve-hour projection stop.
 /// </summary>
 public sealed class ProbeOutputTests
 {
@@ -63,7 +62,7 @@ public sealed class ProbeOutputTests
     [Fact]
     public void Progress_run_stops_absurd_projected_runtime()
     {
-        // The Python test's clock: started at 0, then one reading per line at 1, 2 and 61 seconds.
+        // The clock starts at 0, then one reading per line at 1, 2 and 61 seconds.
         var tracker = new FfmpegProgressTracker(durationSeconds: 72_500.0);
         Assert.Null(tracker.Feed("out_time_ms=1000000\n", 1.0));
         Assert.Null(tracker.Feed("speed=0.006x\n", 2.0));

@@ -2,24 +2,24 @@ using Weir.Core.Rules;
 
 namespace Weir.Core.Library;
 
-/// <summary>One file whose current rules would now keep at least one track it no longer has (#509, step 2).</summary>
+/// <summary>One file whose current rules would now keep at least one track that was removed from it (#509).</summary>
 public sealed record RemovedTrackDiffResult(RemovedTrackFileKey File, IReadOnlyList<RemovedTrackRecord> TracksNowWanted);
 
 /// <summary>
-/// Rules x removed tracks -> titles that would now keep a track they no longer have (issue #509, step 2:
-/// "a diff service: rules x removed tracks -> affected titles"). Removal is final (ADR-0017's #505
-/// decision), so this never restores anything; it only flags files worth offering a re-download for.
+/// Rules x removed tracks -> titles that would now keep a track that was removed from them (#509).
+/// Removal is final (ADR-0017, #505), so this never restores anything; it only flags files worth
+/// offering a re-download for.
 ///
 /// <para><b>Audio is approximate.</b> <see cref="RemuxRules.PlanRemux"/> always keeps exactly one audio
 /// track (see <c>RemuxPlan.Audio</c>'s single-element list) chosen by ranking every candidate under the
 /// configured policy, sorters and languages — this diff has only the removed track's language and codec,
 /// not the full candidate set the original probe saw, so it cannot re-run that ranking. It answers a
-/// narrower, honest question instead: "is this removed track's language now one of the configured audio
-/// languages (primary/secondary/tertiary) that it was not before an operator can act on it. The exact
-/// winner can only be known by re-probing the file, which is what the offered re-download itself does.</para>
+/// narrower question instead: is this removed track's language one of the configured audio languages
+/// (primary/secondary/tertiary)? The exact winner can only be known by re-probing the file, which is what
+/// the offered re-download itself does.</para>
 ///
-/// <para><b>Variant-aware</b> (issue #496 landed after this diff's own base, so <see cref="RemovedTrackRecord.Variant"/>
-/// is now populated): each configured language is compared with <see cref="LanguageVariants.Matches"/>, exactly as
+/// <para><b>Variant-aware</b> (#496, using <see cref="RemovedTrackRecord.Variant"/>): each configured language
+/// is compared with <see cref="LanguageVariants.Matches"/>, exactly as
 /// <c>RemuxRules.PlanRemux</c> compares a candidate — a plain base-language configuration ("eng") matches any variant of
 /// it, while a variant-specific configuration ("fre-CA") matches only a removed track recorded with that same variant,
 /// never its base ("fre") or a different variant ("fre-FR").</para>

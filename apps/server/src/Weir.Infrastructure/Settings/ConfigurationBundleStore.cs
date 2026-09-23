@@ -8,16 +8,11 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Settings;
 
 /// <summary>
-/// Export and restore of the settings rows (port of <c>weir.platform.configuration_bundle.service</c>),
-/// format version 4 only.
+/// Export and restore of the settings rows, format version 4 only.
 /// </summary>
 /// <remarks>
-/// This used to also read format version 3 — the shape the Python suite exported, with
-/// <c>processing_path_settings</c> and <c>processing_remux_rules_settings</c> sections that were
-/// unpicked into the first movie and TV library and their rule set. 3.0.0 drops it. There are no
-/// version 3 bundles that matter (one install, a breaking release), and the reconstruction was the
-/// worst kind of code to keep: it only ran on input nobody has, so it could rot silently while
-/// still being on the restore path for bundles that are the current shape.
+/// Bundles in the older format version 3 are refused rather than converted: conversion code that only runs on
+/// input nobody has can rot unnoticed while sitting on the restore path for current bundles.
 /// </remarks>
 public static class ConfigurationBundleStore
 {
@@ -38,7 +33,7 @@ public static class ConfigurationBundleStore
 
     private sealed record Column(string Name, ColumnKind Kind);
 
-    /// <summary><c>build_configuration_bundle</c>. Throws <see cref="PyValueErrorException"/> when a required row is missing.</summary>
+    /// <summary>Build the export bundle from the settings rows. Throws <see cref="PyValueErrorException"/> when a required row is missing.</summary>
     public static async Task<PyDict> BuildAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -68,8 +63,8 @@ public static class ConfigurationBundleStore
     }
 
     /// <summary>
-    /// <c>apply_configuration_bundle</c>. <see cref="PyValueErrorException"/> becomes a 400; anything else
-    /// (<see cref="PyTypeErrorException"/>, <see cref="SqliteException"/>) is a server error, as in Python.
+    /// Restore a bundle into the settings rows. <see cref="PyValueErrorException"/> becomes a 400; anything else
+    /// (<see cref="PyTypeErrorException"/>, <see cref="SqliteException"/>) is a server error.
     /// </summary>
     public static async Task ApplyAsync(UnitOfWork uow, PyDict bundle, ITimeZoneResolver zones)
     {
@@ -102,7 +97,7 @@ public static class ConfigurationBundleStore
 
     private static async Task ApplySuiteSettingsAsync(UnitOfWork uow, PyJson section, ITimeZoneResolver zones)
     {
-        var ss = section as PyDict ?? throw new PyTypeErrorException($"'{section.PythonTypeName}' object is not subscriptable");
+        var ss = section as PyDict ?? throw new PyTypeErrorException($"The backup's {SuiteTable} section must be an object.");
         var name = PyConvert.Str(Required(ss, "product_display_name"));
         var noticeValue = ss.Get("signed_in_home_notice");
         var timezone = PyConvert.Str(Required(ss, "app_timezone"));
@@ -110,14 +105,15 @@ public static class ConfigurationBundleStore
         string? notice = null;
         if (noticeValue is not null && noticeValue.IsTruthy)
         {
-            notice = noticeValue is PyStr s ? s.Value : throw new PyTypeErrorException($"'{noticeValue.PythonTypeName}' object has no attribute 'strip'");
+            notice = noticeValue is PyStr s ? s.Value : throw new PyTypeErrorException("The backup's signed_in_home_notice must be text.");
         }
 
         bool? backupEnabled = ss.Get("configuration_backup_enabled") is { } enabledValue and not PyNull ? enabledValue.IsTruthy : null;
         long? backupHours = null;
         var hoursValue = ss.Get("configuration_backup_interval_hours");
 
-        // Same order as apply_suite_settings_put: name, notice, timezone, log retention, then activity and interval.
+        // Validated in the same order as a suite settings save, so the same error is reported first:
+        // name, notice, timezone, log retention, then activity and interval.
         var normalized = SuiteSettingsRules.Normalize(new SuiteSettingsUpdate(name, notice, timezone, Saturate(logRetention)), zones);
         long? activity = null;
         if (ss.Get("activity_retention_days") is { } activityValue and not PyNull)
@@ -146,7 +142,7 @@ public static class ConfigurationBundleStore
 
     private static async Task ApplySingletonAsync(UnitOfWork uow, string table, PyJson section)
     {
-        var data = section as PyDict ?? throw new PyTypeErrorException($"'{section.PythonTypeName}' object has no attribute 'items'");
+        var data = section as PyDict ?? throw new PyTypeErrorException($"The backup's {table} section must be an object.");
         var columns = await ColumnsAsync(uow, table).ConfigureAwait(false);
         var kwargs = ToKwargs(columns, data);
         var pk = kwargs.GetValueOrDefault("id");
@@ -186,10 +182,8 @@ public static class ConfigurationBundleStore
     /// Replaces <c>libraries</c> and <c>rule_sets</c> from the bundle's own rows.
     /// </summary>
     /// <remarks>
-    /// The format version 3 path that used to live here is gone (see the type remarks): no
-    /// <c>processing_path_settings</c>/<c>processing_remux_rules_settings</c> reconstruction, and no
-    /// <c>media_scope</c> to <c>media_type</c> rename for rows exported before #557. A version 4
-    /// bundle always carries both sections in the current shape, because this build wrote it.
+    /// Rows are inserted as they are, with no renaming (such as <c>media_scope</c> to <c>media_type</c>, #557):
+    /// a version 4 bundle always carries both sections in the current shape.
     /// </remarks>
     private static async Task RestoreProcessingLibrariesAsync(UnitOfWork uow, PyDict bundle)
     {
@@ -204,13 +198,13 @@ public static class ConfigurationBundleStore
         var libraryColumns = await ColumnsAsync(uow, LibrariesTable).ConfigureAwait(false);
         foreach (var row in Iterate(bundle.Get(RuleSetsTable) ?? new PyList()))
         {
-            var data = row as PyDict ?? throw new PyTypeErrorException($"'{row.PythonTypeName}' object has no attribute 'items'");
+            var data = row as PyDict ?? throw new PyTypeErrorException($"Each row in the backup's {RuleSetsTable} section must be an object.");
             await InsertAsync(uow, RuleSetsTable, ruleColumns, ToKwargs(ruleColumns, data)).ConfigureAwait(false);
         }
 
         foreach (var row in Iterate(bundle[LibrariesTable]))
         {
-            var data = row as PyDict ?? throw new PyTypeErrorException($"'{row.PythonTypeName}' object has no attribute 'items'");
+            var data = row as PyDict ?? throw new PyTypeErrorException($"Each row in the backup's {LibrariesTable} section must be an object.");
             await InsertAsync(uow, LibrariesTable, libraryColumns, ToKwargs(libraryColumns, data)).ConfigureAwait(false);
         }
     }
@@ -220,16 +214,16 @@ public static class ConfigurationBundleStore
         PyList list => list.Items,
         PyDict dict => dict.Keys.Select(key => (PyJson)new PyStr(key)),
         PyStr text => text.Value.Select(c => (PyJson)new PyStr(c.ToString())),
-        _ => throw new PyTypeErrorException($"'{value.PythonTypeName}' object is not iterable"),
+        _ => throw new PyTypeErrorException("A section of the backup that holds rows must be a list."),
     };
 
     private static PyJson Required(PyDict dict, string key) =>
-        dict.Get(key) ?? throw new PyTypeErrorException($"KeyError: {PyStrings.Repr(key)}");
+        dict.Get(key) ?? throw new PyTypeErrorException($"The backup is missing {key}.");
 
     private static long Saturate(System.Numerics.BigInteger value) =>
         value > long.MaxValue ? long.MaxValue : value < long.MinValue ? long.MinValue : (long)value;
 
-    /// <summary><c>dict_to_model_kwargs</c>: column keys only, timestamps parsed with <c>fromisoformat</c>.</summary>
+    /// <summary>The section's values for the table's own columns (other keys are ignored), with timestamps parsed as ISO 8601.</summary>
     private static List<KeyValuePair<string, PyJson>> ToKwargsList(Dictionary<string, Column> columns, PyDict data)
     {
         var output = new List<KeyValuePair<string, PyJson>>();
@@ -359,7 +353,7 @@ public static class ConfigurationBundleStore
         return ordered;
     }
 
-    /// <summary><c>orm_row_to_dict</c> for every matching row, columns in table order.</summary>
+    /// <summary>Every matching row as a dictionary, columns in table order.</summary>
     private static async Task<List<PyJson>> ReadRowsAsync(UnitOfWork uow, string table, string clause)
     {
         var columns = await ColumnsAsync(uow, table).ConfigureAwait(false);

@@ -8,14 +8,12 @@ using Microsoft.Net.Http.Headers;
 namespace Weir.Api.Web;
 
 /// <summary>
-/// Serves hashed <c>/assets/*</c> files with pre-compressed variants and immutable caching
-/// (port of <c>CompressedStaticAssetsMiddleware</c>). Like Python it sits outside the other
-/// middleware, so asset responses carry neither security headers nor <c>X-Request-ID</c>.
+/// Serves hashed <c>/assets/*</c> files with pre-compressed variants and immutable caching.
+/// It sits outside the other middleware, so asset responses carry neither security headers nor
+/// <c>X-Request-ID</c>.
 /// </summary>
 /// <remarks>
-/// The ETag is derived from the served file's modification time and size. Python also mixes in
-/// the inode, which .NET cannot read portably, so the tag values differ between the servers;
-/// both change whenever the file does.
+/// The ETag is derived from the served file's modification time and size, so it changes whenever the file does.
 /// </remarks>
 public sealed class CompressedStaticAssetsMiddleware
 {

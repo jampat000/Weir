@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
 
@@ -78,7 +79,7 @@ public static class LibraryFileMarksStore
         return marks;
     }
 
-    /// <summary>Forget everything Weir knows about a file it no longer has (a library's folders changed, say).</summary>
+    /// <summary>Forget everything Weir knows about a file that has left the library (a library's folders changed, say).</summary>
     public static Task ForgetAsync(UnitOfWork uow, long libraryId, string path)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -88,7 +89,7 @@ public static class LibraryFileMarksStore
             ("@path", path));
     }
 
-    private static LibraryFileMark Read(Microsoft.Data.Sqlite.SqliteDataReader reader) => new(
+    private static LibraryFileMark Read(SqliteDataReader reader) => new(
         SqliteValues.GetString(reader, 0),
         PythonTimestamps.Parse(reader.GetValue(1)),
         SqliteValues.GetBool(reader, 2));

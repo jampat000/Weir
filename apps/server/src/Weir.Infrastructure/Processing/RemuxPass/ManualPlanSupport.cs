@@ -74,7 +74,9 @@ public static class ManualPlanSupport
         {
             probeJson = await mediaTools.FfprobeJsonAsync(source, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
+#pragma warning disable CA1031 // Any probe failure is the operator's 400, not a server error.
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             throw new ManualPlanEnqueueException(400, $"Weir could not read this file's tracks: {exception.Message}");
         }

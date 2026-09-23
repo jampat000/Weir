@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Library;
-using Weir.Core.MediaManagers;
 using Weir.Infrastructure.Library;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.MediaManagers;
@@ -12,8 +11,8 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.LibraryMode;
 
 /// <summary>
-/// Registers library mode (#505): the #506 safe swap (not wired into anything until now — see
-/// <c>docs/archive/server-port-notes.md</c>, "Library mode: safe swap"), its scan and clean job handlers, and the real
+/// Registers library mode (#505): the #506 safe swap (see <c>docs/archive/server-port-notes.md</c>, "Library mode: safe
+/// swap"), its scan and clean job handlers, and the real
 /// notify seam (#507, <c>Weir.Infrastructure.MediaManagers.LibraryFileChangeNotifier</c>, registered by
 /// <c>AddWeirMediaManagers</c>).
 /// </summary>
@@ -23,11 +22,9 @@ public static class LibraryModeServices
     {
         ArgumentNullException.ThrowIfNull(options);
         services.AddWeirMediaManagers(options);
-        services.TryAddSingleton<IMediaToolResolver>(sp => new MediaToolResolver(sp.GetRequiredService<WeirOptions>().WeirHome));
-        services.TryAddSingleton<Processes.IProcessRunner, Processes.ProcessRunner>();
-        services.TryAddSingleton<MediaTools>();
+        services.AddWeirMediaTools();
 
-        // The #506 safe swap: real files, real journal (jobs.payload_json — no new table), the #500 seam.
+        // The #506 safe swap: real files, the library_swaps journal, the #500 output check.
         services.TryAddSingleton<ISwapFileSystem>(_ => PhysicalSwapFileSystem.Instance);
         services.TryAddSingleton(sp => new ProcessingJobSwapJournal(sp.GetRequiredService<SqliteDatabase>()));
         services.TryAddSingleton<ISwapJournal>(sp => sp.GetRequiredService<ProcessingJobSwapJournal>());
@@ -41,11 +38,11 @@ public static class LibraryModeServices
         services.TryAddSingleton<RedownloadRiskChecker>();
 
         // #509: what a clean removed for good, and asking a manager to redownload a title that is missing it.
-        // FileLogRemovedTrackStore is durable (file_logs.detail_json — no migration, ADR-0017); the
-        // redownload tracker stays in-memory (see its own remarks) since nothing yet calls its ClearAsync hook.
+        // The only registrations of these two: the removed_tracks table keeps removed-track history across restarts,
+        // and the redownload tracker stays in memory (see its remarks). AddWeirMediaManagers registers the redownload
+        // call itself.
         services.TryAddSingleton<IRemovedTrackStore, FileLogRemovedTrackStore>();
         services.TryAddSingleton<IRedownloadTracker, InMemoryRedownloadTracker>();
-        services.TryAddSingleton<IManagerRedownload, ArrManagerRedownload>();
 
         // #507's notify seam: AddWeirMediaManagers (above) registers the real LibraryFileChangeNotifier.
         services.TryAddSingleton<LibraryScanHandler>();

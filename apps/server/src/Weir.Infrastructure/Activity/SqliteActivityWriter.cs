@@ -6,8 +6,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Activity;
 
 /// <summary>
-/// Appends <c>activity_events</c> rows with the columns Python's <c>record_activity_event</c> writes:
-/// the event, plus the <c>trigger</c>, <c>result</c>, <c>library_id</c>, <c>relative_path</c> and
+/// Appends <c>activity_events</c> rows: the event, plus the <c>trigger</c>, <c>result</c>, <c>library_id</c>, <c>relative_path</c> and
 /// <c>run_key</c> that <see cref="ActivityClassifier"/> lifts from the detail. <c>created_at</c> is the
 /// database default. Every write tells the live Activity stream once its transaction commits
 /// (<see cref="ActivityNotifications"/>).
@@ -80,7 +79,7 @@ public sealed class SqliteActivityWriter : IActivityWriter
     }
 
     /// <summary>
-    /// <c>update_activity_event</c> inside a caller's transaction: change the given fields (a
+    /// Updates an event inside a caller's transaction: change the given fields (a
     /// <see langword="null"/> argument keeps the stored value), classify the row again, and tell listeners
     /// after commit. <see langword="false"/> when the row does not exist.
     /// </summary>
@@ -115,7 +114,7 @@ public sealed class SqliteActivityWriter : IActivityWriter
         return true;
     }
 
-    /// <summary><c>update_activity_event</c> inside a unit of work.</summary>
+    /// <summary>Updates an event inside a unit of work.</summary>
     public static async Task<bool> UpdateAsync(UnitOfWork uow, long activityId, string? eventType = null, string? title = null, string? detail = null)
     {
         ArgumentNullException.ThrowIfNull(uow);

@@ -21,7 +21,7 @@ public sealed class ScanWakeups
     /// <summary>The scan timer's next periodic look at <paramref name="libraryId"/>.</summary>
     public void RecordNextPeriodic(long libraryId, DateTimeOffset at) => _periodic[libraryId] = at;
 
-    /// <summary>The scan timer no longer looks at <paramref name="libraryId"/> on a schedule (switched off or gone).</summary>
+    /// <summary>The scan timer stops looking at <paramref name="libraryId"/> on a schedule (switched off or gone).</summary>
     public void ForgetPeriodic(long libraryId) => _periodic.TryRemove(libraryId, out _);
 
     /// <summary>The next look at <paramref name="libraryId"/>: the earlier of a booked look and the next periodic one.</summary>

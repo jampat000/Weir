@@ -10,8 +10,7 @@ namespace Weir.Infrastructure.Tests.Processing;
 
 /// <summary>
 /// Closes #522's "why held" diagnostic gap: it must ask every linked manager's live queue and apply the
-/// same domain rules as the watched-folder scan, not report every library as consulted-but-silent (port of
-/// the manager-signal scenarios from <c>test_processing_candidate_gate_evaluate.py</c>), driven through
+/// same domain rules as the watched-folder scan, not report every library as consulted-but-silent, driven through
 /// <see cref="HoldDiagnosticStore.EvaluateAsync"/> with a fake Radarr/Sonarr behind
 /// <see cref="FakeManagerHttp"/>.
 /// </summary>

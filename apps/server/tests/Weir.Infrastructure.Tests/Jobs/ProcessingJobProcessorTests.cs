@@ -7,9 +7,8 @@ using Weir.Infrastructure.Jobs;
 namespace Weir.Infrastructure.Tests.Jobs;
 
 /// <summary>
-/// Ports of <c>process_one_processing_job</c> tests from <c>test_processing_worker_loop.py</c>,
-/// <c>test_retired_job_kinds.py</c> and <c>test_worker_failures.py</c>, plus the .NET rule that unported
-/// kinds are never claimed.
+/// One worker step: success, failure and retry reporting, retired job kinds, finalize failures, and the
+/// rule that a kind with no registered handler is never claimed.
 /// </summary>
 public sealed class ProcessingJobProcessorTests : IDisposable
 {
@@ -88,7 +87,7 @@ public sealed class ProcessingJobProcessorTests : IDisposable
     }
 
     [Fact]
-    public async Task An_unrecorded_handler_failure_writes_one_activity_entry_with_python_detail()
+    public async Task An_unrecorded_handler_failure_writes_one_activity_entry_with_the_documented_detail()
     {
         await _db.Store.EnqueueOrGetAsync(
             "c",
@@ -189,7 +188,7 @@ public sealed class ProcessingJobProcessorTests : IDisposable
     }
 
     [Fact]
-    public async Task An_unported_live_kind_is_never_claimed_by_a_dotnet_worker()
+    public async Task A_kind_with_no_handler_is_never_claimed()
     {
         await _db.Store.EnqueueOrGetAsync("d3", "processing.test.unknown.v1");
 
@@ -202,7 +201,7 @@ public sealed class ProcessingJobProcessorTests : IDisposable
     }
 
     [Fact]
-    public async Task Claiming_every_kind_fails_a_missing_handler_as_python_does()
+    public async Task Claiming_every_kind_fails_a_job_with_no_handler()
     {
         await _db.Store.EnqueueOrGetAsync("d3", "processing.test.unknown.v1");
 
@@ -264,7 +263,7 @@ public sealed class ProcessingJobProcessorTests : IDisposable
     [Fact]
     public async Task A_long_handler_still_completes_against_the_claim_time()
     {
-        // Python passes the claim-time `now` to complete, so a handler outliving its lease still completes.
+        // Complete is passed the claim-time `now`, so a handler outliving its lease still completes.
         await _db.Store.EnqueueOrGetAsync("slow", "processing.test.slow.v1");
         var processor = _db.Processor([new DelegateHandler("processing.test.slow.v1", _ => _db.Clock.Now = T0.AddHours(3))]);
 

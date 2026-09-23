@@ -100,7 +100,7 @@ public sealed class ArrManagerRedownloadTests
 
         Assert.Equal(RedownloadOutcome.DeletedButSearchFailed, result.Outcome);
         // The file is already gone: the destructive step must still be flagged even though the
-        // request overall did not succeed, so a caller never loses track of a file that no longer exists.
+        // request overall did not succeed, so a caller never loses track of a file that is gone.
         Assert.True(result.DeletedExistingFile);
         Assert.Contains("no file", result.Summary, StringComparison.Ordinal);
     }

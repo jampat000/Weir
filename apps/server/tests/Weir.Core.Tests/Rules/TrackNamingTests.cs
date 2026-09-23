@@ -3,9 +3,8 @@ using Weir.Core.Rules;
 namespace Weir.Core.Tests.Rules;
 
 /// <summary>
-/// The #498 track-name template engine: placeholder rendering, override selection and validation. This is a new
-/// .NET-only feature (the Python reference has no equivalent yet, per issue #498), so these are ordinary
-/// hand-written expectations rather than golden fixtures generated from Python.
+/// The #498 track-name template engine: placeholder rendering, override selection and validation. The golden files
+/// predate this feature, so these are ordinary hand-written expectations rather than golden fixtures.
 /// </summary>
 public sealed class TrackNamingTests
 {

@@ -11,7 +11,7 @@ namespace Weir.Api.Tests.Processing;
 
 /// <summary>
 /// Media-manager library discovery, import, drift and unlink over real HTTP against a scripted Deluno
-/// manifest (port of the HTTP-relevant assertions in <c>test_processing_library_discovery.py</c>; #554).
+/// manifest (#554).
 /// </summary>
 public sealed class ProcessingLibraryDiscoveryApiTests
 {
@@ -34,7 +34,7 @@ public sealed class ProcessingLibraryDiscoveryApiTests
         string? ProcessorOutputPath = null,
         string? DownloadsPath = null);
 
-    /// <summary>The confirmed Deluno manifest shape (jampat000/Deluno#331), matching Python's fixture.</summary>
+    /// <summary>The confirmed Deluno manifest shape (jampat000/Deluno#331).</summary>
     private static string ManifestJson(params ManifestLibrary[] libraries)
     {
         var payload = new
@@ -95,7 +95,7 @@ public sealed class ProcessingLibraryDiscoveryApiTests
         return await Json(response);
     }
 
-    // --- discoverable_libraries -----------------------------------------------------------------
+    // --- discovery ------------------------------------------------------------------------------
 
     [Fact]
     public async Task Listing_marks_what_is_already_imported()
@@ -177,7 +177,7 @@ public sealed class ProcessingLibraryDiscoveryApiTests
         Assert.Contains("address and API key", await Detail(response), StringComparison.Ordinal);
     }
 
-    // --- import_libraries -------------------------------------------------------------------------
+    // --- import -----------------------------------------------------------------------------------
 
     [Fact]
     public async Task Importing_a_subset_creates_only_what_was_chosen()
@@ -362,7 +362,7 @@ public sealed class ProcessingLibraryDiscoveryApiTests
             var created = (await ImportAsync(client, connectionId, "8")).AsArray()[0]!;
 
             Assert.Equal(string.Empty, created["output_folder"]!.GetValue<string>());
-            // With nowhere to hand files back it arrives off, still linked to its manager (23 Sep 2026).
+            // With nowhere to hand files back it arrives off, still linked to its manager.
             Assert.False(created["enabled"]!.GetValue<bool>());
             Assert.Equal([connectionId], created["manager_connection_ids"]!.AsArray().Select(id => id!.GetValue<long>()));
         }
@@ -394,7 +394,7 @@ public sealed class ProcessingLibraryDiscoveryApiTests
         }
     }
 
-    // --- resync_drift -----------------------------------------------------------------------------
+    // --- drift ------------------------------------------------------------------------------------
 
     [Fact]
     public async Task Resync_reports_a_moved_root_and_changes_nothing()
@@ -526,7 +526,7 @@ public sealed class ProcessingLibraryDiscoveryApiTests
         Assert.Empty((await Json(response))!.AsArray());
     }
 
-    // --- unlink_library ---------------------------------------------------------------------------
+    // --- unlink -----------------------------------------------------------------------------------
 
     [Fact]
     public async Task Unlinking_keeps_the_library()

@@ -4,22 +4,22 @@ using System.Text.Json.Nodes;
 namespace Weir.Api.Tests;
 
 /// <summary>
-/// <c>GET /openapi.json</c> is Python's own committed document (<c>apps/web/openapi/weir-openapi.json</c>,
+/// <c>GET /openapi.json</c> is the committed document (<c>apps/web/openapi/weir-openapi.json</c>,
 /// embedded into Weir.Api at build time — see <c>OpenApi/WeirOpenApiDocument.cs</c>), pruned to the routes
-/// the .NET server actually maps. These tests read a normalized structural view — paths+methods, and each
+/// the server actually maps. These tests read a normalized structural view — paths+methods, and each
 /// component schema's property names, required list and enum values — and compare it against the committed
-/// Python document, so:
+/// document, so:
 ///
-/// - every path+method the .NET server implements matches Python's document exactly (same schemas, because
+/// - every path+method the server implements matches the committed document exactly (same schemas, because
 ///   they are literally the same JSON), and
 /// - the only paths+methods missing are the ones in <see cref="KnownGaps"/>, each with a reason, so a route
-///   that quietly stops being served (or a newly-ported route nobody removed from the allowlist) fails here
+///   that quietly stops being served (or a newly served route nobody removed from the allowlist) fails here
 ///   instead of surfacing later as a broken web build against <c>openapi-typescript</c> output.
 /// </summary>
 public sealed class OpenApiDocumentParityTests
 {
     /// <summary>
-    /// Python operations the .NET server does not answer yet, each with why. Every entry must be a real gap:
+    /// Operations in the committed document the server does not answer yet, each with why. Every entry must be a real gap:
     /// <see cref="Not_implemented_yet_matches_exactly_the_allowlisted_gaps"/> fails if the .NET server starts
     /// answering one (remove it here) or stops answering one that is not listed (add it here with a reason).
     /// </summary>
@@ -41,7 +41,7 @@ public sealed class OpenApiDocumentParityTests
     }
 
     [Fact]
-    public async Task Every_served_path_and_method_matches_a_real_python_operation()
+    public async Task Every_served_path_and_method_is_in_the_committed_document()
     {
         await using var server = await WeirTestServer.StartAsync();
         using var response = await server.Client.GetAsync("/openapi.json");
@@ -76,7 +76,7 @@ public sealed class OpenApiDocumentParityTests
     }
 
     [Fact]
-    public async Task Component_schemas_for_served_operations_match_python_property_names_required_and_enums()
+    public async Task Component_schemas_for_served_operations_match_the_committed_property_names_required_and_enums()
     {
         await using var server = await WeirTestServer.StartAsync();
         using var response = await server.Client.GetAsync("/openapi.json");
@@ -87,7 +87,7 @@ public sealed class OpenApiDocumentParityTests
         var pythonSchemas = ((JsonObject?)python["components"]?["schemas"]) ?? [];
         Assert.NotEmpty(pythonSchemas);
 
-        // Every schema the .NET document still references must be Python's own, unedited shape. (The .NET
+        // Every schema the served document still references must be the committed, unedited shape. (The served
         // document never prunes components, only paths, so this also proves that has not changed by accident.)
         foreach (var (name, schemaNode) in dotnetSchemas)
         {

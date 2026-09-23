@@ -9,10 +9,9 @@ public sealed class SchemaMigratorTests
     [Fact]
     public void An_alembic_database_at_the_frozen_baseline_is_upgraded_to_head()
     {
-        // Before #557, the .NET head *was* the frozen Alembic baseline, so an Alembic-created database
-        // needed no change at all. #557 lifted the freeze and added migrations past it, so this database
-        // is now merely at the oldest revision this build knows how to reach, and EnsureAtHead upgrades
-        // it in place instead of adopting it unchanged.
+        // An Alembic-created database is at the frozen baseline, the oldest revision this build knows how to
+        // reach. #557 added migrations past it, so EnsureAtHead upgrades it in place instead of adopting it
+        // unchanged.
         using var temp = new TempDirectory();
         var path = temp.Join("weir.sqlite3");
         SchemaSnapshot.Execute(path, File.ReadAllText(RepositoryPaths.AlembicHeadReference));
@@ -66,7 +65,7 @@ public sealed class SchemaMigratorTests
     }
 
     [Fact]
-    public void An_unknown_revision_is_refused_with_the_python_message()
+    public void An_unknown_revision_is_refused_with_the_documented_message()
     {
         using var temp = new TempDirectory();
         var path = AlembicDatabaseAt(temp, "0099_from_the_future");
@@ -106,7 +105,7 @@ public sealed class SchemaMigratorTests
     [InlineData(true)]
     public void An_existing_file_without_a_schema_is_refused_and_left_empty(bool zeroBytes)
     {
-        // Python refuses any unversioned database; only a missing file is a new install.
+        // Any unversioned database is refused; only a missing file is a new install.
         using var temp = new TempDirectory();
         var path = temp.Join("weir.sqlite3");
         if (zeroBytes)
@@ -166,7 +165,7 @@ public sealed class SchemaMigratorTests
     }
 
     [Fact]
-    public void Connections_apply_the_python_engine_pragmas()
+    public void Connections_apply_wal_foreign_keys_busy_timeout_and_synchronous_pragmas()
     {
         using var temp = new TempDirectory();
         var database = new SqliteDatabase(temp.Join("weir.sqlite3"));

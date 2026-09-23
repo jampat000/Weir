@@ -1,9 +1,10 @@
+using Weir.Core.Media;
 using Weir.Core.Rules;
 using Weir.Core.Time;
 
 namespace Weir.Core.Processing;
 
-/// <summary>The two Processing media scopes (<c>PROCESSING_MEDIA_SCOPES</c>).</summary>
+/// <summary>The two Processing media scopes.</summary>
 public static class ProcessingMediaScopes
 {
     public const string Movie = "movie";
@@ -11,11 +12,11 @@ public static class ProcessingMediaScopes
 
     public static readonly IReadOnlyList<string> All = [Movie, Tv];
 
-    /// <summary><c>normalize_media_scope</c>.</summary>
+    /// <summary><see cref="Tv"/> for any casing of "tv"; anything else, including null, is <see cref="Movie"/>.</summary>
     public static string Normalize(string? raw) => string.Equals((raw ?? Movie).Trim(), Tv, StringComparison.OrdinalIgnoreCase) ? Tv : Movie;
 }
 
-/// <summary>The three Processing failure policies (<c>processing_pass_through.FAILURE_POLICIES</c>).</summary>
+/// <summary>The three Processing failure policies.</summary>
 public static class ProcessingFailurePolicies
 {
     public const string PassThrough = "pass_through";
@@ -24,7 +25,7 @@ public static class ProcessingFailurePolicies
 
     public static readonly IReadOnlyList<string> All = [PassThrough, Hold, Reject];
 
-    /// <summary><c>normalize_failure_policy</c>: anything unrecognised is the product's guarantee, pass_through.</summary>
+    /// <summary>Anything unrecognised is the product's guarantee, <see cref="PassThrough"/>.</summary>
     public static string Normalize(string? raw)
     {
         var value = (raw ?? string.Empty).Trim().ToLowerInvariant();
@@ -129,7 +130,7 @@ public sealed record ProcessingLibraryRecord
     public string FfmpegStrictness { get; init; } = "normal";
 
     /// <summary>#548: which tool writes the output. See <see cref="Weir.Core.Media.RemuxWriterChoice"/>.</summary>
-    public string RemuxWriter { get; init; } = Weir.Core.Media.RemuxWriterChoice.Best;
+    public string RemuxWriter { get; init; } = RemuxWriterChoice.Best;
 
     /// <summary>#548: rewrite with ffmpeg when the preferred writer cannot write or validate a file.</summary>
     public bool RewriteWithFfmpeg { get; init; } = true;

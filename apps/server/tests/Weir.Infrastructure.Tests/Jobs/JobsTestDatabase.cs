@@ -16,8 +16,8 @@ internal sealed class JobsTestDatabase : IDisposable
     private readonly TempDirectory _directory = new();
 
     /// <param name="keepSeedRows">
-    /// Keep the singleton settings and the two seeded libraries a fresh database has. The Python tests
-    /// these port use <c>create_all</c>, which seeds nothing, so they are removed by default.
+    /// Keep the singleton settings and the two seeded libraries a fresh database has. Most job tests want
+    /// an empty database, so they are removed by default.
     /// </param>
     public JobsTestDatabase(bool keepSeedRows = false)
     {
@@ -169,7 +169,7 @@ internal sealed class JobsTestDatabase : IDisposable
         return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
     }
 
-    /// <summary>A raw row insert, bypassing the enqueue guard, as Python tests do with <c>session.add(ProcessingJob(...))</c>.</summary>
+    /// <summary>A raw row insert, bypassing the enqueue guard, to set up states the store itself would not write.</summary>
     public void InsertRawJob(string dedupeKey, string jobKind, string status = ProcessingJobStatus.Pending, string? leaseOwner = null,
         string? leaseExpiresAt = null, int attemptCount = 0, int maxAttempts = 3, string? payloadJson = null) =>
         Execute(

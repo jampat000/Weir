@@ -1,6 +1,6 @@
 # Third-party notices
 
-Weir bundles or installs the following third-party runtime tools for packaged user installs.
+Weir bundles or installs the following third-party runtime tools for packaged user installs. The last section lists source code that Weir derives from another project.
 
 ## FFmpeg
 
@@ -30,3 +30,16 @@ The web app bundles the Outfit typeface locally via the `@fontsource/outfit` pac
 - Project: https://github.com/Outfitio/Outfit-Fonts
 - Package source: https://www.npmjs.com/package/@fontsource/outfit
 - License: https://openfontlicense.org/
+
+## Muxarr
+
+Parts of Weir's server are derived from Muxarr, a tool that strips unwanted audio and subtitle tracks from media files. Muxarr is a third-party project and is not owned by Weir. It is distributed under the GNU General Public License, version 3, which is compatible with Weir's GNU Affero General Public License, version 3.
+
+The derived parts are:
+
+- Regional language variant detection (`apps/server/src/Weir.Core/Rules/LanguageVariants.cs`), from Muxarr's `Muxarr.Core/Language/LanguageVariants.cs`.
+- Remux output validation (`apps/server/src/Weir.Core/Media/RemuxOutputValidation.cs`), from Muxarr's `OutputValidator`.
+- The interrupted-swap recovery sweep (`apps/server/src/Weir.Infrastructure/LibraryMode/SwapRecoverySweep.cs`), which follows Muxarr's backup cleanup and restore approach.
+
+- Project: https://github.com/KirovAir/muxarr
+- License: https://www.gnu.org/licenses/gpl-3.0.html

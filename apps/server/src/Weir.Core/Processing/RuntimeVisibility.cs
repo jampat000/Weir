@@ -3,7 +3,7 @@ using Weir.Core.Rules;
 
 namespace Weir.Core.Processing;
 
-/// <summary>The read-only Processing runtime snapshot (<c>ProcessingRuntimeSettingsOut</c>).</summary>
+/// <summary>The read-only Processing runtime snapshot.</summary>
 public sealed record ProcessingRuntimeSettings
 {
     public required int InProcessProcessingWorkerCount { get; init; }
@@ -38,7 +38,7 @@ public sealed record ProcessingRuntimeSettings
     public required string WorkTempStaleSweepPeriodicConfigurationNote { get; init; }
 }
 
-/// <summary>Port of <c>processing_runtime_visibility.py</c>: maps loaded settings to a DTO, no DB reads.</summary>
+/// <summary>Maps loaded settings to the runtime snapshot, with no database reads.</summary>
 public static class RuntimeVisibility
 {
     private const string SqliteThroughputNote =

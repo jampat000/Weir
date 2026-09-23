@@ -33,7 +33,7 @@ public sealed class FilesAtOnceTests
     [Fact]
     public void A_library_without_its_own_limit_runs_as_many_as_files_at_once_allows()
     {
-        // It used to mean 1, which undercut "Files at once" on every install that never opened the library's own field.
+        // Treating 0 as a limit of 1 would undercut "Files at once" on every install that never opens the library's own field.
         var two = WorkAdmissionRules.Evaluate(Suite, null, [Running(1), Running(1)], [Library(1, 0)], Now, filesAtOnce: 3);
         var three = WorkAdmissionRules.Evaluate(Suite, null, [Running(1), Running(1), Running(1)], [Library(1, 0)], Now, filesAtOnce: 3);
 

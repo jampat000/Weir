@@ -12,7 +12,7 @@ using Weir.Core.Updates;
 
 namespace Weir.Core.Tests.Platform;
 
-/// <summary>Ports of the backend's unit tests for sessions, rate limits, settings, observability, metrics, logs and updates.</summary>
+/// <summary>Sessions, rate limits, settings, observability, metrics, logs and updates.</summary>
 public sealed class PlatformRulesTests
 {
     private static readonly WeirOptions Options = TestRuntime.Load();
@@ -179,12 +179,12 @@ public sealed class PlatformRulesTests
     }
 
     [Fact]
-    public void Failure_messages_classify_like_python()
+    public void Failure_messages_classify_by_class_name_and_text()
     {
-        var credentials = FailureMessages.FromException("Processing", "connection test", new FailureSubject("RuntimeError", "api_key=secret was rejected", ExceptionCategory.Other), provider: "jellyfin");
+        var credentials = FailureMessages.FromException("Processing", "connection test", new FailureSubject("RuntimeError", "api_key=secret was rejected", ExceptionCategory.Other), provider: "sonarr");
         Assert.Equal(FailureKind.Credential, credentials.Kind);
-        Assert.Contains("Processing connection test for Jellyfin failed", credentials.Message, StringComparison.Ordinal);
-        Assert.Contains("Re-enter the Jellyfin credentials", credentials.NextAction, StringComparison.Ordinal);
+        Assert.Contains("Processing connection test for Sonarr failed", credentials.Message, StringComparison.Ordinal);
+        Assert.Contains("Re-enter the Sonarr credentials", credentials.NextAction, StringComparison.Ordinal);
         Assert.Contains("api_key=[redacted]", credentials.TechnicalDetail, StringComparison.Ordinal);
 
         var rate = FailureMessages.FromException("Processing", "subtitle search", new FailureSubject("RuntimeError", "HTTP 429 rate limit", ExceptionCategory.Other), provider: "opensubtitles_com", recoverable: true);
@@ -202,7 +202,7 @@ public sealed class PlatformRulesTests
         Assert.Equal(FailureKind.Auth, FailureMessages.Classify(new FailureSubject("RuntimeError", "403 Forbidden", ExceptionCategory.Other)));
         Assert.Equal(FailureKind.Internal, FailureMessages.Classify(new FailureSubject("RuntimeError", "boom", ExceptionCategory.Other)));
 
-        // .NET exceptions classify as their Python counterparts: the class name is part of what is searched.
+        // .NET exceptions map to the class names stored in technical details, and that name is part of what is searched.
         Assert.Equal(FailureKind.Validation, FailureMessages.Classify(FailureMessages.FromDotNet(new FormatException("bad payload"))));
         Assert.Equal(FailureKind.Network, FailureMessages.Classify(FailureMessages.FromDotNet(new IOException("pipe broke"))));
         Assert.Equal(FailureKind.NotFound, FailureMessages.Classify(FailureMessages.FromDotNet(new InvalidOperationException("file not found"))));
@@ -210,8 +210,8 @@ public sealed class PlatformRulesTests
         Assert.Equal(FailureKind.RateLimit, FailureMessages.Classify(FailureMessages.RuntimeError("HTTP 429")));
         Assert.Equal("PermissionError: denied", FailureMessages.FromException("Processing", "job", FailureMessages.FromDotNet(new UnauthorizedAccessException("denied"))).TechnicalDetail);
 
-        // #540 item 7: a blank provider is not named, and the fallback no longer doubles "the" (was
-        // "Re-enter the the provider credentials...").
+        // #540 item 7: a blank provider is not named, and the fallback says "the" once, not
+        // "Re-enter the the provider credentials...".
         var blank = FailureMessages.FromException("Processing", "sync", new FailureSubject("RuntimeError", "401", ExceptionCategory.Other), provider: "   ");
         Assert.Equal(("Processing sync failed: The service from  rejected the credentials or permission level. This job is marked failed so it does not look successful.", "Re-enter the provider credentials and run the connection test again."), (blank.Message, blank.NextAction));
     }
@@ -219,11 +219,11 @@ public sealed class PlatformRulesTests
     [Fact]
     public void Diagnostics_and_operator_messages_keep_the_shared_shape()
     {
-        var safe = new DiagnosticEvent("processing", "preview", "scheduled", "failed", Diagnostics.SeverityForResult("failed"), "Jellyfin", "movies", "job-123",
-            "Provider returned api_key=abc123 as rejected", "Re-enter the Jellyfin API key and run the connection test again.",
+        var safe = new DiagnosticEvent("processing", "preview", "scheduled", "failed", Diagnostics.SeverityForResult("failed"), "Sonarr", "movies", "job-123",
+            "Provider returned api_key=abc123 as rejected", "Re-enter the Sonarr API key and run the connection test again.",
             [new("scanned", 4), new("failed", 1)]).AsSafeDict();
         Assert.Equal(
-            "{\"module\":\"processing\",\"action\":\"preview\",\"trigger\":\"scheduled\",\"result\":\"failed\",\"severity\":\"error\",\"provider\":\"Jellyfin\",\"media_scope\":\"movies\",\"correlation_id\":\"job-123\",\"reason\":\"Provider returned api_key=[redacted] as rejected\",\"next_action\":\"Re-enter the Jellyfin API key and run the connection test again.\",\"counts\":{\"scanned\":4,\"failed\":1}}",
+            "{\"module\":\"processing\",\"action\":\"preview\",\"trigger\":\"scheduled\",\"result\":\"failed\",\"severity\":\"error\",\"provider\":\"Sonarr\",\"media_scope\":\"movies\",\"correlation_id\":\"job-123\",\"reason\":\"Provider returned api_key=[redacted] as rejected\",\"next_action\":\"Re-enter the Sonarr API key and run the connection test again.\",\"counts\":{\"scanned\":4,\"failed\":1}}",
             PyJsonWriter.Dumps(safe, PyJsonFormat.Response));
         Assert.Equal(["info", "info", "warning", "error"], new[] { "success", "skipped", "retrying", "failed" }.Select(Diagnostics.SeverityForResult));
         Assert.Equal(
@@ -232,13 +232,13 @@ public sealed class PlatformRulesTests
                 OperatorMessages.ActivityDetailEnvelope("processing", "search", "worker", "skipped", "opensubtitles", "movies", [new("checked", 1), new("downloaded", 0), new("bad_flag", null)], "No subtitle was found."),
                 PyJsonFormat.Response));
         Assert.Equal("{\"failed\":0,\"removed\":3}", PyJsonWriter.Dumps(OperatorMessages.CountSummary([new("failed", -5), new("removed", 3)]), PyJsonFormat.Response));
-        Assert.Equal(("Jellyfin", "TV episodes"), (OperatorMessages.ProviderLabel("jellyfin"), OperatorMessages.MediaScopeLabel("tv")));
+        Assert.Equal(("Deluno", "TV episodes"), (OperatorMessages.ProviderLabel("deluno"), OperatorMessages.MediaScopeLabel("tv")));
         Assert.Equal(5, MetricsTruth.FinalizedSuccessTotal(new Dictionary<string, long> { ["output_written"] = 2, ["unchanged_copied"] = 3 }));
         Assert.Contains("must not be negative", Assert.Throws<PyValueErrorException>(() => MetricsTruth.RequireNonNegative(new Dictionary<string, long> { ["files_processed"] = -1 })).Message, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Runtime_metrics_render_like_python()
+    public void Runtime_metrics_render_as_prometheus_text_and_a_summary()
     {
         var store = new RuntimeMetricsStore(new ManualTimeProvider());
         store.RecordRequest("GET", "/api/v1/health", 200, 12.5);
@@ -288,7 +288,7 @@ public sealed class PlatformRulesTests
     }
 
     [Fact]
-    public void Release_versions_and_update_status_match_python()
+    public void Release_versions_and_update_status_are_reported_exactly()
     {
         Assert.Equal("2.0.8", ReleaseCatalog.NormalizeReleaseVersion("v2.0.8"));
         Assert.Equal("v2.0.8", ReleaseCatalog.TagForVersion("2.0.8"));
@@ -318,7 +318,7 @@ public sealed class PlatformRulesTests
     }
 
     [Fact]
-    public void Notification_rules_and_url_policy_match_python()
+    public void Notification_rules_and_url_policy_refuse_with_exact_messages()
     {
         string Error(string label, string provider, string url, params string[] events) =>
             Assert.Throws<PyValueErrorException>(() => NotificationRules.Validate(label, provider, url, events)).Message;
@@ -346,9 +346,9 @@ public sealed class PlatformRulesTests
     [Fact]
     public void Job_notification_wording_is_retry_aware()
     {
-        // #540 item 6: Python always says "exhausted all retry attempts" for a failed event, even the
-        // attempt about to retry. Fixed here to say a retry is coming instead, using the same #488
-        // vocabulary WorkerFailures already uses for the stored job error.
+        // #540 item 6: a failed attempt that is about to retry says a retry is coming rather than
+        // "exhausted all retry attempts", using the same #488 vocabulary WorkerFailures uses for the
+        // stored job error.
         Assert.Equal(
             ("processing_job_completed", "Weir job completed", "Job 5 (processing.test.v1) finished successfully."),
             NotificationRules.JobNotification("processing", "completed", 5, "processing.test.v1"));

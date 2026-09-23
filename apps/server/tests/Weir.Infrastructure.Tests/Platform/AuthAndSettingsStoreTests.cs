@@ -155,7 +155,7 @@ public sealed class AuthAndSettingsStoreTests
     [Fact]
     public async Task An_expired_session_is_revoked_even_when_the_request_rolls_back()
     {
-        // Deliberate fix (#529): Python's revoke is lost with the request's rollback.
+        // #529: the revoke is committed on its own, so the request's rollback cannot undo it.
         using var fixture = new StoreFixture();
         var userId = await fixture.WithUnitOfWork(uow => AuthStore.InsertUserAsync(uow, "alice", "x", "admin", true));
         var (_, raw) = await fixture.WithUnitOfWork(uow => fixture.Auth.CreateSessionAsync(uow, new UserRecord(userId, "alice", "x", "admin", true), false, "b"));
@@ -198,7 +198,7 @@ public sealed class AuthAndSettingsStoreTests
     }
 
     [Fact]
-    public async Task Username_and_password_changes_follow_the_python_rules()
+    public async Task Username_and_password_changes_follow_the_documented_rules()
     {
         using var fixture = new StoreFixture();
         var id = await fixture.WithUnitOfWork(uow => AuthStore.InsertUserAsync(uow, "alice", PasswordHasher.Hash(Password), "admin", true));
@@ -279,7 +279,7 @@ public sealed class AuthAndSettingsStoreTests
     [Fact]
     public void Log_lines_with_invalid_utf8_are_read_with_replacement_characters()
     {
-        // Deliberate fix (#536): Python's reader fails the request on one bad byte.
+        // #536: one bad byte must not fail the whole read.
         using var directory = new TempDirectory();
         var path = directory.Join("weir.log");
         File.WriteAllBytes(path, [.. Encoding.UTF8.GetBytes("{\"timestamp\":\"2099-01-01T00:00:00Z\",\"level\":\"INFO\",\"logger\":\"weir.x\",\"message\":\"bad "), 0xFF, .. "\"}\n"u8]);

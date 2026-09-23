@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Library;
 using Weir.Core.LibraryMode;
 using Weir.Core.Rules;
@@ -172,7 +173,7 @@ public sealed class Issue557MigrationTests : IDisposable
         Upgrade();
 
         await using var uow = await UnitOfWork.OpenAsync(_database);
-        var snapshot = await LibraryScanStore.LatestSnapshotAsync(uow, 1);
+        var snapshot = await LibraryScanStore.LatestSnapshotAsync(uow, 1, NullLogger.Instance);
         Assert.NotNull(snapshot);
         Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1700000000), snapshot!.GeneratedAt);
         Assert.Equal(["Weir could not ask Sonarr which titles it manages: timed out"], snapshot.Errors);
@@ -244,7 +245,7 @@ public sealed class Issue557MigrationTests : IDisposable
 
         Upgrade();
 
-        var store = new FileLogRemovedTrackStore(_database);
+        var store = new FileLogRemovedTrackStore(_database, TimeProvider.System);
         var structured = await store.GetAsync(new RemovedTrackFileKey(1, "A.mkv"));
         Assert.Equal(2, structured.Count);
         Assert.Equal("jpn", structured[0].Language);
@@ -302,11 +303,11 @@ public sealed class Issue557MigrationTests : IDisposable
         Assert.Equal(["/lib/a"], settings.Folders);
         Assert.True(settings.ScheduleEnabled);
 
-        var snapshot = await LibraryScanStore.LatestSnapshotAsync(uow, 1);
+        var snapshot = await LibraryScanStore.LatestSnapshotAsync(uow, 1, NullLogger.Instance);
         Assert.NotNull(snapshot);
         Assert.Equal("A.mkv", Assert.Single(snapshot!.Files).Path);
 
-        var removedTrackStore = new FileLogRemovedTrackStore(_database);
+        var removedTrackStore = new FileLogRemovedTrackStore(_database, TimeProvider.System);
         var tracks = await removedTrackStore.GetAsync(new RemovedTrackFileKey(1, "A.mkv"));
         Assert.Equal("jpn", Assert.Single(tracks).Language);
     }

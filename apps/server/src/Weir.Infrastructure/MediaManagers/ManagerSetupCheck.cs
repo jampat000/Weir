@@ -106,7 +106,7 @@ public sealed class ManagerSetupCheck
         return (result.Hosts, result.Lines);
     }
 
-    /// <summary>Queued downloads' <c>outputPath</c>s, through the port's own queue read; none when the queue cannot be read.</summary>
+    /// <summary>Queued downloads' <c>outputPath</c>s, through the manager port's own queue read; none when the queue cannot be read.</summary>
     private async Task<IReadOnlyList<string>> QueueOutputPathsAsync(ManagerConnection connection, CancellationToken cancellationToken)
     {
         if (_connections.Ports.PortForKind(connection.Kind) is not { } port)

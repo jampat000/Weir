@@ -2,7 +2,7 @@ namespace Weir.Infrastructure.Logging;
 
 /// <summary>
 /// Per-request and per-job identifiers that every log line carries as <c>correlation_id</c> and
-/// <c>job_id</c> (port of <c>weir.platform.http.request_context</c>).
+/// <c>job_id</c>.
 /// </summary>
 public static class LogContext
 {

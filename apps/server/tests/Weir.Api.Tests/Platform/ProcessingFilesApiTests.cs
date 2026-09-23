@@ -24,7 +24,7 @@ public sealed class ProcessingFilesApiTests
     [Theory]
     [InlineData("passed_through")]
     [InlineData("rejected")]
-    public async Task Filtering_by_either_bug_530_status_answers_200_not_422(string status)
+    public async Task Filtering_by_passed_through_or_rejected_answers_200_not_422(string status)
     {
         await using var server = await ApiTestClient.StartServerAsync();
         await TestDatabase.SeedAdminAsync(server);

@@ -31,9 +31,9 @@ public sealed record VariantDetection(string? Identifier, VariantSource Source, 
 /// <summary>
 /// Issue #496: tells regional language variants apart (Quebec vs France French, Latin American vs
 /// Castilian Spanish, Brazilian vs European Portuguese, Traditional vs Simplified Chinese,
-/// Cantonese vs Mandarin, Flemish) from a track's name or an explicit BCP 47 region/script subtag,
-/// ported from Muxarr's <c>Muxarr.Core/Language/LanguageVariants.cs</c> (the owner cleared copying
-/// its behaviour; see the issue).
+/// Cantonese vs Mandarin, Flemish) from a track's name or an explicit BCP 47 region/script subtag.
+/// Derived from Muxarr's <c>Muxarr.Core/Language/LanguageVariants.cs</c> (https://github.com/KirovAir/muxarr,
+/// GPL-3.0); see THIRD_PARTY_NOTICES.md.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -396,7 +396,7 @@ public static class LanguageVariants
         return VariantDetection.None;
     }
 
-    /// <summary><c>detect_variant(title, base_code, bcp47_tag) -&gt; identifier</c>, the public entry point named by issue #496.</summary>
+    /// <summary>The detected identifier alone, or null: the public entry point issue #496 names.</summary>
     public static string? DetectVariant(string? title, string? baseCode, string? bcp47Tag = null) => Detect(title, baseCode, bcp47Tag).Identifier;
 
     // --- rule matching and config normalization ------------------------------------------

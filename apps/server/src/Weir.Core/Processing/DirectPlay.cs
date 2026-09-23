@@ -1,6 +1,6 @@
 namespace Weir.Core.Processing;
 
-/// <summary>One device's playback capabilities (<c>DeviceProfile</c>).</summary>
+/// <summary>One device's playback capabilities.</summary>
 public sealed record DeviceProfile(
     string Id,
     string Name,
@@ -16,14 +16,14 @@ public sealed record DeviceProfile(
 /// <summary>A codec's playable limits (<c>max_height</c>, <c>max_bit_depth</c>, allowed <c>containers</c>).</summary>
 public sealed record DeviceVideoLimits(int? MaxHeight, int? MaxBitDepth, IReadOnlySet<string>? Containers);
 
-/// <summary>What the pass measured. Null means not measured, and is never read as "no" (<c>MediaFacts</c>).</summary>
+/// <summary>What the pass measured. Null means not measured, and is never read as "no".</summary>
 public sealed record MediaFacts(string? Container, string? VideoCodec, long? VideoHeight, long? VideoBitDepth, IReadOnlyList<string>? AudioCodecs);
 
-/// <summary>One device's answer for one file (<c>DirectPlayVerdict</c>).</summary>
+/// <summary>One device's answer for one file.</summary>
 public sealed record DirectPlayVerdict(string DeviceId, string DeviceName, string Verdict, IReadOnlyList<string> Reasons);
 
 /// <summary>
-/// Which of the operator's devices can play a file without conversion (port of <c>processing/direct_play/__init__.py</c>, #467).
+/// Which of the operator's devices can play a file without conversion (#467).
 /// Information only: nothing here may feed a processing decision.
 /// </summary>
 public static class DirectPlayEvaluation
@@ -55,7 +55,7 @@ public static class DirectPlayEvaluation
         ["mpeg2video"] = "MPEG-2",
     };
 
-    /// <summary><c>container_for_path</c>.</summary>
+    /// <summary>The container a file's extension names, lower-cased; null when it has none.</summary>
     public static string? ContainerForPath(string relativePath)
     {
         var suffix = Path.GetExtension(relativePath);
@@ -88,7 +88,7 @@ public static class DirectPlayEvaluation
         return (true, null);
     }
 
-    /// <summary><c>evaluate</c>: one device's answer, with reasons an operator can act on.</summary>
+    /// <summary>One device's answer, with reasons an operator can act on.</summary>
     public static DirectPlayVerdict Evaluate(DeviceProfile profile, MediaFacts facts)
     {
         var no = new List<string>();

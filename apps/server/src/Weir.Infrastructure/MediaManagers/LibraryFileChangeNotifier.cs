@@ -53,14 +53,14 @@ public sealed class LibraryFileChangeNotifier : ILibraryFileChangeNotifier
         MediaManagerConnectionService connections,
         SqliteDatabase database,
         IActivityWriter activity,
-        TimeProvider? time = null,
+        TimeProvider time,
         ILogger<LibraryFileChangeNotifier>? logger = null,
         Func<int, CancellationToken, Task>? delay = null)
     {
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _activity = activity ?? throw new ArgumentNullException(nameof(activity));
-        _time = time ?? TimeProvider.System;
+        _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = (ILogger?)logger ?? NullLogger.Instance;
         _delay = delay ?? DefaultDelayAsync;
     }

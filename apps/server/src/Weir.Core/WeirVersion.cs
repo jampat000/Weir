@@ -3,7 +3,7 @@ using System.Reflection;
 namespace Weir.Core;
 
 /// <summary>
-/// The version the server reports: <c>WEIR_VERSION</c> when set (as in Python's <c>get_version</c>),
+/// The version the server reports: <c>WEIR_VERSION</c> when set,
 /// otherwise the build's version, which MSBuild takes from <c>WeirVersion</c> in <c>apps/server/Directory.Build.props</c>.
 /// </summary>
 public static class WeirVersion

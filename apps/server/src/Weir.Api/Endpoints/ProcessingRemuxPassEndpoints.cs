@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Routing;
 using Weir.Api.Http;
 using Weir.Core.Auth;
+using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Jobs;
@@ -8,7 +9,7 @@ using Weir.Infrastructure.Processing.RemuxPass;
 
 namespace Weir.Api.Endpoints;
 
-/// <summary>Manual enqueue of one per-file pass (port of <c>file_remux_pass/api.py</c>).</summary>
+/// <summary>Manual enqueue of one per-file pass.</summary>
 public static class ProcessingRemuxPassEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingRemuxPassEndpoints(this IEndpointRouteBuilder endpoints)
@@ -34,7 +35,7 @@ public static class ProcessingRemuxPassEndpoints
         request.RequireConfirmationToken(csrfToken, "Invalid or expired CSRF token.");
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        Weir.Core.Jobs.ProcessingJob job;
+        ProcessingJob job;
         try
         {
             job = await RemuxPassEnqueue.EnqueueManualAsync(uow, request.Service<ProcessingJobStore>(), relativeMediaPath, mediaScope, libraryId, passThrough)

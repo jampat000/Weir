@@ -9,7 +9,7 @@ using static Weir.Api.Tests.Platform.ApiTestClient;
 
 namespace Weir.Api.Tests.Platform;
 
-/// <summary>Ports of <c>test_activity_history.py</c> (the API half) and <c>test_activity_stream.py</c>, on a real temp SQLite database.</summary>
+/// <summary>The activity history and stream APIs, on a real temp SQLite database.</summary>
 public sealed class ActivityApiTests
 {
     private static readonly (string Title, string Detail)[] HistoryRows =
@@ -88,9 +88,8 @@ public sealed class ActivityApiTests
     [Fact]
     public async Task Without_a_filter_the_total_counts_every_matching_row()
     {
-        // #543 item 1: Python's count query replaces the selected columns with count(*), which drops FROM
-        // when nothing filters ("SELECT count(*)" is 1), so its total is just the page size and has_more is
-        // always false. Fixed here: always count from activity_events, filtered or not.
+        // #543 item 1: the total always counts from activity_events, filtered or not. A count that drops FROM
+        // when nothing filters ("SELECT count(*)" is 1) would make the total the page size and has_more always false.
         await using var server = await SeededServerAsync();
         var client = await AdminAsync(server);
         using var response = await client.GetAsync("/api/v1/activity/recent?limit=2");
@@ -100,7 +99,7 @@ public sealed class ActivityApiTests
     }
 
     [Fact]
-    public async Task Query_validation_and_dates_answer_as_fastapi_does()
+    public async Task Query_validation_and_dates_answer_with_the_documented_errors()
     {
         await using var server = await SeededServerAsync();
         var client = await AdminAsync(server);
@@ -172,7 +171,7 @@ public sealed class ActivityApiTests
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
         Assert.Equal(
             "{\"relative_path\":\"Heat/heat.mkv\",\"activity_events\":2,\"processing_records\":1,\"message\":\"This removes 2 Activity events and 1 processing record about Heat/heat.mkv. " +
-            "It does not touch the file itself, its current status on the Files screen, or anything else's history.\"}",
+            "It does not touch the file itself, its current status in Weir, or anything else's history.\"}",
             await preview.Content.ReadAsStringAsync());
 
         using var removed = await client.PostAsync(

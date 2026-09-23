@@ -5,13 +5,13 @@ using Weir.Core.MediaManagers;
 
 namespace Weir.Infrastructure.MediaManagers;
 
-/// <summary><c>port_for_kind</c>: the outbound dialect for a kind, or null for a kind Weir does not know.</summary>
+/// <summary>The outbound dialect for a kind, or null for a kind Weir does not know.</summary>
 public interface IMediaManagerPorts
 {
     IMediaManagerPort? PortForKind(string? kind);
 }
 
-/// <summary>The four ports over HTTP (port of <c>manager_dialects._PORTS</c>).</summary>
+/// <summary>The manager ports over HTTP, one per known kind.</summary>
 public sealed class HttpMediaManagerPorts : IMediaManagerPorts
 {
     private readonly IManagerHttpHandlerFactory _handlers;
@@ -25,7 +25,7 @@ public sealed class HttpMediaManagerPorts : IMediaManagerPorts
         ManagerKindProfiles.ForKind(kind) is { } profile ? new HttpMediaManagerPort(profile, _handlers) : null;
 
     /// <summary>
-    /// <c>environment_connection_for_scope</c>: the <c>WEIR_ARR_*</c> credentials that predate the connections table.
+    /// A connection from the <c>WEIR_ARR_*</c> credentials that predate the connections table, or null when unset.
     /// </summary>
     public static ManagerConnection? EnvironmentConnectionForScope(WeirOptions options, string mediaScope)
     {
@@ -39,7 +39,7 @@ public sealed class HttpMediaManagerPorts : IMediaManagerPorts
     }
 }
 
-/// <summary><c>ArrV3ManagerPort</c> and <c>ExternalIntegrationManagerPort</c>, chosen by the kind's profile.</summary>
+/// <summary>One manager over HTTP; the kind's profile chooses the Sonarr/Radarr v3 dialect or the external-integration one.</summary>
 public sealed class HttpMediaManagerPort : IMediaManagerPort
 {
     private readonly ManagerKindProfile _profile;

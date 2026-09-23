@@ -1,9 +1,9 @@
 namespace Weir.Core.Media;
 
-/// <summary>pathlib's <c>name</c>, <c>suffix</c> and <c>stem</c>, which differ from <see cref="Path"/>'s for dot files.</summary>
+/// <summary>A path's name, suffix and stem, where a dot file such as <c>.hidden</c> has no suffix (unlike <see cref="Path"/>).</summary>
 public static class MediaPathNames
 {
-    /// <summary><c>PurePath.name</c>: the final component.</summary>
+    /// <summary>The final component.</summary>
     public static string Name(string path, bool windows)
     {
         ArgumentNullException.ThrowIfNull(path);
@@ -13,7 +13,7 @@ public static class MediaPathNames
         return name == "." ? string.Empty : name;
     }
 
-    /// <summary><c>PurePath.suffix</c>: empty for <c>.bashrc</c> and for a name ending in a dot.</summary>
+    /// <summary>The final component's last dot-suffix: empty for <c>.bashrc</c> and for a name ending in a dot.</summary>
     public static string Suffix(string path, bool windows)
     {
         var name = Name(path, windows);
@@ -21,7 +21,7 @@ public static class MediaPathNames
         return i > 0 && i < name.Length - 1 ? name[i..] : string.Empty;
     }
 
-    /// <summary><c>PurePath.stem</c>.</summary>
+    /// <summary>The final component without its suffix.</summary>
     public static string Stem(string path, bool windows)
     {
         var name = Name(path, windows);

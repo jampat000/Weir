@@ -5,22 +5,21 @@ using Weir.Infrastructure.MediaManagers;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
-/// <summary>A free-space check before a write-heavy step (<c>DiskSpaceCheck</c>).</summary>
+/// <summary>A free-space check before a write-heavy step.</summary>
 public sealed record DiskSpaceCheck(bool Ok, string CheckedPath, double FreeMb, long RequiredMb, string Message);
 
 /// <summary>
-/// Recoverable file writes and moves for media mutations (port of <c>platform/file_lifecycle/mutations.py</c> and
-/// <c>guardrails.py</c>): nothing partial is ever exposed at a final path.
+/// Recoverable file writes and moves for media mutations: nothing partial is ever exposed at a final path.
 /// </summary>
 public static partial class FileLifecycle
 {
     private const int CopyChunkBytes = 8 * 1024 * 1024;
     private const long BytesPerMib = 1024 * 1024;
 
-    /// <summary><c>bytes_to_mb</c>.</summary>
+    /// <summary>Bytes as MiB, never negative.</summary>
     public static double BytesToMb(long sizeBytes) => Math.Max(0.0, sizeBytes / (double)BytesPerMib);
 
-    /// <summary><c>nearest_existing_parent</c>: the path itself when it is an existing directory, else its closest existing ancestor.</summary>
+    /// <summary>The path itself when it is an existing directory, else its closest existing ancestor.</summary>
     public static string NearestExistingParent(string path)
     {
         var current = Directory.Exists(path) ? path : Path.GetDirectoryName(path) ?? path;
@@ -38,7 +37,8 @@ public static partial class FileLifecycle
         return current;
     }
 
-    /// <summary><c>check_minimum_free_disk_space</c>. A requirement of zero turns the check off.</summary>
+    /// <summary>Whether the drive holding <paramref name="targetPath"/> has at least <paramref name="requiredMb"/> free.
+    /// A requirement of zero turns the check off.</summary>
     public static DiskSpaceCheck CheckMinimumFreeDiskSpace(string targetPath, long requiredMb, Func<string, long>? freeBytes = null)
     {
         var required = Math.Max(0, requiredMb);
@@ -59,8 +59,8 @@ public static partial class FileLifecycle
     private static long AvailableFreeBytes(string path) => new DriveInfo(Path.GetFullPath(path)).AvailableFreeSpace;
 
     /// <summary>
-    /// <c>safe_copy_to_final</c>: copy into a hidden <c>.{name}.XXXXXXXX.partial</c> beside the destination, validate it,
-    /// then atomically replace the destination. A failed copy or validation leaves nothing behind.
+    /// Copies into a hidden <c>.{name}.XXXXXXXX.partial</c> beside the destination, validates it, then atomically
+    /// replaces the destination. A failed copy or validation leaves nothing behind.
     /// </summary>
     public static async Task SafeCopyToFinalAsync(
         string source,
@@ -147,7 +147,7 @@ public static partial class FileLifecycle
     }
 
     /// <summary>
-    /// <c>try_hardlink_to_final</c>: validate and atomically expose a same-volume hard link. False means the link was refused
+    /// Validates and atomically exposes a same-volume hard link. False means the link was refused
     /// and the caller should copy; validation and publication errors still throw.
     /// </summary>
     public static async Task<bool> TryHardlinkToFinalAsync(string source, string final, Func<string, Task>? validateStaged = null, IOutputOwnership? ownership = null)
@@ -185,25 +185,23 @@ public static partial class FileLifecycle
         }
 
         // A hard link shares one inode with the source, so the ownership/mode change lands on the source's file
-        // too (and its other names, if any) — the same trade-off Python accepted for this fast path.
+        // too (and its other names, if any). That is the accepted cost of this fast path.
         ownership?.ApplyToFile(Path.GetFullPath(final));
         return true;
     }
 
     /// <summary>
-    /// <c>safe_finalize_file</c>: the staged file is moved to a hidden <c>.{name}.XXXXXXXX.partial</c> beside the destination,
-    /// then renamed onto the destination, so the destination only ever appears complete.
+    /// Moves the staged file to a hidden <c>.{name}.XXXXXXXX.partial</c> beside the destination, then renames it onto the
+    /// destination, so the destination only ever appears complete.
     /// </summary>
     /// <remarks>
-    /// Python's <c>os.replace</c> refuses to cross volumes, which is what made "rename, else copy to a partial" safe there.
-    /// .NET's <see cref="File.Move(string, string, bool)"/> does not refuse: across volumes it copies straight to the name it
-    /// is given and then deletes the source (dotnet/runtime@release/10.0 <c>System/IO/FileSystem.Unix.cs</c> L190-202, the
-    /// <c>EXDEV</c> branch; on Windows every move passes <c>MOVEFILE_COPY_ALLOWED</c>, <c>Interop.MoveFileEx.cs</c> L35). The
-    /// default work folder lives under Weir's home, which in Docker is usually another volume from the output folder, so a
-    /// direct move exposed a half-written file at its final name — exactly what Sonarr or Radarr importing from the output
-    /// folder through a remote path mapping must never see. Moving to the partial first keeps any such copy under a hidden,
-    /// non-video name; the last step is a rename within one directory, which is atomic on every filesystem. Same-volume
-    /// finalisation is still two renames and no copy.
+    /// <see cref="File.Move(string, string, bool)"/> does not refuse to cross volumes: it copies straight to the name it is
+    /// given and then deletes the source (the <c>EXDEV</c> branch on Unix; on Windows every move passes
+    /// <c>MOVEFILE_COPY_ALLOWED</c>). The default work folder lives under Weir's home, which in Docker is usually another
+    /// volume from the output folder, so a direct move would expose a half-written file at its final name, which Sonarr or
+    /// Radarr importing from the output folder through a remote path mapping must never see. Moving to the partial first
+    /// keeps any such copy under a hidden, non-video name; the last step is a rename within one directory, which is atomic
+    /// on every filesystem. Same-volume finalisation is two renames and no copy.
     /// </remarks>
     public static void SafeFinalizeFile(string staged, string final, IOutputOwnership? ownership = null) =>
         SafeFinalizeFile(staged, final, ownership, File.Move);
@@ -269,7 +267,7 @@ public static partial class FileLifecycle
         }
     }
 
-    /// <summary><c>_best_effort_unlink</c>.</summary>
+    /// <summary>Deletes a file if it can; a failure is ignored.</summary>
     public static void BestEffortDelete(string path)
     {
         try

@@ -9,7 +9,7 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
-/// <summary>Short SQLite writes that retry briefly when another local writer holds the lock (<c>_retry_locked_write</c>).</summary>
+/// <summary>Short SQLite writes that retry briefly when another local writer holds the lock.</summary>
 public static class LockedWrites
 {
     private const int Attempts = 4;
@@ -100,7 +100,7 @@ public sealed class SqliteRemuxPassData : IRemuxPassFileFacts, IPostSuccessClean
         }
     }
 
-    /// <summary>Issue #545 item 1: has the ledger already recorded this hand-off's outcome as delivered?</summary>
+    /// <summary>Whether the ledger already recorded this hand-off's outcome as delivered (#545).</summary>
     public async Task<bool> HandoffOutcomeAcknowledgedAsync(HandoffOrigin? origin, CancellationToken cancellationToken)
     {
         if (origin is not { HandoffId.Length: > 0 })
@@ -116,7 +116,8 @@ public sealed class SqliteRemuxPassData : IRemuxPassFileFacts, IPostSuccessClean
         }
     }
 
-    /// <summary><c>_commit_cleanup_session</c>: optional metadata must never make a safe file mutation look like a failed remux.</summary>
+    /// <summary>Commits optional file metadata, logging a failure instead of throwing: optional metadata must never make
+    /// a safe file mutation look like a failed remux.</summary>
     private async Task BestEffortAsync(Func<UnitOfWork, Task> work, string label, CancellationToken cancellationToken)
     {
         try
@@ -131,7 +132,7 @@ public sealed class SqliteRemuxPassData : IRemuxPassFileFacts, IPostSuccessClean
 }
 
 /// <summary>
-/// #537 item 4: the original language from the configured metadata provider. Movies only, because the provider port asks
+/// The original language from the configured metadata provider (#537). Movies only, because the provider lookup asks
 /// about movies; a TV episode, an unconfigured provider or an unreadable name declines, and the language preferences decide.
 /// </summary>
 public sealed class MetadataProviderOriginalLanguageLookup : IOriginalLanguageLookup

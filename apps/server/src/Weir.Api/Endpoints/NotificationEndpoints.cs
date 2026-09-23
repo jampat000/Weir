@@ -13,7 +13,7 @@ using Weir.Infrastructure.Notifications;
 
 namespace Weir.Api.Endpoints;
 
-/// <summary>Notification channels (port of <c>weir.platform.notifications.router</c>) and <c>GET /metrics</c>.</summary>
+/// <summary>Notification channels and <c>GET /metrics</c>.</summary>
 public static class NotificationEndpoints
 {
     private const string ConfirmationExpired = "Your confirmation token expired. Refresh the page and try again.";
@@ -156,7 +156,7 @@ public static class NotificationEndpoints
         return ApiRoutes.Ok(new PyDict().Set("ok", error is null).Set("error", error));
     }
 
-    /// <summary><c>require_metrics_access</c>: a matching bearer token, or an operator or admin session.</summary>
+    /// <summary>Metrics access needs a matching bearer token, or an operator or admin session.</summary>
     private static async Task<ApiResult> MetricsAsync(ApiRequest request)
     {
         var bearer = BearerToken(request.FirstHeader("Authorization"));

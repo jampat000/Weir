@@ -1,9 +1,12 @@
+using Microsoft.Data.Sqlite;
 using Weir.Core.Jobs;
+using Weir.Core.Time;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
 
-/// <summary>Read-only <c>jobs</c> listing for operators (port of <c>jobs_inspection_service.py</c>).</summary>
+/// <summary>Read-only <c>jobs</c> listing for operators.</summary>
 public static class JobsInspectionStore
 {
     private static readonly HashSet<string> AllowedStatuses = new(StringComparer.Ordinal)
@@ -12,7 +15,7 @@ public static class JobsInspectionStore
         ProcessingJobStatus.Failed, ProcessingJobStatus.HandlerOkFinalizeFailed, ProcessingJobStatus.Cancelled,
     };
 
-    /// <summary><c>validate_processing_inspection_statuses</c>.</summary>
+    /// <summary>Throws <see cref="ArgumentException"/> naming any status filter value that is not a known job status.</summary>
     public static void ValidateStatuses(IReadOnlyList<string> statuses)
     {
         var unknown = statuses.Where(s => !AllowedStatuses.Contains(s)).ToList();
@@ -24,14 +27,13 @@ public static class JobsInspectionStore
     }
 
     /// <summary>
-    /// <c>list_jobs_for_inspection</c>: up to <paramref name="limit"/> rows, newest <c>updated_at</c>
+    /// Up to <paramref name="limit"/> rows, newest <c>updated_at</c>
     /// first. With no status filter, excludes completed watched-folder scan-dispatch rows so frequent,
     /// successful periodic checks do not crowd out real work.
     /// </summary>
     public static async Task<(List<ProcessingJob> Rows, bool DefaultRecentSlice)> ListAsync(UnitOfWork uow, int limit, IReadOnlyList<string>? statuses)
     {
-        const string columns = "id, dedupe_key, job_kind, payload_json, status, lease_owner, lease_expires_at, attempt_count, " +
-                                "max_attempts, last_error, not_before, runner_cost, priority, created_at, updated_at";
+        const string columns = ProcessingJobStore.JobColumns;
         if (statuses is { Count: > 0 })
         {
             var placeholders = string.Join(",", statuses.Select((_, i) => $"@status{i}"));
@@ -50,9 +52,11 @@ public static class JobsInspectionStore
         return (recent, true);
     }
 
-    private static DateTimeOffset? ToOffset(Weir.Core.Time.PyDateTime? value) => value is { } v ? new DateTimeOffset(v.AsUtc, TimeSpan.Zero) : null;
+    private static DateTimeOffset? ToOffset(PyDateTime? value) => value is { } v ? new DateTimeOffset(v.AsUtc, TimeSpan.Zero) : null;
 
-    private static ProcessingJob Read(Microsoft.Data.Sqlite.SqliteDataReader reader) => new(
+    // Timestamps go through the strict ISO reader in SqliteValues rather than ProcessingJobStore.ReadJob's parser: the two
+    // differ on unusual stored text, and the inspection API keeps its existing output and errors.
+    private static ProcessingJob Read(SqliteDataReader reader) => new(
         reader.GetInt64(0),
         reader.GetString(1),
         reader.GetString(2),

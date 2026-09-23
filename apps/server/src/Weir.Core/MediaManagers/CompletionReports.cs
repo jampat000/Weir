@@ -3,10 +3,10 @@ using Weir.Core.Text;
 
 namespace Weir.Core.MediaManagers;
 
-/// <summary>The manager-supplied half of a hand-off, carried on the job payload (<c>HandoffOrigin</c>).</summary>
+/// <summary>The manager-supplied half of a hand-off, carried on the job payload.</summary>
 public sealed record HandoffOrigin(string SourceKey, string? HandoffId, string? CallbackPath, string? ReleaseName, string? LibraryId = null)
 {
-    /// <summary><c>HandoffOrigin.from_payload</c>: null unless the payload has an origin naming its source.</summary>
+    /// <summary>Reads the payload's <c>origin</c>; null unless it names its source.</summary>
     public static HandoffOrigin? FromPayload(PyJson? payload)
     {
         if (payload is not PyDict dict || dict.Get("origin") is not PyDict origin)
@@ -28,7 +28,7 @@ public sealed record HandoffOrigin(string SourceKey, string? HandoffId, string? 
             OptionalText(origin.Get("library_id")));
     }
 
-    /// <summary><c>_optional_text</c>: <c>str(value).strip()</c> of a truthy value, or null.</summary>
+    /// <summary>A truthy value as stripped text, or null when absent, falsy or blank.</summary>
     public static string? OptionalText(PyJson? value)
     {
         if (Truthy(value) is not { } present)
@@ -46,7 +46,7 @@ public sealed record HandoffOrigin(string SourceKey, string? HandoffId, string? 
 /// <summary>Whether a manager accepted a report. <see cref="Accepted"/> is only ever true on a 2xx answer.</summary>
 public sealed record HandoffReportDelivery(bool Accepted, string Status);
 
-/// <summary>The report body and its wording (port of the pure parts of <c>completion_callback</c>).</summary>
+/// <summary>The completion report body a manager receives, and its wording.</summary>
 public static class CompletionReports
 {
     public const string ProcessorName = "Weir";
@@ -61,14 +61,14 @@ public static class CompletionReports
     private static string Outcome(PyDict result) =>
         PyStrings.Strip(result.Get("outcome") is { IsTruthy: true } value ? PyConvert.Str(value) : string.Empty);
 
-    /// <summary><c>is_succeeded</c>: <c>ok</c> and an outcome that actually wrote or verified a file.</summary>
+    /// <summary><c>ok</c> and an outcome that actually wrote or verified a file.</summary>
     public static bool IsSucceeded(PyDict result)
     {
         ArgumentNullException.ThrowIfNull(result);
         return result.Get("ok") is { IsTruthy: true } && SuccessOutcomes.Contains(Outcome(result));
     }
 
-    /// <summary><c>build_completion_body</c>.</summary>
+    /// <summary>The body reported to the manager when a hand-off's pass finishes.</summary>
     public static PyDict BuildCompletionBody(HandoffOrigin origin, PyDict result, string? outputPath = null, bool rejected = false)
     {
         ArgumentNullException.ThrowIfNull(origin);
@@ -171,8 +171,8 @@ public static class CompletionReports
     }
 
     /// <summary>
-    /// <c>str(_pure_manager_path(folder).joinpath(*parts))</c>: the path in the manager's own style, since its host
-    /// is not necessarily this one.
+    /// Joins <paramref name="parts"/> onto the manager's folder in the manager's own path style (Windows when the
+    /// folder has a backslash or drive letter), since its host is not necessarily this one.
     /// </summary>
     public static string ManagerPathJoin(string managerFolder, IEnumerable<string> parts)
     {

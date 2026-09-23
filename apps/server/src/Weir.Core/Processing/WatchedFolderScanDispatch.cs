@@ -2,15 +2,14 @@ using Weir.Core.Time;
 
 namespace Weir.Core.Processing;
 
-/// <summary>Durable job kind for the watched-folder scan that dispatches per-file remux passes
-/// (port of <c>processing_watched_folder_remux_scan_dispatch_job_kinds.py</c>).</summary>
+/// <summary>Durable job kind for the watched-folder scan that dispatches per-file remux passes.</summary>
 public static class ProcessingWatchedFolderScanDispatchJobKinds
 {
     public const string ScanDispatch = "processing.watched_folder.remux_scan_dispatch.v1";
 }
 
-/// <summary>Why one scan could not be queued (<c>validate_watched_folder_scan_dispatch_prerequisites</c>'s
-/// second half; "no library" is decided by the caller, which is why it is not a case here).</summary>
+/// <summary>Why one scan could not be queued once its library is found ("no library" is decided by the
+/// caller, which is why it is not a case here).</summary>
 public enum ScanDispatchPrerequisiteError
 {
     NoSavedWatchedFolder,
@@ -20,7 +19,7 @@ public enum ScanDispatchPrerequisiteError
 /// <summary>Pure prerequisite checks shared by the manual HTTP route and the periodic enqueue tick.</summary>
 public static class ScanDispatchPrerequisites
 {
-    /// <summary>The library-found half of <c>validate_watched_folder_scan_dispatch_prerequisites</c>.</summary>
+    /// <summary>Check a found library has a watched folder, and an output folder when remux jobs will run.</summary>
     public static ScanDispatchPrerequisiteError? Validate(string? watchedFolder, string? outputFolder, bool enqueueRemuxJobs)
     {
         if (string.IsNullOrWhiteSpace(watchedFolder))
@@ -37,7 +36,7 @@ public static class ScanDispatchPrerequisites
     }
 }
 
-/// <summary>The scan job's own payload (<c>enqueue_watched_folder_remux_scan_dispatch_job</c>'s body).</summary>
+/// <summary>The scan job's own payload.</summary>
 public sealed record ScanDispatchJobPayload(bool EnqueueRemuxJobs, string ScanTrigger, string MediaScope, long? LibraryId)
 {
     /// <summary><c>scan_trigger</c> is normalized to one of three values; anything else becomes "manual".</summary>
@@ -45,30 +44,26 @@ public sealed record ScanDispatchJobPayload(bool EnqueueRemuxJobs, string ScanTr
         raw is "manual" or "periodic" or "filesystem_event" ? raw : "manual";
 }
 
-/// <summary>Media-scope and library id as recorded on a periodic-scan library window (port of
-/// <c>processing_library_periodic_scan_enabled</c>/<c>processing_scope_periodic_scan_enabled</c>).</summary>
+/// <summary>Whether periodic scanning is switched on for a library and for its media scope.</summary>
 public static class ScanDispatchScheduleGate
 {
-    /// <summary><c>processing_library_periodic_scan_enabled</c>: the library's own on/off switch.</summary>
+    /// <summary>The library's own on/off switch.</summary>
     public static bool LibraryPeriodicScanEnabled(bool libraryEnabled) => libraryEnabled;
 
     /// <summary>
-    /// Half of the fix for #533: whether periodic scanning is switched on for one scope, from the operator
-    /// settings singleton's per-scope <c>movie_schedule_enabled</c> / <c>tv_schedule_enabled</c> column —
-    /// the "Settings" switch an operator sees and toggles on the Processing operator-settings screen. Python's
-    /// scheduler never read this column either (only <c>library.enabled</c>), so it was as dead as the
-    /// separate <c>WEIR_PROCESSING_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_ENABLED</c> environment
-    /// variable — see <c>ProcessingWatchedFolderScanDispatchScheduleTask</c> in Weir.Infrastructure, which
-    /// this port reintroduces as a working global kill switch alongside this per-scope check. Manual scans
-    /// never consult either: they are an explicit, one-off request, not the recurring timer these switches
-    /// turn off.
+    /// Whether periodic scanning is switched on for one scope, from the operator settings singleton's
+    /// per-scope <c>movie_schedule_enabled</c> / <c>tv_schedule_enabled</c> column: the switch an operator
+    /// toggles on the Processing settings screen (#533). The
+    /// <c>WEIR_PROCESSING_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_ENABLED</c> environment variable is a
+    /// separate global kill switch (see <c>ProcessingWatchedFolderScanDispatchScheduleTask</c> in
+    /// Weir.Infrastructure). Manual scans never consult either: they are an explicit, one-off request, not
+    /// the recurring timer these switches turn off.
     /// </summary>
     public static bool ScopePeriodicScanEnabled(bool movieScheduleEnabled, bool tvScheduleEnabled, string mediaScope) =>
         ProcessingMediaScopes.Normalize(mediaScope) == ProcessingMediaScopes.Tv ? tvScheduleEnabled : movieScheduleEnabled;
 }
 
-/// <summary>A library's admission rules read off its CSV/scalar columns (<c>LibraryAdmissionRules</c> /
-/// <c>admission_rules_for</c>).</summary>
+/// <summary>A library's admission rules read off its CSV/scalar columns.</summary>
 public sealed record LibraryAdmissionRules(
     IReadOnlySet<string> MediaExtensions,
     IReadOnlySet<string> ExcludeMarkers,
@@ -90,7 +85,7 @@ public sealed record LibraryAdmissionRules(
             ? []
             : [.. csv.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0)];
 
-    /// <summary><c>admission_rules_for</c>.</summary>
+    /// <summary>Read the rules off a library row, clamping sizes and ages to zero or more.</summary>
     public static LibraryAdmissionRules For(ProcessingLibraryRecord library)
     {
         ArgumentNullException.ThrowIfNull(library);
@@ -112,7 +107,7 @@ public sealed record LibraryAdmissionRules(
     }
 }
 
-/// <summary>A settled file the library rules refuse, and the counter it moves (<c>_library_admission_rejection</c>).</summary>
+/// <summary>A settled file the library rules refuse, and the counter it moves.</summary>
 public sealed record LibraryAdmissionRejection(string Reason, string Counter);
 
 /// <summary>Facts about one candidate file needed by the admission rejection check, independent of how
@@ -121,7 +116,7 @@ public sealed record CandidateFileFacts(long SizeBytes, DateTimeOffset? CreatedA
 
 public static class LibraryAdmission
 {
-    /// <summary><c>_library_admission_rejection</c>: the plain-language reason and summary counter for a
+    /// <summary>The plain-language reason and summary counter for a
     /// settled file the library's rules refuse, or <see langword="null"/> when it is admitted.</summary>
     public static LibraryAdmissionRejection? Rejection(
         string relativePath,
@@ -195,12 +190,12 @@ public static class LibraryAdmission
         return null;
     }
 
-    /// <summary>Python's <c>fnmatch.fnmatchcase</c>: shell-style <c>*</c>/<c>?</c>/<c>[seq]</c> glob, case as given.</summary>
+    /// <summary>Shell-style <c>*</c>/<c>?</c>/<c>[seq]</c> glob match, case-sensitive (callers lower-case both sides).</summary>
     internal static bool FnMatch(string value, string pattern) => Glob.IsMatch(value, pattern);
 }
 
 /// <summary>Minimal POSIX shell-glob matcher (<c>*</c>, <c>?</c>, <c>[seq]</c>/<c>[!seq]</c>), the subset
-/// <c>fnmatch.translate</c> needs for library include/exclude patterns.</summary>
+/// library include/exclude patterns need.</summary>
 internal static class Glob
 {
     public static bool IsMatch(string value, string pattern) => IsMatch(value, 0, pattern, 0);
@@ -251,7 +246,7 @@ internal static class Glob
                 var close = pattern.IndexOf(']', pi + 1);
                 if (close < 0)
                 {
-                    // Unterminated bracket: Python's fnmatch treats '[' literally in this case.
+                    // Unterminated bracket: '[' is matched literally, as shell globs do.
                     if (value[vi] != '[')
                     {
                         return false;
@@ -305,19 +300,17 @@ internal static class Glob
     }
 }
 
-// FileSettling/SettlingObservation (observe_size_settling) live in Weir.Core.Processing.RemuxPass — #522 part 3
-// (the remux pass) and this scan port each independently ported it; the RemuxPass one (whose
-// ObserveSizeSettling takes the ProcessingLibraryRecord directly, matching Python's keyword-argument call) is the
-// one kept, so this file uses it via that namespace instead of defining its own copy.
+// Size settling (FileSettling/SettlingObservation) lives in Weir.Core.Processing.RemuxPass and is shared with
+// the scan rather than duplicated here.
 
-/// <summary>A status and the sentence that explains it (<c>FileStateVerdict</c>).</summary>
+/// <summary>A status and the sentence that explains it.</summary>
 public sealed record FileStateVerdict(string Status, string Reason, string? BlockedByConnection = null, DateTimeOffset? HoldUntil = null)
 {
     public bool Eligible => Status == ProcessingFileStatuses.Unprocessed;
 }
 
-/// <summary>Port of <c>processing_file_state_service.decide_file_state</c> (pure decision; the caller supplies
-/// the schedule-window, settling and access-probe results it already computed).</summary>
+/// <summary>Decide one file's processing state. Pure: the caller supplies the schedule-window, settling and
+/// access-probe results it already computed.</summary>
 public static class FileStateDecision
 {
     public static FileStateVerdict DecideFileState(
@@ -392,7 +385,7 @@ public static class FileStateDecision
     }
 }
 
-/// <summary>Whether one watched file can be processed (<c>WatchedFileDispatchOutcome</c>).</summary>
+/// <summary>Whether one watched file can be processed.</summary>
 public sealed record WatchedFileDispatchOutcome(string Verdict, string? BlockedReason = null, string? BlockedConnection = null)
 {
     public const string Proceed = "proceed";
@@ -401,8 +394,7 @@ public sealed record WatchedFileDispatchOutcome(string Verdict, string? BlockedR
 }
 
 /// <summary>
-/// Port of <c>processing_watched_folder_remux_scan_dispatch_evaluate.verdict_for_watched_scan_file</c>: decide
-/// whether a watched-folder file can be processed. A block from any manager blocks the file — two
+/// Decide whether a watched-folder file can be processed. A block from any manager blocks the file — two
 /// connections covering one library is an ordinary 4K-plus-1080p setup, and either of them may be
 /// mid-import. Its rows are built by <see cref="ManagerQueueSignals.AttributedRowsForFile"/>, so the reason
 /// can name the connection rather than just "a media manager".
@@ -419,7 +411,7 @@ public static class WatchedFileDispatch
     }
 }
 
-/// <summary>Port of <c>processing_runner_units.resolution_class_for_dimensions</c>.</summary>
+/// <summary>Classify a video's resolution (sd/720p/1080p/4k) from its width, falling back to its height.</summary>
 public static class RunnerUnits
 {
     private static readonly (int Ceiling, string Name)[] ClassByWidth = [(1200, "sd"), (1900, "720p"), (2600, "1080p")];

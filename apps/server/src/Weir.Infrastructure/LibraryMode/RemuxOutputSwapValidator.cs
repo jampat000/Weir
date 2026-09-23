@@ -5,12 +5,11 @@ using Weir.Infrastructure.Media;
 namespace Weir.Infrastructure.LibraryMode;
 
 /// <summary>
-/// The safe swap's <see cref="ISwapOutputValidator"/> (#506) until the dedicated #500 output-check pipeline lands in this
-/// codebase: it runs the same full-read integrity check the download pipeline already has
-/// (<see cref="MediaTools.ValidateMediaIntegrityAsync"/> — demuxes the whole cleaned copy and rejects a truncated or
-/// otherwise incomplete file), cross-checked against the original's probed duration when that can be read. #500's richer
-/// checks (track-by-track comparison against the plan) can replace this in place without SafeSwap or its callers changing,
-/// since they only ever see <see cref="ISwapOutputValidator"/>.
+/// The safe swap's <see cref="ISwapOutputValidator"/> (#506): the same full-read integrity check the download pipeline
+/// has (<see cref="MediaTools.ValidateMediaIntegrityAsync"/> — demuxes the whole cleaned copy and rejects a truncated or
+/// otherwise incomplete file), cross-checked against the original's probed duration when that can be read. The #500
+/// track-by-track check against the plan has already run by then: the clean writes its copy through
+/// <see cref="MediaTools.RemuxToTempFileAsync"/>, which validates the staged output before returning it.
 /// </summary>
 public sealed class RemuxOutputSwapValidator : ISwapOutputValidator
 {

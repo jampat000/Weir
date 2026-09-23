@@ -13,9 +13,8 @@ namespace Weir.Infrastructure.Jobs;
 /// folder (#645), whether or not that library's watched-folder scan runs.
 /// </summary>
 /// <remarks>
-/// 3.2.4 (the Deluno soak, 23 Sep 2026): the rule ran only inside a scan, and a library fed by a media manager's hand-offs
-/// often has its periodic scan off, so on the soak rig the rows 3.2.3 was meant to clear never met a scan and stayed listed.
-/// This runs the same rule on its own clock. It only forgets; it never queues work, so it cannot pick up a stray file a scan
+/// A library fed by a media manager's hand-offs often has its periodic scan off, so a rule that ran only inside a scan would
+/// never clear its rows. This runs the same rule on its own clock. It only forgets; it never queues work, so it cannot pick up a stray file a scan
 /// would have processed. A library whose watched folder cannot be read is skipped, so an unmounted share never empties the list.
 /// </remarks>
 public sealed partial class VanishedFileSweepTask : IPeriodicTask

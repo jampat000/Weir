@@ -3,9 +3,9 @@ using System.Text;
 namespace Weir.Core.Media;
 
 /// <summary>
-/// Splits a byte stream into lines the way iterating a Python text-mode pipe does
-/// (<c>encoding="utf-8", errors="replace"</c>, universal newlines): <c>\n</c>, <c>\r\n</c> and a lone <c>\r</c>
-/// each end a line. Lines are reported without their ending. Bytes may arrive in any chunking.
+/// Splits a byte stream into lines, decoded as UTF-8 with invalid bytes replaced, using universal newlines:
+/// <c>\n</c>, <c>\r\n</c> and a lone <c>\r</c> each end a line. Lines are reported without their ending. Bytes may
+/// arrive in any chunking.
 /// </summary>
 public sealed class UniversalNewlineSplitter
 {

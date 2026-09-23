@@ -3,17 +3,16 @@ using Weir.Core.Processing;
 namespace Weir.Core.Tests.Processing;
 
 /// <summary>
-/// Fixes #530: <c>passed_through</c> and <c>rejected</c> must be valid Processing file statuses in both
-/// responses and filters, matching Python's <c>ProcessingFileStatus</c> enum in full. The Python response and
-/// query schemas (<c>ProcessingFileStatusName</c>) omitted them, which 500'd a file at either status and
-/// 422'd a filter naming one — this is the assertion that the .NET port does not reproduce that gap.
+/// #530: <c>passed_through</c> and <c>rejected</c> must be valid Processing file statuses in both responses
+/// and filters. Leaving them out of the response and query schemas would 500 a file at either status and 422 a
+/// filter naming one.
 /// </summary>
 public sealed class FileStatusesTests
 {
     [Fact]
-    public void All_eleven_python_statuses_are_present_then_cancelled()
+    public void The_eleven_original_statuses_keep_their_order_then_cancelled()
     {
-        // #643 added cancelled after the Python enum's eleven, which keep their order.
+        // #643: cancelled comes after the eleven original statuses, which keep their order.
         Assert.Equal(
             [
                 "unprocessed", "processing", "processed", "processing_failed", "skipped", "disabled",
@@ -26,7 +25,7 @@ public sealed class FileStatusesTests
     [InlineData(ProcessingFileStatuses.PassedThrough)]
     [InlineData(ProcessingFileStatuses.Rejected)]
     [InlineData(ProcessingFileStatuses.Cancelled)]
-    public void Terminal_bug_530_statuses_are_valid_status_values(string status) => Assert.Contains(status, ProcessingFileStatuses.All);
+    public void Terminal_outcome_statuses_are_valid_status_values(string status) => Assert.Contains(status, ProcessingFileStatuses.All);
 
     [Fact]
     public void Withheld_statuses_do_not_include_the_two_terminal_ones()

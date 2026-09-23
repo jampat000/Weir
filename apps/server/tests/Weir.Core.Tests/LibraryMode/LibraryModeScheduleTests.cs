@@ -8,7 +8,7 @@ public sealed class LibraryModeScheduleTests
 {
     private const string EveryDay = "Mon,Tue,Wed,Thu,Fri,Sat,Sun";
 
-    // Wednesday 23 September 2026, 10:00 UTC.
+    // A Wednesday (2026-09-23), 10:00 UTC.
     private static readonly DateTimeOffset Now = new(2026, 9, 23, 10, 0, 0, TimeSpan.Zero);
 
     private static LibraryAdmissionSnapshot NoWindow(bool enabled = true) =>

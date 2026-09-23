@@ -25,8 +25,9 @@ public sealed record SwapRecoveryReport(int TempFilesDeleted, int BackupsDeleted
 }
 
 /// <summary>
-/// The startup sweep for interrupted library swaps (#506), after Muxarr's <c>CleanupMuxbakFiles</c> and <c>RestoreFromBackup</c>.
-/// Run it before any worker starts.
+/// The startup sweep for interrupted library swaps (#506). Run it before any worker starts.
+/// The approach follows Muxarr's <c>CleanupMuxbakFiles</c>/<c>RestoreFromBackup</c> (https://github.com/KirovAir/muxarr, GPL-3.0);
+/// see THIRD_PARTY_NOTICES.md.
 /// </summary>
 /// <remarks>
 /// <para>For each original it looks at the files only, so it is correct whatever step a crash interrupted:</para>
@@ -70,7 +71,9 @@ public sealed class SwapRecoverySweep
         {
             unfinished = await _journal.ListUnfinishedAsync(cancellationToken).ConfigureAwait(false);
         }
+#pragma warning disable CA1031 // Without the job records the sweep still walks the folders.
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             _logger.LogWarning(exception, "Library swap sweep could not read the swaps recorded on job rows; only a folder walk can find leftovers");
             unfinished = [];
@@ -92,7 +95,9 @@ public sealed class SwapRecoverySweep
             {
                 await _journal.RecordAsync(entry with { State = SwapJournalState.Recovered }, cancellationToken).ConfigureAwait(false);
             }
+#pragma warning disable CA1031 // A recovered file stays recovered even when the record of it cannot be written.
             catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
             {
                 _logger.LogWarning(exception, "Library swap sweep recovered a file but could not record it job_id={JobId} path={Path}", entry.JobId, entry.OriginalPath);
             }
@@ -170,7 +175,9 @@ public sealed class SwapRecoverySweep
                 }
             }
         }
+#pragma warning disable CA1031 // One leftover that cannot be dealt with is counted and logged; the sweep carries on.
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             problems++;
             logger.LogWarning(exception, "Library swap recovery could not deal with the backup backup={Backup}", backup);
@@ -184,7 +191,9 @@ public sealed class SwapRecoverySweep
                 tempsDeleted++;
             }
         }
+#pragma warning disable CA1031 // One leftover that cannot be dealt with is counted and logged; the sweep carries on.
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             problems++;
             logger.LogWarning(exception, "Library swap recovery could not delete the temp file temp={Temp}", temp);

@@ -3,8 +3,8 @@ using System.Net;
 namespace Weir.Api.Tests.Platform;
 
 /// <summary>
-/// The opt-in Reject failure policy's support gate over real HTTP (port of the relevant assertions in
-/// <c>test_processing_api_surface.py</c>): <c>GET /processing/reject-support</c>, and the same check refusing an
+/// The opt-in Reject failure policy's support gate over real HTTP: <c>GET /processing/reject-support</c>, and the
+/// same check refusing an
 /// unsupported save at <c>POST</c>/<c>PUT /processing/libraries</c>.
 /// </summary>
 public sealed class ProcessingRejectSupportApiTests

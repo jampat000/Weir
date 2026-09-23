@@ -9,17 +9,19 @@ using Weir.Core.Rules;
 using Weir.Core.Time;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Jobs;
+using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
+using static Weir.Api.Endpoints.EndpointLookups;
 
 namespace Weir.Api.Endpoints;
 
-/// <summary>Processing libraries and rule sets — <c>/api/v1/processing/libraries</c>, <c>/processing/rule-sets</c>
-/// (port of <c>libraries_api.py</c>). Manager coverage now reads the linked connections' saved
-/// test results (#520). The opt-in Reject failure policy's support gate (<c>GET /processing/reject-support</c>,
-/// and the same check on save) is ported (#522 part 4). Media-manager library discovery (discover/drift/
-/// import) and library unlink are ported in #554, backed by <see cref="LibraryDiscoveryService"/>.</summary>
+/// <summary>Processing libraries and rule sets — <c>/api/v1/processing/libraries</c>, <c>/processing/rule-sets</c>.
+/// Manager coverage reads the linked connections' saved test results (#520). Also the opt-in Reject failure
+/// policy's support gate (<c>GET /processing/reject-support</c>, and the same check on save; #522 part 4), and
+/// media-manager library discovery (discover/drift/import) and library unlink (#554), backed by
+/// <see cref="LibraryDiscoveryService"/>.</summary>
 public static class ProcessingLibraryEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingLibraryEndpoints(this IEndpointRouteBuilder endpoints)
@@ -43,23 +45,6 @@ public static class ProcessingLibraryEndpoints
         return endpoints;
     }
 
-    private static async Task<ProcessingLibraryRecord> RequireLibraryAsync(UnitOfWork uow, long id) =>
-        await LibraryStore.GetAsync(uow, id).ConfigureAwait(false)
-        ?? throw new ApiException(StatusCodes.Status404NotFound, "That library does not exist.");
-
-    /// <summary><c>_require_connection</c>: <c>int = Path(ge=1)</c>.</summary>
-    private static long ConnectionId(ApiRequest request, ValidationIssues issues)
-    {
-        var raw = request.RouteValue("connection_id") ?? string.Empty;
-        return PydanticRules.TryInt(new PyStr(raw), ["path", "connection_id"], 1, null, issues, out var value)
-            ? value > long.MaxValue ? long.MaxValue : (long)value
-            : 0;
-    }
-
-    private static async Task<MediaManagerConnectionRecord> RequireConnectionAsync(UnitOfWork uow, long connectionId) =>
-        await MediaManagerConnectionStore.GetAsync(uow, connectionId).ConfigureAwait(false)
-        ?? throw new ApiException(StatusCodes.Status404NotFound, "That media manager connection does not exist.");
-
     private static async Task<ProcessingRuleSetRecord> RequireRuleSetAsync(UnitOfWork uow, long id) =>
         await LibraryStore.GetRuleSetAsync(uow, id).ConfigureAwait(false)
         ?? throw new ApiException(StatusCodes.Status404NotFound, "That rule set does not exist.");
@@ -69,8 +54,8 @@ public static class ProcessingLibraryEndpoints
         var managerIds = await LibraryStore.ManagerConnectionIdsAsync(uow, row.Id).ConfigureAwait(false);
         var activeJobs = await LibraryStore.ActiveJobCountAsync(uow, row).ConfigureAwait(false);
 
-        // Port of _library_out's manager_coverage: the linked connections' last saved connection-test
-        // result (no live call — a listing must not depend on every linked manager answering right now).
+        // manager_coverage: the linked connections' last saved connection-test result (no live call — a
+        // listing must not depend on every linked manager answering right now).
         var managerRows = new List<MediaManagerConnectionRecord?>(managerIds.Count);
         foreach (var connectionId in managerIds)
         {
@@ -296,7 +281,7 @@ public static class ProcessingLibraryEndpoints
     }
 
     /// <summary>
-    /// <c>_refuse_unsupported_reject</c>: <c>reject</c> deletes downloads, so it cannot be saved for a library no manager
+    /// <c>reject</c> deletes downloads, so it cannot be saved for a library no manager
     /// can take one for. Called after the row is written (so the manager links it was just given are the ones checked)
     /// but before the transaction commits.
     /// </summary>
@@ -431,9 +416,9 @@ public static class ProcessingLibraryEndpoints
     }
 
     /// <summary>
-    /// <c>detection_window_requires_timezone</c> (a <c>field_validator</c>) and
-    /// <c>detection_windows_are_ordered</c> (a <c>model_validator</c>), both surfaced as pydantic
-    /// <c>value_error</c> issues so the 422 body matches FastAPI's shape rather than a flat detail string.
+    /// A detection window needs a timezone, and its windows must be in order. Both are reported as
+    /// <c>value_error</c> validation issues so the 422 body has the issue-list shape existing clients read,
+    /// not a flat detail string.
     /// </summary>
     private static void ValidateDetectionWindows(ProcessingLibraryInput body, ValidationIssues issues)
     {
@@ -563,7 +548,7 @@ public static class ProcessingLibraryEndpoints
 
         // #505: a deleted library takes its library-mode settings and scan history with it (both live on
         // jobs rows, not a foreign-keyed table — see docs/archive/server-port-notes.md, "Library mode").
-        await Weir.Infrastructure.LibraryMode.LibrarySettingsStore.DeleteAllForLibraryAsync(uow, row.Id).ConfigureAwait(false);
+        await LibrarySettingsStore.DeleteAllForLibraryAsync(uow, row.Id).ConfigureAwait(false);
 
         await request.CommitAsync().ConfigureAwait(false);
         return new CustomApiResult(context =>
@@ -639,7 +624,7 @@ public static class ProcessingLibraryEndpoints
         issues.ThrowIfAny();
 
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
-        // Python's <c>_verify_csrf</c> (shared by every route in this file) refuses with this exact wording.
+        // Every route in this file refuses a bad token with this exact wording, which clients match on.
         request.RequireConfirmationToken(csrfToken, "Invalid or expired CSRF token.");
 
         var uow = await request.DbAsync().ConfigureAwait(false);
@@ -704,7 +689,7 @@ public static class ProcessingLibraryEndpoints
         issues.ThrowIfAny();
 
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
-        // Python's <c>_verify_csrf</c> (shared by every route in this file) refuses with this exact wording.
+        // Every route in this file refuses a bad token with this exact wording, which clients match on.
         request.RequireConfirmationToken(csrfToken, "Invalid or expired CSRF token.");
 
         var uow = await request.DbAsync().ConfigureAwait(false);
@@ -895,7 +880,7 @@ public static class ProcessingLibraryEndpoints
         // #505 point 6: saving rules on a library with library folders runs a background re-plan (a normal scan, trigger
         // "rule_change"); the web shows "Apply to library? N files would change" once it finishes. Nothing runs on its own.
         var rescanJobIds = new List<long>();
-        var jobStore = request.Service<Weir.Infrastructure.Jobs.ProcessingJobStore>();
+        var jobStore = request.Service<ProcessingJobStore>();
         foreach (var library in await LibraryStore.ListAsync(uow).ConfigureAwait(false))
         {
             if (library.RuleSetId != updated.Id)
@@ -903,13 +888,13 @@ public static class ProcessingLibraryEndpoints
                 continue;
             }
 
-            var librarySettings = await Weir.Infrastructure.LibraryMode.LibrarySettingsStore.GetAsync(uow, library.Id).ConfigureAwait(false);
+            var librarySettings = await LibrarySettingsStore.GetAsync(uow, library.Id).ConfigureAwait(false);
             if (librarySettings.Folders.Count == 0)
             {
                 continue;
             }
 
-            var job = await Weir.Infrastructure.LibraryMode.LibraryScanStore.RequestScanAsync(uow, jobStore, library.Id, "rule_change").ConfigureAwait(false);
+            var job = await LibraryScanStore.RequestScanAsync(uow, jobStore, library.Id, "rule_change").ConfigureAwait(false);
             rescanJobIds.Add(job.Id);
         }
 

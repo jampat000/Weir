@@ -184,6 +184,33 @@ public sealed class LibraryCleanHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task A_cleaned_copy_that_fails_the_staged_output_check_is_never_swapped_in()
+    {
+        // #500: the copy still carries the Japanese track the plan drops, so the staged-output check rejects it before
+        // the safe swap starts. The library lane runs the same check the download pass does, inside the remux step.
+        var library = await LibraryAsync();
+        var path = _libraryFolder.Join("film.mkv");
+        var originalBytes = new byte[] { 0xAA, 0xBB, 0xCC, 0xDD };
+        await File.WriteAllBytesAsync(path, originalBytes);
+        _media.Probes["film.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+        _media.DefaultProbe = FakeMediaRunner.EnglishAndJapanese;
+
+        var jobId = await EnqueueCleanAsync(library, path, confirmFinalRemoval: true);
+        await RunCleanAsync(jobId);
+
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(path));
+        Assert.False(File.Exists(SafeSwapRules.TempPath(path)));
+        Assert.False(File.Exists(SafeSwapRules.BackupPath(path)));
+        Assert.Equal(0, await _fixture.Store.Scalar($"SELECT count(*) FROM activity_events WHERE event_type = '{LibraryActivityEventTypes.FileCleaned}'"));
+        Assert.Equal(1, await _fixture.Store.Scalar($"SELECT count(*) FROM activity_events WHERE event_type = '{LibraryActivityEventTypes.FileFailed}'"));
+        var title = await _fixture.Db(async uow => Convert.ToString(
+            await uow.ScalarAsync($"SELECT title FROM activity_events WHERE event_type = '{LibraryActivityEventTypes.FileFailed}'"),
+            CultureInfo.InvariantCulture));
+        Assert.Contains("while writing the cleaned copy", title, StringComparison.Ordinal);
+        Assert.Contains("Planned 1 audio track, output has 2", title, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_finished_clean_does_not_stop_the_same_file_being_cleaned_again()
     {
         // The dedupe key means "one clean outstanding for this file", not "this file has had its turn": a rule change,

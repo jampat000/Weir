@@ -89,7 +89,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
         Assert.Equal(changingBytesBefore, File.ReadAllBytes(changingPath));
         Assert.Equal(changingWriteTimeBefore, File.GetLastWriteTimeUtc(changingPath));
 
-        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library), commit: false);
+        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library, NullLogger.Instance), commit: false);
         Assert.NotNull(snapshot);
         Assert.Equal(2, snapshot!.Files.Count);
         var matching = snapshot.Files.Single(f => f.Path == matchingPath);
@@ -136,7 +136,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
         await RunScanAsync(jobId);
 
         Assert.Empty(_media.Probed);
-        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library), commit: false);
+        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library, NullLogger.Instance), commit: false);
         Assert.NotNull(snapshot);
         Assert.Empty(snapshot!.Files);
     }
@@ -232,7 +232,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var jobId = await EnqueueScanAsync(library);
         await RunScanAsync(jobId);
 
-        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library), commit: false);
+        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library, NullLogger.Instance), commit: false);
         var file = snapshot!.Files.Single();
         Assert.Equal("radarr", file.ManagerKind);
         Assert.Equal("Blade Runner 2049", file.ManagerTitle);
@@ -265,7 +265,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var jobId = await EnqueueScanAsync(library);
         await RunScanAsync(jobId);
 
-        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library), commit: false);
+        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library, NullLogger.Instance), commit: false);
         var file = snapshot!.Files.Single();
         Assert.NotNull(file.ManagerConnectionId);
         Assert.Equal(42L, file.ManagerFileId);
@@ -311,7 +311,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var jobId = await EnqueueScanAsync(library);
         await RunScanAsync(jobId);
 
-        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library), commit: false);
+        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library, NullLogger.Instance), commit: false);
         var file = snapshot!.Files.Single();
         Assert.Equal("radarr", file.ManagerKind);
         Assert.Equal("Blade Runner 2049", file.ManagerTitle);
@@ -323,8 +323,8 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var library = await LibraryAsync();
         await _fixture.Db(async uow => { await LibrarySettingsStore.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
         await _fixture.AddConnectionAsync("radarr", "Radarr");
-        // No /api/v3/movie route is scripted: the fake HTTP client refuses the connection, which the port
-        // reports as SignalStatus.Unreachable rather than throwing out of ListLibraryFilesAsync.
+        // No /api/v3/movie route is scripted: the fake HTTP client refuses the connection, which the manager
+        // adapter reports as SignalStatus.Unreachable rather than throwing out of ListLibraryFilesAsync.
 
         var path = _libraryFolder.Join("film.mkv");
         await File.WriteAllBytesAsync(path, [1, 2, 3]);
@@ -333,7 +333,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var jobId = await EnqueueScanAsync(library);
         await RunScanAsync(jobId);
 
-        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library), commit: false);
+        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library, NullLogger.Instance), commit: false);
         var file = snapshot!.Files.Single();
         Assert.Null(file.ManagerKind);
         Assert.Null(file.ManagerTitle);

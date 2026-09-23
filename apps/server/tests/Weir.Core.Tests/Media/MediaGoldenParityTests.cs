@@ -7,9 +7,9 @@ using Weir.Core.Rules;
 namespace Weir.Core.Tests.Media;
 
 /// <summary>
-/// <c>Weir.Core.Media</c> against answers recorded from the Python reference by
-/// <c>scripts/generate-ffmpeg-golden.py</c>: command lines token for token, hardware choices, output
-/// validation messages and Python's text handling. The orchestration (ffprobe logs, progress runs,
+/// <c>Weir.Core.Media</c> against the recorded answers in the golden files: command lines token for token,
+/// hardware choices, output validation messages and text handling (decoding, line splitting, clipping and
+/// timeout messages). The orchestration (ffprobe logs, progress runs,
 /// detection) is held to the same files in <c>Weir.Infrastructure.Tests</c>.
 /// </summary>
 public sealed class MediaGoldenParityTests
@@ -17,7 +17,7 @@ public sealed class MediaGoldenParityTests
     private static readonly string GoldenDirectory = Path.Combine(AppContext.BaseDirectory, "Media", "golden");
 
     [Fact]
-    public void Remux_command_lines_match_the_python_layer()
+    public void Remux_command_lines_match_the_golden_files()
     {
         using var document = Load("argv.json");
         var cases = document.RootElement.GetProperty("remux").EnumerateArray().ToList();
@@ -47,7 +47,7 @@ public sealed class MediaGoldenParityTests
     }
 
     [Fact]
-    public void Ffprobe_integrity_and_progress_command_lines_match_the_python_layer()
+    public void Ffprobe_integrity_and_progress_command_lines_match_the_golden_files()
     {
         using var document = Load("argv.json");
         var root = document.RootElement;
@@ -84,7 +84,7 @@ public sealed class MediaGoldenParityTests
     }
 
     [Fact]
-    public void Hardware_decisions_match_the_python_layer()
+    public void Hardware_decisions_match_the_golden_files()
     {
         using var document = Load("hardware.json");
         var root = document.RootElement;
@@ -150,7 +150,7 @@ public sealed class MediaGoldenParityTests
     }
 
     [Fact]
-    public void Hwaccels_output_is_read_as_the_python_layer_reads_it()
+    public void Hwaccels_output_is_read_as_the_golden_files_record()
     {
         using var document = Load("hardware.json");
         var cases = document.RootElement.GetProperty("detection").EnumerateArray()
@@ -171,7 +171,7 @@ public sealed class MediaGoldenParityTests
     }
 
     [Fact]
-    public void Remux_output_validation_matches_the_python_layer()
+    public void Remux_output_validation_matches_the_golden_files()
     {
         using var document = Load("validation.json");
         var root = document.RootElement;
@@ -212,7 +212,7 @@ public sealed class MediaGoldenParityTests
     }
 
     [Fact]
-    public void Python_text_handling_is_reproduced()
+    public void Text_decoding_splitting_and_formatting_match_the_golden_files()
     {
         using var document = Load("text.json");
         var root = document.RootElement;
@@ -372,19 +372,17 @@ public sealed class MediaGoldenParityTests
 }
 
 /// <summary>
-/// Deliberate divergences from the golden fixtures in <c>tests/Weir.Core.Tests/Media/golden</c>: fixing a bug on
-/// purpose makes the .NET port behave differently from the Python code the fixtures were captured from.
-/// Regenerating the fixtures with <c>scripts/generate-ffmpeg-golden.py</c> would erase that difference (Python
-/// was not changed), so each entry here patches the loaded expectation instead, named for the GitHub issue that
-/// required it, keeping every other case in the file an unmodified proof of parity. See docs/archive/server-port-notes.md,
-/// "ffmpeg parity", for the mechanism.
+/// Deliberate divergences from the golden fixtures in <c>tests/Weir.Core.Tests/Media/golden</c>: a bug fixed on
+/// purpose changes the expected output of cases recorded before the fix. Each entry here patches the loaded
+/// expectation instead of editing the fixture, named for the GitHub issue that required it, so every other case
+/// in the file stays an unmodified recorded answer. See docs/archive/server-port-notes.md, "ffmpeg parity", for the mechanism.
 /// </summary>
 internal static class GoldenDivergences
 {
     /// <summary>
-    /// #539 item 1: ffprobe now runs with "-v error" (the golden fixture has Python's "-v quiet") so that
-    /// unreadable-media markers reach stderr instead of being suppressed. #498: ffprobe also now runs with
-    /// "-show_chapters" (absent from the fixture, captured before that option existed) so a probe's JSON always
+    /// #539 item 1: ffprobe runs with "-v error" (the golden fixture has "-v quiet") so that unreadable-media
+    /// markers reach stderr instead of being suppressed. #498: ffprobe also runs with "-show_chapters" (absent
+    /// from the fixture, recorded before that option existed) so a probe's JSON always
     /// carries a chapters array for <see cref="Weir.Core.Rules.ProbeResult.Chapters"/>.
     /// </summary>
     public static IReadOnlyList<string> FfprobeArgv(IReadOnlyList<string> golden)

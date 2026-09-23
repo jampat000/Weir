@@ -1,6 +1,6 @@
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
-/// <summary>The delivered copy is not byte-identical to the source, so it must not be published (<c>PassThroughIntegrityError</c>).</summary>
+/// <summary>The delivered copy is not byte-identical to the source, so it must not be published.</summary>
 public sealed class PassThroughIntegrityException : Exception
 {
     public PassThroughIntegrityException(string message)
@@ -9,17 +9,17 @@ public sealed class PassThroughIntegrityException : Exception
     }
 }
 
-/// <summary>The library values a delivery needs, copied out so no unit of work is open during the copy (<c>DeliverySettings</c>).</summary>
+/// <summary>The library values a delivery needs, copied out so no unit of work is open during the copy.</summary>
 public sealed record PassThroughDeliverySettings(long LibraryId, string WatchedFolder, string OutputFolder, string? OutputCollisionPolicy);
 
-/// <summary><c>DeliveryResult</c>.</summary>
+/// <summary>Whether a pass-through copy was delivered, where, the collision decision, and the sentence describing it.</summary>
 public sealed record PassThroughDeliveryResult(bool Delivered, string Destination, CollisionDecision Collision, string Sentence);
 
 /// <summary>
-/// <c>deliver_unchanged</c>: hand the original back to the output folder unmodified when Weir could not process it (#465).
-/// Pure filesystem work; touches no database. The copy is verified as byte-identical to the source, never as valid media
-/// (see the module docstring of <c>processing_pass_through.py</c>: a file that failed processing may be exactly the kind
-/// that will not probe, so validating it as media would make pass-through fail on the files that most need it).
+/// Hands the original back to the output folder unmodified when Weir could not process it (#465).
+/// Pure filesystem work; touches no database. The copy is verified as byte-identical to the source, never as valid media:
+/// a file that failed processing may be exactly the kind that will not probe, so validating it as media would make
+/// pass-through fail on the files that most need it.
 /// </summary>
 public static class PassThroughDelivery
 {
@@ -29,8 +29,8 @@ public static class PassThroughDelivery
         var watchedRoot = RemuxPassPaths.Resolve(settings.WatchedFolder);
         var outputRoot = RemuxPassPaths.Resolve(settings.OutputFolder);
         var source = RemuxPassPaths.Resolve(Path.Combine(watchedRoot, relativePath));
-        // Resolved (not left as a raw join) so a payload's "/" separators normalize to the platform's own, matching
-        // pathlib's automatic parsing of "/" regardless of the host OS (Python's `output_root / relative_path`).
+        // Resolved (not left as a raw join) so a payload's "/" separators normalize to the platform's own on
+        // every host OS.
         var final = RemuxPassPaths.Resolve(Path.Combine(outputRoot, relativePath));
 
         if (!File.Exists(source))
@@ -82,7 +82,7 @@ public static class PassThroughDelivery
         return new PassThroughDeliveryResult(decision.Wrote, decision.Destination, decision, sentence);
     }
 
-    /// <summary><c>_fingerprint</c>: size plus a modification marker, to catch a source that changed underneath the copy.</summary>
+    /// <summary>Size plus a modification marker, to catch a source that changed underneath the copy.</summary>
     private static (long Size, long ModifiedTicks) Fingerprint(string path)
     {
         var info = new FileInfo(path);

@@ -9,7 +9,7 @@ using Weir.Infrastructure.Tests.MediaManagers;
 namespace Weir.Infrastructure.Tests.Processing.RemuxPass;
 
 /// <summary>
-/// Ported from <c>apps/backend/tests/test_processing_pass_through.py</c>: <see cref="ProcessingPassThroughHandler"/> against a
+/// <see cref="ProcessingPassThroughHandler"/> against a
 /// real database and real temporary folders, with the manager side behind <see cref="FakeManagerHttp"/>.
 /// </summary>
 public sealed class ProcessingPassThroughHandlerTests : IDisposable

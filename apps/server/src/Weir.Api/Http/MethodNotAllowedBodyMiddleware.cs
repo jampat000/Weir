@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Http;
 namespace Weir.Api.Http;
 
 /// <summary>
-/// Routing answers a known path with the wrong method with an empty 405; FastAPI sends
-/// <c>{"detail": "Method Not Allowed"}</c>. This fills in that body.
+/// Routing answers a known path with the wrong method with an empty 405; existing clients and the contract
+/// suite expect <c>{"detail": "Method Not Allowed"}</c> and an <c>Allow</c> header. This fills them in.
 /// </summary>
 public sealed class MethodNotAllowedBodyMiddleware
 {
@@ -26,7 +26,7 @@ public sealed class MethodNotAllowedBodyMiddleware
             context.Response.ContentLength is null or 0 &&
             string.IsNullOrEmpty(context.Response.ContentType))
         {
-            // Starlette names the methods of the first route whose path matched.
+            // Allow names the methods of the first route whose path matched, not the union of all of them.
             if (_routes.FirstPathMatch(context.Request.Path) is { } match)
             {
                 context.Response.Headers.Allow = string.Join(", ", match.Methods);

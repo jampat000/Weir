@@ -1,7 +1,7 @@
 namespace Weir.Core.Jobs;
 
 /// <summary>
-/// Values persisted in <c>jobs.status</c> (port of <c>weir.processing.jobs_model.ProcessingJobStatus</c>).
+/// Values persisted in <c>jobs.status</c>.
 /// </summary>
 /// <remarks>
 /// <see cref="Failed"/> means the handler (or the refusal path) failed or exhausted its attempts.
@@ -40,7 +40,7 @@ public sealed record ProcessingJob(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-/// <summary>What an operator action on one job row came to (Python's <c>"ok" | "not_found" | "wrong_status"</c>).</summary>
+/// <summary>What an operator action on one job row came to.</summary>
 public enum JobActionOutcome
 {
     Ok,

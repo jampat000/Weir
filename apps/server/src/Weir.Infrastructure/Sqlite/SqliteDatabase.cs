@@ -6,9 +6,8 @@ using SQLitePCL;
 namespace Weir.Infrastructure.Sqlite;
 
 /// <summary>
-/// Opens connections to Weir's SQLite file with the same per-connection PRAGMAs the Python
-/// engine applies on every new DB-API connection (<c>weir.core.db._register_sqlite_pragmas</c>):
-/// WAL journal, foreign keys on, a 30 second busy timeout and <c>synchronous=NORMAL</c>.
+/// Opens connections to Weir's SQLite file with the same PRAGMAs on every connection: WAL journal,
+/// foreign keys on, a 30 second busy timeout and <c>synchronous=NORMAL</c>.
 /// </summary>
 public sealed class SqliteDatabase
 {
@@ -17,12 +16,11 @@ public sealed class SqliteDatabase
     /// that transaction rather than fail a completed media mutation.
     /// </summary>
     /// <remarks>
-    /// The contract suite's HTTP client timeout (<c>REQUEST_TIMEOUT_S</c>, tests/contract/support/client.py)
-    /// is deliberately held above this value — 45s against this 30s — and the two must not be made equal
-    /// again. When they match, a request blocked on the write lock has the client give up at the same
-    /// instant this ceiling expires, so the failure shows up as a bare <c>httpx.ReadTimeout</c> with no
-    /// server-side error to go with it. That ambiguity is what made #586 take two investigations to pin
-    /// down. If this value changes, move that one too, and keep it the larger of the pair.
+    /// The contract suite's HTTP client timeout (<c>REQUEST_TIMEOUT_S</c> in its support client module) is
+    /// held above this value, 45s against 30s. If the two were equal, a request blocked on the write lock
+    /// would have the client give up at the same instant this ceiling expires, and the failure would show up
+    /// as a bare <c>httpx.ReadTimeout</c> with no server-side error to go with it (#586). If this value
+    /// changes, move that one too, and keep it the larger of the pair.
     /// </remarks>
     public const int BusyTimeoutMilliseconds = 30_000;
 
@@ -66,14 +64,13 @@ public sealed class SqliteDatabase
             Mode = SqliteOpenMode.ReadWriteCreate,
             Cache = SqliteCacheMode.Private,
             Pooling = pooling,
-            // Seconds a command waits on a locked database (complements PRAGMA busy_timeout).
-            // Since #586 this only ever times a genuine wait for another writer's lock, which is what it
-            // is for. It used to be reachable a second way: Microsoft.Data.Sqlite re-runs a statement that
-            // answers SQLITE_BUSY until this expires, and SQLITE_BUSY_SNAPSHOT — a read-then-write upgrade
-            // on a snapshot another connection has already overtaken — answers exactly that while never
-            // being able to succeed, so the whole thirty seconds went by before the request failed. Units
-            // of work now take the write lock at BEGIN (UnitOfWork.EnsureTransaction), so no transaction
-            // here can hold a stale snapshot and that second path is gone.
+            // Seconds a command waits on a locked database (complements PRAGMA busy_timeout). It should
+            // only ever time a genuine wait for another writer's lock. Microsoft.Data.Sqlite re-runs a
+            // statement that answers SQLITE_BUSY until this expires, and SQLITE_BUSY_SNAPSHOT (a
+            // read-then-write upgrade on a snapshot another connection has already overtaken) answers
+            // exactly that while never being able to succeed, wasting the whole thirty seconds. Units of
+            // work take the write lock at BEGIN (UnitOfWork.EnsureTransaction), so no transaction here can
+            // hold a stale snapshot (#586).
             DefaultTimeout = BusyTimeoutMilliseconds / 1000,
         }.ToString();
         _poolGate = pooling ? PoolGates.GetOrAdd(ConnectionString, static _ => new Lock()) : null;

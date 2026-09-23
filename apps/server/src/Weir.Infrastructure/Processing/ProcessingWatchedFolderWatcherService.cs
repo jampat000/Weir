@@ -9,8 +9,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing;
 
 /// <summary>
-/// Filesystem events as the trigger, the periodic scan as the backstop (port of
-/// <c>processing_watched_folder_watcher.py</c>). One <see cref="FileSystemWatcher"/> per enabled library with
+/// Filesystem events as the trigger, the periodic scan as the backstop. One <see cref="FileSystemWatcher"/> per enabled library with
 /// a saved watched folder and filesystem events switched on, recursive, debounced into exactly the same
 /// <c>processing.watched_folder.remux_scan_dispatch.v1</c> job the periodic timer enqueues
 /// (<see cref="ProcessingWatchedFolderScanDispatchEnqueue.TryEnqueueForWatcherEventAsync"/>) — this decides
@@ -18,18 +17,16 @@ namespace Weir.Infrastructure.Processing;
 /// settling all stay in the handler that already owns them.
 /// </summary>
 /// <remarks>
-/// Two deliberate divergences from the Python port, both asked for by issue #552:
+/// Both behaviours below come from issue #552:
 /// <list type="bullet">
 /// <item>
 /// <b>Overflow/error → full scan and restart.</b> <see cref="FileSystemWatcher"/> can report a lost-events
-/// overflow (or another OS-level error) through its <c>Error</c> event, something Python's watchdog does
-/// not surface the same way. On that event this immediately enqueues a scan for the affected library
-/// (bypassing the debounce — events may have been lost, so waiting for another one is not safe) and
-/// replaces that library's watcher, exactly as though it were only just being scheduled.
+/// overflow (or another OS-level error) through its <c>Error</c> event. On that event this immediately enqueues
+/// a scan for the affected library (bypassing the debounce — events may have been lost, so waiting for another
+/// one is not safe) and replaces that library's watcher, exactly as though it were only just being scheduled.
 /// </item>
 /// <item>
-/// <b>Reacts to library create/update/delete without a restart.</b> Python's watcher reads the library
-/// list once, at process startup, and never revisits it. This re-reads the enabled libraries and their
+/// <b>Reacts to library create/update/delete without a restart.</b> This re-reads the enabled libraries and their
 /// folders every tick (<see cref="TickInterval"/>) and reconciles the watch set to match — a library
 /// created, edited (folder, enabled, or "watch for changes" toggled) or deleted takes effect within a
 /// tick, with no restart needed. Watchers whose watched folder has not changed are left running, so a tick
@@ -93,7 +90,9 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
                 {
                     await ReconcileAsync(watches, pending, immediateScans, restarts, stoppingToken).ConfigureAwait(false);
                 }
+#pragma warning disable CA1031 // The watcher keeps its previous watch set when settings cannot be read.
                 catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
                 {
                     _logger.LogError(exception, "Filesystem watcher could not read library settings; keeping the previous watch set.");
                 }
@@ -147,7 +146,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
         var toWatch = libraries.Where(row => HasWatchedFolder(row) && row.FileSystemEventsEnabled).ToDictionary(row => row.Id);
         var disabled = libraries.Where(row => HasWatchedFolder(row) && !row.FileSystemEventsEnabled).ToList();
 
-        // Libraries no longer eligible at all (disabled, or the watched folder was cleared): tear down
+        // Libraries that are not eligible any more (disabled, or the watched folder was cleared): tear down
         // and stop reporting.
         foreach (var goneId in watches.Keys.Where(id => !toWatch.ContainsKey(id)).ToList())
         {
@@ -181,7 +180,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
                     continue;
                 }
 
-                // The watched folder itself changed: the old watch no longer points at the right place.
+                // The watched folder itself changed: the existing watch points at the wrong place.
                 DisposeWatcher(existing.Watcher);
                 watches.Remove(id);
                 pending.Forget(id);
@@ -319,7 +318,9 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
 
             await uow.CommitAsync().ConfigureAwait(false);
         }
+#pragma warning disable CA1031 // A failed enqueue must not stop the watcher; the periodic scan still runs.
         catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             // A failed enqueue must not kill the watcher: the periodic scan is still running, and the next
             // event (or tick, for an overflow) gets another attempt.
