@@ -332,7 +332,7 @@ public sealed class HandoffLedgerStore
                     // by an earlier hand-off of the same release belongs to that hand-off, not this one. Counting it
                     // turned a hand-off Weir had just completed into "failed", and Weir then refused the manager's
                     // "imported" for it (the rig, 23 Sep 2026: Tears of Steel, two older hand-offs of the same path).
-                    if (IsFromEarlierHandoff(row, job))
+                    if (IsFromEarlierHandoff(row, job.CreatedAt))
                     {
                         continue;
                     }
@@ -398,7 +398,7 @@ public sealed class HandoffLedgerStore
                 // what became of an earlier hand-off of the path (the rig's Tears of Steel had a failed row for its
                 // folder from four days before). A success from before still counts, as it always has.
                 if (state is HandoffLedgerRules.Failed or HandoffLedgerRules.Rejected or HandoffLedgerRules.Cancelled &&
-                    row.ReceivedAt is { } received && file.UpdatedAt is { } touched && touched < received)
+                    IsFromEarlierHandoff(row, file.UpdatedAt))
                 {
                     continue;
                 }
@@ -599,11 +599,15 @@ public sealed class HandoffLedgerStore
     private static DateTimeOffset Min(DateTimeOffset a, DateTimeOffset b) => a <= b ? a : b;
 
     /// <summary>
-    /// Whether a job was queued before this hand-off was received, and so belongs to an earlier hand-off of the same
-    /// file. The hand-off's time is whole seconds (the column's default), so a job from the same second still counts.
+    /// How much older than the hand-off a record must be to belong to an earlier one. Receiving a hand-off writes its
+    /// file's row in the same request, a moment before the hand-off's own row, so "older at all" would wrongly set
+    /// aside a failure that happened to this hand-off. An earlier hand-off's leftovers are minutes to days old.
     /// </summary>
-    internal static bool IsFromEarlierHandoff(HandoffLedgerRow row, ProcessingJob job) =>
-        row.ReceivedAt is { } received && job.CreatedAt < received;
+    private static readonly TimeSpan EarlierHandoffMargin = TimeSpan.FromMinutes(1);
+
+    /// <summary>Whether a record last written at <paramref name="at"/> belongs to an earlier hand-off of the same path.</summary>
+    internal static bool IsFromEarlierHandoff(HandoffLedgerRow row, DateTimeOffset? at) =>
+        row.ReceivedAt is { } received && at is { } written && written < received - EarlierHandoffMargin;
 
     private static HandoffLedgerRow ReadLedger(SqliteDataReader reader) => new(
         SqliteValues.GetInt64(reader, 0),

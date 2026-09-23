@@ -372,6 +372,32 @@ public sealed class HandbackOutcomeApiTests : IDisposable
     }
 
     [Fact]
+    public async Task A_file_that_fails_during_this_hand_off_still_fails_it_though_its_row_was_written_at_receipt()
+    {
+        // Receiving the hand-off writes the file's row a moment before the hand-off's own; a failure that leaves that time
+        // alone must still count. The contract suite caught the first version of the fix setting this aside.
+        await using var server = await StartAsync();
+        var library = await MoviesAsync(server);
+        Directory.CreateDirectory(Path.Join(Watched, "Film"));
+        await File.WriteAllTextAsync(Path.Join(Watched, "Film", "film.mkv"), "the original download");
+        var handoff = new { eventType = "deluno.processor-handoff", handoffId = "h3", libraryId = "lib-1", mediaType = "movies", sourcePath = Path.Join(Watched, "Film", "film.mkv"), callbackPath = "/api/integrations/processors/events" };
+        using (var queued = await new ApiTestClient(server).PostAsync("/api/v1/intake/webhook/deluno", handoff, SecretHeader))
+        {
+            Assert.Equal(HttpStatusCode.OK, queued.StatusCode);
+        }
+
+        await TestDatabase.ExecuteAsync(server, "UPDATE jobs SET status = 'completed' WHERE job_kind = 'processing.file.remux_pass.v1'");
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO files (library_id, relative_path, status) VALUES ($l, 'Film/film.mkv', 'processing_failed') " +
+            "ON CONFLICT (library_id, relative_path) DO UPDATE SET status = 'processing_failed'",
+            ("$l", library));
+
+        using var status = await new ApiTestClient(server).GetAsync("/api/v1/intake/handoffs/deluno/h3", SecretHeader);
+        Assert.Equal("failed", (await Json(status))["state"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task A_failed_job_queued_for_this_hand_off_still_fails_it()
     {
         await using var server = await StartAsync();
