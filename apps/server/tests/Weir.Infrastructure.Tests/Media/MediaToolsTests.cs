@@ -10,9 +10,8 @@ using Weir.Infrastructure.Processes;
 namespace Weir.Infrastructure.Tests.Media;
 
 /// <summary>
-/// Ports of <c>test_processing_ffprobe_log_levels.py</c>, <c>test_processing_remux_mux_validation.py</c>,
-/// <c>test_processing_probe_controls.py</c> (tool resolution) and the detection half of
-/// <c>test_processing_hardware_acceleration.py</c>, with a scripted runner in place of <c>subprocess</c>.
+/// <see cref="MediaTools"/> with a scripted runner in place of real processes: ffprobe log levels, remux output
+/// validation, tool resolution and hardware acceleration detection.
 /// </summary>
 public sealed class MediaToolsTests : IDisposable
 {
@@ -129,9 +128,9 @@ public sealed class MediaToolsTests : IDisposable
     [InlineData("[mov,mp4,m4a,3gp,3g2,mj2] stream 0, offset 0x12d3: partial file")]
     public async Task Integrity_validation_rejects_an_exit_zero_warning_that_means_incomplete(string stderr)
     {
-        // #539 item 3: fixed, not parity. The reference only looks at the exit code, so a real ffmpeg build that
-        // exits 0 from a truncated demux with only one of these warnings (see RealFfmpegTests for the real
-        // wording observed) would be reported as passing.
+        // #539 item 3: the exit code alone is not enough. A real ffmpeg build can exit 0 from a truncated demux
+        // with only one of these warnings (see RealFfmpegTests for the real wording observed), and that must
+        // not be reported as passing.
         var source = WriteFile("truncated.mkv", "source"u8.ToArray());
         var runner = new ScriptedRunner(_ => new ScriptedRun { ExitCode = 0, Stderr = Encoding.UTF8.GetBytes(stderr) });
 
@@ -176,8 +175,8 @@ public sealed class MediaToolsTests : IDisposable
     [Fact]
     public async Task A_decided_hardware_acceleration_reaches_the_executed_remux_argv()
     {
-        // #539 item 2: fixed, not parity. The reference's remux_to_temp_file builds its own argv that never
-        // includes the hwaccel flags run.py decided on, so the setting has no effect on what actually runs.
+        // #539 item 2: the executed remux argv carries the decided hwaccel flags, so the setting changes what
+        // actually runs instead of being dropped when the remux builds its own argv.
         var source = WriteFile("source.mkv", "source"u8.ToArray());
         var workDir = Path.Combine(_root, "work");
         var plan = new RemuxPlan { VideoIndices = [0], Audio = [new PlannedTrack { InputIndex = 1, LangLabel = "eng", Default = true }], Subtitles = [] };

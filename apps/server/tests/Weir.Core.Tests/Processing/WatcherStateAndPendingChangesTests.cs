@@ -2,8 +2,8 @@ using Weir.Core.Processing;
 
 namespace Weir.Core.Tests.Processing;
 
-/// <summary>Pure-logic port of the debounce and readiness-summary assertions in
-/// <c>test_processing_watched_folder_watcher.py</c> (<c>PendingChanges</c> and <c>watcher_summary</c>).</summary>
+/// <summary>The pure logic of the watched-folder watcher: debouncing pending changes and the readiness
+/// summary.</summary>
 public sealed class WatcherStateAndPendingChangesTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);

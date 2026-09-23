@@ -23,10 +23,10 @@ public sealed record ActualOutputTrack(string CodecType, bool Default, bool Forc
 /// <summary>
 /// Issue #500: checks a staged remux output against the whole <see cref="RemuxPlan"/> — the container family, the
 /// track type and disposition at every position, the language tags the plan sets, new ffprobe warnings the source
-/// did not have, and metadata rules that must have taken effect — instead of the older "at least the expected audio
-/// count and not much shorter" check (kept as <see cref="ProbeOutput.ValidateRemuxOutput"/> only for golden parity
-/// with the Python reference, which is not fixed). Ported from Muxarr's <c>OutputValidator</c> (see the issue for
-/// the exact reference checked against).
+/// did not have, and metadata rules that must have taken effect. <see cref="ProbeOutput.ValidateRemuxOutput"/> is the
+/// narrower "at least the expected audio count and not much shorter" check that the golden files cover.
+/// Derived from Muxarr's <c>OutputValidator</c> (https://github.com/KirovAir/muxarr, GPL-3.0); see
+/// THIRD_PARTY_NOTICES.md.
 /// </summary>
 public static partial class RemuxOutputValidation
 {
@@ -42,10 +42,10 @@ public static partial class RemuxOutputValidation
     /// The <c>0x</c> form is the obvious one. The second alternative is the one that matters in practice:
     /// ffmpeg and ffprobe prefix almost every diagnostic with their own context, and print that pointer
     /// <b>bare</b> — <c>[matroska,webm @ 000002a22ac49500] Could not find codec parameters…</c>. Without this,
-    /// only the digit runs inside such an address were replaced and the letters survived
-    /// (<c>000002a22ac49500</c> → <c>#a#ac#</c>), so the same warning from two different process runs never
-    /// normalised alike and <see cref="WarningsNewInOutput"/> called every one of them new. A file that made
-    /// ffprobe say anything at all therefore failed its own output validation, every time.
+    /// only the digit runs inside such an address would be replaced and the letters would survive
+    /// (<c>000002a22ac49500</c> → <c>#a#ac#</c>), so the same warning from two process runs would never
+    /// normalise alike, <see cref="WarningsNewInOutput"/> would call every one of them new, and any file that made
+    /// ffprobe say anything at all would fail its own output validation.
     /// </para>
     /// </summary>
     [GeneratedRegex(@"0x[0-9a-fA-F]+|(?<=@\s)[0-9a-fA-F]{8,}", RegexOptions.CultureInvariant)]
@@ -91,7 +91,7 @@ public static partial class RemuxOutputValidation
         languageTagsRemoved || track.LangLabel.Length == 0 ? null : track.LangLabel;
 
     /// <summary>
-    /// ffprobe's <c>format.format_name</c>, canonicalized to the family the reference groups it in: Matroska and
+    /// ffprobe's <c>format.format_name</c>, canonicalized to its muxer family: Matroska and
     /// WebM share a muxer family, as do the MOV/MP4-derived containers, so a WebM output for a Matroska plan is not
     /// a container flip. An unrecognized format name is returned lower-cased, so an exact match still passes and
     /// any other value still fails.
@@ -466,7 +466,7 @@ public static partial class RemuxOutputValidation
                 "ffprobe reported warnings on the output that the source did not have: " + string.Join(" | ", newWarnings));
         }
 
-        // 6. Metadata: a cleared title must actually be cleared. Chapters are not modeled yet (#498 is not merged here).
+        // 6. Metadata: a cleared title must actually be cleared. Chapter removal (#498) is not checked here.
         if (plan.Metadata.RemoveTitle)
         {
             var outputTitle = FormatTitle(outputProbe);

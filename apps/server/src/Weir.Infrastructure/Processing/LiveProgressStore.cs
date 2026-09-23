@@ -6,7 +6,7 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
 
-/// <summary>How far the pass currently working on a file has got (<c>LiveProgress</c>).</summary>
+/// <summary>How far the pass currently working on a file has got.</summary>
 /// <param name="Percent">How much of the file has been written, 0 to 100.</param>
 /// <param name="Message">What the pass says it is doing, in its own words.</param>
 /// <param name="EtaSeconds">The pass's own estimate of the time left.</param>
@@ -26,15 +26,15 @@ public sealed record LiveProgress(
     IReadOnlyList<string> RemovedSubtitles);
 
 /// <summary>
-/// Reads the live per-file progress Activity row a running pass keeps updated (port of
-/// <c>processing_live_progress.py</c>, #463). Read-only: nothing here writes a second source of truth.
+/// Reads the live per-file progress Activity row a running pass keeps updated (#463). Read-only: nothing here
+/// writes a second source of truth.
 /// </summary>
 /// <remarks>
 /// A pass inserts one row and rewrites it on every report, so the row's <c>created_at</c> is when the pass
-/// started, not when it last reported. Staleness used to be judged on <c>created_at</c>, which dropped the live
-/// progress of any pass longer than <see cref="StaleAfter"/>: a big file's progress bar vanished part-way. Each
-/// report now carries <c>reported_at</c> (<see cref="RemuxPass.ActivityProgressReporter"/>), and a row is stale
-/// when its last report is. Rows written before that field existed fall back to <c>created_at</c>.
+/// started, not when it last reported. Judging staleness on it would drop the live progress of any pass longer
+/// than <see cref="StaleAfter"/>, so each report carries <c>reported_at</c>
+/// (<see cref="RemuxPass.ActivityProgressReporter"/>) and a row is stale when its last report is. Rows without
+/// that field, written by earlier releases, fall back to <c>created_at</c>.
 /// </remarks>
 public static class LiveProgressStore
 {
@@ -46,7 +46,7 @@ public static class LiveProgressStore
     private static readonly HashSet<string> LiveStatuses = new(StringComparer.Ordinal) { "processing", "finishing" };
     private const int MaxRows = 64;
 
-    /// <summary><c>live_progress_by_path</c>: maps <c>relative_media_path</c> to the progress of the pass running on it.</summary>
+    /// <summary>Maps <c>relative_media_path</c> to the progress of the pass running on it.</summary>
     public static async Task<Dictionary<string, LiveProgress>> ByPathAsync(UnitOfWork uow, TimeProvider time)
     {
         var now = time.GetUtcNow();

@@ -4,12 +4,12 @@ namespace Weir.Core.Activity;
 
 /// <summary>
 /// Why a piece of work is happening, carried from where it is queued to the Activity it writes
-/// (port of <c>weir.platform.activity.provenance</c>, #469). The trigger and run id ride on the job
+/// (#469). The trigger and run id ride on the job
 /// payload; handlers copy them into their details and <see cref="ActivityClassifier"/> lifts them into columns.
 /// </summary>
 public static class ActivityProvenance
 {
-    /// <summary><c>SCAN_TRIGGER_TO_TRIGGER</c>: the watched-folder scan's own words in the shared vocabulary.</summary>
+    /// <summary>The watched-folder scan's own trigger words in the shared vocabulary.</summary>
     public static readonly IReadOnlyDictionary<string, string> ScanTriggerToTrigger = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["manual"] = "manual",
@@ -17,7 +17,7 @@ public static class ActivityProvenance
         ["filesystem_event"] = "folder_change",
     };
 
-    /// <summary><c>job_provenance</c>: <c>trigger</c> and <c>run_id</c> from a job payload, only when present and valid.</summary>
+    /// <summary><c>trigger</c> and <c>run_id</c> from a job payload, only when present and valid.</summary>
     public static PyDict JobProvenance(PyJson? payload)
     {
         var output = new PyDict();
@@ -35,7 +35,7 @@ public static class ActivityProvenance
             }
         }
 
-        // isinstance(run_id, (str, int)) and not isinstance(run_id, bool)
+        // A string or integer run_id only; a boolean is not a run id.
         if (dict.Get("run_id") is (PyStr or PyInt) and var runId && PyStrings.Strip(PyConvert.Str(runId)).Length > 0)
         {
             output.Set("run_id", runId);
@@ -44,7 +44,7 @@ public static class ActivityProvenance
         return output;
     }
 
-    /// <summary><c>with_provenance</c>: <c>{**job_provenance(payload), **detail}</c>, never overwriting what the detail says.</summary>
+    /// <summary>The detail with the payload's provenance added, never overwriting what the detail says.</summary>
     public static PyDict WithProvenance(PyDict detail, PyJson? payload)
     {
         ArgumentNullException.ThrowIfNull(detail);

@@ -5,10 +5,10 @@ using Weir.Core.Json;
 
 namespace Weir.Core.MediaManagers;
 
-/// <summary>Search-lane schedule fields (port of <c>schedule_csv_validate</c>).</summary>
+/// <summary>Search-lane schedule fields.</summary>
 public static class ScheduleCsv
 {
-    /// <summary><c>validate_schedule_days_csv</c>. Throws <see cref="PyValueErrorException"/> with the operator's sentence.</summary>
+    /// <summary>A comma-separated list of day names, tidied. Throws <see cref="PyValueErrorException"/> with the operator's sentence.</summary>
     public static string ValidateScheduleDaysCsv(string? raw)
     {
         var text = PyStrings.Strip(raw ?? string.Empty);
@@ -26,7 +26,7 @@ public static class ScheduleCsv
         return string.Join(',', tokens);
     }
 
-    /// <summary><c>normalize_hhmm</c>. Throws <see cref="PyValueErrorException"/> for a time it cannot read.</summary>
+    /// <summary>A time as zero-padded <c>HH:MM</c>. Throws <see cref="PyValueErrorException"/> for a time it cannot read.</summary>
     public static string NormalizeHhmm(string? raw, string fallback)
     {
         var text = PyStrings.Strip(raw ?? string.Empty);

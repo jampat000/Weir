@@ -3,7 +3,7 @@ using Weir.Core.MediaManagers;
 
 namespace Weir.Core.Processing;
 
-/// <summary>How to read the entity out of one queue row for a given media scope (<c>QueueDialect</c>).</summary>
+/// <summary>How to read the entity out of one queue row for a given media scope.</summary>
 public sealed record QueueDialect(
     string Scope,
     IReadOnlyList<string> EntityKeys,
@@ -19,16 +19,15 @@ public sealed record QueueDialect(
 }
 
 /// <summary>
-/// Media-manager queue row -&gt; <see cref="ProcessingQueueRowView"/>, driven by a media-scope dialect (port of
-/// <c>queue_adapter.py</c> and the path-matching parts of <c>queue_row_plumbing.py</c>). A queue row differs
-/// by what kind of library it describes, not by which product sent it: a movie row nests its entity under
+/// Media-manager queue row -&gt; <see cref="ProcessingQueueRowView"/>, driven by a media-scope dialect.
+/// A queue row differs by what kind of library it describes, not by which product sent it: a movie row nests its entity under
 /// <c>movie</c> and identifies it with <c>movieId</c>; an episode row nests under <c>series</c> and uses
 /// <c>seriesId</c>. Neutral keys (<c>media</c>/<c>entityId</c>) let a manager that is neither Radarr nor
 /// Sonarr use either dialect without vendor-specific code.
 /// </summary>
 public static class QueueRowMapping
 {
-    /// <summary><c>MOVIE_QUEUE_DIALECT</c>.</summary>
+    /// <summary>Dialect for movie queue rows (entity under <c>movie</c>, id in <c>movieId</c>).</summary>
     public static readonly QueueDialect MovieDialect = new(
         MediaManagerKinds.Movie,
         ["movie", "media", "item"],
@@ -36,7 +35,7 @@ public static class QueueRowMapping
         ["movieId", "movie_id", "entityId", "entity_id"],
         QueueDialect.DefaultActiveStatuses);
 
-    /// <summary><c>TV_QUEUE_DIALECT</c>.</summary>
+    /// <summary>Dialect for episode queue rows (entity under <c>series</c>, id in <c>seriesId</c>).</summary>
     public static readonly QueueDialect TvDialect = new(
         MediaManagerKinds.Tv,
         ["series", "show", "media", "item"],
@@ -52,7 +51,7 @@ public static class QueueRowMapping
         ["series"] = TvDialect,
     };
 
-    /// <summary><c>queue_dialect_for_scope</c>: resolve a dialect from a media-scope string, accepting the common spellings.</summary>
+    /// <summary>Resolve a dialect from a media-scope string, accepting the common spellings.</summary>
     public static QueueDialect DialectForScope(string scope)
     {
         var key = PyStrings.Strip(scope ?? string.Empty).ToLowerInvariant();
@@ -64,11 +63,11 @@ public static class QueueRowMapping
         throw new ArgumentException($"Unknown media scope for queue dialect: '{scope}'", nameof(scope));
     }
 
-    /// <summary><c>normalize_storage_path</c>: normalize paths for equality (case-insensitive, forward slashes).</summary>
+    /// <summary>Normalize a path for equality checks (case-insensitive, forward slashes).</summary>
     public static string NormalizeStoragePath(string path) =>
         PyStrings.Strip(path.Replace('\\', '/')).ToLowerInvariant();
 
-    /// <summary><c>primary_queue_status</c>: first non-empty status-like string.</summary>
+    /// <summary>The row's first non-empty status-like field, lower-cased.</summary>
     public static string PrimaryQueueStatus(PyDict row)
     {
         foreach (var key in (string[])["status", "trackedDownloadStatus", "trackedDownloadState"])
@@ -82,10 +81,10 @@ public static class QueueRowMapping
         return string.Empty;
     }
 
-    /// <summary><c>output_path</c>.</summary>
+    /// <summary>The row's download output path, if it reports one.</summary>
     public static string? OutputPath(PyDict row) => PyValues.FirstText(row, "outputPath", "output_path");
 
-    /// <summary><c>path_matches_candidate</c>.</summary>
+    /// <summary>Whether the row's output path is the candidate file's path.</summary>
     public static bool PathMatchesCandidate(PyDict row, string? candidatePath)
     {
         if (candidatePath is null)
@@ -96,7 +95,7 @@ public static class QueueRowMapping
         return OutputPath(row) is { } outputPath && NormalizeStoragePath(outputPath) == NormalizeStoragePath(candidatePath);
     }
 
-    /// <summary><c>blocking_suppressed_for_import_wait</c>.</summary>
+    /// <summary>Whether the manager flagged this row as not blocking while it waits to import.</summary>
     public static bool BlockingSuppressedForImportWait(PyDict row)
     {
         foreach (var key in (string[])["blockingSuppressedForImportWait", "blocking_suppressed_for_import_wait", "weirBlockingSuppressedForImportWait"])
@@ -127,8 +126,8 @@ public static class QueueRowMapping
             }
         }
 
-        // Year only ever comes from the nested entity, matching the previous per-vendor behaviour: a
-        // top-level year on the row is not trusted to describe the entity.
+        // Year only ever comes from the nested entity: a top-level year on the row is not trusted to
+        // describe the entity.
         return (PyValues.FirstText(row, "title", "name"), null);
     }
 
@@ -149,9 +148,9 @@ public static class QueueRowMapping
     }
 
     /// <summary>
-    /// <c>map_queue_row_to_processing_view</c>: one media-manager queue row to the Processing domain row view.
-    /// <c>applies_to_file</c> is <c>outputPath</c> matching <paramref name="candidatePath"/>, and/or the row's
-    /// scope id field matching <paramref name="candidateEntityId"/>; <c>queue_title</c>/<c>queue_year</c> come
+    /// One media-manager queue row to the Processing domain row view.
+    /// <c>AppliesToFile</c> is <c>outputPath</c> matching <paramref name="candidatePath"/>, and/or the row's
+    /// scope id field matching <paramref name="candidateEntityId"/>; <c>QueueTitle</c>/<c>QueueYear</c> come
     /// from the nested entity named by the dialect when present, else the row's top-level <c>title</c>/<c>name</c>.
     /// </summary>
     public static ProcessingQueueRowView MapQueueRowToProcessingView(
@@ -173,12 +172,12 @@ public static class QueueRowMapping
     }
 }
 
-/// <summary>One mapped queue row, plus the connection that reported it (<c>AttributedQueueRow</c>).</summary>
+/// <summary>One mapped queue row, plus the connection that reported it.</summary>
 public sealed record AttributedQueueRow(string ConnectionLabel, ProcessingQueueRowView View);
 
 /// <summary>
-/// Turn media-manager queue signals into Processing domain rows that remember who said what (port of
-/// <c>manager_queue_signals.py</c>). <see cref="ProcessingDomain"/> decides whether a row blocks a file; it has
+/// Turn media-manager queue signals into Processing domain rows that remember who said what.
+/// <see cref="ProcessingDomain"/> decides whether a row blocks a file; it has
 /// no idea which manager the row came from, and should not — attribution is carried alongside the view here,
 /// which is what lets a blocked-upstream reason say "Deluno (Main) is still importing this file" instead of
 /// naming a product the operator may not even have installed.
@@ -186,7 +185,7 @@ public sealed record AttributedQueueRow(string ConnectionLabel, ProcessingQueueR
 public static class ManagerQueueSignals
 {
     /// <summary>
-    /// <c>attributed_queue_rows</c>: map every reported row for <paramref name="mediaScope"/> through its
+    /// Map every reported row for <paramref name="mediaScope"/> through its
     /// dialect, keeping the reporter's name. Rows describing the other kind of library are dropped rather
     /// than mapped: a manager that serves both scopes reports on its whole instance, and an in-flight TV
     /// import carries a title and year that the anchor rules will match against a film with a similar name.
@@ -220,7 +219,7 @@ public static class ManagerQueueSignals
     }
 
     /// <summary>
-    /// <c>attributed_rows_for_file</c>: the rows any manager holds against one file on disk, within its own
+    /// The rows any manager holds against one file on disk, within its own
     /// scope. <paramref name="resolvedFilePath"/> must already be the fully resolved absolute path — resolving
     /// it is the caller's job, since it touches the filesystem and this module stays IO-free.
     /// </summary>
@@ -228,16 +227,16 @@ public static class ManagerQueueSignals
         IReadOnlyList<ManagerQueueSignal> signals, string mediaScope, string resolvedFilePath) =>
         AttributedQueueRows(signals, mediaScope, candidatePath: resolvedFilePath);
 
-    /// <summary><c>views_of</c>.</summary>
+    /// <summary>The row views without their attribution.</summary>
     public static List<ProcessingQueueRowView> ViewsOf(IReadOnlyList<AttributedQueueRow> rows) =>
         [.. rows.Select(r => r.View)];
 
-    /// <summary><c>file_is_owned_by_any_manager</c>.</summary>
+    /// <summary>Whether any manager's queue still owns the file.</summary>
     public static bool FileIsOwnedByAnyManager(IReadOnlyList<AttributedQueueRow> rows, FileAnchorCandidate? candidate = null) =>
         ProcessingDomain.FileIsOwnedByQueue(ViewsOf(rows), candidate);
 
     /// <summary>
-    /// <c>blocking_connection_label</c>: the first connection holding this file open, or <see langword="null"/>
+    /// The first connection holding this file open, or <see langword="null"/>
     /// if none is. A block from any manager blocks the file, so the first one found is enough to explain the wait.
     /// </summary>
     public static string? BlockingConnectionLabel(IReadOnlyList<AttributedQueueRow> rows, FileAnchorCandidate? candidate = null)
@@ -254,14 +253,7 @@ public static class ManagerQueueSignals
         return null;
     }
 
-    /// <summary><c>upstream_block_reason</c>: plain-language reason naming the connection, not the vendor.</summary>
-    public static string? UpstreamBlockReason(IReadOnlyList<AttributedQueueRow> rows, FileAnchorCandidate? candidate = null)
-    {
-        var label = BlockingConnectionLabel(rows, candidate);
-        return label is null ? null : $"{label} is still importing this file, so Weir left it alone for now.";
-    }
-
-    /// <summary><c>report_for_signals</c>.</summary>
+    /// <summary>Summarise which connections reported their queue and which stayed silent.</summary>
     public static QueueSignalReport ReportForSignals(IReadOnlyList<ManagerQueueSignal> signals)
     {
         ArgumentNullException.ThrowIfNull(signals);

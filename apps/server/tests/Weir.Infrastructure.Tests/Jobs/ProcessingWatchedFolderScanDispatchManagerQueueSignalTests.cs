@@ -13,10 +13,7 @@ namespace Weir.Infrastructure.Tests.Jobs;
 
 /// <summary>
 /// Closes #522's per-file manager queue attribution gap: a linked manager's live queue must block/hold a
-/// watched-folder file it still reports downloading or importing, exactly like Python's
-/// <c>evaluate_watched_media_file_for_dispatch</c> (port of the manager-signal parts of
-/// <c>test_processing_watched_folder_remux_scan_dispatch_evaluate.py</c> and
-/// <c>test_processing_watched_folder_remux_scan_dispatch_lane.py</c>), driven through
+/// watched-folder file it still reports downloading or importing, driven through
 /// <see cref="ProcessingWatchedFolderScanDispatchJobHandler"/> with a fake Radarr behind
 /// <see cref="FakeManagerHttp"/> rather than a hand-built signal.
 /// </summary>

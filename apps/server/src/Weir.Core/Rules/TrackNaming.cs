@@ -47,7 +47,7 @@ public sealed record TrackNameContext
 }
 
 /// <summary>
-/// The track-name template engine (#498, muxarr-inspired): resolves which template applies to a track, renders
+/// The track-name template engine (#498, Muxarr-inspired): resolves which template applies to a track, renders
 /// its placeholders and validates a template for a future settings API. All-off <see cref="MetadataRules"/> means
 /// this is never reached in ordinary remux planning, so it changes nothing for an upgrade.
 /// </summary>

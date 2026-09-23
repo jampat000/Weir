@@ -12,7 +12,7 @@ public sealed class InMemoryRedownloadTrackerTests
     [Fact]
     public async Task Marking_then_clearing_a_title_round_trips()
     {
-        var tracker = new InMemoryRedownloadTracker();
+        var tracker = new InMemoryRedownloadTracker(TimeProvider.System);
         var key = new RemovedTrackFileKey(1, "Movies/A.mkv");
 
         Assert.False(await tracker.IsWaitingAsync(key));
@@ -33,7 +33,7 @@ public sealed class InMemoryRedownloadTrackerTests
     [Fact]
     public async Task Clearing_a_title_that_was_never_marked_reports_nothing_happened()
     {
-        var tracker = new InMemoryRedownloadTracker();
+        var tracker = new InMemoryRedownloadTracker(TimeProvider.System);
         var cleared = await tracker.ClearAsync(new RemovedTrackFileKey(1, "Movies/Untouched.mkv"));
         Assert.False(cleared);
     }
@@ -41,7 +41,7 @@ public sealed class InMemoryRedownloadTrackerTests
     [Fact]
     public async Task Marking_the_same_title_twice_replaces_the_earlier_reason()
     {
-        var tracker = new InMemoryRedownloadTracker();
+        var tracker = new InMemoryRedownloadTracker(TimeProvider.System);
         var key = new RemovedTrackFileKey(null, "Movies/A.mkv");
 
         await tracker.MarkWaitingAsync(key, "first reason");

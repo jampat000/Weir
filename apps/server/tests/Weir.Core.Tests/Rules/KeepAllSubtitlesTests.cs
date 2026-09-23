@@ -4,10 +4,9 @@ using Weir.Core.Rules;
 namespace Weir.Core.Tests.Rules;
 
 /// <summary>
-/// "Keep all subtitles" (<c>keep_all</c>, the stored default) keeps every subtitle track. The planner used to know only
-/// remove-all and keep-selected, so keep-all was read as keep-selected: with the language list the Rules screen hides in
-/// that mode left empty, every subtitle was removed, forced and default tracks included; with a list left over from an
-/// earlier choice, only those languages survived.
+/// "Keep all subtitles" (<c>keep_all</c>, the stored default) keeps every subtitle track. Read as keep-selected, it would
+/// remove every subtitle, forced and default tracks included, when the language list the Rules screen hides in that mode
+/// is empty, and keep only the listed languages when a list is left over from an earlier choice.
 /// </summary>
 public sealed class KeepAllSubtitlesTests
 {

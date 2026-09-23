@@ -6,8 +6,8 @@ namespace Weir.Infrastructure.LibraryMode;
 /// <summary>
 /// Per-library #505 settings (<see cref="LibrarySettings"/>): real columns on <c>libraries</c>
 /// (<c>library_schedule_enabled</c>, <c>clean_hardlinked_files</c>, <c>skip_if_manager_would_redownload</c>)
-/// plus the <c>library_folders</c> table, since #557's migration (0038_library_mode_settings) moved this off
-/// the one permanent <c>jobs</c> row per library that job-row retention could otherwise prune.
+/// plus the <c>library_folders</c> table, rather than a <c>jobs</c> row that job-row retention could prune
+/// (#557, migration 0038_library_mode_settings).
 /// </summary>
 public static class LibrarySettingsStore
 {
@@ -70,11 +70,11 @@ public static class LibrarySettingsStore
         await uow.ExecuteAsync(
             "DELETE FROM jobs WHERE job_kind = @scanKind AND dedupe_key LIKE @prefix ESCAPE '\\'",
             ("@scanKind", LibraryModeJobKinds.ScanKind),
-            ("@prefix", EscapeLike(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%")).ConfigureAwait(false);
+            ("@prefix", SqliteLike.Escape(LibraryModeJobKinds.ScanDedupeKeyPrefix(libraryId)) + "%")).ConfigureAwait(false);
         await uow.ExecuteAsync(
             "DELETE FROM jobs WHERE job_kind = @cleanKind AND dedupe_key LIKE @prefix ESCAPE '\\'",
             ("@cleanKind", LibraryModeJobKinds.CleanKind),
-            ("@prefix", EscapeLike($"{LibraryModeJobKinds.CleanKind}:{libraryId}:") + "%")).ConfigureAwait(false);
+            ("@prefix", SqliteLike.Escape($"{LibraryModeJobKinds.CleanKind}:{libraryId}:") + "%")).ConfigureAwait(false);
     }
 
     private static async Task<List<string>> FoldersForAsync(UnitOfWork uow, long libraryId) =>
@@ -82,7 +82,4 @@ public static class LibrarySettingsStore
             "SELECT folder FROM library_folders WHERE library_id = @id ORDER BY position, id",
             reader => reader.GetString(0),
             ("@id", libraryId)).ConfigureAwait(false);
-
-    private static string EscapeLike(string value) =>
-        value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
 }

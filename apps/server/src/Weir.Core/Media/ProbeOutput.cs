@@ -8,13 +8,12 @@ using Weir.Core.Text;
 namespace Weir.Core.Media;
 
 /// <summary>
-/// What <c>ffprobe_json</c>, <c>validate_remux_output</c>, <c>validate_media_integrity</c> and
-/// <c>_probe_duration_seconds</c> decide once a tool has run: which failures mean the media is
-/// unreadable, what counts as usable output, and when staged output is incomplete.
+/// What probing, output validation and the integrity check decide once a tool has run: which failures
+/// mean the media is unreadable, what counts as usable output, and when staged output is incomplete.
 /// </summary>
 public static class ProbeOutput
 {
-    /// <summary>ffprobe's own words for "this is not readable media" (<c>_UNREADABLE_MEDIA_MARKERS</c>).</summary>
+    /// <summary>ffprobe's own words for "this is not readable media".</summary>
     public static IReadOnlyList<string> UnreadableMediaMarkers { get; } =
     [
         "invalid data found when processing input",
@@ -36,7 +35,7 @@ public static class ProbeOutput
     private static readonly string[] TruncationEndOfFilePhrases = ["premature end of file", "unexpected end of file"];
 
     /// <summary>
-    /// The error <c>ffprobe_json</c> raises for a non-zero exit: <see cref="MediaUnreadableException"/>
+    /// The error for a non-zero ffprobe exit: <see cref="MediaUnreadableException"/>
     /// when the message carries an unreadable-media marker, otherwise <see cref="MediaToolException"/>.
     /// </summary>
     public static MediaToolException FailureFor(string? stdout, string? stderr)
@@ -67,9 +66,8 @@ public static class ProbeOutput
 
     /// <summary>
     /// Stderr wording from the integrity read that means the file is incomplete even though ffmpeg exited 0
-    /// (#539 item 3): the reference's <c>validate_media_integrity</c> only looks at the exit code, so a Matroska
-    /// file cut off mid-cluster keeps its full header duration and a truncated demux that only warns still
-    /// reports success.
+    /// (#539 item 3): the exit code alone is not enough, because a Matroska file cut off mid-cluster keeps its
+    /// full header duration and a truncated demux that only warns still reports success.
     /// </summary>
     public static IReadOnlyList<string> IntegrityIncompleteMarkers { get; } =
     [
@@ -83,7 +81,7 @@ public static class ProbeOutput
         IntegrityIncompleteMarkers.Any(marker => Py.Lower(stderr ?? string.Empty).Contains(marker, StringComparison.Ordinal));
 
     /// <summary>
-    /// Everything <c>ffprobe_json</c> does after ffprobe exits: raise for a failure, otherwise parse stdout
+    /// Everything done with a probe after ffprobe exits: throw for a failure, otherwise parse stdout
     /// and require a JSON object. The returned element is detached from any document.
     /// </summary>
     public static JsonElement Interpret(int returnCode, string? stdout, string? stderr)
@@ -116,7 +114,7 @@ public static class ProbeOutput
     }
 
     /// <summary>
-    /// <c>_probe_duration_seconds</c>: the longest positive duration among the format and the streams, or null.
+    /// The longest positive duration among the format and the streams, or null.
     /// </summary>
     public static double? DurationSeconds(JsonElement data)
     {
@@ -145,7 +143,7 @@ public static class ProbeOutput
         double? best = null;
         foreach (var duration in candidates)
         {
-            // Python's max() keeps the first of equals and never picks a NaN, which "> 0" already excluded.
+            // The first of equal durations wins; "> 0" also excludes NaN.
             if (duration > 0 && (best is null || duration > best.Value))
             {
                 best = duration;
@@ -156,7 +154,7 @@ public static class ProbeOutput
     }
 
     /// <summary>
-    /// The checks <c>validate_remux_output</c> makes on the staged output's probe: at least one audio stream,
+    /// The checks made on the staged output's probe: at least one audio stream,
     /// the expected audio count, and a duration no shorter than expected less max(5 s, 1%).
     /// </summary>
     public static void ValidateRemuxOutput(JsonElement data, int expectedAudio = 0, double? expectedDurationSeconds = null)
@@ -185,7 +183,7 @@ public static class ProbeOutput
 
                 if (!Py.IsStr(codecType))
                 {
-                    // (s.get("codec_type") or "").lower() on a truthy non-string.
+                    // A truthy codec_type that is not a string cannot be lower-cased.
                     throw new RulesInputException("AttributeError", "codec_type has no lower()");
                 }
 
@@ -227,8 +225,8 @@ public static class ProbeOutput
     }
 
     /// <summary>
-    /// The error <c>validate_media_integrity</c> raises when the full demux exits non-zero, and (#539 item 3,
-    /// a deliberate divergence) when it exits 0 but warned of a marker in <see cref="IntegrityIncompleteMarkers"/>.
+    /// The integrity check's error when the full demux exits non-zero, or (#539 item 3) exits 0 but warned of a
+    /// marker in <see cref="IntegrityIncompleteMarkers"/>.
     /// </summary>
     public static MediaCompletenessException IntegrityFailure(string? stderr)
     {
@@ -240,7 +238,7 @@ public static class ProbeOutput
     }
 
     /// <summary>
-    /// The error <c>validate_media_integrity</c> raises when it decoded far less than the probed duration
+    /// The integrity check's error when it decoded far less than the probed duration
     /// (#539 item 3): comparing the last decoded timestamp against the duration where practical, alongside the
     /// stderr markers, since a container can keep a header duration that the actual stream data never reaches.
     /// </summary>
@@ -277,25 +275,25 @@ public static class ProbeOutput
         return last;
     }
 
-    /// <summary>The error <c>run_ffmpeg</c> raises for a non-zero exit, from the tail of stderr.</summary>
+    /// <summary>The error for a non-zero ffmpeg exit, from the tail of stderr.</summary>
     public static MediaToolException FfmpegFailure(string stderrTail) =>
         new(stderrTail.Length > 0 ? stderrTail : "ffmpeg failed");
 
-    /// <summary><c>_read_tail_text</c>: the last bytes of stderr, decoded with replacement and stripped.</summary>
+    /// <summary>The last bytes of stderr, decoded with replacement and stripped.</summary>
     public static string TailText(ReadOnlySpan<byte> bytes, int maxBytes = FfmpegCommands.FfmpegStderrTailBytes)
     {
         var tail = bytes.Length > maxBytes ? bytes[^maxBytes..] : bytes;
         return PyStrings.Strip(PyText.DecodeUtf8(tail));
     }
 
-    /// <summary>Output captured with <c>text=True, encoding="utf-8", errors="replace"</c>.</summary>
+    /// <summary>Captured output as text: UTF-8 with replacement characters, newlines translated to <c>\n</c>.</summary>
     public static string CapturedText(ReadOnlySpan<byte> bytes) => PyText.TranslateNewlines(PyText.DecodeUtf8(bytes));
 
-    /// <summary><c>str(subprocess.TimeoutExpired)</c> for a timeout given in whole seconds.</summary>
+    /// <summary>The timeout message for a timeout given in whole seconds (<c>... after 120 seconds</c>).</summary>
     public static string TimeoutMessage(IEnumerable<string> argv, int timeoutSeconds) =>
         PyText.TimeoutExpiredMessage(argv, timeoutSeconds.ToString(CultureInfo.InvariantCulture));
 
-    /// <summary><c>str(subprocess.TimeoutExpired)</c> for a timeout given as a Python float.</summary>
+    /// <summary>The timeout message for a fractional timeout, which prints with a decimal point (<c>10.0</c>).</summary>
     public static string TimeoutMessage(IEnumerable<string> argv, double timeoutSeconds) =>
         PyText.TimeoutExpiredMessage(argv, PyConvert.FloatRepr(timeoutSeconds));
 
@@ -333,8 +331,8 @@ public static class ProbeOutput
             PyJsonFormat.Default);
 
     /// <summary>
-    /// <c>float(value or 0)</c> with <c>TypeError</c>/<c>ValueError</c> suppressed (false). An integer too
-    /// large for a float raises <c>OverflowError</c> in the reference, which is not suppressed.
+    /// Reads a duration as a double: a falsy value is 0, an unreadable one returns false. An integer too
+    /// large for a double throws rather than returning false.
     /// </summary>
     private static bool TryFloatOrZero(JsonElement? value, out double result)
     {

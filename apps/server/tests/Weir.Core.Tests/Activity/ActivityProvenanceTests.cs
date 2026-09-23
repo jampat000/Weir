@@ -3,7 +3,7 @@ using Weir.Core.Json;
 
 namespace Weir.Core.Tests.Activity;
 
-/// <summary>Ports of the provenance and notifier tests in <c>test_activity_triggers.py</c> and <c>test_activity_stream.py</c>.</summary>
+/// <summary>Activity provenance (triggers and runs) and the activity notifier.</summary>
 public sealed class ActivityProvenanceTests
 {
     [Fact]

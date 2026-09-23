@@ -55,7 +55,7 @@ public static class WeirPlatformServices
 
     /// <summary>
     /// Hosts every registered <see cref="IPeriodicTask"/>. Added by the job host after startup recovery,
-    /// so, as in Python's lifespan, no periodic work starts before interrupted jobs are recovered.
+    /// so no periodic work starts before interrupted jobs are recovered.
     /// </summary>
     public static IServiceCollection AddWeirPeriodicTasks(this IServiceCollection services)
     {

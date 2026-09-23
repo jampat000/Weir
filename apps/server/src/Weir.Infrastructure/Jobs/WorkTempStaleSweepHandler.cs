@@ -4,6 +4,7 @@ using Weir.Core.Activity;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
+using Weir.Core.Processing;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Processing.RemuxPass;
 
@@ -41,7 +42,7 @@ public sealed class WorkTempStaleSweepHandler : IJobHandler
     {
         ArgumentNullException.ThrowIfNull(context);
         var payload = JobPayload.ParseObject(context.PayloadJson);
-        var scope = ProcessingLibraryFolders.NormalizeMediaScope(JobPayload.StringProperty(payload, "media_scope"));
+        var scope = ProcessingMediaScopes.Normalize(JobPayload.StringProperty(payload, "media_scope"));
         var trigger = JobPayload.StringProperty(payload, "trigger");
 
         var (libraries, running) = await _store.InTransactionAsync(
@@ -101,7 +102,7 @@ public sealed class WorkTempStaleSweepHandler : IJobHandler
         {
             scope == "tv" ? ProcessingLibraryFolders.DefaultTvWorkFolder(weirHome) : ProcessingLibraryFolders.DefaultMovieWorkFolder(weirHome),
         };
-        foreach (var library in libraries.Where(l => ProcessingLibraryFolders.NormalizeMediaScope(l.MediaType) == scope))
+        foreach (var library in libraries.Where(l => ProcessingMediaScopes.Normalize(l.MediaType) == scope))
         {
             roots.Add(ProcessingLibraryFolders.EffectiveWorkFolder(library, weirHome));
         }

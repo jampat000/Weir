@@ -4,7 +4,7 @@ using System.Net.Http.Headers;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
-using Weir.Core;
+using Microsoft.Data.Sqlite;
 using Weir.Core.Json;
 using Weir.Core.Net;
 using Weir.Core.Notifications;
@@ -12,7 +12,7 @@ using Weir.Core.Updates;
 
 namespace Weir.Infrastructure.Http;
 
-/// <summary>Fetches the latest GitHub release (port of <c>fetch_latest_release_record</c>).</summary>
+/// <summary>Fetches the latest GitHub release.</summary>
 public interface IReleaseCatalogClient
 {
     /// <summary>Throws <see cref="ReleaseFetchException"/> for an HTTP error status, other exceptions for anything else.</summary>
@@ -39,7 +39,7 @@ public sealed class GitHubReleaseCatalogClient : IReleaseCatalogClient
     }
 }
 
-/// <summary>An operator-facing failure to reach or use an external endpoint (<c>ExternalEndpointError</c>).</summary>
+/// <summary>An operator-facing failure to reach or use an external endpoint; the message is shown as is.</summary>
 public sealed class ExternalEndpointException : Exception
 {
     public ExternalEndpointException()
@@ -57,7 +57,7 @@ public sealed class ExternalEndpointException : Exception
     }
 }
 
-/// <summary>Posts JSON to a public endpoint (port of <c>post_json_to_external_url</c>).</summary>
+/// <summary>Posts JSON to a public endpoint.</summary>
 public interface IExternalJsonPoster
 {
     Task<int> PostJsonAsync(string url, byte[] body, IReadOnlyDictionary<string, string> headers, TimeSpan timeout, CancellationToken cancellationToken);
@@ -65,7 +65,8 @@ public interface IExternalJsonPoster
 
 /// <summary>
 /// Resolves the host, refuses any non-public answer, connects to exactly the validated address with no
-/// redirects and TLS 1.2 or newer, as <c>weir.platform.outbound_http</c> does.
+/// redirects and TLS 1.2 or newer, so a hostname cannot be re-resolved to a private address between the
+/// check and the connection.
 /// </summary>
 public sealed class ExternalJsonPoster : IExternalJsonPoster
 {
@@ -138,7 +139,7 @@ public sealed class ExternalJsonPoster : IExternalJsonPoster
 
     private sealed record ResolvedEndpoint(Uri Uri, IPAddress Address, int Port);
 
-    /// <summary><c>resolve_public_external_endpoint</c>.</summary>
+    /// <summary>Validates the URL and resolves it to a public address, throwing <see cref="ExternalEndpointException"/> otherwise.</summary>
     private static async Task<ResolvedEndpoint> ResolveAsync(string raw, CancellationToken cancellationToken)
     {
         SplitUrl parsed;
@@ -202,7 +203,7 @@ public sealed class ExternalJsonPoster : IExternalJsonPoster
     }
 }
 
-/// <summary>Port of <c>weir.platform.notifications.dispatch</c>.</summary>
+/// <summary>Delivers notifications to Discord and webhook channels.</summary>
 public sealed class NotificationDispatcher
 {
     public const string TestTitle = "Weir test notification";
@@ -219,7 +220,7 @@ public sealed class NotificationDispatcher
         _time = time;
     }
 
-    /// <summary><c>_post_one</c>.</summary>
+    /// <summary>Posts one notification to one channel, in the channel's payload shape; returns the HTTP status.</summary>
     public Task<int> PostOneAsync(NotificationChannelRecord channel, string title, string detail, string jobEvent, string module, long jobId, string jobKind, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(channel);
@@ -230,7 +231,7 @@ public sealed class NotificationDispatcher
         return _poster.PostJsonAsync(channel.Url, body, new Dictionary<string, string>(StringComparer.Ordinal) { ["User-Agent"] = "Weir/1.0" }, DispatchTimeout, cancellationToken);
     }
 
-    /// <summary><c>test_dispatch_notification_channel</c>: the error text, or <see langword="null"/> on success.</summary>
+    /// <summary>Sends a test notification: the error text, or <see langword="null"/> on success.</summary>
     public async Task<string?> TestAsync(NotificationChannelRecord channel, CancellationToken cancellationToken)
     {
         try
@@ -242,17 +243,16 @@ public sealed class NotificationDispatcher
         {
             return exception.Message;
         }
+#pragma warning disable CA1031 // A test delivery that fails for any reason reads as the generic delivery error, never an exception page.
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+#pragma warning restore CA1031
         {
             return ExternalUrlPolicy.GenericDeliveryError;
         }
     }
 
-    /// <summary>The version string a request's <c>User-Agent</c> names.</summary>
-    public static string UserAgentVersion(string? versionOverride) => WeirVersion.Resolve(versionOverride);
-
     /// <summary>
-    /// <c>dispatch_job_notification</c>: send <c>{module}_job_{eventKind}</c> to every enabled channel subscribed
+    /// Sends <c>{module}_job_{eventKind}</c> to every enabled channel subscribed
     /// to it or to its generic form, without the caller waiting. For <c>failed</c> the job must be permanently
     /// failed. Never throws; failures are logged through <paramref name="warn"/>.
     /// </summary>
@@ -263,10 +263,8 @@ public sealed class NotificationDispatcher
     /// <param name="jobKind">The job's kind, for the notification payload.</param>
     /// <param name="warn">Where a delivery or lookup failure is logged; never thrown to the caller.</param>
     /// <param name="willRetry">
-    /// #540 item 6: whether another attempt follows this failure, so the detail text says so instead
-    /// of claiming retries are exhausted. Ignored for <c>completed</c>. The permanently-failed check
-    /// below already keeps a wrongly-worded "failed" notification from reaching a channel while a
-    /// retry is still coming; this makes the text correct on its own terms too.
+    /// Whether another attempt follows this failure, so the detail text says so instead of claiming
+    /// retries are exhausted (#540). Ignored for <c>completed</c>.
     /// </param>
     public void DispatchJobNotification(
         Sqlite.SqliteDatabase database, string module, string eventKind, long jobId, string jobKind, Action<string, Exception?> warn, bool willRetry = false)
@@ -306,7 +304,7 @@ public sealed class NotificationDispatcher
                     }
                 }
             }
-            catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or IOException or InvalidOperationException)
+            catch (Exception exception) when (exception is SqliteException or IOException or InvalidOperationException)
             {
                 warn($"Notification dispatch: failed to read channels for event={jobEvent}", exception);
                 return;

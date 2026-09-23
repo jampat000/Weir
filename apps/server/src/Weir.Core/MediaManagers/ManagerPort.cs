@@ -5,16 +5,16 @@ namespace Weir.Core.MediaManagers;
 /// <summary>The kinds, lanes and scopes a media manager connection can have.</summary>
 public static class MediaManagerKinds
 {
-    /// <summary><c>MEDIA_MANAGER_KINDS</c>.</summary>
+    /// <summary>Every manager kind.</summary>
     public static readonly IReadOnlyList<string> All = ["radarr", "sonarr", "deluno", "native"];
 
-    /// <summary><c>SEARCH_LANES</c>.</summary>
+    /// <summary>Every search lane.</summary>
     public static readonly IReadOnlyList<string> SearchLanes = ["missing", "upgrade"];
 
     public const string Movie = "movie";
     public const string Tv = "tv";
 
-    /// <summary><c>ALL_MEDIA_SCOPES</c>.</summary>
+    /// <summary>Every media scope.</summary>
     public static readonly IReadOnlySet<string> AllMediaScopes = new SortedSet<string>(StringComparer.Ordinal) { Movie, Tv };
 
     private static readonly Dictionary<string, string> KindLabels = new(StringComparer.Ordinal)
@@ -25,7 +25,7 @@ public static class MediaManagerKinds
         ["native"] = "Media manager",
     };
 
-    /// <summary><c>label_for_connection</c>: <c>"Deluno (Main)"</c>; a connection named after its product is not repeated.</summary>
+    /// <summary>A connection's label, e.g. <c>"Deluno (Main)"</c>; a connection named after its product is not repeated.</summary>
     public static string LabelForConnection(string? kind, string? name)
     {
         var product = KindLabels.GetValueOrDefault(PyStrings.Strip(kind ?? string.Empty).ToLowerInvariant(), "Media manager");
@@ -41,7 +41,7 @@ public static class MediaManagerKinds
     }
 }
 
-/// <summary>The three answers a manager can give (<c>SignalStatus</c>).</summary>
+/// <summary>The three answers a manager can give.</summary>
 public static class SignalStatus
 {
     public const string Reported = "reported";
@@ -71,7 +71,7 @@ public sealed record ManagerLibraryTruth(ManagerConnection Connection, string St
 }
 
 /// <summary>
-/// One file a manager's library holds, matched to the title that owns it (<c>list_library_files</c>, #507).
+/// One file a manager's library holds, matched to the title that owns it (<see cref="IMediaManagerPort.ListLibraryFilesAsync"/>, #507).
 /// <see cref="FileId"/> and <see cref="QualityProfileId"/> (#551) are read from the same movie/series payload
 /// this file was already found in — a movie's own <c>movieFile.id</c>, an episode file row's own <c>id</c>,
 /// and either resource's own <c>qualityProfileId</c> — so resolving them costs no extra round trip. Null for
@@ -86,7 +86,7 @@ public sealed record ManagerLibraryFilesSignal(ManagerConnection Connection, str
     public bool IsReported => Status == SignalStatus.Reported;
 }
 
-/// <summary>What happened when a manager was asked to re-read a changed file (<c>file_changed</c>, #507).</summary>
+/// <summary>What happened when a manager was asked to re-read a changed file (<see cref="IMediaManagerPort.FileChangedAsync"/>, #507).</summary>
 public enum ManagerNotifyOutcome
 {
     /// <summary>The manager accepted the call.</summary>
@@ -123,7 +123,7 @@ public sealed record ManagerDescription(
     string? Detail = null,
     IReadOnlySet<string>? AdvertisedCapabilities = null);
 
-/// <summary>A call to a manager failed (<c>MediaManagerHttpError</c>).</summary>
+/// <summary>A call to a manager failed.</summary>
 public class MediaManagerHttpException : Exception
 {
     public MediaManagerHttpException()
@@ -141,7 +141,7 @@ public class MediaManagerHttpException : Exception
     }
 }
 
-/// <summary>The manager answered 429 (<c>MediaManagerRateLimitedError</c>). Back off; never retry inside the call.</summary>
+/// <summary>The manager answered 429. Back off; never retry inside the call.</summary>
 public sealed class MediaManagerRateLimitedException : MediaManagerHttpException
 {
     public MediaManagerRateLimitedException()
@@ -167,7 +167,7 @@ public sealed class MediaManagerRateLimitedException : MediaManagerHttpException
     public double? RetryAfterSeconds { get; }
 }
 
-/// <summary>The manager could not be reached at all: Python's <c>OSError</c> (refused, timed out, name not resolved).</summary>
+/// <summary>The manager could not be reached at all (refused, timed out, name not resolved).</summary>
 public sealed class MediaManagerUnreachableException : Exception
 {
     public MediaManagerUnreachableException()
@@ -185,7 +185,7 @@ public sealed class MediaManagerUnreachableException : Exception
     }
 }
 
-/// <summary>One kind of manager answering the three questions (<c>MediaManagerPort</c>).</summary>
+/// <summary>One kind of manager answering the three questions.</summary>
 public interface IMediaManagerPort
 {
     string Kind { get; }
@@ -204,13 +204,13 @@ public interface IMediaManagerPort
 
     /// <summary>
     /// Every library file this manager knows for <paramref name="mediaScope"/>, matched to its title
-    /// (<c>list_library_files</c>, #507). <see cref="SignalStatus.NoSignal"/> for a manager with no
+    /// (#507). <see cref="SignalStatus.NoSignal"/> for a manager with no
     /// per-file listing (Deluno's external API offers none); no network is spent finding that out.
     /// </summary>
     Task<ManagerLibraryFilesSignal> ListLibraryFilesAsync(ManagerConnection connection, string mediaScope, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Tell this manager one of its files changed on disk, so it re-reads it (<c>file_changed</c>, #507).
+    /// Tell this manager one of its files changed on disk, so it re-reads it (#507).
     /// <paramref name="advertisedCapabilities"/> is the manifest capability set from a prior
     /// <see cref="DescribeAsync"/> (avoids a second round trip just to check it); <paramref name="titleId"/>
     /// is required for an arr manager (the id <see cref="ListLibraryFilesAsync"/> matched) and ignored by an

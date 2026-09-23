@@ -6,7 +6,7 @@ using Weir.Core.Json;
 
 namespace Weir.Core.Rules;
 
-/// <summary>The sorter list is not usable (<c>TrackSorterError</c>).</summary>
+/// <summary>The sorter list is not usable.</summary>
 public sealed class TrackSorterException : Exception
 {
     public TrackSorterException()
@@ -25,7 +25,7 @@ public sealed class TrackSorterException : Exception
 }
 
 /// <summary>
-/// One entry in the ordered sorter list (<c>processing_track_sorters.TrackSorter</c>). A null
+/// One entry in the ordered sorter list. A null
 /// <see cref="Value"/> sorts by the field naturally; anything else is a match test.
 /// </summary>
 public sealed record TrackSorter(string Field, string? Value = null, bool Reversed = false)
@@ -35,10 +35,9 @@ public sealed record TrackSorter(string Field, string? Value = null, bool Revers
     {
         if (Value is null)
         {
-            // Issue #537 item 1: the reference's notes said the opposite of what the code did
-            // (claiming "lowest first" for channels/bitrate, which actually rank highest first,
-            // and "commentary first" when commentary is in fact ranked last). Fixed here so the
-            // note matches the real ranking; see golden/overrides for the affected golden cases.
+            // The note describes the real ranking (#537 item 1): channels/bitrate rank highest
+            // first and commentary ranks last. The golden files recorded the opposite wording;
+            // golden/overrides patches the affected cases.
             if (Field is "default" or "forced")
             {
                 return $"{Field} {(Reversed ? "last" : "first")}";
@@ -52,8 +51,8 @@ public sealed record TrackSorter(string Field, string? Value = null, bool Revers
 
             if (Field == "content_tier")
             {
-                // Issue #497: the default sorters' new leading key — main, then a dub or audio
-                // description track, then commentary — replacing the old plain "commentary" key.
+                // Issue #497: the default sorters' leading key — main, then a dub or audio
+                // description track, then commentary.
                 return Reversed
                     ? "content tier (commentary, then dub/audio description, then main)"
                     : "content tier (main, then dub/audio description, then commentary)";
@@ -76,7 +75,7 @@ public sealed record TrackSorter(string Field, string? Value = null, bool Revers
 
 /// <summary>
 /// The facts a sorter can look at for one track. The planner fills <see cref="Title"/> with the
-/// codec name, as the reference's <c>_candidate_as_track</c> does.
+/// stream's own title tag (#537 item 2).
 /// </summary>
 public sealed record SortableTrack
 {
@@ -99,7 +98,7 @@ public sealed record SortableTrack
 
     public bool AudioDescription { get; init; }
 
-    /// <summary><c>track.get(field)</c>: a bool, a long, a string, or null for a key the track does not have.</summary>
+    /// <summary>The fact named <paramref name="field"/>: a bool, a long, a string, or null for a key the track does not have.</summary>
     internal object? Get(string field) => field switch
     {
         "index" => (long)Index,
@@ -119,7 +118,7 @@ public sealed record SortableTrack
     };
 }
 
-/// <summary>Lexicographic ordering of sort keys, like Python tuple comparison.</summary>
+/// <summary>Lexicographic ordering of sort keys; a key that is a prefix of another sorts first.</summary>
 public sealed class SortKeyComparer : IComparer<IReadOnlyList<long>>
 {
     public static SortKeyComparer Instance { get; } = new();
@@ -143,24 +142,21 @@ public sealed class SortKeyComparer : IComparer<IReadOnlyList<long>>
 }
 
 /// <summary>
-/// The ordered, editable sorter list (<c>processing_track_sorters.py</c>): key building, storage
-/// and the seeded default, which reproduces the ranking Processing used to hardcode.
+/// The ordered, editable sorter list: key building, storage and the seeded default.
 /// </summary>
 public static partial class TrackSorters
 {
     /// <summary>
-    /// The vocabulary, in the reference's order, plus <c>content_tier</c> (issue #497), the
-    /// engine's own addition with no Python equivalent.
+    /// The vocabulary, ending with <c>content_tier</c> (issue #497), which the golden files predate.
     /// </summary>
     public static IReadOnlyList<string> Fields { get; } =
         ["bitrate", "channels", "codec", "language", "title", "default", "forced", "commentary", "content_tier"];
 
     /// <summary>
-    /// Exactly the ranking the fixed tuple applied, except that issue #497 replaced the leading
-    /// <c>commentary</c> key with the broader <c>content_tier</c> key (main &gt; dub/audio
-    /// description &gt; commentary), so a dub or audio-description track no longer ties with the
-    /// main track on this first key. <see cref="Presets"/>' <c>quality_all_languages</c> preset
-    /// keeps its own <c>commentary</c> key unchanged — the issue asks for this only on the default.
+    /// The default audio ranking. Its leading key is <c>content_tier</c> (main &gt; dub/audio
+    /// description &gt; commentary, issue #497), so a dub or audio-description track does not tie with
+    /// the main track on this first key. <see cref="Presets"/>' <c>quality_all_languages</c> preset
+    /// keeps a plain <c>commentary</c> key — the issue asks for <c>content_tier</c> only on the default.
     /// </summary>
     public static IReadOnlyList<TrackSorter> DefaultAudioSorters { get; } =
     [
@@ -189,15 +185,15 @@ public static partial class TrackSorters
 
     internal static bool LargerIsBetter(string field) => field is "bitrate" or "channels";
 
-    // Python's \s is str.isspace(), which also covers U+001C..U+001F; .NET's \s does not.
+    // Whitespace here includes U+001C..U+001F, which .NET's \s does not, so saved sorters keep parsing the same way.
     private const string PyWhitespace = "[\\t\\n\\x0b\\x0c\\r\x001c-\x001f \x0085\x00a0\x1680\x2000-\x200a\x2028\x2029\x202f\x205f\x3000]";
 
     [GeneratedRegex("^" + PyWhitespace + "*(>=|<=|!=|>|<|=)?" + PyWhitespace + "*(.+?)" + PyWhitespace + "*$", RegexOptions.CultureInvariant)]
     private static partial Regex ComparisonRegex();
 
     /// <summary>
-    /// <c>5.1</c> means six channels, and operators write it that way. Null where the reference
-    /// returns <c>None</c>.
+    /// <c>5.1</c> means six channels, and operators write it that way. Null when the text is not a
+    /// channel count.
     /// </summary>
     internal static double? ParseChannels(string text)
     {
@@ -301,7 +297,7 @@ public static partial class TrackSorters
         _ => value.ToString() ?? string.Empty,
     };
 
-    /// <summary><c>float(actual or 0)</c> / <c>int(actual or 0)</c> over a track fact.</summary>
+    /// <summary>A track fact as a number, 0 when falsy.</summary>
     private static double NumberOrZero(object? actual) => (double)LongOrZero(actual);
 
     private static long LongOrZero(object? actual) => actual switch
@@ -346,7 +342,7 @@ public static partial class TrackSorters
         if (sorter.Field == "content_tier")
         {
             // Issue #497: main (0) beats a dub or audio-description track (1), which beats
-            // commentary (2) — a superset of the old "commentary" demotion.
+            // commentary (2) — a superset of the plain "commentary" demotion.
             long tier = track.Commentary ? 2 : track.Dub || track.AudioDescription ? 1 : 0;
             return [sorter.Reversed ? 2 - tier : tier];
         }
@@ -453,7 +449,7 @@ public static partial class TrackSorters
         return new TrackSorter(field, keptValue, Py.Truthy(Py.Get(item, "reversed")));
     }
 
-    /// <summary><c>dump_sorters</c>: compact JSON exactly as <c>json.dumps(..., separators=(",", ":"))</c> writes it.</summary>
+    /// <summary>Compact, ASCII-escaped JSON, byte-identical to the sorter JSON already stored in rule sets.</summary>
     public static string Dump(IEnumerable<TrackSorter> sorters)
     {
         ArgumentNullException.ThrowIfNull(sorters);

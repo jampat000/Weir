@@ -9,9 +9,7 @@ using Weir.Infrastructure.Jobs;
 
 namespace Weir.Api.Endpoints;
 
-/// <summary>Manual enqueue for watched-folder remux scan dispatch (port of
-/// <c>processing_watched_folder_remux_scan_dispatch_api.py</c> and
-/// <c>schemas_watched_folder_remux_scan_dispatch_manual.py</c>; <c>jobs</c> only).</summary>
+/// <summary>Manual enqueue for watched-folder remux scan dispatch (<c>jobs</c> only).</summary>
 public static class ProcessingWatchedFolderScanDispatchEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingWatchedFolderScanDispatchEndpoints(this IEndpointRouteBuilder endpoints)

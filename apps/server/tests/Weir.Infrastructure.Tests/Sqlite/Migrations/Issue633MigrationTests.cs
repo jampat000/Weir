@@ -7,7 +7,7 @@ namespace Weir.Infrastructure.Tests.Sqlite.Migrations;
 /// Issue #633's migration (<c>0011_files_at_once.sql</c>): an upgrade changes nothing about how many files run today,
 /// and an install that never tuned anything gets the simple model - a library follows "Files at once", and the
 /// resolution budget is off.
-/// <para>Each test builds a database at head, puts it back the way 3.0.3 left it (no budget switch, the saved limits
+/// <para>Each test builds a database at head, puts it back the way it was before this migration (no budget switch, the saved limits
 /// under test), and runs the migration's own SQL.</para>
 /// </summary>
 public sealed class Issue633MigrationTests : IDisposable

@@ -1,8 +1,9 @@
+using Weir.Core.Configuration;
 using Weir.Core.Time;
 
 namespace Weir.Core.Jobs;
 
-/// <summary>The stored schedule grid is not a usable schedule (<c>ScheduleGridError</c>).</summary>
+/// <summary>The stored schedule grid is not a usable schedule.</summary>
 public sealed class ScheduleGridException : Exception
 {
     public ScheduleGridException()
@@ -21,8 +22,8 @@ public sealed class ScheduleGridException : Exception
 }
 
 /// <summary>
-/// A 7x24 schedule at 15-minute resolution stored as 672 <c>0</c>/<c>1</c> characters (port of
-/// <c>weir.processing.processing_schedule_grid</c>). Day 0 is Monday. An empty grid means no restriction.
+/// A 7x24 schedule at 15-minute resolution stored as 672 <c>0</c>/<c>1</c> characters.
+/// Day 0 is Monday. An empty grid means no restriction.
 /// </summary>
 public static class ScheduleGrid
 {
@@ -31,13 +32,13 @@ public static class ScheduleGrid
     public const int SlotsPerWeek = 7 * SlotsPerDay;
     public const int SlotMinutes = 60 / SlotsPerHour;
 
-    /// <summary>Monday-first day names, as <c>schedule_wall_clock.DAY_NAMES</c>.</summary>
+    /// <summary>Monday-first day names, matching the grid's day order.</summary>
     public static readonly IReadOnlyList<string> DayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-    /// <summary><c>normalize_grid</c>: validate and canonicalise stored grid text.</summary>
+    /// <summary>Validates and canonicalises stored grid text.</summary>
     public static string Normalize(string? raw)
     {
-        var text = PythonStrip(raw ?? string.Empty);
+        var text = (raw ?? string.Empty).Trim();
         if (text.Length == 0)
         {
             return string.Empty;
@@ -58,13 +59,13 @@ public static class ScheduleGrid
         return text;
     }
 
-    /// <summary><c>slot_index</c>: Monday is weekday 0.</summary>
+    /// <summary>The grid position of a weekday, hour and minute; Monday is weekday 0.</summary>
     public static int SlotIndex(int weekday, int hour, int minute) =>
-        (PythonMod(weekday, 7) * SlotsPerDay) + (hour * SlotsPerHour) + PythonFloorDiv(minute, SlotMinutes);
+        (FloorMod(weekday, 7) * SlotsPerDay) + (hour * SlotsPerHour) + FloorDiv(minute, SlotMinutes);
 
     /// <summary>
-    /// <c>grid_allows</c>: an empty grid allows everything, and so does one that fails to parse, so a
-    /// display bug never becomes a stoppage.
+    /// An empty grid allows everything, and so does one that fails to parse, so a display bug never
+    /// becomes a stoppage.
     /// </summary>
     public static bool Allows(string? grid, string? timezoneName, DateTimeOffset now)
     {
@@ -84,15 +85,15 @@ public static class ScheduleGrid
         }
 
         var local = TimeZones.ToLocal(now, timezoneName);
-        return text[SlotIndex(PythonWeekday(local.DayOfWeek), local.Hour, local.Minute)] == '1';
+        return text[SlotIndex(MondayFirstDayIndex(local.DayOfWeek), local.Hour, local.Minute)] == '1';
     }
 
-    /// <summary><c>grid_from_days_and_times</c>: the grid a day/start/end window describes, or no restriction.</summary>
+    /// <summary>The grid a day/start/end window describes, or no restriction.</summary>
     public static string FromDaysAndTimes(string? days, string? start, string? end)
     {
         var wanted = (days ?? string.Empty).Split(',')
-            .Where(d => PythonStrip(d).Length > 0)
-            .Select(d => Prefix3(PythonStrip(d).ToLowerInvariant()))
+            .Where(d => d.Trim().Length > 0)
+            .Select(d => Prefix3(d.Trim().ToLowerInvariant()))
             .ToHashSet(StringComparer.Ordinal);
         if (wanted.Count == 0)
         {
@@ -105,8 +106,8 @@ public static class ScheduleGrid
             return string.Empty;
         }
 
-        var startSlot = (startHour * SlotsPerHour) + PythonFloorDiv(startMinute, SlotMinutes);
-        var endSlot = (endHour * SlotsPerHour) + PythonFloorDiv(endMinute, SlotMinutes);
+        var startSlot = (startHour * SlotsPerHour) + FloorDiv(startMinute, SlotMinutes);
+        var endSlot = (endHour * SlotsPerHour) + FloorDiv(endMinute, SlotMinutes);
         if (startSlot is < 0 or >= SlotsPerDay || endSlot is < 0 or >= SlotsPerDay)
         {
             return string.Empty;
@@ -145,7 +146,7 @@ public static class ScheduleGrid
         return new string(slots);
     }
 
-    /// <summary><c>next_open_slot</c>: when the grid next allows work, or null if never or unrestricted.</summary>
+    /// <summary>When the grid next allows work, or null if never or unrestricted.</summary>
     public static DateTimeOffset? NextOpenSlot(string? grid, string? timezoneName, DateTimeOffset now)
     {
         string text;
@@ -165,7 +166,7 @@ public static class ScheduleGrid
 
         var zone = TimeZones.Find(timezoneName);
         var local = TimeZoneInfo.ConvertTime(now, zone);
-        var start = SlotIndex(PythonWeekday(local.DayOfWeek), local.Hour, local.Minute);
+        var start = SlotIndex(MondayFirstDayIndex(local.DayOfWeek), local.Hour, local.Minute);
         for (var ahead = 1; ahead <= SlotsPerWeek; ahead++)
         {
             if (text[(start + ahead) % SlotsPerWeek] != '1')
@@ -173,8 +174,8 @@ public static class ScheduleGrid
                 continue;
             }
 
-            // Python adds minutes to the *wall clock* (aware datetime arithmetic keeps the tzinfo and
-            // ignores DST transitions), then converts back to UTC with the offset of the result.
+            // Minutes are added to the local *wall clock* (ignoring any DST transition in between), then
+            // converted back to UTC with the offset in force at the result, so the answer is the slot the grid shows.
             var aligned = new DateTime(local.Year, local.Month, local.Day, local.Hour, (local.Minute / SlotMinutes) * SlotMinutes, 0, DateTimeKind.Unspecified);
             var wall = aligned.AddMinutes(SlotMinutes * ahead);
             return TimeZones.FromWallClock(wall, zone).ToUniversalTime();
@@ -183,10 +184,8 @@ public static class ScheduleGrid
         return null;
     }
 
-    /// <summary><c>datetime.weekday()</c>: Monday is 0.</summary>
-    public static int PythonWeekday(DayOfWeek day) => ((int)day + 6) % 7;
-
-    internal static string PythonStrip(string value) => value.Trim();
+    /// <summary>The Monday-first day index the grid uses: Monday is 0, Sunday is 6.</summary>
+    public static int MondayFirstDayIndex(DayOfWeek day) => ((int)day + 6) % 7;
 
     private static string Prefix3(string value) => value.Length <= 3 ? value : value[..3];
 
@@ -194,17 +193,21 @@ public static class ScheduleGrid
     {
         hour = 0;
         minute = 0;
-        // Python: (int(x) for x in text.split(":", 1)) unpacked into exactly two values.
+        // "HH:MM": split on the first colon only, and both sides must parse as integers.
         var parts = text.Split(':', 2);
         return parts.Length == 2 &&
-               TryPythonInt(parts[0], out hour) &&
-               TryPythonInt(parts[1], out minute);
+               TryParseInt(parts[0], out hour) &&
+               TryParseInt(parts[1], out minute);
     }
 
-    internal static bool TryPythonInt(string raw, out int value)
+    /// <summary>
+    /// An integer with the configuration rules (optional sign, ASCII digits, single underscores between digits),
+    /// ignoring surrounding whitespace so a time typed as <c>09 : 30</c> still reads; fails outside the int range.
+    /// </summary>
+    internal static bool TryParseInt(string raw, out int value)
     {
         value = 0;
-        if (!PythonCompatInt(raw, out var parsed) || parsed is < int.MinValue or > int.MaxValue)
+        if (!PythonCompat.TryParseInt(raw.Trim(), out var parsed) || parsed is < int.MinValue or > int.MaxValue)
         {
             return false;
         }
@@ -213,10 +216,9 @@ public static class ScheduleGrid
         return true;
     }
 
-    private static bool PythonCompatInt(string raw, out long value) =>
-        Configuration.PythonCompat.TryParseInt(raw, out value);
+    // Floor modulo: the result takes the divisor's sign, so -1 mod 7 is 6.
+    private static int FloorMod(int value, int divisor) => ((value % divisor) + divisor) % divisor;
 
-    private static int PythonMod(int value, int divisor) => ((value % divisor) + divisor) % divisor;
-
-    private static int PythonFloorDiv(int value, int divisor) => (int)Math.Floor(value / (double)divisor);
+    // Floor division: rounds toward negative infinity, so -1 / 15 is -1.
+    private static int FloorDiv(int value, int divisor) => (int)Math.Floor(value / (double)divisor);
 }

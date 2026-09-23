@@ -14,10 +14,9 @@ public interface IHardlinkInspector
 /// <remarks>
 /// Issue #506 (crash-safe in-place swap) reads the same two OS facts through <c>ISwapFileSystem.LinkCount</c>
 /// (<c>Weir.Infrastructure/LibraryMode/SwapFileSystem.cs</c>, <c>PhysicalSwapFileSystem</c>) for the same reason:
-/// the swap itself must not silently double disk use on a still-shared file either. #508 originally carried its
-/// own copy of the native declarations, written before #506 had landed here; now that both are on the same
-/// branch, this type keeps only the smaller, preflight-only seam (<see cref="IHardlinkInspector"/>) and forwards
-/// to the one real implementation instead of maintaining a second native binding that could drift from it.
+/// the swap itself must not silently double disk use on a still-shared file either. This type keeps only the
+/// smaller, preflight-only seam (<see cref="IHardlinkInspector"/>) and forwards to that one implementation, so
+/// there is no second native binding to drift from it.
 /// </remarks>
 public sealed class PhysicalHardlinkInspector : IHardlinkInspector
 {

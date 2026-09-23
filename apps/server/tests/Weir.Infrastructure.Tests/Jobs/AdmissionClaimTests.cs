@@ -5,8 +5,8 @@ using Weir.Infrastructure.Jobs;
 namespace Weir.Infrastructure.Tests.Jobs;
 
 /// <summary>
-/// Ports of the leasing assertions in <c>test_processing_schedules_and_pause.py</c>: the schedule and the pause
-/// gate leasing, not only enqueue (#337), and a running job finishes.
+/// Leasing under the schedule and the pause: both gate leasing, not only enqueue (#337), and a running job
+/// finishes.
 /// </summary>
 public sealed class AdmissionClaimTests : IDisposable
 {
@@ -201,10 +201,10 @@ public sealed class AdmissionClaimTests : IDisposable
     [Fact]
     public async Task Detection_prefix_matching_is_exact_not_a_like_pattern()
     {
-        // #540 item 3: Python's LIKE-based pause filter ignores ASCII case and treats '_' as a
-        // wildcard, so "processing.watched-folder.remux-scan-dispatch" (hyphens, not underscores) also
-        // reads as the detection prefix and keeps running through a pause. Fixed here to compare the
-        // literal prefix, so only the real detection kind survives a pause.
+        // #540 item 3: a LIKE-based pause filter would ignore ASCII case and treat '_' as a wildcard, so
+        // "processing.watched-folder.remux-scan-dispatch" (hyphens, not underscores) would read as the
+        // detection prefix and keep running through a pause. The literal prefix is compared, so only the
+        // real detection kind survives a pause.
         _db.InsertRawJob("odd", "processing.watched-folder.remux-scan-dispatch.v1");
         _db.Pause(scanWhilePaused: true);
 

@@ -5,7 +5,7 @@ using Weir.Core.Text;
 
 namespace Weir.Core.Validation;
 
-/// <summary>One pydantic error as FastAPI reports it in a 422 body.</summary>
+/// <summary>One validation error in a 422 body: <c>type</c>, <c>loc</c>, <c>msg</c>, <c>input</c> and optional <c>ctx</c>.</summary>
 public sealed record ValidationIssue(string Type, IReadOnlyList<object> Loc, string Msg, PyJson Input, PyDict? Ctx = null)
 {
     public PyDict ToPyDict()
@@ -24,7 +24,7 @@ public sealed record ValidationIssue(string Type, IReadOnlyList<object> Loc, str
     }
 }
 
-/// <summary>FastAPI's <c>RequestValidationError</c>: answered with 422 and <c>{"detail": [...]}</c>.</summary>
+/// <summary>An invalid request: answered with 422 and <c>{"detail": [...]}</c>.</summary>
 public sealed class RequestValidationException : Exception
 {
     public RequestValidationException()
@@ -55,7 +55,7 @@ public sealed class RequestValidationException : Exception
     public PyDict ToBody() => new PyDict().Set("detail", new PyList(Issues.Select(issue => (PyJson)issue.ToPyDict())));
 }
 
-/// <summary>Collects errors across path, query, header and body parameters in FastAPI's order.</summary>
+/// <summary>Collects errors across path, query, header and body parameters, in that order.</summary>
 public sealed class ValidationIssues
 {
     private readonly List<ValidationIssue> _issues = [];
@@ -76,8 +76,9 @@ public sealed class ValidationIssues
 }
 
 /// <summary>
-/// Pydantic v2 lax-mode validation for the scalar shapes Weir's request models use, producing the
-/// same error <c>type</c>, <c>msg</c>, <c>input</c> and <c>ctx</c>.
+/// Lenient validation for the scalar shapes Weir's request models use. The error <c>type</c>, <c>msg</c>,
+/// <c>input</c> and <c>ctx</c> are fixed so 422 bodies stay byte-identical for existing clients and the
+/// contract suite.
 /// </summary>
 public static class PydanticRules
 {
@@ -287,9 +288,9 @@ public static class PydanticRules
     }
 
     /// <summary>
-    /// Pydantic's lax <c>datetime</c> parsing for the one shape Weir's request models use: an ISO-8601
-    /// string with an explicit UTC offset (a bare <c>PyDateTime.Naive</c> value is never produced here —
-    /// the caller's own <c>field_validator</c> rejects a naive value with its own message instead).
+    /// Date-time parsing for the one shape Weir's request models use: an ISO-8601 string with an explicit
+    /// UTC offset. A string without one parses as a naive value, which the caller rejects with its own
+    /// message.
     /// </summary>
     public static bool TryDateTime(PyJson input, IReadOnlyList<object> loc, ValidationIssues issues, out Time.PyDateTime? value)
     {
@@ -331,7 +332,7 @@ public static class PydanticRules
         return false;
     }
 
-    /// <summary>Pydantic's UUID parsing, with the uuid crate's error sentences.</summary>
+    /// <summary>UUID parsing (plain, hyphenated, braced or <c>urn:uuid:</c>), with fixed error sentences that clients match on.</summary>
     public static bool TryUuid(string text, IReadOnlyList<object> loc, ValidationIssues issues, out Guid value)
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -416,7 +417,7 @@ public static class PydanticRules
         return null;
     }
 
-    /// <summary>Strings pydantic reads as integers: whitespace, a sign, digits with underscores, and an all-zero fraction.</summary>
+    /// <summary>Strings accepted as integers: whitespace, a sign, digits with underscores, and an all-zero fraction.</summary>
     internal static bool TryParseIntString(string raw, out BigInteger value)
     {
         value = BigInteger.Zero;
@@ -469,7 +470,7 @@ public enum ExtraFields
 }
 
 /// <summary>
-/// Validates one JSON body against a pydantic model, field by field in declaration order.
+/// Validates one JSON body against a request model, field by field in declaration order.
 /// Create it, read each field once, then call <see cref="Finish"/>.
 /// </summary>
 public sealed class BodyModel

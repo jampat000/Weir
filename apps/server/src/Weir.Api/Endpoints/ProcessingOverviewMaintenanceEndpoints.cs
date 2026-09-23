@@ -11,8 +11,7 @@ using Weir.Infrastructure.Processing;
 
 namespace Weir.Api.Endpoints;
 
-/// <summary>The custody-screen overview stats and the maintenance job families (ports of
-/// <c>processing_overview_stats_api.py</c> and <c>processing_maintenance_api.py</c>).</summary>
+/// <summary>The custody-screen overview stats and the maintenance job families.</summary>
 public static class ProcessingOverviewMaintenanceEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingOverviewMaintenanceEndpoints(this IEndpointRouteBuilder endpoints)

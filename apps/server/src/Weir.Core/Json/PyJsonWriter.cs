@@ -3,7 +3,7 @@ using System.Text;
 
 namespace Weir.Core.Json;
 
-/// <summary>How <see cref="PyJsonWriter"/> lays out JSON, mirroring <c>json.dumps</c> arguments.</summary>
+/// <summary>How <see cref="PyJsonWriter"/> lays out JSON: escaping, separators, indentation and key order.</summary>
 /// <param name="EnsureAscii">Escape every non-ASCII character as <c>\uXXXX</c>.</param>
 /// <param name="ItemSeparator">Between items.</param>
 /// <param name="KeySeparator">Between a key and its value.</param>
@@ -11,23 +11,26 @@ namespace Weir.Core.Json;
 /// <param name="SortKeys">Sort object keys.</param>
 public sealed record PyJsonFormat(bool EnsureAscii, string ItemSeparator, string KeySeparator, int? Indent, bool SortKeys)
 {
-    /// <summary>Starlette's <c>JSONResponse</c>: <c>ensure_ascii=False, separators=(",", ":")</c>.</summary>
+    /// <summary>API responses: non-ASCII written as-is, no spaces after separators.</summary>
     public static readonly PyJsonFormat Response = new(false, ",", ":", null, false);
 
-    /// <summary><c>json.dumps(value)</c> with default arguments.</summary>
+    /// <summary>One line, ASCII-escaped, with <c>", "</c> and <c>": "</c> separators.</summary>
     public static readonly PyJsonFormat Default = new(true, ", ", ": ", null, false);
 
-    /// <summary><c>json.dumps(value, indent=2, sort_keys=True)</c> (configuration snapshots).</summary>
+    /// <summary>Two-space indent with sorted keys (configuration snapshots).</summary>
     public static readonly PyJsonFormat IndentedSorted = new(true, ",", ": ", 2, true);
 
-    /// <summary><c>json.dumps(value, indent=2)</c>.</summary>
+    /// <summary>Two-space indent in insertion order.</summary>
     public static readonly PyJsonFormat Indented = new(true, ",", ": ", 2, false);
 
-    /// <summary><c>json.dumps(value, separators=(",", ":"))</c>.</summary>
+    /// <summary>One line, ASCII-escaped, no spaces after separators.</summary>
     public static readonly PyJsonFormat Compact = new(true, ",", ":", null, false);
 }
 
-/// <summary><c>json.dumps</c>: Python's float <c>repr</c>, its escaping rules and its separators.</summary>
+/// <summary>
+/// Writes JSON with fixed float formatting, escaping rules and separators so API responses stay
+/// byte-identical for existing clients and stored JSON matches what earlier releases wrote.
+/// </summary>
 public static class PyJsonWriter
 {
     public static string Dumps(PyJson value, PyJsonFormat format)
@@ -41,7 +44,10 @@ public static class PyJsonWriter
 
     public static byte[] DumpsUtf8(PyJson value, PyJsonFormat format) => Encoding.UTF8.GetBytes(Dumps(value, format));
 
-    /// <summary>Python's <c>repr(float)</c>.</summary>
+    /// <summary>
+    /// A float as JSON text: shortest round-trip digits, whole values as <c>1.0</c>, exponent form
+    /// (<c>1e+16</c>, <c>1e-05</c>) outside 1e-4 .. 1e16, and <c>NaN</c>/<c>Infinity</c> for non-finite values.
+    /// </summary>
     public static string FloatRepr(double value)
     {
         if (double.IsNaN(value))
@@ -64,7 +70,7 @@ public static class PyJsonWriter
             return double.IsNegative(value) ? "-0.0" : "0.0";
         }
 
-        // Shortest round-trip digits and the decimal exponent, then Python's layout rules.
+        // Shortest round-trip digits and the decimal exponent, then the fixed-or-exponent layout existing clients expect.
         var shortest = Math.Abs(value).ToString("R", CultureInfo.InvariantCulture);
         var (digits, decimalPoint) = SplitDigits(shortest);
         var sign = value < 0 ? "-" : string.Empty;
@@ -223,7 +229,10 @@ public static class PyJsonWriter
         }
     }
 
-    /// <summary><c>py_encode_basestring(_ascii)</c>.</summary>
+    /// <summary>
+    /// Writes a quoted JSON string: short escapes for quote, backslash and common controls, <c>\uXXXX</c> for
+    /// other controls and, when <paramref name="ensureAscii"/> is set, for everything above <c>~</c>.
+    /// </summary>
     public static void WriteString(StringBuilder builder, string value, bool ensureAscii)
     {
         ArgumentNullException.ThrowIfNull(builder);

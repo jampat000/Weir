@@ -5,7 +5,7 @@ using Weir.Core.Time;
 namespace Weir.Core.Tests.Jobs;
 
 /// <summary>
-/// The pure half of <c>processing_work_admission</c> (pause, library windows, per-library caps, runner budget),
+/// The pure half of work admission (pause, library windows, per-library caps, runner budget),
 /// the remux temp name patterns (#534) and activity classification.
 /// </summary>
 public sealed class WorkAdmissionTests
@@ -73,8 +73,8 @@ public sealed class WorkAdmissionTests
     [Fact]
     public void Without_suite_settings_nothing_is_blocked_and_the_default_budget_applies()
     {
-        // #540 item 4: a missing suite_settings row used to zero the runner budget, so only free jobs
-        // could run. Fixed to fall back to the default budget (capacity 4, nothing in use) instead.
+        // #540 item 4: a missing suite_settings row falls back to the default budget (capacity 4, nothing
+        // in use) rather than a zero budget that would let only free jobs run.
         var admission = WorkAdmissionRules.Evaluate(null, null, [], [Library(1) with { Enabled = false }], Now);
 
         Assert.False(admission.Pause.Paused);
@@ -151,8 +151,8 @@ public sealed class WorkAdmissionTests
 
     [Theory]
     [InlineData("{\"library_id\": 7}", 7L)]
-    // #540 item 5: Python's isinstance(value, int) also accepts a bool, so library_id: true counted
-    // as library 1. Fixed here to reject booleans; only a genuine integer literal counts.
+    // #540 item 5: booleans are rejected, so library_id: true does not count as library 1; only a
+    // genuine integer literal counts.
     [InlineData("{\"library_id\": true}", null)]
     [InlineData("{\"library_id\": false}", null)]
     [InlineData("{\"library_id\": 7.0}", null)]
@@ -183,7 +183,7 @@ public sealed class WorkAdmissionTests
     }
 
     [Fact]
-    public void Temp_names_for_one_source_follow_mkstemp_with_the_source_stem_and_suffix()
+    public void Temp_names_for_one_source_carry_the_source_stem_and_suffix()
     {
         var pattern = WeirTempFiles.RemuxTempNameFor("Movies/Film (2020)/Film (2020).mp4");
         Assert.Matches(pattern, "Film (2020).processing.a1b2c3d4.mp4");
@@ -191,7 +191,7 @@ public sealed class WorkAdmissionTests
         Assert.DoesNotMatch(pattern, "Other.processing.a1b2c3d4.mp4");
         Assert.DoesNotMatch(pattern, "Film (2020).mp4");
 
-        // No suffix: mkstemp was given ".mkv".
+        // No suffix: the temp name falls back to ".mkv".
         Assert.Matches(WeirTempFiles.RemuxTempNameFor(@"tv\Show\episode"), "episode.processing.zzzzzzzz.mkv");
         Assert.Equal(("archive.tar", ".gz"), WeirTempFiles.PythonStemAndSuffix("archive.tar.gz"));
         Assert.Equal((".hidden", string.Empty), WeirTempFiles.PythonStemAndSuffix(".hidden"));

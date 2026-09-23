@@ -1,6 +1,6 @@
 namespace Weir.Core.Activity;
 
-/// <summary>One Activity entry to write (the arguments of Python's <c>record_activity_event</c>).</summary>
+/// <summary>One Activity entry to write.</summary>
 public sealed record ActivityEventDraft(string EventType, string Module, string Title, string? Detail);
 
 /// <summary>

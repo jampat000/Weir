@@ -28,7 +28,7 @@ public sealed class RuntimeAndLoggingTests
     }
 
     [Fact]
-    public void A_directory_at_the_database_path_is_refused_with_the_python_message()
+    public void A_directory_at_the_database_path_is_refused_with_the_documented_message()
     {
         using var temp = new TempDirectory();
         var path = temp.Join("weir.sqlite3");
@@ -42,7 +42,7 @@ public sealed class RuntimeAndLoggingTests
     }
 
     [Fact]
-    public void A_missing_parent_directory_is_refused_with_the_python_message()
+    public void A_missing_parent_directory_is_refused_with_the_documented_message()
     {
         using var temp = new TempDirectory();
         var path = temp.Join("missing", "weir.sqlite3");
@@ -71,11 +71,11 @@ public sealed class RuntimeAndLoggingTests
     [InlineData("fatal", LogLevel.Critical)]
     [InlineData("notset", LogLevel.Trace)]
     [InlineData("verbose", LogLevel.Information)]
-    public void Log_level_names_follow_python_logging(string name, LogLevel expected) =>
+    public void Log_level_names_map_to_minimum_levels(string name, LogLevel expected) =>
         Assert.Equal(expected, PythonLogFormat.ParseMinimumLevel(name));
 
     [Fact]
-    public void Json_lines_match_the_python_formatter()
+    public void Json_lines_match_the_documented_log_format()
     {
         var at = new DateTimeOffset(2026, 9, 17, 1, 2, 3, TimeSpan.Zero).AddTicks(1234560);
         Assert.Equal(

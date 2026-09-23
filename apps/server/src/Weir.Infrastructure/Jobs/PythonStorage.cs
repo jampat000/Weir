@@ -4,24 +4,23 @@ using Weir.Core.Time;
 namespace Weir.Infrastructure.Jobs;
 
 /// <summary>
-/// Timestamps exactly as the Python backend writes them into SQLite, so either backend can read,
-/// compare and claim rows the other wrote.
+/// Writes and reads the two text shapes the database's timestamp columns hold. Rows written by earlier
+/// releases use these shapes, so they must keep parsing and comparing correctly.
 /// </summary>
 /// <remarks>
-/// Python stores time in two shapes. Values bound into raw SQL (the claim's <c>:now</c> and
-/// <c>:lease_exp</c>) go through its <c>sqlite3</c> adapter, <c>isoformat(sep=" ")</c>:
-/// <c>2026-04-10 13:00:00.123456+00:00</c>, microseconds omitted when zero. Values written through
-/// the ORM (<c>not_before</c>, prune cutoffs, <c>processing_paused_until</c>) drop the offset and always
-/// carry microseconds: <c>2026-04-10 12:00:30.123456</c>. The claim compares them as text, which is
-/// reproduced by writing the same text.
+/// The offset shape, <c>2026-04-10 13:00:00.123456+00:00</c> with the fraction omitted when zero, is used
+/// for the claim's <c>@now</c> and <c>@lease_exp</c>. The offset-less shape, <c>2026-04-10 12:00:30.123456</c>
+/// with microseconds always present, is used for <c>not_before</c>, prune cutoffs and
+/// <c>processing_paused_until</c>. Both are read as UTC. Compare them in SQL with <c>julianday()</c>, not as
+/// text, because the two shapes do not sort correctly against each other as strings (#540).
 /// </remarks>
 public static class PythonTimestamps
 {
-    /// <summary>The <c>sqlite3</c> adapter shape, for values bound into raw SQL.</summary>
+    /// <summary>The offset shape, fraction omitted when zero: <c>2026-04-10 13:00:00.123456+00:00</c>.</summary>
     public static string Adapter(DateTimeOffset value) =>
         PyDateTime.FromDateTimeOffset(value.ToUniversalTime()).IsoFormat(' ');
 
-    /// <summary>The SQLAlchemy SQLite <c>DATETIME</c> storage shape, for values written through the ORM.</summary>
+    /// <summary>The offset-less shape, microseconds always present: <c>2026-04-10 12:00:30.123456</c>.</summary>
     public static string Orm(DateTimeOffset value) => PyDateTime.FromDateTimeOffset(value.ToUniversalTime()).ToSqlite();
 
     /// <summary>Read any of the stored shapes (including <c>CURRENT_TIMESTAMP</c>); a value without an offset is UTC.</summary>

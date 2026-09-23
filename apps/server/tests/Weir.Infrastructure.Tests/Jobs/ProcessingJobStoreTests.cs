@@ -3,7 +3,7 @@ using Weir.Infrastructure.Jobs;
 
 namespace Weir.Infrastructure.Tests.Jobs;
 
-/// <summary>Ports of <c>test_jobs_claim.py</c>: enqueue dedupe, atomic claim, lease, complete, fail.</summary>
+/// <summary>The job store: enqueue dedupe, atomic claim, lease, complete, fail.</summary>
 public sealed class ProcessingJobStoreTests : IDisposable
 {
     private const string Kind = "processing.test.harness.v1";
@@ -23,7 +23,7 @@ public sealed class ProcessingJobStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task Enqueue_writes_the_python_row_shape()
+    public async Task Enqueue_clamps_attempts_and_cost_and_writes_a_fresh_pending_row()
     {
         var job = await _db.Store.EnqueueOrGetAsync("shape", Kind, "{\"a\":1}", maxAttempts: 0, runnerCost: -4, priority: 7);
 
@@ -38,7 +38,7 @@ public sealed class ProcessingJobStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task Issue_632_a_job_queued_to_start_later_is_not_claimed_before_then()
+    public async Task A_job_queued_to_start_later_is_not_claimed_before_then()
     {
         var job = await _db.Store.EnqueueOrGetAsync("later", Kind, notBefore: T0.AddSeconds(45));
 
@@ -98,7 +98,7 @@ public sealed class ProcessingJobStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task Claim_writes_python_timestamp_text()
+    public async Task Claim_writes_the_stored_timestamp_text_formats()
     {
         await _db.Store.EnqueueOrGetAsync("text", Kind);
         await _db.Store.ClaimNextAsync("w", T0.AddHours(1).AddTicks(1_234_567), T0);
@@ -193,10 +193,10 @@ public sealed class ProcessingJobStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task A_not_before_row_written_the_way_python_writes_it_still_compares_correctly()
+    public async Task A_legacy_six_digit_not_before_row_still_compares_correctly()
     {
-        // A raw row shaped exactly as SQLAlchemy's SQLite DATETIME column writes it (no offset, always
-        // six fraction digits) — not a row this store itself produced — claimable at its exact second.
+        // A raw row in the legacy timestamp shape earlier releases wrote (no offset, always six fraction
+        // digits) — not a row this store itself produced — claimable at its exact second.
         _db.InsertRawJob("python-written", Kind, maxAttempts: 5);
         _db.Execute("UPDATE jobs SET not_before = '2026-04-10 12:00:30.000000' WHERE dedupe_key = 'python-written'");
 
@@ -230,7 +230,7 @@ public sealed class ProcessingJobStoreTests : IDisposable
         Assert.False(await _db.Store.RenewLeaseAsync(job.Id, "good", T0.AddSeconds(200), T0.AddSeconds(61)));
         Assert.Equal(T0.AddSeconds(60), (await _db.Store.GetAsync(job.Id))!.LeaseExpiresAt);
 
-        // A completed row no longer holds a lease to renew.
+        // A completed row holds no lease to renew.
         Assert.True(await _db.Store.CompleteClaimedAsync(job.Id, "good", T0.AddSeconds(15)));
         Assert.False(await _db.Store.RenewLeaseAsync(job.Id, "good", T0.AddSeconds(400), T0.AddSeconds(16)));
     }

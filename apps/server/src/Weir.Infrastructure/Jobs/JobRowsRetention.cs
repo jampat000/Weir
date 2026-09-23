@@ -11,22 +11,21 @@ public sealed record JobRowsPruneCounts(int Processing, int HandoffLedger, int A
 }
 
 /// <summary>
-/// Periodic pruning of terminal job rows (port of <c>weir.platform.jobs.job_rows_retention_periodic</c>):
-/// terminal <c>jobs</c> rows past <c>WEIR_JOB_ROWS_RETENTION_DAYS</c>, terminal hand-off ledger
+/// Periodic pruning of terminal job rows: terminal <c>jobs</c> rows past <c>WEIR_JOB_ROWS_RETENTION_DAYS</c>, terminal hand-off ledger
 /// rows past 90 days, and Activity past the suite's <c>activity_retention_days</c>, in one transaction.
 /// </summary>
 public static class JobRowsRetention
 {
-    /// <summary><c>LEDGER_RETENTION_DAYS</c>: hand-off answers outlive job rows on purpose (#480).</summary>
+    /// <summary>How long terminal hand-off ledger rows are kept: hand-off answers outlive job rows on purpose (#480).</summary>
     public const int LedgerRetentionDays = 90;
 
-    /// <summary><c>ensure_suite_settings_row</c>'s default when the row does not exist yet.</summary>
+    /// <summary>The Activity retention used when the suite settings row does not exist yet.</summary>
     public const int DefaultActivityRetentionDays = 90;
 
-    /// <summary>The ledger's terminal states, sorted as Python binds them.</summary>
+    /// <summary>The ledger's terminal states.</summary>
     public static readonly IReadOnlyList<string> LedgerTerminalStates = ["cancelled", "completed", "failed", "passed-through", "rejected"];
 
-    /// <summary><c>prune_job_rows</c>: terminal rows whose <c>updated_at</c> is older than <paramref name="cutoff"/>.</summary>
+    /// <summary>Delete terminal rows whose <c>updated_at</c> is older than <paramref name="cutoff"/>.</summary>
     public static int PruneJobRows(SqliteConnection connection, SqliteTransaction transaction, DateTimeOffset cutoff)
     {
         var statuses = ProcessingJobStatus.Terminal;
@@ -41,7 +40,7 @@ public static class JobRowsRetention
             parameters);
     }
 
-    /// <summary><c>_run_prune_tick</c>.</summary>
+    /// <summary>One retention tick: jobs, hand-off ledger and Activity, in one transaction.</summary>
     public static Task<JobRowsPruneCounts> RunTickAsync(ProcessingJobStore queue, int jobRowsRetentionDays, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(queue);
@@ -69,7 +68,7 @@ public static class JobRowsRetention
             parameters);
     }
 
-    /// <summary><c>prune_activity_events</c>: zero or less keeps everything.</summary>
+    /// <summary>Delete Activity older than <paramref name="retentionDays"/>; zero or less keeps everything.</summary>
     private static int PruneActivity(SqliteConnection connection, SqliteTransaction transaction, int retentionDays, DateTimeOffset now)
     {
         if (retentionDays <= 0)

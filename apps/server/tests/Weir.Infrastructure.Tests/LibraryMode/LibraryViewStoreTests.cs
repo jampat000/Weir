@@ -257,8 +257,8 @@ public sealed class LibraryViewStoreTests : IDisposable
         // The Library Overview's attention line names the "Cannot be processed" figure and the files a clean is
         // holding back, and the Problems view is the same files grouped. Both only add up if no file is in two
         // groups and every file the scan could not process is in one. A hardlinked file the scan could not read
-        // used to count under "Still shared with a download" as well as "Weir could not read the file", and a
-        // hardlinked file that already matches (nothing to clean) counted as a problem at all.
+        // counts under "Weir could not read the file" only, not also under "Still shared with a download", and a
+        // hardlinked file that already matches (nothing to clean) is not a problem at all.
         await LibraryAsync();
         await RecordAsync(
             File("/lib/fine.mkv", LibraryFileClassification.Matches, Probe("h264", 1080, ("audio", "aac", 2, "eng"))),

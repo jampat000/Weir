@@ -14,7 +14,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
 /// <summary>
-/// Worker handler for <c>processing.file.reject.v1</c> (port of <c>make_processing_file_reject_handler</c>): tell the media
+/// Worker handler for <c>processing.file.reject.v1</c>: tell the media
 /// manager a release Weir could not process is bad, so it can find a different one (#465, #471).
 /// </summary>
 /// <remarks>
@@ -214,7 +214,7 @@ public sealed class ProcessingRejectHandler : IJobHandler
         _logger.LogInformation("Reject for {Path}: {Reason}", relativePath, attempt.Reason);
     }
 
-    /// <summary><c>_reject_through_handoff</c>: a manager that hands files over gets a failed report with disposition: rejected.</summary>
+    /// <summary>A manager that hands files over gets a failed report with disposition: rejected.</summary>
     private async Task<RejectAttempt> RejectThroughHandoffAsync(
         HandoffReportTarget target, HandoffOrigin origin, string source, string watchedRoot, string reason, string? failureClass, CancellationToken cancellationToken)
     {
@@ -275,7 +275,7 @@ public sealed class ProcessingRejectHandler : IJobHandler
         return new RejectAttempt(true, sentence, label, new PyDict().Set("route", "handoff").Set("source_removed", cleanup.Deleted), report);
     }
 
-    /// <summary><c>_reject_through_queue</c>: a manager whose port removes queue items is asked to remove the matching item.</summary>
+    /// <summary>A manager whose port removes queue items is asked to remove the matching item.</summary>
     private async Task<RejectAttempt> RejectThroughQueueAsync(List<ManagerConnection> connections, string source, CancellationToken cancellationToken)
     {
         var matches = new List<(ManagerConnection Connection, PyDict Row, bool IsFolder, int Index)>();
@@ -387,7 +387,7 @@ public sealed class ProcessingRejectHandler : IJobHandler
             new PyDict().Set("route", "queue").Set("queue_item", matchedRow.Get("id") ?? PyNull.Instance).Set("download_id", downloadId));
     }
 
-    /// <summary><c>enqueue_pass_through</c>, called unconditionally on any reject failure — the reject route never
+    /// <summary>Queues a pass-through, called unconditionally on any reject failure — the reject route never
     /// re-checks the library's failure policy: anything short of certainty always falls back to pass-through.</summary>
     private void EnqueuePassThroughFallback(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, PyDict? origin)
     {
@@ -413,10 +413,10 @@ public sealed class ProcessingRejectHandler : IJobHandler
             (int)Math.Clamp(library.Priority, int.MinValue, int.MaxValue));
     }
 
-    /// <summary><c>normalize_storage_path</c>.</summary>
+    /// <summary>A path in a form that compares equal across slash direction, surrounding spaces and case.</summary>
     private static string NormalizeStoragePath(string path) => path.Replace('\\', '/').Trim().ToLowerInvariant();
 
-    /// <summary><c>_single_video_file_under</c>: the only video file in a download folder, or null.</summary>
+    /// <summary>The only video file in a download folder, or null.</summary>
     private static string? SingleVideoFileUnder(string folder)
     {
         if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))

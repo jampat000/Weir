@@ -1,10 +1,12 @@
 using Weir.Core.Json;
+using Weir.Core.Media;
 using Weir.Core.Processing;
 using Weir.Core.Rules;
+using Weir.Infrastructure.IO;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
-/// <summary>Resolved folders and output-side settings for one pass (<c>ProcessingPathRuntime</c>).</summary>
+/// <summary>Resolved folders and output-side settings for one pass.</summary>
 public sealed record ProcessingPathRuntime
 {
     public required string WatchedFolder { get; init; }
@@ -20,22 +22,24 @@ public sealed record ProcessingPathRuntime
     public string FfmpegStrictness { get; init; } = "normal";
 
     /// <summary>#548: which tool writes this library's output (<see cref="Weir.Core.Media.RemuxWriterChoice"/>).</summary>
-    public string RemuxWriter { get; init; } = Weir.Core.Media.RemuxWriterChoice.Best;
+    public string RemuxWriter { get; init; } = RemuxWriterChoice.Best;
 
     /// <summary>#548: rewrite with ffmpeg when the preferred writer cannot write or validate a file.</summary>
     public bool RewriteWithFfmpeg { get; init; } = true;
 
     /// <summary>The library's <c>remove_original_after_success</c>: false leaves the source where it is after a successful pass.</summary>
     public bool RemoveOriginalAfterSuccess { get; init; } = true;
+
+    /// <summary>The library's own media extensions, so removing a source never takes another video with it.</summary>
+    public string MediaExtensionsCsv { get; init; } = string.Empty;
 }
 
-/// <summary>The rejected-file deletion's outcome (<c>RejectedFileCleanupResult</c>).</summary>
+/// <summary>The rejected-file deletion's outcome.</summary>
 public sealed record RejectedFileCleanupResult(bool Deleted, string Detail);
 
 /// <summary>
-/// Paths for a pass: the safe join under the watched folder (<c>file_remux_pass/paths.py</c>), the library's folders
-/// (<c>processing_path_settings_service.py</c>), its rules (<c>rules_config_for</c>) and the rejected-file primitive
-/// (<c>processing_rejected_file_cleanup.py</c>).
+/// Paths for a pass: the safe join under the watched folder, the library's folders, its rules and the rejected-file
+/// cleanup.
 /// </summary>
 public static class RemuxPassPaths
 {
@@ -43,7 +47,7 @@ public static class RemuxPassPaths
 
     private static StringComparison PathComparison => Windows ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
-    /// <summary><c>Path(raw).expanduser().resolve()</c> as far as .NET can: absolute and normalised.</summary>
+    /// <summary>The path absolute and normalised, with a leading <c>~</c> expanded to the user's home and no trailing separator.</summary>
     public static string Resolve(string raw)
     {
         var text = raw;
@@ -57,11 +61,11 @@ public static class RemuxPassPaths
         return full.Length > root.Length ? full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) : full;
     }
 
-    /// <summary><c>Path.relative_to</c> as a test.</summary>
+    /// <summary>Whether <paramref name="path"/> is <paramref name="root"/> or inside it, compared component by component.</summary>
     public static bool IsUnder(string path, string root) => RelativeTo(path, root) is not null;
 
     /// <summary>
-    /// <c>path.relative_to(root)</c>: the relative part with the platform separator (empty for the root itself), or null when
+    /// The part of <paramref name="path"/> below <paramref name="root"/> with the platform separator (empty for the root itself), or null when
     /// <paramref name="path"/> is not under <paramref name="root"/>.
     /// </summary>
     public static string? RelativeTo(string path, string root)
@@ -87,7 +91,7 @@ public static class RemuxPassPaths
     /// <summary>Two resolved paths name the same place.</summary>
     public static bool SamePath(string a, string b) => RelativeTo(a, b) is { Length: 0 };
 
-    /// <summary><c>as_posix()</c> of a relative path.</summary>
+    /// <summary>A relative path with forward slashes.</summary>
     public static string Posix(string relative) => relative.Replace('\\', '/');
 
     private static List<string> Split(string path)
@@ -100,8 +104,8 @@ public static class RemuxPassPaths
     }
 
     /// <summary>
-    /// <c>resolve_media_file_under_processing_root</c>: <c>(root / relative).resolve()</c>, only when it stays under the watched
-    /// folder. Throws <see cref="ArgumentException"/> with the reference's sentence otherwise.
+    /// The full path of <paramref name="relativePath"/> under the watched folder, only when it stays under that folder.
+    /// Throws <see cref="ArgumentException"/> otherwise, so a crafted relative path can never reach a file outside it.
     /// </summary>
     public static string ResolveMediaFileUnderRoot(string mediaRoot, string relativePath)
     {
@@ -131,19 +135,18 @@ public static class RemuxPassPaths
         return candidate;
     }
 
-    /// <summary><c>resolved_default_processing_work_folder</c> / <c>resolved_default_processing_tv_work_folder</c>.</summary>
+    /// <summary>The default work folder for a scope, under the Weir home folder.</summary>
     public static string DefaultWorkFolder(string weirHome, string mediaType) =>
         Path.Join(Resolve(weirHome), "processing", mediaType == "tv" ? "processing-tv-work" : "processing-movie-work");
 
     /// <summary>
-    /// <c>effective_library_work_folder</c>: the library's own, or the per-scope default when it has
-    /// none. <c>IsDefault</c> says which, and callers use it to decide whether a folder that is not on
-    /// disk is an error (a custom path) or something to create (the default).
+    /// The library's own work folder, or the per-scope default when it has none. <c>IsDefault</c> says which,
+    /// and callers use it to decide whether a folder that is not on disk is an error (a custom path) or
+    /// something to create (the default).
     /// </summary>
     /// <remarks>
-    /// This carried the same two hard-coded MediaMop-era Windows paths as
-    /// <see cref="Jobs.ProcessingLibraryFolders.EffectiveWorkFolder"/> and for the same reason; 3.0.0
-    /// removed both copies. See that method for what changes for a row still holding one.
+    /// There are no hard-coded Windows default paths here; see
+    /// <see cref="Jobs.ProcessingLibraryFolders.EffectiveWorkFolder"/> for how a row still holding one is treated.
     /// </remarks>
     public static (string WorkFolder, bool IsDefault) EffectiveWorkFolder(ProcessingLibraryRecord library, string weirHome)
     {
@@ -158,7 +161,7 @@ public static class RemuxPassPaths
     }
 
     /// <summary>
-    /// <c>resolve_processing_path_runtime_for_library</c>: one library's folders, or the sentence saying why they cannot be used.
+    /// One library's folders, or the sentence saying why they cannot be used.
     /// </summary>
     public static (ProcessingPathRuntime? Runtime, string? Problem) RuntimeForLibrary(ProcessingLibraryRecord library, string weirHome)
     {
@@ -228,16 +231,17 @@ public static class RemuxPassPaths
             HardwareDevice = library.HardwareDevice ?? string.Empty,
             HardwareDisabledVendorsCsv = library.HardwareDisabledVendorsCsv ?? string.Empty,
             FfmpegStrictness = string.IsNullOrEmpty(library.FfmpegStrictness) ? "normal" : library.FfmpegStrictness,
-            RemuxWriter = Weir.Core.Media.RemuxWriterChoice.Normalize(library.RemuxWriter),
+            RemuxWriter = RemuxWriterChoice.Normalize(library.RemuxWriter),
             RewriteWithFfmpeg = library.RewriteWithFfmpeg,
             RemoveOriginalAfterSuccess = library.RemoveOriginalAfterSuccess,
+            MediaExtensionsCsv = library.MediaExtensionsCsv ?? string.Empty,
         }, null);
     }
 
     private static bool SameOrNested(string a, string b) => IsUnder(a, b) || IsUnder(b, a);
 
     /// <summary>
-    /// <c>rules_config_for</c>: a library's rule set, including the original-language and metadata options the plain
+    /// A library's rule set, including the original-language and metadata options the plain
     /// conversion (<see cref="RuleSetConversion.ToRulesConfig"/>, the fallback for a library without one) leaves out.
     /// </summary>
     public static ProcessingRulesConfig RulesConfigFor(ProcessingRuleSetRecord ruleSet)
@@ -250,8 +254,7 @@ public static class RemuxPassPaths
             TertiaryAudioLang = ruleSet.TertiaryAudioLang,
             DefaultAudioSlot = ruleSet.DefaultAudioSlot,
             RemoveCommentary = ruleSet.RemoveCommentary,
-            // #545 item 4: rules_config_for used to pass the stored mode through unchanged while the fallback path
-            // (RuleSetConversion.ToRulesConfig) normalized it; both paths now agree on the same normalization.
+            // Normalized the same way as the fallback path (RuleSetConversion.ToRulesConfig) so both agree (#545).
             SubtitleMode = RuleSetConversion.NormalizeSubtitleMode(ruleSet.SubtitleMode),
             SubtitleLangs = [.. (ruleSet.SubtitleLangsCsv ?? string.Empty).Split(',').Select(PyStrings.Strip).Where(x => x.Length > 0)],
             PreserveForcedSubs = ruleSet.PreserveForcedSubs,
@@ -286,7 +289,7 @@ public static class RemuxPassPaths
         };
     }
 
-    /// <summary><c>cleanup_rejected_file</c>: delete one regular file under the watched folder, never a populated folder.</summary>
+    /// <summary>Deletes one regular file under the watched folder, never a populated folder.</summary>
     public static RejectedFileCleanupResult CleanupRejectedFile(string watchedRoot, string filePath, string? action)
     {
         if (!string.Equals(PyStrings.Strip(action ?? "leave"), "delete_file", StringComparison.OrdinalIgnoreCase))
@@ -300,27 +303,28 @@ public static class RemuxPassPaths
         {
             root = Resolve(watchedRoot);
             source = Resolve(filePath);
-            if (!Directory.Exists(root) && !File.Exists(root))
-            {
-                throw new FileNotFoundException($"[Errno 2] No such file or directory: '{watchedRoot}'");
-            }
-
-            if (!Directory.Exists(source) && !File.Exists(source))
-            {
-                throw new FileNotFoundException($"[Errno 2] No such file or directory: '{filePath}'");
-            }
-
-            if (RelativeTo(source, root) is null)
-            {
-                throw new ArgumentException($"'{source}' is not in the subpath of '{root}'");
-            }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
         {
             return new RejectedFileCleanupResult(false, $"Weir did not delete the rejected file because it was not safely inside the watched folder ({exception.Message}).");
         }
 
-        if (SamePath(source, root) || !File.Exists(source))
+        if (!Directory.Exists(root) && !File.Exists(root))
+        {
+            return new RejectedFileCleanupResult(false, $"Weir did not delete the rejected file because the watched folder {watchedRoot} could not be found.");
+        }
+
+        if (!Directory.Exists(source) && !File.Exists(source))
+        {
+            return new RejectedFileCleanupResult(false, $"Weir did not delete the rejected file because {filePath} could not be found.");
+        }
+
+        if (!PathContainment.IsUnder(root, source))
+        {
+            return new RejectedFileCleanupResult(false, "Weir did not delete the rejected file because it was not safely inside the watched folder.");
+        }
+
+        if (!File.Exists(source))
         {
             return new RejectedFileCleanupResult(false, "Weir did not delete the rejected path because it is not a regular file inside the watched folder.");
         }
@@ -334,8 +338,9 @@ public static class RemuxPassPaths
             return new RejectedFileCleanupResult(false, $"Weir could not delete the rejected file because it is locked or unavailable ({exception.Message}).");
         }
 
+        // Empty folders left behind are removed up to, never including, the watched folder.
         var parent = Path.GetDirectoryName(source);
-        while (parent is not null && !SamePath(parent, root))
+        while (parent is not null && PathContainment.IsUnder(root, parent))
         {
             try
             {

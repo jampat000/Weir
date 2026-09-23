@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
+using Weir.Core.Time;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Sqlite;
@@ -321,7 +322,7 @@ public static class HandbackStore
     }
 
     private static string? Stamp(DateTimeOffset? value) =>
-        value is { } stamp ? Weir.Core.Time.PyDateTime.FromDateTimeOffset(stamp.ToUniversalTime()).PydanticJson() : null;
+        value is { } stamp ? PyDateTime.FromDateTimeOffset(stamp.ToUniversalTime()).PydanticJson() : null;
 
     private static HandbackRow Read(SqliteDataReader reader) => new(
         SqliteValues.GetInt64(reader, 0),

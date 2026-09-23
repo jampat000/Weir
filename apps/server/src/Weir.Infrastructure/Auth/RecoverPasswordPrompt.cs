@@ -3,12 +3,11 @@ using System.Text;
 namespace Weir.Infrastructure.Auth;
 
 /// <summary>
-/// Reads the new password from the operator when <c>--password</c> was not given
-/// (port of <c>getpass.getpass</c>'s two calls in <c>weir.platform.auth.recover._read_new_password</c>).
+/// Reads the new password from the operator when <c>--password</c> was not given.
 /// </summary>
 public interface IRecoverPasswordPrompt
 {
-    /// <summary>Whether a password can be prompted for at all (Python's <c>sys.stdin.isatty()</c>).</summary>
+    /// <summary>Whether a password can be prompted for at all (standard input is an interactive console).</summary>
     bool IsInteractive { get; }
 
     /// <summary>Read one line from the operator without echoing it.</summary>
@@ -16,8 +15,8 @@ public interface IRecoverPasswordPrompt
 }
 
 /// <summary>
-/// The real console: no echo at all, not even the masking characters some prompts show, matching
-/// <c>getpass.getpass</c>.
+/// The real console: no echo at all, not even the masking characters some prompts show, so the
+/// password's length is not revealed either.
 /// </summary>
 public sealed class ConsoleRecoverPasswordPrompt : IRecoverPasswordPrompt
 {

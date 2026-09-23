@@ -14,8 +14,8 @@ public enum Argon2Type
 }
 
 /// <summary>
-/// Argon2 (RFC 9106), a straight port of the reference implementation that argon2-cffi wraps.
-/// Versions 0x10 and 0x13 are supported so any hash argon2-cffi produced verifies.
+/// Argon2 (RFC 9106), following the reference implementation. Versions 0x10 and 0x13 are both supported
+/// so every existing password hash keeps verifying.
 /// </summary>
 public static class Argon2
 {

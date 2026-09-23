@@ -99,7 +99,7 @@ internal sealed class ApiTestClient
             : string.Empty;
 }
 
-/// <summary>Direct database access for seeding and assertions, as the Python tests use their session factory.</summary>
+/// <summary>Direct database access for seeding and assertions, bypassing the HTTP API.</summary>
 internal static class TestDatabase
 {
     public static string PathFor(WeirTestServer server) => System.IO.Path.Join(server.Home, "data", "weir.sqlite3");
@@ -147,7 +147,7 @@ internal static class TestDatabase
         await command.ExecuteNonQueryAsync();
     }
 
-    /// <summary><c>seed_admin_user</c> / <c>seed_viewer_user</c>.</summary>
+    /// <summary>Inserts an active user with a real password hash and the given role.</summary>
     public static Task SeedUserAsync(WeirTestServer server, string username, string password, string role) =>
         ExecuteAsync(
             server,

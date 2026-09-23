@@ -3,9 +3,8 @@ using Weir.Core.Processing.RemuxPass;
 
 namespace Weir.Core.Tests.Processing;
 
-/// <summary>Pure-logic port of the assertions in
-/// <c>test_processing_watched_folder_remux_scan_dispatch_evaluate.py</c> and the schedule-gate half of
-/// <c>test_processing_watched_folder_remux_scan_dispatch_periodic_enqueue.py</c>.</summary>
+/// <summary>The pure logic of the watched-folder scan dispatch: which files it would queue, and the schedule
+/// gate for its periodic enqueue.</summary>
 public sealed class WatchedFolderScanDispatchTests
 {
     private static ProcessingLibraryRecord Library(
@@ -95,7 +94,7 @@ public sealed class WatchedFolderScanDispatchTests
     public void Resolution_class_bands_by_width_then_falls_back_to_height(long? width, long? height, string expected) =>
         Assert.Equal(expected, RunnerUnits.ResolutionClassForDimensions(width, height));
 
-    // --- file settling: same shape as observe_size_settling ---------------------------------------------
+    // --- file settling ----------------------------------------------------------------------------------
 
     [Fact]
     public void A_first_observation_is_always_settling()
@@ -129,7 +128,7 @@ public sealed class WatchedFolderScanDispatchTests
         Assert.False(result.IsSettling);
     }
 
-    // --- decide_file_state: reason order (disabled > paused > schedule > hold > blocked > unprocessed) ---
+    // --- file state: reason order (disabled > paused > schedule > hold > blocked > unprocessed) ---
 
     [Fact]
     public void A_disabled_library_wins_over_every_other_reason()

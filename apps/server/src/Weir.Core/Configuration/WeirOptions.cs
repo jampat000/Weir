@@ -18,13 +18,12 @@ public enum CookieSameSite
 }
 
 /// <summary>
-/// Runtime configuration loaded once at process start, read from the same <c>WEIR_*</c>
-/// environment variables, with the same defaults and clamps, as the Python backend's
-/// <c>weir.core.config.WeirSettings</c>. Build it with <see cref="WeirOptionsLoader"/>.
+/// Runtime configuration loaded once at process start from the <c>WEIR_*</c> environment variables.
+/// Build it with <see cref="WeirOptionsLoader"/>.
 /// </summary>
 /// <remarks>
-/// Values that Python keeps as unbounded integers are <see cref="long"/> here; inputs outside
-/// the <see cref="long"/> range saturate instead of growing without limit.
+/// Integer settings without a natural upper bound are <see cref="long"/>; inputs outside the
+/// <see cref="long"/> range saturate instead of failing.
 /// </remarks>
 public sealed record WeirOptions
 {
@@ -52,7 +51,7 @@ public sealed record WeirOptions
 
     /// <summary>
     /// Guards the hand-off intake webhook for installs with no per-connection secret yet.
-    /// Read from <c>WEIR_MEDIA_MANAGER_WEBHOOK_SECRET</c> and nothing else since 3.0.0.
+    /// Read from <c>WEIR_MEDIA_MANAGER_WEBHOOK_SECRET</c> only.
     /// </summary>
     public required string? MediaManagerWebhookSecret { get; init; }
 
@@ -62,12 +61,14 @@ public sealed record WeirOptions
     public required string LogDir { get; init; }
     public required string TempDir { get; init; }
 
-    /// <summary>0 = no in-process Processing workers; 1..8 worker slots otherwise.</summary>
+    /// <summary>
+    /// 0 = no in-process Processing workers; otherwise 1 .. <see cref="Weir.Core.Processing.OperatorSettingsRules.MaxFilesAtOnce"/> worker slots.
+    /// </summary>
     public required int ProcessingWorkerCount { get; init; }
 
     /// <summary>
     /// How long a worker's claim on a <c>jobs</c> row lasts before another worker may reclaim
-    /// it (<c>WEIR_PROCESSING_JOB_LEASE_SECONDS</c>, #540 item 1). A heartbeat renews it roughly every
+    /// it (<c>WEIR_PROCESSING_JOB_LEASE_SECONDS</c>, #540). A heartbeat renews it roughly every
     /// third of this while a handler runs, so a job taking longer than this is still never claimed
     /// twice; this only bounds how long a crashed worker's row sits unclaimed before recovery.
     /// </summary>

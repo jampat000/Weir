@@ -10,7 +10,7 @@ using Weir.Infrastructure.Tests.MediaManagers;
 namespace Weir.Infrastructure.Tests.Processing.RemuxPass;
 
 /// <summary>
-/// Ported from <c>apps/backend/tests/test_processing_reject.py</c>: <see cref="ProcessingRejectHandler"/> against a real
+/// <see cref="ProcessingRejectHandler"/> against a real
 /// database and real temporary folders, with each manager behind <see cref="FakeManagerHttp"/>.
 /// </summary>
 public sealed class ProcessingRejectHandlerTests : IDisposable
@@ -255,7 +255,7 @@ public sealed class ProcessingRejectHandlerTests : IDisposable
     // --- fix #532: a rejection always upserts a Files row ----------------------------------------
 
     [Fact]
-    public async Task Fix_532_a_rejection_upserts_a_files_row_even_with_no_prior_scan()
+    public async Task A_rejection_upserts_a_files_row_even_with_no_prior_scan()
     {
         var library = await LibraryAsync(rejectedFileAction: "delete_file");
         _folders.Source("Film/film.mkv");

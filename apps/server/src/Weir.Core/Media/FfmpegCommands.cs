@@ -4,55 +4,52 @@ using Weir.Core.Rules;
 namespace Weir.Core.Media;
 
 /// <summary>
-/// The ffprobe and ffmpeg command lines from <c>processing_remux_mux.py</c>, token for token. Paths are
-/// taken as the strings the caller already holds (the reference passes <c>str(path)</c>).
+/// The ffprobe and ffmpeg command lines, token for token as the golden files record them. Paths are
+/// taken as the strings the caller already holds.
 /// </summary>
 public static class FfmpegCommands
 {
-    /// <summary><c>PROCESSING_FFMPEG_TIMEOUT_S</c>: the wall-clock limit for one ffmpeg run.</summary>
+    /// <summary>The wall-clock limit for one ffmpeg run.</summary>
     public const int FfmpegTimeoutSeconds = 3600;
 
-    /// <summary><c>PROCESSING_FFMPEG_SLOW_GRACE_S</c>: projections are ignored for the first minute.</summary>
+    /// <summary>Projections are ignored for the first minute.</summary>
     public const int FfmpegSlowGraceSeconds = 60;
 
-    /// <summary><c>PROCESSING_FFMPEG_MAX_PROJECTED_REMAINING_S</c>: twelve hours.</summary>
+    /// <summary>The longest projected remaining time allowed: twelve hours.</summary>
     public const int FfmpegMaxProjectedRemainingSeconds = 12 * 60 * 60;
 
-    /// <summary>ffprobe's default time limit in <c>ffprobe_json</c>.</summary>
+    /// <summary>ffprobe's default time limit.</summary>
     public const int FfprobeTimeoutSeconds = 120;
 
-    /// <summary><c>_PROCESSING_FFPROBE_LOG_MAX_CHARS</c>.</summary>
+    /// <summary>How much of ffprobe's output a log entry keeps.</summary>
     public const int ProbeLogMaxChars = 2000;
 
-    /// <summary><c>_PROCESSING_FFMPEG_STDERR_TAIL_BYTES</c>: how much of ffmpeg's stderr a failure message keeps.</summary>
+    /// <summary>How much of ffmpeg's stderr a failure message keeps.</summary>
     public const int FfmpegStderrTailBytes = 32 * 1024;
 
-    /// <summary>The ffmpeg wait after its progress stream closes (<c>proc.wait(timeout=5)</c>).</summary>
+    /// <summary>The ffmpeg wait after its progress stream closes.</summary>
     public const int ProgressExitWaitSeconds = 5;
 
-    /// <summary><c>_HWACCEL_TIMEOUT_SECONDS</c> (a float in the reference, so it prints as <c>10.0</c>).</summary>
+    /// <summary>A double so a timeout message prints it as <c>10.0</c>, as the golden files expect.</summary>
     public const double HwaccelTimeoutSeconds = 10.0;
 
     /// <summary>
-    /// <c>build_ffprobe_argv</c>: probe size and analyze duration are clamped to 1..1024 MB and 1..300 s.
+    /// The probe command: probe size and analyze duration are clamped to 1..1024 MB and 1..300 s.
     /// </summary>
     /// <remarks>
-    /// Deliberate divergence (#539 item 1): the reference passes <c>-v quiet</c>, which discards ffprobe's
-    /// diagnostics entirely, so the words <see cref="ProbeOutput.UnreadableMediaMarkers"/> looks for never
-    /// reach stderr and unreadable media is reported as a plain failure instead of <c>MediaUnreadableException</c>.
-    /// <c>-v error</c> keeps JSON on stdout unchanged (verbosity does not affect <c>-print_format json</c>) and
-    /// puts ffmpeg's own error lines on stderr, which is what the classification in
-    /// <see cref="ProbeOutput.FailureFor"/> needs. See docs/archive/server-port-notes.md "ffmpeg parity" for how the golden
-    /// fixtures captured against Python's <c>-v quiet</c> behaviour are patched to prove this on purpose.
+    /// <c>-v error</c>, not <c>-v quiet</c> (#539 item 1): quiet discards ffprobe's diagnostics, so the words
+    /// <see cref="ProbeOutput.UnreadableMediaMarkers"/> looks for would never reach stderr and unreadable media would
+    /// be reported as a plain failure instead of <c>MediaUnreadableException</c>. Verbosity does not affect
+    /// <c>-print_format json</c>, so stdout is unchanged, and stderr carries the error lines
+    /// <see cref="ProbeOutput.FailureFor"/> classifies. The golden files record <c>-v quiet</c>; see
+    /// docs/archive/server-port-notes.md, "ffmpeg parity", for how the tests patch that token.
     /// <para>
-    /// Deliberate divergence (#498): the reference never asks ffprobe for chapters, so a caller wanting to know
-    /// whether a file has any (<see cref="Weir.Core.Rules.RemuxRules.IsRemuxRequired"/>'s <c>chaptersPresent</c>,
-    /// for the "remove chapters" option) would need a second probe just for that. <c>-show_chapters</c> is added
-    /// here instead, so every probe's JSON already carries a <c>chapters</c> array (see
-    /// <see cref="ProbeResult.Chapters"/>) — empty when the file has none. This only adds a <c>chapters</c> key to
-    /// the parsed result; every other field is unchanged, and the golden fixtures (captured before this option
-    /// existed) are patched at the one changed argv token — see docs/archive/server-port-notes.md, "ffmpeg parity", and each patch site's
-    /// <c>GoldenDivergences</c> helper.
+    /// <c>-show_chapters</c> (#498) lets a caller know whether a file has chapters
+    /// (<see cref="Weir.Core.Rules.RemuxRules.IsRemuxRequired"/>'s <c>chaptersPresent</c>, for the "remove chapters"
+    /// option) without a second probe. Every probe's JSON carries a <c>chapters</c> array (see
+    /// <see cref="ProbeResult.Chapters"/>), empty when the file has none; every other field is unchanged. The golden
+    /// files predate this option and are patched at that one argv token (docs/archive/server-port-notes.md, "ffmpeg parity", and each patch
+    /// site's <c>GoldenDivergences</c> helper).
     /// </para>
     /// </remarks>
     public static IReadOnlyList<string> BuildFfprobeArgv(string ffprobeBin, string src, long probeSizeMb = 10, long analyzeDurationSeconds = 10)
@@ -124,7 +121,7 @@ public static class FfmpegCommands
         return args;
     }
 
-    /// <summary>The full demux of the primary video that <c>validate_media_integrity</c> runs.</summary>
+    /// <summary>The full demux of the primary video that the integrity check runs.</summary>
     public static IReadOnlyList<string> BuildIntegrityArgv(string ffmpegBin, string path)
     {
         ArgumentNullException.ThrowIfNull(ffmpegBin);
@@ -150,7 +147,7 @@ public static class FfmpegCommands
         ];
     }
 
-    /// <summary>What <c>detect_acceleration</c> asks ffmpeg.</summary>
+    /// <summary>What hardware-acceleration detection asks ffmpeg.</summary>
     public static IReadOnlyList<string> BuildHwaccelsArgv(string ffmpegBin)
     {
         ArgumentNullException.ThrowIfNull(ffmpegBin);
@@ -203,7 +200,7 @@ public static class FfmpegCommands
     ];
 
     /// <summary>
-    /// <c>build_ffmpeg_argv</c>. <paramref name="inputFlags"/> (hardware acceleration and strictness) go
+    /// The remux command. <paramref name="inputFlags"/> (hardware acceleration and strictness) go
     /// before <c>-i</c>, because <c>-hwaccel</c> applies to the input that follows it.
     /// </summary>
     public static IReadOnlyList<string> BuildRemuxArgv(string ffmpegBin, string src, string dst, RemuxPlan plan, IReadOnlyList<string>? inputFlags = null)
@@ -266,8 +263,8 @@ public static class FfmpegCommands
 
         // #547 item 2: additive syntax ("+flag"/"-flag") only ever touches default/forced, whatever else ffmpeg
         // already copied through from the source stream's own disposition (comment, descriptions,
-        // hearing_impaired, dub, original, ...) unlike the flat "default"/"0" this replaced, which discarded them;
-        // verified against the bundled ffmpeg's -dispositions and real remuxes.
+        // hearing_impaired, dub, original, ...); a flat "default"/"0" would discard them. Verified against the
+        // bundled ffmpeg's -dispositions and real remuxes.
         for (var i = 0; i < plan.Audio.Count; i++)
         {
             args.AddRange([$"-disposition:a:{i.ToString(CultureInfo.InvariantCulture)}", plan.Audio[i].Default ? "+default" : "-default"]);
@@ -313,7 +310,7 @@ public static class FfmpegCommands
         return args;
     }
 
-    /// <summary><c>_argv_with_progress</c>: <c>-progress pipe:1 -nostats</c> goes just before the output path.</summary>
+    /// <summary><c>-progress pipe:1 -nostats</c> goes just before the output path.</summary>
     public static IReadOnlyList<string> WithProgress(IReadOnlyList<string> argv)
     {
         ArgumentNullException.ThrowIfNull(argv);
@@ -325,7 +322,7 @@ public static class FfmpegCommands
         return result;
     }
 
-    /// <summary><c>logger.debug("Processing: ffmpeg %s", " ".join(argv[:8]) + " ...")</c>.</summary>
+    /// <summary>The debug-log summary of a command: its first eight tokens, then <c>...</c>.</summary>
     public static string DebugSummary(IReadOnlyList<string> argv)
     {
         ArgumentNullException.ThrowIfNull(argv);

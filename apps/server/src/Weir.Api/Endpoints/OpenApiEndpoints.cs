@@ -9,7 +9,7 @@ using Weir.Core.Configuration;
 
 namespace Weir.Api.Endpoints;
 
-/// <summary><c>GET /openapi.json</c> (FastAPI's default <c>openapi_url</c>, unauthenticated, not itself listed in its own paths).</summary>
+/// <summary><c>GET /openapi.json</c>: unauthenticated, at the address existing clients use, and not itself listed in its own paths.</summary>
 public static class OpenApiEndpoints
 {
     public static IEndpointRouteBuilder MapOpenApiEndpoint(this IEndpointRouteBuilder endpoints)

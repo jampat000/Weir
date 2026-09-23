@@ -15,7 +15,7 @@ public enum OperatorAuthenticationResult
 }
 
 /// <summary>
-/// Resolves the signed-in operator for endpoints that Python guards with <c>UserPublicDep</c>.
+/// Resolves the signed-in operator for endpoints that any signed-in user may call.
 /// </summary>
 public interface IOperatorAuthentication
 {
@@ -23,7 +23,7 @@ public interface IOperatorAuthentication
 }
 
 /// <summary>
-/// <c>UserPublicDep</c> for endpoints outside <see cref="ApiRoutes"/>: the request's session cookie, with
+/// The signed-in check for endpoints outside <see cref="ApiRoutes"/>: the request's session cookie, with
 /// the <c>last_seen_at</c> touch committed when the request is signed in.
 /// </summary>
 public sealed class SessionOperatorAuthentication : IOperatorAuthentication
@@ -55,7 +55,7 @@ public sealed class SessionOperatorAuthentication : IOperatorAuthentication
 
 internal static class OperatorAuthenticationExtensions
 {
-    /// <summary>Writes the Python error response and returns <see langword="false"/> unless signed in.</summary>
+    /// <summary>Writes the same 401/403 detail body as <see cref="ApiRoutes"/> routes and returns <see langword="false"/> unless signed in.</summary>
     public static async Task<bool> RequireOperatorAsync(this IOperatorAuthentication authentication, HttpContext context)
     {
         switch (await authentication.AuthenticateAsync(context).ConfigureAwait(false))

@@ -7,6 +7,7 @@ using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Rules;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.Processes;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Tests.Media;
 
@@ -217,7 +218,7 @@ internal sealed class PassFolders : IDisposable
 }
 
 /// <summary>
-/// Ported from <c>apps/backend/tests/test_processing_file_remux_pass_run.py</c> on real temporary folders, with ffprobe and ffmpeg
+/// A remux pass run on real temporary folders, with ffprobe and ffmpeg
 /// replaced by a fake process runner rather than by patching the pass.
 /// </summary>
 public sealed class RemuxPassRunnerTests : IDisposable
@@ -319,7 +320,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
         Assert.Equal(_folders.Watched, Str(result, "processing_watched_folder_resolved"));
         Assert.Empty(_media.Remuxes);
         Assert.False(File.Exists(_folders.Out("audio-disguised-as-video.mpg")));
-        // The keys in the reference's order: extras first, then the inspected path.
+        // The keys in the order existing readers of this detail see: extras first, then the inspected path.
         Assert.Equal(["ok", "outcome", "preflight_status", "preflight_reason", "reason", "relative_media_path", "rejection_kind", "media_scope", "processing_watched_folder_resolved", "inspected_source_path"], result.Keys);
     }
 
@@ -367,6 +368,53 @@ public sealed class RemuxPassRunnerTests : IDisposable
         // #539 item 5: the integrity read runs on every platform, Windows included.
         Assert.Contains(_media.Calls, argv => argv.Contains("null"));
         Assert.Equal("{\"device\"", PyJsonWriter.Dumps(result["source_fingerprint"], PyJsonFormat.Compact)[..9]);
+    }
+
+    [Fact]
+    public async Task A_finished_film_in_a_collection_pack_removes_only_itself()
+    {
+        var source = _folders.Source(Path.Join("Trilogy.Pack", "Part.One.mkv"));
+        var sibling = _folders.Source(Path.Join("Trilogy.Pack", "Part.Two.mkv"));
+        var nested = _folders.Source(Path.Join("Trilogy.Pack", "Extras", "Part.Three.mkv"));
+
+        var result = await Run("Trilogy.Pack/Part.One.mkv");
+
+        Assert.True(Bool(result, "ok"));
+        Assert.False(File.Exists(source));
+        Assert.True(File.Exists(sibling), "the other film in the pack is not this file's to delete");
+        Assert.True(File.Exists(nested), "a film in a subfolder of the pack is kept too");
+        Assert.True(Bool(result, "source_deleted_after_success"));
+        Assert.False(Bool(result, "source_folder_deleted"));
+        Assert.Equal(ReleaseFolderRemoval.OtherVideosReason, Str(result, "source_folder_skip_reason"));
+    }
+
+    [Fact]
+    public async Task A_finished_film_in_a_category_folder_leaves_its_neighbours()
+    {
+        var source = _folders.Source(Path.Join("movies", "Film.mkv"));
+        var neighbour = _folders.Source(Path.Join("movies", "Another.Film.mp4"));
+
+        var result = await Run("movies/Film.mkv");
+
+        Assert.True(Bool(result, "ok"));
+        Assert.False(File.Exists(source));
+        Assert.True(File.Exists(neighbour));
+        Assert.True(Directory.Exists(Path.Join(_folders.Watched, "movies")));
+    }
+
+    [Fact]
+    public async Task A_single_release_with_its_sample_and_nfo_is_still_removed_whole()
+    {
+        _folders.Source(Path.Join("Film.2024", "Film.2024.mkv"));
+        _folders.Source(Path.Join("Film.2024", "Sample", "film.2024.mkv"));
+        _folders.Source(Path.Join("Film.2024", "film.2024-sample.mkv"));
+        File.WriteAllText(Path.Join(_folders.Watched, "Film.2024", "Film.2024.nfo"), "info");
+
+        var result = await Run("Film.2024/Film.2024.mkv");
+
+        Assert.True(Bool(result, "ok"));
+        Assert.True(Bool(result, "source_folder_deleted"));
+        Assert.False(Directory.Exists(Path.Join(_folders.Watched, "Film.2024")));
     }
 
     [Fact]
@@ -542,7 +590,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task Issue_545_item_1_a_manager_that_has_not_imported_yet_keeps_the_season_folder()
+    public async Task A_manager_that_has_not_imported_yet_keeps_the_season_folder()
     {
         // The manager answers (it is reachable and reporting), but its own library listing does not yet include
         // this release — exactly what a manager that has not scanned or finished importing yet looks like. Reporting
@@ -561,7 +609,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task Issue_545_item_1_a_manager_that_renamed_the_release_on_import_still_confirms_it()
+    public async Task A_manager_that_renamed_the_release_on_import_still_confirms_it()
     {
         // A manager that renames on import (a common *arr pattern) will not report the exact output path Weir wrote,
         // but the same title (file-name stem) shows up at a different path — that is still positive evidence.
@@ -628,7 +676,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task Issue_632_a_file_younger_than_the_minimum_age_is_a_wait_with_an_end_not_a_failure()
+    public async Task A_file_younger_than_the_minimum_age_is_a_wait_with_an_end_not_a_failure()
     {
         // It was FailedBeforeExecution, which classifies as "preflight": never retried, and the failure policy ran at
         // once, so a file handed over seconds after its download finished was passed through unprocessed.
@@ -715,7 +763,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task Issue_537_item_4_the_original_language_decides_the_kept_audio()
+    public async Task The_original_language_decides_the_kept_audio()
     {
         _folders.Source(Path.Join("Amelie.2001.1080p", "film.mkv"));
         _media.Probes["film.mkv"] =

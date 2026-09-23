@@ -5,7 +5,7 @@ using Weir.Core.Json;
 
 namespace Weir.Core.Security;
 
-/// <summary>The Fernet specification, as <c>cryptography.fernet.Fernet</c> implements it.</summary>
+/// <summary>Fernet tokens (AES-128-CBC plus HMAC-SHA256), per the Fernet specification, so stored credentials stay readable.</summary>
 public sealed class Fernet
 {
     private readonly byte[] _signingKey;
@@ -46,7 +46,7 @@ public sealed class Fernet
         return Convert.ToBase64String([.. basic, .. mac]).Replace('+', '-').Replace('/', '_');
     }
 
-    /// <summary><c>decrypt(token)</c> without a TTL; <see langword="null"/> where Python raises <c>InvalidToken</c>.</summary>
+    /// <summary>Decrypts without a TTL; <see langword="null"/> for a malformed, tampered or wrongly keyed token.</summary>
     public byte[]? Decrypt(string token)
     {
         ArgumentNullException.ThrowIfNull(token);
@@ -91,8 +91,7 @@ public sealed class Fernet
 }
 
 /// <summary>
-/// Stored media-manager and provider credentials (port of
-/// <c>weir.platform.arr_library.arr_connection_crypto</c>): Fernet keyed by PBKDF2-SHA256 over the
+/// Stored media-manager and provider credentials: Fernet keyed by PBKDF2-SHA256 over the
 /// credentials secret, in a <c>{"version":2,"key_id":…,"token":…}</c> envelope, with the legacy
 /// session-secret fallback and rotation through previous credentials secrets.
 /// </summary>
@@ -121,7 +120,7 @@ public sealed class CredentialCipher
 
     public const string MissingSecretMessage = "Cannot save library API keys until WEIR_CREDENTIALS_SECRET or WEIR_SESSION_SECRET is set.";
 
-    /// <summary><c>encrypt_arr_api_key</c>. Throws <see cref="PyValueErrorException"/> when no secret is configured.</summary>
+    /// <summary>Encrypts an API key into the envelope with the active secret. Throws <see cref="PyValueErrorException"/> when no secret is configured.</summary>
     public string Encrypt(string plaintext)
     {
         ArgumentNullException.ThrowIfNull(plaintext);
@@ -137,7 +136,7 @@ public sealed class CredentialCipher
             PyJsonFormat.Compact);
     }
 
-    /// <summary><c>decrypt_arr_api_key</c>.</summary>
+    /// <summary>Decrypts an envelope (or a bare legacy token); <see langword="null"/> when no configured secret opens it.</summary>
     public string? Decrypt(string? ciphertext)
     {
         var raw = (ciphertext ?? string.Empty).Trim();
@@ -175,7 +174,7 @@ public sealed class CredentialCipher
         return legacy is null ? null : TryDecryptText(legacy, raw);
     }
 
-    /// <summary><c>rewrap_arr_api_key</c>.</summary>
+    /// <summary>Re-encrypts under the current credentials secret; <see langword="null"/> when there is none or the value cannot be decrypted.</summary>
     public string? Rewrap(string ciphertext)
     {
         if (string.IsNullOrEmpty(_credentialsSecret))

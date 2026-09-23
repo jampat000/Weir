@@ -7,14 +7,14 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
 
-/// <summary>SQLite access for <c>file_logs</c> (port of <c>processing_file_log_service.py</c>).</summary>
+/// <summary>SQLite access for <c>file_logs</c>.</summary>
 public static class FileLogStore
 {
     public const int MaxDetailChars = 200_000;
 
     private const string Columns = "id, file_id, library_id, relative_path, library_name, outcome, title, detail_json, recorded_at";
 
-    /// <summary><c>logs_for_file</c>: every retained pass over this file, newest first, matched by path.</summary>
+    /// <summary>Every retained pass over this file, newest first, matched by path.</summary>
     public static Task<List<ProcessingFileLogRecord>> LogsForFileAsync(UnitOfWork uow, string relativePath, int limit) =>
         uow.QueryAsync(
             $"SELECT {Columns} FROM file_logs WHERE relative_path = @path ORDER BY recorded_at DESC, id DESC LIMIT {Math.Max(1, Math.Min(limit, 500))}",
@@ -42,7 +42,7 @@ public static class FileLogStore
         }
     }
 
-    /// <summary><c>render_log_text</c>: a plain-text rendering for attaching to a bug report.</summary>
+    /// <summary>A plain-text rendering for attaching to a bug report.</summary>
     public static string RenderLogText(IReadOnlyList<ProcessingFileLogRecord> rows)
     {
         if (rows.Count == 0)
@@ -95,7 +95,7 @@ public static class FileLogStore
         _ => string.Empty,
     };
 
-    /// <summary><c>prune_file_logs</c>: delete records older than the retention window. 0 keeps everything.</summary>
+    /// <summary>Deletes records older than the retention window. 0 keeps everything.</summary>
     public static async Task<int> PruneAsync(UnitOfWork uow, long retentionDays, DateTimeOffset now)
     {
         if (retentionDays <= 0)

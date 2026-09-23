@@ -5,7 +5,7 @@ using Weir.Infrastructure.MediaManagers;
 
 namespace Weir.Infrastructure.Tests.MediaManagers;
 
-/// <summary>Ports of <c>test_media_manager_http_security.py</c> and the HTTP half of <c>test_media_manager_port_dialects.py</c>.</summary>
+/// <summary>Media manager HTTP security and the HTTP side of each manager dialect.</summary>
 public sealed class ManagerHttpAndPortTests
 {
     private static ManagerConnection Connection(string kind = "radarr", string name = "Main") => new(kind, name, "http://manager.local", "k", 1);

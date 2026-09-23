@@ -3,9 +3,8 @@ using Weir.Core.MediaManagers;
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
 /// <summary>
-/// <c>_pace</c>: minimum spacing between outbound rejects, across the whole process (registered as a singleton so its
-/// state is shared the way the reference's module-level lock and clock are). Uses an asynchronous wait rather than
-/// Python's blocking <c>time.sleep</c>, so it never ties up a worker thread while it waits.
+/// Minimum spacing between outbound rejects, across the whole process (registered as a singleton so one lock and clock
+/// are shared by every caller). The wait is asynchronous, so it never ties up a worker thread.
 /// </summary>
 public sealed class RejectPacing : IDisposable
 {

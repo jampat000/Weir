@@ -2,16 +2,16 @@ using System.Text.RegularExpressions;
 
 namespace Weir.Core.Processing;
 
-/// <summary>File-side strings for anchor ownership (port of <c>weir.processing.domain.FileAnchorCandidate</c>).</summary>
+/// <summary>File-side strings for anchor ownership.</summary>
 public sealed record FileAnchorCandidate(string Title, int? Year = null);
 
-/// <summary>Order-independent title anchor plus a single release year (<c>TitleYearAnchor</c>).</summary>
+/// <summary>Order-independent title anchor plus a single release year.</summary>
 public sealed record TitleYearAnchor(IReadOnlySet<string> TitleTokens, int? Year)
 {
     public bool IsUsableForMatch => TitleTokens.Count > 0 && Year is not null;
 }
 
-/// <summary>One upstream queue row after the caller has mapped *arr data (<c>ProcessingQueueRowView</c>).</summary>
+/// <summary>One upstream queue row after the caller has mapped the manager's data.</summary>
 public sealed record ProcessingQueueRowView(
     bool AppliesToFile,
     bool IsUpstreamActive,
@@ -21,9 +21,9 @@ public sealed record ProcessingQueueRowView(
     int? QueueYear = null);
 
 /// <summary>
-/// Processing domain: pure ownership vs. upstream blocking (port of <c>weir.processing.domain</c>). No manager
-/// HTTP, no orchestration — see <see cref="CandidateGate"/> for the layer that attributes rows to a
-/// reporting connection, which needs the (not yet ported) media-manager queue signal infrastructure.
+/// Processing domain: pure ownership vs. upstream blocking. No manager HTTP, no orchestration; see
+/// <see cref="CandidateGate"/> and <see cref="ManagerQueueSignals"/> for the layer that attributes rows to a
+/// reporting connection.
 /// </summary>
 public static partial class ProcessingDomain
 {
@@ -53,7 +53,7 @@ public static partial class ProcessingDomain
     [GeneratedRegex(@"\s+")]
     private static partial Regex Whitespace();
 
-    /// <summary><c>normalize_titleish</c>.</summary>
+    /// <summary>Lower-case a title-like string and reduce it to space-separated alphanumeric tokens.</summary>
     public static string NormalizeTitleish(string raw)
     {
         var s = raw.ToLowerInvariant().Trim();
@@ -80,7 +80,7 @@ public static partial class ProcessingDomain
         return y is >= YearMin and <= YearMax;
     }
 
-    /// <summary><c>extract_title_tokens_and_year</c>.</summary>
+    /// <summary>Split tokens into title and year: the explicit year when given, else the last year-like token.</summary>
     public static (IReadOnlyList<string> Title, int? Year) ExtractTitleTokensAndYear(IReadOnlyList<string> tokens, int? explicitYear)
     {
         if (explicitYear is { } year)
@@ -100,7 +100,7 @@ public static partial class ProcessingDomain
         return ([.. tokens.Where((_, i) => i != idx)], foundYear);
     }
 
-    /// <summary><c>extract_title_year_anchor</c>. Null when there is no non-empty raw string.</summary>
+    /// <summary>Build a title/year anchor from a raw name. Null when there is no non-empty raw string.</summary>
     public static TitleYearAnchor? ExtractTitleYearAnchor(string? raw, int? explicitYear = null)
     {
         if (string.IsNullOrWhiteSpace(raw))
@@ -115,7 +115,7 @@ public static partial class ProcessingDomain
         return new TitleYearAnchor(new HashSet<string>(titleTokens, StringComparer.Ordinal), year);
     }
 
-    /// <summary><c>title_year_anchors_match</c>.</summary>
+    /// <summary>Both anchors are usable and have the same title tokens and year.</summary>
     public static bool AnchorsMatch(TitleYearAnchor a, TitleYearAnchor b) =>
         a.IsUsableForMatch && b.IsUsableForMatch && a.TitleTokens.SetEquals(b.TitleTokens) && a.Year == b.Year;
 
@@ -124,7 +124,7 @@ public static partial class ProcessingDomain
 
     private static TitleYearAnchor? FileAnchor(FileAnchorCandidate candidate) => ExtractTitleYearAnchor(candidate.Title, candidate.Year);
 
-    /// <summary><c>row_owns_by_title_year_anchor</c>.</summary>
+    /// <summary>Whether the queue row's title/year anchor matches the file's.</summary>
     public static bool RowOwnsByTitleYearAnchor(ProcessingQueueRowView row, FileAnchorCandidate candidate)
     {
         var qa = RowAnchor(row);
@@ -135,17 +135,17 @@ public static partial class ProcessingDomain
     private static bool RowAppliesToCandidate(ProcessingQueueRowView row, FileAnchorCandidate? candidate) =>
         row.AppliesToFile || (candidate is not null && RowOwnsByTitleYearAnchor(row, candidate));
 
-    /// <summary><c>file_is_owned_by_queue</c>.</summary>
+    /// <summary>Whether any row applies to the file, by path, id or title/year anchor.</summary>
     public static bool FileIsOwnedByQueue(IReadOnlyList<ProcessingQueueRowView> rows, FileAnchorCandidate? candidate = null) =>
         rows.Any(r => RowAppliesToCandidate(r, candidate));
 
-    /// <summary><c>should_block_for_upstream</c>.</summary>
+    /// <summary>Whether a row that applies to the file is still active upstream and not suppressed for an import wait.</summary>
     public static bool ShouldBlockForUpstream(IReadOnlyList<ProcessingQueueRowView> rows, FileAnchorCandidate? candidate = null) =>
         rows.Any(r => RowAppliesToCandidate(r, candidate) && r.IsUpstreamActive && !r.BlockingSuppressedForImportWait);
 }
 
 /// <summary>
-/// Which managers were asked, and which could not answer (<c>QueueSignalReport</c>). <see cref="SilentLabels"/>
+/// Which managers were asked, and which could not answer. <see cref="SilentLabels"/>
 /// is the point of this type: a manager that is unreachable, or that cannot report a queue at all, must never
 /// be counted as "nothing is importing", so it is counted here instead. <see cref="SilentDetails"/> carries the
 /// per-manager detail sentence (e.g. "Weir could not reach Sonarr (Main)...") for callers that need to quote it,
@@ -157,13 +157,13 @@ public sealed record QueueSignalReport(int Consulted, int Reported, IReadOnlyLis
 
     public bool HasAnySignal => Reported > 0;
 
-    /// <summary><c>note</c>: one sentence for an operator, or null when every manager answered.</summary>
+    /// <summary>One sentence for an operator, or null when every manager answered.</summary>
     public string? Note() => SilentLabels.Count == 0
         ? null
         : $"Weir could not get an import check from {string.Join(", ", SilentLabels)}, so it did not treat that as 'nothing is importing'.";
 }
 
-/// <summary>The verdict the "why held" diagnostic reports (<c>candidate_gate_evaluate.Verdict</c>).</summary>
+/// <summary>The verdict the "why held" diagnostic reports.</summary>
 public enum CandidateGateVerdict
 {
     Proceed,
@@ -172,7 +172,7 @@ public enum CandidateGateVerdict
     NoUpstreamSignal,
 }
 
-/// <summary>Structured result for operators (<c>ProcessingCandidateGateOutcome</c>).</summary>
+/// <summary>Structured result for operators.</summary>
 public sealed record CandidateGateOutcome(
     CandidateGateVerdict Verdict,
     bool Owned,
@@ -186,12 +186,11 @@ public sealed record CandidateGateOutcome(
     IReadOnlyList<string> Reasons);
 
 /// <summary>
-/// Evaluate a file/release candidate against every media manager covering its scope (port of
-/// <c>processing_candidate_gate_evaluate.py</c> and the pure parts of <c>manager_queue_signals.py</c>).
+/// Evaluate a file/release candidate against every media manager covering its scope.
 /// </summary>
 public static class CandidateGate
 {
-    /// <summary><c>no_manager_configured_note</c>.</summary>
+    /// <summary>The operator note when no media manager covers the scope.</summary>
     public static string NoManagerConfiguredNote(string mediaScope)
     {
         var scopeWord = mediaScope == "tv" ? "TV episodes" : "Movies";
@@ -200,11 +199,11 @@ public static class CandidateGate
     }
 
     /// <summary>
-    /// <c>evaluate_processing_candidate_gate_from_manager_signals</c>: map every reported row with the same
-    /// candidate anchors Processing uses elsewhere (<see cref="ManagerQueueSignals.AttributedQueueRows"/>), then
-    /// apply domain. <paramref name="attributedRows"/> keeps each row's reporting connection so a
-    /// <c>wait_upstream</c> verdict can name it (<c>HoldDiagnosticStore</c> and the watched-folder scan both
-    /// build these from the already-ported manager queue signals).
+    /// Map every reported row with the same candidate anchors Processing uses elsewhere
+    /// (<see cref="ManagerQueueSignals.AttributedQueueRows"/>), then apply the domain rules.
+    /// <paramref name="attributedRows"/> keeps each row's reporting connection so a <c>wait_upstream</c>
+    /// verdict can name it (<c>HoldDiagnosticStore</c> and the watched-folder scan both build these from
+    /// the manager queue signals).
     /// </summary>
     public static CandidateGateOutcome Evaluate(
         string mediaScope,

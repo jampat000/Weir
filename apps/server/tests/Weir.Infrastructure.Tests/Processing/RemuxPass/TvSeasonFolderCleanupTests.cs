@@ -10,7 +10,7 @@ using Weir.Infrastructure.Tests.Platform;
 namespace Weir.Infrastructure.Tests.Processing.RemuxPass;
 
 /// <summary>
-/// Ported from <c>apps/backend/tests/test_processing_tv_season_folder_cleanup.py</c>: the manager-signal, active-job,
+/// The manager-signal, active-job,
 /// output-completeness and minimum-age gates a whole-season deletion must pass, driven through
 /// <see cref="TvSeasonFolderCleanup"/> with a fake Sonarr behind <see cref="FakeManagerHttp"/> — reuses
 /// <see cref="PassFolders"/> from <c>RemuxPassRunnerTests</c> for the folder tree.

@@ -20,7 +20,7 @@ public sealed record MediaManagerSearchLaneRecord(
     string ScheduleEnd,
     long ScheduleIntervalSeconds)
 {
-    /// <summary><c>MediaManagerSearchLaneOut</c>.</summary>
+    /// <summary>The lane as the API returns it.</summary>
     public PyDict ToOut() => new PyDict()
         .Set("lane", Lane)
         .Set("enabled", Enabled)
@@ -48,10 +48,10 @@ public sealed record MediaManagerConnectionRecord(
 {
     public IReadOnlyList<MediaManagerSearchLaneRecord> Lanes { get; init; } = [];
 
-    /// <summary><c>_webhook_url_path</c>.</summary>
+    /// <summary>The path a manager of this kind posts its webhook to.</summary>
     public string WebhookUrlPath => $"/api/v1/intake/webhook/{Kind}";
 
-    /// <summary><c>_to_out</c> (<c>MediaManagerConnectionOut</c>): secrets are reported only as saved or not.</summary>
+    /// <summary>The connection as the API returns it: secrets are reported only as saved or not.</summary>
     public PyDict ToOut() => new PyDict()
         .Set("id", Id)
         .Set("kind", Kind)
@@ -68,11 +68,11 @@ public sealed record MediaManagerConnectionRecord(
 }
 
 /// <summary>
-/// The legacy singleton that migration 0009 copied out of but did not drop (port of <c>arr_operator_settings_repo</c>).
+/// The legacy <c>arr_library_operator_settings</c> singleton that migration 0009 copied out of but did not drop.
 /// </summary>
 public static class ArrLibraryOperatorSettingsStore
 {
-    /// <summary><c>ensure_arr_library_operator_settings_row</c>: row 1 with its defaults, created when missing.</summary>
+    /// <summary>Row 1 with its defaults, created when missing.</summary>
     public static async Task EnsureRowAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -94,7 +94,7 @@ public static class MediaManagerConnectionStore
         "id, connection_id, lane, enabled, max_items_per_run, retry_delay_minutes, schedule_enabled, schedule_days, " +
         "schedule_start, schedule_end, schedule_interval_seconds";
 
-    /// <summary><c>list_connections</c>: by id.</summary>
+    /// <summary>Every connection with its lanes, by id.</summary>
     public static async Task<List<MediaManagerConnectionRecord>> ListAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -102,14 +102,14 @@ public static class MediaManagerConnectionStore
         return await WithLanesAsync(uow, rows).ConfigureAwait(false);
     }
 
-    /// <summary>Enabled connections by id (<c>_enabled_rows</c>).</summary>
+    /// <summary>Enabled connections by id, without their lanes.</summary>
     public static async Task<List<MediaManagerConnectionRecord>> ListEnabledAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return await uow.QueryAsync($"SELECT {ConnectionColumns} FROM media_manager_connections WHERE enabled IS 1 ORDER BY id", ReadConnection).ConfigureAwait(false);
     }
 
-    /// <summary><c>get_connection</c>.</summary>
+    /// <summary>One connection with its lanes, or null.</summary>
     public static async Task<MediaManagerConnectionRecord?> GetAsync(UnitOfWork uow, long connectionId)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -117,7 +117,7 @@ public static class MediaManagerConnectionStore
         return row is null ? null : (await WithLanesAsync(uow, [row]).ConfigureAwait(false))[0];
     }
 
-    /// <summary><c>connection_for_kind</c>: the first enabled connection of a kind.</summary>
+    /// <summary>The first enabled connection of a kind.</summary>
     public static Task<MediaManagerConnectionRecord?> FirstEnabledForKindAsync(UnitOfWork uow, string kind)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -128,10 +128,9 @@ public static class MediaManagerConnectionStore
     }
 
     /// <summary>
-    /// #544 item 6: every enabled connection of a kind, by id. Used to authenticate an inbound webhook against
-    /// whichever connection's own secret was presented, instead of only <see cref="FirstEnabledForKindAsync"/>'s
-    /// single row — a second connection of the same kind (a 4K Radarr alongside a 1080p one, say) could not
-    /// authenticate otherwise, because its secret was never even considered.
+    /// Every enabled connection of a kind, by id. Intake authenticates an inbound webhook against whichever
+    /// connection's own secret was presented, so a second connection of the same kind (a 4K Radarr alongside a
+    /// 1080p one, say) can authenticate too, not only <see cref="FirstEnabledForKindAsync"/>'s row (#544 item 6).
     /// </summary>
     public static Task<List<MediaManagerConnectionRecord>> ListEnabledForKindAsync(UnitOfWork uow, string kind)
     {
@@ -142,7 +141,7 @@ public static class MediaManagerConnectionStore
             ("$kind", kind));
     }
 
-    /// <summary>Enabled connections that have a webhook secret saved, by id (as <c>_require_secret</c> reads them).</summary>
+    /// <summary>Enabled connections that have a webhook secret saved.</summary>
     public static Task<List<MediaManagerConnectionRecord>> ListEnabledWithWebhookSecretAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -184,7 +183,7 @@ public static class MediaManagerConnectionStore
         return id;
     }
 
-    /// <summary>Write the changed columns, stamping <c>updated_at</c> as the ORM's <c>onupdate</c> does. Nothing changed, nothing written.</summary>
+    /// <summary>Write the changed columns and stamp <c>updated_at</c>. Nothing changed, nothing written.</summary>
     public static async Task UpdateColumnsAsync(UnitOfWork uow, long connectionId, IReadOnlyList<(string Column, object? Value)> changes)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -201,7 +200,7 @@ public static class MediaManagerConnectionStore
             parameters).ConfigureAwait(false);
     }
 
-    /// <summary>The ORM delete: the lanes first (cascade "all, delete-orphan"), then the connection.</summary>
+    /// <summary>Delete the lanes first, then the connection, so no lane is left without its connection.</summary>
     public static async Task DeleteAsync(UnitOfWork uow, long connectionId)
     {
         ArgumentNullException.ThrowIfNull(uow);

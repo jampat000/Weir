@@ -8,20 +8,20 @@ namespace Weir.Core.Jobs;
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
-/// <item>Remux output: <c>tempfile.mkstemp(prefix=f"{src.stem}.processing.", suffix=src.suffix or ".mkv", dir=work_dir)</c>,
-/// so <c>{stem}.processing.{8 characters of [a-z0-9_]}{suffix}</c> in the library's work folder.</item>
+/// <item>Remux output: <c>{stem}.processing.{8 characters of [a-z0-9_]}{suffix}</c> in the library's work
+/// folder, where the suffix is the source's (or <c>.mkv</c> when it has none).</item>
 /// <item>The dry-run placeholder <c>dry-run-ffmpeg-destination-placeholder.mkv</c>.</item>
-/// <item>Atomic output writes: <c>mkstemp(prefix=f".{dst.name}.", suffix=".partial", dir=dst.parent)</c>,
-/// swept by the existing <c>.*.partial</c> glob.</item>
+/// <item>Atomic output writes: a hidden <c>.{name}.{8 characters}.partial</c> beside the destination,
+/// matched by the <c>.*.partial</c> name test.</item>
 /// </list>
-/// Python's periodic sweep matches any name containing <c>.processing.</c>; this is deliberately the
-/// exact <c>mkstemp</c> shape instead, so an operator's own <c>Film.processing.notes.txt</c> survives.
+/// Matching is the exact created shape, not any name containing <c>.processing.</c>, so an operator's
+/// own <c>Film.processing.notes.txt</c> survives.
 /// </remarks>
 public static partial class WeirTempFiles
 {
     public const string DryRunPlaceholderName = "dry-run-ffmpeg-destination-placeholder.mkv";
 
-    /// <summary><c>tempfile</c>'s random name characters and length.</summary>
+    /// <summary>The random part of a temp name: its characters and length.</summary>
     private const string RandomPart = "[a-z0-9_]{8}";
 
     /// <summary>Any remux temp output name Weir creates, for any source.</summary>
@@ -33,7 +33,7 @@ public static partial class WeirTempFiles
 
     /// <summary>
     /// The remux temp output names for one source file: <c>{stem}.processing.XXXXXXXX{suffix}</c>, where
-    /// stem and suffix follow Python's <c>PurePath.stem</c> and <c>PurePath.suffix</c>.
+    /// stem and suffix are split as <see cref="PythonStemAndSuffix"/> splits them.
     /// </summary>
     public static Regex RemuxTempNameFor(string relativeMediaPath)
     {
@@ -47,7 +47,7 @@ public static partial class WeirTempFiles
             TimeSpan.FromSeconds(1));
     }
 
-    /// <summary>Python's <c>glob(".*.partial")</c> name test: a hidden name ending in <c>.partial</c>.</summary>
+    /// <summary>The <c>.*.partial</c> name test: a hidden name ending in <c>.partial</c>.</summary>
     public static bool IsPartialOutputName(string fileName, bool ignoreCase)
     {
         ArgumentNullException.ThrowIfNull(fileName);
@@ -58,7 +58,7 @@ public static partial class WeirTempFiles
                fileName.EndsWith(".partial", comparison);
     }
 
-    /// <summary><c>PurePath(path).name</c> for either separator.</summary>
+    /// <summary>The last path segment for either separator, ignoring trailing separators.</summary>
     public static string PythonName(string path)
     {
         ArgumentNullException.ThrowIfNull(path);
@@ -67,7 +67,10 @@ public static partial class WeirTempFiles
         return index < 0 ? trimmed : trimmed[(index + 1)..];
     }
 
-    /// <summary><c>PurePath.stem</c> and <c>PurePath.suffix</c>: the last dot not at the start splits them.</summary>
+    /// <summary>
+    /// Stem and suffix: the last dot splits them unless it is the first or last character, in which case
+    /// there is no suffix (so <c>.hidden</c> and <c>name.</c> have none).
+    /// </summary>
     public static (string Stem, string Suffix) PythonStemAndSuffix(string name)
     {
         ArgumentNullException.ThrowIfNull(name);

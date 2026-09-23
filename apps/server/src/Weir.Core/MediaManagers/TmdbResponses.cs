@@ -5,12 +5,12 @@ using Weir.Core.Rules;
 
 namespace Weir.Core.MediaManagers;
 
-/// <summary>Reading a TMDb <c>/search/movie</c> answer (the pure half of <c>integrations.metadata.tmdb_provider</c>).</summary>
+/// <summary>Reading a TMDb <c>/search/movie</c> answer, apart from the HTTP call itself.</summary>
 public static class TmdbResponses
 {
     public const string DefaultBaseUrl = "https://api.themoviedb.org/3";
 
-    /// <summary><c>KNOWN_PROVIDERS</c>.</summary>
+    /// <summary>The metadata providers Weir knows.</summary>
     public static readonly IReadOnlyList<string> KnownProviders = ["tmdb"];
 
     public static readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
@@ -27,14 +27,14 @@ public static class TmdbResponses
     public static string Subject(string cleanedTitle, int? year) =>
         year is { } y && y != 0 ? $"{cleanedTitle} ({y.ToString(CultureInfo.InvariantCulture)})" : cleanedTitle;
 
-    /// <summary><c>urllib.parse.urlencode</c> of string pairs (<c>quote_plus</c>, UTF-8).</summary>
+    /// <summary>A form-encoded query string of string pairs (see <see cref="QuotePlus"/>).</summary>
     public static string UrlEncode(IEnumerable<KeyValuePair<string, string>> pairs)
     {
         ArgumentNullException.ThrowIfNull(pairs);
         return string.Join('&', pairs.Select(pair => QuotePlus(pair.Key) + "=" + QuotePlus(pair.Value)));
     }
 
-    /// <summary><c>urllib.parse.quote_plus</c> with <c>safe=""</c>.</summary>
+    /// <summary>Percent-encodes UTF-8 bytes except ASCII letters, digits and <c>_.-~</c>; a space becomes <c>+</c>.</summary>
     public static string QuotePlus(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -102,6 +102,6 @@ public static class TmdbResponses
         };
     }
 
-    /// <summary><c>str(value or "")</c>.</summary>
+    /// <summary>A truthy value as text, otherwise empty.</summary>
     private static string StrOrEmpty(PyJson? value) => value is { IsTruthy: true } present ? PyConvert.Str(present) : string.Empty;
 }

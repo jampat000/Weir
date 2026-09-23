@@ -3,16 +3,15 @@ using Weir.Core.Json;
 namespace Weir.Core.Jobs;
 
 /// <summary>
-/// Plain-language status summaries for persisted background jobs (port of
-/// <c>weir.platform.jobs.operator_job_status</c>). Job rows retain the technical error for diagnostics;
-/// this is the one translation every inspection screen shares.
+/// Plain-language status summaries for persisted background jobs. Job rows retain the technical error
+/// for diagnostics; this is the one translation every inspection screen shares.
 /// </summary>
 public static class OperatorJobStatus
 {
     /// <summary>
     /// Display names for module keys whose plain capitalization would not read as a person expects.
-    /// The "processing" module key is unchanged (it is the stored identifier the caller passes), but the
-    /// app that runs it is just called Weir now.
+    /// The "processing" module key is the stored identifier the caller passes; the app that runs it is
+    /// called Weir.
     /// </summary>
     private static readonly Dictionary<string, string> ModuleDisplayNames = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -37,7 +36,7 @@ public static class OperatorJobStatus
         return slash >= 0 ? normalized[(slash + 1)..] : normalized;
     }
 
-    /// <summary><c>build_job_operator_status</c>: (operator_message, next_action, technical_detail).</summary>
+    /// <summary>A job's status for an operator: the API's <c>operator_message</c>, <c>next_action</c> and <c>technical_detail</c>.</summary>
     public static (string Message, string NextAction, string? TechnicalDetail) Build(string module, string jobKind, string status, string? lastError, string? payloadJson)
     {
         _ = jobKind;

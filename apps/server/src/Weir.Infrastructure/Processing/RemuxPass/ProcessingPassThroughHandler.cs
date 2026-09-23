@@ -12,7 +12,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
 /// <summary>
-/// Worker handler for <c>processing.file.pass_through.v1</c> (port of <c>make_processing_file_pass_through_handler</c>): hand
+/// Worker handler for <c>processing.file.pass_through.v1</c>: hand
 /// the unmodified original back to the output folder once retries are exhausted, then tell a waiting manager it is ready.
 /// </summary>
 /// <remarks>
@@ -141,7 +141,7 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
         }
     }
 
-    /// <summary><c>record_delivery</c>: the short bookkeeping transaction after a delivery.</summary>
+    /// <summary>The short bookkeeping transaction after a delivery.</summary>
     private static async Task RecordDeliveryAsync(UnitOfWork uow, PassThroughDeliverySettings settings, string relativePath, PassThroughDeliveryResult result, long jobId, DateTimeOffset now)
     {
         await RemuxPassFileState.RecordOutputCollisionAsync(uow, relativePath, result.Collision, settings.LibraryId).ConfigureAwait(false);

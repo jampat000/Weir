@@ -5,7 +5,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing;
 
 /// <summary>
-/// Periodic pruning of the per-file processing record (port of <c>processing_file_log_retention_periodic.py</c>).
+/// Periodic pruning of the per-file processing record.
 /// Separate from the suite log's own retention: a suite log diagnoses the application, a per-file record
 /// diagnoses a file, and the two need different lifetimes.
 /// </summary>
@@ -15,7 +15,7 @@ public sealed class FileLogRetentionTask(SqliteDatabase database, TimeProvider t
 
     public TimeSpan Interval => TimeSpan.FromSeconds(3600);
 
-    /// <summary>Python's <c>_run_forever</c> prunes once before its first wait, so the .NET host does too.</summary>
+    /// <summary>Prunes once at startup, before the first wait, so a long-running interval never delays the first prune.</summary>
     public bool RunAtStart => true;
 
     public TimeSpan? FailureCooldown => null;

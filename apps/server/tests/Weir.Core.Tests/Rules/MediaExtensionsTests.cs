@@ -3,9 +3,8 @@ using Weir.Core.Rules;
 namespace Weir.Core.Tests.Rules;
 
 /// <summary>
-/// Ported from <c>apps/backend/tests/test_processing_media_allowlist.py</c>: the allowlist itself.
-/// The tests that check files on disk (<c>is_processing_media_candidate</c>) and the watched-folder
-/// scan counters belong to the watched-folder scan port.
+/// The media extension allowlist itself. Checks against files on disk and the watched-folder scan
+/// counters are tested with the watched-folder scan.
 /// </summary>
 public sealed class MediaExtensionsTests
 {

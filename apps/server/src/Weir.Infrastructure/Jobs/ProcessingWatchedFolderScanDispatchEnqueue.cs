@@ -7,9 +7,8 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Jobs;
 
 /// <summary>
-/// Enqueue <c>processing.watched_folder.remux_scan_dispatch.v1</c> (port of
-/// <c>processing_watched_folder_remux_scan_dispatch_enqueue.py</c>): manual HTTP and the periodic scheduler
-/// share these checks and the exact payload/dedupe-key shape.
+/// Enqueue <c>processing.watched_folder.remux_scan_dispatch.v1</c>: manual HTTP, the periodic scheduler and the
+/// folder watcher share these checks and the exact payload/dedupe-key shape.
 /// </summary>
 public static class ProcessingWatchedFolderScanDispatchEnqueue
 {
@@ -66,8 +65,7 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
     }
 
     /// <summary>
-    /// <c>processing_watched_folder_remux_scan_dispatch_queue_has_active_scan</c>: true when a pending/leased
-    /// scan already covers this exact library. A legacy job with no library id still occupies its whole
+    /// True when a pending/leased scan already covers this exact library. A legacy job with no library id still occupies its whole
     /// Movies/TV scope.
     /// </summary>
     public static async Task<bool> QueueHasActiveScanAsync(UnitOfWork uow, string mediaScope, long? libraryId)
@@ -106,8 +104,7 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
     }
 
     /// <summary>
-    /// <c>validate_watched_folder_scan_dispatch_prerequisites</c>: shared checks for manual HTTP and
-    /// periodic enqueue (library found; watched folder saved; output folder saved when live remux is on).
+    /// Shared checks for manual HTTP and periodic enqueue (library found; watched folder saved; output folder saved when live remux is on).
     /// </summary>
     public static async Task<(bool Ok, ScanDispatchPrerequisiteError? Error)> ValidatePrerequisitesAsync(
         UnitOfWork uow, bool enqueueRemuxJobs, string mediaScope, long? libraryId)
@@ -116,8 +113,8 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
         library ??= await LibraryStore.SeededForScopeAsync(uow, mediaScope).ConfigureAwait(false);
         if (library is null)
         {
-            // One store now (#363): a database with no library covering this scope is one an operator
-            // emptied, not an unmigrated one.
+            // Libraries are the only store (#363): a database with no library covering this scope is one
+            // an operator emptied, not an unmigrated one.
             return (false, ScanDispatchPrerequisiteError.NoSavedWatchedFolder);
         }
 
@@ -125,8 +122,7 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
         return (error is null, error);
     }
 
-    /// <summary><c>enqueue_watched_folder_remux_scan_dispatch_job</c>: insert one scan job with a unique
-    /// dedupe key. Caller commits.</summary>
+    /// <summary>Insert one scan job with a unique dedupe key. Caller commits.</summary>
     public static Task<ProcessingJob> EnqueueScanDispatchJobAsync(
         UnitOfWork uow, ProcessingJobStore jobStore, bool enqueueRemuxJobs, string scanTrigger, string mediaScope, long? libraryId)
     {
@@ -148,10 +144,8 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
     }
 
     /// <summary>
-    /// <c>try_enqueue_periodic_watched_folder_remux_scan_dispatch</c>: one library's periodic tick. The
-    /// #533 fix (whether this scope is scheduled at all) is decided by the caller — see
-    /// <see cref="ProcessingWatchedFolderScanDispatchScheduleTask"/> — exactly as Python decides it from the
-    /// per-scope <c>movie_schedule_enabled</c>/<c>tv_schedule_enabled</c> rows before ever reaching here.
+    /// One library's periodic tick. Whether this scope is scheduled at all (#533) is decided by the caller,
+    /// <see cref="ProcessingWatchedFolderScanDispatchScheduleTask"/>, before it gets here.
     /// <paramref name="enqueueRemuxJobs"/> is the operator's <c>..._periodic_enqueue_remux_jobs</c> setting.
     /// </summary>
     public static async Task<(bool Inserted, string? Skip)> TryEnqueuePeriodicAsync(
@@ -179,10 +173,9 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
     }
 
     /// <summary>
-    /// <c>enqueue_scan_for_library</c>: turn a settled burst of filesystem events — or a watcher overflow/
-    /// error, which asks for the same "look at this library again" scan — into one job. Identical to what
-    /// the periodic timer enqueues apart from <c>scan_trigger</c>, which is the whole design: there is one
-    /// admission implementation, and the watcher is not a second one. Used by
+    /// Turn a settled burst of filesystem events, or a watcher overflow/error (which asks for the same "look at
+    /// this library again" scan), into one job. Identical to what the periodic timer enqueues apart from
+    /// <c>scan_trigger</c>, so there is one admission implementation and the watcher is not a second one. Used by
     /// <c>ProcessingWatchedFolderWatcherService</c>.
     /// </summary>
     public static async Task<(bool Inserted, string? Skip)> TryEnqueueForWatcherEventAsync(

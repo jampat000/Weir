@@ -7,7 +7,7 @@ using Weir.Infrastructure.Processing.DirectPlay;
 
 namespace Weir.Api.Endpoints;
 
-/// <summary>Choosing the devices the Direct Play badge answers for (port of <c>direct_play/api.py</c>, #467).</summary>
+/// <summary>Choosing the devices the Direct Play badge answers for (#467).</summary>
 public static class ProcessingDirectPlayEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingDirectPlayEndpoints(this IEndpointRouteBuilder endpoints)

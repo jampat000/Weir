@@ -2,7 +2,7 @@ using Weir.Core.Text;
 
 namespace Weir.Core.Workers;
 
-/// <summary>One lane's worker health as readiness reports it (<c>ReadinessWorkerOut</c>).</summary>
+/// <summary>One lane's worker health as readiness reports it.</summary>
 public sealed record WorkerLaneHealth(
     string Module,
     int ExpectedWorkers,
@@ -13,10 +13,8 @@ public sealed record WorkerLaneHealth(
     string Detail);
 
 /// <summary>
-/// In-memory worker heartbeat registry (port of <c>weir.platform.jobs.worker_health</c>).
-/// Until the workers are ported (#521) nothing reports a heartbeat, so every expected slot
-/// reads as not responding, which is exactly what the Python server reports when its workers
-/// never start.
+/// In-memory worker heartbeat registry. An expected worker slot that has never reported reads as not
+/// responding, so workers that fail to start show up as a degraded lane.
 /// </summary>
 public sealed class WorkerHeartbeats
 {
@@ -25,8 +23,8 @@ public sealed class WorkerHeartbeats
 
     /// <summary>
     /// Display names for module keys whose plain <see cref="TitleCase"/> would not read as a person
-    /// expects. The "processing" module key is unchanged (it is a stored identifier other modules and the
-    /// web app match on), but the app that runs it is just called Weir now.
+    /// expects. The "processing" module key stays as it is (it is a stored identifier other modules and the
+    /// web app match on), but operators know the app that runs it as Weir.
     /// </summary>
     private static readonly Dictionary<string, string> ModuleDisplayNames = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -90,7 +88,7 @@ public sealed class WorkerHeartbeats
         return lanes;
     }
 
-    /// <summary>Python's <c>str.title()</c> for the ASCII module names Weir uses.</summary>
+    /// <summary>Title case for module names: each letter that follows a non-letter is upper-cased, every other letter lower-cased.</summary>
     internal static string TitleCase(string value)
     {
         var chars = value.ToCharArray();

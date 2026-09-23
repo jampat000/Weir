@@ -4,8 +4,8 @@ using Weir.Core.Json;
 namespace Weir.Core.MediaManagers;
 
 /// <summary>
-/// The phrasing half of <c>weir.platform.media_managers.manager_dialects</c>: each product's JSON read into
-/// the neutral port shapes. The HTTP half lives in Weir.Infrastructure.
+/// The phrasing half of the manager dialects: each product's JSON read into the neutral
+/// <see cref="IMediaManagerPort"/> shapes. The HTTP half lives in Weir.Infrastructure.
 /// </summary>
 public static class ManagerDialectRules
 {
@@ -45,7 +45,7 @@ public static class ManagerDialectRules
         "importing", "importpending", "import_pending", "import-pending", "finalizing", "finalising", "moving", "handoff", "handing_off",
     };
 
-    /// <summary>The outbound <c>_scope_from_media_type</c>.</summary>
+    /// <summary>The scope a manager's media type names, accepting plural spellings too; null when it names neither.</summary>
     public static string? ScopeFromMediaType(PyJson? raw)
     {
         var value = (PyValues.Text(raw) ?? string.Empty).ToLowerInvariant();
@@ -57,7 +57,7 @@ public static class ManagerDialectRules
         };
     }
 
-    /// <summary><c>_unreachable</c>: one sentence an operator can act on, with the connection named.</summary>
+    /// <summary>One sentence an operator can act on, with the connection named.</summary>
     public static string Unreachable(ManagerConnection connection, Exception exception, string what)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -87,13 +87,9 @@ public static class ManagerDialectRules
     }
 
     /// <summary>
-    /// <c>_paths_under</c>. #544 item 4: Python reads the raw value with <c>str(row.get("path", ""))</c>, so a
-    /// root folder whose <c>path</c> is JSON <c>null</c> (present but empty) turns into the literal string
-    /// <c>"None"</c> and is reported as a root folder called "None" — the default in <c>dict.get</c> only ever
-    /// applies when the key is missing, never when it is <c>null</c>. Decision: skip it, the same as a root
-    /// folder with no <c>path</c> at all, rather than invent a label for a folder the manager did not name.
-    /// This matches the <c>libraries</c> side of <see cref="ArrRootFolders"/>, which already used
-    /// <see cref="PyValues.Text"/> and so already dropped these rows; only the <c>roots</c> list disagreed.
+    /// The root folder paths. A root folder whose <c>path</c> is JSON <c>null</c>, blank or missing is skipped
+    /// (#544 item 4) rather than given a label the manager did not name, the same as the <c>libraries</c> side of
+    /// <see cref="ArrRootFolders"/>.
     /// </summary>
     public static List<string> ArrRootPaths(IEnumerable<PyDict> rows) =>
         [.. rows.Select(row => PyValues.Text(row.Get("path"))).OfType<string>()];
@@ -126,9 +122,9 @@ public static class ManagerDialectRules
             PyList => payload,
             null or PyNull => null,
             PyDict dict => dict.Get("records"),
-            // Python: payload.get("records") on a non-mapping raises AttributeError, answered as a 500.
+            // Any other truthy shape is not a queue answer: throw, and the caller answers with a 500.
             _ when !payload.IsTruthy => null,
-            _ => throw new InvalidOperationException($"'{payload.PythonTypeName}' object has no attribute 'get'"),
+            _ => throw new InvalidOperationException("The media manager's queue answer was neither a list nor an object with records."),
         };
         return [.. PyValues.Dicts(records).Select(row => new ManagerQueueRow(scope, row))];
     }
@@ -150,7 +146,7 @@ public static class ManagerDialectRules
     }
 
     /// <summary>
-    /// list_library_files (#507), the movie half: <c>/api/v3/movie</c> rows carry the title's own id/name and,
+    /// Library files (#507), the movie half: <c>/api/v3/movie</c> rows carry the title's own id/name and,
     /// when the movie has a file, the embedded <c>movieFile.path</c> (verified: <c>MovieResource</c> and
     /// <c>MovieFileResource</c> in Radarr's <c>openapi.json</c> — a movie with no file simply has no
     /// <c>movieFile</c>, which is skipped rather than treated as a match).
@@ -180,7 +176,7 @@ public static class ManagerDialectRules
     }
 
     /// <summary>
-    /// list_library_files (#507), the series half: one series' <c>/api/v3/episodefile?seriesId=</c> rows, each
+    /// Library files (#507), the series half: one series' <c>/api/v3/episodefile?seriesId=</c> rows, each
     /// tagged with the series id/title/quality-profile-id the caller already looked up from <c>/api/v3/series</c>
     /// (verified: Sonarr's <c>EpisodeFileController.GetEpisodeFiles</c> throws <c>BadRequestException</c> without
     /// <c>seriesId</c> or <c>episodeFileIds</c>, so listing every file means walking <c>/api/v3/series</c> first,
@@ -203,7 +199,7 @@ public static class ManagerDialectRules
     }
 
     /// <summary>
-    /// file_changed (#507)'s <c>POST /api/v3/command</c> shape: the command's own name (matched
+    /// The file-changed (#507) <c>POST /api/v3/command</c> shape: the command's own name (matched
     /// case-insensitively against its class name minus "Command" — <c>CommandController.StartCommand</c>) and
     /// its one id property, camelCase (<c>STJson</c>'s <c>JsonNamingPolicy.CamelCase</c>). Verified against
     /// <c>RescanMovieCommand</c>/<c>RescanSeriesCommand</c> in each product's <c>MediaFiles/Commands</c>.
@@ -211,7 +207,7 @@ public static class ManagerDialectRules
     public static (string CommandName, string IdProperty) ArrRescanCommand(string mediaScope) =>
         mediaScope == MediaManagerKinds.Tv ? ("RescanSeries", "seriesId") : ("RescanMovie", "movieId");
 
-    /// <summary><c>_manifest_libraries</c>.</summary>
+    /// <summary>The manifest's libraries, from the first non-empty list among its known keys, or a bare list.</summary>
     public static List<PyDict> ManifestLibraries(PyJson? payload)
     {
         if (payload is PyDict mapping)
@@ -231,7 +227,7 @@ public static class ManagerDialectRules
         return PyValues.Dicts(payload);
     }
 
-    /// <summary><c>_manifest_capabilities</c>: the manifest's capability strings, lower-cased.</summary>
+    /// <summary>The manifest's capability strings, lower-cased.</summary>
     public static IReadOnlySet<string> ManifestCapabilities(PyJson? payload)
     {
         var set = new SortedSet<string>(StringComparer.Ordinal);
@@ -250,7 +246,7 @@ public static class ManagerDialectRules
         return set;
     }
 
-    /// <summary><c>_manifest_library_key</c>.</summary>
+    /// <summary>A manifest library's <c>id</c>, numeric or text.</summary>
     public static string? ManifestLibraryKey(PyDict library)
     {
         ArgumentNullException.ThrowIfNull(library);
@@ -258,7 +254,7 @@ public static class ManagerDialectRules
         return number is { } n ? n.ToString(CultureInfo.InvariantCulture) : PyValues.FirstText(library, "id");
     }
 
-    /// <summary><c>_manifest_library_descriptor</c>, read against the confirmed Deluno contract.</summary>
+    /// <summary>A manifest library, read against the confirmed Deluno contract.</summary>
     public static ManagerLibraryDescriptor ManifestLibraryDescriptor(PyDict library)
     {
         ArgumentNullException.ThrowIfNull(library);
@@ -306,7 +302,7 @@ public static class ManagerDialectRules
             AdvertisedCapabilities: ManifestCapabilities(payload));
     }
 
-    /// <summary><c>_external_queue_entries</c>: every row, whichever container the manager wrapped it in.</summary>
+    /// <summary>Every queue row, whichever container the manager wrapped it in.</summary>
     public static List<PyDict> ExternalQueueEntries(PyJson? payload)
     {
         if (payload is PyList)
@@ -328,7 +324,7 @@ public static class ManagerDialectRules
         return collected;
     }
 
-    /// <summary><c>_external_queue_status</c>: an unrecognised state reads as still in progress.</summary>
+    /// <summary>A queue row's status; an unrecognised state reads as still in progress.</summary>
     public static string ExternalQueueStatus(PyDict entry)
     {
         var raw = PyValues.FirstText(entry, "status", "state", "jobStatus", "job_status", "phase") ?? string.Empty;
@@ -341,7 +337,7 @@ public static class ManagerDialectRules
         return SettledStates.Contains(value) ? value : "downloading";
     }
 
-    /// <summary><c>_external_queue_row</c>: null when the row names no scope.</summary>
+    /// <summary>An external queue row in the neutral shape; null when the row names no scope.</summary>
     public static ManagerQueueRow? ExternalQueueRow(PyDict entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
@@ -363,7 +359,7 @@ public static class ManagerDialectRules
         return new ManagerQueueRow(scope, payload);
     }
 
-    /// <summary><c>_only_rows_for_scope</c>: drop rows describing the other kind of library; a silent manager stays silent.</summary>
+    /// <summary>Drops rows describing the other kind of library; a silent manager stays silent.</summary>
     public static ManagerQueueSignal OnlyRowsForScope(ManagerQueueSignal signal, string mediaScope)
     {
         ArgumentNullException.ThrowIfNull(signal);

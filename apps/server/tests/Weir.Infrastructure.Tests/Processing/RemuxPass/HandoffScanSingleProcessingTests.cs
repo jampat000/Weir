@@ -271,7 +271,7 @@ public sealed class HandoffScanSingleProcessingTests : IDisposable
     [Fact]
     public async Task A_due_automatic_retry_does_not_queue_a_second_pass_beside_a_hand_offs()
     {
-        // The scan's automatic-retry branch for a failed file used to enqueue with no check for an active pass at all.
+        // The scan's automatic-retry branch for a failed file must check for an active pass before it enqueues.
         await SetUpAsync();
         var size = new FileInfo(Path.Join(_folders.Watched, "Film", "film.mkv")).Length;
         var due = DateTimeOffset.UtcNow.AddMinutes(-5).ToString("yyyy-MM-dd HH:mm:ss.ffffff", CultureInfo.InvariantCulture);

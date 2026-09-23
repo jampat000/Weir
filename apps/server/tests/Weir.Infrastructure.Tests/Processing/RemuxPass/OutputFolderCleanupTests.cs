@@ -1,13 +1,13 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 
 namespace Weir.Infrastructure.Tests.Processing.RemuxPass;
 
 /// <summary>
-/// Ported from <c>apps/backend/tests/test_processing_movie_output_cleanup.py</c> and <c>test_processing_tv_output_cleanup.py</c>, on real
-/// folders with the managers' answers and the job queue stated directly.
+/// Movie and TV output folder cleanup on real folders, with the managers' answers and the job queue stated directly.
 /// </summary>
 public sealed class OutputFolderCleanupTests : IDisposable
 {
@@ -80,6 +80,22 @@ public sealed class OutputFolderCleanupTests : IDisposable
     }
 
     [Fact]
+    public async Task An_output_folder_that_also_holds_another_films_output_is_kept()
+    {
+        var final = MovieOutput("Pack");
+        var otherOutput = _folders.Out(Path.Join("Pack", "Other Film.mkv"));
+        File.WriteAllText(otherOutput, "y");
+        File.SetLastWriteTimeUtc(otherOutput, DateTime.UtcNow.AddDays(-3));
+        _data.Truth.Add(Reported(_folders.Out(Path.Join("ManagerLibrary", "m.mkv"))));
+
+        var output = await RunMovie(final, "Pack/m.mkv");
+
+        Assert.False(((PyBool)output["movie_output_folder_deleted"]).Value);
+        Assert.Equal(ReleaseFolderRemoval.OtherVideosFolderKeptReason, Str(output, "movie_output_folder_skip_reason"));
+        Assert.True(File.Exists(otherOutput));
+    }
+
+    [Fact]
     public async Task Every_manager_clear_and_old_enough_deletes_the_folder_and_its_empty_parents()
     {
         var final = MovieOutput(Path.Join("Collection", "Title"));
@@ -99,7 +115,7 @@ public sealed class OutputFolderCleanupTests : IDisposable
     }
 
     [Fact]
-    public async Task Issue_545_item_1_a_manager_that_has_not_imported_yet_keeps_the_folder()
+    public async Task A_manager_that_has_not_imported_yet_keeps_the_folder()
     {
         // The manager is reachable and answers, but its library does not yet include this release — exactly what
         // "hasn't imported yet" (or "imports by copy and scans later") looks like. Reporting zero files that

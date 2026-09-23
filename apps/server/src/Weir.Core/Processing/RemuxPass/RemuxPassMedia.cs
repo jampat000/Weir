@@ -4,16 +4,16 @@ using Weir.Core.Rules;
 
 namespace Weir.Core.Processing.RemuxPass;
 
-/// <summary>What a pass reads off the probe beyond the plan (helpers of <c>run.py</c> and <c>processing_runner_units.py</c>).</summary>
+/// <summary>What a pass reads off the probe beyond the plan.</summary>
 public static class RemuxPassMedia
 {
-    /// <summary><c>str(value or "")</c>.</summary>
+    /// <summary>The value as text, or empty when it is missing, null, false, zero or empty.</summary>
     public static string TruthyText(JsonElement? value) => Py.Truthy(value) ? Py.Str(value) : string.Empty;
 
-    /// <summary><c>int(value or 0)</c> inside <c>try/except (TypeError, ValueError)</c> returning 0.</summary>
+    /// <summary>The value as an integer, or 0 when it is empty or not a number.</summary>
     public static long IntegerOrZero(JsonElement? value) => Py.Truthy(value) && Py.TryInt(value, out var parsed) ? parsed : 0;
 
-    /// <summary><c>video_dimensions_from_streams</c>: (width, height) of the largest video stream, by <c>width</c>/<c>coded_width</c>.</summary>
+    /// <summary>(width, height) of the largest video stream, by <c>width</c>/<c>coded_width</c>.</summary>
     public static (long? Width, long? Height) VideoDimensions(IReadOnlyList<ProbeStreamInfo> videoStreams) =>
         (LargestDimension(videoStreams, "width", "coded_width"), LargestDimension(videoStreams, "height", "coded_height"));
 
@@ -40,7 +40,7 @@ public static class RemuxPassMedia
         return largest;
     }
 
-    /// <summary><c>_probe_duration_seconds</c>: the longest positive duration among the format and the streams.</summary>
+    /// <summary>The longest positive duration among the format and the streams.</summary>
     public static double? ProbeDurationSeconds(ProbeResult probe)
     {
         ArgumentNullException.ThrowIfNull(probe);
@@ -59,7 +59,7 @@ public static class RemuxPassMedia
         return valid.Count > 0 ? valid.Max() : null;
     }
 
-    /// <summary><c>float(value or 0)</c> inside <c>contextlib.suppress(TypeError, ValueError)</c>.</summary>
+    /// <summary>Add the value as a number: 0 when empty, nothing at all when it cannot be read as one.</summary>
     private static void AddFloat(List<double> candidates, JsonElement? value)
     {
         if (!Py.Truthy(value))
@@ -83,7 +83,7 @@ public static class RemuxPassMedia
         }
     }
 
-    /// <summary><c>_video_bit_depth</c>: <c>bits_per_raw_sample</c>, else read from the pixel format, else null.</summary>
+    /// <summary>The video bit depth: <c>bits_per_raw_sample</c>, else read from the pixel format, else null.</summary>
     public static long? VideoBitDepth(ProbeStreamInfo stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -116,7 +116,7 @@ public static class RemuxPassMedia
     }
 
     /// <summary>
-    /// <c>_pass_through_plan</c>: an unchanged file described without applying any rules. Observability only; pass-through
+    /// An unchanged file described without applying any rules. Observability only; pass-through
     /// never runs ffmpeg.
     /// </summary>
     public static RemuxPlan PassThroughPlan(IReadOnlyList<ProbeStreamInfo> video, IReadOnlyList<ProbeStreamInfo> audio, IReadOnlyList<ProbeStreamInfo> subtitles)

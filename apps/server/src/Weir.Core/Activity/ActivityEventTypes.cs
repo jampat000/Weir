@@ -1,8 +1,8 @@
 namespace Weir.Core.Activity;
 
 /// <summary>
-/// Stable <c>event_type</c> strings for persisted activity, an append-only contract (port of
-/// <c>weir.platform.activity.constants</c>). Every value must match the Python module exactly.
+/// Stable <c>event_type</c> strings for persisted activity, an append-only contract: stored rows and
+/// clients filter on these exact values, so an existing value never changes.
 /// </summary>
 public static class ActivityEventTypes
 {
@@ -47,7 +47,7 @@ public static class ActivityEventTypes
     /// <summary>An operator queued a hand-picked track choice for a held file (#501).</summary>
     public const string ProcessingFileManualPlanQueued = "processing.file_manual_plan_queued";
 
-    /// <summary>A file left the watched folder before Weir finished with it, so it is no longer listed (#645).</summary>
+    /// <summary>A file left the watched folder before Weir finished with it, so it drops off the list (#645).</summary>
     public const string ProcessingFileLeftWatchedFolder = "processing.file_left_watched_folder";
 
     /// <summary>A media manager said it imported, or will not import, a file Weir handed back, and what Weir did with its copy (#652).</summary>
@@ -58,10 +58,8 @@ public static class ActivityEventTypes
 }
 
 /// <summary>
-/// Library mode's (#505) event types: cleaning files already in a library, in place. Deliberately kept out of
-/// <see cref="ActivityEventTypes"/>, whose <c>Event_types_match_the_python_constants_exactly</c> test requires every member
-/// to have a matching Python constant — library mode is .NET only (same as the #506 safe swap it uses), so there is no
-/// Python family to match.
+/// Library mode's (#505) event types: cleaning files already in a library, in place. Kept in their own
+/// <c>library.*</c> family, apart from the processing and platform types in <see cref="ActivityEventTypes"/>.
 /// </summary>
 public static class LibraryActivityEventTypes
 {

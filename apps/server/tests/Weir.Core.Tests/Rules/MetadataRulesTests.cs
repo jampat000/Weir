@@ -4,9 +4,8 @@ using Weir.Core.Rules;
 namespace Weir.Core.Tests.Rules;
 
 /// <summary>
-/// Ported from <c>apps/backend/tests/test_processing_metadata_rules.py</c> and
-/// <c>test_processing_remux_rules_split_streams.py</c>, including the two that build the ffmpeg argv
-/// (<c>build_ffmpeg_argv</c>, ported as <see cref="Weir.Core.Media.FfmpegCommands.BuildRemuxArgv"/>).
+/// Metadata rules and stream splitting, including the ffmpeg argv they produce
+/// (<see cref="Weir.Core.Media.FfmpegCommands.BuildRemuxArgv"/>).
 /// </summary>
 public sealed class MetadataRulesTests
 {
@@ -50,7 +49,7 @@ public sealed class MetadataRulesTests
 
     private static IEnumerable<long?> Indices(IEnumerable<ProbeStreamInfo> streams) => streams.Select(s => s.Index);
 
-    // --- split_streams --------------------------------------------------------------------
+    // --- splitting streams ----------------------------------------------------------------
 
     [Fact]
     public void Split_streams_orders_by_index()

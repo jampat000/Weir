@@ -6,8 +6,7 @@ using Weir.Infrastructure.Logging;
 namespace Weir.Api.Http;
 
 /// <summary>
-/// <c>X-Request-ID</c> on every response and the request id in every log line
-/// (port of <c>RequestContextMiddleware</c>).
+/// <c>X-Request-ID</c> on every response and the request id in every log line.
 /// </summary>
 public sealed class RequestContextMiddleware
 {
@@ -60,7 +59,7 @@ public sealed class RequestContextMiddleware
         _metrics.RecordRequest(context.Request.Method, RouteLabelFor(context), context.Response.StatusCode, _time.GetElapsedTime(started).TotalMilliseconds);
     }
 
-    /// <summary>The route template the request matched in its Python router, else the URL path (<c>_route_label</c>).</summary>
+    /// <summary>The label of the route the request matched (see <see cref="RouteLabel"/>), else the URL path.</summary>
     private string RouteLabelFor(HttpContext context) =>
         context.GetEndpoint()?.Metadata.GetMetadata<RouteLabel>()?.Label
         ?? _routes.FirstPathMatch(context.Request.Path)?.Label
@@ -91,8 +90,8 @@ public sealed class RequestContextMiddleware
 }
 
 /// <summary>
-/// Security headers on every response that passes through it (port of <c>SecurityHeadersMiddleware</c>).
-/// Existing values win, as with Python's <c>setdefault</c>.
+/// Security headers on every response that passes through it. A header a handler already set wins, so a
+/// route can override the default.
 /// </summary>
 public sealed class SecurityHeadersMiddleware
 {

@@ -3,8 +3,8 @@ using Weir.Core.Configuration;
 namespace Weir.Infrastructure.Runtime;
 
 /// <summary>
-/// Startup checks on the runtime paths (port of <c>ensure_runtime_directories</c> and
-/// <c>assert_sqlite_db_location_usable</c>), with the same operator messages.
+/// Startup checks on the runtime paths: create the directories Weir writes to and refuse a database
+/// path that cannot be used read-write.
 /// </summary>
 public static class RuntimeDirectories
 {
@@ -38,8 +38,8 @@ public static class RuntimeDirectories
                 "Fix WEIR_DB_PATH or remove the directory at that location.");
         }
 
-        // Python also rejects special files (FIFOs, sockets) with "must be a regular file"; .NET has
-        // no portable file-type check, so such a path fails below as "not writable" or at open.
+        // Special files (FIFOs, sockets) have no portable file-type check in .NET, so such a path
+        // fails below as "not writable" or at open.
         var parent = Path.GetDirectoryName(resolved) ?? resolved;
         try
         {

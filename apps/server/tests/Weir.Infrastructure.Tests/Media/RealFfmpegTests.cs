@@ -64,8 +64,8 @@ internal static class RealFfmpeg
 
 /// <summary>
 /// The ffmpeg layer against real ffprobe and ffmpeg on tiny files generated with <c>-f lavfi</c> at test time:
-/// probing, a remux that drops an audio track, validation, truncation and unreadable input. These assert what the
-/// Python reference does with the same tools, including where that is not what one would want.
+/// probing, a remux that drops an audio track, validation, truncation and unreadable input. These pin the current
+/// behaviour with the real tools, including where that is not what one would want.
 /// </summary>
 public sealed class RealFfmpegTests : IDisposable
 {
@@ -193,7 +193,7 @@ public sealed class RealFfmpegTests : IDisposable
     }
 
     [RequiresFfmpegFact]
-    public async Task Issue_500_a_correct_remux_that_keeps_the_planned_subtitle_passes_staged_validation()
+    public async Task A_correct_remux_that_keeps_the_planned_subtitle_passes_staged_validation()
     {
         var fixture = await GenerateFixtureWithSubtitleAsync();
         var tools = Tools();
@@ -222,7 +222,7 @@ public sealed class RealFfmpegTests : IDisposable
     }
 
     [RequiresFfmpegFact]
-    public async Task Issue_500_an_output_that_drops_a_subtitle_the_plan_kept_fails_staged_validation()
+    public async Task An_output_that_drops_a_subtitle_the_plan_kept_fails_staged_validation()
     {
         var fixture = await GenerateFixtureWithSubtitleAsync("with-subs-wrong.mkv");
         var tools = Tools();
@@ -260,7 +260,7 @@ public sealed class RealFfmpegTests : IDisposable
     [RequiresFfmpegFact]
     public async Task A_remux_standardizes_names_clears_video_titles_and_removes_chapters()
     {
-        // #498: real ffmpeg and ffprobe, not the golden fixtures (this option has no Python equivalent yet).
+        // #498: real ffmpeg and ffprobe, not the golden fixtures, which do not cover this option.
         var fixture = await GenerateFixtureWithChaptersAsync();
         var tools = Tools();
         var probe = await tools.FfprobeJsonAsync(fixture);
@@ -384,7 +384,7 @@ public sealed class RealFfmpegTests : IDisposable
     [RequiresFfmpegFact]
     public async Task A_remux_keeps_the_comment_disposition_while_changing_default()
     {
-        // #547 item 2: "-disposition:a:N default|0" used to overwrite the whole disposition, clearing "comment"
+        // #547 item 2: "-disposition:a:N default|0" overwrites the whole disposition, clearing "comment"
         // (and similarly "descriptions", "hearing_impaired", "dub", "original", ...) on a kept track. The
         // additive "+default"/"-default" syntax only ever touches default/forced.
         var fixture = Path.Combine(_root, "fixture-commentary.mkv");
@@ -535,11 +535,11 @@ public sealed class RealFfmpegTests : IDisposable
     }
 
     [RequiresFfmpegFact]
-    public async Task A_truncated_matroska_file_passes_the_duration_check_as_in_the_reference()
+    public async Task A_truncated_matroska_file_still_passes_the_header_duration_check()
     {
-        // Parity, not approval: Matroska keeps its duration in the header, so a file cut in half still reports the
-        // full length and passes the staged-output check. This is exactly why #539 item 3 fixes the *integrity*
-        // read (the next test) rather than this one: the header cannot be trusted, only a full demux can.
+        // Pinned, not approved: Matroska keeps its duration in the header, so a file cut in half still reports the
+        // full length and passes the staged-output check. This is why #539 item 3 checks the *integrity* read
+        // (the next test) rather than this one: the header cannot be trusted, only a full demux can.
         var fixture = await GenerateFixtureAsync();
         var bytes = await File.ReadAllBytesAsync(fixture);
         var truncated = Path.Combine(_root, "truncated.mkv");
@@ -551,9 +551,8 @@ public sealed class RealFfmpegTests : IDisposable
     [RequiresFfmpegFact]
     public async Task A_truncated_matroska_file_fails_the_fixed_integrity_read()
     {
-        // #539 item 3: fixed, not parity. The reference's validate_media_integrity only looks at ffmpeg's exit
-        // code; this build's ffmpeg exits 0 from the full demux of a file cut in half, only warning "File ended
-        // prematurely", so the reference would call this file complete. ValidateMediaIntegrityAsync now treats
+        // #539 item 3: ffmpeg exits 0 from the full demux of a file cut in half, only warning "File ended
+        // prematurely", so the exit code alone would call this file complete. ValidateMediaIntegrityAsync treats
         // that warning as failure (Weir.Core.Media.ProbeOutput.IntegrityIncompleteMarkers).
         var fixture = await GenerateFixtureAsync();
         var bytes = await File.ReadAllBytesAsync(fixture);
@@ -566,11 +565,11 @@ public sealed class RealFfmpegTests : IDisposable
     }
 
     [RequiresFfmpegFact]
-    public async Task Garbage_input_is_classified_unreadable_now_that_ffprobe_runs_with_v_error()
+    public async Task Garbage_input_is_classified_unreadable_because_ffprobe_runs_with_v_error()
     {
-        // #539 item 1: fixed, not parity. The reference probes with "-v quiet", so ffprobe never prints the
-        // words the unreadable-media markers look for and this comes back as a plain RuntimeError instead of
-        // MediaUnreadableError; "-v error" (Weir.Core.Media.FfmpegCommands.BuildFfprobeArgv) puts them on stderr.
+        // #539 item 1: with "-v quiet" ffprobe never prints the words the unreadable-media markers look for, and
+        // this would come back as a plain RuntimeError instead of MediaUnreadableError; "-v error"
+        // (Weir.Core.Media.FfmpegCommands.BuildFfprobeArgv) puts them on stderr.
         var garbage = Path.Combine(_root, "garbage.mkv");
         await File.WriteAllBytesAsync(garbage, Enumerable.Range(1, 4096).Select(i => (byte)(i * 37 % 256)).ToArray());
 
@@ -623,9 +622,9 @@ public sealed class RealFfmpegTests : IDisposable
     [RequiresFfmpegFact]
     public async Task A_progress_run_that_never_writes_a_line_is_still_stopped_by_the_timer()
     {
-        // #539 item 4: the reference's progress loop only checks its timeout as a line arrives ("for raw in
-        // proc.stdout: ..."), so a process stuck reading its input - one that never gets to write a progress line
-        // at all - would hang forever. ProcessRunner's timeout is a wall-clock timer instead (see
+        // #539 item 4: a progress loop that only checks its timeout as a line arrives would hang forever on a
+        // process stuck reading its input - one that never gets to write a progress line at all. ProcessRunner's
+        // timeout is a wall-clock timer instead (see
         // ProcessRunnerTests for the same guarantee without a real ffmpeg), so this is enforced even though
         // nothing is ever read. A Windows named pipe with no writer makes ffmpeg block inside avformat_open_input,
         // before it can emit anything.

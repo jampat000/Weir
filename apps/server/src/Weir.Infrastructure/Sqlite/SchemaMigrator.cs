@@ -9,7 +9,7 @@ namespace Weir.Infrastructure.Sqlite;
 /// <param name="ResourceName">The embedded <c>Migrations/*.sql</c> file.</param>
 public sealed record SchemaMigration(int Number, string Revision, string ResourceName);
 
-/// <summary>Why the database could not be used, mirroring the Python <c>DatabaseSchemaMismatch.kind</c> values where they apply.</summary>
+/// <summary>Why the database could not be used.</summary>
 public enum SchemaMismatchKind
 {
     /// <summary>The file exists but no revision is recorded (including an empty file).</summary>
@@ -18,7 +18,7 @@ public enum SchemaMismatchKind
     /// <summary>A revision this build has never heard of (probably a newer release).</summary>
     UnknownRevision,
 
-    /// <summary>An older Alembic revision: the Python release must migrate it first.</summary>
+    /// <summary>A revision from before the baseline: an earlier Weir release must migrate it first.</summary>
     BehindHead,
 
     /// <summary>The version table is malformed.</summary>
@@ -57,13 +57,12 @@ public enum SchemaStartupOutcome
     /// <summary>The file did not exist; the schema was created and seeded.</summary>
     Created,
 
-    /// <summary>The database was already at this build's revision (created by Alembic or by an earlier .NET start); nothing was written.</summary>
+    /// <summary>The database was already at this build's revision; nothing was written.</summary>
     AlreadyCurrent,
 
     /// <summary>
-    /// The database was at an earlier revision this build knows how to reach (created by Alembic at the
-    /// frozen baseline, or by an earlier .NET build at one of its own migrations): every migration after
-    /// that revision, in order, was applied to bring it to head.
+    /// The database was at an earlier revision in <see cref="SchemaMigrator.Migrations"/> (the baseline or a
+    /// later migration): every migration after that revision, in order, was applied to bring it to head.
     /// </summary>
     Upgraded,
 }
@@ -73,22 +72,19 @@ public enum SchemaStartupOutcome
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Version ledger:</b> the .NET server reuses Alembic's own <c>alembic_version</c> table
-/// instead of adding a <c>schema_version</c> table. The schema is part of the contract that must
-/// not move (ADR-0017), so a database created by either backend is byte-for-byte the same kind of
-/// database and either backend can open it, which the contract suite relies on; an existing
-/// install is adopted with no write at all. Each migration names the revision it leaves behind;
-/// after the switch (#523) new migrations continue Alembic's numbering (<c>0037_…</c>).
+/// <b>Version ledger:</b> the revision is recorded in the <c>alembic_version</c> table (one <c>version_num</c>
+/// row), because every existing Weir database already carries that table; a separate version table would
+/// make existing installs look unversioned. The schema is part of the contract (ADR-0017), and an install
+/// already at head is adopted with no write at all. Each migration names the revision it leaves behind,
+/// continuing the existing numbering (<c>0037_…</c>, #523).
 /// </para>
 /// <para>
 /// <b>On startup:</b> a missing database file is created at head; a database whose recorded revision is
-/// head is adopted unchanged; a database recorded at any earlier revision in <see cref="Migrations"/> —
-/// the frozen Alembic baseline, or one of this build's own earlier migrations — is upgraded in place by
-/// applying every migration after it, in order, in one transaction (issue #557 lifted the freeze and
-/// this is the "SchemaMigrator taught to upgrade a database at the previous head" the schema docs
-/// promise); anything else, including an existing file with no schema or a genuinely pre-baseline
-/// Alembic revision, is refused with a message and no change — the pre-baseline case still needs the
-/// retired Python backend's own Alembic to reach the baseline first.
+/// head is adopted unchanged; a database recorded at any earlier revision in <see cref="Migrations"/> (the
+/// baseline or a later migration) is upgraded in place by applying every migration after it, in order, in
+/// one transaction (#557); anything else, including an existing file with no schema or a revision from
+/// before the baseline, is refused with a message and no change. A pre-baseline database has to be started
+/// once on an earlier Weir release, which migrates it to the baseline.
 /// </para>
 /// </remarks>
 public sealed class SchemaMigrator
@@ -113,17 +109,15 @@ public sealed class SchemaMigrator
     ];
 
     /// <summary>
-    /// The schema before issue #557's migrations (the frozen Alembic-head shape every released Weir up to
-    /// and including #523's switch-over could create): the checked-in <c>schema/alembic-head.sql</c>
-    /// reference and <c>SchemaParityTests</c> stay pinned to this revision on purpose (see
-    /// apps/server/README.md, "Schema") rather than to the moving <see cref="HeadRevision"/>, since #557
-    /// deliberately diverges from the frozen Alembic shape.
+    /// The schema before issue #557's migrations. The checked-in <c>schema/alembic-head.sql</c> reference and
+    /// <c>SchemaParityTests</c> stay pinned to this revision (see apps/server/README.md, "Schema and migrations") rather than
+    /// to the moving <see cref="HeadRevision"/>, so the reference file never changes.
     /// </summary>
     public static string BaselineRevision => Migrations[0].Revision;
 
     /// <summary>
-    /// Alembic revisions before the baseline, oldest first. A database at one of these was made by
-    /// an older Python release that knows how to upgrade it.
+    /// Revisions before the baseline, oldest first. A database at one of these was made by an earlier
+    /// Weir release, which upgrades it to the baseline when started once.
     /// </summary>
     public static readonly IReadOnlyList<string> AlembicRevisionsBeforeBaseline =
     [
@@ -176,8 +170,8 @@ public sealed class SchemaMigrator
     public SchemaStartupOutcome EnsureAtHead()
     {
         // Only a missing file is a new install. A file that exists but holds no schema was made by
-        // something else (or by a start that failed half-way); Python refuses it as unversioned, and so
-        // does this build, without opening it (opening would switch it to WAL).
+        // something else (or by a start that failed half-way), so it is refused as unversioned without
+        // being opened (opening would switch it to WAL).
         var existed = File.Exists(_database.DatabasePath);
         if (existed && new FileInfo(_database.DatabasePath).Length == 0)
         {
@@ -231,14 +225,14 @@ public sealed class SchemaMigrator
         using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(migration.ResourceName)
             ?? throw new InvalidOperationException($"Migration resource {migration.ResourceName} is missing from this build.");
         using var reader = new StreamReader(stream);
-        // Line endings are normalized so sqlite_master holds the same text as an Alembic-created database.
+        // Line endings are normalized so sqlite_master holds the same schema text as existing databases on every platform.
         return reader.ReadToEnd().Replace("\r\n", "\n", StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// Builds a fresh database at exactly <see cref="BaselineRevision"/> (the frozen Alembic-head shape),
-    /// ignoring every migration #557 and later added. Test-only: <c>SchemaParityTests</c> uses this to keep
-    /// comparing against <c>alembic-head.sql</c> without that reference file ever changing.
+    /// Builds a fresh database at exactly <see cref="BaselineRevision"/>, ignoring every later migration.
+    /// Test-only: <c>SchemaParityTests</c> uses this to compare against <c>alembic-head.sql</c> without that
+    /// reference file ever changing.
     /// </summary>
     public SchemaStartupOutcome EnsureAtBaseline()
     {
@@ -253,13 +247,11 @@ public sealed class SchemaMigrator
     /// Runs <paramref name="migrations"/> in one transaction and records <paramref name="revision"/>.
     /// <para>
     /// Foreign keys are turned off <b>before</b> the transaction opens, which is SQLite's documented
-    /// procedure for schema changes and is not the same thing as the <c>defer_foreign_keys</c> that used to
-    /// be set here. <c>PRAGMA foreign_keys</c> is a no-op inside a transaction, so the old setting could
-    /// only defer constraint <i>violations</i> to commit — it did nothing about <c>ON DELETE CASCADE</c>,
-    /// which fires immediately. Any migration that rebuilt a table by dropping it therefore deleted its
-    /// children's rows, transitively and silently. #578's table rename hit exactly that: dropping
-    /// <c>refiner_files</c> emptied <c>library_files</c>, which emptied <c>library_file_facets</c>.
-    /// Issue557MigrationTests and Issue568MigrationTests caught it.
+    /// procedure for schema changes. <c>PRAGMA foreign_keys</c> is a no-op inside a transaction, and
+    /// <c>defer_foreign_keys</c> only defers constraint <i>violations</i> to commit: neither stops
+    /// <c>ON DELETE CASCADE</c>, which fires immediately, so a migration that rebuilds a table by dropping it
+    /// would silently delete its children's rows, transitively (#578: dropping <c>refiner_files</c> would
+    /// empty <c>library_files</c> and, through it, <c>library_file_facets</c>).
     /// </para>
     /// <para>
     /// A <c>foreign_key_check</c> runs before the commit so turning enforcement off cannot hide a migration
@@ -349,7 +341,7 @@ public sealed class SchemaMigrator
         };
     }
 
-    /// <summary>Python's <c>kind="unversioned"</c> refusal, with this build's advice instead of Alembic's.</summary>
+    /// <summary>The refusal for a database with no recorded revision, with the operator's options.</summary>
     private static DatabaseSchemaMismatchException UnversionedError() => new(
         "No Alembic revision is recorded for this database (migrations have not been applied). " +
         $"This build requires schema revision {Quote(HeadRevision)}. " +
@@ -364,6 +356,6 @@ public sealed class SchemaMigrator
         return Convert.ToInt64(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    /// <summary>Python's <c>repr()</c> of a revision string, as the Python messages print it.</summary>
+    /// <summary>A revision in single quotes, as the operator messages print it.</summary>
     private static string Quote(string value) => $"'{value}'";
 }

@@ -3,8 +3,8 @@ using System.Globalization;
 namespace Weir.Core.Configuration;
 
 /// <summary>
-/// Where the HTTP server listens. The Python backend has no settings for this; its launchers pass
-/// it in, and this keeps each launcher's contract:
+/// Where the HTTP server listens. There is no <c>WEIR_*</c> setting for this; the launchers pass it
+/// in, and this keeps each launcher's contract:
 /// <list type="bullet">
 /// <item>the Windows tray starts the server with <c>--port &lt;port&gt;</c>;</item>
 /// <item>the Docker entrypoint reads <c>PORT</c>;</item>

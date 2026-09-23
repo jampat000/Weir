@@ -8,8 +8,7 @@ public sealed record LibraryWalkedFile(string Path, long SizeBytes, long Modifie
 /// <summary>
 /// Walks a library's #505 library folders for media files, read-only. Reuses the library's existing media-extension and
 /// exclude-marker filters (the same CSVs the download-pipeline watched-folder scan uses) so "which files count" agrees with
-/// the rest of the library's settings; a dedicated watched-folder-style scan port is out of scope here (see
-/// <c>docs/archive/server-port-notes.md</c>'s "known rules-engine gaps"/"seams" sections for the pattern this follows).
+/// the rest of the library's settings.
 /// </summary>
 public static class LibraryFileWalker
 {

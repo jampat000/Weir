@@ -3,8 +3,7 @@ using Weir.Core.Json;
 namespace Weir.Core.Jobs;
 
 /// <summary>
-/// Immutable view passed to a job handler after a successful claim, outside the claim transaction
-/// (port of <c>ProcessingJobWorkContext</c>).
+/// Immutable view passed to a job handler after a successful claim, outside the claim transaction.
 /// </summary>
 public sealed record JobWorkContext(
     long Id,
@@ -22,7 +21,7 @@ public sealed record JobWorkContext(
 /// <remarks>
 /// The cancellation token fires only when Weir is shutting down. A handler that stops because of it
 /// leaves its row leased, and startup recovery requeues it on the next start, exactly as when the
-/// Python process is stopped mid-job.
+/// process is killed mid-job.
 /// </remarks>
 public interface IJobHandler
 {
@@ -37,13 +36,10 @@ public interface IJobHandler
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Unported kinds are never claimed.</b> While the port is in progress (#514), the .NET server has
-/// handlers for only some kinds. Python claims every eligible row and fails the ones it has no handler
-/// for; doing that here would fail real work queued by, or meant for, the Python backend. So a .NET
-/// worker only claims rows whose kind is registered here, plus rows no worker may ever run (retired or
-/// unprefixed kinds), which it claims only to refuse with Python's exact wording. Every other row stays
-/// <c>pending</c>, untouched, for a backend that can run it. When the last handler lands (#522, #523)
-/// the registry covers every live kind and the behaviour is Python's again.
+/// <b>Kinds without a handler are never claimed.</b> A worker claims only rows whose kind is registered
+/// here, plus rows no worker may ever run (retired or unprefixed kinds), which it claims only to refuse
+/// them with a stored reason. Any other row stays <c>pending</c>, untouched, rather than being failed for
+/// lack of a handler (#514).
 /// </para>
 /// </remarks>
 public sealed class JobHandlerRegistry
@@ -81,7 +77,7 @@ public static class PeriodicSchedule
     /// <summary>How long a periodic enqueuer waits after a failed tick before trying again.</summary>
     public static readonly TimeSpan FailureCooldown = TimeSpan.FromSeconds(2);
 
-    /// <summary><c>_missed_due_run_count</c>: how many intervals elapsed after the next due time.</summary>
+    /// <summary>How many whole intervals elapsed after the next due time.</summary>
     public static int MissedDueRunCount(double nowSeconds, double nextRunSeconds, double intervalSeconds)
     {
         var interval = Math.Max(1.0, intervalSeconds);
@@ -93,7 +89,7 @@ public static class PeriodicSchedule
         return (int)Math.Floor((nowSeconds - nextRunSeconds) / interval);
     }
 
-    /// <summary><c>_next_scheduler_sleep_seconds</c>: until the nearest due scope, capped by the polling cadence.</summary>
+    /// <summary>How long the scheduler sleeps: until the nearest due scope, capped by the polling cadence.</summary>
     public static double NextSchedulerSleepSeconds(double nowSeconds, double nextRunMovie, double nextRunTv, double pollSeconds)
     {
         var nextDue = Math.Min(nextRunMovie, nextRunTv);
@@ -101,7 +97,7 @@ public static class PeriodicSchedule
         return Math.Max(0.25, Math.Min(pollSeconds, untilDue));
     }
 
-    /// <summary><c>_watched_folder_scan_interval_seconds</c>: a library's scan cadence, 10 s .. 7 days.</summary>
+    /// <summary>A library's scan cadence, 10 s .. 7 days (300 s when unset).</summary>
     public static double WatchedFolderScanIntervalSeconds(long? scanIntervalSeconds) =>
         Math.Max(10.0, Math.Min(scanIntervalSeconds ?? 300, 7 * 24 * 3600));
 }
