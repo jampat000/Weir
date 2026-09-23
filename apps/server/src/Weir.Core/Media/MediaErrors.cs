@@ -1,8 +1,7 @@
 namespace Weir.Core.Media;
 
 /// <summary>
-/// A failure the reference raises as <c>RuntimeError</c> from <c>processing_remux_mux.py</c>: ffprobe or
-/// ffmpeg failed, returned nothing usable, or the output did not validate.
+/// ffprobe or ffmpeg failed, returned nothing usable, or the output did not validate.
 /// </summary>
 public class MediaToolException : Exception
 {
@@ -22,7 +21,7 @@ public class MediaToolException : Exception
 }
 
 /// <summary>
-/// ffprobe ran and could not read the file's contents: the file itself is bad (<c>MediaUnreadableError</c>).
+/// ffprobe ran and could not read the file's contents: the file itself is bad.
 /// </summary>
 /// <remarks>
 /// Distinct from ffprobe being missing, timing out or being denied access, which say nothing about
@@ -45,7 +44,7 @@ public sealed class MediaUnreadableException : MediaToolException
     }
 }
 
-/// <summary>A staged or source media file cannot be trusted as complete (<c>MediaCompletenessError</c>).</summary>
+/// <summary>A staged or source media file cannot be trusted as complete.</summary>
 public sealed class MediaCompletenessException : MediaToolException
 {
     public MediaCompletenessException()
@@ -64,9 +63,9 @@ public sealed class MediaCompletenessException : MediaToolException
 }
 
 /// <summary>
-/// A tool ran past its time limit (<c>subprocess.TimeoutExpired</c>). Not a <see cref="MediaToolException"/>,
-/// because the reference's <c>TimeoutExpired</c> is not a <c>RuntimeError</c> either; the message is the
-/// one Python prints (<c>Command '[...]' timed out after 120 seconds</c>).
+/// A tool ran past its time limit. Not a <see cref="MediaToolException"/>, so a handler for tool failures does
+/// not also catch a timeout. The message has the form the golden files record
+/// (<c>Command '[...]' timed out after 120 seconds</c>).
 /// </summary>
 public sealed class MediaToolTimeoutException : TimeoutException
 {

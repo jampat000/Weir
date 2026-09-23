@@ -3,7 +3,7 @@ using Weir.Core.Json;
 
 namespace Weir.Core.Rules;
 
-/// <summary>The stored values the reference compares against, kept as strings so unknown stored values behave identically.</summary>
+/// <summary>The stored values the planner compares against, kept as strings so unknown stored values behave predictably.</summary>
 public static class RemuxRuleValues
 {
     public const string SubtitleModeRemoveAll = "remove_all";
@@ -11,8 +11,8 @@ public static class RemuxRuleValues
 
     /// <summary>
     /// Keep every subtitle track, whatever its language: the stored default and what Settings › Rules calls
-    /// "Keep all subtitles". The planner used to know only remove-all and keep-selected, so this fell into
-    /// keep-selected with an empty language list and removed every subtitle, forced and default included.
+    /// "Keep all subtitles". It must not be read as keep-selected with an empty language list, which would
+    /// remove every subtitle, forced and default included.
     /// </summary>
     public const string SubtitleModeKeepAll = "keep_all";
     public const string DefaultAudioSlotPrimary = "primary";
@@ -21,7 +21,7 @@ public static class RemuxRuleValues
     public const string PolicyPreferredLangsStrict = "preferred_langs_strict";
     public const string PolicyQualityAllLanguages = "quality_all_languages";
 
-    /// <summary>Issue #497: keep exactly one audio track overall (today's behaviour, and the default).</summary>
+    /// <summary>Issue #497: keep exactly one audio track overall (the default).</summary>
     public const string AudioKeepModeSingle = "single";
 
     /// <summary>Issue #497: keep the best track of each configured language slot that has one.</summary>
@@ -37,7 +37,7 @@ public static class RemuxRuleValues
 }
 
 /// <summary>
-/// The rules in force for one pass (<c>processing_remux_rules.ProcessingRulesConfig</c>).
+/// The rules in force for one pass.
 /// <see cref="SubtitleMode"/> and <see cref="AudioPreferenceMode"/> stay strings: a subtitle mode is one of
 /// <c>remove_all</c>, <c>keep_selected</c> or <c>keep_all</c> once <c>RuleSetConversion.NormalizeSubtitleMode</c>
 /// has read it, and the planner normalizes an unknown policy to the default.
@@ -65,8 +65,7 @@ public sealed record ProcessingRulesConfig
 
     /// <summary>
     /// Issue #537 item 3: normalized the same way a track's own language tag is (<see cref="RemuxRules.NormalizeLang"/>),
-    /// so "ENG" or "en-US" matches a file tagged "eng". Stored values were compared as-is before the fix.
-    /// Issue #496: a recognized variant identifier ("fre-CA", or "fr-CA" as a BCP 47 tag) is kept
+    /// so "ENG" or "en-US" matches a file tagged "eng". Issue #496: a recognized variant identifier ("fre-CA", or "fr-CA" as a BCP 47 tag) is kept
     /// instead of being reduced to its base language, so a list can single out a regional dub.
     /// </summary>
     public required IReadOnlyList<string> SubtitleLangs { get; init; }
@@ -79,8 +78,8 @@ public sealed record ProcessingRulesConfig
     public string AudioSortersJson { get; init; } = string.Empty;
 
     /// <summary>
-    /// The profile's "Subtitle order": how the kept subtitle tracks are ranked. Empty (no order saved) keeps today's order:
-    /// the file's own for keep-all, the languages-to-keep list for keep-selected. Until 3.2 this was saved and never read.
+    /// The profile's "Subtitle order": how the kept subtitle tracks are ranked. Empty (no order saved) keeps the default
+    /// order: the file's own for keep-all, the languages-to-keep list for keep-selected.
     /// </summary>
     public string SubtitleSortersJson { get; init; } = string.Empty;
 
@@ -91,17 +90,15 @@ public sealed record ProcessingRulesConfig
     public bool RemoveHearingImpairedSubs { get; init; }
 
     /// <summary>
-    /// Issue #497: <see cref="RemuxRuleValues.AudioKeepModeSingle"/> (default; today's behaviour —
-    /// every golden case is unchanged) or <see cref="RemuxRuleValues.AudioKeepModePerLanguage"/>,
-    /// which keeps the best track of each configured language slot (primary/secondary/tertiary)
-    /// that has one, instead of a single winner. New, so absent (the record default) means "single",
-    /// exactly like every golden fixture recorded before this field existed.
+    /// Issue #497: <see cref="RemuxRuleValues.AudioKeepModeSingle"/> (the default, which every golden file
+    /// assumes) or <see cref="RemuxRuleValues.AudioKeepModePerLanguage"/>, which keeps the best track of each
+    /// configured language slot (primary/secondary/tertiary) that has one, instead of a single winner.
     /// </summary>
     public string AudioKeepMode { get; init; } = RemuxRuleValues.AudioKeepModeSingle;
 
     /// <summary>
     /// Issue #497: caps how many subtitle tracks survive per language, keeping the best by
-    /// <see cref="SubtitleQualityStrategy"/>. 0 (the default) means unlimited — today's behaviour.
+    /// <see cref="SubtitleQualityStrategy"/>. 0 (the default) means unlimited.
     /// A forced track kept under <see cref="PreserveForcedSubs"/> does not count toward the cap.
     /// </summary>
     public int SubtitleMaxPerLanguage { get; init; }
@@ -126,11 +123,9 @@ public sealed record ProcessingRulesConfig
     public string OriginalLanguageNote { get; init; } = string.Empty;
 
     /// <summary>
-    /// Issue #537 item 4: how a caller feeds an original-language decision in cleanly, once the
-    /// remux pass can look one up (it needs the manager/TMDb metadata lookup from #520, not ported
-    /// yet — see apps/server/README.md). <see cref="PreferredAudioIndices"/> and
-    /// <see cref="OriginalLanguageNote"/> already flow straight into <see cref="RemuxRules.PlanRemux"/>
-    /// unchanged; this just saves a caller from copying both fields by hand.
+    /// Issue #537 item 4: feeds an original-language decision (from the metadata lookup, #520) in
+    /// cleanly. <see cref="PreferredAudioIndices"/> and <see cref="OriginalLanguageNote"/> flow straight
+    /// into <see cref="RemuxRules.PlanRemux"/> unchanged; this saves a caller copying both fields by hand.
     /// </summary>
     public ProcessingRulesConfig WithOriginalLanguage(OriginalLanguageOutcome outcome)
     {
@@ -145,7 +140,7 @@ public enum TrackKind
     Subtitle,
 }
 
-/// <summary>One kept track in a plan (<c>PlannedTrack</c>).</summary>
+/// <summary>One kept track in a plan.</summary>
 public sealed record PlannedTrack
 {
     public required int InputIndex { get; init; }
@@ -167,7 +162,7 @@ public sealed record PlannedTrack
     public string? Variant { get; init; }
 }
 
-/// <summary>What one pass writes (<c>RemuxPlan</c>).</summary>
+/// <summary>What one pass writes.</summary>
 public sealed record RemuxPlan
 {
     public required IReadOnlyList<int> VideoIndices { get; init; }
@@ -180,8 +175,8 @@ public sealed record RemuxPlan
     /// The same removals as <see cref="RemovedAudio"/>/<see cref="RemovedSubtitles"/>, structured for #509
     /// (a rule change surfacing titles that can only be fixed by re-downloading): one entry per removed
     /// track with its language, kind and codec, captured from the same source data those display strings
-    /// are built from rather than parsed back out of them. Additive — existing golden fixtures compare
-    /// only the fields <c>GoldenParityTests.WritePlanResult</c> names, which does not include this one.
+    /// are built from rather than parsed back out of them. The golden files compare only the fields
+    /// <c>GoldenParityTests.WritePlanResult</c> names, which does not include this one.
     /// </summary>
     public IReadOnlyList<RemovedTrackRecord> RemovedTrackRecords { get; init; } = [];
     public int DefaultAudioOutputIndex { get; init; }
@@ -195,11 +190,11 @@ public sealed record RemuxPlan
     public MetadataRules Metadata { get; init; } = new();
 }
 
-/// <summary>The streams of a probe by type, each ordered by index (<c>split_streams</c>).</summary>
+/// <summary>The streams of a probe by type, each ordered by index.</summary>
 public sealed record SplitProbeStreams(IReadOnlyList<ProbeStreamInfo> Video, IReadOnlyList<ProbeStreamInfo> Audio, IReadOnlyList<ProbeStreamInfo> Subtitles);
 
 /// <summary>
-/// Remux planning (<c>processing_remux_rules.py</c>): stream splitting, audio candidate ranking under
+/// Remux planning: stream splitting, audio candidate ranking under
 /// the three policies, subtitle retention, metadata stripping and whether a pass is needed.
 /// </summary>
 public static partial class RemuxRules
@@ -271,7 +266,7 @@ public static partial class RemuxRules
     [GeneratedRegex("^([a-z]{2,3})(?:-[a-z0-9]+)?$", RegexOptions.CultureInvariant)]
     private static partial Regex LanguageTagRegex();
 
-    /// <summary><c>normalize_lang</c>: the primary subtag of a language tag, lower-cased.</summary>
+    /// <summary>The primary subtag of a language tag, lower-cased.</summary>
     public static string NormalizeLang(string? tag)
     {
         if (string.IsNullOrEmpty(tag))
@@ -295,7 +290,7 @@ public static partial class RemuxRules
         foreach (var part in (raw ?? string.Empty).Replace("\n", ",", StringComparison.Ordinal).Split(','))
         {
             // Issue #496: preserves a recognized variant identifier instead of reducing it to its
-            // base language; identical to NormalizeLang for every plain code (no fixture regresses).
+            // base language; identical to NormalizeLang for every plain code.
             var lang = LanguageVariants.NormalizeLanguageOrVariant(part);
             if (lang.Length > 0 && !result.Contains(lang))
             {
@@ -306,7 +301,7 @@ public static partial class RemuxRules
         return result;
     }
 
-    /// <summary><c>parse_path_lines</c>: non-blank lines, stripped.</summary>
+    /// <summary>Non-blank lines, stripped.</summary>
     public static IReadOnlyList<string> ParsePathLines(string? raw)
     {
         var lines = new List<string>();
@@ -451,13 +446,12 @@ public static partial class RemuxRules
     /// <param name="subtitleProbe">The source's subtitle streams, for the subtitle comparisons and (#498) their current titles.</param>
     /// <param name="videoProbe">
     /// #498: the source's video streams, for <see cref="MetadataRules.ClearVideoTrackNames"/>'s current-title
-    /// check. Optional and defaulting to null so every pre-#498 caller (and the golden parity tests, which predate
-    /// this option) keeps compiling and behaving exactly as before; when null and the option is on, a video title
+    /// check. Optional, since the golden-file tests do not pass it; when null and the option is on, a video title
     /// is assumed present (the safer of the two guesses) rather than silently skipped.
     /// </param>
     /// <param name="chaptersPresent">
     /// #498: whether the source has any chapters, for <see cref="MetadataRules.RemoveChapters"/>. Defaults to
-    /// false, matching every caller from before this option existed.
+    /// false for callers that do not probe chapters.
     /// </param>
     public static bool IsRemuxRequired(
         RemuxPlan plan,
@@ -662,9 +656,9 @@ public static partial class RemuxRules
     {
         Index = c.InputIndex,
         Language = c.LangLabel,
-        // Issue #537 item 2: a "title" sorter now compares the stream's own title tag. The reference
-        // handed it the codec name instead, so "demote a title containing X" could never match a
-        // real track; kept only in golden/overrides for the cases that pinned the old behaviour.
+        // Issue #537 item 2: a "title" sorter compares the stream's own title tag, not the codec name, so
+        // "demote a title containing X" can match a real track. golden/overrides patches the golden files
+        // that recorded the codec name here.
         Title = c.Title,
         Commentary = c.Commentary,
         Default = c.Default,
@@ -1040,7 +1034,7 @@ public static partial class RemuxRules
     }
 
     /// <summary>
-    /// Issue #497: <c>subtitle_max_per_language</c> (0 = unlimited, today's behaviour). Groups the
+    /// Issue #497: <c>subtitle_max_per_language</c> (0 = unlimited). Groups the
     /// matched candidates by the configured language slot they matched (<see cref="SubtitleCandidate.Tier"/>,
     /// so a variant-specific slot and its base language are never conflated), keeps every forced
     /// track preserved under <see cref="ProcessingRulesConfig.PreserveForcedSubs"/> unconditionally
@@ -1139,9 +1133,9 @@ public static partial class RemuxRules
 
         foreach (var (s, streamIndex) in WithIndex(audio))
         {
-            // Issue #495: commentary now flows through TrackFlags (disposition first, then the
-            // name), which behaves exactly like the older title/comment-tag check for every track
-            // that has no disposition.comment flag set — the only source ffprobe fixtures use today.
+            // Issue #495: commentary comes from TrackFlags (disposition first, then the name). For a
+            // track with no disposition.comment flag, which covers every golden file, this matches a
+            // plain title/comment-tag check.
             var flags = TrackFlagsReader.Detect(s);
             if (config.RemoveCommentary && flags.Commentary.Value)
             {
@@ -1339,7 +1333,7 @@ public static partial class RemuxRules
                     continue;
                 }
 
-                // Issue #495: forced now also comes from the name (a signs track counts as forced),
+                // Issue #495: forced also comes from the name (a signs track counts as forced),
                 // and a hearing-impaired track can be dropped outright when the rule is enabled.
                 var flags = TrackFlagsReader.Detect(s);
                 if (config.RemoveHearingImpairedSubs && flags.HearingImpaired.Value)
@@ -1385,7 +1379,7 @@ public static partial class RemuxRules
             }
 
             // Issue #497: cap how many subtitles survive per configured language slot (0 =
-            // unlimited, today's behaviour). A forced track kept under preserve-forced is exempt.
+            // unlimited). A forced track kept under preserve-forced is exempt.
             keptSubtitles = ApplySubtitleCap(subtitleCandidates, config, notes, removedSubtitleLabels);
 
             // Keep-all leaves the file's own order; keep-selected orders by the configured language list.
@@ -1395,8 +1389,8 @@ public static partial class RemuxRules
                     .OrderBy(t => t.Variant is not null && rank.TryGetValue(t.Variant, out var vr) ? vr : rank.GetValueOrDefault(t.LangLabel, 99))
                     .ThenBy(t => t.InputIndex)];
 
-            // Subtitle order (James, 23 Sep 2026: make it work): the profile's saved ranking orders the kept subtitles. The
-            // order above is where a tie falls, because the key ends in the position a track already has.
+            // Subtitle order: the profile's saved ranking orders the kept subtitles, so the ranking a person saves is
+            // the one the output has. The order above breaks ties, because the key ends in the position a track already has.
             if (SubtitleOrder(config) is { Count: > 0 } subtitleSorters)
             {
                 var position = keptSubtitles.Select((t, i) => (t.InputIndex, i)).ToDictionary(p => p.InputIndex, p => p.i);
@@ -1424,7 +1418,7 @@ public static partial class RemuxRules
         };
     }
 
-    /// <summary>The saved subtitle order, or none: unlike audio, no saved order means "keep today's order", not a default one.</summary>
+    /// <summary>The saved subtitle order, or none: unlike audio, no saved order means "keep the order above", not a seeded default.</summary>
     private static IReadOnlyList<TrackSorter> SubtitleOrder(ProcessingRulesConfig config) =>
         PyStrings.Strip(config.SubtitleSortersJson).Length == 0 ? [] : TrackSorters.Parse(config.SubtitleSortersJson);
 
@@ -1465,7 +1459,7 @@ public static partial class RemuxRules
         return parts;
     }
 
-    /// <summary>Sane defaults for remux planning (<c>default_processing_remux_rules_config</c>).</summary>
+    /// <summary>Sane defaults for remux planning.</summary>
     public static ProcessingRulesConfig DefaultConfig() => new()
     {
         PrimaryAudioLang = "eng",

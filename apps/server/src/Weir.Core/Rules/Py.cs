@@ -7,23 +7,23 @@ using Weir.Core.Json;
 namespace Weir.Core.Rules;
 
 /// <summary>
-/// The Python built-ins the rules engine applies to ffprobe JSON: truthiness, <c>int()</c>,
-/// <c>float()</c>, <c>str()</c>, <c>repr()</c>, <c>str.strip()</c> and <c>json.dumps</c> string
-/// encoding. ffprobe values are untyped in the reference (a bit rate arrives as a string, a
-/// disposition flag may be a string), so matching its decisions means matching these exactly,
-/// including where they raise.
+/// The conversions the rules engine applies to ffprobe JSON: truthiness, integer and float
+/// parsing, text and repr forms, stripping and string encoding. ffprobe values are loosely typed (a
+/// bit rate arrives as a string, a disposition flag may be a string), so these are fixed exactly,
+/// including which inputs throw and with what error class and message, to keep plans and error
+/// texts identical to the golden files.
 /// </summary>
 internal static class Py
 {
-    /// <summary><c>str.lower()</c>.</summary>
+    /// <summary>Invariant lower-casing.</summary>
     public static string Lower(string value) => value.ToLowerInvariant();
 
-    /// <summary><c>str.upper()</c>.</summary>
+    /// <summary>Invariant upper-casing.</summary>
     public static string Upper(string value) => value.ToUpperInvariant();
 
     // --- JSON values -------------------------------------------------------------------
 
-    /// <summary><c>dict.get(name)</c> on a parsed JSON object: the last duplicate wins, as in <c>json.loads</c>.</summary>
+    /// <summary>The value under <paramref name="name"/> in a parsed JSON object, or null; the last duplicate key wins.</summary>
     public static JsonElement? Get(JsonElement obj, string name)
     {
         JsonElement? found = null;
@@ -38,11 +38,11 @@ internal static class Py
         return found;
     }
 
-    /// <summary><c>dict[name]</c>: <c>KeyError</c> when absent.</summary>
+    /// <summary>The value under <paramref name="name"/>; throws a <c>KeyError</c> when absent.</summary>
     public static JsonElement Item(JsonElement obj, string name) =>
         Get(obj, name) ?? throw new RulesInputException("KeyError", $"'{name}'");
 
-    /// <summary><c>dict.items()</c>, with duplicate keys collapsed to the first position and last value.</summary>
+    /// <summary>The object's entries, with duplicate keys collapsed to the first position and last value.</summary>
     public static List<KeyValuePair<string, JsonElement>> Items(JsonElement obj)
     {
         var order = new List<string>();
@@ -68,10 +68,10 @@ internal static class Py
 
     public static bool IsStr(JsonElement? value) => value is { ValueKind: JsonValueKind.String };
 
-    /// <summary><c>json.loads</c> reads a number with a fraction or exponent as <c>float</c>, otherwise <c>int</c>.</summary>
+    /// <summary>A number with a fraction or exponent is a float; otherwise it is an integer.</summary>
     private static bool IsFloatNumber(JsonElement value) => value.GetRawText().AsSpan().IndexOfAny('.', 'e', 'E') >= 0;
 
-    /// <summary><c>bool(value)</c>.</summary>
+    /// <summary>False for absent, null, false, zero, and an empty string, array or object; true otherwise.</summary>
     public static bool Truthy(JsonElement? value)
     {
         if (value is not { } v)
@@ -91,12 +91,12 @@ internal static class Py
         };
     }
 
-    /// <summary><c>value or fallback</c> for a string fallback, then <c>str()</c>.</summary>
+    /// <summary>A truthy value as <see cref="Str"/> text, otherwise <paramref name="fallback"/>.</summary>
     public static string StrOr(JsonElement? value, string fallback) => Truthy(value) ? Str(value) : fallback;
 
     /// <summary>
-    /// <c>(value or "")</c> followed by a string method: a truthy value that is not a string has no
-    /// <c>strip</c>, so Python raises <c>AttributeError</c>.
+    /// The text to strip or lower-case: empty for a falsy value; a truthy value that is not a string
+    /// throws an <c>AttributeError</c>.
     /// </summary>
     public static string StrMethodTarget(JsonElement? value)
     {
@@ -113,7 +113,10 @@ internal static class Py
         return value!.Value.GetString()!;
     }
 
-    /// <summary><c>int(value)</c>, raising what Python raises.</summary>
+    /// <summary>
+    /// The value as an integer: booleans are 1/0, floats truncate, strings parse as base-10 integers.
+    /// Anything else throws a <c>TypeError</c>, <c>ValueError</c> or <c>OverflowError</c>.
+    /// </summary>
     public static long Int(JsonElement? value)
     {
         if (value is not { } v || v.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
@@ -138,7 +141,7 @@ internal static class Py
         }
     }
 
-    /// <summary><c>int(value)</c> inside <c>try: … except (TypeError, ValueError)</c>.</summary>
+    /// <summary><see cref="Int"/>, returning false for a <c>TypeError</c> or <c>ValueError</c>; an overflow still throws.</summary>
     public static bool TryInt(JsonElement? value, out long result)
     {
         try
@@ -153,7 +156,7 @@ internal static class Py
         }
     }
 
-    /// <summary><c>int(text)</c> for a Python <c>str</c>.</summary>
+    /// <summary>Text as a base-10 integer, surrounding whitespace ignored; throws a <c>ValueError</c> otherwise.</summary>
     public static long IntFromText(string text)
     {
         if (!PythonCompat.TryParseInt(PyStrings.Strip(text), out var parsed))
@@ -164,7 +167,7 @@ internal static class Py
         return parsed;
     }
 
-    /// <summary><c>int(text)</c> for a Python <c>str</c>, or null where it raises <c>ValueError</c>.</summary>
+    /// <summary><see cref="IntFromText"/>, or null where that throws.</summary>
     public static long? TryIntFromText(string text) => PythonCompat.TryParseInt(PyStrings.Strip(text), out var parsed) ? parsed : null;
 
     private static long FloatToInt(double value)
@@ -187,13 +190,13 @@ internal static class Py
             ? (long)value
             : throw new RulesInputException("OverflowError", "integer is outside the range the .NET engine supports");
 
-    /// <summary>Narrows a Python int to the <see cref="int"/> the plan records use.</summary>
+    /// <summary>Narrows a parsed integer to the <see cref="int"/> the plan records use.</summary>
     public static int ToInt32(long value) =>
         value is >= int.MinValue and <= int.MaxValue
             ? (int)value
             : throw new RulesInputException("OverflowError", "integer is outside the range the .NET engine supports");
 
-    /// <summary><c>float(text)</c> for a Python <c>str</c>, or null where it raises <c>ValueError</c>.</summary>
+    /// <summary>Text as a float (including <c>inf</c>, <c>infinity</c> and <c>nan</c>, any case, optional sign), or null when unreadable.</summary>
     public static double? TryFloatFromText(string text)
     {
         var s = Lower(PyStrings.Strip(text));
@@ -223,7 +226,7 @@ internal static class Py
         return sign * double.Parse(body.Replace("_", string.Empty, StringComparison.Ordinal), NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent, CultureInfo.InvariantCulture);
     }
 
-    /// <summary>Python's float literal grammar: digits with single underscores between them, a point, an exponent.</summary>
+    /// <summary>The accepted float literal grammar: digits with single underscores between them, a point, an exponent.</summary>
     private static bool IsFloatLiteral(string body)
     {
         var i = 0;
@@ -291,7 +294,7 @@ internal static class Py
         return count;
     }
 
-    /// <summary><c>str(value)</c>.</summary>
+    /// <summary>A string as itself; anything else as <see cref="Repr(JsonElement)"/>; absent as <c>None</c>.</summary>
     public static string Str(JsonElement? value)
     {
         if (value is not { } v)
@@ -302,7 +305,7 @@ internal static class Py
         return v.ValueKind == JsonValueKind.String ? v.GetString()! : Repr(v);
     }
 
-    /// <summary><c>repr(value)</c>.</summary>
+    /// <summary>The repr form the golden files and error messages carry: <c>None</c>, <c>True</c>, quoted strings, <c>[...]</c>, <c>{...}</c>.</summary>
     public static string Repr(JsonElement value) => value.ValueKind switch
     {
         JsonValueKind.Null or JsonValueKind.Undefined => "None",
@@ -316,7 +319,7 @@ internal static class Py
         _ => string.Empty,
     };
 
-    /// <summary><c>repr(text)</c> for a <c>str</c>.</summary>
+    /// <summary>The quoted repr form of a string.</summary>
     public static string Repr(string text) => PyStrings.Repr(text);
 
     private static string TypeName(JsonElement? value) => value?.ValueKind switch

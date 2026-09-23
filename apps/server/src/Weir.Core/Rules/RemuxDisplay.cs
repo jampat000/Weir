@@ -3,12 +3,11 @@ using Weir.Core.Json;
 namespace Weir.Core.Rules;
 
 /// <summary>
-/// Human-readable language labels and audio/subtitle lines for the overview and activity
-/// (<c>processing_remux_lang_display.py</c>, <c>processing_remux_track_display.py</c>).
+/// Human-readable language labels and audio/subtitle lines for the overview and activity.
 /// </summary>
 public static class RemuxDisplay
 {
-    /// <summary>ISO 639 code to English label, in the reference's order.</summary>
+    /// <summary>ISO 639 code to English label, in display order.</summary>
     public static IReadOnlyList<KeyValuePair<string, string>> StreamLanguageOptions { get; } =
     [
         new("eng", "English"),
@@ -58,14 +57,14 @@ public static class RemuxDisplay
         return null;
     }
 
-    /// <summary><c>processing_lang_display</c>: a label, the upper-cased code, or an em dash.</summary>
+    /// <summary>A label, the upper-cased code, or an em dash.</summary>
     public static string LangDisplay(string? code)
     {
         var c = RemuxRules.NormalizeLang(code ?? string.Empty);
         return c.Length == 0 ? Dash : Label(c) ?? Py.Upper(c);
     }
 
-    /// <summary><c>processing_lang_display_or_blank</c>: as <see cref="LangDisplay"/>, but empty for no code.</summary>
+    /// <summary>As <see cref="LangDisplay"/>, but empty for no code.</summary>
     public static string LangDisplayOrBlank(string? code)
     {
         var c = RemuxRules.NormalizeLang(code ?? string.Empty);

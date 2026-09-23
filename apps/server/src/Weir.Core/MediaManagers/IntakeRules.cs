@@ -8,16 +8,16 @@ namespace Weir.Core.MediaManagers;
 /// <summary>The library columns intake reads.</summary>
 public sealed record IntakeLibrary(long Id, string MediaType, string WatchedFolder);
 
-/// <summary>The rules of <c>intake_api</c> that do not touch the database or filesystem.</summary>
+/// <summary>The intake rules that do not touch the database or filesystem.</summary>
 public static partial class IntakeRules
 {
-    /// <summary><c>PROCESSING_FILE_REMUX_PASS_JOB_KIND</c>.</summary>
+    /// <summary>The job kind for a remux pass.</summary>
     public const string RemuxPassJobKind = "processing.file.remux_pass.v1";
 
-    /// <summary><c>PROCESSING_FILE_PASS_THROUGH_JOB_KIND</c>.</summary>
+    /// <summary>The job kind for a pass-through.</summary>
     public const string PassThroughJobKind = "processing.file.pass_through.v1";
 
-    /// <summary><c>PROCESSING_FILE_REJECT_JOB_KIND</c>.</summary>
+    /// <summary>The job kind for a rejection.</summary>
     public const string RejectJobKind = "processing.file.reject.v1";
 
     public const string MissingSecretDetail = "Invalid or missing X-Webhook-Secret header.";
@@ -25,12 +25,12 @@ public static partial class IntakeRules
     public const string NeverReceivedDetail = "Weir has never received this hand-off.";
 
     /// <summary>
-    /// <c>HANDOFF_CAPABILITIES</c>, plus <c>handoff-outcome</c> (#652, agreed with Deluno on 23 Sep 2026): a manager may tell
-    /// Weir what became of a file Weir handed back, at <c>POST /api/v1/intake/handoffs/{source}/{id}/outcome</c>.
+    /// The hand-off capabilities Weir advertises. <c>handoff-outcome</c> (#652, agreed with Deluno) means a manager may
+    /// tell Weir what became of a file Weir handed back, at <c>POST /api/v1/intake/handoffs/{source}/{id}/outcome</c>.
     /// </summary>
     public static readonly IReadOnlyList<string> HandoffCapabilities = ["handoff-status", "handoff-cancel", HandbackRules.OutcomeCapability];
 
-    /// <summary><c>remux_dedupe_key</c>: the remux job's key for a hand-off, exactly as intake writes it.</summary>
+    /// <summary>The remux job's key for a hand-off, exactly as intake writes it.</summary>
     public static string RemuxDedupeKey(string sourceKey, string handoffId) => $"{RemuxPassJobKind}:{sourceKey}:handoff:{handoffId}";
 
     /// <summary>The base key: the manager's hand-off id when it gave one, otherwise a fresh one.</summary>
@@ -77,11 +77,11 @@ public static partial class IntakeRules
         return payload;
     }
 
-    /// <summary>The payload as Python's <c>json.dumps(payload, separators=(",", ":"))</c> writes it.</summary>
+    /// <summary>The payload as compact JSON (no spaces after separators), the form existing job rows hold.</summary>
     public static string PayloadJson(PyDict payload) => PyJsonWriter.Dumps(payload, PyJsonFormat.Compact);
 
     /// <summary>
-    /// <c>_library_for_handoff</c>'s choice among libraries whose watched folder holds the file: a library of the
+    /// The choice among libraries whose watched folder holds the file: a library of the
     /// hand-off's media type first, then the deepest folder, then the lowest id. Null when none holds it.
     /// </summary>
     public static (IntakeLibrary Library, HandoffPathResult Resolved)? ChooseLibrary(IEnumerable<IntakeLibrary> libraries, MediaManagerImportEvent importEvent)
@@ -109,16 +109,16 @@ public static partial class IntakeRules
         return best is { } chosen ? (chosen.Library, chosen.Resolved) : null;
     }
 
-    /// <summary><c>_SAMPLE_PART</c>: a path part that is, or contains the word, "sample".</summary>
+    /// <summary>A path part that is, or contains the word, "sample".</summary>
     [GeneratedRegex("(^|[^a-z0-9])sample([^a-z0-9]|$)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     public static partial Regex SamplePart();
 
-    /// <summary><c>is_processing_media_candidate</c> on a name: the pathlib suffix, lower-cased, in the allowlist.</summary>
+    /// <summary>Whether a file name is one Weir processes: its suffix, lower-cased, is in the allowlist.</summary>
     public static bool IsMediaCandidateName(string fileName) =>
         RemuxRules.MediaExtensions.Contains(MediaPathNames.Suffix(fileName, windows: false).ToLowerInvariant());
 
     /// <summary>
-    /// Which of a folder's videos a hand-off means (relative parts under the folder, in pathlib order): the ones with
+    /// Which of a folder's videos a hand-off means (relative parts under the folder, in <see cref="ComparePathParts"/> order): the ones with
     /// no sample part, or every video when all of them are samples.
     /// </summary>
     public static List<IReadOnlyList<string>> ChooseFolderVideos(IEnumerable<IReadOnlyList<string>> videoParts, bool windows)
@@ -130,7 +130,7 @@ public static partial class IntakeRules
         return main.Count > 0 ? main : videos;
     }
 
-    /// <summary>pathlib's ordering: part by part, case-folded on Windows.</summary>
+    /// <summary>Path ordering: part by part, ordinal, case-folded on Windows; a shorter prefix sorts first.</summary>
     public static int ComparePathParts(IReadOnlyList<string> left, IReadOnlyList<string> right, bool windows)
     {
         ArgumentNullException.ThrowIfNull(left);

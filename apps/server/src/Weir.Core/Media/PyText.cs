@@ -7,31 +7,31 @@ using Weir.Core.Rules;
 namespace Weir.Core.Media;
 
 /// <summary>
-/// The Python text behaviour the ffmpeg layer depends on: <c>format(x, ".1f")</c>, <c>str.splitlines()</c>,
-/// <c>bytes.decode("utf-8", "replace")</c>, subprocess newline translation, code-point slicing and the
-/// messages <c>subprocess.TimeoutExpired</c> prints.
+/// The text handling the ffmpeg layer depends on, fixed so log payloads, messages and parsed lines match the
+/// golden files: fixed-point formatting, line splitting on every Unicode line boundary, lenient UTF-8 decoding,
+/// newline translation, code-point clipping and the timeout message.
 /// </summary>
 internal static class PyText
 {
     private static readonly UTF8Encoding Utf8Replace = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
 
-    /// <summary><c>t[:max_chars] + "…(truncated)"</c> when longer than <paramref name="maxChars"/>.</summary>
+    /// <summary>The first <paramref name="maxChars"/> code points plus <c>…(truncated)</c> when longer.</summary>
     public static string Clip(string text, int maxChars) =>
         PyStrings.Length(text) > maxChars ? PyStrings.Slice(text, maxChars) + "…(truncated)" : text;
 
-    /// <summary><c>bytes.decode("utf-8", errors="replace")</c>.</summary>
+    /// <summary>UTF-8 with invalid bytes replaced by U+FFFD.</summary>
     public static string DecodeUtf8(ReadOnlySpan<byte> bytes)
     {
         var text = Utf8Replace.GetString(bytes);
-        // Python drops a leading BOM only for the utf-8-sig codec; "utf-8" keeps it, and so does GetString.
+        // A leading BOM is kept as U+FEFF, not dropped.
         return text;
     }
 
-    /// <summary>What <c>subprocess.run(..., text=True)</c> hands back: decoded, then <c>\r\n</c> and <c>\r</c> become <c>\n</c>.</summary>
+    /// <summary>Decoded output with <c>\r\n</c> and <c>\r</c> turned into <c>\n</c>.</summary>
     public static string TranslateNewlines(string text) =>
         text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
 
-    /// <summary><c>str.splitlines()</c>, without keeping the line ends.</summary>
+    /// <summary>Splits on every line boundary (including U+001C..U+001E, U+0085, U+2028, U+2029), without keeping the line ends.</summary>
     public static List<string> SplitLines(string text)
     {
         var lines = new List<string>();
@@ -67,7 +67,7 @@ internal static class PyText
     private static bool IsLineBoundary(char c) =>
         c is '\n' or '\r' or '\v' or '\f' or (char)0x1c or (char)0x1d or (char)0x1e or (char)0x85 or LineSeparator or ParagraphSeparator;
 
-    /// <summary><c>format(value, ".{decimals}f")</c>: exact decimal expansion, ties to even.</summary>
+    /// <summary>Fixed-point text with <paramref name="decimals"/> places: exact decimal expansion, ties to even.</summary>
     public static string FormatFixed(double value, int decimals)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(decimals);
@@ -127,14 +127,14 @@ internal static class PyText
         return (negative ? "-" : string.Empty) + digits;
     }
 
-    /// <summary><c>str(subprocess.TimeoutExpired(cmd=argv, timeout=...))</c>.</summary>
+    /// <summary>The timeout message, in the form the golden files and existing logs carry.</summary>
     public static string TimeoutExpiredMessage(IEnumerable<string> argv, string timeoutText) =>
         $"Command '{ListRepr(argv)}' timed out after {timeoutText} seconds";
 
-    /// <summary><c>str(list_of_str)</c>.</summary>
+    /// <summary>A bracketed, comma-separated list of quoted strings, e.g. <c>['ffprobe', '-v']</c>.</summary>
     public static string ListRepr(IEnumerable<string> items) => "[" + string.Join(", ", items.Select(Py.Repr)) + "]";
 
-    /// <summary><c>str(int)</c> or <c>str(float)</c> for a timeout as the reference passes it.</summary>
+    /// <summary>A timeout as text: a whole number, or with a decimal point (<c>10.0</c>) when <paramref name="isFloat"/>.</summary>
     public static string NumberText(double value, bool isFloat) =>
         isFloat ? PyConvert.FloatRepr(value) : ((long)value).ToString(CultureInfo.InvariantCulture);
 }

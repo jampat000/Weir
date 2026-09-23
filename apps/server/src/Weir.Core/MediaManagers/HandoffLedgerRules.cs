@@ -3,7 +3,7 @@ using Weir.Core.Time;
 
 namespace Weir.Core.MediaManagers;
 
-/// <summary>What Weir tells a manager about one hand-off (<c>HandoffStatus</c>).</summary>
+/// <summary>What Weir tells a manager about one hand-off.</summary>
 public sealed record HandoffStatus(
     string HandoffId,
     string State,
@@ -13,7 +13,7 @@ public sealed record HandoffStatus(
     string? OutputPath = null,
     string? Message = null)
 {
-    /// <summary><c>as_json</c>: timestamps in UTC with a <c>Z</c>.</summary>
+    /// <summary>The status as JSON, timestamps in UTC with a <c>Z</c>.</summary>
     public PyDict AsJson() => new PyDict()
         .Set("handoffId", HandoffId)
         .Set("state", State)
@@ -27,7 +27,7 @@ public sealed record HandoffStatus(
         value is { } stamp ? PyDateTime.FromDateTimeOffset(stamp.ToUniversalTime()).IsoFormat().Replace("+00:00", "Z", StringComparison.Ordinal) : null;
 }
 
-/// <summary>The hand-off vocabulary agreed with Deluno and how a file's state maps onto it (port of <c>handoff_ledger</c>).</summary>
+/// <summary>The hand-off vocabulary agreed with Deluno and how a file's state maps onto it.</summary>
 public static class HandoffLedgerRules
 {
     public const string Queued = "queued";
@@ -39,13 +39,13 @@ public static class HandoffLedgerRules
     public const string Rejected = "rejected";
     public const string Cancelled = "cancelled";
 
-    /// <summary><c>TERMINAL_STATES</c>.</summary>
+    /// <summary>States a hand-off does not leave.</summary>
     public static readonly IReadOnlySet<string> TerminalStates = new SortedSet<string>(StringComparer.Ordinal)
     {
         Completed, PassedThrough, Failed, Rejected, Cancelled,
     };
 
-    /// <summary><c>LEDGER_RETENTION_DAYS</c>.</summary>
+    /// <summary>How long a hand-off's ledger entry is kept.</summary>
     public const int RetentionDays = 90;
 
     public const string CancelledMessage = "The media manager cancelled this hand-off before Weir started on it.";
@@ -53,17 +53,16 @@ public static class HandoffLedgerRules
     /// <summary>What the manager hears when a person cancelled the hand-off's queued pass in Weir (#643).</summary>
     public const string CancelledInWeirMessage = "Someone cancelled this hand-off in Weir before Weir started on it.";
 
-    /// <summary>After this many consecutive failures a file is held for a person (<c>PROCESSING_QUARANTINE_AFTER_FAILURES</c>).</summary>
+    /// <summary>After this many consecutive failures a file is held for a person.</summary>
     public const int QuarantineAfterFailures = 3;
 
     /// <summary>
-    /// <c>_file_state</c>: one file's state in the manager's words, and when it would next run if known.
+    /// One file's state in the manager's words, and when it would next run if known.
     /// </summary>
     /// <remarks>
-    /// Deliberate fix (#531): a failed file with a retry still owed reads <c>scheduled</c> until that retry is
-    /// queued, including between the backoff ending and the next watched-folder scan. Python reported
-    /// <c>failed</c> in that window, which a manager takes as final. A retry is owed exactly when the failure
-    /// recorded a <c>next_retry_at</c>; <c>failed</c> means no retry remains.
+    /// A failed file with a retry still owed reads <c>scheduled</c> until that retry is queued, including between
+    /// the backoff ending and the next watched-folder scan (#531), because a manager takes <c>failed</c> as final.
+    /// A retry is owed exactly when the failure recorded a <c>next_retry_at</c>; <c>failed</c> means no retry remains.
     /// </remarks>
     public static (string State, DateTimeOffset? When) FileState(string status, DateTimeOffset? nextRetryAt, long failureAttempts)
     {
@@ -82,7 +81,7 @@ public static class HandoffLedgerRules
         };
     }
 
-    /// <summary><c>_combine</c>: a hand-off covering several files is as far along as its least finished file.</summary>
+    /// <summary>A hand-off covering several files is as far along as its least finished file.</summary>
     public static string Combine(IReadOnlyCollection<string> states)
     {
         ArgumentNullException.ThrowIfNull(states);

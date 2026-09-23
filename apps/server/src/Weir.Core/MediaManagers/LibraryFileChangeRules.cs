@@ -32,8 +32,8 @@ public interface ILibraryFileChangeNotifier
 public static class LibraryFileChangeRules
 {
     /// <summary>
-    /// Activity <c>event_type</c>s for this area. Kept here rather than in <see cref="Weir.Core.Activity.ActivityEventTypes"/>,
-    /// which was pinned to the retired Python backend's constants when this was written; they can move there now.
+    /// Activity <c>event_type</c>s for this area. They could move to <see cref="Weir.Core.Activity.ActivityEventTypes"/>
+    /// with the others.
     /// </summary>
     public const string NotifiedEventType = "library.file_change_notified";
 

@@ -10,7 +10,7 @@ public sealed record HandoffPathResult(string? RelativeMediaPath, string? Proble
 
 /// <summary>
 /// A manager's absolute file path made relative to a watched folder, textually and without touching
-/// the filesystem (port of <c>weir.platform.media_managers.handoff_paths</c>).
+/// the filesystem, since the manager's host may not be this one.
 /// </summary>
 public static class HandoffPaths
 {
@@ -48,7 +48,7 @@ public static class HandoffPaths
         return new HandoffPathResult(relative, null);
     }
 
-    /// <summary><c>PurePath(*parts).as_posix()</c> for parts that hold no separators: empty and <c>.</c> parts drop out.</summary>
+    /// <summary>Joins separator-free parts with <c>/</c>; <c>.</c> parts drop out.</summary>
     private static string PosixJoin(IEnumerable<string> parts) => string.Join('/', parts.Where(p => p != "."));
 
     private static string Comparable(string part) =>

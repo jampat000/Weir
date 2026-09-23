@@ -3,15 +3,15 @@ using Weir.Core.Json;
 namespace Weir.Core.Media;
 
 /// <summary>
-/// Where <c>resolve_ffprobe_ffmpeg</c> looks for ffprobe and ffmpeg, and <c>shutil.which</c>'s PATH search,
-/// as pure functions of the environment. The filesystem checks are passed in.
+/// Where Weir looks for ffprobe and ffmpeg, and the PATH search, as pure functions of the environment.
+/// The filesystem checks are passed in.
 /// </summary>
 public static class MediaToolLocations
 {
-    /// <summary><c>shutil._WIN_DEFAULT_PATHEXT</c>.</summary>
+    /// <summary>The PATHEXT used on Windows when the variable is unset or empty.</summary>
     public const string WindowsDefaultPathExt = ".COM;.EXE;.BAT;.CMD;.VBS;.JS;.WS;.MSC";
 
-    /// <summary>Python's <c>os.confstr("CS_PATH")</c> on glibc, used when PATH is unset.</summary>
+    /// <summary>glibc's default search path (<c>CS_PATH</c>), used when PATH is unset.</summary>
     public const string PosixDefaultPath = "/bin:/usr/bin";
 
     public const string FfmpegDirEnvironmentVariable = "WEIR_FFMPEG_DIR";
@@ -70,14 +70,14 @@ public static class MediaToolLocations
     }
 
     /// <summary>
-    /// The directories checked in order, as pathlib would print them: <c>WEIR_FFMPEG_DIR</c> (expanded, not
-    /// resolved), <c>&lt;home&gt;/bin/ffmpeg</c>, then, for a packaged app, <c>&lt;app&gt;/bin/ffmpeg</c> and
-    /// <c>&lt;app&gt;/_internal/bin/ffmpeg</c>.
+    /// The directories checked in order, lexically normalized (see <see cref="Normalize"/>): <c>WEIR_FFMPEG_DIR</c>
+    /// (expanded, not resolved), <c>&lt;home&gt;/bin/ffmpeg</c>, then, for a packaged app, <c>&lt;app&gt;/bin/ffmpeg</c>
+    /// and <c>&lt;app&gt;/_internal/bin/ffmpeg</c>.
     /// </summary>
-    /// <param name="resolvedWeirHome">The Weir home, already made absolute (<c>expanduser().resolve()</c>).</param>
+    /// <param name="resolvedWeirHome">The Weir home, already made absolute.</param>
     /// <param name="ffmpegDirEnvironment">The raw <c>WEIR_FFMPEG_DIR</c> value, or null.</param>
     /// <param name="userHome">What <c>~</c> expands to.</param>
-    /// <param name="packagedAppDirectory">The packaged executable's directory; null when not running packaged (<c>sys.frozen</c>).</param>
+    /// <param name="packagedAppDirectory">The packaged executable's directory; null when not running packaged.</param>
     /// <param name="windows">Windows path rules.</param>
     public static IReadOnlyList<string> CandidateDirectories(
         string resolvedWeirHome,
@@ -105,7 +105,7 @@ public static class MediaToolLocations
         return candidates;
     }
 
-    /// <summary><c>Path(a) / b / c</c> as <c>str()</c> prints it.</summary>
+    /// <summary>Joins the parts with the platform separator, then normalizes (see <see cref="Normalize"/>).</summary>
     public static string Join(bool windows, string first, params string[] rest)
     {
         ArgumentNullException.ThrowIfNull(first);
@@ -121,8 +121,8 @@ public static class MediaToolLocations
     }
 
     /// <summary>
-    /// pathlib's lexical normalisation: separators unified, repeated separators and <c>.</c> segments
-    /// dropped, no trailing separator. <c>..</c> is kept, as pathlib keeps it.
+    /// Lexical normalization: separators unified, repeated separators and <c>.</c> segments dropped, no
+    /// trailing separator. <c>..</c> is kept, since collapsing it without the filesystem can change the target.
     /// </summary>
     public static string Normalize(string path, bool windows)
     {
@@ -180,7 +180,7 @@ public static class MediaToolLocations
         return result.Length == 0 ? "." : result;
     }
 
-    /// <summary><c>os.path.expanduser</c> for <c>~</c> and <c>~/...</c>; other forms are left alone.</summary>
+    /// <summary>Expands <c>~</c> and <c>~/...</c> to the user's home; other forms are left alone.</summary>
     public static string ExpandUser(string path, string userHome, bool windows)
     {
         ArgumentNullException.ThrowIfNull(path);
@@ -200,8 +200,8 @@ public static class MediaToolLocations
     }
 
     /// <summary>
-    /// <c>shutil.which(cmd)</c> as Python 3.11 runs it for a bare command name: on Windows the current
-    /// directory first and each PATHEXT extension; directories deduplicated case-insensitively on Windows.
+    /// The PATH search for a bare command name: on Windows the current directory first and each PATHEXT
+    /// extension; directories deduplicated case-insensitively on Windows.
     /// </summary>
     /// <param name="command">A bare command name such as <c>ffprobe</c>.</param>
     /// <param name="pathEnvironment">PATH, or null when unset.</param>
@@ -256,7 +256,7 @@ public static class MediaToolLocations
         return null;
     }
 
-    /// <summary><c>os.path.join(directory, file)</c> for a relative file name.</summary>
+    /// <summary>Joins a directory and a relative file name, adding a separator only when one is missing.</summary>
     private static string OsPathJoin(string directory, string file, bool windows)
     {
         if (directory.Length == 0)
