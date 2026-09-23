@@ -14,7 +14,7 @@ import {
   useTestMediaManagerConnection,
   useUpdateMediaManagerConnection,
 } from "../../lib/media-managers/queries";
-import { ConfirmRemovalDialog } from "../../components/ui/confirm-removal-dialog";
+import { ConfirmDialog } from "../../components/ui/confirm-dialog";
 import { Field } from "../../components/shared/field";
 import {
   mmActionButtonClass,
@@ -297,7 +297,7 @@ function ConnectionCard({
         </div>
 
         {confirmingRemoval ? (
-          <ConfirmRemovalDialog
+          <ConfirmDialog
             testId="media-manager-remove-confirm"
             title={`Remove ${connection.name}?`}
             description={

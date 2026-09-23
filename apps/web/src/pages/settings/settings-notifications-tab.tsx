@@ -7,7 +7,7 @@ import {
   useTestNotificationChannelMutation,
   useUpdateNotificationChannelMutation,
 } from "../../lib/settings/queries";
-import { ConfirmRemovalDialog } from "../../components/ui/confirm-removal-dialog";
+import { ConfirmDialog } from "../../components/ui/confirm-dialog";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { QuietFieldGroup } from "../../components/shared/quiet-section";
 import { Field } from "../../components/shared/field";
@@ -550,7 +550,7 @@ export function SettingsNotificationsTab() {
       </SettingsQuietSection>
 
       {pendingDelete ? (
-        <ConfirmRemovalDialog
+        <ConfirmDialog
           testId="notification-channel-remove-confirm"
           title={`Remove ${pendingDelete.label}?`}
           description={

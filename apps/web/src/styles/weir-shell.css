@@ -320,6 +320,17 @@ body.mm-body {
   color: var(--mm-status-failed-text) !important;
 }
 
+/* The default tone: a quiet well, no colour of its own. */
+.mm-activity-chip--info {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--mm-text2);
+}
+
+html[data-mm-theme="light"] .mm-activity-chip--info,
+html[data-mm-theme="light"] .mm-activity-item__structured {
+  background: var(--mm-well-bg);
+}
+
 .mm-activity-chip--success {
   border-color: color-mix(
     in srgb,
@@ -428,11 +439,14 @@ body.mm-body {
 }
 
 .mm-activity-item__title {
+  min-width: 0;
   margin: 0;
   color: var(--mm-text1);
   font-size: 0.9375rem;
   font-weight: 600;
   line-height: 1.35;
+  /* A long release name breaks anywhere rather than pushing the time off the row. */
+  overflow-wrap: anywhere;
 }
 
 .mm-activity-item__count {
@@ -524,6 +538,24 @@ body.mm-body {
   margin-top: 0.5rem;
 }
 
+.mm-activity-item__more-text,
+.mm-activity-item__structured-text {
+  color: var(--mm-text2);
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+}
+
+.mm-activity-item__more-text {
+  white-space: pre-wrap;
+}
+
+.mm-activity-item__structured {
+  padding: 0.75rem;
+  border: 1px solid var(--mm-border);
+  border-radius: 0.375rem;
+  background: rgba(0, 0, 0, 0.1);
+}
+
 .mm-activity-item__time {
   padding-top: 0.1rem;
   color: var(--mm-text3);
@@ -588,6 +620,11 @@ body.mm-body {
   content: "−";
 }
 
+.mm-activity-cluster__text {
+  flex: 1;
+  min-width: 0;
+}
+
 .mm-activity-cluster__summary strong {
   display: block;
   color: var(--mm-text1);
@@ -627,6 +664,16 @@ body.mm-body {
 
 .mm-activity-filters__search {
   grid-column: span 2;
+}
+
+.mm-activity-filters__field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: var(--mm-text2);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
 }
 
 .mm-activity-filters__toggle {
@@ -1443,6 +1490,13 @@ html[data-mm-theme="light"] .mm-theme-toggle {
 .mm-activity-remux-detail {
   margin-top: 0.5rem;
   max-width: 100%;
+}
+
+/* A progress detail that is not JSON, shown as the text it is. */
+.mm-activity-processing__raw {
+  color: var(--mm-text2);
+  font-size: 0.875rem;
+  line-height: 1.5rem;
 }
 
 .mm-activity-processing {

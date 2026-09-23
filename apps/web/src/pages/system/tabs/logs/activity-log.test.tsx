@@ -16,63 +16,49 @@ import {
   it,
   vi,
 } from "vitest";
-import type { ActivityEventItem } from "../../lib/api/types";
-import { ActivityPage } from "./activity-page";
+import type { ActivityEventItem } from "../../../../lib/api/types";
+import { ActivityLog } from "./activity-log";
 
 const mocks = vi.hoisted(() => ({
   useActivityRecentQuery: vi.fn(),
   role: { current: "operator" as string },
   fetchActivityExport: vi.fn(),
-  fetchActivityFileHistoryPreview: vi.fn(),
-  removeActivityFileHistory: vi.fn(),
   fetchOperationalHistoryPreview: vi.fn(),
   resetOperationalHistory: vi.fn(),
-  fetchProcessingFiles: vi.fn(),
-  fetchProcessingFileLog: vi.fn(),
 }));
 
-vi.mock("../../lib/activity/queries", () => ({
+vi.mock("../../../../lib/activity/queries", () => ({
   useActivityRecentQuery: (...args: unknown[]) =>
     mocks.useActivityRecentQuery(...args),
 }));
 
-vi.mock("../../lib/activity/use-activity-stream-invalidation", () => ({
+vi.mock("../../../../lib/activity/use-activity-stream-invalidation", () => ({
   useActivityStreamInvalidation: vi.fn(),
 }));
 
-vi.mock("../../lib/ui/mm-format-date", () => ({
+vi.mock("../../../../lib/ui/mm-format-date", () => ({
   useAppDateFormatter: () => (iso: string) => iso,
 }));
 
-vi.mock("../../lib/auth/queries", () => ({
+vi.mock("../../../../lib/auth/queries", () => ({
   useMeQuery: () => ({
     data: { id: 1, username: "alice", role: mocks.role.current },
   }),
 }));
 
-vi.mock("../../lib/processing/libraries-queries", () => ({
-  useProcessingLibrariesQuery: () => ({
-    data: [{ id: 3, name: "Movie downloads" }],
-  }),
-}));
-
-vi.mock("../../lib/api/activity-api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../lib/api/activity-api")>()),
+vi.mock("../../../../lib/api/activity-api", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../../../../lib/api/activity-api")
+  >()),
   fetchActivityExport: mocks.fetchActivityExport,
-  fetchActivityFileHistoryPreview: mocks.fetchActivityFileHistoryPreview,
-  removeActivityFileHistory: mocks.removeActivityFileHistory,
 }));
 
-vi.mock("../../lib/settings/settings-api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../lib/settings/settings-api")>()),
+vi.mock("../../../../lib/settings/settings-api", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../../../../lib/settings/settings-api")
+  >()),
   fetchOperationalHistoryPreview: mocks.fetchOperationalHistoryPreview,
   resetOperationalHistory: mocks.resetOperationalHistory,
-}));
-
-vi.mock("../../lib/processing/files-api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../lib/processing/files-api")>()),
-  fetchProcessingFiles: mocks.fetchProcessingFiles,
-  fetchProcessingFileLog: mocks.fetchProcessingFileLog,
 }));
 
 beforeAll(() => {
@@ -88,7 +74,7 @@ function event(
   overrides: Partial<ActivityEventItem> & { id: number },
 ): ActivityEventItem {
   return {
-    created_at: "2026-09-16T22:00:00Z",
+    created_at: "2026-08-16T22:00:00Z",
     event_type: "processing.work_temp_stale_sweep_completed",
     module: "processing",
     title: "Temporary files cleanup finished",
@@ -123,19 +109,19 @@ function recentResult(
   };
 }
 
-function renderPage() {
+function renderLog() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const tree = () => (
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <ActivityPage />
+        <ActivityLog />
       </MemoryRouter>
     </QueryClientProvider>
   );
   const view = render(tree());
-  return { ...view, rerenderPage: () => view.rerender(tree()) };
+  return { ...view, rerenderLog: () => view.rerender(tree()) };
 }
 
 function lastQueryFilters(): Record<string, unknown> {
@@ -145,18 +131,16 @@ function lastQueryFilters(): Record<string, unknown> {
   >;
 }
 
-const fileEvent = event({
+const passEvent = event({
   id: 40,
   event_type: "processing.file_remux_pass_completed",
   title: "Movie.mkv was processed successfully",
   detail: JSON.stringify({ outcome: "ok", relative_media_path: "Movie.mkv" }),
-  library_id: 3,
-  relative_path: "Movies/Movie.mkv",
   trigger: "webhook",
   result: "success",
 });
 
-describe("ActivityPage", () => {
+describe("ActivityLog", () => {
   beforeEach(() => {
     mocks.role.current = "operator";
     Object.values(mocks).forEach((value) => {
@@ -180,7 +164,7 @@ describe("ActivityPage", () => {
       recentResult([event({ id: 1, detail: '{"removed":0}' })]),
     );
 
-    renderPage();
+    renderLog();
 
     expect(screen.getByTestId("activity-summary")).toHaveTextContent(
       "Showing 1 of 1 event · live",
@@ -188,29 +172,34 @@ describe("ActivityPage", () => {
     expect(screen.getByDisplayValue("All events")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Any reason")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Any result")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("All libraries")).toBeInTheDocument();
     expect(
       screen.getAllByText("Temporary files cleanup finished").length,
     ).toBeGreaterThan(0);
   });
 
+  it("asks only for Weir's own events, with no library or file filter", () => {
+    mocks.useActivityRecentQuery.mockReturnValue(recentResult([]));
+
+    renderLog();
+
+    expect(lastQueryFilters()).toMatchObject({ about: "weir" });
+    expect(screen.queryByDisplayValue("All libraries")).not.toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText("Part of a file path"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue("All modules")).not.toBeInTheDocument();
+    expect(lastQueryFilters()).not.toHaveProperty("module");
+  });
+
   it("shows a proper empty state when no events match", () => {
     mocks.useActivityRecentQuery.mockReturnValue(recentResult([]));
 
-    renderPage();
+    renderLog();
 
     fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
     expect(
       screen.getByText("No activity matched the current filters."),
     ).toBeInTheDocument();
-  });
-
-  it("has no module filter, since Weir is one app", () => {
-    mocks.useActivityRecentQuery.mockReturnValue(recentResult([]));
-
-    renderPage();
-    expect(screen.queryByDisplayValue("All modules")).not.toBeInTheDocument();
-    expect(lastQueryFilters()).not.toHaveProperty("module");
   });
 
   it("folds identical consecutive entries into one row with a count", () => {
@@ -227,7 +216,7 @@ describe("ActivityPage", () => {
       recentResult([signIn(9), signIn(8), signIn(7), event({ id: 6 })]),
     );
 
-    renderPage();
+    renderLog();
 
     const rows = screen.getAllByTestId("activity-row");
     expect(rows).toHaveLength(2);
@@ -251,7 +240,7 @@ describe("ActivityPage", () => {
       ]),
     );
 
-    renderPage();
+    renderLog();
 
     expect(
       screen.getByRole("heading", { name: "System repair finished" }),
@@ -263,7 +252,7 @@ describe("ActivityPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps long activity titles wrappable while preserving the full title", () => {
+  it("keeps long titles whole in the title attribute and shortens the heading", () => {
     const fileName =
       "An.Example.Feature.With.A.Very.Long.Release.Name.2024.UHD.BluRay.2160p.TrueHD.Atmos.EXAMPLE.mkv";
     const longTitle = `${fileName} was processed successfully`;
@@ -281,17 +270,17 @@ describe("ActivityPage", () => {
       ]),
     );
 
-    renderPage();
+    renderLog();
 
     const heading = screen.getByTitle(longTitle);
     expect(heading.tagName).toBe("H2");
-    expect(heading).toHaveAttribute("title", longTitle);
-    expect(heading.className).toContain("[overflow-wrap:anywhere]");
+    expect(heading).toHaveClass("mm-activity-item__title");
+    expect(heading.textContent).toContain("...");
   });
 
-  it("sends trigger, result, library and file filters to the server", () => {
+  it("sends trigger and result filters to the server", () => {
     mocks.useActivityRecentQuery.mockReturnValue(recentResult([]));
-    renderPage();
+    renderLog();
 
     fireEvent.change(screen.getByDisplayValue("Any reason"), {
       target: { value: "scheduled" },
@@ -299,25 +288,18 @@ describe("ActivityPage", () => {
     fireEvent.change(screen.getByDisplayValue("Any result"), {
       target: { value: "failed" },
     });
-    fireEvent.change(screen.getByDisplayValue("All libraries"), {
-      target: { value: "3" },
-    });
-    fireEvent.change(screen.getByPlaceholderText("Part of a file path"), {
-      target: { value: "Movie.mkv" },
-    });
     fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
 
     expect(lastQueryFilters()).toMatchObject({
       trigger: "scheduled",
       result: "failed",
-      library_id: 3,
-      file: "Movie.mkv",
+      about: "weir",
     });
   });
 
   it("applies last night as yesterday 18:00 to today 08:00 in one click", () => {
     mocks.useActivityRecentQuery.mockReturnValue(recentResult([]));
-    renderPage();
+    renderLog();
 
     fireEvent.click(screen.getByRole("button", { name: "Last night →" }));
 
@@ -332,12 +314,12 @@ describe("ActivityPage", () => {
   it("explains the trigger in plain words and shows nothing when it is not known", () => {
     mocks.useActivityRecentQuery.mockReturnValue(
       recentResult([
-        fileEvent,
+        passEvent,
         event({ id: 41, trigger: null }),
         event({ id: 42, trigger: "folder_change" }),
       ]),
     );
-    renderPage();
+    renderLog();
 
     const chips = screen.getAllByTestId("activity-trigger-chip");
     expect(chips.map((chip) => chip.textContent)).toEqual([
@@ -382,7 +364,7 @@ describe("ActivityPage", () => {
         }),
       ]),
     );
-    renderPage();
+    renderLog();
 
     const runGroup = screen.getByTestId("activity-run") as HTMLDetailsElement;
     expect(runGroup).toHaveTextContent(
@@ -404,7 +386,7 @@ describe("ActivityPage", () => {
         oldest_event_at: "2026-06-19T00:00:00Z",
       }),
     );
-    renderPage();
+    renderLog();
 
     expect(screen.getByTestId("activity-retention")).toHaveTextContent(
       "History goes back 90 days (oldest entry 2026-06-19T00:00:00Z).",
@@ -418,7 +400,7 @@ describe("ActivityPage", () => {
     mocks.useActivityRecentQuery.mockReturnValue(
       recentResult([], { retention_days: 0 }),
     );
-    renderPage();
+    renderLog();
 
     expect(screen.getByTestId("activity-retention")).toHaveTextContent(
       "History is kept until you clear it.",
@@ -437,7 +419,7 @@ describe("ActivityPage", () => {
     const click = vi
       .spyOn(HTMLAnchorElement.prototype, "click")
       .mockImplementation(() => undefined);
-    renderPage();
+    renderLog();
 
     fireEvent.change(screen.getByDisplayValue("Any reason"), {
       target: { value: "scheduled" },
@@ -464,66 +446,8 @@ describe("ActivityPage", () => {
     click.mockRestore();
   });
 
-  it("removes one file's history after showing the server's counts", async () => {
-    const result = recentResult([fileEvent]);
-    mocks.useActivityRecentQuery.mockReturnValue(result);
-    mocks.fetchActivityFileHistoryPreview.mockResolvedValue({
-      relative_path: "Movies/Movie.mkv",
-      activity_events: 3,
-      processing_records: 1,
-      message:
-        "This removes 3 Activity events and 1 processing record about Movies/Movie.mkv.",
-    });
-    mocks.removeActivityFileHistory.mockResolvedValue({
-      relative_path: "Movies/Movie.mkv",
-      activity_events_deleted: 3,
-      processing_records_deleted: 1,
-    });
-    renderPage();
-
-    expect(screen.getByTestId("activity-row-file")).toHaveTextContent(
-      "Movie downloads · Movies/Movie.mkv",
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Remove this file's history" }),
-    );
-
-    const dialog = await screen.findByTestId(
-      "activity-remove-file-history-dialog",
-    );
-    expect(mocks.fetchActivityFileHistoryPreview).toHaveBeenCalledWith({
-      relative_path: "Movies/Movie.mkv",
-      library_id: 3,
-    });
-    expect(dialog).toHaveTextContent(
-      "This removes 3 Activity events and 1 processing record about Movies/Movie.mkv.",
-    );
-    expect(dialog).toHaveTextContent("3 Activity events");
-    expect(dialog).toHaveTextContent("1 processing record");
-    expect(dialog).toHaveTextContent("No media file is touched.");
-    expect(mocks.removeActivityFileHistory).not.toHaveBeenCalled();
-
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: "Remove history" }),
-    );
-
-    await waitFor(() =>
-      expect(screen.getByRole("status")).toHaveTextContent(
-        "Removed 3 Activity events and 1 processing record about Movies/Movie.mkv. No media file was touched.",
-      ),
-    );
-    expect(mocks.removeActivityFileHistory).toHaveBeenCalledWith({
-      relative_path: "Movies/Movie.mkv",
-      library_id: 3,
-    });
-    expect(result.refetch).toHaveBeenCalled();
-    expect(
-      screen.queryByTestId("activity-remove-file-history-dialog"),
-    ).not.toBeInTheDocument();
-  });
-
   it("clears all history only after RESET is typed, listing the counts", async () => {
-    mocks.useActivityRecentQuery.mockReturnValue(recentResult([fileEvent]));
+    mocks.useActivityRecentQuery.mockReturnValue(recentResult([passEvent]));
     mocks.fetchOperationalHistoryPreview.mockResolvedValue({
       status: "preview",
       activity_events_deleted: 12,
@@ -536,7 +460,7 @@ describe("ActivityPage", () => {
       jobs_deleted: 4,
       total_deleted: 16,
     });
-    renderPage();
+    renderLog();
 
     fireEvent.click(
       screen.getByRole("button", { name: "Clear all history →" }),
@@ -573,52 +497,34 @@ describe("ActivityPage", () => {
     );
   });
 
-  it("does not offer removal to viewers", () => {
-    mocks.role.current = "viewer";
-    mocks.useActivityRecentQuery.mockReturnValue(recentResult([fileEvent]));
-    renderPage();
+  it("closes the clear-history dialog on Escape", async () => {
+    mocks.useActivityRecentQuery.mockReturnValue(recentResult([passEvent]));
+    mocks.fetchOperationalHistoryPreview.mockResolvedValue({
+      status: "preview",
+      activity_events_deleted: 1,
+      jobs_deleted: 0,
+      total_deleted: 1,
+    });
+    renderLog();
 
+    fireEvent.click(
+      screen.getByRole("button", { name: "Clear all history →" }),
+    );
+    await screen.findByTestId("activity-clear-all-history-dialog");
+    fireEvent.keyDown(document, { key: "Escape" });
     expect(
-      screen.getByRole("button", { name: "File story" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Remove this file's history" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Clear all history →" }),
+      screen.queryByTestId("activity-clear-all-history-dialog"),
     ).not.toBeInTheDocument();
   });
 
-  it("opens the file story for the matching tracked file", async () => {
-    mocks.useActivityRecentQuery.mockReturnValue(recentResult([fileEvent]));
-    mocks.fetchProcessingFiles.mockResolvedValue({
-      files: [
-        { id: 55, library_id: 3, relative_path: "Movies/Movie.mkv.bak" },
-        { id: 56, library_id: 3, relative_path: "Movies/Movie.mkv" },
-      ],
-      status_counts: {},
-      returned: 2,
-      limit: 50,
-    });
-    mocks.fetchProcessingFileLog.mockResolvedValue({
-      file_id: 56,
-      relative_path: "Movies/Movie.mkv",
-      retention_days: 90,
-      entries: [],
-    });
-    renderPage();
+  it("does not offer clearing to viewers", () => {
+    mocks.role.current = "viewer";
+    mocks.useActivityRecentQuery.mockReturnValue(recentResult([passEvent]));
+    renderLog();
 
-    fireEvent.click(screen.getByRole("button", { name: "File story" }));
-
-    expect(await screen.findByRole("dialog")).toHaveTextContent("Movie.mkv");
-    await waitFor(() =>
-      expect(mocks.fetchProcessingFileLog).toHaveBeenCalledWith(56),
-    );
-    expect(mocks.fetchProcessingFiles).toHaveBeenCalledWith({
-      library_id: 3,
-      path_contains: "Movies/Movie.mkv",
-      limit: 50,
-    });
+    expect(
+      screen.queryByRole("button", { name: "Clear all history →" }),
+    ).not.toBeInTheDocument();
   });
 
   describe("live updates", () => {
@@ -633,12 +539,12 @@ describe("ActivityPage", () => {
 
     it("inserts new entries straight away when the reader is at the top", () => {
       mocks.useActivityRecentQuery.mockReturnValue(recentResult([older]));
-      const view = renderPage();
+      const view = renderLog();
 
       mocks.useActivityRecentQuery.mockReturnValue(
         recentResult([newer, older]),
       );
-      view.rerenderPage();
+      view.rerenderLog();
 
       expect(screen.getByText("Newest entry detail")).toBeInTheDocument();
       expect(
@@ -648,7 +554,7 @@ describe("ActivityPage", () => {
 
     it("holds new entries behind a button when the reader has scrolled away", () => {
       mocks.useActivityRecentQuery.mockReturnValue(recentResult([older]));
-      const view = renderPage();
+      const view = renderLog();
       const feed = screen.getByTestId("activity-feed");
       feed.getBoundingClientRect = () => ({ top: -240 }) as DOMRect;
       fireEvent.scroll(window);
@@ -656,7 +562,7 @@ describe("ActivityPage", () => {
       mocks.useActivityRecentQuery.mockReturnValue(
         recentResult([newer, older]),
       );
-      view.rerenderPage();
+      view.rerenderLog();
 
       expect(screen.queryByText("Newest entry detail")).not.toBeInTheDocument();
       expect(screen.getAllByTestId("activity-row")).toHaveLength(1);
@@ -677,7 +583,7 @@ describe("ActivityPage", () => {
         detail: "x".repeat(200),
       });
       mocks.useActivityRecentQuery.mockReturnValue(recentResult([detailed]));
-      const view = renderPage();
+      const view = renderLog();
       const details = screen
         .getByTestId("activity-feed")
         .querySelector("details")!;
@@ -687,7 +593,7 @@ describe("ActivityPage", () => {
       mocks.useActivityRecentQuery.mockReturnValue(
         recentResult([newer, detailed]),
       );
-      view.rerenderPage();
+      view.rerenderLog();
 
       expect(
         screen.getByRole("button", { name: "1 new entry — show" }),

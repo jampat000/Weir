@@ -1,15 +1,14 @@
 /**
  * What happened to one file, read from the Activity entry written when Weir finished with it: a
- * download's `processing.file_remux_pass_completed`, or a library file's `library.file_cleaned`.
- * Live's "Just finished" list reads these (docs/archive/live-and-library.md). Every number
- * comes from the entry itself; nothing is estimated here.
+ * download's finished pass, or a library file's clean. The Processing screen's "Just finished" list
+ * reads these. Every number comes from the entry itself; nothing is estimated here.
  */
 import type { ActivityEventItem } from "../api/types";
 import { asNumber, asString, parseActivityDetail } from "./detail";
-
-export const REMUX_PASS_COMPLETED_EVENT =
-  "processing.file_remux_pass_completed";
-export const LIBRARY_FILE_CLEANED_EVENT = "library.file_cleaned";
+import {
+  LIBRARY_FILE_CLEANED_EVENT,
+  REMUX_PASS_COMPLETED_EVENT,
+} from "./event-types";
 
 export type FinishedKind = "cleaned" | "already" | "passed" | "failed";
 

@@ -24,6 +24,8 @@ import { PageLoading } from "../../components/shared/page-loading";
 import {
   LIBRARY_FILE_CLEANED_EVENT,
   REMUX_PASS_COMPLETED_EVENT,
+} from "../../lib/activity/event-types";
+import {
   finishedFileFromEvent,
   type FinishedFile,
 } from "../../lib/activity/processing-outcome";

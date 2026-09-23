@@ -16,5 +16,3 @@ export type BootstrapStatus = Schema<"BootstrapStatusOut">;
 export type ActivityEventItem = Schema<"ActivityEventItemOut">;
 export type SystemReadiness = Schema<"ReadinessResponse">;
 export type ActivityRecentResponse = Schema<"ActivityRecentOut">;
-export type ActivityFileHistoryPreview = Schema<"ActivityFileHistoryCountOut">;
-export type ActivityFileHistoryRemoved = Schema<"ActivityFileHistoryRemoveOut">;

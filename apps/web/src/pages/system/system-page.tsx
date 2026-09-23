@@ -40,7 +40,7 @@ import { SettingsUpgradeTab } from "../settings/settings-upgrade-tab";
 import { SettingsSecurityTab } from "../settings/settings-security-tab";
 import { SettingsLogsTab } from "../settings/settings-logs-tab";
 import { SettingsSupportTab } from "../settings/settings-support-tab";
-import { ActivityPage } from "../activity/activity-page";
+import { ActivityLog } from "./tabs/logs/activity-log";
 import { ProcessingJobsInspectionSection } from "../processing/processing-jobs-inspection-section";
 import { AboutFacts } from "./about-facts";
 import { errorMessage } from "../../lib/api/error-message";
@@ -551,7 +551,7 @@ export function SystemPage() {
               </select>
             </label>
             {historyView === "activity" ? (
-              <ActivityPage embedded about="weir" />
+              <ActivityLog />
             ) : historyView === "jobs" ? (
               <ProcessingJobsInspectionSection />
             ) : (
