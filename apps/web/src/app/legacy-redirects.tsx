@@ -16,6 +16,24 @@ const PROCESSING_TAB_HOMES: Record<string, string> = {
   maintenance: "/settings?tab=cleanup",
 };
 
+/** Settings tabs from 3.1 that moved to System in 3.2, so an old bookmark lands on the same thing. */
+const SETTINGS_TABS_MOVED_TO_SYSTEM: Record<string, string> = {
+  upgrade: "/system?tab=about",
+  support: "/system?tab=about",
+  backup: "/system?tab=backups",
+  security: "/system?tab=security",
+  logs: "/system?tab=logs",
+};
+
+/** Where a Settings tab name now lives on System, or null when it is still a Settings tab. */
+export function systemAddressForSettingsTab(
+  tab: string | null | undefined,
+): string | null {
+  return (
+    SETTINGS_TABS_MOVED_TO_SYSTEM[(tab ?? "").trim().toLowerCase()] ?? null
+  );
+}
+
 /** Filters the old Files and Jobs tabs understood, carried over so a saved filter still works. */
 const CARRIED_PARAMS = ["status", "path"];
 

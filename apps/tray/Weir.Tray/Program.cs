@@ -17,7 +17,8 @@ static class Program
     internal const int ServerStopTimeoutMs = 10_000;
     internal const double BrowserDebounceCooldownMs = 1250;
     internal const string GitHubRepo = "https://github.com/jampat000/Weir";
-    internal const string UpgradeSettingsPath = "/settings?tab=upgrade";
+    /// <summary>System › About, where the web app checks for and installs updates.</summary>
+    internal const string UpdateCheckPath = "/system?tab=about";
 
     /// <summary>
     /// Start without opening Weir in the browser. The starts nobody asked to see pass it: at sign-in, and after an
@@ -267,7 +268,7 @@ static class Program
     }
 
     internal static string? TrayUpdateFallbackPath(bool isInstalled) =>
-        isInstalled ? null : UpgradeSettingsPath;
+        isInstalled ? null : UpdateCheckPath;
 
     internal static void AppendFallbackLog(string message)
     {
