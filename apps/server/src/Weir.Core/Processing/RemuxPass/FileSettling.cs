@@ -2,18 +2,18 @@ using System.Globalization;
 
 namespace Weir.Core.Processing.RemuxPass;
 
-/// <summary>What one scan saw, and what the next one needs to remember (<c>SettlingObservation</c>).</summary>
+/// <summary>What one scan saw, and what the next one needs to remember.</summary>
 public sealed record SettlingObservation(bool IsSettling, DateTimeOffset? SizeChangedAt, DateTimeOffset? StableAt, string? Reason = null);
 
 /// <summary>
-/// Has a file finished being written? The pure half of <c>processing_file_settling.py</c>: two observations of the same size, far
+/// Has a file finished being written? The pure half of the check: two observations of the same size, far
 /// enough apart, are evidence that writing stopped. The read guard and access checks live in
 /// <c>Weir.Infrastructure.Processing.RemuxPass.SourceReadGuard</c>.
 /// </summary>
 public static class FileSettling
 {
     /// <summary>
-    /// <c>observe_size_settling</c>: compare this scan's size against the last one. A file seen for the first time is still
+    /// Compare this scan's size against the last one. A file seen for the first time is still
     /// settling, because one observation cannot show that anything has stopped.
     /// </summary>
     /// <param name="library">The library's detection settings.</param>

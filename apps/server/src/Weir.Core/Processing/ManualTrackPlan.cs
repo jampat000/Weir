@@ -17,15 +17,14 @@ public enum ManualTrackKind
 }
 
 /// <summary>
-/// Build a <see cref="RemuxPlan"/> directly from an operator's manual track choice (issue #501), instead of
-/// <see cref="RemuxRules.PlanRemux"/>. Following the precedent the issue names (muxarr's <c>CustomConversionEditor</c> /
-/// <c>ConversionPlan</c>): the operator's choice is authoritative and skips the automatic mutations <c>PlanRemux</c>
-/// applies (candidate ranking, flag-from-name fixes, commentary/hearing-impaired removal, metadata stripping).
+/// Build a <see cref="RemuxPlan"/> directly from an operator's manual track choice (#501), instead of
+/// <see cref="RemuxRules.PlanRemux"/>. As Muxarr's custom conversion editor does, the operator's choice is authoritative
+/// and skips the automatic mutations <c>PlanRemux</c> applies (candidate ranking, flag-from-name fixes,
+/// commentary/hearing-impaired removal, metadata stripping).
 /// </summary>
 public static class ManualTrackPlan
 {
-    /// <summary>The one sentence shown for every way a manual plan can no longer be trusted (issue #501, matching muxarr's
-    /// "Source file has changed since this custom conversion was queued").</summary>
+    /// <summary>The one sentence shown for every way a manual plan has gone stale because the source file changed (#501).</summary>
     public const string ChangedMessage = "The file changed since you chose its tracks; choose again";
 
     /// <summary>Every real (non-image) video, audio and subtitle stream's kind, keyed by its ffprobe index. Embedded
