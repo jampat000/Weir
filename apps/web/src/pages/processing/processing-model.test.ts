@@ -11,6 +11,8 @@ import {
   prettyName,
   readRate,
   ringLabel,
+  ringState,
+  arrivingDeadline,
   runningFor,
   secondsLeft,
   speedWords,
@@ -444,5 +446,54 @@ describe("the numbers on a file being written", () => {
     expect(ringLabel(582)).toBe("10m");
     expect(ringLabel(2680)).toBe("45m");
     expect(ringLabel(7200)).toBe("2h");
+  });
+});
+
+describe("an arriving file's ring", () => {
+  it("counts down to a known moment, turns only once it has come, and stays still when no time is known", () => {
+    expect(ringState(42)).toBe("counting");
+    expect(ringState(0)).toBe("checking");
+    expect(ringState(null)).toBe("unknown");
+  });
+
+  it("counts a wait with no clock of its own down to Weir's next look at the library", () => {
+    const at = Date.parse("2026-09-22T10:03:12Z");
+    const lanes = buildLanes(
+      [
+        file({
+          id: 1,
+          status: "blocked_upstream",
+          blocked_by_connection: "Sonarr",
+          library_id: 1,
+        }),
+        file({
+          id: 2,
+          status: "on_hold",
+          status_reason: "Weir could not read this file yet.",
+          library_id: 1,
+        }),
+        file({
+          id: 3,
+          status: "on_hold",
+          hold_until: "2026-09-22T10:00:30Z",
+          library_id: 1,
+        }),
+      ],
+      [],
+      new Map(),
+      new Map(),
+      new Map([[1, { at, interval: 300 }]]),
+    );
+
+    const byId = (id: number) =>
+      lanes.arriving.find((item) => item.file.id === id)!;
+    const [upstream, unreadable, timed] = [byId(1), byId(2), byId(3)];
+    // The one whose moment comes first leads the lane.
+    expect(lanes.arriving[0]).toBe(timed);
+    expect(arrivingDeadline(upstream)).toBe(at);
+    expect(arrivingDeadline(unreadable)).toBe(at);
+    // A file with its own hold counts down to that, not to the next look.
+    expect(arrivingDeadline(timed)).toBe(Date.parse("2026-09-22T10:00:30Z"));
+    expect(timed.nextLook).toBeNull();
   });
 });

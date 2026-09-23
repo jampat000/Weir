@@ -593,8 +593,14 @@
   stroke: var(--mm-status-info-text);
 }
 
-.mm-live-ring--waiting .mm-live-ring__fill {
-  animation: mm-live-turn 2.4s linear infinite;
+/* Turning only while Weir is checking the file; a wait with no known end stays still and dim, and says why beneath. */
+.mm-live-ring--checking .mm-live-ring__fill {
+  stroke-dasharray: 24 70;
+  animation: mm-live-turn 1.6s linear infinite;
+}
+
+.mm-live-ring--unknown {
+  opacity: 0.55;
 }
 
 .mm-live-ring__text {
@@ -1013,7 +1019,7 @@
   .mm-live-done,
   .mm-live-bar__fill,
   .mm-live-bar--busy .mm-live-bar__fill,
-  .mm-live-ring--waiting .mm-live-ring__fill {
+  .mm-live-ring--checking .mm-live-ring__fill {
     animation: none;
   }
 

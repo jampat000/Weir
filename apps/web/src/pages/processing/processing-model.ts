@@ -25,7 +25,17 @@ export type ArrivingItem = {
   holdTotal: number | null;
   /** The media manager still has it (blocked upstream). */
   upstream: boolean;
+  /**
+   * For a wait with no clock of its own (a manager still importing it, a file Weir cannot read yet): when Weir next
+   * looks at the library (epoch ms) and how often it looks (seconds), so the card counts down to that instead.
+   */
+  nextLook: { at: number; interval: number } | null;
 };
+
+/** When an arriving file's wait next changes: its own hold, or failing that Weir's next look at its library. */
+export function arrivingDeadline(item: ArrivingItem): number | null {
+  return item.holdUntil ?? item.nextLook?.at ?? null;
+}
 
 export type WaitingItem = {
   key: string;
@@ -156,6 +166,7 @@ export function buildLanes(
   libraryJobs: ProcessingJobInspectionRow[],
   libraryNames: Map<number, string>,
   minAgeByLibrary: Map<number, number>,
+  nextLookByLibrary: Map<number, { at: number; interval: number }> = new Map(),
 ): Lanes {
   const lanes: Lanes = {
     arriving: [],
@@ -194,6 +205,10 @@ export function buildLanes(
           holdUntil,
           holdTotal,
           upstream: false,
+          nextLook:
+            holdUntil == null
+              ? (nextLookByLibrary.get(file.library_id) ?? null)
+              : null,
         });
         break;
       }
@@ -209,6 +224,7 @@ export function buildLanes(
           holdUntil: null,
           holdTotal: null,
           upstream: true,
+          nextLook: nextLookByLibrary.get(file.library_id) ?? null,
         });
         break;
       case "unprocessed":
@@ -287,9 +303,10 @@ export function buildLanes(
     }
   }
 
-  // The file closest to its turn first; the rest keep the server's order.
+  // The file closest to its next moment (its own hold, or Weir's next look) first; the rest keep the server's order.
   lanes.arriving.sort(
-    (a, b) => (a.holdUntil ?? Infinity) - (b.holdUntil ?? Infinity),
+    (a, b) =>
+      (arrivingDeadline(a) ?? Infinity) - (arrivingDeadline(b) ?? Infinity),
   );
   return lanes;
 }
@@ -474,4 +491,17 @@ export function ringLabel(seconds: number): string {
   if (seconds < 100) return `${Math.round(seconds)}s`;
   if (seconds < 100 * 60) return `${Math.round(seconds / 60)}m`;
   return `${Math.round(seconds / 3600)}h`;
+}
+
+/**
+ * What an arriving file's ring can honestly say, from the seconds left to its deadline (its own hold, or Weir's next
+ * look at its library). Counting: that moment is ahead. Checking: it has come, and Weir is looking now (a scan books the
+ * next look for the end of every hold it sets), so the ring turns because something is happening. Unknown: no time at
+ * all is known, so the ring stays still and the reason underneath says why.
+ */
+export function ringState(
+  left: number | null,
+): "counting" | "checking" | "unknown" {
+  if (left == null) return "unknown";
+  return left > 0 ? "counting" : "checking";
 }

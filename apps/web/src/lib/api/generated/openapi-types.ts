@@ -4373,6 +4373,12 @@ export interface components {
       modified_before: string | null;
       /** Name */
       name: string;
+      /**
+       * Next Look At
+       * @description When Weir next looks at this library's watched folder: the next periodic scan, or sooner when a held file's wait ends. Null when no look is scheduled (the library is off, or only folder events trigger a look).
+       * @default null
+       */
+      next_look_at: string | null;
       /** Output Collision Policy */
       output_collision_policy: string;
       /** Output Folder */

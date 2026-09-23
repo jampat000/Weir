@@ -81,6 +81,8 @@ export interface ProcessingLibrary {
   discovered_library_key: string | null;
   /** Queued or running jobs. Deletion is refused while this is non-zero. */
   active_job_count: number;
+  /** When Weir next looks at the watched folder (the next periodic scan, or sooner when a held file's wait ends). */
+  next_look_at?: string | null;
   updated_at: string | null;
 }
 

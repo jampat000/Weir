@@ -62,6 +62,8 @@ import {
   HANDED_BACK_BUCKET_MS,
   readRate,
   ringLabel,
+  ringState,
+  arrivingDeadline,
   runningFor,
   secondsLeft,
   speedWords,
@@ -136,17 +138,20 @@ function SourceTag({
 }
 
 function Ring({ item, now }: { item: ArrivingItem; now: number }) {
-  const left = secondsLeft(item.holdUntil, now);
+  const left = secondsLeft(arrivingDeadline(item), now);
+  const state = ringState(left);
   const circumference = 94.2;
-  // With a clock on the wait the ring fills as it runs out; without one it turns slowly instead.
-  // At zero the wait is over and the file is due on Weir's next look, so it turns rather than sit at 0s.
+  const total =
+    item.holdUntil != null ? item.holdTotal : item.nextLook?.interval;
   const fraction =
-    left != null && left > 0 && item.holdTotal
-      ? Math.min(1, Math.max(0, 1 - left / item.holdTotal))
-      : null;
+    state === "counting" && total && left != null
+      ? Math.min(1, Math.max(0, 1 - left / total))
+      : state === "checking"
+        ? 1
+        : null;
   return (
     <svg
-      className={`mm-live-ring${fraction == null ? " mm-live-ring--waiting" : ""}`}
+      className={`mm-live-ring mm-live-ring--${state}`}
       width="38"
       height="38"
       viewBox="0 0 38 38"
@@ -166,14 +171,20 @@ function Ring({ item, now }: { item: ArrivingItem; now: number }) {
         }
       />
       <text x="19" y="23" textAnchor="middle" className="mm-live-ring__text">
-        {left != null && left > 0 ? ringLabel(left) : "…"}
+        {state === "counting" && left != null
+          ? ringLabel(left)
+          : state === "checking"
+            ? "now"
+            : "–"}
       </text>
     </svg>
   );
 }
 
 function ArrivingCard({ item, now }: { item: ArrivingItem; now: number }) {
-  const left = secondsLeft(item.holdUntil, now);
+  const left = secondsLeft(arrivingDeadline(item), now);
+  const state = ringState(left);
+  const waitsOnWeir = item.holdUntil == null && item.nextLook != null;
   return (
     <li className="mm-live-card" data-testid="live-arriving">
       <div className="mm-live-card__row">
@@ -184,9 +195,15 @@ function ArrivingCard({ item, now }: { item: ArrivingItem; now: number }) {
         </div>
       </div>
       <p className="mm-live-card__note">
-        {left === 0 && !item.upstream
-          ? "Due now. Weir picks it up on its next look."
-          : item.note}
+        {state === "checking"
+          ? item.upstream
+            ? `${item.note} Weir is checking again now.`
+            : waitsOnWeir
+              ? `${item.note} Weir is looking again now.`
+              : "Its wait is over. Weir is checking it now."
+          : waitsOnWeir && left != null
+            ? `${item.note} Weir looks again in ${clock(left)}.`
+            : item.note}
       </p>
     </li>
   );
@@ -577,7 +594,8 @@ export function ProcessingPage(): React.ReactElement {
   const files = useProcessingFilesQuery(FILES_QUERY);
   const today = useProcessingOverviewStatsQuery(1);
   const filesAtOnce = useProcessingFilesAtOnceQuery();
-  const libraries = useProcessingLibrariesQuery();
+  // Every ten seconds: Arriving counts down to each library's next look, which moves with every scan.
+  const libraries = useProcessingLibrariesQuery(true, 10_000);
   const readiness = useSystemReadinessQuery();
   const pause = usePauseQuery();
   const failedJobs = useProcessingJobsInspectionQuery(
@@ -625,6 +643,16 @@ export function ProcessingPage(): React.ReactElement {
       ),
     [libraries.data],
   );
+  const nextLooks = useMemo(() => {
+    const looks = new Map<number, { at: number; interval: number }>();
+    for (const library of libraries.data ?? []) {
+      const at = library.next_look_at ? Date.parse(library.next_look_at) : NaN;
+      if (Number.isFinite(at)) {
+        looks.set(library.id, { at, interval: library.scan_interval_seconds });
+      }
+    }
+    return looks;
+  }, [libraries.data]);
   const lanes = useMemo(
     () =>
       buildLanes(
@@ -632,8 +660,9 @@ export function ProcessingPage(): React.ReactElement {
         activeJobs.data?.jobs ?? [],
         libraryNames,
         minAge,
+        nextLooks,
       ),
-    [files.data, activeJobs.data, libraryNames, minAge],
+    [files.data, activeJobs.data, libraryNames, minAge, nextLooks],
   );
   const finished = useMemo(() => {
     const all = [...(passes.data?.items ?? []), ...(cleans.data?.items ?? [])]

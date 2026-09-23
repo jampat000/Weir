@@ -5133,6 +5133,20 @@
             "title": "Name",
             "type": "string"
           },
+          "next_look_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "When Weir next looks at this library's watched folder: the next periodic scan, or sooner when a held file's wait ends. Null when no look is scheduled (the library is off, or only folder events trigger a look).",
+            "title": "Next Look At"
+          },
           "output_collision_policy": {
             "title": "Output Collision Policy",
             "type": "string"

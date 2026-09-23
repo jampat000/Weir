@@ -36,14 +36,22 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
     private readonly ProcessingJobStore _jobStore;
     private readonly MediaManagerConnectionService _managerConnections;
 
+    private readonly ScanWakeups? _wakeups;
+
     public ProcessingWatchedFolderScanDispatchJobHandler(
-        SqliteDatabase database, TimeProvider time, WeirOptions options, ProcessingJobStore jobStore, MediaManagerConnectionService managerConnections)
+        SqliteDatabase database,
+        TimeProvider time,
+        WeirOptions options,
+        ProcessingJobStore jobStore,
+        MediaManagerConnectionService managerConnections,
+        ScanWakeups? wakeups = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _jobStore = jobStore ?? throw new ArgumentNullException(nameof(jobStore));
         _managerConnections = managerConnections ?? throw new ArgumentNullException(nameof(managerConnections));
+        _wakeups = wakeups;
     }
 
     public string JobKind => ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch;
@@ -108,6 +116,9 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
 
         var relThisRun = new HashSet<string>(StringComparer.Ordinal);
         var pendingRejectedCleanups = new List<(string RelativePath, string FilePath, string Reason, string Action)>();
+
+        // The earliest moment a file held by this scan stops being held; the next look is booked for then.
+        DateTimeOffset? earliestHoldEnds = null;
 
         foreach (var filePath in candidates.Files)
         {
@@ -273,6 +284,10 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
 
             await FileStateStore.RecordFileStateAsync(
                 uow, library.Id, rel, verdict, observedSize, settling.SizeChangedAt, now).ConfigureAwait(false);
+            if (verdict.HoldUntil is { } holdEnds && holdEnds > now && (earliestHoldEnds is null || holdEnds < earliestHoldEnds))
+            {
+                earliestHoldEnds = holdEnds;
+            }
 
             var cleanupRetryReady = !settling.IsSettling && access.Problem is null;
             var noActivePass = !await WatchedFolderScanOps.ActiveRemuxPassExistsForRelativePathAsync(uow, rel, mediaScope, library.Id).ConfigureAwait(false);
@@ -345,6 +360,13 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         }
 
         await uow.CommitAsync().ConfigureAwait(false);
+
+        // A second after the first hold ends, so the look finds it over. A pass booked for later (#646) carries its own
+        // start time and needs no look; this is for files the scan itself holds.
+        if (earliestHoldEnds is { } firstEnds)
+        {
+            _wakeups?.Request(library.Id, firstEnds + TimeSpan.FromSeconds(1));
+        }
 
         // The SKIPPED decision above committed before this mutation. If the process stops between the
         // two, the source remains and the next scan safely retries.

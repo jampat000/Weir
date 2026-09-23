@@ -24,6 +24,7 @@ _LIBRARY_READ_ONLY = frozenset(
         "discovered_from_connection_id",
         "discovered_library_key",
         "active_job_count",
+        "next_look_at",
         "updated_at",
     }
 )
