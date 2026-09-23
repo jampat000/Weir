@@ -23,7 +23,7 @@ internal sealed class ScriptedManager : IManagerHttpHandlerFactory
     public ScriptedManager Json(HttpMethod method, string path, string json, HttpStatusCode status = HttpStatusCode.OK) =>
         Route(method, path, _ => Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(json) }));
 
-    public HttpMessageHandler Handler(bool followRedirects) => new Recording(this);
+    public HttpMessageHandler Handler(bool followRedirects, ManagerAddressPolicy policy = ManagerAddressPolicy.Local) => new Recording(this);
 
     private sealed class Recording(ScriptedManager owner) : HttpMessageHandler
     {
@@ -80,7 +80,7 @@ public sealed class MediaManagerApiTests
         await using var _server = server;
         var row = await CreateAsync(client);
         Assert.Equal(
-            """{"id":1,"kind":"deluno","name":"Deluno","enabled":true,"base_url":"http://192.0.2.10:5099","api_key_is_saved":true,"webhook_secret_is_set":false,"webhook_url_path":"/api/v1/intake/webhook/deluno","last_test_ok":null,"last_test_at":null,"last_test_detail":null,"lanes":[{"lane":"missing","enabled":false,"max_items_per_run":50,"retry_delay_minutes":1440,"schedule_enabled":false,"schedule_days":"","schedule_start":"00:00","schedule_end":"23:59","schedule_interval_seconds":3600},{"lane":"upgrade","enabled":false,"max_items_per_run":50,"retry_delay_minutes":1440,"schedule_enabled":false,"schedule_days":"","schedule_start":"00:00","schedule_end":"23:59","schedule_interval_seconds":3600}]}""",
+            """{"id":1,"kind":"deluno","name":"Deluno","enabled":true,"base_url":"http://192.0.2.10:5099","api_key_is_saved":true,"webhook_secret_is_set":false,"webhook_url_path":"/api/v1/intake/webhook/deluno","unsigned_webhook_warning":"This connection accepts webhooks without a secret. Create a secret and add it to Deluno.","last_test_ok":null,"last_test_at":null,"last_test_detail":null,"lanes":[{"lane":"missing","enabled":false,"max_items_per_run":50,"retry_delay_minutes":1440,"schedule_enabled":false,"schedule_days":"","schedule_start":"00:00","schedule_end":"23:59","schedule_interval_seconds":3600},{"lane":"upgrade","enabled":false,"max_items_per_run":50,"retry_delay_minutes":1440,"schedule_enabled":false,"schedule_days":"","schedule_start":"00:00","schedule_end":"23:59","schedule_interval_seconds":3600}]}""",
             row.ToJsonString());
         await CreateAsync(client, "radarr", "Radarr", "http://192.0.2.20:7878");
 
@@ -391,6 +391,49 @@ public sealed class MediaManagerApiTests
         Assert.Equal("cancelled", (await Json(await manager.GetAsync("/api/v1/intake/handoffs/deluno/h1", secret)))["state"]!.GetValue<string>());
         using var again = await manager.SendAsync(HttpMethod.Delete, "/api/v1/intake/handoffs/deluno/h1", headers: secret);
         Assert.Equal((HttpStatusCode.Conflict, "This hand-off is cancelled, so Weir did not cancel it."), (again.StatusCode, await Detail(again)));
+    }
+
+    /// <summary>
+    /// H3: a webhook secret authenticated against any enabled connection of
+    /// the same kind, so one same-kind connection's own secret could drive or read another's hand-offs. The secret
+    /// that created a hand-off is now the only one (besides the instance-wide fallback a secret-less connection
+    /// still accepts) that can ask about it or cancel it.
+    /// </summary>
+    [Fact]
+    public async Task A_hand_offs_secret_scopes_it_to_the_connection_that_received_it()
+    {
+        var watched = Path.Join(Path.GetTempPath(), "weir-handoff-" + Guid.NewGuid().ToString("N"));
+        var (server, client, _) = await StartAsync();
+        await using var _server = server;
+        await TestDatabase.ExecuteAsync(server, "UPDATE libraries SET watched_folder = $w WHERE media_type = 'movie'", ("$w", watched));
+
+        var connectionA = await CreateAsync(client, "native", "A", baseUrl: "", apiKey: "");
+        var connectionB = await CreateAsync(client, "native", "B", baseUrl: "", apiKey: "");
+        var secretA = await RotateWebhookSecretAsync(client, connectionA["id"]!.GetValue<int>());
+        var secretB = await RotateWebhookSecretAsync(client, connectionB["id"]!.GetValue<int>());
+        var headersA = new Dictionary<string, string> { ["X-Webhook-Secret"] = secretA };
+        var headersB = new Dictionary<string, string> { ["X-Webhook-Secret"] = secretB };
+
+        var manager = new ApiTestClient(server);
+        var handoff = new { @event = "handoff", mediaScope = "movie", filePath = Path.Join(watched, "Film", "film.mkv"), handoffId = "h1", callbackPath = "/callback" };
+        using (var queued = await manager.PostAsync("/api/v1/intake/webhook/native", handoff, headersA))
+        {
+            Assert.Equal(HttpStatusCode.OK, queued.StatusCode);
+        }
+
+        using (var wrongSecret = await manager.GetAsync("/api/v1/intake/handoffs/native/h1", headersB))
+        {
+            Assert.Equal((HttpStatusCode.Unauthorized, "Invalid or missing X-Webhook-Secret header."), (wrongSecret.StatusCode, await Detail(wrongSecret)));
+        }
+
+        using var ownSecret = await manager.GetAsync("/api/v1/intake/handoffs/native/h1", headersA);
+        Assert.Equal(HttpStatusCode.OK, ownSecret.StatusCode);
+    }
+
+    private static async Task<string> RotateWebhookSecretAsync(ApiTestClient client, int connectionId)
+    {
+        using var response = await client.PostAsync($"{Connections}/{connectionId}/webhook-secret", new { csrf_token = await client.CsrfAsync() });
+        return (await Json(response))["webhook_secret"]!.GetValue<string>();
     }
 
     [Fact]

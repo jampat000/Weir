@@ -5,8 +5,11 @@ namespace Weir.Core.MediaManagers;
 /// <summary>The kinds, lanes and scopes a media manager connection can have.</summary>
 public static class MediaManagerKinds
 {
+    /// <summary>The connection-less generic source: a manager with no dialect of its own.</summary>
+    public const string Native = "native";
+
     /// <summary>Every manager kind.</summary>
-    public static readonly IReadOnlyList<string> All = ["radarr", "sonarr", "deluno", "native"];
+    public static readonly IReadOnlyList<string> All = ["radarr", "sonarr", "deluno", Native];
 
     /// <summary>Every search lane.</summary>
     public static readonly IReadOnlyList<string> SearchLanes = ["missing", "upgrade"];
@@ -165,6 +168,15 @@ public sealed class MediaManagerRateLimitedException : MediaManagerHttpException
     }
 
     public double? RetryAfterSeconds { get; }
+}
+
+/// <summary>A manager answered with a redirect, which Weir refuses to follow (real Sonarr, Radarr and Deluno never send one).</summary>
+public sealed class MediaManagerRedirectedException : MediaManagerHttpException
+{
+    public MediaManagerRedirectedException()
+        : base("answered with a redirect to another address. Use the address it redirects to.")
+    {
+    }
 }
 
 /// <summary>The manager could not be reached at all (refused, timed out, name not resolved).</summary>

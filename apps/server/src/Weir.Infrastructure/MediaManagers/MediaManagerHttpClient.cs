@@ -1,11 +1,25 @@
 using System.Globalization;
 using System.Net.Http.Headers;
+using System.Security.Authentication;
 using System.Text;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
+using Weir.Core.Net;
 using Weir.Core.Notifications;
+using Weir.Infrastructure.Http;
 
 namespace Weir.Infrastructure.MediaManagers;
+
+/// <summary>
+/// Which addresses a manager connection's traffic may reach, once resolved. A media manager lives on the LAN or the
+/// same host, so <see cref="Local"/> keeps private ranges and loopback allowed; the metadata provider is a public
+/// service, so <see cref="Public"/> requires a globally-routable address (ADR-0015; audit report findings H1/H2).
+/// </summary>
+public enum ManagerAddressPolicy
+{
+    Local,
+    Public,
+}
 
 /// <summary>
 /// The HTTP transport for media managers and the metadata provider. A seam so tests answer with a fake handler.
@@ -15,22 +29,76 @@ public interface IManagerHttpHandlerFactory
     /// <summary>
     /// A handler the caller does not dispose. <paramref name="followRedirects"/> is true for manager API and metadata
     /// provider calls, and false for a hand-off completion report, which posts once to the exact callback URL.
+    /// <paramref name="policy"/> is only meaningful for a handler that actually connects over the network (a test
+    /// fake may ignore it).
     /// </summary>
-    HttpMessageHandler Handler(bool followRedirects);
+    HttpMessageHandler Handler(bool followRedirects, ManagerAddressPolicy policy = ManagerAddressPolicy.Local);
 }
 
-/// <summary>Two shared <see cref="SocketsHttpHandler"/>s, one following up to ten redirects and one not.</summary>
+/// <summary>
+/// One <see cref="SocketsHttpHandler"/> per redirect/address-policy combination, shared across requests. Every
+/// handler resolves its target host and connects only to an address <see cref="ManagerAddressPolicy"/> allows,
+/// pinning the connection to that address so the check cannot be defeated by the name resolving differently a
+/// moment later (DNS rebinding) — the same defence <see cref="ExternalJsonPoster"/> uses for outbound notifications.
+/// </summary>
 public sealed class SocketsManagerHttpHandlerFactory : IManagerHttpHandlerFactory, IDisposable
 {
-    private readonly SocketsHttpHandler _following = new() { AllowAutoRedirect = true, MaxAutomaticRedirections = 10, PooledConnectionLifetime = TimeSpan.FromMinutes(2) };
-    private readonly SocketsHttpHandler _notFollowing = new() { AllowAutoRedirect = false, PooledConnectionLifetime = TimeSpan.FromMinutes(2) };
+    private readonly OutboundAddressGuard.HostResolver? _resolveHost;
+    private readonly Dictionary<(bool FollowRedirects, ManagerAddressPolicy Policy), SocketsHttpHandler> _handlers = [];
+    private readonly Lock _lock = new();
 
-    public HttpMessageHandler Handler(bool followRedirects) => followRedirects ? _following : _notFollowing;
+    /// <param name="resolveHost">Overrides DNS resolution; tests use this to prove the policy against fixed answers.</param>
+    public SocketsManagerHttpHandlerFactory(OutboundAddressGuard.HostResolver? resolveHost = null)
+    {
+        _resolveHost = resolveHost;
+    }
+
+    public HttpMessageHandler Handler(bool followRedirects, ManagerAddressPolicy policy = ManagerAddressPolicy.Local)
+    {
+        var key = (followRedirects, policy);
+        lock (_lock)
+        {
+            if (!_handlers.TryGetValue(key, out var handler))
+            {
+                handler = Build(followRedirects, policy);
+                _handlers.Add(key, handler);
+            }
+
+            return handler;
+        }
+    }
+
+    private SocketsHttpHandler Build(bool followRedirects, ManagerAddressPolicy policy)
+    {
+        Func<PyIpAddress, bool> isAllowed = policy == ManagerAddressPolicy.Public ? OutboundAddressGuard.IsPublic : OutboundAddressGuard.IsLocalServiceAddress;
+        return new SocketsHttpHandler
+        {
+            AllowAutoRedirect = followRedirects,
+            MaxAutomaticRedirections = followRedirects ? 10 : 1,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+            ConnectCallback = (context, cancellationToken) =>
+                OutboundAddressGuard.ConnectAsync(context, isAllowed, host => new ManagerAddressRefusedException(host), _resolveHost, cancellationToken),
+        };
+    }
 
     public void Dispose()
     {
-        _following.Dispose();
-        _notFollowing.Dispose();
+        lock (_lock)
+        {
+            foreach (var handler in _handlers.Values)
+            {
+                handler.Dispose();
+            }
+        }
+    }
+}
+
+/// <summary>The host resolved to an address <see cref="ManagerAddressPolicy"/> refuses to connect to.</summary>
+public sealed class ManagerAddressRefusedException : Exception
+{
+    public ManagerAddressRefusedException(string host)
+        : base($"Weir will not connect to {host}: it does not resolve to an address this connection may use.")
+    {
     }
 }
 
@@ -140,7 +208,10 @@ public sealed class MediaManagerHttpClient
     {
         using (request)
         {
-            using var client = new HttpClient(_handlers.Handler(followRedirects: true), disposeHandler: false) { Timeout = _timeout };
+            // Real Sonarr, Radarr and Deluno never redirect their own API; a manager base URL that does is either
+            // misconfigured or is answering from somewhere Weir did not ask, and following it would carry the
+            // X-Api-Key header to whatever host the redirect names.
+            using var client = new HttpClient(_handlers.Handler(followRedirects: false, ManagerAddressPolicy.Local), disposeHandler: false) { Timeout = _timeout };
             HttpResponseMessage response;
             try
             {
@@ -153,6 +224,12 @@ public sealed class MediaManagerHttpClient
 
             using (response)
             {
+                var status = (int)response.StatusCode;
+                if (status is >= 300 and < 400)
+                {
+                    throw new MediaManagerRedirectedException();
+                }
+
                 byte[] raw;
                 try
                 {
@@ -163,18 +240,19 @@ public sealed class MediaManagerHttpClient
                     throw Unreachable(exception);
                 }
 
-                var status = (int)response.StatusCode;
                 if (status is < 200 or >= 300)
                 {
-                    var text = PyStrings.Slice(new UTF8Encoding(false, false).GetString(raw), 500);
+                    // Neither exception carries the response body: an unreachable manager already leaks nothing, and
+                    // the connection test and setup-check screens that surface these messages must not become a way
+                    // to read back bytes from whatever answered instead of the manager Weir asked for.
                     if (status == 429)
                     {
                         throw new MediaManagerRateLimitedException(
-                            $"HTTP 429: {text}",
+                            $"HTTP {status.ToString(CultureInfo.InvariantCulture)}",
                             RetryAfterSeconds(response.Headers.TryGetValues("Retry-After", out var values) ? values.First() : null));
                     }
 
-                    throw new MediaManagerHttpException($"HTTP {status.ToString(CultureInfo.InvariantCulture)}: {text}");
+                    throw new MediaManagerHttpException($"HTTP {status.ToString(CultureInfo.InvariantCulture)}");
                 }
 
                 if (raw.Length == 0 && allowEmpty)
@@ -231,10 +309,27 @@ public sealed class MediaManagerHttpClient
         exception is HttpRequestException or IOException ||
         (exception is TaskCanceledException && !cancellationToken.IsCancellationRequested);
 
-    internal static MediaManagerUnreachableException Unreachable(Exception exception)
+    internal static MediaManagerUnreachableException Unreachable(Exception exception) =>
+        new($"<urlopen error {ClassifyTransportFailure(exception)}>", exception);
+
+    /// <summary>
+    /// A plain word for why the connection failed, never the framework's own exception text: that text can carry
+    /// details (a resolved address, a certificate subject) that do not belong in a message an unauthenticated
+    /// caller or a viewer-role screen can read back.
+    /// </summary>
+    internal static string ClassifyTransportFailure(Exception exception)
     {
-        var message = exception is TaskCanceledException ? "timed out" : Innermost(exception).Message;
-        return new MediaManagerUnreachableException($"<urlopen error {message}>", exception);
+        if (exception is TaskCanceledException)
+        {
+            return "timed out";
+        }
+
+        return Innermost(exception) switch
+        {
+            ManagerAddressRefusedException refused => refused.Message,
+            AuthenticationException => "a certificate problem",
+            _ => "couldn't connect",
+        };
     }
 
     private static Exception Innermost(Exception exception)

@@ -71,6 +71,8 @@ public static class ManagerDialectRules
                     : string.Empty;
                 return $"{connection.Label} is rate limiting Weir, so it could not say {what}.{when} " +
                        "Weir backed off rather than retrying straight away.";
+            case MediaManagerRedirectedException redirected:
+                return $"{connection.Label} {redirected.Message}";
             case MediaManagerHttpException http:
                 var detail = http.Message;
                 if (detail.Contains("HTTP 401", StringComparison.Ordinal) || detail.Contains("HTTP 403", StringComparison.Ordinal))

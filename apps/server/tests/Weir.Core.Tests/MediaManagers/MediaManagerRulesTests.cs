@@ -54,9 +54,12 @@ public sealed class MediaManagerRulesTests
         }
 
         Assert.Contains("did not name a file path", HandoffPaths.RelativeMediaPathForHandoff("/srv/handoff", "  ").Problem, StringComparison.Ordinal);
+        // Only the file's own name is named, never the absolute path either side gave: this message can reach an
+        // unauthenticated caller, and it must not disclose the layout of Weir's own disk (#M1).
         Assert.Equal(
-            "The hand-off names '/x/y.mkv', which is not inside Weir's watched folder '/srv'. Point the media manager and Weir at the same folder — both hosts have to see it at that path.",
+            "The hand-off names 'y.mkv', which is not inside Weir's watched folder for this media type. Point the media manager and Weir at the same folder — both hosts have to see it at that path.",
             HandoffPaths.RelativeMediaPathForHandoff("/srv", "/x/y.mkv").Problem);
+        Assert.DoesNotContain("/srv", HandoffPaths.RelativeMediaPathForHandoff("/srv", "/x/y.mkv").Problem, StringComparison.Ordinal);
     }
 
     // --- import events -------------------------------------------------------------------------
@@ -166,6 +169,9 @@ public sealed class MediaManagerRulesTests
         Assert.Contains("rate limiting Weir", limited, StringComparison.Ordinal);
         Assert.Contains("about 30s", limited, StringComparison.Ordinal);
         Assert.Contains("backed off rather than retrying straight away", limited, StringComparison.Ordinal);
+        Assert.Equal(
+            "Radarr (4K) answered with a redirect to another address. Use the address it redirects to.",
+            ManagerDialectRules.Unreachable(connection, new MediaManagerRedirectedException(), "x"));
     }
 
     [Fact]
