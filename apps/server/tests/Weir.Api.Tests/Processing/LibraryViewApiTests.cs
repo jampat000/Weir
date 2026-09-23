@@ -15,17 +15,17 @@ public sealed class LibraryViewApiTests
 {
     private const string FilmProbe = """
     {"streams": [
-      {"codec_type": "video", "codec_name": "hevc", "width": 3840, "height": 2160},
-      {"codec_type": "audio", "codec_name": "eac3", "channels": 6, "channel_layout": "5.1(side)", "tags": {"language": "eng"}},
-      {"codec_type": "audio", "codec_name": "aac", "channels": 2, "tags": {"language": "jpn"}},
-      {"codec_type": "subtitle", "codec_name": "subrip", "tags": {"language": "eng"}}
+      {"index": 0, "codec_type": "video", "codec_name": "hevc", "width": 3840, "height": 2160},
+      {"index": 1, "codec_type": "audio", "codec_name": "eac3", "channels": 6, "channel_layout": "5.1(side)", "tags": {"language": "eng"}},
+      {"index": 2, "codec_type": "audio", "codec_name": "aac", "channels": 2, "tags": {"language": "jpn"}},
+      {"index": 3, "codec_type": "subtitle", "codec_name": "subrip", "tags": {"language": "eng"}}
     ]}
     """;
 
     private const string ShowProbe = """
     {"streams": [
-      {"codec_type": "video", "codec_name": "h264", "width": 1920, "height": 1080},
-      {"codec_type": "audio", "codec_name": "ac3", "channels": 6, "tags": {"language": "eng"}}
+      {"index": 0, "codec_type": "video", "codec_name": "h264", "width": 1920, "height": 1080},
+      {"index": 1, "codec_type": "audio", "codec_name": "ac3", "channels": 6, "tags": {"language": "eng"}}
     ]}
     """;
 
@@ -310,6 +310,189 @@ public sealed class LibraryViewApiTests
         Assert.Equal(HttpStatusCode.NotFound, notFound.StatusCode);
         using var problemsNotFound = await client.GetAsync(ProblemsPath(missing));
         Assert.Equal(HttpStatusCode.NotFound, problemsNotFound.StatusCode);
+    }
+
+    private static string CleanPath(long libraryId) => $"/api/v1/processing/libraries/{libraryId}/library-files/clean";
+
+    private static string LeaveAlonePath(long libraryId) => $"/api/v1/processing/libraries/{libraryId}/library-files/leave-alone";
+
+    /// <summary>Keep the video and the second audio track: the opposite of what the seeded library's rules would do.</summary>
+    private static object JapaneseOnlyChoice() => new
+    {
+        keep = new[]
+        {
+            new { index = 0, @default = false, forced = false },
+            new { index = 2, @default = true, forced = false },
+        },
+        order = new[] { 0, 2 },
+    };
+
+    [Fact]
+    public async Task A_file_left_alone_stays_left_alone_when_it_is_selected_for_cleaning()
+    {
+        var (server, client, libraryId) = await StartAsync();
+        await using var _ = server;
+        await SeedFileAsync(server, libraryId, "/lib/film.mkv", "would_change", FilmProbe);
+
+        using var set = await client.PostAsync(
+            LeaveAlonePath(libraryId),
+            new { csrf_token = await client.CsrfAsync(), path = "/lib/film.mkv", leave_alone = true });
+        Assert.Equal(HttpStatusCode.OK, set.StatusCode);
+
+        using var clean = await client.PostAsync(
+            CleanPath(libraryId),
+            new { csrf_token = await client.CsrfAsync(), paths = new[] { "/lib/film.mkv" }, confirm_final_removal = true });
+
+        var body = await Json(clean);
+        Assert.Equal(HttpStatusCode.OK, clean.StatusCode);
+        Assert.Equal(0, body["queued"]!.GetValue<int>());
+        Assert.Equal(["/lib/film.mkv"], body["skipped_paths"]!.AsArray().Select(p => p!.GetValue<string>()));
+        // Nothing will be removed, so nothing claims it will be.
+        Assert.Equal(0, body["files_count"]!.GetValue<int>());
+        Assert.Equal(0, body["tracks_count"]!.GetValue<int>());
+
+        // And the table says so, both as a count and as something to filter by.
+        using var files = await client.GetAsync(FilesPath(libraryId, "state=left_alone"));
+        var table = await Json(files);
+        Assert.Equal(["/lib/film.mkv"], Paths(table));
+        Assert.True(table["files"]![0]!["leave_alone"]!.GetValue<bool>());
+        Assert.Equal(1, table["summary"]!["left_alone"]!.GetValue<int>());
+        Assert.Equal(0, table["summary"]!["cleaned"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task A_file_left_alone_is_not_counted_in_what_the_confirmation_asks_about()
+    {
+        var (server, client, libraryId) = await StartAsync();
+        await using var _ = server;
+        await SeedFileAsync(server, libraryId, "/lib/film.mkv", "would_change", FilmProbe);
+        await SeedFileAsync(server, libraryId, "/lib/show.mkv", "would_change", ShowProbe);
+        await TestDatabase.ExecuteAsync(
+            server,
+            "UPDATE library_files SET removed_audio_tracks = 1 WHERE library_id = $l",
+            ("$l", libraryId));
+
+        using var set = await client.PostAsync(
+            LeaveAlonePath(libraryId),
+            new { csrf_token = await client.CsrfAsync(), path = "/lib/film.mkv", leave_alone = true });
+        Assert.Equal(HttpStatusCode.OK, set.StatusCode);
+
+        using var clean = await client.PostAsync(
+            CleanPath(libraryId),
+            new { csrf_token = await client.CsrfAsync(), paths = new[] { "/lib/film.mkv", "/lib/show.mkv" } });
+
+        // One of the two is set aside, so the dialog asks about the other one only.
+        var body = await Json(clean);
+        Assert.Equal(HttpStatusCode.BadRequest, clean.StatusCode);
+        Assert.Equal(1, body["files_count"]!.GetValue<int>());
+        Assert.Equal(1, body["tracks_count"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task Changing_your_mind_about_a_file_lets_it_be_cleaned_again()
+    {
+        var (server, client, libraryId) = await StartAsync();
+        await using var _ = server;
+        await SeedFileAsync(server, libraryId, "/lib/film.mkv", "would_change", FilmProbe);
+
+        foreach (var leaveAlone in new[] { true, false })
+        {
+            using var set = await client.PostAsync(
+                LeaveAlonePath(libraryId),
+                new { csrf_token = await client.CsrfAsync(), path = "/lib/film.mkv", leave_alone = leaveAlone });
+            Assert.Equal(HttpStatusCode.OK, set.StatusCode);
+        }
+
+        using var clean = await client.PostAsync(
+            CleanPath(libraryId),
+            new { csrf_token = await client.CsrfAsync(), paths = new[] { "/lib/film.mkv" }, confirm_final_removal = true });
+
+        var body = await Json(clean);
+        Assert.Equal(1, body["queued"]!.GetValue<int>());
+        Assert.Empty(body["skipped_paths"]!.AsArray());
+    }
+
+    [Fact]
+    public async Task A_track_choice_is_quoted_back_for_confirmation_before_anything_is_queued()
+    {
+        var (server, client, libraryId) = await StartAsync();
+        await using var _ = server;
+        // "matches": the library's own rules would leave this file alone, so only the choice can explain the removal.
+        await SeedFileAsync(server, libraryId, "/lib/film.mkv", "matches", FilmProbe);
+
+        using var response = await client.PostAsync(
+            CleanPath(libraryId),
+            new { csrf_token = await client.CsrfAsync(), paths = new[] { "/lib/film.mkv" }, manual_plan = JapaneseOnlyChoice() });
+
+        var body = await Json(response);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(1, body["files_count"]!.GetValue<int>());
+        // Dropping the English audio track and the subtitle track the choice does not keep.
+        Assert.Equal(2, body["tracks_count"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task A_confirmed_track_choice_queues_a_clean_for_a_file_the_rules_are_happy_with()
+    {
+        var (server, client, libraryId) = await StartAsync();
+        await using var _ = server;
+        await SeedFileAsync(server, libraryId, "/lib/film.mkv", "matches", FilmProbe);
+
+        using var response = await client.PostAsync(
+            CleanPath(libraryId),
+            new
+            {
+                csrf_token = await client.CsrfAsync(),
+                paths = new[] { "/lib/film.mkv" },
+                confirm_final_removal = true,
+                manual_plan = JapaneseOnlyChoice(),
+            });
+
+        var body = await Json(response);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1, body["queued"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task A_track_choice_that_cannot_apply_is_refused_rather_than_queued()
+    {
+        var (server, client, libraryId) = await StartAsync();
+        await using var _ = server;
+        await SeedFileAsync(server, libraryId, "/lib/film.mkv", "would_change", FilmProbe);
+        await SeedFileAsync(server, libraryId, "/lib/show.mkv", "would_change", ShowProbe);
+        var csrf = await client.CsrfAsync();
+
+        // One file at a time: track numbers mean nothing across two files.
+        using var twoFiles = await client.PostAsync(
+            CleanPath(libraryId),
+            new { csrf_token = csrf, paths = new[] { "/lib/film.mkv", "/lib/show.mkv" }, confirm_final_removal = true, manual_plan = JapaneseOnlyChoice() });
+        Assert.Equal(HttpStatusCode.BadRequest, twoFiles.StatusCode);
+
+        // A track the file does not have.
+        using var noSuchTrack = await client.PostAsync(
+            CleanPath(libraryId),
+            new
+            {
+                csrf_token = csrf,
+                paths = new[] { "/lib/show.mkv" },
+                confirm_final_removal = true,
+                manual_plan = new { keep = new[] { new { index = 0, @default = false, forced = false }, new { index = 7, @default = true, forced = false } }, order = new[] { 0, 7 } },
+            });
+        Assert.Equal(HttpStatusCode.BadRequest, noSuchTrack.StatusCode);
+
+        // Keeping everything the file already holds, flags and all, is not a clean.
+        using var nothingToDo = await client.PostAsync(
+            CleanPath(libraryId),
+            new
+            {
+                csrf_token = csrf,
+                paths = new[] { "/lib/show.mkv" },
+                confirm_final_removal = true,
+                manual_plan = new { keep = new[] { new { index = 0, @default = false, forced = false }, new { index = 1, @default = false, forced = false } }, order = new[] { 0, 1 } },
+            });
+        Assert.Equal(HttpStatusCode.BadRequest, nothingToDo.StatusCode);
+
+        Assert.Equal(0, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM jobs WHERE job_kind = 'processing.library.clean.v1'"));
     }
 
     [Fact]

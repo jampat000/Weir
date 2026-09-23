@@ -371,6 +371,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/intake/handoffs/{source_key}/{handoff_id}/outcome": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Intake Handoff Outcome
+     * @description The manager says what became of the file Weir handed back. imported records it and releases Weir's copy when it is still exactly the file Weir wrote; not-imported records it and keeps the copy. 200 again for the same outcome; 404 never received; 409 not finished or a different outcome already recorded.
+     */
+    post: operations["post_intake_handoff_outcome_api_v1_intake_handoffs__source_key___handoff_id__outcome_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/intake/webhook/{source_key}": {
     parameters: {
       query?: never;
@@ -1089,6 +1109,26 @@ export interface paths {
      * @description Library mode (#505 point 5). Cleans the selected files in place. Refused with 400 (LibraryConfirmationRequired) when any selected file would have tracks removed and confirm_final_removal is not true.
      */
     post: operations["post_library_files_clean"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/processing/libraries/{library_id}/library-files/leave-alone": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Library Files Leave Alone
+     * @description Library mode. Sets one file aside so nothing cleans it — a rescan does not forget it — or brings it back with leave_alone: false.
+     */
+    post: operations["post_library_files_leave_alone"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2283,6 +2323,54 @@ export interface components {
       detail?: components["schemas"]["ValidationError"][];
     };
     /**
+     * HandoffOutcomeIn
+     * @description What a media manager says became of a file Weir handed back (agreed with Deluno, 23 Sep 2026).
+     */
+    HandoffOutcomeIn: {
+      /**
+       * Outcome
+       * @description imported, or not-imported. not-imported is final: never sent for a failure the manager will retry.
+       * @enum {string}
+       */
+      outcome: "imported" | "not-imported";
+      /**
+       * Occurredutc
+       * Format: date-time
+       * @description When it happened, with a time zone.
+       */
+      occurredUtc: string;
+      /**
+       * Importedpath
+       * @description Where the manager put the file in its library.
+       */
+      importedPath?: string | null;
+      /**
+       * Reason
+       * @description Why the manager will not import it.
+       */
+      reason?: string | null;
+    };
+    /** HandoffOutcomeOut */
+    HandoffOutcomeOut: {
+      /** Handoffid */
+      handoffId: string;
+      /**
+       * Outcome
+       * @enum {string}
+       */
+      outcome: "imported" | "not-imported";
+      /**
+       * Released
+       * @description Weir removed its copy from the hand-back folder.
+       */
+      released: boolean;
+      /**
+       * Message
+       * @description What Weir did, in plain words.
+       */
+      message: string;
+    };
+    /**
      * HealthResponse
      * @description Minimal liveness payload for load balancers and ops.
      */
@@ -2342,6 +2430,16 @@ export interface components {
       confirm_final_removal: boolean;
       /** Csrf Token */
       csrf_token: string;
+      /**
+       * Expected Size Bytes
+       * @description The file's size when those tracks were chosen. A file that changed since is left alone rather than cleaned to a stale choice.
+       */
+      expected_size_bytes?: number | null;
+      /**
+       * Manual Plan
+       * @description Your own choice of tracks for this one file, instead of the library's rules. Only valid with exactly one path.
+       */
+      manual_plan?: components["schemas"]["ProcessingManualPlanIn"] | null;
       /** Paths */
       paths: string[];
     };
@@ -2436,8 +2534,18 @@ export interface components {
        * @enum {string}
        */
       classification: "matches" | "would_change" | "cannot_process";
+      /**
+       * Cleaned At
+       * @description When Weir last cleaned this file (unix seconds), or null if it never has.
+       */
+      cleaned_at: number | null;
       /** Estimated Bytes Saved */
       estimated_bytes_saved: number;
+      /**
+       * Leave Alone
+       * @description You asked Weir to leave this file alone; nothing cleans it until you say otherwise.
+       */
+      leave_alone: boolean;
       /** Link Count */
       link_count: number | null;
       /** Manager Kind */
@@ -2539,6 +2647,44 @@ export interface components {
       would_change: number;
     };
     /**
+     * LibraryLeaveAloneIn
+     * @description Library mode: set one file aside so nothing cleans it, or bring it back. Weir server (.NET) only.
+     */
+    LibraryLeaveAloneIn: {
+      /** Csrf Token */
+      csrf_token: string;
+      /**
+       * Leave Alone
+       * @default true
+       */
+      leave_alone: boolean;
+      /** Path */
+      path: string;
+    };
+    /**
+     * LibraryLeaveAloneOut
+     * @description Library mode: what that file is now. Weir server (.NET) only.
+     */
+    LibraryLeaveAloneOut: {
+      /** Leave Alone */
+      leave_alone: boolean;
+      /** Path */
+      path: string;
+    };
+    /**
+     * LibraryModeScheduleOut
+     * @description "Scheduled scan and clean": whether it is on and when it next runs. It runs once a day, inside the library's own schedule window.
+     */
+    LibraryModeScheduleOut: {
+      /** Enabled */
+      enabled: boolean;
+      /**
+       * Next Run At
+       * @description When it next runs; now when it is due. Null when it is off or cannot run: no library folders, the library switched off, or a schedule window that never opens.
+       */
+      next_run_at: string | null;
+    };
+    /**
      * LibraryOverviewOut
      * @description Issue #568: what the library holds and its state, aggregated in SQL rather than in the browser.
      */
@@ -2552,6 +2698,7 @@ export interface components {
       problems: components["schemas"]["LibraryProblemGroupOut"][];
       /** Scan */
       scan: components["schemas"]["LibraryScanStateOut"] | null;
+      schedule: components["schemas"]["LibraryModeScheduleOut"];
       totals: components["schemas"]["LibraryTotalsOut"];
     };
     /**
@@ -2750,10 +2897,14 @@ export interface components {
     LibraryTotalsOut: {
       /** Cannot Process */
       cannot_process: number;
+      /** Cleaned */
+      cleaned: number;
       /** Estimated Bytes Saved */
       estimated_bytes_saved: number;
       /** Files */
       files: number;
+      /** Left Alone */
+      left_alone: number;
       /** Matches */
       matches: number;
       /** Size Bytes */
@@ -2810,7 +2961,18 @@ export interface components {
        * Family
        * @enum {string}
        */
-      family: "work_temp_stale_sweep" | "failure_cleanup";
+      family:
+        "work_temp_stale_sweep" | "failure_cleanup" | "unclaimed_handbacks";
+      /**
+       * Window Days
+       * @description Unclaimed hand-backs only: how many days a copy waits before the job may remove it.
+       */
+      window_days?: number;
+      /**
+       * Interval Seconds
+       * @description How often this job runs: the interval saved in Settings › Cleanup, else the environment's.
+       */
+      interval_seconds?: number;
       /** Last Completed At */
       last_completed_at?: string | null;
       /**
@@ -2818,6 +2980,11 @@ export interface components {
        * @description The most recent failure reason, when the last run failed.
        */
       last_error?: string | null;
+      /**
+       * Next Run At
+       * @description When the job next runs by itself. Null while it is switched off.
+       */
+      next_run_at?: string | null;
       /** Last Failed At */
       last_failed_at?: string | null;
       /**
@@ -2844,7 +3011,8 @@ export interface components {
        * Family
        * @enum {string}
        */
-      family: "work_temp_stale_sweep" | "failure_cleanup";
+      family:
+        "work_temp_stale_sweep" | "failure_cleanup" | "unclaimed_handbacks";
       /**
        * Media Scope
        * @default movie
@@ -3519,6 +3687,11 @@ export interface components {
        */
       output_collision_reason?: string | null;
       /**
+       * Progress Elapsed Seconds
+       * @description How long the running pass has been writing, in seconds.
+       */
+      progress_elapsed_seconds?: number | null;
+      /**
        * Progress Eta Seconds
        * @description The running pass's own estimate of the time left, when it has one.
        */
@@ -3533,6 +3706,26 @@ export interface components {
        * @description How far the current pass has got, when one is running. Null when nothing is in flight.
        */
       progress_percent?: number | null;
+      /**
+       * Progress Removed Audio
+       * @description The audio tracks the running pass is taking out, as its plan describes each one. Null when nothing is in flight.
+       */
+      progress_removed_audio?: string[] | null;
+      /**
+       * Progress Removed Subtitles
+       * @description The subtitle tracks the running pass is taking out. Null when nothing is in flight.
+       */
+      progress_removed_subtitles?: string[] | null;
+      /**
+       * Progress Speed
+       * @description The running pass's speed as ffmpeg reports it, for example 148x.
+       */
+      progress_speed?: string | null;
+      /**
+       * Progress Status
+       * @description processing while the file is written; finishing during the final checks and hand-back. Null when nothing is in flight.
+       */
+      progress_status?: string | null;
       /**
        * Quarantined
        * @description True when repeated failures placed this file on hold until an operator requeues it.
@@ -3596,6 +3789,61 @@ export interface components {
        * @description Measured width in pixels.
        */
       video_width?: number | null;
+      /**
+       * Handback
+       * @description The copy Weir handed back for a media manager to import, and what became of it. Null when Weir wrote none.
+       */
+      handback?: components["schemas"]["ProcessingFileHandbackOut"] | null;
+    };
+    /**
+     * ProcessingFileHandbackOut
+     * @description The copy Weir handed back, what a media manager said about it, and whether Weir removed it.
+     */
+    ProcessingFileHandbackOut: {
+      /**
+       * Output Path
+       * @description Where Weir wrote the copy.
+       */
+      output_path: string;
+      /** Written At */
+      written_at?: string | null;
+      /**
+       * Outcome
+       * @description What a media manager said. Null while none has said anything.
+       */
+      outcome: ("imported" | "not-imported") | null;
+      /**
+       * Outcome By
+       * @description Which media manager said it: Sonarr, Radarr, Deluno.
+       */
+      outcome_by: string | null;
+      /** Outcome At */
+      outcome_at?: string | null;
+      /**
+       * Imported Path
+       * @description Where the media manager put the file in its library, as it said.
+       */
+      imported_path?: string | null;
+      /**
+       * Outcome Reason
+       * @description Why the media manager will not import it, when it said.
+       */
+      outcome_reason?: string | null;
+      /**
+       * Released At
+       * @description When Weir removed its copy. Null while the copy is there or Weir left it.
+       */
+      released_at: string | null;
+      /**
+       * Settled At
+       * @description When Weir stopped looking after the copy.
+       */
+      settled_at?: string | null;
+      /**
+       * Release Note
+       * @description What happened to the copy, in plain words.
+       */
+      release_note: string | null;
     };
     /**
      * ProcessingFileRemuxPassManualEnqueueIn
@@ -4173,6 +4421,13 @@ export interface components {
        * @default true
        */
       remove_original_after_success: boolean;
+      /**
+       * Remux Writer
+       * @description Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
+       * @default best
+       * @enum {string}
+       */
+      remux_writer: "best" | "ffmpeg";
     };
     /** ProcessingLibraryDeleteIn */
     ProcessingLibraryDeleteIn: {
@@ -4279,6 +4534,12 @@ export interface components {
       modified_before: string | null;
       /** Name */
       name: string;
+      /**
+       * Next Look At
+       * @description When Weir next looks at this library's watched folder: the next periodic scan, or sooner when a held file's wait ends. Null when no look is scheduled (the library is off, or only folder events trigger a look).
+       * @default null
+       */
+      next_look_at: string | null;
       /** Output Collision Policy */
       output_collision_policy: string;
       /** Output Folder */
@@ -4329,6 +4590,13 @@ export interface components {
        * @default true
        */
       remove_original_after_success: boolean;
+      /**
+       * Remux Writer
+       * @description Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
+       * @default best
+       * @enum {string}
+       */
+      remux_writer: "best" | "ffmpeg";
     };
     /** ProcessingLibraryReorderIn */
     ProcessingLibraryReorderIn: {
@@ -4611,6 +4879,13 @@ export interface components {
        * @default true
        */
       remove_original_after_success: boolean;
+      /**
+       * Remux Writer
+       * @description Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
+       * @default best
+       * @enum {string}
+       */
+      remux_writer: "best" | "ffmpeg";
     };
     /**
      * ProcessingManualPlanIn
@@ -4662,6 +4937,11 @@ export interface components {
        * @description Delete the source release folder after a file fails terminally. Off by default: this removes the original, so it stays off until you choose it.
        */
       failure_cleanup_enabled: boolean;
+      /**
+       * Failure Cleanup Interval Seconds
+       * @description How often the failed-download cleanup runs, set in Settings › Cleanup. Null keeps the environment's interval.
+       */
+      failure_cleanup_interval_seconds?: number | null;
       /**
        * File Log Retention Days
        * @description How long to keep the per-file processing record. 0 keeps it forever.
@@ -4740,15 +5020,30 @@ export interface components {
       /** Updated At */
       updated_at: string;
       /**
-       * Verbose Detection Logging
-       * @description Record extra detail from the file-detection stage. Turn this on while working out why a file is or is not being picked up, and turn it off again afterwards — it is loud.
-       */
-      verbose_detection_logging: boolean;
-      /**
        * Work Temp Stale Sweep Enabled
        * @description Reclaim Weir's own stale working files. Safe, and on by default.
        */
       work_temp_stale_sweep_enabled: boolean;
+      /**
+       * Work Temp Stale Sweep Interval Seconds
+       * @description How often the leftover-work-file sweep runs, set in Settings › Cleanup. Null keeps the environment's interval.
+       */
+      work_temp_stale_sweep_interval_seconds?: number | null;
+      /**
+       * Unclaimed Handback Cleanup Enabled
+       * @description Remove Weir's own hand-back copies no media manager claimed in time. Off by default.
+       */
+      unclaimed_handback_cleanup_enabled: boolean;
+      /**
+       * Unclaimed Handback Window Days
+       * @description How many days an unclaimed hand-back copy waits before the cleanup may remove it.
+       */
+      unclaimed_handback_window_days: number;
+      /**
+       * Unclaimed Handback Cleanup Interval Seconds
+       * @description How often the unclaimed hand-back cleanup runs, set in Settings › Cleanup. Null keeps six hours.
+       */
+      unclaimed_handback_cleanup_interval_seconds?: number | null;
     };
     /**
      * ProcessingOperatorSettingsPutIn
@@ -4759,6 +5054,8 @@ export interface components {
       csrf_token: string;
       /** Failure Cleanup Enabled */
       failure_cleanup_enabled?: boolean | null;
+      /** Failure Cleanup Interval Seconds */
+      failure_cleanup_interval_seconds?: number | null;
       /** File Log Retention Days */
       file_log_retention_days?: number | null;
       /** Keep Failed Work Files */
@@ -4805,10 +5102,22 @@ export interface components {
       tv_schedule_hours_limited?: boolean | null;
       /** Tv Schedule Start */
       tv_schedule_start?: string | null;
-      /** Verbose Detection Logging */
+      /**
+       * Verbose Detection Logging
+       * @deprecated
+       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused.
+       */
       verbose_detection_logging?: boolean | null;
       /** Work Temp Stale Sweep Enabled */
       work_temp_stale_sweep_enabled?: boolean | null;
+      /** Work Temp Stale Sweep Interval Seconds */
+      work_temp_stale_sweep_interval_seconds?: number | null;
+      /** Unclaimed Handback Cleanup Enabled */
+      unclaimed_handback_cleanup_enabled?: boolean | null;
+      /** Unclaimed Handback Window Days */
+      unclaimed_handback_window_days?: number | null;
+      /** Unclaimed Handback Cleanup Interval Seconds */
+      unclaimed_handback_cleanup_interval_seconds?: number | null;
     };
     /** ProcessingOverviewStatsOut */
     ProcessingOverviewStatsOut: {
@@ -6329,6 +6638,8 @@ export interface operations {
         result?: string | null;
         library_id?: number | null;
         file?: string | null;
+        /** @description "weir" keeps Weir's own events (not about one file); "files" keeps the events about a file. */
+        about?: string | null;
       };
       header?: never;
       path?: never;
@@ -6435,6 +6746,8 @@ export interface operations {
         result?: string | null;
         library_id?: number | null;
         file?: string | null;
+        /** @description "weir" keeps Weir's own events (not about one file); "files" keeps the events about a file. */
+        about?: string | null;
       };
       header?: never;
       path?: never;
@@ -6904,6 +7217,46 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_intake_handoff_outcome_api_v1_intake_handoffs__source_key___handoff_id__outcome_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        "X-Webhook-Secret"?: string | null;
+      };
+      path: {
+        /** @description The manager that gave Weir the hand-off. */
+        source_key: string;
+        /** @description The manager's own hand-off id. */
+        handoff_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["HandoffOutcomeIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HandoffOutcomeOut"];
+        };
       };
       /** @description Validation Error */
       422: {
@@ -8199,6 +8552,8 @@ export interface operations {
         audio?: string;
         audio_language?: string;
         subtitle_language?: string;
+        /** @description Narrow to files Weir has cleaned, or files you have set aside. */
+        state?: ("cleaned" | "left_alone") | null;
         sort?:
           | "path"
           | "title"
@@ -8273,6 +8628,41 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["LibraryConfirmationRequired"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_library_files_leave_alone: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        library_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LibraryLeaveAloneIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LibraryLeaveAloneOut"];
         };
       };
       /** @description Validation Error */

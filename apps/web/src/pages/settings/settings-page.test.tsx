@@ -1,667 +1,89 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+  act,
+  cleanup,
   fireEvent,
   render,
   screen,
-  waitFor,
-  within,
 } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DISPLAY_DENSITY_STORAGE_KEY } from "../../lib/ui/display-density";
-import type { CurrentSession, UserPublic } from "../../lib/api/types";
-import { qk } from "../../lib/auth/queries";
-import * as suiteSettingsApi from "../../lib/suite/suite-settings-api";
-import {
-  suiteConfigurationBackupsQueryKey,
-  suiteLogsQueryKey,
-  suiteMetricsQueryKey,
-  suiteSecurityOverviewQueryKey,
-  suiteSettingsQueryKey,
-  suiteUpdateStatusQueryKey,
-} from "../../lib/suite/queries";
-import type {
-  SuiteLogsOut,
-  SuiteMetricsOut,
-  SuiteSecurityOverviewOut,
-  SuiteSettingsOut,
-  SuiteUpdateStatusOut,
-} from "../../lib/suite/types";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { SettingsPage } from "./settings-page";
 
-const operatorMe: UserPublic = { id: 1, username: "alice", role: "operator" };
-const viewerMe: UserPublic = { id: 2, username: "bob", role: "viewer" };
+// Each tab's own content is tested beside it; this file is about which tab is showing.
+vi.mock("../../components/shell/pause-control", () => ({
+  PauseControl: () => null,
+}));
+vi.mock("../processing/processing-libraries-section", () => ({
+  ProcessingLibrariesSection: () => <div>Libraries content</div>,
+}));
+vi.mock("../processing/processing-remux-section", () => ({
+  ProcessingRemuxSection: () => <div>Rules content</div>,
+}));
+vi.mock("./settings-media-managers-tab", () => ({
+  SettingsMediaManagersTab: () => <div>Media managers content</div>,
+}));
+vi.mock("../processing/processing-process-settings-section", () => ({
+  ProcessingProcessSettingsSection: () => <div>Running content</div>,
+}));
+vi.mock("../processing/processing-direct-play-section", () => ({
+  ProcessingDirectPlaySection: () => null,
+}));
+vi.mock("../processing/processing-maintenance-section", () => ({
+  ProcessingMaintenanceSection: () => <div>Housekeeping content</div>,
+}));
+vi.mock("../processing/processing-schedules-section", () => ({
+  ProcessingSchedulesSection: () => <div>Schedule content</div>,
+}));
+vi.mock("./settings-notifications-tab", () => ({
+  SettingsNotificationsTab: () => <div>Alerts content</div>,
+}));
 
-const minimalSuiteSettings: SuiteSettingsOut = {
-  product_display_name: "Weir",
-  signed_in_home_notice: null,
-  setup_wizard_state: "pending",
-  app_timezone: "UTC",
-  log_retention_days: 30,
-  activity_retention_days: 90,
-  configuration_backup_enabled: false,
-  configuration_backup_interval_hours: 24,
-  configuration_backup_preferred_time: "02:00",
-  configuration_backup_last_run_at: null,
-  updated_at: "2026-04-11T00:00:00Z",
-};
-
-const minimalUpdateStatus: SuiteUpdateStatusOut = {
-  current_version: "1.0.0",
-  install_type: "source",
-  status: "up_to_date",
-  summary: "This install is already on Weir 1.0.0.",
-  latest_version: "1.0.0",
-  latest_name: "Weir 1.0.0",
-  published_at: null,
-  release_url: "https://example.com/release",
-  windows_installer_url: null,
-  docker_image: null,
-  docker_tag: null,
-  docker_update_command: null,
-  in_app_upgrade_supported: false,
-  in_app_upgrade_summary: null,
-};
-
-const windowsUpdateAvailableStatus: SuiteUpdateStatusOut = {
-  ...minimalUpdateStatus,
-  current_version: "2.0.7",
-  install_type: "windows",
-  status: "update_available",
-  summary: "Weir 2.0.8 is available.",
-  latest_version: "2.0.8",
-  latest_name: "Weir 2.0.8",
-  windows_installer_url:
-    "https://github.com/jampat000/Weir/releases/download/v2.0.8/Weir-win-Setup.exe",
-  in_app_upgrade_supported: true,
-  in_app_upgrade_summary:
-    "Updates are managed by the Weir desktop app via Velopack.",
-};
-
-const minimalSecurity: SuiteSecurityOverviewOut = {
-  session_signing_configured: true,
-  sign_in_cookie_https_mode: "auto",
-  sign_in_cookie_https_plain:
-    "Matched to each connection — on over HTTPS, off over plain HTTP on your network.",
-  sign_in_cookie_same_site: "Lax (recommended for most setups)",
-  standard_session_idle_timeout_plain: "14 days",
-  standard_session_absolute_timeout_plain: "90 days",
-  trusted_session_idle_timeout_plain: "60 days",
-  trusted_session_absolute_timeout_plain: "365 days",
-  extra_https_hardening_enabled: false,
-  sign_in_attempt_limit: 30,
-  sign_in_attempt_window_plain: "1 minute",
-  first_time_setup_attempt_limit: 10,
-  first_time_setup_attempt_window_plain: "1 hour",
-  allowed_browser_origins_count: 1,
-  restart_required_note:
-    "These safety options are read when the app starts from the server configuration file. To change them, ask whoever runs the server to edit that file and restart the app.",
-};
-
-const minimalCurrentSession: CurrentSession = {
-  session_id: "00000000-0000-0000-0000-000000000001",
-  client_label: "Chrome on Windows",
-  current: true,
-  trusted_device: true,
-  created_at: "2026-04-11T00:00:00Z",
-  last_seen_at: "2026-04-11T00:05:00Z",
-  absolute_expires_at: "2027-04-11T00:00:00Z",
-  idle_timeout_minutes: 86400,
-  absolute_timeout_days: 365,
-};
-
-const minimalLogs: SuiteLogsOut = {
-  items: [],
-  total: 0,
-  counts: {
-    error: 0,
-    warning: 0,
-    information: 0,
-  },
-};
-
-const minimalMetrics: SuiteMetricsOut = {
-  uptime_seconds: 3600,
-  total_requests: 20,
-  average_response_ms: 12,
-  error_log_count: 0,
-  status_counts: { "2xx": 18, "3xx": 0, "4xx": 2, "5xx": 0 },
-  busiest_routes: [],
-};
-
-function wrap(ui: ReactNode, client: QueryClient) {
-  const router = createMemoryRouter([{ path: "*", element: ui }]);
-  return (
-    <QueryClientProvider client={client}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
-  );
-}
-
-function renderSettings(
-  me: UserPublic,
-  overrides?: {
-    updateStatus?: SuiteUpdateStatusOut;
-    initialEntries?: string[];
-  },
-) {
-  const qc = new QueryClient({
-    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
-  });
-  qc.setQueryData(suiteSettingsQueryKey, minimalSuiteSettings);
-  qc.setQueryData(suiteSecurityOverviewQueryKey, minimalSecurity);
-  qc.setQueryData(qk.me, me);
-  qc.setQueryData(qk.session, minimalCurrentSession);
-  qc.setQueryData(suiteConfigurationBackupsQueryKey, {
-    directory: "C:/Weir/backups/suite-configuration",
-    items: [],
-  });
-  qc.setQueryData(
-    suiteUpdateStatusQueryKey,
-    overrides?.updateStatus ?? minimalUpdateStatus,
-  );
-  qc.setQueryData(
-    [
-      ...suiteLogsQueryKey,
-      {
-        level: undefined,
-        search: undefined,
-        has_exception: undefined,
-        limit: 100,
-      },
-    ],
-    minimalLogs,
-  );
-  qc.setQueryData(suiteMetricsQueryKey, minimalMetrics);
+function renderAt(entry: string) {
   const router = createMemoryRouter(
-    [{ path: "*", element: <SettingsPage /> }],
-    overrides?.initialEntries
-      ? { initialEntries: overrides.initialEntries }
-      : undefined,
+    [{ path: "/settings", element: <SettingsPage /> }],
+    { initialEntries: [entry] },
   );
-  return render(
-    <QueryClientProvider client={qc}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
+  render(<RouterProvider router={router} />);
+  return router;
 }
 
-async function renderSettingsWithSupportConfig(
-  me: UserPublic,
-  supportConfig: {
-    showCard: boolean;
-    showPlaceholder: boolean;
-    supportUrl: string | null;
-  },
-  overrides?: { updateStatus?: SuiteUpdateStatusOut },
-) {
-  vi.resetModules();
-  vi.doMock("../../lib/support", () => ({
-    SHOW_SUPPORT_CARD: supportConfig.showCard,
-    SHOW_SUPPORT_URL_PLACEHOLDER: supportConfig.showPlaceholder,
-    SUPPORT_URL: supportConfig.supportUrl,
-  }));
-
-  const { SettingsPage: SettingsPageWithMockedSupport } =
-    await import("./settings-page");
-
-  const qc = new QueryClient({
-    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
-  });
-  qc.setQueryData(suiteSettingsQueryKey, minimalSuiteSettings);
-  qc.setQueryData(suiteSecurityOverviewQueryKey, minimalSecurity);
-  qc.setQueryData(qk.me, me);
-  qc.setQueryData(qk.session, minimalCurrentSession);
-  qc.setQueryData(suiteConfigurationBackupsQueryKey, {
-    directory: "C:/Weir/backups/suite-configuration",
-    items: [],
-  });
-  qc.setQueryData(
-    suiteUpdateStatusQueryKey,
-    overrides?.updateStatus ?? minimalUpdateStatus,
-  );
-  qc.setQueryData(
-    [
-      ...suiteLogsQueryKey,
-      {
-        level: undefined,
-        search: undefined,
-        has_exception: undefined,
-        limit: 100,
-      },
-    ],
-    minimalLogs,
-  );
-  qc.setQueryData(suiteMetricsQueryKey, minimalMetrics);
-  return render(wrap(<SettingsPageWithMockedSupport />, qc));
+function selectedTab(): string | null {
+  return screen.getByRole("tab", { selected: true }).textContent;
 }
 
-describe("SettingsPage (suite settings)", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-    localStorage.removeItem(DISPLAY_DENSITY_STORAGE_KEY);
-    document.documentElement.removeAttribute("data-mm-density");
+afterEach(() => cleanup());
+
+describe("SettingsPage", () => {
+  it("opens on the tab the address names, including the names 3.1 used", () => {
+    renderAt("/settings?tab=schedules");
+    expect(selectedTab()).toBe("Schedule");
+    expect(screen.getByText("Schedule content")).toBeInTheDocument();
   });
 
-  afterEach(() => {
-    vi.doUnmock("../../lib/support");
-    vi.resetModules();
+  it("puts the tab in the address, so it can be bookmarked and gone back to", () => {
+    const router = renderAt("/settings");
+    expect(selectedTab()).toBe("Libraries");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Alerts" }));
+    expect(router.state.location.search).toBe("?tab=alerts");
+    expect(screen.getByText("Alerts content")).toBeInTheDocument();
   });
 
-  it("does not mention Sonarr or Radarr on the central Settings page", () => {
-    const { container } = renderSettings(operatorMe);
-    const t = (container.textContent ?? "").toLowerCase();
-    expect(t).not.toContain("sonarr");
-    expect(t).not.toContain("radarr");
-    expect(screen.getByTestId("suite-settings-page")).toBeTruthy();
-    expect(screen.getByTestId("suite-settings-global")).toBeTruthy();
-  });
+  it("follows the address when it changes without the page remounting: Back, Forward and the side menu", async () => {
+    const router = renderAt("/settings");
+    fireEvent.click(screen.getByRole("tab", { name: "Rules" }));
+    expect(selectedTab()).toBe("Rules");
 
-  it("shows development support guidance inside the Support tab without a button when URL is missing", () => {
-    renderSettings(operatorMe);
-    expect(
-      screen.queryByTestId("suite-settings-support"),
-    ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "Support" }));
-    expect(screen.getByTestId("suite-settings-support")).toBeInTheDocument();
-    expect(
-      screen.getByText("Weir is free to use. Support is optional."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "If Weir saves you time or keeps your downloads clean, you can support ongoing development.",
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/Development note: set/i)).toBeInTheDocument();
-    expect(screen.getByText("VITE_SUPPORT_URL")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", { name: "Support Weir" }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText(/supporter licence/i)).not.toBeInTheDocument();
-  });
+    await act(() => router.navigate(-1));
+    expect(router.state.location.search).toBe("");
+    expect(selectedTab()).toBe("Libraries");
+    expect(screen.getByText("Libraries content")).toBeInTheDocument();
 
-  it("shows the Support settings destination and button when a valid support URL is configured", async () => {
-    await renderSettingsWithSupportConfig(operatorMe, {
-      showCard: true,
-      showPlaceholder: false,
-      supportUrl: "https://example.com/support",
-    });
+    await act(() => router.navigate(1));
+    expect(selectedTab()).toBe("Rules");
 
-    fireEvent.click(screen.getByRole("tab", { name: "Support" }));
-
-    expect(screen.getByTestId("suite-settings-support")).toBeInTheDocument();
-    expect(
-      screen.getByText("Weir is free to use. Support is optional."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "If Weir saves you time or keeps your downloads clean, you can support ongoing development.",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Support Weir →" }),
-    ).toHaveAttribute("href", "https://example.com/support");
-    expect(screen.queryByText("VITE_SUPPORT_URL")).not.toBeInTheDocument();
-    expect(screen.queryByText(/supporter licence/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/feature limits/i)).not.toBeInTheDocument();
-  });
-
-  it("hides the Support settings destination in production when the support URL is missing or invalid", async () => {
-    await renderSettingsWithSupportConfig(operatorMe, {
-      showCard: false,
-      showPlaceholder: false,
-      supportUrl: null,
-    });
-
-    expect(
-      screen.queryByRole("tab", { name: "Support" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("suite-settings-support"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", { name: "Support Weir" }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText("VITE_SUPPORT_URL")).not.toBeInTheDocument();
-    expect(screen.queryByText(/supporter licence/i)).not.toBeInTheDocument();
-  });
-
-  it("hides save for viewers", () => {
-    renderSettings(viewerMe);
-    expect(screen.getByTestId("suite-settings-save-timezone")).toBeDisabled();
-    expect(screen.getByTestId("suite-settings-save-logs")).toBeDisabled();
-  });
-
-  it("shows configuration backup + export for operators", () => {
-    renderSettings(operatorMe);
-    fireEvent.click(screen.getByRole("tab", { name: "Backup and restore" }));
-    expect(screen.getByTestId("suite-settings-backup-restore")).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: "Download configuration now" }),
-    ).toBeEnabled();
-    expect(
-      screen.getByRole("button", { name: "Restore from file..." }),
-    ).toBeEnabled();
-    expect(
-      screen.getByRole("button", { name: "Save backup schedule" }),
-    ).toBeDisabled();
-    expect(
-      screen.queryByTestId("suite-settings-history-reset"),
-    ).not.toBeInTheDocument();
-  });
-
-  it("saves how long Activity history is kept, including 0 for until cleared", async () => {
-    vi.spyOn(suiteSettingsApi, "fetchSuiteSettings").mockResolvedValue(
-      minimalSuiteSettings,
-    );
-    const putSuiteSettingsSpy = vi
-      .spyOn(suiteSettingsApi, "putSuiteSettings")
-      .mockImplementation(async (body) => ({
-        ...minimalSuiteSettings,
-        activity_retention_days: body.activity_retention_days,
-      }));
-
-    renderSettings(operatorMe);
-    const input = await screen.findByTestId(
-      "suite-settings-activity-retention",
-    );
-    expect(input).toHaveValue(90);
-    fireEvent.change(input, { target: { value: "0" } });
-    fireEvent.click(screen.getByTestId("suite-settings-save-logs"));
-
-    await waitFor(() => {
-      expect(putSuiteSettingsSpy).toHaveBeenCalledTimes(1);
-    });
-    expect(putSuiteSettingsSpy.mock.calls[0]?.[0]).toMatchObject({
-      activity_retention_days: 0,
-      log_retention_days: 30,
-    });
-  });
-
-  it("allows changing and saving backup schedule more than once", async () => {
-    let currentSavedSettings: SuiteSettingsOut = {
-      ...minimalSuiteSettings,
-      configuration_backup_enabled: true,
-      configuration_backup_interval_hours: 24,
-      configuration_backup_preferred_time: "02:00",
-    };
-    vi.spyOn(suiteSettingsApi, "fetchSuiteSettings").mockImplementation(
-      async () => currentSavedSettings,
-    );
-    const putSuiteSettingsSpy = vi
-      .spyOn(suiteSettingsApi, "putSuiteSettings")
-      .mockImplementation(async (body) => {
-        currentSavedSettings = {
-          ...currentSavedSettings,
-          configuration_backup_enabled:
-            body.configuration_backup_enabled ?? false,
-          configuration_backup_interval_hours:
-            body.configuration_backup_interval_hours ?? 24,
-          configuration_backup_preferred_time:
-            body.configuration_backup_preferred_time ?? "02:00",
-          updated_at: "2026-04-12T00:00:00Z",
-        };
-        return currentSavedSettings;
-      });
-
-    renderSettings(operatorMe);
-    fireEvent.click(screen.getByRole("tab", { name: "Backup and restore" }));
-
-    fireEvent.change(screen.getByLabelText("Minimum time between runs"), {
-      target: { value: "12" },
-    });
-    fireEvent.change(screen.getByLabelText("Preferred backup time"), {
-      target: { value: "03:30" },
-    });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Save backup schedule" }),
-    );
-
-    await waitFor(() => {
-      expect(putSuiteSettingsSpy).toHaveBeenCalledTimes(1);
-    });
-    await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: "Save backup schedule" }),
-      ).toBeDisabled();
-    });
-
-    fireEvent.change(screen.getByLabelText("Minimum time between runs"), {
-      target: { value: "24" },
-    });
-    fireEvent.change(screen.getByLabelText("Preferred backup time"), {
-      target: { value: "04:15" },
-    });
-
-    const saveButton = screen.getByRole("button", {
-      name: "Save backup schedule",
-    });
-    expect(saveButton).toBeEnabled();
-    fireEvent.click(saveButton);
-
-    await waitFor(() => {
-      expect(putSuiteSettingsSpy).toHaveBeenCalledTimes(2);
-    });
-    expect(putSuiteSettingsSpy.mock.calls[1]?.[0]).toMatchObject({
-      configuration_backup_interval_hours: 24,
-      configuration_backup_preferred_time: "04:15",
-    });
-  });
-
-  it("hides configuration backup for viewers", () => {
-    renderSettings(viewerMe);
-    fireEvent.click(screen.getByRole("tab", { name: "Backup and restore" }));
-    expect(
-      screen.queryByTestId("suite-settings-backup-restore"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("suite-settings-history-reset"),
-    ).not.toBeInTheDocument();
-  });
-
-  it("keeps General focused and splits Logs, Backup, and Upgrade to their own tabs", () => {
-    renderSettings(operatorMe);
-    expect(screen.queryByText("Product name")).not.toBeInTheDocument();
-    expect(screen.queryByText("Application logs")).not.toBeInTheDocument();
-    expect(screen.getByText("Time zone")).toBeInTheDocument();
-    expect(screen.getByText("Setup wizard")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(screen.getByText("System log retention (days)")).toBeInTheDocument();
-    expect(
-      screen.getByText("Keep Activity history for (days)"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/0 keeps it until you clear it/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("suite-settings-history-reset"),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("suite-settings-backup-restore"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("suite-settings-upgrade"),
-    ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "Backup and restore" }));
-    expect(screen.getByTestId("suite-settings-backup-tab")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("suite-settings-backup-restore"),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText("System log retention (days)"),
-    ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "Upgrade" }));
-    expect(
-      screen.getByTestId("suite-settings-upgrade-tab"),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("suite-settings-upgrade")).toBeInTheDocument();
-    expect(
-      screen.queryByText("System log retention (days)"),
-    ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "Logs" }));
-    expect(screen.getByText("Search logs")).toBeInTheDocument();
-    expect(screen.getByText("System events")).toBeInTheDocument();
-    expect(screen.getByText("Server diagnostics")).toBeInTheDocument();
-    expect(
-      screen.queryByText("System log retention (days)"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Optional home dashboard notice"),
-    ).not.toBeInTheDocument();
-  });
-
-  it("keeps Upgrade selected when the URL tab query is upgrade", () => {
-    renderSettings(operatorMe, {
-      updateStatus: windowsUpdateAvailableStatus,
-      initialEntries: ["/settings?tab=upgrade"],
-    });
-
-    expect(screen.getByRole("tab", { name: "Upgrade" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(
-      screen.getByTestId("suite-settings-upgrade-tab"),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("suite-settings-global"),
-    ).not.toBeInTheDocument();
-  });
-
-  it("shows Checking... and disables button when refetch is in flight", async () => {
-    vi.spyOn(suiteSettingsApi, "fetchSuiteUpdateStatus").mockImplementation(
-      () => new Promise(() => {}),
-    );
-    const qc = new QueryClient({
-      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
-    });
-    qc.setQueryData(suiteSettingsQueryKey, minimalSuiteSettings);
-    qc.setQueryData(suiteSecurityOverviewQueryKey, minimalSecurity);
-    qc.setQueryData(qk.me, operatorMe);
-    qc.setQueryData(qk.session, minimalCurrentSession);
-    qc.setQueryData(suiteConfigurationBackupsQueryKey, {
-      directory: "C:/Weir/backups/suite-configuration",
-      items: [],
-    });
-    qc.setQueryData(suiteUpdateStatusQueryKey, windowsUpdateAvailableStatus);
-    qc.setQueryData(
-      [
-        ...suiteLogsQueryKey,
-        {
-          level: undefined,
-          search: undefined,
-          has_exception: undefined,
-          limit: 100,
-        },
-      ],
-      minimalLogs,
-    );
-    qc.setQueryData(suiteMetricsQueryKey, minimalMetrics);
-
-    render(wrap(<SettingsPage />, qc));
-    fireEvent.click(screen.getByRole("tab", { name: "Upgrade" }));
-
-    // staleTime: Infinity means the pre-seeded data is fresh — the link reads "Check again →"
-    expect(screen.getByRole("button", { name: "Check again →" })).toBeEnabled();
-
-    // Trigger a manual refetch (mock never resolves)
-    fireEvent.click(screen.getByRole("button", { name: "Check again →" }));
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: "Checking..." }),
-      ).toBeDisabled();
-    });
-    expect(
-      screen.queryByRole("button", { name: "Check again →" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("does not render mojibake in the upgrade panel", () => {
-    renderSettings(operatorMe, { updateStatus: windowsUpdateAvailableStatus });
-    fireEvent.click(screen.getByRole("tab", { name: "Upgrade" }));
-
-    expect(document.body.textContent).not.toContain("â");
-    expect(document.body.textContent).not.toContain("Ã");
-    expect(document.body.textContent).not.toContain("�");
-  });
-
-  it("shows change password only on Security tab", () => {
-    renderSettings(operatorMe);
-    fireEvent.click(screen.getByRole("tab", { name: "Security" }));
-    expect(
-      screen.getByRole("heading", { name: "Change password" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("heading", { name: "Security posture" }),
-    ).toBeInTheDocument();
-  });
-
-  it("change password fields use Show/Hide and reset visibility when cleared", () => {
-    renderSettings(operatorMe);
-    fireEvent.click(screen.getByRole("tab", { name: "Security" }));
-    const current = screen.getByPlaceholderText("Enter current password");
-    expect(current).toHaveAttribute("type", "password");
-    fireEvent.change(current, { target: { value: "current-secret" } });
-    const showButtons = screen.getAllByRole("button", { name: "Show" });
-    expect(showButtons.length).toBe(3);
-    fireEvent.click(showButtons[0]!);
-    expect(current).toHaveAttribute("type", "text");
-    fireEvent.change(current, { target: { value: "" } });
-    expect(current).toHaveAttribute("type", "password");
-  });
-
-  it("closes timezone dropdown and shows selected timezone", () => {
-    renderSettings(operatorMe);
-    const trigger = screen.getByRole("button", { name: /Time zone/ });
-    expect(trigger).toHaveTextContent("Select time zone");
-    fireEvent.click(trigger);
-    const firstOption = within(screen.getByRole("listbox")).getAllByRole(
-      "option",
-    )[0];
-    const chosenLabel = firstOption.textContent ?? "";
-    fireEvent.mouseDown(firstOption);
-    fireEvent.click(firstOption);
-    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Time zone/ })).toHaveTextContent(
-      chosenLabel,
-    );
-  });
-
-  it("closes timezone dropdown on outside click", () => {
-    renderSettings(operatorMe);
-    const trigger = screen.getByRole("button", { name: /Time zone/ });
-    fireEvent.click(trigger);
-    expect(screen.getByRole("listbox")).toBeInTheDocument();
-    fireEvent.mouseDown(document.body);
-    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
-  });
-
-  it("closes timezone dropdown on Escape", () => {
-    renderSettings(operatorMe);
-    const trigger = screen.getByRole("button", { name: /Time zone/ });
-    fireEvent.click(trigger);
-    expect(screen.getByRole("listbox")).toBeInTheDocument();
-    fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
-  });
-
-  it("applies display density locally without suite save", () => {
-    renderSettings(viewerMe);
-    expect(screen.getByTestId("suite-settings-display-density")).toBeTruthy();
-    fireEvent.click(screen.getByText("Comfortable"));
-    expect(document.documentElement.getAttribute("data-mm-density")).toBe(
-      "comfortable",
-    );
-    fireEvent.click(screen.getByText("Expanded"));
-    expect(document.documentElement.getAttribute("data-mm-density")).toBe(
-      "expanded",
-    );
-    fireEvent.click(screen.getByText("Balanced"));
-    expect(document.documentElement.getAttribute("data-mm-density")).toBeNull();
+    // The side menu's Settings link is a plain /settings.
+    await act(() => router.navigate("/settings"));
+    expect(selectedTab()).toBe("Libraries");
   });
 });

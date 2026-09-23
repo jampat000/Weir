@@ -34,6 +34,21 @@ public sealed class ActivityApiTests
     }
 
     [Fact]
+    public async Task About_weir_keeps_the_events_that_are_not_about_one_file_and_about_files_keeps_the_rest()
+    {
+        await using var server = await SeededServerAsync();
+        var writer = server.Services.GetRequiredService<IActivityWriter>();
+        await writer.RecordAsync(new ActivityEventDraft(ActivityEventTypes.ProcessingFailureCleanupSweepCompleted, "processing", "Sweep finished", "{}"));
+        var client = await AdminAsync(server);
+
+        Assert.Equal(["Sweep finished"], await TitlesAsync(client, "about=weir"));
+        Assert.Equal(
+            ["Alien processed", "Heat failed", "Heat was handed back", "Show processed"],
+            await TitlesAsync(client, "about=files"));
+        Assert.Equal(5, (await TitlesAsync(client, string.Empty)).Count);
+    }
+
+    [Fact]
     public async Task The_page_is_told_how_far_back_history_goes()
     {
         await using var server = await SeededServerAsync();

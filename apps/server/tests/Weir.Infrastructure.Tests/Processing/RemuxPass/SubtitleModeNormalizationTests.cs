@@ -6,19 +6,22 @@ namespace Weir.Infrastructure.Tests.Processing.RemuxPass;
 
 /// <summary>
 /// Issue #545 item 4: <c>rules_config_for</c> (the path a live remux job takes) used to pass the stored subtitle mode
-/// through unchanged, while the fallback path (<see cref="RuleSetConversion.ToRulesConfig"/>, used when a library has
-/// no rule set of its own) normalized it. A library saved with the shipped default, <c>keep_all</c>, is not one of the
-/// two modes the planner implements (<see cref="RemuxRuleValues.SubtitleModeRemoveAll"/> or
-/// <see cref="RemuxRuleValues.SubtitleModeKeepSelected"/>), so both paths must agree on the same normalization.
+/// through unchanged, while the fallback path (<see cref="RuleSetConversion.ToRulesConfig"/>) normalized it, so both must
+/// agree. The mapping itself changed later: <c>keep_all</c> — the stored default, and "Keep all subtitles" on the Rules
+/// screen — used to normalize to keep-selected and so removed every subtitle when no language was listed. It now keeps
+/// every subtitle, and an unknown value errs towards keeping rather than removing.
 /// </summary>
 public sealed class SubtitleModeNormalizationTests
 {
     private static ProcessingRuleSetRecord RuleSet(string subtitleMode) => new() { Name = "Test", SubtitleMode = subtitleMode };
 
     [Theory]
-    [InlineData("keep_all", RemuxRuleValues.SubtitleModeKeepSelected)]
-    [InlineData("", RemuxRuleValues.SubtitleModeKeepSelected)]
-    [InlineData("bogus", RemuxRuleValues.SubtitleModeKeepSelected)]
+    [InlineData("keep_all", RemuxRuleValues.SubtitleModeKeepAll)]
+    [InlineData("KEEP_ALL", RemuxRuleValues.SubtitleModeKeepAll)]
+    [InlineData("", RemuxRuleValues.SubtitleModeKeepAll)]
+    [InlineData("bogus", RemuxRuleValues.SubtitleModeKeepAll)]
+    [InlineData("keep_listed", RemuxRuleValues.SubtitleModeKeepSelected)]
+    [InlineData("keep_selected", RemuxRuleValues.SubtitleModeKeepSelected)]
     [InlineData("remove_all", RemuxRuleValues.SubtitleModeRemoveAll)]
     [InlineData("REMOVE_ALL", RemuxRuleValues.SubtitleModeRemoveAll)]
     [InlineData(" remove_all ", RemuxRuleValues.SubtitleModeRemoveAll)]

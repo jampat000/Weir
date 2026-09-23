@@ -33,7 +33,8 @@ public sealed record ActivityFilter(
     string? Trigger = null,
     string? Result = null,
     long? LibraryId = null,
-    string? File = null)
+    string? File = null,
+    string? About = null)
 {
     public static readonly ActivityFilter None = new();
 }

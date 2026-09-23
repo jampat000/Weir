@@ -3,10 +3,12 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Activity;
 using Weir.Core.Jobs;
 using Weir.Core.LibraryMode;
+using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.Media;
+using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Tests.Media;
 using Weir.Infrastructure.Tests.MediaManagers;
@@ -64,6 +66,15 @@ public sealed class LibraryCleanHandlerTests : IDisposable
     private Task<long> EnqueueCleanAsync(long libraryId, string path, bool confirmFinalRemoval) =>
         _fixture.Store.WithUnitOfWork(async uow =>
             (await LibraryScanStore.EnqueueCleanAsync(uow, _fixture.Jobs, libraryId, path, "manual", confirmFinalRemoval)).Id);
+
+    private Task<long> EnqueueChosenCleanAsync(long libraryId, string path, ManualPlanChoice choice, long? expectedSizeBytes = null) =>
+        _fixture.Store.WithUnitOfWork(async uow =>
+            (await LibraryScanStore.EnqueueCleanAsync(
+                uow, _fixture.Jobs, libraryId, path, "manual", true, ManualPlanJson.ToPyDict(choice), expectedSizeBytes)).Id);
+
+    /// <summary>Keep exactly these input indices, in this order: the video first, and the track after it as default.</summary>
+    private static ManualPlanChoice Keeping(params int[] indices) =>
+        new(indices.Select((index, position) => new ManualKeepEntry(index, Default: position == 1, Forced: false)).ToList(), indices);
 
     /// <summary>Claims, runs and completes one clean job exactly as the real worker would.</summary>
     private async Task RunCleanAsync(long jobId)
@@ -170,6 +181,102 @@ public sealed class LibraryCleanHandlerTests : IDisposable
         Assert.False(File.Exists(SafeSwapRules.BackupPath(path)));
         Assert.Equal(1, await _fixture.Store.Scalar($"SELECT count(*) FROM activity_events WHERE event_type = '{LibraryActivityEventTypes.FileCleaned}'"));
         Assert.Equal(0, await ReferencePolicyJobCountAsync());
+    }
+
+    [Fact]
+    public async Task A_finished_clean_does_not_stop_the_same_file_being_cleaned_again()
+    {
+        // The dedupe key means "one clean outstanding for this file", not "this file has had its turn": a rule change,
+        // or a hand-picked plan, must be able to clean a file that was already cleaned days ago.
+        var library = await LibraryAsync();
+        var path = _libraryFolder.Join("film.mkv");
+        await File.WriteAllBytesAsync(path, [1, 2, 3]);
+        _media.Probes["film.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+
+        var first = await EnqueueCleanAsync(library, path, confirmFinalRemoval: true);
+        await RunCleanAsync(first);
+        var second = await EnqueueCleanAsync(library, path, confirmFinalRemoval: true);
+
+        // SQLite hands the deleted row's id straight back, so the id proves nothing: what matters is that the job
+        // this second request returned is one waiting to run, not the finished one from before.
+        Assert.Equal(1, await _fixture.Store.Scalar($"SELECT count(*) FROM jobs WHERE id = {second} AND status = '{ProcessingJobStatus.Pending}'"));
+    }
+
+    [Fact]
+    public async Task A_chosen_plan_is_used_instead_of_the_librarys_rules()
+    {
+        // The library keeps English and drops Japanese. Someone who wants the opposite for one film says so, and
+        // that is what the clean does.
+        var library = await LibraryAsync();
+        var path = _libraryFolder.Join("film.mkv");
+        await File.WriteAllBytesAsync(path, [1, 2, 3]);
+        _media.Probes["film.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+        _media.DefaultProbe = FakeMediaRunner.JapaneseOnly;
+
+        var jobId = await EnqueueChosenCleanAsync(library, path, Keeping(0, 2));
+        await RunCleanAsync(jobId);
+
+        var remux = Assert.Single(_media.Remuxes);
+        Assert.Contains("0:2", remux);
+        Assert.DoesNotContain("0:1", remux);
+        Assert.Equal(1, await _fixture.Store.Scalar($"SELECT count(*) FROM activity_events WHERE event_type = '{LibraryActivityEventTypes.FileCleaned}'"));
+    }
+
+    [Fact]
+    public async Task A_file_that_changed_since_its_tracks_were_chosen_is_left_alone()
+    {
+        var library = await LibraryAsync();
+        var path = _libraryFolder.Join("film.mkv");
+        await File.WriteAllBytesAsync(path, [1, 2, 3]);
+        _media.Probes["film.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+
+        // Chosen against a file of a different size: the indices in the choice describe some other file's tracks.
+        var jobId = await EnqueueChosenCleanAsync(library, path, Keeping(0, 2), expectedSizeBytes: 999);
+        await RunCleanAsync(jobId);
+
+        Assert.Empty(_media.Remuxes);
+        Assert.Equal(new byte[] { 1, 2, 3 }, await File.ReadAllBytesAsync(path));
+        Assert.Equal(1, await _fixture.Store.Scalar($"SELECT count(*) FROM activity_events WHERE event_type = '{LibraryActivityEventTypes.FileFailed}'"));
+    }
+
+    [Fact]
+    public async Task A_file_you_asked_Weir_to_leave_alone_is_not_cleaned()
+    {
+        var library = await LibraryAsync();
+        var path = _libraryFolder.Join("film.mkv");
+        await File.WriteAllBytesAsync(path, [1, 2, 3]);
+        _media.Probes["film.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+
+        var jobId = await EnqueueCleanAsync(library, path, confirmFinalRemoval: true);
+        await _fixture.Db(async uow =>
+        {
+            await LibraryFileMarksStore.SetLeaveAloneAsync(uow, library, path, leaveAlone: true, _fixture.Store.Clock.GetUtcNow());
+            return 0;
+        });
+        await RunCleanAsync(jobId);
+
+        // Set aside after the job was queued: the handler is the last word, so the file is still untouched.
+        Assert.Empty(_media.Remuxes);
+        Assert.Equal(new byte[] { 1, 2, 3 }, await File.ReadAllBytesAsync(path));
+        Assert.Equal(1, await _fixture.Store.Scalar($"SELECT count(*) FROM activity_events WHERE event_type = '{LibraryActivityEventTypes.FileSkipped}'"));
+    }
+
+    [Fact]
+    public async Task A_clean_records_that_the_file_has_been_cleaned()
+    {
+        // The next scan rewrites the file list from scratch, so "Weir has cleaned this one" has to be kept elsewhere.
+        var library = await LibraryAsync();
+        var path = _libraryFolder.Join("film.mkv");
+        await File.WriteAllBytesAsync(path, [1, 2, 3]);
+        _media.Probes["film.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+
+        var jobId = await EnqueueCleanAsync(library, path, confirmFinalRemoval: true);
+        await RunCleanAsync(jobId);
+
+        var mark = await _fixture.Db(uow => LibraryFileMarksStore.FindAsync(uow, library, path));
+        Assert.NotNull(mark);
+        Assert.NotNull(mark!.CleanedAt);
+        Assert.False(mark.LeaveAlone);
     }
 
     [Theory]

@@ -15,9 +15,11 @@ import {
   requestLibraryRedownload,
   saveLibraryFolders,
   saveLibrarySettings,
+  setLibraryFileLeaveAlone,
   setLibrarySchedule,
   triggerLibraryScan,
   type LibraryFileFilters,
+  type LibraryManualPlan,
 } from "./library-api";
 
 export const librarySettingsKey = (libraryId: number) => [
@@ -141,8 +143,26 @@ export function useLibraryProblemsQuery(libraryId: number, enabled = true) {
 export function useCleanLibraryFiles(libraryId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ paths, confirm }: { paths: string[]; confirm: boolean }) =>
-      cleanLibraryFiles(libraryId, paths, confirm),
+    mutationFn: ({
+      paths,
+      confirm,
+      manual,
+    }: {
+      paths: string[];
+      confirm: boolean;
+      /** Your own choice of tracks, for one file; without it the library's rules decide. */
+      manual?: LibraryManualPlan;
+    }) => cleanLibraryFiles(libraryId, paths, confirm, manual),
+    onSuccess: () => invalidateLibraryViews(qc, libraryId),
+  });
+}
+
+/** "Leave this file alone", and its undo. */
+export function useSetLibraryFileLeaveAlone(libraryId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ path, leaveAlone }: { path: string; leaveAlone: boolean }) =>
+      setLibraryFileLeaveAlone(libraryId, path, leaveAlone),
     onSuccess: () => invalidateLibraryViews(qc, libraryId),
   });
 }

@@ -229,7 +229,13 @@ public sealed class ProcessingRejectHandler : IJobHandler
         var description = await port.DescribeAsync(connection, cancellationToken).ConfigureAwait(false);
         if (description.Status != SignalStatus.Reported)
         {
-            return new RejectAttempt(false, description.Detail ?? $"Weir could not ask {label} what it can do.", label);
+            // #652 item 5: a manager that is not answering is said to be not answering, in those words.
+            return new RejectAttempt(
+                false,
+                description.Status == SignalStatus.Unreachable
+                    ? ManagerWaitMessages.RejectNotAnswering(label)
+                    : description.Detail ?? $"Weir could not ask {label} what it can do.",
+                label);
         }
 
         if (description.AdvertisedCapabilities is null || !description.AdvertisedCapabilities.Contains(RejectSupportRules.RejectCapability))
@@ -253,6 +259,11 @@ public sealed class ProcessingRejectHandler : IJobHandler
         var report = new ReportEnvelope(target, body, delivery);
         if (!delivery.Accepted)
         {
+            if (HandoffCompletionReporter.IsNotAnswering(delivery))
+            {
+                return new RejectAttempt(false, $"{ManagerWaitMessages.RejectNotAnswering(label)} Weir kept the download.", label, null, report);
+            }
+
             var status = delivery.Status.StartsWith("failed: ", StringComparison.Ordinal) ? delivery.Status["failed: ".Length..] : delivery.Status;
             return new RejectAttempt(false, $"{label} did not accept the rejection ({status}), so Weir kept the download.", label, null, report);
         }
@@ -282,7 +293,12 @@ public sealed class ProcessingRejectHandler : IJobHandler
             var signal = await port.QueueRowsAsync(connection, cancellationToken).ConfigureAwait(false);
             if (!signal.IsReported)
             {
-                return new RejectAttempt(false, signal.Detail ?? $"Weir could not read {connection.Label}'s queue.", connection.Label);
+                return new RejectAttempt(
+                    false,
+                    signal.Status == SignalStatus.Unreachable
+                        ? ManagerWaitMessages.RejectNotAnswering(connection.Label)
+                        : signal.Detail ?? $"Weir could not read {connection.Label}'s queue.",
+                    connection.Label);
             }
 
             var rows = signal.Rows.Select(row => row.Payload).ToList();

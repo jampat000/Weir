@@ -6,16 +6,15 @@ import {
   WorkspaceTabList,
 } from "./workspace-shell";
 
+// The title row carries Pause, which talks to the server; this test is about the tabs.
+vi.mock("../shell/pause-control", () => ({ PauseControl: () => null }));
+
 describe("workspace shell", () => {
   it("connects the themed horizontal tabs to their shared panel", () => {
     const onSelect = vi.fn();
 
     render(
-      <WorkspacePage
-        eyebrow="Weir"
-        title="Example"
-        description="Example sections"
-      >
+      <WorkspacePage title="Example" description="Example sections">
         <WorkspaceTabList
           tabs={[
             { id: "overview", label: "Overview" },

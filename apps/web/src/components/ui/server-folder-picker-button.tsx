@@ -92,7 +92,7 @@ export function ServerFolderPickerButton({
     <>
       <button
         type="button"
-        className={mmActionButtonClass({ variant: "tertiary", disabled })}
+        className={mmActionButtonClass({ variant: "tertiary" })}
         disabled={disabled}
         onClick={() => setOpen(true)}
       >
@@ -152,10 +152,7 @@ export function ServerFolderPickerButton({
                 />
                 <button
                   type="submit"
-                  className={mmActionButtonClass({
-                    variant: "secondary",
-                    disabled: loading,
-                  })}
+                  className={mmActionButtonClass({ variant: "secondary" })}
                   disabled={loading}
                 >
                   Go to path
@@ -164,10 +161,7 @@ export function ServerFolderPickerButton({
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  className={mmActionButtonClass({
-                    variant: "secondary",
-                    disabled: loading || !data?.parent_path,
-                  })}
+                  className={mmActionButtonClass({ variant: "secondary" })}
                   disabled={loading || !data?.parent_path}
                   onClick={() => setPath(data?.parent_path ?? null)}
                 >
@@ -175,10 +169,7 @@ export function ServerFolderPickerButton({
                 </button>
                 <button
                   type="button"
-                  className={mmActionButtonClass({
-                    variant: "tertiary",
-                    disabled: loading || data?.current_path === null,
-                  })}
+                  className={mmActionButtonClass({ variant: "tertiary" })}
                   disabled={loading || data?.current_path === null}
                   onClick={() => setPath(null)}
                 >

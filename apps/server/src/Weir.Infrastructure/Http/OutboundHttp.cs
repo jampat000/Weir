@@ -280,7 +280,8 @@ public sealed class NotificationDispatcher
                 var uow = await Sqlite.UnitOfWork.OpenAsync(database).ConfigureAwait(false);
                 await using (uow.ConfigureAwait(false))
                 {
-                    if (eventKind == "failed" && module == "processing")
+                    // Any failure, not only file processing: an alert says "failed" only once no retry follows.
+                    if (eventKind == "failed")
                     {
                         var status = await uow.ScalarAsync("SELECT status FROM jobs WHERE id = $id", ("$id", jobId)).ConfigureAwait(false);
                         if (status is not string text || text != "failed")

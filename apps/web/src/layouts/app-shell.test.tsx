@@ -37,6 +37,12 @@ vi.mock("../lib/system/readiness-queries", () => ({
   }),
 }));
 
+// The Processing entry says how many files are being written right now.
+const filesAtOnce = { running: 0 };
+vi.mock("../lib/processing/queries", () => ({
+  useProcessingFilesAtOnceQuery: () => ({ data: filesAtOnce }),
+}));
+
 vi.mock("../lib/suite/queries", () => ({
   useSuiteSettingsQuery: () => ({
     data: {
@@ -72,7 +78,7 @@ describe("AppShell", () => {
     expect(screen.queryByText(/feature limits/i)).not.toBeInTheDocument();
   });
 
-  it("has no Dashboard entry; Home is the main screen (#459)", () => {
+  it("opens on Processing; there is no Home, Dashboard or Activity entry (3.2)", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <Routes>
@@ -83,10 +89,15 @@ describe("AppShell", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("link", { name: "Home" })).toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", { name: "Dashboard" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Processing" })).toHaveAttribute(
+      "href",
+      "/",
+    );
+    for (const retired of ["Home", "Dashboard", "Activity"]) {
+      expect(
+        screen.queryByRole("link", { name: retired }),
+      ).not.toBeInTheDocument();
+    }
   });
 
   it("sends every nav item to the screen its label names, and has no others", () => {
@@ -108,20 +119,21 @@ describe("AppShell", () => {
     // The whole nav, in order. A new entry has to be added here deliberately, and a label that
     // stops matching its destination fails rather than quietly misleading someone.
     expect(items).toEqual([
-      ["Home", "/"],
-      ["Activity", "/activity"],
-      ["Processing", "/processing"],
+      ["Processing", "/"],
+      ["History", "/history"],
+      ["Library", "/library"],
       ["Settings", "/settings"],
+      ["System", "/system"],
     ]);
   });
 
   it("marks only the current screen, and marks nothing on a page that is not one", () => {
     const { unmount } = render(
-      <MemoryRouter initialEntries={["/activity"]}>
+      <MemoryRouter initialEntries={["/library"]}>
         <Routes>
           <Route path="/" element={<AppShell />}>
-            <Route index element={<div>Home</div>} />
-            <Route path="activity" element={<div>Activity</div>} />
+            <Route index element={<div>Processing</div>} />
+            <Route path="library" element={<div>Library</div>} />
             <Route path="*" element={<div>Not found</div>} />
           </Route>
         </Routes>
@@ -134,10 +146,10 @@ describe("AppShell", () => {
         .filter((link) => link.getAttribute("aria-current") === "page")
         .map((link) => link.textContent);
 
-    expect(current()).toEqual(["Activity"]);
+    expect(current()).toEqual(["Library"]);
     unmount();
 
-    // `/dashboard` is the Not found page now that 3.0.0 dropped its redirect (#585). Home is
+    // `/dashboard` is the Not found page now that 3.0.0 dropped its redirect (#585). Processing is
     // the index route, so it must not claim to be the screen you are on.
     render(
       <MemoryRouter initialEntries={["/dashboard"]}>
@@ -151,6 +163,58 @@ describe("AppShell", () => {
     );
 
     expect(current()).toEqual([]);
+  });
+
+  it("shows how many files are being written beside Processing, and nothing when none are", () => {
+    filesAtOnce.running = 2;
+    const view = render(
+      <MemoryRouter initialEntries={["/library"]}>
+        <Routes>
+          <Route path="/" element={<AppShell />}>
+            <Route path="library" element={<div>Library</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    const live = screen.getByRole("link", { name: "Processing, 2 working" });
+    expect(
+      within(live).getByTestId("nav-processing-working"),
+    ).toHaveTextContent("2 working");
+
+    filesAtOnce.running = 0;
+    view.rerender(
+      <MemoryRouter initialEntries={["/library"]}>
+        <Routes>
+          <Route path="/" element={<AppShell />}>
+            <Route path="library" element={<div>Library</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId("nav-processing-working")).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Processing" }),
+    ).toBeInTheDocument();
+  });
+
+  it("collapses to icons when asked, and expands again", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route path="/" element={<AppShell />}>
+            <Route index element={<div>Processing</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    const sidebar = document.getElementById("mm-primary-sidebar");
+    const toggle = screen.getByTestId("sidebar-collapse");
+    expect(sidebar).not.toHaveClass("mm-sidebar--collapsed");
+    fireEvent.click(toggle);
+    expect(sidebar).toHaveClass("mm-sidebar--collapsed");
+    expect(toggle).toHaveAttribute("aria-label", "Expand navigation");
+    fireEvent.click(toggle);
+    expect(sidebar).not.toHaveClass("mm-sidebar--collapsed");
   });
 
   it("names the sidebar landmark after the product", () => {
@@ -178,16 +242,16 @@ describe("AppShell", () => {
       <MemoryRouter initialEntries={["/"]}>
         <Routes>
           <Route path="/" element={<AppShell />}>
-            <Route index element={<div>Home page</div>} />
-            <Route path="activity" element={<div>Activity page</div>} />
+            <Route index element={<div>Processing page</div>} />
+            <Route path="library" element={<div>Library page</div>} />
           </Route>
         </Routes>
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("link", { name: "Activity" }));
+    fireEvent.click(screen.getByRole("link", { name: "Library" }));
 
-    expect(screen.getByText("Activity page")).toBeInTheDocument();
+    expect(screen.getByText("Library page")).toBeInTheDocument();
     expect(scrollToMock).toHaveBeenLastCalledWith(0, 0);
   });
 });

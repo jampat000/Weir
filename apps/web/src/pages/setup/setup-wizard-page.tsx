@@ -24,23 +24,7 @@ import {
   useSuiteSettingsQuery,
   useSuiteSettingsSaveMutation,
 } from "../../lib/suite/queries";
-import {
-  persistDisplayDensity,
-  readStoredDisplayDensity,
-  type DisplayDensity,
-} from "../../lib/ui/display-density";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
-
-const WIZARD_DENSITY_OPTIONS: ReadonlyArray<{
-  id: DisplayDensity;
-  label: string;
-  hint: string;
-}> = [
-  { id: "compact", label: "Compact", hint: "Tighter, fits more" },
-  { id: "default", label: "Balanced", hint: "The default" },
-  { id: "comfortable", label: "Comfortable", hint: "Larger text" },
-  { id: "expanded", label: "Expanded", hint: "For big screens" },
-];
 
 const BACKUP_INTERVAL_OPTIONS = [
   { value: "24", label: "Every day" },
@@ -96,9 +80,6 @@ export function SetupWizardPage() {
   const updateLibrary = useUpdateProcessingLibrary();
 
   const [appTimezone, setAppTimezone] = useState<string>("UTC");
-  const [displayDensity, setDisplayDensity] = useState<DisplayDensity>(() =>
-    readStoredDisplayDensity(),
-  );
   const [backupEnabled, setBackupEnabled] = useState(false);
   const [backupIntervalHours, setBackupIntervalHours] = useState("24");
   const [backupPreferredTime, setBackupPreferredTime] = useState("02:00");
@@ -306,8 +287,6 @@ export function SetupWizardPage() {
       return;
     }
 
-    persistDisplayDensity(displayDensity);
-
     try {
       await saveSuite.mutateAsync({
         product_display_name: current.product_display_name,
@@ -363,7 +342,7 @@ export function SetupWizardPage() {
             <WizardSection
               headingId="setup-wizard-basics-heading"
               title="Basics"
-              description="The clock Weir uses, and how dense the screens are in this browser."
+              description="The clock Weir uses for schedules and for everything it writes down."
             >
               <div className="mm-wizard-basics">
                 <div className="min-w-0">
@@ -378,39 +357,6 @@ export function SetupWizardPage() {
                     value={appTimezone}
                     onChange={(value) => setAppTimezone(value)}
                   />
-                </div>
-                <div className="min-w-0">
-                  <span id="setup-wizard-density" className="mm-wizard-label">
-                    Display density
-                  </span>
-                  <div
-                    className="mm-density-options mm-density-options--wide"
-                    role="radiogroup"
-                    aria-labelledby="setup-wizard-density"
-                  >
-                    {WIZARD_DENSITY_OPTIONS.map(({ id, label, hint }) => (
-                      <label
-                        key={id}
-                        className={`mm-density-option${displayDensity === id ? " mm-density-option--selected" : ""}`}
-                      >
-                        <input
-                          type="radio"
-                          name="setup-display-density"
-                          className="mm-density-option__input"
-                          checked={displayDensity === id}
-                          onChange={() => setDisplayDensity(id)}
-                        />
-                        <span className="min-w-0">
-                          <span className="mm-density-option__label">
-                            {label}
-                          </span>
-                          <span className="mm-density-option__hint">
-                            {hint}
-                          </span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
                 </div>
               </div>
             </WizardSection>
@@ -540,10 +486,7 @@ export function SetupWizardPage() {
             <button
               type="button"
               data-testid="setup-wizard-skip"
-              className={mmActionButtonClass({
-                variant: "secondary",
-                disabled: savePending,
-              })}
+              className={mmActionButtonClass({ variant: "secondary" })}
               onClick={() => void saveWizardState("skipped")}
               disabled={savePending}
             >

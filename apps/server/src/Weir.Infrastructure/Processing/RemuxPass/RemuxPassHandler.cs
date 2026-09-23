@@ -146,7 +146,7 @@ public sealed class RemuxPassHandler : IJobHandler
             return;
         }
 
-        var progress = new ActivityProgressReporter(_database, context.Id, provenance, _logger);
+        var progress = new ActivityProgressReporter(_database, context.Id, provenance, _logger, _time);
         var result = await _runner.RunAsync(
             new RemuxPassRequest
             {
@@ -157,6 +157,7 @@ public sealed class RemuxPassHandler : IJobHandler
                 MinFileAgeSeconds = claim.Operator!.MinFileAgeSeconds,
                 MinInputFileSizeMb = Math.Max(claim.Operator.ProcessingMinInputFileSizeMb, claim.Library?.MinFileSizeMb ?? 0),
                 MinimumFreeDiskSpaceMb = claim.Operator.MinimumFreeDiskSpaceMb,
+                KeepFailedWorkFiles = claim.Operator.KeepFailedWorkFiles,
                 MediaScope = mediaScope,
                 CurrentJobId = context.Id,
                 ProgressReporter = progress.Report,
@@ -528,6 +529,16 @@ public sealed class RemuxPassHandler : IJobHandler
                         if (await RemuxPassFileState.MarkFileStatusAsync(uow, library.Id, rel, ProcessingFileStatuses.OnHold, reason, now).ConfigureAwait(false))
                         {
                             await RemuxPassFileState.ClearFailureFieldsAsync(uow, library.Id, rel).ConfigureAwait(false);
+                            // Another look is booked (#646): the file is on hold until it, not ready for the next free lane.
+                            if (result.Get("failure_next_retry_at") is PyStr { Value.Length: > 0 } booked &&
+                                PythonTimestamps.Parse(booked.Value) is { } lookAgainAt)
+                            {
+                                await uow.ExecuteAsync(
+                                    "UPDATE files SET hold_until = $hold WHERE library_id = $library AND relative_path = $path",
+                                    ("$hold", PythonTimestamps.Orm(lookAgainAt)),
+                                    ("$library", library.Id),
+                                    ("$path", rel)).ConfigureAwait(false);
+                            }
                         }
 
                         updates.Set("retry_scheduled", false).Set("quarantined", false).Set("failure_next_retry_at", PyNull.Instance).Set("failure_operator_message", reason);
@@ -573,6 +584,14 @@ public sealed class RemuxPassHandler : IJobHandler
                         rel,
                         result.Get("source_fingerprint_size") is PyInt size ? (long)size.Value : null,
                         result.Get("source_fingerprint_mtime_ns") is PyInt mtime ? (long)mtime.Value : null).ConfigureAwait(false);
+
+                    // #652: exactly which copy this pass handed back, so it can be released safely once a manager has it.
+                    // Only a copy this pass wrote itself: after a collision skip the file at that path is not Weir's.
+                    if (result.Get("output_file") is PyStr { Value.Length: > 0 } handedBack &&
+                        result.Get("output_collision_action") is PyStr { Value: "write" })
+                    {
+                        await HandbackStore.RecordWrittenAsync(uow, library.Id, rel, handedBack.Value, now).ConfigureAwait(false);
+                    }
                 },
                 _logger,
                 "file outcome").ConfigureAwait(false);
@@ -740,14 +759,16 @@ public sealed class ActivityProgressReporter
     private readonly long _jobId;
     private readonly PyDict _extra;
     private readonly ILogger _logger;
+    private readonly TimeProvider _time;
     private readonly Lock _lock = new();
 
-    public ActivityProgressReporter(SqliteDatabase database, long jobId, PyDict extra, ILogger logger)
+    public ActivityProgressReporter(SqliteDatabase database, long jobId, PyDict extra, ILogger logger, TimeProvider? time = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _jobId = jobId;
         _extra = extra ?? new PyDict();
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _time = time ?? TimeProvider.System;
     }
 
     /// <summary>The progress row, once written; the handler turns it into the completed row.</summary>
@@ -761,6 +782,10 @@ public sealed class ActivityProgressReporter
         {
             body.Set(key, value);
         }
+
+        // The row is rewritten in place, so its created_at stays at the pass's start. This is how a reader
+        // tells a long pass that is still reporting from one that died (LiveProgressStore).
+        body.Set("reported_at", PyDateTime.UtcNow(_time).PydanticJson());
 
         lock (_lock)
         {

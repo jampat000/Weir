@@ -46,6 +46,8 @@ export interface ProcessingLibrary {
   preserve_original_timestamps: boolean;
   /** Off keeps the original download in the watched folder after cleaning, so a torrent keeps seeding. */
   remove_original_after_success: boolean;
+  /** Which tool writes the output: mkvmerge for MKV when installed and FFmpeg otherwise (best), or FFmpeg only. */
+  remux_writer?: RemuxWriter;
   /** What to do when an output already exists at the same path. "replace" is the long-standing behaviour. */
   output_collision_policy: string;
   /** Hardware decoding. A choice that cannot work falls back to software and records why. */
@@ -81,6 +83,8 @@ export interface ProcessingLibrary {
   discovered_library_key: string | null;
   /** Queued or running jobs. Deletion is refused while this is non-zero. */
   active_job_count: number;
+  /** When Weir next looks at the watched folder (the next periodic scan, or sooner when a held file's wait ends). */
+  next_look_at?: string | null;
   updated_at: string | null;
 }
 
@@ -111,6 +115,8 @@ export interface ProcessingLibraryWrite {
   preserve_original_timestamps: boolean;
   /** Off keeps the original download in the watched folder after cleaning, so a torrent keeps seeding. */
   remove_original_after_success: boolean;
+  /** Which tool writes the output: mkvmerge for MKV when installed and FFmpeg otherwise (best), or FFmpeg only. */
+  remux_writer?: RemuxWriter;
   output_collision_policy: string;
   hardware_decode_mode: string;
   hardware_device: string;
@@ -139,6 +145,8 @@ export interface ProcessingLibraryWrite {
 }
 
 /** A new library needs only a name and media type; the server fills in every other field's default. */
+export type RemuxWriter = "best" | "ffmpeg";
+
 export type ProcessingLibraryCreate = Pick<
   ProcessingLibraryWrite,
   "name" | "media_type"

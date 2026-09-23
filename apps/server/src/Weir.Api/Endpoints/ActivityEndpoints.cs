@@ -57,9 +57,10 @@ public static class ActivityEndpoints
         var result = QueryStr(request, "result", issues, 1, 16);
         var libraryId = QueryInt(request, "library_id", issues, ge: 1);
         var file = QueryStr(request, "file", issues, 1, 2000);
+        var about = QueryStr(request, "about", issues, 1, 16);
         issues.ThrowIfAny();
 
-        var filter = new ActivityFilter(module, eventType, search, ParseWhen(dateFrom, "date_from"), ParseWhen(dateTo, "date_to"), trigger, result, libraryId, file);
+        var filter = new ActivityFilter(module, eventType, search, ParseWhen(dateFrom, "date_from"), ParseWhen(dateTo, "date_to"), trigger, result, libraryId, file, about);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var rows = await ActivityHistoryStore.ListRecentAsync(uow, filter, limit, beforeId).ConfigureAwait(false);
         var total = await ActivityHistoryStore.CountAsync(uow, filter).ConfigureAwait(false);
@@ -100,9 +101,10 @@ public static class ActivityEndpoints
         var result = QueryStr(request, "result", issues, 1, 16);
         var libraryId = QueryInt(request, "library_id", issues, ge: 1);
         var file = QueryStr(request, "file", issues, 1, 2000);
+        var about = QueryStr(request, "about", issues, 1, 16);
         issues.ThrowIfAny();
 
-        var filter = new ActivityFilter(module, eventType, search, ParseWhen(dateFrom, "date_from"), ParseWhen(dateTo, "date_to"), trigger, result, libraryId, file);
+        var filter = new ActivityFilter(module, eventType, search, ParseWhen(dateFrom, "date_from"), ParseWhen(dateTo, "date_to"), trigger, result, libraryId, file, about);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var rows = await ActivityHistoryStore.ListForExportAsync(uow, filter).ConfigureAwait(false);
         var localNow = request.Time.GetLocalNow();

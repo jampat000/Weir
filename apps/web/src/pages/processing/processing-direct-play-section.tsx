@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { PageLoading } from "../../components/shared/page-loading";
 import {
-  QuietSection,
+  QuietDisclosure,
   quietActionRowClass,
 } from "../../components/shared/quiet-section";
 import {
@@ -115,9 +115,11 @@ export function ProcessingDirectPlaySection() {
   };
 
   return (
-    <QuietSection
-      headingId="processing-direct-play-heading"
-      heading="Direct Play devices"
+    // Nothing here is a setting — it is a reference table of what each device can play, and it was
+    // taking half of Running. Folded away until someone asks for it.
+    <QuietDisclosure
+      title="Direct Play devices"
+      summaryWhenClosed="Reference"
       data-testid="processing-direct-play-section"
     >
       <p className="mm-quiet-note">
@@ -184,10 +186,7 @@ export function ProcessingDirectPlaySection() {
       <div className={`${quietActionRowClass} mt-8`}>
         <button
           type="button"
-          className={mmActionButtonClass({
-            variant: "primary",
-            disabled: !canSave,
-          })}
+          className={mmActionButtonClass({ variant: "primary" })}
           disabled={!canSave}
           onClick={() =>
             save.mutate(
@@ -198,6 +197,6 @@ export function ProcessingDirectPlaySection() {
           {save.isPending ? "Saving…" : "Save devices"}
         </button>
       </div>
-    </QuietSection>
+    </QuietDisclosure>
   );
 }

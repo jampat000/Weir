@@ -13,6 +13,7 @@ using Weir.Core.Validation;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
+using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.DirectPlay;
 using Weir.Infrastructure.Processing.RemuxPass;
@@ -67,6 +68,13 @@ public static class ProcessingFilesEndpoints
             .Set("progress_percent", progress?.Percent is { } pct ? PyJson.Of(pct) : PyJson.Null)
             .Set("progress_message", progress?.Message)
             .Set("progress_eta_seconds", progress?.EtaSeconds is { } eta ? PyJson.Of(eta) : PyJson.Null)
+            // What Live shows on a working file (docs/exec-plans/active/live-and-library.md): which step, how fast,
+            // and what is coming out. All null when nothing is running on the file.
+            .Set("progress_status", progress?.Status)
+            .Set("progress_speed", progress?.Speed)
+            .Set("progress_elapsed_seconds", progress?.ElapsedSeconds is { } elapsed ? PyJson.Of(elapsed) : PyJson.Null)
+            .Set("progress_removed_audio", progress is null ? PyJson.Null : new PyList(progress.RemovedAudio.Select(t => (PyJson)PyJson.Of(t))))
+            .Set("progress_removed_subtitles", progress is null ? PyJson.Null : new PyList(progress.RemovedSubtitles.Select(t => (PyJson)PyJson.Of(t))))
             .Set("failure_class", row.FailureClass)
             .Set("failure_attempts", row.FailureAttempts)
             .Set("quarantined", quarantined)
@@ -119,6 +127,7 @@ public static class ProcessingFilesEndpoints
         var knownDevices = DeviceProfileLoader.Load(request.Options.WeirHome);
         var devices = await DirectPlayService.SelectedProfilesAsync(uow, knownDevices).ConfigureAwait(false);
         var progressByPath = await LiveProgressStore.ByPathAsync(uow, request.Time).ConfigureAwait(false);
+        var handbacks = await HandbackStore.ForLibrariesAsync(uow, rows.Select(row => row.LibraryId)).ConfigureAwait(false);
 
         var files = new List<PyJson>();
         foreach (var row in rows)
@@ -126,7 +135,9 @@ public static class ProcessingFilesEndpoints
             var libraryName = libraryNames.GetValueOrDefault(row.LibraryId, "Unknown library");
             var directPlay = DirectPlayService.ForRow(row, devices);
             progressByPath.TryGetValue(row.RelativePath, out var progress);
-            files.Add(FileOut(row, libraryName, directPlay, progress));
+            // #652: the copy Weir handed back, and what a media manager said about it, for History.
+            handbacks.TryGetValue((row.LibraryId, row.RelativePath), out var handback);
+            files.Add(FileOut(row, libraryName, directPlay, progress).Set("handback", HandbackStore.ToOut(handback)));
         }
 
         var counts = await FileStateStore.StatusCountsAsync(uow, libraryId).ConfigureAwait(false);

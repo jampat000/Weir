@@ -12,14 +12,9 @@ import {
   applyAppThemeToDocument,
   readStoredAppTheme,
 } from "./lib/ui/app-theme";
-import {
-  applyDisplayDensityToDocument,
-  readStoredDisplayDensity,
-} from "./lib/ui/display-density";
 import "./index.css";
 
 applyAppThemeToDocument(readStoredAppTheme());
-applyDisplayDensityToDocument(readStoredDisplayDensity());
 
 const el = document.getElementById("root");
 if (!el) {

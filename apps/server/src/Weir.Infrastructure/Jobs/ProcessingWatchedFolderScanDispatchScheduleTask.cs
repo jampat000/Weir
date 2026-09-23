@@ -58,10 +58,17 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
     private readonly TimeProvider _time;
     private readonly ILogger<ProcessingWatchedFolderScanDispatchScheduleTask> _logger;
     private readonly Dictionary<long, DateTimeOffset> _nextRunByLibrary = [];
+    private readonly ScanWakeups? _wakeups;
 
     public ProcessingWatchedFolderScanDispatchScheduleTask(
-        SqliteDatabase database, WeirOptions options, ProcessingJobStore jobStore, TimeProvider time, ILogger<ProcessingWatchedFolderScanDispatchScheduleTask> logger)
+        SqliteDatabase database,
+        WeirOptions options,
+        ProcessingJobStore jobStore,
+        TimeProvider time,
+        ILogger<ProcessingWatchedFolderScanDispatchScheduleTask> logger,
+        ScanWakeups? wakeups = null)
     {
+        _wakeups = wakeups;
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _jobStore = jobStore ?? throw new ArgumentNullException(nameof(jobStore));
@@ -89,6 +96,11 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
             // #533: the global kill switch is off. No scope is scheduled — clear any due times a
             // library earned before the switch was flipped, so turning it back on starts clean rather
             // than immediately firing a catch-up for every library that missed its window meanwhile.
+            foreach (var id in _nextRunByLibrary.Keys)
+            {
+                _wakeups?.ForgetPeriodic(id);
+            }
+
             _nextRunByLibrary.Clear();
             return;
         }
@@ -107,6 +119,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
         foreach (var staleId in _nextRunByLibrary.Keys.Where(id => !activeIds.Contains(id)).ToList())
         {
             _nextRunByLibrary.Remove(staleId);
+            _wakeups?.ForgetPeriodic(staleId);
         }
 
         foreach (var library in libraries)
@@ -117,11 +130,18 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
                 // #533: this scope's own "run periodic scans" switch is off. Never schedule it — not even
                 // a delayed catch-up — exactly as if the library did not exist for this timer.
                 _nextRunByLibrary.Remove(library.Id);
+                _wakeups?.ForgetPeriodic(library.Id);
                 continue;
             }
 
             var interval = TimeSpan.FromSeconds(PeriodicSchedule.WatchedFolderScanIntervalSeconds(library.ScanIntervalSeconds));
             var due = _nextRunByLibrary.TryGetValue(library.Id, out var existing) ? existing : now;
+            // A look booked for when a held file stops being held (ScanWakeups) comes before the periodic one.
+            if (now < due && _wakeups?.TakeDue(library.Id, now) == true)
+            {
+                due = now;
+            }
+
             if (now < due)
             {
                 continue;
@@ -157,6 +177,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
             }
 
             _nextRunByLibrary[library.Id] = now + nextDelay;
+            _wakeups?.RecordNextPeriodic(library.Id, now + nextDelay);
         }
     }
 

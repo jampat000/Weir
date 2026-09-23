@@ -115,10 +115,7 @@ export function ConfirmRemovalDialog({
           <button
             type="button"
             data-testid={`${testId}-confirm`}
-            className={mmActionButtonClass({
-              variant: "primary",
-              disabled: busy,
-            })}
+            className={mmActionButtonClass({ variant: "primary" })}
             disabled={busy}
             onClick={onConfirm}
           >
