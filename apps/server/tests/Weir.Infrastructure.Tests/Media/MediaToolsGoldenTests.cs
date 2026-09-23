@@ -339,7 +339,7 @@ public sealed class MediaToolsGoldenTests
 /// Deliberate divergences from the golden fixtures in <c>tests/Weir.Core.Tests/Media/golden</c> (shared with
 /// <c>Weir.Core.Tests</c>, which has its own copy of this patch for the argv-level fixtures): fixing a bug on
 /// purpose makes the .NET port log differently from the Python code the fixtures were captured from. See
-/// apps/server/README.md, "ffmpeg parity", for the mechanism.
+/// docs/archive/server-port-notes.md, "ffmpeg parity", for the mechanism.
 /// </summary>
 internal static class GoldenDivergences
 {

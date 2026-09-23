@@ -1,54 +1,13 @@
 # Execution Plans
 
-Use execution plans for work that is too large or risky for a single conversational task.
+Execution plans live in [GitHub issues](https://github.com/jampat000/Weir/issues). Open an issue (or an
+epic with sub-issues) for work that is too large or risky for a single change: anything that touches
+several modules, changes release or installer behavior, changes file deletion or mutation safety,
+changes data migrations, or needs staged validation across Windows, Docker, server and web.
 
-## Directory Layout
-
-- `active/` - plans currently being implemented.
-- `completed/` - completed plans retained for decision history.
-
-## When To Create A Plan
-
-Create a plan when work touches multiple modules, changes release or installer behavior, changes file deletion/mutation safety, changes data migrations, or requires staged validation across Windows, Docker, backend, and frontend.
+A plan issue should state the goal, the current state, the scope and non-goals, acceptance criteria
+(including the tests or smoke checks that must pass), the steps, and decisions as they are made.
 
 Small bug fixes can stay in the PR description if they have clear acceptance criteria and validation.
 
-## Plan Template
-
-```markdown
-# Plan: short title
-
-## Goal
-
-What user-visible outcome this delivers.
-
-## Current State
-
-What exists now and what is failing or missing.
-
-## Scope
-
-Files, modules, workflows, or docs expected to change.
-
-## Non-Goals
-
-What this plan intentionally does not cover.
-
-## Acceptance Criteria
-
-- Observable condition that proves the goal is met.
-- Tests or smoke checks that must pass.
-
-## Steps
-
-1. First durable step.
-2. Second durable step.
-
-## Validation Log
-
-- Date, command, result.
-
-## Decisions
-
-- Date, decision, reason.
-```
+Completed historical plans are kept in [`../archive/`](../archive/).

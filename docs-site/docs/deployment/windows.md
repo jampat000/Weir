@@ -16,9 +16,11 @@ Weir ships a Velopack-based Windows package. It installs as a desktop app with a
 
 ## What gets installed
 
+Relative paths below are inside the application folder.
+
 | Component | Location |
 |-----------|----------|
-| Application binaries | `%LocalAppData%\Weir` |
+| Application folder | `%LocalAppData%\Weir\current` |
 | Tray app (the main program) | `Weir.exe` |
 | Weir server | `server\WeirServer.exe` |
 | Web UI | `server\web-dist` |
@@ -37,17 +39,17 @@ The tray icon provides:
 - **Open Weir** — opens the web UI in your browser (so does clicking the icon)
 - **Open Data Folder** — opens the runtime data directory
 - **Change port** — moves Weir to a different port and restarts it (the current port is shown in the menu)
-- **Check for updates** — checks directly in installed builds or opens **Settings → Upgrade** when install metadata is unavailable
-- **Quit** — stops Weir
+- **Check for updates** — checks GitHub for a newer release; once one is found the item becomes **Download update**, then **Restart to update**
+- **Quit** — stops Weir, and applies an update that has already downloaded
 
 ## Updates
 
-Updates are managed automatically by the .NET tray app via Velopack:
+The tray app installs updates itself, using Velopack:
 
 - Delta updates keep downloads small
-- Automatic rollback on update failure
 - No admin privileges required for updates
-- Update behavior is configurable (auto, download-only, notify-only)
+- **System › About** shows the running version, the latest release and its release notes, and has
+  the **Update mode** setting: **Auto**, **Download only** or **Notify only**. Auto is the default.
 - Weir starts again after an update without opening your browser, so an update never leaves a window behind on a computer nobody is watching. Starting Weir yourself still opens it.
 
 ## Choosing the port
@@ -104,6 +106,11 @@ it if 9347 is taken, saves that, and records which port it chose and why in
 `C:\ProgramData\Weir\tray-host.log`. If a saved port is busy on a later start with no desktop,
 Weir does not move and does not start; the log says which port is busy and how to choose another.
 
-## Migrating from legacy installs
+## Starting with Windows
 
-If you have a previous Weir install that used the older setup program (installed under `C:\Program Files\Weir`), the new tray app automatically detects and cleans up the legacy updater service on first launch. Runtime data under `C:\ProgramData\Weir` is preserved.
+Installing or updating Weir registers it to start when you sign in to Windows, as a `Weir` entry
+under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. That start passes `--no-browser`, so
+signing in doesn't open a browser window. If there is a `Weir.lnk` shortcut in your Startup folder,
+Weir removes it so there is only one startup entry. Uninstalling removes both.
+
+Uninstalling leaves the runtime data in `C:\ProgramData\Weir` in place.

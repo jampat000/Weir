@@ -1,6 +1,6 @@
 # Weir releases
 
-Weir now ships three release deliverables from a tagged release:
+Each tagged release produces three deliverables:
 
 1. a GitHub Release for the tagged source snapshot
 2. a Windows desktop package (Velopack installer + delta update files)
@@ -86,7 +86,7 @@ source cleanup therefore stops the release before either the versioned image or
 `latest` is published. The Windows package smoke runs the same real pass-through
 lifecycle against the packaged executable and bundled FFmpeg.
 
-`VITE_SUPPORT_URL` is a Vite build-time variable. Official releases should set the GitHub Actions repository variable `VITE_SUPPORT_URL` to `https://github.com/sponsors/jampat000` so the production frontend and packaged Windows installer include **Settings -> Support**. If that variable is missing, release builds still succeed, but production safely hides the Support tab.
+`VITE_SUPPORT_URL` is a Vite build-time variable. Official releases should set the GitHub Actions repository variable `VITE_SUPPORT_URL` to `https://github.com/sponsors/jampat000` so the production frontend and packaged Windows installer include the Support section of **System › About**. If that variable is missing, release builds still succeed, and production hides the Support section.
 
 ## Registry authentication
 
@@ -107,7 +107,7 @@ The release workflow publishes GHCR images with the repository `GITHUB_TOKEN` an
 
 The Velopack-based Windows package is the supported Windows release artifact. Release builds produce a setup exe, full nupkg, and delta nupkg under `dist/windows/releases/`.
 
-If you build the Windows package locally and want the installer to include **Settings -> Support**, set `VITE_SUPPORT_URL` before running `packaging/windows/build-velopack.ps1`:
+If you build the Windows package locally and want the installer to include the Support section of **System › About**, set `VITE_SUPPORT_URL` before running `packaging/windows/build-velopack.ps1`:
 
 ```powershell
 $env:VITE_SUPPORT_URL = "https://github.com/sponsors/jampat000"
@@ -119,15 +119,15 @@ After installing:
 1. Launch `Weir` from the Start Menu or desktop shortcut.
 2. Weir starts in the user session, not as a Windows service.
 3. The .NET tray app (`Weir.exe`) launches the Weir server (`server\WeirServer.exe`) as a child process, watches it, and restarts it if it stops.
-4. The tray icon opens the local app in the browser and exposes `Open Weir`, `Open Data Folder`, `Check for updates`, and `Quit`.
+4. The tray icon opens the local app in the browser and exposes `Open Weir`, `Open Data Folder`, `Change port`, `Check for updates`, and `Quit`.
 5. Application binaries install under `%LocalAppData%\Weir` (per-user, no admin required).
 6. The local runtime root is created under `C:\ProgramData\Weir`.
 
 Updates are handled automatically by the .NET tray app via Velopack. Delta updates keep downloads small and rollback is automatic on failure. No separate updater service is needed.
 
 If an operator runs a manually staged copy without Velopack install metadata, the
-tray keeps `Check for updates` visible and opens Settings -> Upgrade for the
-browser-based release check. It must not silently remove the update action.
+tray keeps `Check for updates` visible and sends it to the browser-based release check
+on **System › About**. It must not silently remove the update action.
 
 This design is intentional. Running in the user session avoids common NAS or external-drive access issues that affect Windows services, while keeping writable configuration, logs, backups, and the SQLite database out of the application install directory.
 

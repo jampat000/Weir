@@ -1,5 +1,10 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from "node:fs";
+// Checks the repository's Markdown documentation:
+//   1. the files agents are pointed at exist;
+//   2. every relative link in the root *.md files and in docs/, docs-site/docs and docker/ resolves;
+//   3. no current doc presents a retired UI name as if it were still on screen.
+// It reads files only, so it runs in well under a second.
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,14 +21,32 @@ const requiredFiles = [
   "docs/release-governance.md",
 ];
 
-const markdownFiles = [
-  "AGENTS.md",
-  "ARCHITECTURE.md",
-  "README.md",
-  "CONTRIBUTING.md",
-  "docs/README.md",
-  "docs/agent-harness.md",
-  "docs/exec-plans/README.md",
+// Directories whose Markdown is checked, recursively, besides the root *.md files.
+const markdownDirs = ["docs", "docs-site/docs", "docker"];
+
+// Docs that record the past rather than describe the current UI. Links in them are still checked;
+// the retired-term check skips them.
+const historicalPrefixes = [
+  "docs/archive/",
+  "docs/release-notes/",
+  "docs/adr/",
+  "docs-site/docs/architecture/adr/",
+];
+const historicalFiles = new Set(["CHANGELOG.md"]);
+
+// UI names Weir no longer has. A current doc that uses one is describing a screen that is gone.
+// A line that names one on purpose, to say it is gone, ends with this HTML comment (invisible when rendered):
+const retiredUiAllowMarker = "<!-- retired-ui: history -->";
+const retiredUiTerms = [
+  { label: "Housekeeping", pattern: /Housekeeping/ },
+  { label: "display density", pattern: /display density/i },
+  { label: "Settings › General", pattern: /Settings\s*(?:›|→|->)\s*General\b/ },
+  { label: "Settings › Upgrade", pattern: /Settings\s*(?:›|→|->)\s*Upgrade\b/ },
+  { label: "Settings › Logs", pattern: /Settings\s*(?:›|→|->)\s*Logs\b/ },
+  { label: "Settings › Support", pattern: /Settings\s*(?:›|→|->)\s*Support\b/ },
+  { label: "Processing ›", pattern: /Processing\s*(?:›|→|->)/ },
+  { label: "Home screen", pattern: / Home screen/ },
+  { label: "Activity page", pattern: /Activity page/ },
 ];
 
 let failures = 0;
@@ -33,10 +56,39 @@ function fail(message) {
   console.error(`[agent-docs] ${message}`);
 }
 
+function toPosix(rel) {
+  return rel.split(path.sep).join("/");
+}
+
+function collectMarkdown(dirRel, out) {
+  const abs = path.join(repoRoot, dirRel);
+  if (!existsSync(abs)) {
+    return;
+  }
+  for (const entry of readdirSync(abs, { withFileTypes: true })) {
+    if (entry.name === "node_modules" || entry.name.startsWith(".")) {
+      continue;
+    }
+    const childRel = path.join(dirRel, entry.name);
+    if (entry.isDirectory()) {
+      collectMarkdown(childRel, out);
+    } else if (/\.mdx?$/.test(entry.name)) {
+      out.push(toPosix(childRel));
+    }
+  }
+}
+
 for (const rel of requiredFiles) {
   if (!existsSync(path.join(repoRoot, rel))) {
     fail(`Missing required agent documentation file: ${rel}`);
   }
+}
+
+const markdownFiles = readdirSync(repoRoot).filter(
+  (name) => name.endsWith(".md") && statSync(path.join(repoRoot, name)).isFile(),
+);
+for (const dir of markdownDirs) {
+  collectMarkdown(dir, markdownFiles);
 }
 
 const readme = readFileSync(path.join(repoRoot, "README.md"), "utf8");
@@ -49,34 +101,81 @@ for (const legacyUpgradeText of [
   }
 }
 
-const markdownLinkPattern = /!?\[[^\]]*]\(([^)]+)\)/g;
+/** Removes fenced code blocks and inline code, which hold examples rather than links or UI names. */
+function proseOnly(text) {
+  return text
+    .replace(/^( {0,3})(```|~~~)[^\n]*\n[\s\S]*?^\1\2[^\n]*$/gm, "")
+    .replace(/`[^`\n]*`/g, "");
+}
+
+const markdownLinkPattern = /!?\[[^\]]*]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+const docsSiteRoot = path.join(repoRoot, "docs-site");
+
+/** Docusaurus resolves extensionless doc links and site-absolute paths; mirror that for docs-site pages. */
+function candidatesFor(rel, dir, target) {
+  const inDocsSite = rel.startsWith("docs-site/");
+  const bases = [];
+  if (target.startsWith("/")) {
+    if (!inDocsSite) {
+      return [path.join(repoRoot, target)];
+    }
+    const withoutBase = target.replace(/^\/Weir\//, "/");
+    bases.push(path.join(docsSiteRoot, "static", withoutBase));
+    if (withoutBase.startsWith("/docs/")) {
+      bases.push(path.join(docsSiteRoot, withoutBase));
+    }
+  } else {
+    bases.push(path.resolve(dir, target));
+  }
+  if (!inDocsSite) {
+    return bases;
+  }
+  return bases.flatMap((base) => [base, `${base}.md`, `${base}.mdx`, path.join(base, "index.md")]);
+}
 
 for (const rel of markdownFiles) {
   const abs = path.join(repoRoot, rel);
-  if (!existsSync(abs)) {
-    continue;
-  }
   const dir = path.dirname(abs);
-  const text = readFileSync(abs, "utf8");
-  for (const match of text.matchAll(markdownLinkPattern)) {
-    const target = match[1].trim();
+  const prose = proseOnly(readFileSync(abs, "utf8"));
+
+  for (const match of prose.matchAll(markdownLinkPattern)) {
+    const target = match[1].trim().replace(/^<|>$/g, "");
     if (
       !target ||
       target.startsWith("#") ||
-      /^[a-z][a-z0-9+.-]*:/i.test(target) ||
-      target.startsWith("mailto:")
+      /^[a-z][a-z0-9+.-]*:/i.test(target)
     ) {
       continue;
     }
-    const withoutAnchor = target.split("#")[0];
+    const withoutAnchor = target.split("#")[0].split("?")[0];
     if (!withoutAnchor) {
       continue;
     }
-    const targetPath = path.resolve(dir, decodeURIComponent(withoutAnchor));
-    if (!targetPath.startsWith(repoRoot) || !existsSync(targetPath)) {
+    const decoded = decodeURIComponent(withoutAnchor);
+    const found = candidatesFor(rel, dir, decoded).some(
+      (candidate) => candidate.startsWith(repoRoot) && existsSync(candidate),
+    );
+    if (!found) {
       fail(`${rel} links to missing local target: ${target}`);
     }
   }
+
+  const historical =
+    historicalFiles.has(rel) || historicalPrefixes.some((prefix) => rel.startsWith(prefix));
+  if (historical) {
+    continue;
+  }
+  const lines = prose.split("\n");
+  lines.forEach((line, index) => {
+    if (line.includes(retiredUiAllowMarker)) {
+      return;
+    }
+    for (const term of retiredUiTerms) {
+      if (term.pattern.test(line)) {
+        fail(`${rel}:${index + 1} names retired UI "${term.label}" as if it were current`);
+      }
+    }
+  });
 }
 
 if (failures > 0) {
@@ -84,4 +183,4 @@ if (failures > 0) {
   process.exit(1);
 }
 
-console.error("[agent-docs] Agent documentation map is valid.");
+console.error(`[agent-docs] Agent documentation map is valid (${markdownFiles.length} Markdown files checked).`);

@@ -8,7 +8,7 @@
 #   <out-dir>     directory to write the corpus into (created if missing)
 #
 # What is and is not achievable with this ffmpeg build is documented in
-# docs/trials/503-mkvmerge-vs-ffmpeg.md ("Corpus and gaps"). In short, this build has
+# docs/engineering/503-mkvmerge-vs-ffmpeg.md ("Corpus and gaps"). In short, this build has
 # --disable-libx264 --disable-libx265: there is no software H.264/HEVC encoder with 10-bit
 # support, so true HEVC 10-bit + HDR10 static metadata (mastering display / MaxCLL SEI),
 # Dolby Vision RPUs, TrueHD Atmos objects and PGS bitmap subtitles cannot be synthesized here.

@@ -12,15 +12,19 @@ without Radarr, Sonarr, Deluno, or another manager.
 | Destructive cleanup requiring manager truth | Safely held until Weir can confirm | Available when the manager answers | Available when the manager answers | Depends on the hand-off contract |
 | Callback/hand-off | Not required | Integration-specific | Integration-specific | Supported where configured |
 
-The library screen uses three coverage states:
+Each library reports one of three coverage states (`manager_coverage` on
+`GET /api/v1/processing/libraries`):
 
-- **Connected** — the linked connection passed its latest test.
-- **No upstream signal** — no manager is linked, or a linked manager has not yet
+- `connected`: the linked connection passed its latest test.
+- `no_upstream_signal`: no manager is linked, or a linked manager has not yet
   returned a successful signal. This does not mean that its queue is empty.
-- **Unreachable** — a linked manager failed its latest connection test. Local
+- `unreachable`: a linked manager failed its latest connection test. Local
   remux remains possible, but manager-truth-dependent cleanup is held.
 
-Connect or repair a manager from Settings → Media managers. A manually created
+Settings › Libraries shows which manager each library is linked to, and a
+warning when that manager did not answer its last check.
+
+Connect or repair a manager from Settings › Media managers. A manually created
 library remains valid and is never deleted or disabled merely because it has no
 manager link.
 
@@ -33,7 +37,7 @@ manager link.
   both from Deluno's manifest and offers to fill them in.
 - **Sonarr and Radarr** are set up by hand, the way FileFlows documents it: the
   download client finishes into Weir's watched folder, and a remote path mapping
-  in Sonarr/Radarr (Settings → Download Clients → Remote Path Mappings) maps that
+  in Sonarr/Radarr (Settings › Download Clients › Remote Path Mappings) maps that
   folder to Weir's output folder, so Completed Download Handling only ever looks
   at cleaned files. Weir writes each output under the same relative path, name
   and extension as the download, and publishes it in one step. With a torrent

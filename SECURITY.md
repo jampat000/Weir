@@ -2,23 +2,28 @@
 
 ## Supported versions
 
-- `main` is the supported branch for security fixes.
+Security fixes ship in the latest release. Older versions don't get backported fixes, so update to
+the latest release to receive them.
 
 ## Reporting a vulnerability
 
-- Do not open public GitHub issues for unpatched security vulnerabilities.
-- Report vulnerabilities privately to the repository owner through GitHub Security Advisories or direct maintainer contact.
-- Include:
-  - affected area
-  - reproduction steps
-  - impact assessment
-  - any proof-of-concept details needed to reproduce
+Don't open a public GitHub issue for a vulnerability that isn't fixed yet. Report it privately
+through GitHub's security advisories:
+
+https://github.com/jampat000/Weir/security/advisories/new
+
+Include:
+
+- the affected area and the Weir version
+- steps to reproduce
+- what an attacker could do with it
+- any proof-of-concept details needed to reproduce it
 
 ## Response expectations
 
-- Initial acknowledgment target: within 7 days.
-- Confirmed vulnerabilities are triaged, fixed, and disclosed once a patch is available.
+- Reports are acknowledged within 7 days.
+- Confirmed vulnerabilities are fixed in a new release and disclosed once that release is available.
 
 ## Hardening baseline
 
-The practical release hardening checklist lives in [`docs/security-hardening.md`](docs/security-hardening.md).
+The release hardening checklist is in [`docs/security-hardening.md`](docs/security-hardening.md).

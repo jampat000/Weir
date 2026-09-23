@@ -8,7 +8,7 @@
 //      track count/order/flags/attachments/chapters, file size and wall time.
 //
 // Output: a Markdown table fragment and one JSON file per source under <outDir>/results/.
-// Not part of Weir.slnx; not built or run by CI. See docs/trials/503-mkvmerge-vs-ffmpeg.md.
+// Not part of Weir.slnx; not built or run by CI. See docs/engineering/503-mkvmerge-vs-ffmpeg.md.
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;

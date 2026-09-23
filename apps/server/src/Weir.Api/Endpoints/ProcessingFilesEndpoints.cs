@@ -68,7 +68,7 @@ public static class ProcessingFilesEndpoints
             .Set("progress_percent", progress?.Percent is { } pct ? PyJson.Of(pct) : PyJson.Null)
             .Set("progress_message", progress?.Message)
             .Set("progress_eta_seconds", progress?.EtaSeconds is { } eta ? PyJson.Of(eta) : PyJson.Null)
-            // What Live shows on a working file (docs/exec-plans/active/live-and-library.md): which step, how fast,
+            // What Live shows on a working file (docs/archive/live-and-library.md): which step, how fast,
             // and what is coming out. All null when nothing is running on the file.
             .Set("progress_status", progress?.Status)
             .Set("progress_speed", progress?.Speed)

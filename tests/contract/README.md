@@ -2,9 +2,9 @@
 
 A test suite that judges a **running** Weir server from the outside. It starts the server as its own
 process, talks to it only over HTTP, and reads or writes the SQLite file only while the server is
-stopped. It never imports Weir. It was written against the Python backend and proved the .NET server
-matched it area by area (epic #514, this suite is #516, decision record ADR-0017); since the switch
-(#523) it judges the .NET server only, and every area in `areas.json` is required.
+stopped. It never imports Weir. It was first written against the retired Python backend to prove the .NET
+server matched it area by area (ADR-0017). It now judges the .NET server only, and every area in
+`areas.json` is required.
 
 ## Running it
 
@@ -111,7 +111,7 @@ its own job without a workflow change.
 ## Adding a test
 
 1. Put it in the area folder it belongs to (`tests/contract/<area>/test_*.py`); add a new area to
-   `areas.json` only for a new port issue.
+   `areas.json` only when no existing area fits.
 2. Drive the server only through HTTP. If no API can set up the state you need, seed SQLite while the
    server is stopped; if no API shows the result, read SQLite after stopping it. Never import `weir`
    (collection fails if anything does) and never patch the server.

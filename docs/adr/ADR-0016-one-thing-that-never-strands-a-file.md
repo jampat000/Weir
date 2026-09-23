@@ -139,8 +139,6 @@ media is not on their NAS, and the tool that took it is the reason.
   re-recording screenshots over a known-unreliable harness.
 - The intake webhook stays generic per ADR-0013. Sonarr and Radarr users outnumber Deluno
   users and this product must keep working for them.
-- The visual direction, including the custody framing of the main screen, is drafted at
-  <https://claude.ai/artifact/JLUAA7uBm5taBAwNdh9mWv>.
 
 ## Deferred
 

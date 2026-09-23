@@ -11,7 +11,7 @@ namespace Weir.Core.LibraryMode;
 /// new tables. Issue #557 (after the freeze ended with #523) moved the per-library settings
 /// (<see cref="LibrarySettings"/>) onto real <c>libraries</c> columns and the <c>library_folders</c>
 /// table, and the scan index onto <c>library_files</c> — see <c>Weir.Infrastructure.LibraryMode.LibrarySettingsStore</c>/
-/// <c>LibraryScanStore</c> and <c>apps/server/README.md</c>, "Library mode" for the current storage.
+/// <c>LibraryScanStore</c> and <c>docs/archive/server-port-notes.md</c>, "Library mode" for the current storage.
 /// <see cref="ScanKind"/> is still an ordinary <c>jobs</c> row (a scan is real, visible work with a
 /// lifecycle); only its bulky per-file payload moved to <c>library_files</c>.
 /// </remarks>

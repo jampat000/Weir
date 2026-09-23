@@ -364,7 +364,7 @@ export function SetupWizardPage() {
             <WizardSection
               headingId="setup-wizard-libraries-heading"
               title="Libraries"
-              description="Where your downloader finishes files, and where Weir puts them once cleaned for your media manager to import. This fills in your first Movies and TV library; add more, and set their audio and subtitle rules, on the Processing page."
+              description="Where your downloader finishes files, and where Weir puts them once cleaned for your media manager to import. This fills in your first Movies and TV library. Add more under Settings › Libraries, and set their audio and subtitle rules under Settings › Rules."
             >
               <div className="mm-wizard-libraries">
                 {(

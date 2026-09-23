@@ -42,7 +42,7 @@ public static class FfmpegCommands
     /// reach stderr and unreadable media is reported as a plain failure instead of <c>MediaUnreadableException</c>.
     /// <c>-v error</c> keeps JSON on stdout unchanged (verbosity does not affect <c>-print_format json</c>) and
     /// puts ffmpeg's own error lines on stderr, which is what the classification in
-    /// <see cref="ProbeOutput.FailureFor"/> needs. See apps/server/README.md "ffmpeg parity" for how the golden
+    /// <see cref="ProbeOutput.FailureFor"/> needs. See docs/archive/server-port-notes.md "ffmpeg parity" for how the golden
     /// fixtures captured against Python's <c>-v quiet</c> behaviour are patched to prove this on purpose.
     /// <para>
     /// Deliberate divergence (#498): the reference never asks ffprobe for chapters, so a caller wanting to know
@@ -51,7 +51,7 @@ public static class FfmpegCommands
     /// here instead, so every probe's JSON already carries a <c>chapters</c> array (see
     /// <see cref="ProbeResult.Chapters"/>) — empty when the file has none. This only adds a <c>chapters</c> key to
     /// the parsed result; every other field is unchanged, and the golden fixtures (captured before this option
-    /// existed) are patched at the one changed argv token — see README "ffmpeg parity" and each patch site's
+    /// existed) are patched at the one changed argv token — see docs/archive/server-port-notes.md, "ffmpeg parity", and each patch site's
     /// <c>GoldenDivergences</c> helper.
     /// </para>
     /// </remarks>

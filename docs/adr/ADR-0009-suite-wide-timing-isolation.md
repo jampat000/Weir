@@ -62,7 +62,7 @@ Shipped today:
 
 ### Pruner (Phase 1)
 
-- **Lane only** — ``pruner_jobs`` and in-process workers; **no** shipped durable ``pruner.*`` families or operator schedules in this pass. Future removal job families must each carry **family-local** timing per this ADR (and per ``docs/pruner-forward-design-constraints.md`` for TV/Movies and per server-instance splits).
+- **Lane only** — ``pruner_jobs`` and in-process workers; **no** shipped durable ``pruner.*`` families or operator schedules in this pass. Future removal job families must each carry **family-local** timing per this ADR (and per ``docs/pruner-forward-design-constraints.md`` for TV/Movies and per server-instance splits; that document was removed with Pruner, #473).
 
 ### Subber (Subber v1)
 
