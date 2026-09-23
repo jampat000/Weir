@@ -105,12 +105,11 @@ update_runtime_identity() {
 }
 
 # /opt/weir is owned by root and read-only for weir (see Dockerfile); it is never chowned here.
-# WEIR_HOME's own ownership is checked once, cheaply, by stat-ing just the top-level directory
-# rather than walking it — the walk (and the chown that used to follow it unconditionally on
-# every start) is what was slow, and actively harmful if an operator ever points WEIR_HOME at a
-# large media library. Only recurse into it when that one check says ownership is actually wrong:
-# a bind mount created by the host, or a WEIR_PUID/WEIR_PGID remap since the last start, either of
-# which would otherwise leave the server unable to read its own database and logs.
+# Checking only WEIR_HOME's top-level owner, with a single stat, keeps every normal start fast
+# even when WEIR_HOME holds a large database or years of logs. A recursive chown runs only when
+# that one check says ownership is actually wrong: a bind mount created by the host, or a
+# WEIR_PUID/WEIR_PGID remap since the last start, either of which would otherwise leave the
+# server unable to read its own database and logs.
 ensure_runtime_home_ownership() {
   mkdir -p "$WEIR_HOME"
   current_owner="$(stat -c '%u:%g' "$WEIR_HOME")"

@@ -75,7 +75,7 @@ $velopackOut = Join-Path $distRoot "releases"
 $trayPublishDir = Join-Path $distRoot "tray-publish"
 $serverPublishDir = Join-Path $distRoot "server-publish"
 # Ignored by version control and reused between builds: Ensure-WindowsFfmpegRuntime downloads again
-# only when the vendored copy no longer matches the pin below (CI caches this folder too).
+# only when the vendored copy doesn't match the pin below (CI caches this folder too).
 #
 # Pinned the same way #548 pins MKVToolNix below: a specific, immutable BtbN release rather than
 # the `latest` tag. BtbN republishes `latest` from git master continuously, so it is a moving
