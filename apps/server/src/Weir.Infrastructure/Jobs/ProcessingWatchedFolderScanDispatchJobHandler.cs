@@ -392,24 +392,32 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
     internal static readonly TimeSpan VanishedFileGrace = TimeSpan.FromMinutes(10);
 
     /// <summary>
-    /// #645: a row still waiting, held or failed whose file has not been on disk for <see cref="VanishedFileGrace"/>. The download
-    /// client removed it, a person deleted it, or the manager took it. The scan walks only files on disk, so nothing else would
-    /// ever judge that row again, and it stayed listed for ever. It is forgotten, as Forget does, with one Activity entry
-    /// saying why. A file with a pass queued or running is left to that pass, and a row no scan has ever seen is left alone.
-    /// Outcomes (processed, passed through, rejected, skipped, cancelled) stay as history.
+    /// #645: a row still waiting, held, failed or cancelled whose file has not been on disk for <see cref="VanishedFileGrace"/>.
+    /// The download client removed it, a person deleted it, or the manager took it. The scan walks only files on disk, so nothing
+    /// else would ever judge that row again, and it stayed listed for ever. It is forgotten, as Forget does, with one Activity
+    /// entry saying why. A file with a pass queued or running is left to that pass, and a path that is now a folder on disk is
+    /// kept. Outcomes Weir reached (processed, passed through, rejected, skipped) stay as history.
     /// </summary>
+    /// <remarks>
+    /// 3.2.3 (the Deluno soak, 23 Sep 2026): a row a scan never saw was left alone, and cancelled rows were kept. But a media
+    /// manager's hand-off records its file on receipt, before any scan sees it, and a cancelled hand-off is one Weir never
+    /// started. When those files were then deleted, their rows sat on Processing and History for good: "stuck", "waiting", or
+    /// "cancelled, queue it again", for files that no longer exist. A row no scan has seen now counts from when it was last
+    /// written, so it still gets the same grace before it is judged.
+    /// </remarks>
     private static async Task ForgetVanishedFilesAsync(UnitOfWork uow, long libraryId, string watchedRoot, string mediaScope, DateTimeOffset now)
     {
         var rows = await uow.QueryAsync(
-            "SELECT id, relative_path, status, last_seen_at FROM files WHERE library_id = @lib AND last_seen_at IS NOT NULL " +
-            "AND status IN (@waiting, @held, @outside, @blocked, @failed)",
+            "SELECT id, relative_path, status, coalesce(last_seen_at, updated_at, created_at) FROM files WHERE library_id = @lib " +
+            "AND status IN (@waiting, @held, @outside, @blocked, @failed, @cancelled)",
             reader => (Id: reader.GetInt64(0), RelativePath: reader.GetString(1), Status: reader.GetString(2), LastSeen: PythonTimestamps.Parse(reader.GetValue(3))),
             ("@lib", libraryId),
             ("@waiting", ProcessingFileStatuses.Unprocessed),
             ("@held", ProcessingFileStatuses.OnHold),
             ("@outside", ProcessingFileStatuses.OutOfSchedule),
             ("@blocked", ProcessingFileStatuses.BlockedUpstream),
-            ("@failed", ProcessingFileStatuses.ProcessingFailed)).ConfigureAwait(false);
+            ("@failed", ProcessingFileStatuses.ProcessingFailed),
+            ("@cancelled", ProcessingFileStatuses.Cancelled)).ConfigureAwait(false);
         var cutoff = now - VanishedFileGrace;
         foreach (var (id, rel, status, lastSeen) in rows)
         {
@@ -428,7 +436,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
                 continue;
             }
 
-            if (File.Exists(path) ||
+            if (File.Exists(path) || Directory.Exists(path) ||
                 await WatchedFolderScanOps.ActiveRemuxPassExistsForRelativePathAsync(uow, rel, mediaScope, libraryId).ConfigureAwait(false))
             {
                 continue;
