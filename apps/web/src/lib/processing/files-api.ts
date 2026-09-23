@@ -1,20 +1,9 @@
 import { fetchCsrfToken } from "../api/auth-api";
 import { apiFetch, readJson, requireOk } from "../api/client";
+import type { RequestBody, Schema } from "../api/types";
 
-export type ProcessingFileStatus =
-  | "unprocessed"
-  | "processing"
-  | "processed"
-  | "processing_failed"
-  | "skipped"
-  | "disabled"
-  | "on_hold"
-  | "out_of_schedule"
-  | "blocked_upstream"
-  | "passed_through"
-  | "rejected"
-  /** Its queued pass was cancelled before Weir started on it (#643). Left alone until it changes or is queued again. */
-  | "cancelled";
+/** "cancelled": its queued pass was cancelled before Weir started on it (#643). */
+export type ProcessingFileStatus = Schema<"ProcessingFileOut">["status"];
 
 /** Plain words for each state. The reason string carries the detail. */
 export const PROCESSING_FILE_STATUS_LABELS: Record<
@@ -169,10 +158,8 @@ export async function forgetProcessingFile(id: number): Promise<void> {
   await requireOk(path, r, "Could not remove that file from the list");
 }
 
-export interface ProcessingFileMoveToTopResult {
-  moved: boolean;
-  detail: string;
-}
+export type ProcessingFileMoveToTopResult =
+  Schema<"ProcessingFileMoveToTopOut">;
 
 export async function moveProcessingFileToTop(
   id: number,
@@ -192,11 +179,7 @@ export async function moveProcessingFileToTop(
   return readJson<ProcessingFileMoveToTopResult>(response);
 }
 
-export interface ProcessingRequeueResult {
-  requeued: number;
-  skipped: number;
-  detail: string;
-}
+export type ProcessingRequeueResult = Schema<"ProcessingRequeueOut">;
 
 export async function requeueProcessingFile(
   id: number,
@@ -343,23 +326,8 @@ export async function fetchProcessingFileTracks(
   return readJson<ProcessingFileTracks>(response);
 }
 
-export interface ProcessingManualPlanKeep {
-  index: number;
-  default: boolean;
-  forced: boolean;
-}
-
-export interface ProcessingManualPlanChoice {
-  keep: ProcessingManualPlanKeep[];
-  order: number[];
-}
-
-export interface ProcessingManualPlanResult {
-  ok: boolean;
-  job_id: number;
-  dedupe_key: string;
-  job_kind: string;
-}
+export type ProcessingManualPlanChoice = RequestBody<"ProcessingManualPlanIn">;
+export type ProcessingManualPlanResult = Schema<"ProcessingManualPlanOut">;
 
 export async function postProcessingManualPlan(
   id: number,

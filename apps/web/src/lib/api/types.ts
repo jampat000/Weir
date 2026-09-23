@@ -1,17 +1,20 @@
 import type { components } from "./generated/openapi-types";
 
-type OpenApiSchemaName = keyof components["schemas"];
-type OpenApiSchema<T extends OpenApiSchemaName> = components["schemas"][T];
+type SchemaName = keyof components["schemas"];
 
-export type UserPublic = OpenApiSchema<"UserPublic">;
-export type CurrentSession = OpenApiSchema<"CurrentSessionOut">;
-export type ActiveSession = OpenApiSchema<"SessionOut">;
-export type SessionAction = OpenApiSchema<"SessionActionOut">;
-export type BootstrapStatus = OpenApiSchema<"BootstrapStatusOut">;
-export type ActivityEventItem = OpenApiSchema<"ActivityEventItemOut">;
-export type SystemReadiness = OpenApiSchema<"ReadinessResponse">;
-export type ActivityRecentResponse = OpenApiSchema<"ActivityRecentOut">;
-export type ActivityFileHistoryPreview =
-  OpenApiSchema<"ActivityFileHistoryCountOut">;
-export type ActivityFileHistoryRemoved =
-  OpenApiSchema<"ActivityFileHistoryRemoveOut">;
+/** A type from the server's OpenAPI document, by schema name. */
+export type Schema<T extends SchemaName> = components["schemas"][T];
+
+/** A request body as the caller builds it: the API function adds the CSRF token itself. */
+export type RequestBody<T extends SchemaName> = Omit<Schema<T>, "csrf_token">;
+
+export type UserPublic = Schema<"UserPublic">;
+export type CurrentSession = Schema<"CurrentSessionOut">;
+export type ActiveSession = Schema<"SessionOut">;
+export type SessionAction = Schema<"SessionActionOut">;
+export type BootstrapStatus = Schema<"BootstrapStatusOut">;
+export type ActivityEventItem = Schema<"ActivityEventItemOut">;
+export type SystemReadiness = Schema<"ReadinessResponse">;
+export type ActivityRecentResponse = Schema<"ActivityRecentOut">;
+export type ActivityFileHistoryPreview = Schema<"ActivityFileHistoryCountOut">;
+export type ActivityFileHistoryRemoved = Schema<"ActivityFileHistoryRemoveOut">;

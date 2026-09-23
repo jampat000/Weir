@@ -1,6 +1,8 @@
 import { fetchCsrfToken } from "../api/auth-api";
 import { apiFetch, readJson, requireOk } from "../api/client";
+import type { RequestBody } from "../api/types";
 
+/** Kept by hand: the server always sends paused_until, which the schema marks optional. */
 export interface PauseState {
   paused: boolean;
   /** When the pause lifts on its own. Null for one that lasts until it is lifted by hand. */
@@ -11,11 +13,7 @@ export interface PauseState {
   in_flight_policy: string;
 }
 
-export interface PauseWrite {
-  paused: boolean;
-  pause_for_minutes?: number | null;
-  scan_while_paused: boolean;
-}
+export type PauseWrite = RequestBody<"PauseIn">;
 
 export const pausePath = () => "/api/v1/pause";
 

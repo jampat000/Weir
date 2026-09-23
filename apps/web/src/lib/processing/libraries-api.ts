@@ -1,6 +1,6 @@
 import { fetchCsrfToken } from "../api/auth-api";
 import { apiFetch, readJson, requireOk } from "../api/client";
-import type { components } from "../api/generated/openapi-types";
+import type { Schema } from "../api/types";
 
 export type ProcessingMediaType = "movie" | "tv";
 
@@ -175,12 +175,7 @@ export interface ProcessingLibraryDrift {
 }
 
 /** Issue #498: per-flag track name templates, checked forced, then hearing-impaired, then commentary, then audio description. */
-export interface ProcessingTrackNameOverrides {
-  forced: string;
-  hearing_impaired: string;
-  commentary: string;
-  audio_description: string;
-}
+export type ProcessingTrackNameOverrides = Schema<"TrackNameOverrides">;
 
 export interface ProcessingRuleSet {
   id: number;
@@ -455,10 +450,7 @@ export function writeFromProcessingLibrary(
 }
 
 /** Whether Reject can be chosen for a library linked to these managers, and why. */
-export interface ProcessingRejectSupport {
-  available: boolean;
-  reason: string;
-}
+export type ProcessingRejectSupport = Schema<"RejectSupportOut">;
 
 export async function fetchProcessingRejectSupport(
   connectionIds: number[],
@@ -480,9 +472,8 @@ export async function fetchProcessingRejectSupport(
  * What each connected Sonarr, Radarr or Deluno needs for a library with these folders, and whether it
  * already has it. Read only on the manager's side: Weir only ever sends it GET requests.
  */
-export type ProcessingManagerSetup = components["schemas"]["ManagerSetupOut"];
-export type ProcessingManagerSetupItem =
-  components["schemas"]["ManagerSetupItemOut"];
+export type ProcessingManagerSetup = Schema<"ManagerSetupOut">;
+export type ProcessingManagerSetupItem = Schema<"ManagerSetupItemOut">;
 
 export async function fetchProcessingManagerSetup(
   mediaType: ProcessingMediaType,

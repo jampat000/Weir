@@ -1,6 +1,8 @@
 import { fetchCsrfToken } from "../api/auth-api";
 import { apiFetch, readJson, requireOk } from "../api/client";
+import type { RequestBody, Schema } from "../api/types";
 
+/** Kept by hand: the server always sends known_providers, which the schema marks optional. */
 export interface ProcessingMetadataProvider {
   provider: string;
   base_url: string;
@@ -8,16 +10,8 @@ export interface ProcessingMetadataProvider {
   known_providers: string[];
 }
 
-export interface ProcessingMetadataProviderWrite {
-  provider: "" | "tmdb";
-  base_url: string;
-  api_key?: string;
-}
-
-export interface ProcessingMetadataProviderTest {
-  status: "matched" | "no_match" | "not_configured" | "unreachable";
-  detail: string;
-}
+export type ProcessingMetadataProviderWrite = RequestBody<"MetadataProviderIn">;
+export type ProcessingMetadataProviderTest = Schema<"MetadataProviderTestOut">;
 
 const path = "/api/v1/processing/metadata-provider";
 

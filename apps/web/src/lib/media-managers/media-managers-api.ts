@@ -1,10 +1,12 @@
 import { fetchCsrfToken } from "../api/auth-api";
 import { apiFetch, readJson, requireOk } from "../api/client";
+import type { RequestBody, Schema } from "../api/types";
+
+export type MediaManagerSearchLane = Schema<"MediaManagerSearchLaneOut">;
+export type SearchLane = MediaManagerSearchLane["lane"];
 
 /** A media manager Weir talks to. The kind selects the payload dialect, nothing more. */
-export type MediaManagerKind = "radarr" | "sonarr" | "deluno" | "native";
-
-export type SearchLane = "missing" | "upgrade";
+export type MediaManagerKind = Schema<"MediaManagerConnectionOut">["kind"];
 
 export const MEDIA_MANAGER_KIND_LABELS: Record<MediaManagerKind, string> = {
   radarr: "Radarr",
@@ -13,18 +15,7 @@ export const MEDIA_MANAGER_KIND_LABELS: Record<MediaManagerKind, string> = {
   native: "Something else",
 };
 
-export interface MediaManagerSearchLane {
-  lane: SearchLane;
-  enabled: boolean;
-  max_items_per_run: number;
-  retry_delay_minutes: number;
-  schedule_enabled: boolean;
-  schedule_days: string;
-  schedule_start: string;
-  schedule_end: string;
-  schedule_interval_seconds: number;
-}
-
+/** Kept by hand: the server always sends the last_test_* fields and lanes, which the schema marks optional. */
 export interface MediaManagerConnection {
   id: number;
   kind: MediaManagerKind;
@@ -41,35 +32,14 @@ export interface MediaManagerConnection {
   lanes: MediaManagerSearchLane[];
 }
 
-export interface MediaManagerConnectionCreate {
-  kind: MediaManagerKind;
-  name: string;
-  enabled: boolean;
-  base_url: string;
-  api_key: string;
-}
-
-export interface MediaManagerConnectionUpdate {
-  name?: string;
-  enabled?: boolean;
-  base_url?: string;
-  /** Omit to keep the saved key. Send "" to clear it. */
-  api_key?: string;
-}
-
-export interface MediaManagerWebhookSecret {
-  connection_id: number;
-  webhook_secret: string;
-  webhook_url_path: string;
-  header_name: string;
-}
-
-export interface MediaManagerConnectionTest {
-  connection_id: number;
-  ok: boolean;
-  detail: string;
-  checked_at: string;
-}
+export type MediaManagerConnectionCreate =
+  RequestBody<"MediaManagerConnectionCreateIn">;
+/** Leave api_key out to keep the saved key; send "" to clear it. */
+export type MediaManagerConnectionUpdate =
+  RequestBody<"MediaManagerConnectionUpdateIn">;
+export type MediaManagerWebhookSecret = Schema<"MediaManagerWebhookSecretOut">;
+export type MediaManagerConnectionTest =
+  Schema<"MediaManagerConnectionTestOut">;
 
 export const mediaManagerConnectionsPath = () =>
   "/api/v1/media-managers/connections";

@@ -5,146 +5,40 @@
 import { fetchCsrfToken } from "../api/auth-api";
 import { apiFetch, readJson, requireOk } from "../api/client";
 
-export type LibraryFileClassification =
-  "matches" | "would_change" | "cannot_process";
+import type { Schema } from "../api/types";
 
-export interface LibrarySettings {
-  library_folders: string[];
-  library_schedule_enabled: boolean;
-  /** #508 step 1: clean a file even while another name still shares its data (seeding). Default false. */
-  clean_hardlinked_files: boolean;
-  /** #508 step 2: skip a clean that would make a manager re-download the title. Default true. Not yet enforced
-   * server-side — see docs/archive/server-port-notes.md's "Seams for #507, #508 and #509" — but always safe to save. */
-  skip_if_manager_would_redownload: boolean;
-}
+export type LibrarySettings = Schema<"LibrarySettingsOut">;
+export type LibraryFile = Schema<"LibraryFileOut">;
+export type LibraryFileClassification = LibraryFile["classification"];
+/** Why a file is not something Weir will clean. */
+export type LibraryProblemKind = NonNullable<LibraryFile["problem_kind"]>;
+export type LibraryTotals = Schema<"LibraryTotalsOut">;
+export type LibraryScanInfo = Schema<"LibraryScanStateOut">;
+export type LibraryBreakdownRow = Schema<"LibraryBreakdownRowOut">;
+export type LibraryBreakdowns = Schema<"LibraryBreakdownsOut">;
+export type LibraryProblemGroup = Schema<"LibraryProblemGroupOut">;
+/** Once a day, inside the library's own schedule window. next_run_at is null when it is off or cannot run. */
+export type LibraryModeSchedule = Schema<"LibraryModeScheduleOut">;
+export type LibraryOverview = Schema<"LibraryOverviewOut">;
+export type LibraryFilesResult = Schema<"LibraryFilesOut">;
+export type LibraryScanTrigger = Schema<"LibraryScanTriggerOut">;
+export type LibraryCleanResult = {
+  kind: "cleaned";
+} & Schema<"LibraryCleanOut">;
 
-/**
- * Issue #568: the facets the Library view breaks a library down by and filters its Files table on. Same names
- * the server stores and accepts, so a "show files" link is just this value in the query string.
- */
+/** The facets a library is broken down by and its files filtered on, as the server names them. */
 export const LIBRARY_FACETS = [
   "video_codec",
   "resolution",
   "audio",
   "audio_language",
   "subtitle_language",
-] as const;
+] as const satisfies readonly (keyof LibraryBreakdowns)[];
 
 export type LibraryFacet = (typeof LIBRARY_FACETS)[number];
 
-/** Why a file is not something Weir will clean (#568's Problems view). */
-export type LibraryProblemKind =
-  | "seeding"
-  | "manager_redownload"
-  | "no_permission"
-  | "unreadable"
-  | "no_video"
-  | "no_audio_left";
-
 /** The Files table's sortable columns, as the server names them. */
-export const LIBRARY_FILE_SORTS = [
-  "path",
-  "title",
-  "size",
-  "state",
-  "saved",
-  "video",
-  "resolution",
-  "audio",
-  "subtitles",
-  "modified",
-] as const;
-
-export type LibraryFileSort = (typeof LIBRARY_FILE_SORTS)[number];
-
-export interface LibraryFile {
-  path: string;
-  size_bytes: number;
-  modified_at: number;
-  classification: LibraryFileClassification;
-  summary: string | null;
-  reason: string | null;
-  removed_audio_tracks: number;
-  removed_subtitle_tracks: number;
-  estimated_bytes_saved: number;
-  manager_kind: string | null;
-  manager_title: string | null;
-  /** #568's media facts, from the ffprobe JSON the scan cached; "unknown" when it did not carry one. */
-  video_codec: string;
-  video_height: number | null;
-  resolution_class: string;
-  audio_track_count: number;
-  subtitle_track_count: number;
-  audio_summary: string | null;
-  subtitle_summary: string | null;
-  link_count: number | null;
-  problem_kind: LibraryProblemKind | null;
-  /** When Weir last cleaned this file (unix seconds), or null if it never has. Outlives a rescan. */
-  cleaned_at: number | null;
-  /** You asked Weir to leave this file alone; nothing cleans it until you say otherwise. */
-  leave_alone: boolean;
-}
-
-export interface LibraryTotals {
-  files: number;
-  size_bytes: number;
-  matches: number;
-  would_change: number;
-  cannot_process: number;
-  total_removed_audio_tracks: number;
-  total_removed_subtitle_tracks: number;
-  estimated_bytes_saved: number;
-  /** Files Weir has cleaned at least once, and files you have set aside. */
-  cleaned: number;
-  left_alone: number;
-}
-
-export interface LibraryScanInfo {
-  job_id: number | null;
-  status: string;
-  /** Queued or being worked on right now — what "Scan now" shows progress for. */
-  running: boolean;
-  generated_at: number | null;
-  errors: string[];
-}
-
-export interface LibraryBreakdownRow {
-  value: string;
-  files: number;
-  size_bytes: number;
-  /** 0-1, computed on the server so every bar is drawn from one number. */
-  share: number;
-}
-
-export type LibraryBreakdowns = Record<LibraryFacet, LibraryBreakdownRow[]>;
-
-export interface LibraryProblemGroup {
-  kind: LibraryProblemKind;
-  title: string;
-  what_to_do: string;
-  files: number;
-  size_bytes: number;
-  sample_paths: string[];
-}
-
-/**
- * "Scheduled scan and clean": once a day, inside the library's own schedule window. `next_run_at` is null when it
- * is off or cannot run (no library folders, the library switched off, a window that never opens).
- */
-export interface LibraryModeSchedule {
-  enabled: boolean;
-  next_run_at: string | null;
-}
-
-export interface LibraryOverview {
-  library_id: number;
-  folders_configured: number;
-  scan: LibraryScanInfo | null;
-  schedule: LibraryModeSchedule;
-  totals: LibraryTotals;
-  breakdowns: LibraryBreakdowns;
-  problems: LibraryProblemGroup[];
-}
+export type LibraryFileSort = LibraryFilesResult["sort"];
 
 /** Every way the Files table can be narrowed, sorted and paged. */
 export interface LibraryFileFilters {
@@ -161,27 +55,6 @@ export interface LibraryFileFilters {
   page_size?: number;
 }
 
-export interface LibraryFilesResult {
-  library_id: number;
-  scan: LibraryScanInfo | null;
-  /** The whole library, whatever the filters say — what the header reads. */
-  summary: LibraryTotals;
-  /** Just what the current filters select. */
-  filtered: LibraryTotals;
-  files: LibraryFile[];
-  total: number;
-  page: number;
-  page_size: number;
-  sort: LibraryFileSort;
-  direction: "asc" | "desc";
-}
-
-export interface LibraryScanTrigger {
-  job_id: number;
-  status: string;
-  already_running: boolean;
-}
-
 /** The exact #505 point 5 confirmation: "N files, M tracks will be removed..." plus the size behind it. */
 export interface LibraryConfirmationRequired {
   kind: "confirmation_required";
@@ -191,19 +64,6 @@ export interface LibraryConfirmationRequired {
   estimated_bytes_saved: number;
   /** #508's per-file preflight notes (seeding, re-download risk), one line per file that would be skipped. */
   warnings?: string[];
-}
-
-export interface LibraryCleanResult {
-  kind: "cleaned";
-  queued: number;
-  job_ids: number[];
-  files_count: number;
-  tracks_count: number;
-  estimated_bytes_saved: number;
-  /** #508: paths selected for cleaning but skipped outright (still shared with a download). */
-  skipped_paths: string[];
-  /** #508's per-file preflight notes, same shape as the confirmation dialog's. */
-  warnings: string[];
 }
 
 function librarySettingsPath(libraryId: number): string {

@@ -1,43 +1,14 @@
 import { fetchCsrfToken } from "../api/auth-api";
 import { apiFetch, readJson, requireOk } from "../api/client";
+import type { Schema } from "../api/types";
 
 import { type ProcessingRuleSetWrite } from "./libraries-api";
 
-export type ProcessingRulesPreviewTrackType = "video" | "audio" | "subtitle";
-export type ProcessingRulesPreviewAction = "keep" | "drop";
-
-export interface ProcessingRulesPreviewTrack {
-  index: number;
-  type: ProcessingRulesPreviewTrackType;
-  codec: string;
-  language: string;
-  title: string;
-  channels: number;
-  action: ProcessingRulesPreviewAction;
-  default: boolean;
-  forced: boolean;
-  reasons: string[];
-}
-
-export interface ProcessingRulesPreviewOriginalLanguage {
-  lookup_status: "matched" | "no_match" | "not_configured" | "unreachable";
-  lookup_detail: string;
-  original_language: string | null;
-  note: string;
-}
-
-export interface ProcessingRulesPreviewResult {
-  library_id: number;
-  media_scope: "movie" | "tv";
-  inspected_path: string;
-  tracks: ProcessingRulesPreviewTrack[];
-  notes: string[];
-  metadata_notes: string[];
-  remux_required: boolean;
-  estimated_size_reduction_bytes: number | null;
-  estimated_size_reduction_is_estimate: boolean;
-  original_language: ProcessingRulesPreviewOriginalLanguage | null;
-}
+export type ProcessingRulesPreviewTrack =
+  Schema<"ProcessingRulesPreviewTrackOut">;
+export type ProcessingRulesPreviewOriginalLanguage =
+  Schema<"ProcessingRulesPreviewOriginalLanguageOut">;
+export type ProcessingRulesPreviewResult = Schema<"ProcessingRulesPreviewOut">;
 
 export type ProcessingRulesPreviewRequest = {
   libraryId: number;

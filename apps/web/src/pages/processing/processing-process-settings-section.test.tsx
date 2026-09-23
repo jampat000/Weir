@@ -29,6 +29,8 @@ const settings: ProcessingOperatorSettingsOut = {
   runner_budget_enabled: true,
   work_temp_stale_sweep_enabled: true,
   failure_cleanup_enabled: false,
+  unclaimed_handback_cleanup_enabled: false,
+  unclaimed_handback_window_days: 14,
   keep_failed_work_files: false,
   file_log_retention_days: 90,
   min_file_age_seconds: 60,

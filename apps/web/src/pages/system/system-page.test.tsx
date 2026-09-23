@@ -351,7 +351,7 @@ describe("SystemPage", () => {
       .spyOn(suiteSettingsApi, "putSuiteSettings")
       .mockImplementation(async (body) => ({
         ...minimalSuiteSettings,
-        activity_retention_days: body.activity_retention_days,
+        activity_retention_days: body.activity_retention_days ?? 0,
       }));
 
     renderSettings(operatorMe, { initialEntries: ["/system?tab=history"] });

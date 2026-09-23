@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { apiFetch, readJson, requireOk } from "../api/client";
-import type { components } from "../api/generated/openapi-types";
+import type { Schema } from "../api/types";
 
-export type MediaTools = components["schemas"]["MediaToolsOut"];
+export type MediaTools = Schema<"MediaToolsOut">;
 
 const mediaToolsPath = "/api/v1/system/media-tools";
 

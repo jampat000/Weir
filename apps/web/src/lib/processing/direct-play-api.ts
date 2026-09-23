@@ -1,21 +1,10 @@
 import { fetchCsrfToken } from "../api/auth-api";
 import { apiFetch, readJson, requireOk } from "../api/client";
+import type { Schema } from "../api/types";
 
 /** A device the Direct Play badge can answer for. */
-export interface DirectPlayDevice {
-  id: string;
-  name: string;
-  /** A URL followed by "(checked YYYY-MM-DD)". */
-  source: string;
-  note: string;
-  selected: boolean;
-}
-
-export interface DirectPlayDevices {
-  devices: DirectPlayDevice[];
-  /** True when the list comes from the operator's own direct-play-devices.json. */
-  customised: boolean;
-}
+export type DirectPlayDevice = Schema<"DirectPlayDeviceOut">;
+export type DirectPlayDevices = Schema<"DirectPlayDevicesOut">;
 
 export const directPlayDevicesPath = () =>
   "/api/v1/processing/direct-play/devices";
