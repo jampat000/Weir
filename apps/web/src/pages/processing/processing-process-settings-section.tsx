@@ -247,13 +247,16 @@ export function ProcessingProcessSettingsSection() {
   };
 
   return (
+    // "Processing, safety and records" was a heading that listed three unrelated things, which is
+    // what a dumping ground sounds like when you try to name it. The three groups beneath it already
+    // say what they are, so the section says the one thing they have in common instead.
     <QuietSection
       headingId="processing-process-settings-heading"
-      heading="Processing, safety and records"
+      heading="How hard Weir works"
     >
       <p className="mm-quiet-note">
         These defaults apply to every library. Each library can still narrow its
-        own intake and schedule, and hold itself below Files at once, above.
+        own intake and schedule, and hold itself below Files at once.
       </p>
       <div className="mt-6 text-sm leading-relaxed text-[var(--mm-text2)]">
         {/* Three short groups of small fields ran down one 48rem column and made Running a 2.5-screen

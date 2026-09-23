@@ -47,7 +47,10 @@ import { ProcessingDirectPlaySection } from "../processing/processing-direct-pla
 import { ProcessingFilesSection } from "../processing/processing-files-section";
 import { ProcessingJobsInspectionSection } from "../processing/processing-jobs-inspection-section";
 import { ProcessingLibrariesSection } from "../processing/processing-libraries-section";
-import { ProcessingMaintenanceSection } from "../processing/processing-maintenance-section";
+import {
+  ProcessingMaintenanceSection,
+  ProcessingRuntimeFactsSection,
+} from "../processing/processing-maintenance-section";
 import { ProcessingProcessSettingsSection } from "../processing/processing-process-settings-section";
 import { ProcessingRemuxSection } from "../processing/processing-remux-section";
 import { ProcessingSchedulesSection } from "../processing/processing-schedules-section";
@@ -628,6 +631,8 @@ export function SettingsPage() {
           </div>
         ) : (
           <div className="mm-quiet-stack mm-quiet-stack--columns">
+            {/* What it is, before anything you can change about it. */}
+            <ProcessingRuntimeFactsSection />
             <SettingsInstanceSection
               editable={editable}
               settingsData={settingsQ.data}

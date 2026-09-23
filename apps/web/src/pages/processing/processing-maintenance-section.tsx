@@ -65,7 +65,6 @@ export function ProcessingMaintenanceSection() {
   const formatDate = useAppDateFormatter();
   const me = useMeQuery();
   const maintenance = useProcessingMaintenanceQuery();
-  const runtime = useProcessingRuntimeSettingsQuery();
   const run = useRunProcessingMaintenance();
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -210,7 +209,19 @@ export function ProcessingMaintenanceSection() {
           )}
         </div>
       </section>
+    </div>
+  );
+}
 
+/**
+ * What this instance is running with: worker mode, the file types it accepts, and the note about where
+ * those come from. Read-only — they come from the environment and a restart — so a tab can open with
+ * them without offering anything the screen cannot deliver.
+ */
+export function ProcessingRuntimeFactsSection() {
+  const runtime = useProcessingRuntimeSettingsQuery();
+  return (
+    <>
       {runtime.data ? (
         <section
           className="mm-quiet-section"
@@ -242,6 +253,6 @@ export function ProcessingMaintenanceSection() {
           </div>
         </section>
       ) : null}
-    </div>
+    </>
   );
 }
