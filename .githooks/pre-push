@@ -1,4 +1,10 @@
 #!/usr/bin/env sh
 # Runs the local pre-push checks (scripts/pre-push.mjs). One-time setup: git config core.hooksPath .githooks
 set -e
-exec node "$(git rev-parse --show-toplevel)/scripts/pre-push.mjs"
+root="$(git rev-parse --show-toplevel)"
+if [ -f "$root/scripts/pre-push.mjs" ]; then
+    exec node "$root/scripts/pre-push.mjs"
+fi
+# core.hooksPath is shared by every worktree of a clone, so this hook also runs for branches cut before
+# scripts/pre-push.mjs existed. Those branches still carry the PowerShell checks.
+exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$root/scripts/pre-push-check.ps1"
