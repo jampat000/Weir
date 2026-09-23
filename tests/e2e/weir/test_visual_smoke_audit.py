@@ -284,7 +284,8 @@ def test_rules_editor_renders(weir_shell: str) -> None:
             open_tab(page, "Settings", "Rules")
             expect(page.get_by_test_id("processing-rule-set-workspace")).to_be_visible()
             page.get_by_role("button", name="New profile →", exact=True).click()
-            expect(page.get_by_label("Profile name", exact=True)).to_be_visible()
+            # The profile bar (3.2): the picker, the name and who uses it on one line; the field is "Name".
+            expect(page.get_by_test_id("rule-set-profile-bar").get_by_label("Name", exact=True)).to_be_visible()
             expect(page.get_by_text("Audio order", exact=True)).not_to_be_visible()
 
             _assert_document_owns_vertical_scroll(page)
