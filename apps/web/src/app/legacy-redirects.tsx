@@ -7,13 +7,13 @@ import { Navigate, useSearchParams } from "react-router-dom";
  */
 const PROCESSING_TAB_HOMES: Record<string, string> = {
   overview: "/",
-  files: "/system?tab=history&show=downloads",
+  files: "/history",
   libraries: "/settings?tab=libraries",
   "audio-subtitles": "/settings?tab=rules",
   schedules: "/settings?tab=schedule",
   library: "/library",
-  jobs: "/system?tab=history&show=jobs",
-  maintenance: "/settings?tab=housekeeping",
+  jobs: "/system?tab=logs&show=jobs",
+  maintenance: "/settings?tab=cleanup",
 };
 
 /** Filters the old Files and Jobs tabs understood, carried over so a saved filter still works. */
@@ -30,7 +30,7 @@ export function LegacyProcessingRedirect() {
   return <Navigate to={`${url.pathname}${url.search}`} replace />;
 }
 
-/** Activity is System › History and logs now. */
+/** Activity is System › Logs now; a file's own story is in History. */
 export function LegacyActivityRedirect() {
-  return <Navigate to="/system?tab=history" replace />;
+  return <Navigate to="/system?tab=logs" replace />;
 }

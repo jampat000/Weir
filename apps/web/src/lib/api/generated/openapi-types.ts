@@ -6429,6 +6429,8 @@ export interface operations {
         result?: string | null;
         library_id?: number | null;
         file?: string | null;
+        /** @description "weir" keeps Weir's own events (not about one file); "files" keeps the events about a file. */
+        about?: string | null;
       };
       header?: never;
       path?: never;
@@ -6535,6 +6537,8 @@ export interface operations {
         result?: string | null;
         library_id?: number | null;
         file?: string | null;
+        /** @description "weir" keeps Weir's own events (not about one file); "files" keeps the events about a file. */
+        about?: string | null;
       };
       header?: never;
       path?: never;

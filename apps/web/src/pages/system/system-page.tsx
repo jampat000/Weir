@@ -41,7 +41,6 @@ import { SettingsSecurityTab } from "../settings/settings-security-tab";
 import { SettingsLogsTab } from "../settings/settings-logs-tab";
 import { SettingsSupportTab } from "../settings/settings-support-tab";
 import { ActivityPage } from "../activity/activity-page";
-import { ProcessingFilesSection } from "../processing/processing-files-section";
 import { ProcessingJobsInspectionSection } from "../processing/processing-jobs-inspection-section";
 import { ProcessingRuntimeFactsSection } from "../processing/processing-maintenance-section";
 
@@ -55,7 +54,7 @@ function canEditSuiteGlobal(role: string | undefined): boolean {
  * (docs/exec-plans/active/live-and-library.md). James chose tabs across the top over a second
  * side menu ("I dont like 2 side menus", 2026-09-22).
  */
-type TabId = "instance" | "backups" | "security" | "history";
+type TabId = "about" | "backups" | "security" | "logs";
 
 /**
  * The order someone actually sets Weir up in (James, 23 Sep 2026): say where the media is, say what to
@@ -66,10 +65,10 @@ type TabId = "instance" | "backups" | "security" | "history";
  * thing each is about — the time zone and the wizard to System, retention and clearing to History.
  */
 const SYSTEM_TABS: readonly WorkspaceTabOption<TabId>[] = [
-  { id: "instance", label: "This instance" },
+  { id: "about", label: "About" },
   { id: "backups", label: "Backups" },
   { id: "security", label: "Security" },
-  { id: "history", label: "History and logs" },
+  { id: "logs", label: "Logs" },
 ];
 
 /** A tab name from the address, including the 3.1 names, which land on the tab that took them in. */
@@ -80,21 +79,23 @@ function normalizeSystemTab(candidate: string | null | undefined): TabId {
       return "backups";
     case "security":
       return "security";
-    case "history":
     case "logs":
-      return "history";
+    case "history":
+      return "logs";
     default:
-      return "instance";
+      return "about";
   }
 }
 
-/** What History and logs shows: one "Show" choice beside the list, never a second row of tabs. */
-type HistoryView = "activity" | "log" | "jobs" | "downloads";
+/**
+ * What Logs shows: one "Show" choice beside the list, never a second row of tabs. Weir's own events only;
+ * a file's story is in History (James, 23 Sep 2026), which is where the old Downloads view went.
+ */
+type HistoryView = "activity" | "log" | "jobs";
 
 const HISTORY_VIEWS: { id: HistoryView; label: string }[] = [
-  { id: "activity", label: "Activity" },
-  { id: "downloads", label: "Downloads" },
-  { id: "jobs", label: "Jobs" },
+  { id: "activity", label: "Events" },
+  { id: "jobs", label: "Weir's jobs" },
   { id: "log", label: "Server log" },
 ];
 
@@ -122,8 +123,8 @@ export function SystemPage() {
   function setSystemTab(nextTab: TabId): void {
     setTab(nextTab);
     const nextParams = new URLSearchParams(searchParams);
-    // This instance is where System opens, so it needs no tab in the address.
-    if (nextTab === "instance") {
+    // About is where System opens, so it needs no tab in the address.
+    if (nextTab === "about") {
       nextParams.delete("tab");
     } else {
       nextParams.set("tab", nextTab);
@@ -134,7 +135,7 @@ export function SystemPage() {
 
   function setHistoryView(next: HistoryView): void {
     const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("tab", "history");
+    nextParams.set("tab", "logs");
     if (next === "activity") nextParams.delete("show");
     else nextParams.set("show", next);
     for (const name of ["status", "path"]) nextParams.delete(name);
@@ -192,10 +193,10 @@ export function SystemPage() {
 
   const editable = canEditSuiteGlobal(me.data?.role);
   const backupsQ = useSuiteConfigurationBackupsQuery(
-    editable && tab === "instance" && Boolean(settingsQ.data),
+    editable && tab === "about" && Boolean(settingsQ.data),
   );
   const updateStatusQ = useSuiteUpdateStatusQuery(
-    tab === "instance" && Boolean(settingsQ.data),
+    tab === "about" && Boolean(settingsQ.data),
   );
 
   const serverCuratedTimezone =
@@ -518,7 +519,7 @@ export function SystemPage() {
         dataTestId="system-section-tabs"
       />
       <WorkspacePanel id="system-panel" labelledBy={`system-tab-${tab}`}>
-        {tab === "instance" ? (
+        {tab === "about" ? (
           <div className="mm-quiet-stack mm-quiet-stack--columns">
             {/* What it is, before anything you can change about it. */}
             <ProcessingRuntimeFactsSection />
@@ -593,9 +594,7 @@ export function SystemPage() {
               </select>
             </label>
             {historyView === "activity" ? (
-              <ActivityPage embedded />
-            ) : historyView === "downloads" ? (
-              <ProcessingFilesSection />
+              <ActivityPage embedded about="weir" />
             ) : historyView === "jobs" ? (
               <ProcessingJobsInspectionSection />
             ) : (

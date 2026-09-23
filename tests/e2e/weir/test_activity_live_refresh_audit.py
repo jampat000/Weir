@@ -5,7 +5,7 @@ import os
 import pytest
 from playwright.sync_api import expect, sync_playwright
 
-from ._helpers import ensure_signed_in, open_history
+from ._helpers import ensure_signed_in, open_logs
 
 pytestmark = [
     pytest.mark.weir_e2e,
@@ -20,7 +20,7 @@ def test_activity_feed_updates_without_manual_refresh(
     weir_shell: str,
     seed_activity_event,
 ) -> None:
-    marker_detail = "Live refresh reached the open History and logs tab."
+    marker_detail = "Live refresh reached the open Logs tab."
     base = weir_shell.rstrip("/")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -29,7 +29,7 @@ def test_activity_feed_updates_without_manual_refresh(
             page.set_default_timeout(30_000)
 
             ensure_signed_in(page, base)
-            open_history(page)
+            open_logs(page)
 
             expect(page.get_by_text(marker_detail, exact=True)).to_have_count(0)
 

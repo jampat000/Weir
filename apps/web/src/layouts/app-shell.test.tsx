@@ -120,6 +120,7 @@ describe("AppShell", () => {
     // stops matching its destination fails rather than quietly misleading someone.
     expect(items).toEqual([
       ["Processing", "/"],
+      ["History", "/history"],
       ["Library", "/library"],
       ["Settings", "/settings"],
       ["System", "/system"],

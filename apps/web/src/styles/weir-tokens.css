@@ -4,7 +4,7 @@
   color-scheme: dark;
   /* Kept as variables because every stylesheet multiplies by them. The setting that changed them was a
      zoom of the whole interface in four near-identical steps, which the browser's own zoom already does. */
-  --mm-density-font-scale: 1.08;
+  --mm-density-font-scale: 0.9375;
   --mm-density-ui-scale: 1;
   --mm-main-max-cap: 2400px;
   --mm-charcoal: #0b1418;

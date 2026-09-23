@@ -86,14 +86,14 @@ def open_tab(page: Page, sidebar: str, tab: str) -> None:
     expect(selected).to_have_attribute("aria-selected", "true")
 
 
-def open_history(page: Page, show: str = "Activity") -> None:
-    """System › History and logs, where the Activity page, Downloads, Jobs and the server log live since 3.2.
+def open_logs(page: Page, show: str = "Events") -> None:
+    """System › Logs: Weir's own events, its jobs and the server log (3.2). Each file's story is in History.
 
     ``show`` is the label of one option in its Show choice.
     """
 
-    open_tab(page, "System", "History and logs")
+    open_tab(page, "System", "Logs")
     choice = page.get_by_test_id("settings-history-show")
-    if show != "Activity":
+    if show != "Events":
         choice.select_option(label=show)
     expect(choice.locator("option:checked")).to_have_text(show)

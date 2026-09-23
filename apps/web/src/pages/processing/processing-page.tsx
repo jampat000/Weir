@@ -893,7 +893,7 @@ export function ProcessingPage(): React.ReactElement {
         </div>
         <p className="mm-live-toolbar__note">
           {toolbarNote ? `${toolbarNote} · ` : ""}
-          <Link to="/settings?tab=running">change in Settings</Link>
+          <Link to="/settings?tab=performance">change in Settings</Link>
         </p>
       </div>
 

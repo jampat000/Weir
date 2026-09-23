@@ -204,3 +204,26 @@ export function NavIconSystem({ className = "" }: { className?: string }) {
     </svg>
   );
 }
+
+/** History: a clock turning back, for every file Weir has already worked on. */
+export function NavIconHistory({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path
+        d="M3.5 12a8.5 8.5 0 1 0 2.4-5.9M3.2 3.8v3.6h3.6M12 7.5V12l3 2"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}

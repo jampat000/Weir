@@ -5,6 +5,7 @@ import {
   NavIconChevronLeft,
   NavIconChevronRight,
   NavIconLibrary,
+  NavIconHistory,
   NavIconLive,
   NavIconSettings,
   NavIconSystem,
@@ -99,8 +100,8 @@ export function AppShell() {
         </button>
         <div className="mm-sidebar-inner">
           <BrandHeaderLink to="/" productTitle={productTitle} />
-          {/* Four places since 3.2: what Weir is doing now, the files already imported, how Weir
-              treats your media, and Weir itself. */}
+          {/* Five places since 3.2: what Weir is doing now, every file it has worked on, the files
+              already imported, how Weir treats your media, and Weir itself. */}
           <nav className="mm-sidebar-nav" aria-label="Primary">
             <NavLink
               to="/"
@@ -127,6 +128,17 @@ export function AppShell() {
                   </span>
                 </span>
               ) : null}
+            </NavLink>
+            <NavLink
+              to="/history"
+              className={sidebarNavClass}
+              title="History"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <span className="mm-sidebar-link-icon" aria-hidden="true">
+                <NavIconHistory />
+              </span>
+              <span className="mm-sidebar-link-label">History</span>
             </NavLink>
             <NavLink
               to="/library"

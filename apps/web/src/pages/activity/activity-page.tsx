@@ -677,7 +677,12 @@ type ExportFormat = "csv" | "json";
  */
 export function ActivityPage({
   embedded = false,
-}: { embedded?: boolean } = {}) {
+  about,
+}: {
+  embedded?: boolean;
+  /** "weir" keeps Weir's own events and leaves each file's story to History (System › Logs). */
+  about?: "weir" | "files";
+} = {}) {
   const [filters, setFilters] = useState<ActivityFiltersState>(EMPTY_FILTERS);
   const [applied, setApplied] = useState<ActivityFiltersState>(EMPTY_FILTERS);
   const [olderItems, setOlderItems] = useState<ActivityEventItem[]>([]);
@@ -711,6 +716,7 @@ export function ActivityPage({
     const libraryId = Number(applied.libraryId);
     return {
       limit: 100,
+      ...(about ? { about } : {}),
       event_type: applied.eventType || undefined,
       search: applied.search.trim() || undefined,
       date_from: localInputToIso(applied.from),
@@ -721,7 +727,7 @@ export function ActivityPage({
         applied.libraryId && Number.isFinite(libraryId) ? libraryId : undefined,
       file: applied.file.trim() || undefined,
     };
-  }, [applied]);
+  }, [applied, about]);
   const dataKey = JSON.stringify(queryFilters);
 
   useActivityStreamInvalidation(activityRecentKey);

@@ -71,6 +71,15 @@ const router = createBrowserRouter([
                 errorElement: routeErrorElement,
               },
               {
+                // Every file Weir has touched: what it was, what Weir did and what came out.
+                path: "history",
+                lazy: async () => ({
+                  Component: (await import("../pages/history/history-page"))
+                    .HistoryPage,
+                }),
+                errorElement: routeErrorElement,
+              },
+              {
                 // The files already imported, and what Weir would do to each (library mode).
                 path: "library",
                 lazy: async () => ({

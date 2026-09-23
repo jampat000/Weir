@@ -1339,41 +1339,6 @@ html[data-mm-theme="light"] .mm-theme-toggle {
   z-index: 1;
 }
 
-.mm-processing-file-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.85rem;
-}
-
-.mm-processing-files > ul > li {
-  content-visibility: auto;
-  contain-intrinsic-size: 18rem;
-}
-
-.mm-processing-file-content {
-  display: grid;
-  gap: 0.9rem;
-}
-
-.mm-processing-file-main {
-  display: grid;
-  min-width: 0;
-}
-
-.mm-processing-file-select {
-  display: inline-flex;
-  padding-top: 0.2rem;
-}
-
-.mm-processing-file-select input {
-  accent-color: var(--mm-accent);
-}
-
-.mm-processing-file-actions {
-  width: 100%;
-  justify-content: flex-end;
-}
-
 /* Desktop (Material "expanded" and up): first typography step before large / extra-large tiers. */
 @media (min-width: 1280px) {
   body.mm-body {
@@ -2374,10 +2339,6 @@ select.mm-input::-ms-expand {
 }
 
 @media (max-width: 640px) {
-  .mm-processing-file-actions {
-    justify-content: flex-start;
-  }
-
   .mm-main {
     padding-top: clamp(10px, 3.5vw, 16px);
   }

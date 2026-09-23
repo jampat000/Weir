@@ -263,7 +263,7 @@ describe("SystemPage", () => {
     expect(
       screen.queryByTestId("suite-settings-support"),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "This instance" }));
+    fireEvent.click(screen.getByRole("tab", { name: "About" }));
     expect(screen.getByTestId("suite-settings-support")).toBeInTheDocument();
     expect(
       screen.getByText("Weir is free to use. Support is optional."),
@@ -288,7 +288,7 @@ describe("SystemPage", () => {
       supportUrl: "https://example.com/support",
     });
 
-    fireEvent.click(screen.getByRole("tab", { name: "This instance" }));
+    fireEvent.click(screen.getByRole("tab", { name: "About" }));
 
     expect(screen.getByTestId("suite-settings-support")).toBeInTheDocument();
     expect(
@@ -317,7 +317,7 @@ describe("SystemPage", () => {
     expect(
       screen.queryByRole("tab", { name: "Support" }),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "This instance" }));
+    fireEvent.click(screen.getByRole("tab", { name: "About" }));
     expect(
       screen.queryByTestId("suite-settings-support"),
     ).not.toBeInTheDocument();
@@ -452,7 +452,7 @@ describe("SystemPage", () => {
 
   it("hides configuration backup for viewers", () => {
     renderSettings(viewerMe);
-    fireEvent.click(screen.getByRole("tab", { name: "This instance" }));
+    fireEvent.click(screen.getByRole("tab", { name: "About" }));
     expect(
       screen.queryByTestId("suite-settings-backup-restore"),
     ).not.toBeInTheDocument();
@@ -461,10 +461,10 @@ describe("SystemPage", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("opens on This instance, and each tab holds one job", () => {
+  it("opens on About, and each tab holds one job", () => {
     renderSettings(operatorMe);
     // System opens with what the instance is, before anything you can change about it.
-    expect(screen.getByRole("tab", { name: "This instance" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "About" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -481,7 +481,7 @@ describe("SystemPage", () => {
     expect(screen.queryByText("Time zone")).not.toBeInTheDocument();
 
     // How long history is kept sits with the history it governs.
-    fireEvent.click(screen.getByRole("tab", { name: "History and logs" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Logs" }));
     expect(screen.getByText("System log retention (days)")).toBeInTheDocument();
     expect(
       screen.getByText("Keep Activity history for (days)"),
@@ -503,7 +503,7 @@ describe("SystemPage", () => {
       initialEntries: ["/system?tab=upgrade"],
     });
 
-    expect(screen.getByRole("tab", { name: "This instance" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "About" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -545,7 +545,7 @@ describe("SystemPage", () => {
     qc.setQueryData(suiteMetricsQueryKey, minimalMetrics);
 
     render(wrap(<SystemPage />, qc));
-    fireEvent.click(screen.getByRole("tab", { name: "This instance" }));
+    fireEvent.click(screen.getByRole("tab", { name: "About" }));
 
     // staleTime: Infinity means the pre-seeded data is fresh — the link reads "Check again →"
     expect(screen.getByRole("button", { name: "Check again →" })).toBeEnabled();
@@ -565,7 +565,7 @@ describe("SystemPage", () => {
 
   it("does not render mojibake in the upgrade panel", () => {
     renderSettings(operatorMe, { updateStatus: windowsUpdateAvailableStatus });
-    fireEvent.click(screen.getByRole("tab", { name: "This instance" }));
+    fireEvent.click(screen.getByRole("tab", { name: "About" }));
 
     expect(document.body.textContent).not.toContain("â");
     expect(document.body.textContent).not.toContain("Ã");

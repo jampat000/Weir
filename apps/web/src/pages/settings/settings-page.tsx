@@ -31,8 +31,8 @@ type TabId =
   | "libraries"
   | "rules"
   | "media-managers"
-  | "running"
-  | "housekeeping"
+  | "performance"
+  | "cleanup"
   | "schedule"
   | "alerts";
 
@@ -40,8 +40,8 @@ const SETTINGS_TABS: readonly WorkspaceTabOption<TabId>[] = [
   { id: "libraries", label: "Libraries" },
   { id: "rules", label: "Rules" },
   { id: "media-managers", label: "Media managers" },
-  { id: "running", label: "Running" },
-  { id: "housekeeping", label: "Housekeeping" },
+  { id: "performance", label: "Performance" },
+  { id: "cleanup", label: "Cleanup" },
   { id: "schedule", label: "Schedule" },
   { id: "alerts", label: "Alerts" },
 ];
@@ -54,12 +54,14 @@ function normalizeSettingsTab(candidate: string | null | undefined): TabId {
       return "rules";
     case "media-managers":
       return "media-managers";
+    case "performance":
     case "running":
     case "processing":
-      return "running";
+      return "performance";
+    case "cleanup":
     case "housekeeping":
     case "maintenance":
-      return "housekeeping";
+      return "cleanup";
     case "schedule":
     case "schedules":
       return "schedule";
@@ -117,12 +119,12 @@ export function SettingsPage() {
           <ProcessingRemuxSection />
         ) : tab === "media-managers" ? (
           <SettingsMediaManagersTab />
-        ) : tab === "running" ? (
+        ) : tab === "performance" ? (
           <div className="mm-quiet-stack mm-quiet-stack--columns">
             <ProcessingProcessSettingsSection />
             <ProcessingDirectPlaySection />
           </div>
-        ) : tab === "housekeeping" ? (
+        ) : tab === "cleanup" ? (
           <ProcessingMaintenanceSection />
         ) : tab === "schedule" ? (
           <ProcessingSchedulesSection />

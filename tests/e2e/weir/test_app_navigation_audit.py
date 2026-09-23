@@ -6,7 +6,7 @@ import re
 import pytest
 from playwright.sync_api import expect, sync_playwright
 
-from ._helpers import ensure_signed_in, open_history, open_sidebar, open_tab
+from ._helpers import ensure_signed_in, open_logs, open_sidebar, open_tab
 
 pytestmark = [
     pytest.mark.weir_e2e,
@@ -21,8 +21,8 @@ SETTINGS_TABS = (
     ("Libraries", "processing-libraries-section"),
     ("Rules", "processing-rule-set-workspace"),
     ("Media managers", "suite-settings-media-managers"),
-    ("Running", "processing-direct-play-section"),
-    ("Housekeeping", "processing-maintenance-section"),
+    ("Performance", "processing-direct-play-section"),
+    ("Cleanup", "processing-maintenance-section"),
     ("Schedule", "processing-schedules-section"),
     ("Alerts", "suite-settings-notifications"),
 )
@@ -38,10 +38,12 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
 
             ensure_signed_in(page, base)
 
-            # Four places since 3.2: Processing (the landing screen), Library, Settings and System.
+            # Five places since 3.2: Processing (the landing screen), History, Library, Settings and System.
             primary = page.get_by_role("navigation", name="Primary")
             # The labels, not the links: the Processing link also carries its "1 working" badge while a file runs.
-            expect(primary.locator(".mm-sidebar-link-label")).to_have_text(["Processing", "Library", "Settings", "System"])
+            expect(primary.locator(".mm-sidebar-link-label")).to_have_text(
+                ["Processing", "History", "Library", "Settings", "System"]
+            )
             for retired in ("Home", "Dashboard", "Activity"):
                 expect(page.get_by_role("link", name=retired, exact=True)).to_have_count(0)
 
@@ -54,6 +56,12 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
             expect(page.get_by_role("heading", name="Page not found", exact=True)).to_be_visible()
             page.goto(base + "/", wait_until="domcontentloaded")
             expect(page.get_by_test_id("processing-page")).to_be_visible()
+
+            # Every file Weir has touched, with what it kept and removed.
+            open_sidebar(page, "History")
+            expect(page).to_have_url(re.compile(r".*/history(?:$|[?#])"))
+            expect(page.get_by_test_id("history-page")).to_be_visible()
+            expect(page.get_by_role("group", name="Show").get_by_role("button")).to_have_count(5)
 
             open_sidebar(page, "Library")
             expect(page).to_have_url(re.compile(r".*/library(?:$|[?#])"))
@@ -72,7 +80,7 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
             expect(page).to_have_url(re.compile(r".*/system(?:$|[?#])"))
             expect(page.get_by_test_id("suite-system-page")).to_be_visible()
             expect(page.get_by_test_id("system-section-tabs").get_by_role("tab")).to_have_text(
-                ["This instance", "Backups", "Security", "History and logs"]
+                ["About", "Backups", "Security", "Logs"]
             )
             expect(page.get_by_test_id("suite-settings-global")).to_be_visible()
             expect(page.get_by_text("Setup wizard", exact=True)).to_be_visible()
@@ -86,17 +94,17 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
             expect(page.get_by_test_id("suite-settings-security")).to_be_visible()
             expect(page.get_by_role("heading", name="Change password", exact=True)).to_be_visible()
 
-            open_history(page)
-            expect(page).to_have_url(re.compile(r".*/system\?tab=history(?:$|[&#])"))
+            open_logs(page)
+            expect(page).to_have_url(re.compile(r".*/system\?tab=logs(?:$|[&#])"))
             expect(page.get_by_test_id("activity-feed")).to_be_visible()
             expect(page.get_by_test_id("activity-summary")).to_contain_text("Showing")
             # Weir is one app: no Module filter.
             expect(page.get_by_text("All modules", exact=True)).to_have_count(0)
 
-            open_history(page, "Jobs")
+            open_logs(page, "Weir's jobs")
             expect(page.get_by_test_id("processing-jobs-inspection-section")).to_be_visible()
 
-            open_history(page, "Server log")
+            open_logs(page, "Server log")
             expect(page.get_by_test_id("suite-settings-logs")).to_be_visible()
             expect(page.get_by_text("Showing now", exact=False)).to_be_visible()
             expect(page.get_by_text("Matching events", exact=False)).to_be_visible()
@@ -105,14 +113,15 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
 
             # 3.1 has been installed, so its addresses land on the same thing in its new place.
             page.goto(f"{base}/activity", wait_until="domcontentloaded")
-            expect(page).to_have_url(re.compile(r".*/system\?tab=history$"))
+            expect(page).to_have_url(re.compile(r".*/system\?tab=logs$"))
             expect(page.get_by_test_id("activity-feed")).to_be_visible()
             for old_tab, new_address, section in (
-                ("jobs", r"/system\?tab=history&show=jobs", "processing-jobs-inspection-section"),
+                ("jobs", r"/system\?tab=logs&show=jobs", "processing-jobs-inspection-section"),
+                ("files", r"/history", "history-page"),
                 ("libraries", r"/settings\?tab=libraries", "processing-libraries-section"),
                 ("audio-subtitles", r"/settings\?tab=rules", "processing-rule-set-workspace"),
                 ("schedules", r"/settings\?tab=schedule", "processing-schedules-section"),
-                ("maintenance", r"/settings\?tab=housekeeping", "processing-maintenance-section"),
+                ("maintenance", r"/settings\?tab=cleanup", "processing-maintenance-section"),
             ):
                 page.goto(f"{base}/processing?tab={old_tab}", wait_until="domcontentloaded")
                 expect(page).to_have_url(re.compile(rf".*{new_address}$"))

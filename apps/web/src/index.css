@@ -4,6 +4,7 @@
 @import "./styles/weir-content.css";
 @import "./styles/weir-processing.css";
 @import "./styles/weir-library.css";
+@import "./styles/weir-history.css";
 
 @theme {
   --font-outfit: "Outfit", system-ui, -apple-system, sans-serif;

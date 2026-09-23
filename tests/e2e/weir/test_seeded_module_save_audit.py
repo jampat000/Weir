@@ -34,7 +34,7 @@ def test_saved_state_persists_across_settings_and_processing(
 
             ensure_signed_in(page, base)
 
-            # The setup wizard reopens from System › This instance, where it folds away because it
+            # The setup wizard reopens from System › About, where it folds away because it
             # is run once. Display density was removed in 3.2: not in the wizard, not on the page.
             open_sidebar(page, "System")
             expect(page.get_by_test_id("suite-settings-global")).to_be_visible()

@@ -9233,6 +9233,25 @@
               ],
               "title": "File"
             }
+          },
+          {
+            "description": "\"weir\" keeps Weir's own events (not about one file); \"files\" keeps the events about a file.",
+            "in": "query",
+            "name": "about",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "About"
+            }
           }
         ],
         "responses": {
@@ -9554,6 +9573,25 @@
                 }
               ],
               "title": "File"
+            }
+          },
+          {
+            "description": "\"weir\" keeps Weir's own events (not about one file); \"files\" keeps the events about a file.",
+            "in": "query",
+            "name": "about",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "About"
             }
           }
         ],

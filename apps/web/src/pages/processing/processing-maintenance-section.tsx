@@ -121,7 +121,7 @@ export function ProcessingMaintenanceSection() {
 
           {families.length === 0 ? (
             <p className="mm-quiet-note mt-4">
-              No housekeeping families are available on this instance.
+              No cleanup jobs are available on this instance.
             </p>
           ) : (
             <div className="mm-quiet-table-wrap mt-4">

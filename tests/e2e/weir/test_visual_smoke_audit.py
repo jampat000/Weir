@@ -4,7 +4,7 @@ Run with WEIR_E2E=1. Screenshots are saved to artifacts/screenshots/ for
 visual inspection. The artifacts/ directory is .gitignored so no pixel-exact
 baselines are committed; these are informational smoke checks. What is asserted is
 the structure of each screen, rebaselined for the 3.2 screens: Processing at "/"
-(it replaced Home), Settings and System as two rows of tabs, and History and logs
+(it replaced Home), Settings and System as two rows of tabs, and System › Logs
 (the 3.1 Activity page) with its history statement.
 
 Usage:
@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import expect, sync_playwright
 
-from ._helpers import ensure_signed_in, open_history, open_sidebar, open_tab
+from ._helpers import ensure_signed_in, open_logs, open_sidebar, open_tab
 
 pytestmark = [
     pytest.mark.weir_e2e,
@@ -154,7 +154,7 @@ def test_processing_is_the_landing_page(weir_shell: str) -> None:
 
 
 def test_history_says_how_far_back_it_goes(weir_shell: str) -> None:
-    """System › History and logs (the 3.1 Activity page) states its history horizon plainly (#469)."""
+    """System › Logs (the 3.1 Activity page) states its history horizon plainly (#469)."""
     base = weir_shell.rstrip("/")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -163,9 +163,9 @@ def test_history_says_how_far_back_it_goes(weir_shell: str) -> None:
             page.set_default_timeout(30_000)
 
             ensure_signed_in(page, base)
-            open_history(page)
+            open_logs(page)
 
-            expect(page).to_have_url(re.compile(r".*/system\?tab=history(?:$|[&#])"))
+            expect(page).to_have_url(re.compile(r".*/system\?tab=logs(?:$|[&#])"))
             expect(page.get_by_test_id("activity-retention")).to_contain_text("History goes back 90 days")
             expect(page.get_by_test_id("activity-feed")).to_be_visible()
             _assert_no_error_state(page)
@@ -206,7 +206,7 @@ def test_settings_and_system_tabs_render(weir_shell: str) -> None:
                 full_page=True,
             )
 
-            open_tab(page, "System", "This instance")
+            open_tab(page, "System", "About")
             expect(page.get_by_test_id("suite-settings-global")).to_be_visible()
 
             _assert_document_owns_vertical_scroll(page)

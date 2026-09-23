@@ -557,18 +557,18 @@ class LiveAudit:
             f"{sidebar} › {tab} selected",
         )
 
-    def open_history(self, show: str = "Activity") -> None:
-        """System › History and logs; ``show`` is the label of one option in its Show choice."""
+    def open_logs(self, show: str = "Events") -> None:
+        """System › Logs, Weir's own events; ``show`` is the label of one option in its Show choice."""
 
-        self.open_tab("System", "History and logs")
+        self.open_tab("System", "Logs")
         choice = self.visible(
-            self.page.get_by_test_id("settings-history-show"), "History and logs Show choice"
+            self.page.get_by_test_id("settings-history-show"), "Logs Show choice"
         )
-        if show != "Activity":
+        if show != "Events":
             choice.select_option(label=show)
         self.require(
             (choice.locator("option:checked").text_content() or "").strip() == show,
-            f"History and logs is not showing {show}",
+            f"Logs is not showing {show}",
         )
 
     def tab_labels(self, tabs_test_id: str) -> list[str]:
@@ -582,12 +582,12 @@ class LiveAudit:
             self.page.get_by_role("heading", name="Processing", exact=True),
             "Processing heading",
         )
-        # Four places since 3.2. Home became Processing, the dashboard folded into it (#459), and
-        # Activity is System › History and logs.
+        # Five places since 3.2. Home became Processing, the dashboard folded into it (#459), every
+        # file's story is History, and the 3.1 Activity page is System › Logs.
         primary = self.page.get_by_role("navigation", name="Primary")
         labels = [text.strip() for text in primary.locator(".mm-sidebar-link-label").all_text_contents()]
         self.require(
-            labels == ["Processing", "Library", "Settings", "System"],
+            labels == ["Processing", "History", "Library", "Settings", "System"],
             f"primary navigation is {labels}",
         )
         for retired in ("Home", "Dashboard", "Activity"):
@@ -597,7 +597,7 @@ class LiveAudit:
             )
         self.assert_no_visible_crash()
         self.screenshot("processing")
-        self.record("Processing main screen and the four-place side menu")
+        self.record("Processing main screen and the five-place side menu")
 
     def library(self) -> None:
         self.open_sidebar("Library")
@@ -607,7 +607,7 @@ class LiveAudit:
         self.record("Library screen")
 
     def history_activity(self) -> None:
-        self.open_history()
+        self.open_logs()
         self.visible(self.page.get_by_test_id("activity-feed"), "Activity feed")
         # Scoped to the filters: the Show choice above them is a select too.
         filters = self.visible(
@@ -643,7 +643,7 @@ class LiveAudit:
             "Activity filters did not clear",
         )
         self.screenshot("history-activity")
-        self.record("History and logs: Activity feed, filters, and clear action")
+        self.record("Logs: Weir's own events, filters, and clear action")
 
     def settings_tabs(self) -> None:
         self.open_sidebar("Settings")
@@ -652,8 +652,8 @@ class LiveAudit:
             "Libraries": "processing-libraries-section",
             "Rules": "processing-rule-set-workspace",
             "Media managers": "suite-settings-media-managers",
-            "Running": "processing-direct-play-section",
-            "Housekeeping": "processing-maintenance-section",
+            "Performance": "processing-direct-play-section",
+            "Cleanup": "processing-maintenance-section",
             "Schedule": "processing-schedules-section",
             "Alerts": "suite-settings-notifications",
         }
@@ -689,58 +689,49 @@ class LiveAudit:
 
         self.screenshot("settings")
         self.record(
-            "Settings libraries, rules, media managers, running, housekeeping, schedule, and alerts tabs"
+            "Settings libraries, rules, media managers, performance, cleanup, schedule, and alerts tabs"
         )
 
-    def history_downloads_and_jobs(self) -> None:
-        self.open_history("Downloads")
-        self.visible(
-            self.page.get_by_test_id("processing-files-section"), "History Downloads list"
-        )
-        # The lead band draws only when Weir is holding files, because a row of zeroes on a fresh
-        # install is the thing the content language forbids -- so this asserts whichever of the two
-        # states is real, and never that the list rendered nothing at all. Decided here, while the
-        # list is settled: every filter change re-keys the files query, which remounts the list
-        # through its loading state.
-        band = self.page.get_by_test_id("processing-files-buckets")
-        if band.count():
-            self.visible(band, "Downloads state band")
-            segment = self.page.get_by_test_id("processing-files-bucket-unprocessed")
-            self.click(segment, "filter Downloads by state")
-            self.visible(
-                self.page.get_by_test_id("processing-files-flow-caption"),
-                "Downloads band caption",
-            )
-            self.click(segment, "clear the Downloads state filter")
+    def history_and_jobs(self) -> None:
+        # History: every file Weir has touched, with the open file's record beside the list.
+        self.open_sidebar("History")
+        self.visible(self.page.get_by_test_id("history-page"), "History page")
+        chips = self.page.get_by_role("group", name="Show").get_by_role("button")
+        self.require(chips.count() == 5, f"History shows {chips.count()} Show choices, not 5")
+        # A fresh install has no files, so assert whichever of the two states is real, and never
+        # that the page rendered nothing at all.
+        if self.page.get_by_test_id("history-detail").count():
+            self.visible(self.page.get_by_test_id("history-detail"), "History open file")
         else:
             self.require(
-                self.page.get_by_text("No files match", exact=False).count() > 0,
-                "Downloads showed neither a state band nor its empty state",
+                self.page.get_by_text("Nothing yet.", exact=False).count() > 0
+                or self.page.get_by_text("No file matches", exact=False).count() > 0,
+                "History showed neither files nor its empty state",
             )
-        self.page.get_by_placeholder("part of a file or folder name").fill("audit")
-        self.visible(
-            self.page.get_by_test_id("processing-files-section"),
-            "Downloads list after the path filter",
-        )
+        search = self.page.get_by_role("searchbox", name="Find a file")
+        search.fill("audit")
+        search.press("Enter")
+        self.visible(self.page.get_by_test_id("history-page"), "History after a search")
+        self.screenshot("history")
 
-        self.open_history("Jobs")
+        self.open_logs("Weir's jobs")
         self.visible(
             self.page.get_by_test_id("processing-jobs-inspection-section"),
-            "History Jobs list",
+            "Logs jobs list",
         )
-        self.screenshot("history-jobs")
-        self.record("History and logs: Downloads filters and Jobs")
+        self.screenshot("logs-jobs")
+        self.record("History: every file and its record; Logs: Weir's jobs")
 
     def system_instance_and_setup(self) -> None:
         self.open_sidebar("System")
         self.visible(self.page.get_by_test_id("suite-system-page"), "System page")
         labels = self.tab_labels("system-section-tabs")
         self.require(
-            labels == ["This instance", "Backups", "Security", "History and logs"],
+            labels == ["About", "Backups", "Security", "Logs"],
             f"System tabs are {labels}",
         )
         self.visible(
-            self.page.get_by_test_id("suite-settings-global"), "System › This instance"
+            self.page.get_by_test_id("suite-settings-global"), "System › About"
         )
         self.visible(
             self.page.get_by_text("Time zone", exact=True), "time zone control"
@@ -748,7 +739,7 @@ class LiveAudit:
         self.require(
             self.page.get_by_text("What this instance is running with", exact=True).count()
             > 0,
-            "runtime facts are missing from This instance",
+            "runtime facts are missing from About",
         )
         # Display density was removed in 3.2 and must not come back.
         self.require(
@@ -794,10 +785,10 @@ class LiveAudit:
         self.open_sidebar("System")
         self.visible(
             self.page.get_by_test_id("suite-settings-global"),
-            "return to System › This instance",
+            "return to System › About",
         )
         self.screenshot("system-instance")
-        self.record("System › This instance: time zone, runtime facts, upgrade refresh, and wizard re-entry")
+        self.record("System › About: time zone, runtime facts, upgrade refresh, and wizard re-entry")
 
     def system_backups_logs_security(self) -> None:
         self.open_tab("System", "Backups")
@@ -821,7 +812,7 @@ class LiveAudit:
             "configuration export is not JSON",
         )
 
-        self.open_history("Server log")
+        self.open_logs("Server log")
         logs = self.visible(
             self.page.get_by_test_id("suite-settings-logs"), "server log panel"
         )
@@ -1309,7 +1300,7 @@ class LiveAudit:
             ),
             (
                 "System",
-                "This instance",
+                "About",
                 "suite-settings-global",
                 "Security",
                 "tab=security",
@@ -1397,7 +1388,7 @@ def run(playwright: Playwright) -> dict[str, Any]:
         audit.library()
         audit.history_activity()
         audit.settings_tabs()
-        audit.history_downloads_and_jobs()
+        audit.history_and_jobs()
         audit.system_instance_and_setup()
         audit.system_backups_logs_security()
         audit.settings_notifications()
