@@ -150,13 +150,38 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTaskTests
         var libraryId = await CreateLibraryAsync(store, watched, output);
         await SetLibraryEnabledAsync(store, libraryId, watched, output, enabled: false);
         await SetMovieScheduleEnabledAsync(store, enabled: true);
-        var changes = new LibraryChanges();
+        var changes = new ScanSettingsChanges();
         var task = new ProcessingWatchedFolderScanDispatchScheduleTask(
             store.Database, store.Options, new ProcessingJobStore(store.Database, store.Clock), store.Clock,
-            NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance, libraryChanges: changes);
+            NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance, scanSettingsChanges: changes);
         await task.RunOnceAsync(CancellationToken.None);
 
         await SetLibraryEnabledAsync(store, libraryId, watched, output, enabled: true);
+        changes.Record();
+        store.Clock.Set(store.Clock.GetUtcNow() + TimeSpan.FromSeconds(1));
+        await task.RunOnceAsync(CancellationToken.None);
+
+        var count = await store.Scalar("SELECT COUNT(*) FROM jobs WHERE job_kind = 'processing.watched_folder.remux_scan_dispatch.v1'");
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task Turning_the_scope_switch_on_is_scheduled_on_the_next_tick_once_recorded()
+    {
+        using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "schedule-task-tests-secret-6"));
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        await CreateLibraryAsync(store, watched, output);
+        await SetMovieScheduleEnabledAsync(store, enabled: false);
+        var changes = new ScanSettingsChanges();
+        var task = new ProcessingWatchedFolderScanDispatchScheduleTask(
+            store.Database, store.Options, new ProcessingJobStore(store.Database, store.Clock), store.Clock,
+            NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance, scanSettingsChanges: changes);
+        await task.RunOnceAsync(CancellationToken.None);
+
+        await SetMovieScheduleEnabledAsync(store, enabled: true);
         changes.Record();
         store.Clock.Set(store.Clock.GetUtcNow() + TimeSpan.FromSeconds(1));
         await task.RunOnceAsync(CancellationToken.None);

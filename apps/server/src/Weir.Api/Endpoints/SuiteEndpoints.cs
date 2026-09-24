@@ -173,7 +173,7 @@ public static class SuiteEndpoints
         }
 
         await request.CommitAsync().ConfigureAwait(false);
-        request.Service<LibraryChanges>().Record();
+        request.Service<ScanSettingsChanges>().Record();
         return ApiRoutes.Ok(await ConfigurationBundleStore.BuildAsync(uow).ConfigureAwait(false));
     }
 

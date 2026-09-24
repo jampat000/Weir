@@ -274,7 +274,7 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
         var libraryId = await CreateLibraryAsync(store, watched, output, fileSystemEventsEnabled: false);
         var time = new FakeTimeProvider();
         var state = new WatcherStateStore();
-        var changes = new LibraryChanges();
+        var changes = new ScanSettingsChanges();
         var service = new ProcessingWatchedFolderWatcherService(
             store.Database, store.Options, new ProcessingJobStore(store.Database, time), state,
             time, NullLogger<ProcessingWatchedFolderWatcherService>.Instance, changes);

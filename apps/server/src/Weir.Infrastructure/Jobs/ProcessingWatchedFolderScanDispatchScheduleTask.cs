@@ -31,7 +31,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
     private readonly ILogger<ProcessingWatchedFolderScanDispatchScheduleTask> _logger;
     private readonly Dictionary<long, DateTimeOffset> _nextRunByLibrary = [];
     private readonly ScanWakeups? _wakeups;
-    private readonly LibraryChanges? _libraryChanges;
+    private readonly ScanSettingsChanges? _scanSettingsChanges;
     private ScheduleInputs? _inputs;
 
     public ProcessingWatchedFolderScanDispatchScheduleTask(
@@ -41,10 +41,10 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
         TimeProvider time,
         ILogger<ProcessingWatchedFolderScanDispatchScheduleTask> logger,
         ScanWakeups? wakeups = null,
-        LibraryChanges? libraryChanges = null)
+        ScanSettingsChanges? scanSettingsChanges = null)
     {
         _wakeups = wakeups;
-        _libraryChanges = libraryChanges;
+        _scanSettingsChanges = scanSettingsChanges;
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _jobStore = jobStore ?? throw new ArgumentNullException(nameof(jobStore));
@@ -60,8 +60,8 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
     public TimeSpan Interval => TimeSpan.FromSeconds(1);
 
     /// <summary>
-    /// How long the libraries and the scan switches are trusted before they are read again, unless a library change is
-    /// recorded first (<see cref="LibraryChanges"/>). Reading them on every one-second tick was idle load for nothing (#720).
+    /// How long the libraries and the scan switches are trusted before they are read again, unless a change to them is
+    /// recorded first (<see cref="ScanSettingsChanges"/>). Reading them on every one-second tick was idle load for nothing (#720).
     /// </summary>
     public static readonly TimeSpan InputsRefresh = TimeSpan.FromSeconds(20);
 
@@ -161,7 +161,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
     /// <summary>The enabled libraries and the scan switches, read again only when they may have changed.</summary>
     private async Task<(IReadOnlyList<ProcessingLibraryRecord> Libraries, ProcessingOperatorSettingsRecord Settings)> ReadInputsAsync(UnitOfWork uow, DateTimeOffset now)
     {
-        var version = _libraryChanges?.Version ?? 0;
+        var version = _scanSettingsChanges?.Version ?? 0;
         if (_inputs is { } known && known.LibraryVersion == version && now >= known.ReadAt && now - known.ReadAt < InputsRefresh)
         {
             return (known.Libraries, known.Settings);

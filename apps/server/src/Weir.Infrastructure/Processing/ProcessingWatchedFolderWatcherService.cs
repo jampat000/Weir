@@ -28,7 +28,7 @@ namespace Weir.Infrastructure.Processing;
 /// <item>
 /// <b>Reacts to library create/update/delete without a restart.</b> This re-reads the enabled libraries and their
 /// folders and reconciles the watch set to match: on the next tick after a change is recorded
-/// (<see cref="LibraryChanges"/>), and every <see cref="ReconcileInterval"/> in case one was not (#720). A library
+/// (<see cref="ScanSettingsChanges"/>), and every <see cref="ReconcileInterval"/> in case one was not (#720). A library
 /// created, edited (folder, enabled, or "watch for changes" toggled) or deleted takes effect with no restart needed.
 /// Watchers whose watched folder has not changed are left running, so a reconcile never interrupts a debounce already
 /// in progress for an unrelated library.
@@ -42,7 +42,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
     public static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(500);
 
     /// <summary>
-    /// How often the watch set is reconciled against the database when no library change was recorded: a backstop for
+    /// How often the watch set is reconciled against the database when no change was recorded: a backstop for
     /// changes made some other way. Reading every library twice a second was most of Weir's idle load (#720).
     /// </summary>
     public static readonly TimeSpan ReconcileInterval = TimeSpan.FromSeconds(20);
@@ -53,7 +53,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
     private readonly WatcherStateStore _state;
     private readonly TimeProvider _time;
     private readonly ILogger<ProcessingWatchedFolderWatcherService> _logger;
-    private readonly LibraryChanges _libraryChanges;
+    private readonly ScanSettingsChanges _scanSettingsChanges;
 
     public ProcessingWatchedFolderWatcherService(
         SqliteDatabase database,
@@ -62,7 +62,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
         WatcherStateStore state,
         TimeProvider time,
         ILogger<ProcessingWatchedFolderWatcherService> logger,
-        LibraryChanges? libraryChanges = null)
+        ScanSettingsChanges? scanSettingsChanges = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -70,7 +70,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
         _state = state ?? throw new ArgumentNullException(nameof(state));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _libraryChanges = libraryChanges ?? new LibraryChanges();
+        _scanSettingsChanges = scanSettingsChanges ?? new ScanSettingsChanges();
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -97,7 +97,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                var version = _libraryChanges.Version;
+                var version = _scanSettingsChanges.Version;
                 if (version != reconciledVersion || _time.GetElapsedTime(reconciledAt) >= ReconcileInterval)
                 {
                     reconciledVersion = version;
