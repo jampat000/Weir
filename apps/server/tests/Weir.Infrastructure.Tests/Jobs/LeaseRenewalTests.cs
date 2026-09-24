@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Weir.Core.Jobs;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
@@ -9,15 +10,16 @@ namespace Weir.Infrastructure.Tests.Jobs;
 /// #540 item 1: nothing renewed a lease, so a handler running longer than its lease could be claimed by
 /// a second worker while the first was still running it (two ffmpeg processes on the same file). A
 /// heartbeat now renews the lease roughly every lease/3 while the handler runs. Proven here with a real
-/// SQLite file, a genuinely long-running fake handler and a second worker polling in parallel on its own
-/// connection, using the real clock so the renewal heartbeat's own timer is exercised (a fake
-/// <c>TimeProvider</c> only overrides <c>GetUtcNow</c>; <c>Task.Delay</c> still waits in real time).
+/// SQLite file, a genuinely long-running fake handler and a second worker trying to claim in parallel, on
+/// a shared <see cref="FakeTimeProvider"/> so the heartbeat's own timer, the claim's lease math and the
+/// test's assertions all agree on "now" instead of racing the real clock.
 /// </summary>
 [Collection(SerialTestGroup.Name)]
 public sealed class LeaseRenewalTests : IDisposable
 {
     private const string Kind = "processing.test.long_running.v1";
     private readonly JobsTestDatabase _db = new();
+    private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 4, 10, 12, 0, 0, TimeSpan.Zero));
 
     public void Dispose() => _db.Dispose();
 
@@ -26,48 +28,40 @@ public sealed class LeaseRenewalTests : IDisposable
     {
         await _db.Store.EnqueueOrGetAsync("long-running", Kind, maxAttempts: 3);
 
-        var runningWorkerRuns = 0;
         var intruderRuns = 0;
+        var claimed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var runningHandler = new DelegateHandler(Kind, async _ =>
         {
-            Interlocked.Increment(ref runningWorkerRuns);
-            await Task.Delay(TimeSpan.FromMilliseconds(1200));
+            claimed.TrySetResult();
+            await release.Task;
         });
         var intruderHandler = new DelegateHandler(Kind, _ => Interlocked.Increment(ref intruderRuns));
 
-        var runningProcessor = new ProcessingJobProcessor(
-            new ProcessingJobStore(new SqliteDatabase(_db.DbPath, pooling: false), TimeProvider.System),
-            new JobHandlerRegistry([runningHandler]),
-            new RecordingActivityWriter(),
-            new NoUnhandledJobFailureRecorder(),
-            new NoJobNotifications(),
-            TimeProvider.System,
-            NullLogger<ProcessingJobProcessor>.Instance);
-        var intruderProcessor = new ProcessingJobProcessor(
-            new ProcessingJobStore(new SqliteDatabase(_db.DbPath, pooling: false), TimeProvider.System),
-            new JobHandlerRegistry([intruderHandler]),
-            new RecordingActivityWriter(),
-            new NoUnhandledJobFailureRecorder(),
-            new NoJobNotifications(),
-            TimeProvider.System,
-            NullLogger<ProcessingJobProcessor>.Instance);
+        var runningProcessor = Processor(runningHandler);
+        var intruderProcessor = Processor(intruderHandler);
 
-        // A one-second lease; the handler runs well past it, so only a working renewal keeps it safe.
-        var runningTask = runningProcessor.ProcessOneAsync("worker-running", leaseSeconds: 1);
-        await Task.Delay(150); // Let the running worker claim before the intruder starts polling.
+        // A one-second lease; the handler outlives it by design, so only a working renewal keeps it safe.
+        const int leaseSeconds = 1;
+        var runningTask = runningProcessor.ProcessOneAsync("worker-running", leaseSeconds, _time.GetUtcNow());
+        await claimed.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
+        // Step past the original lease in heartbeat-sized increments (lease/3), giving the renewal
+        // heartbeat a chance to fire before each intruder claim attempt at the same "now". Whether or not
+        // a given step happens to land on a renewal, the intruder can only ever see a lease that is either
+        // still within its original window or has already been pushed out further - never expired.
         var intruderOutcomes = new List<JobProcessOutcome>();
-        var pollDeadline = DateTime.UtcNow.AddMilliseconds(1300);
-        while (DateTime.UtcNow < pollDeadline)
+        for (var step = 0; step < 6; step++)
         {
-            intruderOutcomes.Add(await intruderProcessor.ProcessOneAsync("worker-intruder", leaseSeconds: 1));
-            await Task.Delay(80);
+            _time.Advance(TimeSpan.FromSeconds(leaseSeconds / 3.0));
+            await Task.Delay(20); // let the heartbeat's renewal write land before the intruder reads it
+            intruderOutcomes.Add(await intruderProcessor.ProcessOneAsync("worker-intruder", leaseSeconds, _time.GetUtcNow()));
         }
 
+        release.TrySetResult();
         var outcome = await runningTask;
 
         Assert.Equal(JobProcessOutcome.Processed, outcome);
-        Assert.Equal(1, runningWorkerRuns);
         Assert.Equal(0, intruderRuns);
         Assert.All(intruderOutcomes, o => Assert.Equal(JobProcessOutcome.Idle, o));
         Assert.Equal(ProcessingJobStatus.Completed, (await _db.Store.GetAsync(1))!.Status);
@@ -84,26 +78,36 @@ public sealed class LeaseRenewalTests : IDisposable
             started.TrySetResult();
             await release.Task;
         });
-        var store = new ProcessingJobStore(new SqliteDatabase(_db.DbPath, pooling: false), TimeProvider.System);
-        var processor = new ProcessingJobProcessor(
-            store,
-            new JobHandlerRegistry([handler]),
-            new RecordingActivityWriter(),
-            new NoUnhandledJobFailureRecorder(),
-            new NoJobNotifications(),
-            TimeProvider.System,
-            NullLogger<ProcessingJobProcessor>.Instance);
+        var processor = Processor(handler);
 
-        var runTask = processor.ProcessOneAsync("worker", leaseSeconds: 1);
+        const int leaseSeconds = 1;
+        var runTask = processor.ProcessOneAsync("worker", leaseSeconds, _time.GetUtcNow());
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
         var originalExpiry = (await _db.Store.GetAsync(1))!.LeaseExpiresAt;
 
-        // Wait past the original one-second lease; the heartbeat (every ~1/3 s) should have pushed it out.
-        await Task.Delay(TimeSpan.FromMilliseconds(1300));
+        // Step forward in heartbeat-sized increments (lease/3), same as the intruder test: renewing the
+        // lease only ever succeeds while it hasn't already expired, so a single jump straight past the
+        // full lease would (correctly) find nothing left to renew instead of proving the heartbeat works.
+        for (var step = 0; step < 3; step++)
+        {
+            _time.Advance(TimeSpan.FromSeconds(leaseSeconds / 3.0));
+            await Task.Delay(20);
+        }
+
         var renewedExpiry = (await _db.Store.GetAsync(1))!.LeaseExpiresAt;
         Assert.True(renewedExpiry > originalExpiry, $"expected {renewedExpiry} > {originalExpiry}");
 
         release.TrySetResult();
         Assert.Equal(JobProcessOutcome.Processed, await runTask);
     }
+
+    private ProcessingJobProcessor Processor(IJobHandler handler) =>
+        new(
+            new ProcessingJobStore(new SqliteDatabase(_db.DbPath, pooling: false), _time),
+            new JobHandlerRegistry([handler]),
+            new RecordingActivityWriter(),
+            new NoUnhandledJobFailureRecorder(),
+            new NoJobNotifications(),
+            _time,
+            NullLogger<ProcessingJobProcessor>.Instance);
 }

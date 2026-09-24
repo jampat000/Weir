@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Weir.Infrastructure.Scheduling;
@@ -13,12 +12,14 @@ public sealed class PeriodicTaskTests
     [Fact]
     public async Task A_task_that_runs_at_start_runs_straight_away_then_waits_the_interval()
     {
+        var time = new FakeTimeProvider();
         var task = new CountingTask(runAtStart: true, interval: TimeSpan.FromHours(1));
         using var stop = new CancellationTokenSource();
-        var loop = PeriodicTaskRunner.RunAsync(task, TimeProvider.System, NullLogger.Instance, stop.Token);
+        var loop = PeriodicTaskRunner.RunAsync(task, time, NullLogger.Instance, stop.Token);
 
-        await WaitUntilAsync(() => task.Calls >= 1);
-        await Task.Delay(200);
+        await Eventually.ThatAsync(() => task.Calls >= 1);
+        // The loop is now parked in Task.Delay(Interval, time, ...): with a frozen fake clock and nothing
+        // advancing it, a second call inside the interval is impossible rather than merely unobserved.
         Assert.Equal(1, task.Calls);
 
         await stop.CancelAsync();
@@ -41,7 +42,7 @@ public sealed class PeriodicTaskTests
         Assert.Equal(0, task.Calls);
 
         time.Advance(task.Interval);
-        await WaitUntilAsync(() => task.Calls >= 1);
+        await Eventually.ThatAsync(() => task.Calls >= 1);
 
         await stop.CancelAsync();
         await loop.WaitAsync(TimeSpan.FromSeconds(5));
@@ -50,13 +51,19 @@ public sealed class PeriodicTaskTests
     [Fact]
     public async Task A_failed_run_is_logged_and_retried_after_the_cooldown()
     {
-        var task = new CountingTask(runAtStart: true, interval: TimeSpan.FromHours(1), cooldown: TimeSpan.FromMilliseconds(20), failFirst: true);
-        var logger = new ListLogger();
+        var time = new FakeTimeProvider();
+        var cooldown = TimeSpan.FromSeconds(20);
+        var task = new CountingTask(runAtStart: true, interval: TimeSpan.FromHours(1), cooldown: cooldown, failFirst: true);
+        var logger = new RecordingLogger<PeriodicTaskTests>();
         using var stop = new CancellationTokenSource();
-        var loop = PeriodicTaskRunner.RunAsync(task, TimeProvider.System, logger, stop.Token);
+        var loop = PeriodicTaskRunner.RunAsync(task, time, logger, stop.Token);
 
-        await WaitUntilAsync(() => task.Calls >= 2);
+        await Eventually.ThatAsync(() => logger.Errors.Count >= 1);
         Assert.Equal(["counting tick failed"], logger.Errors);
+        Assert.Equal(1, task.Calls);
+
+        time.Advance(cooldown);
+        await Eventually.ThatAsync(() => task.Calls >= 2);
 
         await stop.CancelAsync();
         await loop.WaitAsync(TimeSpan.FromSeconds(5));
@@ -69,7 +76,7 @@ public sealed class PeriodicTaskTests
         var second = new CountingTask(runAtStart: true, interval: TimeSpan.FromHours(1));
         var services = new ServiceCollection()
             .AddLogging()
-            .AddSingleton(TimeProvider.System)
+            .AddSingleton<TimeProvider>(new FakeTimeProvider())
             .AddSingleton<IPeriodicTask>(first)
             .AddSingleton<IPeriodicTask>(second);
         services.AddWeirPeriodicTasks();
@@ -78,22 +85,8 @@ public sealed class PeriodicTaskTests
         var hosted = Assert.Single(provider.GetServices<IHostedService>());
 
         await hosted.StartAsync(CancellationToken.None);
-        await WaitUntilAsync(() => first.Calls >= 1 && second.Calls >= 1);
+        await Eventually.ThatAsync(() => first.Calls >= 1 && second.Calls >= 1);
         await hosted.StopAsync(CancellationToken.None);
-    }
-
-    private static async Task WaitUntilAsync(Func<bool> condition)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        while (!condition())
-        {
-            if (DateTime.UtcNow > deadline)
-            {
-                throw new TimeoutException();
-            }
-
-            await Task.Delay(10);
-        }
     }
 
     private sealed class CountingTask(bool runAtStart, TimeSpan interval, TimeSpan? cooldown = null, bool failFirst = false) : IPeriodicTask
@@ -116,27 +109,6 @@ public sealed class PeriodicTaskTests
         {
             var call = Interlocked.Increment(ref _calls);
             return failFirst && call == 1 ? throw new InvalidOperationException("boom") : Task.CompletedTask;
-        }
-    }
-
-    private sealed class ListLogger : ILogger
-    {
-        public List<string> Errors { get; } = [];
-
-        public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull => null;
-
-        public bool IsEnabled(LogLevel logLevel) => true;
-
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-        {
-            if (logLevel == LogLevel.Error)
-            {
-                lock (Errors)
-                {
-                    Errors.Add(formatter(state, exception));
-                }
-            }
         }
     }
 }

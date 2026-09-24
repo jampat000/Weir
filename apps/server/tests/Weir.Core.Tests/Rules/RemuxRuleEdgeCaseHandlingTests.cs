@@ -3,18 +3,21 @@ using Weir.Core.Rules;
 namespace Weir.Core.Tests.Rules;
 
 /// <summary>
-/// Focused tests for the defects fixed by issue #537 (items 1, 2, 3, 5, 6 — item 4 is covered
-/// separately below) and the engine-side plumbing added for item 4. The golden corpus already
-/// proves these against the full 106-case suite via <c>golden/overrides</c>; these tests isolate
-/// one behaviour each so a regression points straight at the cause.
+/// Sorter and tag-parsing edge cases: comparing a track's own title rather than its codec name,
+/// normalizing a configured subtitle language the same way a track's own tag is normalized, and
+/// treating a non-string tag, an unparseable bit rate or a stream with no usable index as missing
+/// data rather than a failure. The golden corpus already proves these against the full 106-case
+/// suite via <c>golden/overrides</c>; these tests isolate one behaviour each so a regression points
+/// straight at the cause.
 /// </summary>
-public sealed class RemuxRulesIssueFixesTests
+/// <seealso href="https://github.com/jampat000/Weir/issues/537"/>
+public sealed class RemuxRuleEdgeCaseHandlingTests
 {
     private static ProbeStreamInfo Stream(string json) => ProbeStreamInfo.Parse(json);
 
     private static readonly ProbeStreamInfo Video = Stream("""{"index": 0, "codec_type": "video", "codec_name": "h264"}""");
 
-    // --- item 2: a "title" sorter compares the stream's own title, not the codec name ------
+    // --- a "title" sorter compares the stream's own title, not the codec name ------------
 
     [Fact]
     public void A_title_sorter_compares_the_stream_title_not_the_codec_name()
@@ -37,7 +40,7 @@ public sealed class RemuxRulesIssueFixesTests
         Assert.Equal(2, plan!.Audio[0].InputIndex);
     }
 
-    // --- item 3: configured subtitle languages are normalized like a track's own tag ------
+    // --- configured subtitle languages are normalized like a track's own tag ----------------
 
     [Fact]
     public void Configured_subtitle_languages_are_normalized_like_a_tracks_own_language_tag()
@@ -60,7 +63,7 @@ public sealed class RemuxRulesIssueFixesTests
         Assert.Empty(plan.RemovedSubtitles);
     }
 
-    // --- item 5: a non-string tag value is missing, not stringified -----------------------
+    // --- a non-string tag value is missing, not stringified ----------------------------------
 
     [Fact]
     public void A_list_valued_title_does_not_mark_a_track_as_commentary()
@@ -90,7 +93,7 @@ public sealed class RemuxRulesIssueFixesTests
         Assert.Equal(string.Empty, plan!.Audio[0].LangLabel);
     }
 
-    // --- item 6: one bad ffprobe value must not fail the whole plan ------------------------
+    // --- one bad ffprobe value must not fail the whole plan ----------------------------------
 
     [Fact]
     public void An_unparseable_bit_rate_is_treated_as_unknown_not_a_failure()
@@ -131,7 +134,7 @@ public sealed class RemuxRulesIssueFixesTests
         Assert.Empty(plan.RemovedSubtitles);
     }
 
-    // --- item 4: the engine accepts a preferred-language decision cleanly ------------------
+    // --- the engine accepts a preferred-language decision cleanly ----------------------------
 
     [Fact]
     public void WithOriginalLanguage_copies_the_outcome_into_the_config_in_one_call()

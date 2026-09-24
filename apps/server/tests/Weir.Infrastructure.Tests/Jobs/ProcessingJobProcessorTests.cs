@@ -265,7 +265,7 @@ public sealed class ProcessingJobProcessorTests : IDisposable
     {
         // Complete is passed the claim-time `now`, so a handler outliving its lease still completes.
         await _db.Store.EnqueueOrGetAsync("slow", "processing.test.slow.v1");
-        var processor = _db.Processor([new DelegateHandler("processing.test.slow.v1", _ => _db.Clock.Now = T0.AddHours(3))]);
+        var processor = _db.Processor([new DelegateHandler("processing.test.slow.v1", _ => _db.Clock.SetUtcNow(T0.AddHours(3)))]);
 
         await processor.ProcessOneAsync("w", 300, T0);
 

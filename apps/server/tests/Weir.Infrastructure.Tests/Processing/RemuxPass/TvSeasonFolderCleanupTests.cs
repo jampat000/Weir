@@ -190,7 +190,7 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
     }
 
     [Fact]
-    public async Task Check4_blocked_when_a_never_processed_sibling_is_not_old_enough()
+    public async Task A_never_processed_sibling_that_is_not_old_enough_blocks_the_folder_delete()
     {
         var (store, cleanup, http, connections, _) = await BuildAsync();
         using var _1 = store;
@@ -211,7 +211,7 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
     }
 
     [Fact]
-    public async Task Check4_passes_when_the_never_processed_sibling_is_old_enough()
+    public async Task A_never_processed_sibling_old_enough_does_not_block_the_folder_delete()
     {
         var (store, cleanup, http, connections, _) = await BuildAsync();
         using var _1 = store;

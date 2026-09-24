@@ -38,7 +38,7 @@ public sealed class ProbeOutputTests
 
     [Fact]
     public void Staged_output_accepts_normal_duration_rounding() =>
-        ProbeOutput.ValidateRemuxOutput(Probe(5379.0), 1, 5384.046);
+        Assert.Null(Record.Exception(() => ProbeOutput.ValidateRemuxOutput(Probe(5379.0), 1, 5384.046)));
 
     [Fact]
     public void Source_integrity_validation_reads_primary_video_to_completion()

@@ -22,7 +22,7 @@ public sealed class WeirOptionsDefaultsTests
     }
 
     [Fact]
-    public void Sessions_and_cookies()
+    public void Session_cookie_defaults_to_lax_auto_secure_with_a_14_day_idle_and_90_day_absolute_expiry()
     {
         Assert.Equal("weir_session", Defaults.SessionCookieName);
         Assert.Equal(CookieSecureMode.Auto, Defaults.SessionCookieSecureMode);
@@ -59,7 +59,7 @@ public sealed class WeirOptionsDefaultsTests
     }
 
     [Fact]
-    public void Processing()
+    public void Processing_defaults_run_ten_workers_with_the_watcher_on_and_cleanup_schedules_off()
     {
         Assert.Equal(10, Defaults.ProcessingWorkerCount);
         Assert.Equal(300, Defaults.ProcessingJobLeaseSeconds);

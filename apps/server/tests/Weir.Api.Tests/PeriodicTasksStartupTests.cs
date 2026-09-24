@@ -46,24 +46,18 @@ public sealed class PeriodicTasksStartupTests
             });
 
         var database = server.Services.GetRequiredService<SqliteDatabase>();
-        var deadline = DateTime.UtcNow.AddSeconds(30);
-        while (true)
-        {
-            using (var connection = database.Open())
-            using (var command = connection.CreateCommand())
+        await Eventually.ThatAsync(
+            () =>
             {
+                using var connection = database.Open();
+                using var command = connection.CreateCommand();
                 command.CommandText =
                     "SELECT (SELECT count(*) FROM suite_configuration_backup), (SELECT configuration_backup_last_run_at FROM suite_settings WHERE id = 1)";
                 using var reader = command.ExecuteReader();
                 reader.Read();
-                if (reader.GetInt64(0) == 1 && !reader.IsDBNull(1))
-                {
-                    break;
-                }
-            }
-
-            Assert.True(DateTime.UtcNow < deadline, "No automatic configuration backup was written.");
-            await Task.Delay(100);
-        }
+                return reader.GetInt64(0) == 1 && !reader.IsDBNull(1);
+            },
+            TimeSpan.FromSeconds(30),
+            "No automatic configuration backup was written.");
     }
 }

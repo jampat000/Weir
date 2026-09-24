@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Time.Testing;
 using Weir.Core.Auth;
 
 namespace Weir.Core.Tests.Auth;
@@ -8,7 +9,7 @@ public sealed class UsernameLoginBackoffTests
     [Fact]
     public void The_first_five_failures_in_the_window_are_free()
     {
-        var time = new ManualTimeProvider();
+        var time = new FakeTimeProvider();
         var backoff = new UsernameLoginBackoff(time);
 
         for (var i = 0; i < UsernameLoginBackoff.FreeAttempts; i++)
@@ -23,7 +24,7 @@ public sealed class UsernameLoginBackoffTests
     [Fact]
     public void The_wait_doubles_with_each_failure_past_the_free_attempts()
     {
-        var time = new ManualTimeProvider();
+        var time = new FakeTimeProvider();
         var backoff = new UsernameLoginBackoff(time);
         for (var i = 0; i < UsernameLoginBackoff.FreeAttempts; i++)
         {
@@ -45,7 +46,7 @@ public sealed class UsernameLoginBackoffTests
     [Fact]
     public void The_wait_never_exceeds_the_maximum_backoff()
     {
-        var time = new ManualTimeProvider();
+        var time = new FakeTimeProvider();
         var backoff = new UsernameLoginBackoff(time);
 
         // Enough failures, back to back, that 2^(failures - FreeAttempts) is far past the cap.
@@ -60,7 +61,7 @@ public sealed class UsernameLoginBackoffTests
     [Fact]
     public void The_wait_expires_once_the_window_has_passed_since_the_last_failure()
     {
-        var time = new ManualTimeProvider();
+        var time = new FakeTimeProvider();
         var backoff = new UsernameLoginBackoff(time);
         for (var i = 0; i <= UsernameLoginBackoff.FreeAttempts; i++)
         {
@@ -77,7 +78,7 @@ public sealed class UsernameLoginBackoffTests
     [Fact]
     public void A_success_clears_the_accounts_history()
     {
-        var time = new ManualTimeProvider();
+        var time = new FakeTimeProvider();
         var backoff = new UsernameLoginBackoff(time);
         for (var i = 0; i <= UsernameLoginBackoff.FreeAttempts; i++)
         {
@@ -94,7 +95,7 @@ public sealed class UsernameLoginBackoffTests
     [Fact]
     public void Usernames_are_tracked_independently_and_case_insensitively()
     {
-        var time = new ManualTimeProvider();
+        var time = new FakeTimeProvider();
         var backoff = new UsernameLoginBackoff(time);
         for (var i = 0; i <= UsernameLoginBackoff.FreeAttempts; i++)
         {

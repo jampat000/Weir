@@ -3,14 +3,15 @@ using Weir.Core.Rules;
 namespace Weir.Core.Tests.Rules;
 
 /// <summary>
-/// Issue #497: keep more than one audio track (one per configured language slot), cap subtitles
-/// per language by quality, and put content tier (main &gt; dub/audio description &gt; commentary)
+/// Keeping more than one audio track (one per configured language slot), capping subtitles per
+/// language by quality, and content tier (main &gt; dub/audio description &gt; commentary) coming
 /// first in the default audio sorters. The golden corpus (<see cref="GoldenParityTests"/>) already
 /// proves <c>audio_keep_mode: single</c> gives the recorded plans (585 recorded cases,
-/// 80 of them carrying a wording-only override for the new default sorter); these tests isolate
-/// the new behaviour so a regression points straight at the cause.
+/// 80 of them carrying a wording-only override for the default sorter); these tests isolate
+/// the per-language and sorter behaviour so a regression points straight at the cause.
 /// </summary>
-public sealed class Issue497Tests
+/// <seealso href="https://github.com/jampat000/Weir/issues/497"/>
+public sealed class AudioAndSubtitleSelectionRulesTests
 {
     private static ProbeStreamInfo Stream(string json) => ProbeStreamInfo.Parse(json);
 

@@ -69,18 +69,10 @@ public sealed class JobsStartupTests
 
         // A running worker handles the remux pass (#522 part 3), so it claims the recovered row and runs it to the end.
         var store = server.Services.GetRequiredService<ProcessingJobStore>();
-        var deadline = DateTime.UtcNow.AddSeconds(30);
-        ProcessingJob job;
-        while (true)
-        {
-            job = (await store.ListAsync()).Single(row => row.JobKind == "processing.file.remux_pass.v1");
-            if (job.Status == ProcessingJobStatus.Completed || DateTime.UtcNow > deadline)
-            {
-                break;
-            }
-
-            await Task.Delay(100);
-        }
+        var job = await Eventually.PollAsync(
+            async () => (await store.ListAsync()).Single(row => row.JobKind == "processing.file.remux_pass.v1"),
+            row => row.Status == ProcessingJobStatus.Completed,
+            TimeSpan.FromSeconds(30));
 
         Assert.Equal(ProcessingJobStatus.Completed, job.Status);
         Assert.Equal(2, job.AttemptCount);
