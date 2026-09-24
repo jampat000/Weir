@@ -7,54 +7,6 @@ using Weir.Core.Time;
 
 namespace Weir.Infrastructure.Jobs;
 
-/// <summary>What one worker pass came to: nothing to claim, or one job handled.</summary>
-public enum JobProcessOutcome
-{
-    Idle,
-    Processed,
-}
-
-/// <summary>
-/// Records the file side of a handler crash: the failure against the file and the library's failure
-/// policy, which the processing engine owns (#522).
-/// </summary>
-public interface IUnhandledJobFailureRecorder
-{
-    /// <summary>
-    /// Record the failure against the file and apply the library's failure policy. Returns whether the
-    /// file will be retried, or null when there was no library or file to record against.
-    /// </summary>
-    Task<bool?> RecordAsync(UnhandledJobFailure failure, CancellationToken cancellationToken);
-}
-
-/// <summary>A handler failure the handler did not record itself.</summary>
-public sealed record UnhandledJobFailure(JobWorkContext Context, long? LibraryId, string MediaScope, string? RelativeMediaPath, string Message);
-
-/// <summary>Records nothing; used when no file-state policy is registered.</summary>
-public sealed class NoUnhandledJobFailureRecorder : IUnhandledJobFailureRecorder
-{
-    public Task<bool?> RecordAsync(UnhandledJobFailure failure, CancellationToken cancellationToken) => Task.FromResult<bool?>(null);
-}
-
-/// <summary>Job completion and failure notifications; the notifications area owns delivery.</summary>
-public interface IJobNotifications
-{
-    /// <summary>
-    /// <paramref name="eventKind"/> is <c>completed</c> or <c>failed</c>. <paramref name="willRetry"/>
-    /// (#540 item 6) says whether another attempt follows a <c>failed</c> event, so the wording says so
-    /// instead of always claiming retries are exhausted; it is ignored for <c>completed</c>. Must not throw.
-    /// </summary>
-    void Dispatch(string moduleName, string eventKind, long jobId, string jobKind, bool willRetry = false);
-}
-
-/// <summary>Sends nothing; used when no notification sender is registered.</summary>
-public sealed class NoJobNotifications : IJobNotifications
-{
-    public void Dispatch(string moduleName, string eventKind, long jobId, string jobKind, bool willRetry = false)
-    {
-    }
-}
-
 /// <summary>
 /// One worker pass: claim at most one job under the current admission, run its handler, then complete
 /// or fail it.

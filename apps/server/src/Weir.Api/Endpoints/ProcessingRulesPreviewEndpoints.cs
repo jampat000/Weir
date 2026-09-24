@@ -53,7 +53,7 @@ public static class ProcessingRulesPreviewEndpoints
             else
             {
                 var rulesModel = new BodyModel(rulesDict, issues);
-                ruleSetInput = ProcessingLibraryEndpoints.ReadRuleSetBody(rulesModel, issues);
+                ruleSetInput = ProcessingRuleSetsEndpoints.ReadRuleSetBody(rulesModel, issues);
                 rulesModel.Finish(ExtraFields.Forbid);
             }
         }

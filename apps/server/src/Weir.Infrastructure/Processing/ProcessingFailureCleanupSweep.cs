@@ -1,12 +1,10 @@
 using Microsoft.Extensions.Logging;
-using Weir.Core.Activity;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
-using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.IO;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
@@ -14,53 +12,6 @@ using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
-
-/// <summary>Activity writes for a Pass 4 failure-cleanup sweep.</summary>
-public static class ProcessingFailureCleanupActivity
-{
-    private static string Label(string mediaScope) => mediaScope == "tv" ? "TV" : "Movies";
-
-    private static PyDict WithOutcome(PyDict detail, string result, string? trigger)
-    {
-        var copy = detail.Copy();
-        if (copy.Get("result") is null)
-        {
-            copy.Set("result", result);
-        }
-
-        if (trigger is not null && copy.Get("trigger") is null)
-        {
-            copy.Set("trigger", trigger);
-        }
-
-        return copy;
-    }
-
-    public static Task RecordSweepStartedAsync(UnitOfWork uow, string mediaScope, PyDict detail, string? trigger)
-    {
-        var withOutcome = WithOutcome(detail, "running", trigger);
-        return SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(
-            ActivityEventTypes.ProcessingFailureCleanupSweepCompleted, "processing",
-            $"Cleanup started for {Label(mediaScope)}",
-            PyStrings.Slice(PyJsonWriter.Dumps(withOutcome, PyJsonFormat.Compact), 10_000)));
-    }
-
-    public static Task RecordSweepCompletedAsync(UnitOfWork uow, string mediaScope, PyDict detail, string? trigger)
-    {
-        var label = Label(mediaScope);
-        var status = detail.Get("cleanup_run_status") is PyStr statusValue ? statusValue.Value : null;
-        var (title, result) = status switch
-        {
-            "no_eligible_files" => ($"Cleanup checked {label}: no changes needed", "success"),
-            "skipped" => ($"Cleanup skipped {label}", "skipped"),
-            _ => ($"Cleaned up after failed files ({label})", "success"),
-        };
-        var withOutcome = WithOutcome(detail, result, trigger);
-        return SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(
-            ActivityEventTypes.ProcessingFailureCleanupSweepCompleted, "processing", title,
-            PyStrings.Slice(PyJsonWriter.Dumps(withOutcome, PyJsonFormat.Compact), 10_000)));
-    }
-}
 
 /// <summary>
 /// Processing Pass 4: the periodic cleanup sweep for terminal failed remux jobs.
@@ -71,8 +22,10 @@ public static class ProcessingFailureCleanupActivity
 /// <remarks>
 /// The queue-block check (<c>HeldByManager</c>) uses <see cref="QueueRowMapping"/>'s exact output-path match
 /// only; it does not fall back to the title/year anchor the watched-folder scan uses (#522).
+/// The movie-specific cleanup lives in the <c>.Movie</c> partial, the TV-specific cleanup (which spans a whole
+/// season) in the <c>.Tv</c> partial, and the shared filesystem removal helpers in the <c>.FileOps</c> partial.
 /// </remarks>
-public sealed class ProcessingFailureCleanupSweep
+public sealed partial class ProcessingFailureCleanupSweep
 {
     /// <summary>A failed job whose recorded path resolves outside the watched folder is never acted on.</summary>
     public const string OutsideWatchedFolderReason = "The failed file's recorded path is outside the watched folder, so nothing was removed.";
@@ -223,174 +176,6 @@ public sealed class ProcessingFailureCleanupSweep
         return outResult;
     }
 
-    private void ProcessMovie(
-        PyDict detail, string srcFile, string relNorm, string watchedRoot, string outputRoot, string workRoot, string? mediaExtensionsCsv,
-        IReadOnlyList<ManagerQueueSignal> signals)
-    {
-        var srcFolder = Path.GetDirectoryName(srcFile) ?? watchedRoot;
-        detail.Set("movie_failure_cleanup_source_folder_deleted", false);
-        detail.Set("movie_failure_cleanup_source_folder_path", srcFolder);
-        detail.Set("movie_failure_cleanup_output_folder_deleted", false);
-        var outFile = RemuxPassPaths.Resolve(Path.Join(outputRoot, relNorm));
-        var outFolder = Path.GetDirectoryName(outFile) ?? outputRoot;
-        detail.Set("movie_failure_cleanup_output_folder_path", outFolder);
-
-        var holder = HeldByManager(signals, "movie", srcFile);
-        if (holder is not null)
-        {
-            detail.Set("movie_failure_cleanup_queue_check", "blocked_in_queue");
-            detail.Set("movie_failure_cleanup_skip_reason", $"{holder} is still importing this file, so failure cleanup skipped.");
-            return;
-        }
-
-        detail.Set("movie_failure_cleanup_queue_check", "passed_not_in_queue");
-        detail.Set("movie_failure_cleanup_ran", true);
-
-        var cascade = (PyList)detail.Get("movie_failure_cleanup_cascade_folders_deleted")!;
-        if (PathContainment.IsUnder(watchedRoot, srcFolder) && Directory.Exists(srcFolder))
-        {
-            var removal = RemoveRelease(watchedRoot, srcFile, mediaExtensionsCsv);
-            detail.Set("movie_failure_cleanup_source_folder_deleted", removal.FolderRemoved);
-            if (removal.FolderRemoved)
-            {
-                CascadeUnderRoot(Path.GetDirectoryName(srcFolder) ?? watchedRoot, watchedRoot, cascade);
-            }
-            else if (removal.Reason is { } kept)
-            {
-                detail.Set("movie_failure_cleanup_source_folder_kept_reason", kept);
-            }
-        }
-
-        if (PathContainment.IsUnder(outputRoot, outFolder) && Directory.Exists(outFolder))
-        {
-            var removal = RemoveRelease(outputRoot, outFile, mediaExtensionsCsv);
-            detail.Set("movie_failure_cleanup_output_folder_deleted", removal.FolderRemoved);
-            if (removal.FolderRemoved)
-            {
-                CascadeUnderRoot(Path.GetDirectoryName(outFolder) ?? outputRoot, outputRoot, cascade);
-            }
-            else if (removal.Reason is { } kept)
-            {
-                detail.Set("movie_failure_cleanup_output_folder_kept_reason", kept);
-            }
-        }
-
-        var tempDeleted = (PyList)detail.Get("movie_failure_cleanup_temp_files_deleted")!;
-        foreach (var temp in JobTempCandidates(workRoot, relNorm))
-        {
-            var (ok, _) = SafeUnlink(temp);
-            if (ok)
-            {
-                tempDeleted.Items.Add(new PyStr(temp));
-            }
-        }
-    }
-
-    private async Task ProcessTvAsync(
-        UnitOfWork uow, PyDict detail, string srcSeason, string relNorm, string watchedRoot, string outputRoot, string workRoot,
-        IReadOnlyList<ManagerQueueSignal> signals)
-    {
-        detail.Set("tv_failure_cleanup_season_folder_deleted", false);
-        detail.Set("tv_failure_cleanup_output_season_deleted", false);
-        detail.Set("tv_failure_cleanup_season_folder_path", srcSeason);
-        var relDirectory = Path.GetDirectoryName(relNorm.Replace('/', Path.DirectorySeparatorChar)) ?? string.Empty;
-        var outSeason = RemuxPassPaths.Resolve(relDirectory.Length == 0 ? outputRoot : Path.Join(outputRoot, relDirectory));
-        detail.Set("tv_failure_cleanup_output_season_path", outSeason);
-
-        var episodes = new List<string>();
-        if (Directory.Exists(srcSeason))
-        {
-            try
-            {
-                episodes = [.. Directory.EnumerateFiles(srcSeason)
-                    .Where(IntakeRules.IsMediaCandidateName)
-                    .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)];
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                episodes = [];
-            }
-        }
-
-        if (episodes.Count == 0)
-        {
-            detail.Set("tv_failure_cleanup_skip_reason", "No direct-child episode media files were found in this season folder, so season cleanup was skipped.");
-            return;
-        }
-
-        var blocked = false;
-        foreach (var episode in episodes)
-        {
-            if (HeldByManager(signals, "tv", episode) is not null)
-            {
-                blocked = true;
-                break;
-            }
-
-            var rel = RemuxPassPaths.RelativeTo(episode, watchedRoot);
-            if (rel is null)
-            {
-                _logger.LogWarning("TV failure cleanup skipped episode outside watched root path={Path}", episode);
-                continue;
-            }
-
-            var relPosix = RemuxPassPaths.Posix(rel);
-            if (await ActiveRemuxPassExistsAsync(uow, relPosix, "tv").ConfigureAwait(false))
-            {
-                blocked = true;
-                break;
-            }
-
-            if (!await TvHasTerminalFailedRemuxAsync(uow, relPosix).ConfigureAwait(false))
-            {
-                blocked = true;
-                break;
-            }
-        }
-
-        if (blocked)
-        {
-            detail.Set("tv_failure_cleanup_queue_check", "blocked_in_queue_or_active_job");
-            detail.Set(
-                "tv_failure_cleanup_skip_reason",
-                "TV season is not clear yet (episode still queued, active TV remux exists, or not every direct-child episode has a terminal failed TV remux outcome), so cleanup skipped.");
-            return;
-        }
-
-        detail.Set("tv_failure_cleanup_queue_check", "passed_not_in_queue");
-        detail.Set("tv_failure_cleanup_ran", true);
-
-        if (RemuxPassPaths.RelativeTo(srcSeason, watchedRoot) is not null && !RemuxPassPaths.SamePath(srcSeason, watchedRoot) && Directory.Exists(srcSeason))
-        {
-            var (ok, _) = SafeRmTree(watchedRoot, srcSeason);
-            detail.Set("tv_failure_cleanup_season_folder_deleted", ok);
-            if (ok)
-            {
-                CascadeUnderRoot(Path.GetDirectoryName(srcSeason) ?? watchedRoot, watchedRoot, (PyList)detail.Get("tv_failure_cleanup_cascade_folders_deleted")!);
-            }
-        }
-
-        if (RemuxPassPaths.RelativeTo(outSeason, outputRoot) is not null && !RemuxPassPaths.SamePath(outSeason, outputRoot) && Directory.Exists(outSeason))
-        {
-            var (ok, _) = SafeRmTree(outputRoot, outSeason);
-            detail.Set("tv_failure_cleanup_output_season_deleted", ok);
-            if (ok)
-            {
-                CascadeUnderRoot(Path.GetDirectoryName(outSeason) ?? outputRoot, outputRoot, (PyList)detail.Get("tv_failure_cleanup_cascade_folders_deleted")!);
-            }
-        }
-
-        var tempDeleted = (PyList)detail.Get("tv_failure_cleanup_temp_files_deleted")!;
-        foreach (var temp in JobTempCandidates(workRoot, relNorm))
-        {
-            var (ok, _) = SafeUnlink(temp);
-            if (ok)
-            {
-                tempDeleted.Items.Add(new PyStr(temp));
-            }
-        }
-    }
-
     /// <summary>The connection whose queue still names this exact file, or null. Path equality only.</summary>
     private static string? HeldByManager(IReadOnlyList<ManagerQueueSignal> signals, string mediaScope, string mediaFile)
     {
@@ -478,78 +263,6 @@ public sealed class ProcessingFailureCleanupSweep
         return result;
     }
 
-    private static async Task<bool> TvHasTerminalFailedRemuxAsync(UnitOfWork uow, string relativePosix)
-    {
-        var want = NormRel(relativePosix);
-        var rows = await uow.QueryAsync(
-            "SELECT payload_json FROM jobs WHERE job_kind = $kind AND status = $status",
-            reader => reader.IsDBNull(0) ? null : reader.GetString(0),
-            ("$kind", RemuxPassOutcomes.JobKind),
-            ("$status", ProcessingJobStatus.Failed)).ConfigureAwait(false);
-        foreach (var payload in rows)
-        {
-            (string Rel, string Scope, bool LegacyDryRun)? parsed;
-            try
-            {
-                parsed = ParseFailedJobPayload(payload);
-            }
-            catch (Exception exception) when (exception is FormatException or PyJsonDecodeException)
-            {
-                continue;
-            }
-
-            if (parsed.Value.Scope == "tv" && parsed.Value.Rel == want)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static async Task<bool> ActiveRemuxPassExistsAsync(UnitOfWork uow, string relativePosix, string mediaScope)
-    {
-        var wantScope = mediaScope is "movie" or "tv" ? mediaScope : "movie";
-        var rows = await uow.QueryAsync(
-            "SELECT payload_json FROM jobs WHERE job_kind = $kind AND status IN ($pending, $leased)",
-            reader => reader.IsDBNull(0) ? null : reader.GetString(0),
-            ("$kind", RemuxPassOutcomes.JobKind),
-            ("$pending", ProcessingJobStatus.Pending),
-            ("$leased", ProcessingJobStatus.Leased)).ConfigureAwait(false);
-        foreach (var payload in rows)
-        {
-            var raw = PyStrings.Strip(payload ?? string.Empty);
-            if (raw.Length == 0)
-            {
-                continue;
-            }
-
-            PyJson parsedJson;
-            try
-            {
-                parsedJson = PyJsonParser.Parse(raw);
-            }
-            catch (PyJsonDecodeException)
-            {
-                continue;
-            }
-
-            if (parsedJson is not PyDict data)
-            {
-                continue;
-            }
-
-            var rel = data.Get("relative_media_path") is PyStr relStr ? relStr.Value : null;
-            var jobScope = data.Get("media_scope") is PyStr scopeStr && scopeStr.Value is "movie" or "tv" ? scopeStr.Value : "movie";
-            if (rel is not null && PyStrings.Strip(rel) == relativePosix && jobScope == wantScope)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private static (string Rel, string Scope, bool LegacyDryRun) ParseFailedJobPayload(string? payloadJson)
     {
         if (string.IsNullOrWhiteSpace(payloadJson))
@@ -580,132 +293,5 @@ public sealed class ProcessingFailureCleanupSweep
         var trimmed = PyStrings.Strip(raw).Replace('\\', '/');
         var parts = trimmed.Split('/').Where(part => part.Length > 0 && part != ".").ToArray();
         return parts.Length == 0 ? string.Empty : string.Join('/', parts);
-    }
-
-    /// <summary>The work-folder temp files Weir created for this source, matched by <see cref="WeirTempFiles.RemuxTempNameFor"/>.</summary>
-    private static List<string> JobTempCandidates(string workRoot, string relNorm)
-    {
-        var result = new List<string>();
-        if (relNorm.Length == 0 || !Directory.Exists(workRoot))
-        {
-            return result;
-        }
-
-        // Only the exact temp names Weir creates for this source (#534); an operator's own "Film.processing.notes.txt"
-        // beside a failed "Film.mkv" is not Weir's to delete.
-        var ownTempName = WeirTempFiles.RemuxTempNameFor(relNorm);
-        List<string> files;
-        try
-        {
-            files = [.. Directory.EnumerateFiles(workRoot)];
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            return result;
-        }
-
-        foreach (var child in files.OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase))
-        {
-            if (ownTempName.IsMatch(Path.GetFileName(child)))
-            {
-                result.Add(child);
-            }
-        }
-
-        return result;
-    }
-
-    /// <summary>Removes now-empty ancestor folders, up to (not including) the root.</summary>
-    private static void CascadeUnderRoot(string firstParent, string root, PyList deletedOut)
-    {
-        var current = RemuxPassPaths.Resolve(firstParent);
-        var rr = RemuxPassPaths.Resolve(root);
-        while (!RemuxPassPaths.SamePath(current, rr))
-        {
-            if (RemuxPassPaths.RelativeTo(current, rr) is null || !Directory.Exists(current))
-            {
-                break;
-            }
-
-            try
-            {
-                if (Directory.EnumerateFileSystemEntries(current).Any())
-                {
-                    break;
-                }
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                break;
-            }
-
-            try
-            {
-                Directory.Delete(current);
-                deletedOut.Items.Add(new PyStr(current));
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                break;
-            }
-
-            var parent = Path.GetDirectoryName(current);
-            if (parent is null)
-            {
-                break;
-            }
-
-            current = parent;
-        }
-    }
-
-    /// <summary>A failed movie's source or output release, removed by <see cref="ReleaseFolderRemoval"/>; a locked folder is logged, not thrown.</summary>
-    private ReleaseRemoval RemoveRelease(string root, string file, string? mediaExtensionsCsv)
-    {
-        try
-        {
-            return ReleaseFolderRemoval.Remove(root, file, mediaExtensionsCsv);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            _logger.LogWarning(exception, "Failure cleanup could not remove the release of {File}; it is in use or blocked.", file);
-            return new ReleaseRemoval(ReleaseRemovalKind.NothingRemoved, null);
-        }
-    }
-
-    private (bool Ok, string? Error) SafeRmTree(string root, string path)
-    {
-        if (PathContainment.HasLinkBelowRoot(root, path))
-        {
-            _logger.LogWarning("Failure cleanup left {Path} alone: it, or a folder above it, is a link to another place.", path);
-            return (false, ReleaseFolderRemoval.LinkedFolderReason);
-        }
-
-        try
-        {
-            Directory.Delete(path, recursive: true);
-            return (true, null);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            var message = $"Could not remove {path} because it is in use or blocked ({exception.Message}).";
-            _logger.LogWarning("Failure cleanup: {Message}", message);
-            return (false, message);
-        }
-    }
-
-    private (bool Ok, string? Error) SafeUnlink(string path)
-    {
-        try
-        {
-            File.Delete(path);
-            return (true, null);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            var message = $"Could not remove temp file {path} because it is in use or blocked ({exception.Message}).";
-            _logger.LogWarning("Failure cleanup: {Message}", message);
-            return (false, message);
-        }
     }
 }
