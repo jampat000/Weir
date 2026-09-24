@@ -228,7 +228,7 @@ NORMAL_SCREENS: list[Screen] = [
         25,
         "not-found",
         "/this-page-does-not-exist-weir-screenshot-harness",
-        "text=Page not found",
+        "text=This page doesn't exist.",
         "Not found",
     ),
 ]

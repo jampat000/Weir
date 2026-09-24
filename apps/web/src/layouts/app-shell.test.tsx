@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PageLoading } from "../components/shared/page-loading";
 import { AppShell } from "./app-shell";
 
 const logoutMutate = vi.fn();
@@ -235,6 +236,44 @@ describe("AppShell", () => {
     expect(
       screen.queryByRole("complementary", { name: "Product" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("moves focus into the phone menu, closes it on Escape and hands focus back to Menu", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route path="/" element={<AppShell />}>
+            <Route index element={<div>Main</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    const menu = screen.getByTestId("shell-nav-toggle");
+    menu.focus();
+
+    fireEvent.click(menu);
+    expect(screen.getByRole("link", { name: "Processing" })).toHaveFocus();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(document.getElementById("mm-primary-sidebar")).not.toHaveClass(
+      "mm-sidebar--open",
+    );
+    expect(menu).toHaveFocus();
+  });
+
+  it("shows a screen that is still loading inside the one main landmark", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route path="/" element={<AppShell />}>
+            <Route index element={<PageLoading label="Loading Processing" />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+    expect(screen.getByRole("status")).toHaveTextContent("Loading Processing");
   });
 
   it("returns document scrolling to the top when the route changes", () => {

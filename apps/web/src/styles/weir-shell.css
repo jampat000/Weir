@@ -54,6 +54,14 @@ body.mm-body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Keyboard focus is a solid accent outline everywhere: 5.0:1 or better on every light surface and
+   7.9:1 or better on dark, where WCAG needs 3:1. A control's own soft halo stays as an extra, never
+   as the only sign of focus (#697). Unlayered, so it outranks utility classes that remove outlines. */
+:focus-visible {
+  outline: 2px solid var(--mm-accent);
+  outline-offset: 2px;
+}
+
 .mm-skip {
   position: absolute;
   left: -9999px;
@@ -192,7 +200,7 @@ body.mm-body {
 }
 
 .mm-head-control:focus-visible {
-  outline: 2px solid var(--mm-accent-ring);
+  outline: 2px solid var(--mm-accent);
   outline-offset: 2px;
 }
 

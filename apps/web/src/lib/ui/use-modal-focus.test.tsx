@@ -67,6 +67,80 @@ it("closes only the newest of two open layers on Escape", () => {
   expect(closePanel).not.toHaveBeenCalled();
 });
 
+function ModalLayer({ modal }: { modal: boolean }) {
+  const ref = useModalFocus<HTMLDivElement>({ onClose: () => undefined });
+  return (
+    <>
+      <div
+        ref={ref}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal={modal ? "true" : undefined}
+        aria-label="Layer"
+      >
+        <button type="button">First</button>
+        <button type="button">Last</button>
+      </div>
+      <button type="button">Behind</button>
+    </>
+  );
+}
+
+it("wraps Tab from the last control to the first inside a modal layer", () => {
+  render(<ModalLayer modal />);
+  screen.getByRole("button", { name: "Last" }).focus();
+
+  fireEvent.keyDown(document, { key: "Tab" });
+
+  expect(screen.getByRole("button", { name: "First" })).toHaveFocus();
+});
+
+it("wraps Shift+Tab from the first control to the last inside a modal layer", () => {
+  render(<ModalLayer modal />);
+  screen.getByRole("button", { name: "First" }).focus();
+
+  fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+
+  expect(screen.getByRole("button", { name: "Last" })).toHaveFocus();
+});
+
+it("lets Tab leave a layer that is not modal", () => {
+  render(<ModalLayer modal={false} />);
+  const last = screen.getByRole("button", { name: "Last" });
+  last.focus();
+
+  const allowed = fireEvent.keyDown(document, { key: "Tab" });
+
+  expect(allowed).toBe(true);
+  expect(last).toHaveFocus();
+});
+
+it("keeps focus where it is when the owner re-renders with a new onClose", () => {
+  function Form() {
+    const [name, setName] = useState("");
+    const ref = useModalFocus<HTMLDivElement>({
+      onClose: () => setName(""),
+    });
+    return (
+      <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true">
+        <input
+          aria-label="Name"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+      </div>
+    );
+  }
+  render(<Form />);
+  const field = screen.getByRole("textbox", { name: "Name" });
+  field.focus();
+
+  fireEvent.change(field, { target: { value: "Films" } });
+
+  expect(field).toHaveValue("Films");
+  expect(field).toHaveFocus();
+});
+
 it("ignores Escape while busy", () => {
   const onClose = vi.fn();
   render(<Harness busy onClose={onClose} />);

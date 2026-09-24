@@ -1,4 +1,4 @@
-import { PageLoading } from "../components/shared/page-loading";
+import { PanelLoading } from "../components/shared/page-loading";
 
 /** Route-level fallback keeps the page geometry and announces navigation progress. */
 export function AppHydrateFallback() {
@@ -10,7 +10,7 @@ export function AppHydrateFallback() {
       </aside>
       <main className="mm-main" id="mm-main-content" tabIndex={-1}>
         <div className="mm-main-inner">
-          <PageLoading label="Loading Weir" />
+          <PanelLoading label="Loading Weir" />
         </div>
       </main>
     </div>

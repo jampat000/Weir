@@ -53,7 +53,7 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
             expect(page.get_by_role("heading", name="Processing", exact=True)).to_be_visible()
             # A retired address gets the not-found page, not a hidden alias.
             page.goto(f"{base}/dashboard", wait_until="domcontentloaded")
-            expect(page.get_by_role("heading", name="Page not found", exact=True)).to_be_visible()
+            expect(page.get_by_role("heading", name="This page doesn't exist.", exact=True)).to_be_visible()
             page.goto(base + "/", wait_until="domcontentloaded")
             expect(page.get_by_test_id("processing-page")).to_be_visible()
 
