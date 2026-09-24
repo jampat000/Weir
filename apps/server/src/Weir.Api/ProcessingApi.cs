@@ -66,6 +66,10 @@ public static class ProcessingApi
         endpoints.MapProcessingSettingsEndpoints();
         endpoints.MapProcessingWatchedFolderScanDispatchEndpoints();
         endpoints.MapLibraryModeEndpoints();
+        endpoints.MapLibraryModeOverviewEndpoints();
+        endpoints.MapLibraryModeFilesEndpoints();
+        endpoints.MapLibraryModeScheduleEndpoints();
+        endpoints.MapLibraryModeRedownloadsEndpoints();
         return endpoints;
     }
 }
