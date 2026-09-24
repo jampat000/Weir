@@ -1,7 +1,6 @@
-import { useState } from "react";
 import {
   persistAppTheme,
-  readStoredAppTheme,
+  useAppTheme,
   type AppTheme,
 } from "../../lib/ui/app-theme";
 
@@ -11,7 +10,7 @@ import {
  * click goes.
  */
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<AppTheme>(() => readStoredAppTheme());
+  const theme = useAppTheme();
   const next: AppTheme = theme === "dark" ? "light" : "dark";
 
   return (
@@ -21,10 +20,7 @@ export function ThemeToggle() {
       data-testid="theme-toggle"
       aria-label={`Switch to ${next} mode`}
       title={`Switch to ${next} mode`}
-      onClick={() => {
-        setTheme(next);
-        persistAppTheme(next);
-      }}
+      onClick={() => persistAppTheme(next)}
     >
       {theme === "dark" ? (
         <svg

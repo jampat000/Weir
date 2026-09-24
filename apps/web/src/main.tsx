@@ -10,11 +10,13 @@ import { StartupGate } from "./app/startup-gate";
 import { AppErrorScreen, ErrorBoundary } from "./components/error-boundary";
 import {
   applyAppThemeToDocument,
-  readStoredAppTheme,
+  currentAppTheme,
+  followSystemAppTheme,
 } from "./lib/ui/app-theme";
 import "./index.css";
 
-applyAppThemeToDocument(readStoredAppTheme());
+applyAppThemeToDocument(currentAppTheme());
+followSystemAppTheme();
 
 const el = document.getElementById("root");
 if (!el) {
