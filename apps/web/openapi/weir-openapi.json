@@ -1583,6 +1583,23 @@
         "title": "LibraryFilesSummaryOut",
         "type": "object"
       },
+      "LibraryFoldersOut": {
+        "description": "Every enabled library's published folders (#768).",
+        "properties": {
+          "libraries": {
+            "items": {
+              "$ref": "#/components/schemas/PublishedLibraryFoldersOut"
+            },
+            "title": "Libraries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "libraries"
+        ],
+        "title": "LibraryFoldersOut",
+        "type": "object"
+      },
       "LibraryLeaveAloneIn": {
         "additionalProperties": false,
         "description": "Library mode: set one file aside so nothing cleans it, or bring it back. Weir server (.NET) only.",
@@ -3405,6 +3422,49 @@
           "status"
         ],
         "title": "PublicReadinessResponse",
+        "type": "object"
+      },
+      "PublishedLibraryFoldersOut": {
+        "description": "One library's watched, work and output folders, as published for a media manager to read (#768).",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "media_type": {
+            "enum": [
+              "movie",
+              "tv"
+            ],
+            "title": "Media Type",
+            "type": "string"
+          },
+          "watched_folder": {
+            "title": "Watched Folder",
+            "type": "string"
+          },
+          "work_folder": {
+            "title": "Work Folder",
+            "type": "string"
+          },
+          "output_folder": {
+            "title": "Output Folder",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "media_type",
+          "watched_folder",
+          "work_folder",
+          "output_folder"
+        ],
+        "title": "PublishedLibraryFoldersOut",
         "type": "object"
       },
       "ReadinessResponse": {
@@ -10773,6 +10833,56 @@
           }
         },
         "summary": "Get Intake Capabilities",
+        "tags": [
+          "media-manager-intake"
+        ]
+      }
+    },
+    "/api/v1/intake/library-folders": {
+      "get": {
+        "description": "Every enabled library's watched, work and output folders, so a media manager can read them instead of a person retyping them. Read only.",
+        "operationId": "get_intake_library_folders_api_v1_intake_library_folders_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Webhook-Secret",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Webhook-Secret"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryFoldersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Intake Library Folders",
         "tags": [
           "media-manager-intake"
         ]

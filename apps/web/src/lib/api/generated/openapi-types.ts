@@ -347,6 +347,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/intake/library-folders": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Intake Library Folders
+     * @description Every enabled library's watched, work and output folders, so a media manager can read them instead of a person retyping them. Read only.
+     */
+    get: operations["get_intake_library_folders_api_v1_intake_library_folders_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/intake/handoffs/{source_key}/{handoff_id}": {
     parameters: {
       query?: never;
@@ -2703,6 +2723,14 @@ export interface components {
       would_change: number;
     };
     /**
+     * LibraryFoldersOut
+     * @description Every enabled library's published folders (#768).
+     */
+    LibraryFoldersOut: {
+      /** Libraries */
+      libraries: components["schemas"]["PublishedLibraryFoldersOut"][];
+    };
+    /**
      * LibraryLeaveAloneIn
      * @description Library mode: set one file aside so nothing cleans it, or bring it back. Weir server (.NET) only.
      */
@@ -3561,6 +3589,27 @@ export interface components {
       ready: boolean;
       /** Status */
       status: string;
+    };
+    /**
+     * PublishedLibraryFoldersOut
+     * @description One library's watched, work and output folders, as published for a media manager to read (#768).
+     */
+    PublishedLibraryFoldersOut: {
+      /** Id */
+      id: number;
+      /** Name */
+      name: string;
+      /**
+       * Media Type
+       * @enum {string}
+       */
+      media_type: "movie" | "tv";
+      /** Watched Folder */
+      watched_folder: string;
+      /** Work Folder */
+      work_folder: string;
+      /** Output Folder */
+      output_folder: string;
     };
     /** ReadinessResponse */
     ReadinessResponse: {
@@ -6714,7 +6763,7 @@ export interface components {
       mapping?: components["schemas"]["ManagerSetupMappingOut"] | null;
       /**
        * Suggested Watched Folder
-       * @description Deluno only: where this media type's downloads arrive, as Deluno reports it.
+       * @description Deluno: where this media type's downloads arrive, as Deluno reports it. Sonarr/Radarr: the first enabled download client's own directory, when one is set.
        */
       suggested_watched_folder?: string | null;
       /**
@@ -7297,6 +7346,37 @@ export interface operations {
           "application/json": {
             [key: string]: string[];
           };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_intake_library_folders_api_v1_intake_library_folders_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        "X-Webhook-Secret"?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LibraryFoldersOut"];
         };
       };
       /** @description Validation Error */

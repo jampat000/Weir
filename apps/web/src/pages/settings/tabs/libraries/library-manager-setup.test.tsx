@@ -111,6 +111,54 @@ it("shows Sonarr exactly what to enter, with copy buttons, and what is still wro
   );
 });
 
+it("offers a Sonarr download client's own folder as a suggested watched folder", async () => {
+  const onUseFolders = vi.fn();
+  setup([{ ...sonarr, suggested_watched_folder: "/downloads/tv-sonarr" }]);
+
+  render(
+    <LibraryManagerSetup
+      mediaType="tv"
+      watchedFolder="/media/downloads/complete"
+      outputFolder="/media/downloads/weir"
+      editable
+      onUseFolders={onUseFolders}
+    />,
+    { wrapper },
+  );
+
+  const block = await screen.findByRole("region", { name: "Sonarr" });
+  expect(within(block).getByText("/downloads/tv-sonarr")).toBeInTheDocument();
+
+  fireEvent.click(
+    within(block).getByRole("button", {
+      name: "Use this as the watched folder",
+    }),
+  );
+  expect(onUseFolders).toHaveBeenCalledWith("/downloads/tv-sonarr", null);
+});
+
+it("does not suggest a Sonarr download client folder that is already the watched folder", async () => {
+  setup([{ ...sonarr, suggested_watched_folder: "/media/downloads/complete" }]);
+
+  render(
+    <LibraryManagerSetup
+      mediaType="tv"
+      watchedFolder="/media/downloads/complete"
+      outputFolder="/media/downloads/weir"
+      editable
+      onUseFolders={() => {}}
+    />,
+    { wrapper },
+  );
+
+  const block = await screen.findByRole("region", { name: "Sonarr" });
+  expect(
+    within(block).queryByRole("button", {
+      name: "Use this as the watched folder",
+    }),
+  ).not.toBeInTheDocument();
+});
+
 it("tells a Deluno library there is nothing to map and offers Deluno's own folders", async () => {
   setup([deluno]);
   const onUseFolders = vi.fn();
