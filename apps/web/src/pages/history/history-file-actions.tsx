@@ -121,6 +121,11 @@ export function HistoryFileActions({
   }
 
   const status = file.status;
+  const queueAgain = () =>
+    void run(
+      async () => (await requeue.mutateAsync(file.id)).detail,
+      "That file could not be queued again.",
+    );
   const button = (
     label: string,
     title: string,
@@ -151,11 +156,7 @@ export function HistoryFileActions({
           ? button(
               "Try again",
               "Tries this file again now, ignoring the automatic wait and attempt limit.",
-              () =>
-                void run(
-                  async () => (await requeue.mutateAsync(file.id)).detail,
-                  "That file could not be queued again.",
-                ),
+              queueAgain,
               { pending: requeue.isPending, pendingLabel: "Queueing…" },
             )
           : null}
@@ -163,11 +164,7 @@ export function HistoryFileActions({
           ? button(
               "Process again",
               "Queues this file to be processed again, from its original in the watched folder.",
-              () =>
-                void run(
-                  async () => (await requeue.mutateAsync(file.id)).detail,
-                  "That file could not be queued again.",
-                ),
+              queueAgain,
               { pending: requeue.isPending, pendingLabel: "Queueing…" },
             )
           : null}
