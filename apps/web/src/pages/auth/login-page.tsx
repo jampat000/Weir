@@ -1,5 +1,6 @@
 import { FormEvent, useId, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { AuthPasswordField } from "../../components/auth/auth-password-field";
 import { AuthBrandStack } from "../../components/brand/auth-brand-stack";
 import { ApiEntryError } from "../../components/shared/api-entry-error";
 import { PageLoading } from "../../components/shared/page-loading";
@@ -14,55 +15,6 @@ import {
 } from "../../lib/auth/queries";
 import { errorMessage } from "../../lib/api/error-message";
 
-function EyeIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden
-    >
-      <path
-        d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  );
-}
-
-function EyeOffIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden
-    >
-      <path
-        d="M10.73 5.08A10.4 10.4 0 0 1 12 5c7 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68M6.61 6.61A13.5 13.5 0 0 0 2 12s4 7 10 7c1.38 0 2.65-.21 3.78-.6M9.88 9.88a3 3 0 1 0 4.24 4.24"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="m2 2 20 20"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -70,6 +22,12 @@ export function LoginPage() {
   const fromSetup =
     Boolean((location.state as { fromSetup?: boolean } | null)?.fromSetup) ||
     searchParams.get("bootstrap") === "created";
+  // Set by the setup screen's "Already have an account?" link: this browser wants the real
+  // sign-in form once, even though no admin exists yet on this install (#704). Without it, a
+  // stale bootstrap-allowed read would bounce the click straight back to Setup.
+  const manualSignIn = Boolean(
+    (location.state as { manualSignIn?: boolean } | null)?.manualSignIn,
+  );
   const sessionExpired = searchParams.get("session") === "expired";
   const sessionNotKept = searchParams.get("problem") === "session-not-kept";
   const me = useMeQuery();
@@ -78,8 +36,7 @@ export function LoginPage() {
   const fieldId = useId();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [trustedDevice, setTrustedDevice] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
+  const [trustedDevice, setTrustedDevice] = useState(false);
 
   if (me.isPending || boot.isPending) {
     return <PageLoading />;
@@ -100,7 +57,7 @@ export function LoginPage() {
       </main>
     );
   }
-  if (boot.data?.bootstrap_allowed && !fromSetup) {
+  if (boot.data?.bootstrap_allowed && !fromSetup && !manualSignIn) {
     return <Navigate to="/setup" replace />;
   }
 
@@ -119,7 +76,6 @@ export function LoginPage() {
   };
 
   const loginUserId = `${fieldId}-user`;
-  const loginPasswordId = `${fieldId}-pass`;
   const loginErrorMessage = (() => {
     if (!login.isError) {
       return null;
@@ -127,6 +83,17 @@ export function LoginPage() {
     const status = httpStatusFromApiError(login.error);
     if (status === 400 || status === 401) {
       return errorMessage(login.error, "Sign-in failed.");
+    }
+    if (status === 429) {
+      // The server already names which limit was hit and how long to wait; that is the
+      // rate-limit-specific message the reader needs, not a generic connectivity guess.
+      return errorMessage(
+        login.error,
+        "Too many sign-in attempts. Wait a few minutes, then try again.",
+      );
+    }
+    if (status === 403) {
+      return "This browser isn't allowed to sign in here. Reload the page and try again.";
     }
     if (
       isLikelyNetworkFailure(login.error) ||
@@ -205,36 +172,17 @@ export function LoginPage() {
               onChange={(e) => setUsername(e.target.value)}
               required
             />
-            <label className="mm-auth-label" htmlFor={loginPasswordId}>
-              Password
-            </label>
-            <div className="mm-auth-password-field">
-              <input
-                id={loginPasswordId}
-                data-testid="login-password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                className="mm-auth-input mm-auth-input--password-toggle"
-                value={password}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setPassword(next);
-                  if (next === "") setShowPassword(false);
-                }}
-                required
-              />
-              <button
-                type="button"
-                className="mm-auth-password-toggle"
-                data-testid="login-password-toggle"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                title={showPassword ? "Hide password" : "Show password"}
-                onClick={() => setShowPassword((v) => !v)}
-              >
-                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-              </button>
-            </div>
+            <AuthPasswordField
+              id={`${fieldId}-pass`}
+              testId="login-password"
+              name="password"
+              label="Password"
+              revealLabel="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={setPassword}
+              required
+            />
             {loginErrorMessage ? (
               <p className="mm-auth-banner" role="alert">
                 {loginErrorMessage}

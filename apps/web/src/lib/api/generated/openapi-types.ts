@@ -2147,7 +2147,7 @@ export interface components {
     BootstrapOut: {
       /** Message */
       message: string;
-      user?: components["schemas"]["UserPublic"];
+      user: components["schemas"]["UserPublic"];
       /** Username */
       username: string;
     };

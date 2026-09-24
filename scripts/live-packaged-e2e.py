@@ -394,6 +394,7 @@ class LiveAudit:
             self.visible(setup_user, "first-time setup form is visible")
             setup_user.fill(AUDIT_USER)
             self.page.get_by_test_id("setup-password").fill(AUDIT_PASSWORD)
+            self.page.get_by_test_id("setup-confirm-password").fill(AUDIT_PASSWORD)
             setup_code = self.page.get_by_test_id("setup-code")
             if setup_code.count():
                 self.visible(
@@ -407,7 +408,12 @@ class LiveAudit:
             self.click(
                 self.page.get_by_test_id("setup-submit"), "first-time setup submit"
             )
-            self.page.wait_for_url(re.compile(r".*/login"), timeout=TIMEOUT_MS)
+            # Bootstrap signs the new admin in directly (#704): the next screen is the app
+            # itself, by way of the setup wizard, never a second sign-in screen.
+            self.page.wait_for_url(
+                lambda url: not url.rstrip("/").endswith("/setup"),
+                timeout=TIMEOUT_MS,
+            )
 
         login_user = self.page.get_by_test_id("login-username")
         if login_user.count():

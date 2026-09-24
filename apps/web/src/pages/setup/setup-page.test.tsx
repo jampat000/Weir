@@ -70,6 +70,9 @@ describe("SetupPage", () => {
     fireEvent.change(screen.getByTestId("setup-password"), {
       target: { value: "short" },
     });
+    fireEvent.change(screen.getByTestId("setup-confirm-password"), {
+      target: { value: "short" },
+    });
     fireEvent.submit(screen.getByTestId("setup-form"));
 
     expect(mutateAsyncMock).not.toHaveBeenCalled();
@@ -78,8 +81,32 @@ describe("SetupPage", () => {
     );
   });
 
-  it("submits bootstrap when username and password meet the requirements", async () => {
-    mutateAsyncMock.mockResolvedValue({ message: "ok", username: "admin" });
+  it("blocks bootstrap submit when the confirmation does not match", async () => {
+    render(wrap(<SetupPage />));
+
+    fireEvent.change(screen.getByTestId("setup-username"), {
+      target: { value: "admin" },
+    });
+    fireEvent.change(screen.getByTestId("setup-password"), {
+      target: { value: "password-strong" },
+    });
+    fireEvent.change(screen.getByTestId("setup-confirm-password"), {
+      target: { value: "password-different" },
+    });
+    fireEvent.submit(screen.getByTestId("setup-form"));
+
+    expect(mutateAsyncMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Passwords do not match.",
+    );
+  });
+
+  it("submits bootstrap when username and password meet the requirements, then signs straight in", async () => {
+    mutateAsyncMock.mockResolvedValue({
+      message: "ok",
+      username: "admin",
+      user: { id: 1, username: "admin", role: "admin" },
+    });
 
     render(wrap(<SetupPage />));
 
@@ -89,6 +116,9 @@ describe("SetupPage", () => {
     fireEvent.change(screen.getByTestId("setup-password"), {
       target: { value: "password-strong" },
     });
+    fireEvent.change(screen.getByTestId("setup-confirm-password"), {
+      target: { value: "password-strong" },
+    });
     fireEvent.submit(screen.getByTestId("setup-form"));
 
     expect(mutateAsyncMock).toHaveBeenCalledWith({
@@ -96,9 +126,7 @@ describe("SetupPage", () => {
       password: "password-strong",
     });
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith("/login?bootstrap=created", {
-        replace: true,
-      });
+      expect(navigateMock).toHaveBeenCalledWith("/", { replace: true });
     });
   });
 
@@ -110,7 +138,11 @@ describe("SetupPage", () => {
 
   it("requires and submits the setup code when the peer needs one", async () => {
     requiresSetupCode = true;
-    mutateAsyncMock.mockResolvedValue({ message: "ok", username: "admin" });
+    mutateAsyncMock.mockResolvedValue({
+      message: "ok",
+      username: "admin",
+      user: { id: 1, username: "admin", role: "admin" },
+    });
 
     render(wrap(<SetupPage />));
 
@@ -118,6 +150,9 @@ describe("SetupPage", () => {
       target: { value: "admin" },
     });
     fireEvent.change(screen.getByTestId("setup-password"), {
+      target: { value: "password-strong" },
+    });
+    fireEvent.change(screen.getByTestId("setup-confirm-password"), {
       target: { value: "password-strong" },
     });
     fireEvent.change(screen.getByTestId("setup-code"), {
@@ -131,7 +166,7 @@ describe("SetupPage", () => {
       setupCode: "ABCD-1234",
     });
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalled();
+      expect(navigateMock).toHaveBeenCalledWith("/", { replace: true });
     });
   });
 

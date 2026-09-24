@@ -1,4 +1,4 @@
-"""Playwright smoke: bootstrap -> login -> setup wizard -> app -> logout -> guard redirect."""
+"""Playwright smoke: bootstrap -> setup wizard -> app -> logout -> guard redirect."""
 
 from __future__ import annotations
 
@@ -34,15 +34,10 @@ def test_auth_shell_bootstrap_login_logout_guard(weir_shell: str) -> None:
 
             page.get_by_test_id("setup-username").fill(BOOTSTRAP_USER)
             page.get_by_test_id("setup-password").fill(BOOTSTRAP_PASS)
+            page.get_by_test_id("setup-confirm-password").fill(BOOTSTRAP_PASS)
             page.get_by_test_id("setup-submit").click()
 
-            expect(page).to_have_url(re.compile(r".*/login"))
-            expect(page.get_by_test_id("login-form")).to_be_visible()
-
-            page.get_by_test_id("login-username").fill(BOOTSTRAP_USER)
-            page.get_by_test_id("login-password").fill(BOOTSTRAP_PASS)
-            page.get_by_test_id("login-submit").click()
-
+            # Bootstrap signs the new admin in directly (#704): no separate sign-in screen follows.
             expect(page).to_have_url(re.compile(r".*/setup-wizard"))
             expect(page.get_by_role("heading", name="Set up Weir")).to_be_visible()
             page.get_by_test_id("setup-wizard-skip").click()

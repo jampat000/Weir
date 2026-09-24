@@ -315,7 +315,8 @@
         },
         "required": [
           "message",
-          "username"
+          "username",
+          "user"
         ],
         "title": "BootstrapOut",
         "type": "object"

@@ -1,6 +1,7 @@
 import { apiFetch, readJson, requireOk } from "./client";
 import type {
   ActiveSession,
+  BootstrapResult,
   BootstrapStatus,
   CurrentSession,
   SessionAction,
@@ -114,7 +115,7 @@ export async function postBootstrap(
   username: string,
   password: string,
   setupCode?: string,
-): Promise<{ message: string; username: string }> {
+): Promise<BootstrapResult> {
   const csrf_token = await fetchCsrfToken();
   const path = "/api/v1/auth/bootstrap";
   const r = await apiFetch(path, {
