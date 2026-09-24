@@ -559,12 +559,12 @@ describe("ProcessingPage", () => {
     ).toHaveAttribute("href", "/history?show=failed");
   });
 
-  it("says nothing was handed back rather than drawing a row of empty bars", () => {
+  it("says nothing finished rather than drawing a row of empty bars", () => {
     renderLive();
 
     const figure = screen.getByTestId("live-handed-back");
     expect(screen.getByTestId("live-handed-back-sum")).toHaveTextContent(
-      "Nothing handed back in the last 2 hours.",
+      "Nothing finished in the last 2 hours.",
     );
     expect(figure.querySelector(".mm-live-spark__bar")).toBeNull();
     // The chart's place is kept, empty, so switching views never resizes the toolbar.

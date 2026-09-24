@@ -20,9 +20,13 @@
 # https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/node:pull.)
 FROM node:25-bookworm-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370 AS web
 WORKDIR /src/apps/web
+# Only the manifest and lockfile go in before the install, so this layer (and the BuildKit cache
+# mount below, which survives even when the layer cache is cold) is reused for every build that
+# doesn't touch a dependency; COPY apps/web . below invalidates only the build step that follows.
 COPY apps/web/package.json apps/web/package-lock.json ./
 # Resilient installs in CI/buildx (registry flakes, slow links); lockfile must stay in sync with package.json.
-RUN npm config set fund false \
+RUN --mount=type=cache,target=/root/.npm \
+  npm config set fund false \
   && npm config set audit false \
   && npm config set fetch-retries 10 \
   && npm config set fetch-retry-mintimeout 20000 \
@@ -39,10 +43,32 @@ RUN npm run build
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.401-noble@sha256:35d40304542c8689331f8cab17c65926cdf48fe711e289321d71924b230a7d29 AS server-build
 ARG TARGETARCH
 WORKDIR /src
-# The solution-level MSBuild files (Directory.Build.props holds the product version) and the server source.
-# Weir.Api embeds the committed OpenAPI document from apps/web/openapi.
+# The solution-level MSBuild files (Directory.Build.props holds the product version) and, below, only
+# each project's .csproj and packages.lock.json (Directory.Build.props sets RestorePackagesWithLockFile,
+# so restore expects it next to the .csproj): enough for `dotnet restore` to resolve every package,
+# without the .cs source that changes on nearly every build. Restore is then cached (both as its own
+# Docker layer, and by the BuildKit cache mount, which survives a cold layer cache) and skipped by
+# --no-restore below whenever only application code changed.
 # .editorconfig carries the analyzer severities the build relies on (warnings are errors), so it must come too.
 COPY apps/server/global.json apps/server/Directory.Build.props apps/server/Directory.Packages.props apps/server/NuGet.Config apps/server/Weir.slnx apps/server/.editorconfig apps/server/
+COPY apps/server/src/Weir.Api/Weir.Api.csproj apps/server/src/Weir.Api/packages.lock.json apps/server/src/Weir.Api/
+COPY apps/server/src/Weir.Core/Weir.Core.csproj apps/server/src/Weir.Core/packages.lock.json apps/server/src/Weir.Core/
+COPY apps/server/src/Weir.Host/Weir.Host.csproj apps/server/src/Weir.Host/packages.lock.json apps/server/src/Weir.Host/
+COPY apps/server/src/Weir.Infrastructure/Weir.Infrastructure.csproj apps/server/src/Weir.Infrastructure/packages.lock.json apps/server/src/Weir.Infrastructure/
+# Restore for the target RID up front, with the same -p:SelfContained=true the publish profiles set
+# (plain `-r` alone only restores the framework-dependent apphost pack, not the full self-contained
+# runtime pack the profiles need), so the publish step below can run with --no-restore. Not
+# --locked-mode: none of the lock files pin a RID-specific section (only "net10.0"), so a locked
+# restore here would reject the RID-specific native assets (e.g. SQLitePCLRaw) it needs to add,
+# the same as plain `dotnet publish -p:PublishProfile=...` already did before this change. Weir.Host's
+# ProjectReferences pull Api/Core/Infrastructure into the same restore graph.
+RUN --mount=type=cache,target=/root/.nuget/packages,sharing=locked \
+    case "$TARGETARCH" in \
+      amd64) rid=linux-x64 ;; \
+      arm64) rid=linux-arm64 ;; \
+      *) echo "Dockerfile: unsupported TARGETARCH '$TARGETARCH'" >&2; exit 1 ;; \
+    esac; \
+    dotnet restore apps/server/src/Weir.Host -r "$rid" -p:SelfContained=true
 COPY apps/server/src apps/server/src
 COPY apps/web/openapi apps/web/openapi
 # Publish through the checked-in per-runtime profile (Weir.Host/Properties/PublishProfiles/*.pubxml), not
@@ -50,12 +76,13 @@ COPY apps/web/openapi apps/web/openapi
 # global property that reaches every project, and the single-file analyzer then fails Weir.Infrastructure
 # with IL3000 on the Assembly.Location check that detects single-file mode on purpose. The profiles scope
 # those properties to Weir.Host. Do not "simplify" this back to explicit flags.
-RUN case "$TARGETARCH" in \
+RUN --mount=type=cache,target=/root/.nuget/packages,sharing=locked \
+    case "$TARGETARCH" in \
       amd64) profile=linux-x64 ;; \
       arm64) profile=linux-arm64 ;; \
       *) echo "Dockerfile: unsupported TARGETARCH '$TARGETARCH'" >&2; exit 1 ;; \
     esac; \
-    dotnet publish apps/server/src/Weir.Host -p:PublishProfile="$profile" -p:PublishDir=/out/
+    dotnet publish apps/server/src/Weir.Host -p:PublishProfile="$profile" -p:PublishDir=/out/ --no-restore
 
 # A self-contained single-file publish needs only the native dependencies .NET itself uses (libc,
 # OpenSSL; not ICU, because Directory.Build.props sets InvariantGlobalization), which is exactly what

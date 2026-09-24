@@ -976,7 +976,7 @@ class LiveAudit:
         # Keep the default failure event selected and exercise the enabled switch
         # without leaving the final channel disabled.
         self.click(
-            form.get_by_role("button", name="Save channel", exact=True),
+            form.get_by_role("button", name="Save alert", exact=True),
             "create notification channel",
         )
         row = self.page.get_by_text("Live audit channel", exact=True)

@@ -84,7 +84,7 @@ export function ProcessingToolbar({
         </div>
         <div className="mm-live-toolbar__figures">
           <div className="mm-live-figure">
-            <span className="mm-live-figure__label">Handed back today</span>
+            <span className="mm-live-figure__label">Finished today</span>
             <span
               className="mm-live-figure__value"
               data-testid="live-done-today"

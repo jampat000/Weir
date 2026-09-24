@@ -202,7 +202,7 @@ export function UpdateModeSection() {
           disabled={!dirty || saveMode.isPending || settingsQ.isPending}
           onClick={saveDraft}
         >
-          {saveMode.isPending ? "Saving..." : "Save"}
+          {saveMode.isPending ? "Saving…" : "Save"}
         </button>
         {dirty ? (
           <button

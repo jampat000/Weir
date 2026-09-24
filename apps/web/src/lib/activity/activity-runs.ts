@@ -50,7 +50,7 @@ const RUN_NAME_BY_TRIGGER: Record<string, string> = {
 
 type RunOutcome =
   | "processed"
-  | "handed back"
+  | "passed through"
   | "rejected"
   | "no changes needed"
   | "skipped"
@@ -58,7 +58,7 @@ type RunOutcome =
 
 const OUTCOME_ORDER: RunOutcome[] = [
   "processed",
-  "handed back",
+  "passed through",
   "rejected",
   "no changes needed",
   "skipped",
@@ -72,12 +72,12 @@ function entryOutcome(ev: ActivityEventItem): RunOutcome | null {
     type === "processing.file_passed_through" ||
     type === "processing.file_reject_fell_back"
   )
-    return "handed back";
+    return "passed through";
   if (type === "processing.file_rejected") return "rejected";
   if (ev.result === "failed") return "failed";
   if (type === "processing.file_remux_pass_completed") {
     const detail = parseActivityDetail(ev.detail) ?? {};
-    if (detail.pass_through_unchanged === true) return "handed back";
+    if (detail.pass_through_unchanged === true) return "passed through";
     if (detail.outcome === "live_skipped_not_required")
       return "no changes needed";
     return "processed";
@@ -91,7 +91,7 @@ type RunSummary = {
   failed: number;
 };
 
-/** "Scheduled run · 12 files: 8 processed, 2 handed back, 2 no changes needed" */
+/** "Scheduled run · 12 files: 8 processed, 2 passed through, 2 no changes needed" */
 export function summarizeRun(events: ActivityEventItem[]): RunSummary {
   const trigger = events.find((ev) => ev.trigger)?.trigger ?? null;
   const name = (trigger && RUN_NAME_BY_TRIGGER[trigger]) || "Run";

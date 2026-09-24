@@ -175,7 +175,7 @@ export function CleanupTab() {
               <DaysSettingRow
                 testId="processing-maintenance-handback-window"
                 name="Cleaned copies nobody picked up wait"
-                description="How long a copy Weir handed back waits for a media manager before Cleaned copies nobody picked up may remove it."
+                description="How long a copy Weir made for a media manager waits before Cleaned copies nobody picked up may remove it."
                 inputId={`${ids}-window`}
                 inputLabel="Cleaned copies nobody picked up wait for"
                 saved={

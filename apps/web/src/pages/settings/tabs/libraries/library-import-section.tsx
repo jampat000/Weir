@@ -131,7 +131,7 @@ export function LibraryImportSection({
     setSelectedKeys([]);
     askManager(
       (id) => discover.mutateAsync(id),
-      "Weir could not discover libraries from that manager.",
+      "Weir could not discover libraries from that media manager.",
     );
   };
 
@@ -193,7 +193,7 @@ export function LibraryImportSection({
           onClick={() =>
             askManager(
               (id) => drift.mutateAsync(id),
-              "Weir could not compare libraries with that manager.",
+              "Weir could not compare libraries with that media manager.",
             )
           }
           disabled={!connectionId || drift.isPending}
