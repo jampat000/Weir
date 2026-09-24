@@ -57,6 +57,8 @@ public static class ProcessingApi
         endpoints.MapProcessingLibraryDiscoveryEndpoints();
         endpoints.MapProcessingRuleSetsEndpoints();
         endpoints.MapProcessingFilesEndpoints();
+        endpoints.MapProcessingFileLogEndpoints();
+        endpoints.MapProcessingFileTracksEndpoints();
         endpoints.MapProcessingLibraryCleansEndpoints();
         endpoints.MapProcessingDirectPlayEndpoints();
         endpoints.MapProcessingJobsEndpoints();
