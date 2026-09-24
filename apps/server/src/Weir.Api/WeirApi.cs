@@ -111,7 +111,8 @@ public static class WeirApi
             endpoints.MapSuiteEndpoints();
             endpoints.MapSuiteFileEndpoints();
             endpoints.MapReconciliationEndpoints();
-            endpoints.MapMediaManagerEndpoints();
+            endpoints.MapMediaManagerConnectionsEndpoints();
+            endpoints.MapMediaManagerIntakeEndpoints();
             endpoints.MapNotificationEndpoints();
             endpoints.MapActivityEndpoints();
             endpoints.MapWeirProcessingApis();

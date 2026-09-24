@@ -54,7 +54,11 @@ public static class ProcessingApi
     public static IEndpointRouteBuilder MapWeirProcessingApis(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapProcessingLibraryEndpoints();
+        endpoints.MapProcessingLibraryDiscoveryEndpoints();
+        endpoints.MapProcessingRuleSetsEndpoints();
         endpoints.MapProcessingFilesEndpoints();
+        endpoints.MapProcessingFileLogEndpoints();
+        endpoints.MapProcessingFileTracksEndpoints();
         endpoints.MapProcessingLibraryCleansEndpoints();
         endpoints.MapProcessingDirectPlayEndpoints();
         endpoints.MapProcessingJobsEndpoints();
@@ -64,6 +68,10 @@ public static class ProcessingApi
         endpoints.MapProcessingSettingsEndpoints();
         endpoints.MapProcessingWatchedFolderScanDispatchEndpoints();
         endpoints.MapLibraryModeEndpoints();
+        endpoints.MapLibraryModeOverviewEndpoints();
+        endpoints.MapLibraryModeFilesEndpoints();
+        endpoints.MapLibraryModeScheduleEndpoints();
+        endpoints.MapLibraryModeRedownloadsEndpoints();
         return endpoints;
     }
 }

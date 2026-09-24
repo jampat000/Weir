@@ -1,0 +1,65 @@
+using Microsoft.AspNetCore.Routing;
+using Weir.Api.Http;
+using Weir.Core.Auth;
+using Weir.Core.Validation;
+using Weir.Infrastructure.LibraryMode;
+using Weir.Infrastructure.MediaManagers;
+using static Weir.Api.Endpoints.EndpointLookups;
+
+namespace Weir.Api.Endpoints;
+
+/// <summary>
+/// Library mode (#505 point 7): the scheduled scan/clean toggle. Turning it on for the first time shows the same
+/// final-removal confirmation Clean does (via the shared helpers on <see cref="LibraryModeMapping"/>), using
+/// whatever the last scan found. See <see cref="LibraryModeEndpoints"/> for the rest of the Library mode surface.
+/// </summary>
+public static class LibraryModeScheduleEndpoints
+{
+    public static IEndpointRouteBuilder MapLibraryModeScheduleEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapV1("POST", "/processing/libraries/{library_id}/library-schedule", PostScheduleAsync);
+        return endpoints;
+    }
+
+    private static async Task<ApiResult> PostScheduleAsync(ApiRequest request)
+    {
+        var payload = await request.ReadBodyAsync().ConfigureAwait(false);
+        var issues = new ValidationIssues();
+        var libraryId = request.PathInt("library_id", issues);
+        var model = new BodyModel(payload, issues);
+        var enabled = model.Bool("enabled", false, required: true);
+        var confirmed = model.Bool("confirm_final_removal", false);
+        var csrfToken = model.Str("csrf_token", minLength: 1);
+        model.Finish(ExtraFields.Forbid);
+        issues.ThrowIfAny();
+
+        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
+        request.RequireConfirmationToken(csrfToken);
+
+        var uow = await request.DbAsync().ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
+        var settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
+
+        if (enabled && !settings.ScheduleEnabled)
+        {
+            // #505 point 7: turning the schedule on shows the same final-removal warning once, using whatever the last scan found.
+            var files = await LibraryScanStore.CurrentFilesAsync(uow, libraryId).ConfigureAwait(false);
+            var (removingFiles, removingTracks, bytesSaved) = LibraryModeMapping.RemovalTotals(files);
+            if (removingFiles > 0 && !confirmed)
+            {
+                var rules = await LibraryModeMapping.RulesForAsync(uow, library).ConfigureAwait(false);
+                var connectionsById = await LibraryModeMapping.ConnectionsForFilesAsync(uow, request.Service<MediaManagerConnectionService>(), files).ConfigureAwait(false);
+                var preflight = await LibraryCleanPreflightRunner.RunAsync(
+                        files, settings, rules, library.MediaType, request.Service<IHardlinkInspector>(),
+                        request.Service<RedownloadRiskChecker>(), connectionsById, request.Context.RequestAborted)
+                    .ConfigureAwait(false);
+                return LibraryModeMapping.ConfirmationRequired(removingFiles, removingTracks, bytesSaved, LibraryCleanPreflightRunner.WarningMessages(preflight));
+            }
+        }
+
+        var updated = settings with { ScheduleEnabled = enabled };
+        await LibrarySettingsStore.SetAsync(uow, libraryId, updated).ConfigureAwait(false);
+        await request.CommitAsync().ConfigureAwait(false);
+        return ApiRoutes.Ok(LibraryModeMapping.SettingsOut(updated));
+    }
+}
