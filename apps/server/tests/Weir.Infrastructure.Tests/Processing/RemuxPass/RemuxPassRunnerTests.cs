@@ -161,19 +161,6 @@ internal sealed class FakeOriginalLanguage : IOriginalLanguageLookup
     }
 }
 
-/// <summary>A fact that runs only on Windows, for share-mode, hard-link and mandatory-lock behaviour.</summary>
-[AttributeUsage(AttributeTargets.Method)]
-internal sealed class WindowsFactAttribute : FactAttribute
-{
-    public WindowsFactAttribute(string reason)
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            Skip = reason;
-        }
-    }
-}
-
 /// <summary>Real folders for one pass: watched, output and a custom work folder.</summary>
 internal sealed class PassFolders : IDisposable
 {

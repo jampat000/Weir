@@ -1,52 +1,5 @@
 namespace Weir.Infrastructure.Tests;
 
-/// <summary>
-/// A temporary directory removed after the test. A caller that opened a <c>SqliteDatabase</c> inside it
-/// must release that database's own pooled connections itself (<c>SqliteDatabase.ClearPool()</c>) before
-/// this runs; deleting does not clear every pool in the process, because that would race with any other
-/// test's connections still open at the same time.
-/// </summary>
-internal sealed class TempDirectory : IDisposable
-{
-    public TempDirectory()
-    {
-        Path = System.IO.Path.Join(System.IO.Path.GetTempPath(), "weir-tests-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(Path);
-    }
-
-    public string Path { get; }
-
-    public string Join(params string[] parts) => System.IO.Path.Join([Path, .. parts]);
-
-    public void Dispose()
-    {
-        for (var attempt = 0; attempt < 5; attempt++)
-        {
-            try
-            {
-                Directory.Delete(Path, recursive: true);
-                return;
-            }
-            catch (IOException) when (attempt < 4)
-            {
-                Thread.Sleep(100);
-            }
-            catch (UnauthorizedAccessException) when (attempt < 4)
-            {
-                Thread.Sleep(100);
-            }
-            catch (IOException)
-            {
-                return;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return;
-            }
-        }
-    }
-}
-
 /// <summary>Folder links for tests of code that must never follow one.</summary>
 internal static class FolderLinks
 {
@@ -101,9 +54,9 @@ internal static class RepositoryPaths
 /// <summary>
 /// <see cref="Weir.Infrastructure.Tests.Jobs.ClaimConcurrencyTests"/> and
 /// <see cref="Weir.Infrastructure.Tests.Jobs.LeaseRenewalTests"/> each block many thread-pool
-/// threads at once (parallel SQLite claims behind a barrier, or a real-clock lease heartbeat under
-/// <c>Task.Delay</c>). This collection keeps those two classes from running at the same time as each
-/// other, so their thread-pool pressure and real-time assumptions don't compound.
+/// threads at once (parallel SQLite claims behind a barrier, or a lease heartbeat driven by a shared
+/// <c>FakeTimeProvider</c>). This collection keeps those two classes from running at the same time as each
+/// other, so their thread-pool pressure doesn't compound.
 /// </summary>
 /// <remarks>
 /// <c>DisableParallelization</c> only serializes the members of <em>this</em> collection against each

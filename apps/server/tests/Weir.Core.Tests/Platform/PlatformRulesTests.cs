@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Time.Testing;
 using Weir.Core.Auth;
 using Weir.Core.Configuration;
 using Weir.Core.Json;
@@ -84,7 +85,7 @@ public sealed class PlatformRulesTests
     [Fact]
     public void Rate_limiter_evicts_expired_buckets_and_caps_keys()
     {
-        var clock = new ManualTimeProvider();
+        var clock = new FakeTimeProvider();
         var limiter = new SlidingWindowLimiter(2, 10, clock);
         Assert.True(limiter.Allow("one"));
         Assert.True(limiter.Allow("two"));
@@ -240,7 +241,7 @@ public sealed class PlatformRulesTests
     [Fact]
     public void Runtime_metrics_render_as_prometheus_text_and_a_summary()
     {
-        var store = new RuntimeMetricsStore(new ManualTimeProvider());
+        var store = new RuntimeMetricsStore(new FakeTimeProvider());
         store.RecordRequest("GET", "/api/v1/health", 200, 12.5);
         store.RecordRequest("POST", "/api/v1/processing/jobs", 500, 33.0);
         store.RecordLog("error");

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Time.Testing;
 using Weir.Core.Security;
 
 namespace Weir.Core.Tests.Security;
@@ -84,7 +85,7 @@ public sealed class SecurityCompatibilityTests
         var csrf = Fixture.GetProperty("csrf");
         var secret = csrf.GetProperty("secret").GetString()!;
         var raw = csrf.GetProperty("raw_session_token").GetString()!;
-        var clock = new FixedClock(DateTimeOffset.FromUnixTimeSeconds(csrf.GetProperty("timestamp").GetInt64()));
+        var clock = new FakeTimeProvider(DateTimeOffset.FromUnixTimeSeconds(csrf.GetProperty("timestamp").GetInt64()));
 
         var anonymous = csrf.GetProperty("anonymous").GetString()!;
         var bound = csrf.GetProperty("session_bound").GetString()!;
@@ -105,12 +106,12 @@ public sealed class SecurityCompatibilityTests
         var issuedAt = DateTimeOffset.FromUnixTimeSeconds(csrf.GetProperty("timestamp").GetInt64());
         var token = csrf.GetProperty("anonymous").GetString()!;
 
-        Assert.True(CsrfTokens.Verify(secret, token, null, true, new FixedClock(issuedAt.AddSeconds(3600))));
-        Assert.False(CsrfTokens.Verify(secret, token, null, true, new FixedClock(issuedAt.AddSeconds(3601))));
-        Assert.False(CsrfTokens.Verify(secret, token, null, true, new FixedClock(issuedAt.AddSeconds(-1))));
-        Assert.False(CsrfTokens.Verify("another-secret", token, null, true, new FixedClock(issuedAt)));
-        Assert.False(CsrfTokens.Verify(secret, "tampered", null, true, new FixedClock(issuedAt)));
-        Assert.False(CsrfTokens.Verify(secret, token[..^1] + (token[^1] == 'A' ? 'B' : 'A'), null, true, new FixedClock(issuedAt)));
+        Assert.True(CsrfTokens.Verify(secret, token, null, true, new FakeTimeProvider(issuedAt.AddSeconds(3600))));
+        Assert.False(CsrfTokens.Verify(secret, token, null, true, new FakeTimeProvider(issuedAt.AddSeconds(3601))));
+        Assert.False(CsrfTokens.Verify(secret, token, null, true, new FakeTimeProvider(issuedAt.AddSeconds(-1))));
+        Assert.False(CsrfTokens.Verify("another-secret", token, null, true, new FakeTimeProvider(issuedAt)));
+        Assert.False(CsrfTokens.Verify(secret, "tampered", null, true, new FakeTimeProvider(issuedAt)));
+        Assert.False(CsrfTokens.Verify(secret, token[..^1] + (token[^1] == 'A' ? 'B' : 'A'), null, true, new FakeTimeProvider(issuedAt)));
     }
 
     [Fact]
@@ -161,10 +162,5 @@ public sealed class SecurityCompatibilityTests
         Assert.NotNull(rewrapped);
         Assert.Equal("arr-key", rotated.Decrypt(rewrapped));
         Assert.Throws<Core.Json.PyValueErrorException>(() => new CredentialCipher(null, null, [], TimeProvider.System).Encrypt("x"));
-    }
-
-    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
-    {
-        public override DateTimeOffset GetUtcNow() => now;
     }
 }

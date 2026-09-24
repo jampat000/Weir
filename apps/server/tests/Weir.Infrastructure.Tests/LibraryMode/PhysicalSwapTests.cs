@@ -6,7 +6,6 @@ using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Tests.Jobs;
 using Weir.Infrastructure.Tests.Media;
-using Weir.Infrastructure.Tests.Processing.RemuxPass;
 
 namespace Weir.Infrastructure.Tests.LibraryMode;
 
