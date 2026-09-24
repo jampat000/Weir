@@ -12,7 +12,7 @@ namespace Weir.Infrastructure.Auth;
 public sealed record SignedInSession(UserSessionRecord Session, UserRecord User);
 
 /// <summary>Credentials, first-admin bootstrap, server-side sessions and logout.</summary>
-public sealed class AuthService
+public sealed class AuthService : IDisposable
 {
     public const string BootstrapNotAllowedMessage = "bootstrap not allowed: an admin user already exists";
 
@@ -20,6 +20,13 @@ public sealed class AuthService
     private readonly TimeProvider _time;
     private readonly SqliteDatabase _database;
     private readonly ILogger _logger;
+
+    /// <summary>
+    /// Argon2 is deliberately memory-hard (64 MiB per verification), so a burst of concurrent login
+    /// attempts is also a burst of memory pressure; capping how many run at once bounds that regardless
+    /// of how many requests arrive together.
+    /// </summary>
+    private readonly SemaphoreSlim _argon2Concurrency = new(Math.Max(1, Environment.ProcessorCount));
 
     public AuthService(WeirOptions options, TimeProvider time, SqliteDatabase database, ILoggerFactory loggerFactory)
     {
@@ -29,6 +36,8 @@ public sealed class AuthService
         _database = database;
         _logger = loggerFactory.CreateLogger("weir.platform.auth.service");
     }
+
+    public void Dispose() => _argon2Concurrency.Dispose();
 
     public PyDateTime Now() => PyDateTime.UtcNow(_time);
 
@@ -103,23 +112,34 @@ public sealed class AuthService
         var user = await AuthStore.FindUserByLowerUsernameAsync(uow, (username ?? string.Empty).Trim().ToLowerInvariant()).ConfigureAwait(false);
         if (user is null || !user.IsActive)
         {
-            VerifyPassword(password, PasswordHasher.DummyPasswordHash);
+            await VerifyPasswordAsync(password, PasswordHasher.DummyPasswordHash).ConfigureAwait(false);
             return null;
         }
 
-        return VerifyPassword(password, user.PasswordHash) ? user : null;
+        return await VerifyPasswordAsync(password, user.PasswordHash).ConfigureAwait(false) ? user : null;
     }
 
-    /// <summary>Verifies a password against a stored hash, logging a hash that cannot be read.</summary>
-    public bool VerifyPassword(string plain, string passwordHash)
+    /// <summary>
+    /// Verifies a password against a stored hash, logging a hash that cannot be read, inside
+    /// <see cref="_argon2Concurrency"/>.
+    /// </summary>
+    public async Task<bool> VerifyPasswordAsync(string plain, string passwordHash)
     {
-        var result = PasswordHasher.Verify(plain, passwordHash);
-        if (result == PasswordVerification.InvalidHash)
+        await _argon2Concurrency.WaitAsync().ConfigureAwait(false);
+        try
         {
-            _logger.LogWarning("password verify: stored hash is invalid or unsupported (user record may be corrupt)");
-        }
+            var result = PasswordHasher.Verify(plain, passwordHash);
+            if (result == PasswordVerification.InvalidHash)
+            {
+                _logger.LogWarning("password verify: stored hash is invalid or unsupported (user record may be corrupt)");
+            }
 
-        return result == PasswordVerification.Match;
+            return result == PasswordVerification.Match;
+        }
+        finally
+        {
+            _argon2Concurrency.Release();
+        }
     }
 
     /// <summary>Signs a user in: checks the credentials and creates a session.</summary>
@@ -293,7 +313,7 @@ public sealed class AuthService
             throw new PyValueErrorException("Account is not available.");
         }
 
-        if (!VerifyPassword(currentPassword, user.PasswordHash))
+        if (!await VerifyPasswordAsync(currentPassword, user.PasswordHash).ConfigureAwait(false))
         {
             throw new PyValueErrorException("Current password is incorrect.");
         }
@@ -328,7 +348,7 @@ public sealed class AuthService
             throw new PyValueErrorException("Account is not available.");
         }
 
-        if (!VerifyPassword(currentPassword, user.PasswordHash))
+        if (!await VerifyPasswordAsync(currentPassword, user.PasswordHash).ConfigureAwait(false))
         {
             throw new PyValueErrorException("Current password is incorrect.");
         }

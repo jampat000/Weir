@@ -16,6 +16,7 @@ export function SetupPage() {
   const bootstrap = useBootstrapMutation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [setupCode, setSetupCode] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
 
   if (me.isPending || boot.isPending) {
@@ -59,7 +60,11 @@ export function SetupPage() {
     }
     setValidationError(null);
     try {
-      await bootstrap.mutateAsync({ username: trimmedUsername, password });
+      await bootstrap.mutateAsync({
+        username: trimmedUsername,
+        password,
+        setupCode: setupCode.trim() || undefined,
+      });
       void navigate("/login?bootstrap=created", { replace: true });
     } catch {
       /* surfaced below */
@@ -124,6 +129,33 @@ export function SetupPage() {
               minLength={8}
               maxLength={512}
             />
+            {boot.data?.requires_setup_code ? (
+              <>
+                <label className="mm-auth-label" htmlFor="setup-code">
+                  Setup code
+                </label>
+                <input
+                  id="setup-code"
+                  data-testid="setup-code"
+                  name="setup_code"
+                  autoComplete="off"
+                  className="mm-auth-input"
+                  value={setupCode}
+                  onChange={(e) => {
+                    setSetupCode(e.target.value);
+                    if (validationError) {
+                      setValidationError(null);
+                    }
+                  }}
+                  required
+                  maxLength={32}
+                />
+                <p className="mm-auth-hint">
+                  Shown in Weir&apos;s log (docker logs) and saved in the
+                  setup-code file in Weir&apos;s data folder.
+                </p>
+              </>
+            ) : null}
             {validationError ? (
               <p className="mm-auth-banner" role="alert">
                 {validationError}

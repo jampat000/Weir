@@ -277,6 +277,18 @@
             "title": "Password",
             "type": "string"
           },
+          "setup_code": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Setup Code"
+          },
           "username": {
             "maxLength": 64,
             "minLength": 1,
@@ -320,11 +332,17 @@
           "reason": {
             "title": "Reason",
             "type": "string"
+          },
+          "requires_setup_code": {
+            "description": "Whether the current caller must supply the setup code from Weir's log or setup-code file.",
+            "title": "Requires Setup Code",
+            "type": "boolean"
           }
         },
         "required": [
           "bootstrap_allowed",
-          "reason"
+          "reason",
+          "requires_setup_code"
         ],
         "title": "BootstrapStatusOut",
         "type": "object"

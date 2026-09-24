@@ -35,6 +35,7 @@ public static class WeirApi
         services.TryAddSingleton<RuntimeMetricsStore>();
         services.AddSingleton<AuthService>();
         services.AddSingleton<AuthRateLimiters>();
+        services.AddSingleton<SetupCodeGate>();
         services.AddSingleton<ConfigurationBackups>();
         services.AddSingleton<UpdateFiles>();
         services.AddSingleton<IReleaseCatalogClient, GitHubReleaseCatalogClient>();
