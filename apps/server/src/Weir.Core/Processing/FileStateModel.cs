@@ -44,6 +44,15 @@ public static class ProcessingFileStatuses
     {
         Disabled, OnHold, OutOfSchedule, BlockedUpstream, Skipped,
     };
+
+    /// <summary>
+    /// States where Weir is done with the file, one way or another. The original usually leaves the watched folder at
+    /// that point, so processing one of these again needs its original to still be there.
+    /// </summary>
+    public static readonly IReadOnlySet<string> Concluded = new HashSet<string>(StringComparer.Ordinal)
+    {
+        Processed, PassedThrough, Rejected, Cancelled,
+    };
 }
 
 /// <summary>What a cancelled file says on the Files screen (#643).</summary>
@@ -110,6 +119,9 @@ public sealed record ProcessingFileListFilter
     public string? Status { get; init; }
     public string? PathContains { get; init; }
     public PyDateTime? Since { get; init; }
+
+    /// <summary>Only these files, when set: a person's exact choice rather than whatever else matches.</summary>
+    public IReadOnlyList<long>? Ids { get; init; }
     public int Limit { get; init; } = 200;
 
     /// <summary><see cref="Limit"/> clamped to 1..1000.</summary>
