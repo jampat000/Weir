@@ -46,7 +46,7 @@ public sealed class ProbeOutputTests
         var source = Path.Combine(Path.GetTempPath(), "complete.mkv");
 
         Assert.Equal(
-            ["ffmpeg", "-hide_banner", "-v", "error", "-xerror", "-err_detect", "explode", "-i", source, "-map", "0:v:0", "-c", "copy", "-f", "null", "-"],
+            ["ffmpeg", "-hide_banner", "-v", "error", "-xerror", "-err_detect", "explode", "-protocol_whitelist", "file", "-i", source, "-map", "0:v:0", "-c", "copy", "-f", "null", "-"],
             FfmpegCommands.BuildIntegrityArgv("ffmpeg", source));
     }
 

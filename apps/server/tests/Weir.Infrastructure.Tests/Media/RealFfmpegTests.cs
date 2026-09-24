@@ -41,8 +41,7 @@ public sealed class RequiresMkvmergeFactAttribute : FactAttribute
 
 internal static class RealMkvmerge
 {
-    public static readonly string? Tool =
-        new MediaToolResolver(Path.Combine(Path.GetTempPath(), "weir-no-home-" + Guid.NewGuid().ToString("N"))).ResolveMkvmerge();
+    public static readonly string? Tool = new MediaToolResolver().ResolveMkvmerge();
 }
 
 internal static class RealFfmpeg
@@ -53,7 +52,7 @@ internal static class RealFfmpeg
     {
         try
         {
-            return new MediaToolResolver(Path.Combine(Path.GetTempPath(), "weir-no-home-" + Guid.NewGuid().ToString("N"))).Resolve();
+            return new MediaToolResolver().Resolve();
         }
         catch (MediaToolException)
         {

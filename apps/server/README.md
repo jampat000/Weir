@@ -78,7 +78,7 @@ dotnet publish apps/server/src/Weir.Host -p:PublishProfile=linux-arm64
 
 Always publish through a profile. Passing `-r`, `--self-contained` or `-p:PublishSingleFile=true` on the command line makes those global properties, and the single-file analyzer then fails `Weir.Infrastructure` with IL3000. The profiles scope them to `Weir.Host`.
 
-`MediaToolResolver` looks for ffmpeg and ffprobe in `WEIR_FFMPEG_DIR`, then `<WEIR_HOME>/bin/ffmpeg`, then (in a single-file build) `<app>/bin/ffmpeg`, then `PATH`. mkvmerge is found the same way (`WEIR_MKVTOOLNIX_DIR`, `<WEIR_HOME>/bin/mkvtoolnix`, `<app>/bin/mkvtoolnix`, `PATH`) but is optional: without it a library's writer setting falls back to ffmpeg. `GET /api/v1/system/media-tools` reports what an install has.
+`MediaToolResolver` looks for ffmpeg and ffprobe in `WEIR_FFMPEG_DIR`, then (in a single-file build) `<app>/bin/ffmpeg`, then `PATH` (`.exe` only on Windows; PATHEXT and the current directory are never consulted). mkvmerge is found the same way (`WEIR_MKVTOOLNIX_DIR`, `<app>/bin/mkvtoolnix`, `PATH`) but is optional: without it a library's writer setting falls back to ffmpeg. `WEIR_HOME` is never searched — a default Windows install lets every local account write to it, so a tool found there could never be trusted. `GET /api/v1/system/media-tools` reports what an install has.
 
 The product version is `WeirVersion` in `apps/server/Directory.Build.props`. The assembly version, `--version`, `/openapi.json` and both packages take it from there.
 

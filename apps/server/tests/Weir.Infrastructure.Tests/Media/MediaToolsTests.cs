@@ -107,7 +107,7 @@ public sealed class MediaToolsTests : IDisposable
 
         var request = Assert.Single(runner.Requests);
         Assert.Equal(
-            ["ffmpeg", "-hide_banner", "-v", "error", "-xerror", "-err_detect", "explode", "-i", source, "-map", "0:v:0", "-c", "copy", "-f", "null", "-"],
+            ["ffmpeg", "-hide_banner", "-v", "error", "-xerror", "-err_detect", "explode", "-protocol_whitelist", "file", "-i", source, "-map", "0:v:0", "-c", "copy", "-f", "null", "-"],
             request.Argv);
     }
 
@@ -160,7 +160,9 @@ public sealed class MediaToolsTests : IDisposable
 
         Assert.Contains("decoded 12.0s of 30.0s expected", error.Message, StringComparison.Ordinal);
         var request = Assert.Single(runner.Requests);
-        Assert.Equal(["ffmpeg", "-hide_banner", "-v", "error", "-xerror", "-err_detect", "explode", "-i", source, "-map", "0:v:0", "-c", "copy", "-f", "null", "-progress", "pipe:1", "-nostats", "-"], request.Argv);
+        Assert.Equal(
+            ["ffmpeg", "-hide_banner", "-v", "error", "-xerror", "-err_detect", "explode", "-protocol_whitelist", "file", "-i", source, "-map", "0:v:0", "-c", "copy", "-f", "null", "-progress", "pipe:1", "-nostats", "-"],
+            request.Argv);
     }
 
     [Fact]
@@ -190,7 +192,9 @@ public sealed class MediaToolsTests : IDisposable
         await tools.RemuxToTempFileAsync(source, workDir, plan, sourceDocument.RootElement, [], durationSeconds: 100.0, acceleration: acceleration);
 
         var ffmpeg = Assert.Single(runner.Requests, r => r.Argv[0] == "ffmpeg");
-        Assert.Equal(["-hwaccel", "cuda"], ffmpeg.Argv.SkipWhile(a => a != "-y").Skip(1).TakeWhile(a => a != "-i"));
+        Assert.Equal(
+            ["-hwaccel", "cuda", "-protocol_whitelist", "file"],
+            ffmpeg.Argv.SkipWhile(a => a != "-y").Skip(1).TakeWhile(a => a != "-i"));
         Assert.Contains("-i", ffmpeg.Argv);
         Assert.True(ffmpeg.Argv.ToList().IndexOf("-hwaccel") < ffmpeg.Argv.ToList().IndexOf("-i"), "hwaccel flags must come before -i");
     }
@@ -259,28 +263,45 @@ public sealed class MediaToolsTests : IDisposable
         var (probeName, mpegName) = MediaToolLocations.ToolNames(OperatingSystem.IsWindows());
         var ffprobe = WriteFile(Path.Combine("ffmpeg-tools", probeName), []);
         var ffmpeg = WriteFile(Path.Combine("ffmpeg-tools", mpegName), []);
-        var resolver = new MediaToolResolver(Path.Combine(_root, "home"), getEnvironmentVariable: name => name == "WEIR_FFMPEG_DIR" ? toolDir : null);
+        var resolver = new MediaToolResolver(getEnvironmentVariable: name => name == "WEIR_FFMPEG_DIR" ? toolDir : null);
 
         Assert.Equal((ffprobe, ffmpeg), resolver.Resolve());
     }
 
     [Fact]
-    public void Bundled_tools_under_the_weir_home_are_used_before_path()
+    public void Bundled_tools_beside_the_packaged_app_are_used_before_path()
     {
-        var home = Path.Combine(_root, "home");
-        var bundled = Directory.CreateDirectory(Path.Combine(home, "bin", "ffmpeg")).FullName;
+        var appDir = Path.Combine(_root, "app");
+        var bundled = Directory.CreateDirectory(Path.Combine(appDir, "bin", "ffmpeg")).FullName;
         var (probeName, mpegName) = MediaToolLocations.ToolNames(OperatingSystem.IsWindows());
         File.WriteAllBytes(Path.Combine(bundled, probeName), []);
         File.WriteAllBytes(Path.Combine(bundled, mpegName), []);
-        var resolver = new MediaToolResolver(home, getEnvironmentVariable: _ => null);
+        var resolver = new MediaToolResolver(appDir, getEnvironmentVariable: _ => null);
 
         Assert.Equal((Path.Combine(bundled, probeName), Path.Combine(bundled, mpegName)), resolver.Resolve());
     }
 
     [Fact]
+    public void A_tool_planted_under_the_weir_home_bin_folder_is_never_used()
+    {
+        // #723: WEIR_HOME is writable by every local account on a default Windows install, so a tool found
+        // there can never be trusted over Weir's own bundle or PATH.
+        var weirHome = Path.Combine(_root, "home");
+        var planted = Directory.CreateDirectory(Path.Combine(weirHome, "bin", "ffmpeg")).FullName;
+        var (probeName, mpegName) = MediaToolLocations.ToolNames(OperatingSystem.IsWindows());
+        File.WriteAllBytes(Path.Combine(planted, probeName), []);
+        File.WriteAllBytes(Path.Combine(planted, mpegName), []);
+        var resolver = new MediaToolResolver(getEnvironmentVariable: name => name == "PATH" ? string.Empty : null);
+
+        var error = Assert.Throws<MediaToolException>(() => resolver.Resolve());
+
+        Assert.Equal(MediaToolLocations.MissingToolsMessage, error.Message);
+    }
+
+    [Fact]
     public void Missing_tools_say_how_to_provide_them()
     {
-        var resolver = new MediaToolResolver(Path.Combine(_root, "home"), getEnvironmentVariable: name => name == "PATH" ? string.Empty : null);
+        var resolver = new MediaToolResolver(getEnvironmentVariable: name => name == "PATH" ? string.Empty : null);
 
         var error = Assert.Throws<MediaToolException>(() => resolver.Resolve());
 

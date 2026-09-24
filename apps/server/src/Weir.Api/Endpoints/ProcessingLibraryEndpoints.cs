@@ -316,7 +316,7 @@ public static class ProcessingLibraryEndpoints
         var excludePatternsCsv = model.OptionalStr("exclude_patterns_csv", defaultValue: "", maxLength: 1000) ?? "";
         var minFileSizeMb = model.Number("min_file_size_mb", 0, required: false, ge: 0, le: 1_000_000);
         var maxFileSizeMb = model.Number("max_file_size_mb", 0, required: false, ge: 0, le: 1_000_000);
-        var rejectedFileAction = model.Literal("rejected_file_action", ["leave", "delete_file"], defaultValue: "leave");
+        var rejectedFileAction = model.Literal("rejected_file_action", [.. RejectedFileActions.All], defaultValue: RejectedFileActions.Leave);
         var minFileAgeSeconds = model.Number("min_file_age_seconds", 60, required: false, ge: 0, le: 604800);
         var createdAfter = model.OptionalDateTime("created_after");
         var createdBefore = model.OptionalDateTime("created_before");
@@ -326,11 +326,11 @@ public static class ProcessingLibraryEndpoints
         var topLevelOnly = model.Bool("top_level_only", defaultValue: false);
         var sidecarPatternsCsv = model.OptionalStr("sidecar_patterns_csv", defaultValue: ".srt,.ass,.ssa,.sub,.idx,.vtt,.nfo,.jpg,.png") ?? string.Empty;
         var preserveOriginalTimestamps = model.Bool("preserve_original_timestamps", defaultValue: false);
-        var outputCollisionPolicy = model.Literal("output_collision_policy", ["replace", "skip", "keep_both", "replace_if_larger", "replace_if_newer"], defaultValue: "replace");
-        var hardwareDecodeMode = model.Literal("hardware_decode_mode", ["off", "auto", "device"], defaultValue: "off");
+        var outputCollisionPolicy = model.Literal("output_collision_policy", [.. OutputCollisionPolicies.All], defaultValue: OutputCollisionPolicies.Replace);
+        var hardwareDecodeMode = model.Literal("hardware_decode_mode", [.. HardwareDecodeModes.All], defaultValue: HardwareDecodeModes.Off);
         var hardwareDevice = model.OptionalStr("hardware_device", defaultValue: "", maxLength: 32) ?? string.Empty;
         var hardwareDisabledVendorsCsv = model.OptionalStr("hardware_disabled_vendors_csv", defaultValue: "", maxLength: 200) ?? string.Empty;
-        var ffmpegStrictness = model.Literal("ffmpeg_strictness", ["very", "strict", "normal", "unofficial", "experimental"], defaultValue: "normal");
+        var ffmpegStrictness = model.Literal("ffmpeg_strictness", [.. FfmpegStrictnessLevels.All], defaultValue: FfmpegStrictnessLevels.Normal);
         // #548: two values, because "mkvmerge" and "auto" would behave identically - see RemuxWriterChoice.
         var remuxWriter = model.Literal("remux_writer", [.. RemuxWriterChoice.All], defaultValue: RemuxWriterChoice.Best);
         var rewriteWithFfmpeg = model.Bool("rewrite_with_ffmpeg", defaultValue: true);
@@ -472,7 +472,7 @@ public static class ProcessingLibraryEndpoints
         ProcessingLibraryRecord row;
         try
         {
-            row = await LibraryStore.CreateAsync(uow, body).ConfigureAwait(false);
+            row = await LibraryStore.CreateAsync(uow, body, request.Options.WeirHome).ConfigureAwait(false);
         }
         catch (ProcessingLibraryException exception)
         {
@@ -510,7 +510,7 @@ public static class ProcessingLibraryEndpoints
         ProcessingLibraryRecord updated;
         try
         {
-            updated = await LibraryStore.UpdateAsync(uow, existing, body).ConfigureAwait(false);
+            updated = await LibraryStore.UpdateAsync(uow, existing, body, request.Options.WeirHome).ConfigureAwait(false);
         }
         catch (ProcessingLibraryException exception)
         {
