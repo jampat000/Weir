@@ -277,4 +277,56 @@ public sealed class LibraryFolderChainApiTests
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    private static async Task<long> ConnectDownloadClientAsync(ApiTestClient client, string kind, string name, string baseUrl)
+    {
+        using var response = await client.PostAsync("/api/v1/download-clients/connections", new Dictionary<string, object?>
+        {
+            ["csrf_token"] = await client.CsrfAsync(),
+            ["kind"] = kind,
+            ["name"] = name,
+            ["base_url"] = baseUrl,
+            ["api_key"] = "key",
+        });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await Json(response))!["id"]!.GetValue<long>();
+    }
+
+    [Fact]
+    public async Task A_download_client_whose_completed_folder_is_the_watched_folder_is_ready()
+    {
+        var (server, client, manager) = await StartAsync();
+        await using var _server = server;
+        using var folders = TempFolders.Create();
+        await ConnectDownloadClientAsync(client, "sabnzbd", "SABnzbd", "http://192.0.2.40:8080");
+        var completeDir = System.Text.Json.JsonSerializer.Serialize(folders.Watched);
+        manager.Json(HttpMethod.Get, "/api", "{\"config\":{\"misc\":{\"complete_dir\":" + completeDir + "}}}");
+        var libraryId = await CreateLibraryAsync(client, "Weir with SABnzbd", folders);
+
+        var chain = await FolderChainAsync(client, libraryId);
+
+        var sabnzbd = Assert.Single(chain["download_clients"]!.AsArray())!;
+        Assert.Equal("sabnzbd", sabnzbd["kind"]!.GetValue<string>());
+        Assert.True(sabnzbd["ready"]!.GetValue<bool>());
+        Assert.Contains(sabnzbd["lines"]!.AsArray(), line => line!["text"]!.GetValue<string>().Contains("completed-downloads folder", StringComparison.Ordinal));
+        Assert.True(chain["ready"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task A_download_client_with_no_matching_folder_makes_the_chain_not_ready()
+    {
+        var (server, client, manager) = await StartAsync();
+        await using var _server = server;
+        using var folders = TempFolders.Create();
+        await ConnectDownloadClientAsync(client, "sabnzbd", "SABnzbd", "http://192.0.2.40:8080");
+        manager.Json(HttpMethod.Get, "/api", """{"config":{"misc":{"complete_dir":"/somewhere/else"}}}""");
+        var libraryId = await CreateLibraryAsync(client, "Weir with a mismatched SABnzbd", folders);
+
+        var chain = await FolderChainAsync(client, libraryId);
+
+        var sabnzbd = Assert.Single(chain["download_clients"]!.AsArray())!;
+        Assert.False(sabnzbd["ready"]!.GetValue<bool>());
+        Assert.Contains(sabnzbd["lines"]!.AsArray(), line => line!["state"]!.GetValue<string>() == "problem");
+        Assert.False(chain["ready"]!.GetValue<bool>());
+    }
 }

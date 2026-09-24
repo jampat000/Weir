@@ -24,6 +24,7 @@ function ChainDetail({ chain }: { chain: LibraryFolderChain }) {
   const lines = [
     ...chain.local.lines,
     ...chain.managers.flatMap((manager) => manager.lines),
+    ...chain.download_clients.flatMap((client) => client.lines),
   ];
   return (
     <ul className="mt-1 space-y-1 pl-4">

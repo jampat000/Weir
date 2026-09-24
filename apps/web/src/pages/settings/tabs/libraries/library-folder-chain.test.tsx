@@ -26,6 +26,7 @@ function chain(
       ],
     },
     managers: [],
+    download_clients: [],
     ready: true,
     ...over,
   };
@@ -116,6 +117,48 @@ it("surfaces a connected manager's own lines and readiness", async () => {
   expect(
     within(block).getByText(
       "Sonarr has no enabled download client, so it has no downloads to import.",
+    ),
+  ).toBeInTheDocument();
+});
+
+it("surfaces a bare download client's own lines and readiness", async () => {
+  vi.spyOn(chainApi, "fetchLibraryFolderChain").mockResolvedValue(
+    chain({
+      ready: false,
+      download_clients: [
+        {
+          connection_id: 9,
+          kind: "sabnzbd",
+          name: "SABnzbd",
+          label: "SABnzbd",
+          ready: false,
+          lines: [
+            {
+              state: "problem",
+              text: "None of SABnzbd's folders match this library's watched folder /media/in.",
+            },
+          ],
+        },
+      ],
+    }),
+  );
+
+  render(
+    <LibraryFolderChain
+      libraryId={12}
+      watchedFolder="/media/in"
+      workFolder=""
+      outputFolder="/media/out"
+      mediaType="tv"
+    />,
+    { wrapper },
+  );
+
+  const block = await screen.findByRole("region", { name: "SABnzbd" });
+  expect(within(block).getByText("Needs attention")).toBeInTheDocument();
+  expect(
+    within(block).getByText(
+      "None of SABnzbd's folders match this library's watched folder /media/in.",
     ),
   ).toBeInTheDocument();
 });

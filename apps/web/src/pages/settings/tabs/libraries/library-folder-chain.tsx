@@ -7,7 +7,10 @@
 
 import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
 import type { ProcessingMediaType } from "../../../../lib/processing/libraries-api";
-import type { FolderChainLine } from "../../../../lib/processing/library-folder-chain-api";
+import type {
+  FolderChainLine,
+  LibraryFolderChainDownloadClient,
+} from "../../../../lib/processing/library-folder-chain-api";
 import type { ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { useLibraryFolderChainQuery } from "../../../../lib/processing/libraries-queries";
 import { useDebouncedValue } from "../../../../lib/ui/use-debounced-value";
@@ -65,6 +68,22 @@ function ReadinessBadge({ ready }: { ready: boolean }) {
 }
 
 function ManagerSection({ item }: { item: ProcessingManagerSetupItem }) {
+  return (
+    <section aria-label={item.label} className="space-y-3">
+      <p className="text-sm font-medium text-mm-text1">
+        {item.label}
+        <ReadinessBadge ready={item.ready} />
+      </p>
+      <ChainLines lines={item.lines} />
+    </section>
+  );
+}
+
+function DownloadClientSection({
+  item,
+}: {
+  item: LibraryFolderChainDownloadClient;
+}) {
   return (
     <section aria-label={item.label} className="space-y-3">
       <p className="text-sm font-medium text-mm-text1">
@@ -154,6 +173,9 @@ export function LibraryFolderChain({
             </section>
             {chain.data.managers.map((item) => (
               <ManagerSection key={item.connection_id} item={item} />
+            ))}
+            {chain.data.download_clients.map((item) => (
+              <DownloadClientSection key={item.connection_id} item={item} />
             ))}
           </>
         ) : null}

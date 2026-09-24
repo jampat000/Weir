@@ -96,6 +96,7 @@ it("lists each linked library by name with its readiness, expandable to its line
           ],
         },
       ],
+      download_clients: [],
       ready: false,
     },
   ]);

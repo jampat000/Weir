@@ -18,26 +18,32 @@ namespace Weir.Infrastructure.MediaManagers;
 public sealed class LibraryFolderChainCheck
 {
     private readonly ManagerSetupCheck _managerSetupCheck;
+    private readonly DownloadClientSuggestions _downloadClientSuggestions;
     private readonly WeirOptions _options;
     private readonly IFolderProbe _probe;
 
-    public LibraryFolderChainCheck(ManagerSetupCheck managerSetupCheck, WeirOptions options)
-        : this(managerSetupCheck, options, new FilesystemFolderProbe())
+    public LibraryFolderChainCheck(ManagerSetupCheck managerSetupCheck, DownloadClientSuggestions downloadClientSuggestions, WeirOptions options)
+        : this(managerSetupCheck, downloadClientSuggestions, options, new FilesystemFolderProbe())
     {
     }
 
     /// <summary>For tests: the filesystem comes from <paramref name="probe"/> instead of the real disk.</summary>
-    internal LibraryFolderChainCheck(ManagerSetupCheck managerSetupCheck, WeirOptions options, IFolderProbe probe)
+    internal LibraryFolderChainCheck(
+        ManagerSetupCheck managerSetupCheck, DownloadClientSuggestions downloadClientSuggestions, WeirOptions options, IFolderProbe probe)
     {
         _managerSetupCheck = managerSetupCheck ?? throw new ArgumentNullException(nameof(managerSetupCheck));
+        _downloadClientSuggestions = downloadClientSuggestions ?? throw new ArgumentNullException(nameof(downloadClientSuggestions));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _probe = probe ?? throw new ArgumentNullException(nameof(probe));
     }
 
     /// <summary>
-    /// One library's chain: <c>{ library_id, local: { ready, lines }, managers: [...], ready }</c>. <c>managers</c> is
-    /// exactly what <see cref="ManagerSetupCheck.CheckAsync"/> already returns for this library's watched/output
-    /// folders and media type, reused as-is.
+    /// One library's chain: <c>{ library_id, local: { ready, lines }, managers: [...], download_clients: [...], ready }</c>.
+    /// <c>managers</c> is exactly what <see cref="ManagerSetupCheck.CheckAsync"/> already returns for this library's
+    /// watched/output folders and media type, reused as-is. <c>download_clients</c> is one entry per enabled bare
+    /// download-client connection, checking whether any of its folders is this library's watched folder
+    /// (<see cref="LibraryFolderChainRules.CheckDownloadClientFolder"/>) — with none connected, an empty list never
+    /// makes the library not ready, the same as with no manager connected.
     /// </summary>
     public async Task<WireObject> CheckForLibraryAsync(UnitOfWork uow, ProcessingLibraryRecord library, CancellationToken cancellationToken)
     {
@@ -55,13 +61,34 @@ public sealed class LibraryFolderChainCheck
             .ConfigureAwait(false);
         var managersReady = managers.All(entry => entry.Get("ready") is WireBool { Value: true });
 
+        var downloadClients = await DownloadClientEntriesAsync(uow, library.WatchedFolder, cancellationToken).ConfigureAwait(false);
+        var downloadClientsReady = downloadClients.All(entry => entry.Get("ready") is WireBool { Value: true });
+
         return new WireObject()
             .Set("library_id", library.Id)
             .Set("local", new WireObject()
                 .Set("ready", localReady)
                 .Set("lines", new WireArray(localLines.Select(line => (WireValue)line.ToOut()))))
             .Set("managers", new WireArray(managers.Select(entry => (WireValue)entry)))
-            .Set("ready", localReady && managersReady);
+            .Set("download_clients", new WireArray(downloadClients.Select(entry => (WireValue)entry)))
+            .Set("ready", localReady && managersReady && downloadClientsReady);
+    }
+
+    private async Task<List<WireObject>> DownloadClientEntriesAsync(UnitOfWork uow, string watchedFolder, CancellationToken cancellationToken)
+    {
+        var connections = await _downloadClientSuggestions.ReadAllAsync(uow, cancellationToken).ConfigureAwait(false);
+        return [.. connections.Select(item =>
+        {
+            var label = DownloadClientKinds.LabelForConnection(item.Row.Kind, item.Row.Name);
+            var line = LibraryFolderChainRules.CheckDownloadClientFolder(label, watchedFolder, item.Folders);
+            return new WireObject()
+                .Set("connection_id", item.Row.Id)
+                .Set("kind", item.Row.Kind)
+                .Set("name", item.Row.Name)
+                .Set("label", label)
+                .Set("ready", line.State != SetupCheckLine.Problem)
+                .Set("lines", new WireArray([(WireValue)line.ToOut()]));
+        })];
     }
 
     /// <summary>

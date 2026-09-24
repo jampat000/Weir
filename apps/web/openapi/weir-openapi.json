@@ -2012,8 +2012,57 @@
         "title": "LibraryFolderChainLocalOut",
         "type": "object"
       },
+      "LibraryFolderChainDownloadClientOut": {
+        "description": "One bare download-client connection's own link in the folder chain (#768): whether any of its folders is this library's watched folder.",
+        "properties": {
+          "connection_id": {
+            "title": "Connection Id",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "sabnzbd",
+              "nzbget",
+              "qbittorrent",
+              "deluge",
+              "transmission"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ManagerSetupLineOut"
+            },
+            "title": "Lines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "connection_id",
+          "kind",
+          "name",
+          "label",
+          "ready",
+          "lines"
+        ],
+        "title": "LibraryFolderChainDownloadClientOut",
+        "type": "object"
+      },
       "LibraryFolderChainOut": {
-        "description": "One library's folder chain (#768): Weir's own local folders plus every connected media manager's own setup check, folded into one read-only view. With no manager connected, ready reflects only the local folders.",
+        "description": "One library's folder chain (#768): Weir's own local folders plus every connected media manager's own setup check and every bare download client's own folder link, folded into one read-only view. With no manager or download client connected, ready reflects only the local folders.",
         "properties": {
           "library_id": {
             "title": "Library Id",
@@ -2029,6 +2078,13 @@
             "title": "Managers",
             "type": "array"
           },
+          "download_clients": {
+            "items": {
+              "$ref": "#/components/schemas/LibraryFolderChainDownloadClientOut"
+            },
+            "title": "Download Clients",
+            "type": "array"
+          },
           "ready": {
             "title": "Ready",
             "type": "boolean"
@@ -2038,6 +2094,7 @@
           "library_id",
           "local",
           "managers",
+          "download_clients",
           "ready"
         ],
         "title": "LibraryFolderChainOut",

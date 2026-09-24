@@ -120,6 +120,36 @@ public static class LibraryFolderChainRules
     }
 
     /// <summary>
+    /// Whether a bare download client's own folders (#768) map onto this library's watched folder: its default
+    /// completed-downloads folder, or any one category's own folder. Reuses <see cref="ArrOsPath.SameFolder"/> since
+    /// these are plain local paths on Weir's own host, never remote-mapped the way a manager's are.
+    /// </summary>
+    public static SetupCheckLine CheckDownloadClientFolder(string clientLabel, string watchedFolder, DownloadClientFolders folders)
+    {
+        ArgumentNullException.ThrowIfNull(folders);
+        var watched = new ArrOsPath((watchedFolder ?? string.Empty).Trim());
+        if (!watched.IsRooted)
+        {
+            return new SetupCheckLine(SetupCheckLine.Note, $"Set this library's watched folder to check it against {clientLabel}.");
+        }
+
+        if (!string.IsNullOrEmpty(folders.CompletedFolder) && new ArrOsPath(folders.CompletedFolder).SameFolder(watched))
+        {
+            return new SetupCheckLine(SetupCheckLine.Ok, $"{clientLabel}'s completed-downloads folder is this library's watched folder.");
+        }
+
+        var matchingCategory = folders.CategoryFolders.FirstOrDefault(category => new ArrOsPath(category.Folder).SameFolder(watched));
+        if (matchingCategory is not null)
+        {
+            return new SetupCheckLine(SetupCheckLine.Ok, $"{clientLabel}'s \"{matchingCategory.Category}\" category folder is this library's watched folder.");
+        }
+
+        return new SetupCheckLine(
+            SetupCheckLine.Problem,
+            $"None of {clientLabel}'s folders match this library's watched folder {watched}. Point one of them at it, or use the suggested folder in the library editor.");
+    }
+
+    /// <summary>
     /// Whether a finished file moves from the work folder into the output folder or has to be copied. Either is a valid
     /// setup — a different drive just costs the time a copy takes on a large file — so this is never a problem, only an
     /// Ok when they match or a Note explaining the copy when they do not (or when Weir cannot tell).

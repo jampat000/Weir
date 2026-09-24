@@ -24,7 +24,17 @@ public sealed class DownloadClientSuggestions
     public async Task<List<WireObject>> SuggestAsync(UnitOfWork uow, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        var results = new List<WireObject>();
+        return [.. (await ReadAllAsync(uow, cancellationToken).ConfigureAwait(false)).Select(item => Entry(item.Row, item.Folders))];
+    }
+
+    /// <summary>
+    /// Every enabled connection whose client answered, with its own folders — the same read <see cref="SuggestAsync"/>
+    /// does, reused by the folder chain check (#768) so it needs no second round trip to each client.
+    /// </summary>
+    public async Task<List<(DownloadClientConnectionRecord Row, DownloadClientFolders Folders)>> ReadAllAsync(UnitOfWork uow, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        var results = new List<(DownloadClientConnectionRecord, DownloadClientFolders)>();
         foreach (var row in await DownloadClientConnectionStore.ListEnabledAsync(uow).ConfigureAwait(false))
         {
             if (_connections.ConnectionFromRow(row) is not { } connection || _ports.PortForKind(row.Kind) is not { } port)
@@ -38,7 +48,7 @@ public sealed class DownloadClientSuggestions
                 continue;
             }
 
-            results.Add(Entry(row, folders));
+            results.Add((row, folders));
         }
 
         return results;

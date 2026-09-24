@@ -8,6 +8,8 @@ import type { Schema } from "../api/types";
  */
 export type FolderChainLine = Schema<"ManagerSetupLineOut">;
 export type LibraryFolderChainLocal = Schema<"LibraryFolderChainLocalOut">;
+export type LibraryFolderChainDownloadClient =
+  Schema<"LibraryFolderChainDownloadClientOut">;
 export type LibraryFolderChain = Schema<"LibraryFolderChainOut">;
 
 export async function fetchLibraryFolderChain(

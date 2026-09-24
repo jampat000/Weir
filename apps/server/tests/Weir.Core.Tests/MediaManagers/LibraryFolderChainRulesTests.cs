@@ -168,4 +168,43 @@ public sealed class LibraryFolderChainRulesTests
         Assert.Equal(SetupCheckLine.Problem, line.State);
         Assert.Contains("watched, work and output folders", line.Text, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void A_download_clients_completed_folder_matching_the_watched_folder_is_ok()
+    {
+        var line = LibraryFolderChainRules.CheckDownloadClientFolder("qBittorrent", Watched, new DownloadClientFolders(Watched, []));
+
+        Assert.Equal(SetupCheckLine.Ok, line.State);
+        Assert.Contains("completed-downloads folder", line.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_download_clients_category_folder_matching_the_watched_folder_is_ok()
+    {
+        var folders = new DownloadClientFolders("/downloads/complete", [new DownloadClientCategoryFolder("tv-sonarr", Watched)]);
+
+        var line = LibraryFolderChainRules.CheckDownloadClientFolder("SABnzbd", Watched, folders);
+
+        Assert.Equal(SetupCheckLine.Ok, line.State);
+        Assert.Contains("tv-sonarr", line.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void No_matching_download_client_folder_is_a_problem()
+    {
+        var folders = new DownloadClientFolders("/downloads/complete", [new DownloadClientCategoryFolder("movies", "/downloads/complete/movies")]);
+
+        var line = LibraryFolderChainRules.CheckDownloadClientFolder("NZBGet", Watched, folders);
+
+        Assert.Equal(SetupCheckLine.Problem, line.State);
+        Assert.Contains(Watched, line.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_unset_watched_folder_is_a_note_not_a_problem()
+    {
+        var line = LibraryFolderChainRules.CheckDownloadClientFolder("Deluge", "", new DownloadClientFolders(null, []));
+
+        Assert.Equal(SetupCheckLine.Note, line.State);
+    }
 }

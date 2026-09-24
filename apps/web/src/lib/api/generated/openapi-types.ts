@@ -3020,8 +3020,29 @@ export interface components {
       lines: components["schemas"]["ManagerSetupLineOut"][];
     };
     /**
+     * LibraryFolderChainDownloadClientOut
+     * @description One bare download-client connection's own link in the folder chain (#768): whether any of its folders is this library's watched folder.
+     */
+    LibraryFolderChainDownloadClientOut: {
+      /** Connection Id */
+      connection_id: number;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "sabnzbd" | "nzbget" | "qbittorrent" | "deluge" | "transmission";
+      /** Name */
+      name: string;
+      /** Label */
+      label: string;
+      /** Ready */
+      ready: boolean;
+      /** Lines */
+      lines: components["schemas"]["ManagerSetupLineOut"][];
+    };
+    /**
      * LibraryFolderChainOut
-     * @description One library's folder chain (#768): Weir's own local folders plus every connected media manager's own setup check, folded into one read-only view. With no manager connected, ready reflects only the local folders.
+     * @description One library's folder chain (#768): Weir's own local folders plus every connected media manager's own setup check and every bare download client's own folder link, folded into one read-only view. With no manager or download client connected, ready reflects only the local folders.
      */
     LibraryFolderChainOut: {
       /** Library Id */
@@ -3029,6 +3050,8 @@ export interface components {
       local: components["schemas"]["LibraryFolderChainLocalOut"];
       /** Managers */
       managers: components["schemas"]["ManagerSetupItemOut"][];
+      /** Download Clients */
+      download_clients: components["schemas"]["LibraryFolderChainDownloadClientOut"][];
       /** Ready */
       ready: boolean;
     };
