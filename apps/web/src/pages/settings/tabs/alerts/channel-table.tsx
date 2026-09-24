@@ -104,7 +104,7 @@ export function ChannelTable({
         <table className="mm-quiet-table">
           <thead>
             <tr>
-              <th scope="col">Channel</th>
+              <th scope="col">Alert</th>
               {supportedEvents.map((event) => (
                 <th key={event} scope="col" className="mm-alerts-cell">
                   {eventLabel(event)}

@@ -97,7 +97,7 @@ export function RetentionSection({
           data-testid="suite-settings-save-logs"
           onClick={() => form.saveFrom("logs")}
         >
-          {save.isPending ? "Saving..." : "Save retention"}
+          {save.isPending ? "Saving…" : "Save retention"}
         </button>
       </div>
     </QuietSection>

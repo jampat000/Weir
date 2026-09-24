@@ -390,7 +390,7 @@ describe("words and numbers", () => {
       "Saved 318 MB · removed 4 audio, 6 subtitles",
     );
     expect(finishedLine({ ...base, kind: "already" })).toBe(
-      "Already right · handed back as it was",
+      "Already right · nothing to change",
     );
     expect(
       finishedLine({

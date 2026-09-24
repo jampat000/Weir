@@ -9,7 +9,7 @@ export function finishedLine(item: FinishedFile): string {
   if (item.sentence) return item.sentence;
   switch (item.kind) {
     case "already":
-      return "Already right · handed back as it was";
+      return "Already right · nothing to change";
     case "passed":
       return "Passed through untouched · Weir could not process it";
     case "failed":

@@ -218,7 +218,7 @@ function WizardForm({
               disabled={pending}
             >
               {pending
-                ? "Saving..."
+                ? "Saving…"
                 : wizardStateOf(settings) === "pending"
                   ? "Finish setup"
                   : "Save changes"}

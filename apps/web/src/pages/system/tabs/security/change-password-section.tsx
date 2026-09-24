@@ -111,7 +111,7 @@ export function ChangePasswordSection() {
             }
             onClick={submit}
           >
-            {busy ? "Saving..." : "Change password"}
+            {busy ? "Saving…" : "Change password"}
           </button>
         </div>
       )}
