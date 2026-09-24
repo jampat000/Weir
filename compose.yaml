@@ -14,13 +14,19 @@ name: weir
 
 services:
   weir:
+    # `latest` tracks the newest published image; pin a version instead once you have one you trust
+    # (e.g. ghcr.io/jampat000/weir:3.2.4) so `docker compose pull` can't move you onto an untested
+    # release without you choosing to.
     image: ${WEIR_DOCKER_IMAGE:-ghcr.io/jampat000/weir:latest}
     pull_policy: always
     ports:
       - "9347:9347"
+      # Bind loopback-only instead, and put a reverse proxy in front for LAN/internet access:
+      # - "127.0.0.1:9347:9347"
     environment:
       WEIR_HOME: ${WEIR_HOME:-/data/weir}
-      # Optional UID/GID remap for the runtime account inside the container.
+      # Optional UID/GID remap for the runtime account inside the container. Neither may be 0:
+      # the entrypoint refuses to run the server as root.
       # WEIR_PUID: ${WEIR_PUID:-1000}
       # WEIR_PGID: ${WEIR_PGID:-1000}
       # Optional. If omitted, the container generates and persists /data/weir/session.secret.
@@ -33,6 +39,19 @@ services:
     volumes:
       - weir_data:/data/weir
     restart: unless-stopped
+    # Blocks a process from gaining more privileges than its parent (setuid binaries, etc.); the
+    # entrypoint's own uid/gid remap goes through the capabilities below instead, not setuid.
+    security_opt:
+      - no-new-privileges:true
+    # Deny everything, then grant back only what the entrypoint and server actually use:
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN      # entrypoint.sh fixes WEIR_HOME's owner when it doesn't match WEIR_PUID/PGID
+      - SETUID     # gosu drops from root to the weir user before running the server
+      - SETGID     # gosu drops from root to the weir group before running the server
+      - DAC_OVERRIDE # root reads/writes WEIR_HOME once, before the gosu drop, regardless of its mode
+      - FOWNER     # usermod/groupmod rewrite /etc/passwd, /etc/group and their lock files as part of the id remap
 
 volumes:
   weir_data:

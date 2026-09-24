@@ -34,6 +34,10 @@ env:
   REGISTRY: ghcr.io
   DOTNET_NOLOGO: "1"
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  # The tag that triggered this run, named explicitly here rather than read from the runner's
+  # ambient GITHUB_REF_NAME in each step: every step below that needs the tag gets it the same
+  # declared way as every other value this workflow passes around.
+  TAG: ${{ github.ref_name }}
 
 jobs:
   # Waits (up to 45 minutes) while a CI run for this commit is queued or running, because the normal
@@ -59,13 +63,18 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+      # For actions/attest-build-provenance below: it signs over OIDC (id-token) and records the
+      # attestation against this repo (attestations), neither of which is registry or Release
+      # access, so it does not need the publish job's packages/contents write.
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Normalize tag version
         id: version
         shell: bash
-        run: echo "plain=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: echo "plain=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
@@ -75,7 +84,7 @@ jobs:
 
       - name: Validate release version alignment
         shell: bash
-        run: node scripts/check-release-version.mjs "$GITHUB_REF_NAME"
+        run: node scripts/check-release-version.mjs "$TAG"
 
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
@@ -85,8 +94,8 @@ jobs:
             apps/server/**/packages.lock.json
             apps/tray/**/packages.lock.json
 
-      # Same caches as ci-packaging.yml: FFmpeg keyed on upstream's current build checksum, MKVToolNix on the
-      # build script that pins it. The build script re-checks the vendored copy either way.
+      # Same caches as ci-packaging.yml: both FFmpeg and MKVToolNix are pinned in build-velopack.ps1,
+      # so both keys come from that file's own pin. The build script re-checks the vendored copy either way.
       - name: FFmpeg build checksum
         id: ffmpeg
         shell: bash
@@ -167,6 +176,14 @@ jobs:
             "$hash  $($_.Name)" | Add-Content -LiteralPath (Join-Path $releasesDir "SHA256SUMS.txt") -Encoding ascii
           }
 
+      # After checksums, so the attestation covers the exact bytes SHA256SUMS.txt itself describes,
+      # and gives anyone who downloads a Windows release file a way to verify it actually came from
+      # this repo's own build (`gh attestation verify`), not just that some SHA256SUMS.txt says so.
+      - name: Attest provenance of Windows release artifacts
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/windows/releases/*
+
       - name: Upload Velopack release artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -188,7 +205,7 @@ jobs:
       # Checked first so a missing file fails in seconds, not after the builds; publish reads it again.
       - name: Release notes file present
         run: |
-          notes_file="docs/release-notes/${GITHUB_REF_NAME}.md"
+          notes_file="docs/release-notes/${TAG}.md"
           if [ ! -f "$notes_file" ]; then
             echo "::error::Missing required release notes file: $notes_file"
             echo "::error::Create it from docs/release-notes/TEMPLATE.md before tagging."
@@ -283,7 +300,7 @@ jobs:
 
       - name: Normalize tag version
         id: version
-        run: echo "plain=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: echo "plain=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
@@ -315,6 +332,17 @@ jobs:
           push: false
           tags: weir-release-candidate:${{ steps.version.outputs.plain }}
           cache-to: type=gha,mode=max,scope=weir-release-amd64,ignore-error=true
+
+      # Before the candidate ever runs: a known HIGH/CRITICAL vulnerability with a fix already
+      # available blocks the release outright. ignore-unfixed, because failing on something no
+      # upstream fix exists for yet would just make every release wait on an unrelated CVE.
+      - name: Trivy scan of Docker release candidate
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: weir-release-candidate:${{ steps.version.outputs.plain }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
 
       - name: Start unpushed Docker release candidate
         run: |
@@ -359,7 +387,7 @@ jobs:
 
       - name: Normalize tag version
         id: version
-        run: echo "plain=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: echo "plain=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       # QEMU for the arm64 image's final stage (apt-get). The .NET server is cross-published natively.
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
@@ -404,7 +432,7 @@ jobs:
 
       - name: Normalize tag version
         id: version
-        run: echo "plain=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: echo "plain=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Download Velopack release artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -477,7 +505,7 @@ jobs:
 
       - name: Prepare user-facing release notes
         run: |
-          notes_file="docs/release-notes/${GITHUB_REF_NAME}.md"
+          notes_file="docs/release-notes/${TAG}.md"
           if [ ! -f "$notes_file" ]; then
             echo "::error::Missing required release notes file: $notes_file"
             echo "::error::Create it from docs/release-notes/TEMPLATE.md before tagging."
