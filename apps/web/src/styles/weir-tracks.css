@@ -39,12 +39,19 @@
   white-space: nowrap;
 }
 
-/* A 24px target for a finger or a shaky hand, not just the native box's own size. */
-.mm-tracks-table input[type="checkbox"],
-.mm-tracks-table input[type="radio"],
-.mm-tracks-no-default input[type="radio"] {
+/* The box is drawn at the text's size; the label around it is the 24px target a finger or a shaky hand needs. */
+.mm-tracks-check-target {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 24px;
   height: 24px;
+  cursor: pointer;
+}
+
+.mm-tracks-check-target input {
+  margin: 0;
+  cursor: inherit;
   accent-color: var(--mm-accent);
 }
 

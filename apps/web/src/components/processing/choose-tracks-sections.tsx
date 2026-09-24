@@ -25,40 +25,47 @@ function TrackRow({
   return (
     <tr data-testid={`choose-tracks-row-${track.index}`}>
       <td data-label={COLUMNS.keep}>
-        <input
-          type="checkbox"
-          checked={kept}
-          onChange={(e) => choice.setKeep(track, e.target.checked)}
-          aria-label={`Keep ${label}`}
-          data-testid={`choose-tracks-keep-${track.index}`}
-        />
+        {/* The label is the target: a 24px square around a box drawn at the text's own size. */}
+        <label className="mm-tracks-check-target">
+          <input
+            type="checkbox"
+            checked={kept}
+            onChange={(e) => choice.setKeep(track, e.target.checked)}
+            aria-label={`Keep ${label}`}
+            data-testid={`choose-tracks-keep-${track.index}`}
+          />
+        </label>
       </td>
       <td data-label={COLUMNS.track} className="mm-tracks-table__track">
         {label}
       </td>
       <td data-label={COLUMNS.default}>
         {type === "audio" || type === "subtitle" ? (
-          <input
-            type="radio"
-            name={`choose-tracks-default-${type}`}
-            checked={state?.default ?? false}
-            disabled={!kept}
-            onChange={() => choice.setDefault(type, track.index)}
-            aria-label={`Make ${label} the default ${type} track`}
-            data-testid={`choose-tracks-default-${track.index}`}
-          />
+          <label className="mm-tracks-check-target">
+            <input
+              type="radio"
+              name={`choose-tracks-default-${type}`}
+              checked={state?.default ?? false}
+              disabled={!kept}
+              onChange={() => choice.setDefault(type, track.index)}
+              aria-label={`Make ${label} the default ${type} track`}
+              data-testid={`choose-tracks-default-${track.index}`}
+            />
+          </label>
         ) : null}
       </td>
       <td data-label={COLUMNS.forced}>
         {track.type === "subtitle" ? (
-          <input
-            type="checkbox"
-            checked={state?.forced ?? false}
-            disabled={!kept}
-            onChange={(e) => choice.setForced(track.index, e.target.checked)}
-            aria-label={`Mark ${label} forced`}
-            data-testid={`choose-tracks-forced-${track.index}`}
-          />
+          <label className="mm-tracks-check-target">
+            <input
+              type="checkbox"
+              checked={state?.forced ?? false}
+              disabled={!kept}
+              onChange={(e) => choice.setForced(track.index, e.target.checked)}
+              aria-label={`Mark ${label} forced`}
+              data-testid={`choose-tracks-forced-${track.index}`}
+            />
+          </label>
         ) : null}
       </td>
       <td data-label={COLUMNS.rule} className="mm-tracks-table__rule">
