@@ -1,3 +1,4 @@
+using Weir.Core.Jobs;
 using Weir.Core.Time;
 
 namespace Weir.Core.Processing;
@@ -61,6 +62,58 @@ public static class ScanDispatchScheduleGate
     /// </summary>
     public static bool ScopePeriodicScanEnabled(bool movieScheduleEnabled, bool tvScheduleEnabled, string mediaScope) =>
         ProcessingMediaScopes.Normalize(mediaScope) == ProcessingMediaScopes.Tv ? tvScheduleEnabled : movieScheduleEnabled;
+}
+
+/// <summary>The three states a library's periodic watched-folder scanning can be observed in from outside (#747).</summary>
+public static class PeriodicScanStates
+{
+    /// <summary>The global kill switch, the scope's own switch or the library's own switch is off; never scheduled.</summary>
+    public const string Off = "off";
+
+    /// <summary>Every switch is on, but the library's own schedule window is currently closed.</summary>
+    public const string OutsideHours = "outside_hours";
+
+    /// <summary>Every switch is on and the library's schedule window is open; the periodic timer ticks for it.</summary>
+    public const string Scheduled = "scheduled";
+}
+
+/// <summary>
+/// A library's periodic watched-folder scanning as reported to clients: one of <see cref="PeriodicScanStates"/>, with the
+/// next scan time when one is known. Computed from the same switches the periodic scan-dispatch scheduler reads (the
+/// global kill switch, the scope switch, the library's own switch) and the same <see cref="WorkAdmissionRules"/> window
+/// the worker uses to admit a library's upkeep, so the field never drifts from the real gates.
+/// </summary>
+public sealed record PeriodicScanStatus(string State, DateTimeOffset? NextScanAt)
+{
+    public static PeriodicScanStatus Resolve(
+        ProcessingLibraryRecord library,
+        bool globalScheduleEnabled,
+        bool movieScheduleEnabled,
+        bool tvScheduleEnabled,
+        string? timezoneName,
+        DateTimeOffset now,
+        DateTimeOffset? nextPeriodicScanAt)
+    {
+        ArgumentNullException.ThrowIfNull(library);
+        var scope = ProcessingMediaScopes.Normalize(library.MediaType);
+        var switchedOn = globalScheduleEnabled
+            && ScanDispatchScheduleGate.LibraryPeriodicScanEnabled(library.Enabled)
+            && ScanDispatchScheduleGate.ScopePeriodicScanEnabled(movieScheduleEnabled, tvScheduleEnabled, scope);
+        if (!switchedOn)
+        {
+            return new PeriodicScanStatus(PeriodicScanStates.Off, null);
+        }
+
+        var window = new LibraryAdmissionSnapshot(
+            library.Id, library.Enabled, library.ScheduleEnabled, library.ScheduleGrid, library.ScheduleHoursLimited,
+            library.ScheduleDays, library.ScheduleStart, library.ScheduleEnd, library.MaxConcurrentFiles);
+        if (!WorkAdmissionRules.LibraryWindowOpen(window, timezoneName, now))
+        {
+            return new PeriodicScanStatus(PeriodicScanStates.OutsideHours, WorkAdmissionRules.LibraryWindowReopensAt(window, timezoneName, now));
+        }
+
+        return new PeriodicScanStatus(PeriodicScanStates.Scheduled, nextPeriodicScanAt);
+    }
 }
 
 /// <summary>A library's admission rules read off its CSV/scalar columns.</summary>

@@ -5631,12 +5631,37 @@
             "description": "When Weir next looks at this library's watched folder: the next periodic scan, or sooner when a held file's wait ends. Null when no look is scheduled (the library is off, or only folder events trigger a look).",
             "title": "Next Look At"
           },
+          "next_scan_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "When the periodic scan-dispatch timer next creates a scan for this library. Null when periodic_scan is \"off\", and also null under \"outside_hours\" if the schedule never reopens.",
+            "title": "Next Scan At"
+          },
           "output_collision_policy": {
             "title": "Output Collision Policy",
             "type": "string"
           },
           "output_folder": {
             "title": "Output Folder",
+            "type": "string"
+          },
+          "periodic_scan": {
+            "default": "off",
+            "description": "Whether the periodic scan-dispatch timer currently runs for this library: \"off\" (a switch is off, or the library itself is), \"outside_hours\" (every switch is on, but the library's own schedule window is closed), or \"scheduled\".",
+            "enum": [
+              "off",
+              "outside_hours",
+              "scheduled"
+            ],
+            "title": "Periodic Scan",
             "type": "string"
           },
           "preserve_original_timestamps": {

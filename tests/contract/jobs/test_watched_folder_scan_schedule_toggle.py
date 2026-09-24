@@ -7,17 +7,12 @@ timing is unit-tested with a controlled clock in
 ``Weir.Infrastructure.Tests.Jobs.ProcessingWatchedFolderScanDispatchScheduleTaskTests``; these tests check
 it from outside, with a positive control so a quiet timer cannot pass for a working switch.
 
-The switched-off case is watched for two intervals rather than read from the API: a library's
-``next_look_at`` is null when no periodic look is scheduled, but it is also null before the scheduler's
-first tick, and nothing reports that the tick has happened.
-
-#747 looked at replacing this with a state read, the way ``test_resilience.py``'s pause and
-schedule-window waits now use ``GET /processing/files-at-once``'s ``waiting_for``. That endpoint
-describes a job already sitting in the queue; this test is about whether the scan dispatch job is
-ever *created* in the first place, which needs the scheduler's own tick state (last run, next run)
-to observe directly rather than infer from a job's absence. Exposing that is real design (what the
-scheduler reports, and where), not a field add to an existing endpoint, so it was left as a
-``never_within`` wait rather than done as part of that cleanup.
+The switched-off case used to be watched for two intervals rather than read from the API, because nothing
+reported the scheduler's own state. #747 closed that gap: a library's ``periodic_scan`` field
+(``off`` / ``outside_hours`` / ``scheduled``) and ``next_scan_at`` are computed straight from the same
+switches and schedule window the scheduler and the worker's upkeep admission read (see
+``PeriodicScanStatus`` in ``Weir.Core.Processing``), so the switched-off case is read immediately instead
+of waited for.
 """
 
 from __future__ import annotations
@@ -28,7 +23,7 @@ from tests.contract.jobs._helpers import job_by_id, library_for_scope, save_libr
 from tests.contract.support import seed
 from tests.contract.support.client import API, WeirClient
 from tests.contract.support.launcher import ServerUnderTest
-from tests.contract.support.polling import never_within, wait_until
+from tests.contract.support.polling import wait_until
 
 SCAN_KIND = "processing.watched_folder.remux_scan_dispatch.v1"
 ENQUEUE = f"{API}/processing/jobs/watched-folder-remux-scan-dispatch/enqueue"
@@ -42,9 +37,7 @@ def _scan_job_count(admin: WeirClient) -> int:
     return sum(1 for job in r.json()["jobs"] if job["job_kind"] == SCAN_KIND)
 
 
-def test_disabling_the_periodic_scan_switch_stops_the_scan_timer(
-    server_factory, client_factory, tmp_path: Path
-) -> None:
+def test_disabling_the_periodic_scan_switch_reports_it_off(server_factory, client_factory, tmp_path: Path) -> None:
     watched = tmp_path / "watched"
     watched.mkdir()
     output = tmp_path / "output"
@@ -55,7 +48,7 @@ def test_disabling_the_periodic_scan_switch_stops_the_scan_timer(
     admin = client_factory(sut)
     admin.ensure_admin()
     movie = library_for_scope(admin, "movie")
-    save_library(
+    saved = save_library(
         admin,
         movie["id"],
         watched_folder=str(watched),
@@ -64,22 +57,8 @@ def test_disabling_the_periodic_scan_switch_stops_the_scan_timer(
         skip_access_tests=True,
     )
 
-    # Restart (same env, switch still off) so the scheduler's first tick after this sees the library
-    # already configured. Without this, "nothing happened yet" can just mean the first tick raced this
-    # test's own setup and saw an unready library, whatever the switch says, rather than proving the
-    # switch itself stopped anything.
-    with seed.stopped(sut):
-        pass
-    admin = client_factory(sut)
-    admin.ensure_admin()
-
-    before = _scan_job_count(admin)
-    never_within(
-        lambda: _scan_job_count(admin) > before,
-        seconds=SHORT_INTERVAL_SECONDS * 2 + 5,
-        what="a periodic scan-dispatch job with the switch off",
-        interval_s=0.5,
-    )
+    assert saved["periodic_scan"] == "off"
+    assert saved["next_scan_at"] is None
 
     # A manual scan must still work regardless of the periodic switch.
     manual = admin.post_csrf(ENQUEUE, {"enqueue_remux_jobs": False})
@@ -101,7 +80,7 @@ def test_periodic_scan_switch_left_on_lets_the_scan_timer_run(server_factory, cl
     admin = client_factory(sut)
     admin.ensure_admin()
     movie = library_for_scope(admin, "movie")
-    save_library(
+    saved = save_library(
         admin,
         movie["id"],
         watched_folder=str(watched),
@@ -109,6 +88,8 @@ def test_periodic_scan_switch_left_on_lets_the_scan_timer_run(server_factory, cl
         scan_interval_seconds=SHORT_INTERVAL_SECONDS,
         skip_access_tests=True,
     )
+
+    assert saved["periodic_scan"] == "scheduled"
 
     # Restart so the scheduler's first tick sees the library already configured, rather than racing
     # this test's own setup calls and locking in a stale "not ready yet" due time for a full interval
