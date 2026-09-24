@@ -187,6 +187,31 @@ public sealed class ActivityHistoryStoreTests
             ActivityHistory.ExportCsv([row]));
     }
 
+    [Theory]
+    [InlineData("=HYPERLINK(\"http://example.invalid\")")]
+    [InlineData("+1+1")]
+    [InlineData("-1+1")]
+    [InlineData("@SUM(1)")]
+    [InlineData("\tindented")]
+    public void Csv_writes_a_cell_a_spreadsheet_would_run_as_text(string title)
+    {
+        var row = new ActivityEventRow(7, PyDateTime.Naive(new DateTime(2026, 1, 2, 3, 4, 5)), "a.b", "processing", title, null, null, null, null, "Film/film.mkv", null);
+
+        var line = ActivityHistory.ExportCsv([row]).Split("\r\n")[1];
+
+        Assert.Contains("'" + title.Replace("\"", "\"\"", StringComparison.Ordinal), line, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Csv_leaves_ordinary_cells_as_they_are()
+    {
+        var row = new ActivityEventRow(7, PyDateTime.Naive(new DateTime(2026, 1, 2, 3, 4, 5)), "a.b", "processing", "Film (2020) - 1080p", null, null, null, null, "Film/film.mkv", null);
+
+        Assert.Equal(
+            "7,2026-01-02T03:04:05,processing,a.b,,,,Film/film.mkv,Film (2020) - 1080p,",
+            ActivityHistory.ExportCsv([row]).Split("\r\n")[1]);
+    }
+
     /// <summary>#543 item 1: the count covers every row even with no filter, not one row.</summary>
     [Fact]
     public async Task Count_activity_events_counts_every_row_even_unfiltered()
