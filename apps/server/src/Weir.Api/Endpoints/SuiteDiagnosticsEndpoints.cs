@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Weir.Api.Http;
 using Weir.Core.Auth;
@@ -17,15 +18,32 @@ public static class SuiteDiagnosticsEndpoints
 {
     public static IEndpointRouteBuilder MapSuiteDiagnosticsEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        var handlers = endpoints.ServiceProvider.GetRequiredService<SuiteDiagnosticsEndpointHandlers>();
+
         // Local directory browser.
-        endpoints.MapV1("GET", "/system/directories", GetDirectoriesAsync);
+        endpoints.MapV1("GET", "/system/directories", handlers.GetDirectoriesAsync);
 
         // #548: the external media tools this install actually has.
-        endpoints.MapV1("GET", "/system/media-tools", GetMediaToolsAsync);
+        endpoints.MapV1("GET", "/system/media-tools", handlers.GetMediaToolsAsync);
 
-        endpoints.MapV1("GET", "/suite/logs", GetLogsAsync);
-        endpoints.MapV1("GET", "/suite/metrics", GetMetricsAsync);
+        endpoints.MapV1("GET", "/suite/logs", handlers.GetLogsAsync);
+        endpoints.MapV1("GET", "/suite/metrics", handlers.GetMetricsAsync);
         return endpoints;
+    }
+}
+
+/// <summary>Handlers for <see cref="SuiteDiagnosticsEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class SuiteDiagnosticsEndpointHandlers
+{
+    private readonly MediaTools _mediaTools;
+    private readonly WeirLogFile _logFile;
+    private readonly RuntimeMetricsStore _metrics;
+
+    public SuiteDiagnosticsEndpointHandlers(MediaTools mediaTools, WeirLogFile logFile, RuntimeMetricsStore metrics)
+    {
+        _mediaTools = mediaTools ?? throw new ArgumentNullException(nameof(mediaTools));
+        _logFile = logFile ?? throw new ArgumentNullException(nameof(logFile));
+        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
     }
 
     /// <summary>
@@ -43,10 +61,10 @@ public static class SuiteDiagnosticsEndpoints
     /// not a 500.
     /// </para>
     /// </summary>
-    private static async Task<ApiResult> GetMediaToolsAsync(ApiRequest request)
+    public async Task<ApiResult> GetMediaToolsAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
-        var report = await request.Service<MediaTools>()
+        var report = await _mediaTools
             .DescribeVersionsAsync(request.Context.RequestAborted)
             .ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
@@ -54,7 +72,7 @@ public static class SuiteDiagnosticsEndpoints
             .Set("mkvmerge", report.Mkvmerge));
     }
 
-    private static async Task<ApiResult> GetDirectoriesAsync(ApiRequest request)
+    public async Task<ApiResult> GetDirectoriesAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
         try
@@ -67,7 +85,7 @@ public static class SuiteDiagnosticsEndpoints
         }
     }
 
-    private static async Task<ApiResult> GetLogsAsync(ApiRequest request)
+    public async Task<ApiResult> GetLogsAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -87,11 +105,10 @@ public static class SuiteDiagnosticsEndpoints
 
         issues.ThrowIfAny();
         var filter = new SuiteLogFilter(level, search, hasException, limit);
-        var logFile = request.Service<WeirLogFile>();
         var result = SuiteLogFilter.Empty;
-        if (File.Exists(logFile.Path))
+        if (File.Exists(_logFile.Path))
         {
-            if (logFile.ReadLines(filter.Add))
+            if (_logFile.ReadLines(filter.Add))
             {
                 result = filter.Result();
             }
@@ -121,9 +138,9 @@ public static class SuiteDiagnosticsEndpoints
             .Set("counts", new WireObject().Set("error", result.Errors).Set("warning", result.Warnings).Set("information", result.Information)));
     }
 
-    private static async Task<ApiResult> GetMetricsAsync(ApiRequest request)
+    public async Task<ApiResult> GetMetricsAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(request.Service<RuntimeMetricsStore>().SuiteMetricsOut());
+        return ApiRoutes.Ok(_metrics.SuiteMetricsOut());
     }
 }

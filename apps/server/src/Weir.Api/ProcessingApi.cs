@@ -33,9 +33,8 @@ public static class ProcessingApi
 
         // Processing's own stores (#745 part 5): stateless SQL access over the caller's UnitOfWork, so a
         // singleton is as cheap as a static class was and lets endpoints and handlers take them by constructor.
-        // FileStateStore stays static: it is threaded through Jobs/*, RemuxPass/* and
-        // MediaManagers/HandoffLedgerStore.Cancellation.cs (off limits while #768 is in flight), well beyond
-        // this area.
+        // LibraryStore and FileStateStore are registered by AddWeirPlatform: both are reached from Jobs,
+        // LibraryMode and MediaManagers as well as Processing.
         services.TryAddSingleton<FileLogStore>();
         services.TryAddSingleton<HoldDiagnosticStore>();
         services.TryAddSingleton<JobsInspectionStore>();
@@ -45,19 +44,28 @@ public static class ProcessingApi
         services.TryAddSingleton<OverviewStatsStore>();
 
         // Endpoint handler classes (#745 part 5): each endpoint file's real dependencies, constructor-injected
-        // and resolved once when routes are mapped, rather than reached with request.Service<T>() per call.
+        // and resolved once when routes are mapped, rather than looked up per call through the request.
         services.AddSingleton<LibraryModeEndpointHandlers>();
         services.AddSingleton<LibraryModeFilesEndpointHandlers>();
         services.AddSingleton<LibraryModeOverviewEndpointHandlers>();
         services.AddSingleton<LibraryModeRedownloadsEndpointHandlers>();
         services.AddSingleton<LibraryModeScheduleEndpointHandlers>();
+        services.AddSingleton<ProcessingDirectPlayEndpointHandlers>();
         services.AddSingleton<ProcessingFileLogEndpointHandlers>();
+        services.AddSingleton<ProcessingFileTracksEndpointHandlers>();
+        services.AddSingleton<ProcessingFilesEndpointHandlers>();
         services.AddSingleton<ProcessingJobsEndpointHandlers>();
+        services.AddSingleton<ProcessingLibraryEndpointHandlers>();
         services.AddSingleton<ProcessingLibraryCleansEndpointHandlers>();
+        services.AddSingleton<ProcessingLibraryDiscoveryEndpointHandlers>();
         services.AddSingleton<ProcessingMetadataProviderEndpointHandlers>();
         services.AddSingleton<ProcessingOperatorSettingsEndpointHandlers>();
         services.AddSingleton<ProcessingOverviewMaintenanceEndpointHandlers>();
+        services.AddSingleton<ProcessingRemuxPassEndpointHandlers>();
         services.AddSingleton<ProcessingRuleSetsEndpointHandlers>();
+        services.AddSingleton<ProcessingRulesPreviewEndpointHandlers>();
+        services.AddSingleton<ProcessingRuntimeEndpointHandlers>();
+        services.AddSingleton<ProcessingWatchedFolderScanDispatchEndpointHandlers>();
 
         // The only "processing-file-log-retention" task (#546): it uses the same UnitOfWork/
         // OperatorSettingsStore/FileLogStore plumbing as the rest of Processing.

@@ -7,6 +7,7 @@ using Weir.Core.Processing;
 using Weir.Core.Time;
 using Weir.Core.Validation;
 using Weir.Infrastructure.LibraryMode;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
 using static Weir.Api.Endpoints.EndpointLookups;
@@ -36,14 +37,16 @@ internal sealed class LibraryModeOverviewEndpointHandlers
     private readonly LibraryViewStore _libraryView;
     private readonly LibraryScanStore _scans;
     private readonly SuiteSettingsStore _suiteSettings;
+    private readonly LibraryStore _libraries;
 
     public LibraryModeOverviewEndpointHandlers(
-        LibrarySettingsStore librarySettings, LibraryViewStore libraryView, LibraryScanStore scans, SuiteSettingsStore suiteSettings)
+        LibrarySettingsStore librarySettings, LibraryViewStore libraryView, LibraryScanStore scans, SuiteSettingsStore suiteSettings, LibraryStore libraries)
     {
         _librarySettings = librarySettings ?? throw new ArgumentNullException(nameof(librarySettings));
         _libraryView = libraryView ?? throw new ArgumentNullException(nameof(libraryView));
         _scans = scans ?? throw new ArgumentNullException(nameof(scans));
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
     }
 
     /// <summary>
@@ -87,7 +90,7 @@ internal sealed class LibraryModeOverviewEndpointHandlers
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, _libraries, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
         var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
         var totals = await _libraryView.TotalsAsync(uow, libraryId).ConfigureAwait(false);
         var breakdowns = await _libraryView.AllBreakdownsAsync(uow, libraryId).ConfigureAwait(false);
@@ -119,7 +122,7 @@ internal sealed class LibraryModeOverviewEndpointHandlers
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
+        await RequireLibraryAsync(uow, _libraries, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
         var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
         var groups = await _libraryView.ProblemsAsync(uow, libraryId, settings.CleanHardlinkedFiles).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()

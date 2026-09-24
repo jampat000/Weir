@@ -46,8 +46,13 @@ public static class WeirApi
         services.AddSingleton<ActivityEndpointHandlers>();
         services.AddSingleton<NotificationEndpointHandlers>();
         services.AddSingleton<SuiteConfigurationEndpointHandlers>();
+        services.AddSingleton<SuiteDiagnosticsEndpointHandlers>();
+        services.AddSingleton<SuiteFileEndpointHandlers>();
+        services.AddSingleton<SuiteUpdateEndpointHandlers>();
         services.AddSingleton<SuiteOperationalHistoryEndpointHandlers>();
         services.AddSingleton<SuitePauseEndpointHandlers>();
+        services.AddSingleton<MediaManagerConnectionsEndpointHandlers>();
+        services.AddSingleton<MediaManagerIntakeEndpointHandlers>();
         services.AddSingleton<UpdateFiles>();
         services.AddSingleton<IReleaseCatalogClient, GitHubReleaseCatalogClient>();
         services.AddSingleton<IExternalJsonPoster, ExternalJsonPoster>();

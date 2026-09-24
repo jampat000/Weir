@@ -42,10 +42,14 @@ internal sealed class NotificationEndpointHandlers
     private const string ConfirmationExpired = "Your confirmation token expired. Refresh the page and try again.";
 
     private readonly NotificationChannelStore _channels;
+    private readonly NotificationDispatcher _dispatcher;
+    private readonly RuntimeMetricsStore _metrics;
 
-    public NotificationEndpointHandlers(NotificationChannelStore channels)
+    public NotificationEndpointHandlers(NotificationChannelStore channels, NotificationDispatcher dispatcher, RuntimeMetricsStore metrics)
     {
         _channels = channels ?? throw new ArgumentNullException(nameof(channels));
+        _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
+        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
     }
 
     private sealed record ChannelInput(string CsrfToken, string Label, string Provider, string Url, List<string> Events, bool Enabled);
@@ -166,7 +170,7 @@ internal sealed class NotificationEndpointHandlers
         var uow = await request.DbAsync().ConfigureAwait(false);
         var row = await _channels.GetAsync(uow, channelId).ConfigureAwait(false)
             ?? throw new ApiException(StatusCodes.Status404NotFound, "Notification channel not found.");
-        var error = await request.Service<NotificationDispatcher>().TestAsync(row, request.Context.RequestAborted).ConfigureAwait(false);
+        var error = await _dispatcher.TestAsync(row, request.Context.RequestAborted).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject().Set("ok", error is null).Set("error", error));
     }
 
@@ -188,7 +192,7 @@ internal sealed class NotificationEndpointHandlers
             }
         }
 
-        var text = request.Service<RuntimeMetricsStore>().RenderPrometheus();
+        var text = _metrics.RenderPrometheus();
         return new CustomApiResult(context => ApiResponses.WritePlainTextAsync(context, StatusCodes.Status200OK, text, "text/plain; version=0.0.4; charset=utf-8"));
     }
 

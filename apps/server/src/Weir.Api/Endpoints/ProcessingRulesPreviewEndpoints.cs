@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Core.Auth;
 using Weir.Core.Json;
 using Weir.Core.Media;
@@ -25,11 +26,30 @@ public static class ProcessingRulesPreviewEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingRulesPreviewEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("POST", "/processing/libraries/{library_id}/preview", PostPreviewAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<ProcessingRulesPreviewEndpointHandlers>();
+        endpoints.MapV1("POST", "/processing/libraries/{library_id}/preview", handlers.PostPreviewAsync);
         return endpoints;
     }
+}
 
-    private static async Task<ApiResult> PostPreviewAsync(ApiRequest request)
+/// <summary>Handlers for <see cref="ProcessingRulesPreviewEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class ProcessingRulesPreviewEndpointHandlers
+{
+    private readonly RulesPreviewGate _gate;
+    private readonly MediaTools _mediaTools;
+    private readonly IOriginalLanguageLookup _originalLanguageLookup;
+    private readonly LibraryStore _libraries;
+
+    public ProcessingRulesPreviewEndpointHandlers(
+        RulesPreviewGate gate, MediaTools mediaTools, IOriginalLanguageLookup originalLanguageLookup, LibraryStore libraries)
+    {
+        _gate = gate ?? throw new ArgumentNullException(nameof(gate));
+        _mediaTools = mediaTools ?? throw new ArgumentNullException(nameof(mediaTools));
+        _originalLanguageLookup = originalLanguageLookup ?? throw new ArgumentNullException(nameof(originalLanguageLookup));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
+    }
+
+    public async Task<ApiResult> PostPreviewAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -76,14 +96,13 @@ public static class ProcessingRulesPreviewEndpoints
         }
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await EndpointLookups.RequireLibraryAsync(uow, libraryId).ConfigureAwait(false);
+        var library = await EndpointLookups.RequireLibraryAsync(uow, _libraries, libraryId).ConfigureAwait(false);
 
         var resolvedPath = hasRelative
             ? ResolveWithinLibraryFolders(library, relativePath!)
             : ResolveViaLocalBrowseAllowList(absolutePath!);
 
-        var gate = request.Service<RulesPreviewGate>();
-        if (!gate.TryEnter())
+        if (!_gate.TryEnter())
         {
             throw new ApiException(StatusCodes.Status409Conflict, "Another rules preview is already running. Try again in a moment.");
         }
@@ -94,7 +113,7 @@ public static class ProcessingRulesPreviewEndpoints
         }
         finally
         {
-            gate.Release();
+            _gate.Release();
         }
     }
 
@@ -147,7 +166,7 @@ public static class ProcessingRulesPreviewEndpoints
         }
     }
 
-    private static async Task<ApiResult> RunPreviewAsync(
+    private async Task<ApiResult> RunPreviewAsync(
         ApiRequest request,
         UnitOfWork uow,
         ProcessingLibraryRecord library,
@@ -158,11 +177,10 @@ public static class ProcessingRulesPreviewEndpoints
 
         var config = await BuildConfigAsync(uow, library, ruleSetInput).ConfigureAwait(false);
 
-        var tools = request.Service<MediaTools>();
         System.Text.Json.JsonElement probeJson;
         try
         {
-            probeJson = await tools.FfprobeJsonAsync(
+            probeJson = await _mediaTools.FfprobeJsonAsync(
                 resolvedPath,
                 probeSizeMb: request.Options.ProcessingProbeSizeMb,
                 analyzeDurationSeconds: request.Options.ProcessingAnalyzeDurationSeconds,
@@ -223,7 +241,7 @@ public static class ProcessingRulesPreviewEndpoints
 
     /// <summary>Unsaved rules (validated exactly like a save) take priority; otherwise the library's saved
     /// rule set; otherwise the shipped defaults — the same fallback order a live pass uses.</summary>
-    private static async Task<ProcessingRulesConfig> BuildConfigAsync(UnitOfWork uow, ProcessingLibraryRecord library, LibraryRules.RuleSetInput? ruleSetInput)
+    private async Task<ProcessingRulesConfig> BuildConfigAsync(UnitOfWork uow, ProcessingLibraryRecord library, LibraryRules.RuleSetInput? ruleSetInput)
     {
         if (ruleSetInput is not null)
         {
@@ -241,7 +259,7 @@ public static class ProcessingRulesPreviewEndpoints
             return RemuxPassPaths.RulesConfigFor(previewRow);
         }
 
-        if (library.RuleSetId is { } ruleSetId && await LibraryStore.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) is { } savedRow)
+        if (library.RuleSetId is { } ruleSetId && await _libraries.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) is { } savedRow)
         {
             return RemuxPassPaths.RulesConfigFor(savedRow);
         }
@@ -254,7 +272,7 @@ public static class ProcessingRulesPreviewEndpoints
     /// unreachable) leaves the configured language preferences in charge, with a note saying so, rather
     /// than failing the preview.
     /// </summary>
-    private static async Task<(ProcessingRulesConfig Config, WireObject Record)> ApplyOriginalLanguageAsync(
+    private async Task<(ProcessingRulesConfig Config, WireObject Record)> ApplyOriginalLanguageAsync(
         ApiRequest request,
         ProcessingRulesConfig config,
         OriginalLanguageRules rules,
@@ -262,11 +280,10 @@ public static class ProcessingRulesPreviewEndpoints
         string resolvedPath,
         IReadOnlyList<ProbeStreamInfo> audio)
     {
-        var lookupService = request.Service<IOriginalLanguageLookup>();
         LookupResult lookup;
         try
         {
-            lookup = await lookupService.LookupAsync(scope, resolvedPath, origin: null, request.Context.RequestAborted).ConfigureAwait(false);
+            lookup = await _originalLanguageLookup.LookupAsync(scope, resolvedPath, origin: null, request.Context.RequestAborted).ConfigureAwait(false);
         }
 #pragma warning disable CA1031 // A failed metadata lookup is shown as unreachable; the preview still answers.
         catch (Exception exception) when (exception is not OperationCanceledException)

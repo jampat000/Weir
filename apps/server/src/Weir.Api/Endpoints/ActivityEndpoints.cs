@@ -119,11 +119,13 @@ internal sealed class ActivityEndpointHandlers
 
     private readonly ActivityHistoryStore _history;
     private readonly SuiteSettingsStore _suiteSettings;
+    private readonly LiveProgressStore _liveProgress;
 
-    public ActivityEndpointHandlers(ActivityHistoryStore history, SuiteSettingsStore suiteSettings)
+    public ActivityEndpointHandlers(ActivityHistoryStore history, SuiteSettingsStore suiteSettings, LiveProgressStore liveProgress)
     {
         _history = history ?? throw new ArgumentNullException(nameof(history));
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+        _liveProgress = liveProgress ?? throw new ArgumentNullException(nameof(liveProgress));
     }
 
     public async Task<ApiResult> GetRecentAsync(ApiRequest request)
@@ -254,7 +256,7 @@ internal sealed class ActivityEndpointHandlers
         await request.ReleaseDbAsync().ConfigureAwait(false);
         var database = request.Database;
         var notifier = ActivityNotifications.For(database);
-        var liveProgress = request.Service<LiveProgressStore>();
+        var liveProgress = _liveProgress;
         var time = request.Time;
         var logger = request.LoggerFactory.CreateLogger("weir.platform.activity.router");
         return new CustomApiResult(async context =>

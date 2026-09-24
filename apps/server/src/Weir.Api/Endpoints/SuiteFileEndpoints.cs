@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Weir.Api.Http;
 using Weir.Core.Auth;
@@ -16,16 +17,30 @@ namespace Weir.Api.Endpoints;
 /// </summary>
 public static class SuiteFileEndpoints
 {
-    private const string LogMediaType = "application/x-ndjson; charset=utf-8";
-
     public static IEndpointRouteBuilder MapSuiteFileEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("POST", "/suite/configuration-backups", PostBackupAsync);
-        endpoints.MapV1("GET", "/suite/logs/download", DownloadLogAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<SuiteFileEndpointHandlers>();
+        endpoints.MapV1("POST", "/suite/configuration-backups", handlers.PostBackupAsync);
+        endpoints.MapV1("GET", "/suite/logs/download", handlers.DownloadLogAsync);
         return endpoints;
     }
+}
 
-    private static async Task<ApiResult> PostBackupAsync(ApiRequest request)
+/// <summary>Handlers for <see cref="SuiteFileEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class SuiteFileEndpointHandlers
+{
+    private const string LogMediaType = "application/x-ndjson; charset=utf-8";
+
+    private readonly ConfigurationBackups _backups;
+    private readonly WeirLogFile _logFile;
+
+    public SuiteFileEndpointHandlers(ConfigurationBackups backups, WeirLogFile logFile)
+    {
+        _backups = backups ?? throw new ArgumentNullException(nameof(backups));
+        _logFile = logFile ?? throw new ArgumentNullException(nameof(logFile));
+    }
+
+    public async Task<ApiResult> PostBackupAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
@@ -40,7 +55,7 @@ public static class SuiteFileEndpoints
         ConfigurationBackupRecord row;
         try
         {
-            row = await request.Service<ConfigurationBackups>().CreateAsync(uow).ConfigureAwait(false);
+            row = await _backups.CreateAsync(uow).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -54,18 +69,17 @@ public static class SuiteFileEndpoints
         return new JsonApiResult(StatusCodes.Status201Created, ConfigurationBackups.ItemOut(row));
     }
 
-    private static async Task<ApiResult> DownloadLogAsync(ApiRequest request)
+    public async Task<ApiResult> DownloadLogAsync(ApiRequest request)
     {
         // Install-level operational data (the whole server log, not just this account's activity): admins only,
         // like the configuration backup above.
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
-        var logFile = request.Service<WeirLogFile>();
 
         // A snapshot copied aside under the write lock, so the slow part - handing potentially many megabytes to a
         // browser - runs with the lock already released and logging never waits on a download (#741 review).
         var snapshotPath = System.IO.Path.Join(
             System.IO.Path.GetTempPath(), $"weir-log-download-{Guid.NewGuid():N}.tmp");
-        if (!logFile.SnapshotTo(snapshotPath))
+        if (!_logFile.SnapshotTo(snapshotPath))
         {
             request.LoggerFactory.CreateLogger("weir.platform.suite_settings.logs_service").LogWarning("Log download skipped because the active log could not be opened.");
             throw new ApiException(StatusCodes.Status503ServiceUnavailable, "Weir could not open its log file just now. Try again in a moment.");

@@ -139,9 +139,6 @@ public sealed class ApiRequest : IAsyncDisposable
 
     public ILoggerFactory LoggerFactory { get; }
 
-    public T Service<T>()
-        where T : notnull => Context.RequestServices.GetRequiredService<T>();
-
     public async Task<UnitOfWork> DbAsync()
     {
         _uow ??= await UnitOfWork.OpenAsync(Database, Context.RequestAborted).ConfigureAwait(false);
@@ -318,7 +315,7 @@ public sealed class ApiRequest : IAsyncDisposable
     /// <summary>The rate-limit key for this client; <c>X-Forwarded-For</c> counts only from a trusted proxy.</summary>
     public string RateLimitKey()
     {
-        var limiters = Service<AuthRateLimiters>();
+        var limiters = Context.RequestServices.GetRequiredService<AuthRateLimiters>();
         return ClientRateLimitKey.Resolve(
             ClientHost,
             Header("X-Forwarded-For"),
