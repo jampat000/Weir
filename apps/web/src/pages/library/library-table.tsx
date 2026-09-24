@@ -66,14 +66,17 @@ function FileRow({
       data-testid="library-row"
     >
       <span role="cell">
-        <input
-          type="checkbox"
-          className="mm-library-check"
-          aria-label={`Select ${baseName(file.path)}`}
-          checked={selected}
-          disabled={file.classification !== "would_change"}
-          onChange={() => onToggle(file.path)}
-        />
+        {/* The label is the target: a 24px square around a box drawn at the text's own size. */}
+        <label className="mm-library-check-target">
+          <input
+            type="checkbox"
+            className="mm-library-check"
+            aria-label={`Select ${baseName(file.path)}`}
+            checked={selected}
+            disabled={file.classification !== "would_change"}
+            onChange={() => onToggle(file.path)}
+          />
+        </label>
       </span>
       <span role="cell" className="mm-library-name">
         <button type="button" onClick={() => onOpen(file.path)}>
@@ -101,15 +104,13 @@ function FileRow({
   );
 }
 
-/** The library's files grouped by title, one row each, with a note when the server sent only the first page. */
+/** One page of the library's files grouped by title, one row each. */
 export function LibraryTable({
   libraryName,
   groups,
   compact,
   openPath,
   selected,
-  shownCount,
-  total,
   onToggle,
   onOpen,
 }: {
@@ -118,8 +119,6 @@ export function LibraryTable({
   compact: boolean;
   openPath: string | null;
   selected: Set<string>;
-  shownCount: number;
-  total: number;
   onToggle: (path: string) => void;
   onOpen: (path: string) => void;
 }) {
@@ -152,12 +151,6 @@ export function LibraryTable({
           ))}
         </div>
       ))}
-      {total > shownCount ? (
-        <p className="mm-library-more">
-          Showing {shownCount.toLocaleString()} of {total.toLocaleString()}.
-          Narrow it with search or a chip to see the rest.
-        </p>
-      ) : null}
     </div>
   );
 }

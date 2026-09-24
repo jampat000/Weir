@@ -1,8 +1,8 @@
 /**
  * One library file, opened from the table: what is in it, what your rules would take out of it and why,
  * and what you can do about it. The track list is the rule-set editor's own preview (#502), so the two can
- * never disagree about a file. You can also pick the tracks for this one file (#501), or set it aside so
- * nothing cleans it.
+ * never disagree about a file. You can also pick the tracks for this one file (#501), mark it Left alone so
+ * nothing cleans it, or ask its media manager to download it again when a past clean took too much (#509).
  */
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -10,26 +10,85 @@ import { SidePanel } from "../../components/shared/side-panel";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { useActivityRecentQuery } from "../../lib/activity/queries";
 import { formatBytes } from "../../lib/format/bytes";
+import { positionsByKind, videoCodecName } from "../../lib/format/track";
 import type {
+  LibraryCleanResult,
   LibraryFile,
   LibraryManualPlan,
 } from "../../lib/processing/library-mode-api";
 import { useLibraryFilePreviewQuery } from "../../lib/processing/library-mode-queries";
-import type { ProcessingRulesPreviewTrack } from "../../lib/processing/rules-preview-api";
 import { baseName } from "../../lib/format/path";
 import { errorMessage } from "../../lib/api/error-message";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { plural } from "../../lib/ui/mm-plural";
+import { LibraryCleanOutcome } from "./library-clean-dialog";
+import { REMOVAL_IS_FINAL } from "./library-clean-model";
+import { TrackList, rulesKeep, toggled } from "./library-drawer-tracks";
+import { LibraryLeaveAlone, useLeaveAlone } from "./library-leave-alone";
+import { LibraryRedownload } from "./library-redownload";
 
-function trackLabel(track: ProcessingRulesPreviewTrack): string {
-  return [
-    track.language || "Undetermined",
-    track.codec.toUpperCase(),
-    track.channels ? `${track.channels}ch` : "",
-    track.title,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+const MANAGER_NAMES: Record<string, string> = {
+  sonarr: "Sonarr",
+  radarr: "Radarr",
+};
+
+/** How a clean started from this panel is going: waiting on the server, why it failed, or what it did. */
+export interface FileCleanState {
+  pending: boolean;
+  failure: string | null;
+  result: LibraryCleanResult | null;
+  onDismissResult: () => void;
+}
+
+function FileChips({
+  file,
+  leftAlone,
+}: {
+  file: LibraryFile;
+  leftAlone: boolean;
+}) {
+  return (
+    <div className="mm-drawer__chips">
+      {file.video_height ? (
+        <span className="mm-drawer__chip">{file.video_height}p</span>
+      ) : null}
+      {file.video_codec && file.video_codec !== "unknown" ? (
+        <span className="mm-drawer__chip">
+          {videoCodecName(file.video_codec)}
+        </span>
+      ) : null}
+      <span className="mm-drawer__chip">{formatBytes(file.size_bytes)}</span>
+      {file.manager_kind ? (
+        <span className="mm-drawer__chip mm-drawer__chip--ok">
+          {MANAGER_NAMES[file.manager_kind] ?? file.manager_kind}: matched
+        </span>
+      ) : null}
+      {file.cleaned_at ? (
+        <span className="mm-drawer__chip mm-drawer__chip--ok">
+          Cleaned {new Date(file.cleaned_at * 1000).toLocaleDateString()}
+        </span>
+      ) : null}
+      {leftAlone ? <span className="mm-drawer__chip">Left alone</span> : null}
+    </div>
+  );
+}
+
+function FileHistory({ path }: { path: string }) {
+  const when = useAppDateFormatter();
+  const history = useActivityRecentQuery({ limit: 6, file: path });
+  const items = history.data?.items ?? [];
+  if (items.length === 0) return null;
+  return (
+    <div className="mm-drawer__history">
+      <p className="mm-drawer__eyebrow">What has happened to this file</p>
+      {items.map((item) => (
+        <p key={item.id} className="mm-drawer__step">
+          <span className="mm-drawer__when">{when(item.created_at)}</span>
+          {item.title}
+        </p>
+      ))}
+    </div>
+  );
 }
 
 export function LibraryFileDrawer({
@@ -38,34 +97,23 @@ export function LibraryFileDrawer({
   file,
   onClose,
   onClean,
-  onLeaveAlone,
-  cleaning,
-  settingAside,
+  clean,
 }: {
   libraryId: number;
   libraryName: string;
-  file: LibraryFile | null;
+  file: LibraryFile;
   onClose: () => void;
   /** Without a plan the library's rules decide; with one, exactly these tracks are kept. */
   onClean: (path: string, manual?: LibraryManualPlan) => void;
-  onLeaveAlone: (path: string, leaveAlone: boolean) => void;
-  cleaning: boolean;
-  settingAside: boolean;
-}): React.ReactElement | null {
-  const open = file !== null;
+  clean: FileCleanState;
+}): React.ReactElement {
   // The tracks you have said to keep, once you start choosing; null while the rules are deciding.
   const [keep, setKeep] = useState<Set<number> | null>(null);
-  const when = useAppDateFormatter();
+  const leaveAlone = useLeaveAlone(libraryId, file);
+  const preview = useLibraryFilePreviewQuery(libraryId, file.path);
 
-  const preview = useLibraryFilePreviewQuery(libraryId, file?.path ?? null);
-  const history = useActivityRecentQuery(
-    open ? { limit: 6, file: file.path } : undefined,
-  );
-
-  if (!file) return null;
-
-  const name = baseName(file.path);
   const tracks = preview.data?.tracks ?? [];
+  const positions = positionsByKind(tracks);
   const audio = tracks.filter((track) => track.type === "audio");
   const subtitles = tracks.filter((track) => track.type === "subtitle");
   const choosing = keep !== null;
@@ -75,11 +123,11 @@ export function LibraryFileDrawer({
     (track) => track.type !== "video" && !kept.has(track.index),
   ).length;
 
-  // A file set aside is never cleaned; a choice must keep some audio and must actually change something; and
+  // A file Left alone is never cleaned; a choice must keep some audio and must actually change something; and
   // without a choice, only a file the rules would change has anything to do.
   const cannotClean =
-    cleaning ||
-    file.leave_alone ||
+    clean.pending ||
+    leaveAlone.leftAlone ||
     (choosing
       ? keptAudio === 0 || removing === 0
       : file.classification !== "would_change");
@@ -102,40 +150,15 @@ export function LibraryFileDrawer({
 
   return (
     <SidePanel
-      open={open}
-      title={name}
+      open
+      title={baseName(file.path)}
       eyebrow={`Library · ${libraryName}${file.manager_title ? ` · ${file.manager_title}` : ""}`}
       subtitle={file.path}
       onClose={onClose}
       dataTestId="library-file-drawer"
     >
       <>
-        <div className="mm-drawer__chips">
-          {file.video_height ? (
-            <span className="mm-drawer__chip">{file.video_height}p</span>
-          ) : null}
-          {file.video_codec && file.video_codec !== "unknown" ? (
-            <span className="mm-drawer__chip">
-              {file.video_codec.toUpperCase()}
-            </span>
-          ) : null}
-          <span className="mm-drawer__chip">
-            {formatBytes(file.size_bytes)}
-          </span>
-          {file.manager_kind ? (
-            <span className="mm-drawer__chip mm-drawer__chip--ok">
-              {file.manager_kind === "sonarr" ? "Sonarr" : "Radarr"}: matched
-            </span>
-          ) : null}
-          {file.cleaned_at ? (
-            <span className="mm-drawer__chip mm-drawer__chip--ok">
-              Cleaned {new Date(file.cleaned_at * 1000).toLocaleDateString()}
-            </span>
-          ) : null}
-          {file.leave_alone ? (
-            <span className="mm-drawer__chip">Set aside</span>
-          ) : null}
-        </div>
+        <FileChips file={file} leftAlone={leaveAlone.leftAlone} />
 
         <p className="mm-drawer__verdict">
           {choosing
@@ -161,39 +184,23 @@ export function LibraryFileDrawer({
             <TrackList
               title={`Audio · ${plural(audio.length, "track", "tracks")}`}
               tracks={audio}
+              positions={positions}
               kept={choosing ? kept : null}
               onToggle={(index) => setKeep(toggled(kept, index))}
             />
             <TrackList
               title={`Subtitles · ${plural(subtitles.length, "track", "tracks")}`}
               tracks={subtitles}
+              positions={positions}
               kept={choosing ? kept : null}
               onToggle={(index) => setKeep(toggled(kept, index))}
             />
             <p className="mm-drawer__note">
               {choosing ? (
-                <>
-                  {"Your choice, for this file only. "}
-                  <button
-                    type="button"
-                    className="mm-link-button"
-                    onClick={() => setKeep(null)}
-                  >
-                    Use this library’s rules instead
-                  </button>
-                </>
+                "Your choice, for this file only."
               ) : (
                 <>
                   {"Decided by this library’s rules. "}
-                  <button
-                    type="button"
-                    className="mm-link-button"
-                    disabled={tracks.length === 0}
-                    onClick={() => setKeep(new Set(kept))}
-                  >
-                    Choose the tracks yourself
-                  </button>
-                  {" · "}
                   <Link to={`/settings?tab=rules&library=${libraryId}`}>
                     Edit the rules →
                   </Link>
@@ -212,7 +219,19 @@ export function LibraryFileDrawer({
               onClean(file.path, choosing ? manualPlan() : undefined)
             }
           >
-            {choosing ? "Clean with these tracks" : "Clean this file"}
+            {clean.pending
+              ? "Checking this file…"
+              : choosing
+                ? "Clean with these tracks"
+                : "Clean this file"}
+          </button>
+          <button
+            type="button"
+            className="mm-head-control"
+            disabled={tracks.length === 0}
+            onClick={() => setKeep(choosing ? null : new Set(kept))}
+          >
+            {choosing ? "Use this library’s rules" : "Choose tracks"}
           </button>
           <button
             type="button"
@@ -220,104 +239,34 @@ export function LibraryFileDrawer({
             disabled={preview.isFetching}
             onClick={() => void preview.refetch()}
           >
-            Check it again
+            {preview.isFetching ? "Checking…" : "Check it again"}
           </button>
         </div>
 
-        <label className="mm-drawer__aside">
-          <input
-            type="checkbox"
-            checked={file.leave_alone}
-            disabled={settingAside}
-            onChange={(event) => onLeaveAlone(file.path, event.target.checked)}
+        {clean.failure ? (
+          <p className="mm-drawer__failure" role="alert">
+            {clean.failure}
+          </p>
+        ) : null}
+        {clean.result ? (
+          <LibraryCleanOutcome
+            result={clean.result}
+            known={[file]}
+            onClose={clean.onDismissResult}
           />
-          <span>
-            Leave this file alone. Nothing cleans it — not a scan, not the
-            schedule, not picking it in the table — until you clear this.
-          </span>
-        </label>
+        ) : null}
+
+        <LibraryLeaveAlone file={file} state={leaveAlone} />
 
         <p className="mm-drawer__note">
           Cleaning rewrites this file where it sits and tells your media manager
-          to look at it again. A removed track only comes back by downloading
-          the title again, unless keeping originals is on for this library.
+          to look at it again. {REMOVAL_IS_FINAL}
         </p>
 
-        {(history.data?.items ?? []).length > 0 ? (
-          <div className="mm-drawer__history">
-            <p className="mm-drawer__eyebrow">What has happened to this file</p>
-            {(history.data?.items ?? []).map((item) => (
-              <p key={item.id} className="mm-drawer__step">
-                <span className="mm-drawer__when">{when(item.created_at)}</span>
-                {item.title}
-              </p>
-            ))}
-          </div>
-        ) : null}
+        <LibraryRedownload libraryId={libraryId} path={file.path} />
+
+        <FileHistory path={file.path} />
       </>
     </SidePanel>
-  );
-}
-
-const rulesKeep = (track: ProcessingRulesPreviewTrack): boolean =>
-  track.action === "keep";
-
-function toggled(kept: Set<number>, index: number): Set<number> {
-  const next = new Set(kept);
-  if (next.has(index)) next.delete(index);
-  else next.add(index);
-  return next;
-}
-
-function TrackList({
-  title,
-  tracks,
-  kept,
-  onToggle,
-}: {
-  title: string;
-  tracks: ProcessingRulesPreviewTrack[];
-  /** The tracks you have chosen to keep, or null while the rules are deciding. */
-  kept: Set<number> | null;
-  onToggle: (index: number) => void;
-}): React.ReactElement | null {
-  if (tracks.length === 0) return null;
-  return (
-    <div className="mm-drawer__tracks">
-      <p className="mm-drawer__eyebrow">{title}</p>
-      {tracks.map((track) => {
-        const keeping = kept ? kept.has(track.index) : rulesKeep(track);
-        const row = (
-          <>
-            <span
-              className={`mm-drawer__verdict-tag mm-drawer__verdict-tag--${keeping ? "keep" : "drop"}`}
-            >
-              {keeping ? "Keep" : "Remove"}
-            </span>
-            <span className="mm-drawer__track-name">{trackLabel(track)}</span>
-            <span className="mm-drawer__track-why">
-              {kept ? "" : (track.reasons[0] ?? "")}
-            </span>
-          </>
-        );
-        return kept ? (
-          <label
-            key={track.index}
-            className="mm-drawer__track mm-drawer__track--choosable"
-          >
-            <input
-              type="checkbox"
-              checked={keeping}
-              onChange={() => onToggle(track.index)}
-            />
-            {row}
-          </label>
-        ) : (
-          <div key={track.index} className="mm-drawer__track">
-            {row}
-          </div>
-        );
-      })}
-    </div>
   );
 }

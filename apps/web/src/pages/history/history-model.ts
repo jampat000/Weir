@@ -4,7 +4,11 @@ import type {
   ProcessingFileLogEntry,
   ProcessingFileStatus,
 } from "../../lib/processing/files-api";
-import { processingStreamLanguageLabel } from "../../lib/processing/stream-language-options";
+import {
+  audioCodecName,
+  channelLayout,
+  languageName,
+} from "../../lib/format/track";
 import { parseAppDate } from "../../lib/ui/mm-format-date";
 
 /** A server time as epoch ms. Its times carry no zone and are UTC. */
@@ -116,57 +120,21 @@ function splitLine(line: unknown): string[] {
     );
 }
 
-/** The bibliographic spellings some files carry, mapped to the ones Weir's language list uses. */
-const LANGUAGE_ALIASES: Record<string, string> = {
-  ger: "deu",
-  fra: "fre",
-  chi: "zho",
-  dut: "nld",
-  cze: "ces",
-  gre: "ell",
-  rum: "ron",
-  may: "msa",
-};
-
-const CODECS: Record<string, string> = {
-  eac3: "E-AC-3",
-  ac3: "AC-3",
-  aac: "AAC",
-  dts: "DTS",
-  truehd: "TrueHD",
-  flac: "FLAC",
-  opus: "Opus",
-  mp3: "MP3",
-  pcm_s16le: "PCM",
-  pcm_s24le: "PCM",
-};
-
-const CHANNELS: Record<string, string> = {
-  "1": "mono",
-  "2": "2.0",
-  "6": "5.1",
-  "8": "7.1",
-};
-
 /**
  * The planner describes a track the way ffprobe does ("fre eac3 6 ch (stream 2)"). Put it the way the
  * rest of History reads ("French 5.1 E-AC-3"): language named, channels as a layout, codec spelled out,
  * stream numbers dropped.
  */
 export function readableTrack(text: string): string {
-  const language = (code: string) =>
-    processingStreamLanguageLabel(
-      LANGUAGE_ALIASES[code.toLowerCase()] ?? code.toLowerCase(),
-    );
   return text
     .replace(/\s*\(stream \d+\)/gi, "")
-    .replace(/\b[a-z]{3}\b(?=\s+[a-z0-9_]+\s+\d+\s*ch\b)/gi, language)
+    .replace(/\b[a-z]{3}\b(?=\s+[a-z0-9_]+\s+\d+\s*ch\b)/gi, languageName)
     .replace(
       /\b([a-z0-9_]+)\s+(\d+)\s*ch\b/gi,
       (_, codec: string, ch: string) =>
-        `${CHANNELS[ch] ?? `${ch} channels`} ${CODECS[codec.toLowerCase()] ?? codec.toUpperCase()}`,
+        `${channelLayout(Number(ch))} ${audioCodecName(codec)}`,
     )
-    .replace(/^[a-z]{3}$/, language)
+    .replace(/^[a-z]{3}$/, languageName)
     .trim();
 }
 

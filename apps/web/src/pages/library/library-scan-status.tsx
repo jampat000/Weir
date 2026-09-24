@@ -1,3 +1,4 @@
+import { errorMessage } from "../../lib/api/error-message";
 import type {
   LibraryModeSchedule,
   LibraryScanInfo,
@@ -43,8 +44,20 @@ export function LibraryScanStatus({
         disabled={rescan.isPending || Boolean(scan?.running)}
         onClick={() => rescan.mutate()}
       >
-        Check again
+        {rescan.isPending ? "Starting a check…" : "Check again"}
       </button>
+      {rescan.isError ? (
+        <span
+          className="mm-library-scan__error"
+          role="alert"
+          data-testid="library-scan-error"
+        >
+          {errorMessage(
+            rescan.error,
+            "Weir couldn't start a check. Try again in a moment.",
+          )}
+        </span>
+      ) : null}
     </div>
   );
 }

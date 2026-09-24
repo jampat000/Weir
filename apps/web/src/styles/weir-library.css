@@ -119,6 +119,7 @@
 /* When this library was last checked, beside the lead. */
 .mm-library-scan {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   font-size: var(--mm-type-caption);
@@ -130,6 +131,10 @@
   height: 7px;
   border-radius: 50%;
   background: var(--mm-status-healthy-text);
+}
+
+.mm-library-scan__error {
+  color: var(--mm-status-failed-text);
 }
 
 /* Search, the counts that are also the filters, and what cleaning would give back. */
@@ -195,7 +200,6 @@
 
 /* What is selected, and the one thing to do with it. */
 .mm-library-bulk,
-.mm-library-confirm,
 .mm-library-outcome {
   display: flex;
   flex-direction: column;
@@ -210,16 +214,10 @@
   color: var(--mm-text1);
 }
 
-/* Asking before something irreversible is a warning; saying what happened afterwards is not. */
-.mm-library-confirm {
-  border-color: var(--mm-warning-border);
-  background: var(--mm-warning-bg);
-}
-
-.mm-library-confirm p,
 .mm-library-outcome p {
   margin: 0;
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .mm-library-outcome__why {
@@ -227,10 +225,43 @@
   color: var(--mm-text2);
 }
 
-.mm-library-confirm__actions {
+/* The files a clean's checks will leave out, listed in its confirmation before anything changes. */
+.mm-library-confirm__warnings {
+  margin: 6px 0 0;
+  padding-left: 1.2rem;
+  font-size: var(--mm-type-caption);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* The table and the count of what is on this page. */
+.mm-library-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  scroll-margin-top: 16px;
+}
+
+.mm-library-pager {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.mm-library-pager__range {
+  margin: 0;
+  font-size: var(--mm-type-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text2);
+}
+
+.mm-library-pager__note {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--mm-type-caption);
+  color: var(--mm-text3);
 }
 
 .mm-library-error {

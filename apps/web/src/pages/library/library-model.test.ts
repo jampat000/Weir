@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { LibraryFile } from "../../lib/processing/library-mode-api";
-import { groupOf, scanned, verdictOf } from "./library-model";
+import { groupOf, headerLead, scanned, verdictOf } from "./library-model";
 
 const NOW = Date.UTC(2026, 7, 22, 10, 0, 0);
 const MINUTE = 60;
@@ -54,6 +54,27 @@ describe("verdictOf", () => {
     });
 
     expect(verdictOf(file)).toBe("Still seeding");
+  });
+
+  it("says a file already matches your rules", () => {
+    expect(verdictOf(libraryFile({ classification: "matches" }))).toBe(
+      "Matches your rules",
+    );
+  });
+});
+
+describe("headerLead", () => {
+  it("says Weir only changes a file when asked while the daily clean is off", () => {
+    expect(headerLead(undefined, false)).toBe(
+      "Weir reads your library where it is and only changes one when you ask.",
+    );
+  });
+
+  it("says Weir cleans once a day on its own while the daily clean is on", () => {
+    const lead = headerLead(undefined, true);
+
+    expect(lead).toContain("cleans what would change once a day");
+    expect(lead).not.toContain("when you ask");
   });
 });
 
