@@ -25,19 +25,19 @@ public sealed class FolderHandoffCompletionTests
     };
 
     private static string RelativeOf(Core.Jobs.ProcessingJob job) =>
-        ((PyStr)((PyDict)PyJsonParser.Parse(job.PayloadJson!))["relative_media_path"]).Value;
+        ((WireString)((WireObject)WireJsonParser.Parse(job.PayloadJson!))["relative_media_path"]).Value;
 
     /// <summary>The copy Weir would write for a target: the local output folder plus the target's own path segments.</summary>
     private static string OutputFileFor(string localFolder, string relative) => Path.Join([localFolder, .. relative.Split('/')]);
 
-    private static PyDict Delivered(string relative, string outputFile, string localFolder) => new PyDict()
+    private static WireObject Delivered(string relative, string outputFile, string localFolder) => new WireObject()
         .Set("ok", true)
         .Set("outcome", "live_output_written")
         .Set("output_file", outputFile)
         .Set("relative_media_path", relative)
         .Set("processing_output_folder_resolved", localFolder);
 
-    private static PyDict FinalFailure(string relative, string reason) => new PyDict()
+    private static WireObject FinalFailure(string relative, string reason) => new WireObject()
         .Set("ok", false)
         .Set("outcome", "failed_execution")
         .Set("reason", reason)
@@ -117,10 +117,10 @@ public sealed class FolderHandoffCompletionTests
 
         Assert.Equal("reported completed to Deluno", finalStatus);
         var post = Assert.Single(fixture.Http.RequestsTo(HttpMethod.Post, ReportPath));
-        var body = (PyDict)post.Json!;
-        Assert.Equal("completed", ((PyStr)body["status"]).Value);
-        Assert.Equal(Path.Join(localFolder, folder), ((PyStr)body["outputPath"]).Value);
-        var outputFiles = ((PyList)body["outputFiles"]).Items.Cast<PyStr>().Select(item => item.Value).Order().ToList();
+        var body = (WireObject)post.Json!;
+        Assert.Equal("completed", ((WireString)body["status"]).Value);
+        Assert.Equal(Path.Join(localFolder, folder), ((WireString)body["outputPath"]).Value);
+        var outputFiles = ((WireArray)body["outputFiles"]).Items.Cast<WireString>().Select(item => item.Value).Order().ToList();
         Assert.Equal(episodes.Select(name => Path.Join(localFolder, folder, name)).Order().ToList(), outputFiles);
 
         var finished = (await fixture.Db(uow => HandoffLedgerStore.FindAsync(uow, "deluno", "pack")))!;
@@ -165,11 +165,11 @@ public sealed class FolderHandoffCompletionTests
 
         Assert.Equal("reported failed to Deluno", finalStatus);
         var post = Assert.Single(fixture.Http.RequestsTo(HttpMethod.Post, ReportPath));
-        var body = (PyDict)post.Json!;
-        Assert.Equal("failed", ((PyStr)body["status"]).Value);
+        var body = (WireObject)post.Json!;
+        Assert.Equal("failed", ((WireString)body["status"]).Value);
         Assert.False(body.ContainsKey("outputPath"));
-        Assert.Equal([OutputFileFor(localFolder, okRelative)], ((PyList)body["outputFiles"]).Items.Cast<PyStr>().Select(item => item.Value));
-        Assert.Contains("Show.S02E02.mkv", ((PyStr)body["message"]).Value, StringComparison.Ordinal);
+        Assert.Equal([OutputFileFor(localFolder, okRelative)], ((WireArray)body["outputFiles"]).Items.Cast<WireString>().Select(item => item.Value));
+        Assert.Contains("Show.S02E02.mkv", ((WireString)body["message"]).Value, StringComparison.Ordinal);
         Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM media_manager_handoffs WHERE handoff_id = 'partial' AND state = 'failed'"));
     }
 
@@ -281,9 +281,9 @@ public sealed class FolderHandoffCompletionTests
 
         Assert.Equal("reported completed to Deluno", finalStatus);
         var post = Assert.Single(fixture.Http.RequestsTo(HttpMethod.Post, ReportPath));
-        var body = (PyDict)post.Json!;
-        Assert.Equal("completed", ((PyStr)body["status"]).Value);
-        Assert.Equal([OutputFileFor(localFolder, relative)], ((PyList)body["outputFiles"]).Items.Cast<PyStr>().Select(item => item.Value));
+        var body = (WireObject)post.Json!;
+        Assert.Equal("completed", ((WireString)body["status"]).Value);
+        Assert.Equal([OutputFileFor(localFolder, relative)], ((WireArray)body["outputFiles"]).Items.Cast<WireString>().Select(item => item.Value));
     }
 
     /// <summary>
@@ -364,9 +364,9 @@ public sealed class FolderHandoffCompletionTests
         Assert.Equal(1, answered);
 
         var post = Assert.Single(fixture.Http.RequestsTo(HttpMethod.Post, ReportPath));
-        var body = (PyDict)post.Json!;
-        Assert.Equal("completed", ((PyStr)body["status"]).Value);
-        Assert.Equal([OutputFileFor(localFolder, finishingRelative)], ((PyList)body["outputFiles"]).Items.Cast<PyStr>().Select(item => item.Value));
+        var body = (WireObject)post.Json!;
+        Assert.Equal("completed", ((WireString)body["status"]).Value);
+        Assert.Equal([OutputFileFor(localFolder, finishingRelative)], ((WireArray)body["outputFiles"]).Items.Cast<WireString>().Select(item => item.Value));
     }
 
     /// <summary>Cancelling every one of a pack's files delivers nothing to the manager: the whole hand-off just ends cancelled.</summary>

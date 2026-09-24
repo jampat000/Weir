@@ -22,7 +22,7 @@ public static class WorkAdmissionReader
                 suite = new SuitePauseSettings(
                     reader.IsDBNull(0) ? null : reader.GetString(0),
                     Bool(reader.GetValue(1)),
-                    PythonTimestamps.Parse(reader.GetValue(2)) is { } until ? PyDateTime.FromUtc(until.UtcDateTime) : null,
+                    TimestampColumns.Parse(reader.GetValue(2)) is { } until ? Timestamp.FromUtc(until.UtcDateTime) : null,
                     Bool(reader.GetValue(3)));
             }
         }
@@ -133,7 +133,7 @@ public static class WorkAdmissionReader
                 "SELECT runner_cost, payload_json FROM jobs WHERE status = 'pending' AND job_kind = @kind " +
                 "AND (not_before IS NULL OR julianday(not_before) <= julianday(@now))";
             command.Parameters.AddWithValue("@kind", RemuxPassOutcomes.JobKind);
-            command.Parameters.AddWithValue("@now", PythonTimestamps.Adapter(now));
+            command.Parameters.AddWithValue("@now", TimestampColumns.Adapter(now));
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {

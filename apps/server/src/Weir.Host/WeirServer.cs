@@ -82,7 +82,7 @@ public static class WeirServer
             }
         });
 
-        var minimumLevel = PythonLogFormat.ParseMinimumLevel(options.LogLevel);
+        var minimumLevel = LogLineFormat.ParseMinimumLevel(options.LogLevel);
         var logFile = new WeirLogFile(Path.Join(options.LogDir, RuntimePaths.LogFileName), TimeProvider.System);
         builder.Services.AddSingleton(logFile);
         builder.Logging.ClearProviders();

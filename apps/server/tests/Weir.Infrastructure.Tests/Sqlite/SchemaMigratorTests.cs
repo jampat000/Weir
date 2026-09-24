@@ -7,11 +7,10 @@ namespace Weir.Infrastructure.Tests.Sqlite;
 public sealed class SchemaMigratorTests
 {
     [Fact]
-    public void An_alembic_database_at_the_frozen_baseline_is_upgraded_to_head()
+    public void A_database_at_the_frozen_baseline_is_upgraded_to_head()
     {
-        // An Alembic-created database is at the frozen baseline, the oldest revision this build knows how to
-        // reach. #557 added migrations past it, so EnsureAtHead upgrades it in place instead of adopting it
-        // unchanged.
+        // A database at the frozen baseline is the oldest revision this build knows how to reach. #557
+        // added migrations past it, so EnsureAtHead upgrades it in place instead of adopting it unchanged.
         using var temp = new TempDirectory();
         var path = temp.Join("weir.sqlite3");
         SchemaSnapshot.Execute(path, File.ReadAllText(RepositoryPaths.AlembicHeadReference));
@@ -45,10 +44,10 @@ public sealed class SchemaMigratorTests
     }
 
     [Fact]
-    public void An_older_alembic_revision_is_refused_untouched()
+    public void An_older_database_revision_is_refused_untouched()
     {
         using var temp = new TempDirectory();
-        var path = AlembicDatabaseAt(temp, "0035_direct_play_facts");
+        var path = DatabaseStampedAtRevision(temp, "0035_direct_play_facts");
         var before = SchemaSnapshot.Describe(path);
 
         var database = new SqliteDatabase(path);
@@ -68,7 +67,7 @@ public sealed class SchemaMigratorTests
     public void An_unknown_revision_is_refused_with_the_documented_message()
     {
         using var temp = new TempDirectory();
-        var path = AlembicDatabaseAt(temp, "0099_from_the_future");
+        var path = DatabaseStampedAtRevision(temp, "0099_from_the_future");
 
         var database = new SqliteDatabase(path);
         var error = Assert.Throws<DatabaseSchemaMismatchException>(() => new SchemaMigrator(database).EnsureAtHead());
@@ -303,9 +302,10 @@ public sealed class SchemaMigratorTests
         database.ClearPool();
     }
 
-    private static string AlembicDatabaseAt(TempDirectory temp, string revision)
+    /// <summary>A copy of the frozen baseline reference with its recorded revision replaced, for tests of the refusal path that only care what revision is stored, not the real schema at that revision.</summary>
+    private static string DatabaseStampedAtRevision(TempDirectory temp, string revision)
     {
-        var path = temp.Join("alembic.sqlite3");
+        var path = temp.Join("stamped.sqlite3");
         SchemaSnapshot.Execute(
             path,
             File.ReadAllText(RepositoryPaths.AlembicHeadReference)

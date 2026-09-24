@@ -107,17 +107,17 @@ public sealed class SuiteLogFilter
     /// <summary>One JSON log line, or <see langword="null"/> when it does not parse or has no timestamp or message.</summary>
     public static ParsedLogEntry? Parse(string raw)
     {
-        PyJson payload;
+        WireValue payload;
         try
         {
-            payload = PyJsonParser.Parse(raw);
+            payload = WireJsonParser.Parse(raw);
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
             return null;
         }
 
-        if (payload is not PyDict dict)
+        if (payload is not WireObject dict)
         {
             return null;
         }
@@ -156,16 +156,16 @@ public sealed class SuiteLogFilter
     }
 
     /// <summary>The entry as the Logs API returns it, or <see langword="null"/> when the timestamp does not parse.</summary>
-    public static PyDict? ToOut(ParsedLogEntry entry)
+    public static WireObject? ToOut(ParsedLogEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        if (!PyDateTime.TryFromIsoFormat(entry.Timestamp.Replace("Z", "+00:00", StringComparison.Ordinal), out var parsed))
+        if (!Timestamp.TryFromIsoFormat(entry.Timestamp.Replace("Z", "+00:00", StringComparison.Ordinal), out var parsed))
         {
             return null;
         }
 
-        return new PyDict()
-            .Set("timestamp", parsed.PydanticJson())
+        return new WireObject()
+            .Set("timestamp", parsed.ToWireText())
             .Set("level", entry.Level)
             .Set("component", entry.Component)
             .Set("message", entry.Message)
@@ -177,11 +177,11 @@ public sealed class SuiteLogFilter
             .Set("job_id", entry.JobId);
     }
 
-    private static string OrText(PyJson? value, string fallback) => value is null || !value.IsTruthy ? fallback : PyConvert.Str(value);
+    private static string OrText(WireValue? value, string fallback) => value is null || !value.IsTruthy ? fallback : WireConvert.Str(value);
 
-    private static string ComponentLabel(string logger, PyJson? source)
+    private static string ComponentLabel(string logger, WireValue? source)
     {
-        var sourceText = source is null || !source.IsTruthy ? string.Empty : PyConvert.Str(source);
+        var sourceText = source is null || !source.IsTruthy ? string.Empty : WireConvert.Str(source);
         var haystack = $"{logger} {sourceText}".ToLowerInvariant();
         if (haystack.Contains("weir.processing", StringComparison.Ordinal))
         {
@@ -196,14 +196,14 @@ public sealed class SuiteLogFilter
         return haystack.Contains("platform.activity", StringComparison.Ordinal) ? "Activity" : "System";
     }
 
-    private static string? CleanOptional(PyJson? value)
+    private static string? CleanOptional(WireValue? value)
     {
-        if (value is null or PyNull)
+        if (value is null or WireNull)
         {
             return null;
         }
 
-        var text = PyConvert.Str(value).Trim();
+        var text = WireConvert.Str(value).Trim();
         return text.Length == 0 ? null : text;
     }
 

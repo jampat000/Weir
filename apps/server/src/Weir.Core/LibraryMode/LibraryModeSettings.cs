@@ -81,32 +81,32 @@ public sealed record LibrarySettings(
 {
     public static LibrarySettings Empty { get; } = new([], false);
 
-    public PyDict ToPayload(long libraryId) => new PyDict()
+    public WireObject ToPayload(long libraryId) => new WireObject()
         .Set("library_id", libraryId)
-        .Set("library_folders", new PyList(Folders.Select(f => (PyJson)new PyStr(f))))
+        .Set("library_folders", new WireArray(Folders.Select(f => (WireValue)new WireString(f))))
         .Set("library_schedule_enabled", ScheduleEnabled)
         .Set("clean_hardlinked_files", CleanHardlinkedFiles)
         .Set("skip_if_manager_would_redownload", SkipIfManagerWouldRedownload)
         .Set("keep_original_after_clean", KeepOriginalAfterClean)
         .Set("originals_folder", OriginalsFolder);
 
-    public static LibrarySettings FromPayload(PyDict? payload)
+    public static LibrarySettings FromPayload(WireObject? payload)
     {
         if (payload is null)
         {
             return Empty;
         }
 
-        var folders = payload.Get("library_folders") is PyList list
-            ? list.Items.OfType<PyStr>().Select(s => s.Value).Where(s => s.Length > 0).ToList()
+        var folders = payload.Get("library_folders") is WireArray list
+            ? list.Items.OfType<WireString>().Select(s => s.Value).Where(s => s.Length > 0).ToList()
             : [];
-        var scheduleEnabled = payload.Get("library_schedule_enabled") is PyBool { Value: true };
+        var scheduleEnabled = payload.Get("library_schedule_enabled") is WireBool { Value: true };
         // Absent on a settings row written before #508 (or a brand-new library): the documented defaults.
-        var cleanHardlinkedFiles = payload.Get("clean_hardlinked_files") is PyBool { Value: true };
-        var skipIfManagerWouldRedownload = payload.Get("skip_if_manager_would_redownload") is not PyBool { Value: false };
+        var cleanHardlinkedFiles = payload.Get("clean_hardlinked_files") is WireBool { Value: true };
+        var skipIfManagerWouldRedownload = payload.Get("skip_if_manager_would_redownload") is not WireBool { Value: false };
         // Absent on a settings row written before #735: off, and the default originals folder.
-        var keepOriginalAfterClean = payload.Get("keep_original_after_clean") is PyBool { Value: true };
-        var originalsFolder = payload.Get("originals_folder") is PyStr originalsFolderValue ? originalsFolderValue.Value : "";
+        var keepOriginalAfterClean = payload.Get("keep_original_after_clean") is WireBool { Value: true };
+        var originalsFolder = payload.Get("originals_folder") is WireString originalsFolderValue ? originalsFolderValue.Value : "";
         return new LibrarySettings(
             folders, scheduleEnabled, cleanHardlinkedFiles, skipIfManagerWouldRedownload, keepOriginalAfterClean, originalsFolder);
     }

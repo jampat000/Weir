@@ -54,7 +54,7 @@ public static class JobsInspectionStore
         ($"SELECT {ProcessingJobStore.JobColumns} FROM jobs WHERE NOT (status = @completed AND job_kind = @scan_kind) ORDER BY updated_at DESC LIMIT {limit}",
             [("@completed", ProcessingJobStatus.Completed), ("@scan_kind", "processing.watched_folder.remux_scan_dispatch.v1")]);
 
-    private static DateTimeOffset? ToOffset(PyDateTime? value) => value is { } v ? new DateTimeOffset(v.AsUtc, TimeSpan.Zero) : null;
+    private static DateTimeOffset? ToOffset(Timestamp? value) => value is { } v ? new DateTimeOffset(v.AsUtc, TimeSpan.Zero) : null;
 
     // Timestamps go through the strict ISO reader in SqliteValues rather than ProcessingJobStore.ReadJob's parser: the two
     // differ on unusual stored text, and the inspection API keeps its existing output and errors.

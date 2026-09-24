@@ -16,22 +16,22 @@ public sealed partial class OutputFolderCleanup
 
             var scope = "movie";
             var jobRel = string.Empty;
-            if (job.PayloadJson is { } raw && PyStrings.Strip(raw).Length > 0)
+            if (job.PayloadJson is { } raw && WireStrings.Strip(raw).Length > 0)
             {
-                PyJson data;
+                WireValue data;
                 try
                 {
-                    data = PyJsonParser.Parse(raw);
+                    data = WireJsonParser.Parse(raw);
                 }
-                catch (PyJsonDecodeException)
+                catch (WireJsonDecodeException)
                 {
                     continue;
                 }
 
-                if (data is PyDict dict)
+                if (data is WireObject dict)
                 {
-                    scope = ProcessingMediaScopes.Normalize((dict.Get("media_scope") as PyStr)?.Value);
-                    if (dict.Get("relative_media_path") is PyStr jr && PyStrings.Strip(jr.Value).Length > 0)
+                    scope = ProcessingMediaScopes.Normalize((dict.Get("media_scope") as WireString)?.Value);
+                    if (dict.Get("relative_media_path") is WireString jr && WireStrings.Strip(jr.Value).Length > 0)
                     {
                         jobRel = NormalizeRelativeForMatch(jr.Value);
                     }
@@ -63,24 +63,24 @@ public sealed partial class OutputFolderCleanup
 
             var scope = "movie";
             var jobRel = string.Empty;
-            if (job.PayloadJson is { } raw && PyStrings.Strip(raw).Length > 0)
+            if (job.PayloadJson is { } raw && WireStrings.Strip(raw).Length > 0)
             {
-                PyJson data;
+                WireValue data;
                 try
                 {
-                    data = PyJsonParser.Parse(raw);
+                    data = WireJsonParser.Parse(raw);
                 }
-                catch (PyJsonDecodeException)
+                catch (WireJsonDecodeException)
                 {
                     continue;
                 }
 
-                if (data is PyDict dict)
+                if (data is WireObject dict)
                 {
-                    scope = dict.Get("media_scope") is PyStr js && string.Equals(PyStrings.Strip(js.Value), "tv", StringComparison.OrdinalIgnoreCase) ? "tv" : "movie";
-                    if (dict.Get("relative_media_path") is PyStr jr && PyStrings.Strip(jr.Value).Length > 0)
+                    scope = dict.Get("media_scope") is WireString js && string.Equals(WireStrings.Strip(js.Value), "tv", StringComparison.OrdinalIgnoreCase) ? "tv" : "movie";
+                    if (dict.Get("relative_media_path") is WireString jr && WireStrings.Strip(jr.Value).Length > 0)
                     {
-                        jobRel = PyStrings.Strip(jr.Value);
+                        jobRel = WireStrings.Strip(jr.Value);
                     }
                 }
             }

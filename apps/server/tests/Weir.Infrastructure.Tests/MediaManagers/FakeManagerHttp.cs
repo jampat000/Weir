@@ -10,7 +10,7 @@ internal sealed record RecordedRequest(HttpMethod Method, Uri Uri, IReadOnlyDict
 {
     public string PathAndQuery => Uri.PathAndQuery;
 
-    public PyJson? Json => Body.Length == 0 ? null : PyJsonParser.Parse(Body);
+    public WireValue? Json => Body.Length == 0 ? null : WireJsonParser.Parse(Body);
 }
 
 /// <summary>

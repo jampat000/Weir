@@ -10,7 +10,7 @@ public static class ProcessingFailureCleanupActivity
 {
     private static string Label(string mediaScope) => mediaScope == "tv" ? "TV" : "Movies";
 
-    private static PyDict WithOutcome(PyDict detail, string result, string? trigger)
+    private static WireObject WithOutcome(WireObject detail, string result, string? trigger)
     {
         var copy = detail.Copy();
         if (copy.Get("result") is null)
@@ -26,19 +26,19 @@ public static class ProcessingFailureCleanupActivity
         return copy;
     }
 
-    public static Task RecordSweepStartedAsync(UnitOfWork uow, string mediaScope, PyDict detail, string? trigger)
+    public static Task RecordSweepStartedAsync(UnitOfWork uow, string mediaScope, WireObject detail, string? trigger)
     {
         var withOutcome = WithOutcome(detail, "running", trigger);
         return SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(
             ActivityEventTypes.ProcessingFailureCleanupSweepCompleted, "processing",
             $"Cleanup started for {Label(mediaScope)}",
-            PyStrings.Slice(PyJsonWriter.Dumps(withOutcome, PyJsonFormat.Compact), 10_000)));
+            WireStrings.Slice(WireJsonWriter.Dumps(withOutcome, WireJsonFormat.Compact), 10_000)));
     }
 
-    public static Task RecordSweepCompletedAsync(UnitOfWork uow, string mediaScope, PyDict detail, string? trigger)
+    public static Task RecordSweepCompletedAsync(UnitOfWork uow, string mediaScope, WireObject detail, string? trigger)
     {
         var label = Label(mediaScope);
-        var status = detail.Get("cleanup_run_status") is PyStr statusValue ? statusValue.Value : null;
+        var status = detail.Get("cleanup_run_status") is WireString statusValue ? statusValue.Value : null;
         var (title, result) = status switch
         {
             "no_eligible_files" => ($"Cleanup checked {label}: no changes needed", "success"),
@@ -48,6 +48,6 @@ public static class ProcessingFailureCleanupActivity
         var withOutcome = WithOutcome(detail, result, trigger);
         return SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(
             ActivityEventTypes.ProcessingFailureCleanupSweepCompleted, "processing", title,
-            PyStrings.Slice(PyJsonWriter.Dumps(withOutcome, PyJsonFormat.Compact), 10_000)));
+            WireStrings.Slice(WireJsonWriter.Dumps(withOutcome, WireJsonFormat.Compact), 10_000)));
     }
 }

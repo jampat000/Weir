@@ -105,7 +105,7 @@ public sealed class LibraryFileChangeNotifierTests
         await notifier.NotifyAsync(new LibraryFileChange("movie", "/media/f.mkv", Reason: "removed 2 audio tracks"));
 
         var request = Assert.Single(fixture.Http.RequestsTo(HttpMethod.Post, "/api/integrations/external/file-changed"));
-        Assert.Equal("""{"path":"/media/f.mkv","tool":"Weir","reason":"removed 2 audio tracks"}""", PyJsonWriter.Dumps(request.Json!, PyJsonFormat.Compact));
+        Assert.Equal("""{"path":"/media/f.mkv","tool":"Weir","reason":"removed 2 audio tracks"}""", WireJsonWriter.Dumps(request.Json!, WireJsonFormat.Compact));
         Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'library.file_change_notified'"));
     }
 
@@ -143,6 +143,6 @@ public sealed class LibraryFileChangeNotifierTests
         await notifier.NotifyAsync(new LibraryFileChange("movie", localFile, LocalLibraryRoot: localRoot));
 
         var command = Assert.Single(fixture.Http.RequestsTo(HttpMethod.Post, "/api/v3/command"));
-        Assert.Equal("""{"name":"RescanMovie","movieId":7}""", PyJsonWriter.Dumps(command.Json!, PyJsonFormat.Compact));
+        Assert.Equal("""{"name":"RescanMovie","movieId":7}""", WireJsonWriter.Dumps(command.Json!, WireJsonFormat.Compact));
     }
 }

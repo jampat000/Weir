@@ -10,21 +10,21 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 /// </summary>
 public static class ManualPlanJson
 {
-    public static PyDict ToPyDict(ManualPlanChoice choice)
+    public static WireObject ToPyDict(ManualPlanChoice choice)
     {
         ArgumentNullException.ThrowIfNull(choice);
-        return new PyDict()
-            .Set("keep", new PyList(choice.Keep.Select(e => (PyJson)new PyDict()
+        return new WireObject()
+            .Set("keep", new WireArray(choice.Keep.Select(e => (WireValue)new WireObject()
                 .Set("index", e.Index)
                 .Set("default", e.Default)
                 .Set("forced", e.Forced))))
-            .Set("order", new PyList(choice.Order.Select(i => (PyJson)new PyInt(i))));
+            .Set("order", new WireArray(choice.Order.Select(i => (WireValue)new WireInteger(i))));
     }
 
     /// <summary>Null when the payload's <c>manual_plan</c> is missing or not shaped as expected.</summary>
-    public static ManualPlanChoice? FromPyJson(PyJson? value)
+    public static ManualPlanChoice? FromPyJson(WireValue? value)
     {
-        if (value is not PyDict dict || dict.Get("keep") is not PyList keepList)
+        if (value is not WireObject dict || dict.Get("keep") is not WireArray keepList)
         {
             return null;
         }
@@ -32,22 +32,22 @@ public static class ManualPlanJson
         var keep = new List<ManualKeepEntry>();
         foreach (var item in keepList.Items)
         {
-            if (item is not PyDict entry || entry.Get("index") is not PyInt index)
+            if (item is not WireObject entry || entry.Get("index") is not WireInteger index)
             {
                 return null;
             }
 
-            var isDefault = entry.Get("default") is PyBool { Value: true };
-            var forced = entry.Get("forced") is PyBool { Value: true };
+            var isDefault = entry.Get("default") is WireBool { Value: true };
+            var forced = entry.Get("forced") is WireBool { Value: true };
             keep.Add(new ManualKeepEntry((int)index.Value, isDefault, forced));
         }
 
         var order = new List<int>();
-        if (dict.Get("order") is PyList orderList)
+        if (dict.Get("order") is WireArray orderList)
         {
             foreach (var item in orderList.Items)
             {
-                if (item is PyInt orderIndex)
+                if (item is WireInteger orderIndex)
                 {
                     order.Add((int)orderIndex.Value);
                 }
@@ -57,20 +57,20 @@ public static class ManualPlanJson
         return new ManualPlanChoice(keep, order);
     }
 
-    public static PyDict ToPyDict(SourceFingerprint fingerprint) => new PyDict()
-        .Set("device", new PyInt(fingerprint.Device))
-        .Set("inode", new PyInt(fingerprint.Inode))
+    public static WireObject ToPyDict(SourceFingerprint fingerprint) => new WireObject()
+        .Set("device", new WireInteger(fingerprint.Device))
+        .Set("inode", new WireInteger(fingerprint.Inode))
         .Set("size_bytes", fingerprint.SizeBytes)
         .Set("modified_time_ns", fingerprint.ModifiedTimeNs);
 
     /// <summary>Null when the payload's <c>source_fingerprint</c> is missing or not shaped as expected.</summary>
-    public static SourceFingerprint? FingerprintFromPyJson(PyJson? value)
+    public static SourceFingerprint? FingerprintFromPyJson(WireValue? value)
     {
-        if (value is not PyDict dict
-            || dict.Get("device") is not PyInt device
-            || dict.Get("inode") is not PyInt inode
-            || dict.Get("size_bytes") is not PyInt sizeBytes
-            || dict.Get("modified_time_ns") is not PyInt modifiedTimeNs)
+        if (value is not WireObject dict
+            || dict.Get("device") is not WireInteger device
+            || dict.Get("inode") is not WireInteger inode
+            || dict.Get("size_bytes") is not WireInteger sizeBytes
+            || dict.Get("modified_time_ns") is not WireInteger modifiedTimeNs)
         {
             return null;
         }

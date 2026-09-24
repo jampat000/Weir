@@ -141,7 +141,7 @@ internal sealed class JobsTestDatabase : IDisposable
         Execute(
             "UPDATE suite_settings SET processing_paused = 1, scan_while_paused = @scan, processing_paused_until = @until WHERE id = 1",
             ("@scan", scanWhilePaused ? 1 : 0),
-            ("@until", until is { } value ? PythonTimestamps.Orm(value) : null));
+            ("@until", until is { } value ? TimestampColumns.Orm(value) : null));
 
     /// <summary>Insert a library row and return its id.</summary>
     public long AddLibrary(

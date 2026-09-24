@@ -68,7 +68,7 @@ public sealed class ProcessingJobProcessor
         ClaimableKinds? kinds = null,
         CancellationToken cancellationToken = default)
     {
-        var when = PyDateTime.TruncateToMicroseconds((now ?? _time.GetUtcNow()).ToUniversalTime());
+        var when = Timestamp.TruncateToMicroseconds((now ?? _time.GetUtcNow()).ToUniversalTime());
         var leaseUntil = when + TimeSpan.FromSeconds(leaseSeconds);
 
         // The schedule and the pause are evaluated at lease time, not only at enqueue (#337). A job
@@ -187,7 +187,7 @@ public sealed class ProcessingJobProcessor
         }
 
         // The handler finished; only recording that failed. Said plainly, with the detail after it.
-        var bounded = PyStrings.Slice(
+        var bounded = WireStrings.Slice(
             TerminalizationFailurePrefix + WorkerFailures.StoredError(
                 FailureMessages.FromException(
                     Module,
@@ -291,7 +291,7 @@ public sealed class ProcessingJobProcessor
                               JobPayload.LooseInteger(payload, "library_id") is not null)
             ? raw
             : (System.Text.Json.JsonElement?)null;
-        var safeMessage = PyStrings.Slice(string.Join(' ', message.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)), 1200);
+        var safeMessage = WireStrings.Slice(string.Join(' ', message.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)), 1200);
 
         try
         {
@@ -299,7 +299,7 @@ public sealed class ProcessingJobProcessor
                 new UnhandledJobFailure(context, JobPayload.LooseInteger(payload, "library_id"), scope, relativeTrimmed, safeMessage),
                 CancellationToken.None).ConfigureAwait(false);
 
-            var detail = new PyDict()
+            var detail = new WireObject()
                 .Set("job_id", context.Id)
                 .Set("job_kind", context.JobKind)
                 .Set("failure_class", "unknown")
@@ -314,12 +314,12 @@ public sealed class ProcessingJobProcessor
 
             if (libraryIdValue is { } libraryId)
             {
-                detail.Set("library_id", PyJsonParser.Parse(libraryId.GetRawText()));
+                detail.Set("library_id", WireJsonParser.Parse(libraryId.GetRawText()));
             }
 
             AddProvenance(detail, payload);
             await _activity.RecordAsync(
-                new ActivityEventDraft(ActivityEventTypes.ProcessingWorkerFailure, "processing", "A Weir job stopped with an error", PyJsonWriter.Dumps(detail, PyJsonFormat.Compact)),
+                new ActivityEventDraft(ActivityEventTypes.ProcessingWorkerFailure, "processing", "A Weir job stopped with an error", WireJsonWriter.Dumps(detail, WireJsonFormat.Compact)),
                 CancellationToken.None).ConfigureAwait(false);
         }
 #pragma warning disable CA1031 // Diagnostics must never stop the worker from failing the job.
@@ -331,7 +331,7 @@ public sealed class ProcessingJobProcessor
     }
 
     /// <summary>Copy <c>trigger</c> and <c>run_id</c> from the payload, only when present and valid.</summary>
-    internal static void AddProvenance(PyDict detail, System.Text.Json.JsonElement? payload)
+    internal static void AddProvenance(WireObject detail, System.Text.Json.JsonElement? payload)
     {
         if (payload is not { } element)
         {
@@ -354,7 +354,7 @@ public sealed class ProcessingJobProcessor
             };
             if (valid)
             {
-                detail.Set("run_id", PyJsonParser.Parse(runId.GetRawText()));
+                detail.Set("run_id", WireJsonParser.Parse(runId.GetRawText()));
             }
         }
     }

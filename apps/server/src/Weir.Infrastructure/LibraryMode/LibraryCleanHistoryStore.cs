@@ -14,7 +14,7 @@ public sealed record LibraryCleanHistoryFilter
 
     public long? LibraryId { get; init; }
     public string? PathContains { get; init; }
-    public PyDateTime? Since { get; init; }
+    public Timestamp? Since { get; init; }
     public int Limit { get; init; } = DefaultLimit;
 
     public int ClampedLimit => Math.Clamp(Limit, 1, MaxLimit);
@@ -23,7 +23,7 @@ public sealed record LibraryCleanHistoryFilter
 /// <summary>The latest thing a library clean did to one file.</summary>
 public sealed record LibraryCleanHistoryRow(
     long Id,
-    PyDateTime RecordedAt,
+    Timestamp RecordedAt,
     string Outcome,
     string Detail,
     string? Trigger,

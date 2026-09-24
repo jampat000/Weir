@@ -52,7 +52,7 @@ public static class RemuxPassEnqueue
             throw new RemuxPassEnqueueException(404, "The selected library no longer exists. Refresh Libraries and try again.");
         }
 
-        if (library is null || PyStrings.Strip(library.WatchedFolder ?? string.Empty).Length == 0)
+        if (library is null || WireStrings.Strip(library.WatchedFolder ?? string.Empty).Length == 0)
         {
             var label = mediaScope == "tv" ? "TV" : "Movies";
             throw new RemuxPassEnqueueException(
@@ -62,9 +62,9 @@ public static class RemuxPassEnqueue
                 "Saving path settings does not require a watched folder, but you must configure it before enqueueing this job kind.");
         }
 
-        var relative = PyStrings.Strip(relativeMediaPath);
+        var relative = WireStrings.Strip(relativeMediaPath);
         var effectiveLibraryId = library.Id;
-        var payload = new PyDict()
+        var payload = new WireObject()
             .Set("relative_media_path", relative)
             .Set("media_scope", mediaScope)
             .Set("library_id", effectiveLibraryId)
@@ -74,14 +74,14 @@ public static class RemuxPassEnqueue
         if (passThroughUnchanged && await PendingJobForPathAsync(uow, relative, effectiveLibraryId).ConfigureAwait(false) is { } pending)
         {
             // Keep hand-off metadata and other additive fields already carried by the queued job.
-            PyDict existing;
+            WireObject existing;
             try
             {
-                existing = PyJsonParser.Parse(string.IsNullOrEmpty(pending.PayloadJson) ? "{}" : pending.PayloadJson) as PyDict ?? new PyDict();
+                existing = WireJsonParser.Parse(string.IsNullOrEmpty(pending.PayloadJson) ? "{}" : pending.PayloadJson) as WireObject ?? new WireObject();
             }
-            catch (PyJsonDecodeException)
+            catch (WireJsonDecodeException)
             {
-                existing = new PyDict();
+                existing = new WireObject();
             }
 
             foreach (var (key, value) in payload.Items)
@@ -89,7 +89,7 @@ public static class RemuxPassEnqueue
                 existing.Set(key, value);
             }
 
-            var json = PyJsonWriter.Dumps(existing, PyJsonFormat.Compact);
+            var json = WireJsonWriter.Dumps(existing, WireJsonFormat.Compact);
             await uow.ExecuteAsync(
                 "UPDATE jobs SET payload_json = $payload, not_before = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $id",
                 ("$payload", json),
@@ -102,7 +102,7 @@ public static class RemuxPassEnqueue
             uow.WriteTransaction(),
             $"{RemuxPassOutcomes.JobKind}:{Guid.NewGuid():N}",
             RemuxPassOutcomes.JobKind,
-            PyJsonWriter.Dumps(payload, PyJsonFormat.Compact),
+            WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
             0,
             0);
@@ -112,7 +112,7 @@ public static class RemuxPassEnqueue
     public static async Task<ProcessingJob?> PendingJobForPathAsync(UnitOfWork uow, string relativePath, long? libraryId)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        var wanted = PyStrings.Strip(relativePath ?? string.Empty);
+        var wanted = WireStrings.Strip(relativePath ?? string.Empty);
         if (wanted.Length == 0)
         {
             return null;
@@ -130,22 +130,22 @@ public static class RemuxPassEnqueue
                 continue;
             }
 
-            PyJson data;
+            WireValue data;
             try
             {
-                data = PyJsonParser.Parse(job.PayloadJson);
+                data = WireJsonParser.Parse(job.PayloadJson);
             }
-            catch (PyJsonDecodeException)
+            catch (WireJsonDecodeException)
             {
                 continue;
             }
 
-            if (data is not PyDict dict || dict.Get("relative_media_path") is not PyStr { } path || path.Value != wanted)
+            if (data is not WireObject dict || dict.Get("relative_media_path") is not WireString { } path || path.Value != wanted)
             {
                 continue;
             }
 
-            if (libraryId is { } id && dict.Get("library_id") is { } jobLibrary and not PyNull && !(jobLibrary is PyInt number && number.Value == id))
+            if (libraryId is { } id && dict.Get("library_id") is { } jobLibrary and not WireNull && !(jobLibrary is WireInteger number && number.Value == id))
             {
                 continue;
             }

@@ -184,7 +184,7 @@ public sealed class ActivityHistoryStoreTests
     [Fact]
     public void Csv_quotes_only_what_the_excel_dialect_quotes()
     {
-        var row = new ActivityEventRow(7, PyDateTime.Naive(new DateTime(2026, 1, 2, 3, 4, 5)), "a.b", "processing", "comma, \"quote\"", "line\nbreak", null, null, null, "plain;tab\t", null);
+        var row = new ActivityEventRow(7, Timestamp.Naive(new DateTime(2026, 1, 2, 3, 4, 5)), "a.b", "processing", "comma, \"quote\"", "line\nbreak", null, null, null, "plain;tab\t", null);
         Assert.Equal(
             "id,created_at,module,event_type,trigger,result,library_id,relative_path,title,detail\r\n" +
             "7,2026-01-02T03:04:05,processing,a.b,,,,plain;tab\t,\"comma, \"\"quote\"\"\",\"line\nbreak\"\r\n",
@@ -199,7 +199,7 @@ public sealed class ActivityHistoryStoreTests
     [InlineData("\tindented")]
     public void Csv_writes_a_cell_a_spreadsheet_would_run_as_text(string title)
     {
-        var row = new ActivityEventRow(7, PyDateTime.Naive(new DateTime(2026, 1, 2, 3, 4, 5)), "a.b", "processing", title, null, null, null, null, "Film/film.mkv", null);
+        var row = new ActivityEventRow(7, Timestamp.Naive(new DateTime(2026, 1, 2, 3, 4, 5)), "a.b", "processing", title, null, null, null, null, "Film/film.mkv", null);
 
         var line = ActivityHistory.ExportCsv([row]).Split("\r\n")[1];
 
@@ -209,7 +209,7 @@ public sealed class ActivityHistoryStoreTests
     [Fact]
     public void Csv_leaves_ordinary_cells_as_they_are()
     {
-        var row = new ActivityEventRow(7, PyDateTime.Naive(new DateTime(2026, 1, 2, 3, 4, 5)), "a.b", "processing", "Film (2020) - 1080p", null, null, null, null, "Film/film.mkv", null);
+        var row = new ActivityEventRow(7, Timestamp.Naive(new DateTime(2026, 1, 2, 3, 4, 5)), "a.b", "processing", "Film (2020) - 1080p", null, null, null, null, "Film/film.mkv", null);
 
         Assert.Equal(
             "7,2026-01-02T03:04:05,processing,a.b,,,,Film/film.mkv,Film (2020) - 1080p,",
@@ -234,7 +234,7 @@ public sealed class ActivityHistoryStoreTests
             var page = await ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: null);
             var count = await ActivityHistoryStore.CountAsync(uow, ActivityFilter.None);
             var body = ActivityHistory.RecentOut(page.Items, page.HasMore, count, 90, null);
-            using var doc = JsonDocument.Parse(PyJsonWriter.DumpsUtf8(body, PyJsonFormat.Response));
+            using var doc = JsonDocument.Parse(WireJsonWriter.DumpsUtf8(body, WireJsonFormat.Response));
             return (doc.RootElement.GetProperty("total").GetInt64(), doc.RootElement.GetProperty("has_more").GetBoolean(), page.Items.Count);
         });
         Assert.Equal(3, total);
@@ -294,18 +294,18 @@ public sealed class ActivityHistoryStoreTests
         await fixture.Execute(
             "INSERT INTO activity_events (created_at, event_type, module, title) VALUES ('2026-01-02 03:04:05', 'a.1', 'processing', 'exact')");
 
-        Assert.True(PyDateTime.TryFromIsoFormat("2026-01-02T03:04:05", out var naiveBoundary));
+        Assert.True(Timestamp.TryFromIsoFormat("2026-01-02T03:04:05", out var naiveBoundary));
         var atBoundary = new ActivityFilter(DateFrom: naiveBoundary);
         Assert.Single((await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, atBoundary, limit: 10, beforeId: null))).Items);
 
         // The same instant, named with a +02:00 offset: an ignored offset would compare "05:04:05" against
         // the stored "03:04:05" and wrongly exclude the row.
-        Assert.True(PyDateTime.TryFromIsoFormat("2026-01-02T05:04:05+02:00", out var sameInstantOffset));
+        Assert.True(Timestamp.TryFromIsoFormat("2026-01-02T05:04:05+02:00", out var sameInstantOffset));
         var atOffsetBoundary = new ActivityFilter(DateFrom: sameInstantOffset);
         Assert.Single((await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, atOffsetBoundary, limit: 10, beforeId: null))).Items);
 
         // One second later in the same offset: now past the row, in either timezone.
-        Assert.True(PyDateTime.TryFromIsoFormat("2026-01-02T06:04:06+02:00", out var pastIt));
+        Assert.True(Timestamp.TryFromIsoFormat("2026-01-02T06:04:06+02:00", out var pastIt));
         var pastFilter = new ActivityFilter(DateFrom: pastIt);
         Assert.Empty((await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, pastFilter, limit: 10, beforeId: null))).Items);
     }
@@ -323,8 +323,8 @@ public sealed class ActivityHistoryStoreTests
             "('2026-01-02 23:30:00-05:00', 'a.1', 'processing', 'written the day before'), " + // 2026-01-03 04:30 UTC
             "('2026-01-03 03:00:00+10:00', 'a.2', 'processing', 'written the day after')"); // 2026-01-02 17:00 UTC
 
-        Assert.True(PyDateTime.TryFromIsoFormat("2026-01-03T04:00:00+00:00", out var from));
-        Assert.True(PyDateTime.TryFromIsoFormat("2026-01-02T18:00:00+00:00", out var to));
+        Assert.True(Timestamp.TryFromIsoFormat("2026-01-03T04:00:00+00:00", out var from));
+        Assert.True(Timestamp.TryFromIsoFormat("2026-01-02T18:00:00+00:00", out var to));
         var after = await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, new ActivityFilter(DateFrom: from), limit: 10, beforeId: null));
         var before = await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, new ActivityFilter(DateTo: to), limit: 10, beforeId: null));
 

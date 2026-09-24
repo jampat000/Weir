@@ -3,37 +3,37 @@ using System.Text;
 
 namespace Weir.Core.Json;
 
-/// <summary>How <see cref="PyJsonWriter"/> lays out JSON: escaping, separators, indentation and key order.</summary>
+/// <summary>How <see cref="WireJsonWriter"/> lays out JSON: escaping, separators, indentation and key order.</summary>
 /// <param name="EnsureAscii">Escape every non-ASCII character as <c>\uXXXX</c>.</param>
 /// <param name="ItemSeparator">Between items.</param>
 /// <param name="KeySeparator">Between a key and its value.</param>
 /// <param name="Indent">Pretty-print with this many spaces, or <see langword="null"/> for one line.</param>
 /// <param name="SortKeys">Sort object keys.</param>
-public sealed record PyJsonFormat(bool EnsureAscii, string ItemSeparator, string KeySeparator, int? Indent, bool SortKeys)
+public sealed record WireJsonFormat(bool EnsureAscii, string ItemSeparator, string KeySeparator, int? Indent, bool SortKeys)
 {
     /// <summary>API responses: non-ASCII written as-is, no spaces after separators.</summary>
-    public static readonly PyJsonFormat Response = new(false, ",", ":", null, false);
+    public static readonly WireJsonFormat Response = new(false, ",", ":", null, false);
 
     /// <summary>One line, ASCII-escaped, with <c>", "</c> and <c>": "</c> separators.</summary>
-    public static readonly PyJsonFormat Default = new(true, ", ", ": ", null, false);
+    public static readonly WireJsonFormat Default = new(true, ", ", ": ", null, false);
 
     /// <summary>Two-space indent with sorted keys (configuration snapshots).</summary>
-    public static readonly PyJsonFormat IndentedSorted = new(true, ",", ": ", 2, true);
+    public static readonly WireJsonFormat IndentedSorted = new(true, ",", ": ", 2, true);
 
     /// <summary>Two-space indent in insertion order.</summary>
-    public static readonly PyJsonFormat Indented = new(true, ",", ": ", 2, false);
+    public static readonly WireJsonFormat Indented = new(true, ",", ": ", 2, false);
 
     /// <summary>One line, ASCII-escaped, no spaces after separators.</summary>
-    public static readonly PyJsonFormat Compact = new(true, ",", ":", null, false);
+    public static readonly WireJsonFormat Compact = new(true, ",", ":", null, false);
 }
 
 /// <summary>
 /// Writes JSON with fixed float formatting, escaping rules and separators so API responses stay
 /// byte-identical for existing clients and stored JSON matches what earlier releases wrote.
 /// </summary>
-public static class PyJsonWriter
+public static class WireJsonWriter
 {
-    public static string Dumps(PyJson value, PyJsonFormat format)
+    public static string Dumps(WireValue value, WireJsonFormat format)
     {
         ArgumentNullException.ThrowIfNull(value);
         ArgumentNullException.ThrowIfNull(format);
@@ -42,7 +42,7 @@ public static class PyJsonWriter
         return builder.ToString();
     }
 
-    public static byte[] DumpsUtf8(PyJson value, PyJsonFormat format) => Encoding.UTF8.GetBytes(Dumps(value, format));
+    public static byte[] DumpsUtf8(WireValue value, WireJsonFormat format) => Encoding.UTF8.GetBytes(Dumps(value, format));
 
     /// <summary>
     /// A float as JSON text: shortest round-trip digits, whole values as <c>1.0</c>, exponent form
@@ -133,29 +133,29 @@ public static class PyJsonWriter
         return (all, point);
     }
 
-    private static void Write(StringBuilder builder, PyJson value, PyJsonFormat format, int level)
+    private static void Write(StringBuilder builder, WireValue value, WireJsonFormat format, int level)
     {
         switch (value)
         {
-            case PyNull:
+            case WireNull:
                 builder.Append("null");
                 break;
-            case PyBool b:
+            case WireBool b:
                 builder.Append(b.Value ? "true" : "false");
                 break;
-            case PyInt i:
+            case WireInteger i:
                 builder.Append(i.Value.ToString(CultureInfo.InvariantCulture));
                 break;
-            case PyFloat f:
+            case WireNumber f:
                 builder.Append(FloatRepr(f.Value));
                 break;
-            case PyStr s:
+            case WireString s:
                 WriteString(builder, s.Value, format.EnsureAscii);
                 break;
-            case PyList list:
+            case WireArray list:
                 WriteList(builder, list, format, level);
                 break;
-            case PyDict dict:
+            case WireObject dict:
                 WriteDict(builder, dict, format, level);
                 break;
             default:
@@ -163,7 +163,7 @@ public static class PyJsonWriter
         }
     }
 
-    private static void WriteList(StringBuilder builder, PyList list, PyJsonFormat format, int level)
+    private static void WriteList(StringBuilder builder, WireArray list, WireJsonFormat format, int level)
     {
         if (list.Items.Count == 0)
         {
@@ -187,7 +187,7 @@ public static class PyJsonWriter
         builder.Append(']');
     }
 
-    private static void WriteDict(StringBuilder builder, PyDict dict, PyJsonFormat format, int level)
+    private static void WriteDict(StringBuilder builder, WireObject dict, WireJsonFormat format, int level)
     {
         if (dict.Count == 0)
         {
@@ -221,7 +221,7 @@ public static class PyJsonWriter
         builder.Append('}');
     }
 
-    private static void NewLine(StringBuilder builder, PyJsonFormat format, int level)
+    private static void NewLine(StringBuilder builder, WireJsonFormat format, int level)
     {
         if (format.Indent is { } indent)
         {

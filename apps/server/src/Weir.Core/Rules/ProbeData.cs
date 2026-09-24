@@ -4,7 +4,7 @@ using Weir.Core.Json;
 namespace Weir.Core.Rules;
 
 /// <summary>
-/// ffprobe data the rules engine could not read. <see cref="PythonError"/> names the error class the
+/// ffprobe data the rules engine could not read. <see cref="ErrorKind"/> names the error class the
 /// golden files record (<c>KeyError</c>, <c>ValueError</c>, <c>TypeError</c>, <c>AttributeError</c>,
 /// <c>OverflowError</c>) so callers and the golden-file tests can tell the cases apart.
 /// </summary>
@@ -12,28 +12,28 @@ public sealed class RulesInputException : Exception
 {
     public RulesInputException()
     {
-        PythonError = "ValueError";
+        ErrorKind = "ValueError";
     }
 
     public RulesInputException(string message)
         : base(message)
     {
-        PythonError = "ValueError";
+        ErrorKind = "ValueError";
     }
 
     public RulesInputException(string message, Exception innerException)
         : base(message, innerException)
     {
-        PythonError = "ValueError";
+        ErrorKind = "ValueError";
     }
 
-    public RulesInputException(string pythonError, string message)
+    public RulesInputException(string errorKind, string message)
         : base(message)
     {
-        PythonError = pythonError;
+        ErrorKind = errorKind;
     }
 
-    public string PythonError { get; }
+    public string ErrorKind { get; }
 }
 
 /// <summary>
@@ -42,7 +42,7 @@ public sealed class RulesInputException : Exception
 /// <remarks>
 /// ffprobe's values are loosely typed (bit rates and frame counts arrive as strings, a
 /// disposition flag can be a string), and the rules read them with the exact conversions in
-/// <see cref="Py"/>. The raw object stays available as <see cref="Json"/>; the typed properties
+/// <see cref="RulesJson"/>. The raw object stays available as <see cref="Json"/>; the typed properties
 /// below are lenient readings for callers.
 /// </remarks>
 public sealed record ProbeStreamInfo
@@ -67,16 +67,16 @@ public sealed record ProbeStreamInfo
     }
 
     /// <summary>The value under <paramref name="name"/>: null when absent; a JSON <c>null</c> is returned as an element.</summary>
-    public JsonElement? Get(string name) => Py.Get(Json, name);
+    public JsonElement? Get(string name) => RulesJson.Get(Json, name);
 
     /// <summary><c>index</c> when it reads as an integer.</summary>
-    public long? Index => Py.TryInt(Get("index"), out var index) ? index : null;
+    public long? Index => RulesJson.TryInt(Get("index"), out var index) ? index : null;
 
     /// <summary><c>codec_type</c>, stripped and lower-cased; empty when absent or not a string.</summary>
-    public string CodecType => Py.IsStr(Get("codec_type")) ? Py.Lower(PyStrings.Strip(Get("codec_type")!.Value.GetString()!)) : string.Empty;
+    public string CodecType => RulesJson.IsStr(Get("codec_type")) ? RulesJson.Lower(WireStrings.Strip(Get("codec_type")!.Value.GetString()!)) : string.Empty;
 
     /// <summary><c>codec_name</c> as written; empty when absent.</summary>
-    public string CodecName => Py.StrOr(Get("codec_name"), string.Empty);
+    public string CodecName => RulesJson.StrOr(Get("codec_name"), string.Empty);
 
     /// <summary>
     /// The tags as the rules read them, string-valued entries only; empty when tags are not an object.
@@ -90,14 +90,14 @@ public sealed record ProbeStreamInfo
         {
             var tags = Get("tags");
             var result = new Dictionary<string, string>(StringComparer.Ordinal);
-            if (!Py.Truthy(tags) || !Py.IsDict(tags))
+            if (!RulesJson.Truthy(tags) || !RulesJson.IsDict(tags))
             {
                 return result;
             }
 
-            foreach (var (key, value) in Py.Items(tags!.Value))
+            foreach (var (key, value) in RulesJson.Items(tags!.Value))
             {
-                if (Py.IsStr(value))
+                if (RulesJson.IsStr(value))
                 {
                     result[key] = value.GetString()!;
                 }
@@ -108,7 +108,7 @@ public sealed record ProbeStreamInfo
     }
 
     /// <summary>
-    /// The disposition flags: each value read as an integer (<see cref="Py.TryInt"/>), skipping values
+    /// The disposition flags: each value read as an integer (<see cref="RulesJson.TryInt"/>), skipping values
     /// that do not convert.
     /// </summary>
     public IReadOnlyDictionary<string, long> Disposition
@@ -117,14 +117,14 @@ public sealed record ProbeStreamInfo
         {
             var disposition = Get("disposition");
             var result = new Dictionary<string, long>(StringComparer.Ordinal);
-            if (!Py.Truthy(disposition) || !Py.IsDict(disposition))
+            if (!RulesJson.Truthy(disposition) || !RulesJson.IsDict(disposition))
             {
                 return result;
             }
 
-            foreach (var (key, value) in Py.Items(disposition!.Value))
+            foreach (var (key, value) in RulesJson.Items(disposition!.Value))
             {
-                if (Py.TryInt(value, out var flag))
+                if (RulesJson.TryInt(value, out var flag))
                 {
                     result[key] = flag;
                 }
@@ -167,8 +167,8 @@ public sealed record ProbeResult
                 return [];
             }
 
-            var streams = Py.Get(Json, "streams");
-            if (!Py.IsList(streams))
+            var streams = RulesJson.Get(Json, "streams");
+            if (!RulesJson.IsList(streams))
             {
                 return [];
             }
@@ -194,8 +194,8 @@ public sealed record ProbeResult
                 return [];
             }
 
-            var chapters = Py.Get(Json, "chapters");
-            if (!Py.IsList(chapters))
+            var chapters = RulesJson.Get(Json, "chapters");
+            if (!RulesJson.IsList(chapters))
             {
                 return [];
             }

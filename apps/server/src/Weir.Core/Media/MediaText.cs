@@ -11,13 +11,13 @@ namespace Weir.Core.Media;
 /// golden files: fixed-point formatting, line splitting on every Unicode line boundary, lenient UTF-8 decoding,
 /// newline translation, code-point clipping and the timeout message.
 /// </summary>
-internal static class PyText
+internal static class MediaText
 {
     private static readonly UTF8Encoding Utf8Replace = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
 
     /// <summary>The first <paramref name="maxChars"/> code points plus <c>…(truncated)</c> when longer.</summary>
     public static string Clip(string text, int maxChars) =>
-        PyStrings.Length(text) > maxChars ? PyStrings.Slice(text, maxChars) + "…(truncated)" : text;
+        WireStrings.Length(text) > maxChars ? WireStrings.Slice(text, maxChars) + "…(truncated)" : text;
 
     /// <summary>UTF-8 with invalid bytes replaced by U+FFFD.</summary>
     public static string DecodeUtf8(ReadOnlySpan<byte> bytes)
@@ -132,5 +132,5 @@ internal static class PyText
         $"Command '{ListRepr(argv)}' timed out after {timeoutText} seconds";
 
     /// <summary>A bracketed, comma-separated list of quoted strings, e.g. <c>['ffprobe', '-v']</c>.</summary>
-    public static string ListRepr(IEnumerable<string> items) => "[" + string.Join(", ", items.Select(Py.Repr)) + "]";
+    public static string ListRepr(IEnumerable<string> items) => "[" + string.Join(", ", items.Select(RulesJson.Repr)) + "]";
 }

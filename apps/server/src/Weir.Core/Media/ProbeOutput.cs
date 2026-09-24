@@ -41,13 +41,13 @@ public static class ProbeOutput
     public static MediaToolException FailureFor(string? stdout, string? stderr)
     {
         var chosen = !string.IsNullOrEmpty(stderr) ? stderr : !string.IsNullOrEmpty(stdout) ? stdout : string.Empty;
-        var message = PyStrings.Strip(chosen);
+        var message = WireStrings.Strip(chosen);
         if (message.Length == 0)
         {
             message = "ffprobe failed";
         }
 
-        var lowered = Py.Lower(message);
+        var lowered = RulesJson.Lower(message);
         return UnreadableMediaMarkers.Any(marker => MatchesUnreadableMarker(lowered, marker))
             ? new MediaUnreadableException(message)
             : new MediaToolException(message);
@@ -78,7 +78,7 @@ public static class ProbeOutput
 
     /// <summary>Whether the integrity read's stderr carries one of <see cref="IntegrityIncompleteMarkers"/>.</summary>
     public static bool HasIntegrityIncompleteMarker(string? stderr) =>
-        IntegrityIncompleteMarkers.Any(marker => Py.Lower(stderr ?? string.Empty).Contains(marker, StringComparison.Ordinal));
+        IntegrityIncompleteMarkers.Any(marker => RulesJson.Lower(stderr ?? string.Empty).Contains(marker, StringComparison.Ordinal));
 
     /// <summary>
     /// Everything done with a probe after ffprobe exits: throw for a failure, otherwise parse stdout
@@ -92,7 +92,7 @@ public static class ProbeOutput
         }
 
         const string Invalid = "ffprobe returned invalid or empty output";
-        if (stdout is null || PyStrings.Strip(stdout).Length == 0)
+        if (stdout is null || WireStrings.Strip(stdout).Length == 0)
         {
             throw new MediaToolException(Invalid);
         }
@@ -121,18 +121,18 @@ public static class ProbeOutput
         var candidates = new List<double>();
         if (data.ValueKind == JsonValueKind.Object)
         {
-            var format = Py.Get(data, "format");
-            if (Py.IsDict(format) && TryFloatOrZero(Py.Get(format!.Value, "duration"), out var formatDuration))
+            var format = RulesJson.Get(data, "format");
+            if (RulesJson.IsDict(format) && TryFloatOrZero(RulesJson.Get(format!.Value, "duration"), out var formatDuration))
             {
                 candidates.Add(formatDuration);
             }
 
-            var streams = Py.Get(data, "streams");
-            if (Py.IsList(streams))
+            var streams = RulesJson.Get(data, "streams");
+            if (RulesJson.IsList(streams))
             {
                 foreach (var stream in streams!.Value.EnumerateArray())
                 {
-                    if (stream.ValueKind == JsonValueKind.Object && TryFloatOrZero(Py.Get(stream, "duration"), out var streamDuration))
+                    if (stream.ValueKind == JsonValueKind.Object && TryFloatOrZero(RulesJson.Get(stream, "duration"), out var streamDuration))
                     {
                         candidates.Add(streamDuration);
                     }
@@ -159,14 +159,14 @@ public static class ProbeOutput
     /// </summary>
     public static void ValidateRemuxOutput(JsonElement data, int expectedAudio = 0, double? expectedDurationSeconds = null)
     {
-        var streamsValue = data.ValueKind == JsonValueKind.Object ? Py.Get(data, "streams") : null;
-        if (Py.Truthy(streamsValue) && !Py.IsList(streamsValue))
+        var streamsValue = data.ValueKind == JsonValueKind.Object ? RulesJson.Get(data, "streams") : null;
+        if (RulesJson.Truthy(streamsValue) && !RulesJson.IsList(streamsValue))
         {
             throw new MediaToolException("validation failed: invalid ffprobe output");
         }
 
         var audioCount = 0;
-        if (Py.IsList(streamsValue))
+        if (RulesJson.IsList(streamsValue))
         {
             foreach (var stream in streamsValue!.Value.EnumerateArray())
             {
@@ -175,19 +175,19 @@ public static class ProbeOutput
                     continue;
                 }
 
-                var codecType = Py.Get(stream, "codec_type");
-                if (!Py.Truthy(codecType))
+                var codecType = RulesJson.Get(stream, "codec_type");
+                if (!RulesJson.Truthy(codecType))
                 {
                     continue;
                 }
 
-                if (!Py.IsStr(codecType))
+                if (!RulesJson.IsStr(codecType))
                 {
                     // A truthy codec_type that is not a string cannot be lower-cased.
                     throw new RulesInputException("AttributeError", "codec_type has no lower()");
                 }
 
-                if (Py.Lower(codecType!.Value.GetString()!) == "audio")
+                if (RulesJson.Lower(codecType!.Value.GetString()!) == "audio")
                 {
                     audioCount++;
                 }
@@ -219,7 +219,7 @@ public static class ProbeOutput
             {
                 throw new MediaCompletenessException(
                     "Validation failed: the staged output is incomplete "
-                    + $"({PyText.FormatFixed(outputDuration.Value, 1)}s of {PyText.FormatFixed(expected, 1)}s expected), so it was not published.");
+                    + $"({MediaText.FormatFixed(outputDuration.Value, 1)}s of {MediaText.FormatFixed(expected, 1)}s expected), so it was not published.");
             }
         }
     }
@@ -230,8 +230,8 @@ public static class ProbeOutput
     /// </summary>
     public static MediaCompletenessException IntegrityFailure(string? stderr)
     {
-        var detail = PyStrings.Strip(stderr ?? string.Empty);
-        detail = PyText.Clip(detail, FfmpegCommands.ProbeLogMaxChars);
+        var detail = WireStrings.Strip(stderr ?? string.Empty);
+        detail = MediaText.Clip(detail, FfmpegCommands.ProbeLogMaxChars);
         return new MediaCompletenessException(
             "Weir could not read this media file from start to finish. It may still be downloading or may be "
             + $"incomplete, so Weir will wait. The media check reported: {(detail.Length > 0 ? detail : "incomplete media data")}.");
@@ -246,7 +246,7 @@ public static class ProbeOutput
         new(
             "Weir could not read this media file from start to finish. It may still be downloading or may be "
             + "incomplete, so Weir will wait. The media check decoded "
-            + $"{PyText.FormatFixed(decodedSeconds, 1)}s of {PyText.FormatFixed(expectedSeconds, 1)}s expected.");
+            + $"{MediaText.FormatFixed(decodedSeconds, 1)}s of {MediaText.FormatFixed(expectedSeconds, 1)}s expected.");
 
     /// <summary>
     /// The last <c>out_time_ms</c> reported on a <c>-progress pipe:1</c> stream, in seconds, or null when none
@@ -257,16 +257,16 @@ public static class ProbeOutput
     public static double? LastProgressOutTimeSeconds(string stdout)
     {
         double? last = null;
-        foreach (var raw in PyText.SplitLines(stdout))
+        foreach (var raw in MediaText.SplitLines(stdout))
         {
-            var line = PyStrings.Strip(raw);
+            var line = WireStrings.Strip(raw);
             var equals = line.IndexOf('=', StringComparison.Ordinal);
             if (equals < 0)
             {
                 continue;
             }
 
-            if (line[..equals] == "out_time_ms" && Py.TryFloatFromText(line[(equals + 1)..]) is { } micros)
+            if (line[..equals] == "out_time_ms" && RulesJson.TryFloatFromText(line[(equals + 1)..]) is { } micros)
             {
                 last = Math.Max(0.0, micros / 1_000_000.0);
             }
@@ -283,52 +283,52 @@ public static class ProbeOutput
     public static string TailText(ReadOnlySpan<byte> bytes, int maxBytes = FfmpegCommands.FfmpegStderrTailBytes)
     {
         var tail = bytes.Length > maxBytes ? bytes[^maxBytes..] : bytes;
-        return PyStrings.Strip(PyText.DecodeUtf8(tail));
+        return WireStrings.Strip(MediaText.DecodeUtf8(tail));
     }
 
     /// <summary>Captured output as text: UTF-8 with replacement characters, newlines translated to <c>\n</c>.</summary>
-    public static string CapturedText(ReadOnlySpan<byte> bytes) => PyText.TranslateNewlines(PyText.DecodeUtf8(bytes));
+    public static string CapturedText(ReadOnlySpan<byte> bytes) => MediaText.TranslateNewlines(MediaText.DecodeUtf8(bytes));
 
     /// <summary>The timeout message for a timeout given in whole seconds (<c>... after 120 seconds</c>).</summary>
     public static string TimeoutMessage(IEnumerable<string> argv, int timeoutSeconds) =>
-        PyText.TimeoutExpiredMessage(argv, timeoutSeconds.ToString(CultureInfo.InvariantCulture));
+        MediaText.TimeoutExpiredMessage(argv, timeoutSeconds.ToString(CultureInfo.InvariantCulture));
 
     /// <summary>The timeout message for a fractional timeout, which prints with a decimal point (<c>10.0</c>).</summary>
     public static string TimeoutMessage(IEnumerable<string> argv, double timeoutSeconds) =>
-        PyText.TimeoutExpiredMessage(argv, PyConvert.FloatRepr(timeoutSeconds));
+        MediaText.TimeoutExpiredMessage(argv, WireConvert.FloatRepr(timeoutSeconds));
 
     // --- log payloads ------------------------------------------------------------------
 
     /// <summary>The <c>PROCESSING_FFPROBE_FILE_STATE</c> JSON.</summary>
     public static string FileStateLogPayload(string path, string resolvedPath, bool exists, bool isFile, long sizeBytes, string suffix, double mtimeEpoch) =>
-        PyJsonWriter.Dumps(
-            new PyDict()
+        WireJsonWriter.Dumps(
+            new WireObject()
             .Set("path", path)
             .Set("resolved_path", resolvedPath)
             .Set("exists", exists)
             .Set("is_file", isFile)
             .Set("size_bytes", sizeBytes)
-            .Set("suffix", PyText.Clip(suffix, 64))
+            .Set("suffix", MediaText.Clip(suffix, 64))
             .Set("mtime_epoch", mtimeEpoch),
-            PyJsonFormat.Default);
+            WireJsonFormat.Default);
 
     /// <summary>The <c>PROCESSING_FFPROBE_CALL</c> JSON.</summary>
     public static string CallLogPayload(string path, IEnumerable<string> argv) =>
-        PyJsonWriter.Dumps(
-            new PyDict()
+        WireJsonWriter.Dumps(
+            new WireObject()
             .Set("path", path)
-            .Set("argv", new PyList(argv.Select(a => (PyJson)new PyStr(PyText.Clip(a, 256))))),
-            PyJsonFormat.Default);
+            .Set("argv", new WireArray(argv.Select(a => (WireValue)new WireString(MediaText.Clip(a, 256))))),
+            WireJsonFormat.Default);
 
     /// <summary>The <c>PROCESSING_FFPROBE_RESULT</c> JSON.</summary>
     public static string ResultLogPayload(string path, int returnCode, string stdout, string stderr) =>
-        PyJsonWriter.Dumps(
-            new PyDict()
+        WireJsonWriter.Dumps(
+            new WireObject()
             .Set("path", path)
             .Set("returncode", returnCode)
-            .Set("stdout", PyText.Clip(stdout, FfmpegCommands.ProbeLogMaxChars))
-            .Set("stderr", PyText.Clip(stderr, FfmpegCommands.ProbeLogMaxChars)),
-            PyJsonFormat.Default);
+            .Set("stdout", MediaText.Clip(stdout, FfmpegCommands.ProbeLogMaxChars))
+            .Set("stderr", MediaText.Clip(stderr, FfmpegCommands.ProbeLogMaxChars)),
+            WireJsonFormat.Default);
 
     /// <summary>
     /// Reads a duration as a double: a falsy value is 0, an unreadable one returns false. An integer too
@@ -337,7 +337,7 @@ public static class ProbeOutput
     private static bool TryFloatOrZero(JsonElement? value, out double result)
     {
         result = 0;
-        if (!Py.Truthy(value))
+        if (!RulesJson.Truthy(value))
         {
             return true;
         }
@@ -349,7 +349,7 @@ public static class ProbeOutput
                 result = 1.0;
                 return true;
             case JsonValueKind.String:
-                var parsed = Py.TryFloatFromText(v.GetString()!);
+                var parsed = RulesJson.TryFloatFromText(v.GetString()!);
                 result = parsed ?? 0;
                 return parsed is not null;
             case JsonValueKind.Number:

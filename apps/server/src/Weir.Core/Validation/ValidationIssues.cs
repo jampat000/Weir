@@ -4,13 +4,13 @@ using Weir.Core.Json;
 namespace Weir.Core.Validation;
 
 /// <summary>One validation error in a 422 body: <c>type</c>, <c>loc</c>, <c>msg</c>, <c>input</c> and optional <c>ctx</c>.</summary>
-public sealed record ValidationIssue(string Type, IReadOnlyList<object> Loc, string Msg, PyJson Input, PyDict? Ctx = null)
+public sealed record ValidationIssue(string Type, IReadOnlyList<object> Loc, string Msg, WireValue Input, WireObject? Ctx = null)
 {
-    public PyDict ToPyDict()
+    public WireObject ToPyDict()
     {
-        var dict = new PyDict()
+        var dict = new WireObject()
             .Set("type", Type)
-            .Set("loc", new PyList(Loc.Select(part => part is int i ? PyJson.Of(i) : PyJson.Of(Convert.ToString(part, CultureInfo.InvariantCulture)))))
+            .Set("loc", new WireArray(Loc.Select(part => part is int i ? WireValue.Of(i) : WireValue.Of(Convert.ToString(part, CultureInfo.InvariantCulture)))))
             .Set("msg", Msg)
             .Set("input", Input);
         if (Ctx is not null)
@@ -50,7 +50,7 @@ public sealed class RequestValidationException : Exception
 
     public IReadOnlyList<ValidationIssue> Issues { get; }
 
-    public PyDict ToBody() => new PyDict().Set("detail", new PyList(Issues.Select(issue => (PyJson)issue.ToPyDict())));
+    public WireObject ToBody() => new WireObject().Set("detail", new WireArray(Issues.Select(issue => (WireValue)issue.ToPyDict())));
 }
 
 /// <summary>Collects errors across path, query, header and body parameters, in that order.</summary>

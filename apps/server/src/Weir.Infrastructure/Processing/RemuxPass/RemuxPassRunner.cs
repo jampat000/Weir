@@ -71,7 +71,7 @@ public sealed partial class RemuxPassRunner
     internal Func<string, long>? FreeBytes { get; init; }
 
     /// <summary>Reserves the source against writers for the complete pass, then runs it.</summary>
-    public async Task<PyDict> RunAsync(RemuxPassRequest request, CancellationToken cancellationToken = default)
+    public async Task<WireObject> RunAsync(RemuxPassRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         string? source;
@@ -111,7 +111,7 @@ public sealed partial class RemuxPassRunner
         }
     }
 
-    private async Task<PyDict> RunInnerAsync(RemuxPassRequest request, SourceFingerprint expected, CancellationToken cancellationToken)
+    private async Task<WireObject> RunInnerAsync(RemuxPassRequest request, SourceFingerprint expected, CancellationToken cancellationToken)
     {
         var relativeMediaPath = request.RelativeMediaPath;
         var runtime = request.Runtime;
@@ -178,7 +178,7 @@ public sealed partial class RemuxPassRunner
                 $"Weir could not read this file's contents, so the file itself looks damaged: {exception.Message}",
                 inspected,
                 // Evidence the release is bad, so a library set to reject can act on it (#471).
-                new PyDict().Set("content_unusable", true));
+                new WireObject().Set("content_unusable", true));
         }
 #pragma warning disable CA1031 // Any ffprobe failure fails this file before anything is written.
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -197,7 +197,7 @@ public sealed partial class RemuxPassRunner
                 "Weir only processes movie and TV files that contain a video stream. " +
                 "This file contains no video, so it was rejected before any output was written.",
                 inspected,
-                new PyDict()
+                new WireObject()
                     .Set("rejection_kind", "no_video_stream")
                     .Set("media_scope", scope)
                     .Set("processing_watched_folder_resolved", watchedRoot));
@@ -206,7 +206,7 @@ public sealed partial class RemuxPassRunner
         // Measured once and recorded, so the next enqueue can weight this file (#338).
         var (width, height) = RemuxPassMedia.VideoDimensions(video);
         var duration = RemuxPassMedia.ProbeDurationSeconds(probe);
-        var codec = PyStrings.Strip(video[0].CodecName);
+        var codec = WireStrings.Strip(video[0].CodecName);
         await _facts.RecordMeasuredMediaFactsAsync(
             new MeasuredMediaFacts(
                 relativeMediaPath,
@@ -237,7 +237,7 @@ public sealed partial class RemuxPassRunner
         }
 
         var config = request.RulesConfig ?? RemuxRules.DefaultConfig();
-        PyDict? originalLanguage = null;
+        WireObject? originalLanguage = null;
         if (!passThrough && request.ManualPlan is null && config.OriginalLanguage is { Enabled: true } originalRules)
         {
             (config, originalLanguage) = await ApplyOriginalLanguageAsync(config, originalRules, scope, relativeMediaPath, request.Origin, audio, cancellationToken)
@@ -274,7 +274,7 @@ public sealed partial class RemuxPassRunner
                 relativeMediaPath,
                 "remux plan could not be built (no retainable audio)",
                 inspected,
-                new PyDict()
+                new WireObject()
                     .Set("rejection_kind", "no_retainable_audio")
                     .Set("media_scope", scope)
                     .Set("processing_watched_folder_resolved", watchedRoot));
@@ -309,18 +309,18 @@ public sealed partial class RemuxPassRunner
             argv = FfmpegCommands.BuildRemuxArgv(ffmpeg, src, Path.Join(workDir, PlaceholderName), plan, hardware.ArgvFlags);
         }
 
-        var output = new PyDict()
+        var output = new WireObject()
             .Set("ok", true)
             .Set("outcome", RemuxPassOutcomes.LiveOutputWritten)
             .Set("relative_media_path", relativeMediaPath)
             .Set("inspected_source_path", inspected)
             .Set("processing_watched_folder_resolved", watchedRoot)
-            .Set("stream_counts", new PyDict().Set("video", video.Count).Set("audio", audio.Count).Set("subtitle", subtitles.Count))
+            .Set("stream_counts", new WireObject().Set("video", video.Count).Set("audio", audio.Count).Set("subtitle", subtitles.Count))
             .Set("preflight_status", "ok")
             .Set("preflight_reason", passThrough
                 ? "ffprobe completed and the operator's pass-through request was validated"
                 : "ffprobe completed and remux plan was evaluated")
-            .Set("preflight_probe_settings", new PyDict().Set("probe_size_mb", _settings.ProbeSizeMb).Set("analyze_duration_seconds", _settings.AnalyzeDurationSeconds))
+            .Set("preflight_probe_settings", new WireObject().Set("probe_size_mb", _settings.ProbeSizeMb).Set("analyze_duration_seconds", _settings.AnalyzeDurationSeconds))
             .Set("plan_summary", RemuxPassVisibility.SummarizeRemuxPlan(plan))
             .Set("audio_before", audioBefore)
             .Set("audio_after", audioAfter)
@@ -336,9 +336,9 @@ public sealed partial class RemuxPassRunner
             .Set("ffmpeg_argv", StringList(argv))
             .Set("audio_selection_notes", StringList(plan.AudioSelectionNotes))
             .Set("media_scope", scope)
-            .Set("source_fingerprint", new PyDict()
-                .Set("device", new PyInt(expected.Device))
-                .Set("inode", new PyInt(expected.Inode))
+            .Set("source_fingerprint", new WireObject()
+                .Set("device", new WireInteger(expected.Device))
+                .Set("inode", new WireInteger(expected.Inode))
                 .Set("size_bytes", expected.SizeBytes)
                 .Set("modified_time_ns", expected.ModifiedTimeNs));
         if (originalLanguage is not null)

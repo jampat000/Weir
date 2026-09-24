@@ -11,7 +11,7 @@ public sealed partial class RemuxPassRunner
     /// #537 item 4: the metadata lookup decides which audio the planner prefers. Declining (no provider, no match, unreachable)
     /// leaves the language preferences in charge, with a note saying so.
     /// </summary>
-    private async Task<(ProcessingRulesConfig Config, PyDict Record)> ApplyOriginalLanguageAsync(
+    private async Task<(ProcessingRulesConfig Config, WireObject Record)> ApplyOriginalLanguageAsync(
         ProcessingRulesConfig config,
         OriginalLanguageRules rules,
         string scope,
@@ -38,11 +38,11 @@ public sealed partial class RemuxPassRunner
             .Select(stream => new OriginalLanguageTrack((int)stream.Index!.Value, stream.Tag("language") ?? string.Empty))
             .ToList();
         var outcome = OriginalLanguage.SelectTracks(rules, lookup, tracks);
-        var record = new PyDict()
+        var record = new WireObject()
             .Set("lookup_status", lookup.Status)
             .Set("lookup_detail", lookup.Detail)
             .Set("original_language", lookup.Metadata?.OriginalLanguage)
-            .Set("preferred_audio_indices", new PyList(outcome.PreferredIndices.Select(index => (PyJson)new PyInt(index))))
+            .Set("preferred_audio_indices", new WireArray(outcome.PreferredIndices.Select(index => (WireValue)new WireInteger(index))))
             .Set("note", outcome.Note);
         return (config.WithOriginalLanguage(outcome), record);
     }

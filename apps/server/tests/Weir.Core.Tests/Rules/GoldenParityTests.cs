@@ -321,7 +321,7 @@ public sealed class GoldenParityTests
         catch (RulesInputException error)
         {
             writer.WriteStartObject();
-            writer.WriteString("error", error.PythonError);
+            writer.WriteString("error", error.ErrorKind);
             writer.WriteEndObject();
             return;
         }

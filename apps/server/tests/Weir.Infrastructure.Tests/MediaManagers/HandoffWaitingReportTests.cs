@@ -29,7 +29,7 @@ public sealed class HandoffWaitingReportTests
         fixture.Http.Throw(HttpMethod.Post, Callback, new HttpRequestException("No connection could be made because the target machine actively refused it."));
         var payload =
             $$$"""{"relative_media_path":"Film/film.mkv","library_id":{{{library}}},"media_scope":"movie","origin":{"source_key":"deluno","handoff_id":"h1","library_id":"lib-movies","callback_path":"{{{Callback}}}"}}""";
-        var result = (PyDict)PyJsonParser.Parse("""{"ok":true,"outcome":"live_output_written","output_file":"/out/Film/film.mkv","relative_media_path":"Film/film.mkv"}""");
+        var result = (WireObject)WireJsonParser.Parse("""{"ok":true,"outcome":"live_output_written","output_file":"/out/Film/film.mkv","relative_media_path":"Film/film.mkv"}""");
 
         var status = await fixture.Db(uow => fixture.Reporter.ReportHandoffCompletionAsync(uow, payload, result), commit: false);
 
@@ -52,7 +52,7 @@ public sealed class HandoffWaitingReportTests
             "Finished processing this file. Deluno is answering again, and Weir has told it this file is ready.",
             await ReasonAsync(fixture));
         var delivered = fixture.Http.RequestsTo(HttpMethod.Post, Callback)[^1];
-        Assert.Equal("completed", ((PyStr)((PyDict)delivered.Json!)["status"]).Value);
+        Assert.Equal("completed", ((WireString)((WireObject)delivered.Json!)["status"]).Value);
         Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE title = 'Told Deluno that film.mkv is ready to import'"));
         Assert.Equal(0, await fixture.Db(uow => fixture.Reporter.SendWaitingReportsAsync(uow, "deluno"), commit: false));
     }

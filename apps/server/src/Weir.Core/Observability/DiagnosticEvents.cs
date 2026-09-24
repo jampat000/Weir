@@ -48,9 +48,9 @@ public sealed record DiagnosticEvent(
     IReadOnlyList<KeyValuePair<string, long>>? Counts = null)
 {
     /// <summary>The event as a payload: optional fields only when set, secret-looking values redacted.</summary>
-    public PyDict AsSafeDict()
+    public WireObject AsSafeDict()
     {
-        var payload = new PyDict()
+        var payload = new WireObject()
             .Set("module", Module)
             .Set("action", Action)
             .Set("trigger", Trigger)
@@ -70,7 +70,7 @@ public sealed record DiagnosticEvent(
 
         if (Counts is { Count: > 0 })
         {
-            var counts = new PyDict();
+            var counts = new WireObject();
             foreach (var (key, value) in Counts)
             {
                 counts.Set(key, value);

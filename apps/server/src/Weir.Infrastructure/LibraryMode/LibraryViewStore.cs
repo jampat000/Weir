@@ -202,7 +202,7 @@ public static class LibraryViewStore
         SqliteValues.GetStringOrNull(reader, 18),
         reader.IsDBNull(19) ? null : (int)reader.GetInt64(19),
         LibraryProblems.Parse(SqliteValues.GetStringOrNull(reader, 20)),
-        PythonTimestamps.Parse(reader.GetValue(21)),
+        TimestampColumns.Parse(reader.GetValue(21)),
         SqliteValues.GetBool(reader, 22));
 
     private static LibraryFileClassification ClassificationOf(string value) => value switch

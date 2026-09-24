@@ -35,7 +35,7 @@ public sealed record LibraryScanFileEntry(
     public bool MatchesFile(string path, long sizeBytes, long modifiedTimeUnixSeconds) =>
         string.Equals(Path, path, StringComparison.Ordinal) && SizeBytes == sizeBytes && ModifiedTimeUnixSeconds == modifiedTimeUnixSeconds;
 
-    public PyDict ToPyDict() => new PyDict()
+    public WireObject ToPyDict() => new WireObject()
         .Set("path", Path)
         .Set("size_bytes", SizeBytes)
         .Set("mtime", ModifiedTimeUnixSeconds)
@@ -55,9 +55,9 @@ public sealed record LibraryScanFileEntry(
         .Set("problem_kind", ProblemKind is { } kind ? LibraryProblems.Name(kind) : null)
         .Set("link_count", LinkCount);
 
-    public static LibraryScanFileEntry? FromPyDict(PyJson value)
+    public static LibraryScanFileEntry? FromPyDict(WireValue value)
     {
-        if (value is not PyDict dict || dict.Get("path") is not PyStr path || path.Value.Length == 0)
+        if (value is not WireObject dict || dict.Get("path") is not WireString path || path.Value.Length == 0)
         {
             return null;
         }
@@ -90,7 +90,7 @@ public sealed record LibraryScanFileEntry(
         _ => "cannot_process",
     };
 
-    private static LibraryFileClassification ClassificationOf(PyJson? value) => value is PyStr { Value: var text } ? text switch
+    private static LibraryFileClassification ClassificationOf(WireValue? value) => value is WireString { Value: var text } ? text switch
     {
         "matches" => LibraryFileClassification.Matches,
         "would_change" => LibraryFileClassification.WouldChange,
@@ -98,11 +98,11 @@ public sealed record LibraryScanFileEntry(
     }
     : LibraryFileClassification.CannotProcess;
 
-    private static long LongOf(PyJson? value) => value is PyInt i ? (long)i.Value : 0;
+    private static long LongOf(WireValue? value) => value is WireInteger i ? (long)i.Value : 0;
 
-    private static long? LongOrNull(PyJson? value) => value is PyInt i ? (long)i.Value : null;
+    private static long? LongOrNull(WireValue? value) => value is WireInteger i ? (long)i.Value : null;
 
-    private static string? StrOrNull(PyJson? value) => value is PyStr s ? s.Value : null;
+    private static string? StrOrNull(WireValue? value) => value is WireString s ? s.Value : null;
 }
 
 /// <summary>The result of one completed scan (#505 point 2): the file index / plan cache for a library, embedded in the
@@ -111,26 +111,26 @@ public sealed record LibraryScanSnapshot(long LibraryId, DateTimeOffset Generate
 {
     public const string PayloadKey = "scan_result";
 
-    public PyDict ToPyDict() => new PyDict()
+    public WireObject ToPyDict() => new WireObject()
         .Set("generated_at", GeneratedAt.ToUnixTimeSeconds())
-        .Set("files", new PyList(Files.Select(f => (PyJson)f.ToPyDict())))
-        .Set("errors", new PyList(Errors.Select(e => (PyJson)new PyStr(e))));
+        .Set("files", new WireArray(Files.Select(f => (WireValue)f.ToPyDict())))
+        .Set("errors", new WireArray(Errors.Select(e => (WireValue)new WireString(e))));
 
-    public static LibraryScanSnapshot? FromPayload(PyDict payload, long libraryId)
+    public static LibraryScanSnapshot? FromPayload(WireObject payload, long libraryId)
     {
-        if (payload.Get(PayloadKey) is not PyDict scan)
+        if (payload.Get(PayloadKey) is not WireObject scan)
         {
             return null;
         }
 
-        var generatedAt = scan.Get("generated_at") is PyInt seconds
+        var generatedAt = scan.Get("generated_at") is WireInteger seconds
             ? DateTimeOffset.FromUnixTimeSeconds((long)seconds.Value)
             : DateTimeOffset.UnixEpoch;
-        var files = scan.Get("files") is PyList list
+        var files = scan.Get("files") is WireArray list
             ? list.Items.Select(LibraryScanFileEntry.FromPyDict).OfType<LibraryScanFileEntry>().ToList()
             : [];
-        var errors = scan.Get("errors") is PyList errorList
-            ? errorList.Items.OfType<PyStr>().Select(s => s.Value).ToList()
+        var errors = scan.Get("errors") is WireArray errorList
+            ? errorList.Items.OfType<WireString>().Select(s => s.Value).ToList()
             : [];
         return new LibraryScanSnapshot(libraryId, generatedAt, files, errors);
     }

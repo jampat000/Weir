@@ -40,7 +40,7 @@ public static class SidecarMigration
         var output = new List<string>();
         foreach (var raw in (csv ?? string.Empty).Split(','))
         {
-            var text = PyStrings.Strip(raw).ToLowerInvariant();
+            var text = WireStrings.Strip(raw).ToLowerInvariant();
             if (text.Length == 0)
             {
                 continue;

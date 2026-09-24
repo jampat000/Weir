@@ -10,19 +10,19 @@ namespace Weir.Core.Validation;
 /// <c>input</c> and <c>ctx</c> are fixed so 422 bodies stay byte-identical for existing clients and the
 /// contract suite.
 /// </summary>
-public static class PydanticRules
+public static class FieldRules
 {
     private static readonly HashSet<string> TrueStrings = new(StringComparer.OrdinalIgnoreCase) { "1", "on", "t", "true", "y", "yes" };
     private static readonly HashSet<string> FalseStrings = new(StringComparer.OrdinalIgnoreCase) { "0", "off", "f", "false", "n", "no" };
 
-    public static ValidationIssue Missing(IReadOnlyList<object> loc, PyJson input) => new("missing", loc, "Field required", input);
+    public static ValidationIssue Missing(IReadOnlyList<object> loc, WireValue input) => new("missing", loc, "Field required", input);
 
-    public static bool TryStr(PyJson input, IReadOnlyList<object> loc, int? minLength, int? maxLength, ValidationIssues issues, out string value)
+    public static bool TryStr(WireValue input, IReadOnlyList<object> loc, int? minLength, int? maxLength, ValidationIssues issues, out string value)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(issues);
         value = string.Empty;
-        if (input is not PyStr s)
+        if (input is not WireString s)
         {
             issues.Add(new ValidationIssue("string_type", loc, "Input should be a valid string", input));
             return false;
@@ -33,7 +33,7 @@ public static class PydanticRules
         {
             issues.Add(new ValidationIssue(
                 "string_too_short", loc, $"String should have at least {min} {Plural.Noun(min, "character")}", input,
-                new PyDict().Set("min_length", min)));
+                new WireObject().Set("min_length", min)));
             return false;
         }
 
@@ -41,7 +41,7 @@ public static class PydanticRules
         {
             issues.Add(new ValidationIssue(
                 "string_too_long", loc, $"String should have at most {max} {Plural.Noun(max, "character")}", input,
-                new PyDict().Set("max_length", max)));
+                new WireObject().Set("max_length", max)));
             return false;
         }
 
@@ -49,20 +49,20 @@ public static class PydanticRules
         return true;
     }
 
-    public static bool TryInt(PyJson input, IReadOnlyList<object> loc, long? ge, long? le, ValidationIssues issues, out BigInteger value)
+    public static bool TryInt(WireValue input, IReadOnlyList<object> loc, long? ge, long? le, ValidationIssues issues, out BigInteger value)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(issues);
         value = BigInteger.Zero;
         switch (input)
         {
-            case PyInt i:
+            case WireInteger i:
                 value = i.Value;
                 break;
-            case PyBool b:
+            case WireBool b:
                 value = b.Value ? BigInteger.One : BigInteger.Zero;
                 break;
-            case PyFloat f:
+            case WireNumber f:
                 if (double.IsNaN(f.Value) || double.IsInfinity(f.Value))
                 {
                     issues.Add(new ValidationIssue("finite_number", loc, "Input should be a finite number", input));
@@ -83,7 +83,7 @@ public static class PydanticRules
 
                 value = new BigInteger(f.Value);
                 break;
-            case PyStr s:
+            case WireString s:
                 if (!TryParseIntString(s.Value, out value))
                 {
                     issues.Add(new ValidationIssue("int_parsing", loc, "Input should be a valid integer, unable to parse string as an integer", input));
@@ -98,45 +98,45 @@ public static class PydanticRules
 
         if (le is { } maximum && value > maximum)
         {
-            issues.Add(new ValidationIssue("less_than_equal", loc, $"Input should be less than or equal to {maximum}", input, new PyDict().Set("le", maximum)));
+            issues.Add(new ValidationIssue("less_than_equal", loc, $"Input should be less than or equal to {maximum}", input, new WireObject().Set("le", maximum)));
             return false;
         }
 
         if (ge is { } minimum && value < minimum)
         {
-            issues.Add(new ValidationIssue("greater_than_equal", loc, $"Input should be greater than or equal to {minimum}", input, new PyDict().Set("ge", minimum)));
+            issues.Add(new ValidationIssue("greater_than_equal", loc, $"Input should be greater than or equal to {minimum}", input, new WireObject().Set("ge", minimum)));
             return false;
         }
 
         return true;
     }
 
-    public static bool TryBool(PyJson input, IReadOnlyList<object> loc, ValidationIssues issues, out bool value)
+    public static bool TryBool(WireValue input, IReadOnlyList<object> loc, ValidationIssues issues, out bool value)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(issues);
         value = false;
         switch (input)
         {
-            case PyBool b:
+            case WireBool b:
                 value = b.Value;
                 return true;
-            case PyInt i when i.Value.IsZero || i.Value.IsOne:
+            case WireInteger i when i.Value.IsZero || i.Value.IsOne:
                 value = i.Value.IsOne;
                 return true;
-            case PyInt:
+            case WireInteger:
                 issues.Add(BoolParsing(loc, input));
                 return false;
-            case PyFloat f when f.Value is 0.0 or 1.0:
+            case WireNumber f when f.Value is 0.0 or 1.0:
                 value = f.Value == 1.0;
                 return true;
-            case PyStr s when TrueStrings.Contains(s.Value):
+            case WireString s when TrueStrings.Contains(s.Value):
                 value = true;
                 return true;
-            case PyStr s when FalseStrings.Contains(s.Value):
+            case WireString s when FalseStrings.Contains(s.Value):
                 value = false;
                 return true;
-            case PyStr:
+            case WireString:
                 issues.Add(BoolParsing(loc, input));
                 return false;
             default:
@@ -145,12 +145,12 @@ public static class PydanticRules
         }
     }
 
-    public static bool TryLiteral(PyJson input, IReadOnlyList<object> loc, IReadOnlyList<string> allowed, ValidationIssues issues, out string value)
+    public static bool TryLiteral(WireValue input, IReadOnlyList<object> loc, IReadOnlyList<string> allowed, ValidationIssues issues, out string value)
     {
         ArgumentNullException.ThrowIfNull(allowed);
         ArgumentNullException.ThrowIfNull(issues);
         value = string.Empty;
-        if (input is PyStr s && allowed.Contains(s.Value, StringComparer.Ordinal))
+        if (input is WireString s && allowed.Contains(s.Value, StringComparer.Ordinal))
         {
             value = s.Value;
             return true;
@@ -158,16 +158,16 @@ public static class PydanticRules
 
         var quoted = allowed.Select(item => "'" + item + "'").ToList();
         var expected = quoted.Count == 1 ? quoted[0] : string.Join(", ", quoted.Take(quoted.Count - 1)) + " or " + quoted[^1];
-        issues.Add(new ValidationIssue("literal_error", loc, "Input should be " + expected, input, new PyDict().Set("expected", expected)));
+        issues.Add(new ValidationIssue("literal_error", loc, "Input should be " + expected, input, new WireObject().Set("expected", expected)));
         return false;
     }
 
-    public static bool TryStrList(PyJson input, IReadOnlyList<object> loc, ValidationIssues issues, out List<string> value)
+    public static bool TryStrList(WireValue input, IReadOnlyList<object> loc, ValidationIssues issues, out List<string> value)
     {
         ArgumentNullException.ThrowIfNull(loc);
         ArgumentNullException.ThrowIfNull(issues);
         value = [];
-        if (input is not PyList list)
+        if (input is not WireArray list)
         {
             issues.Add(new ValidationIssue("list_type", loc, "Input should be a valid list", input));
             return false;
@@ -176,7 +176,7 @@ public static class PydanticRules
         var ok = true;
         for (var index = 0; index < list.Items.Count; index++)
         {
-            if (list.Items[index] is PyStr item)
+            if (list.Items[index] is WireString item)
             {
                 value.Add(item.Value);
             }
@@ -190,12 +190,12 @@ public static class PydanticRules
         return ok;
     }
 
-    public static bool TryIntList(PyJson input, IReadOnlyList<object> loc, ValidationIssues issues, out List<long> value)
+    public static bool TryIntList(WireValue input, IReadOnlyList<object> loc, ValidationIssues issues, out List<long> value)
     {
         ArgumentNullException.ThrowIfNull(loc);
         ArgumentNullException.ThrowIfNull(issues);
         value = [];
-        if (input is not PyList list)
+        if (input is not WireArray list)
         {
             issues.Add(new ValidationIssue("list_type", loc, "Input should be a valid list", input));
             return false;
@@ -222,16 +222,16 @@ public static class PydanticRules
     /// UTC offset. A string without one parses as a naive value, which the caller rejects with its own
     /// message.
     /// </summary>
-    public static bool TryDateTime(PyJson input, IReadOnlyList<object> loc, ValidationIssues issues, out Time.PyDateTime? value)
+    public static bool TryDateTime(WireValue input, IReadOnlyList<object> loc, ValidationIssues issues, out Time.Timestamp? value)
     {
         ArgumentNullException.ThrowIfNull(issues);
         value = null;
-        if (input is PyNull)
+        if (input is WireNull)
         {
             return true;
         }
 
-        if (input is not PyStr s)
+        if (input is not WireString s)
         {
             issues.Add(new ValidationIssue("datetime_type", loc, "Input should be a valid datetime", input));
             return false;
@@ -244,15 +244,15 @@ public static class PydanticRules
         }
 
         var hasOffset = s.Value.TrimEnd().EndsWith('Z') || System.Text.RegularExpressions.Regex.IsMatch(s.Value.TrimEnd(), @"[+-]\d{2}:?\d{2}$");
-        value = hasOffset ? Time.PyDateTime.FromDateTimeOffset(parsed) : Time.PyDateTime.Naive(parsed.DateTime);
+        value = hasOffset ? Time.Timestamp.FromDateTimeOffset(parsed) : Time.Timestamp.Naive(parsed.DateTime);
         return true;
     }
 
-    public static bool TryDict(PyJson input, IReadOnlyList<object> loc, ValidationIssues issues, out PyDict value)
+    public static bool TryDict(WireValue input, IReadOnlyList<object> loc, ValidationIssues issues, out WireObject value)
     {
         ArgumentNullException.ThrowIfNull(issues);
-        value = new PyDict();
-        if (input is PyDict dict)
+        value = new WireObject();
+        if (input is WireObject dict)
         {
             value = dict;
             return true;
@@ -273,7 +273,7 @@ public static class PydanticRules
             return true;
         }
 
-        issues.Add(new ValidationIssue("uuid_parsing", loc, "Input should be a valid UUID, " + error, PyJson.Of(text), new PyDict().Set("error", error)));
+        issues.Add(new ValidationIssue("uuid_parsing", loc, "Input should be a valid UUID, " + error, WireValue.Of(text), new WireObject().Set("error", error)));
         return false;
     }
 
@@ -369,10 +369,10 @@ public static class PydanticRules
             return false;
         }
 
-        return PyConvert.TryParseIntLiteral(text, out value);
+        return WireConvert.TryParseIntLiteral(text, out value);
     }
 
-    private static ValidationIssue BoolParsing(IReadOnlyList<object> loc, PyJson input) =>
+    private static ValidationIssue BoolParsing(IReadOnlyList<object> loc, WireValue input) =>
         new("bool_parsing", loc, "Input should be a valid boolean, unable to interpret input", input);
 
     private static int CodePointLength(string value)

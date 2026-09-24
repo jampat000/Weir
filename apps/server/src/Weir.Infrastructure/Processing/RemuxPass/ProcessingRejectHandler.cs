@@ -68,11 +68,11 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
 
     public string JobKind => IntakeRules.RejectJobKind;
 
-    private sealed record ReportEnvelope(HandoffReportTarget Target, PyDict Body, HandoffReportDelivery Delivery);
+    private sealed record ReportEnvelope(HandoffReportTarget Target, WireObject Body, HandoffReportDelivery Delivery);
 
-    private sealed record RejectAttempt(bool Done, string Reason, string? Manager = null, PyDict? Detail = null, ReportEnvelope? Report = null)
+    private sealed record RejectAttempt(bool Done, string Reason, string? Manager = null, WireObject? Detail = null, ReportEnvelope? Report = null)
     {
-        public PyDict DetailOrEmpty => Detail ?? new PyDict();
+        public WireObject DetailOrEmpty => Detail ?? new WireObject();
     }
 
     public async Task HandleAsync(JobWorkContext context, CancellationToken cancellationToken)
@@ -87,11 +87,11 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
         }
 
         var originRaw = FollowUpJobPayload.Origin(payload);
-        var reason = payload.Get("reason") is PyStr reasonValue && reasonValue.Value.Length > 0
+        var reason = payload.Get("reason") is WireString reasonValue && reasonValue.Value.Length > 0
             ? reasonValue.Value
             : "Weir could not process this file.";
-        var failureClass = payload.Get("failure_class") is PyStr failureClassValue ? failureClassValue.Value : null;
-        var origin = originRaw is not null ? HandoffOrigin.FromPayload(new PyDict().Set("origin", originRaw)) : null;
+        var failureClass = payload.Get("failure_class") is WireString failureClassValue ? failureClassValue.Value : null;
+        var origin = originRaw is not null ? HandoffOrigin.FromPayload(new WireObject().Set("origin", originRaw)) : null;
 
         // 1. Everything the attempt needs, read with the unit of work closed before any network call.
         string watchedRoot = string.Empty;
@@ -157,7 +157,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
                     await HandoffCompletionReporter.RecordHandoffReportAsync(uow, report.Target, report.Body, report.Delivery, relativePath).ConfigureAwait(false);
                 }
 
-                var detail = new PyDict()
+                var detail = new WireObject()
                     .Set("job_id", context.Id)
                     .Set("relative_media_path", relativePath)
                     .Set("library_id", libraryId)
@@ -177,7 +177,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
                     // Fix #532: always upsert, even when no scan has recorded this file yet. The reason keeps why
                     // the release was rejected (from the job payload — e.g. "no retainable audio") alongside what
                     // happened to the download, rather than the acceptance sentence alone replacing it.
-                    var rejectedReason = PyStrings.Slice(PyStrings.Strip($"{reason} {attempt.Reason}"), 10_000);
+                    var rejectedReason = WireStrings.Slice(WireStrings.Strip($"{reason} {attempt.Reason}"), 10_000);
                     await RemuxPassFileState.UpsertRejectedAsync(uow, libraryId.Value, relativePath, rejectedReason, failureClass).ConfigureAwait(false);
                     if (origin is not null)
                     {
@@ -197,7 +197,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
 
                     await RemuxPassFileState.MarkFileStatusAsync(
                         uow, libraryId.Value, relativePath, ProcessingFileStatuses.ProcessingFailed,
-                        PyStrings.Slice($"{reason} {attempt.Reason} Weir is handing the original back unchanged instead.", 10_000),
+                        WireStrings.Slice($"{reason} {attempt.Reason} Weir is handing the original back unchanged instead.", 10_000),
                         now).ConfigureAwait(false);
                     eventType = ActivityEventTypes.ProcessingFileRejectFellBack;
                     title = $"{MediaPathNames.Name(relativePath, OperatingSystem.IsWindows())} could not be rejected, so it is being handed back";
@@ -205,7 +205,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
                 }
 
                 await SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(
-                    eventType, "processing", title, PyStrings.Slice(PyJsonWriter.Dumps(detail, PyJsonFormat.Compact), 10_000))).ConfigureAwait(false);
+                    eventType, "processing", title, WireStrings.Slice(WireJsonWriter.Dumps(detail, WireJsonFormat.Compact), 10_000))).ConfigureAwait(false);
             },
             _logger,
             "reject bookkeeping",
@@ -215,9 +215,9 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
 
     /// <summary>Queues a pass-through, called unconditionally on any reject failure — the reject route never
     /// re-checks the library's failure policy: anything short of certainty always falls back to pass-through.</summary>
-    private void EnqueuePassThroughFallback(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, PyDict? origin)
+    private void EnqueuePassThroughFallback(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, WireObject? origin)
     {
-        var body = new PyDict().Set("relative_media_path", relativePath).Set("library_id", library.Id).Set("trigger", "worker");
+        var body = new WireObject().Set("relative_media_path", relativePath).Set("library_id", library.Id).Set("trigger", "worker");
         if (origin is { IsTruthy: true })
         {
             body.Set("origin", origin);
@@ -233,7 +233,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
             uow.WriteTransaction(),
             dedupeKey,
             IntakeRules.PassThroughJobKind,
-            PyJsonWriter.Dumps(body, PyJsonFormat.Compact),
+            WireJsonWriter.Dumps(body, WireJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
             0,
             (int)Math.Clamp(library.Priority, int.MinValue, int.MaxValue));

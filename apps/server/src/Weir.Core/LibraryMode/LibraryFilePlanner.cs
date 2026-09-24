@@ -194,7 +194,7 @@ public static class LibraryFilePlanner
             return (long)(bitsPerSecondTag * durationSeconds / 8.0);
         }
 
-        return stream.Get("bit_rate") is { } bitRateValue && Py.TryInt(bitRateValue, out var bitsPerSecond) && bitsPerSecond > 0
+        return stream.Get("bit_rate") is { } bitRateValue && RulesJson.TryInt(bitRateValue, out var bitsPerSecond) && bitsPerSecond > 0
             ? (long)(bitsPerSecond * durationSeconds / 8.0)
             : 0;
     }

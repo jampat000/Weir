@@ -109,7 +109,7 @@ public sealed record RunnerBudget(int Capacity, IReadOnlyDictionary<string, int>
 }
 
 /// <summary>The <c>suite_settings</c> fields admission reads.</summary>
-public sealed record SuitePauseSettings(string? AppTimezone, bool ProcessingPaused, PyDateTime? ProcessingPausedUntil, bool ScanWhilePaused);
+public sealed record SuitePauseSettings(string? AppTimezone, bool ProcessingPaused, Timestamp? ProcessingPausedUntil, bool ScanWhilePaused);
 
 /// <summary>The <c>libraries</c> fields admission reads.</summary>
 public sealed record LibraryAdmissionSnapshot(

@@ -89,8 +89,8 @@ public static class ActivityEndpoints
                     "string_pattern_mismatch",
                     ["query", "format"],
                     $"String should match pattern '{FormatPattern}'",
-                    new PyStr(rawFormat),
-                    new PyDict().Set("pattern", FormatPattern)));
+                    new WireString(rawFormat),
+                    new WireObject().Set("pattern", FormatPattern)));
             }
         }
 
@@ -118,7 +118,7 @@ public static class ActivityEndpoints
             context.Response.Headers["X-Weir-Export-Limit"] = ActivityHistory.ExportMaxRows.ToString(CultureInfo.InvariantCulture);
             context.Response.Headers["X-Weir-Export-Rows"] = rows.Count.ToString(CultureInfo.InvariantCulture);
             context.Response.Headers.ContentDisposition = $"attachment; filename=\"{fileName}\"";
-            await PyResponses.WritePlainTextAsync(context, StatusCodes.Status200OK, text, json ? "application/json" : "text/csv; charset=utf-8").ConfigureAwait(false);
+            await ApiResponses.WritePlainTextAsync(context, StatusCodes.Status200OK, text, json ? "application/json" : "text/csv; charset=utf-8").ConfigureAwait(false);
         });
     }
 
@@ -133,13 +133,13 @@ public static class ActivityEndpoints
         }
         else
         {
-            issues.Add(PydanticRules.Missing(["query", "relative_path"], PyNull.Instance));
+            issues.Add(FieldRules.Missing(["query", "relative_path"], WireNull.Instance));
         }
 
         var libraryId = QueryInt(request, "library_id", issues, ge: 1);
         issues.ThrowIfAny();
 
-        var path = PyStrings.Strip(relativePath!);
+        var path = WireStrings.Strip(relativePath!);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var counts = await ActivityHistoryStore.CountFileHistoryAsync(uow, libraryId, path).ConfigureAwait(false);
         return ApiRoutes.Ok(ActivityHistory.FileHistoryCountOut(counts));
@@ -158,7 +158,7 @@ public static class ActivityEndpoints
         issues.ThrowIfAny();
 
         request.RequireConfirmationToken(csrfToken);
-        var path = PyStrings.Strip(relativePath);
+        var path = WireStrings.Strip(relativePath);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var deleted = await ActivityHistoryStore.DeleteFileHistoryAsync(uow, libraryId, path).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
@@ -304,14 +304,14 @@ public static class ActivityEndpoints
     }
 
     /// <summary>An ISO 8601 date query, or 400 <c>Invalid {name}.</c> (an empty value is no filter).</summary>
-    private static PyDateTime? ParseWhen(string? raw, string name)
+    private static Timestamp? ParseWhen(string? raw, string name)
     {
         if (string.IsNullOrEmpty(raw))
         {
             return null;
         }
 
-        return PyDateTime.TryFromIsoFormat(raw, out var value)
+        return Timestamp.TryFromIsoFormat(raw, out var value)
             ? value
             : throw new ApiException(StatusCodes.Status400BadRequest, $"Invalid {name}.");
     }
@@ -324,13 +324,13 @@ public static class ActivityEndpoints
             return null;
         }
 
-        return PydanticRules.TryStr(new PyStr(raw), ["query", name], minLength, maxLength, issues, out var value) ? value : null;
+        return FieldRules.TryStr(new WireString(raw), ["query", name], minLength, maxLength, issues, out var value) ? value : null;
     }
 
     private static long? QueryInt(ApiRequest request, string name, ValidationIssues issues, long? ge = null, long? le = null)
     {
         var raw = request.Query(name);
-        if (raw is null || !PydanticRules.TryInt(new PyStr(raw), ["query", name], ge, le, issues, out var value))
+        if (raw is null || !FieldRules.TryInt(new WireString(raw), ["query", name], ge, le, issues, out var value))
         {
             return null;
         }

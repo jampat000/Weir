@@ -8,9 +8,9 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 
 public sealed partial class RemuxPassRunner
 {
-    private async Task<PyDict> RemuxAndPublishAsync(
+    private async Task<WireObject> RemuxAndPublishAsync(
         PassContext context,
-        PyDict output,
+        WireObject output,
         RemuxPlan plan,
         IReadOnlyList<string> argv,
         AccelerationDecision hardware,
@@ -41,7 +41,7 @@ public sealed partial class RemuxPassRunner
                     workDisk.Message,
                     "minimum_free_disk_space",
                     context.Inspected,
-                    new PyDict()
+                    new WireObject()
                         .Set("disk_checked_path", workDisk.CheckedPath)
                         .Set("disk_free_mb", Math.Round(workDisk.FreeMb, 1, MidpointRounding.ToEven))
                         .Set("minimum_free_disk_space_mb", workDisk.RequiredMb)
@@ -55,10 +55,10 @@ public sealed partial class RemuxPassRunner
                         .Set("remux_required", true));
             }
 
-            report?.Invoke(new PyDict()
+            report?.Invoke(new WireObject()
                 .Set("status", "processing")
                 .Set("percent", 0.0)
-                .Set("eta_seconds", PyNull.Instance)
+                .Set("eta_seconds", WireNull.Instance)
                 .Set("elapsed_seconds", 0L)
                 .Set("relative_media_path", relativeMediaPath)
                 .Set("inspected_source_path", context.Inspected)
@@ -83,7 +83,7 @@ public sealed partial class RemuxPassRunner
                 report is null
                     ? null
                     : update => report(ProgressWithUpdate(
-                        new PyDict()
+                        new WireObject()
                             .Set("status", "processing")
                             .Set("relative_media_path", relativeMediaPath)
                             .Set("inspected_source_path", context.Inspected)
@@ -120,7 +120,7 @@ public sealed partial class RemuxPassRunner
                     outputDisk.Message,
                     "minimum_free_disk_space",
                     context.Inspected,
-                    new PyDict()
+                    new WireObject()
                         .Set("disk_checked_path", outputDisk.CheckedPath)
                         .Set("disk_free_mb", Math.Round(outputDisk.FreeMb, 1, MidpointRounding.ToEven))
                         .Set("minimum_free_disk_space_mb", outputDisk.RequiredMb)
@@ -148,10 +148,10 @@ public sealed partial class RemuxPassRunner
         }
         catch (MediaCompletenessException exception)
         {
-            report?.Invoke(new PyDict()
+            report?.Invoke(new WireObject()
                 .Set("status", "waiting")
-                .Set("percent", PyNull.Instance)
-                .Set("eta_seconds", PyNull.Instance)
+                .Set("percent", WireNull.Instance)
+                .Set("eta_seconds", WireNull.Instance)
                 .Set("relative_media_path", relativeMediaPath)
                 .Set("inspected_source_path", context.Inspected)
                 .Set("media_scope", context.Scope)
@@ -163,16 +163,16 @@ public sealed partial class RemuxPassRunner
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
 #pragma warning restore CA1031
         {
-            report?.Invoke(new PyDict()
+            report?.Invoke(new WireObject()
                 .Set("status", "failed")
-                .Set("percent", PyNull.Instance)
-                .Set("eta_seconds", PyNull.Instance)
+                .Set("percent", WireNull.Instance)
+                .Set("eta_seconds", WireNull.Instance)
                 .Set("relative_media_path", relativeMediaPath)
                 .Set("inspected_source_path", context.Inspected)
                 .Set("media_scope", context.Scope)
                 .Set("message", "Weir could not finish this file.")
                 .Set("reason", exception.Message));
-            return new PyDict()
+            return new WireObject()
                 .Set("ok", false)
                 .Set("outcome", RemuxPassOutcomes.FailedDuringExecution)
                 .Set("preflight_status", "ok")
@@ -225,7 +225,7 @@ public sealed partial class RemuxPassRunner
         {
         }
 
-        report?.Invoke(new PyDict()
+        report?.Invoke(new WireObject()
             .Set("status", "finishing")
             .Set("percent", 100.0)
             .Set("eta_seconds", 0L)
@@ -239,7 +239,7 @@ public sealed partial class RemuxPassRunner
         await MigrateSidecarsBeforeCleanupAsync(src, final, sidecarPatterns, request.Runtime.PreserveOriginalTimestamps, output).ConfigureAwait(false);
         await HandleCleanupAfterSuccessAsync(context, output, final, cancellationToken).ConfigureAwait(false);
         await RunScopeOutputCleanupAsync(context, output, final, cancellationToken).ConfigureAwait(false);
-        report?.Invoke(new PyDict()
+        report?.Invoke(new WireObject()
             .Set("status", "finished")
             .Set("percent", 100.0)
             .Set("eta_seconds", 0L)
@@ -252,7 +252,7 @@ public sealed partial class RemuxPassRunner
     }
 
     /// <summary><c>{**base, **update}</c> for an ffmpeg progress block.</summary>
-    private static PyDict ProgressWithUpdate(PyDict body, FfmpegProgressUpdate update) =>
+    private static WireObject ProgressWithUpdate(WireObject body, FfmpegProgressUpdate update) =>
         body
             .Set("percent", NullableFloat(update.Percent))
             .Set("eta_seconds", update.EtaSeconds)

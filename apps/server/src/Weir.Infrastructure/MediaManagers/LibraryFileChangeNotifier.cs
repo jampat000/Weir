@@ -265,7 +265,7 @@ public sealed class LibraryFileChangeNotifier : ILibraryFileChangeNotifier
 
     private Task<long> Record(string eventType, ManagerConnection connection, LibraryFileChange change, string result, string title, string? note)
     {
-        var detail = new PyDict()
+        var detail = new WireObject()
             .Set("manager", connection.Label)
             .Set("path", change.FilePath)
             .Set("reason", change.Reason)
@@ -280,7 +280,7 @@ public sealed class LibraryFileChangeNotifier : ILibraryFileChangeNotifier
             eventType,
             "library",
             title,
-            PyStrings.Slice(PyJsonWriter.Dumps(detail, PyJsonFormat.Compact), 10_000)));
+            WireStrings.Slice(WireJsonWriter.Dumps(detail, WireJsonFormat.Compact), 10_000)));
     }
 
     private static string FileName(LibraryFileChange change) => MediaPathNames.Name(change.FilePath, OperatingSystem.IsWindows());

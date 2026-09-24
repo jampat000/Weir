@@ -46,9 +46,9 @@ public static class ManagerDialectRules
     };
 
     /// <summary>The scope a manager's media type names, accepting plural spellings too; null when it names neither.</summary>
-    public static string? ScopeFromMediaType(PyJson? raw)
+    public static string? ScopeFromMediaType(WireValue? raw)
     {
-        var value = (PyValues.Text(raw) ?? string.Empty).ToLowerInvariant();
+        var value = (ManagerValues.Text(raw) ?? string.Empty).ToLowerInvariant();
         return value switch
         {
             "movie" or "movies" or "film" or "films" => MediaManagerKinds.Movie,
@@ -93,22 +93,22 @@ public static class ManagerDialectRules
     /// (#544 item 4) rather than given a label the manager did not name, the same as the <c>libraries</c> side of
     /// <see cref="ArrRootFolders"/>.
     /// </summary>
-    public static List<string> ArrRootPaths(IEnumerable<PyDict> rows) =>
-        [.. rows.Select(row => PyValues.Text(row.Get("path"))).OfType<string>()];
+    public static List<string> ArrRootPaths(IEnumerable<WireObject> rows) =>
+        [.. rows.Select(row => ManagerValues.Text(row.Get("path"))).OfType<string>()];
 
     /// <summary>The arr <c>describe</c> answer from a <c>/api/v3/rootfolder</c> payload.</summary>
-    public static (List<string> Roots, List<ManagerLibraryDescriptor> Libraries) ArrRootFolders(PyJson? payload, string scope)
+    public static (List<string> Roots, List<ManagerLibraryDescriptor> Libraries) ArrRootFolders(WireValue? payload, string scope)
     {
-        var rows = PyValues.Dicts(payload);
+        var rows = ManagerValues.Dicts(payload);
         var libraries = new List<ManagerLibraryDescriptor>();
         foreach (var row in rows)
         {
-            if (PyValues.Text(row.Get("path")) is not { } path)
+            if (ManagerValues.Text(row.Get("path")) is not { } path)
             {
                 continue;
             }
 
-            var id = PyValues.FirstNumber(row, "id");
+            var id = ManagerValues.FirstNumber(row, "id");
             var key = id is { } number && !number.IsZero ? number.ToString(CultureInfo.InvariantCulture) : path;
             libraries.Add(new ManagerLibraryDescriptor(key, path, scope, path));
         }
@@ -117,28 +117,28 @@ public static class ManagerDialectRules
     }
 
     /// <summary>The arr queue rows: a list, or the <c>records</c> of a paged envelope.</summary>
-    public static List<ManagerQueueRow> ArrQueueRows(PyJson? payload, string scope)
+    public static List<ManagerQueueRow> ArrQueueRows(WireValue? payload, string scope)
     {
-        PyJson? records = payload switch
+        WireValue? records = payload switch
         {
-            PyList => payload,
-            null or PyNull => null,
-            PyDict dict => dict.Get("records"),
+            WireArray => payload,
+            null or WireNull => null,
+            WireObject dict => dict.Get("records"),
             // Any other truthy shape is not a queue answer: throw, and the caller answers with a 500.
             _ when !payload.IsTruthy => null,
             _ => throw new InvalidOperationException("The media manager's queue answer was neither a list nor an object with records."),
         };
-        return [.. PyValues.Dicts(records).Select(row => new ManagerQueueRow(scope, row))];
+        return [.. ManagerValues.Dicts(records).Select(row => new ManagerQueueRow(scope, row))];
     }
 
     /// <summary>Library file paths from <c>/api/v3/movie</c> (nested under <paramref name="fileKey"/>) or <c>/api/v3/episodefile</c>.</summary>
-    public static List<string> ArrLibraryFilePaths(PyJson? payload, string? fileKey)
+    public static List<string> ArrLibraryFilePaths(WireValue? payload, string? fileKey)
     {
         var paths = new List<string>();
-        foreach (var row in PyValues.Dicts(payload))
+        foreach (var row in ManagerValues.Dicts(payload))
         {
             var holder = fileKey is null ? row : row.Get(fileKey);
-            if (holder is PyDict mapping && PyValues.Text(mapping.Get("path")) is { } found)
+            if (holder is WireObject mapping && ManagerValues.Text(mapping.Get("path")) is { } found)
             {
                 paths.Add(found);
             }
@@ -153,25 +153,25 @@ public static class ManagerDialectRules
     /// <c>MovieFileResource</c> in Radarr's <c>openapi.json</c> — a movie with no file simply has no
     /// <c>movieFile</c>, which is skipped rather than treated as a match).
     /// </summary>
-    public static List<ManagerLibraryFile> ArrMovieLibraryFiles(PyJson? payload)
+    public static List<ManagerLibraryFile> ArrMovieLibraryFiles(WireValue? payload)
     {
         var files = new List<ManagerLibraryFile>();
-        foreach (var row in PyValues.Dicts(payload))
+        foreach (var row in ManagerValues.Dicts(payload))
         {
-            if (PyValues.FirstNumber(row, "id") is not { } id)
+            if (ManagerValues.FirstNumber(row, "id") is not { } id)
             {
                 continue;
             }
 
-            if (row.Get("movieFile") is not PyDict file || PyValues.Text(file.Get("path")) is not { } path)
+            if (row.Get("movieFile") is not WireObject file || ManagerValues.Text(file.Get("path")) is not { } path)
             {
                 continue;
             }
 
             var idText = id.ToString(CultureInfo.InvariantCulture);
-            var fileId = PyValues.FirstNumber(file, "id") is { } fileNumber ? (long)fileNumber : (long?)null;
-            var qualityProfileId = PyValues.FirstNumber(row, "qualityProfileId") is { } profileNumber ? (long)profileNumber : (long?)null;
-            files.Add(new ManagerLibraryFile(idText, PyValues.FirstText(row, "title") ?? idText, path, fileId, qualityProfileId));
+            var fileId = ManagerValues.FirstNumber(file, "id") is { } fileNumber ? (long)fileNumber : (long?)null;
+            var qualityProfileId = ManagerValues.FirstNumber(row, "qualityProfileId") is { } profileNumber ? (long)profileNumber : (long?)null;
+            files.Add(new ManagerLibraryFile(idText, ManagerValues.FirstText(row, "title") ?? idText, path, fileId, qualityProfileId));
         }
 
         return files;
@@ -185,14 +185,14 @@ public static class ManagerDialectRules
     /// one call per series). #551's <see cref="ManagerLibraryFile.FileId"/> is each row's own <c>id</c> — the
     /// individual episode file, not the series.
     /// </summary>
-    public static List<ManagerLibraryFile> ArrEpisodeLibraryFiles(PyJson? payload, string seriesId, string seriesTitle, long? seriesQualityProfileId = null)
+    public static List<ManagerLibraryFile> ArrEpisodeLibraryFiles(WireValue? payload, string seriesId, string seriesTitle, long? seriesQualityProfileId = null)
     {
         var files = new List<ManagerLibraryFile>();
-        foreach (var row in PyValues.Dicts(payload))
+        foreach (var row in ManagerValues.Dicts(payload))
         {
-            if (PyValues.Text(row.Get("path")) is { } path)
+            if (ManagerValues.Text(row.Get("path")) is { } path)
             {
-                var fileId = PyValues.FirstNumber(row, "id") is { } fileNumber ? (long)fileNumber : (long?)null;
+                var fileId = ManagerValues.FirstNumber(row, "id") is { } fileNumber ? (long)fileNumber : (long?)null;
                 files.Add(new ManagerLibraryFile(seriesId, seriesTitle, path, fileId, seriesQualityProfileId));
             }
         }
@@ -210,13 +210,13 @@ public static class ManagerDialectRules
         mediaScope == MediaManagerKinds.Tv ? ("RescanSeries", "seriesId") : ("RescanMovie", "movieId");
 
     /// <summary>The manifest's libraries, from the first non-empty list among its known keys, or a bare list.</summary>
-    public static List<PyDict> ManifestLibraries(PyJson? payload)
+    public static List<WireObject> ManifestLibraries(WireValue? payload)
     {
-        if (payload is PyDict mapping)
+        if (payload is WireObject mapping)
         {
             foreach (var key in new[] { "libraries", "roots", "rootFolders", "root_folders", "items" })
             {
-                var found = PyValues.Dicts(mapping.Get(key));
+                var found = ManagerValues.Dicts(mapping.Get(key));
                 if (found.Count > 0)
                 {
                     return found;
@@ -226,18 +226,18 @@ public static class ManagerDialectRules
             return [];
         }
 
-        return PyValues.Dicts(payload);
+        return ManagerValues.Dicts(payload);
     }
 
     /// <summary>The manifest's capability strings, lower-cased.</summary>
-    public static IReadOnlySet<string> ManifestCapabilities(PyJson? payload)
+    public static IReadOnlySet<string> ManifestCapabilities(WireValue? payload)
     {
         var set = new SortedSet<string>(StringComparer.Ordinal);
-        if (payload is PyDict mapping && mapping.Get("capabilities") is PyList list)
+        if (payload is WireObject mapping && mapping.Get("capabilities") is WireArray list)
         {
-            foreach (var item in list.Items.OfType<PyStr>())
+            foreach (var item in list.Items.OfType<WireString>())
             {
-                var text = PyStrings.Strip(item.Value);
+                var text = WireStrings.Strip(item.Value);
                 if (text.Length > 0)
                 {
                     set.Add(text.ToLowerInvariant());
@@ -249,47 +249,47 @@ public static class ManagerDialectRules
     }
 
     /// <summary>A manifest library's <c>id</c>, numeric or text.</summary>
-    public static string? ManifestLibraryKey(PyDict library)
+    public static string? ManifestLibraryKey(WireObject library)
     {
         ArgumentNullException.ThrowIfNull(library);
-        var number = PyValues.FirstNumber(library, "id");
-        return number is { } n ? n.ToString(CultureInfo.InvariantCulture) : PyValues.FirstText(library, "id");
+        var number = ManagerValues.FirstNumber(library, "id");
+        return number is { } n ? n.ToString(CultureInfo.InvariantCulture) : ManagerValues.FirstText(library, "id");
     }
 
     /// <summary>A manifest library, read against the confirmed Deluno contract.</summary>
-    public static ManagerLibraryDescriptor ManifestLibraryDescriptor(PyDict library)
+    public static ManagerLibraryDescriptor ManifestLibraryDescriptor(WireObject library)
     {
         ArgumentNullException.ThrowIfNull(library);
         var key = ManifestLibraryKey(library) ?? string.Empty;
-        var name = PyValues.FirstText(library, "name") ?? key;
+        var name = ManagerValues.FirstText(library, "name") ?? key;
         var scope = ScopeFromMediaType(library.Get("mediaType"));
-        var root = PyValues.FirstText(library, "rootPath");
-        var workflow = PyStrings.Strip(PyValues.Text(library.Get("importWorkflow")) ?? string.Empty).ToLowerInvariant();
+        var root = ManagerValues.FirstText(library, "rootPath");
+        var workflow = WireStrings.Strip(ManagerValues.Text(library.Get("importWorkflow")) ?? string.Empty).ToLowerInvariant();
         var processesBeforeImport = workflow == "refine-before-import";
-        var output = processesBeforeImport ? PyValues.FirstText(library, "processorOutputPath") : null;
+        var output = processesBeforeImport ? ManagerValues.FirstText(library, "processorOutputPath") : null;
         // Deluno's ExternalLibraryManifest carries DownloadsPath beside RootPath (Deluno
         // src/Deluno.Platform/ExternalIntegrationEndpointRouteBuilderExtensions.cs, ExternalLibraryManifest): the folder
         // the library's downloads arrive in, which is where a hand-off's sourcePath comes from.
-        var downloads = PyValues.FirstText(library, "downloadsPath");
+        var downloads = ManagerValues.FirstText(library, "downloadsPath");
         return new ManagerLibraryDescriptor(key, name, scope, root, output, processesBeforeImport, downloads);
     }
 
     /// <summary>The external-integration <c>describe</c> answer from a manifest payload.</summary>
-    public static ManagerDescription ExternalDescription(ManagerConnection connection, ManagerCapabilities staticCapabilities, PyJson? payload)
+    public static ManagerDescription ExternalDescription(ManagerConnection connection, ManagerCapabilities staticCapabilities, WireValue? payload)
     {
         ArgumentNullException.ThrowIfNull(staticCapabilities);
         var libraries = ManifestLibraries(payload);
         var scopes = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var library in libraries)
         {
-            if (ScopeFromMediaType(PyValues.Or(library.Get("mediaType"), library.Get("media_type"), library.Get("scope"))) is { } scope)
+            if (ScopeFromMediaType(ManagerValues.Or(library.Get("mediaType"), library.Get("media_type"), library.Get("scope"))) is { } scope)
             {
                 scopes.Add(scope);
             }
         }
 
         var roots = libraries
-            .Select(library => PyStrings.Strip(PyValues.FirstText(library, "path", "rootFolder", "root_folder", "root") ?? string.Empty))
+            .Select(library => WireStrings.Strip(ManagerValues.FirstText(library, "path", "rootFolder", "root_folder", "root") ?? string.Empty))
             .Where(path => path.Length > 0)
             .ToList();
         var capabilities = scopes.Count > 0
@@ -305,31 +305,31 @@ public static class ManagerDialectRules
     }
 
     /// <summary>Every queue row, whichever container the manager wrapped it in.</summary>
-    public static List<PyDict> ExternalQueueEntries(PyJson? payload)
+    public static List<WireObject> ExternalQueueEntries(WireValue? payload)
     {
-        if (payload is PyList)
+        if (payload is WireArray)
         {
-            return PyValues.Dicts(payload);
+            return ManagerValues.Dicts(payload);
         }
 
-        if (payload is not PyDict mapping)
+        if (payload is not WireObject mapping)
         {
             return [];
         }
 
-        var collected = new List<PyDict>();
+        var collected = new List<WireObject>();
         foreach (var key in new[] { "jobs", "dispatches", "downloads", "queue", "items", "records", "results" })
         {
-            collected.AddRange(PyValues.Dicts(mapping.Get(key)));
+            collected.AddRange(ManagerValues.Dicts(mapping.Get(key)));
         }
 
         return collected;
     }
 
     /// <summary>A queue row's status; an unrecognised state reads as still in progress.</summary>
-    public static string ExternalQueueStatus(PyDict entry)
+    public static string ExternalQueueStatus(WireObject entry)
     {
-        var raw = PyValues.FirstText(entry, "status", "state", "jobStatus", "job_status", "phase") ?? string.Empty;
+        var raw = ManagerValues.FirstText(entry, "status", "state", "jobStatus", "job_status", "phase") ?? string.Empty;
         var value = raw.ToLowerInvariant().Replace(" ", "_", StringComparison.Ordinal);
         if (ImportPendingStates.Contains(value))
         {
@@ -340,24 +340,24 @@ public static class ManagerDialectRules
     }
 
     /// <summary>An external queue row in the neutral shape; null when the row names no scope.</summary>
-    public static ManagerQueueRow? ExternalQueueRow(PyDict entry)
+    public static ManagerQueueRow? ExternalQueueRow(WireObject entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        var scope = ScopeFromMediaType(PyValues.Or(
+        var scope = ScopeFromMediaType(ManagerValues.Or(
             entry.Get("mediaType"), entry.Get("media_type"), entry.Get("mediaScope"), entry.Get("media_scope"), entry.Get("scope")));
         if (scope is null)
         {
             return null;
         }
 
-        var path = PyValues.FirstText(entry, "outputPath", "output_path", "targetPath", "target_path", "sourcePath", "source_path", "filePath", "file_path", "path");
-        var title = PyValues.FirstText(entry, "title", "releaseName", "release_name", "name");
-        var payload = new PyDict()
+        var path = ManagerValues.FirstText(entry, "outputPath", "output_path", "targetPath", "target_path", "sourcePath", "source_path", "filePath", "file_path", "path");
+        var title = ManagerValues.FirstText(entry, "title", "releaseName", "release_name", "name");
+        var payload = new WireObject()
             .Set("status", ExternalQueueStatus(entry))
             .Set("outputPath", path)
             .Set("title", title)
-            .Set("media", new PyDict().Set("title", title).Set("year", PyValues.Number(PyValues.FirstNumber(entry, "year", "releaseYear", "release_year"))))
-            .Set("entityId", PyValues.Number(PyValues.FirstNumber(entry, "entityId", "entity_id", "mediaId", "media_id", "id")));
+            .Set("media", new WireObject().Set("title", title).Set("year", ManagerValues.Number(ManagerValues.FirstNumber(entry, "year", "releaseYear", "release_year"))))
+            .Set("entityId", ManagerValues.Number(ManagerValues.FirstNumber(entry, "entityId", "entity_id", "mediaId", "media_id", "id")));
         return new ManagerQueueRow(scope, payload);
     }
 

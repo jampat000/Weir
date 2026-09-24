@@ -13,5 +13,5 @@ public sealed record ProcessingFileLogRecord
     public string Outcome { get; init; } = string.Empty;
     public string Title { get; init; } = string.Empty;
     public string DetailJson { get; init; } = "{}";
-    public PyDateTime RecordedAt { get; init; }
+    public Timestamp RecordedAt { get; init; }
 }

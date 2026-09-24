@@ -28,7 +28,7 @@ public static class ManagerHealthProbe
         IManagerHttpHandlerFactory handlers, string name, string kind, string baseUrl, string? apiKey, TimeSpan timeout, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(handlers);
-        if (PyStrings.Strip(baseUrl).Length == 0)
+        if (WireStrings.Strip(baseUrl).Length == 0)
         {
             return (false, "Add the address where this app can be reached, then test again.");
         }
@@ -109,7 +109,7 @@ public sealed partial class ManagerHeartbeatTask(
             var write = await UnitOfWork.OpenAsync(database, cancellationToken).ConfigureAwait(false);
             await using (write.ConfigureAwait(false))
             {
-                await MediaManagerConnectionStore.RecordTestResultAsync(write, row.Id, ok, PyDateTime.UtcNow(time), detail).ConfigureAwait(false);
+                await MediaManagerConnectionStore.RecordTestResultAsync(write, row.Id, ok, Timestamp.UtcNow(time), detail).ConfigureAwait(false);
                 await write.CommitAsync().ConfigureAwait(false);
             }
 

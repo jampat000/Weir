@@ -28,7 +28,7 @@ public static class AuthSessionEndpoints
     private static async Task<ApiResult> GetMeAsync(ApiRequest request)
     {
         var current = await request.RequireUserAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict().Set("user", AuthService.UserPublic(current.User)));
+        return ApiRoutes.Ok(new WireObject().Set("user", AuthService.UserPublic(current.User)));
     }
 
     private static async Task<ApiResult> GetSessionAsync(ApiRequest request)
@@ -48,7 +48,7 @@ public static class AuthSessionEndpoints
         // Prefer the row RequireUserAsync already loaded: it may carry this request's last-seen touch.
         var current = user.Session.Id == pair.Session.Id ? user.Session : pair.Session;
         var items = await request.Auth.ListActiveSessionsAsync(uow, user.User.Id, current).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict().Set("items", new PyList(items)));
+        return ApiRoutes.Ok(new WireObject().Set("items", new WireArray(items)));
     }
 
     private static async Task<ApiResult> PostRevokeOthersAsync(ApiRequest request)
@@ -70,7 +70,7 @@ public static class AuthSessionEndpoints
             uow, ActivityEventTypes.AuthSessionsRevoked, "auth", "Other sessions signed out",
             count.ToString(System.Globalization.CultureInfo.InvariantCulture)).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict().Set("message", $"Signed out {Plural.Of(count, "other session")}.").Set("revoked_count", count));
+        return ApiRoutes.Ok(new WireObject().Set("message", $"Signed out {Plural.Of(count, "other session")}.").Set("revoked_count", count));
     }
 
     private static async Task<ApiResult> PostRevokeSessionAsync(ApiRequest request)
@@ -78,7 +78,7 @@ public static class AuthSessionEndpoints
         var user = await request.RequireUserAsync().ConfigureAwait(false);
         var headerToken = request.FirstHeader("X-CSRF-Token");
         var issues = new ValidationIssues();
-        PydanticRules.TryUuid(request.RouteValue("session_id") ?? string.Empty, ["path", "session_id"], issues, out var sessionId);
+        FieldRules.TryUuid(request.RouteValue("session_id") ?? string.Empty, ["path", "session_id"], issues, out var sessionId);
         issues.ThrowIfAny();
 
         request.ValidateBrowserPostOrigin();
@@ -103,12 +103,12 @@ public static class AuthSessionEndpoints
 
         await ActivityStore.RecordAsync(uow, ActivityEventTypes.AuthSessionsRevoked, "auth", "Session signed out", "One other session was revoked.").ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict().Set("message", "Session signed out.").Set("revoked_count", 1));
+        return ApiRoutes.Ok(new WireObject().Set("message", "Session signed out.").Set("revoked_count", 1));
     }
 
     private static async Task<ApiResult> GetAdminPingAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict().Set("ok", true));
+        return ApiRoutes.Ok(new WireObject().Set("ok", true));
     }
 }

@@ -9,7 +9,7 @@ namespace Weir.Infrastructure.Processing;
 public sealed partial class ProcessingFailureCleanupSweep
 {
     private void ProcessMovie(
-        PyDict detail, string srcFile, string relNorm, string watchedRoot, string outputRoot, string workRoot, string? mediaExtensionsCsv,
+        WireObject detail, string srcFile, string relNorm, string watchedRoot, string outputRoot, string workRoot, string? mediaExtensionsCsv,
         IReadOnlyList<ManagerQueueSignal> signals)
     {
         var srcFolder = Path.GetDirectoryName(srcFile) ?? watchedRoot;
@@ -31,7 +31,7 @@ public sealed partial class ProcessingFailureCleanupSweep
         detail.Set("movie_failure_cleanup_queue_check", "passed_not_in_queue");
         detail.Set("movie_failure_cleanup_ran", true);
 
-        var cascade = (PyList)detail.Get("movie_failure_cleanup_cascade_folders_deleted")!;
+        var cascade = (WireArray)detail.Get("movie_failure_cleanup_cascade_folders_deleted")!;
         if (PathContainment.IsUnder(watchedRoot, srcFolder) && Directory.Exists(srcFolder))
         {
             var removal = RemoveRelease(watchedRoot, srcFile, mediaExtensionsCsv);
@@ -60,13 +60,13 @@ public sealed partial class ProcessingFailureCleanupSweep
             }
         }
 
-        var tempDeleted = (PyList)detail.Get("movie_failure_cleanup_temp_files_deleted")!;
+        var tempDeleted = (WireArray)detail.Get("movie_failure_cleanup_temp_files_deleted")!;
         foreach (var temp in JobTempCandidates(workRoot, relNorm))
         {
             var (ok, _) = SafeUnlink(temp);
             if (ok)
             {
-                tempDeleted.Items.Add(new PyStr(temp));
+                tempDeleted.Items.Add(new WireString(temp));
             }
         }
     }

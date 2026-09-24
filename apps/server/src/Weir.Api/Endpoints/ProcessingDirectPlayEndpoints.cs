@@ -17,19 +17,19 @@ public static class ProcessingDirectPlayEndpoints
         return endpoints;
     }
 
-    private static async Task<PyDict> BuildOutAsync(ApiRequest request)
+    private static async Task<WireObject> BuildOutAsync(ApiRequest request)
     {
         var uow = await request.DbAsync().ConfigureAwait(false);
         var known = DeviceProfileLoader.Load(request.Options.WeirHome);
         var chosen = new HashSet<string>(await DirectPlayService.SelectedDeviceIdsAsync(uow).ConfigureAwait(false), StringComparer.Ordinal);
-        var devices = known.Select(p => (PyJson)new PyDict()
+        var devices = known.Select(p => (WireValue)new WireObject()
             .Set("id", p.Id)
             .Set("name", p.Name)
             .Set("source", p.Source)
             .Set("note", p.Note)
             .Set("selected", chosen.Contains(p.Id)));
-        return new PyDict()
-            .Set("devices", new PyList(devices))
+        return new WireObject()
+            .Set("devices", new WireArray(devices))
             .Set("customised", DirectPlayService.IsCustomised(request.Options.WeirHome));
     }
 

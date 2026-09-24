@@ -7,7 +7,7 @@ namespace Weir.Core.Tests.Processing;
 /// <summary>Queue row mapping for the movie and TV dialects.</summary>
 public sealed class QueueRowMappingTests
 {
-    private static PyDict Row(string json) => (PyDict)PyJsonParser.Parse(json);
+    private static WireObject Row(string json) => (WireObject)WireJsonParser.Parse(json);
 
     // --- movie scope (the shape Radarr sends) ------------------------------------
 
@@ -199,12 +199,12 @@ public sealed class QueueRowMappingTests
 /// <summary>The candidate gate's domain evaluation, without HTTP.</summary>
 public sealed class CandidateGateEvaluateTests
 {
-    private static PyDict Row(string json) => (PyDict)PyJsonParser.Parse(json);
+    private static WireObject Row(string json) => (WireObject)WireJsonParser.Parse(json);
 
     private static ManagerConnection Connection(string kind = "radarr", string name = "Main", long connectionId = 1) =>
         new(kind, name, "http://manager.local", "key", connectionId);
 
-    private static ManagerQueueSignal Reported(IEnumerable<PyDict> rows, string scope = "movie", string kind = "radarr", string name = "Main", long connectionId = 1) =>
+    private static ManagerQueueSignal Reported(IEnumerable<WireObject> rows, string scope = "movie", string kind = "radarr", string name = "Main", long connectionId = 1) =>
         new(Connection(kind, name, connectionId), SignalStatus.Reported, [.. rows.Select(r => new ManagerQueueRow(scope, r))]);
 
     private static ManagerQueueSignal Unreachable(string kind = "radarr", string name = "Main", long connectionId = 1, string detail = "Weir could not reach this manager.") =>

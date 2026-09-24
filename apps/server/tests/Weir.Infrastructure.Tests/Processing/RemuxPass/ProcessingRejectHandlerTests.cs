@@ -86,12 +86,12 @@ public sealed class ProcessingRejectHandlerTests : IDisposable
         await Handler().HandleAsync(Context(41, payload), CancellationToken.None);
 
         var post = Assert.Single(_fixture.Http.RequestsTo(HttpMethod.Post, EventsPath));
-        var body = (PyDict)post.Json!;
-        Assert.Equal("failed", PyConvert.Str(body["status"]));
-        Assert.Equal("rejected", PyConvert.Str(body["disposition"]));
-        Assert.True(((PyBool)body["sourceRemoved"]).Value);
-        Assert.Equal("lib-movies", PyConvert.Str(body["libraryId"]));
-        Assert.Equal("execution", PyConvert.Str(body["failureClass"]));
+        var body = (WireObject)post.Json!;
+        Assert.Equal("failed", WireConvert.Str(body["status"]));
+        Assert.Equal("rejected", WireConvert.Str(body["disposition"]));
+        Assert.True(((WireBool)body["sourceRemoved"]).Value);
+        Assert.Equal("lib-movies", WireConvert.Str(body["libraryId"]));
+        Assert.Equal("execution", WireConvert.Str(body["failureClass"]));
         Assert.False(File.Exists(source));
         Assert.Equal("rejected", await ScalarText("SELECT status FROM files"));
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.file_rejected'"));

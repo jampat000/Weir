@@ -16,53 +16,53 @@ public static class RedownloadRiskDialect
     /// (Sonarr <c>EpisodeFileResource</c>, openapi.json:8498 at v5-develop; Radarr <c>MovieFileResource</c>,
     /// openapi.json:10819 at develop).
     /// </summary>
-    public static FileFormatSnapshot ParseFileFormatSnapshot(PyJson? payload, string managerKind)
+    public static FileFormatSnapshot ParseFileFormatSnapshot(WireValue? payload, string managerKind)
     {
-        if (payload is not PyDict file)
+        if (payload is not WireObject file)
         {
             return new FileFormatSnapshot([], [], 0);
         }
 
-        var languages = PyValues.Dicts(file.Get("languages"))
-            .Select(language => PyValues.FirstNumber(language, "id"))
+        var languages = ManagerValues.Dicts(file.Get("languages"))
+            .Select(language => ManagerValues.FirstNumber(language, "id"))
             .OfType<System.Numerics.BigInteger>()
             .Select(id => ArrLanguageCatalog.CanonicalCodeFor(managerKind, (int)id))
             .OfType<string>()
             .ToList();
 
-        var customFormats = PyValues.Dicts(file.Get("customFormats"))
+        var customFormats = ManagerValues.Dicts(file.Get("customFormats"))
             .Select(format => ParseCustomFormat(format, managerKind))
             .ToList();
 
-        var score = (int)(PyValues.WholeNumber(file.Get("customFormatScore")) ?? 0);
+        var score = (int)(ManagerValues.WholeNumber(file.Get("customFormatScore")) ?? 0);
         return new FileFormatSnapshot(languages, customFormats, score);
     }
 
-    private static CustomFormatSnapshot ParseCustomFormat(PyDict format, string managerKind)
+    private static CustomFormatSnapshot ParseCustomFormat(WireObject format, string managerKind)
     {
-        var id = PyValues.WholeNumber(format.Get("id")) ?? 0;
-        var name = PyValues.Text(format.Get("name")) ?? string.Empty;
-        var specifications = PyValues.Dicts(format.Get("specifications"))
+        var id = ManagerValues.WholeNumber(format.Get("id")) ?? 0;
+        var name = ManagerValues.Text(format.Get("name")) ?? string.Empty;
+        var specifications = ManagerValues.Dicts(format.Get("specifications"))
             .Select(specification => ParseSpecification(specification, managerKind))
             .ToList();
         return new CustomFormatSnapshot((long)id, name, specifications);
     }
 
-    private static FormatSpecificationSnapshot ParseSpecification(PyDict specification, string managerKind)
+    private static FormatSpecificationSnapshot ParseSpecification(WireObject specification, string managerKind)
     {
-        var implementation = PyValues.Text(specification.Get("implementation")) ?? string.Empty;
+        var implementation = ManagerValues.Text(specification.Get("implementation")) ?? string.Empty;
         var negate = specification.Get("negate")?.IsTruthy ?? false;
         if (implementation != RedownloadRiskEvaluator.LanguageImplementation)
         {
             return new FormatSpecificationSnapshot(implementation, negate, LanguageCode: null, ExceptLanguage: false);
         }
 
-        var fields = PyValues.Dicts(specification.Get("fields"));
-        var valueField = fields.FirstOrDefault(field => string.Equals(PyValues.Text(field.Get("name")), "value", StringComparison.OrdinalIgnoreCase));
+        var fields = ManagerValues.Dicts(specification.Get("fields"));
+        var valueField = fields.FirstOrDefault(field => string.Equals(ManagerValues.Text(field.Get("name")), "value", StringComparison.OrdinalIgnoreCase));
         var exceptLanguageField = fields.FirstOrDefault(field =>
-            string.Equals(PyValues.Text(field.Get("name")), "exceptLanguage", StringComparison.OrdinalIgnoreCase));
+            string.Equals(ManagerValues.Text(field.Get("name")), "exceptLanguage", StringComparison.OrdinalIgnoreCase));
 
-        var languageCode = valueField is not null && PyValues.WholeNumber(valueField.Get("value")) is { } languageId
+        var languageCode = valueField is not null && ManagerValues.WholeNumber(valueField.Get("value")) is { } languageId
             ? ArrLanguageCatalog.CanonicalCodeFor(managerKind, (int)languageId)
             : null;
         var exceptLanguage = exceptLanguageField?.Get("value")?.IsTruthy ?? false;
@@ -75,24 +75,24 @@ public static class RedownloadRiskDialect
     /// <c>format</c> field is the custom format id the score applies to (<c>ProfileFormatItemResource</c>,
     /// openapi.json:10616 / :11493).
     /// </summary>
-    public static QualityProfileSnapshot ParseQualityProfile(PyJson? payload)
+    public static QualityProfileSnapshot ParseQualityProfile(WireValue? payload)
     {
-        if (payload is not PyDict profile)
+        if (payload is not WireObject profile)
         {
             return new QualityProfileSnapshot(UpgradeAllowed: false, CutoffFormatScore: 0, FormatScores: new Dictionary<long, int>());
         }
 
         var upgradeAllowed = profile.Get("upgradeAllowed")?.IsTruthy ?? false;
-        var cutoff = (int)(PyValues.WholeNumber(profile.Get("cutoffFormatScore")) ?? 0);
+        var cutoff = (int)(ManagerValues.WholeNumber(profile.Get("cutoffFormatScore")) ?? 0);
         var scores = new Dictionary<long, int>();
-        foreach (var item in PyValues.Dicts(profile.Get("formatItems")))
+        foreach (var item in ManagerValues.Dicts(profile.Get("formatItems")))
         {
-            if (PyValues.WholeNumber(item.Get("format")) is not { } formatId)
+            if (ManagerValues.WholeNumber(item.Get("format")) is not { } formatId)
             {
                 continue;
             }
 
-            var score = (int)(PyValues.WholeNumber(item.Get("score")) ?? 0);
+            var score = (int)(ManagerValues.WholeNumber(item.Get("score")) ?? 0);
             scores[(long)formatId] = score;
         }
 

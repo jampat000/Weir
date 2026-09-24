@@ -11,20 +11,20 @@ public sealed class ActivityProvenanceTests
     {
         Assert.Equal(
             "{\"trigger\":\"webhook\",\"run_id\":\"scan-4\"}",
-            Dump(ActivityProvenance.JobProvenance(PyJsonParser.Parse("{\"trigger\": \"Webhook\", \"run_id\": \"scan-4\"}"))));
-        Assert.Equal("{}", Dump(ActivityProvenance.JobProvenance(PyJsonParser.Parse("{\"trigger\": \"because\", \"run_id\": true}"))));
-        Assert.Equal("{}", Dump(ActivityProvenance.JobProvenance(new PyStr("not a payload"))));
-        Assert.Equal("{}", Dump(ActivityProvenance.JobProvenance(PyJsonParser.Parse("{\"run_id\": \"  \"}"))));
-        Assert.Equal("{\"run_id\":0}", Dump(ActivityProvenance.JobProvenance(PyJsonParser.Parse("{\"run_id\": 0}"))));
+            Dump(ActivityProvenance.JobProvenance(WireJsonParser.Parse("{\"trigger\": \"Webhook\", \"run_id\": \"scan-4\"}"))));
+        Assert.Equal("{}", Dump(ActivityProvenance.JobProvenance(WireJsonParser.Parse("{\"trigger\": \"because\", \"run_id\": true}"))));
+        Assert.Equal("{}", Dump(ActivityProvenance.JobProvenance(new WireString("not a payload"))));
+        Assert.Equal("{}", Dump(ActivityProvenance.JobProvenance(WireJsonParser.Parse("{\"run_id\": \"  \"}"))));
+        Assert.Equal("{\"run_id\":0}", Dump(ActivityProvenance.JobProvenance(WireJsonParser.Parse("{\"run_id\": 0}"))));
     }
 
     [Fact]
     public void A_detail_keeps_what_it_already_says()
     {
-        var detail = (PyDict)PyJsonParser.Parse("{\"trigger\": \"worker\", \"x\": 1}");
+        var detail = (WireObject)WireJsonParser.Parse("{\"trigger\": \"worker\", \"x\": 1}");
         Assert.Equal(
             "{\"trigger\":\"worker\",\"run_id\":7,\"x\":1}",
-            Dump(ActivityProvenance.WithProvenance(detail, PyJsonParser.Parse("{\"trigger\": \"manual\", \"run_id\": 7}"))));
+            Dump(ActivityProvenance.WithProvenance(detail, WireJsonParser.Parse("{\"trigger\": \"manual\", \"run_id\": 7}"))));
     }
 
     [Fact]
@@ -63,5 +63,5 @@ public sealed class ActivityProvenanceTests
         Assert.Equal(new ActivityLatest(4, 2), await notifier.WaitForChangeAsync(1, TimeSpan.FromSeconds(5), TimeProvider.System));
     }
 
-    private static string Dump(PyJson value) => PyJsonWriter.Dumps(value, PyJsonFormat.Response);
+    private static string Dump(WireValue value) => WireJsonWriter.Dumps(value, WireJsonFormat.Response);
 }

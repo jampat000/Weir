@@ -36,6 +36,6 @@ public sealed class UnclaimedHandbackCleanupEnqueuer : IPeriodicEnqueuer
         _store.EnqueueOrGetAsync(
             _scope == "tv" ? PeriodicJobKinds.UnclaimedHandbackCleanupDedupeKeyTv : PeriodicJobKinds.UnclaimedHandbackCleanupDedupeKeyMovie,
             PeriodicJobKinds.UnclaimedHandbackCleanup,
-            PyJsonWriter.Dumps(new PyDict().Set("media_scope", _scope).Set("trigger", "scheduled"), PyJsonFormat.Compact),
+            WireJsonWriter.Dumps(new WireObject().Set("media_scope", _scope).Set("trigger", "scheduled"), WireJsonFormat.Compact),
             cancellationToken: cancellationToken);
 }

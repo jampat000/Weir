@@ -41,14 +41,14 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
         _fixture.Db(uow => uow.ExecuteAsync(
             "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status, updated_at) VALUES ($dedupe, 'processing.file.remux_pass.v1', $payload, 'failed', $updated)",
             ("$dedupe", $"x:{scope}:{rel}:{Guid.NewGuid():N}"),
-            ("$payload", PyJsonWriter.Dumps(new PyDict().Set("relative_media_path", rel).Set("media_scope", scope).Set("dry_run", dryRun), PyJsonFormat.Compact)),
-            ("$updated", Weir.Infrastructure.Jobs.PythonTimestamps.Orm(DateTimeOffset.UtcNow - (age ?? TimeSpan.FromHours(1))))));
+            ("$payload", WireJsonWriter.Dumps(new WireObject().Set("relative_media_path", rel).Set("media_scope", scope).Set("dry_run", dryRun), WireJsonFormat.Compact)),
+            ("$updated", Weir.Infrastructure.Jobs.TimestampColumns.Orm(DateTimeOffset.UtcNow - (age ?? TimeSpan.FromHours(1))))));
 
     private Task<int> AddPendingJobAsync(string rel, string scope) =>
         _fixture.Db(uow => uow.ExecuteAsync(
             "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status) VALUES ($dedupe, 'processing.file.remux_pass.v1', $payload, 'pending')",
             ("$dedupe", $"p:{scope}:{rel}:{Guid.NewGuid():N}"),
-            ("$payload", PyJsonWriter.Dumps(new PyDict().Set("relative_media_path", rel).Set("media_scope", scope), PyJsonFormat.Compact))));
+            ("$payload", WireJsonWriter.Dumps(new WireObject().Set("relative_media_path", rel).Set("media_scope", scope), WireJsonFormat.Compact))));
 
     [Fact]
     public async Task A_failed_movie_older_than_grace_cleans_source_output_and_temp()
@@ -74,17 +74,17 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
 
         var result = await Sweep().RunForScopeAsync("movie", CancellationToken.None);
 
-        var job = (PyDict)((PyList)result["jobs"]).Items[0];
-        Assert.True(((PyBool)job["movie_failure_cleanup_ran"]).Value);
-        Assert.Equal("passed_not_in_queue", PyConvert.Str(job["movie_failure_cleanup_queue_check"]));
-        Assert.True(((PyBool)job["movie_failure_cleanup_source_folder_deleted"]).Value);
-        Assert.True(((PyBool)job["movie_failure_cleanup_output_folder_deleted"]).Value);
-        Assert.Contains(temp, ((PyList)job["movie_failure_cleanup_temp_files_deleted"]).Items.Select(PyConvert.Str));
+        var job = (WireObject)((WireArray)result["jobs"]).Items[0];
+        Assert.True(((WireBool)job["movie_failure_cleanup_ran"]).Value);
+        Assert.Equal("passed_not_in_queue", WireConvert.Str(job["movie_failure_cleanup_queue_check"]));
+        Assert.True(((WireBool)job["movie_failure_cleanup_source_folder_deleted"]).Value);
+        Assert.True(((WireBool)job["movie_failure_cleanup_output_folder_deleted"]).Value);
+        Assert.Contains(temp, ((WireArray)job["movie_failure_cleanup_temp_files_deleted"]).Items.Select(WireConvert.Str));
         Assert.False(Directory.Exists(Path.Combine(mw, "Title")));
         Assert.False(Directory.Exists(Path.Combine(mo, "Title")));
         Assert.False(File.Exists(temp));
         Assert.True(File.Exists(notes));
-        Assert.DoesNotContain(notes, ((PyList)job["movie_failure_cleanup_temp_files_deleted"]).Items.Select(PyConvert.Str));
+        Assert.DoesNotContain(notes, ((WireArray)job["movie_failure_cleanup_temp_files_deleted"]).Items.Select(WireConvert.Str));
     }
 
     [Fact]
@@ -108,9 +108,9 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
 
         var result = await Sweep().RunForScopeAsync("movie", CancellationToken.None);
 
-        var job = (PyDict)((PyList)result["jobs"]).Items[0];
-        Assert.False(((PyBool)job["movie_failure_cleanup_source_folder_deleted"]).Value);
-        Assert.Equal(ReleaseFolderRemoval.OtherVideosReason, PyConvert.Str(job["movie_failure_cleanup_source_folder_kept_reason"]));
+        var job = (WireObject)((WireArray)result["jobs"]).Items[0];
+        Assert.False(((WireBool)job["movie_failure_cleanup_source_folder_deleted"]).Value);
+        Assert.Equal(ReleaseFolderRemoval.OtherVideosReason, WireConvert.Str(job["movie_failure_cleanup_source_folder_kept_reason"]));
         Assert.False(File.Exists(failed));
         Assert.True(File.Exists(sibling));
         Assert.True(File.Exists(siblingOutput), "another film's finished output is not the failed file's to delete");
@@ -131,8 +131,8 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
 
         var result = await Sweep().RunForScopeAsync("movie", CancellationToken.None);
 
-        var job = (PyDict)((PyList)result["jobs"]).Items[0];
-        Assert.Equal(ProcessingFailureCleanupSweep.OutsideWatchedFolderReason, PyConvert.Str(job["movie_failure_cleanup_skip_reason"]));
+        var job = (WireObject)((WireArray)result["jobs"]).Items[0];
+        Assert.Equal(ProcessingFailureCleanupSweep.OutsideWatchedFolderReason, WireConvert.Str(job["movie_failure_cleanup_skip_reason"]));
         Assert.True(File.Exists(victim));
     }
 
@@ -152,9 +152,9 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
 
         var result = await Sweep().RunForScopeAsync("movie", CancellationToken.None);
 
-        var job = (PyDict)((PyList)result["jobs"]).Items[0];
-        Assert.False(((PyBool)job["movie_failure_cleanup_ran"]).Value);
-        Assert.Equal("blocked_in_queue", PyConvert.Str(job["movie_failure_cleanup_queue_check"]));
+        var job = (WireObject)((WireArray)result["jobs"]).Items[0];
+        Assert.False(((WireBool)job["movie_failure_cleanup_ran"]).Value);
+        Assert.Equal("blocked_in_queue", WireConvert.Str(job["movie_failure_cleanup_queue_check"]));
         Assert.True(Directory.Exists(Path.Combine(mw, "Title")));
     }
 
@@ -166,9 +166,9 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
 
         var result = await Sweep().RunForScopeAsync("movie", CancellationToken.None);
 
-        var job = (PyDict)((PyList)result["jobs"]).Items[0];
-        Assert.True(((PyBool)job["movie_failure_cleanup_dry_run"]).Value);
-        Assert.Contains("compatibility", PyConvert.Str(job["movie_failure_cleanup_skip_reason"]), StringComparison.Ordinal);
+        var job = (WireObject)((WireArray)result["jobs"]).Items[0];
+        Assert.True(((WireBool)job["movie_failure_cleanup_dry_run"]).Value);
+        Assert.Contains("compatibility", WireConvert.Str(job["movie_failure_cleanup_skip_reason"]), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -189,9 +189,9 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
 
         var result = await Sweep().RunForScopeAsync("tv", CancellationToken.None);
 
-        var job = (PyDict)((PyList)result["jobs"]).Items[0];
-        Assert.False(((PyBool)job["tv_failure_cleanup_ran"]).Value);
-        Assert.Equal("blocked_in_queue_or_active_job", PyConvert.Str(job["tv_failure_cleanup_queue_check"]));
+        var job = (WireObject)((WireArray)result["jobs"]).Items[0];
+        Assert.False(((WireBool)job["tv_failure_cleanup_ran"]).Value);
+        Assert.Equal("blocked_in_queue_or_active_job", WireConvert.Str(job["tv_failure_cleanup_queue_check"]));
         Assert.True(Directory.Exists(Path.Combine(tw, "Show", "Season 1")));
     }
 
@@ -213,9 +213,9 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
 
         var result = await Sweep().RunForScopeAsync("tv", CancellationToken.None);
 
-        var job = (PyDict)((PyList)result["jobs"]).Items[0];
-        Assert.False(((PyBool)job["tv_failure_cleanup_ran"]).Value);
-        Assert.Equal("blocked_in_queue_or_active_job", PyConvert.Str(job["tv_failure_cleanup_queue_check"]));
+        var job = (WireObject)((WireArray)result["jobs"]).Items[0];
+        Assert.False(((WireBool)job["tv_failure_cleanup_ran"]).Value);
+        Assert.Equal("blocked_in_queue_or_active_job", WireConvert.Str(job["tv_failure_cleanup_queue_check"]));
     }
 
     [Fact]
@@ -227,8 +227,8 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
 
         var result = await Sweep().RunForScopeAsync("movie", CancellationToken.None);
 
-        Assert.Equal("skipped", PyConvert.Str(result["cleanup_run_status"]));
-        Assert.Contains("not configured", PyConvert.Str(result["skip_reason"]), StringComparison.Ordinal);
+        Assert.Equal("skipped", WireConvert.Str(result["cleanup_run_status"]));
+        Assert.Contains("not configured", WireConvert.Str(result["skip_reason"]), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -238,9 +238,9 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
 
         var result = await Sweep().RunForScopeAsync("movie", CancellationToken.None);
 
-        Assert.Equal("no_eligible_files", PyConvert.Str(result["cleanup_run_status"]));
-        Assert.Equal(0L, (long)((PyInt)result["eligible_failed_jobs"]).Value);
-        Assert.Contains("No eligible failed jobs", PyConvert.Str(result["skip_reason"]), StringComparison.Ordinal);
+        Assert.Equal("no_eligible_files", WireConvert.Str(result["cleanup_run_status"]));
+        Assert.Equal(0L, (long)((WireInteger)result["eligible_failed_jobs"]).Value);
+        Assert.Contains("No eligible failed jobs", WireConvert.Str(result["skip_reason"]), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -251,10 +251,10 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
 
         var result = await Sweep().RunForScopeAsync("movie", CancellationToken.None);
 
-        var job = (PyDict)((PyList)result["jobs"]).Items[0];
-        Assert.False(((PyBool)job["movie_failure_cleanup_ran"]).Value);
-        Assert.Contains("could not check whether anything is still importing", PyConvert.Str(job["movie_failure_cleanup_skip_reason"]), StringComparison.Ordinal);
-        Assert.Contains("No media manager is connected for Movies.", PyConvert.Str(job["movie_failure_cleanup_skip_reason"]), StringComparison.Ordinal);
+        var job = (WireObject)((WireArray)result["jobs"]).Items[0];
+        Assert.False(((WireBool)job["movie_failure_cleanup_ran"]).Value);
+        Assert.Contains("could not check whether anything is still importing", WireConvert.Str(job["movie_failure_cleanup_skip_reason"]), StringComparison.Ordinal);
+        Assert.Contains("No media manager is connected for Movies.", WireConvert.Str(job["movie_failure_cleanup_skip_reason"]), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -272,9 +272,9 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
 
         var result = await Sweep().RunForScopeAsync("movie", CancellationToken.None);
 
-        var job = (PyDict)((PyList)result["jobs"]).Items[0];
-        Assert.False(((PyBool)job["movie_failure_cleanup_source_folder_deleted"]).Value);
-        Assert.Equal(Path.GetFullPath(mw), Path.GetFullPath(PyConvert.Str(job["movie_failure_cleanup_source_folder_path"])));
+        var job = (WireObject)((WireArray)result["jobs"]).Items[0];
+        Assert.False(((WireBool)job["movie_failure_cleanup_source_folder_deleted"]).Value);
+        Assert.Equal(Path.GetFullPath(mw), Path.GetFullPath(WireConvert.Str(job["movie_failure_cleanup_source_folder_path"])));
         Assert.True(File.Exists(Path.Combine(mw, "Film.mkv")));
     }
 

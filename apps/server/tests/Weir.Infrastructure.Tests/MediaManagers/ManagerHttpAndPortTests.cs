@@ -87,13 +87,13 @@ public sealed class ManagerHttpAndPortTests
         var ports = new HttpMediaManagerPorts(http);
         var sonarr = ports.PortForKind("sonarr")!;
         Assert.True(sonarr.Capabilities().RemovesQueueItems);
-        await sonarr.RemoveQueueItemAsync(new ManagerConnection("sonarr", "Sonarr", "http://127.0.0.1:8989", "k"), new PyDict().Set("id", 99).Set("downloadId", "x"));
+        await sonarr.RemoveQueueItemAsync(new ManagerConnection("sonarr", "Sonarr", "http://127.0.0.1:8989", "k"), new WireObject().Set("id", 99).Set("downloadId", "x"));
         Assert.Equal("/api/v3/queue/99?removeFromClient=true&blocklist=true", Assert.Single(http.Requests).PathAndQuery);
-        await Assert.ThrowsAsync<MediaManagerHttpException>(() => sonarr.RemoveQueueItemAsync(Connection("sonarr"), new PyDict().Set("downloadId", "no id")));
+        await Assert.ThrowsAsync<MediaManagerHttpException>(() => sonarr.RemoveQueueItemAsync(Connection("sonarr"), new WireObject().Set("downloadId", "no id")));
 
         var deluno = ports.PortForKind("deluno")!;
         Assert.False(deluno.Capabilities().RemovesQueueItems);
-        await Assert.ThrowsAsync<MediaManagerHttpException>(() => deluno.RemoveQueueItemAsync(Connection("deluno"), new PyDict().Set("id", 1)));
+        await Assert.ThrowsAsync<MediaManagerHttpException>(() => deluno.RemoveQueueItemAsync(Connection("deluno"), new WireObject().Set("id", 1)));
     }
 
     [Fact]
@@ -166,7 +166,7 @@ public sealed class ManagerHttpAndPortTests
         Assert.Equal("tv", row.Scope);
         Assert.Equal(
             """{"status":"importpending","outputPath":"/tv/Show/S01E01.mkv","title":"Show S01E01","media":{"title":"Show S01E01","year":null},"entityId":4}""",
-            PyJsonWriter.Dumps(row.Payload, PyJsonFormat.Compact));
+            WireJsonWriter.Dumps(row.Payload, WireJsonFormat.Compact));
     }
 
     // --- list_library_files / file_changed (#507) -----------------------------------------------
@@ -190,7 +190,7 @@ public sealed class ManagerHttpAndPortTests
         var outcome = await radarr.FileChangedAsync(Connection(), new SortedSet<string>(), "7", "/media/Solaris/f.mkv", "removed 2 audio tracks", CancellationToken.None);
         Assert.Equal(ManagerNotifyOutcome.Notified, outcome);
         var command = http.RequestsTo(HttpMethod.Post, "/api/v3/command").Single();
-        Assert.Equal("""{"name":"RescanMovie","movieId":7}""", PyJsonWriter.Dumps(command.Json!, PyJsonFormat.Compact));
+        Assert.Equal("""{"name":"RescanMovie","movieId":7}""", WireJsonWriter.Dumps(command.Json!, WireJsonFormat.Compact));
     }
 
     [Fact]
@@ -214,7 +214,7 @@ public sealed class ManagerHttpAndPortTests
         http.Json(HttpMethod.Post, "/api/v3/command", """{"id":2}""", HttpStatusCode.Created);
         await sonarr.FileChangedAsync(Connection("sonarr"), new SortedSet<string>(), "12", "/tv/Show/S01/e01.mkv", null, CancellationToken.None);
         var command = http.RequestsTo(HttpMethod.Post, "/api/v3/command").Single();
-        Assert.Equal("""{"name":"RescanSeries","seriesId":12}""", PyJsonWriter.Dumps(command.Json!, PyJsonFormat.Compact));
+        Assert.Equal("""{"name":"RescanSeries","seriesId":12}""", WireJsonWriter.Dumps(command.Json!, WireJsonFormat.Compact));
     }
 
     [Fact]
@@ -235,6 +235,6 @@ public sealed class ManagerHttpAndPortTests
         var notified = await deluno.FileChangedAsync(Connection("deluno"), capabilities, null, "/media/f.mkv", "removed 2 audio tracks", CancellationToken.None);
         Assert.Equal(ManagerNotifyOutcome.Notified, notified);
         var request = http.RequestsTo(HttpMethod.Post, "/api/integrations/external/file-changed").Single();
-        Assert.Equal("""{"path":"/media/f.mkv","tool":"Weir","reason":"removed 2 audio tracks"}""", PyJsonWriter.Dumps(request.Json!, PyJsonFormat.Compact));
+        Assert.Equal("""{"path":"/media/f.mkv","tool":"Weir","reason":"removed 2 audio tracks"}""", WireJsonWriter.Dumps(request.Json!, WireJsonFormat.Compact));
     }
 }

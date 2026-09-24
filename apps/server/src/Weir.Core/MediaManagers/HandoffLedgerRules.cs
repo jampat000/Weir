@@ -19,7 +19,7 @@ public sealed record HandoffStatus(
     IReadOnlyList<string>? OutputFiles = null)
 {
     /// <summary>The status as JSON, timestamps in UTC with a <c>Z</c>.</summary>
-    public PyDict AsJson() => new PyDict()
+    public WireObject AsJson() => new WireObject()
         .Set("handoffId", HandoffId)
         .Set("state", State)
         .Set("queuePosition", QueuePosition)
@@ -30,7 +30,7 @@ public sealed record HandoffStatus(
         .Set("message", Message);
 
     private static string? Iso(DateTimeOffset? value) =>
-        value is { } stamp ? PyDateTime.FromDateTimeOffset(stamp.ToUniversalTime()).IsoFormat().Replace("+00:00", "Z", StringComparison.Ordinal) : null;
+        value is { } stamp ? Timestamp.FromDateTimeOffset(stamp.ToUniversalTime()).IsoFormat().Replace("+00:00", "Z", StringComparison.Ordinal) : null;
 }
 
 /// <summary>The hand-off vocabulary agreed with Deluno and how a file's state maps onto it.</summary>

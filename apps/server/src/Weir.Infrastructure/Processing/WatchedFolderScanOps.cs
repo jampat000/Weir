@@ -82,37 +82,37 @@ public static class WatchedFolderScanOps
                 continue;
             }
 
-            PyJson data;
+            WireValue data;
             try
             {
-                data = PyJsonParser.Parse(trimmed);
+                data = WireJsonParser.Parse(trimmed);
             }
-            catch (PyJsonDecodeException)
+            catch (WireJsonDecodeException)
             {
                 continue;
             }
 
-            if (data is not PyDict dict)
+            if (data is not WireObject dict)
             {
                 continue;
             }
 
-            if (dict.Get("ok") is not PyBool { Value: true } || dict.Get("source_deleted_after_success") is not PyBool { Value: false })
+            if (dict.Get("ok") is not WireBool { Value: true } || dict.Get("source_deleted_after_success") is not WireBool { Value: false })
             {
                 continue;
             }
 
-            if (dict.Get("relative_media_path") is not PyStr relStr || relStr.Value != relativePosix)
+            if (dict.Get("relative_media_path") is not WireString relStr || relStr.Value != relativePosix)
             {
                 continue;
             }
 
-            if (libraryId is { } wantLib && dict.Get("library_id") is PyInt eventLib && (long)eventLib.Value != wantLib)
+            if (libraryId is { } wantLib && dict.Get("library_id") is WireInteger eventLib && (long)eventLib.Value != wantLib)
             {
                 continue;
             }
 
-            var jobScope = dict.Get("media_scope") is PyStr scopeStr ? ProcessingMediaScopes.Normalize(scopeStr.Value) : ProcessingMediaScopes.Movie;
+            var jobScope = dict.Get("media_scope") is WireString scopeStr ? ProcessingMediaScopes.Normalize(scopeStr.Value) : ProcessingMediaScopes.Movie;
             if (jobScope != wantScope)
             {
                 continue;
@@ -123,7 +123,7 @@ public static class WatchedFolderScanOps
                 continue;
             }
 
-            if (dict.Get("output_file") is not PyStr outputStr || outputStr.Value.Trim().Length == 0)
+            if (dict.Get("output_file") is not WireString outputStr || outputStr.Value.Trim().Length == 0)
             {
                 continue;
             }
@@ -149,7 +149,7 @@ public static class WatchedFolderScanOps
         return false;
     }
 
-    private static bool CompletedEventMatchesCurrentSource(PyDict data, string sourcePath)
+    private static bool CompletedEventMatchesCurrentSource(WireObject data, string sourcePath)
     {
         FileInfo stat;
         try
@@ -171,7 +171,7 @@ public static class WatchedFolderScanOps
 
         // There is no inode/device fingerprint on Windows, so match on the path and size every
         // completion record carries.
-        if (data.Get("inspected_source_path") is PyStr inspected && data.Get("source_size_bytes") is PyInt recordedSize)
+        if (data.Get("inspected_source_path") is WireString inspected && data.Get("source_size_bytes") is WireInteger recordedSize)
         {
             try
             {

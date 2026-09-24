@@ -115,7 +115,7 @@ public static class RemuxPassPaths
             throw new ArgumentException("The watched folder (saved settings) must be an existing directory");
         }
 
-        var rel = PyStrings.Strip(relativePath ?? string.Empty).Replace('\\', '/').TrimStart('/');
+        var rel = WireStrings.Strip(relativePath ?? string.Empty).Replace('\\', '/').TrimStart('/');
         if (rel.Length == 0)
         {
             throw new ArgumentException("relative_media_path is required");
@@ -157,13 +157,13 @@ public static class RemuxPassPaths
     public static (string WorkFolder, bool IsDefault) EffectiveWorkFolder(ProcessingLibraryRecord library, string weirHome)
     {
         ArgumentNullException.ThrowIfNull(library);
-        var raw = PyStrings.Strip(library.WorkFolder ?? string.Empty);
+        var raw = WireStrings.Strip(library.WorkFolder ?? string.Empty);
         if (raw.Length > 0)
         {
             return (raw, false);
         }
 
-        return (DefaultWorkFolder(weirHome, PyStrings.Strip(library.MediaType ?? "movie").ToLowerInvariant()), true);
+        return (DefaultWorkFolder(weirHome, WireStrings.Strip(library.MediaType ?? "movie").ToLowerInvariant()), true);
     }
 
     /// <summary>
@@ -172,8 +172,8 @@ public static class RemuxPassPaths
     public static (ProcessingPathRuntime? Runtime, string? Problem) RuntimeForLibrary(ProcessingLibraryRecord library, string weirHome)
     {
         ArgumentNullException.ThrowIfNull(library);
-        var label = PyStrings.Strip(library.Name).Length > 0 ? PyStrings.Strip(library.Name) : library.MediaType == "tv" ? "TV" : "Movies";
-        var watchedRaw = PyStrings.Strip(library.WatchedFolder ?? string.Empty);
+        var label = WireStrings.Strip(library.Name).Length > 0 ? WireStrings.Strip(library.Name) : library.MediaType == "tv" ? "TV" : "Movies";
+        var watchedRaw = WireStrings.Strip(library.WatchedFolder ?? string.Empty);
         if (watchedRaw.Length == 0)
         {
             return (null,
@@ -190,7 +190,7 @@ public static class RemuxPassPaths
 
         var (workRaw, workIsDefault) = EffectiveWorkFolder(library, weirHome);
         var work = Resolve(workRaw);
-        var outputRaw = PyStrings.Strip(library.OutputFolder ?? string.Empty);
+        var outputRaw = WireStrings.Strip(library.OutputFolder ?? string.Empty);
         if (outputRaw.Length == 0)
         {
             return (null,
@@ -262,7 +262,7 @@ public static class RemuxPassPaths
             RemoveCommentary = ruleSet.RemoveCommentary,
             // Normalized the same way as the fallback path (RuleSetConversion.ToRulesConfig) so both agree (#545).
             SubtitleMode = RuleSetConversion.NormalizeSubtitleMode(ruleSet.SubtitleMode),
-            SubtitleLangs = [.. (ruleSet.SubtitleLangsCsv ?? string.Empty).Split(',').Select(PyStrings.Strip).Where(x => x.Length > 0)],
+            SubtitleLangs = [.. (ruleSet.SubtitleLangsCsv ?? string.Empty).Split(',').Select(WireStrings.Strip).Where(x => x.Length > 0)],
             PreserveForcedSubs = ruleSet.PreserveForcedSubs,
             PreserveDefaultSubs = ruleSet.PreserveDefaultSubs,
             AudioPreferenceMode = RemuxRules.NormalizeAudioPreferenceMode(ruleSet.AudioPreferenceMode),
@@ -298,7 +298,7 @@ public static class RemuxPassPaths
     /// <summary>Deletes one regular file under the watched folder, never a populated folder.</summary>
     public static RejectedFileCleanupResult CleanupRejectedFile(string watchedRoot, string filePath, string? action)
     {
-        if (!string.Equals(PyStrings.Strip(action ?? "leave"), "delete_file", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(WireStrings.Strip(action ?? "leave"), "delete_file", StringComparison.OrdinalIgnoreCase))
         {
             return new RejectedFileCleanupResult(false, "Weir left the rejected file in place because this library's cleanup action is Leave in place.");
         }

@@ -183,7 +183,7 @@ public sealed class SessionTouchWriteLockApiTests
         TestDatabase.ExecuteAsync(
             server,
             "UPDATE user_sessions SET last_seen_at = $seen",
-            ("$seen", PyDateTime.FromUtc(DateTime.UtcNow - AgeBy).ToSqlite()));
+            ("$seen", Timestamp.FromUtc(DateTime.UtcNow - AgeBy).ToSqlite()));
 
     /// <summary>
     /// Guards the guard: if the touch ever stopped happening, every test above would pass without exercising
@@ -194,7 +194,7 @@ public sealed class SessionTouchWriteLockApiTests
         var lastSeen = await TestDatabase.ScalarStringAsync(server, "SELECT last_seen_at FROM user_sessions");
         Assert.NotNull(lastSeen);
         Assert.True(
-            PyDateTime.TryFromIsoFormat(lastSeen, out var parsed),
+            Timestamp.TryFromIsoFormat(lastSeen, out var parsed),
             $"last_seen_at is not a timestamp this build can read: '{lastSeen}'.");
         Assert.True(
             DateTime.UtcNow - parsed.AsUtc < AgeBy,

@@ -58,14 +58,14 @@ public sealed class ArrManagerRedownload : IManagerRedownload
     {
         var idText = movieId.ToString(CultureInfo.InvariantCulture);
         var payload = await client.GetJsonAsync($"/api/v3/movie/{idText}", cancellationToken: cancellationToken).ConfigureAwait(false);
-        if (payload is not PyDict movie)
+        if (payload is not WireObject movie)
         {
             throw new MediaManagerHttpException($"{connection.Label} did not return a movie for id {idText}.");
         }
 
-        var file = movie.Get("movieFile") as PyDict;
-        var fileId = file is null ? null : PyValues.FirstNumber(file, "id");
-        var sizeBytes = file is null ? null : (long?)PyValues.FirstNumber(file, "size");
+        var file = movie.Get("movieFile") as WireObject;
+        var fileId = file is null ? null : ManagerValues.FirstNumber(file, "id");
+        var sizeBytes = file is null ? null : (long?)ManagerValues.FirstNumber(file, "size");
 
         return await DeleteThenSearchAsync(
             connection,
@@ -73,7 +73,7 @@ public sealed class ArrManagerRedownload : IManagerRedownload
             existingFileId: fileId is { } n ? (long)n : null,
             existingFileSizeBytes: sizeBytes,
             deletePath: existingId => $"/api/v3/moviefile/{existingId.ToString(CultureInfo.InvariantCulture)}",
-            searchBody: new PyDict().Set("name", "MoviesSearch").Set("movieIds", new PyList([PyJson.Of(movieId)])),
+            searchBody: new WireObject().Set("name", "MoviesSearch").Set("movieIds", new WireArray([WireValue.Of(movieId)])),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -84,9 +84,9 @@ public sealed class ArrManagerRedownload : IManagerRedownload
             "/api/v3/episodefile",
             [new("seriesId", seriesId)],
             cancellationToken).ConfigureAwait(false);
-        var match = PyValues.Dicts(payload).FirstOrDefault(row => LibraryFileChangeRules.PathsEqual(PyValues.Text(row.Get("path")), filePath));
-        var fileId = match is null ? null : PyValues.FirstNumber(match, "id");
-        var sizeBytes = match is null ? null : (long?)PyValues.FirstNumber(match, "size");
+        var match = ManagerValues.Dicts(payload).FirstOrDefault(row => LibraryFileChangeRules.PathsEqual(ManagerValues.Text(row.Get("path")), filePath));
+        var fileId = match is null ? null : ManagerValues.FirstNumber(match, "id");
+        var sizeBytes = match is null ? null : (long?)ManagerValues.FirstNumber(match, "size");
 
         return await DeleteThenSearchAsync(
             connection,
@@ -94,7 +94,7 @@ public sealed class ArrManagerRedownload : IManagerRedownload
             existingFileId: fileId is { } n ? (long)n : null,
             existingFileSizeBytes: sizeBytes,
             deletePath: existingId => $"/api/v3/episodefile/{existingId.ToString(CultureInfo.InvariantCulture)}",
-            searchBody: new PyDict().Set("name", "SeriesSearch").Set("seriesId", seriesId),
+            searchBody: new WireObject().Set("name", "SeriesSearch").Set("seriesId", seriesId),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -109,7 +109,7 @@ public sealed class ArrManagerRedownload : IManagerRedownload
         long? existingFileId,
         long? existingFileSizeBytes,
         Func<long, string> deletePath,
-        PyDict searchBody,
+        WireObject searchBody,
         CancellationToken cancellationToken)
     {
         var deleted = false;

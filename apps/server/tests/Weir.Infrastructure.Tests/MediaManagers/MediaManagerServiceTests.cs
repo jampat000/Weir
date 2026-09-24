@@ -59,7 +59,7 @@ public sealed class MediaManagerServiceTests
         await fixture.AddConnectionAsync("deluno", "Main");
         var signals = await fixture.Db(uow => fixture.Connections.CollectQueueSignalsAsync(uow, "movie"));
         Assert.Equal(["Radarr (1080p)", "Deluno (Main)"], signals.Select(s => s.Connection.Label));
-        Assert.Equal(["a film"], signals[1].Rows.Select(r => ((PyStr)r.Payload["title"]).Value));
+        Assert.Equal(["a film"], signals[1].Rows.Select(r => ((WireString)r.Payload["title"]).Value));
         var byId = await fixture.Db(uow => fixture.Connections.CollectLibraryTruthAsync(uow, "movie", [2]));
         Assert.Equal(SignalStatus.NoSignal, Assert.Single(byId).Status);
     }
@@ -70,7 +70,7 @@ public sealed class MediaManagerServiceTests
         using var fixture = new MediaManagerFixture();
         var old = new Core.Security.CredentialCipher("old-credentials-secret", "session-a", [], TimeProvider.System);
         var envelope = old.Encrypt("arr-key");
-        Assert.Equal("credentials:v1", ((PyStr)((PyDict)PyJsonParser.Parse(envelope))["key_id"]).Value);
+        Assert.Equal("credentials:v1", ((WireString)((WireObject)WireJsonParser.Parse(envelope))["key_id"]).Value);
         var rotated = new Core.Security.CredentialCipher("new-credentials-secret", "session-b", ["old-credentials-secret"], TimeProvider.System);
         Assert.Equal("arr-key", rotated.Decrypt(envelope));
         var rewrapped = rotated.Rewrap(envelope)!;
@@ -98,7 +98,7 @@ public sealed class MediaManagerServiceTests
 
     /// <summary>
     /// #544 item 3: creating or updating a connection when no secret is configured must not let the
-    /// <c>PyValueErrorException</c> from encrypting the API key escape; it becomes the same
+    /// <c>WireValueException</c> from encrypting the API key escape; it becomes the same
     /// <see cref="MediaManagerConnectionException"/> (a 400) any other operator mistake here does, still naming
     /// the env var to set.
     /// </summary>
@@ -278,7 +278,7 @@ public sealed class MediaManagerServiceTests
     private const string DelunoPayload =
         """{"relative_media_path":"Film/film.mkv","media_scope":"movie","origin":{"source_key":"deluno","handoff_id":"h1","library_id":"lib-movies","callback_path":"/api/integrations/processors/events"}}""";
 
-    private static PyDict Result(string json) => (PyDict)PyJsonParser.Parse(json);
+    private static WireObject Result(string json) => (WireObject)WireJsonParser.Parse(json);
 
     private static Task<string> Report(MediaManagerFixture fixture, string? payload, string result) =>
         fixture.Db(uow => fixture.Reporter.ReportHandoffCompletionAsync(uow, payload, Result(result)), commit: false);
@@ -349,8 +349,8 @@ public sealed class MediaManagerServiceTests
         await fixture.Db(async uow => { await fixture.Ledger.RecordReceivedAsync(uow, "deluno", "h1", null, "Film/film.mkv"); return 0; });
         var status = await Report(fixture, DelunoPayload, """{"ok":false,"outcome":"failed_execution","reason":"ffmpeg failed","retry_scheduled":false,"pass_through_queued":false,"failure_class":"execution"}""");
         Assert.Equal("reported failed to Deluno", status);
-        var body = (PyDict)fixture.Http.Requests[0].Json!;
-        Assert.Equal(("lib-movies", "held"), (((PyStr)body["libraryId"]).Value, ((PyStr)body["disposition"]).Value));
+        var body = (WireObject)fixture.Http.Requests[0].Json!;
+        Assert.Equal(("lib-movies", "held"), (((WireString)body["libraryId"]).Value, ((WireString)body["disposition"]).Value));
         Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM media_manager_handoffs WHERE state = 'failed' AND message = 'ffmpeg failed'"));
     }
 
@@ -363,11 +363,11 @@ public sealed class MediaManagerServiceTests
             .Json(HttpMethod.Post, "/api/integrations/processors/events", "{}", HttpStatusCode.Accepted)
             .Json(HttpMethod.Get, "/api/integrations/external/manifest", """{"libraries":[{"id":"lib-tv","mediaType":"tv","importWorkflow":"refine-before-import","processorOutputPath":"/data/tv-refined"},{"id":"lib-movies","mediaType":"movie","importWorkflow":"refine-before-import","processorOutputPath":"/data/refined"}]}""");
         await fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
-        var result = new PyDict().Set("ok", true).Set("outcome", "live_output_written")
+        var result = new WireObject().Set("ok", true).Set("outcome", "live_output_written")
             .Set("output_file", Path.Join(local, "Film", "film.mkv")).Set("processing_output_folder_resolved", local);
         var status = await fixture.Db(uow => fixture.Reporter.ReportHandoffCompletionAsync(uow, DelunoPayload, result), commit: false);
         Assert.Equal("reported completed to Deluno", status);
-        Assert.Equal("/data/refined/Film/film.mkv", ((PyStr)((PyDict)fixture.Http.RequestsTo(HttpMethod.Post, "/api")[0].Json!)["outputPath"]).Value);
+        Assert.Equal("/data/refined/Film/film.mkv", ((WireString)((WireObject)fixture.Http.RequestsTo(HttpMethod.Post, "/api")[0].Json!)["outputPath"]).Value);
         Assert.Equal("k1", fixture.Http.RequestsTo(HttpMethod.Get, "/api/integrations/external/manifest")[0].Headers["X-Api-Key"]);
 
         // No matching library that refines before import, or a manifest that cannot be read: the local path is reported.
@@ -376,7 +376,7 @@ public sealed class MediaManagerServiceTests
         fixture.Http.Json(HttpMethod.Get, "/api/integrations/external/manifest", "not json");
         Assert.Equal("reported completed to Deluno", await fixture.Db(uow => fixture.Reporter.ReportHandoffCompletionAsync(uow, DelunoPayload, result), commit: false));
         var posts = fixture.Http.RequestsTo(HttpMethod.Post, "/api");
-        Assert.Equal([Path.Join(local, "Film", "film.mkv"), Path.Join(local, "Film", "film.mkv")], posts.Skip(1).Select(p => ((PyStr)((PyDict)p.Json!)["outputPath"]).Value));
+        Assert.Equal([Path.Join(local, "Film", "film.mkv"), Path.Join(local, "Film", "film.mkv")], posts.Skip(1).Select(p => ((WireString)((WireObject)p.Json!)["outputPath"]).Value));
     }
 
     [Fact]
@@ -786,12 +786,12 @@ public sealed class MediaManagerServiceTests
         var id = await fixture.AddConnectionAsync("deluno", "Deluno");
         var row = (await fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id)))!;
         Assert.True(row.AcceptsUnsignedWebhooks);
-        Assert.Contains("Create a secret and add it to Deluno", ((PyStr)row.ToOut()["unsigned_webhook_warning"]).Value, StringComparison.Ordinal);
+        Assert.Contains("Create a secret and add it to Deluno", ((WireString)row.ToOut()["unsigned_webhook_warning"]).Value, StringComparison.Ordinal);
 
         await fixture.Db(uow => fixture.Connections.RotateWebhookSecretAsync(uow, row));
         var secured = (await fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id)))!;
         Assert.False(secured.AcceptsUnsignedWebhooks);
-        Assert.Equal(PyNull.Instance, secured.ToOut()["unsigned_webhook_warning"]);
+        Assert.Equal(WireNull.Instance, secured.ToOut()["unsigned_webhook_warning"]);
     }
 
     // --- reconciliation ------------------------------------------------------------------------
@@ -807,17 +807,17 @@ public sealed class MediaManagerServiceTests
         await fixture.Db(uow => uow.ExecuteAsync("UPDATE libraries SET work_folder = $w, watched_folder = $missing WHERE media_type = 'movie'", ("$w", work), ("$missing", fixture.Store.Home.Join("gone"))));
 
         var report = await fixture.Db(ReconciliationService.BuildReportAsync);
-        var issues = ((PyList)report["issues"]).Items.Cast<PyDict>().ToList();
-        Assert.Contains(issues, issue => ((PyStr)issue["kind"]).Value == "configured_folder_missing" && ((PyStr)issue["message"]).Value.EndsWith("watched folder is configured but is not currently reachable on disk.", StringComparison.Ordinal));
-        Assert.Equal(["remove_processing_temp_artifact"], ((PyList)report["repair_actions"]).Items.Select(item => ((PyStr)item).Value));
+        var issues = ((WireArray)report["issues"]).Items.Cast<WireObject>().ToList();
+        Assert.Contains(issues, issue => ((WireString)issue["kind"]).Value == "configured_folder_missing" && ((WireString)issue["message"]).Value.EndsWith("watched folder is configured but is not currently reachable on disk.", StringComparison.Ordinal));
+        Assert.Equal(["remove_processing_temp_artifact"], ((WireArray)report["repair_actions"]).Items.Select(item => ((WireString)item).Value));
 
-        var refused = await Assert.ThrowsAsync<PyValueErrorException>(() => fixture.Db(uow => ReconciliationService.RepairAsync(uow, "remove_processing_temp_artifact", null, artifact, confirm: false)));
+        var refused = await Assert.ThrowsAsync<WireValueException>(() => fixture.Db(uow => ReconciliationService.RepairAsync(uow, "remove_processing_temp_artifact", null, artifact, confirm: false)));
         Assert.Contains("confirm=true", refused.Message, StringComparison.Ordinal);
         Assert.True(File.Exists(artifact));
-        await Assert.ThrowsAsync<PyValueErrorException>(() => fixture.Db(uow => ReconciliationService.RepairAsync(uow, "remove_processing_temp_artifact", null, Path.Join(work, "film.mkv"), confirm: true)));
-        Assert.True(((PyBool)(await fixture.Db(uow => ReconciliationService.RepairAsync(uow, "remove_processing_temp_artifact", null, artifact, confirm: true)))["applied"]).Value);
+        await Assert.ThrowsAsync<WireValueException>(() => fixture.Db(uow => ReconciliationService.RepairAsync(uow, "remove_processing_temp_artifact", null, Path.Join(work, "film.mkv"), confirm: true)));
+        Assert.True(((WireBool)(await fixture.Db(uow => ReconciliationService.RepairAsync(uow, "remove_processing_temp_artifact", null, artifact, confirm: true)))["applied"]).Value);
         Assert.False(File.Exists(artifact));
-        Assert.False(((PyBool)(await fixture.Db(uow => ReconciliationService.RepairAsync(uow, "remove_processing_temp_artifact", null, artifact, confirm: true)))["applied"]).Value);
+        Assert.False(((WireBool)(await fixture.Db(uow => ReconciliationService.RepairAsync(uow, "remove_processing_temp_artifact", null, artifact, confirm: true)))["applied"]).Value);
         await Assert.ThrowsAsync<FileLifecycleException>(() => fixture.Db(uow => ReconciliationService.RepairAsync(uow, "remove_processing_temp_artifact", null, fixture.Store.Home.Join("elsewhere.tmp"), confirm: true)));
     }
 }

@@ -48,18 +48,18 @@ public static class MediaManagerReconciliationEndpoints
 
         MediaManagerConnectionsEndpoints.VerifyCsrf(request, csrfToken);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        PyDict result;
+        WireObject result;
         try
         {
             result = await ReconciliationService.RepairAsync(uow, action, dbId, path, confirm).ConfigureAwait(false);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new ApiException(StatusCodes.Status400BadRequest, exception.Message);
         }
 
         var applied = result.Get("applied") is { IsTruthy: true };
-        var message = result.Get("message") is { } text ? PyConvert.Str(text) : string.Empty;
+        var message = result.Get("message") is { } text ? WireConvert.Str(text) : string.Empty;
         await SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(
             ActivityEventTypes.SystemReconciliationRepair,
             "system",

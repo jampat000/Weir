@@ -105,9 +105,9 @@ public static partial class TrackSorters
             return [sorter.Reversed ? -rank : rank];
         }
 
-        var text = Py.Lower(PyStrings.Strip(Truthy(actual) ? Str(actual) : string.Empty));
+        var text = RulesJson.Lower(WireStrings.Strip(Truthy(actual) ? Str(actual) : string.Empty));
         var parts = new List<long> { text.Length == 0 ? 1 : 0 };
-        foreach (var rune in PyStrings.Slice(text, 32).EnumerateRunes())
+        foreach (var rune in WireStrings.Slice(text, 32).EnumerateRunes())
         {
             parts.Add(sorter.Reversed ? -rune.Value : rune.Value);
         }

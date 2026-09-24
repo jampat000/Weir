@@ -54,7 +54,7 @@ public sealed class JobHandlerRegistry
         {
             if (!_handlers.TryAdd(handler.JobKind, handler))
             {
-                throw new ArgumentException($"Two job handlers are registered for job_kind {PyStrings.Repr(handler.JobKind)}.", nameof(handlers));
+                throw new ArgumentException($"Two job handlers are registered for job_kind {WireStrings.Repr(handler.JobKind)}.", nameof(handlers));
             }
         }
 

@@ -25,7 +25,7 @@ public sealed class CompatibleJsonTests
     [InlineData("\uFEFF{}", "Unexpected UTF-8 BOM (decode using utf-8-sig)", 0)]
     public void Decode_errors_carry_the_exact_message_and_position(string text, string message, int position)
     {
-        var error = Assert.Throws<PyJsonDecodeException>(() => PyJsonParser.Parse(text));
+        var error = Assert.Throws<WireJsonDecodeException>(() => WireJsonParser.Parse(text));
         Assert.Equal(message, error.Detail);
         Assert.Equal(position, error.Position);
     }
@@ -33,13 +33,13 @@ public sealed class CompatibleJsonTests
     [Fact]
     public void Values_keep_their_types_key_order_and_the_last_duplicate()
     {
-        var value = Assert.IsType<PyDict>(PyJsonParser.Parse("{\"b\": 1, \"a\": 2.0, \"b\": 3, \"n\": NaN, \"big\": 123456789012345678901234567890, \"s\": \"\\ud83d\\ude00\"}"));
+        var value = Assert.IsType<WireObject>(WireJsonParser.Parse("{\"b\": 1, \"a\": 2.0, \"b\": 3, \"n\": NaN, \"big\": 123456789012345678901234567890, \"s\": \"\\ud83d\\ude00\"}"));
         Assert.Equal(["b", "a", "n", "big", "s"], value.Keys);
-        Assert.Equal(3, (int)Assert.IsType<PyInt>(value["b"]).Value);
-        Assert.IsType<PyFloat>(value["a"]);
-        Assert.True(double.IsNaN(Assert.IsType<PyFloat>(value["n"]).Value));
+        Assert.Equal(3, (int)Assert.IsType<WireInteger>(value["b"]).Value);
+        Assert.IsType<WireNumber>(value["a"]);
+        Assert.True(double.IsNaN(Assert.IsType<WireNumber>(value["n"]).Value));
         Assert.Equal("123456789012345678901234567890", value["big"].ToString());
-        Assert.Equal("\U0001F600", Assert.IsType<PyStr>(value["s"]).Value);
+        Assert.Equal("\U0001F600", Assert.IsType<WireString>(value["s"]).Value);
     }
 
     [Theory]
@@ -52,15 +52,15 @@ public sealed class CompatibleJsonTests
     [InlineData(0.0001, "0.0001")]
     [InlineData(1234567890123456.0, "1234567890123456.0")]
     [InlineData(-3.25, "-3.25")]
-    public void Floats_are_written_in_the_shortest_round_trip_form(double value, string expected) => Assert.Equal(expected, PyJsonWriter.FloatRepr(value));
+    public void Floats_are_written_in_the_shortest_round_trip_form(double value, string expected) => Assert.Equal(expected, WireJsonWriter.FloatRepr(value));
 
     [Fact]
     public void Response_json_is_compact_and_keeps_non_ascii_while_the_default_format_escapes_it()
     {
-        var value = new PyDict().Set("a", "é\u2028<>&'\u007f\u0001\"\\/").Set("n", PyJson.Null).Set("l", new PyList([PyJson.Of(1), PyJson.Of(true)]));
-        Assert.Equal("{\"a\":\"é\u2028<>&'\u007f\\u0001\\\"\\\\/\",\"n\":null,\"l\":[1,true]}", PyJsonWriter.Dumps(value, PyJsonFormat.Response));
-        Assert.Equal("{\"a\": \"\\u00e9\\u2028<>&'\\u007f\\u0001\\\"\\\\/\", \"n\": null, \"l\": [1, true]}", PyJsonWriter.Dumps(value, PyJsonFormat.Default));
-        Assert.Equal("{\n  \"l\": [\n    1,\n    true\n  ],\n  \"n\": null\n}", PyJsonWriter.Dumps(new PyDict().Set("n", PyJson.Null).Set("l", new PyList([PyJson.Of(1), PyJson.Of(true)])), PyJsonFormat.IndentedSorted));
+        var value = new WireObject().Set("a", "é\u2028<>&'\u007f\u0001\"\\/").Set("n", WireValue.Null).Set("l", new WireArray([WireValue.Of(1), WireValue.Of(true)]));
+        Assert.Equal("{\"a\":\"é\u2028<>&'\u007f\\u0001\\\"\\\\/\",\"n\":null,\"l\":[1,true]}", WireJsonWriter.Dumps(value, WireJsonFormat.Response));
+        Assert.Equal("{\"a\": \"\\u00e9\\u2028<>&'\\u007f\\u0001\\\"\\\\/\", \"n\": null, \"l\": [1, true]}", WireJsonWriter.Dumps(value, WireJsonFormat.Default));
+        Assert.Equal("{\n  \"l\": [\n    1,\n    true\n  ],\n  \"n\": null\n}", WireJsonWriter.Dumps(new WireObject().Set("n", WireValue.Null).Set("l", new WireArray([WireValue.Of(1), WireValue.Of(true)])), WireJsonFormat.IndentedSorted));
     }
 
     [Theory]
@@ -76,7 +76,7 @@ public sealed class CompatibleJsonTests
     public void Integer_strings_accept_whitespace_signs_underscores_and_whole_decimals(string raw, bool ok, int expected)
     {
         var issues = new ValidationIssues();
-        Assert.Equal(ok, PydanticRules.TryInt(new PyStr(raw), ["body", "i"], null, null, issues, out var value));
+        Assert.Equal(ok, FieldRules.TryInt(new WireString(raw), ["body", "i"], null, null, issues, out var value));
         if (ok)
         {
             Assert.Equal(expected, (int)value);
@@ -91,7 +91,7 @@ public sealed class CompatibleJsonTests
     public void Validation_errors_have_the_documented_422_body_shape()
     {
         var issues = new ValidationIssues();
-        var model = new BodyModel(PyJsonParser.Parse("{\"password\": 5, \"csrf_token\": \"\", \"zzz\": 1}"), issues);
+        var model = new BodyModel(WireJsonParser.Parse("{\"password\": 5, \"csrf_token\": \"\", \"zzz\": 1}"), issues);
         model.Str("username", minLength: 1, maxLength: 64);
         model.Str("password", minLength: 8, maxLength: 512);
         model.Str("csrf_token", minLength: 1);
@@ -101,7 +101,7 @@ public sealed class CompatibleJsonTests
             "{\"type\":\"string_type\",\"loc\":[\"body\",\"password\"],\"msg\":\"Input should be a valid string\",\"input\":5}," +
             "{\"type\":\"string_too_short\",\"loc\":[\"body\",\"csrf_token\"],\"msg\":\"String should have at least 1 character\",\"input\":\"\",\"ctx\":{\"min_length\":1}}," +
             "{\"type\":\"extra_forbidden\",\"loc\":[\"body\",\"zzz\"],\"msg\":\"Extra inputs are not permitted\",\"input\":1}]}",
-            PyJsonWriter.Dumps(new RequestValidationException(issues.All).ToBody(), PyJsonFormat.Response));
+            WireJsonWriter.Dumps(new RequestValidationException(issues.All).ToBody(), WireJsonFormat.Response));
     }
 
     [Theory]
@@ -119,7 +119,7 @@ public sealed class CompatibleJsonTests
     public void Booleans_accept_the_lax_spellings_and_reject_the_rest(string json, bool? expected, string? errorType)
     {
         var issues = new ValidationIssues();
-        var ok = PydanticRules.TryBool(PyJsonParser.Parse(json), ["b"], issues, out var value);
+        var ok = FieldRules.TryBool(WireJsonParser.Parse(json), ["b"], issues, out var value);
         Assert.Equal(expected is not null, ok);
         if (expected is { } e)
         {
@@ -142,7 +142,7 @@ public sealed class CompatibleJsonTests
     [InlineData("6F1C2A8E000040008000000000000000", null)]
     public void Uuids_accept_braced_urn_and_simple_forms_with_exact_errors(string raw, string? error)
     {
-        Assert.Equal(error, PydanticRules.UuidError(raw, out var value));
+        Assert.Equal(error, FieldRules.UuidError(raw, out var value));
         if (error is null)
         {
             Assert.Equal(Guid.Parse("6f1c2a8e-0000-4000-8000-000000000000"), value);
@@ -153,15 +153,15 @@ public sealed class CompatibleJsonTests
     public void Literal_and_int_constraint_messages_match()
     {
         var issues = new ValidationIssues();
-        PydanticRules.TryLiteral(new PyStr("Nope"), ["body", "mode"], ["Auto", "DownloadOnly", "NotifyOnly"], issues, out _);
-        PydanticRules.TryInt(PyJson.Of(0), ["body", "m"], 1, 10080, issues, out _);
-        PydanticRules.TryInt(new PyFloat(30.5), ["body", "m"], 1, 10080, issues, out _);
-        PydanticRules.TryInt(new PyStr("99999999999999999999999"), ["body", "m"], 1, 10080, issues, out _);
+        FieldRules.TryLiteral(new WireString("Nope"), ["body", "mode"], ["Auto", "DownloadOnly", "NotifyOnly"], issues, out _);
+        FieldRules.TryInt(WireValue.Of(0), ["body", "m"], 1, 10080, issues, out _);
+        FieldRules.TryInt(new WireNumber(30.5), ["body", "m"], 1, 10080, issues, out _);
+        FieldRules.TryInt(new WireString("99999999999999999999999"), ["body", "m"], 1, 10080, issues, out _);
         Assert.Equal(
             "{\"detail\":[{\"type\":\"literal_error\",\"loc\":[\"body\",\"mode\"],\"msg\":\"Input should be 'Auto', 'DownloadOnly' or 'NotifyOnly'\",\"input\":\"Nope\",\"ctx\":{\"expected\":\"'Auto', 'DownloadOnly' or 'NotifyOnly'\"}}," +
             "{\"type\":\"greater_than_equal\",\"loc\":[\"body\",\"m\"],\"msg\":\"Input should be greater than or equal to 1\",\"input\":0,\"ctx\":{\"ge\":1}}," +
             "{\"type\":\"int_from_float\",\"loc\":[\"body\",\"m\"],\"msg\":\"Input should be a valid integer, got a number with a fractional part\",\"input\":30.5}," +
             "{\"type\":\"less_than_equal\",\"loc\":[\"body\",\"m\"],\"msg\":\"Input should be less than or equal to 10080\",\"input\":\"99999999999999999999999\",\"ctx\":{\"le\":10080}}]}",
-            PyJsonWriter.Dumps(new RequestValidationException(issues.All).ToBody(), PyJsonFormat.Response));
+            WireJsonWriter.Dumps(new RequestValidationException(issues.All).ToBody(), WireJsonFormat.Response));
     }
 }

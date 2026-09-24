@@ -34,15 +34,15 @@ public static partial class ConfigurationBundleStore
 
     private sealed record Column(string Name, ColumnKind Kind);
 
-    /// <summary>Build the export bundle from the settings rows. Throws <see cref="PyValueErrorException"/> when a required row is missing.</summary>
-    public static async Task<PyDict> BuildAsync(UnitOfWork uow)
+    /// <summary>Build the export bundle from the settings rows. Throws <see cref="WireValueException"/> when a required row is missing.</summary>
+    public static async Task<WireObject> BuildAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
         await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
         var suite = await ReadRowsAsync(uow, SuiteTable, "WHERE id = 1").ConfigureAwait(false);
         // The export never carries the metadata provider key, encrypted or not; import already leaves the existing
         // key alone when a bundle omits it.
-        if (suite.Count > 0 && suite[0] is PyDict suiteSettings)
+        if (suite.Count > 0 && suite[0] is WireObject suiteSettings)
         {
             suiteSettings.Remove("metadata_provider_key_ciphertext");
         }
@@ -53,50 +53,50 @@ public static partial class ConfigurationBundleStore
         var ruleSets = await ReadRowsAsync(uow, RuleSetsTable, "ORDER BY id").ConfigureAwait(false);
         if (arr.Count == 0)
         {
-            throw new PyValueErrorException("Missing required configuration row: arr_library_operator_settings");
+            throw new WireValueException("Missing required configuration row: arr_library_operator_settings");
         }
 
         if (processingOperator.Count == 0)
         {
-            throw new PyValueErrorException("Missing required configuration row: operator_settings");
+            throw new WireValueException("Missing required configuration row: operator_settings");
         }
 
-        return new PyDict()
+        return new WireObject()
             .Set("format_version", FormatVersion)
             .Set("suite_settings", suite[0])
             .Set("arr_library_operator_settings", arr[0])
             .Set("operator_settings", processingOperator[0])
-            .Set("rule_sets", new PyList(ruleSets))
-            .Set("libraries", new PyList(libraries))
+            .Set("rule_sets", new WireArray(ruleSets))
+            .Set("libraries", new WireArray(libraries))
             .Set(ConfigurationBundleConnections.MediaManagersSection, await ConfigurationBundleConnections.ExportMediaManagersAsync(uow).ConfigureAwait(false))
             .Set(ConfigurationBundleConnections.AlertsSection, await ConfigurationBundleConnections.ExportAlertsAsync(uow).ConfigureAwait(false));
     }
 
     /// <summary>
-    /// Restore a bundle into the settings rows. <see cref="PyValueErrorException"/> becomes a 400; anything else
-    /// (<see cref="PyTypeErrorException"/>, <see cref="Microsoft.Data.Sqlite.SqliteException"/>) is a server error.
+    /// Restore a bundle into the settings rows. <see cref="WireValueException"/> becomes a 400; anything else
+    /// (<see cref="WireTypeException"/>, <see cref="Microsoft.Data.Sqlite.SqliteException"/>) is a server error.
     /// </summary>
-    public static async Task ApplyAsync(UnitOfWork uow, PyDict bundle, ITimeZoneResolver zones, string weirHome)
+    public static async Task ApplyAsync(UnitOfWork uow, WireObject bundle, ITimeZoneResolver zones, string weirHome)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(bundle);
         ArgumentNullException.ThrowIfNull(weirHome);
         var supported = bundle.Get("format_version") switch
         {
-            PyInt i => i.Value == FormatVersion,
-            PyFloat f => f.Value == FormatVersion,
+            WireInteger i => i.Value == FormatVersion,
+            WireNumber f => f.Value == FormatVersion,
             _ => false,
         };
         if (!supported)
         {
-            throw new PyValueErrorException("This backup was made by a version of Weir that this one cannot restore.");
+            throw new WireValueException("This backup was made by a version of Weir that this one cannot restore.");
         }
 
         foreach (var key in new[] { SuiteTable, ArrTable, ProcessingOperatorTable })
         {
             if (!bundle.ContainsKey(key))
             {
-                throw new PyValueErrorException("This file is not a complete Weir backup.");
+                throw new WireValueException("This file is not a complete Weir backup.");
             }
         }
 
@@ -108,20 +108,20 @@ public static partial class ConfigurationBundleStore
         await ConfigurationBundleConnections.RestoreAlertsAsync(uow, bundle).ConfigureAwait(false);
     }
 
-    private static async Task ApplySuiteSettingsAsync(UnitOfWork uow, PyJson section, ITimeZoneResolver zones)
+    private static async Task ApplySuiteSettingsAsync(UnitOfWork uow, WireValue section, ITimeZoneResolver zones)
     {
-        var ss = section as PyDict ?? throw new PyTypeErrorException($"The backup's {SuiteTable} section must be an object.");
-        var name = PyConvert.Str(Required(ss, "product_display_name"));
+        var ss = section as WireObject ?? throw new WireTypeException($"The backup's {SuiteTable} section must be an object.");
+        var name = WireConvert.Str(Required(ss, "product_display_name"));
         var noticeValue = ss.Get("signed_in_home_notice");
-        var timezone = PyConvert.Str(Required(ss, "app_timezone"));
-        var logRetention = PyConvert.ToInt(Required(ss, "log_retention_days"));
+        var timezone = WireConvert.Str(Required(ss, "app_timezone"));
+        var logRetention = WireConvert.ToInt(Required(ss, "log_retention_days"));
         string? notice = null;
         if (noticeValue is not null && noticeValue.IsTruthy)
         {
-            notice = noticeValue is PyStr s ? s.Value : throw new PyTypeErrorException("The backup's signed_in_home_notice must be text.");
+            notice = noticeValue is WireString s ? s.Value : throw new WireTypeException("The backup's signed_in_home_notice must be text.");
         }
 
-        bool? backupEnabled = ss.Get("configuration_backup_enabled") is { } enabledValue and not PyNull ? enabledValue.IsTruthy : null;
+        bool? backupEnabled = ss.Get("configuration_backup_enabled") is { } enabledValue and not WireNull ? enabledValue.IsTruthy : null;
         long? backupHours = null;
         var hoursValue = ss.Get("configuration_backup_interval_hours");
 
@@ -129,22 +129,22 @@ public static partial class ConfigurationBundleStore
         // name, notice, timezone, log retention, then activity and interval.
         var normalized = SuiteSettingsRules.Normalize(new SuiteSettingsUpdate(name, notice, timezone, Saturate(logRetention)), zones);
         long? activity = null;
-        if (ss.Get("activity_retention_days") is { } activityValue and not PyNull)
+        if (ss.Get("activity_retention_days") is { } activityValue and not WireNull)
         {
-            activity = Saturate(PyConvert.ToInt(activityValue));
+            activity = Saturate(WireConvert.ToInt(activityValue));
             if (activity is < 0 or > 3650)
             {
-                throw new PyValueErrorException("Activity history must be kept between 0 (forever) and 3650 days.");
+                throw new WireValueException("Activity history must be kept between 0 (forever) and 3650 days.");
             }
         }
 
         normalized = normalized with { ActivityRetentionDays = activity };
-        if (hoursValue is not null and not PyNull)
+        if (hoursValue is not null and not WireNull)
         {
-            backupHours = Saturate(PyConvert.ToInt(hoursValue));
+            backupHours = Saturate(WireConvert.ToInt(hoursValue));
             if (backupHours is < 1 or > 720)
             {
-                throw new PyValueErrorException("Backup interval must be between 1 and 720 hours.");
+                throw new WireValueException("Backup interval must be between 1 and 720 hours.");
             }
         }
 
@@ -153,13 +153,13 @@ public static partial class ConfigurationBundleStore
         await SuiteSettingsStore.UpdateAsync(uow, before, SuiteSettingsRules.Apply(before, normalized)).ConfigureAwait(false);
     }
 
-    private static async Task ApplySingletonAsync(UnitOfWork uow, string table, PyJson section)
+    private static async Task ApplySingletonAsync(UnitOfWork uow, string table, WireValue section)
     {
-        var data = section as PyDict ?? throw new PyTypeErrorException($"The backup's {table} section must be an object.");
+        var data = section as WireObject ?? throw new WireTypeException($"The backup's {table} section must be an object.");
         var columns = await ColumnsAsync(uow, table).ConfigureAwait(false);
         var kwargs = ToKwargs(columns, data);
         var pk = kwargs.GetValueOrDefault("id");
-        var loaded = pk is null or PyNull ? null : await ReadTypedRowAsync(uow, table, columns, pk).ConfigureAwait(false);
+        var loaded = pk is null or WireNull ? null : await ReadTypedRowAsync(uow, table, columns, pk).ConfigureAwait(false);
         if (loaded is null)
         {
             await InsertAsync(uow, table, columns, kwargs).ConfigureAwait(false);
@@ -171,7 +171,7 @@ public static partial class ConfigurationBundleStore
             foreach (var (key, value) in kwargs)
             {
                 var column = columns[key];
-                if (!PythonEquals(column.Kind, loaded[key], value))
+                if (!ValuesEqual(column.Kind, loaded[key], value))
                 {
                     sets.Add($"\"{key}\"=${key}");
                     parameters.Add(($"${key}", Bind(column, value)));
@@ -185,7 +185,7 @@ public static partial class ConfigurationBundleStore
                     sets.Add("updated_at=CURRENT_TIMESTAMP");
                 }
 
-                parameters.Add(("$__pk", loaded["id"] is PyJson id ? PyConvert.ToDatabase(id) : DBNull.Value));
+                parameters.Add(("$__pk", loaded["id"] is WireValue id ? WireConvert.ToDatabase(id) : DBNull.Value));
                 await uow.ExecuteAsync($"UPDATE {table} SET {string.Join(", ", sets)} WHERE id = $__pk", [.. parameters]).ConfigureAwait(false);
             }
         }

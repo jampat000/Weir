@@ -22,15 +22,15 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 public sealed class ActivityProgressReporter
 {
     private readonly SqliteDatabase? _database;
-    private readonly Func<PyDict, Task> _save;
+    private readonly Func<WireObject, Task> _save;
     private readonly long _jobId;
-    private readonly PyDict _extra;
+    private readonly WireObject _extra;
     private readonly ILogger? _logger;
     private readonly TimeProvider _time;
     private readonly LiveProgressStore _liveProgress;
     private readonly Lock _lock = new();
-    private PyDict? _pending;
-    private PyDict? _latest;
+    private WireObject? _pending;
+    private WireObject? _latest;
     private string? _relativeMediaPath;
     private string? _savedStatus;
     private bool _unsaved;
@@ -38,7 +38,7 @@ public sealed class ActivityProgressReporter
     private bool _completed;
     private Task _writer = Task.CompletedTask;
 
-    public ActivityProgressReporter(SqliteDatabase database, long jobId, PyDict extra, ILogger logger, TimeProvider time, LiveProgressStore liveProgress)
+    public ActivityProgressReporter(SqliteDatabase database, long jobId, WireObject extra, ILogger logger, TimeProvider time, LiveProgressStore liveProgress)
         : this(
             database ?? throw new ArgumentNullException(nameof(database)),
             logger ?? throw new ArgumentNullException(nameof(logger)),
@@ -51,18 +51,18 @@ public sealed class ActivityProgressReporter
     }
 
     /// <summary>For tests: every save goes to <paramref name="save"/> instead of the database.</summary>
-    internal ActivityProgressReporter(Func<PyDict, Task> save, long jobId, PyDict extra, TimeProvider time, LiveProgressStore liveProgress)
+    internal ActivityProgressReporter(Func<WireObject, Task> save, long jobId, WireObject extra, TimeProvider time, LiveProgressStore liveProgress)
         : this(database: null, logger: null, save ?? throw new ArgumentNullException(nameof(save)), jobId, extra, time, liveProgress)
     {
     }
 
-    private ActivityProgressReporter(SqliteDatabase? database, ILogger? logger, Func<PyDict, Task>? save, long jobId, PyDict extra, TimeProvider time, LiveProgressStore liveProgress)
+    private ActivityProgressReporter(SqliteDatabase? database, ILogger? logger, Func<WireObject, Task>? save, long jobId, WireObject extra, TimeProvider time, LiveProgressStore liveProgress)
     {
         _database = database;
         _logger = logger;
         _save = save ?? SaveToActivityAsync;
         _jobId = jobId;
-        _extra = extra ?? new PyDict();
+        _extra = extra ?? new WireObject();
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _liveProgress = liveProgress ?? throw new ArgumentNullException(nameof(liveProgress));
     }
@@ -75,10 +75,10 @@ public sealed class ActivityProgressReporter
     /// database save only for the first report and a change of stage. Reports after <see cref="CompleteAsync"/> are
     /// ignored.
     /// </summary>
-    public void Report(PyDict payload)
+    public void Report(WireObject payload)
     {
         ArgumentNullException.ThrowIfNull(payload);
-        var body = new PyDict().Set("job_id", _jobId);
+        var body = new WireObject().Set("job_id", _jobId);
         foreach (var (key, value) in _extra.Items.Concat(payload.Items))
         {
             body.Set(key, value);
@@ -86,7 +86,7 @@ public sealed class ActivityProgressReporter
 
         // The row is rewritten in place, so its created_at stays at the pass's start. This is how a reader
         // tells a long pass that is still reporting from one that died (LiveProgressStore).
-        body.Set("reported_at", PyDateTime.UtcNow(_time).PydanticJson());
+        body.Set("reported_at", Timestamp.UtcNow(_time).ToWireText());
 
         var relativeMediaPath = LiveProgress.Text(body, "relative_media_path");
         var status = LiveProgress.StatusOf(body);
@@ -166,7 +166,7 @@ public sealed class ActivityProgressReporter
     }
 
     /// <summary>Queues <paramref name="body"/> for the single background writer, starting it if it is idle. Caller holds <see cref="_lock"/>.</summary>
-    private void Enqueue(PyDict body)
+    private void Enqueue(WireObject body)
     {
         _pending = body;
         if (!_writing)
@@ -181,7 +181,7 @@ public sealed class ActivityProgressReporter
     {
         while (true)
         {
-            PyDict body;
+            WireObject body;
             lock (_lock)
             {
                 if (_pending is null)
@@ -198,7 +198,7 @@ public sealed class ActivityProgressReporter
         }
     }
 
-    private async Task SaveToActivityAsync(PyDict body)
+    private async Task SaveToActivityAsync(WireObject body)
     {
         try
         {
@@ -206,7 +206,7 @@ public sealed class ActivityProgressReporter
             await using (uow.ConfigureAwait(false))
             {
                 var name = FileName(body.Get("relative_media_path"));
-                var detail = PyStrings.Slice(PyJsonWriter.Dumps(body, PyJsonFormat.Compact), 6000);
+                var detail = WireStrings.Slice(WireJsonWriter.Dumps(body, WireJsonFormat.Compact), 6000);
                 if (ActivityId is { } id)
                 {
                     await SqliteActivityWriter.UpdateAsync(uow, id, title: Title(LiveProgress.StatusOf(body), name), detail: detail).ConfigureAwait(false);
@@ -239,9 +239,9 @@ public sealed class ActivityProgressReporter
     };
 
     /// <summary><c>Path(str(relative_media_path or "")).name or "this file"</c>.</summary>
-    private static string FileName(PyJson? value)
+    private static string FileName(WireValue? value)
     {
-        var text = value is { IsTruthy: true } ? PyConvert.Str(value) : string.Empty;
+        var text = value is { IsTruthy: true } ? WireConvert.Str(value) : string.Empty;
         var name = MediaPathNames.Name(text, OperatingSystem.IsWindows());
         return name.Length > 0 ? name : "this file";
     }

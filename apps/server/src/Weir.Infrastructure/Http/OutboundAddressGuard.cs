@@ -18,21 +18,21 @@ public static class OutboundAddressGuard
     private static Task<IPAddress[]> ResolveViaDns(string host, CancellationToken cancellationToken) => Dns.GetHostAddressesAsync(host, cancellationToken);
 
     /// <summary>Only a globally-routable address (the notification poster and the metadata provider: public destinations only).</summary>
-    public static bool IsPublic(PyIpAddress address) => address.IsGlobal;
+    public static bool IsPublic(NetAddress address) => address.IsGlobal;
 
     /// <summary>
     /// A media manager lives on the LAN or the same host, so private ranges and loopback stay allowed — only
     /// link-local addresses (169.254.0.0/16, fe80::/10 — how cloud metadata endpoints are reached), the
     /// unspecified address and multicast are refused.
     /// </summary>
-    public static bool IsLocalServiceAddress(PyIpAddress address) =>
+    public static bool IsLocalServiceAddress(NetAddress address) =>
         !address.IsLinkLocal && !address.IsUnspecified && !address.IsMulticast;
 
     /// <summary>An IPv4-mapped IPv6 address (<c>::ffff:a.b.c.d</c>) is classified by its embedded IPv4 form.</summary>
-    public static PyIpAddress Classify(IPAddress address)
+    public static NetAddress Classify(IPAddress address)
     {
         ArgumentNullException.ThrowIfNull(address);
-        return PyIpAddress.FromIpAddress(address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address);
+        return NetAddress.FromIpAddress(address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address);
     }
 
     /// <summary>
@@ -47,12 +47,12 @@ public static class OutboundAddressGuard
     /// resolved address <paramref name="isAllowed"/> accepts, in the order the resolver gave them.
     /// </summary>
     public static async Task<ResolvedAddresses> ResolveAllowedAsync(
-        string host, Func<PyIpAddress, bool> isAllowed, HostResolver? resolveHost, CancellationToken cancellationToken)
+        string host, Func<NetAddress, bool> isAllowed, HostResolver? resolveHost, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(isAllowed);
         IPAddress[] addresses;
-        if (PyIpAddress.TryParse(host, out _) && IPAddress.TryParse(host, out var literal))
+        if (NetAddress.TryParse(host, out _) && IPAddress.TryParse(host, out var literal))
         {
             addresses = [literal];
         }
@@ -80,7 +80,7 @@ public static class OutboundAddressGuard
     /// </summary>
     public static async ValueTask<Stream> ConnectAsync(
         SocketsHttpConnectionContext context,
-        Func<PyIpAddress, bool> isAllowed,
+        Func<NetAddress, bool> isAllowed,
         Func<string, Exception> refused,
         HostResolver? resolveHost,
         CancellationToken cancellationToken)

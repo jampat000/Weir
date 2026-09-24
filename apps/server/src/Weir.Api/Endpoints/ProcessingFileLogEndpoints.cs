@@ -26,7 +26,7 @@ public static class ProcessingFileLogEndpoints
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
         var id = request.PathInt("file_id", issues);
-        var limit = request.Query("limit") is { } rawLimit && PydanticRules.TryInt(new PyStr(rawLimit), ["query", "limit"], 1, 500, issues, out var parsedLimit) ? (int)parsedLimit : 50;
+        var limit = request.Query("limit") is { } rawLimit && FieldRules.TryInt(new WireString(rawLimit), ["query", "limit"], 1, 500, issues, out var parsedLimit) ? (int)parsedLimit : 50;
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
@@ -35,29 +35,29 @@ public static class ProcessingFileLogEndpoints
         var rows = await FileLogStore.LogsForFileAsync(uow, row.RelativePath, limit).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
 
-        var entries = new List<PyJson>();
+        var entries = new List<WireValue>();
         foreach (var entry in rows)
         {
             var detail = FileLogStore.ParseDetail(entry.DetailJson);
             var story = FileStory.NarratePass(detail, entry.LibraryName);
-            entries.Add(new PyDict()
+            entries.Add(new WireObject()
                 .Set("id", entry.Id)
-                .Set("recorded_at", entry.RecordedAt.PydanticJson())
+                .Set("recorded_at", entry.RecordedAt.ToWireText())
                 .Set("outcome", entry.Outcome)
                 .Set("title", entry.Title)
                 .Set("library_name", entry.LibraryName)
                 .Set("detail", detail)
-                .Set("story", new PyList(story.Select(step => (PyJson)new PyDict()
+                .Set("story", new WireArray(story.Select(step => (WireValue)new WireObject()
                     .Set("heading", step.Heading)
                     .Set("sentence", step.Sentence)
                     .Set("tone", step.Tone.ToString().ToLowerInvariant())))));
         }
 
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("file_id", id)
             .Set("relative_path", row.RelativePath)
             .Set("retention_days", operatorRow.FileLogRetentionDays)
-            .Set("entries", new PyList(entries)));
+            .Set("entries", new WireArray(entries)));
     }
 
     private static async Task<ApiResult> DownloadFileLogAsync(ApiRequest request)
@@ -84,7 +84,7 @@ public static class ProcessingFileLogEndpoints
         return new CustomApiResult(context =>
         {
             context.Response.Headers.ContentDisposition = $"attachment; filename=\"weir-{safe}.log.txt\"";
-            return PyResponses.WritePlainTextAsync(context, StatusCodes.Status200OK, text);
+            return ApiResponses.WritePlainTextAsync(context, StatusCodes.Status200OK, text);
         });
     }
 }

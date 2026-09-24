@@ -83,7 +83,7 @@ public sealed partial class LibraryCleanHandler
     /// lease check then finds the lease already gone and leaves this update alone. After the third attempt, report it as
     /// given up and let the job complete normally.
     /// </summary>
-    private async Task OnInUseAsync(JobWorkContext context, PyDict payload, long libraryId, string path, string trigger, int inUseAttempts)
+    private async Task OnInUseAsync(JobWorkContext context, WireObject payload, long libraryId, string path, string trigger, int inUseAttempts)
     {
         var attempt = inUseAttempts + 1;
         var delay = SafeSwapRules.InUseRetryDelay(attempt);
@@ -98,7 +98,7 @@ public sealed partial class LibraryCleanHandler
         await using var uow = await UnitOfWork.OpenAsync(_database, CancellationToken.None).ConfigureAwait(false);
         await uow.ExecuteAsync(
             "UPDATE jobs SET payload_json = @payload, status = @pending, lease_owner = NULL, lease_expires_at = NULL, not_before = @notBefore, updated_at = CURRENT_TIMESTAMP WHERE id = @id",
-            ("@payload", PyJsonWriter.Dumps(payload, PyJsonFormat.Compact)),
+            ("@payload", WireJsonWriter.Dumps(payload, WireJsonFormat.Compact)),
             ("@pending", ProcessingJobStatus.Pending),
             ("@notBefore", notBefore.UtcDateTime),
             ("@id", context.Id)).ConfigureAwait(false);
@@ -111,7 +111,7 @@ public sealed partial class LibraryCleanHandler
         try
         {
             await using var uow = await UnitOfWork.OpenAsync(_database, CancellationToken.None).ConfigureAwait(false);
-            var extra = new PyDict().Set("library_id", libraryId).Set("relative_path", path);
+            var extra = new WireObject().Set("library_id", libraryId).Set("relative_path", path);
             if (trigger is not null)
             {
                 extra.Set("trigger", trigger);
@@ -129,7 +129,7 @@ public sealed partial class LibraryCleanHandler
 
             await SqliteActivityWriter.RecordAsync(
                     uow,
-                    new ActivityEventDraft(eventType, "library", detail, PyJsonWriter.Dumps(extra, PyJsonFormat.Compact)))
+                    new ActivityEventDraft(eventType, "library", detail, WireJsonWriter.Dumps(extra, WireJsonFormat.Compact)))
                 .ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
         }

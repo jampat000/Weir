@@ -9,41 +9,41 @@ namespace Weir.Core.Net;
 /// An IPv4 or IPv6 address with strict parsing and private/reserved classification from the IANA
 /// special-purpose ranges, so configured proxy lists and address checks keep matching the same addresses.
 /// </summary>
-public sealed record PyIpAddress(bool IsV6, BigInteger Value)
+public sealed record NetAddress(bool IsV6, BigInteger Value)
 {
-    private static readonly PyIpNetwork[] V4Private =
+    private static readonly NetRange[] V4Private =
     [
-        PyIpNetwork.ParseV4("0.0.0.0", 8), PyIpNetwork.ParseV4("10.0.0.0", 8), PyIpNetwork.ParseV4("127.0.0.0", 8),
-        PyIpNetwork.ParseV4("169.254.0.0", 16), PyIpNetwork.ParseV4("172.16.0.0", 12), PyIpNetwork.ParseV4("192.0.0.0", 29),
-        PyIpNetwork.ParseV4("192.0.0.170", 31), PyIpNetwork.ParseV4("192.0.2.0", 24), PyIpNetwork.ParseV4("192.168.0.0", 16),
-        PyIpNetwork.ParseV4("198.18.0.0", 15), PyIpNetwork.ParseV4("198.51.100.0", 24), PyIpNetwork.ParseV4("203.0.113.0", 24),
-        PyIpNetwork.ParseV4("240.0.0.0", 4), PyIpNetwork.ParseV4("255.255.255.255", 32),
+        NetRange.ParseV4("0.0.0.0", 8), NetRange.ParseV4("10.0.0.0", 8), NetRange.ParseV4("127.0.0.0", 8),
+        NetRange.ParseV4("169.254.0.0", 16), NetRange.ParseV4("172.16.0.0", 12), NetRange.ParseV4("192.0.0.0", 29),
+        NetRange.ParseV4("192.0.0.170", 31), NetRange.ParseV4("192.0.2.0", 24), NetRange.ParseV4("192.168.0.0", 16),
+        NetRange.ParseV4("198.18.0.0", 15), NetRange.ParseV4("198.51.100.0", 24), NetRange.ParseV4("203.0.113.0", 24),
+        NetRange.ParseV4("240.0.0.0", 4), NetRange.ParseV4("255.255.255.255", 32),
     ];
 
-    private static readonly PyIpNetwork V4Shared = PyIpNetwork.ParseV4("100.64.0.0", 10);
+    private static readonly NetRange V4Shared = NetRange.ParseV4("100.64.0.0", 10);
 
-    private static readonly PyIpNetwork[] V6Private =
+    private static readonly NetRange[] V6Private =
     [
-        PyIpNetwork.ParseV6("::1", 128), PyIpNetwork.ParseV6("::", 128), PyIpNetwork.ParseV6("::ffff:0:0", 96),
-        PyIpNetwork.ParseV6("100::", 64), PyIpNetwork.ParseV6("2001::", 23), PyIpNetwork.ParseV6("2001:2::", 48),
-        PyIpNetwork.ParseV6("2001:db8::", 32), PyIpNetwork.ParseV6("2001:10::", 28), PyIpNetwork.ParseV6("fc00::", 7),
-        PyIpNetwork.ParseV6("fe80::", 10),
+        NetRange.ParseV6("::1", 128), NetRange.ParseV6("::", 128), NetRange.ParseV6("::ffff:0:0", 96),
+        NetRange.ParseV6("100::", 64), NetRange.ParseV6("2001::", 23), NetRange.ParseV6("2001:2::", 48),
+        NetRange.ParseV6("2001:db8::", 32), NetRange.ParseV6("2001:10::", 28), NetRange.ParseV6("fc00::", 7),
+        NetRange.ParseV6("fe80::", 10),
     ];
 
-    private static readonly PyIpNetwork[] V6Reserved =
+    private static readonly NetRange[] V6Reserved =
     [
-        PyIpNetwork.ParseV6("::", 8), PyIpNetwork.ParseV6("100::", 8), PyIpNetwork.ParseV6("200::", 7), PyIpNetwork.ParseV6("400::", 6),
-        PyIpNetwork.ParseV6("800::", 5), PyIpNetwork.ParseV6("1000::", 4), PyIpNetwork.ParseV6("4000::", 3), PyIpNetwork.ParseV6("6000::", 3),
-        PyIpNetwork.ParseV6("8000::", 3), PyIpNetwork.ParseV6("a000::", 3), PyIpNetwork.ParseV6("c000::", 3), PyIpNetwork.ParseV6("e000::", 4),
-        PyIpNetwork.ParseV6("f000::", 5), PyIpNetwork.ParseV6("f800::", 6), PyIpNetwork.ParseV6("fe00::", 9),
+        NetRange.ParseV6("::", 8), NetRange.ParseV6("100::", 8), NetRange.ParseV6("200::", 7), NetRange.ParseV6("400::", 6),
+        NetRange.ParseV6("800::", 5), NetRange.ParseV6("1000::", 4), NetRange.ParseV6("4000::", 3), NetRange.ParseV6("6000::", 3),
+        NetRange.ParseV6("8000::", 3), NetRange.ParseV6("a000::", 3), NetRange.ParseV6("c000::", 3), NetRange.ParseV6("e000::", 4),
+        NetRange.ParseV6("f000::", 5), NetRange.ParseV6("f800::", 6), NetRange.ParseV6("fe00::", 9),
     ];
 
     public int Bits => IsV6 ? 128 : 32;
 
     /// <summary>Parses strict dotted-quad IPv4, or IPv6 (an optional <c>%scope</c> is kept out of the value).</summary>
-    public static bool TryParse(string? text, out PyIpAddress address)
+    public static bool TryParse(string? text, out NetAddress address)
     {
-        address = new PyIpAddress(false, BigInteger.Zero);
+        address = new NetAddress(false, BigInteger.Zero);
         if (string.IsNullOrEmpty(text))
         {
             return false;
@@ -51,7 +51,7 @@ public sealed record PyIpAddress(bool IsV6, BigInteger Value)
 
         if (TryParseV4(text, out var v4))
         {
-            address = new PyIpAddress(false, v4);
+            address = new NetAddress(false, v4);
             return true;
         }
 
@@ -74,7 +74,7 @@ public sealed record PyIpAddress(bool IsV6, BigInteger Value)
             return false;
         }
 
-        address = new PyIpAddress(true, new BigInteger(parsed.GetAddressBytes(), isUnsigned: true, isBigEndian: true));
+        address = new NetAddress(true, new BigInteger(parsed.GetAddressBytes(), isUnsigned: true, isBigEndian: true));
         return true;
     }
 
@@ -106,25 +106,25 @@ public sealed record PyIpAddress(bool IsV6, BigInteger Value)
         return true;
     }
 
-    public static PyIpAddress FromIpAddress(IPAddress address)
+    public static NetAddress FromIpAddress(IPAddress address)
     {
         ArgumentNullException.ThrowIfNull(address);
         var bytes = address.GetAddressBytes();
-        return new PyIpAddress(address.AddressFamily == AddressFamily.InterNetworkV6, new BigInteger(bytes, isUnsigned: true, isBigEndian: true));
+        return new NetAddress(address.AddressFamily == AddressFamily.InterNetworkV6, new BigInteger(bytes, isUnsigned: true, isBigEndian: true));
     }
 
     /// <summary>The embedded IPv4 address of <c>::ffff:a.b.c.d</c>.</summary>
-    public PyIpAddress? Ipv4Mapped => IsV6 && (Value >> 32) == 0xFFFF ? new PyIpAddress(false, Value & 0xFFFFFFFF) : null;
+    public NetAddress? Ipv4Mapped => IsV6 && (Value >> 32) == 0xFFFF ? new NetAddress(false, Value & 0xFFFFFFFF) : null;
 
-    public bool IsLoopback => IsV6 ? Value == 1 : In(PyIpNetwork.ParseV4("127.0.0.0", 8));
+    public bool IsLoopback => IsV6 ? Value == 1 : In(NetRange.ParseV4("127.0.0.0", 8));
 
-    public bool IsLinkLocal => IsV6 ? In(PyIpNetwork.ParseV6("fe80::", 10)) : In(PyIpNetwork.ParseV4("169.254.0.0", 16));
+    public bool IsLinkLocal => IsV6 ? In(NetRange.ParseV6("fe80::", 10)) : In(NetRange.ParseV4("169.254.0.0", 16));
 
-    public bool IsMulticast => IsV6 ? In(PyIpNetwork.ParseV6("ff00::", 8)) : In(PyIpNetwork.ParseV4("224.0.0.0", 4));
+    public bool IsMulticast => IsV6 ? In(NetRange.ParseV6("ff00::", 8)) : In(NetRange.ParseV4("224.0.0.0", 4));
 
     public bool IsUnspecified => Value.IsZero;
 
-    public bool IsReserved => IsV6 ? V6Reserved.Any(In) : In(PyIpNetwork.ParseV4("240.0.0.0", 4));
+    public bool IsReserved => IsV6 ? V6Reserved.Any(In) : In(NetRange.ParseV4("240.0.0.0", 4));
 
     public bool IsPrivate => IsV6
         ? Ipv4Mapped is { } mapped ? mapped.IsPrivate : V6Private.Any(In)
@@ -132,7 +132,7 @@ public sealed record PyIpAddress(bool IsV6, BigInteger Value)
 
     public bool IsGlobal => IsV6 ? !IsPrivate : !In(V4Shared) && !IsPrivate;
 
-    public bool In(PyIpNetwork network)
+    public bool In(NetRange network)
     {
         ArgumentNullException.ThrowIfNull(network);
         return network.Contains(this);
@@ -140,25 +140,25 @@ public sealed record PyIpAddress(bool IsV6, BigInteger Value)
 }
 
 /// <summary>An IPv4 or IPv6 network in CIDR form.</summary>
-public sealed record PyIpNetwork(bool IsV6, BigInteger NetworkAddress, int PrefixLength)
+public sealed record NetRange(bool IsV6, BigInteger NetworkAddress, int PrefixLength)
 {
-    public static PyIpNetwork ParseV4(string address, int prefix) =>
-        PyIpAddress.TryParse(address, out var parsed) && !parsed.IsV6
-            ? new PyIpNetwork(false, parsed.Value, prefix)
+    public static NetRange ParseV4(string address, int prefix) =>
+        NetAddress.TryParse(address, out var parsed) && !parsed.IsV6
+            ? new NetRange(false, parsed.Value, prefix)
             : throw new ArgumentException("Invalid IPv4 network.", nameof(address));
 
-    public static PyIpNetwork ParseV6(string address, int prefix) =>
-        PyIpAddress.TryParse(address, out var parsed) && parsed.IsV6
-            ? new PyIpNetwork(true, parsed.Value, prefix)
+    public static NetRange ParseV6(string address, int prefix) =>
+        NetAddress.TryParse(address, out var parsed) && parsed.IsV6
+            ? new NetRange(true, parsed.Value, prefix)
             : throw new ArgumentException("Invalid IPv6 network.", nameof(address));
 
     /// <summary>
     /// <paramref name="strict"/> = <see langword="false"/> masks host bits (<c>10.0.0.5/24</c> is <c>10.0.0.0/24</c>);
     /// <see langword="true"/> refuses them. A bare address is a single-host network.
     /// </summary>
-    public static bool TryParse(string? text, bool strict, out PyIpNetwork network)
+    public static bool TryParse(string? text, bool strict, out NetRange network)
     {
-        network = new PyIpNetwork(false, BigInteger.Zero, 32);
+        network = new NetRange(false, BigInteger.Zero, 32);
         if (string.IsNullOrEmpty(text))
         {
             return false;
@@ -166,7 +166,7 @@ public sealed record PyIpNetwork(bool IsV6, BigInteger NetworkAddress, int Prefi
 
         var slash = text.IndexOf('/', StringComparison.Ordinal);
         var addressText = slash < 0 ? text : text[..slash];
-        if (!PyIpAddress.TryParse(addressText, out var address) || (address.IsV6 && addressText.Contains('%', StringComparison.Ordinal)))
+        if (!NetAddress.TryParse(addressText, out var address) || (address.IsV6 && addressText.Contains('%', StringComparison.Ordinal)))
         {
             return false;
         }
@@ -183,7 +183,7 @@ public sealed record PyIpNetwork(bool IsV6, BigInteger NetworkAddress, int Prefi
                     return false;
                 }
             }
-            else if (!address.IsV6 && PyIpAddress.TryParseV4(prefixText, out var mask) && TryMaskToPrefix(mask, out var fromMask))
+            else if (!address.IsV6 && NetAddress.TryParseV4(prefixText, out var mask) && TryMaskToPrefix(mask, out var fromMask))
             {
                 prefix = fromMask;
             }
@@ -199,7 +199,7 @@ public sealed record PyIpNetwork(bool IsV6, BigInteger NetworkAddress, int Prefi
             return false;
         }
 
-        network = new PyIpNetwork(address.IsV6, address.Value & ~hostMask & ((BigInteger.One << bits) - 1), prefix);
+        network = new NetRange(address.IsV6, address.Value & ~hostMask & ((BigInteger.One << bits) - 1), prefix);
         return true;
     }
 
@@ -213,7 +213,7 @@ public sealed record PyIpNetwork(bool IsV6, BigInteger NetworkAddress, int Prefi
         return bytes;
     }
 
-    public bool Contains(PyIpAddress address)
+    public bool Contains(NetAddress address)
     {
         ArgumentNullException.ThrowIfNull(address);
         if (address.IsV6 != IsV6)

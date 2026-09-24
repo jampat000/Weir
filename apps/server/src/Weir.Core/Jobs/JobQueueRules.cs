@@ -41,8 +41,8 @@ public static class JobQueueRules
         var suffix = $":cancelled:{jobId.ToString(CultureInfo.InvariantCulture)}";
         var text = original ?? string.Empty;
         var keep = Math.Max(0, DedupeKeyMaxLength - suffix.Length);
-        var baseText = PyStrings.Slice(text, keep);
-        return PyStrings.Slice(baseText + suffix, DedupeKeyMaxLength);
+        var baseText = WireStrings.Slice(text, keep);
+        return WireStrings.Slice(baseText + suffix, DedupeKeyMaxLength);
     }
 
     /// <summary>
@@ -51,12 +51,12 @@ public static class JobQueueRules
     public static string RecoveredFinalizeFailureError(string? previousError, DateTimeOffset when, string recoveredByLabel)
     {
         var previous = (previousError ?? string.Empty).Trim();
-        var iso = PyDateTime.FromDateTimeOffset(when).IsoFormat('T').Replace("+00:00", "Z", StringComparison.Ordinal);
+        var iso = Timestamp.FromDateTimeOffset(when).IsoFormat('T').Replace("+00:00", "Z", StringComparison.Ordinal);
         var note =
             $"manual_recover_finalize_failure: marked completed at {iso} by {recoveredByLabel} " +
             "(handler was not re-run; row was handler_ok_finalize_failed).";
         var text = previous.Length > 0 ? $"{previous}\n--- {note}" : note;
-        return PyStrings.Slice(text, LastErrorLimit);
+        return WireStrings.Slice(text, LastErrorLimit);
     }
 }
 
@@ -82,7 +82,7 @@ public static class StartupJobRecovery
     {
         var attempts = attemptCount;
         var max = Math.Max(1, maxAttempts);
-        var iso = PyDateTime.FromDateTimeOffset(now).IsoFormat('T');
+        var iso = Timestamp.FromDateTimeOffset(now).IsoFormat('T');
         return attempts >= max
             ? new StartupRecoveryDecision(
                 ProcessingJobStatus.Failed,

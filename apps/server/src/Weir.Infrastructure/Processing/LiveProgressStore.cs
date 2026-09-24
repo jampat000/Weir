@@ -22,7 +22,7 @@ public sealed record LiveProgress(
     IReadOnlyList<string> RemovedSubtitles)
 {
     /// <summary>Builds the live entry from one of <see cref="RemuxPass.ActivityProgressReporter"/>'s reports.</summary>
-    public static LiveProgress FromReport(PyDict body)
+    public static LiveProgress FromReport(WireObject body)
     {
         ArgumentNullException.ThrowIfNull(body);
         return new LiveProgress(
@@ -37,38 +37,38 @@ public sealed record LiveProgress(
     }
 
     /// <summary><c>str(body.get("status") or "processing")</c>.</summary>
-    public static string StatusOf(PyDict body) =>
-        body.TryGetValue("status", out var status) && status is PyStr text && text.Value.Trim().Length > 0
+    public static string StatusOf(WireObject body) =>
+        body.TryGetValue("status", out var status) && status is WireString text && text.Value.Trim().Length > 0
             ? text.Value.Trim().ToLowerInvariant()
             : "processing";
 
     /// <summary>A non-blank string field, trimmed, or <see langword="null"/>. Shared with <see cref="RemuxPass.ActivityProgressReporter"/>.</summary>
-    internal static string? Text(PyDict payload, string key) =>
-        payload.TryGetValue(key, out var value) && value is PyStr text && text.Value.Trim().Length > 0 ? text.Value.Trim() : null;
+    internal static string? Text(WireObject payload, string key) =>
+        payload.TryGetValue(key, out var value) && value is WireString text && text.Value.Trim().Length > 0 ? text.Value.Trim() : null;
 
-    private static List<string> Strings(PyDict payload, string key) =>
-        payload.TryGetValue(key, out var value) && value is PyList list
-            ? list.Items.OfType<PyStr>().Select(item => item.Value).Where(item => item.Trim().Length > 0).ToList()
+    private static List<string> Strings(WireObject payload, string key) =>
+        payload.TryGetValue(key, out var value) && value is WireArray list
+            ? list.Items.OfType<WireString>().Select(item => item.Value).Where(item => item.Trim().Length > 0).ToList()
             : [];
 
-    private static double? CoercePercent(PyJson? value)
+    private static double? CoercePercent(WireValue? value)
     {
         var number = Number(value);
         return number is null || double.IsNaN(number.Value) ? null : Math.Clamp(number.Value, 0.0, 100.0);
     }
 
-    private static double? CoerceSeconds(PyJson? value)
+    private static double? CoerceSeconds(WireValue? value)
     {
         var number = Number(value);
         return number is null || double.IsNaN(number.Value) || number.Value < 0 ? null : number.Value;
     }
 
-    private static double? Number(PyJson? value) => value switch
+    private static double? Number(WireValue? value) => value switch
     {
-        PyInt i => (double)i.Value,
-        PyFloat f => f.Value,
-        PyBool b => b.Value ? 1.0 : 0.0,
-        PyStr s when double.TryParse(s.Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed) => parsed,
+        WireInteger i => (double)i.Value,
+        WireNumber f => f.Value,
+        WireBool b => b.Value ? 1.0 : 0.0,
+        WireString s when double.TryParse(s.Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed) => parsed,
         _ => null,
     };
 }

@@ -24,7 +24,7 @@ public static class LibraryFileMarksStore
             "ON CONFLICT (library_id, path) DO UPDATE SET cleaned_at = excluded.cleaned_at, updated_at = excluded.updated_at",
             ("@library", libraryId),
             ("@path", path),
-            ("@when", PythonTimestamps.Orm(when)));
+            ("@when", TimestampColumns.Orm(when)));
     }
 
     /// <summary>A person asked Weir to leave this file alone, or changed their mind.</summary>
@@ -39,8 +39,8 @@ public static class LibraryFileMarksStore
             ("@library", libraryId),
             ("@path", path),
             ("@leave", leaveAlone),
-            ("@at", leaveAlone ? PythonTimestamps.Orm(when) : null),
-            ("@when", PythonTimestamps.Orm(when)));
+            ("@at", leaveAlone ? TimestampColumns.Orm(when) : null),
+            ("@when", TimestampColumns.Orm(when)));
     }
 
     /// <summary>Whether this file is one Weir has been told to leave alone.</summary>
@@ -91,6 +91,6 @@ public static class LibraryFileMarksStore
 
     private static LibraryFileMark Read(SqliteDataReader reader) => new(
         SqliteValues.GetString(reader, 0),
-        PythonTimestamps.Parse(reader.GetValue(1)),
+        TimestampColumns.Parse(reader.GetValue(1)),
         SqliteValues.GetBool(reader, 2));
 }

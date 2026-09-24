@@ -7,7 +7,7 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 
 public sealed partial class OutputFolderCleanup
 {
-    private async Task DeleteWhenTruthClearsAsync(PyDict output, string prefix, string skipKey, string deletedKey, string cascadeKey, string scope, TitleFolder place, string noun, string logLabel, HandoffOrigin? origin, CancellationToken cancellationToken)
+    private async Task DeleteWhenTruthClearsAsync(WireObject output, string prefix, string skipKey, string deletedKey, string cascadeKey, string scope, TitleFolder place, string noun, string logLabel, HandoffOrigin? origin, CancellationToken cancellationToken)
     {
         var answers = await _data.CollectLibraryTruthAsync(scope, cancellationToken).ConfigureAwait(false);
         var acknowledged = await _data.HandoffOutcomeAcknowledgedAsync(origin, cancellationToken).ConfigureAwait(false);
@@ -49,14 +49,14 @@ public sealed partial class OutputFolderCleanup
         }
 
         output.Set(deletedKey, true);
-        output.Set(skipKey, PyNull.Instance);
-        var cascade = output.Get(cascadeKey) as PyList ?? new PyList();
+        output.Set(skipKey, WireNull.Instance);
+        var cascade = output.Get(cascadeKey) as WireArray ?? new WireArray();
         CascadeDeleteEmptyParents(Path.GetDirectoryName(place.Folder)!, place.OutputRoot, cascade, _logger);
         output.Set(cascadeKey, cascade);
     }
 
     /// <summary>Removes empty parents up to, never including, <paramref name="root"/>.</summary>
-    public static void CascadeDeleteEmptyParents(string firstParent, string root, PyList deleted, ILogger logger)
+    public static void CascadeDeleteEmptyParents(string firstParent, string root, WireArray deleted, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(deleted);
         ArgumentNullException.ThrowIfNull(logger);
@@ -83,7 +83,7 @@ public sealed partial class OutputFolderCleanup
                 }
 
                 Directory.Delete(current, recursive: false);
-                deleted.Items.Add(new PyStr(current));
+                deleted.Items.Add(new WireString(current));
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {

@@ -33,7 +33,7 @@ public static partial class RemuxOutputValidation
     /// <summary>Strips the noise a fresh process run adds to an otherwise identical ffprobe/ffmpeg diagnostic line: pointer addresses and any other run of digits (offsets, timestamps, byte counts).</summary>
     public static string NormalizeWarning(string line)
     {
-        var text = PyStrings.Strip(line);
+        var text = WireStrings.Strip(line);
         text = HexAddressRegex().Replace(text, "0x#");
         text = NumberRunRegex().Replace(text, "#");
         text = WhitespaceRunRegex().Replace(text, " ");
@@ -44,9 +44,9 @@ public static partial class RemuxOutputValidation
     public static IReadOnlyList<string> WarningLines(string stderrText)
     {
         var result = new List<string>();
-        foreach (var raw in PyText.SplitLines(stderrText))
+        foreach (var raw in MediaText.SplitLines(stderrText))
         {
-            var stripped = PyStrings.Strip(raw);
+            var stripped = WireStrings.Strip(raw);
             if (stripped.Length > 0)
             {
                 result.Add(stripped);

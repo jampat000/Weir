@@ -26,7 +26,7 @@ internal static class EndpointLookups
     {
         ArgumentNullException.ThrowIfNull(request);
         var raw = request.RouteValue("connection_id") ?? string.Empty;
-        return PydanticRules.TryInt(new PyStr(raw), ["path", "connection_id"], 1, null, issues, out var value)
+        return FieldRules.TryInt(new WireString(raw), ["path", "connection_id"], 1, null, issues, out var value)
             ? value > long.MaxValue ? long.MaxValue : (long)value
             : 0;
     }

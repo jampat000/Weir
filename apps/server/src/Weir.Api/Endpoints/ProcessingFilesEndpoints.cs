@@ -37,10 +37,10 @@ public static class ProcessingFilesEndpoints
         return endpoints;
     }
 
-    private static PyDict FileOut(ProcessingFileRecord row, string libraryName, List<DirectPlayBadge> directPlay, LiveProgress? progress)
+    private static WireObject FileOut(ProcessingFileRecord row, string libraryName, List<DirectPlayBadge> directPlay, LiveProgress? progress)
     {
         var quarantined = row.Status == ProcessingFileStatuses.OnHold && row.FailureAttempts >= RetryPolicy.QuarantineAfterFailures;
-        return new PyDict()
+        return new WireObject()
             .Set("kind", HistoryEntryKinds.Download)
             .Set("id", row.Id)
             .Set("library_id", row.LibraryId)
@@ -55,58 +55,58 @@ public static class ProcessingFilesEndpoints
             .Set("video_height", row.VideoHeight)
             .Set("audio_track_count", row.AudioTrackCount)
             .Set("subtitle_track_count", row.SubtitleTrackCount)
-            .Set("duration_seconds", row.DurationSeconds is { } d ? PyJson.Of(d) : PyJson.Null)
-            .Set("direct_play", new PyList(directPlay.Select(v => (PyJson)new PyDict()
+            .Set("duration_seconds", row.DurationSeconds is { } d ? WireValue.Of(d) : WireValue.Null)
+            .Set("direct_play", new WireArray(directPlay.Select(v => (WireValue)new WireObject()
                 .Set("device_id", v.DeviceId)
                 .Set("device_name", v.DeviceName)
                 .Set("verdict", v.Verdict)
-                .Set("reasons", new PyList(v.Reasons.Select(r => (PyJson)PyJson.Of(r)))))))
-            .Set("progress_percent", progress?.Percent is { } pct ? PyJson.Of(pct) : PyJson.Null)
+                .Set("reasons", new WireArray(v.Reasons.Select(r => (WireValue)WireValue.Of(r)))))))
+            .Set("progress_percent", progress?.Percent is { } pct ? WireValue.Of(pct) : WireValue.Null)
             .Set("progress_message", progress?.Message)
-            .Set("progress_eta_seconds", progress?.EtaSeconds is { } eta ? PyJson.Of(eta) : PyJson.Null)
+            .Set("progress_eta_seconds", progress?.EtaSeconds is { } eta ? WireValue.Of(eta) : WireValue.Null)
             // What Live shows on a working file (docs/archive/live-and-library.md): which step, how fast,
             // and what is coming out. All null when nothing is running on the file.
             .Set("progress_status", progress?.Status)
             .Set("progress_speed", progress?.Speed)
-            .Set("progress_elapsed_seconds", progress?.ElapsedSeconds is { } elapsed ? PyJson.Of(elapsed) : PyJson.Null)
-            .Set("progress_removed_audio", progress is null ? PyJson.Null : new PyList(progress.RemovedAudio.Select(t => (PyJson)PyJson.Of(t))))
-            .Set("progress_removed_subtitles", progress is null ? PyJson.Null : new PyList(progress.RemovedSubtitles.Select(t => (PyJson)PyJson.Of(t))))
+            .Set("progress_elapsed_seconds", progress?.ElapsedSeconds is { } elapsed ? WireValue.Of(elapsed) : WireValue.Null)
+            .Set("progress_removed_audio", progress is null ? WireValue.Null : new WireArray(progress.RemovedAudio.Select(t => (WireValue)WireValue.Of(t))))
+            .Set("progress_removed_subtitles", progress is null ? WireValue.Null : new WireArray(progress.RemovedSubtitles.Select(t => (WireValue)WireValue.Of(t))))
             .Set("failure_class", row.FailureClass)
             .Set("failure_attempts", row.FailureAttempts)
             .Set("quarantined", quarantined)
-            .Set("next_retry_at", row.NextRetryAt?.PydanticJson())
+            .Set("next_retry_at", row.NextRetryAt?.ToWireText())
             .Set("output_collision_policy", row.OutputCollisionPolicy)
             .Set("output_collision_action", row.OutputCollisionAction)
             .Set("output_collision_reason", row.OutputCollisionReason)
-            .Set("hold_until", row.HoldUntil?.PydanticJson())
-            .Set("size_changed_at", row.SizeChangedAt?.PydanticJson())
-            .Set("created_at", row.CreatedAt.PydanticJson())
-            .Set("updated_at", row.UpdatedAt.PydanticJson())
-            .Set("last_seen_at", row.LastSeenAt?.PydanticJson())
-            .Set("last_attempt_at", row.LastAttemptAt?.PydanticJson());
+            .Set("hold_until", row.HoldUntil?.ToWireText())
+            .Set("size_changed_at", row.SizeChangedAt?.ToWireText())
+            .Set("created_at", row.CreatedAt.ToWireText())
+            .Set("updated_at", row.UpdatedAt.ToWireText())
+            .Set("last_seen_at", row.LastSeenAt?.ToWireText())
+            .Set("last_attempt_at", row.LastAttemptAt?.ToWireText());
     }
 
     private static async Task<ApiResult> GetFilesAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
-        long? libraryId = request.Query("library_id") is { } rawLibrary && PydanticRules.TryInt(new PyStr(rawLibrary), ["query", "library_id"], 1, null, issues, out var parsedLibrary)
+        long? libraryId = request.Query("library_id") is { } rawLibrary && FieldRules.TryInt(new WireString(rawLibrary), ["query", "library_id"], 1, null, issues, out var parsedLibrary)
             ? (long)parsedLibrary
             : null;
         string? fileStatus = null;
         if (request.Query("file_status") is { } rawStatus)
         {
-            if (PydanticRules.TryLiteral(new PyStr(rawStatus), ["query", "file_status"], ProcessingFileStatuses.All, issues, out var parsedStatus))
+            if (FieldRules.TryLiteral(new WireString(rawStatus), ["query", "file_status"], ProcessingFileStatuses.All, issues, out var parsedStatus))
             {
                 fileStatus = parsedStatus;
             }
         }
 
         var pathContains = request.Query("path_contains");
-        long? withinDays = request.Query("within_days") is { } rawWithin && PydanticRules.TryInt(new PyStr(rawWithin), ["query", "within_days"], 1, 3650, issues, out var parsedWithin)
+        long? withinDays = request.Query("within_days") is { } rawWithin && FieldRules.TryInt(new WireString(rawWithin), ["query", "within_days"], 1, 3650, issues, out var parsedWithin)
             ? (long)parsedWithin
             : null;
-        var limit = request.Query("limit") is { } rawLimit && PydanticRules.TryInt(new PyStr(rawLimit), ["query", "limit"], 1, 1000, issues, out var parsedLimit) ? (int)parsedLimit : 200;
+        var limit = request.Query("limit") is { } rawLimit && FieldRules.TryInt(new WireString(rawLimit), ["query", "limit"], 1, 1000, issues, out var parsedLimit) ? (int)parsedLimit : 200;
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
@@ -115,7 +115,7 @@ public static class ProcessingFilesEndpoints
             LibraryId = libraryId,
             Status = fileStatus,
             PathContains = pathContains,
-            Since = withinDays is { } days ? PyDateTime.FromUtc(request.Time.GetUtcNow().AddDays(-days).UtcDateTime) : null,
+            Since = withinDays is { } days ? Timestamp.FromUtc(request.Time.GetUtcNow().AddDays(-days).UtcDateTime) : null,
             Limit = limit,
         };
         var rows = await FileStateStore.ListAsync(uow, filter).ConfigureAwait(false);
@@ -125,7 +125,7 @@ public static class ProcessingFilesEndpoints
         var progressByPath = request.Service<LiveProgressStore>().Snapshot();
         var handbacks = await HandbackStore.ForLibrariesAsync(uow, rows.Select(row => row.LibraryId)).ConfigureAwait(false);
 
-        var files = new List<PyJson>();
+        var files = new List<WireValue>();
         foreach (var row in rows)
         {
             var libraryName = libraryNames.GetValueOrDefault(row.LibraryId, "Unknown library");
@@ -137,9 +137,9 @@ public static class ProcessingFilesEndpoints
         }
 
         var counts = await FileStateStore.StatusCountsAsync(uow, libraryId).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict()
-            .Set("files", new PyList(files))
-            .Set("status_counts", new PyDict().Also(dict =>
+        return ApiRoutes.Ok(new WireObject()
+            .Set("files", new WireArray(files))
+            .Set("status_counts", new WireObject().Also(dict =>
             {
                 foreach (var (status, count) in counts)
                 {
@@ -173,7 +173,7 @@ public static class ProcessingFilesEndpoints
         await request.CommitAsync().ConfigureAwait(false);
         return new CustomApiResult(context =>
         {
-            PyResponses.NoContentJson(context);
+            ApiResponses.NoContentJson(context);
             return Task.CompletedTask;
         });
     }
@@ -197,7 +197,7 @@ public static class ProcessingFilesEndpoints
         if (job is null)
         {
             await request.CommitAsync().ConfigureAwait(false);
-            return ApiRoutes.Ok(new PyDict()
+            return ApiRoutes.Ok(new WireObject()
                 .Set("moved", false)
                 .Set("detail", "There is no queued work for this file to move. It may already be running, or it may not have been picked up by a scan yet."));
         }
@@ -211,10 +211,10 @@ public static class ProcessingFilesEndpoints
         var outcome = await jobStore.MoveToTopAsync(job.Value.Id).ConfigureAwait(false);
         if (outcome != JobActionOutcome.Ok)
         {
-            return ApiRoutes.Ok(new PyDict().Set("moved", false).Set("detail", "This file's work has already started, so it cannot be moved ahead of anything."));
+            return ApiRoutes.Ok(new WireObject().Set("moved", false).Set("detail", "This file's work has already started, so it cannot be moved ahead of anything."));
         }
 
-        return ApiRoutes.Ok(new PyDict().Set("moved", true).Set("detail", "Moved to the front of the queue. It starts as soon as there is capacity for it."));
+        return ApiRoutes.Ok(new WireObject().Set("moved", true).Set("detail", "Moved to the front of the queue. It starts as soon as there is capacity for it."));
     }
 
     /// <summary>The oldest pending remux job for this path.</summary>
@@ -231,17 +231,17 @@ public static class ProcessingFilesEndpoints
                 continue;
             }
 
-            PyJson parsed;
+            WireValue parsed;
             try
             {
-                parsed = PyJsonParser.Parse(payloadJson);
+                parsed = WireJsonParser.Parse(payloadJson);
             }
-            catch (PyJsonDecodeException)
+            catch (WireJsonDecodeException)
             {
                 continue;
             }
 
-            if (parsed is PyDict dict && dict.TryGetValue("relative_media_path", out var value) && value is PyStr s && s.Value == relativePath)
+            if (parsed is WireObject dict && dict.TryGetValue("relative_media_path", out var value) && value is WireString s && s.Value == relativePath)
             {
                 return (id, payloadJson);
             }
@@ -267,7 +267,7 @@ public static class ProcessingFilesEndpoints
         var row = await RequireFileAsync(uow, id).ConfigureAwait(false);
         var result = await new RequeueStore(request.Service<ProcessingJobStore>()).RequeueFileAsync(uow, row).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict().Set("requeued", result.Requeued).Set("skipped", result.Skipped).Set("detail", result.Detail));
+        return ApiRoutes.Ok(new WireObject().Set("requeued", result.Requeued).Set("skipped", result.Skipped).Set("detail", result.Detail));
     }
 
     private static async Task<ApiResult> RequeueManyAsync(ApiRequest request)
@@ -279,7 +279,7 @@ public static class ProcessingFilesEndpoints
         var libraryId = model.OptionalInt("library_id", ge: 1);
         string? fileStatus = null;
         var rawStatus = model.OptionalStr("file_status");
-        if (rawStatus is not null && PydanticRules.TryLiteral(PyJson.Of(rawStatus), ["body", "file_status"], ProcessingFileStatuses.All, issues, out var parsedStatus))
+        if (rawStatus is not null && FieldRules.TryLiteral(WireValue.Of(rawStatus), ["body", "file_status"], ProcessingFileStatuses.All, issues, out var parsedStatus))
         {
             fileStatus = parsedStatus;
         }
@@ -293,8 +293,8 @@ public static class ProcessingFilesEndpoints
                 "too_long",
                 ["body", "file_ids"],
                 $"List should have at most {BulkRequeueMaxFiles} items after validation, not {fileIds.Count}",
-                PyJson.Null,
-                new PyDict().Set("field_type", "List").Set("max_length", BulkRequeueMaxFiles).Set("actual_length", fileIds.Count)));
+                WireValue.Null,
+                new WireObject().Set("field_type", "List").Set("max_length", BulkRequeueMaxFiles).Set("actual_length", fileIds.Count)));
         }
 
         model.Finish(ExtraFields.Forbid);
@@ -316,13 +316,13 @@ public static class ProcessingFilesEndpoints
         }).ConfigureAwait(false);
         var result = await new RequeueStore(request.Service<ProcessingJobStore>()).RequeueFilesAsync(uow, rows).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict().Set("requeued", result.Requeued).Set("skipped", result.Skipped).Set("detail", result.Detail));
+        return ApiRoutes.Ok(new WireObject().Set("requeued", result.Requeued).Set("skipped", result.Skipped).Set("detail", result.Detail));
     }
 }
 
-file static class PyDictExtensions
+file static class WireObjectExtensions
 {
-    public static PyDict Also(this PyDict dict, Action<PyDict> configure)
+    public static WireObject Also(this WireObject dict, Action<WireObject> configure)
     {
         configure(dict);
         return dict;

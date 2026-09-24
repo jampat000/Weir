@@ -35,7 +35,7 @@ public static partial class RemuxRules
     /// <summary>Lower rank is the better codec.</summary>
     public static int AudioCodecQualityRank(string? codecName)
     {
-        var c = Py.Lower(PyStrings.Strip(codecName ?? string.Empty));
+        var c = RulesJson.Lower(WireStrings.Strip(codecName ?? string.Empty));
         if (c.Length == 0)
         {
             return CodecUnknownRank;
@@ -44,5 +44,5 @@ public static partial class RemuxRules
         return CodecRankLookup.TryGetValue(c, out var rank) ? rank : CodecUnknownRank;
     }
 
-    private static bool IsLosslessAudio(string? codecName) => LosslessCodecs.Contains(Py.Lower(PyStrings.Strip(codecName ?? string.Empty)));
+    private static bool IsLosslessAudio(string? codecName) => LosslessCodecs.Contains(RulesJson.Lower(WireStrings.Strip(codecName ?? string.Empty)));
 }

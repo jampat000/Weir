@@ -218,13 +218,13 @@ public static partial class MkvmergeCommands
     public static double? TryParseProgressPercent(string line)
     {
         ArgumentNullException.ThrowIfNull(line);
-        var text = PyStrings.Strip(line);
+        var text = WireStrings.Strip(line);
         if (!text.StartsWith(GuiProgressPrefix, StringComparison.Ordinal))
         {
             return null;
         }
 
-        var value = PyStrings.Strip(text[GuiProgressPrefix.Length..]).TrimEnd('%');
+        var value = WireStrings.Strip(text[GuiProgressPrefix.Length..]).TrimEnd('%');
         return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var percent)
             ? Math.Clamp(percent, 0, 100)
             : null;

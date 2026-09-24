@@ -20,7 +20,7 @@ public sealed record SetupCheckLine(string State, string Text)
     public const string Problem = "problem";
     public const string Note = "note";
 
-    public PyDict ToOut() => new PyDict().Set("state", State).Set("text", Text);
+    public WireObject ToOut() => new WireObject().Set("state", State).Set("text", Text);
 }
 
 /// <summary>What a Sonarr/Radarr check found: the hosts to map, and the lines to show.</summary>

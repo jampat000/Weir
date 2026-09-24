@@ -28,16 +28,16 @@ public static class ProcessingLibraryCleansEndpoints
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
-        long? libraryId = request.Query("library_id") is { } rawLibrary && PydanticRules.TryInt(new PyStr(rawLibrary), ["query", "library_id"], 1, null, issues, out var parsedLibrary)
+        long? libraryId = request.Query("library_id") is { } rawLibrary && FieldRules.TryInt(new WireString(rawLibrary), ["query", "library_id"], 1, null, issues, out var parsedLibrary)
             ? (long)parsedLibrary
             : null;
-        string? pathContains = request.Query("path_contains") is { } rawPath && PydanticRules.TryStr(new PyStr(rawPath), ["query", "path_contains"], null, PathContainsMaxLength, issues, out var parsedPath)
+        string? pathContains = request.Query("path_contains") is { } rawPath && FieldRules.TryStr(new WireString(rawPath), ["query", "path_contains"], null, PathContainsMaxLength, issues, out var parsedPath)
             ? parsedPath
             : null;
-        long? withinDays = request.Query("within_days") is { } rawWithin && PydanticRules.TryInt(new PyStr(rawWithin), ["query", "within_days"], 1, WithinDaysMax, issues, out var parsedWithin)
+        long? withinDays = request.Query("within_days") is { } rawWithin && FieldRules.TryInt(new WireString(rawWithin), ["query", "within_days"], 1, WithinDaysMax, issues, out var parsedWithin)
             ? (long)parsedWithin
             : null;
-        var limit = request.Query("limit") is { } rawLimit && PydanticRules.TryInt(new PyStr(rawLimit), ["query", "limit"], 1, LibraryCleanHistoryFilter.MaxLimit, issues, out var parsedLimit)
+        var limit = request.Query("limit") is { } rawLimit && FieldRules.TryInt(new WireString(rawLimit), ["query", "limit"], 1, LibraryCleanHistoryFilter.MaxLimit, issues, out var parsedLimit)
             ? (int)parsedLimit
             : LibraryCleanHistoryFilter.DefaultLimit;
         issues.ThrowIfAny();
@@ -47,23 +47,23 @@ public static class ProcessingLibraryCleansEndpoints
         {
             LibraryId = libraryId,
             PathContains = pathContains,
-            Since = withinDays is { } days ? PyDateTime.FromUtc(request.Time.GetUtcNow().AddDays(-days).UtcDateTime) : null,
+            Since = withinDays is { } days ? Timestamp.FromUtc(request.Time.GetUtcNow().AddDays(-days).UtcDateTime) : null,
             Limit = limit,
         }).ConfigureAwait(false);
         var libraryNames = await FileStateStore.LibraryNamesAsync(uow).ConfigureAwait(false);
 
-        var cleans = rows.Select(row => (PyJson)new PyDict()
+        var cleans = rows.Select(row => (WireValue)new WireObject()
             .Set("kind", HistoryEntryKinds.LibraryClean)
             .Set("id", row.Id)
-            .Set("library_id", row.LibraryId is { } id ? PyJson.Of(id) : PyJson.Null)
+            .Set("library_id", row.LibraryId is { } id ? WireValue.Of(id) : WireValue.Null)
             .Set("library_name", row.LibraryId is { } known ? libraryNames.GetValueOrDefault(known, "Unknown library") : "Unknown library")
             .Set("relative_path", row.RelativePath)
             .Set("outcome", row.Outcome)
             .Set("detail", row.Detail)
             .Set("trigger", row.Trigger)
-            .Set("recorded_at", row.RecordedAt.PydanticJson()));
-        return ApiRoutes.Ok(new PyDict()
-            .Set("cleans", new PyList(cleans))
+            .Set("recorded_at", row.RecordedAt.ToWireText()));
+        return ApiRoutes.Ok(new WireObject()
+            .Set("cleans", new WireArray(cleans))
             .Set("returned", rows.Count)
             .Set("limit", limit));
     }

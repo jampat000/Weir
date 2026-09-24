@@ -58,7 +58,7 @@ public sealed class ServerErrorMiddleware
             // SecurityHeadersMiddleware skips a response already marked ResponseMarkers.ServerError, so this
             // 500 would otherwise leave with none of nosniff, the frame and permissions policy, or the rest.
             SecurityHeadersMiddleware.Apply(context, _options.SecurityEnableHsts);
-            await PyResponses.WritePlainTextAsync(context, StatusCodes.Status500InternalServerError, "Internal Server Error").ConfigureAwait(false);
+            await ApiResponses.WritePlainTextAsync(context, StatusCodes.Status500InternalServerError, "Internal Server Error").ConfigureAwait(false);
         }
     }
 }
@@ -94,7 +94,7 @@ public static class TrustedForwardedHeaders
 #pragma warning restore ASPDEPR005
         foreach (var raw in options.TrustedProxyIps)
         {
-            if (PyIpNetwork.TryParse(raw.Trim(), strict: false, out var network))
+            if (NetRange.TryParse(raw.Trim(), strict: false, out var network))
             {
                 forwarded.KnownIPNetworks.Add(new System.Net.IPNetwork(new IPAddress(network.AddressBytes()), network.PrefixLength));
             }
@@ -206,8 +206,8 @@ public sealed class CorsMiddleware
         }
 
         return failures.Count > 0
-            ? PyResponses.WritePlainTextAsync(context, StatusCodes.Status400BadRequest, "Disallowed CORS " + string.Join(", ", failures))
-            : PyResponses.WritePlainTextAsync(context, StatusCodes.Status200OK, "OK");
+            ? ApiResponses.WritePlainTextAsync(context, StatusCodes.Status400BadRequest, "Disallowed CORS " + string.Join(", ", failures))
+            : ApiResponses.WritePlainTextAsync(context, StatusCodes.Status200OK, "OK");
     }
 }
 
@@ -218,15 +218,15 @@ public sealed class CorsMiddleware
 public sealed class TrustedProxySchemeMiddleware
 {
     private readonly RequestDelegate _next;
-    private readonly List<PyIpNetwork> _networks;
+    private readonly List<NetRange> _networks;
 
     public TrustedProxySchemeMiddleware(RequestDelegate next, WeirOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
         _next = next;
         _networks = [.. options.TrustedProxyIps
-            .Select(value => PyIpNetwork.TryParse(value.Trim(), strict: false, out var network) ? network : null)
-            .OfType<PyIpNetwork>()];
+            .Select(value => NetRange.TryParse(value.Trim(), strict: false, out var network) ? network : null)
+            .OfType<NetRange>()];
     }
 
     public Task InvokeAsync(HttpContext context)
@@ -322,10 +322,10 @@ public sealed class XRequestedWithMiddleware
             var xrw = (request.Headers["X-Requested-With"].FirstOrDefault() ?? string.Empty).Trim();
             if (!string.Equals(xrw, "xmlhttprequest", StringComparison.OrdinalIgnoreCase))
             {
-                return PyResponses.WriteJsonAsync(
+                return ApiResponses.WriteJsonAsync(
                     context,
                     StatusCodes.Status403Forbidden,
-                    new Core.Json.PyDict().Set("detail", "Missing X-Requested-With header. This endpoint requires an authenticated browser session."));
+                    new Core.Json.WireObject().Set("detail", "Missing X-Requested-With header. This endpoint requires an authenticated browser session."));
             }
         }
 
@@ -362,7 +362,7 @@ public sealed class MetricsLoggerProvider : ILoggerProvider
         {
             if (IsEnabled(logLevel))
             {
-                provider._metrics.RecordLog(Infrastructure.Logging.PythonLogFormat.LevelName(logLevel));
+                provider._metrics.RecordLog(Infrastructure.Logging.LogLineFormat.LevelName(logLevel));
             }
         }
     }

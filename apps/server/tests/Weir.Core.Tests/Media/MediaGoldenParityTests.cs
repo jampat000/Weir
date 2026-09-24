@@ -181,7 +181,7 @@ public sealed class MediaGoldenParityTests
             var input = item.GetProperty("input");
             using var probe = JsonDocument.Parse(input.GetProperty("probe").GetString()!);
             var durationText = input.GetProperty("expected_duration_seconds");
-            double? expectedDuration = durationText.ValueKind == JsonValueKind.Null ? null : Py.TryFloatFromText(durationText.GetString()!);
+            double? expectedDuration = durationText.ValueKind == JsonValueKind.Null ? null : RulesJson.TryFloatFromText(durationText.GetString()!);
 
             var outcome = Outcome(() => ProbeOutput.ValidateRemuxOutput(probe.RootElement, input.GetProperty("expected_audio").GetInt32(), expectedDuration));
 
@@ -194,7 +194,7 @@ public sealed class MediaGoldenParityTests
             var expected = item.GetProperty("expected");
             var result = expected.GetProperty("result");
             var actual = ProbeOutput.DurationSeconds(data.RootElement);
-            Assert.Equal(result.ValueKind == JsonValueKind.Null ? null : result.GetString(), actual is null ? null : PyConvert.FloatRepr(actual.Value));
+            Assert.Equal(result.ValueKind == JsonValueKind.Null ? null : result.GetString(), actual is null ? null : WireConvert.FloatRepr(actual.Value));
         }
 
         foreach (var item in root.GetProperty("integrity").EnumerateArray())
@@ -243,19 +243,19 @@ public sealed class MediaGoldenParityTests
 
         foreach (var item in root.GetProperty("format_1f").EnumerateArray())
         {
-            var value = Py.TryFloatFromText(item.GetProperty("input").GetString()!)!.Value;
-            Assert.Equal(item.GetProperty("expected").GetString(), PyText.FormatFixed(value, 1));
+            var value = RulesJson.TryFloatFromText(item.GetProperty("input").GetString()!)!.Value;
+            Assert.Equal(item.GetProperty("expected").GetString(), MediaText.FormatFixed(value, 1));
         }
 
         foreach (var item in root.GetProperty("splitlines").EnumerateArray())
         {
-            Assert.Equal(Strings(item.GetProperty("expected")), PyText.SplitLines(item.GetProperty("input").GetString()!));
+            Assert.Equal(Strings(item.GetProperty("expected")), MediaText.SplitLines(item.GetProperty("input").GetString()!));
         }
 
         foreach (var item in root.GetProperty("clip").EnumerateArray())
         {
             var input = item.GetProperty("input");
-            Assert.Equal(item.GetProperty("expected").GetString(), PyText.Clip(input[0].GetString()!, input[1].GetInt32()));
+            Assert.Equal(item.GetProperty("expected").GetString(), MediaText.Clip(input[0].GetString()!, input[1].GetInt32()));
         }
 
         foreach (var item in root.GetProperty("timeout_messages").EnumerateArray())
@@ -340,19 +340,19 @@ public sealed class MediaGoldenParityTests
 
         var error = expected.GetProperty("error");
         Assert.True(actual is not null, $"{label}: expected {error.GetRawText()}, got success");
-        Assert.True(error.GetProperty("type").GetString() == PythonType(actual), $"{label}: expected {error.GetRawText()}, got {PythonType(actual)}: {actual.Message}");
+        Assert.True(error.GetProperty("type").GetString() == GoldenErrorType(actual), $"{label}: expected {error.GetRawText()}, got {GoldenErrorType(actual)}: {actual.Message}");
         if (actual is MediaToolException)
         {
             Assert.Equal(error.GetProperty("message").GetString(), actual.Message);
         }
     }
 
-    private static string PythonType(Exception error) => error switch
+    private static string GoldenErrorType(Exception error) => error switch
     {
         MediaUnreadableException => "MediaUnreadableError",
         MediaCompletenessException => "MediaCompletenessError",
         MediaToolException => "RuntimeError",
-        RulesInputException rules => rules.PythonError,
+        RulesInputException rules => rules.ErrorKind,
         _ => error.GetType().Name,
     };
 
@@ -360,7 +360,7 @@ public sealed class MediaGoldenParityTests
     {
         if (!expected.SequenceEqual(actual))
         {
-            Assert.Fail($"{label}:\n expected {PyText.ListRepr(expected)}\n actual   {PyText.ListRepr(actual)}");
+            Assert.Fail($"{label}:\n expected {MediaText.ListRepr(expected)}\n actual   {MediaText.ListRepr(actual)}");
         }
     }
 

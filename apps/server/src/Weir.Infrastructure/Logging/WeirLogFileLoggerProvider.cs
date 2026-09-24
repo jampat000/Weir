@@ -38,7 +38,7 @@ public sealed class WeirLogFileLoggerProvider : ILoggerProvider
                 return;
             }
 
-            provider._file.WriteLine(PythonLogFormat.JsonLine(
+            provider._file.WriteLine(LogLineFormat.JsonLine(
                 provider._time.GetUtcNow(),
                 logLevel,
                 category,

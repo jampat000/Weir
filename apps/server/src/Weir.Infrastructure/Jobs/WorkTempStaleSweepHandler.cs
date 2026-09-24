@@ -71,7 +71,7 @@ public sealed class WorkTempStaleSweepHandler : IJobHandler
         }
 
         var label = scope == "tv" ? "TV" : "Movies";
-        var detail = new PyDict()
+        var detail = new WireObject()
             .Set("job_id", context.Id)
             .Set("media_scope", scope)
             .Set("files_removed", removed)
@@ -88,7 +88,7 @@ public sealed class WorkTempStaleSweepHandler : IJobHandler
         await LockedWrites.RunAsync(
             _store.Database,
             uow => SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(
-                ActivityEventTypes.ProcessingWorkTempStaleSweepCompleted, "processing", title, PyJsonWriter.Dumps(detail, PyJsonFormat.Compact))),
+                ActivityEventTypes.ProcessingWorkTempStaleSweepCompleted, "processing", title, WireJsonWriter.Dumps(detail, WireJsonFormat.Compact))),
             _logger,
             "work file sweep completed",
             cancellationToken).ConfigureAwait(false);

@@ -64,7 +64,7 @@ public sealed class PhysicalSwapTests : IDisposable
     private string[] FilesInLibrary() =>
         Directory.GetFiles(_library, "*", SearchOption.AllDirectories).Select(path => Path.GetRelativePath(_library, path)).Order(StringComparer.Ordinal).ToArray();
 
-    private PyDict Payload() => (PyDict)PyJsonParser.Parse((string)_db.Scalar("SELECT payload_json FROM jobs WHERE id = $id", ("$id", _jobId))!);
+    private WireObject Payload() => (WireObject)WireJsonParser.Parse((string)_db.Scalar("SELECT payload_json FROM jobs WHERE id = $id", ("$id", _jobId))!);
 
     private (string State, string OriginalPath, string TempPath, string BackupPath, bool Committed) SwapRow()
     {

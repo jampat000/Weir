@@ -15,7 +15,7 @@ namespace Weir.Infrastructure.Processing;
 public sealed partial class ProcessingFailureCleanupSweep
 {
     private async Task ProcessTvAsync(
-        UnitOfWork uow, PyDict detail, string srcSeason, string relNorm, string watchedRoot, string outputRoot, string workRoot,
+        UnitOfWork uow, WireObject detail, string srcSeason, string relNorm, string watchedRoot, string outputRoot, string workRoot,
         IReadOnlyList<ManagerQueueSignal> signals)
     {
         detail.Set("tv_failure_cleanup_season_folder_deleted", false);
@@ -94,7 +94,7 @@ public sealed partial class ProcessingFailureCleanupSweep
             detail.Set("tv_failure_cleanup_season_folder_deleted", ok);
             if (ok)
             {
-                CascadeUnderRoot(Path.GetDirectoryName(srcSeason) ?? watchedRoot, watchedRoot, (PyList)detail.Get("tv_failure_cleanup_cascade_folders_deleted")!);
+                CascadeUnderRoot(Path.GetDirectoryName(srcSeason) ?? watchedRoot, watchedRoot, (WireArray)detail.Get("tv_failure_cleanup_cascade_folders_deleted")!);
             }
         }
 
@@ -104,17 +104,17 @@ public sealed partial class ProcessingFailureCleanupSweep
             detail.Set("tv_failure_cleanup_output_season_deleted", ok);
             if (ok)
             {
-                CascadeUnderRoot(Path.GetDirectoryName(outSeason) ?? outputRoot, outputRoot, (PyList)detail.Get("tv_failure_cleanup_cascade_folders_deleted")!);
+                CascadeUnderRoot(Path.GetDirectoryName(outSeason) ?? outputRoot, outputRoot, (WireArray)detail.Get("tv_failure_cleanup_cascade_folders_deleted")!);
             }
         }
 
-        var tempDeleted = (PyList)detail.Get("tv_failure_cleanup_temp_files_deleted")!;
+        var tempDeleted = (WireArray)detail.Get("tv_failure_cleanup_temp_files_deleted")!;
         foreach (var temp in JobTempCandidates(workRoot, relNorm))
         {
             var (ok, _) = SafeUnlink(temp);
             if (ok)
             {
-                tempDeleted.Items.Add(new PyStr(temp));
+                tempDeleted.Items.Add(new WireString(temp));
             }
         }
     }
@@ -134,7 +134,7 @@ public sealed partial class ProcessingFailureCleanupSweep
             {
                 parsed = ParseFailedJobPayload(payload);
             }
-            catch (Exception exception) when (exception is FormatException or PyJsonDecodeException)
+            catch (Exception exception) when (exception is FormatException or WireJsonDecodeException)
             {
                 continue;
             }
@@ -159,30 +159,30 @@ public sealed partial class ProcessingFailureCleanupSweep
             ("$leased", ProcessingJobStatus.Leased)).ConfigureAwait(false);
         foreach (var payload in rows)
         {
-            var raw = PyStrings.Strip(payload ?? string.Empty);
+            var raw = WireStrings.Strip(payload ?? string.Empty);
             if (raw.Length == 0)
             {
                 continue;
             }
 
-            PyJson parsedJson;
+            WireValue parsedJson;
             try
             {
-                parsedJson = PyJsonParser.Parse(raw);
+                parsedJson = WireJsonParser.Parse(raw);
             }
-            catch (PyJsonDecodeException)
+            catch (WireJsonDecodeException)
             {
                 continue;
             }
 
-            if (parsedJson is not PyDict data)
+            if (parsedJson is not WireObject data)
             {
                 continue;
             }
 
-            var rel = data.Get("relative_media_path") is PyStr relStr ? relStr.Value : null;
-            var jobScope = data.Get("media_scope") is PyStr scopeStr && scopeStr.Value is "movie" or "tv" ? scopeStr.Value : "movie";
-            if (rel is not null && PyStrings.Strip(rel) == relativePosix && jobScope == wantScope)
+            var rel = data.Get("relative_media_path") is WireString relStr ? relStr.Value : null;
+            var jobScope = data.Get("media_scope") is WireString scopeStr && scopeStr.Value is "movie" or "tv" ? scopeStr.Value : "movie";
+            if (rel is not null && WireStrings.Strip(rel) == relativePosix && jobScope == wantScope)
             {
                 return true;
             }

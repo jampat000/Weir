@@ -27,7 +27,7 @@ public sealed class WorkAdmissionTests
     [Fact]
     public void A_pause_expires_on_its_own_without_a_background_task()
     {
-        var state = PauseState.Resolve(true, PyDateTime.FromUtc(Now.AddMinutes(-1).UtcDateTime), true, Now.UtcDateTime);
+        var state = PauseState.Resolve(true, Timestamp.FromUtc(Now.AddMinutes(-1).UtcDateTime), true, Now.UtcDateTime);
 
         Assert.False(state.Paused);
         Assert.True(state.Expired);
@@ -37,7 +37,7 @@ public sealed class WorkAdmissionTests
     [Fact]
     public void A_pause_that_has_not_yet_expired_is_still_a_pause_and_says_when()
     {
-        var state = PauseState.Resolve(true, PyDateTime.FromUtc(Now.AddHours(2).UtcDateTime), true, Now.UtcDateTime);
+        var state = PauseState.Resolve(true, Timestamp.FromUtc(Now.AddHours(2).UtcDateTime), true, Now.UtcDateTime);
 
         Assert.True(state.Paused);
         Assert.Equal("Processing is paused. Weir will start work again automatically at 2026-08-26 16:00 UTC.", state.Reason);
@@ -46,7 +46,7 @@ public sealed class WorkAdmissionTests
     [Fact]
     public void An_unpaused_suite_drops_the_until_time()
     {
-        Assert.Equal(new PauseState(false, null, false), PauseState.Resolve(false, PyDateTime.FromUtc(Now.AddHours(1).UtcDateTime), false, Now.UtcDateTime));
+        Assert.Equal(new PauseState(false, null, false), PauseState.Resolve(false, Timestamp.FromUtc(Now.AddHours(1).UtcDateTime), false, Now.UtcDateTime));
     }
 
     [Fact]
@@ -223,8 +223,8 @@ public sealed class WorkAdmissionTests
 
         // No suffix: the temp name falls back to ".mkv".
         Assert.Matches(WeirTempFiles.RemuxTempNameFor(@"tv\Show\episode"), "episode.processing.zzzzzzzz.mkv");
-        Assert.Equal(("archive.tar", ".gz"), WeirTempFiles.PythonStemAndSuffix("archive.tar.gz"));
-        Assert.Equal((".hidden", string.Empty), WeirTempFiles.PythonStemAndSuffix(".hidden"));
+        Assert.Equal(("archive.tar", ".gz"), WeirTempFiles.StemAndSuffix("archive.tar.gz"));
+        Assert.Equal((".hidden", string.Empty), WeirTempFiles.StemAndSuffix(".hidden"));
     }
 
     [Theory]
