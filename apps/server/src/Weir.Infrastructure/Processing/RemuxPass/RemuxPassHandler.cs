@@ -29,6 +29,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
     private readonly IFailurePolicy _failurePolicy;
     private readonly HandoffCompletionReporter? _reporter;
     private readonly ProcessingJobStore? _jobs;
+    private readonly OperatorSettingsStore _operatorSettings;
     private readonly TimeProvider _time;
     private readonly ILogger<RemuxPassHandler> _logger;
     private readonly LiveProgressStore _liveProgress;
@@ -38,6 +39,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
         WeirOptions options,
         RemuxPassRunner runner,
         IFailurePolicy failurePolicy,
+        OperatorSettingsStore operatorSettings,
         TimeProvider time,
         ILogger<RemuxPassHandler> logger,
         HandoffCompletionReporter? reporter = null,
@@ -48,6 +50,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
         _failurePolicy = failurePolicy ?? throw new ArgumentNullException(nameof(failurePolicy));
+        _operatorSettings = operatorSettings ?? throw new ArgumentNullException(nameof(operatorSettings));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _reporter = reporter;

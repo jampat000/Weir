@@ -10,10 +10,10 @@ namespace Weir.Infrastructure.Processing;
 /// cached — the question is only ever asked because the recorded state looks wrong or stale, and answering
 /// it from the same record would be no answer at all.
 /// </summary>
-public static class HoldDiagnosticStore
+public sealed class HoldDiagnosticStore
 {
     /// <summary>The release title for a relative path: the folder name, or the file stem at the root.</summary>
-    public static string ReleaseTitleFromRelativePath(string relativePath)
+    public string ReleaseTitleFromRelativePath(string relativePath)
     {
         var parts = relativePath.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length >= 2)
@@ -37,7 +37,7 @@ public static class HoldDiagnosticStore
     /// <paramref name="connections"/> is the shared connection-resolution/HTTP service: this call never duplicates
     /// its HTTP or dialect logic.
     /// </summary>
-    public static async Task<CandidateGateOutcome> EvaluateAsync(
+    public async Task<CandidateGateOutcome> EvaluateAsync(
         UnitOfWork uow, ProcessingFileRecord file, ProcessingLibraryRecord library, MediaManagerConnectionService connections, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(file);

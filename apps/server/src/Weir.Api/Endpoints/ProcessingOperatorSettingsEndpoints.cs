@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
@@ -16,9 +17,26 @@ public static class ProcessingOperatorSettingsEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingOperatorSettingsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/processing/operator-settings", GetOperatorSettingsAsync);
-        endpoints.MapV1("PUT", "/processing/operator-settings", PutOperatorSettingsAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<ProcessingOperatorSettingsEndpointHandlers>();
+        endpoints.MapV1("GET", "/processing/operator-settings", handlers.GetOperatorSettingsAsync);
+        endpoints.MapV1("PUT", "/processing/operator-settings", handlers.PutOperatorSettingsAsync);
         return endpoints;
+    }
+}
+
+/// <summary>Handlers for <see cref="ProcessingOperatorSettingsEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class ProcessingOperatorSettingsEndpointHandlers
+{
+    private readonly OperatorSettingsStore _operatorSettings;
+    private readonly ScanSettingsChanges _scanSettingsChanges;
+    private readonly SuiteSettingsStore _suiteSettings;
+
+    public ProcessingOperatorSettingsEndpointHandlers(
+        OperatorSettingsStore operatorSettings, ScanSettingsChanges scanSettingsChanges, SuiteSettingsStore suiteSettings)
+    {
+        _operatorSettings = operatorSettings ?? throw new ArgumentNullException(nameof(operatorSettings));
+        _scanSettingsChanges = scanSettingsChanges ?? throw new ArgumentNullException(nameof(scanSettingsChanges));
+        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
     }
 
     private static WireObject OperatorSettingsOut(ProcessingOperatorSettingsRecord row, string timezone) => new WireObject()
@@ -57,16 +75,16 @@ public static class ProcessingOperatorSettingsEndpoints
         .Set("schedule_timezone", timezone)
         .Set("updated_at", row.UpdatedAt.IsoFormat());
 
-    private static async Task<ApiResult> GetOperatorSettingsAsync(ApiRequest request)
+    public async Task<ApiResult> GetOperatorSettingsAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-        var suite = await request.Service<SuiteSettingsStore>().EnsureAsync(uow).ConfigureAwait(false);
+        var row = await _operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
+        var suite = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
         return ApiRoutes.Ok(OperatorSettingsOut(row, string.IsNullOrWhiteSpace(suite.AppTimezone) ? "UTC" : suite.AppTimezone.Trim()));
     }
 
-    private static async Task<ApiResult> PutOperatorSettingsAsync(ApiRequest request)
+    public async Task<ApiResult> PutOperatorSettingsAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -144,7 +162,7 @@ public static class ProcessingOperatorSettingsEndpoints
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var before = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        var before = await _operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
         var after = before;
         if (maxConcurrentFiles is { } m)
         {
@@ -277,12 +295,12 @@ public static class ProcessingOperatorSettingsEndpoints
             throw new ApiException(StatusCodes.Status400BadRequest, exception.Message);
         }
 
-        await OperatorSettingsStore.UpdateAsync(uow, before, after).ConfigureAwait(false);
-        var updated = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-        var suite = await request.Service<SuiteSettingsStore>().EnsureAsync(uow).ConfigureAwait(false);
+        await _operatorSettings.UpdateAsync(uow, before, after).ConfigureAwait(false);
+        var updated = await _operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
+        var suite = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         // The periodic-scan switches are among these settings; the scheduler reads them again on its next tick.
-        request.Service<ScanSettingsChanges>().Record();
+        _scanSettingsChanges.Record();
         return ApiRoutes.Ok(OperatorSettingsOut(updated, string.IsNullOrWhiteSpace(suite.AppTimezone) ? "UTC" : suite.AppTimezone.Trim()));
     }
 }

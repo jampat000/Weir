@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Time.Testing;
 using Weir.Core.Activity;
 using Weir.Core.Json;
 
@@ -39,14 +40,15 @@ public sealed class ActivityProvenanceTests
     public async Task The_notifier_wakes_all_active_stream_subscribers()
     {
         var notifier = new ActivityLatestNotifier();
-        var first = notifier.WaitForChangeAsync(0, TimeSpan.FromSeconds(5), TimeProvider.System);
-        var second = notifier.WaitForChangeAsync(0, TimeSpan.FromSeconds(5), TimeProvider.System);
+        var clock = new FakeTimeProvider();
+        var first = notifier.WaitForChangeAsync(0, TimeSpan.FromSeconds(5), clock);
+        var second = notifier.WaitForChangeAsync(0, TimeSpan.FromSeconds(5), clock);
         Assert.Equal(2, notifier.WaiterCount);
 
         notifier.Notify(99);
 
-        Assert.Equal(new ActivityLatest(99, 1), await first);
-        Assert.Equal(new ActivityLatest(99, 1), await second);
+        Assert.Equal(new ActivityLatest(99, 1), await first.WaitAsync(TimeSpan.FromMinutes(1)));
+        Assert.Equal(new ActivityLatest(99, 1), await second.WaitAsync(TimeSpan.FromMinutes(1)));
         Assert.Equal(0, notifier.WaiterCount);
     }
 

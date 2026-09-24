@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Time.Testing;
 using Weir.Infrastructure.Processing;
 
 namespace Weir.Infrastructure.Tests.Processing;
@@ -100,11 +101,13 @@ public sealed class LiveProgressStoreTests
     public async Task Waiting_for_a_change_returns_as_soon_as_an_update_happens()
     {
         var store = new LiveProgressStore();
-        var wait = store.WaitForChangeAsync(store.Version, TimeSpan.FromSeconds(5), TimeProvider.System);
+        // The wait's own timeout runs on a clock that never moves, so only the update can end it. The guard below
+        // is only there so a wait that missed the update fails the test instead of hanging it.
+        var wait = store.WaitForChangeAsync(store.Version, TimeSpan.FromSeconds(5), new FakeTimeProvider());
 
         store.Update("Film/Film.mkv", Writing(1));
 
-        var version = await wait.WaitAsync(TimeSpan.FromSeconds(5));
+        var version = await wait.WaitAsync(TimeSpan.FromMinutes(1));
         Assert.NotNull(version);
         Assert.Equal(store.Version, version);
     }
@@ -137,13 +140,14 @@ public sealed class LiveProgressStoreTests
     {
         // Every open stream calls WaitForChangeAsync on the same store, so one change must reach them all (#750).
         var store = new LiveProgressStore();
+        var clock = new FakeTimeProvider();
         var waiters = Enumerable.Range(0, 5)
-            .Select(_ => store.WaitForChangeAsync(store.Version, TimeSpan.FromSeconds(5), TimeProvider.System))
+            .Select(_ => store.WaitForChangeAsync(store.Version, TimeSpan.FromSeconds(5), clock))
             .ToArray();
 
         store.Update("Film/Film.mkv", Writing(1));
 
-        var results = await Task.WhenAll(waiters);
+        var results = await Task.WhenAll(waiters).WaitAsync(TimeSpan.FromMinutes(1));
         Assert.All(results, version => Assert.Equal(store.Version, version));
     }
 }

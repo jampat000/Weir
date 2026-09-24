@@ -59,7 +59,7 @@ public sealed partial class LibraryCleanHandler
         try
         {
             await using var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
-            await LibraryFileMarksStore.MarkCleanedAsync(uow, library.Id, path, _time.GetUtcNow()).ConfigureAwait(false);
+            await _fileMarks.MarkCleanedAsync(uow, library.Id, path, _time.GetUtcNow()).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
         }
 #pragma warning disable CA1031 // Best-effort, like the steps above: a committed clean is never undone by bookkeeping.

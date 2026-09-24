@@ -15,20 +15,27 @@ public sealed record MetadataProviderView(string Provider, string BaseUrl, bool 
 /// <see cref="Weir.Infrastructure.MediaManagers.MetadataProviderService"/> (#520) when a key is configured;
 /// <see cref="Test"/> here only covers the not-configured answer.
 /// </summary>
-public static class MetadataProviderStore
+public sealed class MetadataProviderStore
 {
     public const string DefaultTmdbBaseUrl = "https://api.themoviedb.org/3";
 
-    public static readonly IReadOnlyList<string> KnownProviders = ["tmdb"];
+    private readonly SuiteSettingsStore _suiteSettings;
 
-    public static MetadataProviderView View(SuiteSettingsRecord row) => new(
+    public MetadataProviderStore(SuiteSettingsStore suiteSettings)
+    {
+        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+    }
+
+    public IReadOnlyList<string> KnownProviders { get; } = ["tmdb"];
+
+    public MetadataProviderView View(SuiteSettingsRecord row) => new(
         row.MetadataProvider,
         string.IsNullOrWhiteSpace(row.MetadataProviderBaseUrl) ? DefaultTmdbBaseUrl : row.MetadataProviderBaseUrl.Trim(),
         !string.IsNullOrWhiteSpace(row.MetadataProviderKeyCiphertext),
         KnownProviders);
 
     /// <summary>Encrypts the provider key with the same cipher the manager credentials use.</summary>
-    public static string EncryptKey(WeirOptions options, string plaintext, TimeProvider time)
+    public string EncryptKey(WeirOptions options, string plaintext, TimeProvider time)
     {
         if (plaintext.Trim().Length == 0)
         {
@@ -39,18 +46,17 @@ public static class MetadataProviderStore
         return cipher.Encrypt(plaintext);
     }
 
-    public static async Task<SuiteSettingsRecord> ApplyAsync(
-        UnitOfWork uow, SuiteSettingsStore suiteSettings, WeirOptions options, TimeProvider time, string provider, string baseUrl, string? apiKey)
+    public async Task<SuiteSettingsRecord> ApplyAsync(UnitOfWork uow, WeirOptions options, TimeProvider time, string provider, string baseUrl, string? apiKey)
     {
-        var before = await suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
+        var before = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
         var after = before with
         {
             MetadataProvider = provider,
             MetadataProviderBaseUrl = baseUrl.Trim(),
             MetadataProviderKeyCiphertext = apiKey is null ? before.MetadataProviderKeyCiphertext : EncryptKey(options, apiKey, time),
         };
-        await suiteSettings.UpdateAsync(uow, before, after).ConfigureAwait(false);
-        return await suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
+        await _suiteSettings.UpdateAsync(uow, before, after).ConfigureAwait(false);
+        return await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -58,7 +64,7 @@ public static class MetadataProviderStore
     /// reports this honestly instead of calling <see cref="Weir.Infrastructure.MediaManagers.MetadataProviderService"/>
     /// (which needs a saved key). When a key is configured, the endpoint asks that service instead.
     /// </summary>
-    public static LookupResult Test(SuiteSettingsRecord row)
+    public LookupResult Test(SuiteSettingsRecord row)
     {
         ArgumentNullException.ThrowIfNull(row);
         return new LookupResult

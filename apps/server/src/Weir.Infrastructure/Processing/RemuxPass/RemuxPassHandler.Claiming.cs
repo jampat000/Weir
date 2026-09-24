@@ -25,7 +25,7 @@ public sealed partial class RemuxPassHandler
             _database,
             async uow =>
             {
-                var operatorSettings = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+                var operatorSettings = await _operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
                 var library = await ResolveLibraryAsync(uow, libraryId, mediaScope).ConfigureAwait(false);
                 var rules = library is not null ? await RulesConfigForAsync(uow, library).ConfigureAwait(false) : null;
                 rules ??= await LoadScopeRulesConfigAsync(uow, mediaScope).ConfigureAwait(false);

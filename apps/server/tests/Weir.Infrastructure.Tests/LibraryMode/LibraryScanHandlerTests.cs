@@ -21,6 +21,10 @@ public sealed class LibraryScanHandlerTests : IDisposable
     private readonly MediaManagerFixture _fixture = new();
     private readonly TempDirectory _libraryFolder = new();
     private readonly FakeMediaRunner _media = new();
+    private readonly LibraryScanStore _scans = new();
+    private readonly LibrarySettingsStore _librarySettings = new();
+    private readonly LibraryFileMarksStore _fileMarks = new();
+    private readonly LibraryViewStore _libraryView = new();
 
     public void Dispose()
     {
@@ -35,6 +39,10 @@ public sealed class LibraryScanHandlerTests : IDisposable
         PhysicalHardlinkInspector.Instance,
         _fixture.Jobs,
         new RedownloadRiskChecker(new ArrRedownloadRiskGateway(_fixture.Http)),
+        _scans,
+        _librarySettings,
+        _fileMarks,
+        _libraryView,
         _fixture.Store.Clock,
         NullLogger<LibraryScanHandler>.Instance);
 
@@ -44,7 +52,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
             "VALUES ('Movies library', 'movie', '/downloads/watched', '/downloads/output', '/downloads/work', 1) RETURNING id")), CultureInfo.InvariantCulture);
 
     private Task<long> EnqueueScanAsync(long libraryId) =>
-        _fixture.Store.WithUnitOfWork(async uow => (await LibraryScanStore.RequestScanAsync(uow, _fixture.Jobs, libraryId, "manual")).Id);
+        _fixture.Store.WithUnitOfWork(async uow => (await _scans.RequestScanAsync(uow, _fixture.Jobs, libraryId, "manual")).Id);
 
     /// <summary>Claims, runs and completes one scan job exactly as the real worker would, so its row ends up
     /// <c>completed</c> — <see cref="LibraryScanStore.OutcomeAsync"/> reads the scan time and errors from a completed row.</summary>
@@ -67,7 +75,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
     public async Task A_scan_classifies_files_and_writes_nothing_to_them()
     {
         var library = await LibraryAsync();
-        await _fixture.Db(async uow => { await LibrarySettingsStore.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
+        await _fixture.Db(async uow => { await _librarySettings.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
 
         var matchingPath = _libraryFolder.Join("english-only.mkv");
         var changingPath = _libraryFolder.Join("english-and-japanese.mkv");
@@ -89,7 +97,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
         Assert.Equal(changingBytesBefore, File.ReadAllBytes(changingPath));
         Assert.Equal(changingWriteTimeBefore, File.GetLastWriteTimeUtc(changingPath));
 
-        var files = await _fixture.Db(uow => LibraryScanStore.CurrentFilesAsync(uow, library), commit: false);
+        var files = await _fixture.Db(uow => _scans.CurrentFilesAsync(uow, library), commit: false);
         Assert.Equal(2, files.Count);
         var matching = files.Single(f => f.Path == matchingPath);
         var changing = files.Single(f => f.Path == changingPath);
@@ -108,7 +116,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
     public async Task A_second_scan_reuses_the_cached_probe_for_an_unchanged_file()
     {
         var library = await LibraryAsync();
-        await _fixture.Db(async uow => { await LibrarySettingsStore.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
+        await _fixture.Db(async uow => { await _librarySettings.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
         var path = _libraryFolder.Join("film.mkv");
         await File.WriteAllBytesAsync(path, [1, 2, 3]);
         _media.Probes["film.mkv"] = FakeMediaRunner.EnglishOnly;
@@ -135,9 +143,9 @@ public sealed class LibraryScanHandlerTests : IDisposable
         await RunScanAsync(jobId);
 
         Assert.Empty(_media.Probed);
-        var outcome = await _fixture.Db(async uow => await LibraryScanStore.OutcomeAsync(uow, library, await LibraryScanStore.LatestAsync(uow, library), NullLogger.Instance), commit: false);
+        var outcome = await _fixture.Db(async uow => await _scans.OutcomeAsync(uow, library, await _scans.LatestAsync(uow, library), NullLogger.Instance), commit: false);
         Assert.NotNull(outcome);
-        Assert.Empty(await _fixture.Db(uow => LibraryScanStore.CurrentFilesAsync(uow, library), commit: false));
+        Assert.Empty(await _fixture.Db(uow => _scans.CurrentFilesAsync(uow, library), commit: false));
     }
 
     // --- Scheduled scan and clean --------------------------------------------------------------------
@@ -150,7 +158,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
 
     private async Task<(string Changing, string SetAside)> ScheduledLibraryFilesAsync(long library)
     {
-        await _fixture.Db(async uow => { await LibrarySettingsStore.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], ScheduleEnabled: true)); return true; });
+        await _fixture.Db(async uow => { await _librarySettings.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], ScheduleEnabled: true)); return true; });
         var matching = _libraryFolder.Join("english-only.mkv");
         var changing = _libraryFolder.Join("changing.mkv");
         var setAside = _libraryFolder.Join("set-aside.mkv");
@@ -160,7 +168,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
         _media.Probes["english-only.mkv"] = FakeMediaRunner.EnglishOnly;
         _media.Probes["changing.mkv"] = FakeMediaRunner.EnglishAndJapanese;
         _media.Probes["set-aside.mkv"] = FakeMediaRunner.EnglishAndJapanese;
-        await _fixture.Db(async uow => { await LibraryFileMarksStore.SetLeaveAloneAsync(uow, library, setAside, true, _fixture.Store.Clock.GetUtcNow()); return true; });
+        await _fixture.Db(async uow => { await _fileMarks.SetLeaveAloneAsync(uow, library, setAside, true, _fixture.Store.Clock.GetUtcNow()); return true; });
         return (changing, setAside);
     }
 
@@ -171,7 +179,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var (changing, _) = await ScheduledLibraryFilesAsync(library);
 
         var jobId = await _fixture.Store.WithUnitOfWork(async uow =>
-            (await LibraryScanStore.RequestScanAsync(uow, _fixture.Jobs, library, LibraryModeSchedule.Trigger, _fixture.Store.Clock.GetUtcNow())).Id);
+            (await _scans.RequestScanAsync(uow, _fixture.Jobs, library, LibraryModeSchedule.Trigger, _fixture.Store.Clock.GetUtcNow())).Id);
         await RunScanAsync(jobId);
 
         // The file that matches has nothing to clean and the one set aside is never cleaned; only one clean is queued,
@@ -203,8 +211,8 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var library = await LibraryAsync();
         await ScheduledLibraryFilesAsync(library);
         var jobId = await _fixture.Store.WithUnitOfWork(async uow =>
-            (await LibraryScanStore.RequestScanAsync(uow, _fixture.Jobs, library, LibraryModeSchedule.Trigger, _fixture.Store.Clock.GetUtcNow())).Id);
-        await _fixture.Db(async uow => { await LibrarySettingsStore.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], ScheduleEnabled: false)); return true; });
+            (await _scans.RequestScanAsync(uow, _fixture.Jobs, library, LibraryModeSchedule.Trigger, _fixture.Store.Clock.GetUtcNow())).Id);
+        await _fixture.Db(async uow => { await _librarySettings.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], ScheduleEnabled: false)); return true; });
 
         await RunScanAsync(jobId);
 
@@ -217,7 +225,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
     public async Task A_scan_matches_a_file_to_a_fake_radarr_title_when_the_path_is_shared()
     {
         var library = await LibraryAsync();
-        await _fixture.Db(async uow => { await LibrarySettingsStore.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
+        await _fixture.Db(async uow => { await _librarySettings.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
         await _fixture.AddConnectionAsync("radarr", "Radarr");
 
         var path = _libraryFolder.Join("english-and-japanese.mkv");
@@ -231,7 +239,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var jobId = await EnqueueScanAsync(library);
         await RunScanAsync(jobId);
 
-        var files = await _fixture.Db(uow => LibraryScanStore.CurrentFilesAsync(uow, library), commit: false);
+        var files = await _fixture.Db(uow => _scans.CurrentFilesAsync(uow, library), commit: false);
         var file = files.Single();
         Assert.Equal("radarr", file.ManagerKind);
         Assert.Equal("Blade Runner 2049", file.ManagerTitle);
@@ -250,7 +258,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
     public async Task A_scans_match_data_feeds_a_real_redownload_risk_warning()
     {
         var library = await LibraryAsync();
-        await _fixture.Db(async uow => { await LibrarySettingsStore.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
+        await _fixture.Db(async uow => { await _librarySettings.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
         await _fixture.AddConnectionAsync("radarr", "Radarr");
 
         var path = _libraryFolder.Join("english-and-japanese.mkv");
@@ -264,7 +272,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var jobId = await EnqueueScanAsync(library);
         await RunScanAsync(jobId);
 
-        var files = await _fixture.Db(uow => LibraryScanStore.CurrentFilesAsync(uow, library), commit: false);
+        var files = await _fixture.Db(uow => _scans.CurrentFilesAsync(uow, library), commit: false);
         var file = files.Single();
         Assert.NotNull(file.ManagerConnectionId);
         Assert.Equal(42L, file.ManagerFileId);
@@ -292,7 +300,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
     public async Task A_scan_matches_a_manager_path_by_reverse_translating_its_own_library_root()
     {
         var library = await LibraryAsync();
-        await _fixture.Db(async uow => { await LibrarySettingsStore.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
+        await _fixture.Db(async uow => { await _librarySettings.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
         await _fixture.AddConnectionAsync("radarr", "Radarr");
 
         Directory.CreateDirectory(_libraryFolder.Join("Blade Runner 2049 (2017)"));
@@ -310,7 +318,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var jobId = await EnqueueScanAsync(library);
         await RunScanAsync(jobId);
 
-        var files = await _fixture.Db(uow => LibraryScanStore.CurrentFilesAsync(uow, library), commit: false);
+        var files = await _fixture.Db(uow => _scans.CurrentFilesAsync(uow, library), commit: false);
         var file = files.Single();
         Assert.Equal("radarr", file.ManagerKind);
         Assert.Equal("Blade Runner 2049", file.ManagerTitle);
@@ -320,7 +328,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
     public async Task An_unreachable_manager_is_recorded_as_a_scan_error_and_the_file_stays_unmatched()
     {
         var library = await LibraryAsync();
-        await _fixture.Db(async uow => { await LibrarySettingsStore.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
+        await _fixture.Db(async uow => { await _librarySettings.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
         await _fixture.AddConnectionAsync("radarr", "Radarr");
         // No /api/v3/movie route is scripted: the fake HTTP client refuses the connection, which the manager
         // adapter reports as SignalStatus.Unreachable rather than throwing out of ListLibraryFilesAsync.
@@ -332,11 +340,11 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var jobId = await EnqueueScanAsync(library);
         await RunScanAsync(jobId);
 
-        var files = await _fixture.Db(uow => LibraryScanStore.CurrentFilesAsync(uow, library), commit: false);
+        var files = await _fixture.Db(uow => _scans.CurrentFilesAsync(uow, library), commit: false);
         var file = files.Single();
         Assert.Null(file.ManagerKind);
         Assert.Null(file.ManagerTitle);
-        var outcome = await _fixture.Db(async uow => await LibraryScanStore.OutcomeAsync(uow, library, await LibraryScanStore.LatestAsync(uow, library), NullLogger.Instance), commit: false);
+        var outcome = await _fixture.Db(async uow => await _scans.OutcomeAsync(uow, library, await _scans.LatestAsync(uow, library), NullLogger.Instance), commit: false);
         Assert.Single(outcome!.Errors);
         Assert.Contains("Radarr", outcome.Errors[0], StringComparison.Ordinal);
     }

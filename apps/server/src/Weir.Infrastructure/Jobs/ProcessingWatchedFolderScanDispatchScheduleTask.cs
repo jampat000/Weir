@@ -27,6 +27,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
     private readonly SqliteDatabase _database;
     private readonly WeirOptions _options;
     private readonly ProcessingJobStore _jobStore;
+    private readonly OperatorSettingsStore _operatorSettings;
     private readonly TimeProvider _time;
     private readonly ILogger<ProcessingWatchedFolderScanDispatchScheduleTask> _logger;
     private readonly Dictionary<long, DateTimeOffset> _nextRunByLibrary = [];
@@ -38,6 +39,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
         SqliteDatabase database,
         WeirOptions options,
         ProcessingJobStore jobStore,
+        OperatorSettingsStore operatorSettings,
         TimeProvider time,
         ILogger<ProcessingWatchedFolderScanDispatchScheduleTask> logger,
         ScanWakeups? wakeups = null,
@@ -48,6 +50,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _jobStore = jobStore ?? throw new ArgumentNullException(nameof(jobStore));
+        _operatorSettings = operatorSettings ?? throw new ArgumentNullException(nameof(operatorSettings));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -170,7 +173,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
         var libraries = (await LibraryStore.ListAsync(uow, enabledOnly: true).ConfigureAwait(false))
             .Where(ScanDispatchScheduleGateEnabled)
             .ToList();
-        var operatorSettings = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        var operatorSettings = await _operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
         // Release any write lock EnsureAsync took creating the singleton row on first run: the enqueue
         // below opens its own connection through ProcessingJobStore, and SQLite allows only one writer.
         await uow.CommitAsync().ConfigureAwait(false);

@@ -26,12 +26,15 @@ namespace Weir.Infrastructure.Jobs;
 public sealed partial class UnclaimedHandbackCleanupHandler : IJobHandler
 {
     private readonly ProcessingJobStore _store;
+    private readonly OperatorSettingsStore _operatorSettings;
     private readonly TimeProvider _time;
     private readonly ILogger<UnclaimedHandbackCleanupHandler> _logger;
 
-    public UnclaimedHandbackCleanupHandler(ProcessingJobStore store, TimeProvider time, ILogger<UnclaimedHandbackCleanupHandler> logger)
+    public UnclaimedHandbackCleanupHandler(
+        ProcessingJobStore store, OperatorSettingsStore operatorSettings, TimeProvider time, ILogger<UnclaimedHandbackCleanupHandler> logger)
     {
         _store = store;
+        _operatorSettings = operatorSettings;
         _time = time;
         _logger = logger;
     }
@@ -50,7 +53,7 @@ public sealed partial class UnclaimedHandbackCleanupHandler : IJobHandler
         var read = await Sqlite.UnitOfWork.OpenAsync(_store.Database, cancellationToken).ConfigureAwait(false);
         await using (read.ConfigureAwait(false))
         {
-            var settings = await OperatorSettingsStore.GetAsync(read).ConfigureAwait(false);
+            var settings = await _operatorSettings.GetAsync(read).ConfigureAwait(false);
             days = OperatorSettingsRules.ClampUnclaimedHandbackWindowDays(settings?.UnclaimedHandbackWindowDays ?? HandbackRules.DefaultUnclaimedWindowDays);
             rows = await HandbackStore.UnclaimedAsync(read, scope, _time.GetUtcNow() - TimeSpan.FromDays(days)).ConfigureAwait(false);
         }

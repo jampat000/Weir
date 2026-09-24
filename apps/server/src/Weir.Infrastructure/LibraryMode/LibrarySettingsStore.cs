@@ -9,10 +9,10 @@ namespace Weir.Infrastructure.LibraryMode;
 /// plus the <c>library_folders</c> table, rather than a <c>jobs</c> row that job-row retention could prune
 /// (#557, migration 0038_library_mode_settings).
 /// </summary>
-public static class LibrarySettingsStore
+public sealed class LibrarySettingsStore
 {
     /// <summary>Every library folder configured on any library, de-duplicated — for the #506 startup sweep's folder-walk fallback.</summary>
-    public static async Task<IReadOnlyList<string>> AllFoldersAsync(UnitOfWork uow)
+    public async Task<IReadOnlyList<string>> AllFoldersAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var rows = await uow.QueryAsync(
@@ -21,7 +21,7 @@ public static class LibrarySettingsStore
         return rows.Distinct(StringComparer.Ordinal).ToList();
     }
 
-    public static async Task<LibrarySettings> GetAsync(UnitOfWork uow, long libraryId)
+    public async Task<LibrarySettings> GetAsync(UnitOfWork uow, long libraryId)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var rows = await uow.QueryAsync(
@@ -46,7 +46,7 @@ public static class LibrarySettingsStore
             row.KeepOriginalAfterClean, row.OriginalsFolder);
     }
 
-    public static async Task SetAsync(UnitOfWork uow, long libraryId, LibrarySettings settings)
+    public async Task SetAsync(UnitOfWork uow, long libraryId, LibrarySettings settings)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(settings);
@@ -72,7 +72,7 @@ public static class LibrarySettingsStore
 
     /// <summary>Removes a library's scan-history rows (the library itself is being deleted; its settings and folder
     /// rows go with it automatically — <c>library_folders</c>/<c>library_files</c> both cascade from <c>libraries</c>).</summary>
-    public static async Task DeleteAllForLibraryAsync(UnitOfWork uow, long libraryId)
+    public async Task DeleteAllForLibraryAsync(UnitOfWork uow, long libraryId)
     {
         ArgumentNullException.ThrowIfNull(uow);
         await uow.ExecuteAsync(

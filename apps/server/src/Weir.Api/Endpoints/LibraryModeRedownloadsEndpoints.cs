@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
@@ -22,9 +23,28 @@ public static class LibraryModeRedownloadsEndpoints
 {
     public static IEndpointRouteBuilder MapLibraryModeRedownloadsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/processing/libraries/{library_id}/library-redownloads", GetRedownloadsAsync);
-        endpoints.MapV1("POST", "/processing/libraries/{library_id}/library-redownloads", PostRedownloadAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<LibraryModeRedownloadsEndpointHandlers>();
+        endpoints.MapV1("GET", "/processing/libraries/{library_id}/library-redownloads", handlers.GetRedownloadsAsync);
+        endpoints.MapV1("POST", "/processing/libraries/{library_id}/library-redownloads", handlers.PostRedownloadAsync);
         return endpoints;
+    }
+}
+
+/// <summary>Handlers for <see cref="LibraryModeRedownloadsEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class LibraryModeRedownloadsEndpointHandlers
+{
+    private readonly LibraryScanStore _scans;
+    private readonly IRemovedTrackStore _removedTrackStore;
+    private readonly MediaManagerConnectionService _connections;
+    private readonly IManagerRedownload _redownload;
+
+    public LibraryModeRedownloadsEndpointHandlers(
+        LibraryScanStore scans, IRemovedTrackStore removedTrackStore, MediaManagerConnectionService connections, IManagerRedownload redownload)
+    {
+        _scans = scans ?? throw new ArgumentNullException(nameof(scans));
+        _removedTrackStore = removedTrackStore ?? throw new ArgumentNullException(nameof(removedTrackStore));
+        _connections = connections ?? throw new ArgumentNullException(nameof(connections));
+        _redownload = redownload ?? throw new ArgumentNullException(nameof(redownload));
     }
 
     private static WireObject RemovedTrackOut(RemovedTrackRecord track) => new WireObject()
@@ -41,7 +61,7 @@ public static class LibraryModeRedownloadsEndpoints
     /// (<see cref="ManagerRedownloadRules.CanRedownload"/>): true only for a manager kind issue #509 verified
     /// (Sonarr/Radarr) <em>and</em> a file #551's title matching actually resolved to one of that manager's titles.
     /// </summary>
-    private static async Task<ApiResult> GetRedownloadsAsync(ApiRequest request)
+    public async Task<ApiResult> GetRedownloadsAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -52,12 +72,11 @@ public static class LibraryModeRedownloadsEndpoints
         var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
         var rules = await LibraryModeMapping.RulesForAsync(uow, library).ConfigureAwait(false);
 
-        var removedTrackStore = request.Service<IRemovedTrackStore>();
-        var allRemoved = await removedTrackStore.GetAllAsync().ConfigureAwait(false);
+        var allRemoved = await _removedTrackStore.GetAllAsync().ConfigureAwait(false);
         var forLibrary = allRemoved.Where(kv => kv.Key.LibraryId == libraryId).ToDictionary(kv => kv.Key, kv => kv.Value);
         var affected = RemovedTrackDiff.AffectedFiles(rules, forLibrary);
 
-        var scannedByPath = await LibraryScanStore.FilesAtPathsAsync(uow, libraryId, affected.Select(result => result.File.RelativePath)).ConfigureAwait(false);
+        var scannedByPath = await _scans.FilesAtPathsAsync(uow, libraryId, affected.Select(result => result.File.RelativePath)).ConfigureAwait(false);
 
         var items = affected.Select(result =>
         {
@@ -94,7 +113,7 @@ public static class LibraryModeRedownloadsEndpoints
     /// file was cleaned by hand between the two), and <c>"failed"</c> when the manager call itself throws before
     /// committing to anything destructive (a network problem, not a data-safety one).
     /// </summary>
-    private static async Task<ApiResult> PostRedownloadAsync(ApiRequest request)
+    public async Task<ApiResult> PostRedownloadAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -116,7 +135,7 @@ public static class LibraryModeRedownloadsEndpoints
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
-        var scanned = (await LibraryScanStore.FilesAtPathsAsync(uow, libraryId, [path!]).ConfigureAwait(false)).GetValueOrDefault(path!);
+        var scanned = (await _scans.FilesAtPathsAsync(uow, libraryId, [path!]).ConfigureAwait(false)).GetValueOrDefault(path!);
 
         if (!ManagerRedownloadRules.CanRedownload(scanned?.ManagerKind, scanned?.ManagerConnectionId, scanned?.ManagerTitleId))
         {
@@ -124,8 +143,8 @@ public static class LibraryModeRedownloadsEndpoints
             return ApiRoutes.Ok(new WireObject().Set("path", path).Set("outcome", "unsupported").Set("message", ManagerRedownloadRules.NoManagerMessage));
         }
 
-        var connections = await request.Service<MediaManagerConnectionService>().ConnectionsByIdAsync(uow, [scanned!.ManagerConnectionId!.Value]).ConfigureAwait(false);
-        var connection = connections.FirstOrDefault();
+        var resolvedConnections = await _connections.ConnectionsByIdAsync(uow, [scanned!.ManagerConnectionId!.Value]).ConfigureAwait(false);
+        var connection = resolvedConnections.FirstOrDefault();
         await request.CommitAsync().ConfigureAwait(false);
         if (connection is null)
         {
@@ -135,7 +154,7 @@ public static class LibraryModeRedownloadsEndpoints
         RedownloadResult result;
         try
         {
-            result = await request.Service<IManagerRedownload>()
+            result = await _redownload
                 .RequestRedownloadAsync(connection, library.MediaType, scanned.ManagerTitleId!, path, request.Context.RequestAborted)
                 .ConfigureAwait(false);
         }

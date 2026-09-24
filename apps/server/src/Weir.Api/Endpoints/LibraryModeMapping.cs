@@ -38,10 +38,10 @@ internal static class LibraryModeMapping
     /// The scan's own state for the header: which job, what it is doing, when it last finished and anything it
     /// could not do. <c>running</c> is what the "Scan now" button and its progress read.
     /// </summary>
-    internal static async Task<WireValue> ScanOutAsync(UnitOfWork uow, long libraryId, ILogger logger)
+    internal static async Task<WireValue> ScanOutAsync(UnitOfWork uow, LibraryScanStore scans, long libraryId, ILogger logger)
     {
-        var latest = await LibraryScanStore.LatestAsync(uow, libraryId).ConfigureAwait(false);
-        var outcome = await LibraryScanStore.OutcomeAsync(uow, libraryId, latest, logger).ConfigureAwait(false);
+        var latest = await scans.LatestAsync(uow, libraryId).ConfigureAwait(false);
+        var outcome = await scans.OutcomeAsync(uow, libraryId, latest, logger).ConfigureAwait(false);
         if (latest is null)
         {
             return outcome is null
