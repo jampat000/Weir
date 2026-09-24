@@ -138,16 +138,157 @@ public static class LibraryRules
         descendant.StartsWith(ancestor, StringComparison.Ordinal) &&
         (ancestor == "/" || descendant[ancestor.Length] == '/');
 
+    /// <summary>The Linux directories a watched, work, output or library folder may never be, or be inside.</summary>
+    private static readonly string[] LinuxReservedRoots =
+        ["/etc", "/usr", "/bin", "/sbin", "/boot", "/proc", "/sys", "/dev", "/var/lib"];
+
+    /// <summary>
+    /// A folder a library create/update/restore is about to save: must be absolute, may not contain a
+    /// <c>..</c> segment, and may not be a drive or filesystem root, Weir's own data folder, a Windows
+    /// system folder, or one of a fixed list of Linux system folders. Applied only to the folder being
+    /// saved right now, so a library already pointing at such a folder from before this rule existed
+    /// keeps working until it is next saved.
+    /// </summary>
+    /// <param name="label">What the folder is for, used in the exception message ("watched", "output", ...).</param>
+    /// <param name="raw">The folder path as given; empty or whitespace is a no-op.</param>
+    /// <param name="weirHome">Weir's own data folder; null skips that one check.</param>
+    public static void ValidateFolderPath(string label, string? raw, string? weirHome = null)
+    {
+        var text = (raw ?? string.Empty).Trim();
+        if (text.Length == 0)
+        {
+            return;
+        }
+
+        if (HasParentSegment(text))
+        {
+            throw new ProcessingLibraryException($"The {label} folder can't contain a '..' segment. Enter the folder's full path instead.");
+        }
+
+        if (!LooksAbsolute(text))
+        {
+            throw new ProcessingLibraryException($"The {label} folder must be an absolute path.");
+        }
+
+        var windows = LooksLikeWindowsPath(text);
+        var full = MediaToolLocations.Normalize(text, windows);
+        RejectReservedFolder(label, full, windows, weirHome);
+    }
+
+    /// <summary>A path segment equal to <c>..</c>, under either separator style.</summary>
+    private static bool HasParentSegment(string text) =>
+        text.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries).Any(segment => segment == "..");
+
+    /// <summary>A Unix root, a Windows drive-letter path, or a rooted/UNC path starting with a backslash.</summary>
+    private static bool LooksAbsolute(string text) =>
+        text.StartsWith('/') || text.StartsWith('\\') ||
+        (text.Length >= 3 && char.IsAsciiLetter(text[0]) && text[1] == ':' && (text[2] == '\\' || text[2] == '/'));
+
+    /// <summary>A drive-letter or backslash-rooted path is Windows-form; everything else is Unix-form.</summary>
+    private static bool LooksLikeWindowsPath(string text) =>
+        text.StartsWith('\\') || (text.Length >= 2 && char.IsAsciiLetter(text[0]) && text[1] == ':');
+
+    private static void RejectReservedFolder(string label, string fullPath, bool windows, string? weirHome)
+    {
+        if (IsDriveOrFilesystemRoot(fullPath, windows))
+        {
+            throw new ProcessingLibraryException($"Weir can't use the root of a drive as a {label} folder. Choose a folder inside it.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(weirHome) && IsSameOrInside(fullPath, MediaToolLocations.Normalize(weirHome.Trim(), windows), windows))
+        {
+            throw new ProcessingLibraryException($"Weir can't use its own data folder as a {label} folder. Choose a different folder.");
+        }
+
+        if (windows)
+        {
+            foreach (var special in WindowsReservedRoots())
+            {
+                if (IsSameOrInside(fullPath, special, windows))
+                {
+                    throw new ProcessingLibraryException($"Weir can't use a Windows system folder as a {label} folder. Choose a folder outside it.");
+                }
+            }
+
+            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (!string.IsNullOrEmpty(userProfile) && PathsEqual(fullPath, MediaToolLocations.Normalize(userProfile, windows), windows))
+            {
+                throw new ProcessingLibraryException($"Weir can't use your whole user profile folder as a {label} folder. Choose a folder inside it.");
+            }
+        }
+        else
+        {
+            foreach (var reserved in LinuxReservedRoots)
+            {
+                if (IsSameOrInside(fullPath, reserved, windows))
+                {
+                    throw new ProcessingLibraryException($"Weir can't use a system folder as a {label} folder. Choose a folder outside it.");
+                }
+            }
+        }
+    }
+
+    private static bool IsDriveOrFilesystemRoot(string fullPath, bool windows)
+    {
+        if (!windows)
+        {
+            return fullPath == "/";
+        }
+
+        var trimmed = fullPath.TrimEnd('\\');
+        return trimmed.Length == 2 && char.IsAsciiLetter(trimmed[0]) && trimmed[1] == ':';
+    }
+
+    private static bool PathsEqual(string a, string b, bool windows) =>
+        string.Equals(a, b, windows ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+
+    /// <summary>Whether <paramref name="fullPath"/> is <paramref name="reserved"/> itself or a folder inside it.</summary>
+    private static bool IsSameOrInside(string fullPath, string reserved, bool windows)
+    {
+        var trimmedReserved = reserved.TrimEnd('\\', '/');
+        if (PathsEqual(fullPath, trimmedReserved, windows))
+        {
+            return true;
+        }
+
+        var withSeparator = trimmedReserved + (windows ? '\\' : '/');
+        return fullPath.StartsWith(withSeparator, windows ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+    }
+
+    /// <summary>The Windows directory and both Program Files folders, normalized; empty (non-Windows host) entries are skipped.</summary>
+    private static IEnumerable<string> WindowsReservedRoots()
+    {
+        foreach (var folder in new[] { Environment.SpecialFolder.Windows, Environment.SpecialFolder.ProgramFiles, Environment.SpecialFolder.ProgramFilesX86 })
+        {
+            var path = Environment.GetFolderPath(folder);
+            if (!string.IsNullOrEmpty(path))
+            {
+                yield return MediaToolLocations.Normalize(path, windows: true);
+            }
+        }
+    }
+
     /// <summary>
     /// A library's own three folders must be distinct, and its watched/output
     /// folders must not overlap any other library's watched/output folders.
     /// </summary>
+    /// <param name="watchedFolder">The library's watched folder, or empty/null when unset.</param>
+    /// <param name="workFolder">The library's work folder, or empty/null when unset.</param>
+    /// <param name="outputFolder">The library's output folder, or empty/null when unset.</param>
+    /// <param name="others">Every other library's watched/output folders, for the overlap check.</param>
+    /// <param name="weirHome">Weir's own data folder, refused as a library folder (see
+    /// <see cref="ValidateFolderPath"/>); null skips that one check, for callers that don't have it.</param>
     public static void ValidateFolders(
         string? watchedFolder,
         string? workFolder,
         string? outputFolder,
-        IReadOnlyList<OtherLibraryFolders> others)
+        IReadOnlyList<OtherLibraryFolders> others,
+        string? weirHome = null)
     {
+        ValidateFolderPath("watched", watchedFolder, weirHome);
+        ValidateFolderPath("work", workFolder, weirHome);
+        ValidateFolderPath("output", outputFolder, weirHome);
+
         var watched = NormalizeFolder(watchedFolder);
         var work = NormalizeFolder(workFolder);
         var output = NormalizeFolder(outputFolder);
@@ -186,6 +327,30 @@ public static class LibraryRules
                     }
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// The closed enumerations a create/update request already validates at the HTTP boundary
+    /// (<c>BodyModel.Literal</c>, in <c>ProcessingLibraryEndpoints.ReadLibraryBody</c>). Restoring a
+    /// configuration bundle writes rows directly rather than going through that endpoint, so it calls
+    /// this instead, against the same allowed-value lists, to get the same guarantee.
+    /// </summary>
+    public static void ValidateEnums(ProcessingLibraryInput body)
+    {
+        RequireOneOf("rejected file action", body.RejectedFileAction, RejectedFileActions.All);
+        RequireOneOf("output collision policy", body.OutputCollisionPolicy, OutputCollisionPolicies.All);
+        RequireOneOf("hardware decode mode", body.HardwareDecodeMode, HardwareDecodeModes.All);
+        RequireOneOf("ffmpeg strictness level", body.FfmpegStrictness, FfmpegStrictnessLevels.All);
+        RequireOneOf("remux writer", body.RemuxWriter, RemuxWriterChoice.All);
+        RequireOneOf("failure policy", body.FailurePolicy, ProcessingFailurePolicies.All);
+    }
+
+    private static void RequireOneOf(string label, string value, IReadOnlyList<string> allowed)
+    {
+        if (!allowed.Contains(value, StringComparer.Ordinal))
+        {
+            throw new ProcessingLibraryException($"'{value}' is not a valid {label}. Use one of: {string.Join(", ", allowed)}.");
         }
     }
 

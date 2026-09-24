@@ -123,6 +123,30 @@ def test_an_unknown_media_type_is_refused(operator) -> None:
     assert r.status_code == 422
 
 
+def test_a_relative_watched_folder_is_refused(operator) -> None:
+    r = _create(operator, watched_folder="relative/path")
+    assert r.status_code == 400, r.text
+    assert "absolute" in r.json()["detail"]
+
+
+def test_a_parent_segment_in_a_folder_is_refused(operator) -> None:
+    r = _create(operator, watched_folder="/srv/4k/../escape")
+    assert r.status_code == 400, r.text
+    assert ".." in r.json()["detail"]
+
+
+def test_the_filesystem_root_cannot_be_a_watched_folder(operator) -> None:
+    r = _create(operator, watched_folder="/", output_folder="/srv/4k/out")
+    assert r.status_code == 400, r.text
+    assert "root of a drive" in r.json()["detail"]
+
+
+def test_a_linux_system_folder_cannot_be_a_watched_folder(operator) -> None:
+    r = _create(operator, watched_folder="/etc", output_folder="/srv/4k/out")
+    assert r.status_code == 400, r.text
+    assert "system folder" in r.json()["detail"]
+
+
 def test_linking_a_manager_connection_that_does_not_exist_is_refused(operator) -> None:
     r = _create(operator, manager_connection_ids=[4242])
     assert r.status_code == 400

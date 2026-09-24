@@ -110,9 +110,13 @@ public static class LibraryFolderRules
     /// Normalizes, de-duplicates and validates that none of <paramref name="folders"/> overlaps the library's own
     /// watched/work/output folders or each other. Overlap with another library's folders is not checked here: library folders
     /// may deliberately be the same folders a media manager (or another Weir library) already watches — #505 says so
-    /// explicitly ("These may be the same folders a manager uses, or not").
+    /// explicitly ("These may be the same folders a manager uses, or not"). Each folder also goes through
+    /// <see cref="LibraryRules.ValidateFolderPath"/>: absolute, no <c>..</c> segment, not a reserved system folder.
     /// </summary>
-    public static IReadOnlyList<string> Validate(IReadOnlyList<string> folders, ProcessingLibraryRecord library)
+    /// <param name="folders">The library folders an operator submitted.</param>
+    /// <param name="library">The library they belong to, for the watched/work/output overlap check.</param>
+    /// <param name="weirHome">Weir's own data folder, passed through to <see cref="LibraryRules.ValidateFolderPath"/>.</param>
+    public static IReadOnlyList<string> Validate(IReadOnlyList<string> folders, ProcessingLibraryRecord library, string? weirHome = null)
     {
         ArgumentNullException.ThrowIfNull(folders);
         ArgumentNullException.ThrowIfNull(library);
@@ -121,6 +125,15 @@ public static class LibraryFolderRules
         var result = new List<string>();
         foreach (var folder in trimmed)
         {
+            try
+            {
+                LibraryRules.ValidateFolderPath("library", folder, weirHome);
+            }
+            catch (ProcessingLibraryException exception)
+            {
+                throw new LibraryModeException(exception.Message);
+            }
+
             var normalized = LibraryRules.NormalizeFolder(folder);
             if (normalized is null || !normalizedSeen.Add(normalized))
             {

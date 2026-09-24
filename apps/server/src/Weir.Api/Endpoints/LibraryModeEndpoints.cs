@@ -88,7 +88,7 @@ public static class LibraryModeEndpoints
         IReadOnlyList<string> validated;
         try
         {
-            validated = LibraryFolderRules.Validate(folders, library);
+            validated = LibraryFolderRules.Validate(folders, library, request.Options.WeirHome);
         }
         catch (LibraryModeException exception)
         {
