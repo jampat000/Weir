@@ -19,12 +19,12 @@ public static partial class ManagerSetupRules
     /// v3 API and in Radarr). Kept in the manager's own order: the first mapping that matches wins
     /// (<c>RemotePathMappingService.cs</c> L139-148).
     /// </summary>
-    public static List<RemotePathMappingEntry> ParseMappings(PyJson? payload) =>
-        [.. PyValues.Dicts(payload)
+    public static List<RemotePathMappingEntry> ParseMappings(WireValue? payload) =>
+        [.. ManagerValues.Dicts(payload)
             .Select(row => new RemotePathMappingEntry(
-                PyValues.FirstText(row, "host") ?? string.Empty,
-                PyValues.FirstText(row, "remotePath") ?? string.Empty,
-                PyValues.FirstText(row, "localPath") ?? string.Empty))
+                ManagerValues.FirstText(row, "host") ?? string.Empty,
+                ManagerValues.FirstText(row, "remotePath") ?? string.Empty,
+                ManagerValues.FirstText(row, "localPath") ?? string.Empty))
             .Where(mapping => mapping.RemotePath.Length > 0)];
 
     /// <summary>
@@ -34,25 +34,25 @@ public static partial class ManagerSetupRules
     /// <c>tvCategory</c> in Sonarr and <c>movieCategory</c> in Radarr; a directory, when a client has one, is
     /// <c>tvDirectory</c>/<c>movieDirectory</c> (Transmission, rTorrent) or Deluge's <c>completedDirectory</c>.
     /// </summary>
-    public static List<ArrDownloadClientEntry> ParseDownloadClients(PyJson? payload, string mediaScope)
+    public static List<ArrDownloadClientEntry> ParseDownloadClients(WireValue? payload, string mediaScope)
     {
         var categoryField = mediaScope == MediaManagerKinds.Tv ? "tvCategory" : "movieCategory";
         var directoryField = mediaScope == MediaManagerKinds.Tv ? "tvDirectory" : "movieDirectory";
         var clients = new List<ArrDownloadClientEntry>();
-        foreach (var row in PyValues.Dicts(payload))
+        foreach (var row in ManagerValues.Dicts(payload))
         {
-            var fields = PyValues.Dicts(row.Get("fields"))
-                .Where(field => PyValues.Text(field.Get("name")) is not null)
-                .GroupBy(field => PyValues.Text(field.Get("name"))!, StringComparer.Ordinal)
-                .ToDictionary(group => group.Key, group => PyValues.Text(group.First().Get("value")), StringComparer.Ordinal);
+            var fields = ManagerValues.Dicts(row.Get("fields"))
+                .Where(field => ManagerValues.Text(field.Get("name")) is not null)
+                .GroupBy(field => ManagerValues.Text(field.Get("name"))!, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => ManagerValues.Text(group.First().Get("value")), StringComparer.Ordinal);
             clients.Add(new ArrDownloadClientEntry(
-                PyValues.FirstText(row, "name") ?? PyValues.FirstText(row, "implementationName") ?? "Download client",
-                PyValues.FirstText(row, "implementation") ?? string.Empty,
-                row.Get("enable") is not PyBool { Value: false },
+                ManagerValues.FirstText(row, "name") ?? ManagerValues.FirstText(row, "implementationName") ?? "Download client",
+                ManagerValues.FirstText(row, "implementation") ?? string.Empty,
+                row.Get("enable") is not WireBool { Value: false },
                 fields.GetValueOrDefault("host"),
                 fields.GetValueOrDefault(categoryField),
                 fields.GetValueOrDefault(directoryField) ?? fields.GetValueOrDefault("completedDirectory"),
-                PyValues.FirstText(row, "protocol")));
+                ManagerValues.FirstText(row, "protocol")));
         }
 
         return clients;
@@ -79,10 +79,10 @@ public static partial class ManagerSetupRules
         ArgumentNullException.ThrowIfNull(mappings);
         ArgumentNullException.ThrowIfNull(clients);
         var lines = new List<SetupCheckLine>();
-        var watched = new ArrOsPath(PyStrings.Strip(watchedFolder ?? string.Empty));
-        var output = new ArrOsPath(PyStrings.Strip(outputFolder ?? string.Empty));
+        var watched = new ArrOsPath(WireStrings.Strip(watchedFolder ?? string.Empty));
+        var output = new ArrOsPath(WireStrings.Strip(outputFolder ?? string.Empty));
         var enabled = clients.Where(client => client.Enabled).ToList();
-        var hosts = enabled.Select(client => PyStrings.Strip(client.Host ?? string.Empty))
+        var hosts = enabled.Select(client => WireStrings.Strip(client.Host ?? string.Empty))
             .Where(host => host.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -135,7 +135,7 @@ public static partial class ManagerSetupRules
     /// </summary>
     private static IEnumerable<SetupCheckLine> QueueLines(string managerLabel, ArrOsPath watched, ArrOsPath output, IReadOnlyList<string> queueOutputPaths)
     {
-        var paths = queueOutputPaths.Select(path => new ArrOsPath(PyStrings.Strip(path))).Where(path => path.IsRooted).ToList();
+        var paths = queueOutputPaths.Select(path => new ArrOsPath(WireStrings.Strip(path))).Where(path => path.IsRooted).ToList();
         var unmapped = paths.FirstOrDefault(path => watched.Contains(path) && !output.Contains(path));
         if (unmapped.Text is not null)
         {
@@ -163,7 +163,7 @@ public static partial class ManagerSetupRules
         var touching = mappings
             .Where(mapping => new ArrOsPath(mapping.RemotePath) is var remote && (remote.Contains(watched) || watched.Contains(remote)))
             .ToList();
-        var forClient = touching.Where(mapping => hosts.Contains(PyStrings.Strip(mapping.Host), StringComparer.InvariantCultureIgnoreCase)).ToList();
+        var forClient = touching.Where(mapping => hosts.Contains(WireStrings.Strip(mapping.Host), StringComparer.InvariantCultureIgnoreCase)).ToList();
 
         if (forClient.Count == 0)
         {
@@ -183,14 +183,14 @@ public static partial class ManagerSetupRules
             yield break;
         }
 
-        foreach (var host in hosts.Where(host => !forClient.Any(mapping => string.Equals(PyStrings.Strip(mapping.Host), host, StringComparison.InvariantCultureIgnoreCase))))
+        foreach (var host in hosts.Where(host => !forClient.Any(mapping => string.Equals(WireStrings.Strip(mapping.Host), host, StringComparison.InvariantCultureIgnoreCase))))
         {
             yield return new SetupCheckLine(
                 SetupCheckLine.Problem,
                 $"The download client at \"{host}\" has no mapping for {watched} — add the same mapping with Host \"{host}\".");
         }
 
-        foreach (var mapping in forClient.GroupBy(mapping => PyStrings.Strip(mapping.Host), StringComparer.InvariantCultureIgnoreCase).Select(group => group.First()))
+        foreach (var mapping in forClient.GroupBy(mapping => WireStrings.Strip(mapping.Host), StringComparer.InvariantCultureIgnoreCase).Select(group => group.First()))
         {
             var remote = new ArrOsPath(mapping.RemotePath);
             var local = new ArrOsPath(mapping.LocalPath);
@@ -218,7 +218,7 @@ public static partial class ManagerSetupRules
     {
         foreach (var client in clients)
         {
-            var directory = PyStrings.Strip(client.Directory ?? string.Empty);
+            var directory = WireStrings.Strip(client.Directory ?? string.Empty);
             if (directory.Length > 0 && new ArrOsPath(directory) is var folder && folder.IsRooted)
             {
                 yield return watched.Contains(folder)
@@ -230,7 +230,7 @@ public static partial class ManagerSetupRules
                 continue;
             }
 
-            var category = PyStrings.Strip(client.Category ?? string.Empty);
+            var category = WireStrings.Strip(client.Category ?? string.Empty);
             if (category.Length > 0 && !watched.Segments.Contains(category, StringComparer.OrdinalIgnoreCase))
             {
                 yield return new SetupCheckLine(

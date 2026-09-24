@@ -32,7 +32,7 @@ public static partial class RulesPreview
         public bool Forced { get; init; }
         public IReadOnlyList<string> Reasons { get; init; } = [];
 
-        public PyDict ToOut() => new PyDict()
+        public WireObject ToOut() => new WireObject()
             .Set("index", Index)
             .Set("type", Type)
             .Set("codec", Codec)
@@ -42,7 +42,7 @@ public static partial class RulesPreview
             .Set("action", Kept ? "keep" : "drop")
             .Set("default", Default)
             .Set("forced", Forced)
-            .Set("reasons", new PyList(Reasons.Select(r => (PyJson)new PyStr(r))));
+            .Set("reasons", new WireArray(Reasons.Select(r => (WireValue)new WireString(r))));
     }
 
     /// <summary>
@@ -97,7 +97,7 @@ public static partial class RulesPreview
                     isForced = disposition.GetValueOrDefault("forced") != 0;
                     break;
                 case "audio":
-                    channels = Py.TryInt(stream.Get("channels"), out var ch) ? ch : 0;
+                    channels = RulesJson.TryInt(stream.Get("channels"), out var ch) ? ch : 0;
                     kept = keptAudioByIndex.TryGetValue(index, out var audioTrack);
                     isDefault = kept && audioTrack!.Default;
                     isForced = kept ? audioTrack!.Forced : disposition.GetValueOrDefault("forced") != 0;
@@ -231,7 +231,7 @@ public static partial class RulesPreview
     {
         try
         {
-            return Py.Truthy(stream.Get("bit_rate")) ? Py.Int(stream.Get("bit_rate")) : 0;
+            return RulesJson.Truthy(stream.Get("bit_rate")) ? RulesJson.Int(stream.Get("bit_rate")) : 0;
         }
         catch (RulesInputException)
         {

@@ -208,7 +208,7 @@ public sealed class HandbackOutcomes
     private static Task<long> RecordActivityAsync(
         UnitOfWork uow, string manager, string outcome, long? libraryId, string relativePath, string? importedPath, string? reason, bool released, string message, string trigger)
     {
-        var detail = new PyDict()
+        var detail = new WireObject()
             .Set("relative_media_path", relativePath)
             .Set("library_id", libraryId)
             .Set("provider", manager)
@@ -217,7 +217,7 @@ public sealed class HandbackOutcomes
             .Set("reason", reason)
             .Set("released", released)
             .Set("user_message", message)
-            .Set("counts", new PyDict().Set("removed", released ? 1 : 0))
+            .Set("counts", new WireObject().Set("removed", released ? 1 : 0))
             .Set("module", "processing")
             .Set("action", "handback")
             .Set("trigger", trigger)
@@ -226,6 +226,6 @@ public sealed class HandbackOutcomes
             ActivityEventTypes.ProcessingHandbackOutcome,
             "processing",
             HandbackRules.OutcomeTitle(manager, outcome, MediaPathNames.Name(relativePath, OperatingSystem.IsWindows())),
-            PyStrings.Slice(PyJsonWriter.Dumps(detail, PyJsonFormat.Compact), 10_000)));
+            WireStrings.Slice(WireJsonWriter.Dumps(detail, WireJsonFormat.Compact), 10_000)));
     }
 }

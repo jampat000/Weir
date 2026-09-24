@@ -39,8 +39,8 @@ public sealed partial class HandoffLedgerStore
                 SqliteValues.GetString(reader, 2),
                 SqliteValues.GetString(reader, 3),
                 SqliteValues.GetInt64(reader, 4),
-                PythonTimestamps.Parse(reader.GetValue(5)),
-                PythonTimestamps.Parse(reader.GetValue(6))),
+                TimestampColumns.Parse(reader.GetValue(5)),
+                TimestampColumns.Parse(reader.GetValue(6))),
             ("$library", libraryId)).ConfigureAwait(false);
 
         var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
@@ -127,7 +127,7 @@ public sealed partial class HandoffLedgerStore
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(row);
-        var now = PyDateTimeNow();
+        var now = NowToMicroseconds();
         string? liveState = null;
         DateTimeOffset? changedAt = null;
         long? queuePosition = null;
@@ -271,17 +271,17 @@ public sealed partial class HandoffLedgerStore
                 answerState = liveState;
                 lastChanged = changedAt is { } changed && (previous is null || changed > previous) ? changedAt : now;
                 changes.Add(("state", answerState));
-                changes.Add(("last_changed_at", PythonTimestamps.Orm(lastChanged!.Value)));
+                changes.Add(("last_changed_at", TimestampColumns.Orm(lastChanged!.Value)));
             }
             else if (changedAt is { } newer && previous is { } before && newer > before)
             {
                 lastChanged = newer;
-                changes.Add(("last_changed_at", PythonTimestamps.Orm(newer)));
+                changes.Add(("last_changed_at", TimestampColumns.Orm(newer)));
             }
 
             if (message is not null && !HandoffLedgerRules.TerminalStates.Contains(liveState))
             {
-                var sliced = PyStrings.Slice(message, 2000);
+                var sliced = WireStrings.Slice(message, 2000);
                 if (sliced != row.Message)
                 {
                     storedMessage = sliced;
@@ -320,25 +320,25 @@ public sealed partial class HandoffLedgerStore
     /// </summary>
     private static string? PayloadRelativePath(string? payloadJson)
     {
-        PyJson parsed;
+        WireValue parsed;
         try
         {
-            parsed = PyJsonParser.Parse(string.IsNullOrEmpty(payloadJson) ? "{}" : payloadJson);
+            parsed = WireJsonParser.Parse(string.IsNullOrEmpty(payloadJson) ? "{}" : payloadJson);
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
             return null;
         }
 
-        if (parsed is not PyDict dict)
+        if (parsed is not WireObject dict)
         {
             throw new InvalidOperationException("A job's payload is not a JSON object.");
         }
 
-        return dict.Get("relative_media_path") is { IsTruthy: true } value ? PyConvert.Str(value) : string.Empty;
+        return dict.Get("relative_media_path") is { IsTruthy: true } value ? WireConvert.Str(value) : string.Empty;
     }
 
-    private DateTimeOffset PyDateTimeNow() => PyDateTime.TruncateToMicroseconds(_time.GetUtcNow());
+    private DateTimeOffset NowToMicroseconds() => Timestamp.TruncateToMicroseconds(_time.GetUtcNow());
 
     private static DateTimeOffset Min(DateTimeOffset a, DateTimeOffset b) => a <= b ? a : b;
 
@@ -360,13 +360,13 @@ public sealed partial class HandoffLedgerStore
         reader.IsDBNull(3) ? null : reader.GetString(3),
         reader.GetString(4),
         reader.IsDBNull(5) ? null : reader.GetString(5),
-        PythonTimestamps.Parse(reader.GetValue(6)),
+        TimestampColumns.Parse(reader.GetValue(6)),
         (int)reader.GetInt64(7),
         (int)reader.GetInt64(8),
         reader.IsDBNull(9) ? null : reader.GetString(9),
-        PythonTimestamps.Parse(reader.GetValue(10)),
+        TimestampColumns.Parse(reader.GetValue(10)),
         (int)reader.GetInt64(11),
         (int)reader.GetInt64(12),
-        PythonTimestamps.Parse(reader.GetValue(13)) ?? DateTimeOffset.MinValue,
-        PythonTimestamps.Parse(reader.GetValue(14)) ?? DateTimeOffset.MinValue);
+        TimestampColumns.Parse(reader.GetValue(13)) ?? DateTimeOffset.MinValue,
+        TimestampColumns.Parse(reader.GetValue(14)) ?? DateTimeOffset.MinValue);
 }

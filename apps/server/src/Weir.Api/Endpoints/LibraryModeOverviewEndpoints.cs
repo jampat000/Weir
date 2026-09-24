@@ -30,29 +30,29 @@ public static class LibraryModeOverviewEndpoints
     /// cannot run (no library folders, the library switched off, a window that never opens); a run that is due is
     /// reported as now, since the timer starts it within half a minute.
     /// </summary>
-    private static async Task<PyDict> ScheduleOutAsync(
+    private static async Task<WireObject> ScheduleOutAsync(
         UnitOfWork uow, ProcessingLibraryRecord library, LibrarySettings settings, DateTimeOffset now)
     {
         var next = await LibraryModeScheduling.NextRunAsync(uow, library, settings, now).ConfigureAwait(false);
-        return new PyDict()
+        return new WireObject()
             .Set("enabled", settings.ScheduleEnabled)
-            .Set("next_run_at", next is { } at ? PyDateTime.FromDateTimeOffset(at < now ? now : at).PydanticJson() : null);
+            .Set("next_run_at", next is { } at ? Timestamp.FromDateTimeOffset(at < now ? now : at).ToWireText() : null);
     }
 
     /// <summary><c>share</c> is computed here, not in the browser, so every bar in the UI is drawn from one number.</summary>
-    private static PyDict BreakdownRowOut(LibraryBreakdownRow row, long totalFiles) => new PyDict()
+    private static WireObject BreakdownRowOut(LibraryBreakdownRow row, long totalFiles) => new WireObject()
         .Set("value", row.Value)
         .Set("files", row.Files)
         .Set("size_bytes", row.SizeBytes)
         .Set("share", totalFiles > 0 ? Math.Round((double)row.Files / totalFiles, 4) : 0.0);
 
-    private static PyDict ProblemGroupOut(LibraryProblemGroup group) => new PyDict()
+    private static WireObject ProblemGroupOut(LibraryProblemGroup group) => new WireObject()
         .Set("kind", LibraryProblems.Name(group.Kind))
         .Set("title", LibraryProblems.Title(group.Kind))
         .Set("what_to_do", LibraryProblems.WhatToDo(group.Kind))
         .Set("files", group.Files)
         .Set("size_bytes", group.SizeBytes)
-        .Set("sample_paths", new PyList(group.SampleFiles.Select(path => (PyJson)new PyStr(path))));
+        .Set("sample_paths", new WireArray(group.SampleFiles.Select(path => (WireValue)new WireString(path))));
 
     /// <summary>
     /// #568's Overview: what the library holds and how much of it the rules would touch, plus the breakdowns by
@@ -73,21 +73,21 @@ public static class LibraryModeOverviewEndpoints
         var breakdowns = await LibraryViewStore.AllBreakdownsAsync(uow, libraryId).ConfigureAwait(false);
         var problems = await LibraryViewStore.ProblemsAsync(uow, libraryId, settings.CleanHardlinkedFiles).ConfigureAwait(false);
 
-        var breakdownsOut = new PyDict();
+        var breakdownsOut = new WireObject();
         foreach (var facet in LibraryFacets.All)
         {
             var rows = breakdowns.GetValueOrDefault(facet, []);
-            breakdownsOut.Set(facet, new PyList(rows.Select(row => (PyJson)BreakdownRowOut(row, totals.Files))));
+            breakdownsOut.Set(facet, new WireArray(rows.Select(row => (WireValue)BreakdownRowOut(row, totals.Files))));
         }
 
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("library_id", libraryId)
             .Set("folders_configured", settings.Folders.Count)
             .Set("scan", await LibraryModeMapping.ScanOutAsync(uow, libraryId, LibraryModeMapping.Logger(request)).ConfigureAwait(false))
             .Set("schedule", await ScheduleOutAsync(uow, library, settings, request.Time.GetUtcNow()).ConfigureAwait(false))
             .Set("totals", LibraryModeMapping.TotalsOut(totals))
             .Set("breakdowns", breakdownsOut)
-            .Set("problems", new PyList(problems.Select(group => (PyJson)ProblemGroupOut(group)))));
+            .Set("problems", new WireArray(problems.Select(group => (WireValue)ProblemGroupOut(group)))));
     }
 
     /// <summary>#568's Problems view: every reason a file is not something Weir will clean, grouped, with advice.</summary>
@@ -102,10 +102,10 @@ public static class LibraryModeOverviewEndpoints
         await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
         var settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
         var groups = await LibraryViewStore.ProblemsAsync(uow, libraryId, settings.CleanHardlinkedFiles).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("library_id", libraryId)
             .Set("scan", await LibraryModeMapping.ScanOutAsync(uow, libraryId, LibraryModeMapping.Logger(request)).ConfigureAwait(false))
-            .Set("groups", new PyList(groups.Select(group => (PyJson)ProblemGroupOut(group))))
+            .Set("groups", new WireArray(groups.Select(group => (WireValue)ProblemGroupOut(group))))
             .Set("total", groups.Sum(group => group.Files)));
     }
 }

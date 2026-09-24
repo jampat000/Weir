@@ -8,9 +8,9 @@ namespace Weir.Core.Rules;
 public static partial class TrackSorters
 {
     // Whitespace here includes U+001C..U+001F, which .NET's \s does not, so saved sorters keep parsing the same way.
-    private const string PyWhitespace = "[\\t\\n\\x0b\\x0c\\r\x001c-\x001f \x0085\x00a0\x1680\x2000-\x200a\x2028\x2029\x202f\x205f\x3000]";
+    private const string WhitespaceClass = "[\\t\\n\\x0b\\x0c\\r\x001c-\x001f \x0085\x00a0\x1680\x2000-\x200a\x2028\x2029\x202f\x205f\x3000]";
 
-    [GeneratedRegex("^" + PyWhitespace + "*(>=|<=|!=|>|<|=)?" + PyWhitespace + "*(.+?)" + PyWhitespace + "*$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^" + WhitespaceClass + "*(>=|<=|!=|>|<|=)?" + WhitespaceClass + "*(.+?)" + WhitespaceClass + "*$", RegexOptions.CultureInvariant)]
     private static partial Regex ComparisonRegex();
 
     /// <summary>
@@ -19,7 +19,7 @@ public static partial class TrackSorters
     /// </summary>
     internal static double? ParseChannels(string text)
     {
-        var raw = Py.Lower(PyStrings.Strip(text));
+        var raw = RulesJson.Lower(WireStrings.Strip(text));
         if (raw is "mono" or "1.0")
         {
             return 1.0;
@@ -33,12 +33,12 @@ public static partial class TrackSorters
         if (raw.Contains('.', StringComparison.Ordinal))
         {
             var dot = raw.IndexOf('.', StringComparison.Ordinal);
-            var main = Py.TryIntFromText(raw[..dot]);
-            var lfe = Py.TryIntFromText(raw[(dot + 1)..]);
+            var main = RulesJson.TryIntFromText(raw[..dot]);
+            var lfe = RulesJson.TryIntFromText(raw[(dot + 1)..]);
             return main is null || lfe is null ? null : main.Value + lfe.Value;
         }
 
-        return Py.TryIntFromText(raw);
+        return RulesJson.TryIntFromText(raw);
     }
 
     private static bool Compare(object? actual, string op, string expected, string field)
@@ -52,13 +52,13 @@ public static partial class TrackSorters
 
         if (field == "bitrate")
         {
-            var normalized = Py.Lower(PyStrings.Strip(expected)).TrimEnd('k').Replace("_", string.Empty, StringComparison.Ordinal);
-            if (Py.TryFloatFromText(normalized) is not { } wantedNumber)
+            var normalized = RulesJson.Lower(WireStrings.Strip(expected)).TrimEnd('k').Replace("_", string.Empty, StringComparison.Ordinal);
+            if (RulesJson.TryFloatFromText(normalized) is not { } wantedNumber)
             {
                 return false;
             }
 
-            if (Py.Lower(PyStrings.Strip(expected)).EndsWith('k'))
+            if (RulesJson.Lower(WireStrings.Strip(expected)).EndsWith('k'))
             {
                 wantedNumber *= 1000;
             }
@@ -68,14 +68,14 @@ public static partial class TrackSorters
 
         if (field is "default" or "forced" or "commentary")
         {
-            var wantedBool = Py.Lower(PyStrings.Strip(expected)) is "1" or "true" or "yes" or "on";
+            var wantedBool = RulesJson.Lower(WireStrings.Strip(expected)) is "1" or "true" or "yes" or "on";
             var haveBool = Truthy(actual);
             return op == "!=" ? haveBool != wantedBool : haveBool == wantedBool;
         }
 
         // Text compares case-insensitively; title is a containment test.
-        var haveText = Py.Lower(PyStrings.Strip(Truthy(actual) ? Str(actual) : string.Empty));
-        var wantText = Py.Lower(PyStrings.Strip(expected));
+        var haveText = RulesJson.Lower(WireStrings.Strip(Truthy(actual) ? Str(actual) : string.Empty));
+        var wantText = RulesJson.Lower(WireStrings.Strip(expected));
         var matched = field == "title" ? haveText.Contains(wantText, StringComparison.Ordinal) : haveText == wantText;
         return op == "!=" ? !matched : matched;
     }
@@ -95,7 +95,7 @@ public static partial class TrackSorters
         var match = ComparisonRegex().Match(value);
         if (!match.Success)
         {
-            return ("=", PyStrings.Strip(value));
+            return ("=", WireStrings.Strip(value));
         }
 
         return (match.Groups[1].Success ? match.Groups[1].Value : "=", match.Groups[2].Value);
@@ -126,7 +126,7 @@ public static partial class TrackSorters
     {
         long n => n,
         bool b => b ? 1 : 0,
-        string s when s.Length > 0 => Py.IntFromText(s),
+        string s when s.Length > 0 => RulesJson.IntFromText(s),
         _ => 0,
     };
 }

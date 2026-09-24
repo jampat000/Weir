@@ -21,7 +21,7 @@ public static class ManagerKindProfiles
 
     /// <summary>The profile for a kind, case- and whitespace-insensitive.</summary>
     public static ManagerKindProfile? ForKind(string? kind) =>
-        Profiles.GetValueOrDefault(PyStrings.Strip(kind ?? string.Empty).ToLowerInvariant());
+        Profiles.GetValueOrDefault(WireStrings.Strip(kind ?? string.Empty).ToLowerInvariant());
 
     /// <summary>What a kind can do, or null for an unknown kind.</summary>
     public static ManagerCapabilities? CapabilitiesForKind(string? kind) => ForKind(kind)?.Capabilities;

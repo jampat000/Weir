@@ -18,7 +18,7 @@ public sealed record RemuxPassRequest
     public long? MinFileAgeSeconds { get; init; }
     public string? MediaScope { get; init; } = "movie";
     public long? CurrentJobId { get; init; }
-    public Action<PyDict>? ProgressReporter { get; init; }
+    public Action<WireObject>? ProgressReporter { get; init; }
     public long MinInputFileSizeMb { get; init; }
     public long MinimumFreeDiskSpaceMb { get; init; }
     public bool PassThroughUnchanged { get; init; }

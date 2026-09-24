@@ -10,7 +10,7 @@ public static partial class TrackSorters
     /// <summary>Read a stored list. Anything unusable yields the seeded default rather than none.</summary>
     public static IReadOnlyList<TrackSorter> Parse(string? raw)
     {
-        var text = PyStrings.Strip(raw ?? string.Empty);
+        var text = WireStrings.Strip(raw ?? string.Empty);
         if (text.Length == 0)
         {
             return [.. DefaultAudioSorters];
@@ -56,10 +56,10 @@ public static partial class TrackSorters
 
     private static TrackSorter ReadEntry(JsonElement item)
     {
-        var field = Py.Lower(PyStrings.Strip(Py.StrOr(Py.Get(item, "field"), string.Empty)));
-        var value = Py.Get(item, "value");
-        var keptValue = Py.IsStr(value) && PyStrings.Strip(value!.Value.GetString()!).Length > 0 ? value.Value.GetString() : null;
-        return new TrackSorter(field, keptValue, Py.Truthy(Py.Get(item, "reversed")));
+        var field = RulesJson.Lower(WireStrings.Strip(RulesJson.StrOr(RulesJson.Get(item, "field"), string.Empty)));
+        var value = RulesJson.Get(item, "value");
+        var keptValue = RulesJson.IsStr(value) && WireStrings.Strip(value!.Value.GetString()!).Length > 0 ? value.Value.GetString() : null;
+        return new TrackSorter(field, keptValue, RulesJson.Truthy(RulesJson.Get(item, "reversed")));
     }
 
     /// <summary>Compact, ASCII-escaped JSON, byte-identical to the sorter JSON already stored in rule sets.</summary>
@@ -77,7 +77,7 @@ public static partial class TrackSorters
 
             first = false;
             builder.Append("{\"field\":");
-            PyJsonWriter.WriteString(builder, sorter.Field, ensureAscii: true);
+            WireJsonWriter.WriteString(builder, sorter.Field, ensureAscii: true);
             builder.Append(",\"value\":");
             if (sorter.Value is null)
             {
@@ -85,7 +85,7 @@ public static partial class TrackSorters
             }
             else
             {
-                PyJsonWriter.WriteString(builder, sorter.Value, ensureAscii: true);
+                WireJsonWriter.WriteString(builder, sorter.Value, ensureAscii: true);
             }
 
             builder.Append(",\"reversed\":").Append(sorter.Reversed ? "true" : "false").Append('}');
@@ -97,7 +97,7 @@ public static partial class TrackSorters
     /// <summary>Validate a submitted list, refusing rather than silently dropping entries.</summary>
     public static string Validate(string? raw)
     {
-        var text = PyStrings.Strip(raw ?? string.Empty);
+        var text = WireStrings.Strip(raw ?? string.Empty);
         if (text.Length == 0)
         {
             return Dump(DefaultAudioSorters);
@@ -134,7 +134,7 @@ public static partial class TrackSorters
                 if (!Fields.Contains(sorter.Field))
                 {
                     throw new TrackSorterException(
-                        $"Sorter {position} uses an unknown field {Py.Repr(sorter.Field)}. Known fields: {string.Join(", ", Fields)}.");
+                        $"Sorter {position} uses an unknown field {RulesJson.Repr(sorter.Field)}. Known fields: {string.Join(", ", Fields)}.");
                 }
 
                 result.Add(sorter);
@@ -146,7 +146,7 @@ public static partial class TrackSorters
 
     /// <summary>The preset for a policy name, or the seeded default.</summary>
     public static IReadOnlyList<TrackSorter> Preset(string? name) =>
-        Presets.TryGetValue(Py.Lower(PyStrings.Strip(name ?? string.Empty)), out var preset) ? [.. preset] : [.. DefaultAudioSorters];
+        Presets.TryGetValue(RulesJson.Lower(WireStrings.Strip(name ?? string.Empty)), out var preset) ? [.. preset] : [.. DefaultAudioSorters];
 
     /// <summary>A sentence for the selection notes.</summary>
     public static string Describe(IReadOnlyCollection<TrackSorter> sorters)

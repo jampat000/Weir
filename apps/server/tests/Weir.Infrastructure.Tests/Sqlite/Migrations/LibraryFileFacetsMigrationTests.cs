@@ -66,7 +66,7 @@ public sealed class LibraryFileFacetsMigrationTests : IDisposable
     /// <summary>Seeds the completed scan job the <c>0004</c> migration copies into <c>library_files</c>.</summary>
     private void SeedScan(params (string Path, string ProbeJson, string Classification, string? Reason)[] files)
     {
-        var entries = files.Select(file => new PyDictLike(file.Path, file.ProbeJson, file.Classification, file.Reason).ToJson());
+        var entries = files.Select(file => new ScanFileEntry(file.Path, file.ProbeJson, file.Classification, file.Reason).ToJson());
         Execute(
             "INSERT INTO refiner_jobs (dedupe_key, job_kind, payload_json, status, created_at, updated_at) " +
             "VALUES ('refiner.library.scan.v1:1:seed', 'refiner.library.scan.v1', @payload, 'completed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
@@ -75,7 +75,7 @@ public sealed class LibraryFileFacetsMigrationTests : IDisposable
                 "\"files\": [" + string.Join(", ", entries) + "]}}"));
     }
 
-    private sealed record PyDictLike(string Path, string ProbeJson, string Classification, string? Reason)
+    private sealed record ScanFileEntry(string Path, string ProbeJson, string Classification, string? Reason)
     {
         public string ToJson() =>
             "{\"path\": " + Quote(Path) + ", \"size_bytes\": 1000, \"mtime\": 1700000000, \"classification\": " +

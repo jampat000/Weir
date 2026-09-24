@@ -49,7 +49,7 @@ public static class SuiteDiagnosticsEndpoints
         var report = await request.Service<MediaTools>()
             .DescribeVersionsAsync(request.Context.RequestAborted)
             .ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("ffmpeg", report.Ffmpeg)
             .Set("mkvmerge", report.Mkvmerge));
     }
@@ -74,13 +74,13 @@ public static class SuiteDiagnosticsEndpoints
         var level = request.Query("level");
         var search = request.Query("search");
         bool? hasException = null;
-        if (request.Query("has_exception") is { } rawHasException && PydanticRules.TryBool(new PyStr(rawHasException), ["query", "has_exception"], issues, out var parsedHasException))
+        if (request.Query("has_exception") is { } rawHasException && FieldRules.TryBool(new WireString(rawHasException), ["query", "has_exception"], issues, out var parsedHasException))
         {
             hasException = parsedHasException;
         }
 
         long limit = 100;
-        if (request.Query("limit") is { } rawLimit && PydanticRules.TryInt(new PyStr(rawLimit), ["query", "limit"], null, null, issues, out var parsedLimit))
+        if (request.Query("limit") is { } rawLimit && FieldRules.TryInt(new WireString(rawLimit), ["query", "limit"], null, null, issues, out var parsedLimit))
         {
             limit = parsedLimit > long.MaxValue ? long.MaxValue : parsedLimit < long.MinValue ? long.MinValue : (long)parsedLimit;
         }
@@ -101,7 +101,7 @@ public static class SuiteDiagnosticsEndpoints
             }
         }
 
-        var items = new List<PyJson>();
+        var items = new List<WireValue>();
         var logger = request.LoggerFactory.CreateLogger("weir.platform.suite_settings.router");
         foreach (var entry in result.Items)
         {
@@ -115,10 +115,10 @@ public static class SuiteDiagnosticsEndpoints
             items.Add(output);
         }
 
-        return ApiRoutes.Ok(new PyDict()
-            .Set("items", new PyList(items))
+        return ApiRoutes.Ok(new WireObject()
+            .Set("items", new WireArray(items))
             .Set("total", result.Total)
-            .Set("counts", new PyDict().Set("error", result.Errors).Set("warning", result.Warnings).Set("information", result.Information)));
+            .Set("counts", new WireObject().Set("error", result.Errors).Set("warning", result.Warnings).Set("information", result.Information)));
     }
 
     private static async Task<ApiResult> GetMetricsAsync(ApiRequest request)

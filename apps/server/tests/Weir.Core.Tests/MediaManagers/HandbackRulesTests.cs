@@ -9,7 +9,7 @@ namespace Weir.Core.Tests.MediaManagers;
 /// </summary>
 public sealed class HandbackRulesTests
 {
-    private static PyDict Dict(string json) => (PyDict)PyJsonParser.Parse(json);
+    private static WireObject Dict(string json) => (WireObject)WireJsonParser.Parse(json);
 
     [Fact]
     public void A_sonarr_download_payload_yields_the_library_path_the_source_path_and_the_download_id()

@@ -9,7 +9,7 @@ namespace Weir.Core.Tests.Processing.RemuxPass;
 /// <summary>What a remux pass shows about its plan and outcome.</summary>
 public sealed class RemuxPassVisibilityTests
 {
-    private static PyDict Parse(string json) => (PyDict)PyJsonParser.Parse(json);
+    private static WireObject Parse(string json) => (WireObject)WireJsonParser.Parse(json);
 
     [Fact]
     public void The_plan_summary_names_the_streams()
@@ -51,9 +51,9 @@ public sealed class RemuxPassVisibilityTests
     [Fact]
     public void The_activity_title_follows_the_outcome()
     {
-        PyDict Payload(string outcome, bool? ok = null, bool passThrough = false)
+        WireObject Payload(string outcome, bool? ok = null, bool passThrough = false)
         {
-            var payload = new PyDict().Set("relative_media_path", "movies/foo.mkv").Set("outcome", outcome);
+            var payload = new WireObject().Set("relative_media_path", "movies/foo.mkv").Set("outcome", outcome);
             if (ok is { } value)
             {
                 payload.Set("ok", value);
@@ -74,60 +74,60 @@ public sealed class RemuxPassVisibilityTests
         Assert.Equal("Skipped foo.mkv", RemuxPassVisibility.ActivityTitle(Payload(RemuxPassOutcomes.SkippedGuardrail)));
         Assert.Equal("foo.mkv could not be processed", RemuxPassVisibility.ActivityTitle(Payload(RemuxPassOutcomes.FailedDuringExecution)));
         Assert.Equal("foo.mkv could not be checked", RemuxPassVisibility.ActivityTitle(Payload("anything", ok: false)));
-        Assert.Equal("File processing finished", RemuxPassVisibility.ActivityTitle(new PyDict()));
-        Assert.Equal("unknown file could not be checked", RemuxPassVisibility.ActivityTitle(new PyDict().Set("ok", false)));
+        Assert.Equal("File processing finished", RemuxPassVisibility.ActivityTitle(new WireObject()));
+        Assert.Equal("unknown file could not be checked", RemuxPassVisibility.ActivityTitle(new WireObject().Set("ok", false)));
     }
 
     [Fact]
     public void Source_not_ready_is_an_expected_wait_not_a_failure()
     {
-        var detail = Parse(RemuxPassVisibility.ActivityDetail(new PyDict()
+        var detail = Parse(RemuxPassVisibility.ActivityDetail(new WireObject()
             .Set("ok", false)
             .Set("outcome", RemuxPassOutcomes.SourceNotReady)
             .Set("retryable_wait", true)
             .Set("relative_media_path", "movies/downloading.mkv")
             .Set("reason", "This file is still open for writing.")));
 
-        Assert.Equal("skipped", PyConvert.Str(detail["result"]));
-        Assert.Equal("info", PyConvert.Str(detail["severity"]));
+        Assert.Equal("skipped", WireConvert.Str(detail["result"]));
+        Assert.Equal("info", WireConvert.Str(detail["severity"]));
         Assert.False(detail.ContainsKey("next_action"));
     }
 
     [Fact]
     public void A_failure_with_a_retry_coming_is_retrying_and_a_queued_follow_up_needs_no_action()
     {
-        var retrying = RemuxPassVisibility.ClipForActivity(new PyDict().Set("ok", false).Set("outcome", RemuxPassOutcomes.FailedDuringExecution).Set("retry_scheduled", true));
-        Assert.Equal("retrying", PyConvert.Str(retrying["result"]));
+        var retrying = RemuxPassVisibility.ClipForActivity(new WireObject().Set("ok", false).Set("outcome", RemuxPassOutcomes.FailedDuringExecution).Set("retry_scheduled", true));
+        Assert.Equal("retrying", WireConvert.Str(retrying["result"]));
 
-        var failed = RemuxPassVisibility.ClipForActivity(new PyDict().Set("ok", false).Set("outcome", RemuxPassOutcomes.FailedDuringExecution));
-        Assert.Equal("failed", PyConvert.Str(failed["result"]));
-        Assert.Contains("use Try again there", PyConvert.Str(failed["next_action"]), StringComparison.Ordinal);
+        var failed = RemuxPassVisibility.ClipForActivity(new WireObject().Set("ok", false).Set("outcome", RemuxPassOutcomes.FailedDuringExecution));
+        Assert.Equal("failed", WireConvert.Str(failed["result"]));
+        Assert.Contains("use Try again there", WireConvert.Str(failed["next_action"]), StringComparison.Ordinal);
 
-        var handedBack = RemuxPassVisibility.ClipForActivity(new PyDict().Set("ok", false).Set("outcome", RemuxPassOutcomes.FailedDuringExecution).Set("pass_through_queued", true));
+        var handedBack = RemuxPassVisibility.ClipForActivity(new WireObject().Set("ok", false).Set("outcome", RemuxPassOutcomes.FailedDuringExecution).Set("pass_through_queued", true));
         Assert.False(handedBack.ContainsKey("next_action"));
     }
 
     [Fact]
     public void Long_argv_lists_are_clipped_for_activity()
     {
-        var argv = new PyList(Enumerable.Range(0, 100).Select(i => (PyJson)new PyStr($"a{i}")));
+        var argv = new WireArray(Enumerable.Range(0, 100).Select(i => (WireValue)new WireString($"a{i}")));
 
-        var clipped = RemuxPassVisibility.ClipForActivity(new PyDict().Set("ffmpeg_argv", argv));
+        var clipped = RemuxPassVisibility.ClipForActivity(new WireObject().Set("ffmpeg_argv", argv));
 
-        Assert.Equal(PyBool.True, clipped["ffmpeg_argv_truncated"]);
-        Assert.Equal(65, ((PyList)clipped["ffmpeg_argv"]).Items.Count);
+        Assert.Equal(WireBool.True, clipped["ffmpeg_argv_truncated"]);
+        Assert.Equal(65, ((WireArray)clipped["ffmpeg_argv"]).Items.Count);
         Assert.Equal(100, argv.Items.Count);
     }
 
     [Fact]
     public void The_detail_is_compact_ascii_json_with_removed_tracks_and_counts()
     {
-        var detail = RemuxPassVisibility.ActivityDetail(new PyDict()
+        var detail = RemuxPassVisibility.ActivityDetail(new WireObject()
             .Set("ok", true)
             .Set("outcome", RemuxPassOutcomes.LiveOutputWritten)
             .Set("relative_media_path", "movies/sample.mkv")
-            .Set("removed_audio", new PyList([new PyStr("eng commentary"), new PyStr("jpn stereo")]))
-            .Set("removed_subtitles", new PyList([new PyStr("spa"), new PyStr("fre")])));
+            .Set("removed_audio", new WireArray([new WireString("eng commentary"), new WireString("jpn stereo")]))
+            .Set("removed_subtitles", new WireArray([new WireString("spa"), new WireString("fre")])));
 
         Assert.Contains("\"outcome\":\"live_output_written\"", detail, StringComparison.Ordinal);
         Assert.Contains("\"removed_audio\":[\"eng commentary\",\"jpn stereo\"]", detail, StringComparison.Ordinal);
@@ -137,7 +137,7 @@ public sealed class RemuxPassVisibilityTests
         Assert.Contains("\"module\":\"processing\",\"action\":\"remux\",\"trigger\":\"worker\",\"result\":\"success\"", detail, StringComparison.Ordinal);
         Assert.Equal(
             "\"relative_media_path\":\"x\\u00e9.mkv\"",
-            RemuxPassVisibility.ActivityDetail(new PyDict().Set("relative_media_path", "xé.mkv")).Split(',')[0].TrimStart('{'));
+            RemuxPassVisibility.ActivityDetail(new WireObject().Set("relative_media_path", "xé.mkv")).Split(',')[0].TrimStart('{'));
     }
 }
 

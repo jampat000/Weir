@@ -20,11 +20,11 @@ public static class ProcessingMetadataProviderEndpoints
         return endpoints;
     }
 
-    private static PyDict MetadataProviderOut(MetadataProviderView view) => new PyDict()
+    private static WireObject MetadataProviderOut(MetadataProviderView view) => new WireObject()
         .Set("provider", view.Provider)
         .Set("base_url", view.BaseUrl)
         .Set("key_configured", view.KeyConfigured)
-        .Set("known_providers", new PyList(view.KnownProviders.Select(p => (PyJson)PyJson.Of(p))));
+        .Set("known_providers", new WireArray(view.KnownProviders.Select(p => (WireValue)WireValue.Of(p))));
 
     private static async Task<ApiResult> GetMetadataProviderAsync(ApiRequest request)
     {
@@ -78,6 +78,6 @@ public static class ProcessingMetadataProviderEndpoints
         var result = string.IsNullOrWhiteSpace(row.MetadataProviderKeyCiphertext) || string.IsNullOrWhiteSpace(row.MetadataProvider)
             ? MetadataProviderStore.Test(row)
             : await request.Service<MetadataProviderService>().TestProviderAsync(uow, request.Context.RequestAborted).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict().Set("status", result.Status).Set("detail", result.Detail));
+        return ApiRoutes.Ok(new WireObject().Set("status", result.Status).Set("detail", result.Detail));
     }
 }

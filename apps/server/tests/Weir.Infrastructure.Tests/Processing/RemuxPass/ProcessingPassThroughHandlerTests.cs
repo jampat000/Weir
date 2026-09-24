@@ -70,9 +70,9 @@ public sealed class ProcessingPassThroughHandlerTests : IDisposable
         Assert.True(File.Exists(source), "the source must never be deleted by a pass-through");
         Assert.Equal("passed_through", await ScalarText("SELECT status FROM files"));
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.file_passed_through'"));
-        var detail = (PyDict)PyJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.file_passed_through'"));
-        Assert.True(((PyBool)detail["delivered"]).Value);
-        Assert.True(((PyBool)detail["source_kept"]).Value);
+        var detail = (WireObject)WireJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.file_passed_through'"));
+        Assert.True(((WireBool)detail["delivered"]).Value);
+        Assert.True(((WireBool)detail["source_kept"]).Value);
     }
 
     [Fact]
@@ -88,9 +88,9 @@ public sealed class ProcessingPassThroughHandlerTests : IDisposable
         Assert.Contains("no longer in the watched folder", exception.Message, StringComparison.Ordinal);
         Assert.False(File.Exists(_folders.Out("gone.mkv")));
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.file_pass_through_failed'"));
-        var detail = (PyDict)PyJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.file_pass_through_failed'"));
-        Assert.True(((PyBool)detail["source_kept"]).Value);
-        Assert.Equal("failed", PyConvert.Str(detail["result"]));
+        var detail = (WireObject)WireJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.file_pass_through_failed'"));
+        Assert.True(((WireBool)detail["source_kept"]).Value);
+        Assert.Equal("failed", WireConvert.Str(detail["result"]));
     }
 
     [Fact]
@@ -126,9 +126,9 @@ public sealed class ProcessingPassThroughHandlerTests : IDisposable
 
         Assert.Equal("already there", File.ReadAllText(_folders.Out("file.mkv")));
         Assert.Empty(_fixture.Http.RequestsTo(HttpMethod.Post, EventsPath));
-        var detail = (PyDict)PyJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.file_passed_through'"));
-        Assert.False(((PyBool)detail["delivered"]).Value);
-        Assert.Equal("skip", PyConvert.Str(detail["collision_action"]));
+        var detail = (WireObject)WireJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.file_passed_through'"));
+        Assert.False(((WireBool)detail["delivered"]).Value);
+        Assert.Equal("skip", WireConvert.Str(detail["collision_action"]));
     }
 
     [Fact]
@@ -144,12 +144,12 @@ public sealed class ProcessingPassThroughHandlerTests : IDisposable
         await Handler().HandleAsync(Context(5, payload), CancellationToken.None);
 
         var post = Assert.Single(_fixture.Http.RequestsTo(HttpMethod.Post, EventsPath));
-        var body = (PyDict)post.Json!;
-        Assert.Equal(("h1", "completed"), (PyConvert.Str(body["handoffId"]), PyConvert.Str(body["status"])));
-        Assert.Equal(Path.GetFullPath(_folders.Out(Path.Join("Film", "film.mkv"))), PyConvert.Str(body["outputPath"]));
+        var body = (WireObject)post.Json!;
+        Assert.Equal(("h1", "completed"), (WireConvert.Str(body["handoffId"]), WireConvert.Str(body["status"])));
+        Assert.Equal(Path.GetFullPath(_folders.Out(Path.Join("Film", "film.mkv"))), WireConvert.Str(body["outputPath"]));
         Assert.Equal(
             "Weir could not process this file, so it handed the original back unchanged; it is ready to import.",
-            PyConvert.Str(body["message"]));
+            WireConvert.Str(body["message"]));
         Assert.Equal("passed-through", await ScalarText("SELECT state FROM media_manager_handoffs WHERE handoff_id = 'h1'"));
     }
 

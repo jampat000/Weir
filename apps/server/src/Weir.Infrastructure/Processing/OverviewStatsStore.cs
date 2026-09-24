@@ -30,7 +30,7 @@ public static class OverviewStatsStore
     {
         var days = Math.Max(1, windowDays);
         var since = time.GetUtcNow().AddDays(-days);
-        var sinceParam = SqliteValues.ToSqlite(PyDateTime.FromUtc(since.UtcDateTime));
+        var sinceParam = SqliteValues.ToSqlite(Timestamp.FromUtc(since.UtcDateTime));
 
         var failed = await uow.CountAsync(
             "SELECT COUNT(*) FROM jobs WHERE job_kind = @kind AND status IN ('failed', 'handler_ok_finalize_failed') AND updated_at >= @since",
@@ -52,22 +52,22 @@ public static class OverviewStatsStore
                 continue;
             }
 
-            PyJson parsed;
+            WireValue parsed;
             try
             {
-                parsed = PyJsonParser.Parse(raw);
+                parsed = WireJsonParser.Parse(raw);
             }
-            catch (PyJsonDecodeException)
+            catch (WireJsonDecodeException)
             {
                 continue;
             }
 
-            if (parsed is not PyDict payload)
+            if (parsed is not WireObject payload)
             {
                 continue;
             }
 
-            var outcome = payload.TryGetValue("outcome", out var outcomeValue) && outcomeValue is PyStr outcomeStr ? outcomeStr.Value.Trim() : string.Empty;
+            var outcome = payload.TryGetValue("outcome", out var outcomeValue) && outcomeValue is WireString outcomeStr ? outcomeStr.Value.Trim() : string.Empty;
             if (outcome == OutcomeLiveOutputWritten)
             {
                 outputWrittenCount++;
@@ -81,7 +81,7 @@ public static class OverviewStatsStore
             }
             else if (outcome == OutcomeLiveSkippedNotRequired)
             {
-                if (payload.TryGetValue("output_copied_without_remux", out var copied) && copied is PyBool { Value: true })
+                if (payload.TryGetValue("output_copied_without_remux", out var copied) && copied is WireBool { Value: true })
                 {
                     alreadyOptimizedCount++;
                 }
@@ -97,12 +97,12 @@ public static class OverviewStatsStore
         return new ProcessingOverviewStats(days, completed, failed, rate, outputWrittenCount, alreadyOptimizedCount, netSaved, netSavedPercent);
     }
 
-    private static long? JsonInt(PyJson? value) => value switch
+    private static long? JsonInt(WireValue? value) => value switch
     {
-        PyInt i => (long)i.Value,
-        PyFloat f => (long)f.Value,
-        PyStr s when long.TryParse(s.Value.Trim(), out var parsed) => parsed,
-        PyStr s when double.TryParse(s.Value.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsedDouble) => (long)parsedDouble,
+        WireInteger i => (long)i.Value,
+        WireNumber f => (long)f.Value,
+        WireString s when long.TryParse(s.Value.Trim(), out var parsed) => parsed,
+        WireString s when double.TryParse(s.Value.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsedDouble) => (long)parsedDouble,
         _ => null,
     };
 }

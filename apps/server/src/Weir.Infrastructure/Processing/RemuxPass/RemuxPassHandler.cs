@@ -74,39 +74,39 @@ public sealed partial class RemuxPassHandler : IJobHandler
     public async Task HandleAsync(JobWorkContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
-        var raw = PyStrings.Strip(context.PayloadJson ?? string.Empty);
+        var raw = WireStrings.Strip(context.PayloadJson ?? string.Empty);
         if (raw.Length == 0)
         {
             await RecordAsync(FailedPayload(context.Id, "missing payload_json")).ConfigureAwait(false);
             return;
         }
 
-        PyJson parsed;
+        WireValue parsed;
         try
         {
-            parsed = PyJsonParser.Parse(raw);
+            parsed = WireJsonParser.Parse(raw);
         }
-        catch (PyJsonDecodeException exception)
+        catch (WireJsonDecodeException exception)
         {
             await RecordAsync(FailedPayload(context.Id, $"invalid json: {exception.Message}")).ConfigureAwait(false);
             return;
         }
 
-        if (parsed is not PyDict data)
+        if (parsed is not WireObject data)
         {
             await RecordAsync(FailedPayload(context.Id, "payload must be a JSON object")).ConfigureAwait(false);
             return;
         }
 
         var provenance = ActivityProvenance.JobProvenance(data);
-        if (data.Get("relative_media_path") is not PyStr relValue || PyStrings.Strip(relValue.Value).Length == 0)
+        if (data.Get("relative_media_path") is not WireString relValue || WireStrings.Strip(relValue.Value).Length == 0)
         {
             await RecordAsync(Merge(FailedPayload(context.Id, "relative_media_path is required"), provenance)).ConfigureAwait(false);
             return;
         }
 
-        var rel = PyStrings.Strip(relValue.Value);
-        if (data.Get("dry_run") is { } dryRun && dryRun is not PyNull)
+        var rel = WireStrings.Strip(relValue.Value);
+        if (data.Get("dry_run") is { } dryRun && dryRun is not WireNull)
         {
             var legacy = FailedPayload(
                     context.Id,
@@ -116,13 +116,13 @@ public sealed partial class RemuxPassHandler : IJobHandler
             return;
         }
 
-        var mediaScope = data.Get("media_scope") is PyStr { Value: "movie" or "tv" } scopeValue ? scopeValue.Value : "movie";
-        long? libraryId = data.Get("library_id") is PyInt libraryValue ? (long)libraryValue.Value : null;
-        var passThrough = data.Get("pass_through_unchanged") is PyBool { Value: true };
+        var mediaScope = data.Get("media_scope") is WireString { Value: "movie" or "tv" } scopeValue ? scopeValue.Value : "movie";
+        long? libraryId = data.Get("library_id") is WireInteger libraryValue ? (long)libraryValue.Value : null;
+        var passThrough = data.Get("pass_through_unchanged") is WireBool { Value: true };
         var manualPlan = ManualPlanJson.FromPyJson(data.Get("manual_plan"));
         var manualPlanFingerprint = ManualPlanJson.FingerprintFromPyJson(data.Get("source_fingerprint"));
 
-        var origin = data.Get("origin") as PyDict;
+        var origin = data.Get("origin") as WireObject;
         var payloadJson = context.PayloadJson;
         if (origin is null)
         {
@@ -130,7 +130,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
             if (origin is not null)
             {
                 var carried = data.Copy().Set("origin", origin);
-                payloadJson = PyJsonWriter.Dumps(carried, PyJsonFormat.Compact);
+                payloadJson = WireJsonWriter.Dumps(carried, WireJsonFormat.Compact);
             }
         }
 
@@ -158,11 +158,11 @@ public sealed partial class RemuxPassHandler : IJobHandler
             CurrentJobId = context.Id,
             ProgressReporter = progress.Report,
             PassThroughUnchanged = passThrough,
-            Origin = HandoffOrigin.FromPayload(origin is null ? null : new PyDict().Set("origin", origin)),
+            Origin = HandoffOrigin.FromPayload(origin is null ? null : new WireObject().Set("origin", origin)),
             ManualPlan = manualPlan,
             ManualPlanFingerprint = manualPlanFingerprint,
         };
-        PyDict result;
+        WireObject result;
         try
         {
             result = await _runner.RunAsync(request, cancellationToken).ConfigureAwait(false);
@@ -178,14 +178,14 @@ public sealed partial class RemuxPassHandler : IJobHandler
         if (origin is null && await AdoptedOriginAsync(context.Id).ConfigureAwait(false) is { } adopted)
         {
             origin = adopted;
-            payloadJson = PyJsonWriter.Dumps(data.Copy().Set("origin", adopted), PyJsonFormat.Compact);
+            payloadJson = WireJsonWriter.Dumps(data.Copy().Set("origin", adopted), WireJsonFormat.Compact);
         }
 
         result.Set("job_id", context.Id);
         result.Set("library_id", claim.Library?.Id ?? libraryId);
         if (result.Get("rejection_kind") is { IsTruthy: true } && claim.Library is { } library)
         {
-            var action = string.Equals(PyStrings.Strip(library.RejectedFileAction ?? string.Empty), "delete_file", StringComparison.OrdinalIgnoreCase)
+            var action = string.Equals(WireStrings.Strip(library.RejectedFileAction ?? string.Empty), "delete_file", StringComparison.OrdinalIgnoreCase)
                          // Under reject, the reject job removes the download, and only after the manager accepts.
                          && ProcessingFailurePolicies.Normalize(library.FailurePolicy) != ProcessingFailurePolicies.Reject
                 ? "delete_file"
@@ -212,14 +212,14 @@ public sealed partial class RemuxPassHandler : IJobHandler
         await ReportBackAsync(payloadJson, result).ConfigureAwait(false);
     }
 
-    private static PyDict FailedPayload(long jobId, string reason) => new PyDict()
+    private static WireObject FailedPayload(long jobId, string reason) => new WireObject()
         .Set("job_id", jobId)
         .Set("ok", false)
         .Set("outcome", RemuxPassOutcomes.FailedBeforeExecution)
         .Set("reason", reason);
 
     /// <summary><c>d.update(other)</c>.</summary>
-    private static PyDict Merge(PyDict target, PyDict other)
+    private static WireObject Merge(WireObject target, WireObject other)
     {
         foreach (var (key, value) in other.Items)
         {

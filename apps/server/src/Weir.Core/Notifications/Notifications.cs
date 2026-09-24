@@ -14,8 +14,8 @@ public sealed record NotificationChannelRecord(
     string Url,
     string EventsJson,
     bool Enabled,
-    PyDateTime CreatedAt,
-    PyDateTime UpdatedAt);
+    Timestamp CreatedAt,
+    Timestamp UpdatedAt);
 
 /// <summary>Notification channels: supported events and providers, validation, API shapes and delivery payloads.</summary>
 public static class NotificationRules
@@ -29,15 +29,15 @@ public static class NotificationRules
     {
         try
         {
-            return PyJsonParser.Parse(eventsJson ?? string.Empty) switch
+            return WireJsonParser.Parse(eventsJson ?? string.Empty) switch
             {
-                PyList list => [.. list.Items.OfType<PyStr>().Select(item => item.Value)],
-                PyDict dict => [.. dict.Keys],
-                PyStr text => [.. text.Value.Select(c => c.ToString())],
+                WireArray list => [.. list.Items.OfType<WireString>().Select(item => item.Value)],
+                WireObject dict => [.. dict.Keys],
+                WireString text => [.. text.Value.Select(c => c.ToString())],
                 _ => [],
             };
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
             return [];
         }
@@ -45,58 +45,58 @@ public static class NotificationRules
 
     /// <summary>The events as the stored JSON list.</summary>
     public static string SerializeEvents(IEnumerable<string> events) =>
-        PyJsonWriter.Dumps(new PyList(events.Select(e => (PyJson)new PyStr(e))), PyJsonFormat.Default);
+        WireJsonWriter.Dumps(new WireArray(events.Select(e => (WireValue)new WireString(e))), WireJsonFormat.Default);
 
-    /// <summary>Validates a channel's label, provider, URL and events. Throws <see cref="PyValueErrorException"/> with the operator message.</summary>
+    /// <summary>Validates a channel's label, provider, URL and events. Throws <see cref="WireValueException"/> with the operator message.</summary>
     public static void Validate(string label, string provider, string url, IReadOnlyList<string> events)
     {
         ArgumentNullException.ThrowIfNull(events);
         if ((label ?? string.Empty).Trim().Length == 0)
         {
-            throw new PyValueErrorException("Label must not be empty.");
+            throw new WireValueException("Label must not be empty.");
         }
 
         if (!SupportedProviders.Contains(provider, StringComparer.Ordinal))
         {
-            throw new PyValueErrorException($"Unsupported provider: {PyStrings.Repr(provider ?? string.Empty)}. Choose from: {string.Join(", ", SupportedProviders)}");
+            throw new WireValueException($"Unsupported provider: {WireStrings.Repr(provider ?? string.Empty)}. Choose from: {string.Join(", ", SupportedProviders)}");
         }
 
         ExternalUrlPolicy.ValidateExternalProviderUrl(url);
         var bad = events.Where(e => !SupportedEvents.Contains(e, StringComparer.Ordinal)).ToList();
         if (bad.Count > 0)
         {
-            throw new PyValueErrorException($"Unknown events: {string.Join(", ", bad)}. Supported: {string.Join(", ", SupportedEvents)}");
+            throw new WireValueException($"Unknown events: {string.Join(", ", bad)}. Supported: {string.Join(", ", SupportedEvents)}");
         }
 
         if (events.Count == 0)
         {
-            throw new PyValueErrorException("At least one event must be selected.");
+            throw new WireValueException("At least one event must be selected.");
         }
     }
 
-    public static PyDict ChannelOut(NotificationChannelRecord row)
+    public static WireObject ChannelOut(NotificationChannelRecord row)
     {
         ArgumentNullException.ThrowIfNull(row);
-        return new PyDict()
+        return new WireObject()
             .Set("id", row.Id)
             .Set("label", row.Label)
             .Set("provider", row.Provider)
             .Set("url", row.Url)
-            .Set("events", new PyList(ParseEvents(row.EventsJson).Select(e => (PyJson)new PyStr(e))))
+            .Set("events", new WireArray(ParseEvents(row.EventsJson).Select(e => (WireValue)new WireString(e))))
             .Set("enabled", row.Enabled)
-            .Set("created_at", row.CreatedAt.PydanticJson())
-            .Set("updated_at", row.UpdatedAt.PydanticJson());
+            .Set("created_at", row.CreatedAt.ToWireText())
+            .Set("updated_at", row.UpdatedAt.ToWireText());
     }
 
-    public static PyDict ListOut(IEnumerable<NotificationChannelRecord> rows) => new PyDict()
-        .Set("items", new PyList(rows.Select(row => (PyJson)ChannelOut(row))))
-        .Set("supported_events", new PyList(SupportedEvents.Select(e => (PyJson)new PyStr(e))))
-        .Set("supported_providers", new PyList(SupportedProviders.Select(p => (PyJson)new PyStr(p))));
+    public static WireObject ListOut(IEnumerable<NotificationChannelRecord> rows) => new WireObject()
+        .Set("items", new WireArray(rows.Select(row => (WireValue)ChannelOut(row))))
+        .Set("supported_events", new WireArray(SupportedEvents.Select(e => (WireValue)new WireString(e))))
+        .Set("supported_providers", new WireArray(SupportedProviders.Select(p => (WireValue)new WireString(p))));
 
     /// <summary>The JSON body posted to a generic webhook.</summary>
-    public static byte[] WebhookPayload(string jobEvent, string module, long jobId, string jobKind, string title, string detail, PyDateTime now) =>
-        PyJsonWriter.DumpsUtf8(
-            new PyDict()
+    public static byte[] WebhookPayload(string jobEvent, string module, long jobId, string jobKind, string title, string detail, Timestamp now) =>
+        WireJsonWriter.DumpsUtf8(
+            new WireObject()
                 .Set("event", jobEvent)
                 .Set("module", module)
                 .Set("job_id", jobId)
@@ -105,24 +105,24 @@ public static class NotificationRules
                 .Set("detail", detail)
                 .Set("timestamp", now.IsoFormat())
                 .Set("app", "Weir"),
-            PyJsonFormat.Default);
+            WireJsonFormat.Default);
 
     /// <summary>The JSON body posted to a Discord webhook: one embed, green for completed, red otherwise.</summary>
-    public static byte[] DiscordPayload(string title, string detail, string jobEvent, string module, long jobId, PyDateTime now)
+    public static byte[] DiscordPayload(string title, string detail, string jobEvent, string module, long jobId, Timestamp now)
     {
         var color = jobEvent.Contains("completed", StringComparison.Ordinal) ? 0x2ECC71 : 0xE74C3C;
-        var embed = new PyDict()
+        var embed = new WireObject()
             .Set("title", title)
             .Set("description", detail)
             .Set("color", color)
-            .Set("fields", new PyList(
+            .Set("fields", new WireArray(
             [
-                new PyDict().Set("name", "Module").Set("value", module).Set("inline", true),
-                new PyDict().Set("name", "Job ID").Set("value", jobId.ToString(CultureInfo.InvariantCulture)).Set("inline", true),
+                new WireObject().Set("name", "Module").Set("value", module).Set("inline", true),
+                new WireObject().Set("name", "Job ID").Set("value", jobId.ToString(CultureInfo.InvariantCulture)).Set("inline", true),
             ]))
-            .Set("footer", new PyDict().Set("text", "Weir"))
+            .Set("footer", new WireObject().Set("text", "Weir"))
             .Set("timestamp", now.IsoFormat());
-        return PyJsonWriter.DumpsUtf8(new PyDict().Set("embeds", new PyList([embed])), PyJsonFormat.Default);
+        return WireJsonWriter.DumpsUtf8(new WireObject().Set("embeds", new WireArray([embed])), WireJsonFormat.Default);
     }
 
     /// <summary>
@@ -222,7 +222,7 @@ public sealed record SplitUrl(string Scheme, string Netloc, string Path, string 
         }
     }
 
-    /// <summary>The explicit port, or <see langword="null"/>. Throws <see cref="PyValueErrorException"/> for a port that is not a number in range.</summary>
+    /// <summary>The explicit port, or <see langword="null"/>. Throws <see cref="WireValueException"/> for a port that is not a number in range.</summary>
     public int? Port
     {
         get
@@ -247,12 +247,12 @@ public sealed record SplitUrl(string Scheme, string Netloc, string Path, string 
 
             if (!port.All(char.IsAsciiDigit) || !int.TryParse(port, NumberStyles.None, CultureInfo.InvariantCulture, out var number))
             {
-                throw new PyValueErrorException($"Port could not be cast to integer value as {PyStrings.Repr(port)}");
+                throw new WireValueException($"Port could not be cast to integer value as {WireStrings.Repr(port)}");
             }
 
             if (number > 65535)
             {
-                throw new PyValueErrorException("Port out of range 0-65535");
+                throw new WireValueException("Port out of range 0-65535");
             }
 
             return number;
@@ -261,7 +261,7 @@ public sealed record SplitUrl(string Scheme, string Netloc, string Path, string 
 
     /// <summary>
     /// Splits a URL: leading control characters and spaces are dropped, tabs and line breaks removed, and
-    /// malformed IPv6 brackets rejected with <see cref="PyValueErrorException"/>.
+    /// malformed IPv6 brackets rejected with <see cref="WireValueException"/>.
     /// </summary>
     public static SplitUrl Parse(string raw)
     {
@@ -289,7 +289,7 @@ public sealed record SplitUrl(string Scheme, string Netloc, string Path, string 
             if ((netloc.Contains('[', StringComparison.Ordinal) && !netloc.Contains(']', StringComparison.Ordinal)) ||
                 (netloc.Contains(']', StringComparison.Ordinal) && !netloc.Contains('[', StringComparison.Ordinal)))
             {
-                throw new PyValueErrorException("Invalid IPv6 URL");
+                throw new WireValueException("Invalid IPv6 URL");
             }
 
             if (netloc.Contains('[', StringComparison.Ordinal) && netloc.Contains(']', StringComparison.Ordinal))
@@ -300,16 +300,16 @@ public sealed record SplitUrl(string Scheme, string Netloc, string Path, string 
                 {
                     if (!System.Text.RegularExpressions.Regex.IsMatch(bracketed, @"\Av[a-fA-F0-9]+\..+\z"))
                     {
-                        throw new PyValueErrorException("IPvFuture address is invalid");
+                        throw new WireValueException("IPvFuture address is invalid");
                     }
                 }
-                else if (!PyIpAddress.TryParse(bracketed, out var ip))
+                else if (!NetAddress.TryParse(bracketed, out var ip))
                 {
-                    throw new PyValueErrorException($"{PyStrings.Repr(bracketed)} does not appear to be an IPv4 or IPv6 address");
+                    throw new WireValueException($"{WireStrings.Repr(bracketed)} does not appear to be an IPv4 or IPv6 address");
                 }
                 else if (!ip.IsV6)
                 {
-                    throw new PyValueErrorException("An IPv4 address cannot be in brackets");
+                    throw new WireValueException("An IPv4 address cannot be in brackets");
                 }
             }
         }
@@ -342,28 +342,28 @@ public static class ExternalUrlPolicy
         var parsed = SplitUrl.Parse(raw.Trim());
         if (parsed.Scheme is not ("http" or "https"))
         {
-            throw new PyValueErrorException($"Blocked provider URL scheme: {(parsed.Scheme.Length == 0 ? "<missing>" : parsed.Scheme)}");
+            throw new WireValueException($"Blocked provider URL scheme: {(parsed.Scheme.Length == 0 ? "<missing>" : parsed.Scheme)}");
         }
 
         var host = (parsed.Hostname ?? string.Empty).Trim().ToLowerInvariant();
         if (host.Length == 0)
         {
-            throw new PyValueErrorException("Blocked provider URL host: <missing>");
+            throw new WireValueException("Blocked provider URL host: <missing>");
         }
 
         if (host is "localhost" or "127.0.0.1" or "::1" or "0.0.0.0")
         {
-            throw new PyValueErrorException($"Blocked provider URL host: {host}");
+            throw new WireValueException($"Blocked provider URL host: {host}");
         }
 
-        if (!PyIpAddress.TryParse(host, out var ip))
+        if (!NetAddress.TryParse(host, out var ip))
         {
             return raw;
         }
 
         if (ip.IsLoopback || ip.IsLinkLocal || ip.IsPrivate || ip.IsMulticast || ip.IsReserved || ip.IsUnspecified)
         {
-            throw new PyValueErrorException($"Blocked provider URL host: {host}");
+            throw new WireValueException($"Blocked provider URL host: {host}");
         }
 
         return raw;
@@ -376,12 +376,12 @@ public static class ExternalUrlPolicy
         var parsed = SplitUrl.Parse(raw.Trim().TrimEnd('/'));
         if (parsed.Scheme is not ("http" or "https") || parsed.Hostname is null)
         {
-            throw new PyValueErrorException("URL must be a valid http or https URL.");
+            throw new WireValueException("URL must be a valid http or https URL.");
         }
 
         if (!string.IsNullOrEmpty(parsed.Username) || !string.IsNullOrEmpty(parsed.Password) || parsed.Query.Length > 0 || parsed.Fragment.Length > 0)
         {
-            throw new PyValueErrorException("URL must not include credentials, query strings, or fragments.");
+            throw new WireValueException("URL must not include credentials, query strings, or fragments.");
         }
 
         return parsed.Scheme + "://" + parsed.Netloc + parsed.Path.TrimEnd('/');

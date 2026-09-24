@@ -21,6 +21,6 @@ public sealed class WeirConsoleFormatter : ConsoleFormatter
     {
         ArgumentNullException.ThrowIfNull(textWriter);
         var message = logEntry.Formatter(logEntry.State, logEntry.Exception);
-        textWriter.WriteLine(PythonLogFormat.ConsoleLine(_time.GetUtcNow(), logEntry.LogLevel, logEntry.Category, message, logEntry.Exception));
+        textWriter.WriteLine(LogLineFormat.ConsoleLine(_time.GetUtcNow(), logEntry.LogLevel, logEntry.Category, message, logEntry.Exception));
     }
 }

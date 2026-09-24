@@ -48,7 +48,7 @@ public static class SuiteOperationalHistoryEndpoints
         return ApiRoutes.Ok(HistoryOut("reset", result));
     }
 
-    private static PyDict HistoryOut(string status, OperationalHistoryStore.ResetResult result) => new PyDict()
+    private static WireObject HistoryOut(string status, OperationalHistoryStore.ResetResult result) => new WireObject()
         .Set("status", status)
         .Set("activity_events_deleted", result.ActivityEventsDeleted)
         .Set("jobs_deleted", result.ProcessingJobsDeleted)

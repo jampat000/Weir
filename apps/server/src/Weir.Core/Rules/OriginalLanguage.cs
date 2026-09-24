@@ -12,7 +12,7 @@ public sealed record TitleMetadata
     public int? Year { get; init; }
     public string ProviderId { get; init; } = string.Empty;
 
-    public bool HasOriginalLanguage => PyStrings.Strip(OriginalLanguage).Length > 0;
+    public bool HasOriginalLanguage => WireStrings.Strip(OriginalLanguage).Length > 0;
 }
 
 /// <summary>
@@ -120,7 +120,7 @@ public static class OriginalLanguage
     /// <summary>One form per language, whichever standard the caller used. Unknown codes are returned as they are.</summary>
     public static string CanonicalLanguage(string? raw)
     {
-        var code = RemuxRules.NormalizeLang(PyStrings.Strip(raw ?? string.Empty));
+        var code = RemuxRules.NormalizeLang(WireStrings.Strip(raw ?? string.Empty));
         return Canonical.GetValueOrDefault(code, code);
     }
 

@@ -18,7 +18,7 @@ namespace Weir.Api.Http;
 public abstract record ApiResult;
 
 /// <summary>A JSON body, with extra headers (for example <c>Set-Cookie</c>) in the order given.</summary>
-public sealed record JsonApiResult(int StatusCode, PyJson Body) : ApiResult
+public sealed record JsonApiResult(int StatusCode, WireValue Body) : ApiResult
 {
     public IReadOnlyList<KeyValuePair<string, string>> Headers { get; init; } = [];
 }
@@ -183,7 +183,7 @@ public sealed class ApiRequest : IAsyncDisposable
     {
         get
         {
-            var raw = (PyCookies.Get(Context, Options.SessionCookieName) ?? string.Empty).Trim();
+            var raw = (CookieHeaders.Get(Context, Options.SessionCookieName) ?? string.Empty).Trim();
             return raw.Length == 0 ? null : raw;
         }
     }
@@ -338,14 +338,14 @@ public sealed class ApiRequest : IAsyncDisposable
     /// Read and decode the body now. Handlers call this before their other checks, so a malformed body is
     /// answered with its 400 or 422 first, the order existing clients and the contract suite expect.
     /// </summary>
-    public Task<PyJson?> ReadBodyAsync() => PyRequestBody.ReadAsync(Context);
+    public Task<WireValue?> ReadBodyAsync() => ApiRequestBody.ReadAsync(Context);
 
     /// <summary>An <c>int</c> path parameter.</summary>
     public long PathInt(string name, ValidationIssues issues)
     {
         ArgumentNullException.ThrowIfNull(issues);
         var raw = RouteValue(name) ?? string.Empty;
-        return PydanticRules.TryInt(new PyStr(raw), ["path", name], null, null, issues, out var value)
+        return FieldRules.TryInt(new WireString(raw), ["path", name], null, null, issues, out var value)
             ? value > long.MaxValue ? long.MaxValue : value < long.MinValue ? long.MinValue : (long)value
             : 0;
     }

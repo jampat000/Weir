@@ -63,19 +63,19 @@ public sealed partial class OutputFolderCleanup
         }
     }
 
-    private static void InitFields(PyDict output, string prefix, string deleted, string path, string skip, string cascade)
+    private static void InitFields(WireObject output, string prefix, string deleted, string path, string skip, string cascade)
     {
-        SetDefault(output, deleted, PyBool.False);
-        SetDefault(output, path, PyNull.Instance);
-        SetDefault(output, skip, PyNull.Instance);
-        SetDefault(output, $"{prefix}_truth_check", PyNull.Instance);
-        SetDefault(output, $"{prefix}_truth_note", PyNull.Instance);
-        SetDefault(output, $"{prefix}_age_seconds", PyNull.Instance);
-        SetDefault(output, cascade, new PyList());
-        SetDefault(output, $"{prefix}_dry_run", PyNull.Instance);
+        SetDefault(output, deleted, WireBool.False);
+        SetDefault(output, path, WireNull.Instance);
+        SetDefault(output, skip, WireNull.Instance);
+        SetDefault(output, $"{prefix}_truth_check", WireNull.Instance);
+        SetDefault(output, $"{prefix}_truth_note", WireNull.Instance);
+        SetDefault(output, $"{prefix}_age_seconds", WireNull.Instance);
+        SetDefault(output, cascade, new WireArray());
+        SetDefault(output, $"{prefix}_dry_run", WireNull.Instance);
     }
 
-    private static void Skip(PyDict output, string prefix, string skipKey, string reason)
+    private static void Skip(WireObject output, string prefix, string skipKey, string reason)
     {
         output.Set(skipKey, reason);
         output.Set($"{prefix}_truth_check", LibraryTruthVerdict.Skipped);
@@ -83,7 +83,7 @@ public sealed partial class OutputFolderCleanup
     }
 
     /// <summary><c>dict.setdefault</c>.</summary>
-    public static void SetDefault(PyDict output, string key, PyJson value)
+    public static void SetDefault(WireObject output, string key, WireValue value)
     {
         ArgumentNullException.ThrowIfNull(output);
         if (!output.ContainsKey(key))

@@ -106,8 +106,8 @@ public sealed class TmdbMetadataProvider : IMetadataProvider
 
     public TmdbMetadataProvider(string apiKey, IManagerHttpHandlerFactory handlers, TimeProvider time, string baseUrl = TmdbResponses.DefaultBaseUrl, MetadataLookupCache? cache = null)
     {
-        _apiKey = PyStrings.Strip(apiKey ?? string.Empty);
-        var trimmed = PyStrings.Strip(string.IsNullOrEmpty(baseUrl) ? TmdbResponses.DefaultBaseUrl : baseUrl).TrimEnd('/');
+        _apiKey = WireStrings.Strip(apiKey ?? string.Empty);
+        var trimmed = WireStrings.Strip(string.IsNullOrEmpty(baseUrl) ? TmdbResponses.DefaultBaseUrl : baseUrl).TrimEnd('/');
         _baseUrl = trimmed;
         _cache = cache ?? MetadataLookupCache.Shared;
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
@@ -119,7 +119,7 @@ public sealed class TmdbMetadataProvider : IMetadataProvider
     /// <summary>Look a movie up: every failure is a status, never an exception. Negative answers are cached too.</summary>
     public async Task<LookupResult> LookupMovieAsync(string title, int? year, CancellationToken cancellationToken = default)
     {
-        var cleaned = PyStrings.Strip(title ?? string.Empty);
+        var cleaned = WireStrings.Strip(title ?? string.Empty);
         if (cleaned.Length == 0)
         {
             return new LookupResult { Status = LookupResult.StatusNoMatch, Detail = "There was no title to look up." };
@@ -193,7 +193,7 @@ public sealed class TmdbMetadataProvider : IMetadataProvider
         {
             baseUrl = ExternalUrlPolicy.ValidateExternalProviderUrl(_baseUrl);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             return new LookupResult { Status = LookupResult.StatusNotConfigured, Detail = $"The metadata provider address is not usable ({exception.Message})." };
         }
@@ -250,7 +250,7 @@ public sealed class MetadataProviderService
     public string StoreProviderKey(string plaintext)
     {
         ArgumentNullException.ThrowIfNull(plaintext);
-        return PyStrings.Strip(plaintext).Length > 0 ? _cipher.Encrypt(plaintext) : string.Empty;
+        return WireStrings.Strip(plaintext).Length > 0 ? _cipher.Encrypt(plaintext) : string.Empty;
     }
 
     /// <summary>The configured provider: null is a normal answer; every caller degrades to the language preferences.</summary>
@@ -265,20 +265,20 @@ public sealed class MetadataProviderService
             return null;
         }
 
-        var name = PyStrings.Strip(row[0]).ToLowerInvariant();
+        var name = WireStrings.Strip(row[0]).ToLowerInvariant();
         if (!TmdbResponses.KnownProviders.Contains(name))
         {
             return null;
         }
 
-        var ciphertext = PyStrings.Strip(row[1]);
+        var ciphertext = WireStrings.Strip(row[1]);
         var key = ciphertext.Length > 0 ? _cipher.Decrypt(ciphertext) ?? string.Empty : string.Empty;
         if (key.Length == 0)
         {
             return null;
         }
 
-        var baseUrl = PyStrings.Strip(row[2]);
+        var baseUrl = WireStrings.Strip(row[2]);
         return new TmdbMetadataProvider(key, _handlers, _time, baseUrl.Length > 0 ? baseUrl : TmdbResponses.DefaultBaseUrl);
     }
 

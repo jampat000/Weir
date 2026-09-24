@@ -40,7 +40,7 @@ public sealed partial class ProcessingRejectHandler
             return new RejectAttempt(false, $"The original is no longer at {source}, so there is nothing to reject.");
         }
 
-        var result = new PyDict().Set("ok", false).Set("outcome", "failed").Set("reason", reason);
+        var result = new WireObject().Set("ok", false).Set("outcome", "failed").Set("reason", reason);
         if (!string.IsNullOrEmpty(failureClass))
         {
             result.Set("failure_class", failureClass);
@@ -64,6 +64,6 @@ public sealed partial class ProcessingRejectHandler
         var sentence = cleanup.Deleted
             ? $"{label} accepted that this release is bad and can find a different one. {cleanup.Detail}"
             : $"{label} accepted that this release is bad, but Weir could not remove the download: {cleanup.Detail} Remove it by hand; Weir will not process it again.";
-        return new RejectAttempt(true, sentence, label, new PyDict().Set("route", "handoff").Set("source_removed", cleanup.Deleted), report);
+        return new RejectAttempt(true, sentence, label, new WireObject().Set("route", "handoff").Set("source_removed", cleanup.Deleted), report);
     }
 }

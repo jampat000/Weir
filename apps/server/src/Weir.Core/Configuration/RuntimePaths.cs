@@ -17,7 +17,7 @@ public sealed record RuntimePaths(string Home, string DbPath, string BackupDir, 
     public static RuntimePaths Resolve(RuntimeEnvironment runtime)
     {
         ArgumentNullException.ThrowIfNull(runtime);
-        var home = PythonCompat.Resolve(ResolveHome(runtime), runtime);
+        var home = ValueParsing.Resolve(ResolveHome(runtime), runtime);
         return new RuntimePaths(
             home,
             ResolveUnderHome(runtime, home, "WEIR_DB_PATH", "data", "weir.sqlite3"),
@@ -45,7 +45,7 @@ public sealed record RuntimePaths(string Home, string DbPath, string BackupDir, 
     private static string ResolveHome(RuntimeEnvironment runtime)
     {
         var overrideValue = (runtime.Get("WEIR_HOME") ?? string.Empty).Trim();
-        return overrideValue.Length > 0 ? PythonCompat.ExpandUser(overrideValue, runtime) : DefaultHome(runtime);
+        return overrideValue.Length > 0 ? ValueParsing.ExpandUser(overrideValue, runtime) : DefaultHome(runtime);
     }
 
     private static string ResolveUnderHome(RuntimeEnvironment runtime, string home, string variable, params string[] defaultSegments)
@@ -53,10 +53,10 @@ public sealed record RuntimePaths(string Home, string DbPath, string BackupDir, 
         var overrideValue = (runtime.Get(variable) ?? string.Empty).Trim();
         if (overrideValue.Length == 0)
         {
-            return PythonCompat.Resolve(Path.Join([home, .. defaultSegments]), runtime);
+            return ValueParsing.Resolve(Path.Join([home, .. defaultSegments]), runtime);
         }
 
-        var expanded = PythonCompat.ExpandUser(overrideValue, runtime);
-        return PythonCompat.Resolve(Path.IsPathFullyQualified(expanded) ? expanded : Path.Join(home, expanded), runtime);
+        var expanded = ValueParsing.ExpandUser(overrideValue, runtime);
+        return ValueParsing.Resolve(Path.IsPathFullyQualified(expanded) ? expanded : Path.Join(home, expanded), runtime);
     }
 }

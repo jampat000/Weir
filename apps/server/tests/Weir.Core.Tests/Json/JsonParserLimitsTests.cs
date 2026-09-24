@@ -8,10 +8,10 @@ public sealed class JsonParserLimitsTests
     [Fact]
     public void Nesting_at_the_limit_parses()
     {
-        var depth = PyJsonParser.MaxDepth;
-        var parsed = PyJsonParser.Parse(new string('[', depth) + new string(']', depth));
+        var depth = WireJsonParser.MaxDepth;
+        var parsed = WireJsonParser.Parse(new string('[', depth) + new string(']', depth));
 
-        Assert.IsType<PyList>(parsed);
+        Assert.IsType<WireArray>(parsed);
     }
 
     [Theory]
@@ -25,22 +25,22 @@ public sealed class JsonParserLimitsTests
             ? new string('[', Depth) + new string(']', Depth)
             : string.Concat(Enumerable.Repeat("{\"a\":", Depth)) + "1" + new string(close, Depth);
 
-        var error = Assert.Throws<PyJsonDecodeException>(() => PyJsonParser.Parse(text));
+        var error = Assert.Throws<WireJsonDecodeException>(() => WireJsonParser.Parse(text));
 
-        Assert.Equal($"Nested more than {PyJsonParser.MaxDepth} levels deep", error.Detail);
+        Assert.Equal($"Nested more than {WireJsonParser.MaxDepth} levels deep", error.Detail);
     }
 
     [Fact]
     public void An_integer_with_too_many_digits_is_a_decode_error()
     {
-        var error = Assert.Throws<PyJsonDecodeException>(() => PyJsonParser.Parse(new string('9', PyJsonParser.MaxIntegerDigits + 1)));
+        var error = Assert.Throws<WireJsonDecodeException>(() => WireJsonParser.Parse(new string('9', WireJsonParser.MaxIntegerDigits + 1)));
 
-        Assert.Equal($"Integer longer than {PyJsonParser.MaxIntegerDigits} digits", error.Detail);
+        Assert.Equal($"Integer longer than {WireJsonParser.MaxIntegerDigits} digits", error.Detail);
     }
 
     [Fact]
     public void An_integer_at_the_digit_limit_parses_including_its_sign()
     {
-        Assert.IsType<PyInt>(PyJsonParser.Parse("-" + new string('9', PyJsonParser.MaxIntegerDigits)));
+        Assert.IsType<WireInteger>(WireJsonParser.Parse("-" + new string('9', WireJsonParser.MaxIntegerDigits)));
     }
 }

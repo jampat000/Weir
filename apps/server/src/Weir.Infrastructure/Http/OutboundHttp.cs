@@ -34,7 +34,7 @@ public sealed class GitHubReleaseCatalogClient : IReleaseCatalogClient
         }
 
         var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-        return ReleaseCatalog.CoerceReleasePayload(PyJsonParser.ParseBytes(bytes));
+        return ReleaseCatalog.CoerceReleasePayload(WireJsonParser.ParseBytes(bytes));
     }
 }
 
@@ -146,7 +146,7 @@ public sealed class ExternalJsonPoster : IExternalJsonPoster
         {
             parsed = SplitUrl.Parse((raw ?? string.Empty).Trim());
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new ExternalEndpointException(ExternalUrlPolicy.InvalidDestination, exception);
         }
@@ -167,7 +167,7 @@ public sealed class ExternalJsonPoster : IExternalJsonPoster
         {
             port = parsed.Port is { } explicitPort && explicitPort != 0 ? explicitPort : parsed.Scheme == "https" ? 443 : 80;
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new ExternalEndpointException(ExternalUrlPolicy.InvalidPort, exception);
         }
@@ -218,7 +218,7 @@ public sealed class NotificationDispatcher
     public Task<int> PostOneAsync(NotificationChannelRecord channel, string title, string detail, string jobEvent, string module, long jobId, string jobKind, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(channel);
-        var now = Core.Time.PyDateTime.UtcNow(_time);
+        var now = Core.Time.Timestamp.UtcNow(_time);
         var body = channel.Provider == "discord"
             ? NotificationRules.DiscordPayload(title, detail, jobEvent, module, jobId, now)
             : NotificationRules.WebhookPayload(jobEvent, module, jobId, jobKind, title, detail, now);

@@ -8,28 +8,28 @@ namespace Weir.Core.MediaManagers;
 /// <summary>Search-lane schedule fields.</summary>
 public static class ScheduleCsv
 {
-    /// <summary>A comma-separated list of day names, tidied. Throws <see cref="PyValueErrorException"/> with the operator's sentence.</summary>
+    /// <summary>A comma-separated list of day names, tidied. Throws <see cref="WireValueException"/> with the operator's sentence.</summary>
     public static string ValidateScheduleDaysCsv(string? raw)
     {
-        var text = PyStrings.Strip(raw ?? string.Empty);
+        var text = WireStrings.Strip(raw ?? string.Empty);
         if (text.Length == 0)
         {
             return string.Empty;
         }
 
-        var tokens = text.Split(',').Select(PyStrings.Strip).Where(t => t.Length > 0).ToList();
+        var tokens = text.Split(',').Select(WireStrings.Strip).Where(t => t.Length > 0).ToList();
         if (tokens.Any(token => !ScheduleGrid.DayNames.Contains(token)))
         {
-            throw new PyValueErrorException("Days must be written like Mon, Tue, Wed with commas between them.");
+            throw new WireValueException("Days must be written like Mon, Tue, Wed with commas between them.");
         }
 
         return string.Join(',', tokens);
     }
 
-    /// <summary>A time as zero-padded <c>HH:MM</c>. Throws <see cref="PyValueErrorException"/> for a time it cannot read.</summary>
+    /// <summary>A time as zero-padded <c>HH:MM</c>. Throws <see cref="WireValueException"/> for a time it cannot read.</summary>
     public static string NormalizeHhmm(string? raw, string fallback)
     {
-        var text = PyStrings.Strip(raw ?? string.Empty);
+        var text = WireStrings.Strip(raw ?? string.Empty);
         if (text.Length == 0)
         {
             return fallback;
@@ -38,17 +38,17 @@ public static class ScheduleCsv
         var parts = text.Split(':');
         if (parts.Length != 2)
         {
-            throw new PyValueErrorException("Times must look like 09:30 (hour and minute).");
+            throw new WireValueException("Times must look like 09:30 (hour and minute).");
         }
 
-        if (!PythonCompat.TryParseInt(PyStrings.Strip(parts[0]), out var hour) || !PythonCompat.TryParseInt(PyStrings.Strip(parts[1]), out var minute))
+        if (!ValueParsing.TryParseInt(WireStrings.Strip(parts[0]), out var hour) || !ValueParsing.TryParseInt(WireStrings.Strip(parts[1]), out var minute))
         {
-            throw new PyValueErrorException("Times must look like 09:30 (hour and minute).");
+            throw new WireValueException("Times must look like 09:30 (hour and minute).");
         }
 
         if (hour is < 0 or > 23 || minute is < 0 or > 59)
         {
-            throw new PyValueErrorException("Hour must be 0–23 and minute must be 0–59.");
+            throw new WireValueException("Hour must be 0–23 and minute must be 0–59.");
         }
 
         return hour.ToString("00", CultureInfo.InvariantCulture) + ":" + minute.ToString("00", CultureInfo.InvariantCulture);

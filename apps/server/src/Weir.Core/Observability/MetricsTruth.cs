@@ -12,7 +12,7 @@ public static class MetricsTruth
         {
             if (value < 0)
             {
-                throw new PyValueErrorException($"Metric {PyStrings.Repr(name)} must not be negative.");
+                throw new WireValueException($"Metric {WireStrings.Repr(name)} must not be negative.");
             }
         }
     }

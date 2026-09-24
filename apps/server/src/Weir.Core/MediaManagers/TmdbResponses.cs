@@ -63,22 +63,22 @@ public static class TmdbResponses
     public static LookupResult Parse(byte[] body, string subject)
     {
         ArgumentNullException.ThrowIfNull(body);
-        PyJson payload;
+        WireValue payload;
         try
         {
-            payload = PyJsonParser.ParseBytes(body);
+            payload = WireJsonParser.ParseBytes(body);
         }
-        catch (Exception exception) when (exception is PyJsonDecodeException or PyJsonEncodingException)
+        catch (Exception exception) when (exception is WireJsonDecodeException or WireJsonEncodingException)
         {
             return new LookupResult { Status = LookupResult.StatusUnreachable, Detail = "The metadata provider returned something unreadable." };
         }
 
-        if (payload is not PyDict dict || dict.Get("results") is not PyList { Items.Count: > 0 } results)
+        if (payload is not WireObject dict || dict.Get("results") is not WireArray { Items.Count: > 0 } results)
         {
             return new LookupResult { Status = LookupResult.StatusNoMatch, Detail = $"The metadata provider had no match for {subject}." };
         }
 
-        if (results.Items[0] is not PyDict first)
+        if (results.Items[0] is not WireObject first)
         {
             return new LookupResult { Status = LookupResult.StatusNoMatch, Detail = $"The metadata provider had no usable match for {subject}." };
         }
@@ -87,14 +87,14 @@ public static class TmdbResponses
         int? parsedYear = release.Length >= 4 && release[..4].All(char.IsAsciiDigit)
             ? int.Parse(release[..4], CultureInfo.InvariantCulture)
             : null;
-        var title = PyValues.Or(first.Get("title"), first.Get("original_title"));
+        var title = ManagerValues.Or(first.Get("title"), first.Get("original_title"));
         return new LookupResult
         {
             Status = LookupResult.StatusMatched,
             Metadata = new TitleMetadata
             {
-                OriginalLanguage = PyStrings.Strip(StrOrEmpty(first.Get("original_language"))).ToLowerInvariant(),
-                Title = PyStrings.Strip(StrOrEmpty(title)),
+                OriginalLanguage = WireStrings.Strip(StrOrEmpty(first.Get("original_language"))).ToLowerInvariant(),
+                Title = WireStrings.Strip(StrOrEmpty(title)),
                 Year = parsedYear,
                 ProviderId = StrOrEmpty(first.Get("id")),
             },
@@ -103,5 +103,5 @@ public static class TmdbResponses
     }
 
     /// <summary>A truthy value as text, otherwise empty.</summary>
-    private static string StrOrEmpty(PyJson? value) => value is { IsTruthy: true } present ? PyConvert.Str(present) : string.Empty;
+    private static string StrOrEmpty(WireValue? value) => value is { IsTruthy: true } present ? WireConvert.Str(present) : string.Empty;
 }

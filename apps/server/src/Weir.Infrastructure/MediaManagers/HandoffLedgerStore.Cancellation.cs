@@ -54,7 +54,7 @@ public sealed partial class HandoffLedgerStore
             "UPDATE media_manager_handoffs SET state = $state, message = $message, last_changed_at = $now WHERE id = $row",
             ("$state", HandoffLedgerRules.Cancelled),
             ("$message", HandoffLedgerRules.CancelledMessage),
-            ("$now", PythonTimestamps.Orm(_time.GetUtcNow())),
+            ("$now", TimestampColumns.Orm(_time.GetUtcNow())),
             ("$row", row.Id)).ConfigureAwait(false);
         return (true, HandoffLedgerRules.CancelledMessage);
     }
@@ -95,7 +95,7 @@ public sealed partial class HandoffLedgerStore
             "UPDATE media_manager_handoffs SET state = $state, output_path = NULL, message = $message, last_changed_at = $now WHERE id = $row",
             ("$state", HandoffLedgerRules.Cancelled),
             ("$message", message),
-            ("$now", PythonTimestamps.Orm(_time.GetUtcNow())),
+            ("$now", TimestampColumns.Orm(_time.GetUtcNow())),
             ("$row", row.Id)).ConfigureAwait(false);
         return true;
     }

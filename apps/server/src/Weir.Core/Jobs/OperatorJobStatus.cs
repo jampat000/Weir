@@ -24,9 +24,9 @@ public static class OperatorJobStatus
         return joined.Length > limit ? joined[..limit] : joined;
     }
 
-    private static string? FileName(PyDict payload)
+    private static string? FileName(WireObject payload)
     {
-        if (!payload.TryGetValue("relative_media_path", out var value) || value is not PyStr s || s.Value.Trim().Length == 0)
+        if (!payload.TryGetValue("relative_media_path", out var value) || value is not WireString s || s.Value.Trim().Length == 0)
         {
             return null;
         }
@@ -113,20 +113,20 @@ public static class OperatorJobStatus
         return ($"{label} needs a review for this job{subject}.", "Open the related Jobs screen to inspect the current status.", technical);
     }
 
-    private static PyDict ParsePayload(string? raw)
+    private static WireObject ParsePayload(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
         {
-            return new PyDict();
+            return new WireObject();
         }
 
         try
         {
-            return PyJsonParser.Parse(raw) as PyDict ?? new PyDict();
+            return WireJsonParser.Parse(raw) as WireObject ?? new WireObject();
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
-            return new PyDict();
+            return new WireObject();
         }
     }
 }

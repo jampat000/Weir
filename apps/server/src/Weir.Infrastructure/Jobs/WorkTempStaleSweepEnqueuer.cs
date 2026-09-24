@@ -38,7 +38,7 @@ public sealed class WorkTempStaleSweepEnqueuer : IPeriodicEnqueuer
         _store.EnqueueOrGetAsync(
             _scope == "tv" ? PeriodicJobKinds.WorkTempStaleSweepDedupeKeyTv : PeriodicJobKinds.WorkTempStaleSweepDedupeKeyMovie,
             PeriodicJobKinds.WorkTempStaleSweep,
-            PyJsonWriter.Dumps(new PyDict().Set("media_scope", _scope).Set("trigger", "scheduled"), PyJsonFormat.Compact),
+            WireJsonWriter.Dumps(new WireObject().Set("media_scope", _scope).Set("trigger", "scheduled"), WireJsonFormat.Compact),
             cancellationToken: cancellationToken);
 
     /// <summary>An interval column of the operator settings row (seconds), or <paramref name="fallback"/> when it is not set.</summary>

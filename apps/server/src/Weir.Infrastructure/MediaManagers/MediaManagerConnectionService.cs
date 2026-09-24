@@ -56,7 +56,7 @@ public sealed class MediaManagerConnectionService
     public async Task<long> CreateAsync(UnitOfWork uow, string kind, string name, string baseUrl = "", string? apiKey = null, bool enabled = true)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        var label = PyStrings.Strip(name ?? string.Empty);
+        var label = WireStrings.Strip(name ?? string.Empty);
         if (label.Length == 0)
         {
             throw new MediaManagerConnectionException(NeedsNameMessage);
@@ -64,10 +64,10 @@ public sealed class MediaManagerConnectionService
 
         if (await MediaManagerConnectionStore.NameExistsAsync(uow, label).ConfigureAwait(false))
         {
-            throw new MediaManagerConnectionException($"A connection named {PyStrings.Repr(label)} already exists.");
+            throw new MediaManagerConnectionException($"A connection named {WireStrings.Repr(label)} already exists.");
         }
 
-        var key = PyStrings.Strip(apiKey ?? string.Empty);
+        var key = WireStrings.Strip(apiKey ?? string.Empty);
         var validKind = ValidateKind(kind);
         var validUrl = ValidateBaseUrl(baseUrl);
         var ciphertext = key.Length > 0 ? EncryptApiKey(key) : null;
@@ -82,7 +82,7 @@ public sealed class MediaManagerConnectionService
         var changes = new List<(string Column, object? Value)>();
         if (name is not null)
         {
-            var label = PyStrings.Strip(name);
+            var label = WireStrings.Strip(name);
             if (label.Length == 0)
             {
                 throw new MediaManagerConnectionException(NeedsNameMessage);
@@ -90,7 +90,7 @@ public sealed class MediaManagerConnectionService
 
             if (await MediaManagerConnectionStore.NameExistsAsync(uow, label, row.Id).ConfigureAwait(false))
             {
-                throw new MediaManagerConnectionException($"A connection named {PyStrings.Repr(label)} already exists.");
+                throw new MediaManagerConnectionException($"A connection named {WireStrings.Repr(label)} already exists.");
             }
 
             if (label != row.Name)
@@ -125,7 +125,7 @@ public sealed class MediaManagerConnectionService
 
         if (apiKey is not null)
         {
-            var stripped = PyStrings.Strip(apiKey);
+            var stripped = WireStrings.Strip(apiKey);
             var ciphertext = stripped.Length > 0 ? EncryptApiKey(stripped) : null;
             if (ciphertext != row.ApiKeyCiphertext)
             {
@@ -155,14 +155,14 @@ public sealed class MediaManagerConnectionService
         }
 
         var expected = _cipher.Decrypt(row.WebhookSecretCiphertext);
-        return !string.IsNullOrEmpty(expected) && CompareDigest(expected, PyStrings.Strip(presented ?? string.Empty));
+        return !string.IsNullOrEmpty(expected) && CompareDigest(expected, WireStrings.Strip(presented ?? string.Empty));
     }
 
     /// <summary>The connection's address and decrypted key for reporting back, or null when it has no address.</summary>
     public ResolvedCallbackTarget? ResolveCallbackTarget(MediaManagerConnectionRecord row)
     {
         ArgumentNullException.ThrowIfNull(row);
-        var baseUrl = PyStrings.Strip(row.BaseUrl);
+        var baseUrl = WireStrings.Strip(row.BaseUrl);
         if (baseUrl.Length == 0)
         {
             return null;
@@ -182,8 +182,8 @@ public sealed class MediaManagerConnectionService
     public ManagerConnection? ConnectionFromRow(MediaManagerConnectionRecord row)
     {
         ArgumentNullException.ThrowIfNull(row);
-        var url = PyStrings.Strip(row.BaseUrl);
-        var ciphertext = PyStrings.Strip(row.ApiKeyCiphertext ?? string.Empty);
+        var url = WireStrings.Strip(row.BaseUrl);
+        var ciphertext = WireStrings.Strip(row.ApiKeyCiphertext ?? string.Empty);
         if (url.Length == 0 || ciphertext.Length == 0)
         {
             return null;
@@ -288,7 +288,7 @@ public sealed class MediaManagerConnectionService
     }
 
     /// <summary>
-    /// Encryption throws a plain <see cref="PyValueErrorException"/> when no <c>WEIR_CREDENTIALS_SECRET</c> or
+    /// Encryption throws a plain <see cref="WireValueException"/> when no <c>WEIR_CREDENTIALS_SECRET</c> or
     /// <c>WEIR_SESSION_SECRET</c> is configured. It becomes a <see cref="MediaManagerConnectionException"/> so the
     /// operator gets a readable 400 naming the env var to set, not a 500 (#544 item 3).
     /// </summary>
@@ -298,7 +298,7 @@ public sealed class MediaManagerConnectionService
         {
             return _cipher.Encrypt(plaintext);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new MediaManagerConnectionException(exception.Message, exception);
         }
@@ -306,11 +306,11 @@ public sealed class MediaManagerConnectionService
 
     private static string ValidateKind(string? kind)
     {
-        var value = PyStrings.Strip(kind ?? string.Empty).ToLowerInvariant();
+        var value = WireStrings.Strip(kind ?? string.Empty).ToLowerInvariant();
         if (!MediaManagerKinds.All.Contains(value))
         {
             throw new MediaManagerConnectionException(
-                $"Unknown media manager kind {PyStrings.Repr(kind ?? string.Empty)}. Known kinds: {string.Join(", ", MediaManagerKinds.All)}.");
+                $"Unknown media manager kind {WireStrings.Repr(kind ?? string.Empty)}. Known kinds: {string.Join(", ", MediaManagerKinds.All)}.");
         }
 
         return value;
@@ -323,7 +323,7 @@ public sealed class MediaManagerConnectionService
     /// </summary>
     internal static string ValidateBaseUrl(string? baseUrl)
     {
-        var raw = PyStrings.Strip(baseUrl ?? string.Empty);
+        var raw = WireStrings.Strip(baseUrl ?? string.Empty);
         if (raw.Length == 0)
         {
             return string.Empty;
@@ -333,7 +333,7 @@ public sealed class MediaManagerConnectionService
         {
             return ExternalUrlPolicy.NormalizeLocalServiceBaseUrl(raw);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new MediaManagerConnectionException($"That address will not work: {exception.Message}", exception);
         }

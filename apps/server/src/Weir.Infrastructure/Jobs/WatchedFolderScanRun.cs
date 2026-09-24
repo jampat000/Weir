@@ -151,7 +151,7 @@ internal sealed class WatchedFolderScanRun
     private async Task EnqueueAsync(WatchedFileDecision decision)
     {
         var rel = decision.RelativePath;
-        var payload = new PyDict()
+        var payload = new WireObject()
             .Set("relative_media_path", rel)
             .Set("media_scope", _scan.MediaScope)
             .Set("trigger", ActivityProvenance.ScanTriggerToTrigger.GetValueOrDefault(_passes.ScanTrigger, "manual"))
@@ -166,7 +166,7 @@ internal sealed class WatchedFolderScanRun
         }
 
         var dedupe = $"{RequeueStore.RemuxPassJobKind}:scan:{Guid.NewGuid():N}";
-        var payloadJson = PyJsonWriter.Dumps(payload, PyJsonFormat.Compact);
+        var payloadJson = WireJsonWriter.Dumps(payload, WireJsonFormat.Compact);
         var runnerCost = _passes.Budget.CostFor(RunnerUnits.ResolutionClassForDimensions(decision.Previous?.VideoWidth, decision.Previous?.VideoHeight));
 
         // The dedupe key is random, so it cannot stop a second pass for the same file. The file's identity does: look for a

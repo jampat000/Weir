@@ -32,7 +32,7 @@ public static partial class RemuxOutputValidation
         }
 
         double? best = null;
-        if (sourceProbe.ValueKind == JsonValueKind.Object && Py.Get(sourceProbe, "streams") is { } streams && Py.IsList(streams))
+        if (sourceProbe.ValueKind == JsonValueKind.Object && RulesJson.Get(sourceProbe, "streams") is { } streams && RulesJson.IsList(streams))
         {
             foreach (var stream in streams.EnumerateArray())
             {
@@ -41,7 +41,7 @@ public static partial class RemuxOutputValidation
                     continue;
                 }
 
-                if (!Py.TryInt(Py.Get(stream, "index"), out var index) || !kept.Contains((int)index))
+                if (!RulesJson.TryInt(RulesJson.Get(stream, "index"), out var index) || !kept.Contains((int)index))
                 {
                     continue;
                 }
@@ -59,13 +59,13 @@ public static partial class RemuxOutputValidation
 
     private static double? StreamDurationSeconds(JsonElement stream)
     {
-        var duration = Py.Get(stream, "duration");
-        if (Py.Truthy(duration))
+        var duration = RulesJson.Get(stream, "duration");
+        if (RulesJson.Truthy(duration))
         {
             var parsed = duration!.Value.ValueKind switch
             {
                 JsonValueKind.Number => duration.Value.GetDouble(),
-                JsonValueKind.String => Py.TryFloatFromText(duration.Value.GetString()!),
+                JsonValueKind.String => RulesJson.TryFloatFromText(duration.Value.GetString()!),
                 _ => (double?)null,
             };
             if (parsed is { } value && value > 0)
@@ -74,11 +74,11 @@ public static partial class RemuxOutputValidation
             }
         }
 
-        var tags = Py.Get(stream, "tags");
-        if (Py.IsDict(tags))
+        var tags = RulesJson.Get(stream, "tags");
+        if (RulesJson.IsDict(tags))
         {
-            var raw = Py.Get(tags!.Value, "DURATION");
-            if (Py.Truthy(raw) && Py.IsStr(raw) && ParseTagsDuration(raw!.Value.GetString()) is { } seconds)
+            var raw = RulesJson.Get(tags!.Value, "DURATION");
+            if (RulesJson.Truthy(raw) && RulesJson.IsStr(raw) && ParseTagsDuration(raw!.Value.GetString()) is { } seconds)
             {
                 return seconds;
             }
@@ -95,7 +95,7 @@ public static partial class RemuxOutputValidation
             return null;
         }
 
-        var match = TagsDurationRegex().Match(PyStrings.Strip(text));
+        var match = TagsDurationRegex().Match(WireStrings.Strip(text));
         if (!match.Success)
         {
             return null;

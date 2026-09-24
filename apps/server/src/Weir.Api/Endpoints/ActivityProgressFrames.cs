@@ -66,17 +66,17 @@ public static class ActivityProgressFrames
     /// <summary>The <c>processing.progress</c> SSE frame: every file with live progress, keyed by its relative path.</summary>
     private static string Frame(IReadOnlyDictionary<string, LiveProgress> files)
     {
-        var entries = files.Select(pair => (PyJson)new PyDict()
+        var entries = files.Select(pair => (WireValue)new WireObject()
             .Set("relative_path", pair.Key)
             .Set("status", pair.Value.Status)
-            .Set("percent", pair.Value.Percent is { } percent ? PyJson.Of(percent) : PyJson.Null)
-            .Set("eta_seconds", pair.Value.EtaSeconds is { } eta ? PyJson.Of(eta) : PyJson.Null)
+            .Set("percent", pair.Value.Percent is { } percent ? WireValue.Of(percent) : WireValue.Null)
+            .Set("eta_seconds", pair.Value.EtaSeconds is { } eta ? WireValue.Of(eta) : WireValue.Null)
             .Set("message", pair.Value.Message)
             .Set("speed", pair.Value.Speed)
-            .Set("elapsed_seconds", pair.Value.ElapsedSeconds is { } elapsed ? PyJson.Of(elapsed) : PyJson.Null)
-            .Set("removed_audio", new PyList(pair.Value.RemovedAudio.Select(t => (PyJson)PyJson.Of(t))))
-            .Set("removed_subtitles", new PyList(pair.Value.RemovedSubtitles.Select(t => (PyJson)PyJson.Of(t)))));
-        var json = PyJsonWriter.Dumps(new PyDict().Set("files", new PyList(entries)), PyJsonFormat.Compact);
+            .Set("elapsed_seconds", pair.Value.ElapsedSeconds is { } elapsed ? WireValue.Of(elapsed) : WireValue.Null)
+            .Set("removed_audio", new WireArray(pair.Value.RemovedAudio.Select(t => (WireValue)WireValue.Of(t))))
+            .Set("removed_subtitles", new WireArray(pair.Value.RemovedSubtitles.Select(t => (WireValue)WireValue.Of(t)))));
+        var json = WireJsonWriter.Dumps(new WireObject().Set("files", new WireArray(entries)), WireJsonFormat.Compact);
         return $"event: processing.progress\ndata: {json}\n\n";
     }
 }

@@ -131,8 +131,8 @@ public sealed record ProcessingRuleSetRecord
     /// <summary>Issue #498: off by default.</summary>
     public bool RemoveChapters { get; init; }
 
-    public PyDateTime CreatedAt { get; init; }
-    public PyDateTime UpdatedAt { get; init; }
+    public Timestamp CreatedAt { get; init; }
+    public Timestamp UpdatedAt { get; init; }
 }
 
 /// <summary>One <c>libraries</c> row.</summary>
@@ -156,10 +156,10 @@ public sealed record ProcessingLibraryRecord
     public long MaxFileSizeMb { get; init; }
     public string RejectedFileAction { get; init; } = "leave";
     public long MinFileAgeSeconds { get; init; } = 60;
-    public PyDateTime? CreatedAfter { get; init; }
-    public PyDateTime? CreatedBefore { get; init; }
-    public PyDateTime? ModifiedAfter { get; init; }
-    public PyDateTime? ModifiedBefore { get; init; }
+    public Timestamp? CreatedAfter { get; init; }
+    public Timestamp? CreatedBefore { get; init; }
+    public Timestamp? ModifiedAfter { get; init; }
+    public Timestamp? ModifiedBefore { get; init; }
     public bool ExcludeHidden { get; init; } = true;
     public bool TopLevelOnly { get; init; }
 
@@ -211,6 +211,6 @@ public sealed record ProcessingLibraryRecord
     public long? DiscoveredFromConnectionId { get; init; }
     public string? DiscoveredLibraryKey { get; init; }
 
-    public PyDateTime CreatedAt { get; init; }
-    public PyDateTime UpdatedAt { get; init; }
+    public Timestamp CreatedAt { get; init; }
+    public Timestamp UpdatedAt { get; init; }
 }

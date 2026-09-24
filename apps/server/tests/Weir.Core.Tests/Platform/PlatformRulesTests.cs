@@ -53,7 +53,7 @@ public sealed class PlatformRulesTests
         var now = new DateTime(2026, 1, 15, 10, 0, 0, DateTimeKind.Utc);
         var row = Session(now, absolute: now.AddHours(1), lastSeen: now);
         Assert.Null(SessionRules.InvalidReason(row, TimeSpan.FromHours(12), now));
-        Assert.Equal(SessionInvalidReason.Revoked, SessionRules.InvalidReason(row with { RevokedAt = PyDateTime.FromUtc(now) }, TimeSpan.FromHours(12), now));
+        Assert.Equal(SessionInvalidReason.Revoked, SessionRules.InvalidReason(row with { RevokedAt = Timestamp.FromUtc(now) }, TimeSpan.FromHours(12), now));
         Assert.Equal(SessionInvalidReason.AbsoluteExpired, SessionRules.InvalidReason(Session(now, now.AddSeconds(-1), now.AddHours(-24)), TimeSpan.FromHours(12), now));
         Assert.Equal(SessionInvalidReason.AbsoluteExpired, SessionRules.InvalidReason(Session(now, now, now), TimeSpan.FromHours(12), now));
         Assert.Equal(SessionInvalidReason.IdleExpired, SessionRules.InvalidReason(Session(now, now.AddDays(7), now.AddHours(-13)), TimeSpan.FromHours(12), now));
@@ -141,7 +141,7 @@ public sealed class PlatformRulesTests
     public void Suite_settings_validation_messages_match()
     {
         var zones = new FakeZones();
-        string Error(SuiteSettingsUpdate update) => Assert.Throws<PyValueErrorException>(() => SuiteSettingsRules.Normalize(update, zones)).Message;
+        string Error(SuiteSettingsUpdate update) => Assert.Throws<WireValueException>(() => SuiteSettingsRules.Normalize(update, zones)).Message;
         Assert.Equal("Product name cannot be empty.", Error(new("   ", null, "UTC", 30)));
         Assert.Equal("Choose a valid timezone (for example: UTC, Europe/London, America/New_York).", Error(new("Weir", null, "Not/A_Real_Zone", 30)));
         Assert.Equal("Log retention must be between 1 and 3650 days.", Error(new("Weir", null, "UTC", 0)));
@@ -167,7 +167,7 @@ public sealed class PlatformRulesTests
         Assert.False(ConfigurationBackupSchedule.IsDue(suite, new DateTime(2026, 4, 24, 12, 0, 0, DateTimeKind.Utc), zones));
         Assert.True(ConfigurationBackupSchedule.IsDue(suite, new DateTime(2026, 4, 24, 13, 45, 0, DateTimeKind.Utc), zones));
 
-        var hourly = suite with { ConfigurationBackupIntervalHours = 6, ConfigurationBackupLastRunAt = PyDateTime.Naive(new DateTime(2026, 4, 24, 10, 0, 0)) };
+        var hourly = suite with { ConfigurationBackupIntervalHours = 6, ConfigurationBackupLastRunAt = Timestamp.Naive(new DateTime(2026, 4, 24, 10, 0, 0)) };
         Assert.False(ConfigurationBackupSchedule.IsDue(hourly, new DateTime(2026, 4, 24, 15, 0, 0, DateTimeKind.Utc), zones));
         Assert.True(ConfigurationBackupSchedule.IsDue(hourly, new DateTime(2026, 4, 24, 16, 0, 0, DateTimeKind.Utc), zones));
         Assert.False(ConfigurationBackupSchedule.IsDue(suite with { ConfigurationBackupEnabled = false }, DateTime.UtcNow, zones));
@@ -177,11 +177,11 @@ public sealed class PlatformRulesTests
     public void Pause_expiry_is_resolved_on_read()
     {
         var now = new DateTime(2026, 9, 17, 2, 0, 0, DateTimeKind.Utc);
-        var until = PyDateTime.Naive(new DateTime(2026, 9, 17, 4, 21, 1, 799).AddTicks(8780));
+        var until = Timestamp.Naive(new DateTime(2026, 9, 17, 4, 21, 1, 799).AddTicks(8780));
         var paused = PauseState.Resolve(new SuiteSettingsRecord { ProcessingPaused = true, ProcessingPausedUntil = until }, now);
         Assert.Equal(
             "{\"paused\":true,\"paused_until\":\"2026-09-17T04:21:01.799878Z\",\"scan_while_paused\":true,\"reason\":\"Processing is paused. Weir will start work again automatically at 2026-09-17 04:21 UTC.\",\"in_flight_policy\":\"Work already running finishes. Pausing stops Weir starting anything new.\"}",
-            PyJsonWriter.Dumps(paused.ToOut(), PyJsonFormat.Response));
+            WireJsonWriter.Dumps(paused.ToOut(), WireJsonFormat.Response));
         Assert.True(PauseState.Resolve(new SuiteSettingsRecord { ProcessingPaused = true, ProcessingPausedUntil = until }, now.AddHours(3)).Expired);
         Assert.Equal("Processing is paused. Weir will start work again when you resume it.", PauseState.Resolve(new SuiteSettingsRecord { ProcessingPaused = true }, now).Reason);
     }
@@ -190,9 +190,9 @@ public sealed class PlatformRulesTests
     public void Security_overview_uses_plain_durations()
     {
         var overview = SecurityOverview.Build(Options);
-        Assert.Equal("14 days", ((PyStr)overview["standard_session_idle_timeout_plain"]).Value);
-        Assert.Equal("1 minute", ((PyStr)overview["sign_in_attempt_window_plain"]).Value);
-        Assert.Equal("1 hour", ((PyStr)overview["first_time_setup_attempt_window_plain"]).Value);
+        Assert.Equal("14 days", ((WireString)overview["standard_session_idle_timeout_plain"]).Value);
+        Assert.Equal("1 minute", ((WireString)overview["sign_in_attempt_window_plain"]).Value);
+        Assert.Equal("1 hour", ((WireString)overview["first_time_setup_attempt_window_plain"]).Value);
         Assert.Equal(["1 second", "59 seconds", "2 minutes", "1 day"], new[] { 1L, 59, 120, 86400 }.Select(SecurityOverview.PlainDuration));
     }
 
@@ -242,17 +242,17 @@ public sealed class PlatformRulesTests
             [new("scanned", 4), new("failed", 1)]).AsSafeDict();
         Assert.Equal(
             "{\"module\":\"processing\",\"action\":\"preview\",\"trigger\":\"scheduled\",\"result\":\"failed\",\"severity\":\"error\",\"provider\":\"Sonarr\",\"media_scope\":\"movies\",\"correlation_id\":\"job-123\",\"reason\":\"Provider returned api_key=[redacted] as rejected\",\"next_action\":\"Re-enter the Sonarr API key and run the connection test again.\",\"counts\":{\"scanned\":4,\"failed\":1}}",
-            PyJsonWriter.Dumps(safe, PyJsonFormat.Response));
+            WireJsonWriter.Dumps(safe, WireJsonFormat.Response));
         Assert.Equal(["info", "info", "warning", "error"], new[] { "success", "skipped", "retrying", "failed" }.Select(Diagnostics.SeverityForResult));
         Assert.Equal(
             "{\"module\":\"processing\",\"action\":\"search\",\"trigger\":\"worker\",\"result\":\"skipped\",\"severity\":\"info\",\"provider\":\"opensubtitles\",\"media_scope_label\":\"Movies\",\"media_scope\":\"movies\",\"counts\":{\"checked\":1,\"downloaded\":0},\"user_message\":\"No subtitle was found.\"}",
-            PyJsonWriter.Dumps(
+            WireJsonWriter.Dumps(
                 OperatorMessages.ActivityDetailEnvelope("processing", "search", "worker", "skipped", "opensubtitles", "movies", [new("checked", 1), new("downloaded", 0), new("bad_flag", null)], "No subtitle was found."),
-                PyJsonFormat.Response));
-        Assert.Equal("{\"failed\":0,\"removed\":3}", PyJsonWriter.Dumps(OperatorMessages.CountSummary([new("failed", -5), new("removed", 3)]), PyJsonFormat.Response));
+                WireJsonFormat.Response));
+        Assert.Equal("{\"failed\":0,\"removed\":3}", WireJsonWriter.Dumps(OperatorMessages.CountSummary([new("failed", -5), new("removed", 3)]), WireJsonFormat.Response));
         Assert.Equal(("Deluno", "TV episodes"), (OperatorMessages.ProviderLabel("deluno"), OperatorMessages.MediaScopeLabel("tv")));
         Assert.Equal(5, MetricsTruth.FinalizedSuccessTotal(new Dictionary<string, long> { ["output_written"] = 2, ["unchanged_copied"] = 3 }));
-        Assert.Contains("must not be negative", Assert.Throws<PyValueErrorException>(() => MetricsTruth.RequireNonNegative(new Dictionary<string, long> { ["files_processed"] = -1 })).Message, StringComparison.Ordinal);
+        Assert.Contains("must not be negative", Assert.Throws<WireValueException>(() => MetricsTruth.RequireNonNegative(new Dictionary<string, long> { ["files_processed"] = -1 })).Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -281,7 +281,7 @@ public sealed class PlatformRulesTests
         output = store.RenderPrometheus();
         Assert.Contains("# TYPE weir_module_savings_bytes_total counter", output, StringComparison.Ordinal);
         Assert.Contains("weir_module_savings_bytes_total{module=\"processing\"} 12345678", output, StringComparison.Ordinal);
-        var summary = PyJsonWriter.Dumps(store.SuiteMetricsOut(), PyJsonFormat.Response);
+        var summary = WireJsonWriter.Dumps(store.SuiteMetricsOut(), WireJsonFormat.Response);
         Assert.Contains("\"error_log_count\":1,\"status_counts\":{\"2xx\":1,\"3xx\":0,\"4xx\":0,\"5xx\":1}", summary, StringComparison.Ordinal);
         Assert.Contains("{\"route\":\"GET /api/v1/health\",\"request_count\":1,\"average_response_ms\":12.5}", summary, StringComparison.Ordinal);
     }
@@ -302,7 +302,7 @@ public sealed class PlatformRulesTests
         Assert.Equal(20, result.Information);
         Assert.Equal(["row-19", "row-18", "row-17", "row-16", "row-15"], result.Items.Select(item => item.Message));
         Assert.Null(SuiteLogFilter.ToOut(result.Items[0] with { Timestamp = "not-a-time" }));
-        Assert.Equal("2026-05-09T10:00:19Z", ((PyStr)SuiteLogFilter.ToOut(result.Items[0])!["timestamp"]).Value);
+        Assert.Equal("2026-05-09T10:00:19Z", ((WireString)SuiteLogFilter.ToOut(result.Items[0])!["timestamp"]).Value);
     }
 
     [Fact]
@@ -314,24 +314,24 @@ public sealed class PlatformRulesTests
         var current = Asset("Weir-win-Setup.exe");
         var legacy = Asset("WeirSetup.exe");
         GitHubReleaseRecord Record(string version, params GitHubReleaseAsset[] assets) =>
-            new($"v{version}", version, $"Weir {version}", "https://example.com/release", PyDateTime.FromUtc(new DateTime(2026, 5, 7, 0, 0, 0, DateTimeKind.Utc)), false, false, assets);
+            new($"v{version}", version, $"Weir {version}", "https://example.com/release", Timestamp.FromUtc(new DateTime(2026, 5, 7, 0, 0, 0, DateTimeKind.Utc)), false, false, assets);
         Assert.Same(current, Record("2.6.1", legacy, current).WindowsInstallerAsset());
         Assert.Same(legacy, Record("2.6.1", legacy).WindowsInstallerAsset());
 
         var windows = UpdateStatus.FromRelease("2.0.7", "windows", Record("2.0.8", current));
-        Assert.Equal("update_available", ((PyStr)windows["status"]).Value);
-        Assert.Equal("Updates are managed by the Weir desktop app via Velopack.", ((PyStr)windows["in_app_upgrade_summary"]).Value);
-        Assert.Equal("2026-05-07T00:00:00Z", ((PyStr)windows["published_at"]).Value);
-        Assert.Equal("up_to_date", ((PyStr)UpdateStatus.FromRelease("2.1.4", "windows", Record("2.1.4"))["status"]).Value);
+        Assert.Equal("update_available", ((WireString)windows["status"]).Value);
+        Assert.Equal("Updates are managed by the Weir desktop app via Velopack.", ((WireString)windows["in_app_upgrade_summary"]).Value);
+        Assert.Equal("2026-05-07T00:00:00Z", ((WireString)windows["published_at"]).Value);
+        Assert.Equal("up_to_date", ((WireString)UpdateStatus.FromRelease("2.1.4", "windows", Record("2.1.4"))["status"]).Value);
         var docker = UpdateStatus.FromRelease("2.0.7", "docker", Record("2.0.8"));
-        Assert.Equal("docker compose pull && docker compose up -d", ((PyStr)docker["docker_update_command"]).Value);
-        Assert.False(((PyBool)docker["in_app_upgrade_supported"]).Value);
-        Assert.IsType<PyNull>(docker["in_app_upgrade_summary"]);
+        Assert.Equal("docker compose pull && docker compose up -d", ((WireString)docker["docker_update_command"]).Value);
+        Assert.False(((WireBool)docker["in_app_upgrade_supported"]).Value);
+        Assert.IsType<WireNull>(docker["in_app_upgrade_summary"]);
 
         Assert.Null(UpdateStatus.ParseUpdateSettings("{\"mode\": \"Notify"));
         Assert.Null(UpdateStatus.ParseUpdateSettings("{\"mode\": \"InstallEverythingNow\"}"));
         Assert.Equal("{\"mode\":\"DownloadOnly\",\"check_on_startup\":false,\"check_interval_minutes\":240}",
-            PyJsonWriter.Dumps(UpdateStatus.ParseUpdateSettings("{\"mode\": \"DownloadOnly\", \"checkOnStartup\": false, \"checkIntervalMinutes\": 240}")!, PyJsonFormat.Response));
+            WireJsonWriter.Dumps(UpdateStatus.ParseUpdateSettings("{\"mode\": \"DownloadOnly\", \"checkOnStartup\": false, \"checkIntervalMinutes\": 240}")!, WireJsonFormat.Response));
         Assert.Equal("{\n  \"mode\": \"Auto\",\n  \"checkOnStartup\": true,\n  \"checkIntervalMinutes\": 1\n}", UpdateStatus.SerializeUpdateSettings("Auto", true, 1));
     }
 
@@ -339,7 +339,7 @@ public sealed class PlatformRulesTests
     public void Notification_rules_and_url_policy_refuse_with_exact_messages()
     {
         string Error(string label, string provider, string url, params string[] events) =>
-            Assert.Throws<PyValueErrorException>(() => NotificationRules.Validate(label, provider, url, events)).Message;
+            Assert.Throws<WireValueException>(() => NotificationRules.Validate(label, provider, url, events)).Message;
         Assert.Equal("Unsupported provider: 'slack'. Choose from: webhook, discord", Error("x", "slack", "https://example.com", "job_failed"));
         Assert.Equal("Blocked provider URL host: 10.0.0.1", Error("x", "discord", "http://10.0.0.1/x"));
         Assert.Equal("Blocked provider URL host: localhost", Error("x", "discord", "http://LOCALHOST:80/x", "job_failed"));
@@ -352,13 +352,13 @@ public sealed class PlatformRulesTests
         Assert.Equal(["job_failed"], NotificationRules.ParseEvents("[\"job_failed\", 5]"));
         Assert.Empty(NotificationRules.ParseEvents("{bad"));
 
-        Assert.True(PyIpAddress.TryParse("203.0.113.7", out var documentation) && !documentation.IsGlobal);
-        Assert.True(PyIpAddress.TryParse("100.64.0.1", out var shared) && !shared.IsGlobal && !shared.IsPrivate);
-        Assert.True(PyIpAddress.TryParse("8.8.8.8", out var google) && google.IsGlobal);
-        Assert.True(PyIpAddress.TryParse("::ffff:10.0.0.1", out var mapped) && mapped.IsPrivate);
-        Assert.False(PyIpAddress.TryParse("01.1.1.1", out _));
-        Assert.True(PyIpNetwork.TryParse("10.0.0.5/24", strict: false, out var network) && network.Contains(documentation) is false);
-        Assert.False(PyIpNetwork.TryParse("10.0.0.5/24", strict: true, out _));
+        Assert.True(NetAddress.TryParse("203.0.113.7", out var documentation) && !documentation.IsGlobal);
+        Assert.True(NetAddress.TryParse("100.64.0.1", out var shared) && !shared.IsGlobal && !shared.IsPrivate);
+        Assert.True(NetAddress.TryParse("8.8.8.8", out var google) && google.IsGlobal);
+        Assert.True(NetAddress.TryParse("::ffff:10.0.0.1", out var mapped) && mapped.IsPrivate);
+        Assert.False(NetAddress.TryParse("01.1.1.1", out _));
+        Assert.True(NetRange.TryParse("10.0.0.5/24", strict: false, out var network) && network.Contains(documentation) is false);
+        Assert.False(NetRange.TryParse("10.0.0.5/24", strict: true, out _));
     }
 
     [Fact]
@@ -379,7 +379,7 @@ public sealed class PlatformRulesTests
     }
 
     private static UserSessionRecord Session(DateTime now, DateTime absolute, DateTime lastSeen) =>
-        new("ab", 1, "cd", PyDateTime.FromUtc(now), PyDateTime.FromUtc(absolute), false, PyDateTime.FromUtc(lastSeen), null, "Browser session");
+        new("ab", 1, "cd", Timestamp.FromUtc(now), Timestamp.FromUtc(absolute), false, Timestamp.FromUtc(lastSeen), null, "Browser session");
 
     private sealed class FakeZones : ITimeZoneResolver
     {

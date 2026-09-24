@@ -42,7 +42,7 @@ public sealed class SetupCodeGate
     }
 
     /// <summary><paramref name="host"/> is a loopback address: the tray's own <c>127.0.0.1</c>, or the same machine's <c>::1</c>.</summary>
-    public static bool IsLoopback(string? host) => host is not null && PyIpAddress.TryParse(host, out var address) && address.IsLoopback;
+    public static bool IsLoopback(string? host) => host is not null && NetAddress.TryParse(host, out var address) && address.IsLoopback;
 
     /// <summary>
     /// Called once at startup: generates and publishes a new code while no admin exists yet, or clears any

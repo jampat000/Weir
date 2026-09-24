@@ -38,10 +38,10 @@ public static class OperatorMessages
     }
 
     /// <summary>Numeric counts only (nulls dropped), never negative.</summary>
-    public static PyDict CountSummary(IReadOnlyList<KeyValuePair<string, long?>> counts)
+    public static WireObject CountSummary(IReadOnlyList<KeyValuePair<string, long?>> counts)
     {
         ArgumentNullException.ThrowIfNull(counts);
-        var summary = new PyDict();
+        var summary = new WireObject();
         foreach (var (key, value) in counts)
         {
             if (value is { } v)
@@ -54,7 +54,7 @@ public static class OperatorMessages
     }
 
     /// <summary>The structured detail an Activity event carries: who, what, result, severity, and the optional labels, counts and messages.</summary>
-    public static PyDict ActivityDetailEnvelope(
+    public static WireObject ActivityDetailEnvelope(
         string module,
         string action,
         string trigger,
@@ -65,7 +65,7 @@ public static class OperatorMessages
         string? userMessage = null,
         string? nextAction = null)
     {
-        var payload = new PyDict()
+        var payload = new WireObject()
             .Set("module", module)
             .Set("action", action)
             .Set("trigger", trigger)

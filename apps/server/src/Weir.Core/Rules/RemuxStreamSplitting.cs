@@ -9,14 +9,14 @@ public static partial class RemuxRules
     {
         ArgumentNullException.ThrowIfNull(stream);
         var tags = stream.Tags;
-        var title = Py.Lower(tags.GetValueOrDefault("title") ?? string.Empty);
+        var title = RulesJson.Lower(tags.GetValueOrDefault("title") ?? string.Empty);
         if (title.Contains("commentary", StringComparison.Ordinal))
         {
             return true;
         }
 
         var comment = tags.GetValueOrDefault("comment");
-        return !string.IsNullOrEmpty(comment) && Py.Lower(comment).Contains("commentary", StringComparison.Ordinal);
+        return !string.IsNullOrEmpty(comment) && RulesJson.Lower(comment).Contains("commentary", StringComparison.Ordinal);
     }
 
     /// <summary>Attached fonts and similar; not part of <see cref="SplitStreams"/>.</summary>
@@ -34,7 +34,7 @@ public static partial class RemuxRules
         var subtitles = new List<ProbeStreamInfo>();
         foreach (var stream in probe.Streams)
         {
-            var codecType = Py.Lower(PyStrings.Strip(Py.StrMethodTarget(stream.Get("codec_type"))));
+            var codecType = RulesJson.Lower(WireStrings.Strip(RulesJson.StrMethodTarget(stream.Get("codec_type"))));
             switch (codecType)
             {
                 case "video":
@@ -62,11 +62,11 @@ public static partial class RemuxRules
     /// </summary>
     private static List<ProbeStreamInfo> SortByIndex(List<ProbeStreamInfo> streams)
     {
-        var keys = streams.Select(s => Py.TryInt(s.Get("index"), out var n) ? n : 0).ToList();
+        var keys = streams.Select(s => RulesJson.TryInt(s.Get("index"), out var n) ? n : 0).ToList();
         return streams.Select((stream, i) => (stream, key: keys[i])).OrderBy(p => p.key).Select(p => p.stream).ToList();
     }
 
-    private static int IndexOf(ProbeStreamInfo stream) => Py.ToInt32(Py.Int(Py.Item(stream.Json, "index")));
+    private static int IndexOf(ProbeStreamInfo stream) => RulesJson.ToInt32(RulesJson.Int(RulesJson.Item(stream.Json, "index")));
 
     /// <summary>
     /// Issue #537 item 6: a stream with no usable <c>index</c> (missing, <c>null</c>, or not a

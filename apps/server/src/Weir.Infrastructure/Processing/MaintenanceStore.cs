@@ -12,8 +12,8 @@ public sealed record MaintenanceFamilyState(
     string Description,
     long Pending,
     long Running,
-    PyDateTime? LastCompletedAt,
-    PyDateTime? LastFailedAt,
+    Timestamp? LastCompletedAt,
+    Timestamp? LastFailedAt,
     string? LastError);
 
 /// <summary>The Processing maintenance jobs' read model and manual triggers.</summary>
@@ -66,7 +66,7 @@ public static class MaintenanceStore
     {
         var scope = mediaScope == "tv" ? "tv" : "movie";
         var dedupe = scope == "tv" ? PeriodicJobKinds.WorkTempStaleSweepDedupeKeyTv : PeriodicJobKinds.WorkTempStaleSweepDedupeKeyMovie;
-        var payload = PyJsonWriter.Dumps(new PyDict().Set("media_scope", scope).Set("trigger", trigger), PyJsonFormat.Compact);
+        var payload = WireJsonWriter.Dumps(new WireObject().Set("media_scope", scope).Set("trigger", trigger), WireJsonFormat.Compact);
         return jobStore.EnqueueOrGetAsync(dedupe, PeriodicJobKinds.WorkTempStaleSweep, payload);
     }
 
@@ -76,7 +76,7 @@ public static class MaintenanceStore
         ArgumentNullException.ThrowIfNull(jobStore);
         var scope = mediaScope == "tv" ? "tv" : "movie";
         var dedupe = scope == "tv" ? PeriodicJobKinds.UnclaimedHandbackCleanupDedupeKeyTv : PeriodicJobKinds.UnclaimedHandbackCleanupDedupeKeyMovie;
-        var payload = PyJsonWriter.Dumps(new PyDict().Set("media_scope", scope).Set("trigger", trigger), PyJsonFormat.Compact);
+        var payload = WireJsonWriter.Dumps(new WireObject().Set("media_scope", scope).Set("trigger", trigger), WireJsonFormat.Compact);
         return jobStore.EnqueueOrGetAsync(dedupe, PeriodicJobKinds.UnclaimedHandbackCleanup, payload);
     }
 
@@ -101,7 +101,7 @@ public static class MaintenanceStore
         }
 
         var dedupe = $"{dedupeBase}:{Guid.NewGuid():N}";
-        var payload = PyJsonWriter.Dumps(new PyDict().Set("media_scope", scope).Set("trigger", trigger), PyJsonFormat.Compact);
+        var payload = WireJsonWriter.Dumps(new WireObject().Set("media_scope", scope).Set("trigger", trigger), WireJsonFormat.Compact);
         var inserted = await uow.ExecuteScalarWriteAsync(
             "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status, max_attempts, runner_cost, priority) " +
             "VALUES (@dedupe, @kind, @payload, 'pending', 3, 0, 0) ON CONFLICT (dedupe_key) DO NOTHING RETURNING id",

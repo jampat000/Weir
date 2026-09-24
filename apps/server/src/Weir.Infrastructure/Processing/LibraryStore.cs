@@ -85,22 +85,22 @@ public static partial class LibraryStore
                 continue;
             }
 
-            PyJson data;
+            WireValue data;
             try
             {
-                data = PyJsonParser.Parse(raw);
+                data = WireJsonParser.Parse(raw);
             }
-            catch (PyJsonDecodeException)
+            catch (WireJsonDecodeException)
             {
                 continue;
             }
 
-            if (data is not PyDict dict)
+            if (data is not WireObject dict)
             {
                 continue;
             }
 
-            if (dict.TryGetValue("library_id", out var libraryIdValue) && libraryIdValue is PyInt libraryIdInt)
+            if (dict.TryGetValue("library_id", out var libraryIdValue) && libraryIdValue is WireInteger libraryIdInt)
             {
                 if (libraryIdInt.Value == library.Id)
                 {
@@ -112,7 +112,7 @@ public static partial class LibraryStore
 
             if (isSeeded)
             {
-                var scope = dict.TryGetValue("media_scope", out var scopeValue) && scopeValue is PyStr scopeStr
+                var scope = dict.TryGetValue("media_scope", out var scopeValue) && scopeValue is WireString scopeStr
                     ? ProcessingMediaScopes.Normalize(scopeStr.Value)
                     : ProcessingMediaScopes.Movie;
                 if (scope == library.MediaType)

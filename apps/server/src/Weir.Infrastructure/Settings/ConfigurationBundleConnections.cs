@@ -26,10 +26,10 @@ internal static class ConfigurationBundleConnections
     private const int MediaManagerNameMaxLength = 200;
     private const int AlertLabelMaxLength = 255;
 
-    public static async Task<PyList> ExportMediaManagersAsync(UnitOfWork uow)
+    public static async Task<WireArray> ExportMediaManagersAsync(UnitOfWork uow)
     {
         var connections = await MediaManagerConnectionStore.ListAsync(uow).ConfigureAwait(false);
-        return new PyList(connections.Select(connection => (PyJson)new PyDict()
+        return new WireArray(connections.Select(connection => (WireValue)new WireObject()
             .Set("id", connection.Id)
             .Set("kind", connection.Kind)
             .Set("name", connection.Name)
@@ -37,13 +37,13 @@ internal static class ConfigurationBundleConnections
             .Set("base_url", connection.BaseUrl)));
     }
 
-    public static async Task<PyList> ExportAlertsAsync(UnitOfWork uow)
+    public static async Task<WireArray> ExportAlertsAsync(UnitOfWork uow)
     {
         var channels = await NotificationChannelStore.ListAsync(uow).ConfigureAwait(false);
-        return new PyList(channels.Select(channel => (PyJson)new PyDict()
+        return new WireArray(channels.Select(channel => (WireValue)new WireObject()
             .Set("label", channel.Label)
             .Set("provider", channel.Provider)
-            .Set("events", new PyList(NotificationRules.ParseEvents(channel.EventsJson).Select(e => (PyJson)new PyStr(e))))
+            .Set("events", new WireArray(NotificationRules.ParseEvents(channel.EventsJson).Select(e => (WireValue)new WireString(e))))
             .Set("enabled", channel.Enabled)));
     }
 
@@ -52,9 +52,9 @@ internal static class ConfigurationBundleConnections
     /// connection id mapped to the id it has here, or <see langword="null"/> when the bundle has no media managers
     /// section, so the libraries that name a connection can be pointed at the right row.
     /// </summary>
-    public static async Task<Dictionary<long, long>?> RestoreMediaManagersAsync(UnitOfWork uow, PyDict bundle)
+    public static async Task<Dictionary<long, long>?> RestoreMediaManagersAsync(UnitOfWork uow, WireObject bundle)
     {
-        if (bundle.Get(MediaManagersSection) is not PyList rows)
+        if (bundle.Get(MediaManagersSection) is not WireArray rows)
         {
             return null;
         }
@@ -64,12 +64,12 @@ internal static class ConfigurationBundleConnections
         var restoredIds = new Dictionary<long, long>();
         foreach (var row in rows.Items)
         {
-            var data = row as PyDict ?? throw new PyValueErrorException("This backup's media managers are not in a form Weir can read.");
+            var data = row as WireObject ?? throw new WireValueException("This backup's media managers are not in a form Weir can read.");
             var name = RequiredText(data, "name", MediaManagerNameMaxLength);
             var kind = RequiredText(data, "kind");
             if (!MediaManagerKinds.All.Contains(kind, StringComparer.Ordinal))
             {
-                throw new PyValueErrorException($"This backup has a media manager, {name}, of a kind this version of Weir does not support.");
+                throw new WireValueException($"This backup has a media manager, {name}, of a kind this version of Weir does not support.");
             }
 
             var baseUrl = ValidateRestoredBaseUrl(name, OptionalText(data, "base_url"));
@@ -90,9 +90,9 @@ internal static class ConfigurationBundleConnections
     }
 
     /// <summary>Adds the bundle's alerts this install does not have (matched by label and provider).</summary>
-    public static async Task RestoreAlertsAsync(UnitOfWork uow, PyDict bundle)
+    public static async Task RestoreAlertsAsync(UnitOfWork uow, WireObject bundle)
     {
-        if (bundle.Get(AlertsSection) is not PyList rows)
+        if (bundle.Get(AlertsSection) is not WireArray rows)
         {
             return;
         }
@@ -102,12 +102,12 @@ internal static class ConfigurationBundleConnections
             .ToHashSet();
         foreach (var row in rows.Items)
         {
-            var data = row as PyDict ?? throw new PyValueErrorException("This backup's alerts are not in a form Weir can read.");
+            var data = row as WireObject ?? throw new WireValueException("This backup's alerts are not in a form Weir can read.");
             var label = RequiredText(data, "label", AlertLabelMaxLength).Trim();
             var provider = RequiredText(data, "provider");
             if (!NotificationRules.SupportedProviders.Contains(provider, StringComparer.Ordinal))
             {
-                throw new PyValueErrorException($"This backup has an alert, {label}, of a kind this version of Weir does not support.");
+                throw new WireValueException($"This backup has an alert, {label}, of a kind this version of Weir does not support.");
             }
 
             if (!existing.Add((label, provider)))
@@ -115,8 +115,8 @@ internal static class ConfigurationBundleConnections
                 continue;
             }
 
-            var events = data.Get("events") is PyList list
-                ? list.Items.OfType<PyStr>().Select(item => item.Value).Where(e => NotificationRules.SupportedEvents.Contains(e, StringComparer.Ordinal)).ToList()
+            var events = data.Get("events") is WireArray list
+                ? list.Items.OfType<WireString>().Select(item => item.Value).Where(e => NotificationRules.SupportedEvents.Contains(e, StringComparer.Ordinal)).ToList()
                 : [];
             await NotificationChannelStore.CreateAsync(uow, label, provider, url: string.Empty, events, enabled: false).ConfigureAwait(false);
         }
@@ -126,20 +126,20 @@ internal static class ConfigurationBundleConnections
     /// Points a library row's <c>discovered_from_connection_id</c> at the connection's id on this install, or
     /// clears it when the bundle did not carry that connection.
     /// </summary>
-    public static void RemapLibraryConnection(PyDict library, IReadOnlyDictionary<long, long> restoredIds)
+    public static void RemapLibraryConnection(WireObject library, IReadOnlyDictionary<long, long> restoredIds)
     {
         const string column = "discovered_from_connection_id";
         var value = library.Get(column);
-        if (value is not null and not PyNull)
+        if (value is not null and not WireNull)
         {
-            library.Set(column, TryReadId(value, out var exportedId) && restoredIds.TryGetValue(exportedId, out var id) ? PyJson.Of(id) : PyNull.Instance);
+            library.Set(column, TryReadId(value, out var exportedId) && restoredIds.TryGetValue(exportedId, out var id) ? WireValue.Of(id) : WireNull.Instance);
         }
     }
 
-    private static bool TryReadId(PyJson? value, out long id)
+    private static bool TryReadId(WireValue? value, out long id)
     {
         id = 0;
-        if (value is not PyInt number || number.Value < long.MinValue || number.Value > long.MaxValue)
+        if (value is not WireInteger number || number.Value < long.MinValue || number.Value > long.MaxValue)
         {
             return false;
         }
@@ -148,22 +148,22 @@ internal static class ConfigurationBundleConnections
         return true;
     }
 
-    private static string RequiredText(PyDict data, string key, int? maxLength = null)
+    private static string RequiredText(WireObject data, string key, int? maxLength = null)
     {
-        if (data.Get(key) is not PyStr text || text.Value.Trim().Length == 0)
+        if (data.Get(key) is not WireString text || text.Value.Trim().Length == 0)
         {
-            throw new PyValueErrorException("This backup is missing part of a media manager or alert. Download a fresh backup and try again.");
+            throw new WireValueException("This backup is missing part of a media manager or alert. Download a fresh backup and try again.");
         }
 
         if (maxLength is { } limit && text.Value.Length > limit)
         {
-            throw new PyValueErrorException($"This backup's {key} is too long for Weir to store.");
+            throw new WireValueException($"This backup's {key} is too long for Weir to store.");
         }
 
         return text.Value;
     }
 
-    private static string OptionalText(PyDict data, string key) => data.Get(key) is PyStr text ? text.Value : string.Empty;
+    private static string OptionalText(WireObject data, string key) => data.Get(key) is WireString text ? text.Value : string.Empty;
 
     /// <summary>
     /// The same address policy a hand-typed connection is held to (<see cref="MediaManagerConnectionService.ValidateBaseUrl"/>),
@@ -178,7 +178,7 @@ internal static class ConfigurationBundleConnections
         }
         catch (MediaManagerConnectionException exception)
         {
-            throw new PyValueErrorException($"This backup has a media manager, {connectionName}, with an address Weir will not use: {exception.Message}");
+            throw new WireValueException($"This backup has a media manager, {connectionName}, with an address Weir will not use: {exception.Message}");
         }
     }
 }

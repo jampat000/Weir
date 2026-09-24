@@ -10,7 +10,7 @@ namespace Weir.Core.Jobs;
 public sealed class AlreadyRecordedFailureException : Exception
 {
     /// <summary>The type name written into the stored technical detail, kept stable so stored errors read the same.</summary>
-    public const string PythonTypeName = "AlreadyRecordedFailure";
+    public const string FailureTypeName = "AlreadyRecordedFailure";
 
     public AlreadyRecordedFailureException()
     {
@@ -68,7 +68,7 @@ public static class WorkerFailures
             text += $" Technical detail: {failure.TechnicalDetail}";
         }
 
-        return PyStrings.Slice(text, ErrorLimit);
+        return WireStrings.Slice(text, ErrorLimit);
     }
 
     /// <summary>The stored error for a job this worker cannot run.</summary>
@@ -78,14 +78,14 @@ public static class WorkerFailures
     /// <summary>The worker's refusal of a retired kind.</summary>
     public static string RetiredKindReason(string jobKind, long jobId) =>
         "worker refused a retired job_kind: " +
-        $"{PyStrings.Repr(jobKind)} (row id={jobId}); nothing runs this kind any more";
+        $"{WireStrings.Repr(jobKind)} (row id={jobId}); nothing runs this kind any more";
 
     /// <summary>The worker's refusal of a kind without the <c>processing.</c> prefix.</summary>
     public static string UnprefixedKindReason(string jobKind, long jobId) =>
         "worker refused job_kind missing required processing.* prefix: " +
-        $"{PyStrings.Repr(jobKind)} (row id={jobId}); enqueue only processing-owned kinds";
+        $"{WireStrings.Repr(jobKind)} (row id={jobId}); enqueue only processing-owned kinds";
 
     /// <summary>A job kind with no registered handler, as a failure cause.</summary>
     public static FailureSubject NoHandler(string jobKind) =>
-        new("ProcessingNoHandlerForJobKind", $"no job handler registered for job_kind={PyStrings.Repr(jobKind)}", ExceptionCategory.Other);
+        new("ProcessingNoHandlerForJobKind", $"no job handler registered for job_kind={WireStrings.Repr(jobKind)}", ExceptionCategory.Other);
 }

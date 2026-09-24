@@ -21,15 +21,15 @@ public sealed class ConfigurationBundleStoreTests : IDisposable
     private Task SeedMetadataProviderKeyAsync() =>
         _store.Execute("UPDATE suite_settings SET metadata_provider = 'tmdb', metadata_provider_key_ciphertext = 'the-ciphertext' WHERE id = 1");
 
-    private Task<PyDict> BuildBundleAsync() => _store.WithUnitOfWork(ConfigurationBundleStore.BuildAsync, commit: false);
+    private Task<WireObject> BuildBundleAsync() => _store.WithUnitOfWork(ConfigurationBundleStore.BuildAsync, commit: false);
 
-    private Task<bool> ApplyAsync(PyDict bundle) => _store.WithUnitOfWork(async uow =>
+    private Task<bool> ApplyAsync(WireObject bundle) => _store.WithUnitOfWork(async uow =>
     {
         await ConfigurationBundleStore.ApplyAsync(uow, bundle, _zones, _store.Options.WeirHome);
         return true;
     });
 
-    private static PyDict LibraryAt(PyDict bundle, int index) => (PyDict)((PyList)bundle["libraries"]).Items[index];
+    private static WireObject LibraryAt(WireObject bundle, int index) => (WireObject)((WireArray)bundle["libraries"]).Items[index];
 
     [Fact]
     public async Task An_export_omits_the_metadata_provider_key_ciphertext()
@@ -37,10 +37,10 @@ public sealed class ConfigurationBundleStoreTests : IDisposable
         await SeedMetadataProviderKeyAsync();
 
         var bundle = await BuildBundleAsync();
-        var suiteSettings = (PyDict)bundle["suite_settings"];
+        var suiteSettings = (WireObject)bundle["suite_settings"];
 
         Assert.False(suiteSettings.ContainsKey("metadata_provider_key_ciphertext"));
-        Assert.Equal("tmdb", ((PyStr)suiteSettings["metadata_provider"]).Value);
+        Assert.Equal("tmdb", ((WireString)suiteSettings["metadata_provider"]).Value);
     }
 
     [Fact]
@@ -58,9 +58,9 @@ public sealed class ConfigurationBundleStoreTests : IDisposable
     public async Task A_watched_folder_with_no_output_folder_refuses_the_whole_restore()
     {
         var bundle = await BuildBundleAsync();
-        LibraryAt(bundle, 0).Set("watched_folder", new PyStr(@"C:\media\watched"));
+        LibraryAt(bundle, 0).Set("watched_folder", new WireString(@"C:\media\watched"));
 
-        var exception = await Assert.ThrowsAsync<PyValueErrorException>(() => ApplyAsync(bundle));
+        var exception = await Assert.ThrowsAsync<WireValueException>(() => ApplyAsync(bundle));
 
         Assert.Contains("Movies", exception.Message, StringComparison.Ordinal);
         Assert.Contains("output folder", exception.Message, StringComparison.Ordinal);
@@ -70,12 +70,12 @@ public sealed class ConfigurationBundleStoreTests : IDisposable
     public async Task Overlapping_folders_between_two_restored_libraries_refuse_the_whole_restore()
     {
         var bundle = await BuildBundleAsync();
-        LibraryAt(bundle, 0).Set("watched_folder", new PyStr(@"C:\media\shared\in"));
-        LibraryAt(bundle, 0).Set("output_folder", new PyStr(@"C:\media\shared\out"));
-        LibraryAt(bundle, 1).Set("watched_folder", new PyStr(@"C:\media\shared\out\nested"));
-        LibraryAt(bundle, 1).Set("output_folder", new PyStr(@"C:\media\tv-out"));
+        LibraryAt(bundle, 0).Set("watched_folder", new WireString(@"C:\media\shared\in"));
+        LibraryAt(bundle, 0).Set("output_folder", new WireString(@"C:\media\shared\out"));
+        LibraryAt(bundle, 1).Set("watched_folder", new WireString(@"C:\media\shared\out\nested"));
+        LibraryAt(bundle, 1).Set("output_folder", new WireString(@"C:\media\tv-out"));
 
-        var exception = await Assert.ThrowsAsync<PyValueErrorException>(() => ApplyAsync(bundle));
+        var exception = await Assert.ThrowsAsync<WireValueException>(() => ApplyAsync(bundle));
 
         Assert.Contains("overlap", exception.Message, StringComparison.Ordinal);
     }
@@ -84,9 +84,9 @@ public sealed class ConfigurationBundleStoreTests : IDisposable
     public async Task An_unknown_rejected_file_action_refuses_the_whole_restore()
     {
         var bundle = await BuildBundleAsync();
-        LibraryAt(bundle, 0).Set("rejected_file_action", new PyStr("quarantine"));
+        LibraryAt(bundle, 0).Set("rejected_file_action", new WireString("quarantine"));
 
-        var exception = await Assert.ThrowsAsync<PyValueErrorException>(() => ApplyAsync(bundle));
+        var exception = await Assert.ThrowsAsync<WireValueException>(() => ApplyAsync(bundle));
 
         Assert.Contains("rejected file action", exception.Message, StringComparison.Ordinal);
     }
@@ -96,10 +96,10 @@ public sealed class ConfigurationBundleStoreTests : IDisposable
     {
         var bundle = await BuildBundleAsync();
         var insideWeirHome = Path.Combine(_store.Options.WeirHome, "watched");
-        LibraryAt(bundle, 0).Set("watched_folder", new PyStr(insideWeirHome));
-        LibraryAt(bundle, 0).Set("output_folder", new PyStr(Path.Combine(_store.Options.WeirHome, "output")));
+        LibraryAt(bundle, 0).Set("watched_folder", new WireString(insideWeirHome));
+        LibraryAt(bundle, 0).Set("output_folder", new WireString(Path.Combine(_store.Options.WeirHome, "output")));
 
-        var exception = await Assert.ThrowsAsync<PyValueErrorException>(() => ApplyAsync(bundle));
+        var exception = await Assert.ThrowsAsync<WireValueException>(() => ApplyAsync(bundle));
 
         Assert.Contains("data folder", exception.Message, StringComparison.Ordinal);
     }
@@ -108,9 +108,9 @@ public sealed class ConfigurationBundleStoreTests : IDisposable
     public async Task A_duplicate_library_name_refuses_the_whole_restore()
     {
         var bundle = await BuildBundleAsync();
-        LibraryAt(bundle, 1).Set("name", new PyStr("Movies"));
+        LibraryAt(bundle, 1).Set("name", new WireString("Movies"));
 
-        var exception = await Assert.ThrowsAsync<PyValueErrorException>(() => ApplyAsync(bundle));
+        var exception = await Assert.ThrowsAsync<WireValueException>(() => ApplyAsync(bundle));
 
         Assert.Contains("already exists", exception.Message, StringComparison.Ordinal);
     }
@@ -119,9 +119,9 @@ public sealed class ConfigurationBundleStoreTests : IDisposable
     public async Task A_bad_row_leaves_the_library_table_completely_untouched()
     {
         var bundle = await BuildBundleAsync();
-        LibraryAt(bundle, 0).Set("watched_folder", new PyStr(@"C:\media\watched"));
+        LibraryAt(bundle, 0).Set("watched_folder", new WireString(@"C:\media\watched"));
 
-        await Assert.ThrowsAsync<PyValueErrorException>(() => ApplyAsync(bundle));
+        await Assert.ThrowsAsync<WireValueException>(() => ApplyAsync(bundle));
 
         var names = await _store.WithUnitOfWork(
             uow => uow.QueryAsync("SELECT name FROM libraries ORDER BY id", reader => reader.GetString(0)),
@@ -133,8 +133,8 @@ public sealed class ConfigurationBundleStoreTests : IDisposable
     public async Task A_valid_bundle_restores_without_complaint()
     {
         var bundle = await BuildBundleAsync();
-        LibraryAt(bundle, 0).Set("watched_folder", new PyStr(@"C:\media\movies-in"));
-        LibraryAt(bundle, 0).Set("output_folder", new PyStr(@"C:\media\movies-out"));
+        LibraryAt(bundle, 0).Set("watched_folder", new WireString(@"C:\media\movies-in"));
+        LibraryAt(bundle, 0).Set("output_folder", new WireString(@"C:\media\movies-out"));
 
         await ApplyAsync(bundle);
 

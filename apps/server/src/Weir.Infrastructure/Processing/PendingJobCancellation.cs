@@ -37,7 +37,7 @@ public static class PendingJobCancellation
                 SqliteValues.GetString(reader, 2),
                 SqliteValues.GetStringOrNull(reader, 3),
                 SqliteValues.GetString(reader, 4),
-                PythonTimestamps.Parse(reader.GetValue(5))),
+                TimestampColumns.Parse(reader.GetValue(5))),
             ("$id", jobId)).ConfigureAwait(false);
         if (found is null)
         {
@@ -59,8 +59,8 @@ public static class PendingJobCancellation
 
         var payload = Parse(found.Payload);
         if (found.Kind == RemuxPassOutcomes.JobKind &&
-            payload?.Get("library_id") is PyInt library && library.Value > 0 &&
-            payload.Get("relative_media_path") is PyStr { Value.Length: > 0 } path)
+            payload?.Get("library_id") is WireInteger library && library.Value > 0 &&
+            payload.Get("relative_media_path") is WireString { Value.Length: > 0 } path)
         {
             await FileStateStore.MarkCancelledAsync(uow, (long)library.Value, path.Value, CancelledFileReasons.InWeir).ConfigureAwait(false);
         }
@@ -70,7 +70,7 @@ public static class PendingJobCancellation
             var handoff = await HandoffLedgerStore.FindAsync(uow, origin.SourceKey, handoffId).ConfigureAwait(false);
             if (handoff is not null)
             {
-                if (payload?.Get("relative_media_path") is PyStr { Value.Length: > 0 } targetPath)
+                if (payload?.Get("relative_media_path") is WireString { Value.Length: > 0 } targetPath)
                 {
                     // So a later file of the same pack finishing still sees this one settled, instead of waiting on it
                     // forever; and so cancelling the pack's last unresolved file still reports the ones that delivered.
@@ -90,7 +90,7 @@ public static class PendingJobCancellation
 
     private sealed record PendingJobRow(long Id, string DedupeKey, string Kind, string? Payload, string Status, DateTimeOffset? CreatedAt);
 
-    private static PyDict? Parse(string? payloadJson)
+    private static WireObject? Parse(string? payloadJson)
     {
         if (string.IsNullOrEmpty(payloadJson))
         {
@@ -99,9 +99,9 @@ public static class PendingJobCancellation
 
         try
         {
-            return PyJsonParser.Parse(payloadJson) as PyDict;
+            return WireJsonParser.Parse(payloadJson) as WireObject;
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
             return null;
         }

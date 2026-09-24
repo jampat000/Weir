@@ -7,14 +7,14 @@ namespace Weir.Core.MediaManagers;
 public sealed record HandoffOrigin(string SourceKey, string? HandoffId, string? CallbackPath, string? ReleaseName, string? LibraryId = null)
 {
     /// <summary>Reads the payload's <c>origin</c>; null unless it names its source.</summary>
-    public static HandoffOrigin? FromPayload(PyJson? payload)
+    public static HandoffOrigin? FromPayload(WireValue? payload)
     {
-        if (payload is not PyDict dict || dict.Get("origin") is not PyDict origin)
+        if (payload is not WireObject dict || dict.Get("origin") is not WireObject origin)
         {
             return null;
         }
 
-        var sourceKey = PyStrings.Strip(Truthy(origin.Get("source_key")) is { } value ? PyConvert.Str(value) : string.Empty);
+        var sourceKey = WireStrings.Strip(Truthy(origin.Get("source_key")) is { } value ? WireConvert.Str(value) : string.Empty);
         if (sourceKey.Length == 0)
         {
             return null;
@@ -29,18 +29,18 @@ public sealed record HandoffOrigin(string SourceKey, string? HandoffId, string? 
     }
 
     /// <summary>A truthy value as stripped text, or null when absent, falsy or blank.</summary>
-    public static string? OptionalText(PyJson? value)
+    public static string? OptionalText(WireValue? value)
     {
         if (Truthy(value) is not { } present)
         {
             return null;
         }
 
-        var text = PyStrings.Strip(PyConvert.Str(present));
+        var text = WireStrings.Strip(WireConvert.Str(present));
         return text.Length == 0 ? null : text;
     }
 
-    private static PyJson? Truthy(PyJson? value) => value is not null && value.IsTruthy ? value : null;
+    private static WireValue? Truthy(WireValue? value) => value is not null && value.IsTruthy ? value : null;
 }
 
 /// <summary>Whether a manager accepted a report. <see cref="Accepted"/> is only ever true on a 2xx answer.</summary>
@@ -58,11 +58,11 @@ public static class CompletionReports
 
     private static readonly HashSet<string> SuccessOutcomes = new(StringComparer.Ordinal) { "live_output_written", "live_skipped_not_required" };
 
-    private static string Outcome(PyDict result) =>
-        PyStrings.Strip(result.Get("outcome") is { IsTruthy: true } value ? PyConvert.Str(value) : string.Empty);
+    private static string Outcome(WireObject result) =>
+        WireStrings.Strip(result.Get("outcome") is { IsTruthy: true } value ? WireConvert.Str(value) : string.Empty);
 
     /// <summary><c>ok</c> and an outcome that actually wrote or verified a file.</summary>
-    public static bool IsSucceeded(PyDict result)
+    public static bool IsSucceeded(WireObject result)
     {
         ArgumentNullException.ThrowIfNull(result);
         return result.Get("ok") is { IsTruthy: true } && SuccessOutcomes.Contains(Outcome(result));
@@ -72,7 +72,7 @@ public static class CompletionReports
     /// The body reported to the manager when a hand-off of one file finishes. <c>outputFiles</c> lists the output file, or
     /// nothing when there is none, the same field a hand-off of several files reports (<see cref="FolderHandoffReports"/>).
     /// </summary>
-    public static PyDict BuildCompletionBody(HandoffOrigin origin, PyDict result, string? outputPath = null, bool rejected = false)
+    public static WireObject BuildCompletionBody(HandoffOrigin origin, WireObject result, string? outputPath = null, bool rejected = false)
     {
         ArgumentNullException.ThrowIfNull(origin);
         ArgumentNullException.ThrowIfNull(result);
@@ -81,11 +81,11 @@ public static class CompletionReports
         var outputFiles = new List<string>();
         if (succeeded)
         {
-            PyJson? outputFile = !string.IsNullOrEmpty(outputPath) ? new PyStr(outputPath) : result.Get("output_file");
-            if (outputFile is PyStr file && PyStrings.Strip(file.Value).Length > 0)
+            WireValue? outputFile = !string.IsNullOrEmpty(outputPath) ? new WireString(outputPath) : result.Get("output_file");
+            if (outputFile is WireString file && WireStrings.Strip(file.Value).Length > 0)
             {
-                body.Set("outputPath", PyStrings.Strip(file.Value));
-                outputFiles.Add(PyStrings.Strip(file.Value));
+                body.Set("outputPath", WireStrings.Strip(file.Value));
+                outputFiles.Add(WireStrings.Strip(file.Value));
             }
 
             body.Set("message", MessageFor(result));
@@ -98,7 +98,7 @@ public static class CompletionReports
                 body.Set("disposition", "rejected");
                 body.Set("sourceRemoved", true);
             }
-            else if (result.Get("rejected_cleanup_status") is PyStr { Value: "deleted" })
+            else if (result.Get("rejected_cleanup_status") is WireString { Value: "deleted" })
             {
                 body.Set("sourceRemoved", true);
             }
@@ -108,9 +108,9 @@ public static class CompletionReports
                 body.Set("sourceRemoved", false);
             }
 
-            if (result.Get("failure_class") is PyStr failureClass && PyStrings.Strip(failureClass.Value).Length > 0)
+            if (result.Get("failure_class") is WireString failureClass && WireStrings.Strip(failureClass.Value).Length > 0)
             {
-                body.Set("failureClass", PyStrings.Strip(failureClass.Value));
+                body.Set("failureClass", WireStrings.Strip(failureClass.Value));
             }
         }
 
@@ -118,10 +118,10 @@ public static class CompletionReports
     }
 
     /// <summary>The fields every report starts with: which hand-off, how it ended, and who is reporting.</summary>
-    public static PyDict ReportHeader(HandoffOrigin origin, string status)
+    public static WireObject ReportHeader(HandoffOrigin origin, string status)
     {
         ArgumentNullException.ThrowIfNull(origin);
-        var body = new PyDict()
+        var body = new WireObject()
             .Set("handoffId", origin.HandoffId)
             .Set("status", status)
             .Set("processorName", ProcessorName);
@@ -139,20 +139,20 @@ public static class CompletionReports
     }
 
     /// <summary>What one pass came to, in the words a report uses: what changed when it succeeded, else why it failed.</summary>
-    public static string MessageFor(PyDict result)
+    public static string MessageFor(WireObject result)
     {
         ArgumentNullException.ThrowIfNull(result);
         return IsSucceeded(result) ? SuccessMessage(Outcome(result), result) : FailureMessage(result);
     }
 
-    private static string SuccessMessage(string outcome, PyDict result)
+    private static string SuccessMessage(string outcome, WireObject result)
     {
-        if (result.Get("passed_through_after_failure") is PyBool { Value: true })
+        if (result.Get("passed_through_after_failure") is WireBool { Value: true })
         {
             return PassThroughAfterFailureMessage;
         }
 
-        if (result.Get("pass_through_unchanged") is PyBool { Value: true })
+        if (result.Get("pass_through_unchanged") is WireBool { Value: true })
         {
             return "The operator passed this file through unchanged; it is ready in the output folder.";
         }
@@ -163,12 +163,12 @@ public static class CompletionReports
         }
 
         var parts = new List<string>();
-        if (result.Get("removed_audio") is PyList { Items.Count: > 0 } audio)
+        if (result.Get("removed_audio") is WireArray { Items.Count: > 0 } audio)
         {
             parts.Add(Plural.Of(audio.Items.Count, "audio track"));
         }
 
-        if (result.Get("removed_subtitles") is PyList { Items.Count: > 0 } subtitles)
+        if (result.Get("removed_subtitles") is WireArray { Items.Count: > 0 } subtitles)
         {
             parts.Add(Plural.Of(subtitles.Items.Count, "subtitle track"));
         }
@@ -176,13 +176,13 @@ public static class CompletionReports
         return parts.Count == 0 ? "Remux finished." : "Removed " + string.Join(" and ", parts) + ".";
     }
 
-    private static string FailureMessage(PyDict result)
+    private static string FailureMessage(WireObject result)
     {
         foreach (var key in new[] { "reason", "output_completeness_note", "source_folder_skip_reason" })
         {
-            if (result.Get(key) is PyStr text && PyStrings.Strip(text.Value).Length > 0)
+            if (result.Get(key) is WireString text && WireStrings.Strip(text.Value).Length > 0)
             {
-                return PyStrings.Strip(text.Value);
+                return WireStrings.Strip(text.Value);
             }
         }
 
@@ -196,7 +196,7 @@ public static class CompletionReports
     public static string ManagerPathJoin(string managerFolder, IEnumerable<string> parts)
     {
         ArgumentNullException.ThrowIfNull(managerFolder);
-        var text = PyStrings.Strip(managerFolder);
+        var text = WireStrings.Strip(managerFolder);
         var windows = text.Contains('\\', StringComparison.Ordinal) || (text.Length >= 2 && text[1] == ':' && char.IsLetter(text[0]));
         var separator = windows ? '\\' : '/';
         var normalized = windows ? text.Replace('/', '\\') : text;

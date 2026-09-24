@@ -72,7 +72,7 @@ public sealed class RuntimeAndLoggingTests
     [InlineData("notset", LogLevel.Trace)]
     [InlineData("verbose", LogLevel.Information)]
     public void Log_level_names_map_to_minimum_levels(string name, LogLevel expected) =>
-        Assert.Equal(expected, PythonLogFormat.ParseMinimumLevel(name));
+        Assert.Equal(expected, LogLineFormat.ParseMinimumLevel(name));
 
     [Fact]
     public void Json_lines_match_the_documented_log_format()
@@ -82,10 +82,10 @@ public sealed class RuntimeAndLoggingTests
             "{\"timestamp\": \"2026-09-17T01:02:03.123456Z\", \"level\": \"WARNING\", \"logger\": \"Weir.Test\", " +
             "\"message\": \"caf\\u00e9 \\\"quoted\\\"\\nnext \\ud83d\\ude00\", \"source\": null, \"detail\": null, " +
             "\"correlation_id\": \"abc\", \"job_id\": null}",
-            PythonLogFormat.JsonLine(at, LogLevel.Warning, "Weir.Test", "café \"quoted\"\nnext 😀", null, "abc", null));
+            LogLineFormat.JsonLine(at, LogLevel.Warning, "Weir.Test", "café \"quoted\"\nnext 😀", null, "abc", null));
 
         var whole = new DateTimeOffset(2026, 9, 17, 1, 2, 3, TimeSpan.Zero);
-        var withError = PythonLogFormat.JsonLine(whole, LogLevel.Error, "L", "m", new InvalidOperationException("boom"), null, "7");
+        var withError = LogLineFormat.JsonLine(whole, LogLevel.Error, "L", "m", new InvalidOperationException("boom"), null, "7");
         Assert.StartsWith("{\"timestamp\": \"2026-09-17T01:02:03Z\", \"level\": \"ERROR\"", withError, StringComparison.Ordinal);
         Assert.Contains("\"job_id\": \"7\", \"traceback\": \"System.InvalidOperationException: boom\"}", withError, StringComparison.Ordinal);
     }
@@ -97,7 +97,7 @@ public sealed class RuntimeAndLoggingTests
     [InlineData(LogLevel.Warning, "WARNING")]
     [InlineData(LogLevel.Error, "ERROR")]
     [InlineData(LogLevel.Critical, "CRITICAL")]
-    public void Level_names_are_the_documented_uppercase_short_form(LogLevel level, string expected) => Assert.Equal(expected, PythonLogFormat.LevelName(level));
+    public void Level_names_are_the_documented_uppercase_short_form(LogLevel level, string expected) => Assert.Equal(expected, LogLineFormat.LevelName(level));
 
     [Fact]
     public void The_file_logger_writes_weir_log_with_the_request_id()
@@ -131,13 +131,13 @@ public sealed class RuntimeAndLoggingTests
         var path = temp.Join("weir.log");
         var now = DateTimeOffset.UtcNow;
         using var file = new WeirLogFile(path, TimeProvider.System);
-        file.WriteLine(PythonLogFormat.JsonLine(now.AddDays(-10), LogLevel.Information, "L", "old", null, null, null));
+        file.WriteLine(LogLineFormat.JsonLine(now.AddDays(-10), LogLevel.Information, "L", "old", null, null, null));
         file.WriteLine("not json");
         file.WriteLine("{\"timestamp\": 5}");
-        file.WriteLine(PythonLogFormat.JsonLine(now.AddDays(-1), LogLevel.Information, "L", "recent", null, null, null));
+        file.WriteLine(LogLineFormat.JsonLine(now.AddDays(-1), LogLevel.Information, "L", "recent", null, null, null));
 
         Assert.True(file.Prune(keepDays: 3));
-        file.WriteLine(PythonLogFormat.JsonLine(now, LogLevel.Information, "L", "new", null, null, null));
+        file.WriteLine(LogLineFormat.JsonLine(now, LogLevel.Information, "L", "new", null, null, null));
 
         var lines = ReadShared(path);
         Assert.Equal(2, lines.Length);
@@ -155,12 +155,12 @@ public sealed class RuntimeAndLoggingTests
         var path = temp.Join("weir.log");
         var now = DateTimeOffset.UtcNow;
         using var file = new WeirLogFile(path, TimeProvider.System);
-        file.WriteLine(PythonLogFormat.JsonLine(now, LogLevel.Information, "L", "recent", null, null, null));
+        file.WriteLine(LogLineFormat.JsonLine(now, LogLevel.Information, "L", "recent", null, null, null));
         // WeirLogFile keeps its own handle open, so appending needs the same sharing it uses.
         using (var appendStream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
         using (var writer = new StreamWriter(appendStream))
         {
-            writer.Write(PythonLogFormat.JsonLine(now.AddDays(-30), LogLevel.Information, "L", "outside the window", null, null, null));
+            writer.Write(LogLineFormat.JsonLine(now.AddDays(-30), LogLevel.Information, "L", "outside the window", null, null, null));
             writer.Write('\n');
         }
 
@@ -177,7 +177,7 @@ public sealed class RuntimeAndLoggingTests
         using var temp = new TempDirectory();
         var path = temp.Join("weir.log");
         using var file = new WeirLogFile(path, TimeProvider.System);
-        file.WriteLine(PythonLogFormat.JsonLine(DateTimeOffset.UtcNow.AddHours(-12), LogLevel.Information, "L", "half a day", null, null, null));
+        file.WriteLine(LogLineFormat.JsonLine(DateTimeOffset.UtcNow.AddHours(-12), LogLevel.Information, "L", "half a day", null, null, null));
         Assert.True(file.Prune(keepDays: 0));
         Assert.Single(ReadShared(path));
     }
@@ -188,8 +188,8 @@ public sealed class RuntimeAndLoggingTests
         using var temp = new TempDirectory();
         using var file = new WeirLogFile(temp.Join("weir.log"), TimeProvider.System);
         var now = DateTimeOffset.UtcNow;
-        file.WriteLine(PythonLogFormat.JsonLine(now, LogLevel.Information, "L", "first", null, null, null));
-        file.WriteLine(PythonLogFormat.JsonLine(now, LogLevel.Information, "L", "second", null, null, null));
+        file.WriteLine(LogLineFormat.JsonLine(now, LogLevel.Information, "L", "first", null, null, null));
+        file.WriteLine(LogLineFormat.JsonLine(now, LogLevel.Information, "L", "second", null, null, null));
         var read = new List<string>();
         var writtenMidRead = false;
 
@@ -199,7 +199,7 @@ public sealed class RuntimeAndLoggingTests
             if (read.Count == 1)
             {
                 // A completion signal with a generous guard: a write that needed the reader's lock would never finish.
-                writtenMidRead = Task.Run(() => file.WriteLine(PythonLogFormat.JsonLine(now, LogLevel.Information, "L", "during", null, null, null)))
+                writtenMidRead = Task.Run(() => file.WriteLine(LogLineFormat.JsonLine(now, LogLevel.Information, "L", "during", null, null, null)))
                     .Wait(TimeSpan.FromSeconds(30));
             }
         }));

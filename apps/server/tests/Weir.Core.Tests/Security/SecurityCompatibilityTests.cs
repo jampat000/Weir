@@ -161,6 +161,6 @@ public sealed class SecurityCompatibilityTests
         var rotated = new CredentialCipher("new-credentials-secret", "rotated-session-secret", [], TimeProvider.System);
         Assert.NotNull(rewrapped);
         Assert.Equal("arr-key", rotated.Decrypt(rewrapped));
-        Assert.Throws<Core.Json.PyValueErrorException>(() => new CredentialCipher(null, null, [], TimeProvider.System).Encrypt("x"));
+        Assert.Throws<Core.Json.WireValueException>(() => new CredentialCipher(null, null, [], TimeProvider.System).Encrypt("x"));
     }
 }

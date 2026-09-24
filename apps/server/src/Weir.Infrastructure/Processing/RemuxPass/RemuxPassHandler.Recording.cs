@@ -13,7 +13,7 @@ public sealed partial class RemuxPassHandler
     /// Writes the processing record and the Activity row together so they cannot disagree. A progress row
     /// already started for the pass becomes the completed row.
     /// </summary>
-    internal async Task RecordAsync(PyDict payload, long? activityId = null)
+    internal async Task RecordAsync(WireObject payload, long? activityId = null)
     {
         var detail = RemuxPassVisibility.ActivityDetail(payload);
         var title = RemuxPassVisibility.ActivityTitle(payload);
@@ -23,7 +23,7 @@ public sealed partial class RemuxPassHandler
                 _database,
                 async uow =>
                 {
-                    if (payload.Get("relative_media_path") is PyStr rel && PyStrings.Strip(rel.Value).Length > 0)
+                    if (payload.Get("relative_media_path") is WireString rel && WireStrings.Strip(rel.Value).Length > 0)
                     {
                         try
                         {
@@ -59,14 +59,14 @@ public sealed partial class RemuxPassHandler
     }
 
     /// <summary>Applies an opt-in rejection deletion, after the rejection was recorded.</summary>
-    private async Task FinishRejectedInputCleanupAsync(PyDict result, long? libraryId, string mediaScope)
+    private async Task FinishRejectedInputCleanupAsync(WireObject result, long? libraryId, string mediaScope)
     {
-        if (result.Get("rejection_kind") is not { IsTruthy: true } || result.Get("rejected_file_action") is not PyStr { Value: "delete_file" })
+        if (result.Get("rejection_kind") is not { IsTruthy: true } || result.Get("rejected_file_action") is not WireString { Value: "delete_file" })
         {
             return;
         }
 
-        if (result.Get("processing_watched_folder_resolved") is not PyStr watched || result.Get("inspected_source_path") is not PyStr inspected)
+        if (result.Get("processing_watched_folder_resolved") is not WireString watched || result.Get("inspected_source_path") is not WireString inspected)
         {
             result.Set("rejected_cleanup_status", "not_deleted");
             result.Set("rejected_cleanup_detail", "Weir did not delete the rejected file because its verified watched-folder path was unavailable.");
@@ -79,7 +79,7 @@ public sealed partial class RemuxPassHandler
         }
 
         await ApplyFileOutcomeStateAsync(result, libraryId, mediaScope, null).ConfigureAwait(false);
-        if (result.Get("relative_media_path") is not PyStr rel || PyStrings.Strip(rel.Value).Length == 0)
+        if (result.Get("relative_media_path") is not WireString rel || WireStrings.Strip(rel.Value).Length == 0)
         {
             return;
         }

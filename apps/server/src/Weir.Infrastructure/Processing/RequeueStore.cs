@@ -35,7 +35,7 @@ public sealed class RequeueStore(ProcessingJobStore jobStore)
             return new RequeueResult(0, 1, OriginalGoneDetail);
         }
 
-        var payload = new PyDict()
+        var payload = new WireObject()
             .Set("relative_media_path", row.RelativePath)
             .Set("media_scope", library.MediaType == "tv" ? "tv" : "movie")
             .Set("library_id", library.Id)
@@ -55,7 +55,7 @@ public sealed class RequeueStore(ProcessingJobStore jobStore)
         await jobStore.EnqueueOrGetAsync(
             $"{RemuxPassJobKind}:requeue:{Guid.NewGuid():N}",
             RemuxPassJobKind,
-            PyJsonWriter.Dumps(payload, PyJsonFormat.Compact),
+            WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),
             priority: (int)library.Priority).ConfigureAwait(false);
 
         const string detail = "Queued again by hand. It starts as soon as there is capacity for it.";

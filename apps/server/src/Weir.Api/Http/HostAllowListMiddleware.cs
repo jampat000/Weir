@@ -23,7 +23,7 @@ public sealed class HostAllowListMiddleware
 
     private readonly RequestDelegate _next;
     private readonly WeirOptions _options;
-    private readonly IReadOnlyList<PyIpNetwork> _trustedProxies;
+    private readonly IReadOnlyList<NetRange> _trustedProxies;
     private readonly ILogger _logger;
     private readonly SlidingWindowLimiter _warnLimiter;
 
@@ -34,8 +34,8 @@ public sealed class HostAllowListMiddleware
         _next = next;
         _options = options;
         _trustedProxies = [.. options.TrustedProxyIps
-            .Select(value => PyIpNetwork.TryParse(value.Trim(), strict: false, out var network) ? network : null)
-            .OfType<PyIpNetwork>()];
+            .Select(value => NetRange.TryParse(value.Trim(), strict: false, out var network) ? network : null)
+            .OfType<NetRange>()];
         _logger = loggerFactory.CreateLogger("weir.platform.http.allowed_hosts");
         _warnLimiter = new SlidingWindowLimiter(maxEvents: 1, windowSeconds: WarnWindowSeconds, time);
     }
@@ -54,7 +54,7 @@ public sealed class HostAllowListMiddleware
             _logger.LogWarning("Refused a request with Host '{Host}', which is not in the allow-list.", host);
         }
 
-        return PyResponses.WritePlainTextAsync(
+        return ApiResponses.WritePlainTextAsync(
             context,
             StatusCodes.Status400BadRequest,
             string.Format(

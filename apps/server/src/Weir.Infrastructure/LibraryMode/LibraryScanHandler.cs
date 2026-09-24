@@ -78,18 +78,18 @@ public sealed class LibraryScanHandler : IJobHandler
         List<ManagerConnection> connections;
         await using (uow.ConfigureAwait(false))
         {
-            PyDict payload;
+            WireObject payload;
             try
             {
-                payload = string.IsNullOrWhiteSpace(context.PayloadJson) ? new PyDict() : PyJsonParser.Parse(context.PayloadJson) as PyDict ?? new PyDict();
+                payload = string.IsNullOrWhiteSpace(context.PayloadJson) ? new WireObject() : WireJsonParser.Parse(context.PayloadJson) as WireObject ?? new WireObject();
             }
-            catch (PyJsonDecodeException)
+            catch (WireJsonDecodeException)
             {
-                payload = new PyDict();
+                payload = new WireObject();
             }
 
-            libraryId = payload.Get("library_id") is PyInt idValue ? (long)idValue.Value : 0;
-            trigger = payload.Get("trigger") is PyStr { Value.Length: > 0 } triggerValue ? triggerValue.Value : "manual";
+            libraryId = payload.Get("library_id") is WireInteger idValue ? (long)idValue.Value : 0;
+            trigger = payload.Get("trigger") is WireString { Value.Length: > 0 } triggerValue ? triggerValue.Value : "manual";
             library = libraryId > 0 ? await LibraryStore.GetAsync(uow, libraryId).ConfigureAwait(false) : null;
             if (library is null)
             {
@@ -176,9 +176,9 @@ public sealed class LibraryScanHandler : IJobHandler
                         LibraryActivityEventTypes.ScanCompleted,
                         "library",
                         title,
-                        PyJsonWriter.Dumps(
-                            new PyDict().Set("trigger", trigger).Set("library_id", libraryId).Set("result", "success").Set("queued_to_clean", queued),
-                            PyJsonFormat.Compact)))
+                        WireJsonWriter.Dumps(
+                            new WireObject().Set("trigger", trigger).Set("library_id", libraryId).Set("result", "success").Set("queued_to_clean", queued),
+                            WireJsonFormat.Compact)))
                 .ConfigureAwait(false);
             await recordUow.CommitAsync().ConfigureAwait(false);
         }

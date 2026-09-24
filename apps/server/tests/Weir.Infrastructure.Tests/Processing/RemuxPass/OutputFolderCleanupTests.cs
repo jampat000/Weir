@@ -21,7 +21,7 @@ public sealed class OutputFolderCleanupTests : IDisposable
     private static ManagerLibraryTruth Reported(params string[] paths) =>
         new(new ManagerConnection("radarr", "Main", "http://x", "k"), SignalStatus.Reported, paths);
 
-    private static string Str(PyDict output, string key) => PyConvert.Str(output[key]);
+    private static string Str(WireObject output, string key) => WireConvert.Str(output[key]);
 
     private string MovieOutput(string title = "Title", bool old = true)
     {
@@ -36,9 +36,9 @@ public sealed class OutputFolderCleanupTests : IDisposable
         return file;
     }
 
-    private Task<PyDict> RunMovie(string finalOutputFile, string relative = "Title/m.mkv", string scope = "movie", int minAge = 0)
+    private Task<WireObject> RunMovie(string finalOutputFile, string relative = "Title/m.mkv", string scope = "movie", int minAge = 0)
     {
-        var output = new PyDict();
+        var output = new WireObject();
         var source = _folders.Source(relative);
         return Cleanup(minAge).RunMovieAsync(output, _folders.Runtime(), _folders.Watched, source, finalOutputFile, relative, 1, scope, null, CancellationToken.None)
             .ContinueWith(_ => output, TaskScheduler.Default);
@@ -61,7 +61,7 @@ public sealed class OutputFolderCleanupTests : IDisposable
             ["movie_output_folder_deleted", "movie_output_folder_path", "movie_output_folder_skip_reason", "movie_output_truth_check", "movie_output_truth_note", "movie_output_age_seconds", "movie_output_cascade_folders_deleted", "movie_output_dry_run"],
             output.Keys);
 
-        var tv = new PyDict();
+        var tv = new WireObject();
         await Cleanup().RunTvAsync(tv, _folders.Runtime(), _folders.Watched, _folders.Source("m.mkv"), MovieOutput(), 1, "movie", null, CancellationToken.None);
         Assert.Contains("Movies output-folder cleanup is separate", Str(tv, "tv_output_season_folder_skip_reason"), StringComparison.Ordinal);
     }
@@ -75,7 +75,7 @@ public sealed class OutputFolderCleanupTests : IDisposable
         var output = await RunMovie(final);
 
         Assert.Equal("failed", Str(output, "movie_output_truth_check"));
-        Assert.False(((PyBool)output["movie_output_folder_deleted"]).Value);
+        Assert.False(((WireBool)output["movie_output_folder_deleted"]).Value);
         Assert.True(File.Exists(final));
     }
 
@@ -90,7 +90,7 @@ public sealed class OutputFolderCleanupTests : IDisposable
 
         var output = await RunMovie(final, "Pack/m.mkv");
 
-        Assert.False(((PyBool)output["movie_output_folder_deleted"]).Value);
+        Assert.False(((WireBool)output["movie_output_folder_deleted"]).Value);
         Assert.Equal(ReleaseFolderRemoval.OtherVideosFolderKeptReason, Str(output, "movie_output_folder_skip_reason"));
         Assert.True(File.Exists(otherOutput));
     }
@@ -107,11 +107,11 @@ public sealed class OutputFolderCleanupTests : IDisposable
         var output = await RunMovie(final, "Collection/Title/m.mkv");
 
         Assert.Equal("passed", Str(output, "movie_output_truth_check"));
-        Assert.True(((PyBool)output["movie_output_folder_deleted"]).Value);
+        Assert.True(((WireBool)output["movie_output_folder_deleted"]).Value);
         Assert.False(Directory.Exists(_folders.Out("Collection")));
         Assert.True(Directory.Exists(_folders.Output));
-        Assert.Equal(PyNull.Instance, output["movie_output_folder_skip_reason"]);
-        Assert.Single(((PyList)output["movie_output_cascade_folders_deleted"]).Items);
+        Assert.Equal(WireNull.Instance, output["movie_output_folder_skip_reason"]);
+        Assert.Single(((WireArray)output["movie_output_cascade_folders_deleted"]).Items);
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public sealed class OutputFolderCleanupTests : IDisposable
         var output = await RunMovie(final, "Collection/Title/m.mkv");
 
         Assert.Equal("skipped", Str(output, "movie_output_truth_check"));
-        Assert.False(((PyBool)output["movie_output_folder_deleted"]).Value);
+        Assert.False(((WireBool)output["movie_output_folder_deleted"]).Value);
         Assert.Contains("not yet reported this release as imported", Str(output, "movie_output_folder_skip_reason"), StringComparison.Ordinal);
         Assert.True(File.Exists(final));
         Assert.True(Directory.Exists(_folders.Out(Path.Join("Collection", "Title"))));
@@ -146,7 +146,7 @@ public sealed class OutputFolderCleanupTests : IDisposable
         var output = await RunMovie(final, "Collection/Title/m.mkv");
 
         Assert.Equal("passed", Str(output, "movie_output_truth_check"));
-        Assert.True(((PyBool)output["movie_output_folder_deleted"]).Value);
+        Assert.True(((WireBool)output["movie_output_folder_deleted"]).Value);
     }
 
     [Fact]
@@ -182,7 +182,7 @@ public sealed class OutputFolderCleanupTests : IDisposable
         _data.ActiveJobs.Add(new ActiveRemuxJob(1, """{"relative_media_path":"Title/m.mkv","media_scope":"movie"}"""));
 
         var unblocked = await RunMovie(final);
-        Assert.True(((PyBool)unblocked["movie_output_folder_deleted"]).Value);
+        Assert.True(((WireBool)unblocked["movie_output_folder_deleted"]).Value);
 
         final = MovieOutput();
         _data.ActiveJobs.Add(new ActiveRemuxJob(3, """{"relative_media_path":"./Title/m.mkv"}"""));
@@ -206,7 +206,7 @@ public sealed class OutputFolderCleanupTests : IDisposable
     {
         var final = MovieOutput();
         _data.Truth.Add(Reported(_folders.Out(Path.Join("ManagerLibrary", "m.mkv"))));
-        PyDict output;
+        WireObject output;
         using (new FileStream(final, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {
             output = await RunMovie(final);
@@ -228,11 +228,11 @@ public sealed class OutputFolderCleanupTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(nested)!);
         File.WriteAllText(nested, "fresh");
         _data.Truth.Add(Reported(_folders.Out(Path.Join("ManagerLibrary", "ep.mkv"))));
-        var output = new PyDict();
+        var output = new WireObject();
 
         await Cleanup(minAge: 3600).RunTvAsync(output, _folders.Runtime(), _folders.Watched, _folders.Source(Path.Join("Show", "S01", "ep.mkv")), episode, 1, "tv", null, CancellationToken.None);
 
-        Assert.True(((PyBool)output["tv_output_season_folder_deleted"]).Value, PyJsonWriter.Dumps(output, PyJsonFormat.Compact));
+        Assert.True(((WireBool)output["tv_output_season_folder_deleted"]).Value, WireJsonWriter.Dumps(output, WireJsonFormat.Compact));
         Assert.False(Directory.Exists(_folders.Out("Show")));
     }
 
@@ -242,13 +242,13 @@ public sealed class OutputFolderCleanupTests : IDisposable
         var episode = _folders.Out(Path.Join("Show", "S01", "ep.mkv"));
         Directory.CreateDirectory(Path.GetDirectoryName(episode)!);
         _data.Truth.Add(Reported());
-        var empty = new PyDict();
+        var empty = new WireObject();
         await Cleanup().RunTvAsync(empty, _folders.Runtime(), _folders.Watched, _folders.Source(Path.Join("Show", "S01", "ep.mkv")), episode, 1, "tv", null, CancellationToken.None);
         Assert.Contains("did not find any supported episode media file", Str(empty, "tv_output_season_folder_skip_reason"), StringComparison.Ordinal);
 
         File.WriteAllText(episode, "x");
         _data.ActiveJobs.Add(new ActiveRemuxJob(7, """{"relative_media_path":"Show/S01/ep2.mkv","media_scope":"tv"}"""));
-        var blocked = new PyDict();
+        var blocked = new WireObject();
         await Cleanup().RunTvAsync(blocked, _folders.Runtime(), _folders.Watched, _folders.Source(Path.Join("Show", "S01", "ep.mkv")), episode, 1, "tv", null, CancellationToken.None);
         Assert.Contains("Another TV video pass", Str(blocked, "tv_output_season_folder_skip_reason"), StringComparison.Ordinal);
         Assert.True(File.Exists(episode));

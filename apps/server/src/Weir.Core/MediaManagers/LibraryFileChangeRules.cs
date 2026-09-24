@@ -46,7 +46,7 @@ public static class LibraryFileChangeRules
 
     /// <summary>Case- and separator-insensitive, matching <c>HandoffPaths</c>' own comparison.</summary>
     public static string ComparablePath(string? path) =>
-        PyStrings.Strip((path ?? string.Empty).Replace('\\', '/')).TrimEnd('/').ToLowerInvariant();
+        WireStrings.Strip((path ?? string.Empty).Replace('\\', '/')).TrimEnd('/').ToLowerInvariant();
 
     /// <summary>Whether two paths name the same file, ignoring separator style and case; two empty paths never match.</summary>
     public static bool PathsEqual(string? left, string? right)

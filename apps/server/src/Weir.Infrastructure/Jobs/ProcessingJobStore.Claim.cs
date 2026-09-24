@@ -87,8 +87,8 @@ public sealed partial class ProcessingJobStore
             ("@leased", ProcessingJobStatus.Leased),
             ("@pending", ProcessingJobStatus.Pending),
             ("@owner", leaseOwner),
-            ("@lease_exp", PythonTimestamps.Adapter(leaseExpiresAt)),
-            ("@now", PythonTimestamps.Adapter(now)),
+            ("@lease_exp", TimestampColumns.Adapter(leaseExpiresAt)),
+            ("@now", TimestampColumns.Adapter(now)),
         };
         var predicate = AdmissionPredicate(admission, lane, parameters);
         var kindsPredicate = KindsPredicate(kinds, parameters);

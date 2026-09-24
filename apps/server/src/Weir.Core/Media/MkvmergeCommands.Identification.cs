@@ -72,41 +72,41 @@ public static partial class MkvmergeCommands
             return new MkvmergeIdentification(tracks, attachments, chapters);
         }
 
-        var trackArray = Py.Get(json, "tracks");
+        var trackArray = RulesJson.Get(json, "tracks");
         if (trackArray is { ValueKind: JsonValueKind.Array })
         {
             foreach (var track in trackArray.Value.EnumerateArray())
             {
                 if (track.ValueKind == JsonValueKind.Object
-                    && Py.TryInt(Py.Get(track, "id"), out var id))
+                    && RulesJson.TryInt(RulesJson.Get(track, "id"), out var id))
                 {
-                    tracks.Add(new MkvmergeTrack((int)id, Py.Lower(PyStrings.Strip(Py.StrOr(Py.Get(track, "type"), string.Empty)))));
+                    tracks.Add(new MkvmergeTrack((int)id, RulesJson.Lower(WireStrings.Strip(RulesJson.StrOr(RulesJson.Get(track, "type"), string.Empty)))));
                 }
             }
         }
 
-        var attachmentArray = Py.Get(json, "attachments");
+        var attachmentArray = RulesJson.Get(json, "attachments");
         if (attachmentArray is { ValueKind: JsonValueKind.Array })
         {
             foreach (var attachment in attachmentArray.Value.EnumerateArray())
             {
                 if (attachment.ValueKind == JsonValueKind.Object
-                    && Py.TryInt(Py.Get(attachment, "id"), out var id))
+                    && RulesJson.TryInt(RulesJson.Get(attachment, "id"), out var id))
                 {
                     attachments.Add(new MkvmergeAttachment(
                         (int)id,
-                        PyStrings.Strip(Py.StrOr(Py.Get(attachment, "content_type"), string.Empty)),
-                        PyStrings.Strip(Py.StrOr(Py.Get(attachment, "file_name"), string.Empty))));
+                        WireStrings.Strip(RulesJson.StrOr(RulesJson.Get(attachment, "content_type"), string.Empty)),
+                        WireStrings.Strip(RulesJson.StrOr(RulesJson.Get(attachment, "file_name"), string.Empty))));
                 }
             }
         }
 
-        var chapterArray = Py.Get(json, "chapters");
+        var chapterArray = RulesJson.Get(json, "chapters");
         if (chapterArray is { ValueKind: JsonValueKind.Array })
         {
             foreach (var entry in chapterArray.Value.EnumerateArray())
             {
-                if (entry.ValueKind == JsonValueKind.Object && Py.TryInt(Py.Get(entry, "num_entries"), out var count))
+                if (entry.ValueKind == JsonValueKind.Object && RulesJson.TryInt(RulesJson.Get(entry, "num_entries"), out var count))
                 {
                     chapters += (int)count;
                 }
@@ -198,12 +198,12 @@ public static partial class MkvmergeCommands
         }
 
         var disposition = stream.Get("disposition");
-        if (!Py.IsDict(disposition))
+        if (!RulesJson.IsDict(disposition))
         {
             return false;
         }
 
-        var attachedPic = Py.Get(disposition!.Value, "attached_pic");
-        return Py.Truthy(attachedPic) && Py.Int(attachedPic) != 0;
+        var attachedPic = RulesJson.Get(disposition!.Value, "attached_pic");
+        return RulesJson.Truthy(attachedPic) && RulesJson.Int(attachedPic) != 0;
     }
 }

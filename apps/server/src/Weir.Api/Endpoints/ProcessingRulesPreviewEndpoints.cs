@@ -44,9 +44,9 @@ public static class ProcessingRulesPreviewEndpoints
         // readers as PUT /processing/rule-sets/{id}), just never written to the database. It is read by hand
         // rather than through BodyModel.Dict, which always requires the key.
         LibraryRules.RuleSetInput? ruleSetInput = null;
-        if (payload is PyDict topLevel && topLevel.TryGetValue("rules", out var rawRules) && rawRules is not PyNull)
+        if (payload is WireObject topLevel && topLevel.TryGetValue("rules", out var rawRules) && rawRules is not WireNull)
         {
-            if (rawRules is not PyDict rulesDict)
+            if (rawRules is not WireObject rulesDict)
             {
                 issues.Add(new ValidationIssue("dict_type", ["body", "rules"], "Input should be a valid dictionary", rawRules));
             }
@@ -186,7 +186,7 @@ public static class ProcessingRulesPreviewEndpoints
             throw new ApiException(StatusCodes.Status400BadRequest, "This file contains no video stream, so Weir cannot preview a plan for it.");
         }
 
-        PyDict? originalLanguageOut = null;
+        WireObject? originalLanguageOut = null;
         if (config.OriginalLanguage is { Enabled: true } originalRules)
         {
             (config, originalLanguageOut) = await ApplyOriginalLanguageAsync(request, config, originalRules, scope, resolvedPath, audio).ConfigureAwait(false);
@@ -203,15 +203,15 @@ public static class ProcessingRulesPreviewEndpoints
         var rows = RulesPreview.BuildTrackRows(probe, plan);
         var estimatedReduction = RulesPreview.EstimateDroppedBytes(probe, plan, duration);
 
-        var result = new PyDict()
+        var result = new WireObject()
             .Set("library_id", library.Id)
             .Set("media_scope", scope)
             .Set("inspected_path", resolvedPath)
-            .Set("tracks", new PyList(rows.Select(row => (PyJson)row.ToOut())))
-            .Set("notes", new PyList(plan.AudioSelectionNotes.Select(n => (PyJson)new PyStr(n))))
-            .Set("metadata_notes", new PyList(plan.MetadataNotes.Select(n => (PyJson)new PyStr(n))))
+            .Set("tracks", new WireArray(rows.Select(row => (WireValue)row.ToOut())))
+            .Set("notes", new WireArray(plan.AudioSelectionNotes.Select(n => (WireValue)new WireString(n))))
+            .Set("metadata_notes", new WireArray(plan.MetadataNotes.Select(n => (WireValue)new WireString(n))))
             .Set("remux_required", remuxRequired)
-            .Set("estimated_size_reduction_bytes", estimatedReduction is { } bytes ? PyJson.Of(bytes) : PyJson.Null)
+            .Set("estimated_size_reduction_bytes", estimatedReduction is { } bytes ? WireValue.Of(bytes) : WireValue.Null)
             .Set("estimated_size_reduction_is_estimate", true);
         if (originalLanguageOut is not null)
         {
@@ -254,7 +254,7 @@ public static class ProcessingRulesPreviewEndpoints
     /// unreachable) leaves the configured language preferences in charge, with a note saying so, rather
     /// than failing the preview.
     /// </summary>
-    private static async Task<(ProcessingRulesConfig Config, PyDict Record)> ApplyOriginalLanguageAsync(
+    private static async Task<(ProcessingRulesConfig Config, WireObject Record)> ApplyOriginalLanguageAsync(
         ApiRequest request,
         ProcessingRulesConfig config,
         OriginalLanguageRules rules,
@@ -280,7 +280,7 @@ public static class ProcessingRulesPreviewEndpoints
             .Select(stream => new OriginalLanguageTrack((int)stream.Index!.Value, stream.Tag("language") ?? string.Empty))
             .ToList();
         var outcome = OriginalLanguage.SelectTracks(rules, lookup, tracks);
-        var record = new PyDict()
+        var record = new WireObject()
             .Set("lookup_status", lookup.Status)
             .Set("lookup_detail", lookup.Detail)
             .Set("original_language", lookup.Metadata?.OriginalLanguage)

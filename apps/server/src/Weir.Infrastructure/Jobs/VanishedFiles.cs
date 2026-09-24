@@ -82,7 +82,7 @@ public static class VanishedFiles
             var rows = await uow.QueryAsync(
                 "SELECT id, relative_path, status, coalesce(last_seen_at, updated_at, created_at) FROM files WHERE library_id = @lib " +
                 $"AND status IN ({string.Join(", ", WaitingStatuses.Select((_, index) => $"@s{index}"))})",
-                reader => (Row: new WaitingRow(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetValue(3)), LastSeen: PythonTimestamps.Parse(reader.GetValue(3))),
+                reader => (Row: new WaitingRow(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetValue(3)), LastSeen: TimestampColumns.Parse(reader.GetValue(3))),
                 [("@lib", libraryId), .. statuses]).ConfigureAwait(false);
             var cutoff = now - Grace;
             return [.. rows.Where(row => row.LastSeen is { } seen && seen <= cutoff).Select(row => row.Row)];
@@ -126,14 +126,14 @@ public static class VanishedFiles
             ActivityEventTypes.ProcessingFileLeftWatchedFolder,
             "processing",
             $"{MediaPathNames.Name(row.RelativePath, OperatingSystem.IsWindows())} left the watched folder before Weir finished with it, so it is no longer listed",
-            PyJsonWriter.Dumps(
-                new PyDict()
+            WireJsonWriter.Dumps(
+                new WireObject()
                     .Set("relative_media_path", row.RelativePath)
                     .Set("library_id", libraryId)
                     .Set("last_status", row.Status)
                     .Set("trigger", trigger)
                     .Set("result", "skipped"),
-                PyJsonFormat.Compact))).ConfigureAwait(false);
+                WireJsonFormat.Compact))).ConfigureAwait(false);
         return true;
     }
 }

@@ -115,12 +115,12 @@ public static class LibraryModeEndpoints
         if (active is not null)
         {
             await request.CommitAsync().ConfigureAwait(false);
-            return ApiRoutes.Ok(new PyDict().Set("job_id", active.JobId).Set("status", active.Status).Set("already_running", true));
+            return ApiRoutes.Ok(new WireObject().Set("job_id", active.JobId).Set("status", active.Status).Set("already_running", true));
         }
 
         var jobStore = request.Service<ProcessingJobStore>();
         var job = await LibraryScanStore.RequestScanAsync(uow, jobStore, library.Id, "manual").ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict().Set("job_id", job.Id).Set("status", job.Status).Set("already_running", false));
+        return ApiRoutes.Ok(new WireObject().Set("job_id", job.Id).Set("status", job.Status).Set("already_running", false));
     }
 }

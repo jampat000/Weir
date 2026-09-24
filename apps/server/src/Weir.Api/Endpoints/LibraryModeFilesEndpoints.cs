@@ -31,7 +31,7 @@ public static class LibraryModeFilesEndpoints
         return endpoints;
     }
 
-    private static PyDict FileOut(LibraryFileRow row) => new PyDict()
+    private static WireObject FileOut(LibraryFileRow row) => new WireObject()
         .Set("path", row.Path)
         .Set("size_bytes", row.SizeBytes)
         .Set("modified_at", row.ModifiedTimeUnixSeconds)
@@ -114,12 +114,12 @@ public static class LibraryModeFilesEndpoints
         var filtered = await LibraryViewStore.TotalsAsync(uow, libraryId, query).ConfigureAwait(false);
         var rows = await LibraryViewStore.ListFilesAsync(uow, libraryId, query).ConfigureAwait(false);
 
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("library_id", libraryId)
             .Set("scan", await LibraryModeMapping.ScanOutAsync(uow, libraryId, LibraryModeMapping.Logger(request)).ConfigureAwait(false))
             .Set("summary", LibraryModeMapping.TotalsOut(overall))
             .Set("filtered", LibraryModeMapping.TotalsOut(filtered))
-            .Set("files", new PyList(rows.Select(row => (PyJson)FileOut(row))))
+            .Set("files", new WireArray(rows.Select(row => (WireValue)FileOut(row))))
             .Set("total", filtered.Files)
             .Set("page", query.Page)
             .Set("page_size", query.PageSize)
@@ -136,7 +136,7 @@ public static class LibraryModeFilesEndpoints
     /// plan. The clean job checks again when it runs, against a fresh read: this is about answering the request well,
     /// not about deciding whether the file is safe to touch.
     /// </summary>
-    private static ManualCleanChoice ManualChoiceFor(PyDict manualPlan, List<LibraryScanFileEntry> selected)
+    private static ManualCleanChoice ManualChoiceFor(WireObject manualPlan, List<LibraryScanFileEntry> selected)
     {
         if (selected.Count != 1)
         {
@@ -297,21 +297,21 @@ public static class LibraryModeFilesEndpoints
             jobIds.Count, jobIds, removingFiles, removingTracks, bytesSaved, skipped, LibraryCleanPreflightRunner.WarningMessages(preflight.Values)));
     }
 
-    private static PyDict CleanOut(
+    private static WireObject CleanOut(
         int queued,
         IReadOnlyList<long> jobIds,
         int filesCount,
         int tracksCount,
         long bytesSaved,
         IReadOnlyList<string> skipped,
-        IReadOnlyList<string> warnings) => new PyDict()
+        IReadOnlyList<string> warnings) => new WireObject()
         .Set("queued", queued)
-        .Set("job_ids", new PyList(jobIds.Select(id => (PyJson)new PyInt(id))))
+        .Set("job_ids", new WireArray(jobIds.Select(id => (WireValue)new WireInteger(id))))
         .Set("files_count", filesCount)
         .Set("tracks_count", tracksCount)
         .Set("estimated_bytes_saved", bytesSaved)
-        .Set("skipped_paths", new PyList(skipped.Select(p => (PyJson)new PyStr(p))))
-        .Set("warnings", new PyList(warnings.Select(w => (PyJson)new PyStr(w))));
+        .Set("skipped_paths", new WireArray(skipped.Select(p => (WireValue)new WireString(p))))
+        .Set("warnings", new WireArray(warnings.Select(w => (WireValue)new WireString(w))));
 
     /// <summary>
     /// "Leave this file alone", and its undo. It outlives a rescan (the scan rewrites its own index from scratch,
@@ -336,6 +336,6 @@ public static class LibraryModeFilesEndpoints
         var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
         await LibraryFileMarksStore.SetLeaveAloneAsync(uow, library.Id, filePath!, leaveAlone, request.Time.GetUtcNow()).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict().Set("path", filePath).Set("leave_alone", leaveAlone));
+        return ApiRoutes.Ok(new WireObject().Set("path", filePath).Set("leave_alone", leaveAlone));
     }
 }

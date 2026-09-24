@@ -47,7 +47,7 @@ public static class ProcessingRemuxPassEndpoints
         }
 
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("ok", true)
             .Set("job_id", job.Id)
             .Set("dedupe_key", job.DedupeKey)

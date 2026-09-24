@@ -85,11 +85,11 @@ public sealed record ProcessingFileRecord
     public double? DurationSeconds { get; init; }
     public string? AudioCodecs { get; init; }
     public long? VideoBitDepth { get; init; }
-    public PyDateTime? SizeChangedAt { get; init; }
-    public PyDateTime? HoldUntil { get; init; }
+    public Timestamp? SizeChangedAt { get; init; }
+    public Timestamp? HoldUntil { get; init; }
     public string? FailureClass { get; init; }
     public long FailureAttempts { get; init; }
-    public PyDateTime? NextRetryAt { get; init; }
+    public Timestamp? NextRetryAt { get; init; }
 
     public string? OutputCollisionPolicy { get; init; }
     public string? OutputCollisionAction { get; init; }
@@ -99,8 +99,8 @@ public sealed record ProcessingFileRecord
     public bool HardwareFellBackToSoftware { get; init; }
     public string? HardwareReason { get; init; }
 
-    public PyDateTime? LastSeenAt { get; init; }
-    public PyDateTime? LastAttemptAt { get; init; }
+    public Timestamp? LastSeenAt { get; init; }
+    public Timestamp? LastAttemptAt { get; init; }
 
     /// <summary>Size of the source the last successful pass cleaned; null before one, or before migration 0010.</summary>
     public long? ProcessedSourceSize { get; init; }
@@ -108,8 +108,8 @@ public sealed record ProcessingFileRecord
     /// <summary>Modification time (ns since the Unix epoch) of that source, as <c>SourceFiles.Fingerprint</c> measures it.</summary>
     public long? ProcessedSourceMtimeNs { get; init; }
 
-    public PyDateTime CreatedAt { get; init; }
-    public PyDateTime UpdatedAt { get; init; }
+    public Timestamp CreatedAt { get; init; }
+    public Timestamp UpdatedAt { get; init; }
 }
 
 /// <summary>Filters for listing <c>files</c> rows.</summary>
@@ -118,7 +118,7 @@ public sealed record ProcessingFileListFilter
     public long? LibraryId { get; init; }
     public string? Status { get; init; }
     public string? PathContains { get; init; }
-    public PyDateTime? Since { get; init; }
+    public Timestamp? Since { get; init; }
 
     /// <summary>Only these files, when set: a person's exact choice rather than whatever else matches.</summary>
     public IReadOnlyList<long>? Ids { get; init; }

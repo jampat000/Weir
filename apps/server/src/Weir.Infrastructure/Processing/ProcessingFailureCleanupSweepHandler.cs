@@ -32,7 +32,7 @@ public abstract class ProcessingFailureCleanupSweepHandler : IJobHandler
         var (mediaScope, trigger) = ParsePayload(context.PayloadJson, _defaultScope);
 
         var database = _sweep.Database;
-        var startedDetail = new PyDict().Set("job_id", context.Id).Set("media_scope", mediaScope).Set("cleanup_run_status", "started");
+        var startedDetail = new WireObject().Set("job_id", context.Id).Set("media_scope", mediaScope).Set("cleanup_run_status", "started");
         await LockedWrites.RunAsync(
             database,
             uow => ProcessingFailureCleanupActivity.RecordSweepStartedAsync(uow, mediaScope, startedDetail, trigger),
@@ -59,25 +59,25 @@ public abstract class ProcessingFailureCleanupSweepHandler : IJobHandler
             return (defaultScope, null);
         }
 
-        PyJson parsed;
+        WireValue parsed;
         try
         {
-            parsed = PyJsonParser.Parse(payloadJson);
+            parsed = WireJsonParser.Parse(payloadJson);
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
             return (defaultScope, null);
         }
 
-        if (parsed is not PyDict data)
+        if (parsed is not WireObject data)
         {
             return (defaultScope, null);
         }
 
-        var scope = data.Get("media_scope") is PyStr scopeValue && string.Equals(PyStrings.Strip(scopeValue.Value), "tv", StringComparison.OrdinalIgnoreCase)
+        var scope = data.Get("media_scope") is WireString scopeValue && string.Equals(WireStrings.Strip(scopeValue.Value), "tv", StringComparison.OrdinalIgnoreCase)
             ? "tv"
             : "movie";
-        var trigger = data.Get("trigger") is PyStr triggerValue ? triggerValue.Value : null;
+        var trigger = data.Get("trigger") is WireString triggerValue ? triggerValue.Value : null;
         return (scope, trigger);
     }
 }

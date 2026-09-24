@@ -73,10 +73,10 @@ public sealed class RemuxPassRealFfmpegTests : IDisposable
         return path;
     }
 
-    private Task<PyDict> Run(string relative) =>
+    private Task<WireObject> Run(string relative) =>
         Runner().RunAsync(new RemuxPassRequest { Runtime = _folders.Runtime(), RelativeMediaPath = relative, RulesConfig = RemuxRules.DefaultConfig(), MinFileAgeSeconds = 0 });
 
-    private static string Str(PyDict result, string key) => PyConvert.Str(result[key]);
+    private static string Str(WireObject result, string key) => WireConvert.Str(result[key]);
 
     [RequiresFfmpegFact]
     public async Task A_handed_over_film_is_remuxed_without_the_unwanted_language_and_its_release_folder_removed()
@@ -120,7 +120,7 @@ public sealed class RemuxPassRealFfmpegTests : IDisposable
         var result = await Run("The.Terror.1963/The.Terror.1963.mkv");
 
         Assert.Equal(RemuxPassOutcomes.FailedBeforeExecution, Str(result, "outcome"));
-        Assert.Equal(PyBool.True, result["content_unusable"]);
+        Assert.Equal(WireBool.True, result["content_unusable"]);
         Assert.False(File.Exists(_folders.Out(Path.Join("The.Terror.1963", "The.Terror.1963.mkv"))));
         Assert.True(File.Exists(path));
     }

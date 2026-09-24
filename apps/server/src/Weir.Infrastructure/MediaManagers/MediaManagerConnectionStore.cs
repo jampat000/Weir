@@ -21,7 +21,7 @@ public sealed record MediaManagerSearchLaneRecord(
     long ScheduleIntervalSeconds)
 {
     /// <summary>The lane as the API returns it.</summary>
-    public PyDict ToOut() => new PyDict()
+    public WireObject ToOut() => new WireObject()
         .Set("lane", Lane)
         .Set("enabled", Enabled)
         .Set("max_items_per_run", MaxItemsPerRun)
@@ -43,7 +43,7 @@ public sealed record MediaManagerConnectionRecord(
     string? ApiKeyCiphertext,
     string? WebhookSecretCiphertext,
     bool? LastTestOk,
-    PyDateTime? LastTestAt,
+    Timestamp? LastTestAt,
     string? LastTestDetail)
 {
     public IReadOnlyList<MediaManagerSearchLaneRecord> Lanes { get; init; } = [];
@@ -58,7 +58,7 @@ public sealed record MediaManagerConnectionRecord(
     public bool AcceptsUnsignedWebhooks => string.IsNullOrEmpty(WebhookSecretCiphertext);
 
     /// <summary>The connection as the API returns it: secrets are reported only as saved or not.</summary>
-    public PyDict ToOut() => new PyDict()
+    public WireObject ToOut() => new WireObject()
         .Set("id", Id)
         .Set("kind", Kind)
         .Set("name", Name)
@@ -72,10 +72,10 @@ public sealed record MediaManagerConnectionRecord(
             AcceptsUnsignedWebhooks
                 ? $"This connection accepts webhooks without a secret. Create a secret and add it to {MediaManagerKinds.LabelForConnection(Kind, Name)}."
                 : null)
-        .Set("last_test_ok", LastTestOk is { } ok ? PyJson.Of(ok) : PyJson.Null)
-        .Set("last_test_at", LastTestAt is { } at ? at.PydanticJson() : null)
+        .Set("last_test_ok", LastTestOk is { } ok ? WireValue.Of(ok) : WireValue.Null)
+        .Set("last_test_at", LastTestAt is { } at ? at.ToWireText() : null)
         .Set("last_test_detail", LastTestDetail)
-        .Set("lanes", new PyList(Lanes.OrderBy(lane => lane.Lane, StringComparer.Ordinal).Select(lane => (PyJson)lane.ToOut())));
+        .Set("lanes", new WireArray(Lanes.OrderBy(lane => lane.Lane, StringComparer.Ordinal).Select(lane => (WireValue)lane.ToOut())));
 }
 
 /// <summary>
@@ -220,7 +220,7 @@ public static class MediaManagerConnectionStore
     }
 
     /// <summary>The conditional test-result write: 0 when the connection was removed meanwhile.</summary>
-    public static Task<int> RecordTestResultAsync(UnitOfWork uow, long connectionId, bool ok, PyDateTime checkedAt, string detail)
+    public static Task<int> RecordTestResultAsync(UnitOfWork uow, long connectionId, bool ok, Timestamp checkedAt, string detail)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.ExecuteAsync(

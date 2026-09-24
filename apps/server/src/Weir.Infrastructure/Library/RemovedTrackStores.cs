@@ -33,7 +33,7 @@ public sealed class FileLogRemovedTrackStore : IRemovedTrackStore
             "DELETE FROM removed_tracks WHERE relative_path = @relative_path AND library_id IS @library_id",
             ("@relative_path", key.RelativePath), ("@library_id", key.LibraryId)).ConfigureAwait(false);
 
-        var recordedAt = SqliteValues.ToSqlite(PyDateTime.FromUtc(_time.GetUtcNow().UtcDateTime));
+        var recordedAt = SqliteValues.ToSqlite(Timestamp.FromUtc(_time.GetUtcNow().UtcDateTime));
         foreach (var track in tracks)
         {
             await uow.ExecuteAsync(

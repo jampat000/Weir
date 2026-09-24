@@ -33,13 +33,13 @@ public static partial class WeirTempFiles
 
     /// <summary>
     /// The remux temp output names for one source file: <c>{stem}.processing.XXXXXXXX{suffix}</c>, where
-    /// stem and suffix are split as <see cref="PythonStemAndSuffix"/> splits them.
+    /// stem and suffix are split as <see cref="StemAndSuffix"/> splits them.
     /// </summary>
     public static Regex RemuxTempNameFor(string relativeMediaPath)
     {
         ArgumentNullException.ThrowIfNull(relativeMediaPath);
-        var name = PythonName(relativeMediaPath);
-        var (stem, suffix) = PythonStemAndSuffix(name);
+        var name = BaseName(relativeMediaPath);
+        var (stem, suffix) = StemAndSuffix(name);
         var effectiveSuffix = suffix.Length == 0 ? ".mkv" : suffix;
         return new Regex(
             "^" + Regex.Escape(stem) + @"\.processing\." + RandomPart + Regex.Escape(effectiveSuffix) + "$",
@@ -59,7 +59,7 @@ public static partial class WeirTempFiles
     }
 
     /// <summary>The last path segment for either separator, ignoring trailing separators.</summary>
-    public static string PythonName(string path)
+    public static string BaseName(string path)
     {
         ArgumentNullException.ThrowIfNull(path);
         var trimmed = path.TrimEnd('/', '\\');
@@ -71,7 +71,7 @@ public static partial class WeirTempFiles
     /// Stem and suffix: the last dot splits them unless it is the first or last character, in which case
     /// there is no suffix (so <c>.hidden</c> and <c>name.</c> have none).
     /// </summary>
-    public static (string Stem, string Suffix) PythonStemAndSuffix(string name)
+    public static (string Stem, string Suffix) StemAndSuffix(string name)
     {
         ArgumentNullException.ThrowIfNull(name);
         var index = name.LastIndexOf('.');

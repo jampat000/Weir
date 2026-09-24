@@ -8,34 +8,34 @@ namespace Weir.Infrastructure.Auth;
 public sealed partial class AuthService
 {
     /// <summary>The session as the API shows it.</summary>
-    public PyDict SessionPublic(UserSessionRecord session, bool current)
+    public WireObject SessionPublic(UserSessionRecord session, bool current)
     {
         ArgumentNullException.ThrowIfNull(session);
         var label = string.IsNullOrEmpty(session.ClientLabel) ? SessionRules.DefaultClientLabel : session.ClientLabel;
-        return new PyDict()
+        return new WireObject()
             .Set("session_id", session.PublicId)
-            .Set("client_label", PyStrings.Slice(label, 80))
+            .Set("client_label", WireStrings.Slice(label, 80))
             .Set("current", current)
             .Set("trusted_device", session.IsTrustedDevice)
-            .Set("created_at", session.CreatedAt.PydanticJson())
-            .Set("last_seen_at", session.LastSeenAt.PydanticJson())
-            .Set("absolute_expires_at", session.AbsoluteExpiresAt.PydanticJson())
+            .Set("created_at", session.CreatedAt.ToWireText())
+            .Set("last_seen_at", session.LastSeenAt.ToWireText())
+            .Set("absolute_expires_at", session.AbsoluteExpiresAt.ToWireText())
             .Set("idle_timeout_minutes", SessionRules.IdleTimeoutMinutes(session.IsTrustedDevice, _options))
             .Set("absolute_timeout_days", SessionRules.AbsoluteTimeoutDays(session.IsTrustedDevice, _options));
     }
 
-    public static PyDict UserPublic(UserRecord user)
+    public static WireObject UserPublic(UserRecord user)
     {
         ArgumentNullException.ThrowIfNull(user);
-        return new PyDict().Set("id", user.Id).Set("username", user.Username).Set("role", user.Role);
+        return new WireObject().Set("id", user.Id).Set("username", user.Username).Set("role", user.Role);
     }
 
     /// <summary>The user's active sessions, newest first, with the request's own session as it is held in memory.</summary>
-    public async Task<List<PyJson>> ListActiveSessionsAsync(UnitOfWork uow, long userId, UserSessionRecord? current)
+    public async Task<List<WireValue>> ListActiveSessionsAsync(UnitOfWork uow, long userId, UserSessionRecord? current)
     {
         var moment = Now();
         var rows = await AuthStore.ActiveSessionsNewestFirstAsync(uow, userId, moment).ConfigureAwait(false);
-        var output = new List<PyJson>();
+        var output = new List<WireValue>();
         foreach (var stored in rows)
         {
             var row = current is not null && stored.Id == current.Id ? current : stored;

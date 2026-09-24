@@ -38,7 +38,7 @@ public static class LibraryScanStore
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(jobs);
-        var payload = new PyDict().Set("library_id", libraryId).Set("trigger", trigger);
+        var payload = new WireObject().Set("library_id", libraryId).Set("trigger", trigger);
         if (scheduledAt is { } due)
         {
             payload.Set("scheduled_at", due.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
@@ -49,7 +49,7 @@ public static class LibraryScanStore
             uow.WriteTransaction(),
             LibraryModeJobKinds.ScanDedupeKey(libraryId),
             LibraryModeJobKinds.ScanKind,
-            PyJsonWriter.Dumps(payload, PyJsonFormat.Compact),
+            WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
             0,
             LibraryModePriority.Low);
@@ -73,12 +73,12 @@ public static class LibraryScanStore
         string path,
         string trigger,
         bool confirmFinalRemoval,
-        PyDict? manualPlan = null,
+        WireObject? manualPlan = null,
         long? expectedSizeBytes = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(jobs);
-        var payload = new PyDict()
+        var payload = new WireObject()
             .Set("library_id", libraryId)
             .Set("path", path)
             .Set("trigger", trigger)
@@ -112,7 +112,7 @@ public static class LibraryScanStore
             uow.WriteTransaction(),
             dedupeKey,
             LibraryModeJobKinds.CleanKind,
-            PyJsonWriter.Dumps(payload, PyJsonFormat.Compact),
+            WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
             0,
             LibraryModePriority.Low);
@@ -191,11 +191,11 @@ public static class LibraryScanStore
 
         try
         {
-            return PyJsonParser.Parse(json) is PyDict dict && LibraryScanSnapshot.FromPayload(dict, libraryId) is { } parsed
+            return WireJsonParser.Parse(json) is WireObject dict && LibraryScanSnapshot.FromPayload(dict, libraryId) is { } parsed
                 ? new LibraryScanOutcome(parsed.GeneratedAt, parsed.Errors)
                 : new LibraryScanOutcome(DateTimeOffset.UnixEpoch, []);
         }
-        catch (PyJsonDecodeException exception)
+        catch (WireJsonDecodeException exception)
         {
             // The file index still comes from library_files; only the scan time and its errors are lost.
             logger.LogWarning(exception, "Library scan job_id={JobId} has an unreadable payload; showing its files without the scan time or errors.", latest.JobId);
@@ -216,12 +216,12 @@ public static class LibraryScanStore
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(paths);
-        var wanted = new PyList(paths.Distinct(StringComparer.Ordinal).Select(path => (PyJson)new PyStr(path)));
+        var wanted = new WireArray(paths.Distinct(StringComparer.Ordinal).Select(path => (WireValue)new WireString(path)));
         var rows = await uow.QueryAsync(
             $"SELECT {FileColumns} FROM {FilesWithProbes} WHERE f.library_id = @id AND f.path IN (SELECT value FROM json_each(@paths))",
             ReadFile,
             ("@id", libraryId),
-            ("@paths", PyJsonWriter.Dumps(wanted, PyJsonFormat.Compact))).ConfigureAwait(false);
+            ("@paths", WireJsonWriter.Dumps(wanted, WireJsonFormat.Compact))).ConfigureAwait(false);
         return rows.ToDictionary(file => file.Path, StringComparer.Ordinal);
     }
 
@@ -238,14 +238,14 @@ public static class LibraryScanStore
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(outcome);
         var existingJson = await uow.ScalarAsync("SELECT payload_json FROM jobs WHERE id = @id", ("@id", jobId)).ConfigureAwait(false);
-        PyDict payload;
+        WireObject payload;
         try
         {
-            payload = existingJson is string text && text.Length > 0 && PyJsonParser.Parse(text) is PyDict dict ? dict : new PyDict();
+            payload = existingJson is string text && text.Length > 0 && WireJsonParser.Parse(text) is WireObject dict ? dict : new WireObject();
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
-            payload = new PyDict();
+            payload = new WireObject();
         }
 
         payload.Set("ok", ok);
@@ -254,12 +254,12 @@ public static class LibraryScanStore
             payload.Set("reason", reason);
         }
 
-        payload.Set(LibraryScanSnapshot.PayloadKey, new PyDict()
+        payload.Set(LibraryScanSnapshot.PayloadKey, new WireObject()
             .Set("generated_at", outcome.GeneratedAt.ToUnixTimeSeconds())
-            .Set("errors", new PyList(outcome.Errors.Select(e => (PyJson)new PyStr(e)))));
+            .Set("errors", new WireArray(outcome.Errors.Select(e => (WireValue)new WireString(e)))));
         await uow.ExecuteAsync(
             "UPDATE jobs SET payload_json = @payload, updated_at = CURRENT_TIMESTAMP WHERE id = @id",
-            ("@payload", PyJsonWriter.Dumps(payload, PyJsonFormat.Compact)),
+            ("@payload", WireJsonWriter.Dumps(payload, WireJsonFormat.Compact)),
             ("@id", jobId)).ConfigureAwait(false);
     }
 

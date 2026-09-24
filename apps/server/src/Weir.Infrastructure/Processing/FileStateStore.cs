@@ -161,7 +161,7 @@ public static class FileStateStore
         var existingId = await uow.ScalarAsync(
             "SELECT id FROM files WHERE library_id = @lib AND relative_path = @path",
             ("@lib", libraryId), ("@path", relativePath)).ConfigureAwait(false);
-        var state = new StateWrite(verdict, sizeBytes, sizeChangedAt, PyDateTime.FromDateTimeOffset(seenAt), isAttempt);
+        var state = new StateWrite(verdict, sizeBytes, sizeChangedAt, Timestamp.FromDateTimeOffset(seenAt), isAttempt);
         if (existingId is null or DBNull)
         {
             await uow.ExecuteAsync(InsertSql, [("@lib", libraryId), ("@path", relativePath), .. state.InsertParameters()]).ConfigureAwait(false);
@@ -185,7 +185,7 @@ public static class FileStateStore
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(write);
-        var seen = PyDateTime.FromDateTimeOffset(seenAt);
+        var seen = Timestamp.FromDateTimeOffset(seenAt);
         if (write.RowId is not { } id)
         {
             var verdict = write.Verdict ?? throw new ArgumentException("A file with no row needs a state to record.", nameof(write));
@@ -224,7 +224,7 @@ public static class FileStateStore
 
         await uow.ExecuteAsync(
             "UPDATE files SET last_seen_at = @seen WHERE id IN (SELECT value FROM json_each(@ids))",
-            ("@seen", SqliteValues.ToSqlite(PyDateTime.FromDateTimeOffset(seenAt))),
+            ("@seen", SqliteValues.ToSqlite(Timestamp.FromDateTimeOffset(seenAt))),
             ("@ids", "[" + string.Join(",", fileIds.Select(id => id.ToString(System.Globalization.CultureInfo.InvariantCulture))) + "]")).ConfigureAwait(false);
     }
 
@@ -297,11 +297,11 @@ public static class FileStateStore
     };
 
     /// <summary>One state write's values, shared by the upsert and the scan's conditional write.</summary>
-    private sealed record StateWrite(FileStateVerdict Verdict, long? SizeBytes, DateTimeOffset? SizeChangedAt, PyDateTime Seen, bool IsAttempt)
+    private sealed record StateWrite(FileStateVerdict Verdict, long? SizeBytes, DateTimeOffset? SizeChangedAt, Timestamp Seen, bool IsAttempt)
     {
-        private object HoldUntil => SqliteValues.ToSqlite(Verdict.HoldUntil is { } hold ? PyDateTime.FromDateTimeOffset(hold) : (PyDateTime?)null);
+        private object HoldUntil => SqliteValues.ToSqlite(Verdict.HoldUntil is { } hold ? Timestamp.FromDateTimeOffset(hold) : (Timestamp?)null);
 
-        private object ChangedAt => SqliteValues.ToSqlite(SizeChangedAt is { } changed ? PyDateTime.FromDateTimeOffset(changed) : (PyDateTime?)null);
+        private object ChangedAt => SqliteValues.ToSqlite(SizeChangedAt is { } changed ? Timestamp.FromDateTimeOffset(changed) : (Timestamp?)null);
 
         public (string Name, object? Value)[] InsertParameters() =>
         [
