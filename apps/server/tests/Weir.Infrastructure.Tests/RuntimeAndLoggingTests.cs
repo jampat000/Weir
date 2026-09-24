@@ -146,6 +146,32 @@ public sealed class RuntimeAndLoggingTests
     }
 
     [Fact]
+    public void Prune_skips_rewriting_when_the_oldest_line_is_still_within_the_window()
+    {
+        // Lines are always appended in order, so a rewrite is only worth its cost when the oldest line has aged
+        // out (#718). A line appended straight to the file, bypassing WriteLine, stands in for one only a
+        // rewrite would ever remove; it survives here because the recent first line means nothing is checked.
+        using var temp = new TempDirectory();
+        var path = temp.Join("weir.log");
+        var now = DateTimeOffset.UtcNow;
+        using var file = new WeirLogFile(path, TimeProvider.System);
+        file.WriteLine(PythonLogFormat.JsonLine(now, LogLevel.Information, "L", "recent", null, null, null));
+        // WeirLogFile keeps its own handle open, so appending needs the same sharing it uses.
+        using (var appendStream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+        using (var writer = new StreamWriter(appendStream))
+        {
+            writer.Write(PythonLogFormat.JsonLine(now.AddDays(-30), LogLevel.Information, "L", "outside the window", null, null, null));
+            writer.Write('\n');
+        }
+
+        Assert.True(file.Prune(keepDays: 3));
+
+        var lines = ReadShared(path);
+        Assert.Equal(2, lines.Length);
+        Assert.Contains("\"outside the window\"", lines[1], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Prune_keeps_at_least_one_day()
     {
         using var temp = new TempDirectory();

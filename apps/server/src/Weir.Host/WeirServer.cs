@@ -10,7 +10,6 @@ using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Logging;
 using Weir.Infrastructure.Runtime;
-using Weir.Infrastructure.Scheduling;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Host;
@@ -196,19 +195,8 @@ public static class WeirServer
 
         app.Services.GetRequiredService<ServerLifecycle>().MarkDatabaseOpened();
 
-        // Non-essential: a failed prune is logged and startup continues.
-        try
-        {
-            var keepDays = LogRetentionTask.ReadKeepDaysAsync(database).GetAwaiter().GetResult();
-            if (!app.Services.GetRequiredService<WeirLogFile>().Prune(keepDays))
-            {
-                logger.LogWarning("Suite log prune skipped because the active log could not be rewritten.");
-            }
-        }
-        catch (Exception exception) when (exception is SqliteException or FormatException or InvalidOperationException)
-        {
-            logger.LogError(exception, "Weir startup step failed but startup will continue step={Step}", "log_retention_prune");
-        }
+        // The suite log's own prune (LogRetentionTask, RunAtStart) runs in the background once the periodic-task
+        // lane starts, so it never holds up Kestrel from listening; pruning it again here would only prune twice (#718).
 
         try
         {

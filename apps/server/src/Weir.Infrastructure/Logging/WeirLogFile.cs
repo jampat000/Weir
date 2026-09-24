@@ -64,6 +64,11 @@ public sealed class WeirLogFile : IDisposable
     public bool Prune(int keepDays)
     {
         var cutoff = _time.GetUtcNow() - TimeSpan.FromDays(Math.Max(1, keepDays));
+        if (!OldestLineAgedOut(cutoff))
+        {
+            return true;
+        }
+
         _replacing.EnterWriteLock();
         try
         {
@@ -72,6 +77,42 @@ public sealed class WeirLogFile : IDisposable
         finally
         {
             _replacing.ExitWriteLock();
+        }
+    }
+
+    /// <summary>
+    /// Whether pruning would actually remove anything, read from the first line only: lines are always
+    /// appended in order, so when even the oldest is within the window nothing else can be outside it either
+    /// (#718). A line that cannot be read as JSON with a timestamp is what <see cref="Rewrite"/> drops first, so
+    /// it counts as aged out too, and a file that cannot be opened is left for <see cref="Rewrite"/> to report.
+    /// </summary>
+    private bool OldestLineAgedOut(DateTimeOffset cutoff)
+    {
+        _replacing.EnterReadLock();
+        try
+        {
+            string? firstLine;
+            lock (_lock)
+            {
+                _stream?.Flush();
+            }
+
+            try
+            {
+                using var stream = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(stream, new UTF8Encoding(false));
+                firstLine = reader.ReadLine();
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                return true;
+            }
+
+            return firstLine is not null && (!TryReadTimestamp(firstLine, out var at) || at < cutoff);
+        }
+        finally
+        {
+            _replacing.ExitReadLock();
         }
     }
 
