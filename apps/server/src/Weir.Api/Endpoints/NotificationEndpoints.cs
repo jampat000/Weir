@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
@@ -16,22 +17,35 @@ namespace Weir.Api.Endpoints;
 /// <summary>Notification channels and <c>GET /metrics</c>.</summary>
 public static class NotificationEndpoints
 {
-    private const string ConfirmationExpired = "Your confirmation token expired. Refresh the page and try again.";
-
     public static IEndpointRouteBuilder MapNotificationEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/suite/notification-channels", ListAsync);
-        endpoints.MapV1("POST", "/suite/notification-channels", CreateAsync);
-        endpoints.MapV1("PUT", "/suite/notification-channels/{channel_id}", UpdateAsync);
-        endpoints.MapV1("DELETE", "/suite/notification-channels/{channel_id}", DeleteAsync);
-        endpoints.MapV1("POST", "/suite/notification-channels/{channel_id}/test", TestAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<NotificationEndpointHandlers>();
+        endpoints.MapV1("GET", "/suite/notification-channels", handlers.ListAsync);
+        endpoints.MapV1("POST", "/suite/notification-channels", handlers.CreateAsync);
+        endpoints.MapV1("PUT", "/suite/notification-channels/{channel_id}", handlers.UpdateAsync);
+        endpoints.MapV1("DELETE", "/suite/notification-channels/{channel_id}", handlers.DeleteAsync);
+        endpoints.MapV1("POST", "/suite/notification-channels/{channel_id}/test", handlers.TestAsync);
         return endpoints;
     }
 
     public static IEndpointRouteBuilder MapMetricsEndpoint(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapApi("GET", "/metrics", "/metrics", MetricsAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<NotificationEndpointHandlers>();
+        endpoints.MapApi("GET", "/metrics", "/metrics", handlers.MetricsAsync);
         return endpoints;
+    }
+}
+
+/// <summary>Handlers for <see cref="NotificationEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class NotificationEndpointHandlers
+{
+    private const string ConfirmationExpired = "Your confirmation token expired. Refresh the page and try again.";
+
+    private readonly NotificationChannelStore _channels;
+
+    public NotificationEndpointHandlers(NotificationChannelStore channels)
+    {
+        _channels = channels ?? throw new ArgumentNullException(nameof(channels));
     }
 
     private sealed record ChannelInput(string CsrfToken, string Label, string Provider, string Url, List<string> Events, bool Enabled);
@@ -49,14 +63,14 @@ public static class NotificationEndpoints
         return new ChannelInput(csrfToken, label, provider, url, events, enabled);
     }
 
-    private static async Task<ApiResult> ListAsync(ApiRequest request)
+    public async Task<ApiResult> ListAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(NotificationRules.ListOut(await NotificationChannelStore.ListAsync(uow).ConfigureAwait(false)));
+        return ApiRoutes.Ok(NotificationRules.ListOut(await _channels.ListAsync(uow).ConfigureAwait(false)));
     }
 
-    private static async Task<ApiResult> CreateAsync(ApiRequest request)
+    public async Task<ApiResult> CreateAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
@@ -75,12 +89,12 @@ public static class NotificationEndpoints
             throw new ApiException(StatusCodes.Status400BadRequest, exception.Message);
         }
 
-        var row = await NotificationChannelStore.CreateAsync(uow, input.Label, input.Provider, input.Url, input.Events, input.Enabled).ConfigureAwait(false);
+        var row = await _channels.CreateAsync(uow, input.Label, input.Provider, input.Url, input.Events, input.Enabled).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return new JsonApiResult(StatusCodes.Status201Created, NotificationRules.ChannelOut(row));
     }
 
-    private static async Task<ApiResult> UpdateAsync(ApiRequest request)
+    public async Task<ApiResult> UpdateAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
@@ -91,7 +105,7 @@ public static class NotificationEndpoints
 
         request.RequireConfirmationToken(input.CsrfToken, ConfirmationExpired);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await NotificationChannelStore.GetAsync(uow, channelId).ConfigureAwait(false)
+        var row = await _channels.GetAsync(uow, channelId).ConfigureAwait(false)
             ?? throw new ApiException(StatusCodes.Status404NotFound, "Notification channel not found.");
         try
         {
@@ -102,12 +116,12 @@ public static class NotificationEndpoints
             throw new ApiException(StatusCodes.Status400BadRequest, exception.Message);
         }
 
-        var updated = await NotificationChannelStore.UpdateAsync(uow, row, input.Label, input.Provider, input.Url, input.Events, input.Enabled).ConfigureAwait(false);
+        var updated = await _channels.UpdateAsync(uow, row, input.Label, input.Provider, input.Url, input.Events, input.Enabled).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(NotificationRules.ChannelOut(updated));
     }
 
-    private static async Task<ApiResult> DeleteAsync(ApiRequest request)
+    public async Task<ApiResult> DeleteAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var headerToken = request.FirstHeader("X-CSRF-Token");
@@ -123,12 +137,12 @@ public static class NotificationEndpoints
         }
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        if (await NotificationChannelStore.GetAsync(uow, channelId).ConfigureAwait(false) is null)
+        if (await _channels.GetAsync(uow, channelId).ConfigureAwait(false) is null)
         {
             throw new ApiException(StatusCodes.Status404NotFound, "Notification channel not found.");
         }
 
-        await NotificationChannelStore.DeleteAsync(uow, channelId).ConfigureAwait(false);
+        await _channels.DeleteAsync(uow, channelId).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return new CustomApiResult(context =>
         {
@@ -137,7 +151,7 @@ public static class NotificationEndpoints
         });
     }
 
-    private static async Task<ApiResult> TestAsync(ApiRequest request)
+    public async Task<ApiResult> TestAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
@@ -150,14 +164,14 @@ public static class NotificationEndpoints
 
         request.RequireConfirmationToken(csrfToken, ConfirmationExpired);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await NotificationChannelStore.GetAsync(uow, channelId).ConfigureAwait(false)
+        var row = await _channels.GetAsync(uow, channelId).ConfigureAwait(false)
             ?? throw new ApiException(StatusCodes.Status404NotFound, "Notification channel not found.");
         var error = await request.Service<NotificationDispatcher>().TestAsync(row, request.Context.RequestAborted).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject().Set("ok", error is null).Set("error", error));
     }
 
     /// <summary>Metrics access needs a matching bearer token, or an operator or admin session.</summary>
-    private static async Task<ApiResult> MetricsAsync(ApiRequest request)
+    public async Task<ApiResult> MetricsAsync(ApiRequest request)
     {
         var bearer = BearerToken(request.FirstHeader("Authorization"));
         var expected = request.Options.MetricsBearerToken;

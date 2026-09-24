@@ -9,7 +9,7 @@ namespace Weir.Infrastructure.Settings;
 /// The generic column and row IO both the export and the restore use: reading a table's schema, converting a bundle
 /// row into typed values for it, and reading a row back for comparison. Nothing here knows about a specific table.
 /// </summary>
-public static partial class ConfigurationBundleStore
+public sealed partial class ConfigurationBundleStore
 {
     private static IEnumerable<WireValue> Iterate(WireValue value) => value switch
     {

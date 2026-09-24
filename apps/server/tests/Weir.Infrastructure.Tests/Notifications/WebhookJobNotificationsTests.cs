@@ -20,12 +20,13 @@ public sealed class WebhookJobNotificationsTests : IDisposable
 
     private readonly StoreFixture _store = new();
     private readonly RecordingPoster _poster = new();
+    private readonly NotificationChannelStore _channels = new();
     private readonly NotificationDispatcher _dispatcher;
     private readonly WebhookJobNotifications _notifications;
 
     public WebhookJobNotificationsTests()
     {
-        _dispatcher = new NotificationDispatcher(_poster, _store.Clock);
+        _dispatcher = new NotificationDispatcher(_poster, _store.Clock, _channels);
         _notifications = new WebhookJobNotifications(_store.Database, _dispatcher, NullLogger<WebhookJobNotifications>.Instance);
     }
 
@@ -42,7 +43,7 @@ public sealed class WebhookJobNotificationsTests : IDisposable
     public void Dispose() => _store.Dispose();
 
     private Task<Weir.Core.Notifications.NotificationChannelRecord> ChannelAsync(string label, params string[] events) =>
-        _store.WithUnitOfWork(uow => NotificationChannelStore.CreateAsync(uow, label, "webhook", $"https://alerts.example.com/{label}", events, enabled: true));
+        _store.WithUnitOfWork(uow => _channels.CreateAsync(uow, label, "webhook", $"https://alerts.example.com/{label}", events, enabled: true));
 
     private async Task<long> JobAsync(string kind, string status)
     {

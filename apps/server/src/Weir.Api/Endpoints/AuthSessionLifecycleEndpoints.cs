@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Weir.Api.Http;
 using Weir.Core.Activity;
@@ -20,15 +21,31 @@ public static class AuthSessionLifecycleEndpoints
 {
     public static IEndpointRouteBuilder MapAuthSessionLifecycleEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/auth/csrf", GetCsrfAsync);
-        endpoints.MapV1("POST", "/auth/login", PostLoginAsync);
-        endpoints.MapV1("GET", "/auth/bootstrap/status", GetBootstrapStatusAsync);
-        endpoints.MapV1("POST", "/auth/bootstrap", PostBootstrapAsync);
-        endpoints.MapV1("POST", "/auth/logout", PostLogoutAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<AuthSessionLifecycleEndpointHandlers>();
+        endpoints.MapV1("GET", "/auth/csrf", handlers.GetCsrfAsync);
+        endpoints.MapV1("POST", "/auth/login", handlers.PostLoginAsync);
+        endpoints.MapV1("GET", "/auth/bootstrap/status", handlers.GetBootstrapStatusAsync);
+        endpoints.MapV1("POST", "/auth/bootstrap", handlers.PostBootstrapAsync);
+        endpoints.MapV1("POST", "/auth/logout", handlers.PostLogoutAsync);
         return endpoints;
     }
+}
 
-    private static async Task<ApiResult> GetCsrfAsync(ApiRequest request)
+/// <summary>Handlers for <see cref="AuthSessionLifecycleEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class AuthSessionLifecycleEndpointHandlers
+{
+    private readonly AuthStore _users;
+    private readonly ActivityStore _activity;
+    private readonly SuiteSettingsStore _suiteSettings;
+
+    public AuthSessionLifecycleEndpointHandlers(AuthStore users, ActivityStore activity, SuiteSettingsStore suiteSettings)
+    {
+        _users = users ?? throw new ArgumentNullException(nameof(users));
+        _activity = activity ?? throw new ArgumentNullException(nameof(activity));
+        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+    }
+
+    public async Task<ApiResult> GetCsrfAsync(ApiRequest request)
     {
         var secret = request.RequireSessionSecret();
         var raw = request.RawSessionToken;
@@ -44,7 +61,7 @@ public static class AuthSessionLifecycleEndpoints
         return ApiRoutes.Ok(new WireObject().Set("csrf_token", CsrfTokens.Issue(secret, raw, request.Time)));
     }
 
-    private static async Task<ApiResult> PostLoginAsync(ApiRequest request)
+    public async Task<ApiResult> PostLoginAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -92,8 +109,8 @@ public static class AuthSessionLifecycleEndpoints
             // A guess that also happens to name a real account is worth an activity trail entry; a typed
             // password (people sometimes swap the two fields) is not something Weir writes to a log a
             // viewer can read.
-            var existingAccount = await AuthStore.FindUserByLowerUsernameAsync(uow, uname.ToLowerInvariant()).ConfigureAwait(false);
-            await ActivityStore.MaybeRecordLoginFailedAsync(uow, existingAccount?.Username ?? "an unknown username", request.Auth.Now()).ConfigureAwait(false);
+            var existingAccount = await _users.FindUserByLowerUsernameAsync(uow, uname.ToLowerInvariant()).ConfigureAwait(false);
+            await _activity.MaybeRecordLoginFailedAsync(uow, existingAccount?.Username ?? "an unknown username", request.Auth.Now()).ConfigureAwait(false);
             await request.CommitAsync().ConfigureAwait(false);
             throw new ApiException(StatusCodes.Status401Unauthorized, "Invalid username or password.");
         }
@@ -101,7 +118,7 @@ public static class AuthSessionLifecycleEndpoints
         limiters.LoginUsernameBackoff.RecordSuccess(uname);
         var (user, session, rawToken) = result.Value;
         AuthEndpoints.Logger(request).LogInformation("auth event: login succeeded (user_id={UserId})", user.Id);
-        await ActivityStore.RecordAsync(uow, ActivityEventTypes.AuthLoginSucceeded, "auth", "Signed in", user.Username).ConfigureAwait(false);
+        await _activity.RecordAsync(uow, ActivityEventTypes.AuthLoginSucceeded, "auth", "Signed in", user.Username).ConfigureAwait(false);
         return SignedIn(request, new WireObject().Set("user", AuthService.UserPublic(user)), session, rawToken);
     }
 
@@ -146,7 +163,7 @@ public static class AuthSessionLifecycleEndpoints
         }
     }
 
-    private static async Task<ApiResult> GetBootstrapStatusAsync(ApiRequest request)
+    public async Task<ApiResult> GetBootstrapStatusAsync(ApiRequest request)
     {
         const string schemaNotReady = "Local SQLite schema is not ready (Weir migrates its database at startup; check the server log and restart it).";
         const string databaseUnavailable = "SQLite database unavailable or cannot be opened (check WEIR_HOME and WEIR_DB_PATH).";
@@ -159,7 +176,7 @@ public static class AuthSessionLifecycleEndpoints
             var uow = await UnitOfWork.OpenAsync(request.Database, request.Context.RequestAborted).ConfigureAwait(false);
             await using (uow.ConfigureAwait(false))
             {
-                allowed = await AuthService.BootstrapAllowedAsync(uow).ConfigureAwait(false);
+                allowed = await request.Auth.BootstrapAllowedAsync(uow).ConfigureAwait(false);
             }
         }
         catch (SqliteException exception)
@@ -196,7 +213,7 @@ public static class AuthSessionLifecycleEndpoints
             .Set("requires_setup_code", requiresSetupCode));
     }
 
-    private static async Task<ApiResult> PostBootstrapAsync(ApiRequest request)
+    public async Task<ApiResult> PostBootstrapAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -236,10 +253,10 @@ public static class AuthSessionLifecycleEndpoints
         logger.LogInformation("auth event: bootstrap attempted");
         var uow = await request.DbAsync().ConfigureAwait(false);
         uow.BeginImmediate();
-        if (!await AuthService.BootstrapAllowedAsync(uow).ConfigureAwait(false))
+        if (!await request.Auth.BootstrapAllowedAsync(uow).ConfigureAwait(false))
         {
             logger.LogWarning("auth event: bootstrap denied (admin already exists)");
-            await ActivityStore.MaybeRecordBootstrapDeniedAsync(uow, request.Auth.Now()).ConfigureAwait(false);
+            await _activity.MaybeRecordBootstrapDeniedAsync(uow, request.Auth.Now()).ConfigureAwait(false);
             await request.CommitAsync().ConfigureAwait(false);
             throw new ApiException(StatusCodes.Status403Forbidden, "Bootstrap is not available: an admin user already exists.");
         }
@@ -247,7 +264,7 @@ public static class AuthSessionLifecycleEndpoints
         UserRecord user;
         try
         {
-            user = await AuthService.CreateInitialAdminAsync(uow, username.Trim(), password).ConfigureAwait(false);
+            user = await request.Auth.CreateInitialAdminAsync(uow, username.Trim(), password).ConfigureAwait(false);
         }
         catch (WireValueException exception)
         {
@@ -261,16 +278,16 @@ public static class AuthSessionLifecycleEndpoints
         }
 
         logger.LogInformation("auth event: bootstrap succeeded (user_id={UserId})", user.Id);
-        await ActivityStore.RecordAsync(uow, ActivityEventTypes.AuthBootstrapSucceeded, "auth", "Initial admin created", user.Username).ConfigureAwait(false);
+        await _activity.RecordAsync(uow, ActivityEventTypes.AuthBootstrapSucceeded, "auth", "Initial admin created", user.Username).ConfigureAwait(false);
         setupCodes.Clear();
-        var suite = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-        await SuiteSettingsStore.UpdateAsync(uow, suite, suite with { SetupWizardState = "pending" }).ConfigureAwait(false);
+        var suite = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
+        await _suiteSettings.UpdateAsync(uow, suite, suite with { SetupWizardState = "pending" }).ConfigureAwait(false);
 
         // The person who just chose this password is the one at the browser, so asking for it again straight away
         // would add a step and nothing else (#704). A standard session: trusting the device is a sign-in choice.
         var (session, rawToken) = await request.Auth.CreateSessionAsync(
             uow, user, trustedDevice: false, SessionRules.ClientLabelFromUserAgent(request.FirstHeader("User-Agent"))).ConfigureAwait(false);
-        await ActivityStore.RecordAsync(uow, ActivityEventTypes.AuthLoginSucceeded, "auth", "Signed in", user.Username).ConfigureAwait(false);
+        await _activity.RecordAsync(uow, ActivityEventTypes.AuthLoginSucceeded, "auth", "Signed in", user.Username).ConfigureAwait(false);
         return SignedIn(
             request,
             new WireObject()
@@ -281,7 +298,7 @@ public static class AuthSessionLifecycleEndpoints
             rawToken);
     }
 
-    private static async Task<ApiResult> PostLogoutAsync(ApiRequest request)
+    public async Task<ApiResult> PostLogoutAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         var headerToken = request.FirstHeader("X-CSRF-Token");
@@ -316,7 +333,7 @@ public static class AuthSessionLifecycleEndpoints
             var pair = await request.Auth.LoadValidSessionAsync(uow, rawSession).ConfigureAwait(false);
             if (pair is not null)
             {
-                await ActivityStore.RecordAsync(uow, ActivityEventTypes.AuthLogout, "auth", "Signed out", pair.User.Username).ConfigureAwait(false);
+                await _activity.RecordAsync(uow, ActivityEventTypes.AuthLogout, "auth", "Signed out", pair.User.Username).ConfigureAwait(false);
             }
 
             if (await request.Auth.LogoutByCookieAsync(uow, rawSession).ConfigureAwait(false))

@@ -23,12 +23,16 @@ public sealed class ConfigurationBackups
     private readonly WeirOptions _options;
     private readonly TimeProvider _time;
     private readonly ITimeZoneResolver _zones;
+    private readonly SuiteSettingsStore _suiteSettings;
+    private readonly ConfigurationBundleStore _bundle;
 
-    public ConfigurationBackups(WeirOptions options, TimeProvider time, ITimeZoneResolver zones)
+    public ConfigurationBackups(WeirOptions options, TimeProvider time, ITimeZoneResolver zones, SuiteSettingsStore suiteSettings, ConfigurationBundleStore bundle)
     {
         _options = options;
         _time = time;
         _zones = zones;
+        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+        _bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
     }
 
     /// <summary><c>{backup_dir}/suite-configuration</c>, resolved.</summary>
@@ -92,7 +96,7 @@ public sealed class ConfigurationBackups
         var root = Directory;
         System.IO.Directory.CreateDirectory(root);
         var now = Timestamp.UtcNow(_time);
-        var bundle = await ConfigurationBundleStore.BuildAsync(uow).ConfigureAwait(false);
+        var bundle = await _bundle.BuildAsync(uow).ConfigureAwait(false);
         var stamp = now.Clock.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
         var fileName = $"suite-configuration-{stamp}.json";
         var path = Path.Join(root, fileName);
@@ -120,7 +124,7 @@ public sealed class ConfigurationBackups
         var uow = await UnitOfWork.OpenAsync(database, cancellationToken).ConfigureAwait(false);
         await using (uow.ConfigureAwait(false))
         {
-            var suite = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+            var suite = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
             if (!ConfigurationBackupSchedule.IsDue(suite, when, _zones))
             {
                 await uow.CommitAsync().ConfigureAwait(false);
@@ -128,7 +132,7 @@ public sealed class ConfigurationBackups
             }
 
             await CreateAsync(uow).ConfigureAwait(false);
-            await SuiteSettingsStore.UpdateAsync(
+            await _suiteSettings.UpdateAsync(
                 uow, suite, suite with { ConfigurationBackupLastRunAt = Timestamp.FromUtc(Timestamp.TruncateToMicroseconds(when)) }).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
             return 1;

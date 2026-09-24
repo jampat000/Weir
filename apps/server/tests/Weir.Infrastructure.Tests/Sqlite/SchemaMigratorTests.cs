@@ -1,5 +1,8 @@
 using Microsoft.Data.Sqlite;
+using Weir.Infrastructure.Auth;
+using Weir.Infrastructure.Logging;
 using Weir.Infrastructure.Scheduling;
+using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Tests.Sqlite;
@@ -272,7 +275,9 @@ public sealed class SchemaMigratorTests
         using var temp = new TempDirectory();
         var database = new SqliteDatabase(temp.Join("weir.sqlite3"));
         new SchemaMigrator(database).EnsureAtHead();
-        Assert.Equal(30, await LogRetentionTask.ReadKeepDaysAsync(database));
+        using var logFile = new WeirLogFile(temp.Join("weir.log"), TimeProvider.System);
+        var retention = new LogRetentionTask(database, logFile, TimeProvider.System, new SuiteSettingsStore(new AuthStore()));
+        Assert.Equal(30, await retention.ReadKeepDaysAsync(database));
 
         using (var connection = database.Open())
         using (var command = connection.CreateCommand())
@@ -281,7 +286,7 @@ public sealed class SchemaMigratorTests
             command.ExecuteNonQuery();
         }
 
-        Assert.Equal(1, await LogRetentionTask.ReadKeepDaysAsync(database));
+        Assert.Equal(1, await retention.ReadKeepDaysAsync(database));
 
         using (var connection = database.Open())
         using (var command = connection.CreateCommand())
@@ -291,7 +296,7 @@ public sealed class SchemaMigratorTests
         }
 
         // ensure_suite_settings_row: a missing row is created with its defaults.
-        Assert.Equal(30, await LogRetentionTask.ReadKeepDaysAsync(database));
+        Assert.Equal(30, await retention.ReadKeepDaysAsync(database));
         using (var connection = database.Open())
         using (var command = connection.CreateCommand())
         {

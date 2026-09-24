@@ -30,7 +30,7 @@ public static class ProcessingMetadataProviderEndpoints
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        var row = await request.Service<SuiteSettingsStore>().EnsureAsync(uow).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(MetadataProviderOut(MetadataProviderStore.View(row)));
     }
@@ -51,7 +51,8 @@ public static class ProcessingMetadataProviderEndpoints
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await MetadataProviderStore.ApplyAsync(uow, request.Options, request.Time, provider, baseUrl, apiKey).ConfigureAwait(false);
+        var row = await MetadataProviderStore.ApplyAsync(
+            uow, request.Service<SuiteSettingsStore>(), request.Options, request.Time, provider, baseUrl, apiKey).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(MetadataProviderOut(MetadataProviderStore.View(row)));
     }
@@ -73,7 +74,7 @@ public static class ProcessingMetadataProviderEndpoints
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        var row = await request.Service<SuiteSettingsStore>().EnsureAsync(uow).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         var result = string.IsNullOrWhiteSpace(row.MetadataProviderKeyCiphertext) || string.IsNullOrWhiteSpace(row.MetadataProvider)
             ? MetadataProviderStore.Test(row)

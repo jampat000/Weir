@@ -2,9 +2,11 @@ using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Processing;
 using Weir.Core.Security;
+using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
 using Weir.Infrastructure.Tests.MediaManagers;
 using Weir.Infrastructure.Tests.Platform;
@@ -26,7 +28,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         var ports = new HttpMediaManagerPorts(new FakeManagerHttp());
         var connections = new MediaManagerConnectionService(store.Options, cipher, ports);
         var jobs = new ProcessingJobStore(store.Database, store.Clock);
-        var handler = new ProcessingWatchedFolderScanDispatchJobHandler(store.Database, store.Clock, store.Options, jobs, connections);
+        var handler = new ProcessingWatchedFolderScanDispatchJobHandler(store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()));
         // Zero out the operator-wide minimum age/size so these tests assert scan
         // dispatch itself, not the settling/hold-timer gates a freshly written test file would otherwise trip.
         await store.Execute(
