@@ -38,6 +38,9 @@ public static class WeirApi
         services.AddSingleton<AuthRateLimiters>();
         services.AddSingleton<SetupCodeGate>();
         services.AddSingleton<ConfigurationBackups>();
+        // The processing.progress SSE stream (#745 part 5): wraps LiveProgressStore so the one caller that
+        // frames it takes a single dependency instead of holding the store only to forward it.
+        services.TryAddSingleton<ActivityProgressFrames>();
 
         // Endpoint handler groups: one instance per group, constructor-injected with the stores it needs.
         services.AddSingleton<AuthAccountEndpointHandlers>();

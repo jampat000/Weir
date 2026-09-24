@@ -7,6 +7,7 @@ using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Processing.DirectPlay;
 using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Scheduling;
 
@@ -42,6 +43,9 @@ public static class ProcessingApi
         services.TryAddSingleton<MetadataProviderStore>();
         services.TryAddSingleton<OperatorSettingsStore>();
         services.TryAddSingleton<OverviewStatsStore>();
+        // The Direct Play device list lives in SuiteSettingsStore; wrapping it here (#745 part 5) means both
+        // callers take one dependency instead of each holding SuiteSettingsStore only to forward it.
+        services.TryAddSingleton<DirectPlayService>();
 
         // Endpoint handler classes (#745 part 5): each endpoint file's real dependencies, constructor-injected
         // and resolved once when routes are mapped, rather than looked up per call through the request.

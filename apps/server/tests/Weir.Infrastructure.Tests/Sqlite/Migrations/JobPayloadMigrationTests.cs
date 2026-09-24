@@ -295,7 +295,7 @@ public sealed class JobPayloadMigrationTests : IDisposable
         // An aggressive retention window: everything terminal in refiner_jobs, and every refiner_file_logs
         // row, is due for pruning.
         var jobStore = new ProcessingJobStore(_database, TimeProvider.System);
-        await JobRowsRetention.RunTickAsync(jobStore, jobRowsRetentionDays: 0, DateTimeOffset.UtcNow);
+        await new JobRowsRetention(jobStore).RunTickAsync(jobRowsRetentionDays: 0, DateTimeOffset.UtcNow);
         await _fileLogs.PruneAsync(_database, retentionDays: 0, DateTimeOffset.UtcNow);
 
         // The scan job row (a job's own bookkeeping) may now be gone, but the file index it produced is not.

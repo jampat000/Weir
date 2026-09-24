@@ -5,7 +5,6 @@ using Weir.Core.Auth;
 using Weir.Core.Json;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Processing.DirectPlay;
-using Weir.Infrastructure.Settings;
 
 namespace Weir.Api.Endpoints;
 
@@ -24,19 +23,18 @@ public static class ProcessingDirectPlayEndpoints
 /// <summary>Handlers for <see cref="ProcessingDirectPlayEndpoints"/>, constructor-injected with the store it needs.</summary>
 internal sealed class ProcessingDirectPlayEndpointHandlers
 {
-    private readonly SuiteSettingsStore _suiteSettings;
+    private readonly DirectPlayService _directPlay;
 
-    public ProcessingDirectPlayEndpointHandlers(SuiteSettingsStore suiteSettings)
+    public ProcessingDirectPlayEndpointHandlers(DirectPlayService directPlay)
     {
-        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+        _directPlay = directPlay ?? throw new ArgumentNullException(nameof(directPlay));
     }
 
     private async Task<WireObject> BuildOutAsync(ApiRequest request)
     {
         var uow = await request.DbAsync().ConfigureAwait(false);
         var known = DeviceProfileLoader.Load(request.Options.WeirHome);
-        var chosen = new HashSet<string>(
-            await DirectPlayService.SelectedDeviceIdsAsync(uow, _suiteSettings).ConfigureAwait(false), StringComparer.Ordinal);
+        var chosen = new HashSet<string>(await _directPlay.SelectedDeviceIdsAsync(uow).ConfigureAwait(false), StringComparer.Ordinal);
         var devices = known.Select(p => (WireValue)new WireObject()
             .Set("id", p.Id)
             .Set("name", p.Name)
@@ -69,7 +67,7 @@ internal sealed class ProcessingDirectPlayEndpointHandlers
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var known = DeviceProfileLoader.Load(request.Options.WeirHome);
-        await DirectPlayService.SaveSelectedDeviceIdsAsync(uow, _suiteSettings, known, selected).ConfigureAwait(false);
+        await _directPlay.SaveSelectedDeviceIdsAsync(uow, known, selected).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(await BuildOutAsync(request).ConfigureAwait(false));
     }

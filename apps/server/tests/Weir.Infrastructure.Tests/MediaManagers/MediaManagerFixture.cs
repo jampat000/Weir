@@ -29,6 +29,7 @@ internal sealed class MediaManagerFixture : IDisposable
         Intake = new MediaManagerIntake(Store.Options, Connections, ConnectionStore, Ledger, Targets, Jobs, Store.Clock);
         Reporter = new HandoffCompletionReporter(Connections, ConnectionStore, Ledger, Targets, Libraries, Http);
         OperatorSettings = new OperatorSettingsStore();
+        Cancellation = new PendingJobCancellation(Ledger, Reporter, Files);
     }
 
     public StoreFixture Store { get; }
@@ -60,6 +61,8 @@ internal sealed class MediaManagerFixture : IDisposable
     public HandoffCompletionReporter Reporter { get; }
 
     public OperatorSettingsStore OperatorSettings { get; }
+
+    public PendingJobCancellation Cancellation { get; }
 
     public Task<T> Db<T>(Func<UnitOfWork, Task<T>> work, bool commit = true) => Store.WithUnitOfWork(work, commit);
 

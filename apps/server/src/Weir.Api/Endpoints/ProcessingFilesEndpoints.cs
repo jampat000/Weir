@@ -13,7 +13,6 @@ using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.DirectPlay;
-using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Endpoints;
@@ -50,7 +49,7 @@ internal sealed class ProcessingFilesEndpointHandlers
     private const int BulkRequeueMaxFiles = 1000;
 
     private readonly FileStateStore _files;
-    private readonly SuiteSettingsStore _suiteSettings;
+    private readonly DirectPlayService _directPlay;
     private readonly LiveProgressStore _liveProgress;
     private readonly HandbackStore _handback;
     private readonly ProcessingJobStore _jobs;
@@ -58,14 +57,14 @@ internal sealed class ProcessingFilesEndpointHandlers
 
     public ProcessingFilesEndpointHandlers(
         FileStateStore files,
-        SuiteSettingsStore suiteSettings,
+        DirectPlayService directPlay,
         LiveProgressStore liveProgress,
         HandbackStore handback,
         ProcessingJobStore jobs,
         LibraryStore libraries)
     {
         _files = files ?? throw new ArgumentNullException(nameof(files));
-        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+        _directPlay = directPlay ?? throw new ArgumentNullException(nameof(directPlay));
         _liveProgress = liveProgress ?? throw new ArgumentNullException(nameof(liveProgress));
         _handback = handback ?? throw new ArgumentNullException(nameof(handback));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
@@ -156,7 +155,7 @@ internal sealed class ProcessingFilesEndpointHandlers
         var rows = await _files.ListAsync(uow, filter).ConfigureAwait(false);
         var libraryNames = await _files.LibraryNamesAsync(uow).ConfigureAwait(false);
         var knownDevices = DeviceProfileLoader.Load(request.Options.WeirHome);
-        var devices = await DirectPlayService.SelectedProfilesAsync(uow, _suiteSettings, knownDevices).ConfigureAwait(false);
+        var devices = await _directPlay.SelectedProfilesAsync(uow, knownDevices).ConfigureAwait(false);
         var progressByPath = _liveProgress.Snapshot();
         var handbacks = await _handback.ForLibrariesAsync(uow, rows.Select(row => row.LibraryId)).ConfigureAwait(false);
 

@@ -16,6 +16,9 @@ namespace Weir.Infrastructure.Tests.Jobs;
 public sealed class JobServicesTests : IDisposable
 {
     private readonly JobsTestDatabase _db = new(keepSeedRows: true);
+    private readonly JobRowsRetention _retention;
+
+    public JobServicesTests() => _retention = new JobRowsRetention(_db.Store);
 
     public void Dispose() => _db.Dispose();
 
@@ -114,7 +117,7 @@ public sealed class JobServicesTests : IDisposable
         _db.Execute("UPDATE jobs SET updated_at = '2025-01-01 00:00:00' WHERE dedupe_key LIKE 'old-%'");
         _db.Execute("INSERT INTO activity_events (created_at, event_type, module, title) VALUES ('2025-01-01 00:00:00', 'x', 'processing', 'old'), (CURRENT_TIMESTAMP, 'x', 'processing', 'new')");
 
-        var counts = await JobRowsRetention.RunTickAsync(_db.Store, 90, DateTimeOffset.UtcNow);
+        var counts = await _retention.RunTickAsync(90, DateTimeOffset.UtcNow);
 
         Assert.Equal(4, counts.Processing);
         Assert.Equal(1, counts.Activity);
@@ -132,7 +135,7 @@ public sealed class JobServicesTests : IDisposable
             "INSERT INTO activity_events (created_at, event_type, module, title) SELECT '2025-01-01 00:00:00', 'x', 'processing', 'old' FROM n");
         _db.Execute("INSERT INTO activity_events (created_at, event_type, module, title) VALUES (CURRENT_TIMESTAMP, 'x', 'processing', 'new')");
 
-        var counts = await JobRowsRetention.RunTickAsync(_db.Store, 90, DateTimeOffset.UtcNow);
+        var counts = await _retention.RunTickAsync(90, DateTimeOffset.UtcNow);
 
         Assert.Equal(old, counts.Activity);
         Assert.Equal(1, _db.Count("SELECT count(*) FROM activity_events"));
@@ -144,7 +147,7 @@ public sealed class JobServicesTests : IDisposable
         _db.Execute("UPDATE suite_settings SET activity_retention_days = 0");
         _db.Execute("INSERT INTO activity_events (created_at, event_type, module, title) VALUES ('2000-01-01 00:00:00', 'x', 'processing', 'old')");
 
-        Assert.Equal(0, (await JobRowsRetention.RunTickAsync(_db.Store, 90, DateTimeOffset.UtcNow)).Activity);
+        Assert.Equal(0, (await _retention.RunTickAsync(90, DateTimeOffset.UtcNow)).Activity);
     }
 
     [Fact]

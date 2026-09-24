@@ -38,8 +38,7 @@ public static class ProcessingJobsEndpoints
 internal sealed class ProcessingJobsEndpointHandlers
 {
     private readonly JobsInspectionStore _jobsInspection;
-    private readonly HandoffLedgerStore _handoffLedger;
-    private readonly HandoffCompletionReporter _handoffReporter;
+    private readonly PendingJobCancellation _pendingJobCancellation;
     private readonly ProcessingJobStore _jobs;
     private readonly HoldDiagnosticStore _holdDiagnostic;
     private readonly MediaManagerConnectionService _connections;
@@ -48,8 +47,7 @@ internal sealed class ProcessingJobsEndpointHandlers
 
     public ProcessingJobsEndpointHandlers(
         JobsInspectionStore jobsInspection,
-        HandoffLedgerStore handoffLedger,
-        HandoffCompletionReporter handoffReporter,
+        PendingJobCancellation pendingJobCancellation,
         ProcessingJobStore jobs,
         HoldDiagnosticStore holdDiagnostic,
         MediaManagerConnectionService connections,
@@ -57,8 +55,7 @@ internal sealed class ProcessingJobsEndpointHandlers
         LibraryStore libraries)
     {
         _jobsInspection = jobsInspection ?? throw new ArgumentNullException(nameof(jobsInspection));
-        _handoffLedger = handoffLedger ?? throw new ArgumentNullException(nameof(handoffLedger));
-        _handoffReporter = handoffReporter ?? throw new ArgumentNullException(nameof(handoffReporter));
+        _pendingJobCancellation = pendingJobCancellation ?? throw new ArgumentNullException(nameof(pendingJobCancellation));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _holdDiagnostic = holdDiagnostic ?? throw new ArgumentNullException(nameof(holdDiagnostic));
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
@@ -127,7 +124,7 @@ internal sealed class ProcessingJobsEndpointHandlers
         // together or not at all. Nothing here opens a second connection, so the session touch RequireUserAsync may have
         // written cannot hold a lock this handler then waits for.
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var result = await PendingJobCancellation.CancelAsync(uow, _handoffLedger, _handoffReporter, _files, id).ConfigureAwait(false);
+        var result = await _pendingJobCancellation.CancelAsync(uow, id).ConfigureAwait(false);
         if (result.Outcome == JobActionOutcome.NotFound)
         {
             throw new ApiException(StatusCodes.Status404NotFound, "Job not found.");

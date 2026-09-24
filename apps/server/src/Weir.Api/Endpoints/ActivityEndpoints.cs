@@ -12,7 +12,6 @@ using Weir.Core.Json;
 using Weir.Core.Time;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Activity;
-using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Settings;
 
 namespace Weir.Api.Endpoints;
@@ -119,13 +118,13 @@ internal sealed class ActivityEndpointHandlers
 
     private readonly ActivityHistoryStore _history;
     private readonly SuiteSettingsStore _suiteSettings;
-    private readonly LiveProgressStore _liveProgress;
+    private readonly ActivityProgressFrames _progressFrames;
 
-    public ActivityEndpointHandlers(ActivityHistoryStore history, SuiteSettingsStore suiteSettings, LiveProgressStore liveProgress)
+    public ActivityEndpointHandlers(ActivityHistoryStore history, SuiteSettingsStore suiteSettings, ActivityProgressFrames progressFrames)
     {
         _history = history ?? throw new ArgumentNullException(nameof(history));
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
-        _liveProgress = liveProgress ?? throw new ArgumentNullException(nameof(liveProgress));
+        _progressFrames = progressFrames ?? throw new ArgumentNullException(nameof(progressFrames));
     }
 
     public async Task<ApiResult> GetRecentAsync(ApiRequest request)
@@ -256,7 +255,7 @@ internal sealed class ActivityEndpointHandlers
         await request.ReleaseDbAsync().ConfigureAwait(false);
         var database = request.Database;
         var notifier = ActivityNotifications.For(database);
-        var liveProgress = _liveProgress;
+        var progressFrames = _progressFrames;
         var time = request.Time;
         var logger = request.LoggerFactory.CreateLogger("weir.platform.activity.router");
         return new CustomApiResult(async context =>
@@ -299,7 +298,7 @@ internal sealed class ActivityEndpointHandlers
                     ActivityEndpoints.StreamKeepalive,
                     logger,
                     context.RequestAborted));
-                var progressLoop = PumpAsync(ActivityProgressFrames.ForAsync(liveProgress, time, context.RequestAborted));
+                var progressLoop = PumpAsync(progressFrames.ForAsync(time, context.RequestAborted));
                 await Task.WhenAll(activityLoop, progressLoop).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
