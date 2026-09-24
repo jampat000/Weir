@@ -67,11 +67,19 @@ public static class PendingJobCancellation
         if (HandoffOrigin.FromPayload(payload) is { HandoffId: { Length: > 0 } handoffId } origin)
         {
             var handoff = await HandoffLedgerStore.FindAsync(uow, origin.SourceKey, handoffId).ConfigureAwait(false);
-            if (handoff is not null &&
-                await ledger.SettleAfterJobCancelledAsync(
-                    uow, handoff, found.CreatedAt ?? DateTimeOffset.MinValue, HandoffLedgerRules.CancelledInWeirMessage).ConfigureAwait(false))
+            if (handoff is not null)
             {
-                return new PendingJobCancelResult(JobActionOutcome.Ok, handoff);
+                if (payload?.Get("relative_media_path") is PyStr { Value.Length: > 0 } targetPath)
+                {
+                    // So a later file of the same pack finishing still sees this one settled, instead of waiting on it forever.
+                    await HandoffTargetStore.MarkCancelledAsync(uow, handoff.Id, targetPath.Value).ConfigureAwait(false);
+                }
+
+                if (await ledger.SettleAfterJobCancelledAsync(
+                    uow, handoff, found.CreatedAt ?? DateTimeOffset.MinValue, HandoffLedgerRules.CancelledInWeirMessage).ConfigureAwait(false))
+                {
+                    return new PendingJobCancelResult(JobActionOutcome.Ok, handoff);
+                }
             }
         }
 
