@@ -217,26 +217,30 @@ public sealed class JobServicesTests : IDisposable
         var registry = new JobHandlerRegistry([new DelegateHandler(PeriodicJobKinds.WorkTempStaleSweep, _ => { })]);
         var clock = new PeriodicEnqueueClock();
         var sweep = new WorkTempStaleSweepEnqueuer(_db.Store, "movie", TimeSpan.FromHours(1), killSwitch: false);
-        var service = new PeriodicEnqueueService([sweep], registry, time, NullLogger<PeriodicEnqueueService>.Instance, clock, recheck);
+        var iterationComplete = new SemaphoreSlim(0);
+        var service = new PeriodicEnqueueService(
+            [sweep], registry, time, NullLogger<PeriodicEnqueueService>.Instance, clock, recheck, () => iterationComplete.Release());
 
         await service.StartAsync(CancellationToken.None);
-        // Force several recheck ticks while switched off, rather than hoping a fixed real delay covered
-        // enough of them: the loop rereads the switch on the fake clock, so each advance is a tick.
+        // The loop's first pass, before any Advance below, so a later Advance always lands on the delay it set up
+        // from that pass rather than racing its own startup.
+        await WaitForIterationAsync(iterationComplete);
+
+        // Force several recheck ticks while switched off. Waiting on the completion signal instead of a fixed
+        // real sleep proves each Advance was actually acted on before the next one, on whatever thread-pool
+        // schedule the machine running the test happens to give it.
         for (var i = 0; i < 5; i++)
         {
             time.Advance(recheck);
-            await Task.Delay(10);
+            await WaitForIterationAsync(iterationComplete);
         }
 
         Assert.Equal(0, _db.Count("SELECT count(*) FROM jobs"));
         Assert.Null(clock.NextRunFor([PeriodicJobKinds.WorkTempStaleSweep]));
 
         _db.Execute("UPDATE operator_settings SET work_temp_stale_sweep_enabled = 1");
-        for (var i = 0; i < 5 && _db.Count("SELECT count(*) FROM jobs") == 0; i++)
-        {
-            time.Advance(recheck);
-            await Task.Delay(10);
-        }
+        time.Advance(recheck);
+        await WaitForIterationAsync(iterationComplete);
 
         Assert.Equal(1, _db.Count("SELECT count(*) FROM jobs"));
         await service.StopAsync(CancellationToken.None);
@@ -246,6 +250,15 @@ public sealed class JobServicesTests : IDisposable
         Assert.Equal(TimeSpan.FromHours(1), next.Value.Interval);
         Assert.Equal(time.GetUtcNow().AddHours(1), next.Value.NextRunAt);
     }
+
+    /// <summary>
+    /// Bounded generously: this is proving the loop's own iteration count, not timing an actual wait, so a
+    /// signal that never arrives is a real bug, not a slow machine.
+    /// </summary>
+    private static async Task WaitForIterationAsync(SemaphoreSlim iterationComplete) =>
+        Assert.True(
+            await iterationComplete.WaitAsync(TimeSpan.FromSeconds(10)),
+            "The periodic loop did not complete an iteration in time.");
 
     [Fact]
     public async Task A_saved_interval_replaces_the_environments()
