@@ -39,6 +39,13 @@ public static class ConfigurationBundleStore
         ArgumentNullException.ThrowIfNull(uow);
         await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
         var suite = await ReadRowsAsync(uow, SuiteTable, "WHERE id = 1").ConfigureAwait(false);
+        // The export never carries the metadata provider key, encrypted or not; import already leaves the existing
+        // key alone when a bundle omits it.
+        if (suite.Count > 0 && suite[0] is PyDict suiteSettings)
+        {
+            suiteSettings.Remove("metadata_provider_key_ciphertext");
+        }
+
         var arr = await ReadRowsAsync(uow, ArrTable, "WHERE id = 1").ConfigureAwait(false);
         var processingOperator = await ReadRowsAsync(uow, ProcessingOperatorTable, "WHERE id = 1").ConfigureAwait(false);
         var libraries = await ReadRowsAsync(uow, LibrariesTable, "ORDER BY id").ConfigureAwait(false);

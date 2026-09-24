@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,8 @@ from tests.contract.media_managers._helpers import (
     NO_WEBHOOK_SECRET,
     REMUX_KIND,
     LibraryFolders,
+    create_connection,
+    delete_connection,
     ensure_library,
     handoff_dedupe_key,
     payload,
@@ -209,11 +212,27 @@ def test_deluno_tv_handoff_uses_the_tv_watched_folder(
 # --- the native shape, for a manager with no dialect of its own ---------------
 
 
-def test_native_imported_event_is_accepted_and_ignored(admin: WeirClient) -> None:
+@pytest.fixture
+def native_secret(admin: WeirClient) -> Iterator[dict[str, str]]:
+    """A native connection's own secret: the connection-less native source refuses unsigned writes."""
+
+    created = create_connection(admin, kind="native", name="Native", base_url="", api_key="")
+    assert created.status_code == 201, created.text
+    connection_id = created.json()["id"]
+    generated = admin.post_csrf(f"{API}/media-managers/connections/{connection_id}/webhook-secret")
+    assert generated.status_code == 200, generated.text
+    try:
+        yield {"X-Webhook-Secret": generated.json()["webhook_secret"]}
+    finally:
+        delete_connection(admin, connection_id)
+
+
+def test_native_imported_event_is_accepted_and_ignored(admin: WeirClient, native_secret: dict[str, str]) -> None:
     before = len(remux_jobs(admin))
     r = admin.post(
         f"{API}/intake/webhook/native",
         json={"event": "imported", "mediaScope": "movie", "filePath": "/media/m/x.mkv", "title": "X", "year": 1999},
+        headers=native_secret,
     )
     assert r.status_code == 200, r.text
     assert r.json()["event"] == "imported"
@@ -222,7 +241,7 @@ def test_native_imported_event_is_accepted_and_ignored(admin: WeirClient) -> Non
 
 
 def test_native_handoff_event_enqueues_a_processing_pass(
-    with_watched_folders: WeirClient, watched: tuple[LibraryFolders, LibraryFolders]
+    with_watched_folders: WeirClient, watched: tuple[LibraryFolders, LibraryFolders], native_secret: dict[str, str]
 ) -> None:
     client = with_watched_folders
     movies, _ = watched
@@ -234,16 +253,29 @@ def test_native_handoff_event_enqueues_a_processing_pass(
             "filePath": str(movies.watched / "Native" / "x.mkv"),
             "handoffId": "native-1",
         },
+        headers=native_secret,
     )
     assert r.status_code == 200, r.text
     key = handoff_dedupe_key("native-1", source_key="native")
     assert len([job for job in remux_jobs(client) if job["dedupe_key"] == key]) == 1
 
 
-def test_native_event_missing_required_fields_is_ignored(client: WeirClient) -> None:
-    r = client.post(f"{API}/intake/webhook/native", json={"event": "imported", "title": "no path"})
+def test_native_event_missing_required_fields_is_ignored(client: WeirClient, native_secret: dict[str, str]) -> None:
+    r = client.post(
+        f"{API}/intake/webhook/native", json={"event": "imported", "title": "no path"}, headers=native_secret
+    )
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "ignored"
+
+
+def test_native_source_with_no_secret_refuses_writes(server_factory, client_factory) -> None:
+    """A fresh server, so no earlier test's native connection secret is still on file."""
+
+    sut = server_factory(dict(NO_WEBHOOK_SECRET))
+    c = client_factory(sut)
+    r = c.post(f"{API}/intake/webhook/native", json={"event": "imported", "mediaScope": "movie", "filePath": "/x.mkv"})
+    assert r.status_code == 401, r.text
+    assert r.json()["detail"] == "Set a webhook secret before sending hand-offs to Weir."
 
 
 # --- the endpoint itself -----------------------------------------------------

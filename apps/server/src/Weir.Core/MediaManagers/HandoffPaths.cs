@@ -36,13 +36,13 @@ public static class HandoffPaths
 
         if (targetPartsCmp.Count <= folderParts.Count || !targetPartsCmp.Take(folderParts.Count).SequenceEqual(folderParts, StringComparer.Ordinal))
         {
-            return new HandoffPathResult(null, OutsideMessage(folder, target));
+            return new HandoffPathResult(null, OutsideMessage(targetPartsRaw));
         }
 
         var relative = PosixJoin(targetPartsRaw.Skip(folderParts.Count));
         if (relative.Length == 0 || relative.Split('/').Contains(".."))
         {
-            return new HandoffPathResult(null, OutsideMessage(folder, target));
+            return new HandoffPathResult(null, OutsideMessage(targetPartsRaw));
         }
 
         return new HandoffPathResult(relative, null);
@@ -54,7 +54,11 @@ public static class HandoffPaths
     private static string Comparable(string part) =>
         PyStrings.Strip(part.Replace('\\', '/')).TrimEnd('/').ToLowerInvariant();
 
-    private static string OutsideMessage(string folder, string target) =>
-        $"The hand-off names {PyStrings.Repr(target)}, which is not inside Weir's watched folder {PyStrings.Repr(folder)}. " +
+    /// <summary>
+    /// Names only the file, never the full path either side gave: this can run before a caller is authenticated
+    /// (an intake source with no secret configured yet), so it must not disclose the layout of Weir's own disk.
+    /// </summary>
+    private static string OutsideMessage(List<string> targetParts) =>
+        $"The hand-off names {PyStrings.Repr(targetParts.Count > 0 ? targetParts[^1] : string.Empty)}, which is not inside Weir's watched folder for this media type. " +
         "Point the media manager and Weir at the same folder — both hosts have to see it at that path.";
 }

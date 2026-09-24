@@ -123,6 +123,7 @@ it("discovers and imports selected manager libraries", async () => {
       api_key_is_saved: true,
       webhook_secret_is_set: false,
       webhook_url_path: "/hook",
+      unsigned_webhook_warning: null,
       last_test_ok: true,
       last_test_at: null,
       last_test_detail: null,

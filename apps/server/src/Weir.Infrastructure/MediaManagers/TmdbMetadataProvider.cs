@@ -206,7 +206,10 @@ public sealed class TmdbMetadataProvider : IMetadataProvider
         byte[] body;
         try
         {
-            using var client = new HttpClient(_handlers.Handler(followRedirects: true), disposeHandler: false) { Timeout = TmdbResponses.Timeout };
+            // The api_key travels in the query string, so a redirect would carry it to whatever host answered;
+            // TMDb's own API never redirects, and the host must resolve to a public address — the same rule the
+            // notification poster applies, checked here after resolution rather than on the configured string alone.
+            using var client = new HttpClient(_handlers.Handler(followRedirects: false, ManagerAddressPolicy.Public), disposeHandler: false) { Timeout = TmdbResponses.Timeout };
             using var request = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/search/movie?{TmdbResponses.UrlEncode(parameters)}");
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
@@ -222,7 +225,7 @@ public sealed class TmdbMetadataProvider : IMetadataProvider
         }
         catch (Exception exception) when (MediaManagerHttpClient.IsTransportFailure(exception, cancellationToken) || exception is UriFormatException or InvalidOperationException)
         {
-            return new LookupResult { Status = LookupResult.StatusUnreachable, Detail = $"Weir could not reach the metadata provider ({exception.Message})." };
+            return new LookupResult { Status = LookupResult.StatusUnreachable, Detail = $"Weir could not reach the metadata provider ({MediaManagerHttpClient.ClassifyTransportFailure(exception)})." };
         }
 
         return TmdbResponses.Parse(body, subject);

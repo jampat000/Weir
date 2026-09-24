@@ -25,6 +25,12 @@ public static partial class IntakeRules
     public const string NeverReceivedDetail = "Weir has never received this hand-off.";
 
     /// <summary>
+    /// The connection-less native source has no address of its own to prove who is calling, so unlike a real
+    /// manager connection it is refused rather than left open when nobody has ever configured a secret for it.
+    /// </summary>
+    public const string NativeNeedsSecretDetail = "Set a webhook secret before sending hand-offs to Weir.";
+
+    /// <summary>
     /// What a media manager may rely on at <c>/api/v1/intake</c>: asking about and cancelling a hand-off, reporting what
     /// became of a file Weir handed back (#652), and a <c>code</c> on each 409 from that report (#664).
     /// </summary>
@@ -149,6 +155,25 @@ public static partial class IntakeRules
 
         return left.Count.CompareTo(right.Count);
     }
+
+    /// <summary>The longest callback path Weir accepts; Deluno's own is well under this (<see cref="IsValidCallbackPath"/>).</summary>
+    public const int MaxCallbackPathLength = 512;
+
+    /// <summary>
+    /// A hand-off's callback path is later joined onto the manager's own base URL and carries its <c>X-Api-Key</c>
+    /// back (the completion reporter), so it must be a plain, rooted relative path — "/" then ordinary segments —
+    /// with no scheme, parent traversal, doubled slash, backslash, "@", colon, query or fragment to retarget where
+    /// that request actually lands.
+    /// </summary>
+    public static bool IsValidCallbackPath(string path) =>
+        path.Length is > 0 and <= MaxCallbackPathLength &&
+        path[0] == '/' &&
+        !path.Contains("..", StringComparison.Ordinal) &&
+        !path.Contains("//", StringComparison.Ordinal) &&
+        path.AsSpan().IndexOfAny(['\\', '@', ':', '?', '#']) < 0;
+
+    public static string InvalidCallbackPathDetail(string path) =>
+        $"The hand-off's callback path {PyStrings.Repr(path)} is not one Weir can use. Nothing was queued.";
 
     public static string NoVideoInFolderDetail(string relativePath) =>
         $"The hand-off names the folder {PyStrings.Repr(relativePath)}, but it holds no video file Weir processes. Nothing was queued.";

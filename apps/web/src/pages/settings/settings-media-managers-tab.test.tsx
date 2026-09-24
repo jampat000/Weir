@@ -19,6 +19,7 @@ function connection(
     api_key_is_saved: true,
     webhook_secret_is_set: false,
     webhook_url_path: "/api/v1/intake/webhook/deluno",
+    unsigned_webhook_warning: null,
     last_test_ok: null,
     last_test_at: null,
     last_test_detail: null,
