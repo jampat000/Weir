@@ -68,4 +68,54 @@ public sealed class LibraryOriginalsSettingsApiTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
+    [Fact]
+    public async Task An_originals_folder_that_is_a_library_folder_or_its_ancestor_is_refused()
+    {
+        var server = await StartServerAsync();
+        await using var _ = server;
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var libraryId = await TestDatabase.ScalarAsync(
+            server,
+            "INSERT INTO libraries (name, media_type, watched_folder, output_folder, work_folder, display_order) " +
+            "VALUES ('Originals3', 'movie', '/in', '/out', '/work', 11) RETURNING id");
+        var settingsPath = $"/api/v1/processing/libraries/{libraryId}/library-settings";
+
+        using var sameAsScanFolder = await client.PutAsync(
+            settingsPath,
+            new { library_folders = new[] { "/library/films" }, originals_folder = "/library/films", csrf_token = await client.CsrfAsync() });
+        Assert.Equal(HttpStatusCode.BadRequest, sameAsScanFolder.StatusCode);
+
+        using var ancestorOfScanFolder = await client.PutAsync(
+            settingsPath,
+            new { library_folders = new[] { "/library/films" }, originals_folder = "/library", csrf_token = await client.CsrfAsync() });
+        Assert.Equal(HttpStatusCode.BadRequest, ancestorOfScanFolder.StatusCode);
+    }
+
+    [Fact]
+    public async Task An_originals_folder_inside_a_library_folder_must_be_dot_prefixed()
+    {
+        var server = await StartServerAsync();
+        await using var _ = server;
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var libraryId = await TestDatabase.ScalarAsync(
+            server,
+            "INSERT INTO libraries (name, media_type, watched_folder, output_folder, work_folder, display_order) " +
+            "VALUES ('Originals4', 'movie', '/in', '/out', '/work', 12) RETURNING id");
+        var settingsPath = $"/api/v1/processing/libraries/{libraryId}/library-settings";
+
+        using var undotted = await client.PutAsync(
+            settingsPath,
+            new { library_folders = new[] { "/library/films" }, originals_folder = "/library/films/backups", csrf_token = await client.CsrfAsync() });
+        Assert.Equal(HttpStatusCode.BadRequest, undotted.StatusCode);
+
+        using var dotted = await client.PutAsync(
+            settingsPath,
+            new { library_folders = new[] { "/library/films" }, originals_folder = "/library/films/.weir-originals", csrf_token = await client.CsrfAsync() });
+        Assert.Equal(HttpStatusCode.OK, dotted.StatusCode);
+    }
 }

@@ -96,7 +96,7 @@ public static class LibraryModeEndpoints
             validated = LibraryFolderRules.Validate(folders, library, request.Options.WeirHome);
             if (originalsFolder is not null)
             {
-                validatedOriginalsFolder = LibraryFolderRules.ValidateOriginalsFolder(originalsFolder, library, request.Options.WeirHome);
+                validatedOriginalsFolder = LibraryFolderRules.ValidateOriginalsFolder(originalsFolder, validated, library, request.Options.WeirHome);
             }
         }
         catch (LibraryModeException exception)

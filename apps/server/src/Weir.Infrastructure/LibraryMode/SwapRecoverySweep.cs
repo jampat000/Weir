@@ -1,14 +1,41 @@
 using Microsoft.Extensions.Logging;
+using Weir.Core.Activity;
+using Weir.Core.Json;
 using Weir.Core.LibraryMode;
 
 namespace Weir.Infrastructure.LibraryMode;
 
 /// <summary>What recovery did.</summary>
-public sealed record SwapRecoveryReport(int TempFilesDeleted, int BackupsDeleted, int BackupsRestored, int Problems)
+/// <param name="TempFilesDeleted">Leftover <c>.weir-tmp</c> copies removed.</param>
+/// <param name="BackupsDeleted">Leftover <c>.weir-bak</c> files removed once the commit they belonged to was confirmed.</param>
+/// <param name="BackupsRestored">Backups renamed back because their commit never happened.</param>
+/// <param name="Problems">Leftovers that could not be dealt with, logged and left for the next sweep.</param>
+/// <param name="KeepConflicts">#735: original-file paths whose kept original could not be reconciled with its backup
+/// (<see cref="OriginalsKeepConflictException"/>) — a subset of what made up <paramref name="Problems"/>, for the caller
+/// to record an Activity event about and stop retrying, rather than leaving the swap "unfinished" forever.</param>
+public sealed record SwapRecoveryReport(int TempFilesDeleted, int BackupsDeleted, int BackupsRestored, int Problems, IReadOnlyList<string>? KeepConflicts = null)
 {
+    /// <summary>Defaults to empty rather than null, for every construction site written before #735.</summary>
+    public IReadOnlyList<string> KeepConflicts { get; init; } = KeepConflicts ?? [];
+
     public static SwapRecoveryReport Empty { get; } = new(0, 0, 0, 0);
 
     public int FilesChanged => TempFilesDeleted + BackupsDeleted + BackupsRestored;
+
+    /// <summary>
+    /// Sequence, not reference, equality for <see cref="KeepConflicts"/>: two collection-expression literals, or the
+    /// same empty list built two different ways, are never the same instance, but every existing test written before
+    /// #735 (and its own empty-list default) still needs <c>Assert.Equal(new SwapRecoveryReport(...), report)</c> to work.
+    /// </summary>
+    public bool Equals(SwapRecoveryReport? other) =>
+        other is not null &&
+        TempFilesDeleted == other.TempFilesDeleted &&
+        BackupsDeleted == other.BackupsDeleted &&
+        BackupsRestored == other.BackupsRestored &&
+        Problems == other.Problems &&
+        KeepConflicts.SequenceEqual(other.KeepConflicts, StringComparer.Ordinal);
+
+    public override int GetHashCode() => HashCode.Combine(TempFilesDeleted, BackupsDeleted, BackupsRestored, Problems, KeepConflicts.Count);
 
     public static SwapRecoveryReport operator +(SwapRecoveryReport left, SwapRecoveryReport right)
     {
@@ -18,7 +45,8 @@ public sealed record SwapRecoveryReport(int TempFilesDeleted, int BackupsDeleted
             left.TempFilesDeleted + right.TempFilesDeleted,
             left.BackupsDeleted + right.BackupsDeleted,
             left.BackupsRestored + right.BackupsRestored,
-            left.Problems + right.Problems);
+            left.Problems + right.Problems,
+            [.. left.KeepConflicts, .. right.KeepConflicts]);
     }
 
     public static SwapRecoveryReport Add(SwapRecoveryReport left, SwapRecoveryReport right) => left + right;
@@ -45,12 +73,14 @@ public sealed class SwapRecoverySweep
 {
     private readonly ISwapFileSystem _files;
     private readonly ISwapJournal _journal;
+    private readonly IActivityWriter _activityWriter;
     private readonly ILogger _logger;
 
-    public SwapRecoverySweep(ISwapFileSystem files, ISwapJournal journal, ILogger<SwapRecoverySweep> logger)
+    public SwapRecoverySweep(ISwapFileSystem files, ISwapJournal journal, IActivityWriter activityWriter, ILogger<SwapRecoverySweep> logger)
     {
         _files = files;
         _journal = journal;
+        _activityWriter = activityWriter;
         _logger = logger;
     }
 
@@ -86,6 +116,16 @@ public sealed class SwapRecoverySweep
             var fileReport = RecoverFile(_files, entry.OriginalPath, _logger, keptOriginalPath: entry.KeptOriginalPath);
             report += fileReport;
             handled.Add(entry.OriginalPath);
+
+            if (fileReport.KeepConflicts.Count > 0)
+            {
+                // #735 review, MINOR 4: a conflict is not transient like a lock or a permissions error, so it is not
+                // worth retrying every sweep. Recorded once (an Activity event, then a terminal journal state) and
+                // left for a person, rather than warned about silently on every future start.
+                await RecordKeepConflictAsync(entry, cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+
             if (fileReport.Problems > 0)
             {
                 continue;
@@ -150,6 +190,7 @@ public sealed class SwapRecoverySweep
         var backup = SafeSwapRules.BackupPath(originalPath);
         var temp = SafeSwapRules.TempPath(originalPath);
         int tempsDeleted = 0, backupsDeleted = 0, backupsRestored = 0, problems = 0;
+        List<string>? keepConflicts = null;
 
         try
         {
@@ -183,6 +224,13 @@ public sealed class SwapRecoverySweep
                 {
                     files.Move(backup, originalPath);
                     backupsRestored++;
+                    // The commit never happened, so a kept-original reservation (if the crash landed after it was
+                    // made) was never filled either; clean it up now the original is back where it belongs.
+                    if (keptOriginalPath is not null)
+                    {
+                        OriginalsMover.CleanUpUnfilledReservation(files, keptOriginalPath);
+                    }
+
                     if (restoreQuietly)
                     {
                         logger.LogInformation("Library swap put the original back path={Path}", originalPath);
@@ -195,6 +243,12 @@ public sealed class SwapRecoverySweep
                     }
                 }
             }
+        }
+        catch (OriginalsKeepConflictException exception)
+        {
+            problems++;
+            keepConflicts = [originalPath];
+            logger.LogWarning(exception, "Library swap recovery found a kept original that does not match its backup backup={Backup}", backup);
         }
 #pragma warning disable CA1031 // One leftover that cannot be dealt with is counted and logged; the sweep carries on.
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -220,7 +274,43 @@ public sealed class SwapRecoverySweep
             logger.LogWarning(exception, "Library swap recovery could not delete the temp file temp={Temp}", temp);
         }
 
-        return new SwapRecoveryReport(tempsDeleted, backupsDeleted, backupsRestored, problems);
+        return new SwapRecoveryReport(tempsDeleted, backupsDeleted, backupsRestored, problems, keepConflicts);
+    }
+
+    /// <summary>
+    /// #735 review, MINOR 4: tells the operator once that a kept original needs a human, and marks the journal entry
+    /// <see cref="SwapJournalState.KeepConflict"/> so it is never "unfinished" again — the sweep will not retry it, or
+    /// alert about it a second time.
+    /// </summary>
+    private async Task RecordKeepConflictAsync(SwapJournalEntry entry, CancellationToken cancellationToken)
+    {
+        var fileName = Path.GetFileName(entry.OriginalPath);
+        var detail = $"Weir kept both copies of {fileName}; check {entry.KeptOriginalPath} and remove the incomplete one.";
+        try
+        {
+            var extra = new PyDict().Set("relative_path", entry.OriginalPath).Set("kept_original_path", entry.KeptOriginalPath);
+            await _activityWriter.RecordAsync(
+                    new ActivityEventDraft(LibraryActivityEventTypes.OriginalKeepConflict, "library", detail, PyJsonWriter.Dumps(extra, PyJsonFormat.Compact)),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+#pragma warning disable CA1031 // Best-effort: a failed Activity write must not stop the journal from being marked, or spam every future sweep.
+        catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
+        {
+            _logger.LogWarning(exception, "Library swap sweep found a kept-original conflict but could not record it job_id={JobId} path={Path}", entry.JobId, entry.OriginalPath);
+        }
+
+        try
+        {
+            await _journal.RecordAsync(entry with { State = SwapJournalState.KeepConflict }, cancellationToken).ConfigureAwait(false);
+        }
+#pragma warning disable CA1031 // The conflict is logged and (best-effort) recorded above either way; a failed journal write only risks one more sweep re-attempting it.
+        catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
+        {
+            _logger.LogWarning(exception, "Library swap sweep could not mark a kept-original conflict on the journal job_id={JobId} path={Path}", entry.JobId, entry.OriginalPath);
+        }
     }
 
     private SwapRecoveryReport Log(SwapRecoveryReport report)

@@ -55,6 +55,11 @@ function KeepOriginalSettings({
             value={originalsFolder}
             onSelect={onChangeFolder}
           />
+          <p className="mm-library-cleaning__hint">
+            Inside a library folder, this folder&rsquo;s name must start with a
+            dot (like .weir-originals) so your media manager doesn&rsquo;t
+            import the originals; outside a library folder, any name works.
+          </p>
         </div>
       ) : null}
     </>

@@ -57,25 +57,27 @@ public sealed class OriginalsPathPlannerTests
     }
 
     [Fact]
-    public void A_free_name_is_used_unchanged()
+    public void The_first_candidate_is_the_path_itself()
     {
-        Assert.Equal("/originals/film.mkv", OriginalsPathPlanner.AvoidCollision("/originals/film.mkv", _ => false));
+        Assert.Equal("/originals/film.mkv", OriginalsPathPlanner.CandidateAt("/originals/film.mkv", 1));
     }
 
     [Fact]
-    public void A_clash_gets_a_numbered_suffix_and_keeps_looking_until_one_is_free()
+    public void Later_candidates_add_a_numbered_suffix_before_the_extension()
     {
-        var taken = new HashSet<string>(StringComparer.Ordinal) { "/originals/film.mkv", "/originals/film (2).mkv" };
-
-        var result = OriginalsPathPlanner.AvoidCollision("/originals/film.mkv", taken.Contains);
-
-        Assert.Equal("/originals/film (3).mkv", result);
+        Assert.Equal("/originals/film (2).mkv", OriginalsPathPlanner.CandidateAt("/originals/film.mkv", 2));
+        Assert.Equal("/originals/film (3).mkv", OriginalsPathPlanner.CandidateAt("/originals/film.mkv", 3));
     }
 
     [Fact]
-    public void A_clash_on_a_windows_style_path_stays_windows_style()
+    public void A_windows_style_path_keeps_its_own_separator_in_later_candidates()
     {
-        var result = OriginalsPathPlanner.AvoidCollision(@"D:\Media\.weir-originals\film.mkv", path => path == @"D:\Media\.weir-originals\film.mkv");
-        Assert.Equal(@"D:\Media\.weir-originals\film (2).mkv", result);
+        Assert.Equal(@"D:\Media\.weir-originals\film (2).mkv", OriginalsPathPlanner.CandidateAt(@"D:\Media\.weir-originals\film.mkv", 2));
+    }
+
+    [Fact]
+    public void An_attempt_below_one_is_refused()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => OriginalsPathPlanner.CandidateAt("/originals/film.mkv", 0));
     }
 }

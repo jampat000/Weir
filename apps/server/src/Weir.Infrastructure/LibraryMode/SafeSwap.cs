@@ -248,6 +248,13 @@ public sealed class SafeSwap
         async Task<SwapResult> Abandon(SwapOutcome outcome, string message)
         {
             await RollbackAsync(jobId, originalPath).ConfigureAwait(false);
+            // #735: a reservation made before the abandon point is never filled now; clean it up rather than leave an
+            // empty stray file in the originals folder. Best-effort — it never affects the rollback outcome above.
+            if (keepDestination is not null)
+            {
+                OriginalsMover.CleanUpUnfilledReservation(_files, keepDestination);
+            }
+
             return new SwapResult(outcome, message, false, warnings);
         }
 
@@ -348,7 +355,7 @@ public sealed class SafeSwap
         {
             if (keepDestination is not null)
             {
-                OriginalsMover.MoveOrCopy(_files, backup, keepDestination);
+                OriginalsMover.Fill(_files, backup, keepDestination);
                 keptOriginalPath = keepDestination;
             }
             else
@@ -391,8 +398,11 @@ public sealed class SafeSwap
         return new SwapResult(SwapOutcome.Committed, SafeSwapRules.CommittedMessage, backupRemoved, warnings, keptOriginalPath);
     }
 
-    /// <summary>#735: where the original will go once the swap commits, or null while the setting is off. The candidate is
-    /// resolved against the files on disk right now, so a name a concurrent write claims first is never overwritten.</summary>
+    /// <summary>
+    /// #735: where the original will go once the swap commits, or null while the setting is off. Reserves the name
+    /// atomically (<see cref="OriginalsMover.Reserve"/>) rather than just checking it is free: a plain check here and a
+    /// concurrent clean's plain check a moment later could both see the same name free and both write to it.
+    /// </summary>
     private string? ResolveKeepDestination(KeepOriginalOptions? keepOriginal, string originalPath)
     {
         if (keepOriginal is null)
@@ -402,7 +412,7 @@ public sealed class SafeSwap
 
         var containingFolder = OriginalsPathPlanner.ContainingFolder(keepOriginal.LibraryFolders, originalPath) ?? DirectoryOf(originalPath);
         var candidate = OriginalsPathPlanner.DestinationPath(containingFolder, keepOriginal.OriginalsFolder, originalPath);
-        return OriginalsPathPlanner.AvoidCollision(candidate, _files.FileExists);
+        return OriginalsMover.Reserve(_files, candidate);
     }
 
     /// <summary>Whether two fingerprints describe the same unchanged file. Device and inode are compared only when both were read.</summary>

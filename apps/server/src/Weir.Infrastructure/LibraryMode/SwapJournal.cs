@@ -23,6 +23,13 @@ public enum SwapJournalState
 
     /// <summary>Left unfinished by a crash and put right by the startup sweep.</summary>
     Recovered,
+
+    /// <summary>
+    /// #735: the startup sweep found a kept original already at its destination whose content did not match its backup —
+    /// a crash mid-copy a retry cannot resolve on its own. Recorded once, with an Activity event; the sweep does not
+    /// retry it again, so both files are left for a person to look at.
+    /// </summary>
+    KeepConflict,
 }
 
 /// <summary>One job's swap record.</summary>
@@ -138,6 +145,7 @@ public sealed class ProcessingJobSwapJournal : ISwapJournal
         SwapJournalState.Finished => "finished",
         SwapJournalState.RolledBack => "rolled_back",
         SwapJournalState.Recovered => "recovered",
+        SwapJournalState.KeepConflict => "keep_conflict",
         _ => throw new ArgumentOutOfRangeException(nameof(state), state, null),
     };
 

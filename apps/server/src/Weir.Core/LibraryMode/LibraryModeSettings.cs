@@ -162,15 +162,23 @@ public static class LibraryFolderRules
 
     /// <summary>
     /// #735's per-library originals folder, validated exactly like a library folder above (same path rules, same
-    /// watched/work/output overlap check). Blank means "use the default <see cref="OriginalsPathPlanner.DefaultFolderName"/>
-    /// folder inside whichever library folder holds the file", so an empty or whitespace-only value is normalized to blank
-    /// rather than rejected.
+    /// watched/work/output overlap check), plus two checks specific to sitting near a scan folder. Blank means "use the
+    /// default <see cref="OriginalsPathPlanner.DefaultFolderName"/> folder inside whichever library folder holds the file",
+    /// so an empty or whitespace-only value is normalized to blank rather than rejected.
     /// </summary>
     /// <param name="raw">The originals folder an operator submitted, or blank for the default.</param>
+    /// <param name="scanFolders">
+    /// This library's already-validated #505 scan folders (<see cref="Validate"/>'s return value): sitting inside one of
+    /// them is the supported, default-shaped case, but being equal to or an ancestor of one would make
+    /// <c>Weir.Infrastructure.LibraryMode.LibraryFileWalker</c>'s exclusion swallow the whole scan folder, so that is
+    /// refused. A custom folder inside a scan folder must be dot-prefixed, so a media manager watching that folder
+    /// does not import the originals it holds.
+    /// </param>
     /// <param name="library">The library it belongs to, for the watched/work/output overlap check.</param>
     /// <param name="weirHome">Weir's own data folder, passed through to <see cref="LibraryRules.ValidateFolderPath"/>.</param>
-    public static string ValidateOriginalsFolder(string? raw, ProcessingLibraryRecord library, string? weirHome = null)
+    public static string ValidateOriginalsFolder(string? raw, IReadOnlyList<string> scanFolders, ProcessingLibraryRecord library, string? weirHome = null)
     {
+        ArgumentNullException.ThrowIfNull(scanFolders);
         ArgumentNullException.ThrowIfNull(library);
         var trimmed = (raw ?? string.Empty).Trim();
         if (trimmed.Length == 0)
@@ -179,7 +187,44 @@ public static class LibraryFolderRules
         }
 
         ValidateOne("originals", trimmed, library, weirHome);
+
+        var normalized = LibraryRules.NormalizeFolder(trimmed);
+        if (normalized is null)
+        {
+            return trimmed;
+        }
+
+        var dotPrefixed = LastSegment(trimmed).StartsWith('.');
+        foreach (var scanFolder in scanFolders)
+        {
+            var scanNormalized = LibraryRules.NormalizeFolder(scanFolder);
+            if (scanNormalized is null)
+            {
+                continue;
+            }
+
+            if (string.Equals(normalized, scanNormalized, StringComparison.Ordinal) || LibraryRules.IsAncestor(normalized, scanNormalized))
+            {
+                throw new LibraryModeException(
+                    $"The originals folder can't be the same as, or contain, library folder '{scanFolder}'. It can sit inside a library folder, just not around one.");
+            }
+
+            if (!dotPrefixed && LibraryRules.IsAncestor(scanNormalized, normalized))
+            {
+                throw new LibraryModeException(
+                    "Inside a library folder, the originals folder's name must start with a dot (e.g. .weir-originals) so media managers don't import the originals.");
+            }
+        }
+
         return trimmed;
+    }
+
+    /// <summary>The last path segment of <paramref name="path"/>, under either separator style.</summary>
+    private static string LastSegment(string path)
+    {
+        var trimmedPath = path.TrimEnd('\\', '/');
+        var lastSeparator = trimmedPath.LastIndexOfAny(['\\', '/']);
+        return lastSeparator < 0 ? trimmedPath : trimmedPath[(lastSeparator + 1)..];
     }
 
     /// <summary>The checks a single library-folder-shaped path must pass: Weir's general folder rules, plus no overlap

@@ -80,36 +80,28 @@ public static class OriginalsPathPlanner
     }
 
     /// <summary>
-    /// The first name at or after <paramref name="candidate"/> that <paramref name="exists"/> says is free, so a kept
-    /// original never overwrites one already there: <c>Movie.mkv</c> becomes <c>Movie (2).mkv</c>, then <c>(3)</c>, up to
-    /// <paramref name="limit"/> attempts.
+    /// The <paramref name="attempt"/>-th candidate name for a kept original at <paramref name="path"/>: <paramref name="path"/>
+    /// itself for attempt 1, then a numbered suffix from attempt 2 on (<c>Movie.mkv</c> becomes <c>Movie (2).mkv</c>, then
+    /// <c>(3)</c>). Pure: whether a candidate is actually free is for the caller to find out, atomically, when it tries to
+    /// claim it — a snapshot check run just before this one cannot see another swap reserving the same name at the same
+    /// moment. See <c>Weir.Infrastructure.LibraryMode.OriginalsMover.Reserve</c>.
     /// </summary>
-    public static string AvoidCollision(string candidate, Func<string, bool> exists, int limit = 999)
+    public static string CandidateAt(string path, int attempt)
     {
-        ArgumentException.ThrowIfNullOrEmpty(candidate);
-        ArgumentNullException.ThrowIfNull(exists);
-        if (!exists(candidate))
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        ArgumentOutOfRangeException.ThrowIfLessThan(attempt, 1);
+        if (attempt == 1)
         {
-            return candidate;
+            return path;
         }
 
-        var lastSeparator = candidate.LastIndexOfAny(['\\', '/']);
-        var directory = lastSeparator < 0 ? string.Empty : candidate[..(lastSeparator + 1)];
-        var name = candidate[(lastSeparator + 1)..];
+        var lastSeparator = path.LastIndexOfAny(['\\', '/']);
+        var directory = lastSeparator < 0 ? string.Empty : path[..(lastSeparator + 1)];
+        var name = path[(lastSeparator + 1)..];
         var dot = name.LastIndexOf('.');
         var stem = dot <= 0 ? name : name[..dot];
         var extension = dot <= 0 ? string.Empty : name[dot..];
-
-        for (var attempt = 2; attempt <= limit; attempt++)
-        {
-            var next = $"{directory}{stem} ({attempt}){extension}";
-            if (!exists(next))
-            {
-                return next;
-            }
-        }
-
-        return $"{directory}{stem} ({limit}){extension}";
+        return $"{directory}{stem} ({attempt}){extension}";
     }
 
     /// <summary><paramref name="path"/> with <paramref name="folder"/>'s prefix and its separator removed. Falls back to

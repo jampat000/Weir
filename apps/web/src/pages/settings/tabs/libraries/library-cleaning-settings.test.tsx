@@ -107,6 +107,9 @@ it("shows the originals folder field only once keep-the-original is switched on,
   fireEvent.click(within(keepOriginal).getByRole("radio", { name: "On" }));
 
   expect(screen.getByText(/Weir moves the original into/)).toBeInTheDocument();
+  expect(
+    screen.getByText(/must start with a dot \(like \.weir-originals\)/),
+  ).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("Originals folder"), {
     target: { value: "D:\\Media\\Movies\\.weir-originals" },
   });

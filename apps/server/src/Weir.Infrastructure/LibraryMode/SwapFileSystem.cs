@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
+using System.Security.Cryptography;
 using Microsoft.Win32.SafeHandles;
 using Weir.Core.LibraryMode;
 using Weir.Infrastructure.Processing.RemuxPass;
@@ -89,12 +90,27 @@ public interface ISwapFileSystem
     /// originals folder a kept original moves into.</summary>
     void EnsureDirectory(string directory);
 
-    /// <summary>Copies <paramref name="source"/> to <paramref name="destination"/> byte for byte; never overwrites an
-    /// existing destination. #735: used only when <see cref="Move"/> refuses to cross volumes.</summary>
-    void Copy(string source, string destination);
+    /// <summary>A hash of the file's whole contents. #735: verifies a cross-volume copy against its source before the
+    /// source is deleted — a same-size but corrupt or preallocated copy must not pass on size alone.</summary>
+    string ContentHash(string path);
 
-    /// <summary>The file's size in bytes. #735: verifies a cross-volume copy before its source is deleted.</summary>
-    long FileSizeBytes(string path);
+    /// <summary>
+    /// Atomically creates an empty file at <paramref name="path"/>, or does nothing and returns false when a file is
+    /// already there. #735: how a kept-original destination is claimed — a name a plain existence check just found free
+    /// could still be claimed by another swap between that check and the claim; this cannot.
+    /// </summary>
+    bool TryReserve(string path);
+
+    /// <summary>
+    /// A same-volume atomic rename that replaces <paramref name="destination"/>. #735 only: <paramref name="destination"/>
+    /// must be the caller's own reservation from <see cref="TryReserve"/> — overwriting is safe only because nothing but
+    /// the reservation holder could ever have put anything there.
+    /// </summary>
+    void ReplaceReservation(string source, string destination);
+
+    /// <summary>Copies <paramref name="source"/> onto <paramref name="destination"/>, replacing it. #735 only, the same
+    /// way as <see cref="ReplaceReservation"/>: used when the reservation is on a different volume from the source.</summary>
+    void CopyOverReservation(string source, string destination);
 }
 
 /// <summary>The real filesystem.</summary>
@@ -134,6 +150,7 @@ public sealed partial class PhysicalSwapFileSystem : ISwapFileSystem
     private const uint OpenExisting = 3;
     private const uint FileFlagBackupSemantics = 0x02000000;
     private const uint MoveFileWriteThrough = 0x8;
+    private const uint MoveFileReplaceExisting = 0x1;
 
     public static PhysicalSwapFileSystem Instance { get; } = new();
 
@@ -283,9 +300,58 @@ public sealed partial class PhysicalSwapFileSystem : ISwapFileSystem
 
     public void EnsureDirectory(string directory) => Directory.CreateDirectory(directory);
 
-    public void Copy(string source, string destination) => File.Copy(source, destination, overwrite: false);
+    public string ContentHash(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(SHA256.HashData(stream));
+    }
 
-    public long FileSizeBytes(string path) => new FileInfo(path).Length;
+    public bool TryReserve(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    public void ReplaceReservation(string source, string destination)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            if (!MoveFileExW(source, destination, MoveFileWriteThrough | MoveFileReplaceExisting))
+            {
+                var error = Marshal.GetLastPInvokeError();
+                if (error == ErrorNotSameDevice)
+                {
+                    throw new CrossVolumeException($"'{source}' and '{destination}' are on different volumes.");
+                }
+
+                throw WindowsError(error, $"'{source}' -> '{destination}'");
+            }
+
+            return;
+        }
+
+        try
+        {
+            File.Move(source, destination, overwrite: true);
+        }
+        catch (IOException exception) when (exception is not FileInUseException && exception.HResult is Ebusy or Etxtbsy)
+        {
+            throw new FileInUseException(exception.Message, exception);
+        }
+        catch (IOException exception) when (exception is not CrossVolumeException && exception.HResult == Exdev)
+        {
+            throw new CrossVolumeException($"'{source}' and '{destination}' are on different volumes.", exception);
+        }
+    }
+
+    public void CopyOverReservation(string source, string destination) => File.Copy(source, destination, overwrite: true);
 
     public IEnumerable<string> EnumerateLeftovers(string folder)
     {
