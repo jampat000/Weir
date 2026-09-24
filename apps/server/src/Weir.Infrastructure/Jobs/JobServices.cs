@@ -188,6 +188,7 @@ public sealed class ProcessingWorkerService : BackgroundService
     private readonly WorkerLoopTimings _timings;
     private readonly TimeProvider _time;
     private readonly ILogger<ProcessingWorkerService> _logger;
+    private readonly WorkerWakeSignals _wakeSignals;
 
     public ProcessingWorkerService(
         ProcessingJobProcessor processor,
@@ -196,7 +197,8 @@ public sealed class ProcessingWorkerService : BackgroundService
         WeirOptions options,
         WorkerLoopTimings timings,
         TimeProvider time,
-        ILogger<ProcessingWorkerService> logger)
+        ILogger<ProcessingWorkerService> logger,
+        WorkerWakeSignals? wakeSignals = null)
     {
         _processor = processor;
         _store = store;
@@ -205,6 +207,7 @@ public sealed class ProcessingWorkerService : BackgroundService
         _timings = timings;
         _time = time;
         _logger = logger;
+        _wakeSignals = wakeSignals ?? new WorkerWakeSignals();
     }
 
     /// <summary>The <c>lease_owner</c> a slot claims as: <c>{hostname}-{pid}-w{index}</c>.</summary>
@@ -270,9 +273,11 @@ public sealed class ProcessingWorkerService : BackgroundService
                     }
                 }
 
+                // Taken before looking for work, so a job queued while this slot looks still wakes it.
+                var wake = _wakeSignals.NextWake(workerIndex);
                 if (workerIndex >= cachedMaxConcurrent)
                 {
-                    await IdleWithHeartbeatsAsync(workerIndex, stoppingToken).ConfigureAwait(false);
+                    await IdleWithHeartbeatsAsync(workerIndex, wake, stoppingToken).ConfigureAwait(false);
                     continue;
                 }
 
@@ -301,7 +306,7 @@ public sealed class ProcessingWorkerService : BackgroundService
 
                 if (outcome == JobProcessOutcome.Idle)
                 {
-                    await IdleWithHeartbeatsAsync(workerIndex, stoppingToken).ConfigureAwait(false);
+                    await IdleWithHeartbeatsAsync(workerIndex, wake, stoppingToken).ConfigureAwait(false);
                 }
 
                 // Processed: spin straight on to drain the queue.
@@ -316,20 +321,29 @@ public sealed class ProcessingWorkerService : BackgroundService
         }
     }
 
-    private async Task IdleWithHeartbeatsAsync(int workerIndex, CancellationToken stoppingToken)
+    /// <summary>
+    /// Waits out <see cref="WorkerLoopTimings.IdleSleep"/>, or less when a job is queued. One heartbeat covers the wait,
+    /// which is far shorter than <see cref="WorkerHeartbeats.StaleAfter"/>.
+    /// </summary>
+    private async Task IdleWithHeartbeatsAsync(int workerIndex, Task wake, CancellationToken stoppingToken)
     {
-        var deadline = _time.GetTimestamp() + (long)(_timings.IdleSleep.TotalSeconds * _time.TimestampFrequency);
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            _heartbeats.Beat(HeartbeatModule, workerIndex);
-            var remaining = TimeSpan.FromSeconds((deadline - _time.GetTimestamp()) / (double)_time.TimestampFrequency);
-            if (remaining <= TimeSpan.Zero)
-            {
-                break;
-            }
+        _heartbeats.Beat(HeartbeatModule, workerIndex);
+        await WaitForWorkAsync(wake, _timings.IdleSleep, _time, stoppingToken).ConfigureAwait(false);
+    }
 
-            await Task.Delay(remaining < TimeSpan.FromSeconds(1) ? remaining : TimeSpan.FromSeconds(1), _time, stoppingToken).ConfigureAwait(false);
+    /// <summary>Returns when <paramref name="wake"/> completes or <paramref name="idle"/> has passed, whichever is first.</summary>
+    internal static async Task WaitForWorkAsync(Task wake, TimeSpan idle, TimeProvider time, CancellationToken stoppingToken)
+    {
+        using var idleTimer = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        var idleOver = Task.Delay(idle, time, idleTimer.Token);
+        if (await Task.WhenAny(wake, idleOver).ConfigureAwait(false) == idleOver)
+        {
+            // Throws when the host is stopping, which ends the slot as before.
+            await idleOver.ConfigureAwait(false);
+            return;
         }
+
+        await idleTimer.CancelAsync().ConfigureAwait(false);
     }
 
     /// <summary>The saved "Files at once" value; the operator settings row defaults it to 1.</summary>
