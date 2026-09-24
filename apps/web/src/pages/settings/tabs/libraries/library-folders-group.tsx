@@ -7,6 +7,7 @@ import {
   WRITER_OPTIONS,
 } from "./library-options";
 import {
+  FolderSetting,
   SelectSetting,
   TextSetting,
   type LibraryFormBinding,
@@ -71,7 +72,7 @@ export function LibraryFoldersGroup({
           name="rule_set_id"
           label="Rules profile"
           options={ruleSetOptions(binding, ruleSets)}
-          hint="Create and edit reusable rule sets under Rules."
+          hint="Create and edit profiles under Rules."
         />
         <SelectSetting
           binding={binding}
@@ -81,7 +82,7 @@ export function LibraryFoldersGroup({
             { value: "", label: "None" },
             ...connections.map((c) => ({ value: String(c.id), label: c.name })),
           ]}
-          hint="The app that sends this library its downloads. Weir waits for it to finish with a download, hands the cleaned file back, and can ask it for a different release when one is bad."
+          hint="The media manager that sends this library its downloads. Weir waits for it to finish with a download, hands the cleaned file back, and can ask it for a different release when one is bad."
           testId="library-manager-choice"
         />
         <SelectSetting
@@ -92,21 +93,19 @@ export function LibraryFoldersGroup({
           hint={WRITER_HINTS[binding.form.remux_writer]}
           testId="library-writer-choice"
         />
-        <TextSetting
+        <FolderSetting
           binding={binding}
           name="watched_folder"
           label="Watched folder"
-          width="wide"
           placeholder="/srv/media/movies-4k"
         />
-        <TextSetting
+        <FolderSetting
           binding={binding}
           name="output_folder"
           label="Output folder"
-          width="wide"
           placeholder="/srv/media/movies-4k-out"
         />
-        <TextSetting
+        <FolderSetting
           binding={binding}
           name="work_folder"
           label="Work folder"

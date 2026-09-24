@@ -14,6 +14,8 @@ import {
   useUnlinkDiscoveredProcessingLibrary,
   useUpdateProcessingLibrary,
 } from "../../../../lib/processing/libraries-queries";
+import { SaveModelNote } from "../../save-model-note";
+import { SettingsLoadError } from "../../settings-load-error";
 import { LibraryEditor } from "./library-editor";
 import {
   EMPTY_LIBRARY_FORM,
@@ -23,13 +25,17 @@ import {
 } from "./library-form";
 import { LibraryImportSection } from "./library-import-section";
 import { LibraryListSection } from "./library-list-section";
+import { RemoveLibraryDialog } from "./remove-library-dialog";
 
 type Editing =
-  { kind: "closed" } | { kind: "adding" } | { kind: "editing"; id: number };
+  | { kind: "closed" }
+  | { kind: "adding" }
+  | { kind: "editing"; library: ProcessingLibrary };
 
 /**
  * Settings › Libraries: add, edit, reorder, switch on and off, and remove the libraries Weir
  * watches. A library is a row, so a fourth one is ordinary rather than a schema change (ADR-0014).
+ * The list's own switches and arrows save at once; the editor saves only on its Save.
  */
 export function LibrariesTab() {
   const editable = useCanEdit();
@@ -43,19 +49,16 @@ export function LibrariesTab() {
   const unlinkDiscovered = useUnlinkDiscoveredProcessingLibrary();
 
   const [editing, setEditing] = useState<Editing>({ kind: "closed" });
-  const [form, setForm] = useState<LibraryForm>(EMPTY_LIBRARY_FORM);
+  const [removing, setRemoving] = useState<ProcessingLibrary | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  if (libraries.isLoading) return <PageLoading label="Loading libraries" />;
+  if (libraries.isPending) return <PageLoading label="Loading libraries" />;
+  if (libraries.isError) return <SettingsLoadError what="libraries" />;
 
-  const rows = [...(libraries.data ?? [])].sort(
+  const rows = [...libraries.data].sort(
     (a, b) => a.display_order - b.display_order,
   );
   const managers = connections.data ?? [];
-  const editingLibrary =
-    editing.kind === "editing"
-      ? rows.find((r) => r.id === editing.id)
-      : undefined;
 
   /** Runs a change, clearing the last notice first and saying why if it fails. */
   const attempt = (work: Promise<unknown>, failure: string) => {
@@ -63,27 +66,13 @@ export function LibrariesTab() {
     work.catch((error: unknown) => setNotice(errorMessage(error, failure)));
   };
 
-  const open = (next: Editing, values: LibraryForm) => {
-    setForm(values);
-    setEditing(next);
-    setNotice(null);
-  };
-  const close = () => {
-    setEditing({ kind: "closed" });
-    setNotice(null);
-  };
-
-  const save = () =>
-    attempt(
-      (editing.kind === "editing"
-        ? update.mutateAsync({
-            id: editing.id,
-            data: writeFrom(form, editingLibrary),
-          })
-        : create.mutateAsync(writeFrom(form))
-      ).then(close),
-      "That library could not be saved.",
-    );
+  const saveLibrary = (form: LibraryForm) =>
+    editing.kind === "editing"
+      ? update.mutateAsync({
+          id: editing.library.id,
+          data: writeFrom(form, editing.library),
+        })
+      : create.mutateAsync(writeFrom(form));
 
   const move = (library: ProcessingLibrary, direction: -1 | 1) => {
     const index = rows.findIndex((r) => r.id === library.id);
@@ -99,6 +88,7 @@ export function LibrariesTab() {
 
   return (
     <div className="mm-quiet-stack" data-testid="processing-libraries-section">
+      <SaveModelNote model="instant" />
       {notice ? (
         <p
           className="text-sm font-medium text-mm-text1"
@@ -114,7 +104,10 @@ export function LibrariesTab() {
         ruleSets={ruleSets.data ?? []}
         connections={managers}
         editable={editable}
-        onAdd={() => open({ kind: "adding" }, EMPTY_LIBRARY_FORM)}
+        onAdd={() => {
+          setNotice(null);
+          setEditing({ kind: "adding" });
+        }}
         actions={{
           onToggle: (library) =>
             attempt(
@@ -128,8 +121,10 @@ export function LibrariesTab() {
               "That library could not be changed.",
             ),
           onMove: move,
-          onEdit: (library) =>
-            open({ kind: "editing", id: library.id }, formFrom(library)),
+          onEdit: (library) => {
+            setNotice(null);
+            setEditing({ kind: "editing", library });
+          },
           onUnlink: (library) =>
             attempt(
               unlinkDiscovered
@@ -141,12 +136,10 @@ export function LibrariesTab() {
                 ),
               "That library could not be unlinked.",
             ),
-          // The refusal reason is the useful part: it says how much work is in flight.
-          onRemove: (library) =>
-            attempt(
-              remove.mutateAsync(library.id),
-              "That library could not be removed.",
-            ),
+          onRemove: (library) => {
+            remove.reset();
+            setRemoving(library);
+          },
           unlinking: unlinkDiscovered.isPending,
         }}
       />
@@ -155,19 +148,30 @@ export function LibrariesTab() {
         <LibraryImportSection connections={managers} onNotice={setNotice} />
       ) : null}
 
-      <LibraryEditor
-        open={editing.kind !== "closed"}
-        library={editingLibrary}
-        binding={{
-          form,
-          update: (patch) => setForm((current) => ({ ...current, ...patch })),
-          editable,
-        }}
-        ruleSets={ruleSets.data ?? []}
-        connections={managers}
-        onSave={save}
-        onClose={close}
-      />
+      {editing.kind !== "closed" ? (
+        <LibraryEditor
+          key={editing.kind === "editing" ? editing.library.id : "new"}
+          library={editing.kind === "editing" ? editing.library : undefined}
+          initial={
+            editing.kind === "editing"
+              ? formFrom(editing.library)
+              : EMPTY_LIBRARY_FORM
+          }
+          editable={editable}
+          ruleSets={ruleSets.data ?? []}
+          connections={managers}
+          onSave={saveLibrary}
+          onClose={() => setEditing({ kind: "closed" })}
+        />
+      ) : null}
+
+      {removing ? (
+        <RemoveLibraryDialog
+          library={removing}
+          remove={remove}
+          onClose={() => setRemoving(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -116,6 +116,13 @@ export const EMPTY_LIBRARY_FORM: LibraryForm = {
   remux_writer: "best",
 };
 
+/** Whether two sets of editor values are the same, so the editor knows it has nothing unsaved. */
+export function sameLibraryForm(a: LibraryForm, b: LibraryForm): boolean {
+  return (Object.keys(a) as (keyof LibraryForm)[]).every(
+    (key) => a[key] === b[key],
+  );
+}
+
 const MS_PER_MINUTE = 60_000;
 /** "YYYY-MM-DDTHH:MM", the length a datetime-local value takes. */
 const DATETIME_LOCAL_LENGTH = 16;
