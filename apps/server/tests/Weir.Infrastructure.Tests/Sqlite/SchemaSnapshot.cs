@@ -16,16 +16,36 @@ internal static partial class SchemaSnapshot
 {
     public static string Describe(string databasePath)
     {
-        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = databasePath, Pooling = false }.ToString());
-        connection.Open();
+        using var connection = OpenConnection(databasePath);
         var builder = new StringBuilder();
+        var tables = AppendSchema(builder, connection);
+        AppendRows(builder, connection, tables);
+        return builder.ToString();
+    }
+
+    /// <summary>
+    /// Same as <see cref="Describe"/> but omits row data: for comparisons where the two databases are
+    /// expected to hold different rows (e.g. one has test data seeded into it) and only the schema itself
+    /// — tables, columns, indexes, foreign keys and each object's SQL text — must match.
+    /// </summary>
+    public static string DescribeSchema(string databasePath)
+    {
+        using var connection = OpenConnection(databasePath);
+        var builder = new StringBuilder();
+        AppendSchema(builder, connection);
+        return builder.ToString();
+    }
+
+    private static List<string> AppendSchema(StringBuilder builder, SqliteConnection connection)
+    {
         var objects = Query(connection, "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name");
         foreach (var row in objects)
         {
             builder.Append(CultureInfo.InvariantCulture, $"object {row[0]} {row[1]} on {row[2]}: {CollapseWhitespace(row[3])}\n");
         }
 
-        foreach (var table in objects.Where(row => row[0] == "table").Select(row => row[1]!))
+        var tables = objects.Where(row => row[0] == "table").Select(row => row[1]!).ToList();
+        foreach (var table in tables)
         {
             foreach (var column in Query(connection, $"SELECT cid, name, type, \"notnull\", dflt_value, pk, hidden FROM pragma_table_xinfo('{table}') ORDER BY cid"))
             {
@@ -43,21 +63,33 @@ internal static partial class SchemaSnapshot
             {
                 builder.Append(CultureInfo.InvariantCulture, $"foreign_key {table} #{key[0]}.{key[1]} {key[3]} -> {key[2]}.{key[4]} on_update={key[5]} on_delete={key[6]} match={key[7]}\n");
             }
+        }
 
+        return tables;
+    }
+
+    private static void AppendRows(StringBuilder builder, SqliteConnection connection, List<string> tables)
+    {
+        foreach (var table in tables)
+        {
             foreach (var values in Query(connection, $"SELECT * FROM \"{table}\" ORDER BY rowid"))
             {
                 builder.Append(CultureInfo.InvariantCulture, $"row {table}: {string.Join(" | ", values.Select(MaskTimestamp))}\n");
             }
         }
+    }
 
-        return builder.ToString();
+    private static SqliteConnection OpenConnection(string databasePath)
+    {
+        var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = databasePath, Pooling = false }.ToString());
+        connection.Open();
+        return connection;
     }
 
     /// <summary>Build a database by running a SQL script (the checked-in reference) with foreign keys off, as Alembic seeded it.</summary>
     public static void Execute(string databasePath, string sql)
     {
-        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = databasePath, Pooling = false }.ToString());
-        connection.Open();
+        using var connection = OpenConnection(databasePath);
         using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=OFF;\n" + sql;
         command.ExecuteNonQuery();
@@ -65,8 +97,7 @@ internal static partial class SchemaSnapshot
 
     public static long ScalarLong(string databasePath, string sql)
     {
-        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = databasePath, Pooling = false }.ToString());
-        connection.Open();
+        using var connection = OpenConnection(databasePath);
         using var command = connection.CreateCommand();
         command.CommandText = sql;
         return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
