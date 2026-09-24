@@ -68,16 +68,6 @@ public sealed class QueryIndexesMigrationTests : IDisposable
     }
 
     [Fact]
-    public void Live_progress_reads_only_its_event_types_recent_rows()
-    {
-        var plan = Plan(
-            LiveProgressStore.RecentProgressSql,
-            [("@type", ActivityEventTypes.ProcessingFileProcessingProgress), ("@since", "2026-01-01 00:00:00"), ("@max_rows", 64)]);
-
-        Assert.Contains("USING INDEX ix_activity_events_event_type_created_at (event_type=? AND created_at>?)", plan, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void The_processing_overview_reads_only_its_event_types_last_30_days()
     {
         var plan = Plan(

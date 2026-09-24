@@ -13,49 +13,51 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 /// first save and rewritten after. A failed write never interrupts ffprobe or ffmpeg.
 /// </summary>
 /// <remarks>
-/// Reports arrive on the tool's output reader, twice a second from ffmpeg. <see cref="Report"/> only hands the report
-/// over: a background writer saves the newest one at most once every <see cref="MinimumInterval"/>, so reading the
-/// tool's output never waits on the database and a pass takes the write lock a quarter as often (#710). A report whose
-/// status differs from the last one saved (started, finishing, finished, failed) is saved without waiting.
+/// Reports arrive on the tool's output reader, twice a second from ffmpeg. <see cref="Report"/> hands every one to
+/// <see cref="LiveProgressStore"/> at once (in memory, so this is cheap), and only saves to the database on the first
+/// report, when the reported status changes (started, finishing, finished, failed), and at
+/// <see cref="CompleteAsync"/> (#750). A percent-only update inside the same stage never reaches the database, so a
+/// long pass no longer takes the write lock while it runs (#710 covered the same goal by throttling to once every two
+/// seconds; this replaces that throttle with reporting nothing at all in between).
 /// </remarks>
 public sealed class ActivityProgressReporter
 {
-    /// <summary>The shortest time between two saves of the same status.</summary>
-    public static readonly TimeSpan MinimumInterval = TimeSpan.FromSeconds(2);
-
     private readonly SqliteDatabase? _database;
     private readonly Func<PyDict, Task> _save;
     private readonly long _jobId;
     private readonly PyDict _extra;
     private readonly ILogger? _logger;
     private readonly TimeProvider _time;
+    private readonly LiveProgressStore _liveProgress;
     private readonly Lock _lock = new();
     private PyDict? _pending;
+    private PyDict? _latest;
+    private string? _relativeMediaPath;
     private string? _savedStatus;
-    private long? _lastSavedAt;
+    private bool _unsaved;
     private bool _writing;
     private bool _completed;
-    private TaskCompletionSource _saveNow = NewSignal();
     private Task _writer = Task.CompletedTask;
 
-    public ActivityProgressReporter(SqliteDatabase database, long jobId, PyDict extra, ILogger logger, TimeProvider time)
+    public ActivityProgressReporter(SqliteDatabase database, long jobId, PyDict extra, ILogger logger, TimeProvider time, LiveProgressStore liveProgress)
         : this(
             database ?? throw new ArgumentNullException(nameof(database)),
             logger ?? throw new ArgumentNullException(nameof(logger)),
             save: null,
             jobId,
             extra,
-            time)
+            time,
+            liveProgress)
     {
     }
 
     /// <summary>For tests: every save goes to <paramref name="save"/> instead of the database.</summary>
-    internal ActivityProgressReporter(Func<PyDict, Task> save, long jobId, PyDict extra, TimeProvider time)
-        : this(database: null, logger: null, save ?? throw new ArgumentNullException(nameof(save)), jobId, extra, time)
+    internal ActivityProgressReporter(Func<PyDict, Task> save, long jobId, PyDict extra, TimeProvider time, LiveProgressStore liveProgress)
+        : this(database: null, logger: null, save ?? throw new ArgumentNullException(nameof(save)), jobId, extra, time, liveProgress)
     {
     }
 
-    private ActivityProgressReporter(SqliteDatabase? database, ILogger? logger, Func<PyDict, Task>? save, long jobId, PyDict extra, TimeProvider time)
+    private ActivityProgressReporter(SqliteDatabase? database, ILogger? logger, Func<PyDict, Task>? save, long jobId, PyDict extra, TimeProvider time, LiveProgressStore liveProgress)
     {
         _database = database;
         _logger = logger;
@@ -63,12 +65,17 @@ public sealed class ActivityProgressReporter
         _jobId = jobId;
         _extra = extra ?? new PyDict();
         _time = time ?? throw new ArgumentNullException(nameof(time));
+        _liveProgress = liveProgress ?? throw new ArgumentNullException(nameof(liveProgress));
     }
 
     /// <summary>The progress row, once written; the handler turns it into the completed row.</summary>
     public long? ActivityId { get; private set; }
 
-    /// <summary>Takes a report without waiting for it to be saved. Reports after <see cref="CompleteAsync"/> are ignored.</summary>
+    /// <summary>
+    /// Takes a report without waiting for it to be saved: updates <see cref="LiveProgressStore"/> at once, and queues a
+    /// database save only for the first report and a change of stage. Reports after <see cref="CompleteAsync"/> are
+    /// ignored.
+    /// </summary>
     public void Report(PyDict payload)
     {
         ArgumentNullException.ThrowIfNull(payload);
@@ -82,6 +89,20 @@ public sealed class ActivityProgressReporter
         // tells a long pass that is still reporting from one that died (LiveProgressStore).
         body.Set("reported_at", PyDateTime.UtcNow(_time).PydanticJson());
 
+        var relativeMediaPath = LiveProgress.Text(body, "relative_media_path");
+        var status = LiveProgress.StatusOf(body);
+        if (relativeMediaPath is not null)
+        {
+            if (LiveProgressStore.IsLiveStatus(status))
+            {
+                _liveProgress.Update(relativeMediaPath, LiveProgress.FromReport(body));
+            }
+            else
+            {
+                _liveProgress.Remove(relativeMediaPath);
+            }
+        }
+
         lock (_lock)
         {
             if (_completed)
@@ -89,49 +110,79 @@ public sealed class ActivityProgressReporter
                 return;
             }
 
-            _pending = body;
-            if (StatusOf(body) != _savedStatus)
+            _latest = body;
+            _relativeMediaPath ??= relativeMediaPath;
+            var isFirstReport = _savedStatus is null;
+            if (!isFirstReport && status == _savedStatus)
             {
-                _saveNow.TrySetResult();
+                // Percent-only movement inside the same stage stays in memory only; the database is not
+                // touched per progress line (#750). CompleteAsync saves it anyway if the pass ends without
+                // another stage change to carry it out.
+                _unsaved = true;
+                return;
             }
 
-            if (!_writing)
-            {
-                _writing = true;
-                _writer = Task.Run(WriteAsync);
-            }
+            _savedStatus = status;
+            _unsaved = false;
+            Enqueue(body);
         }
     }
 
-    /// <summary>Saves the newest report now, without waiting out the interval, and returns once it is saved.</summary>
+    /// <summary>Saves whatever is queued now, and returns once it is saved.</summary>
     public Task FlushAsync()
     {
         lock (_lock)
         {
-            _saveNow.TrySetResult();
             return _writer;
         }
     }
 
     /// <summary>
-    /// Saves the newest report and stops taking more. The handler calls this before it turns the row into the
-    /// completed row, so no late progress save can overwrite that.
+    /// Saves the newest report — even one that did not change stage, so the pass's final percent and message are not
+    /// lost — and stops taking more. The handler calls this before it turns the row into the completed row, so no
+    /// late progress save can overwrite that. The file also leaves <see cref="LiveProgressStore"/>: the pass is no
+    /// longer live, whatever it ends as.
     /// </summary>
     public Task CompleteAsync()
     {
         lock (_lock)
         {
-            _completed = true;
-        }
+            if (!_completed)
+            {
+                _completed = true;
+                if (_unsaved && _latest is { } body)
+                {
+                    _unsaved = false;
+                    Enqueue(body);
+                }
+            }
 
-        return FlushAsync();
+            if (_relativeMediaPath is { } path)
+            {
+                _liveProgress.Remove(path);
+            }
+
+            return _writer;
+        }
     }
 
-    /// <summary>One writer at a time: saves the pending report, waiting out the interval first, until none is pending.</summary>
+    /// <summary>Queues <paramref name="body"/> for the single background writer, starting it if it is idle. Caller holds <see cref="_lock"/>.</summary>
+    private void Enqueue(PyDict body)
+    {
+        _pending = body;
+        if (!_writing)
+        {
+            _writing = true;
+            _writer = Task.Run(WriteAsync);
+        }
+    }
+
+    /// <summary>One writer at a time: saves the pending report until none is pending, so writes never overlap or reorder.</summary>
     private async Task WriteAsync()
     {
         while (true)
         {
+            PyDict body;
             lock (_lock)
             {
                 if (_pending is null)
@@ -139,48 +190,13 @@ public sealed class ActivityProgressReporter
                     _writing = false;
                     return;
                 }
-            }
 
-            await WaitForTurnAsync().ConfigureAwait(false);
-            PyDict body;
-            lock (_lock)
-            {
-                body = _pending!;
+                body = _pending;
                 _pending = null;
-                _savedStatus = StatusOf(body);
-                if (_saveNow.Task.IsCompleted)
-                {
-                    _saveNow = NewSignal();
-                }
             }
 
             await _save(body).ConfigureAwait(false);
-            _lastSavedAt = _time.GetTimestamp();
         }
-    }
-
-    private async Task WaitForTurnAsync()
-    {
-        if (_lastSavedAt is not { } last)
-        {
-            return;
-        }
-
-        var wait = MinimumInterval - _time.GetElapsedTime(last);
-        if (wait <= TimeSpan.Zero)
-        {
-            return;
-        }
-
-        Task saveNow;
-        lock (_lock)
-        {
-            saveNow = _saveNow.Task;
-        }
-
-        using var interval = new CancellationTokenSource();
-        await Task.WhenAny(saveNow, Task.Delay(wait, _time, interval.Token)).ConfigureAwait(false);
-        await interval.CancelAsync().ConfigureAwait(false);
     }
 
     private async Task SaveToActivityAsync(PyDict body)
@@ -194,7 +210,7 @@ public sealed class ActivityProgressReporter
                 var detail = PyStrings.Slice(PyJsonWriter.Dumps(body, PyJsonFormat.Compact), 6000);
                 if (ActivityId is { } id)
                 {
-                    await SqliteActivityWriter.UpdateAsync(uow, id, title: Title(StatusOf(body), name), detail: detail).ConfigureAwait(false);
+                    await SqliteActivityWriter.UpdateAsync(uow, id, title: Title(LiveProgress.StatusOf(body), name), detail: detail).ConfigureAwait(false);
                     await uow.CommitAsync().ConfigureAwait(false);
                     return;
                 }
@@ -214,9 +230,6 @@ public sealed class ActivityProgressReporter
         }
     }
 
-    private static string StatusOf(PyDict body) =>
-        body.Get("status") is { IsTruthy: true } status ? PyConvert.Str(status) : "processing";
-
     private static string Title(string status, string name) => status switch
     {
         "waiting" => $"Waiting to process {name}",
@@ -233,6 +246,4 @@ public sealed class ActivityProgressReporter
         var name = MediaPathNames.Name(text, OperatingSystem.IsWindows());
         return name.Length > 0 ? name : "this file";
     }
-
-    private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 }

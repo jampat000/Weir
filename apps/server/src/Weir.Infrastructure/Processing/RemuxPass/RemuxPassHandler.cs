@@ -36,6 +36,7 @@ public sealed class RemuxPassHandler : IJobHandler
     private readonly ProcessingJobStore? _jobs;
     private readonly TimeProvider _time;
     private readonly ILogger<RemuxPassHandler> _logger;
+    private readonly LiveProgressStore _liveProgress;
 
     public RemuxPassHandler(
         SqliteDatabase database,
@@ -45,7 +46,8 @@ public sealed class RemuxPassHandler : IJobHandler
         TimeProvider time,
         ILogger<RemuxPassHandler> logger,
         HandoffCompletionReporter? reporter = null,
-        ProcessingJobStore? jobs = null)
+        ProcessingJobStore? jobs = null,
+        LiveProgressStore? liveProgress = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -55,6 +57,7 @@ public sealed class RemuxPassHandler : IJobHandler
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _reporter = reporter;
         _jobs = jobs;
+        _liveProgress = liveProgress ?? new LiveProgressStore();
     }
 
     /// <summary>
@@ -145,7 +148,7 @@ public sealed class RemuxPassHandler : IJobHandler
             return;
         }
 
-        var progress = new ActivityProgressReporter(_database, context.Id, provenance, _logger, _time);
+        var progress = new ActivityProgressReporter(_database, context.Id, provenance, _logger, _time, _liveProgress);
         var request = new RemuxPassRequest
         {
             Runtime = claim.Runtime!,

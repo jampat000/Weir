@@ -3,9 +3,11 @@ using System.Net;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Weir.Api.Endpoints;
 using Weir.Core.Activity;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Processing;
 using static Weir.Api.Tests.Platform.ApiTestClient;
 
 namespace Weir.Api.Tests.Platform;
@@ -386,6 +388,116 @@ public sealed class ActivityApiTests
     }
 
     [Fact]
+    public async Task The_progress_stream_coalesces_a_burst_of_changes_into_one_frame_per_throttle_window()
+    {
+        var store = new LiveProgressStore();
+        var time = new FakeTimeProvider();
+        var throttle = TimeSpan.FromSeconds(1);
+        await using var enumerator = ActivityEndpoints.ProcessingProgressFramesAsync(
+            () => store.Version,
+            store.WaitForChangeAsync,
+            store.Snapshot,
+            time,
+            throttle,
+            TimeSpan.FromMinutes(1),
+            CancellationToken.None).GetAsyncEnumerator();
+
+        async Task<double> NextPercentAsync(Action duringTheWindow)
+        {
+            var next = enumerator.MoveNextAsync().AsTask();
+            duringTheWindow();
+            while (!next.IsCompleted)
+            {
+                time.Advance(TimeSpan.FromMilliseconds(100));
+                await Task.Yield();
+            }
+
+            Assert.True(await next.WaitAsync(TimeSpan.FromSeconds(5)));
+            var dataLine = enumerator.Current.Split('\n').Single(line => line.StartsWith("data: ", StringComparison.Ordinal));
+            var data = JsonNode.Parse(dataLine["data: ".Length..])!;
+            return data["files"]![0]!["percent"]!.GetValue<double>();
+        }
+
+        Assert.Equal(10, await NextPercentAsync(() => store.Update("Film/Film.mkv", Progress(10))));
+
+        // Two updates land in the same throttle window; only the newest reaches the one frame that goes out.
+        Assert.Equal(30, await NextPercentAsync(() =>
+        {
+            store.Update("Film/Film.mkv", Progress(20));
+            store.Update("Film/Film.mkv", Progress(30));
+        }));
+    }
+
+    [Fact]
+    public async Task The_stream_carries_one_files_live_progress_to_every_open_client_at_once()
+    {
+        await using var server = await SeededServerAsync();
+        var liveProgress = server.Services.GetRequiredService<LiveProgressStore>();
+        var clientA = await AdminAsync(server);
+        var clientB = await AdminAsync(server);
+
+        using var readerA = await OpenStreamAsync(server, clientA);
+        using var readerB = await OpenStreamAsync(server, clientB);
+        await NextBlockAsync(readerA); // retry
+        await NextBlockAsync(readerA); // the opening activity.latest frame
+        await NextBlockAsync(readerB);
+        await NextBlockAsync(readerB);
+
+        // Connecting and watching for a change happens after the client gets its response headers back, so an
+        // update sent right away can race the stream's own watch starting. Repeating the update until a frame
+        // is observed makes the test wait out that race instead of depending on its timing.
+        var blockA = await UpdateUntilFrameArrivesAsync(readerA, () => liveProgress.Update("Film/Film.mkv", Progress(42.0)));
+        var blockB = await UpdateUntilFrameArrivesAsync(readerB, () => liveProgress.Update("Film/Film.mkv", Progress(42.0)));
+
+        Assert.Equal("event: processing.progress", blockA[0]);
+        var dataA = JsonNode.Parse(blockA[1]["data: ".Length..])!;
+        Assert.Equal("Film/Film.mkv", dataA["files"]![0]!["relative_path"]!.GetValue<string>());
+        Assert.Equal(42.0, dataA["files"]![0]!["percent"]!.GetValue<double>());
+        Assert.Equal(blockA[1], blockB[1]);
+    }
+
+    private static LiveProgress Progress(double percent) => new(percent, "Weir is writing the cleaned-up file.", 30.0, "processing", "120x", 5.0, [], []);
+
+    private static async Task<StreamReader> OpenStreamAsync(WeirTestServer server, ApiTestClient client)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/activity/stream");
+        request.Headers.Add("Cookie", string.Join("; ", client.Cookies.Select(pair => $"{pair.Key}={pair.Value}")));
+        var response = await server.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        return new StreamReader(await response.Content.ReadAsStreamAsync());
+    }
+
+    /// <summary>Reads blocks until a <c>processing.progress</c> one, skipping any unrelated <c>activity.latest</c> frame.</summary>
+    private static async Task<string[]> NextProcessingBlockAsync(StreamReader reader, CancellationToken cancellationToken)
+    {
+        string[] block;
+        do
+        {
+            block = await NextBlockAsync(reader, cancellationToken);
+        }
+        while (block[0] != "event: processing.progress");
+
+        return block;
+    }
+
+    /// <summary>
+    /// Calls <paramref name="update"/> again every 200ms until the one read it starts completes. Cancelling a read on
+    /// the test host's response stream tears the connection down, so this never abandons or replaces that read —
+    /// it only repeats the update while waiting for it, in case the first one landed before the stream began
+    /// watching for a change.
+    /// </summary>
+    private static async Task<string[]> UpdateUntilFrameArrivesAsync(StreamReader reader, Action update)
+    {
+        var pending = NextProcessingBlockAsync(reader, CancellationToken.None);
+        for (var attempt = 0; attempt < 25 && !pending.IsCompleted; attempt++)
+        {
+            update();
+            await Task.WhenAny(pending, Task.Delay(TimeSpan.FromMilliseconds(200)));
+        }
+
+        return await pending.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
     public async Task Record_activity_event_does_not_prune_history_using_log_retention()
     {
         await using var server = await SeededServerAsync();
@@ -408,10 +520,15 @@ public sealed class ActivityApiTests
     private static async Task<string[]> NextBlockAsync(StreamReader reader)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        return await NextBlockAsync(reader, timeout.Token);
+    }
+
+    private static async Task<string[]> NextBlockAsync(StreamReader reader, CancellationToken cancellationToken)
+    {
         var block = new List<string>();
         while (true)
         {
-            var line = await reader.ReadLineAsync(timeout.Token) ?? throw new InvalidOperationException("The stream ended.");
+            var line = await reader.ReadLineAsync(cancellationToken) ?? throw new InvalidOperationException("The stream ended.");
             if (line.Length == 0)
             {
                 if (block.Count > 0)

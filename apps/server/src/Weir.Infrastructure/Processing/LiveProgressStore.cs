@@ -1,8 +1,4 @@
-using System.Globalization;
-using Weir.Core.Activity;
 using Weir.Core.Json;
-using Weir.Core.Time;
-using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
 
@@ -23,107 +19,31 @@ public sealed record LiveProgress(
     string? Speed,
     double? ElapsedSeconds,
     IReadOnlyList<string> RemovedAudio,
-    IReadOnlyList<string> RemovedSubtitles);
-
-/// <summary>
-/// Reads the live per-file progress Activity row a running pass keeps updated (#463). Read-only: nothing here
-/// writes a second source of truth.
-/// </summary>
-/// <remarks>
-/// A pass inserts one row and rewrites it on every report, so the row's <c>created_at</c> is when the pass
-/// started, not when it last reported. Judging staleness on it would drop the live progress of any pass longer
-/// than <see cref="StaleAfter"/>, so each report carries <c>reported_at</c>
-/// (<see cref="RemuxPass.ActivityProgressReporter"/>) and a row is stale when its last report is. Rows without
-/// that field, written by earlier releases, fall back to <c>created_at</c>.
-/// </remarks>
-public static class LiveProgressStore
+    IReadOnlyList<string> RemovedSubtitles)
 {
-    private static readonly TimeSpan StaleAfter = TimeSpan.FromMinutes(2);
-
-    /// <summary>How far back to look for a pass that is still running. Generous: nothing is shown from it unless it reported within <see cref="StaleAfter"/>.</summary>
-    private static readonly TimeSpan LongestPass = TimeSpan.FromHours(12);
-
-    private static readonly HashSet<string> LiveStatuses = new(StringComparer.Ordinal) { "processing", "finishing" };
-    private const int MaxRows = 64;
-
-    /// <summary>The newest progress rows of the last <see cref="LongestPass"/>.</summary>
-    internal const string RecentProgressSql =
-        "SELECT created_at, detail FROM activity_events WHERE event_type = @type AND created_at >= @since ORDER BY id DESC LIMIT @max_rows";
-
-    /// <summary>Maps <c>relative_media_path</c> to the progress of the pass running on it.</summary>
-    public static async Task<Dictionary<string, LiveProgress>> ByPathAsync(UnitOfWork uow, TimeProvider time)
+    /// <summary>Builds the live entry from one of <see cref="RemuxPass.ActivityProgressReporter"/>'s reports.</summary>
+    public static LiveProgress FromReport(PyDict body)
     {
-        var now = time.GetUtcNow();
-        var since = now - LongestPass;
-        var rows = await uow.QueryAsync(
-            RecentProgressSql,
-            reader => (Created: SqliteValues.GetDateTime(reader, 0), Detail: reader.IsDBNull(1) ? null : reader.GetString(1)),
-            ("@type", ActivityEventTypes.ProcessingFileProcessingProgress),
-            ("@since", SqliteValues.ToSqlite(PyDateTime.FromUtc(since.UtcDateTime))),
-            ("@max_rows", MaxRows)).ConfigureAwait(false);
-
-        var result = new Dictionary<string, LiveProgress>(StringComparer.Ordinal);
-        foreach (var (created, raw) in rows)
-        {
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                continue;
-            }
-
-            PyJson parsed;
-            try
-            {
-                parsed = PyJsonParser.Parse(raw);
-            }
-            catch (PyJsonDecodeException)
-            {
-                continue;
-            }
-
-            if (parsed is not PyDict payload)
-            {
-                continue;
-            }
-
-            var status = payload.TryGetValue("status", out var statusValue) && statusValue is PyStr statusStr ? statusStr.Value.Trim().ToLowerInvariant() : string.Empty;
-            if (!LiveStatuses.Contains(status))
-            {
-                continue;
-            }
-
-            var lastReported = ReportedAt(payload) ?? new DateTimeOffset(created.AsUtc, TimeSpan.Zero);
-            if (now - lastReported > StaleAfter)
-            {
-                continue;
-            }
-
-            var path = payload.TryGetValue("relative_media_path", out var pathValue) && pathValue is PyStr pathStr ? pathStr.Value.Trim() : string.Empty;
-            if (path.Length == 0 || result.ContainsKey(path))
-            {
-                continue;
-            }
-
-            result[path] = new LiveProgress(
-                CoercePercent(payload.TryGetValue("percent", out var p) ? p : null),
-                Text(payload, "message"),
-                CoerceSeconds(payload.TryGetValue("eta_seconds", out var e) ? e : null),
-                status,
-                Text(payload, "speed"),
-                CoerceSeconds(payload.TryGetValue("elapsed_seconds", out var el) ? el : null),
-                Strings(payload, "removed_audio"),
-                Strings(payload, "removed_subtitles"));
-        }
-
-        return result;
+        ArgumentNullException.ThrowIfNull(body);
+        return new LiveProgress(
+            CoercePercent(body.TryGetValue("percent", out var p) ? p : null),
+            Text(body, "message"),
+            CoerceSeconds(body.TryGetValue("eta_seconds", out var e) ? e : null),
+            StatusOf(body),
+            Text(body, "speed"),
+            CoerceSeconds(body.TryGetValue("elapsed_seconds", out var el) ? el : null),
+            Strings(body, "removed_audio"),
+            Strings(body, "removed_subtitles"));
     }
 
-    private static DateTimeOffset? ReportedAt(PyDict payload) =>
-        payload.TryGetValue("reported_at", out var value) && value is PyStr text
-        && DateTimeOffset.TryParse(text.Value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed)
-            ? parsed
-            : null;
+    /// <summary><c>str(body.get("status") or "processing")</c>.</summary>
+    public static string StatusOf(PyDict body) =>
+        body.TryGetValue("status", out var status) && status is PyStr text && text.Value.Trim().Length > 0
+            ? text.Value.Trim().ToLowerInvariant()
+            : "processing";
 
-    private static string? Text(PyDict payload, string key) =>
+    /// <summary>A non-blank string field, trimmed, or <see langword="null"/>. Shared with <see cref="RemuxPass.ActivityProgressReporter"/>.</summary>
+    internal static string? Text(PyDict payload, string key) =>
         payload.TryGetValue(key, out var value) && value is PyStr text && text.Value.Trim().Length > 0 ? text.Value.Trim() : null;
 
     private static List<string> Strings(PyDict payload, string key) =>
@@ -151,4 +71,119 @@ public static class LiveProgressStore
         PyStr s when double.TryParse(s.Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed) => parsed,
         _ => null,
     };
+}
+
+/// <summary>
+/// The process-wide, in-memory live progress of every file currently being worked on (#750), keyed by
+/// <c>relative_media_path</c>. Registered as a singleton in <c>WeirPlatformServices</c>, so one instance is shared by
+/// every running pass and every open stream in the process; <see cref="RemuxPass.ActivityProgressReporter"/>
+/// updates it on every progress line a pass reports, which never touches the database: the database only gets a row
+/// at the start of a pass, when its stage changes, and at the end or on failure. A restart starts this store empty,
+/// which is fine because a job that was mid-pass restarts anyway.
+/// </summary>
+public sealed class LiveProgressStore
+{
+    /// <summary>The only statuses a running pass is "live" under; anything else (waiting, finished, failed) is not shown here.</summary>
+    private static readonly HashSet<string> LiveStatuses = new(StringComparer.Ordinal) { "processing", "finishing" };
+
+    private readonly Lock _gate = new();
+    private readonly Dictionary<string, LiveProgress> _byPath = new(StringComparer.Ordinal);
+    private readonly HashSet<TaskCompletionSource<long>> _waiters = [];
+    private long _version;
+
+    /// <summary>Whether <paramref name="status"/> is one <see cref="Update"/> should keep, rather than <see cref="Remove"/>.</summary>
+    public static bool IsLiveStatus(string status) => LiveStatuses.Contains(status);
+
+    /// <summary>The version bumped on every <see cref="Update"/> or <see cref="Remove"/> that actually changed something.</summary>
+    public long Version
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _version;
+            }
+        }
+    }
+
+    /// <summary>Records the newest progress for <paramref name="relativeMediaPath"/> and wakes every waiter. Cheap: no I/O.</summary>
+    public void Update(string relativeMediaPath, LiveProgress progress)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(relativeMediaPath);
+        ArgumentNullException.ThrowIfNull(progress);
+        Notify(() => _byPath[relativeMediaPath] = progress);
+    }
+
+    /// <summary>Drops <paramref name="relativeMediaPath"/> from the live set: the pass on it finished, failed or is only waiting.</summary>
+    public void Remove(string relativeMediaPath)
+    {
+        if (string.IsNullOrWhiteSpace(relativeMediaPath))
+        {
+            return;
+        }
+
+        Notify(() => _byPath.Remove(relativeMediaPath));
+    }
+
+    /// <summary>A snapshot of every file with live progress right now, safe to enumerate without holding the lock.</summary>
+    public IReadOnlyDictionary<string, LiveProgress> Snapshot()
+    {
+        lock (_gate)
+        {
+            return new Dictionary<string, LiveProgress>(_byPath, StringComparer.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// The current state at once when the version already differs from <paramref name="previousVersion"/>, otherwise the
+    /// next change, or <see langword="null"/> after <paramref name="timeout"/>. Every open stream calls this on the same
+    /// store, so one update wakes them all and nothing polls the store on a timer.
+    /// </summary>
+    public async Task<long?> WaitForChangeAsync(long previousVersion, TimeSpan timeout, TimeProvider time, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(time);
+        var waiter = new TaskCompletionSource<long>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_gate)
+        {
+            if (_version != previousVersion)
+            {
+                return _version;
+            }
+
+            _waiters.Add(waiter);
+        }
+
+        try
+        {
+            return await waiter.Task.WaitAsync(timeout, time, cancellationToken).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                _waiters.Remove(waiter);
+            }
+        }
+    }
+
+    private void Notify(Action mutate)
+    {
+        TaskCompletionSource<long>[] waiters;
+        long version;
+        lock (_gate)
+        {
+            mutate();
+            version = ++_version;
+            waiters = [.. _waiters];
+        }
+
+        foreach (var waiter in waiters)
+        {
+            waiter.TrySetResult(version);
+        }
+    }
 }
