@@ -74,6 +74,7 @@ public static class MediaManagerConnectionsEndpoints
         var enabled = model.Bool("enabled", defaultValue: true);
         var baseUrl = StrWithDefault(model, body, "base_url", string.Empty, 2000);
         var apiKey = StrWithDefault(model, body, "api_key", string.Empty, 2000);
+        var downloadedScanEnabled = model.Bool("downloaded_scan_enabled", defaultValue: false);
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
@@ -82,7 +83,8 @@ public static class MediaManagerConnectionsEndpoints
         long id;
         try
         {
-            id = await Connections(request).CreateAsync(uow, kind, name, baseUrl, apiKey.Length > 0 ? apiKey : null, enabled).ConfigureAwait(false);
+            id = await Connections(request)
+                .CreateAsync(uow, kind, name, baseUrl, apiKey.Length > 0 ? apiKey : null, enabled, downloadedScanEnabled).ConfigureAwait(false);
         }
         catch (MediaManagerConnectionException exception)
         {
@@ -141,6 +143,7 @@ public static class MediaManagerConnectionsEndpoints
         var enabled = model.OptionalBool("enabled");
         var baseUrl = model.OptionalStr("base_url", maxLength: 2000);
         var apiKey = model.OptionalStr("api_key", maxLength: 2000);
+        var downloadedScanEnabled = model.OptionalBool("downloaded_scan_enabled");
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
@@ -149,7 +152,7 @@ public static class MediaManagerConnectionsEndpoints
         var row = await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
         try
         {
-            await Connections(request).UpdateAsync(uow, row, name, baseUrl, apiKey, enabled).ConfigureAwait(false);
+            await Connections(request).UpdateAsync(uow, row, name, baseUrl, apiKey, enabled, downloadedScanEnabled).ConfigureAwait(false);
         }
         catch (MediaManagerConnectionException exception)
         {
