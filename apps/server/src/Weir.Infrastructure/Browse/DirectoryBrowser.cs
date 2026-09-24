@@ -47,6 +47,7 @@ public static partial class DirectoryBrowser
         }
 
         var sanitized = path.Replace("\0", string.Empty, StringComparison.Ordinal);
+        RejectUnsafePathForm(sanitized);
         if (!IsAbsolute(sanitized))
         {
             throw new DirectoryBrowseException(400, "Path must be absolute.");
@@ -125,6 +126,7 @@ public static partial class DirectoryBrowser
         }
 
         var sanitized = path.Replace("\0", string.Empty, StringComparison.Ordinal);
+        RejectUnsafePathForm(sanitized);
         if (!IsAbsolute(sanitized))
         {
             throw new DirectoryBrowseException(400, "Path must be absolute.");
@@ -150,6 +152,35 @@ public static partial class DirectoryBrowser
         }
 
         return normalized;
+    }
+
+    /// <summary>
+    /// Rejects a path's dangerous forms before it reaches any filesystem call (<see cref="RealPath"/>'s
+    /// <c>CreateFileW</c> among them): a UNC path (<c>\\</c> or <c>//</c>), a Windows device path (which
+    /// always starts the same way, so the same check covers <c>\\?\</c> and <c>\\.\</c>), and an alternate
+    /// data stream (a colon after the drive letter). Stateless, and shared by every entry point that turns
+    /// operator-supplied text into a path.
+    /// </summary>
+    internal static void RejectUnsafePathForm(string path)
+    {
+        var slashUnified = path.Replace('/', '\\');
+        if (slashUnified.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            throw new DirectoryBrowseException(400, "UNC and device paths are not allowed.");
+        }
+
+        // Alternate data streams are an NTFS concept; a colon is an ordinary, legal filename character
+        // on Linux/macOS, so this check only applies where a drive letter does.
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var hasDriveLetter = path.Length >= 2 && char.IsAsciiLetter(path[0]) && path[1] == ':';
+        if (path.IndexOf(':', hasDriveLetter ? 2 : 0) >= 0)
+        {
+            throw new DirectoryBrowseException(400, "Alternate data streams are not allowed.");
+        }
     }
 
     private static PyDict Out(string? current, string? parent, IEnumerable<PyDict> entries) => new PyDict()
