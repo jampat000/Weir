@@ -1,8 +1,6 @@
-using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
-using Microsoft.Win32.SafeHandles;
 using Weir.Core.LibraryMode;
 using Weir.Infrastructure.Processing.RemuxPass;
 
@@ -137,21 +135,6 @@ public interface ISwapFileSystem
 /// </remarks>
 public sealed partial class PhysicalSwapFileSystem : ISwapFileSystem
 {
-    private const int ErrorSharingViolation = 32;
-    private const int ErrorLockViolation = 33;
-    private const int ErrorNotSameDevice = 17;
-    private const int Ebusy = 16;
-    private const int Etxtbsy = 26;
-    private const int Exdev = 18;
-
-    private const uint FileReadAttributes = 0x80;
-    private const uint DeleteAccess = 0x00010000;
-    private const uint FileShareAll = 0x1 | 0x2 | 0x4;
-    private const uint OpenExisting = 3;
-    private const uint FileFlagBackupSemantics = 0x02000000;
-    private const uint MoveFileWriteThrough = 0x8;
-    private const uint MoveFileReplaceExisting = 0x1;
-
     public static PhysicalSwapFileSystem Instance { get; } = new();
 
     public bool FileExists(string path) => File.Exists(path);
@@ -373,123 +356,4 @@ public sealed partial class PhysicalSwapFileSystem : ISwapFileSystem
         var code = OperatingSystem.IsWindows() ? exception.HResult & 0xFFFF : exception.HResult;
         return OperatingSystem.IsWindows() ? code is ErrorSharingViolation or ErrorLockViolation : code is Ebusy or Etxtbsy;
     }
-
-    private static Exception WindowsError(int error, string subject) => error switch
-    {
-        ErrorSharingViolation or ErrorLockViolation => new FileInUseException($"{new Win32Exception(error).Message} ({subject})"),
-        5 => new UnauthorizedAccessException($"{new Win32Exception(error).Message} ({subject})"),
-        2 or 3 => new FileNotFoundException($"{new Win32Exception(error).Message} ({subject})"),
-        _ => new IOException($"{new Win32Exception(error).Message} ({subject})", unchecked((int)0x80070000) | error),
-    };
-
-    private static SafeFileHandle OpenWindowsHandle(string path, uint access)
-    {
-        var handle = CreateFileW(path, access, FileShareAll, IntPtr.Zero, OpenExisting, FileFlagBackupSemantics, IntPtr.Zero);
-        if (handle.IsInvalid)
-        {
-            var error = Marshal.GetLastPInvokeError();
-            handle.Dispose();
-            throw WindowsError(error, $"'{path}'");
-        }
-
-        return handle;
-    }
-
-    private readonly record struct UnixFileStat(uint Links, uint Uid, uint Gid);
-
-    private static UnixFileStat? UnixStat(string path)
-    {
-        if (!OperatingSystem.IsLinux())
-        {
-            return null;
-        }
-
-        const int atFdCwd = -100;
-        const uint statxNlink = 0x4;
-        const uint statxUid = 0x8;
-        const uint statxGid = 0x10;
-        // struct statx is the same on every Linux architecture: stx_mask (u32) at 0, stx_nlink at 16, stx_uid at 20, stx_gid at 24.
-        var buffer = new byte[256];
-        try
-        {
-            if (Statx(atFdCwd, path, 0, statxNlink | statxUid | statxGid, ref buffer[0]) != 0)
-            {
-                var errno = Marshal.GetLastPInvokeError();
-                throw errno == 2 ? new FileNotFoundException($"No such file: '{path}'", path) : new IOException($"statx failed with errno {errno} for '{path}'");
-            }
-        }
-        catch (Exception exception) when (exception is DllNotFoundException or EntryPointNotFoundException)
-        {
-            return null;
-        }
-
-        var mask = BitConverter.ToUInt32(buffer, 0);
-        if ((mask & statxNlink) == 0)
-        {
-            return null;
-        }
-
-        return new UnixFileStat(BitConverter.ToUInt32(buffer, 16), BitConverter.ToUInt32(buffer, 20), BitConverter.ToUInt32(buffer, 24));
-    }
-
-    private static bool UnixIsRoot()
-    {
-        try
-        {
-            return Geteuid() == 0;
-        }
-        catch (Exception exception) when (exception is DllNotFoundException or EntryPointNotFoundException)
-        {
-            return false;
-        }
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct ByHandleFileInformation
-    {
-        public uint FileAttributes;
-        public uint CreationTimeLow;
-        public uint CreationTimeHigh;
-        public uint LastAccessTimeLow;
-        public uint LastAccessTimeHigh;
-        public uint LastWriteTimeLow;
-        public uint LastWriteTimeHigh;
-        public uint VolumeSerialNumber;
-        public uint FileSizeHigh;
-        public uint FileSizeLow;
-        public uint NumberOfLinks;
-        public uint FileIndexHigh;
-        public uint FileIndexLow;
-    }
-
-    [LibraryImport("kernel32.dll", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
-    private static partial SafeFileHandle CreateFileW(
-        string fileName,
-        uint desiredAccess,
-        uint shareMode,
-        IntPtr securityAttributes,
-        uint creationDisposition,
-        uint flagsAndAttributes,
-        IntPtr templateFile);
-
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool GetFileInformationByHandle(SafeFileHandle file, out ByHandleFileInformation information);
-
-    [LibraryImport("kernel32.dll", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool MoveFileExW(string existingFileName, string newFileName, uint flags);
-
-    [LibraryImport("kernel32.dll", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool GetDiskFreeSpaceExW(string directoryName, out ulong freeBytesAvailableToCaller, out ulong totalBytes, out ulong totalFreeBytes);
-
-    [LibraryImport("libc", EntryPoint = "statx", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
-    private static partial int Statx(int directoryFd, string path, int flags, uint mask, ref byte buffer);
-
-    [LibraryImport("libc", EntryPoint = "geteuid")]
-    private static partial uint Geteuid();
-
-    [LibraryImport("libc", EntryPoint = "chown", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
-    private static partial int UnixChown(string path, uint owner, uint group);
 }
