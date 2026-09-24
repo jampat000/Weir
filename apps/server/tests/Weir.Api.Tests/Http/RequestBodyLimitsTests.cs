@@ -40,4 +40,44 @@ public sealed class RequestBodyLimitsTests
             (HttpStatusCode.RequestEntityTooLarge, "The request body is larger than Weir accepts."),
             (response.StatusCode, await Detail(response)));
     }
+
+    [Fact]
+    public async Task A_non_empty_body_with_no_content_type_is_refused_with_415()
+    {
+        await using var server = await WeirTestServer.StartAsync([("WEIR_SESSION_SECRET", Secret), ("WEIR_PROCESSING_WORKER_COUNT", "0")]);
+        using var content = new ByteArrayContent("{}"u8.ToArray());
+
+        using var response = await new ApiTestClient(server).SendAsync(HttpMethod.Post, "/api/v1/intake/webhook/sonarr", content: content);
+
+        Assert.Equal(
+            (HttpStatusCode.UnsupportedMediaType, PyRequestBody.UnsupportedContentTypeDetail),
+            (response.StatusCode, await Detail(response)));
+    }
+
+    [Fact]
+    public async Task A_non_empty_body_with_a_non_json_content_type_is_refused_with_415()
+    {
+        await using var server = await WeirTestServer.StartAsync([("WEIR_SESSION_SECRET", Secret), ("WEIR_PROCESSING_WORKER_COUNT", "0")]);
+
+        using var response = await new ApiTestClient(server).SendAsync(
+            HttpMethod.Post, "/api/v1/intake/webhook/sonarr", content: new StringContent("{}", Encoding.UTF8, "text/plain"));
+
+        Assert.Equal(
+            (HttpStatusCode.UnsupportedMediaType, PyRequestBody.UnsupportedContentTypeDetail),
+            (response.StatusCode, await Detail(response)));
+    }
+
+    [Fact]
+    public async Task The_x_requested_with_check_applies_to_an_upper_case_api_path_too()
+    {
+        await using var server = await WeirTestServer.StartAsync([("WEIR_SESSION_SECRET", Secret), ("WEIR_PROCESSING_WORKER_COUNT", "0"), ("WEIR_MEDIA_MANAGER_WEBHOOK_SECRET", "")]);
+
+        using var response = await new ApiTestClient(server).SendAsync(
+            HttpMethod.Post,
+            "/API/v1/intake/webhook/sonarr",
+            content: TestDatabase.RawJson("{}"),
+            headers: new Dictionary<string, string> { ["Origin"] = "http://evil.example" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
 }

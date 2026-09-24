@@ -116,8 +116,16 @@ public static class PyRequestBody
     private const string TooLargeDetail = "The request body is larger than Weir accepts.";
 
     /// <summary>
-    /// The JSON body, <see langword="null"/> when the request has none, or the raw text when the content type is
-    /// not JSON. A JSON syntax error is a 422 <c>json_invalid</c>; undecodable bytes are a 400.
+    /// Every Weir route reads its body as JSON, so a non-empty body with no <c>Content-Type</c> or one that
+    /// isn't JSON is refused rather than guessed at. This also forces a CORS preflight for a cross-origin
+    /// browser request: a plain-text body with no preflight was one way past the X-Requested-With check.
+    /// </summary>
+    public const string UnsupportedContentTypeDetail = "Send the body as application/json.";
+
+    /// <summary>
+    /// The JSON body, <see langword="null"/> when the request has none. A JSON syntax error is a 422
+    /// <c>json_invalid</c>; undecodable bytes are a 400; a non-empty body whose <c>Content-Type</c> is
+    /// missing or not JSON is a 415.
     /// </summary>
     public static async Task<PyJson?> ReadAsync(HttpContext context)
     {
@@ -135,10 +143,9 @@ public static class PyRequestBody
         }
 
         var contentType = context.Request.Headers.ContentType.ToString();
-        var isJson = contentType.Length == 0 || IsJsonContentType(contentType);
-        if (!isJson)
+        if (!IsJsonContentType(contentType))
         {
-            return new PyStr(Encoding.UTF8.GetString(bytes));
+            throw new ApiException(StatusCodes.Status415UnsupportedMediaType, UnsupportedContentTypeDetail);
         }
 
         string text;
