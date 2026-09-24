@@ -1,10 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
 import { activityKeys } from "./query-keys";
-import { useActivityStreamInvalidations } from "./use-activity-stream-invalidation";
+import {
+  useActivityStreamInvalidations,
+  useLiveProgress,
+} from "./use-activity-stream-invalidation";
 import { processingKeys } from "../processing/query-keys";
 
 class FakeEventSource {
@@ -324,5 +327,124 @@ describe("useActivityStreamInvalidations", () => {
 
     expect(FakeEventSource.instances).toHaveLength(2);
     expect(FakeEventSource.instances[1].closed).toBe(false);
+  });
+});
+
+describe("useLiveProgress", () => {
+  afterEach(() => {
+    FakeEventSource.instances = [];
+    vi.unstubAllGlobals();
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+
+  it("starts empty and fills in from the stream's processing.progress frame", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const { result } = renderHook(() => useLiveProgress());
+    expect(result.current).toEqual({});
+
+    const src = FakeEventSource.instances[0];
+    act(() => {
+      src.emit(
+        "processing.progress",
+        JSON.stringify({
+          files: [
+            {
+              relative_path: "Film/Film.mkv",
+              status: "processing",
+              percent: 42.5,
+              eta_seconds: 12,
+              message: "Weir is writing the cleaned-up file.",
+              speed: "148x",
+              elapsed_seconds: 9,
+              removed_audio: ["fre aac 2ch: removed"],
+              removed_subtitles: [],
+            },
+          ],
+        }),
+      );
+    });
+
+    expect(result.current["Film/Film.mkv"]).toEqual({
+      relativePath: "Film/Film.mkv",
+      status: "processing",
+      percent: 42.5,
+      etaSeconds: 12,
+      message: "Weir is writing the cleaned-up file.",
+      speed: "148x",
+      elapsedSeconds: 9,
+      removedAudio: ["fre aac 2ch: removed"],
+      removedSubtitles: [],
+    });
+  });
+
+  it("replaces the whole snapshot, so a file missing from a later frame disappears", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const { result } = renderHook(() => useLiveProgress());
+    const src = FakeEventSource.instances[0];
+
+    act(() => {
+      src.emit(
+        "processing.progress",
+        JSON.stringify({
+          files: [
+            {
+              relative_path: "Film/Film.mkv",
+              status: "processing",
+              percent: 10,
+            },
+          ],
+        }),
+      );
+    });
+    expect(result.current["Film/Film.mkv"]).toBeDefined();
+
+    act(() => {
+      src.emit("processing.progress", JSON.stringify({ files: [] }));
+    });
+
+    expect(result.current["Film/Film.mkv"]).toBeUndefined();
+  });
+
+  it("ignores a malformed frame instead of breaking live progress", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const { result } = renderHook(() => useLiveProgress());
+    const src = FakeEventSource.instances[0];
+
+    act(() => {
+      src.emit("processing.progress", "not json");
+    });
+
+    expect(result.current).toEqual({});
+  });
+
+  it("shares its connection with an invalidation subscriber, and closes only once both are gone", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const qc = new QueryClient();
+    const progress = renderHook(() => useLiveProgress());
+    const invalidation = renderHook(
+      () => useActivityStreamInvalidations([activityKeys.recent]),
+      { wrapper: withQueryClient(qc) },
+    );
+
+    expect(FakeEventSource.instances).toHaveLength(1);
+    const src = FakeEventSource.instances[0];
+
+    invalidation.unmount();
+    expect(src.closed).toBe(false);
+
+    progress.unmount();
+    expect(src.closed).toBe(true);
   });
 });

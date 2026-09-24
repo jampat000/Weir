@@ -11,6 +11,7 @@ using Weir.Core.Json;
 using Weir.Core.Time;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Settings;
 
 namespace Weir.Api.Endpoints;
@@ -165,8 +166,9 @@ public static class ActivityEndpoints
     }
 
     /// <summary>
-    /// Authenticate once with a short-lived connection, then stream
-    /// <c>activity.latest</c> frames and keepalives without holding the database.
+    /// Authenticate once with a short-lived connection, then stream <c>activity.latest</c> frames and, once a second at
+    /// most, a <c>processing.progress</c> frame with every file's live progress (#750), plus keepalives, without
+    /// holding the database.
     /// </summary>
     private static async Task<ApiResult> GetStreamAsync(ApiRequest request)
     {
@@ -174,6 +176,7 @@ public static class ActivityEndpoints
         await request.ReleaseDbAsync().ConfigureAwait(false);
         var database = request.Database;
         var notifier = ActivityNotifications.For(database);
+        var liveProgress = request.Service<LiveProgressStore>();
         var time = request.Time;
         var logger = request.LoggerFactory.CreateLogger("weir.platform.activity.router");
         return new CustomApiResult(async context =>
@@ -183,19 +186,41 @@ public static class ActivityEndpoints
             context.Response.Headers.CacheControl = "no-store, no-cache";
             context.Response.Headers.Connection = "keep-alive";
             context.Response.Headers["X-Accel-Buffering"] = "no";
+            // One write at a time: the two frame sources run concurrently, and a chunk must reach the client whole.
+            var writeGate = new SemaphoreSlim(1, 1);
+            async Task WriteFrameAsync(string chunk)
+            {
+                await writeGate.WaitAsync(context.RequestAborted).ConfigureAwait(false);
+                try
+                {
+                    await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes(chunk), context.RequestAborted).ConfigureAwait(false);
+                    await context.Response.Body.FlushAsync(context.RequestAborted).ConfigureAwait(false);
+                }
+                finally
+                {
+                    writeGate.Release();
+                }
+            }
+
+            async Task PumpAsync(IAsyncEnumerable<string> frames)
+            {
+                await foreach (var chunk in frames.ConfigureAwait(false))
+                {
+                    await WriteFrameAsync(chunk).ConfigureAwait(false);
+                }
+            }
+
             try
             {
-                await foreach (var chunk in LatestFramesAsync(
+                var activityLoop = PumpAsync(LatestFramesAsync(
                     ct => ActivityHistoryStore.LatestIdAsync(database, ct),
                     notifier,
                     time,
                     StreamKeepalive,
                     logger,
-                    context.RequestAborted).ConfigureAwait(false))
-                {
-                    await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes(chunk), context.RequestAborted).ConfigureAwait(false);
-                    await context.Response.Body.FlushAsync(context.RequestAborted).ConfigureAwait(false);
-                }
+                    context.RequestAborted));
+                var progressLoop = PumpAsync(ActivityProgressFrames.ForAsync(liveProgress, time, context.RequestAborted));
+                await Task.WhenAll(activityLoop, progressLoop).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
             {

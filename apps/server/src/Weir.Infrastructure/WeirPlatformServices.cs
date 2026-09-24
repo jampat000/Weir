@@ -30,6 +30,8 @@ public static class WeirPlatformServices
         services.TryAddSingleton<ITimeZoneResolver, IanaTimeZoneResolver>();
         services.TryAddSingleton<IActivityWriter, SqliteActivityWriter>();
         services.TryAddSingleton(sp => ActivityNotifications.For(sp.GetRequiredService<SqliteDatabase>()));
+        // One process-wide live-progress store, shared by every running pass and every open stream (#750).
+        services.TryAddSingleton<LiveProgressStore>();
 
         // #555: WEIR_CHOWN_OUTPUT/WEIR_FILE_MODE_OUTPUT/WEIR_DIR_MODE_OUTPUT. Windows gets a no-op tools
         // implementation (there is no POSIX owner or mode there) and, when an operator actually set one of these,
