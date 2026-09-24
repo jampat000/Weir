@@ -1383,7 +1383,8 @@ class LiveAudit:
             )
         self.page.goto(BASE_URL + "/not-a-real-screen", wait_until="domcontentloaded")
         self.visible(
-            self.page.get_by_text("Page not found", exact=False), "not-found route"
+            self.page.get_by_text("This page doesn't exist.", exact=False),
+            "not-found route",
         )
         self.record("Settings and System URL history and not-found route")
 
