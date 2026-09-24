@@ -189,7 +189,8 @@ public static class ActivityHistory
 
     /// <summary>
     /// Minimal quoting: a field is quoted only when it holds the delimiter, the quote character, <c>\r</c>
-    /// or <c>\n</c>; quotes inside are doubled.
+    /// or <c>\n</c>; quotes inside are doubled. A field that a spreadsheet would read as a formula is written
+    /// as text first (<see cref="AsSpreadsheetText"/>).
     /// </summary>
     private static void AppendCsvLine(StringBuilder builder, IReadOnlyList<string> fields)
     {
@@ -200,7 +201,7 @@ public static class ActivityHistory
                 builder.Append(',');
             }
 
-            var field = fields[index];
+            var field = AsSpreadsheetText(fields[index]);
             if (field.AsSpan().IndexOfAny(",\"\r\n") < 0)
             {
                 builder.Append(field);
@@ -212,4 +213,14 @@ public static class ActivityHistory
 
         builder.Append("\r\n");
     }
+
+    /// <summary>
+    /// File names and titles come from downloaded media, so a cell can start with a character Excel and
+    /// LibreOffice treat as the start of a formula. A leading apostrophe makes the spreadsheet show the value as
+    /// the text it is, without running it.
+    /// </summary>
+    private static string AsSpreadsheetText(string field) =>
+        field.Length > 0 && FormulaLeadCharacters.Contains(field[0]) ? "'" + field : field;
+
+    private const string FormulaLeadCharacters = "=+-@\t\r";
 }
