@@ -194,7 +194,7 @@ public sealed class MediaManagerRulesTests
     {
         var body = CompletionReports.BuildCompletionBody(Origin, Dict("""{"ok":true,"outcome":"live_output_written","output_file":"D:\\Refined\\Blade.Runner.2049\\film.mkv","removed_audio":["fre","deu"],"removed_subtitles":["spa"]}"""));
         Assert.Equal(
-            """{"handoffId":"handoff-1","status":"completed","processorName":"Weir","releaseName":"Blade.Runner.2049","outputPath":"D:\\Refined\\Blade.Runner.2049\\film.mkv","message":"Removed 2 audio tracks and 1 subtitle track."}""",
+            """{"handoffId":"handoff-1","status":"completed","processorName":"Weir","releaseName":"Blade.Runner.2049","outputPath":"D:\\Refined\\Blade.Runner.2049\\film.mkv","message":"Removed 2 audio tracks and 1 subtitle track.","outputFiles":["D:\\Refined\\Blade.Runner.2049\\film.mkv"]}""",
             PyJsonWriter.Dumps(body, PyJsonFormat.Compact));
     }
 
@@ -218,7 +218,7 @@ public sealed class MediaManagerRulesTests
         Assert.Equal(("failed", "File is too small."), (((PyStr)guardrail["status"]).Value, ((PyStr)guardrail["message"]).Value));
 
         Assert.Equal(
-            """{"handoffId":"handoff-1","status":"failed","processorName":"Weir","libraryId":"lib-movies","message":"ffmpeg failed","disposition":"held","sourceRemoved":false,"failureClass":"execution"}""",
+            """{"handoffId":"handoff-1","status":"failed","processorName":"Weir","libraryId":"lib-movies","message":"ffmpeg failed","disposition":"held","sourceRemoved":false,"failureClass":"execution","outputFiles":[]}""",
             PyJsonWriter.Dumps(CompletionReports.BuildCompletionBody(DelunoOrigin, Dict("""{"ok":false,"outcome":"failed_execution","reason":"ffmpeg failed","failure_class":"execution"}""")), PyJsonFormat.Compact));
 
         var deleted = CompletionReports.BuildCompletionBody(DelunoOrigin, Dict("""{"ok":false,"outcome":"skipped_rejected","reason":"No wanted audio language.","rejected_cleanup_status":"deleted"}"""));
@@ -313,7 +313,7 @@ public sealed class MediaManagerRulesTests
     {
         var status = new HandoffStatus("h1", "queued", new DateTimeOffset(2026, 9, 17, 10, 0, 0, TimeSpan.Zero), 1, null, null, null);
         Assert.Equal(
-            """{"handoffId":"h1","state":"queued","queuePosition":1,"scheduledFor":null,"lastChangedUtc":"2026-09-17T10:00:00Z","outputPath":null,"message":null}""",
+            """{"handoffId":"h1","state":"queued","queuePosition":1,"scheduledFor":null,"lastChangedUtc":"2026-09-17T10:00:00Z","outputPath":null,"outputFiles":null,"message":null}""",
             PyJsonWriter.Dumps(status.AsJson(), PyJsonFormat.Response));
         Assert.Equal("2026-09-17T10:00:00.000500Z", ((PyStr)(status with { LastChangedAt = status.LastChangedAt.AddTicks(5000) }).AsJson()["lastChangedUtc"]).Value);
     }

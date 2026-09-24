@@ -16,6 +16,8 @@ namespace Weir.Infrastructure.MediaManagers;
 /// (<c>imported</c> or <c>not-imported</c>, #652), with what Weir answered and whether it released its copy.
 /// <see cref="ConnectionId"/> is the connection this hand-off belongs to when that was unambiguous at intake; a
 /// hand-off route that reveals file paths requires that connection's own secret, never another same-kind one.
+/// <see cref="ReportedStatus"/> is what Weir last reported to the manager, and <see cref="OutputFiles"/> the output files
+/// that report named.
 /// </summary>
 public sealed record HandoffLedgerRow(
     long Id,
@@ -32,7 +34,9 @@ public sealed record HandoffLedgerRow(
     bool OutcomeReleased = false,
     string? DownloadId = null,
     DateTimeOffset? ReceivedAt = null,
-    long? ConnectionId = null);
+    long? ConnectionId = null,
+    string? ReportedStatus = null,
+    IReadOnlyList<string>? OutputFiles = null);
 
 /// <summary>The <c>files</c> columns the ledger reads.</summary>
 public sealed record HandoffFileRow(long Id, string RelativePath, string Status, string StatusReason, long FailureAttempts, DateTimeOffset? NextRetryAt, DateTimeOffset? UpdatedAt);
@@ -45,7 +49,7 @@ public sealed class HandoffLedgerStore
 {
     private const string LedgerColumns =
         "id, source_key, handoff_id, library_id, relative_path, state, output_path, message, last_changed_at, outcome, outcome_message, " +
-        "outcome_released, download_id, created_at, connection_id";
+        "outcome_released, download_id, created_at, connection_id, reported_status, output_files_json";
 
     private readonly TimeProvider _time;
 
@@ -66,13 +70,14 @@ public sealed class HandoffLedgerStore
     }
 
     /// <summary>
-    /// Record a hand-off at intake. A repeat of a finished hand-off starts it over, and so forgets what the
-    /// manager said about the last copy (#652). The manager's download id, when it sent one, is kept so a Sonarr or Radarr
-    /// import can be matched by it. <paramref name="connectionId"/> is who the intake webhook attributed the event to
-    /// (<see cref="MediaManagerIntake.AuthoriseAsync"/>); it is recorded once, at first receipt, and never overwritten by
-    /// a resend, so a hand-off keeps the same owner across its whole lifetime.
+    /// Record a hand-off at intake. A repeat of a finished hand-off starts it over, and so forgets what the manager said
+    /// about the last copy (#652), what Weir reported, and the files it covered. The manager's download id, when it sent
+    /// one, is kept so a Sonarr or Radarr import can be matched by it. <paramref name="connectionId"/> is who the intake
+    /// webhook attributed the event to (<see cref="MediaManagerIntake.AuthoriseAsync"/>); it is recorded once, at first
+    /// receipt, and never overwritten by a resend, so a hand-off keeps the same owner across its whole lifetime.
+    /// Returns the row's id.
     /// </summary>
-    public async Task RecordReceivedAsync(
+    public async Task<long> RecordReceivedAsync(
         UnitOfWork uow, string sourceKey, string handoffId, long? libraryId, string relativePath, long? connectionId = null, string? downloadId = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -80,9 +85,9 @@ public sealed class HandoffLedgerStore
         var row = await FindAsync(uow, sourceKey, handoffId).ConfigureAwait(false);
         if (row is null)
         {
-            await uow.ExecuteAsync(
+            var inserted = await uow.ExecuteScalarWriteAsync(
                 "INSERT INTO media_manager_handoffs (source_key, handoff_id, library_id, relative_path, state, output_path, message, created_at, last_changed_at, download_id, connection_id) " +
-                "VALUES ($source, $id, $library, $path, $state, NULL, NULL, $now, $now, $download, $connection)",
+                "VALUES ($source, $id, $library, $path, $state, NULL, NULL, $now, $now, $download, $connection) RETURNING id",
                 ("$source", sourceKey),
                 ("$id", handoffId),
                 ("$library", libraryId),
@@ -91,13 +96,16 @@ public sealed class HandoffLedgerStore
                 ("$now", now),
                 ("$download", string.IsNullOrWhiteSpace(downloadId) ? null : downloadId.Trim()),
                 ("$connection", connectionId)).ConfigureAwait(false);
+            return Convert.ToInt64(inserted, CultureInfo.InvariantCulture);
         }
-        else if (HandoffLedgerRules.TerminalStates.Contains(row.State))
+
+        if (HandoffLedgerRules.TerminalStates.Contains(row.State))
         {
             await uow.ExecuteAsync(
                 "UPDATE media_manager_handoffs SET library_id = $library, relative_path = $path, state = $state, output_path = NULL, " +
                 "message = NULL, last_changed_at = $now, outcome = NULL, outcome_at = NULL, outcome_message = NULL, outcome_released = 0, " +
-                "pending_report_json = NULL, download_id = coalesce($download, download_id), connection_id = coalesce($connection, connection_id) WHERE id = $row",
+                "pending_report_json = NULL, reported_status = NULL, output_files_json = NULL, " +
+                "download_id = coalesce($download, download_id), connection_id = coalesce($connection, connection_id) WHERE id = $row",
                 ("$library", libraryId),
                 ("$path", relativePath),
                 ("$state", HandoffLedgerRules.Queued),
@@ -105,7 +113,10 @@ public sealed class HandoffLedgerStore
                 ("$download", string.IsNullOrWhiteSpace(downloadId) ? null : downloadId.Trim()),
                 ("$connection", connectionId),
                 ("$row", row.Id)).ConfigureAwait(false);
+            await HandoffTargetStore.ClearAsync(uow, row.Id).ConfigureAwait(false);
         }
+
+        return row.Id;
     }
 
     /// <summary>The manager's own word on a finished hand-off (#652), and what Weir answered.</summary>
@@ -157,8 +168,13 @@ public sealed class HandoffLedgerStore
             ("$source", sourceKey));
     }
 
-    /// <summary>Record a result Weir reached. Unknown and cancelled hand-offs are left alone.</summary>
-    public async Task RecordOutcomeAsync(UnitOfWork uow, string sourceKey, string? handoffId, string state, string? outputPath = null, string? message = null)
+    /// <summary>
+    /// Record a result Weir reached, with the output it reported: <paramref name="outputPath"/> is the one file, or the
+    /// folder a hand-off of several files was handed back in, and <paramref name="outputFiles"/> every file. Unknown and
+    /// cancelled hand-offs are left alone.
+    /// </summary>
+    public async Task RecordOutcomeAsync(
+        UnitOfWork uow, string sourceKey, string? handoffId, string state, string? outputPath = null, string? message = null, IReadOnlyList<string>? outputFiles = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         if (string.IsNullOrEmpty(handoffId))
@@ -172,12 +188,16 @@ public sealed class HandoffLedgerStore
             return;
         }
 
-        if (row.State != state || row.OutputPath != outputPath)
+        var files = outputFiles is null ? null : HandoffOutputFiles.Serialize(outputFiles);
+        var storedFiles = row.OutputFiles is null ? null : HandoffOutputFiles.Serialize(row.OutputFiles);
+        if (row.State != state || row.OutputPath != outputPath || storedFiles != files)
         {
             await uow.ExecuteAsync(
-                "UPDATE media_manager_handoffs SET state = $state, output_path = $output, message = $message, last_changed_at = $now WHERE id = $row",
+                "UPDATE media_manager_handoffs SET state = $state, output_path = $output, output_files_json = $files, message = $message, " +
+                "last_changed_at = $now WHERE id = $row",
                 ("$state", state),
                 ("$output", outputPath),
+                ("$files", files),
                 ("$message", string.IsNullOrEmpty(message) ? null : PyStrings.Slice(message, 2000)),
                 ("$now", PythonTimestamps.Orm(_time.GetUtcNow())),
                 ("$row", row.Id)).ConfigureAwait(false);
@@ -470,15 +490,21 @@ public sealed class HandoffLedgerStore
             }
         }
 
+        var delivered = answerState is HandoffLedgerRules.Completed or HandoffLedgerRules.PassedThrough;
         return new HandoffStatus(
             row.HandoffId,
             answerState,
             lastChanged ?? now,
             queuePosition,
             scheduledFor,
-            answerState is HandoffLedgerRules.Completed or HandoffLedgerRules.PassedThrough ? row.OutputPath : null,
-            message ?? storedMessage);
+            delivered ? row.OutputPath : null,
+            message ?? storedMessage,
+            delivered ? ReportedOutputFiles(row) : null);
     }
+
+    /// <summary>The output files Weir reported; a hand-off reported before the list was kept named its one file.</summary>
+    private static IReadOnlyList<string>? ReportedOutputFiles(HandoffLedgerRow row) =>
+        row.OutputFiles ?? (row.OutputPath is { } single ? [single] : null);
 
     /// <summary>
     /// Drop a hand-off that has not started. Never touches a file and never stops running work.
@@ -624,7 +650,9 @@ public sealed class HandoffLedgerStore
         SqliteValues.GetBool(reader, 11),
         SqliteValues.GetStringOrNull(reader, 12),
         PythonTimestamps.Parse(reader.GetValue(13)),
-        reader.IsDBNull(14) ? null : SqliteValues.GetInt64(reader, 14));
+        reader.IsDBNull(14) ? null : SqliteValues.GetInt64(reader, 14),
+        SqliteValues.GetStringOrNull(reader, 15),
+        HandoffOutputFiles.Parse(SqliteValues.GetStringOrNull(reader, 16)));
 
     internal static ProcessingJob ReadJob(SqliteDataReader reader) => new(
         reader.GetInt64(0),
