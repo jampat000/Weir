@@ -7,6 +7,10 @@ title: Reverse Proxy
 
 Weir is designed for a single-process, single-instance deployment. Production deployments should expose one canonical HTTPS origin.
 
+`WEIR_ENV` defaults to `production` when unset, so an install behind a reverse proxy gets ASP.NET's
+production error handling (no developer exception page) without setting anything. `development` is
+for building Weir from source; a running install should never set it.
+
 ## Trusted proxies
 
 Weir ignores `X-Forwarded-For` unless `WEIR_TRUSTED_PROXY_IPS` is configured:

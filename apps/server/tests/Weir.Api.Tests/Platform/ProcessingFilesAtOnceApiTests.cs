@@ -10,9 +10,9 @@ public sealed class ProcessingFilesAtOnceApiTests
 {
     private const string Remux = "processing.file.remux_pass.v1";
 
-    private static async Task<(WeirTestServer Server, ApiTestClient Client)> SignedInAsync()
+    private static async Task<(WeirTestServer Server, ApiTestClient Client)> SignedInAsync(params (string Name, string Value)[] variables)
     {
-        var server = await ApiTestClient.StartServerAsync();
+        var server = await ApiTestClient.StartServerAsync(variables);
         await TestDatabase.SeedAdminAsync(server);
         var client = new ApiTestClient(server);
         await client.SignInAsync();
@@ -147,5 +147,57 @@ public sealed class ProcessingFilesAtOnceApiTests
         Assert.Equal((1, 1, "workers_off"), (body["running"]!.GetValue<int>(), body["waiting"]!.GetValue<int>(), body["waiting_for"]!.GetValue<string>()));
         Assert.Equal((3, 0, 0), (body["files_at_once"]!.GetValue<int>(), body["worker_slots"]!.GetValue<int>(), body["effective_files_at_once"]!.GetValue<int>()));
         Assert.Contains("workers are switched off", body["message"]!.GetValue<string>(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_read_out_says_paused_when_a_due_file_is_waiting_on_the_suite_pause()
+    {
+        // #747: the contract suite proves pause blocks a worker's claim by watching for the absence of an
+        // ffmpeg call; this pins the same fact through the read-out those tests now also assert on, with
+        // real worker slots (unlike the API test server's default of none) so "paused" is not masked by
+        // "workers_off".
+        var (server, client) = await SignedInAsync(("WEIR_PROCESSING_WORKER_COUNT", "2"));
+        await using var disposeServer = server;
+        await TestDatabase.ExecuteAsync(server, "UPDATE suite_settings SET processing_paused = 1 WHERE id = 1");
+        var library = await TestDatabase.ScalarAsync(server, "SELECT id FROM libraries ORDER BY id LIMIT 1");
+        var payload = $"{{\"library_id\": {library}, \"relative_media_path\": \"a.mkv\"}}";
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status) VALUES ('waiting', @kind, @payload, 'pending')",
+            ("@kind", Remux), ("@payload", payload));
+
+        using var response = await client.GetAsync("/api/v1/processing/files-at-once");
+
+        var body = await ApiTestClient.Json(response);
+        Assert.Equal((1, "paused"), (body["waiting"]!.GetValue<int>(), body["waiting_for"]!.GetValue<string>()));
+        Assert.Equal("1 file is waiting because processing is paused.", body["message"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task The_read_out_says_library_closed_when_a_due_file_waits_on_the_librarys_schedule()
+    {
+        // #747: the same pairing as the pause test above, for the other black-box "nothing happened" wait
+        // the contract suite has (a library's schedule window).
+        var (server, client) = await SignedInAsync(("WEIR_PROCESSING_WORKER_COUNT", "2"));
+        await using var disposeServer = server;
+        var library = await TestDatabase.ScalarAsync(server, "SELECT id FROM libraries ORDER BY id LIMIT 1");
+        // A grid of every slot closed, not a start/end window: a window closes only the instant it names, and a
+        // window that starts and ends at the same wall-clock minute is open during that minute too.
+        var closedAllWeek = new string('0', Weir.Core.Jobs.ScheduleGrid.SlotsPerWeek);
+        await TestDatabase.ExecuteAsync(
+            server,
+            "UPDATE libraries SET name = 'Movies', schedule_enabled = 1, schedule_grid = @grid WHERE id = " + library,
+            ("@grid", closedAllWeek));
+        var payload = $"{{\"library_id\": {library}, \"relative_media_path\": \"a.mkv\"}}";
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status) VALUES ('waiting', @kind, @payload, 'pending')",
+            ("@kind", Remux), ("@payload", payload));
+
+        using var response = await client.GetAsync("/api/v1/processing/files-at-once");
+
+        var body = await ApiTestClient.Json(response);
+        Assert.Equal((1, "library_closed"), (body["waiting"]!.GetValue<int>(), body["waiting_for"]!.GetValue<string>()));
+        Assert.Equal("1 file is waiting for Movies's schedule to open.", body["message"]!.GetValue<string>());
     }
 }

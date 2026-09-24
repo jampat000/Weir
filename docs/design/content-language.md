@@ -23,9 +23,7 @@ type sizes and spacing come from `weir-tokens.css` only.
 
 ### 1. The page leads with what is happening now
 
-Where a page has a real "now", it leads with it, full width, before anything else. The lead band
-(`.mm-lead-band`) is one bordered band whose segments are as wide as the number each carries. Each
-segment is a control that opens the detail behind it.
+Where a page has a real "now", it leads with it, full width, before anything else.
 
 A page with no "now" starts at rule 3. That is a correct outcome, not a shortcut. Do not invent a
 lead.
@@ -34,34 +32,38 @@ Where the screens stand:
 
 | Screen                 | Lead                                                                                  |
 | ---------------------- | ------------------------------------------------------------------------------------- |
-| Processing             | Its own lead: the live lanes in `weir-processing.css` (Arriving, Waiting, Working, Handing back, Just finished). It does not use the lead band. |
+| Processing             | Its own lead: the live lanes in `weir-processing.css` (Arriving, Waiting, Working, Handing back, Just finished). |
 | History                | None. The file list and the chosen file, divided by a hairline.                        |
 | Library                | None. The title is the library picker; a row of chips carries the counts and filters. |
 | Settings               | None. Settings has no "now".                                                           |
-| System › Logs › Events | `.mm-lead` with a `.mm-lead-caption`, no band.                                         |
+| System › Logs › Events | `.mm-lead` with a `.mm-lead-caption`.                                                   |
 
-The lead band primitive is still in `weir-content.css` for a page that has a real "now" to show.
-If it is used:
-
-- The band is the one place a page may be visually loud: a border, a filled surface, an accent
-  rule along the top of each segment, a large number. Nothing else on the page gets any of that.
-- The caption must stay true at every width. Say what a segment does ("Click a stage to filter
-  the list"), not that segments are sized by count, because that stops being true once the band
-  restacks.
-- If the band draws a fixed set of states and the data has others, count them and say so in the
-  caption. Do not drop them, and do not point two segments at the same filter.
+`.mm-lead` and `.mm-lead-caption` (in `weir-content.css`) are the only rule-1 primitives left: a
+wrapper and a one-line caption under it. An earlier, bordered "lead band" primitive
+(`.mm-lead-band` and its segments) existed for a page whose "now" was a handful of named counts side
+by side; it had no user left once Processing's own live lanes replaced its one caller, and was
+deleted along with its CSS rather than kept around unused (see "What not to do" below). If a future
+page needs that shape again, design and add the primitive fresh — do not assume the deleted classes
+still work.
 
 ### 2. One hero, then quiet
 
-Where a page has a number that actually carries it, that number gets a wide tile and its supporting
-numbers get narrow tiles beside it, in one row of unequal widths (`.mm-figure-row`).
+Where a page has a number that actually carries it, that number leads, and its supporting numbers
+stay visibly smaller beside it.
 
 - The hero is the number someone would quote if asked how the thing is going.
 - Supporters qualify the hero. Two or three, not four.
-- If every tile in the row is the same width, the rule has not been applied.
+- If every number reads the same weight, the rule has not been applied.
 
-If the page has no single number worth that much room, skip the figure row and go to rule 3. An
-invented hero is worse than no hero.
+If the page has no single number worth that much room, skip this rule and go to rule 3. An invented
+hero is worse than no hero. `apps/web/src/pages/system/tabs/about/update-section.tsx` and
+`.../logs/server-log.tsx` both say, in a comment naming this rule, why their own facts are coequal
+and neither picks one as a hero — that is what applying rule 2 and getting "no hero" looks like.
+
+No current screen needs the room a dedicated hero primitive gives: the `.mm-figure-row`/`.mm-figure`
+tile-row that rule 2 used to point at was removed with Processing's Overview tab, which was the only
+page that ever had a number that size. Nothing in `weir-content.css` implements this rule today; a
+page that needs it adds the primitive fresh rather than reaching for a deleted class name.
 
 ### 3. Everything below the lead is borderless
 
@@ -131,66 +133,29 @@ layout inside a table cell.
 All of these are in `apps/web/src/styles/weir-content.css`. Use them rather than page-specific layout
 CSS. If a page needs something none of them do, add it as another page-neutral primitive.
 
-### Tokens
-
-Three layout-only custom properties, defined in `weir-tokens.css`:
-
-| Token               | Default | Set where                        | For                                                   |
-| ------------------- | ------- | -------------------------------- | ----------------------------------------------------- |
-| `--mm-flow-share`   | `1`     | Inline, per band segment         | That segment's share of the band's width (unitless)   |
-| `--mm-meter-fill`   | `0%`    | Inline, per `.mm-figure__meter`  | How full the bar is                                   |
-| `--mm-band-stacked` | `0`     | `weir-content.css` only          | `1` once the band has restacked. Never set it from a page. |
-
-Everything else is an existing `--mm-*` token. `apps/web/scripts/check-design-tokens.mjs` fails the
-build on any `var(--mm-…)` that `weir-tokens.css` does not define.
+`apps/web/scripts/check-design-tokens.mjs` fails the build on any `var(--mm-…)` that
+`weir-tokens.css` does not define.
 
 ### Rule 1: the lead
 
-| Class                           | Element               | For                                                   |
-| ------------------------------- | --------------------- | ----------------------------------------------------- |
-| `.mm-lead`                      | `div`                 | Wraps the whole lead: interrupts, band, caption, figure row |
-| `.mm-lead-band`                 | `div`                 | The band: one proportional row, or a stacked list     |
-| `.mm-lead-band__segment`        | `button`              | One segment. Set `--mm-flow-share` inline             |
-| `.mm-lead-band__segment--empty` | modifier              | Count is zero: grey rule, dimmed value                |
-| `.mm-lead-band__segment--live`  | modifier              | Something is happening here now                       |
-| `.mm-lead-band__label`          | `span`                | The stage name                                        |
-| `.mm-lead-band__value`          | `span`                | The count                                             |
-| `.mm-lead-band__hint`           | `span`                | One short line saying what the stage means            |
-| `.mm-lead-band__go`             | `span`, `aria-hidden` | "Filter →", shown on hover and keyboard focus         |
-| `.mm-lead-band__pulse`          | `i`, `aria-hidden`    | The live dot. Honours `prefers-reduced-motion`        |
-| `.mm-lead-caption`              | `p`                   | One line under the band or lead                       |
+| Class              | Element | For                                          |
+| ------------------ | ------- | --------------------------------------------- |
+| `.mm-lead`         | `div`   | Wraps the lead: interrupts, then the caption   |
+| `.mm-lead-caption` | `p`     | One line under the lead                        |
 
-A segment must be a real `<button>` or `<a>`, never a `div` with `onClick`.
-
-Weighting: share is the raw count, floored at 6% of the total so an empty stage still reads as a
-stage: `share = total === 0 ? 1 : Math.max(count, total * 0.06)`.
-
-The band never wraps. It is either one row, where every segment gets at least `6rem` and a bigger
-count always draws wider, or a stacked list with one segment per line where the number is read
-directly. The switch is a container query on `.mm-lead`, so it follows the panel's width, not the
-window's. A page sets `--mm-flow-share` and nothing else. In particular, never give a segment a
-`min-width`: the floor and the stacking threshold are one number, and overriding the floor makes the
-band wrap, at which point widths only compare within a line.
+Rule 1's other primitive, a bordered "lead band" of proportional segments sized by count, was
+deleted with its CSS once Processing's live lanes replaced its only caller (see the rule-1
+discussion above). There is nothing else to list here; a page that needs the band shape again
+designs and adds that primitive fresh, rather than assuming the deleted `.mm-lead-band*` classes
+still work.
 
 ### Rule 2: the figure row
 
-| Class                    | Element              | For                                                          |
-| ------------------------ | -------------------- | ------------------------------------------------------------ |
-| `.mm-figure-row`         | `div`                | The grid. First child is the hero at 1.8fr; every later child is 1fr |
-| `.mm-figure`             | `section`            | One tile                                                     |
-| `.mm-figure--hero`       | modifier             | Big type on the hero's value. First child only               |
-| `.mm-figure--warn`       | modifier             | The value is a bad number                                    |
-| `.mm-figure__eyebrow`    | `div`                | Label on the left, optional context on the right             |
-| `.mm-figure__value`      | `div`                | The number                                                   |
-| `.mm-figure__unit`       | `span`               | Words on the hero number's baseline                          |
-| `.mm-figure__note`       | `p`                  | One sentence under the value                                 |
-| `.mm-figure__meter`      | `div`, `aria-hidden` | Percentage bar. Set `--mm-meter-fill` inline                 |
-| `.mm-figure__foot`       | `div`                | Two or three smaller figures along the bottom of the hero    |
-| `.mm-figure__foot-value` | `span`               | One of those numbers                                         |
-| `.mm-figure__foot-label` | `span`               | Its label                                                    |
-
-At 1280px and below the hero spans the full width with its supporters beneath; at 720px and below
-everything stacks. Do not add breakpoints.
+Deleted along with its CSS (`.mm-figure-row`, `.mm-figure` and their parts) when Processing's
+Overview tab, its only caller, folded into the live board (see the rule-2 discussion above).
+There is nothing under this heading today; a page that needs a hero tile row again adds the
+primitive back to `weir-content.css` rather than reaching for a `.mm-figure*` class name in its
+own CSS.
 
 ### Rule 3: the quiet body
 
@@ -209,9 +174,7 @@ everything stacks. Do not add breakpoints.
 | `.mm-quiet-note`                         | `p`                   | A muted paragraph: empty states, captions, explanations |
 | `.mm-quiet-table-wrap`                   | `div`                 | Horizontal scroll container for a table               |
 | `.mm-quiet-table`                        | `table`               | The borderless table                                  |
-| `.mm-quiet-table--sortable`              | modifier              | The column headings are sort buttons; keeps the header row when the table stacks |
 | `.mm-quiet-badge` / `--off`              | `span`                | A small pill beside a name                            |
-| `.mm-quiet-state` / `--ok` / `--missing` | `span`                | Set or not set, as a word with a tick or warning colour |
 | `.mm-interrupt`                          | `ul`                  | Things that are broken or blocking, above everything else |
 | `.mm-field`, `--short` / `--medium` / `--wide` | `label`         | One setting: label, control, hint (`Field`)           |
 | `.mm-setgroup`, `.mm-setrow`             | `section`, `div`      | A settings group and its rows (`SettingsGroup`, `SettingRow`) |
@@ -236,8 +199,7 @@ An interrupt is a list of sentences with a link each, not a card, banner or colo
 1. Do not change the shell as a side effect of page work. See above.
 2. Do not add a colour, font, shadow or radius. Only tokens already in `weir-tokens.css`. A new
    `--mm-*` token must be pure layout.
-3. Do not put a card anywhere below the lead. The figure tiles and dialogs are the only bordered
-   surfaces outside the band.
+3. Do not put a card anywhere below the lead. Dialogs are the only bordered surface there.
 4. Do not build an equal-width tile row. `repeat(auto-fit, minmax(…, 1fr))` for numbers is the
    pattern this replaces.
 5. Do not invent a lead, a hero, a sparkline, a trend arrow or a percentage the API does not return.
@@ -249,8 +211,7 @@ An interrupt is a list of sentences with a link each, not a card, banner or colo
 9. Do not leave superseded CSS behind. When the last user of a rule goes, delete the rule in the
    same PR.
 10. Do not change what a `data-testid` points at. The E2E suite in `tests/e2e/weir` relies on them.
-11. Do not give a band segment a `min-width`.
-12. Do not use a Tailwind utility to change something a `weir-*` class already sets.
+11. Do not use a Tailwind utility to change something a `weir-*` class already sets.
 
 ---
 
@@ -260,9 +221,5 @@ In `apps/web`: `npm ci`, `npm run lint`, `npm run format`, `npm run test`, `npm 
 runs `check:tokens` and the bundle budget). From the repo root: `node scripts/check-dead-code.mjs`
 and `node scripts/check-agent-docs.mjs`.
 
-Then look at the page in dark and light, at 1440 and 1024 wide, with data and on a fresh empty
+Then look at the page in dark and light, at 1440, 1024 and 390 wide, with data and on a fresh empty
 install. Unit tests have let a blank page ship before.
-
-A page with a band also needs checking narrow: 390, and either side of the width where it restacks.
-Measure rather than eyeball it: at every width, each segment is at least as wide as every segment
-with a smaller count, and the band is either one line or one line per segment.
