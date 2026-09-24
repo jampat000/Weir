@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,7 @@ from tests.contract.media_managers._helpers import (
     REMUX_KIND,
     LibraryFolders,
     create_connection,
+    delete_connection,
     ensure_library,
     handoff_dedupe_key,
     payload,
@@ -210,8 +212,8 @@ def test_deluno_tv_handoff_uses_the_tv_watched_folder(
 # --- the native shape, for a manager with no dialect of its own ---------------
 
 
-@pytest.fixture(scope="module")
-def native_secret(admin: WeirClient) -> dict[str, str]:
+@pytest.fixture
+def native_secret(admin: WeirClient) -> Iterator[dict[str, str]]:
     """A native connection's own secret: the connection-less native source refuses unsigned writes."""
 
     created = create_connection(admin, kind="native", name="Native", base_url="", api_key="")
@@ -219,7 +221,10 @@ def native_secret(admin: WeirClient) -> dict[str, str]:
     connection_id = created.json()["id"]
     generated = admin.post_csrf(f"{API}/media-managers/connections/{connection_id}/webhook-secret")
     assert generated.status_code == 200, generated.text
-    return {"X-Webhook-Secret": generated.json()["webhook_secret"]}
+    try:
+        yield {"X-Webhook-Secret": generated.json()["webhook_secret"]}
+    finally:
+        delete_connection(admin, connection_id)
 
 
 def test_native_imported_event_is_accepted_and_ignored(admin: WeirClient, native_secret: dict[str, str]) -> None:
