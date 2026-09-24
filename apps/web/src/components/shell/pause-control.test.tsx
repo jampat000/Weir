@@ -4,11 +4,16 @@ import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import * as authQueries from "../../lib/auth/queries";
-import type { PauseState } from "../../lib/pause/pause-api";
+import type { PauseState, PauseWrite } from "../../lib/pause/pause-api";
 import * as pauseQueries from "../../lib/pause/pause-queries";
 import { PauseControl } from "./pause-control";
 
-const mutate = vi.fn();
+type MutateOptions = {
+  onSuccess?: () => void;
+  onError?: () => void;
+};
+
+const mutate = vi.fn<(body: PauseWrite, options?: MutateOptions) => void>();
 
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({
@@ -49,30 +54,39 @@ afterEach(() => {
 
 it("offers a pause with an expiry, so it cannot be forgotten", () => {
   setup(state());
+  mutate.mockImplementation((_body, options) => options?.onSuccess?.());
 
   render(<PauseControl />, { wrapper });
   fireEvent.click(screen.getByTestId("pause-open"));
   fireEvent.click(screen.getByTestId("pause-for-120"));
 
-  expect(mutate).toHaveBeenCalledWith({
-    paused: true,
-    pause_for_minutes: 120,
-    scan_while_paused: true,
-  });
+  expect(mutate).toHaveBeenCalledWith(
+    { paused: true, pause_for_minutes: 120, scan_while_paused: true },
+    expect.anything(),
+  );
 });
 
 it("still allows a pause with no expiry", () => {
   setup(state());
+  mutate.mockImplementation((_body, options) => options?.onSuccess?.());
 
   render(<PauseControl />, { wrapper });
   fireEvent.click(screen.getByTestId("pause-open"));
   fireEvent.click(screen.getByTestId("pause-for-indefinite"));
 
-  expect(mutate).toHaveBeenCalledWith({
-    paused: true,
-    pause_for_minutes: null,
-    scan_while_paused: true,
-  });
+  expect(mutate).toHaveBeenCalledWith(
+    { paused: true, pause_for_minutes: null, scan_while_paused: true },
+    expect.anything(),
+  );
+});
+
+it("has a heading naming what the menu asks", () => {
+  setup(state());
+
+  render(<PauseControl />, { wrapper });
+  fireEvent.click(screen.getByTestId("pause-open"));
+
+  expect(screen.getByText("Pause for how long?")).toBeInTheDocument();
 });
 
 it("says what happens to work already running rather than leaving it to be assumed", () => {
@@ -110,10 +124,10 @@ it("resumes without inventing a duration", () => {
   render(<PauseControl />, { wrapper });
   fireEvent.click(screen.getByTestId("pause-resume"));
 
-  expect(mutate).toHaveBeenCalledWith({
-    paused: false,
-    scan_while_paused: true,
-  });
+  expect(mutate).toHaveBeenCalledWith(
+    { paused: false, scan_while_paused: true },
+    expect.anything(),
+  );
 });
 
 it("lets a viewer see a pause but not change it", () => {
@@ -131,4 +145,81 @@ it("shows a viewer nothing at all when processing is running normally", () => {
   const { container } = render(<PauseControl />, { wrapper });
 
   expect(container).toBeEmptyDOMElement();
+});
+
+it("keeps the menu open when a pause fails, and names it in an alert", () => {
+  setup(state());
+  mutate.mockImplementation((_body, options) => options?.onError?.());
+
+  render(<PauseControl />, { wrapper });
+  fireEvent.click(screen.getByTestId("pause-open"));
+  fireEvent.click(screen.getByTestId("pause-for-120"));
+
+  expect(screen.getByTestId("pause-menu")).toBeInTheDocument();
+  expect(screen.getByTestId("pause-alert")).toHaveTextContent(
+    "Weir couldn't pause. Try again.",
+  );
+});
+
+it("closes the menu only once the pause succeeds", () => {
+  setup(state());
+  mutate.mockImplementation(() => undefined);
+
+  render(<PauseControl />, { wrapper });
+  fireEvent.click(screen.getByTestId("pause-open"));
+  fireEvent.click(screen.getByTestId("pause-for-120"));
+
+  expect(screen.getByTestId("pause-menu")).toBeInTheDocument();
+});
+
+it("names a failed resume in an alert", () => {
+  setup(state({ paused: true, reason: "Processing is paused." }));
+  mutate.mockImplementation((_body, options) => options?.onError?.());
+
+  render(<PauseControl />, { wrapper });
+  fireEvent.click(screen.getByTestId("pause-resume"));
+
+  expect(screen.getByTestId("pause-alert")).toHaveTextContent(
+    "Weir couldn't resume. Try again.",
+  );
+});
+
+it("announces the duration once a pause succeeds", () => {
+  setup(state());
+  mutate.mockImplementation((_body, options) => options?.onSuccess?.());
+
+  render(<PauseControl />, { wrapper });
+  fireEvent.click(screen.getByTestId("pause-open"));
+  fireEvent.click(screen.getByTestId("pause-for-120"));
+
+  expect(screen.getByTestId("pause-announcement")).toHaveTextContent(
+    "Paused for 2 hours.",
+  );
+});
+
+it("closes the menu on Escape without saving anything", () => {
+  setup(state());
+
+  render(<PauseControl />, { wrapper });
+  fireEvent.click(screen.getByTestId("pause-open"));
+  fireEvent.keyDown(document, { key: "Escape" });
+
+  expect(screen.queryByTestId("pause-menu")).not.toBeInTheDocument();
+  expect(mutate).not.toHaveBeenCalled();
+});
+
+it("closes the menu on a click outside it", () => {
+  setup(state());
+
+  render(
+    <div>
+      <PauseControl />
+      <button type="button">Elsewhere</button>
+    </div>,
+    { wrapper },
+  );
+  fireEvent.click(screen.getByTestId("pause-open"));
+  fireEvent.mouseDown(screen.getByRole("button", { name: "Elsewhere" }));
+
+  expect(screen.queryByTestId("pause-menu")).not.toBeInTheDocument();
 });

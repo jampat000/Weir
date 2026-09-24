@@ -23,11 +23,11 @@
 }
 
 .mm-pause-reason {
+  /* The reason carries when the pause lifts, so it must stay fully readable rather than cut short
+     with an ellipsis (#697). */
   min-width: 0;
   max-width: 22rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
   font-size: 0.8125rem;
   color: var(--mm-text2);
 }
@@ -48,6 +48,13 @@
   box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
 }
 
+.mm-pause-menu__heading {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--mm-text1);
+}
+
 .mm-pause-scan-toggle {
   display: flex;
   align-items: center;
@@ -60,6 +67,11 @@
   margin: 0;
   font-size: 0.75rem;
   color: var(--mm-text3);
+}
+
+.mm-pause-alert {
+  margin: 0;
+  font-size: 0.8125rem;
 }
 
 .mm-theme-toggle {
