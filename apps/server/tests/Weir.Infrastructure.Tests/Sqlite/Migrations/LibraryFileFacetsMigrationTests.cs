@@ -219,9 +219,9 @@ public sealed class LibraryFileFacetsMigrationTests : IDisposable
 
         Upgrade();
 
-        Assert.Contains(
+        Assert.Equal(
             SchemaMigrator.HeadRevision,
-            Query("SELECT version_num FROM alembic_version", reader => reader.GetString(0)));
+            Query("SELECT version_num FROM alembic_version", reader => reader.GetString(0)).Single());
         var indexes = Query("SELECT name FROM sqlite_master WHERE type = 'index' ORDER BY name", reader => reader.GetString(0));
         Assert.Contains("ix_library_file_facets_library_id_facet_value", indexes);
         Assert.Contains("ix_library_file_facets_library_file_id", indexes);

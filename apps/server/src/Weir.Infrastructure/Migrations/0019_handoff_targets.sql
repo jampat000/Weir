@@ -1,4 +1,4 @@
--- Weir schema 0017 (revision 0052_handoff_targets): a hand-off knows every file it covers.
+-- Weir schema 0019 (revision 0054_handoff_targets): a hand-off knows every file it covers.
 --
 -- A folder hand-off, such as a season pack, covers several files. The manager is told once, when the last of them has
 -- finished, about all of them; telling it after each file made it import the first and treat the hand-off as done.

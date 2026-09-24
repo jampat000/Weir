@@ -261,7 +261,7 @@ public sealed partial class HandoffCompletionReporter
     }
 
     /// <summary>
-    /// The report for a hand-off that records no target rows of its own (it arrived before migration 0017, or has no
+    /// The report for a hand-off that records no target rows of its own (it arrived before migration 0019, or has no
     /// hand-off id at all): the file's own result, exactly as it has always been reported. No claim is made here, so
     /// there is nothing durable to leave dangling if the manager cannot be reached.
     /// </summary>

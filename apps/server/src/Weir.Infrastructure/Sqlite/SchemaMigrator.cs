@@ -72,21 +72,19 @@ public enum SchemaStartupOutcome
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Version ledger:</b> every applied migration's revision is a row in the <c>alembic_version</c> table,
-/// because every existing Weir database already carries that table; a separate version table would make
-/// existing installs look unversioned. The schema is part of the contract (ADR-0017), and an install already
-/// at head is adopted with no write at all. Each migration names the revision it leaves behind, continuing the
-/// existing numbering (<c>0037_…</c>, #523).
+/// <b>Version ledger:</b> the revision is recorded in the <c>alembic_version</c> table (one <c>version_num</c>
+/// row), because every existing Weir database already carries that table; a separate version table would
+/// make existing installs look unversioned. The schema is part of the contract (ADR-0017), and an install
+/// already at head is adopted with no write at all. Each migration names the revision it leaves behind,
+/// continuing the existing numbering (<c>0037_…</c>, #523).
 /// </para>
 /// <para>
-/// <b>On startup:</b> a missing database file is created at head; a database whose recorded revisions already
-/// cover every one of <see cref="Migrations"/> is adopted unchanged; one missing some is upgraded in place by
-/// applying exactly those, in order, in one transaction (#557). A database that still holds only the single
-/// row an older build always collapsed its revision to is read the same way: recording any migration implies
-/// every earlier one (see <see cref="MigrationsToApply"/> for the one migration, #667, that is not implied by
-/// a later one merged out of order with it). Anything else, including an existing file with no schema or a
-/// revision from before the baseline, is refused with a message and no change. A pre-baseline database has to
-/// be started once on an earlier Weir release, which migrates it to the baseline.
+/// <b>On startup:</b> a missing database file is created at head; a database whose recorded revision is
+/// head is adopted unchanged; a database recorded at any earlier revision in <see cref="Migrations"/> (the
+/// baseline or a later migration) is upgraded in place by applying every migration after it, in order, in
+/// one transaction (#557); anything else, including an existing file with no schema or a revision from
+/// before the baseline, is refused with a message and no change. A pre-baseline database has to be started
+/// once on an earlier Weir release, which migrates it to the baseline.
 /// </para>
 /// </remarks>
 public sealed class SchemaMigrator
@@ -109,8 +107,8 @@ public sealed class SchemaMigrator
         new(14, "0049_link_imported_libraries", "Weir.Infrastructure.Migrations.0014_link_imported_libraries.sql"),
         new(15, "0050_handback_outcomes", "Weir.Infrastructure.Migrations.0015_handback_outcomes.sql"),
         new(16, "0051_handoff_owning_connection", "Weir.Infrastructure.Migrations.0016_handoff_owning_connection.sql"),
-        new(17, "0052_handoff_targets", "Weir.Infrastructure.Migrations.0017_handoff_targets.sql"),
         new(18, "0053_query_indexes", "Weir.Infrastructure.Migrations.0018_query_indexes.sql"),
+        new(19, "0054_handoff_targets", "Weir.Infrastructure.Migrations.0019_handoff_targets.sql"),
     ];
 
     /// <summary>
@@ -165,15 +163,6 @@ public sealed class SchemaMigrator
 
     public static string HeadRevision => Migrations[^1].Revision;
 
-    /// <summary>
-    /// Migrations that must be confirmed by their own exact revision, never implied because some later-numbered
-    /// migration is recorded. #667's <c>media_manager_handoff_targets</c> (17) and #734's <c>0053_query_indexes</c>
-    /// (18) were developed in parallel and merged in the other order, so a database already recorded at 18 does
-    /// not necessarily have 17: recording any other migration still safely implies every earlier one, because every
-    /// one of those was merged one at a time onto an already-integrated main, but 17 is not implied by 18.
-    /// </summary>
-    private static readonly HashSet<int> NeverImpliedByALaterRevision = [17];
-
     private readonly SqliteDatabase _database;
 
     public SchemaMigrator(SqliteDatabase database)
@@ -205,73 +194,34 @@ public sealed class SchemaMigrator
             return SchemaStartupOutcome.Created;
         }
 
-        var recorded = ReadRecordedRevisions(connection);
-        var missing = MigrationsToApply(recorded);
-        if (missing.Count == 0)
+        var current = ReadRecordedRevision(connection);
+        if (current == HeadRevision)
         {
             return SchemaStartupOutcome.AlreadyCurrent;
         }
 
-        ApplyRange(connection, missing, Migrations.Select(m => m.Revision));
-        return SchemaStartupOutcome.Upgraded;
+        var currentIndex = Migrations.ToList().FindIndex(m => m.Revision == current);
+        if (currentIndex >= 0)
+        {
+            ApplyRange(connection, Migrations.Skip(currentIndex + 1), HeadRevision);
+            return SchemaStartupOutcome.Upgraded;
+        }
+
+        if (AlembicRevisionsBeforeBaseline.Contains(current, StringComparer.Ordinal))
+        {
+            throw new DatabaseSchemaMismatchException(
+                $"Database revision {Quote(current!)} was created by an older Weir release. " +
+                $"This build requires schema revision {Quote(HeadRevision)} and cannot upgrade older databases itself. " +
+                "Start the previous Weir release once so it migrates the database, then start this build again.",
+                SchemaMismatchKind.BehindHead);
+        }
+
+        throw new DatabaseSchemaMismatchException(
+            $"Database revision {Quote(current!)} is not recognized by this Weir build " +
+            $"(expected head {Quote(HeadRevision)}). The database may come from a newer release; " +
+            "upgrade the application or restore a backup that matches this version.",
+            SchemaMismatchKind.UnknownRevision);
     }
-
-    /// <summary>
-    /// The migrations, in order, still needed to reach head given what is recorded. Recording any migration whose
-    /// <see cref="NeverImpliedByALaterRevision"/> does not list its own number also implies every earlier one
-    /// (the classic, still-correct assumption for every migration merged the ordinary way): so a database recorded
-    /// at, say, revision 5 needs 6 onward, and one recorded at 16 and 18 (18 does not imply 17) needs only 17.
-    /// </summary>
-    private static List<SchemaMigration> MigrationsToApply(List<string> recorded)
-    {
-        var matched = Migrations.Where(m => recorded.Contains(m.Revision)).ToList();
-        if (matched.Count == 0)
-        {
-            if (recorded.Count == 1)
-            {
-                var single = recorded.Single();
-                if (AlembicRevisionsBeforeBaseline.Contains(single, StringComparer.Ordinal))
-                {
-                    throw new DatabaseSchemaMismatchException(
-                        $"Database revision {Quote(single)} was created by an older Weir release. " +
-                        $"This build requires schema revision {Quote(HeadRevision)} and cannot upgrade older databases itself. " +
-                        "Start the previous Weir release once so it migrates the database, then start this build again.",
-                        SchemaMismatchKind.BehindHead);
-                }
-
-                throw new DatabaseSchemaMismatchException(
-                    $"Database revision {Quote(single)} is not recognized by this Weir build " +
-                    $"(expected head {Quote(HeadRevision)}). The database may come from a newer release; " +
-                    "upgrade the application or restore a backup that matches this version.",
-                    SchemaMismatchKind.UnknownRevision);
-            }
-
-            throw IncompatibleError(recorded);
-        }
-
-        if (recorded.Except(Migrations.Select(m => m.Revision)).Any())
-        {
-            throw IncompatibleError(recorded);
-        }
-
-        var confirmed = new HashSet<int>();
-        foreach (var migration in matched)
-        {
-            if (!NeverImpliedByALaterRevision.Contains(migration.Number))
-            {
-                confirmed.UnionWith(Enumerable.Range(1, migration.Number).Where(number => !NeverImpliedByALaterRevision.Contains(number)));
-            }
-
-            confirmed.Add(migration.Number);
-        }
-
-        return [.. Migrations.Where(m => !confirmed.Contains(m.Number)).OrderBy(m => m.Number)];
-    }
-
-    private static DatabaseSchemaMismatchException IncompatibleError(IReadOnlyCollection<string> revisions) => new(
-        $"Database records several schema revisions ({string.Join(", ", revisions.Select(Quote))}); " +
-        $"this build requires exactly {Quote(HeadRevision)}. Restore a backup that matches this version.",
-        SchemaMismatchKind.Incompatible);
 
     internal static string ReadMigrationSql(SchemaMigration migration)
     {
@@ -290,18 +240,14 @@ public sealed class SchemaMigrator
     public SchemaStartupOutcome EnsureAtBaseline()
     {
         using var connection = _database.Open();
-        ApplyRange(connection, Migrations.Take(1), [BaselineRevision]);
+        ApplyRange(connection, Migrations.Take(1), BaselineRevision);
         return SchemaStartupOutcome.Created;
     }
 
-    private static void ApplyAll(SqliteConnection connection) =>
-        ApplyRange(connection, Migrations.OrderBy(m => m.Number), Migrations.Select(m => m.Revision));
+    private static void ApplyAll(SqliteConnection connection) => ApplyRange(connection, Migrations.OrderBy(m => m.Number), HeadRevision);
 
     /// <summary>
-    /// Runs <paramref name="migrations"/> in one transaction and records <paramref name="revisions"/> as every
-    /// revision now applied, replacing whatever the table held before (<see cref="MigrationsToApply"/> decides
-    /// which migrations that is; a full run to head records every one of <see cref="Migrations"/>, and
-    /// <see cref="EnsureAtBaseline"/> keeps recording just the one it stops at).
+    /// Runs <paramref name="migrations"/> in one transaction and records <paramref name="revision"/>.
     /// <para>
     /// Foreign keys are turned off <b>before</b> the transaction opens, which is SQLite's documented
     /// procedure for schema changes. <c>PRAGMA foreign_keys</c> is a no-op inside a transaction, and
@@ -315,12 +261,12 @@ public sealed class SchemaMigrator
     /// that genuinely left the database inconsistent.
     /// </para>
     /// </summary>
-    private static void ApplyRange(SqliteConnection connection, IEnumerable<SchemaMigration> migrations, IEnumerable<string> revisions)
+    private static void ApplyRange(SqliteConnection connection, IEnumerable<SchemaMigration> migrations, string revision)
     {
         Pragma(connection, "PRAGMA foreign_keys=off");
         try
         {
-            ApplyRangeCore(connection, migrations, revisions);
+            ApplyRangeCore(connection, migrations, revision);
         }
         finally
         {
@@ -335,7 +281,7 @@ public sealed class SchemaMigrator
         command.ExecuteNonQuery();
     }
 
-    private static void ApplyRangeCore(SqliteConnection connection, IEnumerable<SchemaMigration> migrations, IEnumerable<string> revisions)
+    private static void ApplyRangeCore(SqliteConnection connection, IEnumerable<SchemaMigration> migrations, string revision)
     {
         using var transaction = connection.BeginTransaction();
 
@@ -347,17 +293,11 @@ public sealed class SchemaMigrator
             command.ExecuteNonQuery();
         }
 
-        var revisionList = revisions.ToList();
         using (var record = connection.CreateCommand())
         {
             record.Transaction = transaction;
-            var placeholders = revisionList.Select((_, index) => $"($r{index})");
-            record.CommandText = $"DELETE FROM alembic_version; INSERT INTO alembic_version (version_num) VALUES {string.Join(", ", placeholders)};";
-            for (var index = 0; index < revisionList.Count; index++)
-            {
-                record.Parameters.AddWithValue($"$r{index}", revisionList[index]);
-            }
-
+            record.CommandText = "DELETE FROM alembic_version; INSERT INTO alembic_version (version_num) VALUES ($revision);";
+            record.Parameters.AddWithValue("$revision", revision);
             record.ExecuteNonQuery();
         }
 
@@ -369,15 +309,14 @@ public sealed class SchemaMigrator
             if (violations.Read())
             {
                 throw new InvalidOperationException(
-                    $"Migration left a foreign key violation in table '{violations.GetValue(0)}'.");
+                    $"Migration to {revision} left a foreign key violation in table '{violations.GetValue(0)}'.");
             }
         }
 
         transaction.Commit();
     }
 
-    /// <summary>Every revision <c>alembic_version</c> currently records, in the order the table holds them.</summary>
-    private static List<string> ReadRecordedRevisions(SqliteConnection connection)
+    private static string? ReadRecordedRevision(SqliteConnection connection)
     {
         var hasTable = ScalarLong(
             connection,
@@ -394,7 +333,15 @@ public sealed class SchemaMigrator
             }
         }
 
-        return revisions.Count == 0 ? throw UnversionedError() : revisions;
+        return revisions.Count switch
+        {
+            0 => throw UnversionedError(),
+            1 => revisions[0],
+            _ => throw new DatabaseSchemaMismatchException(
+                $"Database records several schema revisions ({string.Join(", ", revisions.Select(Quote))}); " +
+                $"this build requires exactly {Quote(HeadRevision)}. Restore a backup that matches this version.",
+                SchemaMismatchKind.Incompatible),
+        };
     }
 
     /// <summary>The refusal for a database with no recorded revision, with the operator's options.</summary>

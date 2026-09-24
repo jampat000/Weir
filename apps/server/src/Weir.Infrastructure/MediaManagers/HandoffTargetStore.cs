@@ -28,7 +28,7 @@ public enum HandoffTargetProgress
 public sealed record HandoffTargetFinish(HandoffTargetProgress Progress, HandoffLedgerRow? Row = null, IReadOnlyList<HandoffTarget>? Targets = null);
 
 /// <summary>
-/// The <c>media_manager_handoff_targets</c> table (migration 0017): every file a hand-off covers, and what each file's
+/// The <c>media_manager_handoff_targets</c> table (migration 0019): every file a hand-off covers, and what each file's
 /// pass came to. A hand-off of several files is reported once, when the last of them finishes, and a manager's
 /// "imported" releases only the copies that report named.
 /// </summary>

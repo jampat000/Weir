@@ -44,65 +44,6 @@ public sealed class SchemaMigratorTests
         database.ClearPool();
     }
 
-    /// <summary>
-    /// #667's migration (17, <c>media_manager_handoff_targets</c>) and #734's (18, <c>0053_query_indexes</c>) were
-    /// developed in parallel and merged in the other order: a database that reached 18 without ever running 17 is
-    /// exactly what a build that only knew about 18 leaves behind. Its alembic_version names both 16 and 18 with
-    /// nothing between; head must still bring it 17, not adopt it as already current or replay 1 through 16.
-    /// </summary>
-    [Fact]
-    public void A_database_recorded_at_16_and_18_with_nothing_between_still_gets_17()
-    {
-        using var temp = new TempDirectory();
-        var database = new SqliteDatabase(temp.Join("weir.sqlite3"));
-        Assert.Equal(SchemaStartupOutcome.Created, new SchemaMigrator(database).EnsureAtHead());
-        Execute(database, "DROP TABLE media_manager_handoff_targets");
-        Execute(database, "ALTER TABLE media_manager_handoffs DROP COLUMN reported_status");
-        Execute(database, "ALTER TABLE media_manager_handoffs DROP COLUMN output_files_json");
-        var sixteen = SchemaMigrator.Migrations.Single(migration => migration.Number == 16).Revision;
-        var eighteen = SchemaMigrator.Migrations.Single(migration => migration.Number == 18).Revision;
-        Execute(database, $"DELETE FROM alembic_version; INSERT INTO alembic_version (version_num) VALUES ('{sixteen}'), ('{eighteen}')");
-
-        var outcome = new SchemaMigrator(database).EnsureAtHead();
-        database.ClearPool();
-
-        Assert.Equal(SchemaStartupOutcome.Upgraded, outcome);
-        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'media_manager_handoff_targets'"));
-        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM pragma_table_info('media_manager_handoffs') WHERE name = 'reported_status'"));
-        Assert.Contains(SchemaMigrator.HeadRevision, Scalars(database.DatabasePath, "SELECT version_num FROM alembic_version"));
-
-        // Matches a database created fresh at head: 1 through 16 were not replayed, only 17.
-        using var freshTemp = new TempDirectory();
-        var freshDatabase = new SqliteDatabase(freshTemp.Join("fresh.sqlite3"));
-        Assert.Equal(SchemaStartupOutcome.Created, new SchemaMigrator(freshDatabase).EnsureAtHead());
-        freshDatabase.ClearPool();
-        Assert.Equal(SchemaSnapshot.Describe(freshDatabase.DatabasePath), SchemaSnapshot.Describe(database.DatabasePath));
-    }
-
-    private static void Execute(SqliteDatabase database, string sql)
-    {
-        using var connection = database.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.ExecuteNonQuery();
-    }
-
-    private static List<string> Scalars(string databasePath, string sql)
-    {
-        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = databasePath, Pooling = false }.ToString());
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        using var reader = command.ExecuteReader();
-        var values = new List<string>();
-        while (reader.Read())
-        {
-            values.Add(reader.GetString(0));
-        }
-
-        return values;
-    }
-
     [Fact]
     public void An_older_alembic_revision_is_refused_untouched()
     {
@@ -199,9 +140,7 @@ public sealed class SchemaMigratorTests
         Assert.Equal(SchemaStartupOutcome.Created, new SchemaMigrator(database).EnsureAtHead());
         database.ClearPool();
 
-        // Every migration's own revision is recorded, not just head's, so a later migration merged out of number
-        // order against an old build's single collapsed row can still be told apart from one truly already applied.
-        Assert.Equal(SchemaMigrator.Migrations.Count, SchemaSnapshot.ScalarLong(path, "SELECT COUNT(*) FROM alembic_version"));
+        Assert.Equal(1, SchemaSnapshot.ScalarLong(path, "SELECT COUNT(*) FROM alembic_version"));
     }
 
     /// <summary>
@@ -214,6 +153,34 @@ public sealed class SchemaMigratorTests
         var numbers = SchemaMigrator.Migrations.Select(migration => migration.Number).ToList();
         Assert.Equal(numbers.Distinct(), numbers);
         Assert.Equal(numbers.OrderBy(number => number), numbers);
+    }
+
+    /// <summary>A database already at 18 (head on main before this migration) still gets 19 once it is added after it.</summary>
+    [Fact]
+    public void A_database_at_18_upgrades_to_include_this_migration()
+    {
+        using var temp = new TempDirectory();
+        var database = new SqliteDatabase(temp.Join("weir.sqlite3"));
+        Assert.Equal(SchemaStartupOutcome.Created, new SchemaMigrator(database).EnsureAtHead());
+        var eighteen = SchemaMigrator.Migrations.Single(migration => migration.Number == 18).Revision;
+        using (var connection = database.Open())
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText =
+                "DROP TABLE media_manager_handoff_targets; " +
+                "ALTER TABLE media_manager_handoffs DROP COLUMN reported_status; " +
+                "ALTER TABLE media_manager_handoffs DROP COLUMN output_files_json; " +
+                $"DELETE FROM alembic_version; INSERT INTO alembic_version (version_num) VALUES ('{eighteen}');";
+            command.ExecuteNonQuery();
+        }
+
+        var outcome = new SchemaMigrator(database).EnsureAtHead();
+        database.ClearPool();
+
+        Assert.Equal(SchemaStartupOutcome.Upgraded, outcome);
+        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'media_manager_handoff_targets'"));
+        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM pragma_table_info('media_manager_handoffs') WHERE name = 'reported_status'"));
+        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, $"SELECT COUNT(*) FROM alembic_version WHERE version_num = '{SchemaMigrator.HeadRevision}'"));
     }
 
     [Fact]
