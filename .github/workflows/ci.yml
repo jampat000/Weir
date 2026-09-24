@@ -8,8 +8,12 @@
 # requires, and the one the release asks for on the tagged commit (scripts/verify-ci-for-release.mjs).
 # scripts/check-release-workflow-gates.mjs checks that ci-passed needs every job here.
 #
-# A push to main always runs server-windows and tray, whatever changed, so every commit a release can tag has
-# had its server tested on Windows and its tray tested in that exact tree.
+# A push to main always runs server-windows, tray and packaging, whatever changed, so every commit a release
+# can tag has had its server tested on Windows, its tray tested, and its Docker and Windows packages built and
+# smoked in that exact tree. On a pull request, packaging runs only when a packaging-relevant path changes
+# (see the `packaging` filter below); a server or web change outside that list is still caught by the package
+# smokes on the next push to main, just not on every pull request, which is the trade-off for not running the
+# two slowest jobs in the workflow on nearly every PR.
 name: CI
 
 on:
@@ -81,19 +85,25 @@ jobs:
               - 'apps/tray/**'
               # The tray imports the server's build rules and product version.
               - 'apps/server/Directory.Build.props'
+            # Only files the package smokes actually exercise: the packaged artefacts (Dockerfile, docker/**,
+            # compose.yaml, .dockerignore, packaging/**, the tray), the host entry point that ships inside them
+            # (apps/server/src/Weir.Host/**, not the whole server), the smoke scripts themselves, and the
+            # workflow that runs them. A server or web change that is not in this list still reaches the
+            # packaging smokes on the next push to main (see main_push below), just not on every pull request.
             packaging:
-              - 'packaging/**'
-              - 'docker/**'
               - 'Dockerfile'
-              - '.dockerignore'
+              - 'docker/**'
               - 'compose.yaml'
+              - '.dockerignore'
+              - 'packaging/**'
               - 'apps/tray/**'
-              - 'apps/server/**'
-              - 'apps/web/**'
-              - 'scripts/smoke-windows-package.ps1'
+              - 'apps/server/src/Weir.Host/**'
+              - 'scripts/live_packaged_e2e/**'
               - 'scripts/live-packaged-e2e.py'
+              - 'scripts/smoke-windows-package.ps1'
               - 'scripts/wait-for-health.mjs'
               - 'scripts/ffmpeg-cache-key.mjs'
+              - '.github/workflows/ci-packaging.yml'
             docker:
               - 'docker/**'
               - 'Dockerfile'
@@ -135,7 +145,7 @@ jobs:
             echo "run_e2e=$(on_pull_request "$web")"
             echo "run_contract=$(either "$all" "$CONTRACT")"
             echo "run_tray=$(either "$all" "$TRAY" "$main_push")"
-            echo "run_packaging=$(either "$all" "$PACKAGING")"
+            echo "run_packaging=$(either "$all" "$PACKAGING" "$main_push")"
             echo "run_arm64=$(either "$manual" "$DOCKER")"
           } | tee -a "$GITHUB_OUTPUT"
 

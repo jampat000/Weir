@@ -99,6 +99,19 @@ it("says when the list comes from the operator's own file", async () => {
   ).toHaveTextContent(/your own direct-play-devices\.json/);
 });
 
+it("shows a load error instead of a blank panel when Direct Play devices fail to load", async () => {
+  asRole("operator");
+  vi.spyOn(api, "fetchDirectPlayDevices").mockRejectedValue(
+    new Error("network down"),
+  );
+
+  render(<DirectPlaySection />, { wrapper });
+
+  expect(await screen.findByTestId("settings-load-error")).toHaveTextContent(
+    "Weir couldn’t load your Direct Play devices. Reload the page to try again.",
+  );
+});
+
 it("shows a viewer the list read-only", async () => {
   asRole("viewer");
   vi.spyOn(api, "fetchDirectPlayDevices").mockResolvedValue(devices);

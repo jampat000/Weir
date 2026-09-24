@@ -33,7 +33,9 @@ root, read by `scripts/stop-dev-api-port.mjs`), never by scanning the port, so a
 is never at risk.
 
 If a port is busy when `npm run dev` starts, `apps/web/scripts/run-dev-stack.mjs` moves to the next
-free port and prints the URL it used. `npm run dev:stop-web` frees the default web port.
+free port and prints the URL it used. `npm run dev:stop-web` stops the dev web server the same way
+`dev:stop-api` stops the dev API: only by the PID it recorded when it started that process
+(`.dev-web.pid` at the repo root, read by `scripts/stop-dev-web-port.mjs`), never by scanning the port.
 
 **Windows / `ERR_CONNECTION_REFUSED`:** Vite listens on **all interfaces** so both **`127.0.0.1`** and **`localhost`** work. If `localhost` resolved to IPv6 (`::1`) while Vite listened only on IPv4, the browser showed connection refused; that mismatch is what the `host: true` dev bind fixes.
 

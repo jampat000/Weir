@@ -180,6 +180,7 @@ If you want to override defaults with an env file instead of inline `environment
 
 | Variable | Purpose |
 |---|---|
+| `WEIR_ENV` | Defaults to `production` (the image also sets it explicitly), which turns off ASP.NET's developer exception page. There is normally no reason to change this in Docker; `development` is for building Weir from source, not for a container. |
 | `WEIR_SESSION_COOKIE_SECURE` | Whether the session cookie is marked HTTPS-only. Defaults to `auto`: the cookie is HTTPS-only when the request arrives over HTTPS (directly, or through a proxy listed in `WEIR_TRUSTED_PROXY_IPS`), so plain `http://` LAN access keeps working. Set `true` to always require HTTPS, or `false` to never require it. |
 | `WEIR_TRUSTED_PROXY_IPS` | The IP or CIDR of your immediate reverse proxy. Weir only trusts `X-Forwarded-For` and `X-Forwarded-Proto` from these addresses. Set it when you put Weir behind a proxy. |
 | `WEIR_CORS_ORIGINS` | Allowed browser origins for credentialed cross-origin requests. Weir refuses to start with `WEIR_CORS_ORIGINS=*` — list real origins instead. |

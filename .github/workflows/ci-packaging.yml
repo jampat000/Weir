@@ -145,8 +145,9 @@ jobs:
             apps/tray/**/packages.lock.json
 
       # The vendor folder is gitignored, so without a cache every run downloads FFmpeg and MKVToolNix again.
-      # Both are pinned in build-velopack.ps1: FFmpeg's key reads that pin's own values (tag, archive,
-      # SHA256), MKVToolNix's key hashes the whole file. Either way the build script re-checks the vendored copy.
+      # Both are pinned in packaging/windows/build-velopack-vendored-media-tools.ps1 (dot-sourced from
+      # build-velopack.ps1): FFmpeg's key reads that pin's own values (tag, archive, SHA256),
+      # MKVToolNix's key hashes the whole file. Either way the build script re-checks the vendored copy.
       - name: FFmpeg build checksum
         id: ffmpeg
         shell: bash
@@ -162,7 +163,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: packaging/windows/vendor/mkvtoolnix
-          key: mkvtoolnix-vendor-${{ runner.os }}-${{ hashFiles('packaging/windows/build-velopack.ps1') }}
+          key: mkvtoolnix-vendor-${{ runner.os }}-${{ hashFiles('packaging/windows/build-velopack-vendored-media-tools.ps1') }}
           restore-keys: |
             mkvtoolnix-vendor-${{ runner.os }}-
 
