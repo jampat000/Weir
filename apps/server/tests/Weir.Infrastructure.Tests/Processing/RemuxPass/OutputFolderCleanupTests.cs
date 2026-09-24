@@ -201,7 +201,7 @@ public sealed class OutputFolderCleanupTests : IDisposable
         Assert.Contains("outside the Movies output folder", Str(await RunMovie(outside), "movie_output_folder_skip_reason"), StringComparison.Ordinal);
     }
 
-    [Fact]
+    [WindowsFact("FileShare.None only blocks a delete on Windows; POSIX has no equivalent share-mode lock.")]
     public async Task A_locked_folder_is_reported_and_left()
     {
         var final = MovieOutput();
@@ -212,12 +212,9 @@ public sealed class OutputFolderCleanupTests : IDisposable
             output = await RunMovie(final);
         }
 
-        if (OperatingSystem.IsWindows())
-        {
-            Assert.Contains("could not remove the movie output folder", Str(output, "movie_output_folder_skip_reason"), StringComparison.Ordinal);
-            Assert.Equal("skipped", Str(output, "movie_output_truth_check"));
-            Assert.True(File.Exists(final));
-        }
+        Assert.Contains("could not remove the movie output folder", Str(output, "movie_output_folder_skip_reason"), StringComparison.Ordinal);
+        Assert.Equal("skipped", Str(output, "movie_output_truth_check"));
+        Assert.True(File.Exists(final));
     }
 
     [Fact]

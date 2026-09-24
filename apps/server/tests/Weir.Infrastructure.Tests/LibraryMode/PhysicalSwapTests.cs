@@ -192,6 +192,8 @@ public sealed class PhysicalSwapTests : IDisposable
     [WindowsFact("Access control lists are a Windows behaviour.")]
     public async Task An_explicit_permission_on_the_original_is_carried_to_the_cleaned_file()
     {
+        // [WindowsFact] already skips this at runtime on other platforms; this check is what lets the
+        // platform-compatibility analyzer (CA1416) see these Windows-only ACL APIs as guarded.
         if (!OperatingSystem.IsWindows())
         {
             return;
