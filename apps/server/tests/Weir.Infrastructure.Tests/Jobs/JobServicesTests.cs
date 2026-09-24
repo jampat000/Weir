@@ -324,15 +324,32 @@ public sealed class JobServicesTests : IDisposable
             _db.Home,
             _db.Home));
         var timings = new WorkerLoopTimings { IdleSleep = TimeSpan.FromMilliseconds(50), TickErrorBackoff = TimeSpan.FromMilliseconds(50), ConcurrencyCacheTtl = TimeSpan.FromMilliseconds(100), LeaseSeconds = 3600 };
+        var registry = new JobHandlerRegistry(handlers);
         var processor = new ProcessingJobProcessor(
             _db.Store,
-            new JobHandlerRegistry(handlers),
+            registry,
             new SqliteActivityWriter(_db.Database),
             new NoUnhandledJobFailureRecorder(),
             new NoJobNotifications(),
             TimeProvider.System,
             NullLogger<ProcessingJobProcessor>.Instance);
-        return new ProcessingWorkerService(processor, _db.Store, heartbeats, options, timings, TimeProvider.System, logger ?? NullLogger<ProcessingWorkerService>.Instance);
+        // Never started, so RecoveryCompleted reads as already done and this slot never waits on it.
+        var recovery = new JobsStartupRecoveryService(_db.Store, options, TimeProvider.System, NullLogger<JobsStartupRecoveryService>.Instance);
+        return new ProcessingWorkerService(processor, _db.Store, heartbeats, options, timings, TimeProvider.System, logger ?? NullLogger<ProcessingWorkerService>.Instance, registry, recovery);
+    }
+
+    private static async Task WaitUntilAsync(Func<Task<bool>> condition, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(15));
+        while (!await condition())
+        {
+            if (DateTime.UtcNow > deadline)
+            {
+                Assert.Fail("condition was not met in time");
+            }
+
+            await Task.Delay(20);
+        }
     }
 
     private sealed class FlakyEnqueuer : IPeriodicEnqueuer

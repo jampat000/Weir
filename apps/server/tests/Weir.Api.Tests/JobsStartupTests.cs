@@ -60,7 +60,10 @@ public sealed class JobsStartupTests
                 database.ClearPool();
             });
 
-        var report = server.Services.GetRequiredService<JobsStartupRecoveryService>().LastReport;
+        // Recovery now runs in the background so it never holds up Kestrel from listening (#718).
+        var recovery = server.Services.GetRequiredService<JobsStartupRecoveryService>();
+        await recovery.RecoveryCompleted.WaitAsync(TimeSpan.FromSeconds(10));
+        var report = recovery.LastReport;
         Assert.NotNull(report);
         Assert.Equal(1, report.Jobs.ProcessingRequeued);
         Assert.Equal(1, report.WorkTempFilesRemoved);
