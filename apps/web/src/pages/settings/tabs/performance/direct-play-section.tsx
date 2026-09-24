@@ -5,10 +5,6 @@ import {
   QuietDisclosure,
   quietActionRowClass,
 } from "../../../../components/shared/quiet-section";
-import {
-  isHttpErrorFromApi,
-  isLikelyNetworkFailure,
-} from "../../../../lib/api/error-guards";
 import { canEdit } from "../../../../lib/auth/can-edit";
 import { useMeQuery } from "../../../../lib/auth/queries";
 import type { DirectPlayDevice } from "../../../../lib/processing/direct-play-api";
@@ -19,6 +15,7 @@ import {
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { errorMessage } from "../../../../lib/api/error-message";
 import { SaveModelNote } from "../../save-model-note";
+import { SettingsLoadError } from "../../settings-load-error";
 
 /** Splits "https://… (checked 2026-08-13)" into its link and its date. */
 function parseSource(source: string): {
@@ -78,25 +75,7 @@ export function DirectPlaySection() {
     return <PageLoading label="Loading Direct Play devices" />;
   }
   if (q.isError) {
-    return (
-      // Something broken, in the language's own shape for it: a sentence with the
-      // interrupt marker, not a red box. Raw red-200 on a red-950 wash was also
-      // unreadable in the light theme.
-      <ul className="mm-interrupt" role="alert">
-        <li className="mm-interrupt__item">
-          <span className="mm-interrupt__text">
-            <strong className="font-semibold">
-              Could not load Direct Play devices.
-            </strong>{" "}
-            {isLikelyNetworkFailure(q.error)
-              ? "Check that the Weir API is running."
-              : isHttpErrorFromApi(q.error)
-                ? "Sign in, then try again."
-                : "Request failed."}
-          </span>
-        </li>
-      </ul>
-    );
+    return <SettingsLoadError what="Direct Play devices" />;
   }
   if (!q.data) return null;
 
