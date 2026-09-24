@@ -5,6 +5,7 @@ using Weir.Core.LibraryMode;
 using Weir.Core.MediaManagers;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.Media;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
 using Weir.Infrastructure.Tests.Media;
 using Weir.Infrastructure.Tests.MediaManagers;
@@ -25,6 +26,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
     private readonly LibrarySettingsStore _librarySettings = new();
     private readonly LibraryFileMarksStore _fileMarks = new();
     private readonly LibraryViewStore _libraryView = new();
+    private readonly LibraryStore _libraries = new();
 
     public void Dispose()
     {
@@ -43,6 +45,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
         _librarySettings,
         _fileMarks,
         _libraryView,
+        _libraries,
         _fixture.Store.Clock,
         NullLogger<LibraryScanHandler>.Instance);
 

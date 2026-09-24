@@ -6,7 +6,6 @@ using Weir.Core.Json;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.MediaManagers;
-using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Tests.Media;
 using Weir.Infrastructure.Tests.MediaManagers;
@@ -51,13 +50,15 @@ public sealed class RemuxPassHandlerDownloadedScanTests : IDisposable
             new RemuxPassSettings { WatchedFolderMinFileAgeSeconds = 0 },
             TimeProvider.System,
             NullLogger<RemuxPassRunner>.Instance);
-        var downloadedScan = new DownloadedScanNotifier(_fixture.Connections, _fixture.Http, NullLogger<DownloadedScanNotifier>.Instance);
+        var downloadedScan = new DownloadedScanNotifier(_fixture.Connections, _fixture.ConnectionStore, _fixture.Libraries, _fixture.Http, NullLogger<DownloadedScanNotifier>.Instance);
         return new RemuxPassHandler(
             _fixture.Store.Database,
             _fixture.Store.Options,
             runner,
             new QueueingFailurePolicy(_fixture.Jobs),
             _fixture.OperatorSettings,
+            _fixture.Handback,
+            _fixture.Libraries,
             TimeProvider.System,
             NullLogger<RemuxPassHandler>.Instance,
             downloadedScan,
@@ -85,7 +86,7 @@ public sealed class RemuxPassHandlerDownloadedScanTests : IDisposable
             await _fixture.Store.Execute($"UPDATE media_manager_connections SET downloaded_scan_enabled = 1 WHERE id = {connectionId}");
         }
 
-        await _fixture.Db(async uow => { await LibraryStore.SetManagerLinksAsync(uow, libraryId, [connectionId]); return 0; });
+        await _fixture.Db(async uow => { await _fixture.Libraries.SetManagerLinksAsync(uow, libraryId, [connectionId]); return 0; });
         return connectionId;
     }
 
@@ -141,7 +142,7 @@ public sealed class RemuxPassHandlerDownloadedScanTests : IDisposable
     {
         var library = await LibraryAsync();
         var connectionId = await ArrConnectionAsync(library, downloadedScanEnabled: false);
-        var row = await _fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, connectionId));
+        var row = await _fixture.Db(uow => _fixture.ConnectionStore.GetAsync(uow, connectionId));
 
         await RunPassAsync(library);
 

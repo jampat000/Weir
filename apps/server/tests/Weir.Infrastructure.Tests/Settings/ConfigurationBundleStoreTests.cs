@@ -21,7 +21,7 @@ public sealed class ConfigurationBundleStoreTests : IDisposable
     public ConfigurationBundleStoreTests()
     {
         var suiteSettings = new SuiteSettingsStore(_store.Users);
-        _bundle = new ConfigurationBundleStore(suiteSettings, new ConfigurationBundleConnections(new NotificationChannelStore()));
+        _bundle = new ConfigurationBundleStore(suiteSettings, new ConfigurationBundleConnections(new NotificationChannelStore(), new Weir.Infrastructure.MediaManagers.MediaManagerConnectionStore()));
     }
 
     public void Dispose() => _store.Dispose();

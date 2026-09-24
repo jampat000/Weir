@@ -16,7 +16,9 @@ namespace Weir.Infrastructure.Tests.Processing;
 /// </summary>
 public sealed class HoldDiagnosticStoreTests
 {
-    private static readonly HoldDiagnosticStore HoldDiagnostic = new();
+    private static readonly LibraryStore Libraries = new();
+    private static readonly FileStateStore Files = new();
+    private static readonly HoldDiagnosticStore HoldDiagnostic = new(Libraries);
 
     private static async Task<(StoreFixture Store, FakeManagerHttp Http, MediaManagerConnectionService Connections)> BuildAsync()
     {
@@ -24,7 +26,7 @@ public sealed class HoldDiagnosticStoreTests
         var cipher = new CredentialCipher(store.Options.CredentialsSecret, store.Options.SessionSecret, store.Options.PreviousCredentialsSecrets, store.Clock);
         var http = new FakeManagerHttp();
         var ports = new HttpMediaManagerPorts(http);
-        var connections = new MediaManagerConnectionService(store.Options, cipher, ports);
+        var connections = new MediaManagerConnectionService(store.Options, cipher, ports, new MediaManagerConnectionStore());
         return (store, http, connections);
     }
 
@@ -34,7 +36,7 @@ public sealed class HoldDiagnosticStoreTests
     private static async Task<(long LibraryId, long FileId)> SeedFileAsync(StoreFixture store, string relativePath, IReadOnlyList<long> managerConnectionIds)
     {
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
-        var library = await LibraryStore.CreateAsync(uow, new ProcessingLibraryInput
+        var library = await Libraries.CreateAsync(uow, new ProcessingLibraryInput
         {
             Name = "Movies " + Guid.NewGuid().ToString("N")[..8],
             MediaType = ProcessingMediaScopes.Movie,
@@ -42,7 +44,7 @@ public sealed class HoldDiagnosticStoreTests
             OutputFolder = store.Home.Join("out"),
             ManagerConnectionIds = managerConnectionIds,
         });
-        var fileId = await FileStateStore.RecordFileStateAsync(
+        var fileId = await Files.RecordFileStateAsync(
             uow, library.Id, relativePath,
             new FileStateVerdict(ProcessingFileStatuses.OnHold, "held for the test"),
             sizeBytes: 100, sizeChangedAt: store.Clock.GetUtcNow(), seenAt: store.Clock.GetUtcNow());
@@ -60,8 +62,8 @@ public sealed class HoldDiagnosticStoreTests
         RouteQueue(http, "[{\"status\":\"downloading\",\"outputPath\":\"Solaris (1972)/Solaris.mkv\",\"movie\":{\"title\":\"Solaris\",\"year\":1972}}]");
 
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
-        var file = await FileStateStore.GetAsync(uow, fileId);
-        var library = await LibraryStore.GetAsync(uow, libraryId);
+        var file = await Files.GetAsync(uow, fileId);
+        var library = await Libraries.GetAsync(uow, libraryId);
         var outcome = await HoldDiagnostic.EvaluateAsync(uow, file!, library!, connections);
 
         Assert.Equal(CandidateGateVerdict.WaitUpstream, outcome.Verdict);
@@ -81,8 +83,8 @@ public sealed class HoldDiagnosticStoreTests
         RouteQueue(http, "[]");
 
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
-        var file = await FileStateStore.GetAsync(uow, fileId);
-        var library = await LibraryStore.GetAsync(uow, libraryId);
+        var file = await Files.GetAsync(uow, fileId);
+        var library = await Libraries.GetAsync(uow, libraryId);
         var outcome = await HoldDiagnostic.EvaluateAsync(uow, file!, library!, connections);
 
         Assert.Equal(CandidateGateVerdict.NotHeld, outcome.Verdict);
@@ -99,8 +101,8 @@ public sealed class HoldDiagnosticStoreTests
         var (libraryId, fileId) = await SeedFileAsync(store, "Unlinked (2000)/Unlinked.mkv", []);
 
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
-        var file = await FileStateStore.GetAsync(uow, fileId);
-        var library = await LibraryStore.GetAsync(uow, libraryId);
+        var file = await Files.GetAsync(uow, fileId);
+        var library = await Libraries.GetAsync(uow, libraryId);
         var outcome = await HoldDiagnostic.EvaluateAsync(uow, file!, library!, connections);
 
         Assert.Equal(CandidateGateVerdict.NoUpstreamSignal, outcome.Verdict);
@@ -118,8 +120,8 @@ public sealed class HoldDiagnosticStoreTests
         http.Throw(HttpMethod.Get, "/api/v3/queue", new HttpRequestException("Connection refused."));
 
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
-        var file = await FileStateStore.GetAsync(uow, fileId);
-        var library = await LibraryStore.GetAsync(uow, libraryId);
+        var file = await Files.GetAsync(uow, fileId);
+        var library = await Libraries.GetAsync(uow, libraryId);
         var outcome = await HoldDiagnostic.EvaluateAsync(uow, file!, library!, connections);
 
         Assert.Equal(CandidateGateVerdict.NoUpstreamSignal, outcome.Verdict);

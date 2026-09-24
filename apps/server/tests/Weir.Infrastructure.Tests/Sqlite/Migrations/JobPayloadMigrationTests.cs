@@ -26,6 +26,7 @@ public sealed class JobPayloadMigrationTests : IDisposable
     private readonly LibrarySettingsStore _librarySettings = new();
     private readonly LibraryScanStore _scans = new();
     private readonly FileLogStore _fileLogs = new();
+    private readonly LibraryStore _libraries = new();
 
     public JobPayloadMigrationTests()
     {
@@ -89,7 +90,7 @@ public sealed class JobPayloadMigrationTests : IDisposable
         Upgrade();
 
         await using var uow = await UnitOfWork.OpenAsync(_database);
-        var migrated = await LibraryStore.GetRuleSetByNameAsync(uow, "Old Rules");
+        var migrated = await _libraries.GetRuleSetByNameAsync(uow, "Old Rules");
         Assert.NotNull(migrated);
         Assert.Equal("""[{"field":"forced","value":null,"reversed":false}]""", migrated!.SubtitleSortersJson);
         Assert.True(migrated.RemoveHearingImpairedSubs);
@@ -105,7 +106,7 @@ public sealed class JobPayloadMigrationTests : IDisposable
         Assert.True(migrated.ClearVideoTrackNames);
         Assert.True(migrated.RemoveChapters);
 
-        var legacy = await LibraryStore.GetRuleSetByNameAsync(uow, "Legacy");
+        var legacy = await _libraries.GetRuleSetByNameAsync(uow, "Legacy");
         Assert.Equal("""[{"field":"forced","value":null,"reversed":false}]""", legacy!.SubtitleSortersJson);
         Assert.False(legacy.RemoveHearingImpairedSubs);
         Assert.Equal(RemuxRuleValues.AudioKeepModeSingle, legacy.AudioKeepMode);
@@ -114,7 +115,7 @@ public sealed class JobPayloadMigrationTests : IDisposable
         Assert.Equal(TrackNaming.DefaultTemplate, legacy.TrackNameTemplate);
         Assert.Equal(new TrackNameOverrides(), legacy.TrackNameOverrides);
 
-        var blank = await LibraryStore.GetRuleSetByNameAsync(uow, "Blank");
+        var blank = await _libraries.GetRuleSetByNameAsync(uow, "Blank");
         Assert.Equal(string.Empty, blank!.SubtitleSortersJson);
         Assert.False(blank.RemoveHearingImpairedSubs);
     }

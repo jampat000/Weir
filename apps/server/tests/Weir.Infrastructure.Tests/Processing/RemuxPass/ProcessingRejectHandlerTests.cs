@@ -36,6 +36,7 @@ public sealed class ProcessingRejectHandlerTests : IDisposable
             _fixture.Ledger,
             _fixture.Jobs,
             new RejectPacing(TimeProvider.System),
+            _fixture.Libraries,
             TimeProvider.System,
             NullLogger<ProcessingRejectHandler>.Instance);
 

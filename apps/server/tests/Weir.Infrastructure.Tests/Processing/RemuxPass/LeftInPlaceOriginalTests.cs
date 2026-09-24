@@ -86,9 +86,11 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
             runner,
             new QueueingFailurePolicy(_fixture.Jobs),
             _fixture.OperatorSettings,
+            _fixture.Handback,
+            _fixture.Libraries,
             _fixture.Store.Clock,
             NullLogger<RemuxPassHandler>.Instance,
-            new DownloadedScanNotifier(_fixture.Connections, _fixture.Http, NullLogger<DownloadedScanNotifier>.Instance),
+            new DownloadedScanNotifier(_fixture.Connections, _fixture.ConnectionStore, _fixture.Libraries, _fixture.Http, NullLogger<DownloadedScanNotifier>.Instance),
             _fixture.Reporter,
             _fixture.Jobs);
     }
@@ -106,7 +108,7 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     {
         var scan = new ProcessingWatchedFolderScanDispatchJobHandler(
             _fixture.Store.Database, _fixture.Store.Clock, _fixture.Store.Options, _fixture.Jobs, _fixture.Connections,
-            new SuiteSettingsStore(new AuthStore()), _fixture.OperatorSettings);
+            new SuiteSettingsStore(new AuthStore()), _fixture.OperatorSettings, _fixture.Libraries, _fixture.Files);
         var payload = new WireObject().Set("enqueue_remux_jobs", true).Set("scan_trigger", "watcher").Set("media_scope", mediaType).Set("library_id", _libraryId);
         var job = await _fixture.Jobs.EnqueueOrGetAsync(
             $"scan-{Guid.NewGuid():N}", ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
@@ -431,7 +433,7 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
         await InsertRowAsync("Still.Here/Still.Here.mkv", ProcessingFileStatuses.Unprocessed, lastSeenMinutesAgo: null);
 
         var log = new ListLogger<VanishedFileSweepTask>();
-        await new VanishedFileSweepTask(_fixture.Store.Database, _fixture.Store.Options, _fixture.Store.Clock, log).RunOnceAsync(CancellationToken.None);
+        await new VanishedFileSweepTask(_fixture.Store.Database, _fixture.Store.Options, _fixture.Libraries, _fixture.Store.Clock, log).RunOnceAsync(CancellationToken.None);
 
         Assert.Null(await StatusAsync("Film.1/Film.mkv"));
         Assert.Null(await StatusAsync("Film"));

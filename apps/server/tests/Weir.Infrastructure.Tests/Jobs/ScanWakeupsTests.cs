@@ -20,6 +20,9 @@ namespace Weir.Infrastructure.Tests.Jobs;
 /// </summary>
 public sealed class ScanWakeupsTests
 {
+    private static readonly LibraryStore Libraries = new();
+    private static readonly FileStateStore Files = new();
+
     [Fact]
     public void Keeps_the_earliest_booking_and_uses_it_up_once_due()
     {
@@ -58,11 +61,11 @@ public sealed class ScanWakeupsTests
         using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "wakeup-tests-credentials-secret"));
         store.Clock.Set(DateTimeOffset.UtcNow);
         var cipher = new CredentialCipher(store.Options.CredentialsSecret, store.Options.SessionSecret, store.Options.PreviousCredentialsSecrets, store.Clock);
-        var connections = new MediaManagerConnectionService(store.Options, cipher, new HttpMediaManagerPorts(new FakeManagerHttp()));
+        var connections = new MediaManagerConnectionService(store.Options, cipher, new HttpMediaManagerPorts(new FakeManagerHttp()), new MediaManagerConnectionStore());
         var jobs = new ProcessingJobStore(store.Database, store.Clock);
         var wakeups = new ScanWakeups();
         var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
-            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore(), wakeups);
+            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore(), Libraries, Files, wakeups);
         await store.Execute(
             "INSERT INTO operator_settings (id, min_file_age_seconds, min_input_file_size_mb, minimum_free_disk_space_mb) " +
             "VALUES (1, 0, 0, 0) ON CONFLICT(id) DO UPDATE SET min_file_age_seconds = 0, min_input_file_size_mb = 0, minimum_free_disk_space_mb = 0");
@@ -75,7 +78,7 @@ public sealed class ScanWakeupsTests
         long libraryId;
         await using (var uow = await UnitOfWork.OpenAsync(store.Database))
         {
-            libraryId = (await LibraryStore.CreateAsync(uow, new ProcessingLibraryInput
+            libraryId = (await Libraries.CreateAsync(uow, new ProcessingLibraryInput
             {
                 Name = "Movies wake-up",
                 MediaType = ProcessingMediaScopes.Movie,
@@ -112,8 +115,8 @@ public sealed class ScanWakeupsTests
         long libraryId;
         await using (var uow = await UnitOfWork.OpenAsync(store.Database))
         {
-            var seeded = await LibraryStore.SeededForScopeAsync(uow, ProcessingMediaScopes.Movie) ?? throw new InvalidOperationException("No seeded Movies library.");
-            libraryId = (await LibraryStore.UpdateAsync(uow, seeded, new ProcessingLibraryInput
+            var seeded = await Libraries.SeededForScopeAsync(uow, ProcessingMediaScopes.Movie) ?? throw new InvalidOperationException("No seeded Movies library.");
+            libraryId = (await Libraries.UpdateAsync(uow, seeded, new ProcessingLibraryInput
             {
                 Name = seeded.Name,
                 MediaType = ProcessingMediaScopes.Movie,
@@ -126,7 +129,7 @@ public sealed class ScanWakeupsTests
 
         var wakeups = new ScanWakeups();
         var task = new ProcessingWatchedFolderScanDispatchScheduleTask(
-            store.Database, store.Options, new ProcessingJobStore(store.Database, store.Clock), new OperatorSettingsStore(), store.Clock,
+            store.Database, store.Options, new ProcessingJobStore(store.Database, store.Clock), new OperatorSettingsStore(), Libraries, store.Clock,
             NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance, wakeups);
         const string countMovieScans =
             "SELECT count(*) FROM jobs WHERE job_kind = 'processing.watched_folder.remux_scan_dispatch.v1' AND payload_json LIKE '%\"media_scope\":\"movie\"%'";

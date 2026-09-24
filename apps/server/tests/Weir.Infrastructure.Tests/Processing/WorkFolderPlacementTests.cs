@@ -13,6 +13,8 @@ namespace Weir.Infrastructure.Tests.Processing;
 /// </summary>
 public sealed class WorkFolderPlacementTests
 {
+    private static readonly LibraryStore Libraries = new();
+
     private const string MountInfo =
         "22 1 8:1 / / rw,relatime - ext4 /dev/sda1 rw\n" +
         "96 22 0:44 / /data/weir rw,relatime - ext4 /dev/sdb1 rw\n" +
@@ -50,7 +52,7 @@ public sealed class WorkFolderPlacementTests
         using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "work-folder-placement-1"));
         await MoviesLibraryAsync(store, store.Home.Join("output"));
         var logger = new ListLogger<WorkFolderPlacementCheck>();
-        var check = new WorkFolderPlacementCheck(store.Database, store.Options, logger, (_, _) => false);
+        var check = new WorkFolderPlacementCheck(store.Database, store.Options, Libraries, logger, (_, _) => false);
 
         await check.StartAsync(CancellationToken.None);
         await check.ExecuteTask!;
@@ -68,7 +70,7 @@ public sealed class WorkFolderPlacementTests
         using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "work-folder-placement-2"));
         await MoviesLibraryAsync(store, store.Home.Join("output"));
         var logger = new ListLogger<WorkFolderPlacementCheck>();
-        var check = new WorkFolderPlacementCheck(store.Database, store.Options, logger, (_, _) => same);
+        var check = new WorkFolderPlacementCheck(store.Database, store.Options, Libraries, logger, (_, _) => same);
 
         await check.StartAsync(CancellationToken.None);
         await check.ExecuteTask!;
@@ -79,8 +81,8 @@ public sealed class WorkFolderPlacementTests
     private static async Task MoviesLibraryAsync(StoreFixture store, string output)
     {
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
-        var seeded = await LibraryStore.SeededForScopeAsync(uow, ProcessingMediaScopes.Movie) ?? throw new InvalidOperationException("No seeded Movies library.");
-        await LibraryStore.UpdateAsync(uow, seeded, new ProcessingLibraryInput
+        var seeded = await Libraries.SeededForScopeAsync(uow, ProcessingMediaScopes.Movie) ?? throw new InvalidOperationException("No seeded Movies library.");
+        await Libraries.UpdateAsync(uow, seeded, new ProcessingLibraryInput
         {
             Name = seeded.Name,
             MediaType = ProcessingMediaScopes.Movie,

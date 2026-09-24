@@ -18,11 +18,16 @@ internal sealed class MediaManagerFixture : IDisposable
         Cipher = new CredentialCipher(Store.Options.CredentialsSecret, Store.Options.SessionSecret, Store.Options.PreviousCredentialsSecrets, Store.Clock);
         Http = new FakeManagerHttp();
         Ports = new HttpMediaManagerPorts(Http);
-        Connections = new MediaManagerConnectionService(Store.Options, Cipher, Ports);
-        Ledger = new HandoffLedgerStore(Store.Clock);
+        ConnectionStore = new MediaManagerConnectionStore();
+        Connections = new MediaManagerConnectionService(Store.Options, Cipher, Ports, ConnectionStore);
+        Targets = new HandoffTargetStore();
+        Files = new FileStateStore();
+        Libraries = new LibraryStore();
+        Handback = new HandbackStore();
+        Ledger = new HandoffLedgerStore(Store.Clock, Targets, Files);
         Jobs = new ProcessingJobStore(Store.Database, Store.Clock);
-        Intake = new MediaManagerIntake(Store.Options, Connections, Ledger, Jobs, Store.Clock);
-        Reporter = new HandoffCompletionReporter(Connections, Ledger, Http);
+        Intake = new MediaManagerIntake(Store.Options, Connections, ConnectionStore, Ledger, Targets, Jobs, Store.Clock);
+        Reporter = new HandoffCompletionReporter(Connections, ConnectionStore, Ledger, Targets, Libraries, Http);
         OperatorSettings = new OperatorSettingsStore();
     }
 
@@ -35,6 +40,16 @@ internal sealed class MediaManagerFixture : IDisposable
     public HttpMediaManagerPorts Ports { get; }
 
     public MediaManagerConnectionService Connections { get; }
+
+    public MediaManagerConnectionStore ConnectionStore { get; }
+
+    public HandoffTargetStore Targets { get; }
+
+    public FileStateStore Files { get; }
+
+    public LibraryStore Libraries { get; }
+
+    public HandbackStore Handback { get; }
 
     public HandoffLedgerStore Ledger { get; }
 

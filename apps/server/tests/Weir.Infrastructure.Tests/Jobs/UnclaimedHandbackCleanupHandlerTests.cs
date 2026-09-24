@@ -16,6 +16,7 @@ public sealed class UnclaimedHandbackCleanupHandlerTests : IDisposable
     private readonly StoreFixture _store = new();
     private readonly ProcessingJobStore _jobs;
     private readonly OperatorSettingsStore _operatorSettings = new();
+    private readonly HandbackStore _handback = new();
     private readonly UnclaimedHandbackCleanupHandler _handler;
     private readonly string _watched;
     private readonly string _output;
@@ -24,7 +25,7 @@ public sealed class UnclaimedHandbackCleanupHandlerTests : IDisposable
     {
         _store.Clock.Set(DateTimeOffset.UtcNow);
         _jobs = new ProcessingJobStore(_store.Database, _store.Clock);
-        _handler = new UnclaimedHandbackCleanupHandler(_jobs, _operatorSettings, _store.Clock, NullLogger<UnclaimedHandbackCleanupHandler>.Instance);
+        _handler = new UnclaimedHandbackCleanupHandler(_jobs, _operatorSettings, _handback, _store.Clock, NullLogger<UnclaimedHandbackCleanupHandler>.Instance);
         _watched = _store.Home.Join("downloads");
         _output = _store.Home.Join("hand-back");
         Directory.CreateDirectory(_watched);
@@ -48,7 +49,7 @@ public sealed class UnclaimedHandbackCleanupHandlerTests : IDisposable
         await File.WriteAllTextAsync(copy, "cleaned film " + relative);
         await _store.WithUnitOfWork(async uow =>
         {
-            await HandbackStore.RecordWrittenAsync(uow, library, relative, copy, _store.Clock.GetUtcNow().AddDays(-daysAgo));
+            await _handback.RecordWrittenAsync(uow, library, relative, copy, _store.Clock.GetUtcNow().AddDays(-daysAgo));
             return 0;
         });
         return copy;

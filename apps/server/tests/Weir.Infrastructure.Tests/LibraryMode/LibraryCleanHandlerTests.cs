@@ -8,8 +8,9 @@ using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.Media;
-using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.MediaManagers;
+using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Tests.Media;
 using Weir.Infrastructure.Tests.MediaManagers;
 using Weir.Infrastructure.Tests.Processing.RemuxPass;
@@ -29,6 +30,7 @@ public sealed class LibraryCleanHandlerTests : IDisposable
     private readonly LibrarySettingsStore _librarySettings = new();
     private readonly LibraryFileMarksStore _fileMarks = new();
     private readonly LibraryScanStore _scans = new();
+    private readonly LibraryStore _libraries = new();
 
     public void Dispose()
     {
@@ -52,7 +54,7 @@ public sealed class LibraryCleanHandlerTests : IDisposable
         var removedTrackStore = new Weir.Infrastructure.Library.FileLogRemovedTrackStore(_fixture.Store.Database, _fixture.Store.Clock);
         return new LibraryCleanHandler(
             _fixture.Store.Database, tools, swap, notifier, PhysicalHardlinkInspector.Instance, removedTrackStore,
-            _librarySettings, _fileMarks, _fixture.Store.Clock, NullLogger<LibraryCleanHandler>.Instance);
+            _librarySettings, _fileMarks, _libraries, _fixture.Store.Clock, NullLogger<LibraryCleanHandler>.Instance);
     }
 
     /// <summary>A library whose rule set keeps only English audio, strictly — the same policy proven in
