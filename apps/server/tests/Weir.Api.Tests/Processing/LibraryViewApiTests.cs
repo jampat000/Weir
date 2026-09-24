@@ -68,16 +68,15 @@ public sealed class LibraryViewApiTests
         var fileId = await TestDatabase.ScalarAsync(
             server,
             "INSERT INTO library_files (library_id, path, size_bytes, mtime, classification, reason, removed_audio_tracks, " +
-            "removed_subtitle_tracks, estimated_bytes_saved, probe_json, video_codec, video_height, resolution_class, " +
+            "removed_subtitle_tracks, estimated_bytes_saved, video_codec, video_height, resolution_class, " +
             "audio_track_count, subtitle_track_count, audio_summary, subtitle_summary, link_count, problem_kind) VALUES " +
-            "($library, $path, $size, 1700000000, $classification, $reason, 0, 0, 0, $probe, $codec, $height, $resolution, " +
+            "($library, $path, $size, 1700000000, $classification, $reason, 0, 0, 0, $codec, $height, $resolution, " +
             "$audio, $subtitle, $audio_summary, $subtitle_summary, $links, $problem) RETURNING id",
             ("$library", libraryId),
             ("$path", path),
             ("$size", sizeBytes),
             ("$classification", classification),
             ("$reason", (object?)reason ?? DBNull.Value),
-            ("$probe", probeJson),
             ("$codec", facts.VideoCodec),
             ("$height", (object?)facts.VideoHeight ?? DBNull.Value),
             ("$resolution", facts.ResolutionClass),
@@ -87,6 +86,11 @@ public sealed class LibraryViewApiTests
             ("$subtitle_summary", (object?)facts.SubtitleSummary ?? DBNull.Value),
             ("$links", (object?)linkCount ?? DBNull.Value),
             ("$problem", (object?)problemKind ?? DBNull.Value));
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO library_file_probes (library_file_id, probe_json) VALUES ($f, $probe)",
+            ("$f", fileId),
+            ("$probe", probeJson));
 
         foreach (var facet in facts.Facets)
         {

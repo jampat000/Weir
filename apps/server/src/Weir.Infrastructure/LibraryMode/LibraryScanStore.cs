@@ -218,7 +218,7 @@ public static class LibraryScanStore
         ArgumentNullException.ThrowIfNull(paths);
         var wanted = new PyList(paths.Distinct(StringComparer.Ordinal).Select(path => (PyJson)new PyStr(path)));
         var rows = await uow.QueryAsync(
-            $"SELECT {FileColumns} FROM library_files WHERE library_id = @id AND path IN (SELECT value FROM json_each(@paths))",
+            $"SELECT {FileColumns} FROM {FilesWithProbes} WHERE f.library_id = @id AND f.path IN (SELECT value FROM json_each(@paths))",
             ReadFile,
             ("@id", libraryId),
             ("@paths", PyJsonWriter.Dumps(wanted, PyJsonFormat.Compact))).ConfigureAwait(false);
@@ -229,15 +229,14 @@ public static class LibraryScanStore
         await uow.CountAsync("SELECT EXISTS (SELECT 1 FROM library_files WHERE library_id = @id)", ("@id", libraryId)).ConfigureAwait(false) != 0;
 
     /// <summary>
-    /// Records the job's own small outcome (<c>ok</c>/<c>reason</c>/<c>generated_at</c>/<c>errors</c>) on its
-    /// payload, keeping every other key, and replaces the library's <c>library_files</c> rows with
-    /// <paramref name="snapshot"/>'s file list (#557: the file list is kept out of the job payload, so job-row
-    /// retention cannot delete it).
+    /// Records the job's own small outcome (<c>ok</c>/<c>reason</c>/<c>generated_at</c>/<c>errors</c>) on its payload,
+    /// keeping every other key. The file list itself goes to <c>library_files</c> through
+    /// <see cref="LibraryFileIndexWriter"/> (#557: kept out of the job payload, so job-row retention cannot delete it).
     /// </summary>
-    public static async Task RecordResultAsync(UnitOfWork uow, long jobId, LibraryScanSnapshot snapshot, bool ok, string? reason)
+    public static async Task RecordResultAsync(UnitOfWork uow, long jobId, LibraryScanOutcome outcome, bool ok, string? reason)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(outcome);
         var existingJson = await uow.ScalarAsync("SELECT payload_json FROM jobs WHERE id = @id", ("@id", jobId)).ConfigureAwait(false);
         PyDict payload;
         try
@@ -256,95 +255,27 @@ public static class LibraryScanStore
         }
 
         payload.Set(LibraryScanSnapshot.PayloadKey, new PyDict()
-            .Set("generated_at", snapshot.GeneratedAt.ToUnixTimeSeconds())
-            .Set("errors", new PyList(snapshot.Errors.Select(e => (PyJson)new PyStr(e)))));
+            .Set("generated_at", outcome.GeneratedAt.ToUnixTimeSeconds())
+            .Set("errors", new PyList(outcome.Errors.Select(e => (PyJson)new PyStr(e)))));
         await uow.ExecuteAsync(
             "UPDATE jobs SET payload_json = @payload, updated_at = CURRENT_TIMESTAMP WHERE id = @id",
             ("@payload", PyJsonWriter.Dumps(payload, PyJsonFormat.Compact)),
             ("@id", jobId)).ConfigureAwait(false);
-
-        await ReplaceFilesAsync(uow, snapshot.LibraryId, snapshot.Files).ConfigureAwait(false);
     }
 
-    /// <summary>The <c>library_files</c> columns <see cref="ReadFile"/> reads, in its order.</summary>
+    /// <summary>The index columns <see cref="ReadFile"/> reads, in its order, from <c>library_files</c> as <c>f</c> and its probe document as <c>p</c>.</summary>
     private const string FileColumns =
-        "path, size_bytes, mtime, classification, summary, reason, removed_audio_tracks, removed_subtitle_tracks, " +
-        "manager_kind, manager_title, probe_json, estimated_bytes_saved, manager_connection_id, manager_title_id, " +
-        "manager_file_id, manager_quality_profile_id, problem_kind, link_count";
+        "f.path, f.size_bytes, f.mtime, f.classification, f.summary, f.reason, f.removed_audio_tracks, f.removed_subtitle_tracks, " +
+        "f.manager_kind, f.manager_title, p.probe_json, f.estimated_bytes_saved, f.manager_connection_id, f.manager_title_id, " +
+        "f.manager_file_id, f.manager_quality_profile_id, f.problem_kind, f.link_count";
+
+    private const string FilesWithProbes = "library_files AS f LEFT JOIN library_file_probes AS p ON p.library_file_id = f.id";
 
     private static async Task<List<LibraryScanFileEntry>> FilesForLibraryAsync(UnitOfWork uow, long libraryId) =>
         await uow.QueryAsync(
-            $"SELECT {FileColumns} FROM library_files WHERE library_id = @id ORDER BY path",
+            $"SELECT {FileColumns} FROM {FilesWithProbes} WHERE f.library_id = @id ORDER BY f.path",
             ReadFile,
             ("@id", libraryId)).ConfigureAwait(false);
-
-    /// <summary>
-    /// Replaces a library's file index. Each row also gets the #568 codec/resolution/track columns and its
-    /// <c>library_file_facets</c> rows, derived here from the ffprobe JSON the scan already cached on the row
-    /// (<see cref="LibraryFileFactsReader"/>) — so the Library view's totals, breakdowns and facet filters are
-    /// plain indexed SQL and never re-open a probe document, let alone re-probe a file.
-    /// </summary>
-    private static async Task ReplaceFilesAsync(UnitOfWork uow, long libraryId, IReadOnlyList<LibraryScanFileEntry> files)
-    {
-        // library_file_facets cascades from library_files, so deleting the rows clears their facets too.
-        await uow.ExecuteAsync("DELETE FROM library_files WHERE library_id = @id", ("@id", libraryId)).ConfigureAwait(false);
-        foreach (var file in files)
-        {
-            var facts = LibraryFileFactsReader.Derive(file.ProbeJson);
-            var fileId = await uow.ExecuteScalarWriteAsync(
-                "INSERT INTO library_files (library_id, path, size_bytes, mtime, classification, summary, reason, " +
-                "removed_audio_tracks, removed_subtitle_tracks, estimated_bytes_saved, manager_kind, manager_title, " +
-                "manager_connection_id, manager_title_id, manager_file_id, manager_quality_profile_id, probe_json, " +
-                "video_codec, video_height, resolution_class, audio_track_count, subtitle_track_count, audio_summary, " +
-                "subtitle_summary, link_count, problem_kind) VALUES " +
-                "(@library_id, @path, @size_bytes, @mtime, @classification, @summary, @reason, @removed_audio, @removed_subtitle, " +
-                "@estimated_bytes_saved, @manager_kind, @manager_title, @manager_connection_id, @manager_title_id, @manager_file_id, " +
-                "@manager_quality_profile_id, @probe_json, @video_codec, @video_height, @resolution_class, @audio_tracks, " +
-                "@subtitle_tracks, @audio_summary, @subtitle_summary, @link_count, @problem_kind) RETURNING id",
-                ("@library_id", libraryId),
-                ("@path", file.Path),
-                ("@size_bytes", file.SizeBytes),
-                ("@mtime", file.ModifiedTimeUnixSeconds),
-                ("@classification", LibraryScanFileEntry.ClassificationName(file.Classification)),
-                ("@summary", file.Summary),
-                ("@reason", file.Reason),
-                ("@removed_audio", file.RemovedAudioCount),
-                ("@removed_subtitle", file.RemovedSubtitleCount),
-                ("@estimated_bytes_saved", file.EstimatedBytesSaved),
-                ("@manager_kind", file.ManagerKind),
-                ("@manager_title", file.ManagerTitle),
-                ("@manager_connection_id", file.ManagerConnectionId),
-                ("@manager_title_id", file.ManagerTitleId),
-                ("@manager_file_id", file.ManagerFileId),
-                ("@manager_quality_profile_id", file.ManagerQualityProfileId),
-                ("@probe_json", file.ProbeJson),
-                ("@video_codec", facts.VideoCodec),
-                ("@video_height", facts.VideoHeight),
-                ("@resolution_class", facts.ResolutionClass),
-                ("@audio_tracks", facts.AudioTrackCount),
-                ("@subtitle_tracks", facts.SubtitleTrackCount),
-                ("@audio_summary", facts.AudioSummary),
-                ("@subtitle_summary", facts.SubtitleSummary),
-                ("@link_count", file.LinkCount),
-                ("@problem_kind", file.ProblemKind is { } kind ? LibraryProblems.Name(kind) : null)).ConfigureAwait(false);
-
-            if (fileId is null)
-            {
-                continue;
-            }
-
-            foreach (var facet in facts.Facets)
-            {
-                await uow.ExecuteAsync(
-                    "INSERT OR IGNORE INTO library_file_facets (library_id, library_file_id, facet, value) " +
-                    "VALUES (@library_id, @file_id, @facet, @value)",
-                    ("@library_id", libraryId),
-                    ("@file_id", Convert.ToInt64(fileId, System.Globalization.CultureInfo.InvariantCulture)),
-                    ("@facet", facet.Facet),
-                    ("@value", facet.Value)).ConfigureAwait(false);
-            }
-        }
-    }
 
     private static LibraryScanFileEntry ReadFile(SqliteDataReader reader) => new(
         Path: SqliteValues.GetString(reader, 0),
