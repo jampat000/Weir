@@ -30,6 +30,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
     private readonly ProcessingJobStore _jobStore;
     private readonly MediaManagerConnectionService _managerConnections;
     private readonly SuiteSettingsStore _suiteSettings;
+    private readonly OperatorSettingsStore _operatorSettings;
 
     private readonly ScanWakeups? _wakeups;
 
@@ -40,6 +41,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         ProcessingJobStore jobStore,
         MediaManagerConnectionService managerConnections,
         SuiteSettingsStore suiteSettings,
+        OperatorSettingsStore operatorSettings,
         ScanWakeups? wakeups = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
@@ -48,6 +50,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         _jobStore = jobStore ?? throw new ArgumentNullException(nameof(jobStore));
         _managerConnections = managerConnections ?? throw new ArgumentNullException(nameof(managerConnections));
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+        _operatorSettings = operatorSettings ?? throw new ArgumentNullException(nameof(operatorSettings));
         _wakeups = wakeups;
     }
 
@@ -129,7 +132,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             var connectionIds = await LibraryStore.ManagerConnectionIdsAsync(uow, library.Id).ConfigureAwait(false);
             var signals = await _managerConnections.CollectQueueSignalsAsync(uow, request.MediaScope, connectionIds, cancellationToken).ConfigureAwait(false);
 
-            var operatorSettings = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+            var operatorSettings = await _operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
             var suite = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
 

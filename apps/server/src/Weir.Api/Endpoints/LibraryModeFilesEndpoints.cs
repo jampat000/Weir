@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
@@ -25,10 +26,44 @@ public static class LibraryModeFilesEndpoints
 {
     public static IEndpointRouteBuilder MapLibraryModeFilesEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/processing/libraries/{library_id}/library-files", GetFilesAsync);
-        endpoints.MapV1("POST", "/processing/libraries/{library_id}/library-files/clean", PostCleanAsync);
-        endpoints.MapV1("POST", "/processing/libraries/{library_id}/library-files/leave-alone", PostLeaveAloneAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<LibraryModeFilesEndpointHandlers>();
+        endpoints.MapV1("GET", "/processing/libraries/{library_id}/library-files", handlers.GetFilesAsync);
+        endpoints.MapV1("POST", "/processing/libraries/{library_id}/library-files/clean", handlers.PostCleanAsync);
+        endpoints.MapV1("POST", "/processing/libraries/{library_id}/library-files/leave-alone", handlers.PostLeaveAloneAsync);
         return endpoints;
+    }
+}
+
+/// <summary>Handlers for <see cref="LibraryModeFilesEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class LibraryModeFilesEndpointHandlers
+{
+    private readonly LibraryScanStore _scans;
+    private readonly LibraryFileMarksStore _fileMarks;
+    private readonly LibrarySettingsStore _librarySettings;
+    private readonly LibraryViewStore _libraryView;
+    private readonly MediaManagerConnectionService _connections;
+    private readonly IHardlinkInspector _hardlinkInspector;
+    private readonly RedownloadRiskChecker _riskChecker;
+    private readonly ProcessingJobStore _jobs;
+
+    public LibraryModeFilesEndpointHandlers(
+        LibraryScanStore scans,
+        LibraryFileMarksStore fileMarks,
+        LibrarySettingsStore librarySettings,
+        LibraryViewStore libraryView,
+        MediaManagerConnectionService connections,
+        IHardlinkInspector hardlinkInspector,
+        RedownloadRiskChecker riskChecker,
+        ProcessingJobStore jobs)
+    {
+        _scans = scans ?? throw new ArgumentNullException(nameof(scans));
+        _fileMarks = fileMarks ?? throw new ArgumentNullException(nameof(fileMarks));
+        _librarySettings = librarySettings ?? throw new ArgumentNullException(nameof(librarySettings));
+        _libraryView = libraryView ?? throw new ArgumentNullException(nameof(libraryView));
+        _connections = connections ?? throw new ArgumentNullException(nameof(connections));
+        _hardlinkInspector = hardlinkInspector ?? throw new ArgumentNullException(nameof(hardlinkInspector));
+        _riskChecker = riskChecker ?? throw new ArgumentNullException(nameof(riskChecker));
+        _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
     }
 
     private static WireObject FileOut(LibraryFileRow row) => new WireObject()
@@ -99,7 +134,7 @@ public static class LibraryModeFilesEndpoints
     /// says), <c>filtered</c> the totals for what the filters select, and <c>total</c> the row count behind the
     /// paging.
     /// </summary>
-    private static async Task<ApiResult> GetFilesAsync(ApiRequest request)
+    public async Task<ApiResult> GetFilesAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -110,13 +145,13 @@ public static class LibraryModeFilesEndpoints
         await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
 
         var query = QueryFrom(request);
-        var overall = await LibraryViewStore.TotalsAsync(uow, libraryId).ConfigureAwait(false);
-        var filtered = await LibraryViewStore.TotalsAsync(uow, libraryId, query).ConfigureAwait(false);
-        var rows = await LibraryViewStore.ListFilesAsync(uow, libraryId, query).ConfigureAwait(false);
+        var overall = await _libraryView.TotalsAsync(uow, libraryId).ConfigureAwait(false);
+        var filtered = await _libraryView.TotalsAsync(uow, libraryId, query).ConfigureAwait(false);
+        var rows = await _libraryView.ListFilesAsync(uow, libraryId, query).ConfigureAwait(false);
 
         return ApiRoutes.Ok(new WireObject()
             .Set("library_id", libraryId)
-            .Set("scan", await LibraryModeMapping.ScanOutAsync(uow, libraryId, LibraryModeMapping.Logger(request)).ConfigureAwait(false))
+            .Set("scan", await LibraryModeMapping.ScanOutAsync(uow, _scans, libraryId, LibraryModeMapping.Logger(request)).ConfigureAwait(false))
             .Set("summary", LibraryModeMapping.TotalsOut(overall))
             .Set("filtered", LibraryModeMapping.TotalsOut(filtered))
             .Set("files", new WireArray(rows.Select(row => (WireValue)FileOut(row))))
@@ -188,7 +223,7 @@ public static class LibraryModeFilesEndpoints
             LibraryFilePlanner.EstimateSavings(probe, streams, plan));
     }
 
-    private static async Task<ApiResult> PostCleanAsync(ApiRequest request)
+    public async Task<ApiResult> PostCleanAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -212,7 +247,7 @@ public static class LibraryModeFilesEndpoints
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
-        var byPath = await LibraryScanStore.FilesAtPathsAsync(uow, libraryId, paths).ConfigureAwait(false);
+        var byPath = await _scans.FilesAtPathsAsync(uow, libraryId, paths).ConfigureAwait(false);
         var selected = paths.Select(p => byPath.GetValueOrDefault(p)).OfType<LibraryScanFileEntry>().ToList();
         if (selected.Count == 0)
         {
@@ -221,7 +256,7 @@ public static class LibraryModeFilesEndpoints
 
         // A file set aside is dropped here rather than inside the queueing loop, so the confirmation dialog quotes
         // what will actually be removed and no preflight reads a file nothing is going to touch.
-        var marks = await LibraryFileMarksStore.ForLibraryAsync(uow, libraryId).ConfigureAwait(false);
+        var marks = await _fileMarks.ForLibraryAsync(uow, libraryId).ConfigureAwait(false);
         var skipped = selected
             .Where(entry => marks.TryGetValue(entry.Path, out var mark) && mark.LeaveAlone)
             .Select(entry => entry.Path)
@@ -232,12 +267,12 @@ public static class LibraryModeFilesEndpoints
             return ApiRoutes.Ok(CleanOut(0, [], 0, 0, 0, skipped, []));
         }
 
-        var settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
+        var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
         var rules = await LibraryModeMapping.RulesForAsync(uow, library).ConfigureAwait(false);
-        var connectionsById = await LibraryModeMapping.ConnectionsForFilesAsync(uow, request.Service<MediaManagerConnectionService>(), selected).ConfigureAwait(false);
+        var connectionsById = await LibraryModeMapping.ConnectionsForFilesAsync(uow, _connections, selected).ConfigureAwait(false);
         var preflightResults = await LibraryCleanPreflightRunner.RunAsync(
-                selected, settings, rules, library.MediaType, request.Service<IHardlinkInspector>(),
-                request.Service<RedownloadRiskChecker>(), connectionsById, request.Context.RequestAborted)
+                selected, settings, rules, library.MediaType, _hardlinkInspector,
+                _riskChecker, connectionsById, request.Context.RequestAborted)
             .ConfigureAwait(false);
         var preflight = preflightResults.ToDictionary(r => r.FilePath, StringComparer.Ordinal);
 
@@ -248,7 +283,7 @@ public static class LibraryModeFilesEndpoints
         // has already done the work, so the notes are recorded either way.
         foreach (var result in preflightResults)
         {
-            await LibraryViewStore.RecordPreflightProblemAsync(uow, libraryId, result.FilePath, result.ProblemKind).ConfigureAwait(false);
+            await _libraryView.RecordPreflightProblemAsync(uow, libraryId, result.FilePath, result.ProblemKind).ConfigureAwait(false);
         }
 
         // A track choice describes one file's tracks, so it only ever applies to one file, and what it removes is
@@ -265,7 +300,6 @@ public static class LibraryModeFilesEndpoints
             return LibraryModeMapping.ConfirmationRequired(removingFiles, removingTracks, bytesSaved, LibraryCleanPreflightRunner.WarningMessages(preflight.Values));
         }
 
-        var jobStore = request.Service<ProcessingJobStore>();
         var jobIds = new List<long>();
         foreach (var entry in selected)
         {
@@ -285,8 +319,8 @@ public static class LibraryModeFilesEndpoints
             }
 
             var fileConfirmed = (chosen is { } c ? c.Tracks == 0 : entry.RemovedAudioCount + entry.RemovedSubtitleCount == 0) || confirmed;
-            var job = await LibraryScanStore.EnqueueCleanAsync(
-                    uow, jobStore, library.Id, entry.Path, "manual", fileConfirmed,
+            var job = await _scans.EnqueueCleanAsync(
+                    uow, _jobs, library.Id, entry.Path, "manual", fileConfirmed,
                     manualPlan, manualPlan is null ? null : expectedSizeBytes ?? entry.SizeBytes)
                 .ConfigureAwait(false);
             jobIds.Add(job.Id);
@@ -318,7 +352,7 @@ public static class LibraryModeFilesEndpoints
     /// so this is kept beside it), and nothing cleans the file while it is set: not a selection on the Library
     /// screen, not a queued job that reaches the handler later.
     /// </summary>
-    private static async Task<ApiResult> PostLeaveAloneAsync(ApiRequest request)
+    public async Task<ApiResult> PostLeaveAloneAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -334,7 +368,7 @@ public static class LibraryModeFilesEndpoints
         request.RequireConfirmationToken(csrfToken);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
-        await LibraryFileMarksStore.SetLeaveAloneAsync(uow, library.Id, filePath!, leaveAlone, request.Time.GetUtcNow()).ConfigureAwait(false);
+        await _fileMarks.SetLeaveAloneAsync(uow, library.Id, filePath!, leaveAlone, request.Time.GetUtcNow()).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject().Set("path", filePath).Set("leave_alone", leaveAlone));
     }

@@ -7,7 +7,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing;
 
 /// <summary>Read-only <c>jobs</c> listing for operators.</summary>
-public static class JobsInspectionStore
+public sealed class JobsInspectionStore
 {
     private static readonly HashSet<string> AllowedStatuses = new(StringComparer.Ordinal)
     {
@@ -16,7 +16,7 @@ public static class JobsInspectionStore
     };
 
     /// <summary>Throws <see cref="ArgumentException"/> naming any status filter value that is not a known job status.</summary>
-    public static void ValidateStatuses(IReadOnlyList<string> statuses)
+    public void ValidateStatuses(IReadOnlyList<string> statuses)
     {
         var unknown = statuses.Where(s => !AllowedStatuses.Contains(s)).ToList();
         if (unknown.Count > 0)
@@ -31,7 +31,7 @@ public static class JobsInspectionStore
     /// first. With no status filter, excludes completed watched-folder scan-dispatch rows so frequent,
     /// successful periodic checks do not crowd out real work.
     /// </summary>
-    public static async Task<(List<ProcessingJob> Rows, bool DefaultRecentSlice)> ListAsync(UnitOfWork uow, int limit, IReadOnlyList<string>? statuses)
+    public async Task<(List<ProcessingJob> Rows, bool DefaultRecentSlice)> ListAsync(UnitOfWork uow, int limit, IReadOnlyList<string>? statuses)
     {
         const string columns = ProcessingJobStore.JobColumns;
         if (statuses is { Count: > 0 })

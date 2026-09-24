@@ -15,6 +15,8 @@ namespace Weir.Infrastructure.Tests.Jobs;
 /// </summary>
 public sealed class ProcessingWatchedFolderScanDispatchScheduleTaskTests
 {
+    private static readonly OperatorSettingsStore OperatorSettings = new();
+
     /// <summary><c>StoreFixture</c> runs the real migrations, which seed a Movies/TV library each
     /// (ADR-0014) — point the seeded Movies library at these folders rather than creating a second one.</summary>
     private static async Task<long> CreateLibraryAsync(StoreFixture store, string watched, string output, long scanIntervalSeconds = 10)
@@ -36,8 +38,8 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTaskTests
     private static async Task SetMovieScheduleEnabledAsync(StoreFixture store, bool enabled)
     {
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
-        var row = await OperatorSettingsStore.EnsureAsync(uow);
-        await OperatorSettingsStore.UpdateAsync(uow, row, row with { MovieScheduleEnabled = enabled });
+        var row = await OperatorSettings.EnsureAsync(uow);
+        await OperatorSettings.UpdateAsync(uow, row, row with { MovieScheduleEnabled = enabled });
         await uow.CommitAsync();
     }
 
@@ -56,7 +58,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTaskTests
         await CreateLibraryAsync(store, watched, output, scanIntervalSeconds: 10);
 
         var jobStore = new ProcessingJobStore(store.Database, store.Clock);
-        var task = new ProcessingWatchedFolderScanDispatchScheduleTask(store.Database, store.Options, jobStore, store.Clock, NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance);
+        var task = new ProcessingWatchedFolderScanDispatchScheduleTask(store.Database, store.Options, jobStore, OperatorSettings, store.Clock, NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance);
 
         for (var i = 0; i < 5; i++)
         {
@@ -80,7 +82,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTaskTests
         await SetMovieScheduleEnabledAsync(store, enabled: false);
 
         var jobStore = new ProcessingJobStore(store.Database, store.Clock);
-        var task = new ProcessingWatchedFolderScanDispatchScheduleTask(store.Database, store.Options, jobStore, store.Clock, NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance);
+        var task = new ProcessingWatchedFolderScanDispatchScheduleTask(store.Database, store.Options, jobStore, OperatorSettings, store.Clock, NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance);
 
         // Several ticks spanning well past the library's 10s scan interval: still nothing queued.
         for (var i = 0; i < 5; i++)
@@ -105,7 +107,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTaskTests
         await SetMovieScheduleEnabledAsync(store, enabled: true);
 
         var jobStore = new ProcessingJobStore(store.Database, store.Clock);
-        var task = new ProcessingWatchedFolderScanDispatchScheduleTask(store.Database, store.Options, jobStore, store.Clock, NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance);
+        var task = new ProcessingWatchedFolderScanDispatchScheduleTask(store.Database, store.Options, jobStore, OperatorSettings, store.Clock, NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance);
 
         await task.RunOnceAsync(CancellationToken.None);
 
@@ -132,7 +134,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTaskTests
         await SetMovieScheduleEnabledAsync(store, enabled: true);
 
         var jobStore = new ProcessingJobStore(store.Database, store.Clock);
-        var task = new ProcessingWatchedFolderScanDispatchScheduleTask(store.Database, store.Options, jobStore, store.Clock, NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance);
+        var task = new ProcessingWatchedFolderScanDispatchScheduleTask(store.Database, store.Options, jobStore, OperatorSettings, store.Clock, NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance);
         await task.RunOnceAsync(CancellationToken.None);
 
         var count = await store.Scalar("SELECT COUNT(*) FROM jobs WHERE job_kind = 'processing.watched_folder.remux_scan_dispatch.v1'");
@@ -152,7 +154,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTaskTests
         await SetMovieScheduleEnabledAsync(store, enabled: true);
         var changes = new ScanSettingsChanges();
         var task = new ProcessingWatchedFolderScanDispatchScheduleTask(
-            store.Database, store.Options, new ProcessingJobStore(store.Database, store.Clock), store.Clock,
+            store.Database, store.Options, new ProcessingJobStore(store.Database, store.Clock), OperatorSettings, store.Clock,
             NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance, scanSettingsChanges: changes);
         await task.RunOnceAsync(CancellationToken.None);
 
@@ -177,7 +179,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTaskTests
         await SetMovieScheduleEnabledAsync(store, enabled: false);
         var changes = new ScanSettingsChanges();
         var task = new ProcessingWatchedFolderScanDispatchScheduleTask(
-            store.Database, store.Options, new ProcessingJobStore(store.Database, store.Clock), store.Clock,
+            store.Database, store.Options, new ProcessingJobStore(store.Database, store.Clock), OperatorSettings, store.Clock,
             NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance, scanSettingsChanges: changes);
         await task.RunOnceAsync(CancellationToken.None);
 

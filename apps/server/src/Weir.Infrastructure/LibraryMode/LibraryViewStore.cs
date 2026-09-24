@@ -13,7 +13,7 @@ namespace Weir.Infrastructure.LibraryMode;
 /// of files must not be aggregated in the browser, and none of these open a row's <c>probe_json</c> either: the
 /// facts were derived once, when the scan wrote the row (<see cref="LibraryFileFactsReader"/>).
 /// </summary>
-public static class LibraryViewStore
+public sealed class LibraryViewStore
 {
     /// <summary>
     /// Every read here is over the scan's picture with what Weir has done to each file beside it. The join is on the
@@ -26,7 +26,7 @@ public static class LibraryViewStore
     /// <summary>How many paths a Problems group carries inline before the operator has to open Files to see the rest.</summary>
     public const int ProblemSampleSize = 5;
 
-    public static async Task<LibraryTotals> TotalsAsync(UnitOfWork uow, long libraryId, LibraryFileQuery? filter = null)
+    public async Task<LibraryTotals> TotalsAsync(UnitOfWork uow, long libraryId, LibraryFileQuery? filter = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var (where, parameters) = BuildWhere(libraryId, filter);
@@ -52,7 +52,7 @@ public static class LibraryViewStore
     /// track: a file with three English audio tracks counts once under <c>eng</c>, which is what "how much of my
     /// library is in English" means.
     /// </summary>
-    public static async Task<IReadOnlyList<LibraryBreakdownRow>> BreakdownAsync(UnitOfWork uow, long libraryId, string facet)
+    public async Task<IReadOnlyList<LibraryBreakdownRow>> BreakdownAsync(UnitOfWork uow, long libraryId, string facet)
     {
         ArgumentNullException.ThrowIfNull(uow);
         if (!LibraryFacets.IsKnown(facet))
@@ -71,7 +71,7 @@ public static class LibraryViewStore
     }
 
     /// <summary>Every breakdown the Overview, Codecs and Languages views show, in one round trip.</summary>
-    public static async Task<IReadOnlyDictionary<string, IReadOnlyList<LibraryBreakdownRow>>> AllBreakdownsAsync(UnitOfWork uow, long libraryId)
+    public async Task<IReadOnlyDictionary<string, IReadOnlyList<LibraryBreakdownRow>>> AllBreakdownsAsync(UnitOfWork uow, long libraryId)
     {
         var result = new Dictionary<string, IReadOnlyList<LibraryBreakdownRow>>(StringComparer.Ordinal);
         foreach (var facet in LibraryFacets.All)
@@ -83,7 +83,7 @@ public static class LibraryViewStore
     }
 
     /// <summary>How many files match the filter, before paging — the Files table's "N files" and page count.</summary>
-    public static async Task<long> CountFilesAsync(UnitOfWork uow, long libraryId, LibraryFileQuery filter)
+    public async Task<long> CountFilesAsync(UnitOfWork uow, long libraryId, LibraryFileQuery filter)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var (where, parameters) = BuildWhere(libraryId, filter);
@@ -91,7 +91,7 @@ public static class LibraryViewStore
     }
 
     /// <summary>One page of the Files table. The sort is always tie-broken by path, so paging never repeats a row.</summary>
-    public static async Task<IReadOnlyList<LibraryFileRow>> ListFilesAsync(UnitOfWork uow, long libraryId, LibraryFileQuery filter)
+    public async Task<IReadOnlyList<LibraryFileRow>> ListFilesAsync(UnitOfWork uow, long libraryId, LibraryFileQuery filter)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(filter);
@@ -116,7 +116,7 @@ public static class LibraryViewStore
     /// handful of paths each. <paramref name="cleanHardlinkedFiles"/> is the library's own #508 setting — when it
     /// is on, a file another name shares is deliberately allowed through, so it is not a problem to report.
     /// </summary>
-    public static async Task<IReadOnlyList<LibraryProblemGroup>> ProblemsAsync(UnitOfWork uow, long libraryId, bool cleanHardlinkedFiles)
+    public async Task<IReadOnlyList<LibraryProblemGroup>> ProblemsAsync(UnitOfWork uow, long libraryId, bool cleanHardlinkedFiles)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var groups = new List<LibraryProblemGroup>();
@@ -148,12 +148,12 @@ public static class LibraryViewStore
     /// every <c>cannot_process</c> file carries the scan's own kind and lands in exactly that group, and seeding only
     /// ever holds back a file the rules would otherwise change.
     /// </summary>
-    public static LibraryFileQuery QueryFor(LibraryProblemKind kind) => kind == LibraryProblemKind.Seeding
+    public LibraryFileQuery QueryFor(LibraryProblemKind kind) => kind == LibraryProblemKind.Seeding
         ? new LibraryFileQuery { ProblemKind = LibraryProblemKind.Seeding }
         : new LibraryFileQuery { ProblemKind = kind };
 
     /// <summary>The path of every file matching a filter, for a Clean over a whole filtered selection.</summary>
-    public static async Task<IReadOnlyList<string>> PathsAsync(UnitOfWork uow, long libraryId, LibraryFileQuery filter)
+    public async Task<IReadOnlyList<string>> PathsAsync(UnitOfWork uow, long libraryId, LibraryFileQuery filter)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var (where, parameters) = BuildWhere(libraryId, filter);
@@ -169,7 +169,7 @@ public static class LibraryViewStore
     /// something other than <c>cannot_process</c>: a scan's own verdict about an unreadable file outranks this.
     /// Passing <see langword="null"/> clears a stale note for a file that is fine now.
     /// </summary>
-    public static async Task RecordPreflightProblemAsync(UnitOfWork uow, long libraryId, string path, LibraryProblemKind? kind)
+    public async Task RecordPreflightProblemAsync(UnitOfWork uow, long libraryId, string path, LibraryProblemKind? kind)
     {
         ArgumentNullException.ThrowIfNull(uow);
         await uow.ExecuteAsync(

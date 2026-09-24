@@ -35,9 +35,9 @@ public sealed record LibraryCleanHistoryRow(
 /// clean job row is deleted when the file is cleaned again), so History reads those events: the newest one per file,
 /// the way the download list keeps one row per file.
 /// </summary>
-public static class LibraryCleanHistoryStore
+public sealed class LibraryCleanHistoryStore
 {
-    public static Task<List<LibraryCleanHistoryRow>> ListAsync(UnitOfWork uow, LibraryCleanHistoryFilter filter)
+    public Task<List<LibraryCleanHistoryRow>> ListAsync(UnitOfWork uow, LibraryCleanHistoryFilter filter)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(filter);

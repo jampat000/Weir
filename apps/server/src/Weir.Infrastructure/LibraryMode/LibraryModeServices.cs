@@ -24,6 +24,14 @@ public static class LibraryModeServices
         services.AddWeirMediaManagers(options);
         services.AddWeirMediaTools();
 
+        // Library mode's own stores (#745 part 5): stateless SQL access over the caller's UnitOfWork, so a
+        // singleton is as cheap as a static class was and lets endpoints and handlers take them by constructor.
+        services.TryAddSingleton<LibraryCleanHistoryStore>();
+        services.TryAddSingleton<LibraryFileMarksStore>();
+        services.TryAddSingleton<LibraryScanStore>();
+        services.TryAddSingleton<LibrarySettingsStore>();
+        services.TryAddSingleton<LibraryViewStore>();
+
         // The #506 safe swap: real files, the library_swaps journal, the #500 output check.
         services.TryAddSingleton<ISwapFileSystem>(_ => PhysicalSwapFileSystem.Instance);
         services.TryAddSingleton(sp => new ProcessingJobSwapJournal(sp.GetRequiredService<SqliteDatabase>()));

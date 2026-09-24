@@ -12,6 +12,8 @@ public sealed class LibraryFileIndexWriterTests : IDisposable
     private const string H264Probe = """{"streams": [{"codec_type": "video", "codec_name": "h264", "width": 1920, "height": 1080}]}""";
 
     private readonly StoreFixture _store = new();
+    private readonly LibraryScanStore _scans = new();
+    private readonly LibraryViewStore _libraryView = new();
     private long _libraryId;
 
     public void Dispose() => _store.Dispose();
@@ -52,7 +54,7 @@ public sealed class LibraryFileIndexWriterTests : IDisposable
             commit: false);
 
     private Task<IReadOnlyList<LibraryScanFileEntry>> CurrentAsync() =>
-        _store.WithUnitOfWork(uow => LibraryScanStore.CurrentFilesAsync(uow, _libraryId), commit: false);
+        _store.WithUnitOfWork(uow => _scans.CurrentFilesAsync(uow, _libraryId), commit: false);
 
     [Fact]
     public async Task An_unchanged_file_keeps_its_row_untouched()
@@ -101,7 +103,7 @@ public sealed class LibraryFileIndexWriterTests : IDisposable
         await ReplaceAsync(File("/lib/a.mkv", HevcProbe));
         await _store.WithUnitOfWork(async uow =>
         {
-            await LibraryViewStore.RecordPreflightProblemAsync(uow, _libraryId, "/lib/a.mkv", LibraryProblemKind.Seeding);
+            await _libraryView.RecordPreflightProblemAsync(uow, _libraryId, "/lib/a.mkv", LibraryProblemKind.Seeding);
             return 0;
         });
 
@@ -122,7 +124,7 @@ public sealed class LibraryFileIndexWriterTests : IDisposable
 
         await _store.WithUnitOfWork(async uow =>
         {
-            await LibraryViewStore.RecordPreflightProblemAsync(uow, _libraryId, "/lib/a.mkv", LibraryProblemKind.Seeding);
+            await _libraryView.RecordPreflightProblemAsync(uow, _libraryId, "/lib/a.mkv", LibraryProblemKind.Seeding);
             return 0;
         });
 

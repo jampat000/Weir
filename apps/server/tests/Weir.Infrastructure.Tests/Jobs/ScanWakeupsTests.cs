@@ -61,7 +61,8 @@ public sealed class ScanWakeupsTests
         var connections = new MediaManagerConnectionService(store.Options, cipher, new HttpMediaManagerPorts(new FakeManagerHttp()));
         var jobs = new ProcessingJobStore(store.Database, store.Clock);
         var wakeups = new ScanWakeups();
-        var handler = new ProcessingWatchedFolderScanDispatchJobHandler(store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), wakeups);
+        var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
+            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore(), wakeups);
         await store.Execute(
             "INSERT INTO operator_settings (id, min_file_age_seconds, min_input_file_size_mb, minimum_free_disk_space_mb) " +
             "VALUES (1, 0, 0, 0) ON CONFLICT(id) DO UPDATE SET min_file_age_seconds = 0, min_input_file_size_mb = 0, minimum_free_disk_space_mb = 0");
@@ -125,7 +126,7 @@ public sealed class ScanWakeupsTests
 
         var wakeups = new ScanWakeups();
         var task = new ProcessingWatchedFolderScanDispatchScheduleTask(
-            store.Database, store.Options, new ProcessingJobStore(store.Database, store.Clock), store.Clock,
+            store.Database, store.Options, new ProcessingJobStore(store.Database, store.Clock), new OperatorSettingsStore(), store.Clock,
             NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance, wakeups);
         const string countMovieScans =
             "SELECT count(*) FROM jobs WHERE job_kind = 'processing.watched_folder.remux_scan_dispatch.v1' AND payload_json LIKE '%\"media_scope\":\"movie\"%'";

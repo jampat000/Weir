@@ -17,7 +17,7 @@ public sealed record MaintenanceFamilyState(
     string? LastError);
 
 /// <summary>The Processing maintenance jobs' read model and manual triggers.</summary>
-public static class MaintenanceStore
+public sealed class MaintenanceStore
 {
     private static readonly Dictionary<string, IReadOnlyList<string>> FamilyJobKinds = new(StringComparer.Ordinal)
     {
@@ -34,12 +34,12 @@ public static class MaintenanceStore
     };
 
     /// <summary>The families Settings › Cleanup lists, in its order.</summary>
-    public static IReadOnlyList<string> Families { get; } = ["work_temp_stale_sweep", "failure_cleanup", "unclaimed_handbacks"];
+    public IReadOnlyList<string> Families { get; } = ["work_temp_stale_sweep", "failure_cleanup", "unclaimed_handbacks"];
 
     /// <summary>The job kinds a family's timers queue, for asking the clock when it next runs.</summary>
-    public static IReadOnlyList<string> JobKindsFor(string family) => FamilyJobKinds[family];
+    public IReadOnlyList<string> JobKindsFor(string family) => FamilyJobKinds[family];
 
-    public static async Task<MaintenanceFamilyState> StateForAsync(UnitOfWork uow, string family, bool enabled)
+    public async Task<MaintenanceFamilyState> StateForAsync(UnitOfWork uow, string family, bool enabled)
     {
         var kinds = FamilyJobKinds[family];
         var placeholders = string.Join(",", kinds.Select((_, i) => $"@kind{i}"));
@@ -62,7 +62,7 @@ public static class MaintenanceStore
     }
 
     /// <summary>Queues the stale work-temp sweep now: single-flight per scope, ignores the schedule toggle.</summary>
-    public static Task EnqueueWorkTempStaleSweepAsync(ProcessingJobStore jobStore, string mediaScope, string trigger)
+    public Task EnqueueWorkTempStaleSweepAsync(ProcessingJobStore jobStore, string mediaScope, string trigger)
     {
         var scope = mediaScope == "tv" ? "tv" : "movie";
         var dedupe = scope == "tv" ? PeriodicJobKinds.WorkTempStaleSweepDedupeKeyTv : PeriodicJobKinds.WorkTempStaleSweepDedupeKeyMovie;
@@ -71,7 +71,7 @@ public static class MaintenanceStore
     }
 
     /// <summary>The unclaimed hand-back cleanup now (#652): single-flight per scope, ignores the schedule toggle like the others.</summary>
-    public static Task EnqueueUnclaimedHandbackCleanupAsync(ProcessingJobStore jobStore, string mediaScope, string trigger)
+    public Task EnqueueUnclaimedHandbackCleanupAsync(ProcessingJobStore jobStore, string mediaScope, string trigger)
     {
         ArgumentNullException.ThrowIfNull(jobStore);
         var scope = mediaScope == "tv" ? "tv" : "movie";
@@ -86,7 +86,7 @@ public static class MaintenanceStore
     /// periodic <see cref="FailureCleanupSweepEnqueuer"/> in <c>JobServices.cs</c>, whose helper is internal
     /// to that file and runs on its own <see cref="ProcessingJobStore"/> connection.
     /// </summary>
-    public static async Task<(long JobId, bool Inserted)> EnqueueFailureCleanupSweepAsync(UnitOfWork uow, string mediaScope, string trigger)
+    public async Task<(long JobId, bool Inserted)> EnqueueFailureCleanupSweepAsync(UnitOfWork uow, string mediaScope, string trigger)
     {
         var scope = mediaScope == "tv" ? "tv" : "movie";
         var jobKind = scope == "tv" ? PeriodicJobKinds.TvFailureCleanupSweep : PeriodicJobKinds.MovieFailureCleanupSweep;

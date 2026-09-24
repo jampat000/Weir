@@ -9,7 +9,9 @@ namespace Weir.Infrastructure.Processing;
 /// Separate from the suite log's own retention: a suite log diagnoses the application, a per-file record
 /// diagnoses a file, and the two need different lifetimes.
 /// </summary>
-public sealed class FileLogRetentionTask(SqliteDatabase database, TimeProvider time, ILogger<FileLogRetentionTask> logger) : IPeriodicTask
+public sealed class FileLogRetentionTask(
+    SqliteDatabase database, OperatorSettingsStore operatorSettings, FileLogStore fileLogs, TimeProvider time, ILogger<FileLogRetentionTask> logger)
+    : IPeriodicTask
 {
     public string Name => "processing-file-log-retention";
 
@@ -28,11 +30,11 @@ public sealed class FileLogRetentionTask(SqliteDatabase database, TimeProvider t
         var uow = await UnitOfWork.OpenAsync(database, cancellationToken).ConfigureAwait(false);
         await using (uow.ConfigureAwait(false))
         {
-            retentionDays = (await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false)).FileLogRetentionDays;
+            retentionDays = (await operatorSettings.EnsureAsync(uow).ConfigureAwait(false)).FileLogRetentionDays;
             await uow.CommitAsync().ConfigureAwait(false);
         }
 
-        var removed = await FileLogStore.PruneAsync(database, retentionDays, time.GetUtcNow(), cancellationToken).ConfigureAwait(false);
+        var removed = await fileLogs.PruneAsync(database, retentionDays, time.GetUtcNow(), cancellationToken).ConfigureAwait(false);
         if (removed == 1)
         {
             logger.LogInformation("Removed {Removed} processing record past its retention window.", removed);

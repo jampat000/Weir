@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
@@ -16,13 +17,34 @@ public static class ProcessingOverviewMaintenanceEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingOverviewMaintenanceEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/processing/overview-stats", GetOverviewStatsAsync);
-        endpoints.MapV1("GET", "/processing/maintenance", GetMaintenanceAsync);
-        endpoints.MapV1("POST", "/processing/maintenance/run", PostMaintenanceRunAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<ProcessingOverviewMaintenanceEndpointHandlers>();
+        endpoints.MapV1("GET", "/processing/overview-stats", handlers.GetOverviewStatsAsync);
+        endpoints.MapV1("GET", "/processing/maintenance", handlers.GetMaintenanceAsync);
+        endpoints.MapV1("POST", "/processing/maintenance/run", handlers.PostMaintenanceRunAsync);
         return endpoints;
     }
+}
 
-    private static async Task<ApiResult> GetOverviewStatsAsync(ApiRequest request)
+/// <summary>Handlers for <see cref="ProcessingOverviewMaintenanceEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class ProcessingOverviewMaintenanceEndpointHandlers
+{
+    private readonly OverviewStatsStore _overviewStats;
+    private readonly OperatorSettingsStore _operatorSettings;
+    private readonly MaintenanceStore _maintenance;
+    private readonly PeriodicEnqueueClock _clock;
+    private readonly ProcessingJobStore _jobs;
+
+    public ProcessingOverviewMaintenanceEndpointHandlers(
+        OverviewStatsStore overviewStats, OperatorSettingsStore operatorSettings, MaintenanceStore maintenance, PeriodicEnqueueClock clock, ProcessingJobStore jobs)
+    {
+        _overviewStats = overviewStats ?? throw new ArgumentNullException(nameof(overviewStats));
+        _operatorSettings = operatorSettings ?? throw new ArgumentNullException(nameof(operatorSettings));
+        _maintenance = maintenance ?? throw new ArgumentNullException(nameof(maintenance));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+    }
+
+    public async Task<ApiResult> GetOverviewStatsAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -30,7 +52,7 @@ public static class ProcessingOverviewMaintenanceEndpoints
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var stats = await OverviewStatsStore.BuildAsync(uow, windowDays, request.Time).ConfigureAwait(false);
+        var stats = await _overviewStats.BuildAsync(uow, windowDays, request.Time).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
             .Set("window_days", stats.WindowDays)
             .Set("files_processed", stats.FilesProcessed)
@@ -58,21 +80,20 @@ public static class ProcessingOverviewMaintenanceEndpoints
         .Set("interval_seconds", (long)interval.TotalSeconds)
         .Set("next_run_at", nextRunAt is { } next ? Timestamp.FromDateTimeOffset(next).ToWireText() : null);
 
-    private static async Task<ApiResult> GetMaintenanceAsync(ApiRequest request)
+    public async Task<ApiResult> GetMaintenanceAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var operatorRow = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-        var sweep = await MaintenanceStore.StateForAsync(uow, "work_temp_stale_sweep", operatorRow.WorkTempStaleSweepEnabled).ConfigureAwait(false);
-        var cleanup = await MaintenanceStore.StateForAsync(uow, "failure_cleanup", operatorRow.FailureCleanupEnabled).ConfigureAwait(false);
-        var unclaimed = await MaintenanceStore.StateForAsync(uow, "unclaimed_handbacks", operatorRow.UnclaimedHandbackCleanupEnabled).ConfigureAwait(false);
+        var operatorRow = await _operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
+        var sweep = await _maintenance.StateForAsync(uow, "work_temp_stale_sweep", operatorRow.WorkTempStaleSweepEnabled).ConfigureAwait(false);
+        var cleanup = await _maintenance.StateForAsync(uow, "failure_cleanup", operatorRow.FailureCleanupEnabled).ConfigureAwait(false);
+        var unclaimed = await _maintenance.StateForAsync(uow, "unclaimed_handbacks", operatorRow.UnclaimedHandbackCleanupEnabled).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
 
-        var clock = request.Service<PeriodicEnqueueClock>();
         var options = request.Options;
         WireObject Out(MaintenanceFamilyState state, long? saved, int environment)
         {
-            var timer = clock.NextRunFor(MaintenanceStore.JobKindsFor(state.Family));
+            var timer = _clock.NextRunFor(_maintenance.JobKindsFor(state.Family));
             var interval = timer?.Interval ?? TimeSpan.FromSeconds(saved is > 0 ? saved.Value : environment);
             return FamilyOut(state, interval, state.Enabled ? timer?.NextRunAt : null);
         }
@@ -86,13 +107,13 @@ public static class ProcessingOverviewMaintenanceEndpoints
         ])));
     }
 
-    private static async Task<ApiResult> PostMaintenanceRunAsync(ApiRequest request)
+    public async Task<ApiResult> PostMaintenanceRunAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
         var model = new BodyModel(payload, issues);
         var csrfToken = model.Str("csrf_token", minLength: 1);
-        var family = model.Literal("family", MaintenanceStore.Families);
+        var family = model.Literal("family", _maintenance.Families);
         var mediaScope = model.Literal("media_scope", ["movie", "tv"], defaultValue: "movie");
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
@@ -103,7 +124,7 @@ public static class ProcessingOverviewMaintenanceEndpoints
         var uow = await request.DbAsync().ConfigureAwait(false);
         if (family == "work_temp_stale_sweep")
         {
-            await MaintenanceStore.EnqueueWorkTempStaleSweepAsync(request.Service<ProcessingJobStore>(), mediaScope, "manual").ConfigureAwait(false);
+            await _maintenance.EnqueueWorkTempStaleSweepAsync(_jobs, mediaScope, "manual").ConfigureAwait(false);
             await request.CommitAsync().ConfigureAwait(false);
             var scopeWord = mediaScope == "tv" ? "TV" : "Movies";
             return ApiRoutes.Ok(new WireObject().Set("queued", true).Set("detail", $"Queued a work file sweep for {scopeWord}. It runs as soon as a worker is free."));
@@ -111,7 +132,7 @@ public static class ProcessingOverviewMaintenanceEndpoints
 
         if (family == "unclaimed_handbacks")
         {
-            await MaintenanceStore.EnqueueUnclaimedHandbackCleanupAsync(request.Service<ProcessingJobStore>(), mediaScope, "manual").ConfigureAwait(false);
+            await _maintenance.EnqueueUnclaimedHandbackCleanupAsync(_jobs, mediaScope, "manual").ConfigureAwait(false);
             await request.CommitAsync().ConfigureAwait(false);
             var scopeWord = mediaScope == "tv" ? "TV" : "Movies";
             return ApiRoutes.Ok(new WireObject()
@@ -119,7 +140,7 @@ public static class ProcessingOverviewMaintenanceEndpoints
                 .Set("detail", $"Queued the unclaimed hand-back cleanup for {scopeWord}. It runs as soon as a worker is free."));
         }
 
-        var (jobId, inserted) = await MaintenanceStore.EnqueueFailureCleanupSweepAsync(uow, mediaScope, "manual").ConfigureAwait(false);
+        var (jobId, inserted) = await _maintenance.EnqueueFailureCleanupSweepAsync(uow, mediaScope, "manual").ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         if (!inserted)
         {

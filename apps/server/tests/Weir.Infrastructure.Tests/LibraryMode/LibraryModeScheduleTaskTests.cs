@@ -15,11 +15,13 @@ public sealed class LibraryModeScheduleTaskTests : IDisposable
 {
     private readonly MediaManagerFixture _fixture = new();
     private readonly SuiteSettingsStore _suiteSettings = new(new AuthStore());
+    private readonly LibraryScanStore _scans = new();
+    private readonly LibrarySettingsStore _librarySettings = new();
 
     public void Dispose() => _fixture.Dispose();
 
-    private LibraryModeScheduleTask Timer() =>
-        new(_fixture.Store.Database, _fixture.Jobs, _fixture.Store.Clock, _suiteSettings, NullLogger<LibraryModeScheduleTask>.Instance);
+    private LibraryModeScheduleTask Timer() => new(
+        _fixture.Store.Database, _fixture.Jobs, _scans, _librarySettings, _fixture.Store.Clock, _suiteSettings, NullLogger<LibraryModeScheduleTask>.Instance);
 
     private async Task<long> LibraryAsync(bool scheduleOn = true, bool withFolder = true, string name = "Films")
     {
@@ -28,7 +30,7 @@ public sealed class LibraryModeScheduleTaskTests : IDisposable
             "VALUES (@name, 'movie', '/downloads/' || @name, '/output/' || @name, '/work/' || @name, 1) RETURNING id",
             ("@name", name))), CultureInfo.InvariantCulture);
         IReadOnlyList<string> folders = withFolder ? ["/library/films"] : [];
-        await _fixture.Db(async uow => { await LibrarySettingsStore.SetAsync(uow, id, new LibrarySettings(folders, scheduleOn)); return true; });
+        await _fixture.Db(async uow => { await _librarySettings.SetAsync(uow, id, new LibrarySettings(folders, scheduleOn)); return true; });
         return id;
     }
 
@@ -47,8 +49,9 @@ public sealed class LibraryModeScheduleTaskTests : IDisposable
             async uow => await LibraryModeScheduling.NextRunAsync(
                 uow,
                 _suiteSettings,
+                _scans,
                 (await Weir.Infrastructure.Processing.LibraryStore.GetAsync(uow, library))!,
-                await LibrarySettingsStore.GetAsync(uow, library),
+                await _librarySettings.GetAsync(uow, library),
                 _fixture.Store.Clock.GetUtcNow()),
             commit: false);
 
@@ -69,7 +72,7 @@ public sealed class LibraryModeScheduleTaskTests : IDisposable
 
         var first = Assert.Single(await ScansAsync(library));
         Assert.Contains("\"trigger\":\"schedule\"", first.Payload, StringComparison.Ordinal);
-        Assert.Equal(start, await _fixture.Db(uow => LibraryScanStore.LastScheduledRunAtAsync(uow, library), commit: false));
+        Assert.Equal(start, await _fixture.Db(uow => _scans.LastScheduledRunAtAsync(uow, library), commit: false));
         Assert.Equal(start.AddDays(1), await NextRunAsync(library));
 
         // While that scan is waiting nothing more is queued, and once it is done the next is a day away.
@@ -83,7 +86,7 @@ public sealed class LibraryModeScheduleTaskTests : IDisposable
         _fixture.Store.Clock.Set(start.AddDays(1).AddSeconds(20));
         await Timer().RunOnceAsync(CancellationToken.None);
         Assert.Equal(2, (await ScansAsync(library)).Count);
-        Assert.Equal(start.AddDays(1), await _fixture.Db(uow => LibraryScanStore.LastScheduledRunAtAsync(uow, library), commit: false));
+        Assert.Equal(start.AddDays(1), await _fixture.Db(uow => _scans.LastScheduledRunAtAsync(uow, library), commit: false));
     }
 
     [Fact]
@@ -101,19 +104,19 @@ public sealed class LibraryModeScheduleTaskTests : IDisposable
         await Timer().RunOnceAsync(CancellationToken.None);
 
         Assert.Equal(2, (await ScansAsync(library)).Count);
-        Assert.Equal(back, await _fixture.Db(uow => LibraryScanStore.LastScheduledRunAtAsync(uow, library), commit: false));
+        Assert.Equal(back, await _fixture.Db(uow => _scans.LastScheduledRunAtAsync(uow, library), commit: false));
     }
 
     [Fact]
     public async Task A_scan_someone_asked_for_is_left_to_finish_first()
     {
         var library = await LibraryAsync();
-        await _fixture.Store.WithUnitOfWork(uow => LibraryScanStore.RequestScanAsync(uow, _fixture.Jobs, library, "manual"));
+        await _fixture.Store.WithUnitOfWork(uow => _scans.RequestScanAsync(uow, _fixture.Jobs, library, "manual"));
 
         await Timer().RunOnceAsync(CancellationToken.None);
 
         Assert.Single(await ScansAsync(library));
-        Assert.Null(await _fixture.Db(uow => LibraryScanStore.LastScheduledRunAtAsync(uow, library), commit: false));
+        Assert.Null(await _fixture.Db(uow => _scans.LastScheduledRunAtAsync(uow, library), commit: false));
     }
 
     [Fact]

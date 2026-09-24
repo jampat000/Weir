@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Json;
 using Weir.Core.Processing;
@@ -15,16 +16,28 @@ namespace Weir.Api.Endpoints;
 /// </summary>
 public static class ProcessingLibraryCleansEndpoints
 {
+    public static IEndpointRouteBuilder MapProcessingLibraryCleansEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var handlers = endpoints.ServiceProvider.GetRequiredService<ProcessingLibraryCleansEndpointHandlers>();
+        endpoints.MapV1("GET", "/processing/library-cleans", handlers.GetLibraryCleansAsync);
+        return endpoints;
+    }
+}
+
+/// <summary>Handlers for <see cref="ProcessingLibraryCleansEndpoints"/>, constructor-injected with the store it needs.</summary>
+internal sealed class ProcessingLibraryCleansEndpointHandlers
+{
     private const int PathContainsMaxLength = 400;
     private const int WithinDaysMax = 3650;
 
-    public static IEndpointRouteBuilder MapProcessingLibraryCleansEndpoints(this IEndpointRouteBuilder endpoints)
+    private readonly LibraryCleanHistoryStore _cleanHistory;
+
+    public ProcessingLibraryCleansEndpointHandlers(LibraryCleanHistoryStore cleanHistory)
     {
-        endpoints.MapV1("GET", "/processing/library-cleans", GetLibraryCleansAsync);
-        return endpoints;
+        _cleanHistory = cleanHistory ?? throw new ArgumentNullException(nameof(cleanHistory));
     }
 
-    private static async Task<ApiResult> GetLibraryCleansAsync(ApiRequest request)
+    public async Task<ApiResult> GetLibraryCleansAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -43,7 +56,7 @@ public static class ProcessingLibraryCleansEndpoints
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var rows = await LibraryCleanHistoryStore.ListAsync(uow, new LibraryCleanHistoryFilter
+        var rows = await _cleanHistory.ListAsync(uow, new LibraryCleanHistoryFilter
         {
             LibraryId = libraryId,
             PathContains = pathContains,
