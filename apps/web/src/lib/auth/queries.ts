@@ -133,10 +133,12 @@ export function useBootstrapMutation() {
     mutationFn: ({
       username,
       password,
+      setupCode,
     }: {
       username: string;
       password: string;
-    }) => postBootstrap(username, password),
+      setupCode?: string;
+    }) => postBootstrap(username, password, setupCode),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.bootstrap });
       void qc.invalidateQueries({ queryKey: activityRecentKey });

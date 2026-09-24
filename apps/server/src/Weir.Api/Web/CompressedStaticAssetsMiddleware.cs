@@ -4,13 +4,16 @@ using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Net.Http.Headers;
+using Weir.Api.Http;
+using Weir.Core.Configuration;
 
 namespace Weir.Api.Web;
 
 /// <summary>
 /// Serves hashed <c>/assets/*</c> files with pre-compressed variants and immutable caching.
-/// It sits outside the other middleware, so asset responses carry neither security headers nor
-/// <c>X-Request-ID</c>.
+/// It sits outside the other middleware, so it applies the baseline security headers itself
+/// rather than reaching <see cref="Weir.Api.Http.SecurityHeadersMiddleware"/>; it still carries
+/// no <c>X-Request-ID</c>.
 /// </summary>
 /// <remarks>
 /// The ETag is derived from the served file's modification time and size, so it changes whenever the file does.
@@ -26,12 +29,14 @@ public sealed class CompressedStaticAssetsMiddleware
 
     private readonly RequestDelegate _next;
     private readonly WebDist _webDist;
+    private readonly WeirOptions _options;
     private readonly FileExtensionContentTypeProvider _contentTypes = WebContentTypes.CreateProvider();
 
-    public CompressedStaticAssetsMiddleware(RequestDelegate next, WebDist webDist)
+    public CompressedStaticAssetsMiddleware(RequestDelegate next, WebDist webDist, WeirOptions options)
     {
         _next = next;
         _webDist = webDist;
+        _options = options;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -77,6 +82,9 @@ public sealed class CompressedStaticAssetsMiddleware
         {
             response.Headers.ContentEncoding = encoding;
         }
+
+        // This middleware answers before UseRouting, so SecurityHeadersMiddleware never runs for it.
+        SecurityHeadersMiddleware.Apply(context, _options.SecurityEnableHsts);
 
         if (request.Headers.IfNoneMatch.ToString().Trim() == etag)
         {

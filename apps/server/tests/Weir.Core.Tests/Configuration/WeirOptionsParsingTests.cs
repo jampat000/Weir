@@ -7,10 +7,14 @@ public sealed class WeirOptionsParsingTests
 {
     [Theory]
     [InlineData(" Production ", "production")]
-    [InlineData("", "development")]
+    [InlineData("", "production")]
     [InlineData("   ", "")]
     public void Env_is_trimmed_and_lower_cased(string raw, string expected) =>
         Assert.Equal(expected, TestRuntime.Load(("WEIR_ENV", raw)).Env);
+
+    [Fact]
+    public void Env_defaults_to_production_when_unset() =>
+        Assert.Equal("production", TestRuntime.Load().Env);
 
     [Theory]
     [InlineData(" debug ", "debug")]
@@ -166,6 +170,7 @@ public sealed class WeirOptionsParsingTests
     public void Development_adds_the_other_loopback_hostname()
     {
         var options = TestRuntime.Load(
+            ("WEIR_ENV", "development"),
             ("WEIR_CORS_ORIGINS", "http://localhost:8782/,https://127.0.0.1,http://weir.lan:1"),
             ("WEIR_TRUSTED_BROWSER_ORIGINS", "HTTP://LOCALHOST:9"));
         Assert.Equal(
@@ -177,9 +182,11 @@ public sealed class WeirOptionsParsingTests
     [Fact]
     public void Development_expansion_refuses_a_non_numeric_or_out_of_range_origin()
     {
-        var notNumber = Assert.Throws<WeirConfigurationException>(() => TestRuntime.Load(("WEIR_CORS_ORIGINS", "http://localhost:abc")));
+        var notNumber = Assert.Throws<WeirConfigurationException>(
+            () => TestRuntime.Load(("WEIR_ENV", "development"), ("WEIR_CORS_ORIGINS", "http://localhost:abc")));
         Assert.Equal("Port could not be cast to integer value as 'abc'", notNumber.Message);
-        var outOfRange = Assert.Throws<WeirConfigurationException>(() => TestRuntime.Load(("WEIR_CORS_ORIGINS", "http://localhost:70000")));
+        var outOfRange = Assert.Throws<WeirConfigurationException>(
+            () => TestRuntime.Load(("WEIR_ENV", "development"), ("WEIR_CORS_ORIGINS", "http://localhost:70000")));
         Assert.Equal("Port out of range 0-65535", outOfRange.Message);
     }
 

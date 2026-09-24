@@ -20,7 +20,8 @@ XRW = {"X-Requested-With": "XMLHttpRequest"}
 @pytest.fixture(scope="module")
 def server_env() -> dict[str, str]:
     # WEIR_TRUSTED_BROWSER_ORIGINS overrides WEIR_CORS_ORIGINS for the Origin check.
-    return {"WEIR_TRUSTED_BROWSER_ORIGINS": TRUSTED, "WEIR_CORS_ORIGINS": CORS_ONLY}
+    # WEIR_ENV is unset (production) by default; the loopback-pairing test below needs development.
+    return {"WEIR_TRUSTED_BROWSER_ORIGINS": TRUSTED, "WEIR_CORS_ORIGINS": CORS_ONLY, "WEIR_ENV": "development"}
 
 
 @pytest.fixture(scope="module")
@@ -64,7 +65,7 @@ def test_origin_uses_trusted_browser_origins_override(_admin: None, client: Weir
 
 
 def test_expand_loopback_browser_origins_pairs_localhost(_admin: None, client: WeirClient) -> None:
-    """In development (the default WEIR_ENV) 127.0.0.1 and localhost at the same port are paired."""
+    """In WEIR_ENV=development (set by this module's server_env), 127.0.0.1 and localhost at the same port are paired."""
 
     assert _login(client, {"Origin": "http://localhost:9000", **XRW}) == 200
     assert _login(client, {"Origin": "http://localhost:9001", **XRW}) == 403

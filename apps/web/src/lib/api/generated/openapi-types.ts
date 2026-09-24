@@ -2098,6 +2098,8 @@ export interface components {
       csrf_token: string;
       /** Password */
       password: string;
+      /** Setup Code */
+      setup_code?: string | null;
       /** Username */
       username: string;
     };
@@ -2117,6 +2119,11 @@ export interface components {
       bootstrap_allowed: boolean;
       /** Reason */
       reason: string;
+      /**
+       * Requires Setup Code
+       * @description Whether the current caller must supply the setup code from Weir's log or setup-code file.
+       */
+      requires_setup_code: boolean;
     };
     /** ChangePasswordIn */
     ChangePasswordIn: {

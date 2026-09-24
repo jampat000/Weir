@@ -57,6 +57,12 @@ and unattended installs.
 The first time you open Weir, it asks for a username and password. This creates the admin
 account — there's no separate sign-up step.
 
+On Docker, this form also asks for a **setup code**, since the browser is reaching Weir from
+somewhere other than the machine Weir itself runs on. Get it with `docker logs weir` (look for
+the line starting "Weir has no account yet"), or open the `setup-code` file in the data folder
+you mounted (`./weir-data/setup-code` in the compose recipe above). The Windows installer opens
+your browser on the same PC, so it never asks for this.
+
 ## 3. Follow the setup wizard
 
 The setup wizard has three parts:
