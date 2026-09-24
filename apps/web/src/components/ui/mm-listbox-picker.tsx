@@ -1,42 +1,10 @@
-import { useEffect, useId, useRef, useState, type RefObject } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import {
   mmListboxOptionButtonClass,
   mmListboxPanelClass,
   mmPickerTriggerClass,
 } from "../../lib/ui/mm-control-roles";
-
-function useCloseOnOutsideAndEscape(
-  open: boolean,
-  setOpen: (v: boolean) => void,
-  containerRef: RefObject<HTMLElement | null>,
-) {
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const onPointerDown = (event: MouseEvent) => {
-      const target = event.target as Node | null;
-      if (
-        containerRef.current &&
-        target &&
-        !containerRef.current.contains(target)
-      ) {
-        setOpen(false);
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open, setOpen, containerRef]);
-}
+import { useCloseOnOutsideAndEscape } from "../../lib/ui/use-close-on-outside";
 
 export type MmListboxOption = { value: string; label: string };
 
@@ -73,7 +41,8 @@ export function MmListboxPicker({
   const listboxId = `${autoId}-listbox`;
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  useCloseOnOutsideAndEscape(open, setOpen, containerRef);
+  const close = useCallback(() => setOpen(false), []);
+  useCloseOnOutsideAndEscape(open, close, containerRef);
 
   const selected = options.find((o) => o.value === value);
   const triggerLabel = selected?.label ?? placeholder;
