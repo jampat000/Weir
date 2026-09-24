@@ -18,7 +18,7 @@ Activate the pre-push hook so the contract suite lint, prettier, the dead-code g
 git config core.hooksPath .githooks
 ```
 
-The hook delegates to `scripts/pre-push-check.ps1`. It skips checks gracefully if `ruff` or `apps/web/node_modules` are not yet installed — set those up first for full coverage.
+The hook delegates to `scripts/pre-push.mjs` (a plain Node script; run it by hand with `node scripts/pre-push.mjs`). It skips checks gracefully if `ruff` or `apps/web/node_modules` are not yet installed — set those up first for full coverage.
 
 The server persists state in **file-backed SQLite** under **`WEIR_HOME`** and creates or migrates its database itself when it starts; there is no separate migration command.
 Docker Desktop is not required for normal local development or for shipping a release.
@@ -36,6 +36,8 @@ Optional path overrides (defaults are under the OS-specific **`WEIR_HOME`**):
 - **`WEIR_HOME`**, **`WEIR_DB_PATH`**, **`WEIR_BACKUP_DIR`**, **`WEIR_LOG_DIR`**, **`WEIR_TEMP_DIR`**
 
 The server itself reads **`WEIR_*`** from its environment only. The dev launchers (**`scripts/dev-backend.ps1`**, **`scripts/dev.ps1`**, **`npm run dev`**) load **`.env`** into that environment first; shell variables still override.
+
+**`WEIR_ENV`** defaults to **`production`** when unset, so a source or systemd install gets ASP.NET's production error handling (no developer exception page) out of the box. The dev launchers above set **`WEIR_ENV=development`** explicitly; do the same if you run the server manually and want the developer exception page.
 
 ## Server (`apps/server`)
 
@@ -102,17 +104,32 @@ The default SQLite file is **`{WEIR_HOME}/data/weir.sqlite3`** unless **`WEIR_DB
 
 ## CI validation
 
-The **`Test`** workflow (`.github/workflows/ci.yml`), path-aware:
+The **`CI`** workflow (`.github/workflows/ci.yml`) is path-aware: a job runs only when the paths it
+cares about changed (a manual run always runs everything). Its jobs:
 
-1. **`weir`** (required): **`dotnet build -warnaserror`**, **`dotnet test`** and a NuGet vulnerability scan for **`apps/server`**; **`npm ci`**, **`api:types:check`**, lint, format, build and unit tests in **`apps/web`**; the dead-code guard; then **E2E** with **`WEIR_E2E=1`**, **`WEIR_HOME`** on a temp dir, the .NET server serving the built web app (**`WEIR_WEB_DIST`**, as the packages do) + Playwright (from repo-root **`tests/e2e/weir/`**, same as local optional E2E below).
-2. **`weir-server (windows-latest)`**: the server build and tests on Windows.
-3. **`contract (<area>)`** and **`contract`**: the contract suite against the .NET server, one job per
-   area in [`tests/contract/areas.json`](../tests/contract/areas.json), in parallel; **`contract`**
-   passes only when every required area did.
-4. **`docker-smoke`** (required): builds the image, runs it and the live packaged audit; builds the linux/arm64 image too when the Docker files change.
-5. **`windows-package-smoke`** (required): tray tests, the Velopack build and **`scripts/smoke-windows-package.ps1`**.
+1. **`repo-checks`**: the agent documentation map, the GitHub Actions pin check, and the release/CI
+   gate rules.
+2. **`server-linux`**: **`dotnet build -warnaserror`**, **`dotnet test`** and a NuGet vulnerability
+   scan for **`apps/server`** on Linux.
+3. **`server-windows`**: the same server build and tests on Windows (always runs on a push to `main`).
+4. **`web-dist`**: builds the production web app once, for `e2e-smoke` and `contract` to serve.
+5. **`web`**: **`npm ci`**, **`api:types:check`**, lint, format and unit tests in **`apps/web`**; the
+   dead-code guard; an `npm audit` on pull requests.
+6. **`e2e-smoke`**: Playwright against the real .NET server serving the built web app
+   (**`WEIR_E2E=1`**, **`WEIR_HOME`** on a temp dir, from repo-root **`tests/e2e/weir/`**, same as
+   local optional E2E below); pull requests only.
+7. **`contract`**: the contract suite against the .NET server, one job per area in
+   [`tests/contract/areas.json`](../tests/contract/areas.json), in parallel.
+8. **`tray`** (always runs on a push to `main`): the tray's unit tests.
+9. **`packaging`**: the Docker and Windows package smokes (`.github/workflows/ci-packaging.yml`) —
+   builds the image, runs it and the live packaged audit, and runs the Velopack build and
+   **`scripts/smoke-windows-package.ps1`**.
+10. **`ci-passed`**: the verdict. It passes only when every job that was due for the change passed and
+    every other job was skipped — this is the one check `main`'s ruleset requires.
 
-Pushing a semver tag **`v*`** runs the **`Release`** workflow. It does not repeat these tests: it refuses to publish unless this workflow already passed on the tagged commit, then builds, tests and publishes the release artefacts — see **[`docs/release.md`](release.md)**.
+Pushing a semver tag **`v*`** runs the **`Release`** workflow. It does not repeat these tests: it
+refuses to publish unless `CI` already passed (`ci-passed`) on the tagged commit, then builds, tests
+and publishes the release artefacts — see **[`docs/release.md`](release.md)**.
 
 ## Contract suite and E2E (local)
 
@@ -131,7 +148,7 @@ cd apps/web
 npm ci
 npm run build
 cd ../..
-python -m pytest tests/contract -q --contract-required-only
+python -m pytest tests/contract -q
 $env:WEIR_E2E = "1"
 $env:WEIR_SESSION_SECRET = "local-dev-secret-at-least-32-characters-long"
 python -m pytest tests/e2e/weir -q --tb=short
@@ -167,8 +184,8 @@ If the static site and API are on **different origins**:
 6. **Port already in use**  
    See **`scripts/dev-ports.json`**. **`WEIR_DEV_API_PORT`** + **`VITE_DEV_API_PROXY_TARGET`** can override for one session.
 
-7. **Two dev windows**  
-   **`.\scripts\dev.ps1`** (launcher only — preflight warns if `.env`, the session secret or `dotnet` are missing). Full check: **`.\scripts\verify-local.ps1`** with the API running.
+7. **Two dev windows, or the server alone**  
+   **`.\scripts\dev.ps1`** (launcher only — preflight warns if `.env`, the session secret or `dotnet` are missing) opens **`dev-backend.ps1`** and **`dev-web.ps1`** in separate windows with separate logs. **`npm run dev`** does not replace this: it always starts the API and Vite together, interleaved in one terminal, from `apps/web`, and cannot run the server on its own. **`dev-backend.ps1`** by itself is also how **`verify-local.ps1`** and manual API testing (curl, Postman, a `WEIR_HOME` you want to inspect between requests) point at a server that keeps running independently of any web tooling. The PowerShell trio therefore stays alongside `npm run dev` rather than being folded into it. Full check: **`.\scripts\verify-local.ps1`** with the API running.
 
 ## All-in-one Docker
 
