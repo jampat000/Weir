@@ -24,11 +24,11 @@ public static class ActivityEndpoints
     /// <summary>The reconnect delay the stream sends as its <c>retry:</c> hint.</summary>
     public const int StreamRetryMilliseconds = 5000;
 
-    /// <summary>Quiet polls between keepalive comments on the stream.</summary>
-    public const int StreamKeepaliveEveryPolls = 8;
+    /// <summary>How long the stream stays quiet before it sends a keepalive comment.</summary>
+    public static readonly TimeSpan StreamKeepalive = TimeSpan.FromSeconds(16);
 
-    /// <summary>How often the stream checks for a new latest id.</summary>
-    public static readonly TimeSpan StreamPoll = TimeSpan.FromSeconds(2);
+    /// <summary>How long the stream waits before trying its first read again when it fails.</summary>
+    public static readonly TimeSpan StreamReadRetry = TimeSpan.FromSeconds(2);
 
     private const string FormatPattern = "^(csv|json)$";
 
@@ -189,8 +189,7 @@ public static class ActivityEndpoints
                     ct => ActivityHistoryStore.LatestIdAsync(database, ct),
                     notifier,
                     time,
-                    StreamPoll,
-                    StreamKeepaliveEveryPolls,
+                    StreamKeepalive,
                     logger,
                     context.RequestAborted).ConfigureAwait(false))
                 {
@@ -206,15 +205,19 @@ public static class ActivityEndpoints
     }
 
     /// <summary>
-    /// The retry hint, then a frame whenever the latest id or the notifier's
-    /// revision changes, and a keepalive comment after <paramref name="keepaliveEveryPolls"/> quiet polls.
+    /// The retry hint, the latest id when the stream opens, then a frame whenever the notifier hears of a committed
+    /// Activity write, and a keepalive comment after <paramref name="keepalive"/> without one.
     /// </summary>
+    /// <remarks>
+    /// The database is read once per stream. After that every open stream waits on the one shared notifier, so an idle
+    /// stream costs nothing and a write reaches every stream at once (#720). <c>latest_event_id</c> never goes backwards
+    /// on a stream: an update to an older row (a progress rewrite) moves <c>activity_revision</c> on and repeats the id.
+    /// </remarks>
     public static async IAsyncEnumerable<string> LatestFramesAsync(
         Func<CancellationToken, Task<long?>> readLatestId,
         ActivityLatestNotifier notifier,
         TimeProvider time,
-        TimeSpan poll,
-        int keepaliveEveryPolls,
+        TimeSpan keepalive,
         ILogger logger,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -222,53 +225,54 @@ public static class ActivityEndpoints
         ArgumentNullException.ThrowIfNull(notifier);
         ArgumentNullException.ThrowIfNull(time);
         ArgumentNullException.ThrowIfNull(logger);
-        long? lastSentId = null;
-        var lastSeenVersion = notifier.Snapshot().Version;
-        var pollsSinceKeepalive = 0;
         yield return string.Create(CultureInfo.InvariantCulture, $"retry: {StreamRetryMilliseconds}\n\n");
+
+        // Taken before the read, so a write that lands during it still reaches this stream.
+        var lastSeenVersion = notifier.Snapshot().Version;
+        var lastSentId = await ReadLatestIdAsync(readLatestId, time, logger, cancellationToken).ConfigureAwait(false);
+        if (lastSentId is { } openingId)
+        {
+            yield return ActivityHistory.LatestEventFrame(openingId, lastSeenVersion);
+        }
+
         while (!cancellationToken.IsCancellationRequested)
         {
-            long? latestId;
+            if (await notifier.WaitForChangeAsync(lastSeenVersion, keepalive, time, cancellationToken).ConfigureAwait(false) is not { } changed)
+            {
+                yield return ": keepalive\n\n";
+                continue;
+            }
+
+            lastSeenVersion = changed.Version;
+            lastSentId = lastSentId is { } sent && changed.LatestId is { } heard ? Math.Max(sent, heard) : lastSentId ?? changed.LatestId;
+            if (lastSentId is { } latest)
+            {
+                yield return ActivityHistory.LatestEventFrame(latest, lastSeenVersion);
+            }
+        }
+    }
+
+    /// <summary>The newest event id when the stream opens, trying again after <see cref="StreamReadRetry"/> until it can be read.</summary>
+    private static async Task<long?> ReadLatestIdAsync(
+        Func<CancellationToken, Task<long?>> readLatestId,
+        TimeProvider time,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
             try
             {
-                latestId = await readLatestId(cancellationToken).ConfigureAwait(false);
+                return await readLatestId(cancellationToken).ConfigureAwait(false);
             }
 #pragma warning disable CA1031 // A failed read must not end the live stream; it backs off and tries again.
             catch (Exception exception) when (exception is not OperationCanceledException)
 #pragma warning restore CA1031
             {
-                logger.LogWarning("SSE activity stream: read_latest_id failed, retrying after back-off");
-                await Task.Delay(poll, time, cancellationToken).ConfigureAwait(false);
-                continue;
+                logger.LogWarning(exception, "The live Activity stream could not read the newest event; trying again shortly.");
             }
 
-            if (latestId is { } id && id != lastSentId)
-            {
-                lastSentId = id;
-                lastSeenVersion = Math.Max(lastSeenVersion, notifier.Snapshot().Version);
-                yield return ActivityHistory.LatestEventFrame(id, lastSeenVersion);
-                pollsSinceKeepalive = 0;
-                continue;
-            }
-
-            if (await notifier.WaitForChangeAsync(lastSeenVersion, poll, time, cancellationToken).ConfigureAwait(false) is { } changed)
-            {
-                lastSeenVersion = changed.Version;
-                if (changed.LatestId is { } changedId)
-                {
-                    lastSentId = changedId;
-                    yield return ActivityHistory.LatestEventFrame(changedId, lastSeenVersion);
-                    pollsSinceKeepalive = 0;
-                    continue;
-                }
-            }
-
-            pollsSinceKeepalive++;
-            if (pollsSinceKeepalive >= keepaliveEveryPolls)
-            {
-                yield return ": keepalive\n\n";
-                pollsSinceKeepalive = 0;
-            }
+            await Task.Delay(StreamReadRetry, time, cancellationToken).ConfigureAwait(false);
         }
     }
 

@@ -285,36 +285,24 @@ public sealed class ActivityApiTests
     }
 
     [Fact]
-    public async Task The_stream_generator_emits_newer_ids_and_the_same_id_when_the_revision_changes()
+    public async Task The_stream_sends_each_change_and_its_latest_id_never_goes_backwards()
     {
         var notifier = new ActivityLatestNotifier();
-        using var cancel = new CancellationTokenSource();
-        long?[] values = [10, 10, 11, 11];
-        var reads = 0;
+        long[] notifications = [11, 11, 9];
         var frames = new List<string>();
+
         await foreach (var frame in ActivityEndpoints.LatestFramesAsync(
-            _ => Task.FromResult(reads < values.Length ? values[reads++] : 11),
-            notifier,
-            TimeProvider.System,
-            TimeSpan.Zero,
-            100,
-            NullLogger.Instance,
-            cancel.Token))
+            _ => Task.FromResult<long?>(10), notifier, TimeProvider.System, TimeSpan.FromMinutes(1), NullLogger.Instance, CancellationToken.None))
         {
             frames.Add(frame);
-            if (frames.Count == 3)
-            {
-                notifier.Notify(11);
-            }
-
-            if (frames.Count == 4)
-            {
-                notifier.Notify(11);
-            }
-
             if (frames.Count == 5)
             {
                 break;
+            }
+
+            if (frames.Count >= 2)
+            {
+                notifier.Notify(notifications[frames.Count - 2]);
             }
         }
 
@@ -322,11 +310,32 @@ public sealed class ActivityApiTests
             [
                 "retry: 5000\n\n",
                 "event: activity.latest\ndata: {\"latest_event_id\":10,\"activity_revision\":0}\n\n",
-                "event: activity.latest\ndata: {\"latest_event_id\":11,\"activity_revision\":0}\n\n",
                 "event: activity.latest\ndata: {\"latest_event_id\":11,\"activity_revision\":1}\n\n",
                 "event: activity.latest\ndata: {\"latest_event_id\":11,\"activity_revision\":2}\n\n",
+                "event: activity.latest\ndata: {\"latest_event_id\":11,\"activity_revision\":3}\n\n",
             ],
             frames);
+    }
+
+    [Fact]
+    public async Task The_stream_reads_the_database_once_and_then_follows_the_shared_notifier()
+    {
+        var notifier = new ActivityLatestNotifier();
+        var reads = 0;
+        var frames = 0;
+
+        await foreach (var _ in ActivityEndpoints.LatestFramesAsync(
+            _ => Task.FromResult<long?>(++reads), notifier, TimeProvider.System, TimeSpan.FromMinutes(1), NullLogger.Instance, CancellationToken.None))
+        {
+            if (++frames == 6)
+            {
+                break;
+            }
+
+            notifier.Notify(100 + frames);
+        }
+
+        Assert.Equal(1, reads);
     }
 
     [Fact]
@@ -334,7 +343,7 @@ public sealed class ActivityApiTests
     {
         var notifier = new ActivityLatestNotifier();
         var frames = new List<string>();
-        await foreach (var frame in ActivityEndpoints.LatestFramesAsync(_ => Task.FromResult<long?>(null), notifier, TimeProvider.System, TimeSpan.Zero, 2, NullLogger.Instance, CancellationToken.None))
+        await foreach (var frame in ActivityEndpoints.LatestFramesAsync(_ => Task.FromResult<long?>(null), notifier, TimeProvider.System, TimeSpan.Zero, NullLogger.Instance, CancellationToken.None))
         {
             frames.Add(frame);
             if (frames.Count == 3)
