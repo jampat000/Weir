@@ -42,7 +42,7 @@ function settingsNote(
       ? `${plural(filesAtOnce, "file", "files")} at once`
       : "",
     ages.size === 1 && age > 0
-      ? `a download is left alone for ${age} s after it stops changing`
+      ? `new downloads wait ${age} seconds after they stop changing`
       : "",
   ]
     .filter(Boolean)
@@ -105,7 +105,7 @@ export function ProcessingToolbar({
       </div>
       <p className="mm-live-toolbar__note">
         {note ? `${note} · ` : ""}
-        <Link to="/settings?tab=performance">change in Settings</Link>
+        <Link to="/settings?tab=performance">Change in Settings</Link>
       </p>
     </>
   );

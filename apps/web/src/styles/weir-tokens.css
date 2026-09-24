@@ -82,7 +82,7 @@
   --mm-type-figure: 1.75rem; /* 28px — hero figures and stat values */
   --mm-tracking-eyebrow: 0.14em;
   /* Layout-only, set per instance from React; no colour or font is introduced here. */
-  --mm-live-fill: 0%; /* how far a working card's pass has got (weir-processing.css) */
+  --mm-live-fill: 0; /* how far a working card's pass has got, 0-100 (weir-processing-cards.css) */
   /* Control sizes (#464). The single 34px height was below a comfortable hit target for form
      fields; 40px is the field size, with smaller steps for secondary and quiet controls. */
   --mm-control-height-lg: calc(40px * var(--mm-density-ui-scale));
