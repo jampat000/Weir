@@ -137,6 +137,36 @@ public sealed class WorkAdmissionTests
     }
 
     [Fact]
+    public void An_upkeep_job_is_exempt_from_the_budget_and_blocks_only_its_own_librarys_upkeep()
+    {
+        var suite = new SuitePauseSettings("UTC", false, null, true);
+        LibraryAdmissionSnapshot[] libraries = [Library(1) with { MaxConcurrentFiles = 1 }];
+        LeasedJobSnapshot[] leased = [new(0, "{\"library_id\": 1}", WorkLane.Upkeep)];
+
+        var admission = WorkAdmissionRules.Evaluate(suite, null, leased, libraries, Now);
+
+        // The files lane never waits behind a scan or sweep (#717): the library's pass limit is untouched.
+        Assert.Empty(admission.BlockedLibraryIds);
+        Assert.Equal(RunnerBudget.Default.Capacity, admission.AvailableUnits);
+        // A library is never scanned twice at once: a second upkeep job for it is blocked.
+        Assert.Equal([1L], admission.UpkeepBlockedLibraryIds.Order());
+    }
+
+    [Fact]
+    public void A_librarys_pass_limit_never_blocks_its_own_upkeep()
+    {
+        var suite = new SuitePauseSettings("UTC", false, null, true);
+        LibraryAdmissionSnapshot[] libraries = [Library(1) with { MaxConcurrentFiles = 1 }];
+        LeasedJobSnapshot[] leased = [new(1, "{\"library_id\": 1}", WorkLane.Files)];
+
+        var admission = WorkAdmissionRules.Evaluate(suite, null, leased, libraries, Now);
+
+        // A scan never waits behind a library's hours-long pass (#717).
+        Assert.Equal([1L], admission.BlockedLibraryIds.Order());
+        Assert.Empty(admission.UpkeepBlockedLibraryIds);
+    }
+
+    [Fact]
     public void Library_windows_fall_back_to_days_and_hours_without_a_grid()
     {
         var hoursLimited = Library(1) with { ScheduleHoursLimited = true, ScheduleDays = "Wed", ScheduleStart = "09:00", ScheduleEnd = "13:00" };

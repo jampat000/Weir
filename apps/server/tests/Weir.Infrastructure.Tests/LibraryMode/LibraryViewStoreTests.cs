@@ -45,7 +45,9 @@ public sealed class LibraryViewStoreTests : IDisposable
     }
 
     /// <summary>Writes a scan snapshot through the real store, which is what derives the facts and facet rows.</summary>
-    private async Task RecordAsync(params LibraryScanFileEntry[] files) =>
+    private async Task RecordAsync(params LibraryScanFileEntry[] files)
+    {
+        await LibraryFileIndexWriter.ReplaceAsync(_store.Database, _libraryId, files, CancellationToken.None);
         await _store.WithUnitOfWork(async uow =>
         {
             var jobId = Convert.ToInt64(
@@ -55,9 +57,10 @@ public sealed class LibraryViewStoreTests : IDisposable
                     ("@key", LibraryModeJobKinds.ScanDedupeKey(_libraryId))),
                 CultureInfo.InvariantCulture);
             await LibraryScanStore.RecordResultAsync(
-                uow, jobId, new LibraryScanSnapshot(_libraryId, DateTimeOffset.UnixEpoch.AddSeconds(1_700_000_000), files, []), true, null);
+                uow, jobId, new LibraryScanOutcome(DateTimeOffset.UnixEpoch.AddSeconds(1_700_000_000), []), true, null);
             return 0;
         });
+    }
 
     private static LibraryScanFileEntry File(
         string path,

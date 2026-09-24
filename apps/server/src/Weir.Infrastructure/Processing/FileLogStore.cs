@@ -95,18 +95,17 @@ public static class FileLogStore
         _ => string.Empty,
     };
 
-    /// <summary>Deletes records older than the retention window. 0 keeps everything.</summary>
-    public static async Task<int> PruneAsync(UnitOfWork uow, long retentionDays, DateTimeOffset now)
+    /// <summary>Deletes records older than the retention window, a batch per transaction. 0 keeps everything.</summary>
+    public static Task<int> PruneAsync(SqliteDatabase database, long retentionDays, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
         if (retentionDays <= 0)
         {
-            return 0;
+            return Task.FromResult(0);
         }
 
         var cutoff = now.AddDays(-retentionDays);
-        return await uow.ExecuteAsync(
-            "DELETE FROM file_logs WHERE recorded_at < @cutoff",
-            ("@cutoff", SqliteValues.ToSqlite(PyDateTime.FromUtc(cutoff.UtcDateTime)))).ConfigureAwait(false);
+        return BatchedDeletes.DeleteAsync(
+            database, "file_logs", "recorded_at < @cutoff", [("@cutoff", SqliteValues.ToSqlite(PyDateTime.FromUtc(cutoff.UtcDateTime)))], cancellationToken);
     }
 
     private static ProcessingFileLogRecord Read(SqliteDataReader reader) => new()

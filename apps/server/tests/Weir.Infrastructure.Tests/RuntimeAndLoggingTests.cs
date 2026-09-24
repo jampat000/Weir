@@ -146,6 +146,32 @@ public sealed class RuntimeAndLoggingTests
     }
 
     [Fact]
+    public void Prune_skips_rewriting_when_the_oldest_line_is_still_within_the_window()
+    {
+        // Lines are always appended in order, so a rewrite is only worth its cost when the oldest line has aged
+        // out (#718). A line appended straight to the file, bypassing WriteLine, stands in for one only a
+        // rewrite would ever remove; it survives here because the recent first line means nothing is checked.
+        using var temp = new TempDirectory();
+        var path = temp.Join("weir.log");
+        var now = DateTimeOffset.UtcNow;
+        using var file = new WeirLogFile(path, TimeProvider.System);
+        file.WriteLine(PythonLogFormat.JsonLine(now, LogLevel.Information, "L", "recent", null, null, null));
+        // WeirLogFile keeps its own handle open, so appending needs the same sharing it uses.
+        using (var appendStream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+        using (var writer = new StreamWriter(appendStream))
+        {
+            writer.Write(PythonLogFormat.JsonLine(now.AddDays(-30), LogLevel.Information, "L", "outside the window", null, null, null));
+            writer.Write('\n');
+        }
+
+        Assert.True(file.Prune(keepDays: 3));
+
+        var lines = ReadShared(path);
+        Assert.Equal(2, lines.Length);
+        Assert.Contains("\"outside the window\"", lines[1], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Prune_keeps_at_least_one_day()
     {
         using var temp = new TempDirectory();
@@ -154,6 +180,33 @@ public sealed class RuntimeAndLoggingTests
         file.WriteLine(PythonLogFormat.JsonLine(DateTimeOffset.UtcNow.AddHours(-12), LogLevel.Information, "L", "half a day", null, null, null));
         Assert.True(file.Prune(keepDays: 0));
         Assert.Single(ReadShared(path));
+    }
+
+    [Fact]
+    public void Another_thread_keeps_logging_while_the_whole_log_is_read()
+    {
+        using var temp = new TempDirectory();
+        using var file = new WeirLogFile(temp.Join("weir.log"), TimeProvider.System);
+        var now = DateTimeOffset.UtcNow;
+        file.WriteLine(PythonLogFormat.JsonLine(now, LogLevel.Information, "L", "first", null, null, null));
+        file.WriteLine(PythonLogFormat.JsonLine(now, LogLevel.Information, "L", "second", null, null, null));
+        var read = new List<string>();
+        var writtenMidRead = false;
+
+        Assert.True(file.ReadLines(line =>
+        {
+            read.Add(line);
+            if (read.Count == 1)
+            {
+                // A completion signal with a generous guard: a write that needed the reader's lock would never finish.
+                writtenMidRead = Task.Run(() => file.WriteLine(PythonLogFormat.JsonLine(now, LogLevel.Information, "L", "during", null, null, null)))
+                    .Wait(TimeSpan.FromSeconds(30));
+            }
+        }));
+
+        Assert.True(writtenMidRead);
+        Assert.Equal(2, read.Count);
+        Assert.Contains("\"during\"", ReadShared(file.Path)[2], StringComparison.Ordinal);
     }
 
     /// <summary>Read the log while the writer still holds it, as the Logs screen does.</summary>

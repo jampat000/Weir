@@ -45,8 +45,14 @@ public sealed partial class VanishedFileSweepTask : IPeriodicTask
     public async Task RunOnceAsync(CancellationToken cancellationToken)
     {
         var now = _time.GetUtcNow();
-        await using var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
-        foreach (var library in await LibraryStore.ListAsync(uow, enabledOnly: false).ConfigureAwait(false))
+        IReadOnlyList<ProcessingLibraryRecord> libraries;
+        var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
+        await using (uow.ConfigureAwait(false))
+        {
+            libraries = await LibraryStore.ListAsync(uow, enabledOnly: false).ConfigureAwait(false);
+        }
+
+        foreach (var library in libraries)
         {
             var (runtime, _) = WatchedFolderScanOps.ResolvePathRuntimeForLibrary(library, _options.WeirHome);
             if (runtime is null || !Directory.Exists(runtime.WatchedFolder))
@@ -54,16 +60,14 @@ public sealed partial class VanishedFileSweepTask : IPeriodicTask
                 continue;
             }
 
-            var forgotten = await ProcessingWatchedFolderScanDispatchJobHandler.ForgetVanishedFilesAsync(
-                uow, library.Id, runtime.WatchedFolder, ProcessingMediaScopes.Normalize(library.MediaType), now, "sweep").ConfigureAwait(false);
+            var forgotten = await VanishedFiles.ForgetAsync(
+                _database, library.Id, runtime.WatchedFolder, ProcessingMediaScopes.Normalize(library.MediaType), now, "sweep", cancellationToken).ConfigureAwait(false);
             if (forgotten.Count > 0)
             {
                 // In the server log as well as Activity, so it can be checked on a machine where nobody signs in.
                 LogForgotten(forgotten.Count, library.Name, string.Join(", ", forgotten));
             }
         }
-
-        await uow.CommitAsync().ConfigureAwait(false);
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Forgot {Count} file(s) that left the watched folder of library {Library}: {Paths}")]

@@ -148,19 +148,15 @@ public sealed class ActivityHistoryStoreTests
 
         async Task<int> PruneOnceAsync(DateTimeOffset moment)
         {
+            long retentionDays;
             var uow = await UnitOfWork.OpenAsync(db.Database);
             await using (uow)
             {
-                var operatorRow = await OperatorSettingsStore.EnsureAsync(uow);
-                if (operatorRow.FileLogRetentionDays <= 0)
-                {
-                    return 0;
-                }
-
-                var removed = await FileLogStore.PruneAsync(uow, operatorRow.FileLogRetentionDays, moment);
+                retentionDays = (await OperatorSettingsStore.EnsureAsync(uow)).FileLogRetentionDays;
                 await uow.CommitAsync();
-                return removed;
             }
+
+            return await FileLogStore.PruneAsync(db.Database, retentionDays, moment);
         }
 
         db.Execute("UPDATE operator_settings SET file_log_retention_days = 0");

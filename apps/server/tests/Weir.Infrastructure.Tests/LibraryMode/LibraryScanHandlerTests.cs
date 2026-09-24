@@ -47,7 +47,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
         _fixture.Store.WithUnitOfWork(async uow => (await LibraryScanStore.RequestScanAsync(uow, _fixture.Jobs, libraryId, "manual")).Id);
 
     /// <summary>Claims, runs and completes one scan job exactly as the real worker would, so its row ends up
-    /// <c>completed</c> — <see cref="LibraryScanStore.LatestSnapshotAsync"/> only reads a completed row.</summary>
+    /// <c>completed</c> — <see cref="LibraryScanStore.OutcomeAsync"/> reads the scan time and errors from a completed row.</summary>
     private async Task RunScanAsync(long jobId)
     {
         const string leaseOwner = "test-worker";
@@ -89,11 +89,10 @@ public sealed class LibraryScanHandlerTests : IDisposable
         Assert.Equal(changingBytesBefore, File.ReadAllBytes(changingPath));
         Assert.Equal(changingWriteTimeBefore, File.GetLastWriteTimeUtc(changingPath));
 
-        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library, NullLogger.Instance), commit: false);
-        Assert.NotNull(snapshot);
-        Assert.Equal(2, snapshot!.Files.Count);
-        var matching = snapshot.Files.Single(f => f.Path == matchingPath);
-        var changing = snapshot.Files.Single(f => f.Path == changingPath);
+        var files = await _fixture.Db(uow => LibraryScanStore.CurrentFilesAsync(uow, library), commit: false);
+        Assert.Equal(2, files.Count);
+        var matching = files.Single(f => f.Path == matchingPath);
+        var changing = files.Single(f => f.Path == changingPath);
         Assert.Equal(LibraryFileClassification.Matches, matching.Classification);
         Assert.Equal(LibraryFileClassification.WouldChange, changing.Classification);
         Assert.Equal(1, changing.RemovedAudioCount);
@@ -136,9 +135,9 @@ public sealed class LibraryScanHandlerTests : IDisposable
         await RunScanAsync(jobId);
 
         Assert.Empty(_media.Probed);
-        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library, NullLogger.Instance), commit: false);
-        Assert.NotNull(snapshot);
-        Assert.Empty(snapshot!.Files);
+        var outcome = await _fixture.Db(async uow => await LibraryScanStore.OutcomeAsync(uow, library, await LibraryScanStore.LatestAsync(uow, library), NullLogger.Instance), commit: false);
+        Assert.NotNull(outcome);
+        Assert.Empty(await _fixture.Db(uow => LibraryScanStore.CurrentFilesAsync(uow, library), commit: false));
     }
 
     // --- Scheduled scan and clean --------------------------------------------------------------------
@@ -232,8 +231,8 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var jobId = await EnqueueScanAsync(library);
         await RunScanAsync(jobId);
 
-        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library, NullLogger.Instance), commit: false);
-        var file = snapshot!.Files.Single();
+        var files = await _fixture.Db(uow => LibraryScanStore.CurrentFilesAsync(uow, library), commit: false);
+        var file = files.Single();
         Assert.Equal("radarr", file.ManagerKind);
         Assert.Equal("Blade Runner 2049", file.ManagerTitle);
         Assert.Equal("7", file.ManagerTitleId);
@@ -265,8 +264,8 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var jobId = await EnqueueScanAsync(library);
         await RunScanAsync(jobId);
 
-        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library, NullLogger.Instance), commit: false);
-        var file = snapshot!.Files.Single();
+        var files = await _fixture.Db(uow => LibraryScanStore.CurrentFilesAsync(uow, library), commit: false);
+        var file = files.Single();
         Assert.NotNull(file.ManagerConnectionId);
         Assert.Equal(42L, file.ManagerFileId);
         Assert.Equal(4L, file.ManagerQualityProfileId);
@@ -311,8 +310,8 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var jobId = await EnqueueScanAsync(library);
         await RunScanAsync(jobId);
 
-        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library, NullLogger.Instance), commit: false);
-        var file = snapshot!.Files.Single();
+        var files = await _fixture.Db(uow => LibraryScanStore.CurrentFilesAsync(uow, library), commit: false);
+        var file = files.Single();
         Assert.Equal("radarr", file.ManagerKind);
         Assert.Equal("Blade Runner 2049", file.ManagerTitle);
     }
@@ -333,11 +332,12 @@ public sealed class LibraryScanHandlerTests : IDisposable
         var jobId = await EnqueueScanAsync(library);
         await RunScanAsync(jobId);
 
-        var snapshot = await _fixture.Db(uow => LibraryScanStore.LatestSnapshotAsync(uow, library, NullLogger.Instance), commit: false);
-        var file = snapshot!.Files.Single();
+        var files = await _fixture.Db(uow => LibraryScanStore.CurrentFilesAsync(uow, library), commit: false);
+        var file = files.Single();
         Assert.Null(file.ManagerKind);
         Assert.Null(file.ManagerTitle);
-        Assert.Single(snapshot.Errors);
-        Assert.Contains("Radarr", snapshot.Errors[0], StringComparison.Ordinal);
+        var outcome = await _fixture.Db(async uow => await LibraryScanStore.OutcomeAsync(uow, library, await LibraryScanStore.LatestAsync(uow, library), NullLogger.Instance), commit: false);
+        Assert.Single(outcome!.Errors);
+        Assert.Contains("Radarr", outcome.Errors[0], StringComparison.Ordinal);
     }
 }

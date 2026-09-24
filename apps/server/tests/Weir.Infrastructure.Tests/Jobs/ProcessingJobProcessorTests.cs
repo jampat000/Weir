@@ -283,7 +283,7 @@ public sealed class ProcessingJobProcessorTests : IDisposable
             stopping.Token.ThrowIfCancellationRequested();
         })]);
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => processor.ProcessOneAsync("w", 300, T0, stopping.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => processor.ProcessOneAsync("w", 300, T0, cancellationToken: stopping.Token));
 
         Assert.Equal(ProcessingJobStatus.Leased, (await _db.Store.GetAsync(1))!.Status);
     }

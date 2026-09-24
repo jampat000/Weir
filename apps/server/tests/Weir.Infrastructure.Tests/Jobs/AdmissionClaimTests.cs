@@ -12,6 +12,7 @@ public sealed class AdmissionClaimTests : IDisposable
 {
     private const string Remux = "processing.file.remux_pass.v1";
     private const string Scan = "processing.watched_folder.remux_scan_dispatch.v1";
+    private const string LibraryScan = "processing.library.scan.v1";
     private static readonly DateTimeOffset Now = new(2026, 8, 26, 14, 0, 0, TimeSpan.Zero);
     private static readonly string Never = new('0', ScheduleGrid.SlotsPerWeek);
     private readonly JobsTestDatabase _db = new();
@@ -209,6 +210,49 @@ public sealed class AdmissionClaimTests : IDisposable
         _db.Pause(scanWhilePaused: true);
 
         Assert.Null(await ClaimAsync(await EvaluateAsync(Now)));
+    }
+
+    [Fact]
+    public async Task Upkeep_is_claimable_for_a_library_at_its_pass_limit()
+    {
+        // A library's "Files at once" cap must never make its scan wait behind an hours-long pass (#717).
+        var library = _db.AddLibrary(maxConcurrentFiles: 1);
+        _db.InsertRawJob(
+            "busy-pass",
+            Remux,
+            status: ProcessingJobStatus.Leased,
+            leaseOwner: "w0",
+            leaseExpiresAt: PythonTimestamps.Orm(Now.AddHours(1)),
+            payloadJson: $"{{\"library_id\": {library}}}");
+        await QueueAsync(LibraryScan, library, key: "scan");
+
+        var admission = await EvaluateAsync(Now);
+        Assert.Contains(library, admission.BlockedLibraryIds);
+        Assert.DoesNotContain(library, admission.UpkeepBlockedLibraryIds);
+
+        var claimed = await _db.Store.ClaimNextAsync("u1", Now.AddHours(1), Now, admission, lane: WorkLane.Upkeep);
+
+        Assert.NotNull(claimed);
+        Assert.Equal(LibraryScan, claimed.JobKind);
+    }
+
+    [Fact]
+    public async Task A_second_scan_of_the_same_library_waits_for_the_first()
+    {
+        // A library is never scanned twice at once (#717), even though upkeep is otherwise unlimited.
+        var library = _db.AddLibrary();
+        _db.InsertRawJob(
+            "running-scan",
+            LibraryScan,
+            status: ProcessingJobStatus.Leased,
+            leaseOwner: "u0",
+            leaseExpiresAt: PythonTimestamps.Orm(Now.AddHours(1)),
+            payloadJson: $"{{\"library_id\": {library}}}");
+        await QueueAsync(LibraryScan, library, key: "second-scan");
+
+        var admission = await EvaluateAsync(Now);
+
+        Assert.Null(await _db.Store.ClaimNextAsync("u1", Now.AddHours(1), Now, admission, lane: WorkLane.Upkeep));
     }
 
     private Task<WorkAdmission> EvaluateAsync(DateTimeOffset now) =>

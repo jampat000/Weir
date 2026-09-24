@@ -263,7 +263,7 @@ public sealed class MediaManagerIntake
             // hand-off still lands on its own row through EnqueueOrGet below.
             if (library is not null &&
                 ProcessingJobStore.GetByDedupeKey(connection, transaction, dedupeKey) is null &&
-                WatchedFolderScanOps.ActiveRemuxPassForRelativePath(connection, transaction, target, library.MediaType, library.Id) is { } active)
+                ActiveRemuxPasses.ForRelativePath(connection, transaction, target, library.MediaType, library.Id) is { } active)
             {
                 if (AdoptActivePass(connection, transaction, active, importEvent, dedupeKey, payload))
                 {

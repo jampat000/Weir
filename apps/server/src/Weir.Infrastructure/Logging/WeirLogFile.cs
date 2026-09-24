@@ -10,9 +10,14 @@ namespace Weir.Infrastructure.Logging;
 /// rewrite share one lock so the file is never replaced while a handle is open, which Windows
 /// does not allow.
 /// </summary>
+/// <remarks>
+/// A read of the whole log (the Logs screen) holds a read side of <see cref="_replacing"/> instead of the write lock, so every
+/// lane keeps logging while it runs (#708); only a retention rewrite waits for readers to finish.
+/// </remarks>
 public sealed class WeirLogFile : IDisposable
 {
     private readonly Lock _lock = new();
+    private readonly ReaderWriterLockSlim _replacing = new();
     private readonly TimeProvider _time;
     private FileStream? _stream;
     private bool _disposed;
@@ -59,6 +64,60 @@ public sealed class WeirLogFile : IDisposable
     public bool Prune(int keepDays)
     {
         var cutoff = _time.GetUtcNow() - TimeSpan.FromDays(Math.Max(1, keepDays));
+        if (!OldestLineAgedOut(cutoff))
+        {
+            return true;
+        }
+
+        _replacing.EnterWriteLock();
+        try
+        {
+            return Rewrite(cutoff);
+        }
+        finally
+        {
+            _replacing.ExitWriteLock();
+        }
+    }
+
+    /// <summary>
+    /// Whether pruning would actually remove anything, read from the first line only: lines are always
+    /// appended in order, so when even the oldest is within the window nothing else can be outside it either
+    /// (#718). A line that cannot be read as JSON with a timestamp is what <see cref="Rewrite"/> drops first, so
+    /// it counts as aged out too, and a file that cannot be opened is left for <see cref="Rewrite"/> to report.
+    /// </summary>
+    private bool OldestLineAgedOut(DateTimeOffset cutoff)
+    {
+        _replacing.EnterReadLock();
+        try
+        {
+            string? firstLine;
+            lock (_lock)
+            {
+                _stream?.Flush();
+            }
+
+            try
+            {
+                using var stream = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(stream, new UTF8Encoding(false));
+                firstLine = reader.ReadLine();
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                return true;
+            }
+
+            return firstLine is not null && (!TryReadTimestamp(firstLine, out var at) || at < cutoff);
+        }
+        finally
+        {
+            _replacing.ExitReadLock();
+        }
+    }
+
+    private bool Rewrite(DateTimeOffset cutoff)
+    {
         lock (_lock)
         {
             _stream?.Dispose();
@@ -118,26 +177,34 @@ public sealed class WeirLogFile : IDisposable
     }
 
     /// <summary>
-    /// Read every line while holding the write lock, so a prune cannot replace the file mid-read. Returns <see langword="false"/> when the file exists but could not be opened.
+    /// Read every line written so far. Writers keep appending while it reads; a prune waits until it is done, so the file is
+    /// not replaced mid-read. Returns <see langword="false"/> when the file exists but could not be opened.
     /// </summary>
     public bool ReadLines(Action<string> onLine)
     {
         ArgumentNullException.ThrowIfNull(onLine);
-        lock (_lock)
+        _replacing.EnterReadLock();
+        try
         {
-            _stream?.Flush();
             FileStream stream;
-            try
+            long length;
+            lock (_lock)
             {
-                stream = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                return false;
+                _stream?.Flush();
+                try
+                {
+                    stream = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    return false;
+                }
+
+                length = stream.Length;
             }
 
             using (stream)
-            using (var reader = new StreamReader(stream, new UTF8Encoding(false)))
+            using (var reader = new StreamReader(new BoundedReadStream(stream, length), new UTF8Encoding(false)))
             {
                 while (reader.ReadLine() is { } line)
                 {
@@ -146,6 +213,10 @@ public sealed class WeirLogFile : IDisposable
             }
 
             return true;
+        }
+        finally
+        {
+            _replacing.ExitReadLock();
         }
     }
 
@@ -157,6 +228,8 @@ public sealed class WeirLogFile : IDisposable
             _stream?.Dispose();
             _stream = null;
         }
+
+        _replacing.Dispose();
     }
 
     internal static bool TryReadTimestamp(string raw, out DateTimeOffset timestamp)
@@ -187,6 +260,53 @@ public sealed class WeirLogFile : IDisposable
 
     private static FileStream OpenForAppend(string path) =>
         new(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+
+    /// <summary>
+    /// The first <c>length</c> bytes of a file others keep appending to: what had been written, as whole lines, when the read
+    /// began. A line still being appended is never read in half.
+    /// </summary>
+    private sealed class BoundedReadStream(Stream inner, long length) : Stream
+    {
+        private long _remaining = length;
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+
+        public override int Read(Span<byte> buffer)
+        {
+            if (_remaining <= 0)
+            {
+                return 0;
+            }
+
+            var read = inner.Read(buffer[..(int)Math.Min(buffer.Length, _remaining)]);
+            _remaining -= read;
+            return read;
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
 }
 
 /// <summary>Writes every log entry at or above the configured level to <see cref="WeirLogFile"/>.</summary>
