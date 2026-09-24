@@ -1,5 +1,5 @@
 import { FactTable, type Fact } from "../../../../components/shared/fact-table";
-import { errorMessage } from "../../../../lib/api/error-message";
+import { LoadError } from "../../../../components/shared/load-error";
 import { useServerMetricsQuery } from "../../../../lib/settings/queries";
 import {
   formatAverageMs,
@@ -64,12 +64,9 @@ export function ServerDiagnostics() {
             not found; they are not the same as application failures.
           </p>
           {metricsQ.isError ? (
-            <p className="mt-4 text-sm text-mm-status-failed-text" role="alert">
-              {errorMessage(
-                metricsQ.error,
-                "Could not load server diagnostics.",
-              )}
-            </p>
+            <div className="mt-4">
+              <LoadError thing="server diagnostics" error={metricsQ.error} />
+            </div>
           ) : (
             <div className="mt-4">
               <FactTable caption="Server runtime counters" facts={facts} />

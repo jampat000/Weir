@@ -1,5 +1,5 @@
+import { LoadError } from "../../../../components/shared/load-error";
 import { QuietSection } from "../../../../components/shared/quiet-section";
-import { errorMessage } from "../../../../lib/api/error-message";
 import { formatBytes } from "../../../../lib/format/bytes";
 import type { useConfigurationBackupsQuery } from "../../../../lib/settings/queries";
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
@@ -42,9 +42,7 @@ export function BackupListSection({
         {backupsQ.isLoading ? (
           <p className="mm-quiet-note">Loading snapshot list...</p>
         ) : backupsQ.isError ? (
-          <p className="text-sm text-mm-status-failed-text" role="alert">
-            {errorMessage(backupsQ.error, "Could not load backups.")}
-          </p>
+          <LoadError thing="your backups" error={backupsQ.error} />
         ) : items.length === 0 ? (
           <p className="mm-quiet-note">No automatic snapshots yet.</p>
         ) : (

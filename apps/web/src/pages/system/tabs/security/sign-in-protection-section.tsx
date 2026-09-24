@@ -1,3 +1,4 @@
+import { LoadError } from "../../../../components/shared/load-error";
 import { QuietDisclosure } from "../../../../components/shared/quiet-section";
 import type { useSecurityOverviewQuery } from "../../../../lib/settings/queries";
 import { plural } from "../../../../lib/ui/mm-plural";
@@ -54,10 +55,12 @@ export function SignInProtectionSection({
           </table>
         </div>
       ) : overviewQ.isError ? (
-        <p className="mt-4 text-sm text-mm-status-failed-text" role="alert">
-          Could not load the server security overview. Check the server logs and
-          try again.
-        </p>
+        <div className="mt-4">
+          <LoadError
+            thing="the server security overview"
+            error={overviewQ.error}
+          />
+        </div>
       ) : (
         <p className="mm-quiet-note mt-4">Loading server security overview…</p>
       )}

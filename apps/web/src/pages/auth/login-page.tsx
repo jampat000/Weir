@@ -5,10 +5,6 @@ import { AuthBrandStack } from "../../components/brand/auth-brand-stack";
 import { ApiEntryError } from "../../components/shared/api-entry-error";
 import { PageLoading } from "../../components/shared/page-loading";
 import {
-  httpStatusFromApiError,
-  isLikelyNetworkFailure,
-} from "../../lib/api/error-guards";
-import {
   useBootstrapStatusQuery,
   useLoginMutation,
   useMeQuery,
@@ -76,36 +72,12 @@ export function LoginPage() {
   };
 
   const loginUserId = `${fieldId}-user`;
-  const loginErrorMessage = (() => {
-    if (!login.isError) {
-      return null;
-    }
-    const status = httpStatusFromApiError(login.error);
-    if (status === 400 || status === 401) {
-      return errorMessage(login.error, "Sign-in failed.");
-    }
-    if (status === 429) {
-      // The server already names which limit was hit and how long to wait; that is the
-      // rate-limit-specific message the reader needs, not a generic connectivity guess.
-      return errorMessage(
-        login.error,
-        "Too many sign-in attempts. Wait a few minutes, then try again.",
-      );
-    }
-    if (status === 403) {
-      return "This browser isn't allowed to sign in here. Reload the page and try again.";
-    }
-    if (
-      isLikelyNetworkFailure(login.error) ||
-      status === 500 ||
-      status === 503
-    ) {
-      console.error("Weir login failed against the backend.", login.error);
-      return "Sign-in failed. Check that the Weir server is running.";
-    }
-    console.error("Weir login failed with an unexpected error.", login.error);
-    return "Sign-in failed. Check that the Weir server is running.";
-  })();
+  // The shared mapping (lib/api/api-error-text.ts) already turns a 429 into a wait-and-retry
+  // sentence, a 403 or 400 into the server's own plain reason, and an unreachable server into
+  // "Can't reach Weir" — one place for every screen to agree with, not a second copy here.
+  const loginErrorMessage = login.isError
+    ? errorMessage(login.error, "Sign-in failed.")
+    : null;
 
   return (
     <main className="mm-auth-body" id="mm-main-content" tabIndex={-1}>
