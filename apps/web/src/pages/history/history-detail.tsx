@@ -10,16 +10,18 @@ import {
   type ProcessingFileLogEntry,
 } from "../../lib/processing/files-api";
 import { useProcessingFileLogQuery } from "../../lib/processing/files-queries";
-import { HistoryFileActions, fileGuidance } from "./history-file-actions";
+import { historyGroupOf } from "./history-entries";
+import { HistoryFileActions } from "./history-file-actions";
 import { SizeFigures, WorkingFigures } from "./history-figures";
+import { fileGuidance } from "./history-guidance";
 import {
   detailSizes,
   handbackStory,
-  historyGroupOf,
   latestPass,
   tookWords,
 } from "./history-model";
 import { PassRecord } from "./history-pass";
+import { useNarrowDetailFocus } from "./use-narrow-detail-focus";
 
 function Guidance({ file, now }: { file: ProcessingFile; now: number }) {
   const pause = usePauseQuery();
@@ -74,7 +76,7 @@ function RecordSection({
       <p className="mm-history-note">
         {file.status === "processing" || historyGroupOf(file) === "working"
           ? "Weir has not finished a pass over this file yet. What it kept and removed shows here once it has."
-          : "Weir kept no record of a pass over this file. Records older than the History setting are removed."}
+          : "Weir has no record of what it did to this file. Records older than the History setting are removed."}
       </p>
     );
   }
@@ -86,10 +88,12 @@ export function HistoryDetail({
   file,
   now,
   editable,
+  onRemoved,
 }: {
   file: ProcessingFile;
   now: number;
   editable: boolean;
+  onRemoved: (message: string) => void;
 }) {
   const working = file.status === "processing";
   const record = useProcessingFileLogQuery(file.id, file.updated_at);
@@ -97,15 +101,22 @@ export function HistoryDetail({
   const took = pass
     ? tookWords(pass.detail.elapsed_seconds as number | undefined)
     : null;
+  const { sectionRef, titleRef } = useNarrowDetailFocus(file.id);
 
   return (
     <section
+      ref={sectionRef}
       className="mm-history-detail"
       aria-labelledby="history-detail-title"
       data-testid="history-detail"
     >
       <p className="mm-history-detail__eyebrow">{file.library_name}</p>
-      <h2 id="history-detail-title" className="mm-history-detail__title">
+      <h2
+        id="history-detail-title"
+        ref={titleRef}
+        tabIndex={-1}
+        className="mm-history-detail__title"
+      >
         {baseName(file.relative_path)}
       </h2>
       <p className="mm-history-detail__lead">
@@ -119,7 +130,12 @@ export function HistoryDetail({
         directPlay={file.direct_play}
         testId="history-direct-play"
       />
-      <HistoryFileActions key={file.id} file={file} editable={editable} />
+      <HistoryFileActions
+        key={file.id}
+        file={file}
+        editable={editable}
+        onRemoved={onRemoved}
+      />
 
       {working ? (
         <WorkingFigures file={file} />

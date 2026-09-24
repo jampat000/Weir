@@ -7,32 +7,48 @@ import type {
   ProcessingFile,
   ProcessingFileLog,
 } from "../../lib/processing/files-api";
+import type { LibraryClean } from "../../lib/processing/library-cleans-api";
 import { HistoryPage } from "./history-page";
 
 const files: {
   files: ProcessingFile[];
   status_counts: Record<string, number>;
 } = { files: [], status_counts: {} };
+const cleans: { cleans: LibraryClean[] } = { cleans: [] };
 const requeue = vi.fn();
+const requeueFiles = vi.fn();
 const processNow = vi.fn();
 const fetchLog = vi.fn<(id: number) => Promise<ProcessingFileLog>>();
 
 vi.mock("../../lib/processing/files-queries", async (importOriginal) => {
   const mutation = (fn = vi.fn()) => ({
     mutateAsync: fn,
+    mutate: (
+      input: unknown,
+      opts?: { onSuccess?: (r: unknown) => void; onError?: () => void },
+    ) => void Promise.resolve(fn(input)).then(opts?.onSuccess, opts?.onError),
     isPending: false,
   });
   return {
     ...(await importOriginal<
       typeof import("../../lib/processing/files-queries")
     >()),
-    useProcessingFilesQuery: () => ({
+    useFileHistoryQuery: () => ({
       data: files,
       isLoading: false,
       isError: false,
       refetch: vi.fn(),
     }),
-    useRequeueProcessingFiles: () => mutation(),
+    useLibraryCleansQuery: () => ({
+      data: {
+        cleans: cleans.cleans,
+        returned: cleans.cleans.length,
+        limit: 200,
+      },
+      isLoading: false,
+      isError: false,
+    }),
+    useRequeueProcessingFiles: () => mutation(requeueFiles),
     useRequeueProcessingFile: () => mutation(requeue),
     useForgetProcessingFile: () => mutation(),
     useMoveProcessingFileToTop: () => mutation(),
@@ -114,8 +130,15 @@ function renderPage(entry = "/history") {
 describe("HistoryPage", () => {
   beforeEach(() => {
     requeue.mockReset();
+    requeueFiles.mockReset();
+    requeueFiles.mockResolvedValue({
+      requeued: 2,
+      skipped: 0,
+      detail: "Queued 2 files again.",
+    });
     processNow.mockReset();
     fetchLog.mockReset();
+    cleans.cleans = [];
     files.files = [
       file({ id: 1 }),
       file({
@@ -251,5 +274,76 @@ describe("HistoryPage", () => {
     expect(processNow).toHaveBeenCalledWith(
       expect.objectContaining({ library_id: 1, pass_through_unchanged: true }),
     );
+  });
+
+  it("offers Process again on a file Weir is done with", async () => {
+    files.files = [file({ id: 1, status: "cancelled" })];
+    fetchLog.mockResolvedValue({
+      file_id: 1,
+      relative_path: "",
+      retention_days: 90,
+      entries: [],
+    });
+    requeue.mockResolvedValue({ detail: "Queued 1 file again." });
+    renderPage("/history?file=1");
+    const detail = screen.getByTestId("history-detail");
+
+    fireEvent.click(
+      within(detail).getByRole("button", { name: "Process again" }),
+    );
+
+    expect(
+      await within(detail).findByText("Queued 1 file again."),
+    ).toBeInTheDocument();
+    expect(requeue).toHaveBeenCalledWith(1);
+  });
+
+  it("acts on exactly the failed files shown, not everything matching the filter", () => {
+    files.files = [
+      file({ id: 1, status: "processing_failed" }),
+      file({ id: 2, status: "processing_failed" }),
+      file({ id: 3, status: "skipped" }),
+    ];
+    renderPage("/history?show=failed");
+
+    const retryAll = screen.getByRole("button", {
+      name: "Try the 2 failed files again",
+    });
+    fireEvent.click(retryAll);
+
+    expect(requeueFiles).toHaveBeenCalledWith({ file_ids: [1, 2] });
+  });
+
+  it("keeps a skip out of Failed and gives it its own neutral group", () => {
+    files.files = [file({ id: 1, status: "skipped" })];
+    renderPage();
+
+    const chips = screen.getByRole("group", { name: "Show" });
+    expect(
+      within(chips).getByRole("button", { name: /Skipped\s*1/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(chips).getByRole("button", { name: /Failed\s*0/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("lists a library clean alongside downloads, as its own kind of entry", () => {
+    files.files = [];
+    cleans.cleans = [
+      {
+        kind: "library_clean",
+        id: 5,
+        library_id: 2,
+        library_name: "Films",
+        relative_path: "Heat (1995)/Heat.mkv",
+        outcome: "cleaned",
+        detail: "Cleaned Heat.mkv: removed 1 audio track.",
+        trigger: null,
+        recorded_at: "2026-08-19T04:00:00",
+      },
+    ];
+    renderPage();
+
+    expect(screen.getAllByText("Heat.mkv").length).toBeGreaterThan(0);
   });
 });

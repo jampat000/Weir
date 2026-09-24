@@ -17,9 +17,9 @@ export const PROCESSING_FILE_STATUS_LABELS: Record<
   skipped: "Skipped",
   disabled: "Library off",
   on_hold: "On hold",
-  out_of_schedule: "Out of schedule",
-  blocked_upstream: "Blocked upstream",
-  passed_through: "Handed back unchanged",
+  out_of_schedule: "Waiting for library hours",
+  blocked_upstream: "Waiting for your media manager",
+  passed_through: "Passed through unchanged",
   rejected: "Rejected for a replacement",
   cancelled: "Cancelled",
 };
@@ -129,9 +129,8 @@ export interface ProcessingFilesQuery {
 
 export const processingFilesPath = () => "/api/v1/processing/files";
 
-export async function fetchProcessingFiles(
-  query: ProcessingFilesQuery = {},
-): Promise<ProcessingFilesPage> {
+/** A list path with its filters as a query string, leaving out the ones not set. */
+export function withQuery(path: string, query: object): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
     if (value !== undefined && value !== null && value !== "") {
@@ -139,9 +138,13 @@ export async function fetchProcessingFiles(
     }
   }
   const suffix = params.toString();
-  const path = suffix
-    ? `${processingFilesPath()}?${suffix}`
-    : processingFilesPath();
+  return suffix ? `${path}?${suffix}` : path;
+}
+
+export async function fetchProcessingFiles(
+  query: ProcessingFilesQuery = {},
+): Promise<ProcessingFilesPage> {
+  const path = withQuery(processingFilesPath(), query);
   const r = await apiFetch(path);
   await requireOk(path, r, "Could not load files");
   return readJson<ProcessingFilesPage>(r);
@@ -189,6 +192,8 @@ export async function requeueProcessingFile(
 }
 
 export interface ProcessingBulkRequeueQuery {
+  /** Only these files: the exact set on screen, whatever else matches the filters. */
+  file_ids?: number[];
   library_id?: number;
   file_status?: ProcessingFileStatus;
   path_contains?: string;
@@ -269,7 +274,7 @@ export async function fetchProcessingFileLog(
   await requireOk(
     path,
     response,
-    "Could not read that file's processing record",
+    "Weir couldn't load what happened to this file. Try again.",
   );
   return readJson<ProcessingFileLog>(response);
 }
