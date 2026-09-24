@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { BrandHeaderLink } from "../components/brand/brand-header-link";
+import { MainLandmark } from "../components/shared/page-loading";
 import {
   NavIconChevronLeft,
   NavIconChevronRight,
@@ -15,10 +16,12 @@ import { useLogoutMutation } from "../lib/auth/queries";
 import { useProcessingFilesAtOnceQuery } from "../lib/processing/queries";
 import { useAppSettingsQuery } from "../lib/settings/queries";
 import { useSystemReadinessQuery } from "../lib/system/readiness-queries";
+import { useModalFocus } from "../lib/ui/use-modal-focus";
 
-// Between phone width (a drawer below 921px) and 1400px the side menu shrinks to icons by itself, so
+// Between phone width (a drawer below 921px) and 1100px the side menu shrinks to icons by itself, so
 // the Processing lanes keep their room; a click on Collapse or Expand overrides it until a reload.
-const LAPTOP_WIDTH = "(min-width: 921px) and (max-width: 1400px)";
+// At 1100px and wider, including the common 1280px, every label stays readable (#697).
+const LAPTOP_WIDTH = "(min-width: 921px) and (max-width: 1099px)";
 
 function useMediaQuery(query: string): boolean {
   return useSyncExternalStore(
@@ -46,6 +49,14 @@ export function AppShell() {
   const suite = useAppSettingsQuery();
   const readiness = useSystemReadinessQuery();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // On phones the side menu is a drawer: opening it moves focus in, Escape closes it, and focus goes
+  // back to the Menu button (#697).
+  const firstPlace = useRef<HTMLAnchorElement>(null);
+  const drawer = useModalFocus<HTMLElement>({
+    open: sidebarOpen,
+    onClose: () => setSidebarOpen(false),
+    initialFocus: firstPlace,
+  });
   const [collapsedChoice, setCollapsedChoice] = useState<boolean | null>(null);
   const laptop = useMediaQuery(LAPTOP_WIDTH);
   const sidebarCollapsed = collapsedChoice ?? laptop;
@@ -72,6 +83,7 @@ export function AppShell() {
         className={`mm-sidebar${sidebarOpen ? " mm-sidebar--open" : ""}${sidebarCollapsed ? " mm-sidebar--collapsed" : ""}`}
         // Named for the app, so a screen reader announces where the user is.
         aria-label={productTitle}
+        ref={drawer}
       >
         <button
           type="button"
@@ -98,6 +110,7 @@ export function AppShell() {
               imported, how Weir treats your media, and Weir itself. */}
           <nav className="mm-sidebar-nav" aria-label="Primary">
             <NavLink
+              ref={firstPlace}
               to="/"
               end
               className={sidebarNavClass}
@@ -175,7 +188,7 @@ export function AppShell() {
                 className="mm-sidebar-version"
                 title="Installed Weir version reported by the running server"
               >
-                {appVersion ? `Version ${appVersion}` : "Version checking..."}
+                {appVersion ? `Version ${appVersion}` : "Checking version…"}
               </div>
               <button
                 type="button"
@@ -221,7 +234,9 @@ export function AppShell() {
               <span>Menu</span>
             </button>
           </div>
-          <Outlet />
+          <MainLandmark>
+            <Outlet />
+          </MainLandmark>
         </div>
       </main>
     </div>

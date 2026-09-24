@@ -1,8 +1,8 @@
 /**
  * A panel that slides over the page from the right, for editing or reading one thing without losing the page
  * behind it. Close it and you are exactly where you were. Anything that would otherwise open below the fold,
- * where clicking looks like nothing happened, belongs here. Escape closes it, focus moves into it and returns to
- * whatever opened it, and the page behind it does not scroll.
+ * where clicking looks like nothing happened, belongs here. Escape closes it, focus moves into it, Tab stays
+ * inside it and focus returns to whatever opened it, and the page behind it does not scroll.
  */
 import { useModalFocus } from "../../lib/ui/use-modal-focus";
 
