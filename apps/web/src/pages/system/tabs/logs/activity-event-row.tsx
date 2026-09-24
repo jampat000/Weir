@@ -2,15 +2,14 @@ import type { ReactNode } from "react";
 
 import { FileProgressDetail } from "../../../../components/activity/file-progress-detail";
 import { RemuxPassDetail } from "../../../../components/activity/remux-pass-detail";
+import { StructuredDetailFacts } from "../../../../components/activity/structured-detail-facts";
 import {
-  compactActivityTitle,
   eventDisplay,
   inlineDetailOf,
   type ActivityDisplay,
   type ActivityTone,
 } from "../../../../lib/activity/activity-display";
 import { activityTriggerLabel } from "../../../../lib/activity/activity-runs";
-import { parseActivityDetail } from "../../../../lib/activity/detail";
 import {
   FILE_PROGRESS_EVENT,
   REMUX_PASS_COMPLETED_EVENT,
@@ -35,15 +34,6 @@ function EventDetails({
     body = <FileProgressDetail detail={display.detail} />;
   } else if (ev.event_type === REMUX_PASS_COMPLETED_EVENT) {
     body = <RemuxPassDetail detail={display.detail} />;
-  } else if (
-    ev.event_type === "system.reconciliation.repair" &&
-    parseActivityDetail(ev.detail)
-  ) {
-    body = (
-      <div className="mm-activity-item__structured">
-        <p className="mm-activity-item__structured-text">{ev.detail}</p>
-      </div>
-    );
   }
   if (!body && inlineDetailOf(ev, display) !== null) {
     return null;
@@ -52,9 +42,7 @@ function EventDetails({
     <details className="mm-activity-item__more">
       <summary>Details</summary>
       <div className="mm-activity-item__more-body">
-        {body ?? (
-          <p className="mm-activity-item__more-text">{display.detail}</p>
-        )}
+        {body ?? <StructuredDetailFacts detail={display.detail} />}
       </div>
     </details>
   );
@@ -92,7 +80,7 @@ export function ActivityEventRow({
       <div className="mm-activity-item__main">
         <div className="mm-activity-item__head">
           <h2 className="mm-activity-item__title" title={display.title}>
-            {compactActivityTitle(display.title)}
+            {display.title}
           </h2>
           {count > 1 ? (
             <span

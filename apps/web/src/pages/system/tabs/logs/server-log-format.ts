@@ -10,8 +10,8 @@ export const LOG_LEVEL_OPTIONS: { value: LogLevelFilter; label: string }[] = [
   { value: "ERROR", label: "Errors" },
 ];
 
-/** How many entries one page of the server log shows. */
-export const SERVER_LOG_PAGE_SIZE = 100;
+/** How many entries one page of the server log shows: the most the server itself will ever return. */
+export const SERVER_LOG_PAGE_SIZE = 250;
 
 /** A level as the list shows it: INFO reads as a word, the others are already loud enough. */
 export function logLevelLabel(level: string): string {
