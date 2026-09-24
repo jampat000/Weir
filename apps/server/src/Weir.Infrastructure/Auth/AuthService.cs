@@ -23,6 +23,7 @@ public sealed partial class AuthService : IDisposable
     private readonly WeirOptions _options;
     private readonly TimeProvider _time;
     private readonly SqliteDatabase _database;
+    private readonly AuthStore _users;
     private readonly ILogger _logger;
 
     /// <summary>
@@ -32,12 +33,13 @@ public sealed partial class AuthService : IDisposable
     /// </summary>
     private readonly SemaphoreSlim _argon2Concurrency = new(Math.Max(1, Environment.ProcessorCount));
 
-    public AuthService(WeirOptions options, TimeProvider time, SqliteDatabase database, ILoggerFactory loggerFactory)
+    public AuthService(WeirOptions options, TimeProvider time, SqliteDatabase database, AuthStore users, ILoggerFactory loggerFactory)
     {
         ArgumentNullException.ThrowIfNull(loggerFactory);
         _options = options;
         _time = time;
         _database = database;
+        _users = users ?? throw new ArgumentNullException(nameof(users));
         _logger = loggerFactory.CreateLogger("weir.platform.auth.service");
     }
 
@@ -54,7 +56,7 @@ public sealed partial class AuthService : IDisposable
             return null;
         }
 
-        var row = await AuthStore.FindSessionByTokenHashAsync(uow, SessionTokens.Hash(rawCookieToken)).ConfigureAwait(false);
+        var row = await _users.FindSessionByTokenHashAsync(uow, SessionTokens.Hash(rawCookieToken)).ConfigureAwait(false);
         if (row is null)
         {
             return null;
@@ -74,7 +76,7 @@ public sealed partial class AuthService : IDisposable
             return null;
         }
 
-        var user = await AuthStore.GetUserAsync(uow, row.UserId).ConfigureAwait(false);
+        var user = await _users.GetUserAsync(uow, row.UserId).ConfigureAwait(false);
         if (user is null || !user.IsActive)
         {
             return null;
@@ -84,7 +86,7 @@ public sealed partial class AuthService : IDisposable
         {
             // Its own short transaction: on the request's unit of work, a page load's once-a-minute touch would hold the write
             // lock until the whole request finished, and every other lane would wait on a read (#708).
-            await WriteOnItsOwnAsync(uow, own => AuthStore.TouchSessionAsync(own, row.Id, now)).ConfigureAwait(false);
+            await WriteOnItsOwnAsync(uow, own => _users.TouchSessionAsync(own, row.Id, now)).ConfigureAwait(false);
             row = row with { LastSeenAt = now };
         }
 
@@ -96,7 +98,7 @@ public sealed partial class AuthService : IDisposable
     /// follows cannot roll it back (#529).
     /// </summary>
     private Task RevokeExpiredAsync(UnitOfWork uow, string sessionId, Timestamp now) =>
-        WriteOnItsOwnAsync(uow, own => AuthStore.RevokeSessionAsync(own, sessionId, now));
+        WriteOnItsOwnAsync(uow, own => _users.RevokeSessionAsync(own, sessionId, now));
 
     /// <summary>
     /// Runs <paramref name="write"/> in a unit of work of its own and commits it at once, unless <paramref name="uow"/> is

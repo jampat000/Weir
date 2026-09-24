@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Weir.Api.Http;
 using Weir.Core.Activity;
@@ -15,12 +16,24 @@ public static class AuthAccountEndpoints
 {
     public static IEndpointRouteBuilder MapAuthAccountEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("POST", "/auth/change-username", PostChangeUsernameAsync);
-        endpoints.MapV1("POST", "/auth/change-password", PostChangePasswordAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<AuthAccountEndpointHandlers>();
+        endpoints.MapV1("POST", "/auth/change-username", handlers.PostChangeUsernameAsync);
+        endpoints.MapV1("POST", "/auth/change-password", handlers.PostChangePasswordAsync);
         return endpoints;
     }
+}
 
-    private static async Task<ApiResult> PostChangeUsernameAsync(ApiRequest request)
+/// <summary>Handlers for <see cref="AuthAccountEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class AuthAccountEndpointHandlers
+{
+    private readonly ActivityStore _activity;
+
+    public AuthAccountEndpointHandlers(ActivityStore activity)
+    {
+        _activity = activity ?? throw new ArgumentNullException(nameof(activity));
+    }
+
+    public async Task<ApiResult> PostChangeUsernameAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         var user = await request.RequireUserAsync().ConfigureAwait(false);
@@ -51,13 +64,13 @@ public static class AuthAccountEndpoints
         }
 
         AuthEndpoints.Logger(request).LogInformation("auth event: username changed (user_id={UserId})", user.User.Id);
-        await ActivityStore.RecordAsync(uow, ActivityEventTypes.AuthUsernameChanged, "auth", "Username changed", $"Signed in as {changed}.").ConfigureAwait(false);
+        await _activity.RecordAsync(uow, ActivityEventTypes.AuthUsernameChanged, "auth", "Username changed", $"Signed in as {changed}.").ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
             .Set("message", "Username changed. Use it the next time you sign in.")
             .Set("username", changed));
     }
 
-    private static async Task<ApiResult> PostChangePasswordAsync(ApiRequest request)
+    public async Task<ApiResult> PostChangePasswordAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         var user = await request.RequireUserAsync().ConfigureAwait(false);
@@ -87,7 +100,7 @@ public static class AuthAccountEndpoints
         }
 
         AuthEndpoints.Logger(request).LogInformation("auth event: password changed (user_id={UserId})", user.User.Id);
-        await ActivityStore.RecordAsync(uow, ActivityEventTypes.AuthPasswordChanged, "auth", "Password changed", user.User.Username).ConfigureAwait(false);
+        await _activity.RecordAsync(uow, ActivityEventTypes.AuthPasswordChanged, "auth", "Password changed", user.User.Username).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject().Set("message", "Password changed. Sign in again with your new password."));
     }
 }

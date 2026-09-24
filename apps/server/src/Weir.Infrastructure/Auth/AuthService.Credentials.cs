@@ -13,7 +13,7 @@ public sealed partial class AuthService
     /// <summary>Checks a username and password, padding a missing or inactive account with a dummy verify so timing does not reveal which accounts exist.</summary>
     public async Task<UserRecord?> AuthenticateAsync(UnitOfWork uow, string username, string password)
     {
-        var user = await AuthStore.FindUserByLowerUsernameAsync(uow, (username ?? string.Empty).Trim().ToLowerInvariant()).ConfigureAwait(false);
+        var user = await _users.FindUserByLowerUsernameAsync(uow, (username ?? string.Empty).Trim().ToLowerInvariant()).ConfigureAwait(false);
         if (user is null || !user.IsActive)
         {
             await VerifyPasswordAsync(password, PasswordHasher.DummyPasswordHash).ConfigureAwait(false);
@@ -78,7 +78,7 @@ public sealed partial class AuthService
             now,
             null,
             WireStrings.Slice(label.Length == 0 ? SessionRules.DefaultClientLabel : label, 80));
-        await AuthStore.InsertSessionAsync(uow, row).ConfigureAwait(false);
+        await _users.InsertSessionAsync(uow, row).ConfigureAwait(false);
         var revoked = await EnforceSessionLimitAsync(uow, user.Id).ConfigureAwait(false);
         if (revoked > 0)
         {
@@ -94,17 +94,17 @@ public sealed partial class AuthService
     {
         var cap = Math.Max(1, maxActiveSessions);
         var now = Now();
-        var active = await AuthStore.CountActiveSessionsAsync(uow, userId, now).ConfigureAwait(false);
+        var active = await _users.CountActiveSessionsAsync(uow, userId, now).ConfigureAwait(false);
         var overflow = active - cap;
         if (overflow <= 0)
         {
             return 0;
         }
 
-        var rows = await AuthStore.OldestActiveSessionsAsync(uow, userId, now, overflow).ConfigureAwait(false);
+        var rows = await _users.OldestActiveSessionsAsync(uow, userId, now, overflow).ConfigureAwait(false);
         foreach (var row in rows)
         {
-            await AuthStore.RevokeSessionAsync(uow, row.Id, now).ConfigureAwait(false);
+            await _users.RevokeSessionAsync(uow, row.Id, now).ConfigureAwait(false);
         }
 
         return rows.Count;
@@ -119,7 +119,7 @@ public sealed partial class AuthService
             return false;
         }
 
-        await AuthStore.RevokeSessionAsync(uow, pair.Session.Id, Now()).ConfigureAwait(false);
+        await _users.RevokeSessionAsync(uow, pair.Session.Id, Now()).ConfigureAwait(false);
         return true;
     }
 
@@ -129,6 +129,6 @@ public sealed partial class AuthService
         var moment = now ?? Now();
         var idleCutoff = Timestamp.FromUtc(SessionRules.SafeSubtract(moment.AsUtc, SessionRules.Minutes(_options.SessionIdleMinutes)));
         var trustedCutoff = Timestamp.FromUtc(SessionRules.SafeSubtract(moment.AsUtc, SessionRules.Minutes(_options.SessionTrustedIdleMinutes)));
-        return AuthStore.DeleteInactiveSessionsAsync(uow, moment, idleCutoff, trustedCutoff);
+        return _users.DeleteInactiveSessionsAsync(uow, moment, idleCutoff, trustedCutoff);
     }
 }

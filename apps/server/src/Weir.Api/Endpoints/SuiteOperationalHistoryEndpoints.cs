@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
@@ -13,19 +14,31 @@ public static class SuiteOperationalHistoryEndpoints
 {
     public static IEndpointRouteBuilder MapSuiteOperationalHistoryEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/suite/operational-history/preview", GetOperationalHistoryPreviewAsync);
-        endpoints.MapV1("POST", "/suite/operational-history/reset", PostOperationalHistoryResetAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<SuiteOperationalHistoryEndpointHandlers>();
+        endpoints.MapV1("GET", "/suite/operational-history/preview", handlers.GetOperationalHistoryPreviewAsync);
+        endpoints.MapV1("POST", "/suite/operational-history/reset", handlers.PostOperationalHistoryResetAsync);
         return endpoints;
     }
+}
 
-    private static async Task<ApiResult> GetOperationalHistoryPreviewAsync(ApiRequest request)
+/// <summary>Handlers for <see cref="SuiteOperationalHistoryEndpoints"/>, constructor-injected with the store they need.</summary>
+internal sealed class SuiteOperationalHistoryEndpointHandlers
+{
+    private readonly OperationalHistoryStore _history;
+
+    public SuiteOperationalHistoryEndpointHandlers(OperationalHistoryStore history)
+    {
+        _history = history ?? throw new ArgumentNullException(nameof(history));
+    }
+
+    public async Task<ApiResult> GetOperationalHistoryPreviewAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(HistoryOut("preview", await OperationalHistoryStore.PreviewAsync(uow).ConfigureAwait(false)));
+        return ApiRoutes.Ok(HistoryOut("preview", await _history.PreviewAsync(uow).ConfigureAwait(false)));
     }
 
-    private static async Task<ApiResult> PostOperationalHistoryResetAsync(ApiRequest request)
+    public async Task<ApiResult> PostOperationalHistoryResetAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
@@ -43,7 +56,7 @@ public static class SuiteOperationalHistoryEndpoints
         }
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var result = await OperationalHistoryStore.ResetAsync(uow).ConfigureAwait(false);
+        var result = await _history.ResetAsync(uow).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(HistoryOut("reset", result));
     }
