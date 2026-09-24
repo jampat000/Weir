@@ -142,8 +142,8 @@ jobs:
             apps/tray/**/packages.lock.json
 
       # The vendor folder is gitignored, so without a cache every run downloads FFmpeg and MKVToolNix again.
-      # FFmpeg follows upstream's latest build, so its key is that build's checksum; MKVToolNix is pinned in
-      # build-velopack.ps1, so its key is that file. Either way the build script re-checks the vendored copy.
+      # Both are pinned in build-velopack.ps1: FFmpeg's key reads that pin's own values (tag, archive,
+      # SHA256), MKVToolNix's key hashes the whole file. Either way the build script re-checks the vendored copy.
       - name: FFmpeg build checksum
         id: ffmpeg
         shell: bash

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-// Prints the cache key for the Windows package's vendored FFmpeg: the checksum of the build
-// packaging/windows/build-velopack.ps1 would download today. FFmpeg tracks BtbN's continuously republished
-// `latest` build rather than a pinned version, so its checksum is the only thing that identifies what the
-// cache holds: the cache is reused until upstream publishes a new build, and never saved once per run.
+// Prints the cache key for the Windows package's vendored FFmpeg, read straight from the pin in
+// packaging/windows/build-velopack.ps1: the release tag, the archive name and the committed
+// archive SHA256. No network call is needed, unlike MKVToolNix's neighbouring pin further down
+// this same file (whose cache key is a hash of the whole script instead, for the same reason).
+// The cache changes exactly when the pin does, and never otherwise.
 //
-// Usage (a workflow step with an id): node scripts/ffmpeg-cache-key.mjs >> "$GITHUB_OUTPUT"   -> key=ffmpeg-vendor-<sha256>
+// Usage (a workflow step with an id): node scripts/ffmpeg-cache-key.mjs >> "$GITHUB_OUTPUT"   -> key=ffmpeg-vendor-<tag>-<archive>-<sha256>
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,15 +20,11 @@ function assignment(name) {
   return match[1];
 }
 
+const releaseTag = assignment("ffmpegReleaseTag");
 const archiveName = assignment("ffmpegArchiveName");
-const checksumsUrl = assignment("ffmpegChecksumsUrl");
+const archiveSha256 = assignment("ffmpegArchiveSha256");
+if (!/^[0-9a-f]{64}$/i.test(archiveSha256)) {
+  throw new Error(`$ffmpegArchiveSha256 in build-velopack.ps1 is not a 64-character hex SHA256: ${archiveSha256}`);
+}
 
-const response = await fetch(checksumsUrl, { signal: AbortSignal.timeout(30_000) });
-if (!response.ok) throw new Error(`GET ${checksumsUrl} returned ${response.status}.`);
-const line = (await response.text())
-  .split(/\r?\n/)
-  .map((entry) => entry.trim().split(/\s+\*?/))
-  .find(([, file]) => file === archiveName);
-if (!line || !/^[0-9a-f]{64}$/i.test(line[0])) throw new Error(`No checksum for ${archiveName} in ${checksumsUrl}.`);
-
-console.log(`key=ffmpeg-vendor-${line[0].toLowerCase()}`);
+console.log(`key=ffmpeg-vendor-${releaseTag}-${archiveName}-${archiveSha256.toLowerCase()}`);

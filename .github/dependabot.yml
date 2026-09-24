@@ -98,3 +98,14 @@ updates:
       tray:
         patterns:
           - "*"
+
+  # The Dockerfile's base images, pinned by digest with the tag kept as a comment for context.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      docker:
+        patterns:
+          - "*"

@@ -33,6 +33,10 @@ jobs:
             build-mode: none
           - language: javascript-typescript
             build-mode: none
+          # Scans the workflow YAML itself for injection (untrusted github.event.* reaching run:,
+          # unpinned actions, etc.) — same build-mode none, no extra setup.
+          - language: actions
+            build-mode: none
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

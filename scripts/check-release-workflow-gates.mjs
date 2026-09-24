@@ -162,7 +162,7 @@ for (const marker of [
   requireText(validate, marker, `${RELEASE} validate job`);
 }
 
-// The amd64 candidate: built unpushed, started, audited end to end, evidence kept.
+// The amd64 candidate: built unpushed, scanned, started, audited end to end, evidence kept.
 const candidate = requireJob(release, "docker-candidate", RELEASE);
 requireOrder(
   candidate,
@@ -170,6 +170,7 @@ requireOrder(
     "- name: Build unpushed Docker release candidate",
     "platforms: linux/amd64",
     "push: false",
+    "- name: Trivy scan of Docker release candidate",
     "- name: Start unpushed Docker release candidate",
     "- name: Full live E2E against unpushed Docker release candidate",
     "- name: Upload Docker release-candidate evidence",
@@ -183,6 +184,11 @@ for (const marker of [
   "WEIR_LIVE_E2E_FIXTURE_SERVER_ROOT: /e2e-fixture",
   "WEIR_LIVE_E2E_FIXTURE_HOST_ROOT:$WEIR_LIVE_E2E_FIXTURE_SERVER_ROOT",
   "name: weir-docker-release-candidate-audit",
+  // The Trivy scan must actually be able to fail the release: a known HIGH/CRITICAL with a fix
+  // available blocks it, and ignore-unfixed keeps that from being an unrelated, un-actionable CVE.
+  "severity: HIGH,CRITICAL",
+  "ignore-unfixed: true",
+  'exit-code: "1"',
 ]) {
   requireText(candidate, marker, `${RELEASE} docker-candidate job`);
 }
@@ -199,18 +205,25 @@ requireOrder(
   `${RELEASE} docker-arm64 job`,
 );
 
-// Checksums describe the files as published. Signing rewrites Setup.exe, so hashing must come after it.
+// Checksums describe the files as published. Signing rewrites Setup.exe, so hashing must come
+// after it, and the provenance attestation must cover the same final bytes, so it comes after
+// checksums and before upload.
+const windowsSmoke = requireJob(release, "windows-smoke", RELEASE);
 requireOrder(
-  requireJob(release, "windows-smoke", RELEASE),
+  windowsSmoke,
   [
     "- name: Validate release version alignment",
     "- name: Sign Velopack release artifacts",
     "- name: Verify Velopack setup signature",
     "- name: Generate release artifact checksums",
+    "- name: Attest provenance of Windows release artifacts",
     "- name: Upload Velopack release artifacts",
   ],
   `${RELEASE} windows-smoke job`,
 );
+for (const marker of ["id-token: write", "attestations: write", "uses: actions/attest-build-provenance@"]) {
+  requireText(windowsSmoke, marker, `${RELEASE} windows-smoke job`);
+}
 
 // --- ci.yml and the workflows it calls --------------------------------------------------------------
 

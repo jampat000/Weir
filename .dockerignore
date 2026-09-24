@@ -14,9 +14,11 @@ apps/server/tests
 apps/tray
 tests
 packaging/windows/vendor
-.env
-.env.*
-!.env.example
+# Every real .env file, anywhere in the repo — not just the root — since apps/web's own build
+# step (`COPY apps/web .`) would otherwise bake a stray apps/web/.env's VITE_* values into the
+# shipped bundle. .env.example files carry no secrets and stay, wherever they live.
+**/.env*
+!**/.env.example
 *.md
 scripts/node_modules
 terminals
