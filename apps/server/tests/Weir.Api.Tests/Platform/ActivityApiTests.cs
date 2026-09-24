@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Api.Endpoints;
 using Weir.Core.Activity;
+using Weir.Infrastructure.Activity;
 using static Weir.Api.Tests.Platform.ApiTestClient;
 
 namespace Weir.Api.Tests.Platform;
@@ -285,6 +286,32 @@ public sealed class ActivityApiTests
     }
 
     [Fact]
+    public async Task An_event_written_outside_the_apps_own_connection_still_reaches_the_stream_and_the_list()
+    {
+        // A raw insert on its own connection, like `weir recover` or a restored backup: nobody calls
+        // ActivityNotifications.Track for it, so only the shared poll (ActivityLatestPollTask), not a commit
+        // signal, can tell the stream about it.
+        await using var server = await SeededServerAsync();
+        var client = await AdminAsync(server);
+        var notifier = server.Services.GetRequiredService<ActivityLatestNotifier>();
+        var beforeVersion = notifier.Snapshot().Version;
+
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO activity_events (created_at, event_type, module, title, detail) " +
+            "VALUES (CURRENT_TIMESTAMP, 'auth.password_changed', 'auth', 'Password changed', 'from outside')");
+        var insertedId = await TestDatabase.ScalarAsync(server, "SELECT max(id) FROM activity_events");
+
+        var poll = server.Services.GetRequiredService<ActivityLatestPollTask>();
+        await poll.RunOnceAsync(CancellationToken.None);
+
+        var after = notifier.Snapshot();
+        Assert.True(after.Version > beforeVersion);
+        Assert.Equal(insertedId, after.LatestId);
+        Assert.Contains("Password changed", await TitlesAboutWeirAsync(client));
+    }
+
+    [Fact]
     public async Task The_stream_sends_each_change_and_its_latest_id_never_goes_backwards()
     {
         var notifier = new ActivityLatestNotifier();
@@ -430,5 +457,12 @@ public sealed class ActivityApiTests
         using var response = await client.GetAsync("/api/v1/activity/recent?module=processing" + (query.Length > 0 ? "&" + query : string.Empty));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return [.. (await Json(response))["items"]!.AsArray().Select(item => item!["title"]!.GetValue<string>()).Order(StringComparer.Ordinal)];
+    }
+
+    private static async Task<List<string>> TitlesAboutWeirAsync(ApiTestClient client)
+    {
+        using var response = await client.GetAsync("/api/v1/activity/recent?about=weir");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return [.. (await Json(response))["items"]!.AsArray().Select(item => item!["title"]!.GetValue<string>())];
     }
 }

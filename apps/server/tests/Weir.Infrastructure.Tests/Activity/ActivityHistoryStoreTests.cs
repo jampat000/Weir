@@ -90,6 +90,38 @@ public sealed class ActivityHistoryStoreTests
     }
 
     [Fact]
+    public async Task The_latest_poll_notifies_of_a_row_written_on_a_connection_the_notifier_never_saw_commit()
+    {
+        // A raw insert with no unit of work and no ActivityNotifications.Track call, like `weir recover`'s
+        // own connection or a restored backup: only the poll, not a commit signal, can tell the notifier.
+        using var fixture = new StoreFixture();
+        var notifier = new ActivityLatestNotifier();
+        var poll = new ActivityLatestPollTask(fixture.Database, notifier);
+
+        await fixture.Execute("INSERT INTO activity_events (event_type, module, title) VALUES ('auth.password_changed', 'auth', 'Password changed')");
+        var insertedId = await fixture.Scalar("SELECT max(id) FROM activity_events");
+
+        await poll.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(new ActivityLatest(insertedId, 1), notifier.Snapshot());
+    }
+
+    [Fact]
+    public async Task The_latest_poll_does_nothing_when_the_latest_id_has_not_moved()
+    {
+        using var fixture = new StoreFixture();
+        var notifier = new ActivityLatestNotifier();
+        var poll = new ActivityLatestPollTask(fixture.Database, notifier);
+        await fixture.Execute("INSERT INTO activity_events (event_type, module, title) VALUES ('auth.password_changed', 'auth', 'Password changed')");
+        await poll.RunOnceAsync(CancellationToken.None);
+        var afterFirstPoll = notifier.Snapshot();
+
+        await poll.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(afterFirstPoll, notifier.Snapshot());
+    }
+
+    [Fact]
     public async Task Processing_records_past_their_retention_are_pruned_and_zero_keeps_everything()
     {
         using var db = new JobsTestDatabase(keepSeedRows: true);

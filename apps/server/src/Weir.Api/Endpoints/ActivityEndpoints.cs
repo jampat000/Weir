@@ -210,8 +210,10 @@ public static class ActivityEndpoints
     /// </summary>
     /// <remarks>
     /// The database is read once per stream. After that every open stream waits on the one shared notifier, so an idle
-    /// stream costs nothing and a write reaches every stream at once (#720). <c>latest_event_id</c> never goes backwards
-    /// on a stream: an update to an older row (a progress rewrite) moves <c>activity_revision</c> on and repeats the id.
+    /// stream costs nothing and a write reaches every stream at once (#720). <see cref="Weir.Infrastructure.Activity.ActivityLatestPollTask"/>
+    /// notifies the same way for a write this process never saw commit, so the stream still catches it, just later.
+    /// <c>latest_event_id</c> never goes backwards on a stream: an update to an older row (a progress rewrite) moves
+    /// <c>activity_revision</c> on and repeats the id.
     /// </remarks>
     public static async IAsyncEnumerable<string> LatestFramesAsync(
         Func<CancellationToken, Task<long?>> readLatestId,
