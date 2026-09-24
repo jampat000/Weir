@@ -349,12 +349,15 @@ internal static class GoldenDivergences
     /// <c>Command '[...]' timed out after N seconds</c> message (single-quoted list). Every other field of either
     /// is unaffected by this fix, so a plain substring patch on the one changed token is enough to reuse the rest
     /// of the fixture unmodified. #498 patches the same two places: both also carry "-show_chapters" (see
-    /// <see cref="Weir.Core.Media.FfmpegCommands.BuildFfprobeArgv"/>), which the recorded fixtures lack.
+    /// <see cref="Weir.Core.Media.FfmpegCommands.BuildFfprobeArgv"/>), which the recorded fixtures lack. #723
+    /// patches in "-protocol_whitelist", "file" right before the source path, the last token of either list.
     /// </summary>
     public static string FfprobeCallLog(string message) =>
         message
             .Replace("\"-v\", \"quiet\"", "\"-v\", \"error\"", StringComparison.Ordinal)
             .Replace("'-v', 'quiet'", "'-v', 'error'", StringComparison.Ordinal)
             .Replace("\"-show_format\", \"", "\"-show_format\", \"-show_chapters\", \"", StringComparison.Ordinal)
-            .Replace("'-show_format', '", "'-show_format', '-show_chapters', '", StringComparison.Ordinal);
+            .Replace("'-show_format', '", "'-show_format', '-show_chapters', '", StringComparison.Ordinal)
+            .Replace("\"-show_chapters\", \"", "\"-show_chapters\", \"-protocol_whitelist\", \"file\", \"", StringComparison.Ordinal)
+            .Replace("'-show_chapters', '", "'-show_chapters', '-protocol_whitelist', 'file', '", StringComparison.Ordinal);
 }

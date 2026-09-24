@@ -136,7 +136,7 @@ public static class LibraryStore
         return count;
     }
 
-    public static async Task<ProcessingLibraryRecord> CreateAsync(UnitOfWork uow, ProcessingLibraryInput body)
+    public static async Task<ProcessingLibraryRecord> CreateAsync(UnitOfWork uow, ProcessingLibraryInput body, string? weirHome = null)
     {
         var existingNames = (await ListAsync(uow).ConfigureAwait(false)).Select(l => l.Name).ToHashSet(StringComparer.Ordinal);
         var name = LibraryRules.ValidateName(body.Name, existingNames);
@@ -147,7 +147,7 @@ public static class LibraryStore
         var ruleSetExists = body.RuleSetId is { } wantedRuleSet && await GetRuleSetAsync(uow, wantedRuleSet).ConfigureAwait(false) is not null;
         var others = await OtherFoldersAsync(uow, excludeId: null).ConfigureAwait(false);
         var row = LibraryRules.ApplyFields(new ProcessingLibraryRecord { Name = name, MediaType = scope, DisplayOrder = displayOrder }, body, ruleSetExists);
-        LibraryRules.ValidateFolders(row.WatchedFolder, row.WorkFolder, row.OutputFolder, others);
+        LibraryRules.ValidateFolders(row.WatchedFolder, row.WorkFolder, row.OutputFolder, others, weirHome);
 
         // A library made without a profile gets its kind's default, so no library runs on rules nobody can see.
         if (row.RuleSetId is null)
@@ -161,7 +161,7 @@ public static class LibraryStore
         return created;
     }
 
-    public static async Task<ProcessingLibraryRecord> UpdateAsync(UnitOfWork uow, ProcessingLibraryRecord existing, ProcessingLibraryInput body)
+    public static async Task<ProcessingLibraryRecord> UpdateAsync(UnitOfWork uow, ProcessingLibraryRecord existing, ProcessingLibraryInput body, string? weirHome = null)
     {
         var existingNames = (await ListAsync(uow).ConfigureAwait(false))
             .Where(l => l.Id != existing.Id).Select(l => l.Name).ToHashSet(StringComparer.Ordinal);
@@ -170,7 +170,7 @@ public static class LibraryStore
         var ruleSetExists = body.RuleSetId is { } wantedRuleSet && await GetRuleSetAsync(uow, wantedRuleSet).ConfigureAwait(false) is not null;
         var others = await OtherFoldersAsync(uow, excludeId: existing.Id).ConfigureAwait(false);
         var row = LibraryRules.ApplyFields(existing with { Name = name, MediaType = scope }, body, ruleSetExists);
-        LibraryRules.ValidateFolders(row.WatchedFolder, row.WorkFolder, row.OutputFolder, others);
+        LibraryRules.ValidateFolders(row.WatchedFolder, row.WorkFolder, row.OutputFolder, others, weirHome);
 
         await UpdateRowAsync(uow, row).ConfigureAwait(false);
         var updated = await GetAsync(uow, existing.Id).ConfigureAwait(false) ?? throw new InvalidOperationException("Library disappeared during update.");

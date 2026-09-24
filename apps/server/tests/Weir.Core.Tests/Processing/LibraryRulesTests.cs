@@ -108,4 +108,123 @@ public sealed class LibraryRulesTests
     [Fact]
     public void A_null_rule_set_id_is_always_accepted() =>
         Assert.Null(LibraryRules.ValidateRuleSet(null, exists: false));
+
+    // --- folder-safety rules (#723) ---------------------------------------------------------
+
+    [Fact]
+    public void A_relative_watched_folder_is_refused()
+    {
+        var exception = Assert.Throws<ProcessingLibraryException>(() => LibraryRules.ValidateFolderPath("watched", "media/watched"));
+        Assert.Contains("absolute", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_empty_folder_needs_no_validation_at_all() =>
+        LibraryRules.ValidateFolderPath("watched", "   ");
+
+    [Fact]
+    public void A_folder_with_a_parent_segment_is_refused()
+    {
+        var exception = Assert.Throws<ProcessingLibraryException>(() => LibraryRules.ValidateFolderPath("watched", @"C:\media\..\other"));
+        Assert.Contains("..", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(@"C:\")]
+    [InlineData(@"D:\")]
+    [InlineData("/")]
+    public void A_drive_or_filesystem_root_cannot_be_a_library_folder(string root)
+    {
+        var exception = Assert.Throws<ProcessingLibraryException>(() => LibraryRules.ValidateFolderPath("watched", root));
+        Assert.Contains("root of a drive", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_ordinary_absolute_folder_is_accepted()
+    {
+        LibraryRules.ValidateFolderPath("watched", @"C:\Media\Movies");
+        LibraryRules.ValidateFolderPath("watched", "/media/movies");
+    }
+
+    [Theory]
+    [InlineData(@"C:\ProgramData\Weir")]
+    [InlineData(@"C:\ProgramData\Weir\bin\ffmpeg")]
+    public void Weirs_own_data_folder_or_anything_inside_it_cannot_be_a_library_folder(string folder)
+    {
+        var exception = Assert.Throws<ProcessingLibraryException>(() =>
+            LibraryRules.ValidateFolderPath("watched", folder, weirHome: @"C:\ProgramData\Weir"));
+        Assert.Contains("data folder", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_folder_that_merely_shares_a_prefix_with_weir_home_is_accepted()
+    {
+        // "C:\ProgramData\Weird" is not inside "C:\ProgramData\Weir" — a naive prefix check without a
+        // separator boundary would wrongly refuse it.
+        LibraryRules.ValidateFolderPath("watched", @"C:\ProgramData\Weird", weirHome: @"C:\ProgramData\Weir");
+    }
+
+    [Theory]
+    [InlineData("/etc")]
+    [InlineData("/etc/weir")]
+    [InlineData("/usr")]
+    [InlineData("/bin")]
+    [InlineData("/sbin")]
+    [InlineData("/boot")]
+    [InlineData("/proc")]
+    [InlineData("/sys")]
+    [InlineData("/dev")]
+    [InlineData("/var/lib")]
+    [InlineData("/var/lib/weir")]
+    public void A_linux_system_folder_cannot_be_a_library_folder(string folder)
+    {
+        var exception = Assert.Throws<ProcessingLibraryException>(() => LibraryRules.ValidateFolderPath("watched", folder));
+        Assert.Contains("system folder", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_folder_under_var_but_not_var_lib_is_accepted() =>
+        LibraryRules.ValidateFolderPath("watched", "/var/media");
+
+    [Fact]
+    public void The_windows_directory_cannot_be_a_library_folder()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var windowsDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        var exception = Assert.Throws<ProcessingLibraryException>(() =>
+            LibraryRules.ValidateFolderPath("watched", Path.Combine(windowsDir, "System32")));
+        Assert.Contains("Windows system folder", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Program_files_cannot_be_a_library_folder()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        var exception = Assert.Throws<ProcessingLibraryException>(() => LibraryRules.ValidateFolderPath("watched", programFiles));
+        Assert.Contains("Windows system folder", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_whole_user_profile_folder_cannot_be_a_library_folder_but_a_folder_inside_it_can()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var exception = Assert.Throws<ProcessingLibraryException>(() => LibraryRules.ValidateFolderPath("watched", userProfile));
+        Assert.Contains("user profile folder", exception.Message, StringComparison.Ordinal);
+
+        LibraryRules.ValidateFolderPath("watched", Path.Combine(userProfile, "Downloads"));
+    }
 }

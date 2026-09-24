@@ -33,6 +33,49 @@ public static class ProcessingFailurePolicies
     }
 }
 
+/// <summary>What Weir does with a file its rules decline to process.</summary>
+public static class RejectedFileActions
+{
+    public const string Leave = "leave";
+    public const string DeleteFile = "delete_file";
+
+    public static readonly IReadOnlyList<string> All = [Leave, DeleteFile];
+}
+
+/// <summary>What happens when a remux's output name already exists.</summary>
+public static class OutputCollisionPolicies
+{
+    public const string Replace = "replace";
+    public const string Skip = "skip";
+    public const string KeepBoth = "keep_both";
+    public const string ReplaceIfLarger = "replace_if_larger";
+    public const string ReplaceIfNewer = "replace_if_newer";
+
+    public static readonly IReadOnlyList<string> All = [Replace, Skip, KeepBoth, ReplaceIfLarger, ReplaceIfNewer];
+}
+
+/// <summary>How a library asks ffmpeg to decode for hardware-accelerated work.</summary>
+public static class HardwareDecodeModes
+{
+    public const string Off = "off";
+    public const string Auto = "auto";
+    public const string Device = "device";
+
+    public static readonly IReadOnlyList<string> All = [Off, Auto, Device];
+}
+
+/// <summary>How strictly ffmpeg treats a standards violation it finds in the source.</summary>
+public static class FfmpegStrictnessLevels
+{
+    public const string Very = "very";
+    public const string Strict = "strict";
+    public const string Normal = "normal";
+    public const string Unofficial = "unofficial";
+    public const string Experimental = "experimental";
+
+    public static readonly IReadOnlyList<string> All = [Very, Strict, Normal, Unofficial, Experimental];
+}
+
 /// <summary>One <c>rule_sets</c> row.</summary>
 public sealed record ProcessingRuleSetRecord
 {

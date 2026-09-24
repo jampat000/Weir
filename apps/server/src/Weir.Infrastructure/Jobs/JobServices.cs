@@ -69,6 +69,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
     {
         LastReport = await StartupRecovery.RunAsync(_store, _options.WeirHome, _time.GetUtcNow(), _logger, cancellationToken).ConfigureAwait(false);
         await GiveEveryLibraryAProfileAsync(cancellationToken).ConfigureAwait(false);
+        await WarnAboutReservedLibraryFoldersAsync(cancellationToken).ConfigureAwait(false);
 
         // #506's startup sweep runs after the existing recovery above and before any worker starts claiming jobs (this
         // hosted service is registered ahead of the worker lane) — see docs/archive/server-port-notes.md, "Library mode: safe swap".
@@ -110,6 +111,45 @@ public sealed class JobsStartupRecoveryService : IHostedService
         catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
         {
             _logger.LogWarning(exception, "Could not give every library a profile; this is tried again at the next start.");
+        }
+    }
+
+    /// <summary>
+    /// The folder-safety rule (drive roots, Weir's own home, system folders) is validated on save, not on load, so an
+    /// existing library that already points at such a folder keeps working. This logs a warning for each one at
+    /// startup instead, so an operator with a grandfathered folder finds out without the library being touched.
+    /// </summary>
+    private async Task WarnAboutReservedLibraryFoldersAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var uow = await UnitOfWork.OpenAsync(_store.Database, cancellationToken).ConfigureAwait(false);
+            await using (uow.ConfigureAwait(false))
+            {
+                var libraries = await LibraryStore.ListAsync(uow).ConfigureAwait(false);
+                foreach (var library in libraries)
+                {
+                    foreach (var (label, folder) in new[] { ("watched", library.WatchedFolder), ("work", library.WorkFolder), ("output", library.OutputFolder) })
+                    {
+                        try
+                        {
+                            LibraryRules.ValidateFolderPath(label, folder, _options.WeirHome);
+                        }
+                        catch (ProcessingLibraryException exception)
+                        {
+                            _logger.LogWarning(
+                                "Library {LibraryName}'s {Label} folder no longer meets Weir's folder rules: {Reason} It keeps working until the library is next saved.",
+                                library.Name,
+                                label,
+                                exception.Message);
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
+        {
+            _logger.LogWarning(exception, "Could not check existing libraries against the folder rules; this is tried again at the next start.");
         }
     }
 

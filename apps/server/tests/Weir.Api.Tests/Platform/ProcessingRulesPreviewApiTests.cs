@@ -59,10 +59,15 @@ public sealed class ProcessingRulesPreviewApiTests
         return (server, runner);
     }
 
-    private static (string Watched, string Output) MakeLibraryFolders(WeirTestServer server)
+    /// <summary>
+    /// Outside <see cref="WeirTestServer.Home"/> (Weir's data folder for this test run) deliberately: a
+    /// library's watched/output folders may not be Weir's own data folder or a folder inside it.
+    /// </summary>
+    private static (string Watched, string Output) MakeLibraryFolders()
     {
-        var watched = Path.Join(server.Home, "watched");
-        var output = Path.Join(server.Home, "output");
+        var root = Directory.CreateTempSubdirectory("weir-preview-test-").FullName;
+        var watched = Path.Join(root, "watched");
+        var output = Path.Join(root, "output");
         Directory.CreateDirectory(watched);
         Directory.CreateDirectory(output);
         return (watched, output);
@@ -101,7 +106,7 @@ public sealed class ProcessingRulesPreviewApiTests
         await TestDatabase.SeedAdminAsync(server);
         var client = new ApiTestClient(server);
         await client.SignInAsync();
-        var (watched, output) = MakeLibraryFolders(server);
+        var (watched, output) = MakeLibraryFolders();
         var (libraryId, ruleSetId) = await SeedLibraryWithRuleSetAsync(client, watched, output, primaryAudioLang: "jpn");
         await File.WriteAllBytesAsync(Path.Join(watched, "movie.mkv"), new byte[16]);
         var ruleSetCountBefore = await TestDatabase.ScalarAsync(server, "SELECT COUNT(*) FROM rule_sets");
@@ -144,7 +149,7 @@ public sealed class ProcessingRulesPreviewApiTests
         await TestDatabase.SeedAdminAsync(server);
         var client = new ApiTestClient(server);
         await client.SignInAsync();
-        var (watched, output) = MakeLibraryFolders(server);
+        var (watched, output) = MakeLibraryFolders();
         var (libraryId, _) = await SeedLibraryWithRuleSetAsync(client, watched, output, primaryAudioLang: "eng");
         // Not written anywhere under the watched or output folder.
         await File.WriteAllBytesAsync(Path.Join(server.Home, "elsewhere.mkv"), new byte[16]);
@@ -164,7 +169,7 @@ public sealed class ProcessingRulesPreviewApiTests
         await TestDatabase.SeedAdminAsync(server);
         var client = new ApiTestClient(server);
         await client.SignInAsync();
-        var (watched, output) = MakeLibraryFolders(server);
+        var (watched, output) = MakeLibraryFolders();
         var (libraryId, _) = await SeedLibraryWithRuleSetAsync(client, watched, output, primaryAudioLang: "eng");
 
         using var response = await client.PostAsync(
@@ -182,7 +187,7 @@ public sealed class ProcessingRulesPreviewApiTests
         await TestDatabase.SeedAdminAsync(server);
         var client = new ApiTestClient(server);
         await client.SignInAsync();
-        var (watched, output) = MakeLibraryFolders(server);
+        var (watched, output) = MakeLibraryFolders();
         var (libraryId, _) = await SeedLibraryWithRuleSetAsync(client, watched, output, primaryAudioLang: "eng");
 
         using var neither = await client.PostAsync($"/api/v1/processing/libraries/{libraryId}/preview", new { csrf_token = await client.CsrfAsync() });
@@ -205,7 +210,7 @@ public sealed class ProcessingRulesPreviewApiTests
         await TestDatabase.SeedAdminAsync(server);
         var client = new ApiTestClient(server);
         await client.SignInAsync();
-        var (watched, output) = MakeLibraryFolders(server);
+        var (watched, output) = MakeLibraryFolders();
         var (libraryId, _) = await SeedLibraryWithRuleSetAsync(client, watched, output, primaryAudioLang: "eng");
         await File.WriteAllBytesAsync(Path.Join(watched, "movie.mkv"), new byte[16]);
         var jobsBefore = await TestDatabase.ScalarAsync(server, "SELECT COUNT(*) FROM jobs");
@@ -247,7 +252,7 @@ public sealed class ProcessingRulesPreviewApiTests
         await TestDatabase.SeedAdminAsync(server);
         var client = new ApiTestClient(server);
         await client.SignInAsync();
-        var (watched, output) = MakeLibraryFolders(server);
+        var (watched, output) = MakeLibraryFolders();
         var (libraryId, _) = await SeedLibraryWithRuleSetAsync(client, watched, output, primaryAudioLang: "jpn");
         await File.WriteAllBytesAsync(Path.Join(watched, "movie.mkv"), new byte[16]);
 
@@ -290,7 +295,7 @@ public sealed class ProcessingRulesPreviewApiTests
         await TestDatabase.SeedAdminAsync(server);
         var client = new ApiTestClient(server);
         await client.SignInAsync();
-        var (watched, output) = MakeLibraryFolders(server);
+        var (watched, output) = MakeLibraryFolders();
         var (libraryId, _) = await SeedLibraryWithRuleSetAsync(client, watched, output, primaryAudioLang: "eng");
         var elsewhere = Path.Join(server.Home, "elsewhere.mkv");
         await File.WriteAllBytesAsync(elsewhere, new byte[16]);

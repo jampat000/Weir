@@ -17,24 +17,22 @@ public interface IMediaToolResolver
 }
 
 /// <summary>
-/// Prefers <c>WEIR_FFMPEG_DIR</c>, then the tools bundled under the Weir home, then (packaged builds only) the
-/// tools next to the executable, then PATH. The environment is read on every call, so a tool installed or a
-/// variable changed while the server runs is picked up without a restart.
+/// Prefers <c>WEIR_FFMPEG_DIR</c>, then (packaged builds only) the tools bundled next to the executable, then
+/// PATH. Weir's data folder (<c>WEIR_HOME</c>) is never searched, because it is writable by every local
+/// account on a default Windows install, so a program planted there could never be trusted over Weir's own
+/// bundle. The environment is read on every call, so a tool installed or a variable changed while the server
+/// runs is picked up without a restart.
 /// </summary>
 public sealed class MediaToolResolver : IMediaToolResolver
 {
-    private readonly string _weirHome;
     private readonly string? _packagedAppDirectory;
     private readonly Func<string, string?> _getEnvironmentVariable;
     private readonly bool _windows;
 
-    /// <param name="weirHome">The Weir home directory.</param>
     /// <param name="packagedAppDirectory">The packaged app's directory, or null when not running packaged.</param>
     /// <param name="getEnvironmentVariable">Environment lookup; <see cref="Environment.GetEnvironmentVariable(string)"/> when null.</param>
-    public MediaToolResolver(string weirHome, string? packagedAppDirectory = null, Func<string, string?>? getEnvironmentVariable = null)
+    public MediaToolResolver(string? packagedAppDirectory = null, Func<string, string?>? getEnvironmentVariable = null)
     {
-        ArgumentNullException.ThrowIfNull(weirHome);
-        _weirHome = weirHome;
         _packagedAppDirectory = packagedAppDirectory;
         _getEnvironmentVariable = getEnvironmentVariable ?? Environment.GetEnvironmentVariable;
         _windows = OperatingSystem.IsWindows();
@@ -44,16 +42,14 @@ public sealed class MediaToolResolver : IMediaToolResolver
     /// The resolver for this process: a single-file publish (the Windows package and the Docker image) also looks in <c>&lt;app&gt;/bin/ffmpeg</c>, where the Windows package
     /// bundles ffmpeg and ffprobe.
     /// </summary>
-    public static MediaToolResolver ForCurrentProcess(string weirHome) =>
-        new(weirHome, string.IsNullOrEmpty(typeof(MediaToolResolver).Assembly.Location) ? AppContext.BaseDirectory : null);
+    public static MediaToolResolver ForCurrentProcess() =>
+        new(string.IsNullOrEmpty(typeof(MediaToolResolver).Assembly.Location) ? AppContext.BaseDirectory : null);
 
     public (string Ffprobe, string Ffmpeg) Resolve()
     {
         var userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var home = MediaToolLocations.Normalize(Path.GetFullPath(MediaToolLocations.ExpandUser(_weirHome, userHome, _windows)), _windows);
         var (ffprobeName, ffmpegName) = MediaToolLocations.ToolNames(_windows);
         var directories = MediaToolLocations.CandidateDirectories(
-            home,
             _getEnvironmentVariable(MediaToolLocations.FfmpegDirEnvironmentVariable),
             userHome,
             _packagedAppDirectory,
@@ -69,9 +65,8 @@ public sealed class MediaToolResolver : IMediaToolResolver
         }
 
         var pathEnvironment = _getEnvironmentVariable("PATH");
-        var pathExt = _getEnvironmentVariable("PATHEXT");
-        var foundProbe = MediaToolLocations.Which("ffprobe", pathEnvironment, pathExt, _windows, IsExecutableFile);
-        var foundMpeg = MediaToolLocations.Which("ffmpeg", pathEnvironment, pathExt, _windows, IsExecutableFile);
+        var foundProbe = MediaToolLocations.Which("ffprobe", pathEnvironment, _windows, IsExecutableFile);
+        var foundMpeg = MediaToolLocations.Which("ffmpeg", pathEnvironment, _windows, IsExecutableFile);
         if (foundProbe is null || foundMpeg is null)
         {
             throw new MediaToolException(MediaToolLocations.MissingToolsMessage);
@@ -81,17 +76,15 @@ public sealed class MediaToolResolver : IMediaToolResolver
     }
 
     /// <summary>
-    /// #548: <c>WEIR_MKVTOOLNIX_DIR</c>, then the bundled MKVToolNix under the Weir home, then (packaged builds
-    /// only) the one next to the executable, then PATH — the same order as <see cref="Resolve"/>, and read fresh
-    /// on every call for the same reason. Null when mkvmerge is nowhere to be found.
+    /// #548: <c>WEIR_MKVTOOLNIX_DIR</c>, then (packaged builds only) the one next to the executable, then PATH —
+    /// the same order as <see cref="Resolve"/>, and read fresh on every call for the same reason. Null when
+    /// mkvmerge is nowhere to be found.
     /// </summary>
     public string? ResolveMkvmerge()
     {
         var userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var home = MediaToolLocations.Normalize(Path.GetFullPath(MediaToolLocations.ExpandUser(_weirHome, userHome, _windows)), _windows);
         var name = MediaToolLocations.MkvmergeToolName(_windows);
         var directories = MediaToolLocations.MkvtoolnixCandidateDirectories(
-            home,
             _getEnvironmentVariable(MediaToolLocations.MkvtoolnixDirEnvironmentVariable),
             userHome,
             _packagedAppDirectory,
@@ -105,12 +98,7 @@ public sealed class MediaToolResolver : IMediaToolResolver
             }
         }
 
-        return MediaToolLocations.Which(
-            "mkvmerge",
-            _getEnvironmentVariable("PATH"),
-            _getEnvironmentVariable("PATHEXT"),
-            _windows,
-            IsExecutableFile);
+        return MediaToolLocations.Which("mkvmerge", _getEnvironmentVariable("PATH"), _windows, IsExecutableFile);
     }
 
     /// <summary>A PATH candidate counts when it exists, is not a directory, and (off Windows) is executable.</summary>
