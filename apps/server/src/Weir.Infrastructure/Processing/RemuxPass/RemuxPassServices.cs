@@ -112,6 +112,7 @@ public static class RemuxPassServices
             sp.GetRequiredService<OperatorSettingsStore>(),
             sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredService<ILogger<RemuxPassHandler>>(),
+            sp.GetRequiredService<DownloadedScanNotifier>(),
             sp.GetService<HandoffCompletionReporter>(),
             sp.GetService<ProcessingJobStore>(),
             sp.GetRequiredService<LiveProgressStore>()));

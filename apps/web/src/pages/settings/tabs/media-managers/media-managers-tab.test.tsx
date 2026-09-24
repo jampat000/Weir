@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import * as downloadClientsApi from "../../../../lib/download-clients/download-clients-api";
 import * as api from "../../../../lib/media-managers/media-managers-api";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import { MediaManagersTab } from "./media-managers-tab";
@@ -19,6 +20,7 @@ function connection(
     api_key_is_saved: true,
     webhook_secret_is_set: false,
     webhook_url_path: "/api/v1/intake/webhook/deluno",
+    downloaded_scan_enabled: false,
     unsigned_webhook_warning: null,
     last_test_ok: null,
     last_test_at: null,
@@ -34,6 +36,15 @@ function wrapper({ children }: { children: ReactNode }) {
   });
   return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
+
+beforeEach(() => {
+  // These tests are about the media-manager list; the download-clients section below it loads
+  // independently and is covered by its own tests (download-clients-section.test.tsx).
+  vi.spyOn(
+    downloadClientsApi,
+    "fetchDownloadClientConnections",
+  ).mockResolvedValue([]);
+});
 
 afterEach(() => {
   vi.restoreAllMocks();

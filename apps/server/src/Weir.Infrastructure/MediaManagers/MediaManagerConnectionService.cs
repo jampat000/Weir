@@ -53,7 +53,8 @@ public sealed class MediaManagerConnectionService
     public IMediaManagerPorts Ports => _ports;
 
     /// <summary>Create a connection. Throws <see cref="MediaManagerConnectionException"/> for an operator mistake.</summary>
-    public async Task<long> CreateAsync(UnitOfWork uow, string kind, string name, string baseUrl = "", string? apiKey = null, bool enabled = true)
+    public async Task<long> CreateAsync(
+        UnitOfWork uow, string kind, string name, string baseUrl = "", string? apiKey = null, bool enabled = true, bool downloadedScanEnabled = false)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var label = WireStrings.Strip(name ?? string.Empty);
@@ -71,11 +72,13 @@ public sealed class MediaManagerConnectionService
         var validKind = ValidateKind(kind);
         var validUrl = ValidateBaseUrl(baseUrl);
         var ciphertext = key.Length > 0 ? EncryptApiKey(key) : null;
-        return await MediaManagerConnectionStore.InsertAsync(uow, validKind, label, enabled, validUrl, ciphertext).ConfigureAwait(false);
+        return await MediaManagerConnectionStore.InsertAsync(uow, validKind, label, enabled, validUrl, ciphertext, downloadedScanEnabled).ConfigureAwait(false);
     }
 
     /// <summary>Update a connection: <see langword="null"/> leaves a field alone; an empty <paramref name="apiKey"/> clears the key.</summary>
-    public async Task UpdateAsync(UnitOfWork uow, MediaManagerConnectionRecord row, string? name = null, string? baseUrl = null, string? apiKey = null, bool? enabled = null)
+    public async Task UpdateAsync(
+        UnitOfWork uow, MediaManagerConnectionRecord row, string? name = null, string? baseUrl = null, string? apiKey = null, bool? enabled = null,
+        bool? downloadedScanEnabled = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(row);
@@ -131,6 +134,11 @@ public sealed class MediaManagerConnectionService
             {
                 changes.Add(("api_key_ciphertext", ciphertext));
             }
+        }
+
+        if (downloadedScanEnabled is { } scan && scan != row.DownloadedScanEnabled)
+        {
+            changes.Add(("downloaded_scan_enabled", scan ? 1 : 0));
         }
 
         await MediaManagerConnectionStore.UpdateColumnsAsync(uow, row.Id, changes).ConfigureAwait(false);

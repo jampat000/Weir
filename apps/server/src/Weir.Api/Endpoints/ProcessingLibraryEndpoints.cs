@@ -28,6 +28,7 @@ public static class ProcessingLibraryEndpoints
         endpoints.MapV1("POST", "/processing/libraries", PostLibraryAsync);
         endpoints.MapV1("GET", "/processing/reject-support", GetRejectSupportAsync);
         endpoints.MapV1("GET", "/processing/manager-setup", GetManagerSetupAsync);
+        endpoints.MapV1("GET", "/processing/libraries/{library_id}/folder-chain", GetLibraryFolderChainAsync);
         endpoints.MapV1("GET", "/processing/libraries/{library_id}", GetLibraryAsync);
         endpoints.MapV1("PUT", "/processing/libraries/{library_id}", PutLibraryAsync);
         endpoints.MapV1("DELETE", "/processing/libraries/{library_id}", DeleteLibraryAsync);
@@ -119,6 +120,26 @@ public static class ProcessingLibraryEndpoints
             .CheckAsync(uow, mediaType, watchedFolder, outputFolder, removesOriginals, request.Context.RequestAborted)
             .ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject().Set("media_type", mediaType).Set("managers", new WireArray(managers.Select(item => (WireValue)item))));
+    }
+
+    /// <summary>
+    /// <c>GET /api/v1/processing/libraries/{library_id}/folder-chain</c>: one library's folder chain — Weir's own
+    /// watched/work/output folders, plus every enabled connection that covers its media type, folded into one plain-
+    /// language, read-only view.
+    /// </summary>
+    private static async Task<ApiResult> GetLibraryFolderChainAsync(ApiRequest request)
+    {
+        await request.RequireUserAsync().ConfigureAwait(false);
+        var issues = new ValidationIssues();
+        var id = request.PathInt("library_id", issues);
+        issues.ThrowIfAny();
+
+        var uow = await request.DbAsync().ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, id).ConfigureAwait(false);
+        var chain = await request.Service<LibraryFolderChainCheck>()
+            .CheckForLibraryAsync(uow, library, request.Context.RequestAborted)
+            .ConfigureAwait(false);
+        return ApiRoutes.Ok(chain);
     }
 
     private static async Task<ApiResult> PostLibraryAsync(ApiRequest request)
