@@ -68,40 +68,31 @@ public static class CompletionReports
         return result.Get("ok") is { IsTruthy: true } && SuccessOutcomes.Contains(Outcome(result));
     }
 
-    /// <summary>The body reported to the manager when a hand-off's pass finishes.</summary>
+    /// <summary>
+    /// The body reported to the manager when a hand-off of one file finishes. <c>outputFiles</c> lists the output file, or
+    /// nothing when there is none, the same field a hand-off of several files reports (<see cref="FolderHandoffReports"/>).
+    /// </summary>
     public static PyDict BuildCompletionBody(HandoffOrigin origin, PyDict result, string? outputPath = null, bool rejected = false)
     {
         ArgumentNullException.ThrowIfNull(origin);
         ArgumentNullException.ThrowIfNull(result);
-        var outcome = Outcome(result);
         var succeeded = IsSucceeded(result);
-        var body = new PyDict()
-            .Set("handoffId", origin.HandoffId)
-            .Set("status", succeeded ? "completed" : "failed")
-            .Set("processorName", ProcessorName);
-        if (!string.IsNullOrEmpty(origin.LibraryId))
-        {
-            body.Set("libraryId", origin.LibraryId);
-        }
-
-        if (!string.IsNullOrEmpty(origin.ReleaseName))
-        {
-            body.Set("releaseName", origin.ReleaseName);
-        }
-
+        var body = ReportHeader(origin, succeeded ? "completed" : "failed");
+        var outputFiles = new List<string>();
         if (succeeded)
         {
             PyJson? outputFile = !string.IsNullOrEmpty(outputPath) ? new PyStr(outputPath) : result.Get("output_file");
             if (outputFile is PyStr file && PyStrings.Strip(file.Value).Length > 0)
             {
                 body.Set("outputPath", PyStrings.Strip(file.Value));
+                outputFiles.Add(PyStrings.Strip(file.Value));
             }
 
-            body.Set("message", SuccessMessage(outcome, result));
+            body.Set("message", MessageFor(result));
         }
         else
         {
-            body.Set("message", FailureMessage(result));
+            body.Set("message", MessageFor(result));
             if (rejected)
             {
                 body.Set("disposition", "rejected");
@@ -123,7 +114,35 @@ public static class CompletionReports
             }
         }
 
+        return body.Set("outputFiles", HandoffOutputFiles.ToJson(outputFiles));
+    }
+
+    /// <summary>The fields every report starts with: which hand-off, how it ended, and who is reporting.</summary>
+    public static PyDict ReportHeader(HandoffOrigin origin, string status)
+    {
+        ArgumentNullException.ThrowIfNull(origin);
+        var body = new PyDict()
+            .Set("handoffId", origin.HandoffId)
+            .Set("status", status)
+            .Set("processorName", ProcessorName);
+        if (!string.IsNullOrEmpty(origin.LibraryId))
+        {
+            body.Set("libraryId", origin.LibraryId);
+        }
+
+        if (!string.IsNullOrEmpty(origin.ReleaseName))
+        {
+            body.Set("releaseName", origin.ReleaseName);
+        }
+
         return body;
+    }
+
+    /// <summary>What one pass came to, in the words a report uses: what changed when it succeeded, else why it failed.</summary>
+    public static string MessageFor(PyDict result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return IsSucceeded(result) ? SuccessMessage(Outcome(result), result) : FailureMessage(result);
     }
 
     private static string SuccessMessage(string outcome, PyDict result)

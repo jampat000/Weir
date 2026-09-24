@@ -217,7 +217,11 @@ public sealed class HandbackOutcomeApiTests : IDisposable
 
     // --- the hand-off outcome ------------------------------------------------------------------------------------------
 
-    /// <summary>A Deluno hand-off Weir received and finished, with the copy it handed back.</summary>
+    /// <summary>
+    /// A Deluno hand-off Weir received and finished, with the copy it handed back. The target row and the hand-off's
+    /// <c>reported_status</c> are set as the real completion report would have left them, since this helper fakes the
+    /// pass finishing rather than running one: an outcome route only releases a copy its report actually named.
+    /// </summary>
     private async Task<string> FinishedHandoffAsync(WeirTestServer server, string handoffId = "h1")
     {
         var library = await MoviesAsync(server);
@@ -231,7 +235,16 @@ public sealed class HandbackOutcomeApiTests : IDisposable
         }
 
         await TestDatabase.ExecuteAsync(server, "UPDATE jobs SET status = 'completed' WHERE job_kind = 'processing.file.remux_pass.v1'");
-        return await HandedBackAsync(server, library, "Film/film.mkv");
+        var copy = await HandedBackAsync(server, library, "Film/film.mkv");
+        await TestDatabase.ExecuteAsync(
+            server,
+            "UPDATE media_manager_handoff_targets SET result = 'completed', output_file = $copy WHERE relative_path = 'Film/film.mkv' " +
+            "AND handoff_row_id = (SELECT id FROM media_manager_handoffs WHERE source_key = 'deluno' AND handoff_id = $id)",
+            ("$copy", copy),
+            ("$id", handoffId));
+        await TestDatabase.ExecuteAsync(
+            server, "UPDATE media_manager_handoffs SET reported_status = 'completed' WHERE source_key = 'deluno' AND handoff_id = $id", ("$id", handoffId));
+        return copy;
     }
 
     /// <summary>Exactly what Deluno's <c>ReportOutcomeAsync</c> sends: <c>JsonContent.Create</c>, web defaults, nulls kept.</summary>
@@ -338,6 +351,58 @@ public sealed class HandbackOutcomeApiTests : IDisposable
             "Deluno will not import this file: The release is a sample. Weir kept its copy in the hand-back folder.",
             await TestDatabase.ScalarStringAsync(server, "SELECT release_note FROM handbacks WHERE outcome = 'not-imported' AND outcome_reason = 'The release is a sample.'"));
         Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE title = 'Deluno will not import film.mkv'"));
+    }
+
+    /// <summary>
+    /// A season pack's completion report names only the episodes it actually covers (#667): if one episode's copy was
+    /// never among the files that report named — whatever the reason — Deluno's "imported" for the pack releases only
+    /// the copies the report did name, never every file that happens to sit under the pack's folder.
+    /// </summary>
+    [Fact]
+    public async Task An_imported_outcome_for_a_pack_releases_only_the_episode_its_report_named()
+    {
+        await using var server = await StartAsync();
+        var library = await MoviesAsync(server);
+        const string handoffId = "pack1";
+        var handoff = new
+        {
+            eventType = "deluno.processor-handoff",
+            handoffId,
+            libraryId = "lib-1",
+            mediaType = "movies",
+            sourcePath = Path.Join(Watched, "Show.S05"),
+            callbackPath = "/api/integrations/processors/events",
+        };
+        Directory.CreateDirectory(Path.Join(Watched, "Show.S05"));
+        await File.WriteAllTextAsync(Path.Join(Watched, "Show.S05", "Show.S05E01.mkv"), "download1");
+        await File.WriteAllTextAsync(Path.Join(Watched, "Show.S05", "Show.S05E02.mkv"), "download2");
+        using (var queued = await new ApiTestClient(server).PostAsync("/api/v1/intake/webhook/deluno", handoff, SecretHeader))
+        {
+            Assert.Equal(HttpStatusCode.OK, queued.StatusCode);
+        }
+
+        await TestDatabase.ExecuteAsync(server, "UPDATE jobs SET status = 'completed' WHERE job_kind = 'processing.file.remux_pass.v1'");
+        var copy1 = await HandedBackAsync(server, library, "Show.S05/Show.S05E01.mkv");
+        var copy2 = await HandedBackAsync(server, library, "Show.S05/Show.S05E02.mkv");
+
+        // Only episode 1's target is marked as delivered and named in the report Weir sent; episode 2's is left as it
+        // was at intake (no final result), as if its pass had not been part of what the report covered.
+        await TestDatabase.ExecuteAsync(
+            server,
+            "UPDATE media_manager_handoff_targets SET result = 'completed', output_file = $copy WHERE relative_path = 'Show.S05/Show.S05E01.mkv' " +
+            "AND handoff_row_id = (SELECT id FROM media_manager_handoffs WHERE source_key = 'deluno' AND handoff_id = $id)",
+            ("$copy", copy1),
+            ("$id", handoffId));
+        await TestDatabase.ExecuteAsync(
+            server, "UPDATE media_manager_handoffs SET reported_status = 'completed' WHERE source_key = 'deluno' AND handoff_id = $id", ("$id", handoffId));
+
+        using var response = await PostOutcomeAsync(server, handoffId, DelunoOutcome("imported", "/media/tv/Show/Show.S05E01.mkv", null));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.False(File.Exists(copy1));
+        Assert.True(File.Exists(copy2));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM handbacks WHERE outcome = 'imported' AND released_at IS NOT NULL"));
+        Assert.Equal(0, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM handbacks WHERE relative_path = 'Show.S05/Show.S05E02.mkv' AND outcome IS NOT NULL"));
     }
 
     [Fact]

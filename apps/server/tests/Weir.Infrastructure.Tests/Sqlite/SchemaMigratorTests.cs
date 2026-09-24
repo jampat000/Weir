@@ -143,6 +143,46 @@ public sealed class SchemaMigratorTests
         Assert.Equal(1, SchemaSnapshot.ScalarLong(path, "SELECT COUNT(*) FROM alembic_version"));
     }
 
+    /// <summary>
+    /// Two migrations sharing a number would silently overwrite one another's slot, and one listed out of order
+    /// would run in the wrong sequence: <c>SchemaMigrator</c>'s decision of what to apply assumes both never happen.
+    /// </summary>
+    [Fact]
+    public void Migration_numbers_are_strictly_increasing_and_unique()
+    {
+        var numbers = SchemaMigrator.Migrations.Select(migration => migration.Number).ToList();
+        Assert.Equal(numbers.Distinct(), numbers);
+        Assert.Equal(numbers.OrderBy(number => number), numbers);
+    }
+
+    /// <summary>A database already at 18 (head on main before this migration) still gets 19 once it is added after it.</summary>
+    [Fact]
+    public void A_database_at_18_upgrades_to_include_this_migration()
+    {
+        using var temp = new TempDirectory();
+        var database = new SqliteDatabase(temp.Join("weir.sqlite3"));
+        Assert.Equal(SchemaStartupOutcome.Created, new SchemaMigrator(database).EnsureAtHead());
+        var eighteen = SchemaMigrator.Migrations.Single(migration => migration.Number == 18).Revision;
+        using (var connection = database.Open())
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText =
+                "DROP TABLE media_manager_handoff_targets; " +
+                "ALTER TABLE media_manager_handoffs DROP COLUMN reported_status; " +
+                "ALTER TABLE media_manager_handoffs DROP COLUMN output_files_json; " +
+                $"DELETE FROM alembic_version; INSERT INTO alembic_version (version_num) VALUES ('{eighteen}');";
+            command.ExecuteNonQuery();
+        }
+
+        var outcome = new SchemaMigrator(database).EnsureAtHead();
+        database.ClearPool();
+
+        Assert.Equal(SchemaStartupOutcome.Upgraded, outcome);
+        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'media_manager_handoff_targets'"));
+        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM pragma_table_info('media_manager_handoffs') WHERE name = 'reported_status'"));
+        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, $"SELECT COUNT(*) FROM alembic_version WHERE version_num = '{SchemaMigrator.HeadRevision}'"));
+    }
+
     [Fact]
     public void An_empty_version_table_is_unversioned_and_several_rows_are_incompatible()
     {

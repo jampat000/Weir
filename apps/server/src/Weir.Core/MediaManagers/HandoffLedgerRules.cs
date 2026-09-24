@@ -4,7 +4,10 @@ using Weir.Core.Time;
 
 namespace Weir.Core.MediaManagers;
 
-/// <summary>What Weir tells a manager about one hand-off.</summary>
+/// <summary>
+/// What Weir tells a manager about one hand-off. <see cref="OutputPath"/> is the one output file, or for a hand-off of
+/// several files the folder they were handed back in; <see cref="OutputFiles"/> lists every output file either way.
+/// </summary>
 public sealed record HandoffStatus(
     string HandoffId,
     string State,
@@ -12,7 +15,8 @@ public sealed record HandoffStatus(
     long? QueuePosition = null,
     DateTimeOffset? ScheduledFor = null,
     string? OutputPath = null,
-    string? Message = null)
+    string? Message = null,
+    IReadOnlyList<string>? OutputFiles = null)
 {
     /// <summary>The status as JSON, timestamps in UTC with a <c>Z</c>.</summary>
     public PyDict AsJson() => new PyDict()
@@ -22,6 +26,7 @@ public sealed record HandoffStatus(
         .Set("scheduledFor", Iso(ScheduledFor))
         .Set("lastChangedUtc", Iso(LastChangedAt))
         .Set("outputPath", OutputPath)
+        .Set("outputFiles", HandoffOutputFiles.ToJsonOrNull(OutputFiles))
         .Set("message", Message);
 
     private static string? Iso(DateTimeOffset? value) =>

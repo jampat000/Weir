@@ -76,8 +76,11 @@ public sealed class HandbackOutcomes
     }
 
     /// <summary>
-    /// A manager's outcome for one of its finished hand-offs: record it on the hand-off and on each of its files' copies.
-    /// <c>imported</c> releases each copy by the shared rule; <c>not-imported</c> is final and keeps every copy.
+    /// A manager's outcome for one of its finished hand-offs: record it on the hand-off and on each of its files' copies
+    /// that Weir's completion report actually named (<see cref="HandoffTargetStore.ReportedCopiesAsync"/>) — a file the
+    /// hand-off covers but that never finished, or finished after the report went out, was never named to the manager, so
+    /// its copy is left untouched. <c>imported</c> releases each named copy by the shared rule; <c>not-imported</c> is
+    /// final and keeps every one.
     /// </summary>
     public async Task<HandoffOutcomeResult> RecordHandoffOutcomeAsync(
         UnitOfWork uow, HandoffLedgerRow row, string manager, string outcome, DateTimeOffset occurredAt, string? importedPath, string? reason)
@@ -89,10 +92,11 @@ public sealed class HandbackOutcomes
         string? firstKeptNote = null;
         if (row.LibraryId is { } libraryId)
         {
+            var wasReported = await HandoffTargetStore.ReportedCopiesAsync(uow, row).ConfigureAwait(false);
             foreach (var file in await HandoffLedgerStore.FileRowsAsync(uow, row).ConfigureAwait(false))
             {
                 var copy = await HandbackStore.FindAsync(uow, libraryId, file.RelativePath).ConfigureAwait(false);
-                if (copy is null)
+                if (copy is null || !wasReported(copy))
                 {
                     continue;
                 }
