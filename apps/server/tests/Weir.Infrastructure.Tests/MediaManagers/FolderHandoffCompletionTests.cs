@@ -7,8 +7,7 @@ using Weir.Infrastructure.Processing;
 namespace Weir.Infrastructure.Tests.MediaManagers;
 
 /// <summary>
-/// A folder hand-off (a TV season pack, say) covers every video in it and is reported to the manager once, when the
-/// last of them finishes, not once per file (the fault a Deluno report of 3.2.4 traced to). #652, #667.
+/// A folder hand-off reports once, when the last of its files finishes, not once per file. #652, #667.
 /// </summary>
 public sealed class FolderHandoffCompletionTests
 {
@@ -56,11 +55,11 @@ public sealed class FolderHandoffCompletionTests
     {
         using var fixture = new MediaManagerFixture();
         var watched = fixture.Store.Home.Join("tv");
-        const string folder = "Pioneer One 2010 Season 1 Complete REDUX 720p x264 [i_c]";
+        const string folder = "Example Show 2010 Season 1 Complete 720p x264 [grp]";
         Directory.CreateDirectory(Path.Join(watched, folder));
         foreach (var episode in Enumerable.Range(1, 6))
         {
-            await File.WriteAllTextAsync(Path.Join(watched, folder, $"Pioneer One - S01E0{episode} - Episode.mkv"), new string('x', episode));
+            await File.WriteAllTextAsync(Path.Join(watched, folder, $"Example Show - S01E0{episode} - Episode.mkv"), new string('x', episode));
         }
 
         await fixture.LibraryAsync("tv", watched);
@@ -68,7 +67,7 @@ public sealed class FolderHandoffCompletionTests
 
         var jobs = await fixture.Jobs.ListAsync();
         Assert.Equal(6, jobs.Count);
-        Assert.All(jobs, job => Assert.StartsWith($"processing.file.remux_pass.v1:deluno:handoff:h1:{folder}/Pioneer One - S01E0", job.DedupeKey));
+        Assert.All(jobs, job => Assert.StartsWith($"processing.file.remux_pass.v1:deluno:handoff:h1:{folder}/Example Show - S01E0", job.DedupeKey));
         Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM media_manager_handoffs WHERE handoff_id = 'h1'"));
         Assert.Equal(6, await fixture.Store.Scalar("SELECT count(*) FROM media_manager_handoff_targets"));
     }
