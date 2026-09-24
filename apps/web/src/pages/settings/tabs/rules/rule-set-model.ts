@@ -97,6 +97,14 @@ export const EMPTY_RULE_SET: ProcessingRuleSetWrite = {
   remove_chapters: false,
 };
 
+/** Whether a profile's draft still matches what it would compare against (its saved form, or the empty starting point). */
+export function sameRuleSet(
+  a: ProcessingRuleSetWrite,
+  b: ProcessingRuleSetWrite,
+): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 function copyOf(rows: TrackSorter[]): TrackSorter[] {
   return rows.map((item) => ({ ...item }));
 }

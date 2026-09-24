@@ -5,6 +5,7 @@ import {
   mmPickerTriggerClass,
 } from "../../lib/ui/mm-control-roles";
 import { useCloseOnOutsideAndEscape } from "../../lib/ui/use-close-on-outside";
+import { useListboxKeyboardNav } from "./use-listbox-keyboard-nav";
 
 export type MmListboxOption = { value: string; label: string };
 
@@ -41,8 +42,20 @@ export function MmListboxPicker({
   const listboxId = `${autoId}-listbox`;
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const close = useCallback(() => setOpen(false), []);
   useCloseOnOutsideAndEscape(open, close, containerRef);
+
+  const selectedIndex = options.findIndex((o) => o.value === value);
+  const nav = useListboxKeyboardNav(options, {
+    isOpen: open,
+    initialIndex: Math.max(selectedIndex, 0),
+    onActivate: (option) => {
+      onChange(option.value);
+      setOpen(false);
+      triggerRef.current?.focus();
+    },
+  });
 
   const selected = options.find((o) => o.value === value);
   const triggerLabel = selected?.label ?? placeholder;
@@ -62,6 +75,7 @@ export function MmListboxPicker({
       className={["relative", className].filter(Boolean).join(" ")}
     >
       <button
+        ref={triggerRef}
         type="button"
         className={triggerSurface}
         disabled={disabled}
@@ -76,8 +90,9 @@ export function MmListboxPicker({
             setOpen((v) => !v);
           }
         }}
+        onKeyDown={nav.onKeyDown}
       >
-        <span className="min-w-0 flex-1 truncate text-left">
+        <span className="min-w-0 max-h-16 flex-1 overflow-y-auto whitespace-normal break-words text-left">
           {triggerLabel}
         </span>
         <svg
@@ -94,14 +109,29 @@ export function MmListboxPicker({
         </svg>
       </button>
       {open ? (
-        <div id={listboxId} className={mmListboxPanelClass} role="listbox">
-          {options.map((opt) => (
+        <div
+          id={listboxId}
+          className={mmListboxPanelClass}
+          role="listbox"
+          tabIndex={-1}
+          onKeyDown={nav.onKeyDown}
+        >
+          {options.map((opt, index) => (
             <button
               key={opt.value === "" ? "__empty__" : opt.value}
+              ref={nav.registerOption(index)}
               type="button"
               role="option"
+              tabIndex={index === nav.activeIndex ? 0 : -1}
               aria-selected={opt.value === value}
-              className={mmListboxOptionButtonClass(opt.value === value)}
+              className={[
+                mmListboxOptionButtonClass(opt.value === value),
+                index === nav.activeIndex
+                  ? "ring-1 ring-inset ring-mm-accent-ring"
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
               onMouseDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -109,8 +139,10 @@ export function MmListboxPicker({
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                nav.setActive(index);
                 onChange(opt.value);
                 setOpen(false);
+                triggerRef.current?.focus();
               }}
             >
               {opt.label}

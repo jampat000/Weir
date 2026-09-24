@@ -95,8 +95,8 @@ export function RulesPreviewResults({
           )}
         >
           {result.remux_required
-            ? "A remux would run"
-            : "Already matches — no remux needed"}
+            ? "Weir would rewrite this file"
+            : "Already matches these rules — no changes needed"}
         </span>
         {sizeText ? (
           <span className="text-mm-text3">
