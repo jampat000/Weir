@@ -7,7 +7,10 @@ using Weir.Core.Activity;
 using Weir.Core.Json;
 using Weir.Core.Media;
 using Weir.Core.MediaManagers;
+using Weir.Core.Text;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
@@ -171,6 +174,8 @@ public sealed partial class HandoffCompletionReporter
     /// <summary>
     /// Post the outcome back to the originating manager and record that it did. Returns a short status for logging and
     /// never throws: a manager being unreachable must not fail a pass that succeeded on disk.
+    /// A hand-off of several files is reported once, by whichever pass finishes its last file, and the report covers
+    /// them all; the passes before it only record their own file's result.
     /// Commits <paramref name="uow"/> (or rolls it back when recording fails).
     /// </summary>
     public async Task<string> ReportHandoffCompletionAsync(UnitOfWork uow, string? payloadJson, PyDict result, CancellationToken cancellationToken = default)
@@ -217,20 +222,121 @@ public sealed partial class HandoffCompletionReporter
             return "skipped: the release is being rejected, which reports on its own";
         }
 
+        var relative = result.Get("relative_media_path") is PyStr text ? text.Value
+            : payload is PyDict named && named.Get("relative_media_path") is PyStr path ? path.Value : null;
+        long? libraryId = payload is PyDict carried && carried.Get("library_id") is PyInt library ? (long)library.Value : null;
+        var finish = await FinishTargetAsync(uow, origin, relative, result).ConfigureAwait(false);
+        switch (finish.Progress)
+        {
+            case HandoffTargetProgress.Waiting:
+                var unfinished = finish.Targets!.Count(target => target.Result is null);
+                return $"skipped: {Plural.Of(unfinished, "other file")} of this hand-off {Plural.Noun(unfinished, "has", "have")} not finished yet";
+            case HandoffTargetProgress.AlreadyReported:
+                return "skipped: another pass already reported this hand-off";
+            case HandoffTargetProgress.NotATarget:
+                return "skipped: this file is not one the hand-off covers";
+            case HandoffTargetProgress.Ready when finish.Targets!.Count > 1:
+                return await ReportFolderAsync(uow, origin, finish.Row!, finish.Targets, result, libraryId, cancellationToken).ConfigureAwait(false);
+            default:
+                return await ReportFileAsync(uow, origin, result, relative, libraryId, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Record this file's result on its hand-off and commit, so the next pass to finish sees it. A result Weir cannot
+    /// record reports nothing: reporting without it could tell the manager a hand-off of several files was done early.
+    /// </summary>
+    private async Task<HandoffTargetFinish> FinishTargetAsync(UnitOfWork uow, HandoffOrigin origin, string? relative, PyDict result)
+    {
+        try
+        {
+            var finish = await HandoffTargetStore.FinishAsync(uow, origin, relative ?? string.Empty, result).ConfigureAwait(false);
+            await uow.CommitAsync().ConfigureAwait(false);
+            return finish;
+        }
+        catch (SqliteException exception)
+        {
+            await uow.RollbackAsync().ConfigureAwait(false);
+            _logger.LogWarning(exception, "Weir could not record the result of {Path} on hand-off {HandoffId}, so it did not report it.", relative, origin.HandoffId);
+            return new HandoffTargetFinish(HandoffTargetProgress.NotATarget);
+        }
+    }
+
+    /// <summary>The report for a hand-off of one file: that file's own result, exactly as it has always been reported.</summary>
+    private async Task<string> ReportFileAsync(UnitOfWork uow, HandoffOrigin origin, PyDict result, string? relative, long? libraryId, CancellationToken cancellationToken)
+    {
         var (target, reason) = await ResolveHandoffTargetAsync(uow, origin).ConfigureAwait(false);
+        var outputPath = target is not null && CompletionReports.IsSucceeded(result)
+            ? await ManagerOutputPathAsync(target.Connection, origin, result, cancellationToken).ConfigureAwait(false)
+            : null;
+        var body = CompletionReports.BuildCompletionBody(origin, result, outputPath);
+        var reported = new ReportedOutcome(FileReportState(body), body, relative, relative is null ? [] : [relative], libraryId);
         if (target is null)
         {
-            await RecordOutcomeAsync(uow, origin, CompletionReports.BuildCompletionBody(origin, result), null).ConfigureAwait(false);
+            await RecordOutcomeAsync(uow, origin, reported, null).ConfigureAwait(false);
             return $"skipped: {reason}";
         }
 
-        var outputPath = succeeded ? await ManagerOutputPathAsync(target.Connection, origin, result, cancellationToken).ConfigureAwait(false) : null;
-        var body = CompletionReports.BuildCompletionBody(origin, result, outputPath);
         var delivery = await PostHandoffReportAsync(target, body, cancellationToken).ConfigureAwait(false);
-        var relative = result.Get("relative_media_path") is PyStr text ? text.Value : null;
-        long? libraryId = payload is PyDict carried && carried.Get("library_id") is PyInt library ? (long)library.Value : null;
-        await RecordOutcomeAsync(uow, origin, body, (target, delivery, relative), libraryId).ConfigureAwait(false);
+        await RecordOutcomeAsync(uow, origin, reported, (target, delivery)).ConfigureAwait(false);
         return delivery.Status;
+    }
+
+    /// <summary>
+    /// The one report for a hand-off of several files, once every file has a final result: <c>outputPath</c> is the folder
+    /// they were handed back in and <c>outputFiles</c> each file, both in the manager's own paths when it has them.
+    /// </summary>
+    private async Task<string> ReportFolderAsync(
+        UnitOfWork uow, HandoffOrigin origin, HandoffLedgerRow row, IReadOnlyList<HandoffTarget> targets, PyDict result, long? libraryId, CancellationToken cancellationToken)
+    {
+        var (target, reason) = await ResolveHandoffTargetAsync(uow, origin).ConfigureAwait(false);
+        var localFolder = await LocalOutputFolderAsync(uow, row, result).ConfigureAwait(false);
+        var managerFolder = target is not null && localFolder is not null
+            ? await ManagerOutputFolderAsync(target.Connection, origin, cancellationToken).ConfigureAwait(false)
+            : null;
+        string AsManagerSees(string local) =>
+            managerFolder is not null && TranslateOutputPath(local, localFolder!, managerFolder) is { } translated ? translated : local;
+
+        var outputFiles = targets.Where(file => file.Delivered && file.OutputFile is not null).Select(file => AsManagerSees(file.OutputFile!)).ToList();
+        var handBackFolder = localFolder is null ? null : AsManagerSees(Path.Join(localFolder, row.RelativePath));
+        var body = FolderHandoffReports.BuildBody(origin, targets, handBackFolder, outputFiles);
+        var delivered = targets.Where(file => file.Delivered).Select(file => file.RelativePath).ToList();
+        var reported = new ReportedOutcome(FolderHandoffReports.State(targets), body, row.RelativePath, delivered, libraryId ?? row.LibraryId);
+        if (target is null)
+        {
+            await RecordOutcomeAsync(uow, origin, reported, null).ConfigureAwait(false);
+            return $"skipped: {reason}";
+        }
+
+        var delivery = await PostHandoffReportAsync(target, body, cancellationToken).ConfigureAwait(false);
+        await RecordOutcomeAsync(uow, origin, reported, (target, delivery)).ConfigureAwait(false);
+        return delivery.Status;
+    }
+
+    /// <summary>The library's output folder as Weir sees it: from the pass that just finished, else from the library itself.</summary>
+    private static async Task<string?> LocalOutputFolderAsync(UnitOfWork uow, HandoffLedgerRow row, PyDict result)
+    {
+        if (result.Get("processing_output_folder_resolved") is PyStr { Value.Length: > 0 } resolved)
+        {
+            return resolved.Value;
+        }
+
+        return row.LibraryId is { } libraryId && await LibraryStore.GetAsync(uow, libraryId).ConfigureAwait(false) is { OutputFolder.Length: > 0 } library
+            ? RemuxPassPaths.Resolve(library.OutputFolder.Trim())
+            : null;
+    }
+
+    /// <summary>The ledger state a one-file report means.</summary>
+    private static string FileReportState(PyDict body)
+    {
+        if (body.Get("status") is not PyStr { Value: "completed" })
+        {
+            return HandoffLedgerRules.Failed;
+        }
+
+        return body.Get("message") is PyStr { Value: CompletionReports.PassThroughAfterFailureMessage }
+            ? HandoffLedgerRules.PassedThrough
+            : HandoffLedgerRules.Completed;
     }
 
     /// <summary>The manager did not answer at all, as opposed to answering with a refusal.</summary>
@@ -238,225 +344,45 @@ public sealed partial class HandoffCompletionReporter
         delivery is { Accepted: false } && delivery.Status.StartsWith(NotAnsweringPrefix, StringComparison.Ordinal);
 
     /// <summary>
-    /// Send every report Weir still owes a manager of this kind because it was not answering when the pass ended (item 5 of
-    /// #652). The heartbeat calls this once the manager answers its connection test. A report the manager answers, accepted
-    /// or refused, stops being owed, and the file's History stops saying Weir is waiting; one it still does not answer
-    /// stays owed. Each report is committed on its own. Returns how many the manager answered.
+    /// A report ready to record: the ledger state it means, the body, the path Activity names it by (the file, or the
+    /// folder of a hand-off of several files), and the files whose History waits on it while the manager is not answering.
     /// </summary>
-    public async Task<int> SendWaitingReportsAsync(UnitOfWork uow, string sourceKey, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(uow);
-        var answered = 0;
-        foreach (var (handoffId, reportJson) in await HandoffLedgerStore.PendingReportsAsync(uow, sourceKey).ConfigureAwait(false))
-        {
-            if (PendingReport.Parse(reportJson) is not { } pending)
-            {
-                await HandoffLedgerStore.SetPendingReportAsync(uow, sourceKey, handoffId, null).ConfigureAwait(false);
-                await uow.CommitAsync().ConfigureAwait(false);
-                continue;
-            }
-
-            var origin = new HandoffOrigin(sourceKey, handoffId, pending.CallbackPath, pending.ReleaseName, pending.ManagerLibraryId);
-            var (target, _) = await ResolveHandoffTargetAsync(uow, origin).ConfigureAwait(false);
-            if (target is null)
-            {
-                continue;
-            }
-
-            var delivery = await PostHandoffReportAsync(target, pending.Body, cancellationToken).ConfigureAwait(false);
-            if (IsNotAnswering(delivery))
-            {
-                continue;
-            }
-
-            await HandoffLedgerStore.SetPendingReportAsync(uow, sourceKey, handoffId, null).ConfigureAwait(false);
-            await RecordHandoffReportAsync(uow, target, pending.Body, delivery, pending.RelativePath).ConfigureAwait(false);
-            if (pending.LibraryId is { } libraryId && pending.RelativePath is { } relativePath)
-            {
-                await ReplaceFileSentenceAsync(
-                    uow,
-                    libraryId,
-                    relativePath,
-                    ManagerWaitMessages.ReportWaiting(target.Connection.Name),
-                    delivery.Accepted ? ManagerWaitMessages.ReportDelivered(target.Connection.Name) : string.Empty).ConfigureAwait(false);
-            }
-
-            await uow.CommitAsync().ConfigureAwait(false);
-            LogWaitingReportSent(_logger, target.Connection.Name, handoffId, delivery.Status);
-            answered++;
-        }
-
-        return answered;
-    }
-
-    /// <summary>A file's status reason with one sentence swapped for another (or dropped), so History reads as things are now.</summary>
-    private static Task<int> ReplaceFileSentenceAsync(UnitOfWork uow, long libraryId, string relativePath, string sentence, string replacement) =>
-        uow.ExecuteAsync(
-            "UPDATE files SET status_reason = trim(replace(status_reason, $old, $new)), updated_at = CURRENT_TIMESTAMP " +
-            "WHERE library_id = $library AND relative_path = $path AND instr(status_reason, $old) > 0",
-            ("$old", sentence),
-            ("$new", replacement),
-            ("$library", libraryId),
-            ("$path", relativePath));
-
-    /// <summary>A file's status reason with a sentence added once.</summary>
-    private static Task<int> AppendFileSentenceAsync(UnitOfWork uow, long libraryId, string relativePath, string sentence) =>
-        uow.ExecuteAsync(
-            "UPDATE files SET status_reason = trim(status_reason || ' ' || $sentence), updated_at = CURRENT_TIMESTAMP " +
-            "WHERE library_id = $library AND relative_path = $path AND instr(status_reason, $sentence) = 0",
-            ("$sentence", sentence),
-            ("$library", libraryId),
-            ("$path", relativePath));
-
-    /// <summary>A report Weir owes a manager that was not answering, as saved on the hand-off row.</summary>
-    private sealed record PendingReport(
-        string? CallbackPath, string? ReleaseName, string? ManagerLibraryId, PyDict Body, long? LibraryId, string? RelativePath)
-    {
-        public string ToJson() => PyJsonWriter.Dumps(
-            new PyDict()
-                .Set("callback_path", CallbackPath)
-                .Set("release_name", ReleaseName)
-                .Set("manager_library_id", ManagerLibraryId)
-                .Set("body", Body)
-                .Set("library_id", LibraryId)
-                .Set("relative_media_path", RelativePath),
-            PyJsonFormat.Compact);
-
-        public static PendingReport? Parse(string json)
-        {
-            try
-            {
-                if (PyJsonParser.Parse(json) is not PyDict dict || dict.Get("body") is not PyDict body)
-                {
-                    return null;
-                }
-
-                return new PendingReport(
-                    HandoffOrigin.OptionalText(dict.Get("callback_path")),
-                    HandoffOrigin.OptionalText(dict.Get("release_name")),
-                    HandoffOrigin.OptionalText(dict.Get("manager_library_id")),
-                    body,
-                    dict.Get("library_id") is PyInt library ? (long)library.Value : null,
-                    HandoffOrigin.OptionalText(dict.Get("relative_media_path")));
-            }
-            catch (PyJsonDecodeException)
-            {
-                return null;
-            }
-        }
-    }
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "{Manager} is answering again; the hand-off report Weir owed it for {HandoffId}: {Status}")]
-    private static partial void LogWaitingReportSent(ILogger logger, string manager, string handoffId, string status);
-
-    /// <summary>
-    /// <paramref name="outputFile"/> rebuilt under the manager's output folder, or null when it is
-    /// not under ours.
-    /// </summary>
-    public static string? TranslateOutputPath(string outputFile, string localOutputFolder, string managerOutputFolder)
-    {
-        string file;
-        string folder;
-        try
-        {
-            file = Path.GetFullPath(outputFile);
-            folder = Path.GetFullPath(localOutputFolder);
-        }
-        catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException or System.Security.SecurityException)
-        {
-            return null;
-        }
-
-        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        var fileParts = file.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Where(p => p.Length > 0).ToList();
-        var folderParts = folder.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Where(p => p.Length > 0).ToList();
-        if (fileParts.Count <= folderParts.Count || !folderParts.Select((part, i) => string.Equals(part, fileParts[i], comparison)).All(same => same))
-        {
-            return null;
-        }
-
-        return CompletionReports.ManagerPathJoin(managerOutputFolder, fileParts.Skip(folderParts.Count));
-    }
-
-    /// <summary>The output as the manager will see it, or null to fall back to the local path.</summary>
-    private async Task<string?> ManagerOutputPathAsync(ManagerConnection connection, HandoffOrigin origin, PyDict result, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrEmpty(origin.LibraryId) || result.Get("output_file") is not PyStr outputFile || result.Get("processing_output_folder_resolved") is not PyStr localFolder)
-        {
-            return null;
-        }
-
-        if (_connections.Ports.PortForKind(connection.Kind) is not { } port)
-        {
-            return null;
-        }
-
-        ManagerDescription description;
-        try
-        {
-            description = await port.DescribeAsync(connection, cancellationToken).ConfigureAwait(false);
-        }
-#pragma warning disable CA1031 // An unreadable library list only means the output path cannot be placed; the report still goes out.
-        catch (Exception exception) when (exception is not OperationCanceledException)
-#pragma warning restore CA1031
-        {
-            _logger.LogWarning(exception, "Could not read {Label}'s libraries to place the output path.", connection.Label);
-            return null;
-        }
-
-        foreach (var library in description.Libraries)
-        {
-            if (library.Key == origin.LibraryId && library.ProcessesBeforeImport && !string.IsNullOrEmpty(library.OutputPath))
-            {
-                return TranslateOutputPath(outputFile.Value, localFolder.Value, library.OutputPath);
-            }
-        }
-
-        return null;
-    }
+    private sealed record ReportedOutcome(string State, PyDict Body, string? Subject, IReadOnlyList<string> Files, long? LibraryId);
 
     /// <summary>
     /// Keep the ledger and Activity in step with a final outcome, then commit. Never throws. A report
-    /// the manager did not answer is kept on the hand-off for the heartbeat to send once it answers, and the file's
-    /// History says Weir is waiting for it, in plain words (#652).
+    /// the manager did not answer is kept on the hand-off for the heartbeat to send once it answers, and the History of
+    /// each file it covers says Weir is waiting for it, in plain words (#652).
     /// </summary>
-    private async Task RecordOutcomeAsync(
-        UnitOfWork uow, HandoffOrigin origin, PyDict body, (HandoffReportTarget Target, HandoffReportDelivery Delivery, string? Relative)? report, long? libraryId = null)
+    private async Task RecordOutcomeAsync(UnitOfWork uow, HandoffOrigin origin, ReportedOutcome outcome, (HandoffReportTarget Target, HandoffReportDelivery Delivery)? report)
     {
+        var body = outcome.Body;
         try
         {
-            string state;
-            if (body.Get("status") is PyStr { Value: "completed" })
-            {
-                state = body.Get("message") is PyStr { Value: CompletionReports.PassThroughAfterFailureMessage }
-                    ? HandoffLedgerRules.PassedThrough
-                    : HandoffLedgerRules.Completed;
-            }
-            else
-            {
-                state = HandoffLedgerRules.Failed;
-            }
-
             await _ledger.RecordOutcomeAsync(
                 uow,
                 origin.SourceKey,
                 origin.HandoffId,
-                state,
+                outcome.State,
                 body.Get("outputPath") is PyStr output ? output.Value : null,
-                body.Get("message") is PyStr message ? message.Value : null).ConfigureAwait(false);
+                body.Get("message") is PyStr message ? message.Value : null,
+                body.Get("outputFiles") is PyList files ? [.. files.Items.OfType<PyStr>().Select(file => file.Value)] : null).ConfigureAwait(false);
             if (report is { } sent)
             {
-                await RecordHandoffReportAsync(uow, sent.Target, body, sent.Delivery, sent.Relative).ConfigureAwait(false);
+                await RecordHandoffReportAsync(uow, sent.Target, body, sent.Delivery, outcome.Subject).ConfigureAwait(false);
                 if (!string.IsNullOrEmpty(origin.HandoffId))
                 {
                     var waiting = IsNotAnswering(sent.Delivery);
                     var owed = waiting
-                        ? new PendingReport(origin.CallbackPath, origin.ReleaseName, origin.LibraryId, body, libraryId, sent.Relative).ToJson()
+                        ? new PendingReport(origin.CallbackPath, origin.ReleaseName, origin.LibraryId, body, outcome.LibraryId, outcome.Subject, outcome.Files).ToJson()
                         : null;
                     await HandoffLedgerStore.SetPendingReportAsync(uow, origin.SourceKey, origin.HandoffId, owed).ConfigureAwait(false);
-                    if (waiting && libraryId is { } library && !string.IsNullOrEmpty(sent.Relative))
+                    if (waiting && outcome.LibraryId is { } library)
                     {
-                        await AppendFileSentenceAsync(uow, library, sent.Relative, ManagerWaitMessages.ReportWaiting(sent.Target.Connection.Name)).ConfigureAwait(false);
+                        foreach (var relativePath in outcome.Files)
+                        {
+                            await AppendFileSentenceAsync(uow, library, relativePath, ManagerWaitMessages.ReportWaiting(sent.Target.Connection.Name)).ConfigureAwait(false);
+                        }
                     }
                 }
             }

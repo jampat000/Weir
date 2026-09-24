@@ -250,6 +250,7 @@ public sealed class MediaManagerIntake
         var relativePath = resolved.RelativeMediaPath!;
         var targets = HandoffMediaFiles(library, relativePath);
         var baseKey = IntakeRules.BaseDedupeKey(importEvent, NewGuid);
+        var covered = new List<string>(targets.Count);
         foreach (var target in targets)
         {
             var dedupeKey = IntakeRules.DedupeKeyFor(baseKey, targets, target, relativePath);
@@ -264,16 +265,23 @@ public sealed class MediaManagerIntake
                 ProcessingJobStore.GetByDedupeKey(connection, transaction, dedupeKey) is null &&
                 WatchedFolderScanOps.ActiveRemuxPassForRelativePath(connection, transaction, target, library.MediaType, library.Id) is { } active)
             {
-                AdoptActivePass(connection, transaction, active, importEvent, dedupeKey, payload);
+                if (AdoptActivePass(connection, transaction, active, importEvent, dedupeKey, payload))
+                {
+                    covered.Add(target);
+                }
+
                 continue;
             }
 
             _jobs.EnqueueOrGet(connection, transaction, dedupeKey, IntakeRules.RemuxPassJobKind, IntakeRules.PayloadJson(payload), JobQueueRules.DefaultMaxAttempts, 0, 0);
+            covered.Add(target);
         }
 
         if (!string.IsNullOrEmpty(importEvent.HandoffId))
         {
-            await _ledger.RecordReceivedAsync(uow, importEvent.SourceKey, importEvent.HandoffId, library?.Id, relativePath, ownerConnectionId, importEvent.DownloadId).ConfigureAwait(false);
+            var rowId = await _ledger.RecordReceivedAsync(
+                uow, importEvent.SourceKey, importEvent.HandoffId, library?.Id, relativePath, ownerConnectionId, importEvent.DownloadId).ConfigureAwait(false);
+            await HandoffTargetStore.AddAsync(uow, rowId, covered).ConfigureAwait(false);
         }
 
         if (library is not null)
@@ -293,9 +301,10 @@ public sealed class MediaManagerIntake
     /// key, so <c>GET /api/v1/intake/handoffs/{kind}/{id}</c> finds it (queue position, working), and it takes the
     /// hand-off's origin, so the outcome is called back to the manager. A pass that is already running picks the origin
     /// up when it finishes (<see cref="Processing.RemuxPass.RemuxPassHandler"/>). A pass that already belongs to
-    /// another hand-off is left with it: this hand-off is still recorded and answers from the file's own state.
+    /// another hand-off is left with it: this hand-off is still recorded and answers from the file's own state, and the
+    /// file is not one this hand-off waits for before it reports. True when the hand-off took the pass over.
     /// </summary>
-    private static void AdoptActivePass(
+    private static bool AdoptActivePass(
         SqliteConnection connection, SqliteTransaction transaction, ProcessingJob active, MediaManagerImportEvent importEvent, string dedupeKey, PyDict handoffPayload)
     {
         PyDict existing;
@@ -311,7 +320,7 @@ public sealed class MediaManagerIntake
         if (HandoffOrigin.FromPayload(existing) is { HandoffId: { } ownerId } owner &&
             (owner.SourceKey != importEvent.SourceKey || ownerId != importEvent.HandoffId))
         {
-            return;
+            return false;
         }
 
         if (handoffPayload.Get("origin") is PyDict origin)
@@ -328,6 +337,7 @@ public sealed class MediaManagerIntake
             ("@dedupe", newKey),
             ("@payload", IntakeRules.PayloadJson(existing)),
             ("@id", active.Id));
+        return true;
     }
 
     /// <summary>

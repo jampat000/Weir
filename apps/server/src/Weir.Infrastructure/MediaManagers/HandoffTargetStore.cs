@@ -1,0 +1,168 @@
+using Weir.Core.Json;
+using Weir.Core.MediaManagers;
+using Weir.Infrastructure.Processing.RemuxPass;
+using Weir.Infrastructure.Sqlite;
+
+namespace Weir.Infrastructure.MediaManagers;
+
+/// <summary>Where a hand-off stands once one of its files has a final result.</summary>
+public enum HandoffTargetProgress
+{
+    /// <summary>The hand-off records no files of its own (it arrived before they were recorded): report the file alone.</summary>
+    Untracked,
+
+    /// <summary>The file is not one this hand-off covers, so the result says nothing about the hand-off.</summary>
+    NotATarget,
+
+    /// <summary>Other files of the hand-off have no final result yet.</summary>
+    Waiting,
+
+    /// <summary>Every file is finished and another pass has already reported this outcome.</summary>
+    AlreadyReported,
+
+    /// <summary>Every file is finished and this caller, and only this caller, reports the hand-off.</summary>
+    Ready,
+}
+
+/// <summary>The answer to <see cref="HandoffTargetStore.FinishAsync"/>, with the hand-off and all its files once they matter.</summary>
+public sealed record HandoffTargetFinish(HandoffTargetProgress Progress, HandoffLedgerRow? Row = null, IReadOnlyList<HandoffTarget>? Targets = null);
+
+/// <summary>
+/// The <c>media_manager_handoff_targets</c> table (migration 0017): every file a hand-off covers, and what each file's
+/// pass came to. A hand-off of several files is reported once, when the last of them finishes, and a manager's
+/// "imported" releases only the copies that report named.
+/// </summary>
+public static class HandoffTargetStore
+{
+    /// <summary>Record the files a hand-off covers. A resend of a hand-off still under way keeps what its files have already done.</summary>
+    public static async Task AddAsync(UnitOfWork uow, long handoffRowId, IEnumerable<string> relativePaths)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        ArgumentNullException.ThrowIfNull(relativePaths);
+        foreach (var relativePath in relativePaths)
+        {
+            await uow.ExecuteAsync(
+                "INSERT INTO media_manager_handoff_targets (handoff_row_id, relative_path) VALUES ($row, $path) " +
+                "ON CONFLICT (handoff_row_id, relative_path) DO NOTHING",
+                ("$row", handoffRowId),
+                ("$path", relativePath)).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Forget a finished hand-off's files, so a resend of it starts over.</summary>
+    public static Task ClearAsync(UnitOfWork uow, long handoffRowId)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        return uow.ExecuteAsync("DELETE FROM media_manager_handoff_targets WHERE handoff_row_id = $row", ("$row", handoffRowId));
+    }
+
+    /// <summary>The files a hand-off covers, in path order.</summary>
+    public static Task<List<HandoffTarget>> ListAsync(UnitOfWork uow, long handoffRowId)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        return uow.QueryAsync(
+            "SELECT relative_path, result, output_file, message FROM media_manager_handoff_targets WHERE handoff_row_id = $row ORDER BY relative_path",
+            reader => new HandoffTarget(
+                SqliteValues.GetString(reader, 0),
+                SqliteValues.GetStringOrNull(reader, 1),
+                SqliteValues.GetStringOrNull(reader, 2),
+                SqliteValues.GetStringOrNull(reader, 3)),
+            ("$row", handoffRowId));
+    }
+
+    /// <summary>
+    /// Record one file's final result, and say whether the caller now reports the whole hand-off. The result and the
+    /// check run in one <c>BEGIN IMMEDIATE</c> transaction, so of two passes finishing together the second sees the
+    /// first's result; and the report is claimed by a conditional update of <c>reported_status</c>, so exactly one caller
+    /// gets <see cref="HandoffTargetProgress.Ready"/>. A hand-off already reported as failed may be reported once more
+    /// when a retry turns it into a success, as a single file always could. The caller commits.
+    /// </summary>
+    public static async Task<HandoffTargetFinish> FinishAsync(UnitOfWork uow, HandoffOrigin origin, string relativePath, PyDict result)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        ArgumentNullException.ThrowIfNull(origin);
+        ArgumentNullException.ThrowIfNull(result);
+        if (string.IsNullOrEmpty(origin.HandoffId) ||
+            await HandoffLedgerStore.FindAsync(uow, origin.SourceKey, origin.HandoffId).ConfigureAwait(false) is not { } row)
+        {
+            return new HandoffTargetFinish(HandoffTargetProgress.Untracked);
+        }
+
+        var outputFile = CompletionReports.IsSucceeded(result) && result.Get("output_file") is PyStr { Value.Length: > 0 } written ? written.Value : null;
+        var updated = await uow.ExecuteAsync(
+            "UPDATE media_manager_handoff_targets SET result = $result, output_file = $output, message = $message " +
+            "WHERE handoff_row_id = $row AND relative_path = $path",
+            ("$result", FolderHandoffReports.TargetResult(result)),
+            ("$output", outputFile),
+            ("$message", PyStrings.Slice(CompletionReports.MessageFor(result), 2000)),
+            ("$row", row.Id),
+            ("$path", relativePath)).ConfigureAwait(false);
+        var targets = await ListAsync(uow, row.Id).ConfigureAwait(false);
+        if (updated == 0)
+        {
+            return new HandoffTargetFinish(targets.Count == 0 ? HandoffTargetProgress.Untracked : HandoffTargetProgress.NotATarget, row);
+        }
+
+        if (targets.Any(target => target.Result is null))
+        {
+            return new HandoffTargetFinish(HandoffTargetProgress.Waiting, row, targets);
+        }
+
+        var status = targets.Any(target => target.Result == HandoffLedgerRules.Failed) ? HandoffLedgerRules.Failed : HandoffLedgerRules.Completed;
+        var claimed = await uow.ExecuteAsync(
+            "UPDATE media_manager_handoffs SET reported_status = $status WHERE id = $row " +
+            "AND (reported_status IS NULL OR (reported_status = $failed AND $status <> $failed))",
+            ("$status", status),
+            ("$failed", HandoffLedgerRules.Failed),
+            ("$row", row.Id)).ConfigureAwait(false);
+        return new HandoffTargetFinish(claimed == 1 ? HandoffTargetProgress.Ready : HandoffTargetProgress.AlreadyReported, row, targets);
+    }
+
+    /// <summary>A file whose queued pass was cancelled in Weir is finished for the hand-off: nothing will be delivered for it.</summary>
+    public static Task MarkCancelledAsync(UnitOfWork uow, long handoffRowId, string relativePath)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        return uow.ExecuteAsync(
+            "UPDATE media_manager_handoff_targets SET result = $cancelled, message = $message " +
+            "WHERE handoff_row_id = $row AND relative_path = $path AND result IS NULL",
+            ("$cancelled", HandoffLedgerRules.Cancelled),
+            ("$message", HandoffLedgerRules.CancelledInWeirMessage),
+            ("$row", handoffRowId),
+            ("$path", relativePath));
+    }
+
+    /// <summary>
+    /// Whether the manager was told about this copy: the hand-off reported the file, naming exactly this copy. A hand-off
+    /// that records no files of its own named only the one file it was for.
+    /// </summary>
+    public static async Task<Func<HandbackRow, bool>> ReportedCopiesAsync(UnitOfWork uow, HandoffLedgerRow row)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        ArgumentNullException.ThrowIfNull(row);
+        var targets = await ListAsync(uow, row.Id).ConfigureAwait(false);
+        if (targets.Count == 0)
+        {
+            return copy => copy.RelativePath == row.RelativePath;
+        }
+
+        if (row.ReportedStatus is null)
+        {
+            return _ => false;
+        }
+
+        var reported = targets.Where(target => target.Delivered && target.OutputFile is not null).ToList();
+        return copy => reported.Any(target => target.RelativePath == copy.RelativePath && SameFile(target.OutputFile!, copy.OutputPath));
+    }
+
+    private static bool SameFile(string reported, string copy)
+    {
+        try
+        {
+            return RemuxPassPaths.SamePath(RemuxPassPaths.Resolve(reported), RemuxPassPaths.Resolve(copy));
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+}
