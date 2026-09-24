@@ -83,6 +83,7 @@ public sealed class RouteTable
 public sealed class AuthRateLimiters
 {
     private int _forwardedWarned;
+    private int _cookieNotSecureWarned;
 
     public AuthRateLimiters(WeirOptions options, TimeProvider time)
     {
@@ -101,6 +102,9 @@ public sealed class AuthRateLimiters
 
     /// <summary>True the first time only: the ignored-forwarded-headers warning is logged once per process.</summary>
     public bool ShouldWarnForwardedIgnored() => Interlocked.Exchange(ref _forwardedWarned, 1) == 0;
+
+    /// <summary>True the first time only: the cookie-not-Secure warning is logged once per process.</summary>
+    public bool ShouldWarnCookieNotSecure() => Interlocked.Exchange(ref _cookieNotSecureWarned, 1) == 0;
 }
 
 /// <summary>

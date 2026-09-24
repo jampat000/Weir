@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import socket
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -51,6 +52,35 @@ def clear_connections(client: WeirClient) -> None:
     assert listed.status_code == 200, listed.text
     for row in listed.json():
         assert delete_connection(client, row["id"]).status_code == 204
+
+
+def ensure_connections(client: WeirClient, kinds: Iterable[tuple[str, str, str]]) -> None:
+    """Create a connection for each ``(kind, name, base_url)`` triple that has none yet, so an
+    unsigned webhook for that kind has something on file it can be attributed to (a manager kind
+    with no connection at all is refused outright — see ``MediaManagerIntake.AuthoriseAsync``).
+    """
+
+    listed = client.get(f"{API}/media-managers/connections")
+    assert listed.status_code == 200, listed.text
+    existing = {row["kind"] for row in listed.json()}
+    for kind, name, base_url in kinds:
+        if kind in existing:
+            continue
+        created = create_connection(client, kind=kind, name=name, base_url=base_url, api_key="key")
+        assert created.status_code == 201, created.text
+
+
+def create_connection_with_secret(client: WeirClient, **overrides: Any) -> tuple[dict[str, Any], dict[str, str]]:
+    """Create a connection and return it with the ``X-Webhook-Secret`` header for its own secret, so a
+    webhook test can prove itself as that connection rather than relying on being its kind's only one.
+    """
+
+    created = create_connection(client, **overrides)
+    assert created.status_code == 201, created.text
+    row = created.json()
+    generated = client.post_csrf(f"{API}/media-managers/connections/{row['id']}/webhook-secret")
+    assert generated.status_code == 200, generated.text
+    return row, {"X-Webhook-Secret": generated.json()["webhook_secret"]}
 
 
 def closed_port_url() -> str:

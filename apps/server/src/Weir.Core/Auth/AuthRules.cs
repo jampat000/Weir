@@ -164,6 +164,27 @@ public static class SessionRules
         _ => string.Equals((requestScheme ?? string.Empty).Trim(), "https", StringComparison.OrdinalIgnoreCase),
     };
 
+    /// <summary>
+    /// Whether the cookie could not be marked Secure only because nothing told Weir this request really arrived
+    /// over TLS: the connection itself reads as plain http, but the browser's own Origin or Referer is https,
+    /// and no trusted proxy is configured to translate an <c>X-Forwarded-Proto</c> header into the real scheme
+    /// (<c>WEIR_TRUSTED_PROXY_IPS</c>). A plain LAN http request, with no https evidence, never triggers this.
+    /// </summary>
+    public static bool CookieSecureBlockedByUntranslatedTls(CookieSecureMode mode, string? requestScheme, string? origin, string? referer, bool hasTrustedProxy)
+    {
+        if (mode != CookieSecureMode.Auto || hasTrustedProxy ||
+            !string.Equals((requestScheme ?? string.Empty).Trim(), "http", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return IsHttpsUrl(origin) || IsHttpsUrl(referer);
+    }
+
+    /// <summary>A cheap, exception-free check: good enough to notice https evidence in an untrusted header,
+    /// without fully parsing (and so having to reject) a malformed one.</summary>
+    private static bool IsHttpsUrl(string? value) => value is not null && value.AsSpan().TrimStart().StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+
     public static string SameSiteText(CookieSameSite sameSite) => sameSite switch
     {
         CookieSameSite.Strict => "strict",

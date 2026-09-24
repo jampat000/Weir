@@ -13,18 +13,43 @@ from tests.contract.media_managers._helpers import (
     REMUX_KIND,
     LibraryFolders,
     create_connection,
+    create_connection_with_secret,
     delete_connection,
+    ensure_connections,
     ensure_library,
     handoff_dedupe_key,
     payload,
     remux_jobs,
 )
 from tests.contract.support.client import API, WeirClient
+from tests.contract.support.launcher import ServerUnderTest
+
+#: This module runs with no instance-wide webhook secret, so every kind it exercises unsigned needs
+#: its own connection on file first (a kind with no connection at all is refused outright).
+EVERY_KIND = (
+    ("sonarr", "Sonarr", "http://192.0.2.30:8989"),
+    ("radarr", "Radarr", "http://192.0.2.20:7878"),
+    ("deluno", "Deluno", "http://192.0.2.10:5099"),
+)
 
 
 @pytest.fixture(scope="module")
 def server_env() -> dict[str, str]:
     return dict(NO_WEBHOOK_SECRET)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def every_kind_has_a_connection(server: ServerUnderTest) -> Iterator[None]:
+    """Sonarr, Radarr and Deluno each need a connection on file before this module's unsigned
+    webhooks have anything to be attributed to."""
+
+    setup = WeirClient(server.base_url)
+    try:
+        setup.ensure_admin()
+        ensure_connections(setup, EVERY_KIND)
+        yield
+    finally:
+        setup.close()
 
 
 @pytest.fixture(scope="module")
@@ -175,6 +200,8 @@ def test_handoff_without_a_configured_watched_folder_says_so(server_factory, cli
     # A server of its own: the module server has watched folders once any hand-off test has run.
     fresh = server_factory(dict(NO_WEBHOOK_SECRET))
     client = client_factory(fresh)
+    client.ensure_admin()
+    assert create_connection(client).status_code == 201
     r = client.post(
         f"{API}/intake/webhook/deluno",
         json={
@@ -216,15 +243,11 @@ def test_deluno_tv_handoff_uses_the_tv_watched_folder(
 def native_secret(admin: WeirClient) -> Iterator[dict[str, str]]:
     """A native connection's own secret: the connection-less native source refuses unsigned writes."""
 
-    created = create_connection(admin, kind="native", name="Native", base_url="", api_key="")
-    assert created.status_code == 201, created.text
-    connection_id = created.json()["id"]
-    generated = admin.post_csrf(f"{API}/media-managers/connections/{connection_id}/webhook-secret")
-    assert generated.status_code == 200, generated.text
+    row, headers = create_connection_with_secret(admin, kind="native", name="Native", base_url="", api_key="")
     try:
-        yield {"X-Webhook-Secret": generated.json()["webhook_secret"]}
+        yield headers
     finally:
-        delete_connection(admin, connection_id)
+        delete_connection(admin, row["id"])
 
 
 def test_native_imported_event_is_accepted_and_ignored(admin: WeirClient, native_secret: dict[str, str]) -> None:
@@ -296,6 +319,29 @@ def test_source_key_is_case_insensitive(client: WeirClient) -> None:
     assert r.json()["status"] == "ignored"
 
 
+def test_a_manager_kind_with_no_connection_at_all_is_refused(server_factory, client_factory) -> None:
+    sut = server_factory(dict(NO_WEBHOOK_SECRET))
+    c = client_factory(sut)
+    refused = c.post(f"{API}/intake/webhook/radarr", json={"eventType": "Grab"})
+    assert refused.status_code == 401, refused.text
+    assert refused.json()["detail"] == (
+        "No Radarr is set up in Weir. Add it in Settings › Media managers, then send webhooks with its secret."
+    )
+
+    c.ensure_admin()
+    created = create_connection(c, kind="radarr", name="Radarr", base_url="http://192.0.2.20:7878")
+    assert created.status_code == 201, created.text
+
+    # An existing connection that has never rotated its secret still accepts an unsigned webhook.
+    assert c.post(f"{API}/intake/webhook/radarr", json={"eventType": "Grab"}).status_code == 200
+
+    connection_id = created.json()["id"]
+    generated = c.post_csrf(f"{API}/media-managers/connections/{connection_id}/webhook-secret")
+    secret = generated.json()["webhook_secret"]
+    signed = c.post(f"{API}/intake/webhook/radarr", json={"eventType": "Grab"}, headers={"X-Webhook-Secret": secret})
+    assert signed.status_code == 200
+
+
 def test_configured_secret_is_required(server_factory, client_factory) -> None:
     sut = server_factory({**NO_WEBHOOK_SECRET, "WEIR_MEDIA_MANAGER_WEBHOOK_SECRET": "s3cret"})
     c = client_factory(sut)
@@ -316,4 +362,7 @@ def test_the_old_subber_env_name_no_longer_configures_the_secret(server_factory,
 
     sut = server_factory({**NO_WEBHOOK_SECRET, "WEIR_SUBBER_WEBHOOK_SECRET": "s3cret"})
     c = client_factory(sut)
+    c.ensure_admin()
+    created = create_connection(c, kind="radarr", name="Radarr", base_url="http://192.0.2.20:7878")
+    assert created.status_code == 201, created.text
     assert c.post(f"{API}/intake/webhook/radarr", json={"eventType": "Grab"}).status_code == 200

@@ -122,6 +122,7 @@ public static class AuthEndpoints
     /// <summary>A 200 that hands the browser its new session cookie.</summary>
     private static JsonApiResult SignedIn(ApiRequest request, PyDict body, UserSessionRecord session, string rawToken)
     {
+        WarnIfCookieSecureBlockedByUntranslatedTls(request);
         var cookie = PyCookies.SetCookieHeader(
             request.Options.SessionCookieName,
             rawToken,
@@ -134,6 +135,29 @@ public static class AuthEndpoints
         {
             Headers = [new("Set-Cookie", cookie), new("Cache-Control", "no-store, private")],
         };
+    }
+
+    /// <summary>
+    /// A reverse proxy that terminates TLS but isn't in <c>WEIR_TRUSTED_PROXY_IPS</c> leaves every session
+    /// cookie without Secure, silently, for as long as it takes an operator to notice their site isn't really
+    /// protected. This logs it once per process, the first time a sign-in shows the tell (an https Origin or
+    /// Referer on a request that otherwise reads as plain http).
+    /// </summary>
+    private static void WarnIfCookieSecureBlockedByUntranslatedTls(ApiRequest request)
+    {
+        var blocked = SessionRules.CookieSecureBlockedByUntranslatedTls(
+            request.Options.SessionCookieSecureMode,
+            request.Context.Request.Scheme,
+            request.FirstHeader("Origin"),
+            request.FirstHeader("Referer"),
+            request.Options.TrustedProxyIps.Count > 0);
+        if (blocked && request.Service<AuthRateLimiters>().ShouldWarnCookieNotSecure())
+        {
+            Logger(request).LogWarning(
+                "The session cookie could not be marked Secure: this request reads as plain http even though " +
+                "its Origin or Referer is https. If Weir sits behind a reverse proxy that terminates TLS, set " +
+                "WEIR_TRUSTED_PROXY_IPS to that proxy's address so Weir can tell.");
+        }
     }
 
     private static async Task<ApiResult> GetBootstrapStatusAsync(ApiRequest request)

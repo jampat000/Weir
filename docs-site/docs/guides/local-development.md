@@ -44,11 +44,11 @@ the other.
 There is no separate migration step. The server creates its SQLite database, or brings an
 existing one up to date, when it starts.
 
-Open **http://localhost:8782/** in your browser. You'll be guided through first-run setup.
+Open **http://127.0.0.1:8782/** in your browser. You'll be guided through first-run setup.
 
 | Component | URL | Port |
 |-----------|-----|------|
-| Web UI (Vite dev server) | http://localhost:8782 | 8782 |
+| Web UI (Vite dev server) | http://127.0.0.1:8782 | 8782 |
 | API (the .NET server) | http://127.0.0.1:18788 | 18788 |
 
 The Vite dev server proxies `/api` requests to the server automatically — no CORS configuration needed for local development.
