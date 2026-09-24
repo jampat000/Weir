@@ -164,7 +164,7 @@ public static class SuiteEndpoints
         var uow = await request.DbAsync().ConfigureAwait(false);
         try
         {
-            await ConfigurationBundleStore.ApplyAsync(uow, bundle, request.Service<ITimeZoneResolver>()).ConfigureAwait(false);
+            await ConfigurationBundleStore.ApplyAsync(uow, bundle, request.Service<ITimeZoneResolver>(), request.Options.WeirHome).ConfigureAwait(false);
         }
         catch (PyValueErrorException exception)
         {
