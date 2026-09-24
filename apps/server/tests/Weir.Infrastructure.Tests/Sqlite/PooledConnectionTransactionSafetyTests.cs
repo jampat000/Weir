@@ -7,13 +7,14 @@ using Weir.Infrastructure.Tests.Jobs;
 namespace Weir.Infrastructure.Tests.Sqlite;
 
 /// <summary>
-/// #640: a pooled native handle must never reach the next caller while it is inside a transaction. SQLite
+/// A pooled native handle must never reach the next caller while it is inside a transaction. SQLite
 /// refuses <c>PRAGMA synchronous</c> only inside a transaction, so <see cref="SqliteDatabase.OpenAsync"/>
 /// failing with "Safety level may not be changed inside a transaction" means the handle it was given had one
 /// open. Microsoft.Data.Sqlite's pool does no reset when a handle comes back (<c>SqliteConnectionPool.Return</c>),
 /// so whatever state the last owner left is what the next one gets.
 /// </summary>
-public sealed class Issue640PooledTransactionTests
+/// <seealso href="https://github.com/jampat000/Weir/issues/640"/>
+public sealed class PooledConnectionTransactionSafetyTests
 {
     /// <summary>
     /// How CI got there with no statement failing (Test run 35688389454). <c>SqliteConnectionFactory.GetConnection</c>

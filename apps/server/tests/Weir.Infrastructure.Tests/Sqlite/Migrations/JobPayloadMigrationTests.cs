@@ -11,19 +11,20 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Tests.Sqlite.Migrations;
 
 /// <summary>
-/// Issue #557: migrations 0002-0006 each copy data out of the old job-payload/detail_json storage they
-/// replace. Every test here builds a database at the frozen baseline (<see cref="SchemaMigrator.BaselineRevision"/>,
-/// the pre-#557 head every released Weir could create), writes one row by hand in the exact old format,
-/// upgrades the database to head (<see cref="SchemaMigrator.EnsureAtHead"/>'s new in-place upgrade path),
-/// and proves the same data reads back identically through the real, current store — not a reimplementation
-/// of the migration's own SQL.
+/// Migrations 0002-0006 each copy data out of the old job-payload/detail_json storage they replace. Every
+/// test here builds a database at the frozen baseline (<see cref="SchemaMigrator.BaselineRevision"/>, the
+/// head every released Weir could create before these migrations existed), writes one row by hand in the
+/// exact old format, upgrades the database to head (<see cref="SchemaMigrator.EnsureAtHead"/>'s new in-place
+/// upgrade path), and proves the same data reads back identically through the real, current store — not a
+/// reimplementation of the migration's own SQL.
 /// </summary>
-public sealed class Issue557MigrationTests : IDisposable
+/// <seealso href="https://github.com/jampat000/Weir/issues/557"/>
+public sealed class JobPayloadMigrationTests : IDisposable
 {
     private readonly TempDirectory _temp = new();
     private readonly SqliteDatabase _database;
 
-    public Issue557MigrationTests()
+    public JobPayloadMigrationTests()
     {
         _database = new SqliteDatabase(_temp.Join("weir.sqlite3"));
         Assert.Equal(SchemaStartupOutcome.Created, new SchemaMigrator(_database).EnsureAtBaseline());
