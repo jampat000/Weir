@@ -291,12 +291,13 @@ describe("useActivityStreamInvalidations", () => {
     expect(FakeEventSource.instances[1].closed).toBe(false);
   });
 
-  it("closes the connection while the tab is hidden", () => {
+  it("keeps the connection and keeps data current while the tab is hidden", () => {
     vi.stubGlobal(
       "EventSource",
       FakeEventSource as unknown as typeof EventSource,
     );
     const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
 
     renderHook(() => useActivityStreamInvalidations(RECENT_KEYS), {
       wrapper: withQueryClient(qc),
@@ -305,28 +306,33 @@ describe("useActivityStreamInvalidations", () => {
 
     setVisibility("hidden");
     document.dispatchEvent(new Event("visibilitychange"));
+    src.emit("activity.latest", JSON.stringify({ latest_event_id: 7 }));
 
-    expect(src.closed).toBe(true);
+    expect(src.closed).toBe(false);
+    expect(spy).toHaveBeenCalledWith(
+      { queryKey: activityKeys.recent, exact: false },
+      CANCEL_REFETCH_FALSE,
+    );
+
+    setVisibility("visible");
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    expect(FakeEventSource.instances).toHaveLength(1);
   });
 
-  it("reopens the connection once the tab becomes visible again", () => {
+  it("opens the connection even when the tab starts hidden", () => {
     vi.stubGlobal(
       "EventSource",
       FakeEventSource as unknown as typeof EventSource,
     );
-    const qc = new QueryClient();
+    setVisibility("hidden");
 
     renderHook(() => useActivityStreamInvalidations(RECENT_KEYS), {
-      wrapper: withQueryClient(qc),
+      wrapper: withQueryClient(new QueryClient()),
     });
 
-    setVisibility("hidden");
-    document.dispatchEvent(new Event("visibilitychange"));
-    setVisibility("visible");
-    document.dispatchEvent(new Event("visibilitychange"));
-
-    expect(FakeEventSource.instances).toHaveLength(2);
-    expect(FakeEventSource.instances[1].closed).toBe(false);
+    expect(FakeEventSource.instances).toHaveLength(1);
+    expect(FakeEventSource.instances[0].closed).toBe(false);
   });
 });
 
@@ -334,7 +340,43 @@ describe("useLiveProgress", () => {
   afterEach(() => {
     FakeEventSource.instances = [];
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     document.dispatchEvent(new Event("visibilitychange"));
+  });
+
+  it("stores progress while the tab is hidden and shows the latest once it is visible", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    let renders = 0;
+    const { result } = renderHook(() => {
+      renders += 1;
+      return useLiveProgress();
+    });
+    const src = FakeEventSource.instances[0];
+    const frame = (percent: number) =>
+      JSON.stringify({
+        files: [{ relative_path: "Film/Film.mkv", percent }],
+      });
+
+    setVisibility("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    const rendersBeforeHiding = renders;
+    act(() => {
+      src.emit("processing.progress", frame(10));
+      src.emit("processing.progress", frame(20));
+      src.emit("processing.progress", frame(30));
+    });
+    expect(renders).toBe(rendersBeforeHiding);
+
+    setVisibility("visible");
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    expect(result.current["Film/Film.mkv"]?.percent).toBe(30);
+    expect(renders).toBe(rendersBeforeHiding + 1);
   });
 
   it("starts empty and fills in from the stream's processing.progress frame", () => {
