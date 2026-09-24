@@ -20,7 +20,7 @@ export function MmOnOffSwitch({
 }) {
   const control = (
     <div
-      className="inline-flex w-fit shrink-0 rounded-md border border-[var(--mm-border)] bg-[var(--mm-surface2)]/40 p-0.5"
+      className="inline-flex w-fit shrink-0 rounded-md border border-mm-border bg-mm-surface2/40 p-0.5"
       role="radiogroup"
       aria-labelledby={id}
     >
@@ -38,8 +38,8 @@ export function MmOnOffSwitch({
             className={[
               "min-w-[3.25rem] rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
               selected
-                ? "bg-[var(--mm-accent-soft)] text-[var(--mm-text1)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--mm-gold)_35%,transparent)]"
-                : "text-[var(--mm-text2)] hover:bg-[var(--mm-card-bg)]/70",
+                ? "bg-mm-accent-soft text-mm-text1 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--mm-gold)_35%,transparent)]"
+                : "text-mm-text2 hover:bg-mm-card-bg/70",
               disabled
                 ? "cursor-not-allowed opacity-50 hover:bg-transparent"
                 : "",
@@ -67,7 +67,7 @@ export function MmOnOffSwitch({
     return (
       <div className="flex w-full min-w-0 flex-row items-center justify-between gap-4">
         <span
-          className="min-w-0 flex-1 text-sm font-medium text-[var(--mm-text1)]"
+          className="min-w-0 flex-1 text-sm font-medium text-mm-text1"
           id={id}
         >
           {label}
@@ -79,7 +79,7 @@ export function MmOnOffSwitch({
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-medium text-[var(--mm-text1)]" id={id}>
+      <span className="text-sm font-medium text-mm-text1" id={id}>
         {label}
       </span>
       {control}

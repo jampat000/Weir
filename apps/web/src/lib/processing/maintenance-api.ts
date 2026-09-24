@@ -1,4 +1,4 @@
-import { fetchCsrfToken } from "../api/auth-api";
+import { sendJson } from "../api/send-json";
 import { apiFetch, readJson, requireOk } from "../api/client";
 
 export type MaintenanceFamily =
@@ -45,13 +45,12 @@ export async function runProcessingMaintenance(
   family: MaintenanceFamily,
   media_scope: "movie" | "tv",
 ): Promise<MaintenanceTriggerResult> {
-  const csrf_token = await fetchCsrfToken();
   const path = `${processingMaintenancePath()}/run`;
-  const response = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ csrf_token, family, media_scope }),
-  });
-  await requireOk(path, response, "Could not start that maintenance job");
+  const response = await sendJson(
+    path,
+    "POST",
+    { family, media_scope },
+    "Could not start that maintenance job",
+  );
   return readJson<MaintenanceTriggerResult>(response);
 }

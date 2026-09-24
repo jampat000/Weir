@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChooseTracksPanel } from "../../components/processing/choose-tracks-panel";
+import { ConfirmDialog } from "../../components/ui/confirm-dialog";
 import type {
   ProcessingFile,
   ProcessingFileTracks,
@@ -18,6 +19,9 @@ import {
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 
+const PASS_THROUGH_EXPLAINED =
+  "Weir will skip the audio, subtitle and metadata rules, copy and check the original in this library's output folder, then remove the watched original the way it does after any finished file. Readiness checks still apply, so a download still being written is left alone.";
+
 /** A file checked while processing was paused carries that reason until something looks at it again. */
 export function pausedWhenChecked(file: ProcessingFile): boolean {
   return (
@@ -27,8 +31,7 @@ export function pausedWhenChecked(file: ProcessingFile): boolean {
 }
 
 /**
- * What a person can do about a file, in the words of the buttons beside it. Moved here from the old
- * Downloads list with History (23 Sep 2026), so nothing that list could do was lost.
+ * What a person can do about a file, in the words of the buttons beside it.
  */
 export function fileGuidance(
   file: ProcessingFile,
@@ -90,8 +93,7 @@ export function fileGuidance(
 }
 
 /**
- * Every action the old Downloads list offered for one file, for the file open in History. Each shows
- * only where it can do something: a running file cannot be started earlier, and a button that looked
+ * Every action for the file open in History. Each shows only where it can do something: a running file cannot be started earlier, and a button that looked
  * like it worked would be worse than no button.
  */
 export function HistoryFileActions({
@@ -115,6 +117,7 @@ export function HistoryFileActions({
   const [tracks, setTracks] = useState<ProcessingFileTracks | null>(null);
   const [tracksError, setTracksError] = useState<string | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
+  const [confirmingPassThrough, setConfirmingPassThrough] = useState(false);
 
   if (!editable) return null;
 
@@ -264,21 +267,7 @@ export function HistoryFileActions({
           ? button(
               "Pass through unchanged",
               "Skips your track rules, places a checked, unchanged copy in the output folder, then tidies the original as after any finished file.",
-              () => {
-                const confirmed = window.confirm(
-                  "Pass this file through unchanged?\n\nWeir will skip the audio, subtitle and metadata rules, copy and check the original in this library's output folder, then remove the watched original the way it does after any finished file. Readiness checks still apply, so a download still being written is left alone.",
-                );
-                if (!confirmed) return;
-                void run(async () => {
-                  await processNow.mutateAsync({
-                    relative_media_path: file.relative_path,
-                    media_scope: scope,
-                    library_id: file.library_id,
-                    pass_through_unchanged: true,
-                  });
-                  return "Queued to pass through unchanged. Weir checks the copy before removing the original.";
-                }, "That file could not be queued to pass through. Refresh and review its library's folders.");
-              },
+              () => setConfirmingPassThrough(true),
               "tertiary",
             )
           : null}
@@ -295,6 +284,28 @@ export function HistoryFileActions({
             )
           : null}
       </div>
+      {confirmingPassThrough ? (
+        <ConfirmDialog
+          testId="history-pass-through-confirm"
+          title="Pass this file through unchanged?"
+          description={PASS_THROUGH_EXPLAINED}
+          confirmLabel="Pass through unchanged"
+          cancelLabel="Not now"
+          onCancel={() => setConfirmingPassThrough(false)}
+          onConfirm={() => {
+            setConfirmingPassThrough(false);
+            void run(async () => {
+              await processNow.mutateAsync({
+                relative_media_path: file.relative_path,
+                media_scope: scope,
+                library_id: file.library_id,
+                pass_through_unchanged: true,
+              });
+              return "Queued to pass through unchanged. Weir checks the copy before removing the original.";
+            }, "That file could not be queued to pass through. Refresh and review its library's folders.");
+          }}
+        />
+      ) : null}
       {notice ? (
         <p className="mm-history-note" role="status">
           {notice}

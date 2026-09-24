@@ -1,0 +1,50 @@
+/* The loading dots every page shows while it reads. */
+
+/* ---- Loading ------------------------------------------------------------- */
+
+.mm-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+  gap: 1.1rem;
+  color: var(--mm-text2);
+  font-size: 0.875rem;
+  letter-spacing: 0.02em;
+}
+
+.mm-loading-dots {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.mm-loading-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--mm-accent-bright);
+  opacity: 0.35;
+  animation: mm-pulse-dot 1.05s ease-in-out infinite;
+}
+
+.mm-loading-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.mm-loading-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes mm-pulse-dot {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: translateY(0) scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1);
+  }
+}

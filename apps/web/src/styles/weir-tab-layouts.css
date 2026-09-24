@@ -1,0 +1,334 @@
+/* Layouts particular to one Settings or System tab. */
+
+/* Settings › Cleanup: each job's own switch and timer on one row. */
+.mm-cleanup-table .mm-quiet-table__name {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 34rem;
+}
+
+.mm-cleanup-what {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--mm-text3);
+}
+
+.mm-cleanup-what--warn {
+  color: var(--mm-status-warning-text);
+}
+
+.mm-cleanup-every {
+  width: 10rem;
+}
+
+/* Settings › Alerts: how an alert travels, in three plain steps, then one column per event. */
+.mm-alert-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 32px;
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+  counter-reset: mm-alert-step;
+}
+
+@media (max-width: 900px) {
+  .mm-alert-steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.mm-alert-steps li {
+  position: relative;
+  padding-left: 40px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--mm-text3);
+  counter-increment: mm-alert-step;
+}
+
+.mm-alert-steps li::before {
+  content: counter(mm-alert-step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--mm-accent-ring);
+  color: var(--mm-accent-bright);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.mm-alert-steps b {
+  display: block;
+  font-weight: 600;
+  color: var(--mm-text);
+}
+
+.mm-alerts-cell {
+  text-align: center;
+  width: 8.5rem;
+}
+
+/* System › About: what Weir works with, its updates, and its time zone and setup, side by side. */
+.mm-about-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 48px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .mm-about-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1400px) {
+  .mm-about-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Facts, one per line: the name dim on the left, the fact on the right. */
+.mm-kv {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mm-kv > div {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--mm-border) 60%, transparent);
+  font-size: 0.875rem;
+}
+
+.mm-kv > div:last-child {
+  border-bottom: 0;
+}
+
+.mm-kv dt {
+  color: var(--mm-text3);
+}
+
+.mm-kv dd {
+  margin: 0;
+  color: var(--mm-text);
+  overflow-wrap: anywhere;
+}
+
+/* System › Backups: what and when on the left, the backups on this machine on the right. */
+.mm-backups-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 56px;
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .mm-backups-grid {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  }
+
+  .mm-backups-grid__wide {
+    grid-column: 1 / -1;
+  }
+}
+
+/* System › Security: changing the username and the password, side by side. */
+.mm-security-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 56px;
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .mm-security-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Settings › Libraries: where a library comes from, and its folders in the code face they are typed in. */
+.mm-library-source {
+  display: block;
+}
+
+.mm-library-source--synced {
+  color: var(--mm-accent-bright);
+}
+
+.mm-library-path {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+/* Settings › Rules: which profile, its name, and who uses it, on one line. */
+.mm-profile-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 20px;
+  margin-top: 4px;
+}
+
+.mm-profile-bar__used {
+  margin: 0 0 9px;
+  font-size: 0.8125rem;
+  color: var(--mm-text2);
+}
+
+/* Settings › Schedule: the time zone on one line, a week per library, its editor underneath. */
+.mm-schedule-zone {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: min(100%, 34rem);
+}
+
+.mm-schedule-zone > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Seven rows of 24 hours, lit where the library may start work. Small on purpose: it is read at a glance,
+   and the editor below is where hours are drawn. */
+.mm-week {
+  display: grid;
+  gap: 2px;
+  width: 16rem;
+}
+
+.mm-week__day {
+  display: grid;
+  grid-template-columns: 0.9rem repeat(24, minmax(0, 1fr));
+  gap: 1px;
+  align-items: center;
+}
+
+.mm-week__label {
+  color: var(--mm-text3);
+  font-size: 0.625rem;
+  line-height: 1;
+}
+
+.mm-week__hour {
+  height: 6px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--mm-text3) 22%, transparent);
+}
+
+.mm-week__hour.is-on {
+  background: var(--mm-accent);
+}
+
+.mm-schedule-table tr.is-selected > * {
+  background: var(--mm-accent-soft);
+}
+
+.mm-schedule-actions {
+  white-space: nowrap;
+}
+
+.mm-schedule-actions > * + * {
+  margin-left: 0.5rem;
+}
+
+.mm-schedule-link {
+  color: var(--mm-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mm-schedule-editor {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--mm-border);
+}
+
+.mm-schedule-editor__title {
+  margin: 0 0 0.75rem;
+  color: var(--mm-text1);
+  font-weight: 600;
+}
+
+/* Library editor › Files already in your library: the folders, then one switch per row. */
+.mm-library-cleaning {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.mm-library-cleaning__folders {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--mm-type-body);
+}
+
+.mm-library-cleaning__folders li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--mm-border);
+  overflow-wrap: anywhere;
+}
+
+.mm-library-cleaning__folders li:last-child {
+  border-bottom: 0;
+}
+
+.mm-library-cleaning__empty {
+  color: var(--mm-text3);
+}
+
+.mm-library-cleaning__add {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.mm-library-cleaning__add .mm-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 28rem;
+}
+
+.mm-library-cleaning__switches {
+  display: grid;
+  gap: 0.6rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--mm-border);
+}
+
+.mm-library-cleaning__hint {
+  margin: -0.3rem 0 0;
+  color: var(--mm-text3);
+  font-size: var(--mm-type-caption);
+}
+
+.mm-library-cleaning__confirm {
+  padding: 0.75rem 0 0.75rem 0.9rem;
+  border-left: 2px solid var(--mm-status-warning-text);
+  color: var(--mm-text2);
+}
+
+.mm-library-cleaning__confirm p {
+  margin: 0 0 0.6rem;
+}
+
+.mm-library-cleaning__confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+}

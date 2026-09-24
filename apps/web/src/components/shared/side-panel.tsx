@@ -1,12 +1,10 @@
 /**
  * A panel that slides over the page from the right, for editing or reading one thing without losing the page
- * behind it. Close it and you are exactly where you were.
- *
- * It exists because the library editor opened *below* the list: on a long Settings page the screen did not move,
- * so clicking Edit looked like nothing happening at all. Anything that used to open below the fold belongs here.
- * Escape closes it, focus moves into it and returns to whatever opened it, and the page behind it does not scroll.
+ * behind it. Close it and you are exactly where you were. Anything that would otherwise open below the fold,
+ * where clicking looks like nothing happened, belongs here. Escape closes it, focus moves into it and returns to
+ * whatever opened it, and the page behind it does not scroll.
  */
-import { useEffect, useRef } from "react";
+import { useModalFocus } from "../../lib/ui/use-modal-focus";
 
 export function SidePanel({
   open,
@@ -26,23 +24,7 @@ export function SidePanel({
   children: React.ReactNode;
   dataTestId?: string;
 }): React.ReactElement | null {
-  const panel = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const returnTo = document.activeElement;
-    panel.current?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    document.body.classList.add("mm-drawer-open");
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.classList.remove("mm-drawer-open");
-      if (returnTo instanceof HTMLElement) returnTo.focus();
-    };
-  }, [open, onClose]);
+  const panel = useModalFocus<HTMLElement>({ open, onClose, lockScroll: true });
 
   if (!open) return null;
 

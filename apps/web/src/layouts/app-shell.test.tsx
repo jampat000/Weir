@@ -43,8 +43,8 @@ vi.mock("../lib/processing/queries", () => ({
   useProcessingFilesAtOnceQuery: () => ({ data: filesAtOnce }),
 }));
 
-vi.mock("../lib/suite/queries", () => ({
-  useSuiteSettingsQuery: () => ({
+vi.mock("../lib/settings/queries", () => ({
+  useAppSettingsQuery: () => ({
     data: {
       product_display_name: "Weir",
     },

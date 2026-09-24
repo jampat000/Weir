@@ -12,6 +12,7 @@ import {
   useLoginMutation,
   useMeQuery,
 } from "../../lib/auth/queries";
+import { errorMessage } from "../../lib/api/error-message";
 
 function EyeIcon() {
   return (
@@ -125,9 +126,7 @@ export function LoginPage() {
     }
     const status = httpStatusFromApiError(login.error);
     if (status === 400 || status === 401) {
-      return login.error instanceof Error
-        ? login.error.message
-        : "Sign-in failed.";
+      return errorMessage(login.error, "Sign-in failed.");
     }
     if (
       isLikelyNetworkFailure(login.error) ||
@@ -179,7 +178,7 @@ export function LoginPage() {
               First-time setup?{" "}
               <Link
                 to="/setup"
-                className="font-medium text-[var(--mm-accent-bright)] hover:underline"
+                className="font-medium text-mm-accent-bright hover:underline"
               >
                 Create the admin account
               </Link>
@@ -242,16 +241,16 @@ export function LoginPage() {
               </p>
             ) : null}
             {/* A checkbox row, not a filled box inside the sign-in card. */}
-            <label className="flex items-start gap-3 py-1 text-sm text-[var(--mm-text2)]">
+            <label className="flex items-start gap-3 py-1 text-sm text-mm-text2">
               <input
                 type="checkbox"
-                className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--mm-accent)]"
+                className="mt-0.5 h-4 w-4 shrink-0 accent-mm-accent"
                 aria-label="Trust this device"
                 checked={trustedDevice}
                 onChange={(e) => setTrustedDevice(e.target.checked)}
               />
               <span>
-                <span className="block font-medium text-[var(--mm-text1)]">
+                <span className="block font-medium text-mm-text1">
                   Trust this device
                 </span>
                 <span className="block">

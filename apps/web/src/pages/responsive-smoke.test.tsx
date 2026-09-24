@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ProcessingJobsInspectionSection } from "./processing/processing-jobs-inspection-section";
+import { JobsSection } from "./system/tabs/logs/jobs-section";
 
 vi.mock("../lib/processing/jobs-inspection/queries", () => ({
   useProcessingJobsInspectionQuery: vi.fn(() => ({
@@ -73,7 +73,7 @@ describe("responsive smoke", () => {
 
   it.each(VIEWPORTS)("renders Processing jobs at %ipx", (width) => {
     setViewport(width);
-    render(withProviders(<ProcessingJobsInspectionSection />));
+    render(withProviders(<JobsSection />));
     expect(
       screen.getByTestId("processing-jobs-inspection-section"),
     ).toBeInTheDocument();

@@ -1,0 +1,141 @@
+import { useNavigate } from "react-router-dom";
+
+import { errorMessage } from "../../lib/api/error-message";
+import {
+  writeFromProcessingLibrary,
+  type ProcessingLibrary,
+  type ProcessingMediaType,
+} from "../../lib/processing/libraries-api";
+import {
+  useCreateProcessingLibrary,
+  useUpdateProcessingLibrary,
+} from "../../lib/processing/libraries-queries";
+import { useAppSettingsSaveMutation } from "../../lib/settings/queries";
+import type { AppSettings } from "../../lib/settings/types";
+import type { BackupDraft } from "./setup-wizard-parts";
+
+export type LibraryFolders = { watched: string; output: string };
+
+export type WizardDraft = {
+  timezone: string;
+  backup: BackupDraft;
+  movie: LibraryFolders;
+  tv: LibraryFolders;
+};
+
+const LIBRARY_NAMES: Record<ProcessingMediaType, string> = {
+  movie: "Movies",
+  tv: "TV",
+};
+
+/** The library the wizard edits for a media type: the first one, when any exist. */
+export function firstLibraryOfType(
+  libraries: ProcessingLibrary[] | undefined,
+  mediaType: ProcessingMediaType,
+): ProcessingLibrary | undefined {
+  return (libraries ?? [])
+    .filter((library) => library.media_type === mediaType)
+    .sort((a, b) => a.display_order - b.display_order)[0];
+}
+
+/** Why the draft cannot be saved yet, or null when it can. */
+function missingOutputFolder(draft: WizardDraft): string | null {
+  if (draft.tv.watched.trim() && !draft.tv.output.trim()) {
+    return "Add a TV output folder: it is needed when a TV watched folder is set.";
+  }
+  if (draft.movie.watched.trim() && !draft.movie.output.trim()) {
+    return "Add a Movies output folder: it is needed when a Movies watched folder is set.";
+  }
+  return null;
+}
+
+/** Saves the wizard: the app settings first, then the first Movies and TV library. */
+export function useWizardSave({
+  settings,
+  libraries,
+  onMessage,
+}: {
+  settings: AppSettings;
+  libraries: ProcessingLibrary[] | undefined;
+  onMessage: (message: string | null) => void;
+}) {
+  const navigate = useNavigate();
+  const saveAppSettings = useAppSettingsSaveMutation();
+  const createLibrary = useCreateProcessingLibrary();
+  const updateLibrary = useUpdateProcessingLibrary();
+
+  /**
+   * The wizard edits the first library of each media type. When there is none yet it adds one, but
+   * only if a folder was entered: an empty library would do nothing.
+   */
+  async function saveLibrary(
+    current: ProcessingLibrary[],
+    mediaType: ProcessingMediaType,
+    folders: LibraryFolders,
+  ) {
+    const watched = folders.watched.trim();
+    const output = folders.output.trim();
+    const existing = firstLibraryOfType(current, mediaType);
+    if (existing) {
+      if (
+        existing.watched_folder === watched &&
+        existing.output_folder === output
+      ) {
+        return;
+      }
+      await updateLibrary.mutateAsync({
+        id: existing.id,
+        data: {
+          ...writeFromProcessingLibrary(existing),
+          watched_folder: watched,
+          output_folder: output,
+        },
+      });
+      return;
+    }
+    if (!watched && !output) return;
+    await createLibrary.mutateAsync({
+      name: LIBRARY_NAMES[mediaType],
+      media_type: mediaType,
+      watched_folder: watched,
+      output_folder: output,
+    });
+  }
+
+  async function save(draft: WizardDraft, nextState: "skipped" | "completed") {
+    onMessage(null);
+    const missing = missingOutputFolder(draft);
+    if (missing) {
+      onMessage(missing);
+      return;
+    }
+    try {
+      await saveAppSettings.mutateAsync({
+        product_display_name: settings.product_display_name,
+        signed_in_home_notice: settings.signed_in_home_notice,
+        setup_wizard_state: nextState,
+        app_timezone: draft.timezone,
+        log_retention_days: settings.log_retention_days,
+        configuration_backup_enabled: draft.backup.enabled,
+        configuration_backup_interval_hours: Number.parseInt(
+          draft.backup.intervalHours,
+          10,
+        ),
+        configuration_backup_preferred_time: draft.backup.preferredTime,
+      });
+      if (libraries) {
+        await saveLibrary(libraries, "movie", draft.movie);
+        await saveLibrary(libraries, "tv", draft.tv);
+      }
+      void navigate("/", { replace: true });
+    } catch (err) {
+      onMessage(errorMessage(err, "Could not save setup."));
+    }
+  }
+
+  const pending =
+    saveAppSettings.isPending ||
+    createLibrary.isPending ||
+    updateLibrary.isPending;
+  return { save, pending };
+}

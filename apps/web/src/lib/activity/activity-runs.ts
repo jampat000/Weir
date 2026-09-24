@@ -6,6 +6,8 @@
  */
 
 import type { ActivityEventItem } from "../api/types";
+import { parseActivityDetail } from "./detail";
+import { plural } from "../ui/mm-plural";
 
 export const ACTIVITY_TRIGGER_LABELS: Record<string, string> = {
   manual: "You started this",
@@ -63,20 +65,6 @@ const OUTCOME_ORDER: RunOutcome[] = [
   "failed",
 ];
 
-function parseDetail(
-  detail: string | null | undefined,
-): Record<string, unknown> {
-  if (!detail?.trim().startsWith("{")) return {};
-  try {
-    const parsed = JSON.parse(detail) as unknown;
-    return parsed && typeof parsed === "object"
-      ? (parsed as Record<string, unknown>)
-      : {};
-  } catch {
-    return {};
-  }
-}
-
 /** What one entry says happened to its file, or null when it is not a final outcome. */
 function entryOutcome(ev: ActivityEventItem): RunOutcome | null {
   const type = ev.event_type;
@@ -88,7 +76,7 @@ function entryOutcome(ev: ActivityEventItem): RunOutcome | null {
   if (type === "processing.file_rejected") return "rejected";
   if (ev.result === "failed") return "failed";
   if (type === "processing.file_remux_pass_completed") {
-    const detail = parseDetail(ev.detail);
+    const detail = parseActivityDetail(ev.detail) ?? {};
     if (detail.pass_through_unchanged === true) return "handed back";
     if (detail.outcome === "live_skipped_not_required")
       return "no changes needed";
@@ -128,8 +116,8 @@ export function summarizeRun(events: ActivityEventItem[]): RunSummary {
   );
   const size =
     files.size > 0
-      ? `${files.size} ${files.size === 1 ? "file" : "files"}`
-      : `${events.length} ${events.length === 1 ? "entry" : "entries"}`;
+      ? plural(files.size, "file", "files")
+      : plural(events.length, "entry", "entries");
   return {
     headline: `${name} · ${size}${parts.length ? `: ${parts.join(", ")}` : ""}`,
     failed: counts.get("failed") ?? 0,

@@ -1,4 +1,4 @@
-import { fetchCsrfToken } from "../api/auth-api";
+import { sendJson } from "../api/send-json";
 import { apiFetch, readJson, requireOk } from "../api/client";
 import type {
   ProcessingOperatorSettingsOut,
@@ -18,13 +18,12 @@ export async function fetchProcessingOperatorSettings(): Promise<ProcessingOpera
 export async function putProcessingOperatorSettings(
   body: ProcessingOperatorSettingsPutBody,
 ): Promise<ProcessingOperatorSettingsOut> {
-  const csrf_token = await fetchCsrfToken();
   const path = processingOperatorSettingsPath();
-  const r = await apiFetch(path, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, csrf_token }),
-  });
-  await requireOk(path, r, "Could not save processing settings");
+  const r = await sendJson(
+    path,
+    "PUT",
+    body,
+    "Could not save processing settings",
+  );
   return readJson<ProcessingOperatorSettingsOut>(r);
 }

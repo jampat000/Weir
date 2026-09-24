@@ -1,0 +1,217 @@
+/* One shape for a setting: its label, its control and the line that explains it. */
+
+/* A control is one of three widths chosen by what goes in it, so two fields that do the same job
+ * are the same size on every screen. */
+.mm-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.mm-field__label {
+  font-size: var(--mm-type-caption);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--mm-text2);
+}
+
+/* The quiet line that explains something, under a field or on its own. */
+.mm-field__hint,
+.mm-caption-note {
+  font-size: var(--mm-type-caption);
+  line-height: 1.45;
+  color: var(--mm-text3);
+}
+
+/* The control inside takes the field's width rather than stretching to the column. A fixed width,
+   capped at the room there is: `min(100%, …)` resolved against nothing inside a row of fields, so
+   each dropdown sized itself to its own text and a row of "medium" fields came out three widths. */
+.mm-field--short .mm-input {
+  width: var(--mm-field-short);
+  max-width: 100%;
+}
+
+.mm-field--medium .mm-input {
+  width: var(--mm-field-medium);
+  max-width: 100%;
+}
+
+.mm-field--wide .mm-input {
+  width: var(--mm-field-wide);
+  max-width: 100%;
+}
+
+/* A row of settings that belong together, on one baseline. */
+.mm-field-row {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.1rem 1.5rem;
+}
+
+/*
+ * Settings groups: the group's name and why it matters on the left, one setting per row on the right,
+ * hairlines between. components/shared/settings-group.tsx. Two groups sit side by side above 1180px
+ * (.mm-setgroups--columns), because a page too long for the screen uses the width, not more boxes.
+ */
+.mm-setgroups {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 1180px) {
+  .mm-setgroups--columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 56px;
+    align-items: start;
+  }
+}
+
+.mm-setgroup {
+  display: grid;
+  grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+  gap: 28px;
+  padding: 16px 0;
+  border-top: 1px solid var(--mm-border);
+}
+
+@media (max-width: 760px) {
+  .mm-setgroup {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+}
+
+.mm-setgroup__title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--mm-text);
+}
+
+.mm-setgroup__detail {
+  margin: 6px 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--mm-text3);
+}
+
+.mm-setgroup__rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mm-setrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 48px;
+  padding: 6px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--mm-border) 60%, transparent);
+}
+
+.mm-setrow:last-child {
+  border-bottom: 0;
+}
+
+.mm-setrow--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.mm-setrow__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mm-setrow__label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--mm-text);
+}
+
+.mm-setrow__hint {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--mm-text3);
+}
+
+.mm-setrow__control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+.mm-setrow--stacked .mm-setrow__control {
+  flex-wrap: wrap;
+}
+
+.mm-setrow__unit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  color: var(--mm-text2);
+}
+
+/* Every number in a group lines up: the box is one width and its unit sits in a fixed column after it, so
+   "seconds", "MB" and "GB" do not push the boxes to different places. */
+.mm-setrow__number {
+  width: 6.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-setrow__unit > span {
+  min-width: 3.75rem;
+}
+
+/* A row of numbered choices (Files at once): one press, no dropdown to open. */
+.mm-choice-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  border: 1px solid var(--mm-line);
+}
+
+.mm-choice-row button {
+  min-width: 34px;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--mm-text2);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.mm-choice-row button:hover:not(:disabled) {
+  color: var(--mm-text);
+}
+
+.mm-choice-row button[aria-pressed="true"] {
+  background: var(--mm-accent-soft);
+  color: var(--mm-text);
+  box-shadow: inset 0 0 0 1px var(--mm-accent-ring);
+}
+
+.mm-choice-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}

@@ -4,6 +4,10 @@ import { expect, it, vi } from "vitest";
 import type { ProcessingFileLog } from "../../lib/processing/files-api";
 import { FileStoryPanel } from "./file-story-panel";
 
+vi.mock("../../lib/settings/queries", () => ({
+  useAppSettingsQuery: () => ({ data: undefined }),
+}));
+
 function log(over: Partial<ProcessingFileLog> = {}): ProcessingFileLog {
   return {
     file_id: 1,
@@ -12,7 +16,7 @@ function log(over: Partial<ProcessingFileLog> = {}): ProcessingFileLog {
     entries: [
       {
         id: 1,
-        recorded_at: "2026-09-16T14:02:00Z",
+        recorded_at: "2026-08-16T14:02:00Z",
         outcome: "live_output_written",
         title: "Remuxed Arrival",
         library_name: "Films 4K",

@@ -13,7 +13,7 @@ import type {
   LibraryFile,
   LibraryFilesResult,
   LibraryOverview,
-} from "../../lib/processing/library-api";
+} from "../../lib/processing/library-mode-api";
 import { LibraryPage } from "./library-page";
 
 const libraries = [
@@ -46,24 +46,30 @@ vi.mock("../../lib/processing/libraries-queries", () => ({
     isError: false,
   }),
 }));
-vi.mock("../../lib/processing/library-queries", () => ({
-  useLibraryOverviewQuery: () => ({ data: overviewResult }),
-  useLibraryFilesQuery: (_id: number, filters: Record<string, unknown>) => {
-    lastFilters.push(filters);
-    return { data: filesResult, isPending: false, isError: false };
-  },
-  useCleanLibraryFiles: () => ({
-    mutate: clean,
-    isPending: false,
-    isError: false,
-    error: null,
+vi.mock(
+  "../../lib/processing/library-mode-queries",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("../../lib/processing/library-mode-queries")
+    >()),
+    useLibraryOverviewQuery: () => ({ data: overviewResult }),
+    useLibraryFilesQuery: (_id: number, filters: Record<string, unknown>) => {
+      lastFilters.push(filters);
+      return { data: filesResult, isPending: false, isError: false };
+    },
+    useCleanLibraryFiles: () => ({
+      mutate: clean,
+      isPending: false,
+      isError: false,
+      error: null,
+    }),
+    useSetLibraryFileLeaveAlone: () => ({
+      mutate: setAside,
+      isPending: false,
+    }),
+    useTriggerLibraryScan: () => ({ mutate: rescan, isPending: false }),
   }),
-  useSetLibraryFileLeaveAlone: () => ({
-    mutate: setAside,
-    isPending: false,
-  }),
-  useTriggerLibraryScan: () => ({ mutate: rescan, isPending: false }),
-}));
+);
 vi.mock("../../lib/processing/rules-preview-api", () => ({
   previewProcessingRules: () =>
     Promise.resolve({
@@ -104,11 +110,10 @@ vi.mock("../../lib/processing/rules-preview-api", () => ({
       inspected_path: "x",
     }),
 }));
-vi.mock("../../lib/suite/queries", () => ({
-  useSuiteSettingsQuery: () => ({ data: { app_timezone: "UTC" } }),
+vi.mock("../../lib/settings/queries", () => ({
+  useAppSettingsQuery: () => ({ data: { app_timezone: "UTC" } }),
 }));
 vi.mock("../../lib/activity/queries", () => ({
-  activityRecentKey: ["activity", "recent"],
   useActivityRecentQuery: () => ({ data: { items: [] } }),
 }));
 

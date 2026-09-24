@@ -1,10 +1,7 @@
 /**
  * The Direct Play badge (#467): which of the operator's devices will play a file without the
- * media server converting it, and why not.
- *
- * Information only. It never changes what Weir does to a file, so nothing here offers to
- * fix or convert anything. Verdicts are carried in words (visible or screen-reader text), never
- * by symbol or colour alone.
+ * media server converting it, and why not. Information only, so nothing here offers to fix or
+ * convert anything. Verdicts are carried in words, never by symbol or colour alone.
  */
 
 import { Fragment } from "react";

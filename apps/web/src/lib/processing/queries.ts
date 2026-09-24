@@ -10,25 +10,12 @@ import type {
   ProcessingOperatorSettingsPutBody,
   ProcessingWatchedFolderRemuxScanDispatchEnqueueBody,
 } from "./types";
-
-export const processingOverviewStatsQueryKey = [
-  "processing",
-  "overview-stats",
-] as const;
-export const processingOperatorSettingsQueryKey = [
-  "processing",
-  "operator-settings",
-] as const;
-
-export const processingFilesAtOnceQueryKey = [
-  "processing",
-  "files-at-once",
-] as const;
+import { processingKeys } from "./query-keys";
 
 /** What is running and what the waiting files are waiting for. Polled: it is a live read-out. */
 export function useProcessingFilesAtOnceQuery() {
   return useQuery({
-    queryKey: processingFilesAtOnceQueryKey,
+    queryKey: processingKeys.filesAtOnce,
     queryFn: () => fetchProcessingFilesAtOnce(),
     staleTime: 5_000,
     refetchInterval: 10_000,
@@ -37,10 +24,7 @@ export function useProcessingFilesAtOnceQuery() {
 
 export function useProcessingOverviewStatsQuery(windowDays?: number) {
   return useQuery({
-    queryKey:
-      windowDays === undefined
-        ? processingOverviewStatsQueryKey
-        : [...processingOverviewStatsQueryKey, windowDays],
+    queryKey: processingKeys.overviewStats(windowDays),
     queryFn: () => fetchProcessingOverviewStats(windowDays),
     staleTime: 30_000,
   });
@@ -48,7 +32,7 @@ export function useProcessingOverviewStatsQuery(windowDays?: number) {
 
 export function useProcessingOperatorSettingsQuery() {
   return useQuery({
-    queryKey: processingOperatorSettingsQueryKey,
+    queryKey: processingKeys.operatorSettings,
     queryFn: () => fetchProcessingOperatorSettings(),
     staleTime: 30_000,
   });
@@ -60,19 +44,14 @@ export function useProcessingOperatorSettingsSaveMutation() {
     mutationFn: (body: ProcessingOperatorSettingsPutBody) =>
       putProcessingOperatorSettings(body),
     onSuccess: (data) => {
-      qc.setQueryData(processingOperatorSettingsQueryKey, data);
-      void qc.invalidateQueries({ queryKey: processingFilesAtOnceQueryKey });
+      qc.setQueryData(processingKeys.operatorSettings, data);
+      void qc.invalidateQueries({ queryKey: processingKeys.filesAtOnce });
       void qc.invalidateQueries({
-        queryKey: processingRuntimeSettingsQueryKey,
+        queryKey: processingKeys.runtimeSettings,
       });
     },
   });
 }
-
-export const processingRuntimeSettingsQueryKey = [
-  "processing",
-  "runtime-settings",
-] as const;
 
 export function useProcessingWatchedFolderRemuxScanDispatchEnqueueMutation() {
   const qc = useQueryClient();
@@ -80,8 +59,8 @@ export function useProcessingWatchedFolderRemuxScanDispatchEnqueueMutation() {
     mutationFn: (body: ProcessingWatchedFolderRemuxScanDispatchEnqueueBody) =>
       postProcessingWatchedFolderRemuxScanDispatchEnqueue(body),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["processing", "files"] });
-      void qc.invalidateQueries({ queryKey: ["processing", "jobs"] });
+      void qc.invalidateQueries({ queryKey: processingKeys.files });
+      void qc.invalidateQueries({ queryKey: processingKeys.jobs });
     },
   });
 }
