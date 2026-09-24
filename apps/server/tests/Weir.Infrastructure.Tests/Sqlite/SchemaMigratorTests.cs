@@ -206,7 +206,7 @@ public sealed class SchemaMigratorTests
 
     /// <summary>
     /// Two migrations sharing a number would silently overwrite one another's slot, and one listed out of order
-    /// would run in the wrong sequence: <see cref="SchemaMigrator.MigrationsToApply"/> assumes both never happen.
+    /// would run in the wrong sequence: <c>SchemaMigrator</c>'s decision of what to apply assumes both never happen.
     /// </summary>
     [Fact]
     public void Migration_numbers_are_strictly_increasing_and_unique()

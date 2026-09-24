@@ -272,7 +272,7 @@ public sealed class FolderHandoffCompletionTests
 
         var cancelledJob = jobs[0];
         var goingOnJob = jobs[1];
-        await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, cancelledJob.Id));
+        await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, fixture.Reporter, cancelledJob.Id));
 
         var relative = RelativeOf(goingOnJob);
         var finalStatus = await fixture.Db(
@@ -284,5 +284,120 @@ public sealed class FolderHandoffCompletionTests
         var body = (PyDict)post.Json!;
         Assert.Equal("completed", ((PyStr)body["status"]).Value);
         Assert.Equal([OutputFileFor(localFolder, relative)], ((PyList)body["outputFiles"]).Items.Cast<PyStr>().Select(item => item.Value));
+    }
+
+    /// <summary>
+    /// The claim that makes a caller responsible for a hand-off's report, and the report itself, are persisted
+    /// together before delivery is even attempted: an exception while sending it (standing in for a crash right
+    /// there) still leaves the report durably owed, so a later retry — the heartbeat's normal path — delivers it
+    /// exactly once, never zero times and never twice.
+    /// </summary>
+    [Fact]
+    public async Task An_exception_between_the_claim_and_delivery_still_delivers_the_report_exactly_once_on_retry()
+    {
+        using var fixture = new MediaManagerFixture();
+        fixture.Http.Throw(HttpMethod.Post, ReportPath, new NotSupportedException("simulated crash during delivery"));
+        await fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        var watched = fixture.Store.Home.Join("movies");
+        Directory.CreateDirectory(Path.Join(watched, "Film"));
+        await File.WriteAllTextAsync(Path.Join(watched, "Film", "film.mkv"), "x");
+        await fixture.LibraryAsync("movie", watched);
+        await fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, Handoff("crash", Path.Join(watched, "Film", "film.mkv"), "movie")));
+        var job = Assert.Single(await fixture.Jobs.ListAsync());
+        var localFolder = fixture.Store.Home.Join("Refined");
+
+        await Assert.ThrowsAsync<NotSupportedException>(() => fixture.Db(
+            uow => fixture.Reporter.ReportHandoffCompletionAsync(uow, job.PayloadJson, Delivered("Film/film.mkv", OutputFileFor(localFolder, "Film/film.mkv"), localFolder)),
+            commit: false));
+
+        // Durably owed, even though nothing was ever successfully sent.
+        Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM media_manager_handoffs WHERE handoff_id = 'crash' AND pending_report_json IS NOT NULL"));
+        Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM media_manager_handoffs WHERE handoff_id = 'crash' AND state = 'completed'"));
+        Assert.Equal(0, await fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.handoff_reported'"));
+
+        // The manager starts answering; the heartbeat sends the durably-owed report exactly once.
+        fixture.Http.Json(HttpMethod.Post, ReportPath, "{}", HttpStatusCode.Accepted);
+        var answered = await fixture.Db(uow => fixture.Reporter.SendWaitingReportsAsync(uow, "deluno"));
+
+        Assert.Equal(1, answered);
+        Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM media_manager_handoffs WHERE handoff_id = 'crash' AND pending_report_json IS NULL"));
+        Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.handoff_reported'"));
+    }
+
+    /// <summary>The finish-then-cancel-last case: E1 finishes normally, then cancelling E2 (the pack's last file) reports E1 alone.</summary>
+    [Fact]
+    public async Task Finishing_one_episode_then_cancelling_the_packs_last_file_reports_the_one_that_finished()
+    {
+        using var fixture = new MediaManagerFixture();
+        fixture.Http.Json(HttpMethod.Post, ReportPath, "{}", HttpStatusCode.Accepted);
+        await fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        var watched = fixture.Store.Home.Join("tv");
+        const string folder = "Show.S07";
+        Directory.CreateDirectory(Path.Join(watched, folder));
+        var episodes = new[] { "Show.S07E01.mkv", "Show.S07E02.mkv" };
+        foreach (var name in episodes)
+        {
+            await File.WriteAllTextAsync(Path.Join(watched, folder, name), "x");
+        }
+
+        await fixture.LibraryAsync("tv", watched);
+        await fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, Handoff("finish-then-cancel", Path.Join(watched, folder), "tv")));
+        var jobs = await fixture.Jobs.ListAsync();
+        Assert.Equal(2, jobs.Count);
+        var localFolder = fixture.Store.Home.Join("Refined");
+
+        var finishingJob = jobs[0];
+        var cancelledJob = jobs[1];
+        var finishingRelative = RelativeOf(finishingJob);
+        var waitingStatus = await fixture.Db(
+            uow => fixture.Reporter.ReportHandoffCompletionAsync(uow, finishingJob.PayloadJson, Delivered(finishingRelative, OutputFileFor(localFolder, finishingRelative), localFolder)),
+            commit: false);
+        Assert.StartsWith("skipped:", waitingStatus, StringComparison.Ordinal);
+        await MarkDeliveredInWeirAsync(fixture, finishingJob.Id, finishingRelative);
+        Assert.Empty(fixture.Http.RequestsTo(HttpMethod.Post, ReportPath));
+
+        await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, fixture.Reporter, cancelledJob.Id));
+
+        // Nothing is delivered synchronously from a cancellation; the heartbeat sends the report it now owes.
+        Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM media_manager_handoffs WHERE handoff_id = 'finish-then-cancel' AND pending_report_json IS NOT NULL"));
+        var answered = await fixture.Db(uow => fixture.Reporter.SendWaitingReportsAsync(uow, "deluno"));
+        Assert.Equal(1, answered);
+
+        var post = Assert.Single(fixture.Http.RequestsTo(HttpMethod.Post, ReportPath));
+        var body = (PyDict)post.Json!;
+        Assert.Equal("completed", ((PyStr)body["status"]).Value);
+        Assert.Equal([OutputFileFor(localFolder, finishingRelative)], ((PyList)body["outputFiles"]).Items.Cast<PyStr>().Select(item => item.Value));
+    }
+
+    /// <summary>Cancelling every one of a pack's files delivers nothing to the manager: the whole hand-off just ends cancelled.</summary>
+    [Fact]
+    public async Task Cancelling_every_file_in_a_pack_sends_no_report()
+    {
+        using var fixture = new MediaManagerFixture();
+        fixture.Http.Json(HttpMethod.Post, ReportPath, "{}", HttpStatusCode.Accepted);
+        await fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        var watched = fixture.Store.Home.Join("tv");
+        const string folder = "Show.S08";
+        Directory.CreateDirectory(Path.Join(watched, folder));
+        var episodes = new[] { "Show.S08E01.mkv", "Show.S08E02.mkv" };
+        foreach (var name in episodes)
+        {
+            await File.WriteAllTextAsync(Path.Join(watched, folder, name), "x");
+        }
+
+        await fixture.LibraryAsync("tv", watched);
+        await fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, Handoff("cancel-all", Path.Join(watched, folder), "tv")));
+        var jobs = await fixture.Jobs.ListAsync();
+        Assert.Equal(2, jobs.Count);
+
+        foreach (var job in jobs)
+        {
+            await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, fixture.Reporter, job.Id));
+        }
+
+        var answered = await fixture.Db(uow => fixture.Reporter.SendWaitingReportsAsync(uow, "deluno"));
+        Assert.Equal(0, answered);
+        Assert.Empty(fixture.Http.RequestsTo(HttpMethod.Post, ReportPath));
+        Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM media_manager_handoffs WHERE handoff_id = 'cancel-all' AND state = 'cancelled'"));
     }
 }

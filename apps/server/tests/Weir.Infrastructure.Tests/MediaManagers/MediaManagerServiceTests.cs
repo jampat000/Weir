@@ -610,7 +610,7 @@ public sealed class MediaManagerServiceTests
         await fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, Handoff("h1", Path.Join(watched, "Film", "film.mkv"))));
         var job = Assert.Single(await fixture.Jobs.ListAsync());
 
-        var result = await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, job.Id));
+        var result = await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, fixture.Reporter, job.Id));
 
         Assert.Equal(JobActionOutcome.Ok, result.Outcome);
         Assert.Equal("h1", result.EndedHandoff?.HandoffId);
@@ -621,9 +621,9 @@ public sealed class MediaManagerServiceTests
         Assert.Equal("cancelled", (await fixture.Jobs.ListAsync()).Single().Status);
 
         // A job that is not pending is refused, and nothing changes.
-        var again = await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, job.Id));
+        var again = await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, fixture.Reporter, job.Id));
         Assert.Equal(JobActionOutcome.WrongStatus, again.Outcome);
-        Assert.Equal(JobActionOutcome.NotFound, (await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, 999_999))).Outcome);
+        Assert.Equal(JobActionOutcome.NotFound, (await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, fixture.Reporter, 999_999))).Outcome);
     }
 
     [Fact]
@@ -644,7 +644,7 @@ public sealed class MediaManagerServiceTests
         Assert.Equal("queued", (await fixture.Db(uow => fixture.Ledger.CurrentStatusAsync(uow, row))).State);
 
         var job = Assert.Single(await fixture.Jobs.ListAsync());
-        await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, job.Id));
+        await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, fixture.Reporter, job.Id));
 
         var ended = (await fixture.Db(uow => HandoffLedgerStore.FindAsync(uow, "deluno", "h2")))!;
         var status = await fixture.Db(uow => fixture.Ledger.CurrentStatusAsync(uow, ended));
@@ -668,7 +668,7 @@ public sealed class MediaManagerServiceTests
         Assert.Equal(2, jobs.Count);
 
         // One episode cancelled in Weir: the other is still queued, so the hand-off goes on.
-        var first = await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, jobs[0].Id));
+        var first = await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, fixture.Reporter, jobs[0].Id));
         Assert.Null(first.EndedHandoff);
         var row = (await fixture.Db(uow => HandoffLedgerStore.FindAsync(uow, "deluno", "pack")))!;
         Assert.Equal("queued", (await fixture.Db(uow => fixture.Ledger.CurrentStatusAsync(uow, row))).State);
