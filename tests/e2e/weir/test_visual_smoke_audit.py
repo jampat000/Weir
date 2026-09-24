@@ -116,7 +116,9 @@ def test_old_dashboard_address_is_not_found(weir_shell: str) -> None:
             page.goto(f"{base}/dashboard", wait_until="domcontentloaded")
             expect(page).to_have_url(re.compile(r".*/dashboard"))
             expect(
-                page.get_by_role("heading", name="Page not found", exact=True)
+                page.get_by_role(
+                    "heading", name="This page doesn't exist.", exact=True
+                )
             ).to_be_visible()
             expect(page.get_by_role("link", name="Dashboard", exact=True)).to_have_count(0)
             _assert_no_error_state(page)

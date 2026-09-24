@@ -82,5 +82,5 @@
 }
 
 .mm-discovered-library:focus-within {
-  outline: 2px solid var(--mm-accent-ring);
+  outline: 2px solid var(--mm-accent);
 }

@@ -3,6 +3,14 @@
  * localStorage; the server's session and its cookie are authoritative.
  */
 
+import {
+  NETWORK_UNREACHABLE_MESSAGE,
+  TIMED_OUT_MESSAGE,
+  responseErrorText,
+} from "./api-error-text";
+
+export { NETWORK_UNREACHABLE_MESSAGE };
+
 const API_PREFIX = "/api/v1";
 const DEFAULT_TIMEOUT_MS = 30_000;
 type UnauthorizedHandler = (path: string) => void;
@@ -42,18 +50,11 @@ export class ApiHttpError extends Error {
 }
 
 /**
- * What to say when `fetch` rejects because the server could not be reached at all, rather than
- * answering with an error. Browsers report that as a bare `TypeError` whose text ("Failed to
- * fetch", "NetworkError…", "Load failed") tells a user nothing.
- */
-export const NETWORK_UNREACHABLE_MESSAGE =
-  "Can't reach Weir. Check it's still running, then try again.";
-
-/**
  * True for the `TypeError` (or equivalent) a rejected `fetch` throws when the request
  * never reached a server — never true for a `Response` that came back with an error
  * status, which is a different situation with its own handling in
- * {@link apiResponseErrorMessage}.
+ * {@link apiResponseErrorMessage}. Browsers word it ("Failed to fetch", "NetworkError…",
+ * "Load failed") in ways that tell a user nothing, so it becomes {@link NETWORK_UNREACHABLE_MESSAGE}.
  */
 function isNetworkUnreachableError(error: unknown): boolean {
   if (error instanceof TypeError) {
@@ -166,13 +167,7 @@ export async function apiFetch(
     });
   } catch (error) {
     if (isTimeoutAbort(error, timeoutSignal)) {
-      throw new ApiHttpError(
-        path,
-        0,
-        "Request timed out - the backend may be slow or unreachable.",
-        undefined,
-        true,
-      );
+      throw new ApiHttpError(path, 0, TIMED_OUT_MESSAGE, undefined, true);
     }
     if (isNetworkUnreachableError(error)) {
       throw new ApiHttpError(
@@ -204,57 +199,39 @@ export async function readJson<T>(r: Response): Promise<T> {
   return JSON.parse(text) as T;
 }
 
-function messageFromResponseBody(body: unknown): {
-  message: string;
-  detail?: unknown;
-} {
-  if (body === undefined || body === null) {
-    return { message: "" };
+async function readJsonBody(r: Response): Promise<unknown> {
+  const ctype = (r.headers.get("content-type") || "").toLowerCase();
+  if (!ctype.includes("application/json")) return undefined;
+  try {
+    return (await r.clone().json()) as unknown;
+  } catch (error) {
+    // A body that claims JSON but isn't is treated like no body: the caller's fallback is said instead.
+    if (error instanceof SyntaxError) return undefined;
+    throw error;
   }
-  if (typeof body === "string") {
-    return { message: body.trim() };
-  }
-  if (typeof body === "object" && "detail" in body) {
-    const detail = (body as { detail?: unknown }).detail;
-    return { message: apiErrorDetailToString(detail), detail };
-  }
-  return { message: apiErrorDetailToString(body), detail: body };
 }
 
+/**
+ * The plain-language message for an error answer (see `responseErrorText`), with the server's
+ * `detail` kept alongside for a caller that reads its structure.
+ */
 export async function apiResponseErrorMessage(
+  path: string,
   r: Response,
   fallback: string,
 ): Promise<{ message: string; detail?: unknown }> {
-  const ctype = (r.headers.get("content-type") || "").toLowerCase();
-  if (ctype.includes("application/json")) {
-    try {
-      const parsed = await r.clone().json();
-      const fromBody = messageFromResponseBody(parsed);
-      if (fromBody.message.length > 0) {
-        return fromBody;
-      }
-    } catch {
-      /* fall through to text/status fallback */
-    }
-  }
-
-  let text = "";
-  try {
-    text = await r.clone().text();
-  } catch {
-    text = "";
-  }
-  const trimmed = text.trimStart();
-  if (trimmed.startsWith("<!") || trimmed.toLowerCase().startsWith("<html")) {
-    return {
-      message: `${fallback} (${r.status}) - received HTML instead of JSON. Use the same origin as the API and restart Weir after upgrading.`,
-    };
-  }
-  const oneLine = text.replace(/\s+/g, " ").trim().slice(0, 180);
-  if (oneLine.length > 0) {
-    return { message: `${fallback} (${r.status}): ${oneLine}` };
-  }
-  return { message: `${fallback} (${r.status})` };
+  const body = await readJsonBody(r);
+  const message = responseErrorText({
+    path,
+    status: r.status,
+    body,
+    fallback,
+  });
+  const detail =
+    typeof body === "object" && body !== null && "detail" in body
+      ? (body as { detail: unknown }).detail
+      : undefined;
+  return { message, detail };
 }
 
 export async function throwApiResponseError(
@@ -262,7 +239,7 @@ export async function throwApiResponseError(
   r: Response,
   fallback: string,
 ): Promise<never> {
-  const normalized = await apiResponseErrorMessage(r, fallback);
+  const normalized = await apiResponseErrorMessage(path, r, fallback);
   throw new ApiHttpError(path, r.status, normalized.message, normalized.detail);
 }
 
@@ -274,45 +251,4 @@ export async function requireOk(
   if (!r.ok) {
     await throwApiResponseError(path, r, fallback);
   }
-}
-
-/**
- * The API's `detail` may be a string, a validation error array, or (rarely) a nested object.
- * Never pass `detail` straight into `new Error()`: non-strings become `"[object Object]"`.
- */
-export function apiErrorDetailToString(detail: unknown): string {
-  if (detail === undefined || detail === null) {
-    return "";
-  }
-  if (typeof detail === "string") {
-    return detail;
-  }
-  if (Array.isArray(detail)) {
-    const parts = detail.map((item) => {
-      if (typeof item === "object" && item !== null && "msg" in item) {
-        const o = item as { msg?: unknown; loc?: unknown };
-        const m = o.msg;
-        if (typeof m === "string") {
-          const loc = Array.isArray(o.loc)
-            ? o.loc.filter((x) => x !== "body").join(".")
-            : "";
-          return loc.length > 0 ? `${loc}: ${m}` : m;
-        }
-      }
-      try {
-        return JSON.stringify(item);
-      } catch {
-        return String(item);
-      }
-    });
-    return parts.filter((s) => s.length > 0).join("; ");
-  }
-  if (typeof detail === "object") {
-    try {
-      return JSON.stringify(detail);
-    } catch {
-      return "Request failed.";
-    }
-  }
-  return String(detail);
 }
