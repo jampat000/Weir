@@ -7,7 +7,6 @@ using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
-using Weir.Core.Rules;
 using Weir.Core.Time;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
@@ -214,122 +213,6 @@ public sealed partial class RemuxPassHandler : IJobHandler
         await RecordAsync(result, progress.ActivityId).ConfigureAwait(false);
         await FinishRejectedInputCleanupAsync(result, libraryId, mediaScope).ConfigureAwait(false);
         await ReportBackAsync(payloadJson, result).ConfigureAwait(false);
-    }
-
-    private sealed record Claim(
-        PyDict? Failure,
-        ProcessingOperatorSettingsRecord? Operator = null,
-        ProcessingLibraryRecord? Library = null,
-        ProcessingRulesConfig? Rules = null,
-        ProcessingPathRuntime? Runtime = null);
-
-    /// <summary>
-    /// Read what the pass needs and mark the file as being processed, then commit: no ffprobe or ffmpeg work runs while the
-    /// worker holds a transaction.
-    /// </summary>
-    private Task<Claim> ClaimAsync(JobWorkContext context, string rel, string mediaScope, long? libraryId, CancellationToken cancellationToken) =>
-        LockedWrites.RunAsync(
-            _database,
-            async uow =>
-            {
-                var operatorSettings = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-                var library = await ResolveLibraryAsync(uow, libraryId, mediaScope).ConfigureAwait(false);
-                var rules = library is not null ? await RulesConfigForAsync(uow, library).ConfigureAwait(false) : null;
-                rules ??= await LoadScopeRulesConfigAsync(uow, mediaScope).ConfigureAwait(false);
-                ProcessingPathRuntime? runtime;
-                string? problem;
-                if (library is null)
-                {
-                    var label = mediaScope == "tv" ? "TV" : "Movies";
-                    (runtime, problem) = (null, $"No library covers {label}. Add one on Processing → Libraries, then queue this work again.");
-                }
-                else
-                {
-                    (runtime, problem) = RemuxPassPaths.RuntimeForLibrary(library, _options.WeirHome);
-                }
-
-                if (problem is not null)
-                {
-                    return new Claim(new PyDict()
-                        .Set("job_id", context.Id)
-                        .Set("ok", false)
-                        .Set("outcome", RemuxPassOutcomes.FailedBeforeExecution)
-                        .Set("reason", problem)
-                        .Set("relative_media_path", rel)
-                        .Set("library_id", library?.Id ?? libraryId));
-                }
-
-                if (library is not null)
-                {
-                    await RemuxPassFileState.MarkFileStatusAsync(uow, library.Id, rel, ProcessingFileStatuses.Processing, "Weir has claimed this file and is checking it now.", _time.GetUtcNow())
-                        .ConfigureAwait(false);
-                }
-
-                return new Claim(null, operatorSettings, library, rules, runtime);
-            },
-            _logger,
-            "claim processing file",
-            cancellationToken);
-
-    /// <summary>The pass's library: by id when the payload carries one, else the seeded library for its scope.</summary>
-    public static async Task<ProcessingLibraryRecord?> ResolveLibraryAsync(UnitOfWork uow, long? libraryId, string? mediaScope)
-    {
-        if (libraryId is { } id && await LibraryStore.GetAsync(uow, id).ConfigureAwait(false) is { } found)
-        {
-            return found;
-        }
-
-        return await LibraryStore.SeededForScopeAsync(uow, mediaScope ?? "movie").ConfigureAwait(false);
-    }
-
-    private static async Task<ProcessingRulesConfig?> RulesConfigForAsync(UnitOfWork uow, ProcessingLibraryRecord library) =>
-        library.RuleSetId is { } ruleSetId && await LibraryStore.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) is { } ruleSet
-            ? RemuxPassPaths.RulesConfigFor(ruleSet)
-            : null;
-
-    /// <summary>The seeded library's rule set for the scope, or the shipped defaults.</summary>
-    private static async Task<ProcessingRulesConfig> LoadScopeRulesConfigAsync(UnitOfWork uow, string mediaScope)
-    {
-        var seeded = await LibraryStore.SeededForScopeAsync(uow, mediaScope).ConfigureAwait(false);
-        var ruleSet = seeded?.RuleSetId is { } id ? await LibraryStore.GetRuleSetAsync(uow, id).ConfigureAwait(false) : null;
-        return RuleSetConversion.ToRulesConfig(ruleSet);
-    }
-
-    private async Task<PyDict?> CarriedOriginAsync(long jobId, long? libraryId, string rel, string mediaScope)
-    {
-        try
-        {
-            var uow = await UnitOfWork.OpenAsync(_database).ConfigureAwait(false);
-            await using (uow.ConfigureAwait(false))
-            {
-                var library = await ResolveLibraryAsync(uow, libraryId, mediaScope).ConfigureAwait(false);
-                return await HandoffOriginCarry.FindAsync(uow, library?.Id ?? libraryId, rel, jobId).ConfigureAwait(false);
-            }
-        }
-        catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
-        {
-            _logger.LogWarning(exception, "Weir could not look up the hand-off this file came from.");
-            return null;
-        }
-    }
-
-    /// <summary>The origin written onto this job's own row after it started, or null.</summary>
-    private async Task<PyDict?> AdoptedOriginAsync(long jobId)
-    {
-        try
-        {
-            var uow = await UnitOfWork.OpenAsync(_database).ConfigureAwait(false);
-            await using (uow.ConfigureAwait(false))
-            {
-                var payload = await uow.ScalarAsync("SELECT payload_json FROM jobs WHERE id = @id", ("@id", jobId)).ConfigureAwait(false);
-                return payload is string text && PyJsonParser.Parse(text) is PyDict dict ? dict.Get("origin") as PyDict : null;
-            }
-        }
-        catch (Exception exception) when (exception is SqliteException or InvalidOperationException or PyJsonDecodeException)
-        {
-            _logger.LogWarning(exception, "Weir could not check whether a hand-off took over this pass.");
-            return null;
-        }
     }
 
     /// <summary>Keeps the durable Files row in step with the result shown in Activity.</summary>
