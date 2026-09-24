@@ -20,7 +20,7 @@ live side by side in a single file, and at 16px three streams cannot survive: a 
 a 24-unit grid is 1.23 device pixels there, sub-pixel by construction, so the arcs fuse into a
 smear. The 16px frame therefore renders from `weir-app-icon-small.svg` — the same tile with the
 two-stream fallback geometry. At 24 and 32 the three streams stay distinct in all three
-renderings (`design-options/logos-round4/gate-16px.png`), so the cutoff is 16px only.
+renderings (`packaging/brand/gate-16px.png`), so the cutoff is 16px only.
 `favicon.svg` itself (the SVG favicon, not the .ico) is unaffected: browsers scale one vector for
 it, at whatever size they show it, so it is always the three-stream primary mark like every other
 SVG in this repo.
@@ -42,7 +42,7 @@ MARK_DARK = BRAND / "weir-mark.svg"
 MARK_LIGHT = BRAND / "weir-mark-light.svg"
 
 # At or below this size, .ico frames render from the two-stream fallback tile; above it, from
-# the three-stream primary tile. Only 16px falls back: design-options/logos-round4/gate-16px.png
+# the three-stream primary tile. Only 16px falls back: packaging/brand/gate-16px.png
 # shows three bands still separating cleanly at 24 and 32 in all three renderings, including the
 # single-colour tray case, and fusing into a grey smear only at 16, where a band is sub-pixel.
 # See the module docstring and packaging/brand/README.md.

@@ -16,7 +16,7 @@ recover each band edge, then a Kasa algebraic circle fit per edge.
 
 Run it from anywhere:
 
-    python design-options/logos-round4/build/trace.py
+    python packaging/brand/build/trace.py
 
 It prints a table and writes trace-overlay.png next to source.png so the fitted circles can be
 checked against the pixels they were fitted to.

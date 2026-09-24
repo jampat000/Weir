@@ -69,19 +69,19 @@ Everything Weir needs comes with it, including ffmpeg and MKVToolNix. There's no
 
 | Processing: every file as it is worked on | History: what Weir did to a file, track by track |
 | --- | --- |
-| ![Processing](screenshots/processing.png) | ![History of one file](screenshots/history-detail.png) |
+| ![Processing](docs/assets/screenshots/processing.png) | ![History of one file](docs/assets/screenshots/history-detail.png) |
 
 | History | Library: the files already on your storage |
 | --- | --- |
-| ![History](screenshots/history.png) | ![Library](screenshots/library.png) |
+| ![History](docs/assets/screenshots/history.png) | ![Library](docs/assets/screenshots/library.png) |
 
 | Settings › Rules | Settings › Schedule |
 | --- | --- |
-| ![Rules](screenshots/settings.png) | ![Schedule](screenshots/schedule.png) |
+| ![Rules](docs/assets/screenshots/settings.png) | ![Schedule](docs/assets/screenshots/schedule.png) |
 
 | Light mode | On your phone |
 | --- | --- |
-| ![Processing in light mode](screenshots/processing-light.png) | ![Processing on a phone](screenshots/processing-mobile.png) |
+| ![Processing in light mode](docs/assets/screenshots/processing-light.png) | ![Processing on a phone](docs/assets/screenshots/processing-mobile.png) |
 
 ## Install with Docker
 
