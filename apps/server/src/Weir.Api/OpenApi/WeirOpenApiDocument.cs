@@ -14,7 +14,7 @@ namespace Weir.Api.OpenApi;
 /// </remarks>
 public static class WeirOpenApiDocument
 {
-    private const string ResourceName = "Weir.Api.OpenApi.python-openapi.json";
+    private const string ResourceName = "Weir.Api.OpenApi.committed-openapi.json";
 
     /// <summary>The lowercase JSON keys OpenAPI uses for HTTP operations under a path item.</summary>
     private static readonly HashSet<string> OperationKeys = new(StringComparer.Ordinal)
@@ -22,7 +22,7 @@ public static class WeirOpenApiDocument
         "get", "put", "post", "delete", "options", "head", "patch", "trace",
     };
 
-    private static readonly Lazy<JsonObject> PythonDocument = new(LoadEmbeddedDocument);
+    private static readonly Lazy<JsonObject> CommittedDocument = new(LoadEmbeddedDocument);
 
     /// <summary>
     /// The committed document, pruned to the <paramref name="implementedRoutes"/> (a <see cref="Http.RouteTable"/>
@@ -42,7 +42,7 @@ public static class WeirOpenApiDocument
             }
         }
 
-        var document = Clone(PythonDocument.Value);
+        var document = Clone(CommittedDocument.Value);
         if (document["paths"] is JsonObject paths)
         {
             foreach (var path in paths.Select(entry => entry.Key).ToList())

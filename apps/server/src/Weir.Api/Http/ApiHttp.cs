@@ -49,12 +49,12 @@ public sealed class ApiException : Exception
 }
 
 /// <summary>Writes JSON and plain-text responses with the exact bytes, content type and length existing clients expect.</summary>
-public static class PyResponses
+public static class ApiResponses
 {
-    public static async Task WriteJsonAsync(HttpContext context, int statusCode, PyJson body)
+    public static async Task WriteJsonAsync(HttpContext context, int statusCode, WireValue body)
     {
         ArgumentNullException.ThrowIfNull(context);
-        var bytes = PyJsonWriter.DumpsUtf8(body, PyJsonFormat.Response);
+        var bytes = WireJsonWriter.DumpsUtf8(body, WireJsonFormat.Response);
         context.Response.StatusCode = statusCode;
         context.Response.ContentType = "application/json";
         context.Response.ContentLength = bytes.Length;
@@ -80,7 +80,7 @@ public static class PyResponses
             context.Response.Headers[name] = value;
         }
 
-        var body = new PyDict().Set("detail", exception.Detail);
+        var body = new WireObject().Set("detail", exception.Detail);
         if (exception.Code is { } code)
         {
             body.Set("code", code);
@@ -105,7 +105,7 @@ public static class PyResponses
 }
 
 /// <summary>Reads a request body before validating it, with the error statuses and bodies existing clients expect.</summary>
-public static class PyRequestBody
+public static class ApiRequestBody
 {
     /// <summary>
     /// The largest body Weir reads. The biggest legitimate body is a configuration backup being restored, which is
@@ -127,7 +127,7 @@ public static class PyRequestBody
     /// <c>json_invalid</c>; undecodable bytes are a 400; a non-empty body whose <c>Content-Type</c> is
     /// missing or not JSON is a 415.
     /// </summary>
-    public static async Task<PyJson?> ReadAsync(HttpContext context)
+    public static async Task<WireValue?> ReadAsync(HttpContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
         if (context.Request.ContentLength > MaxBodyBytes)
@@ -151,24 +151,24 @@ public static class PyRequestBody
         string text;
         try
         {
-            text = PyJsonParser.DecodeBytes(bytes);
+            text = WireJsonParser.DecodeBytes(bytes);
         }
-        catch (PyJsonEncodingException)
+        catch (WireJsonEncodingException)
         {
             throw new ApiException(StatusCodes.Status400BadRequest, "There was an error parsing the body");
         }
 
         try
         {
-            return PyJsonParser.Parse(text);
+            return WireJsonParser.Parse(text);
         }
-        catch (PyJsonDecodeException exception)
+        catch (WireJsonDecodeException exception)
         {
             throw new RequestValidationException(
             [
                 new ValidationIssue(
-                    "json_invalid", ["body", exception.Position], "JSON decode error", new PyDict(),
-                    new PyDict().Set("error", exception.Detail)),
+                    "json_invalid", ["body", exception.Position], "JSON decode error", new WireObject(),
+                    new WireObject().Set("error", exception.Detail)),
             ]);
         }
     }
@@ -209,7 +209,7 @@ public static class PyRequestBody
 }
 
 /// <summary>Cookie parsing and <c>Set-Cookie</c> headers, byte-identical to what existing clients and the contract suite expect.</summary>
-public static class PyCookies
+public static class CookieHeaders
 {
     /// <summary>Splits on <c>;</c>; the last value for a name wins and quoted values are unquoted.</summary>
     public static Dictionary<string, string> Parse(StringValues cookieHeaders)

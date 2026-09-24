@@ -46,7 +46,7 @@ public static class RemuxPassVisibility
 
         var parts = new List<string>
         {
-            $"video copy indices: {PythonIntList(plan.VideoIndices)}",
+            $"video copy indices: {IntListRepr(plan.VideoIndices)}",
             $"audio out: {audio}",
             $"subtitles out: {subtitles}",
         };
@@ -61,25 +61,25 @@ public static class RemuxPassVisibility
         }
 
         var summary = string.Join(" | ", parts);
-        return PyStrings.Length(summary) > maxLength ? PyStrings.Slice(summary, maxLength - 12) + "…(truncated)" : summary;
+        return WireStrings.Length(summary) > maxLength ? WireStrings.Slice(summary, maxLength - 12) + "…(truncated)" : summary;
 
         static string Track(PlannedTrack track) =>
             $"#{track.InputIndex.ToString(CultureInfo.InvariantCulture)} {(track.LangLabel.Length > 0 ? track.LangLabel : "und")}";
     }
 
     /// <summary>A list of ints written as <c>[0, 2]</c>, the form stored plan summaries already use.</summary>
-    public static string PythonIntList(IEnumerable<int> values) =>
+    public static string IntListRepr(IEnumerable<int> values) =>
         "[" + string.Join(", ", values.Select(v => v.ToString(CultureInfo.InvariantCulture))) + "]";
 
     /// <summary>One plain line, with the file name when there is one.</summary>
-    public static string ActivityTitle(PyDict payload)
+    public static string ActivityTitle(WireObject payload)
     {
         ArgumentNullException.ThrowIfNull(payload);
-        var name = payload.Get("relative_media_path") is PyStr rel && PyStrings.Strip(rel.Value).Length > 0
+        var name = payload.Get("relative_media_path") is WireString rel && WireStrings.Strip(rel.Value).Length > 0
             ? MediaPathNames.Name(rel.Value, OperatingSystem.IsWindows())
             : "unknown file";
-        var outcome = payload.Get("outcome") is PyStr text ? text.Value : null;
-        if (payload.Get("pass_through_unchanged") is PyBool { Value: true } && outcome == RemuxPassOutcomes.LiveSkippedNotRequired)
+        var outcome = payload.Get("outcome") is WireString text ? text.Value : null;
+        if (payload.Get("pass_through_unchanged") is WireBool { Value: true } && outcome == RemuxPassOutcomes.LiveSkippedNotRequired)
         {
             return $"{name} was passed through unchanged";
         }
@@ -91,7 +91,7 @@ public static class RemuxPassVisibility
             RemuxPassOutcomes.SkippedGuardrail => $"Skipped {name}",
             RemuxPassOutcomes.SourceNotReady => $"Waiting for {name}",
             RemuxPassOutcomes.FailedDuringExecution => $"{name} could not be processed",
-            _ when outcome == RemuxPassOutcomes.FailedBeforeExecution || payload.Get("ok") is PyBool { Value: false } => $"{name} could not be checked",
+            _ when outcome == RemuxPassOutcomes.FailedBeforeExecution || payload.Get("ok") is WireBool { Value: false } => $"{name} could not be checked",
             _ => "File processing finished",
         };
     }
@@ -100,11 +100,11 @@ public static class RemuxPassVisibility
     /// The diagnostic envelope, and the ffmpeg argv bounded so Activity JSON
     /// stays under typical row limits.
     /// </summary>
-    public static PyDict ClipForActivity(PyDict payload)
+    public static WireObject ClipForActivity(WireObject payload)
     {
         ArgumentNullException.ThrowIfNull(payload);
         var output = payload.Copy();
-        var outcome = output.Get("outcome") is { IsTruthy: true } value ? PyConvert.Str(value) : string.Empty;
+        var outcome = output.Get("outcome") is { IsTruthy: true } value ? WireConvert.Str(value) : string.Empty;
         string result;
         if (outcome is RemuxPassOutcomes.LiveOutputWritten or RemuxPassOutcomes.LiveSkippedNotRequired)
         {
@@ -116,16 +116,16 @@ public static class RemuxPassVisibility
         }
         else
         {
-            result = output.Get("ok") is PyBool { Value: false } ? "failed" : "success";
+            result = output.Get("ok") is WireBool { Value: false } ? "failed" : "success";
         }
 
-        if (result == "failed" && output.Get("retry_scheduled") is PyBool { Value: true })
+        if (result == "failed" && output.Get("retry_scheduled") is WireBool { Value: true })
         {
             // Not the end of it: the standard calls a failure that will be tried again "retrying".
             result = "retrying";
         }
 
-        var trigger = output.Get("trigger") is PyStr rawTrigger && ActivityClassifier.Triggers.Contains(rawTrigger.Value) ? rawTrigger.Value : "worker";
+        var trigger = output.Get("trigger") is WireString rawTrigger && ActivityClassifier.Triggers.Contains(rawTrigger.Value) ? rawTrigger.Value : "worker";
         string? nextAction = null;
         if (result == "failed" && !(Truthy(output.Get("pass_through_queued")) || Truthy(output.Get("reject_queued"))))
         {
@@ -138,7 +138,7 @@ public static class RemuxPassVisibility
             action: "remux",
             trigger: trigger,
             result: result,
-            mediaScope: output.Get("media_scope") is PyStr scope ? scope.Value : null,
+            mediaScope: output.Get("media_scope") is WireString scope ? scope.Value : null,
             counts:
             [
                 new("audio_removed", ListLength(output.Get("removed_audio"))),
@@ -151,10 +151,10 @@ public static class RemuxPassVisibility
             output.Set(key, item);
         }
 
-        if (output.Get("ffmpeg_argv") is PyList { Items.Count: > MaxArgvForActivity } argv)
+        if (output.Get("ffmpeg_argv") is WireArray { Items.Count: > MaxArgvForActivity } argv)
         {
-            var clipped = new PyList(argv.Items.Take(MaxArgvForActivity));
-            clipped.Items.Add(new PyStr("…(truncated for activity log)"));
+            var clipped = new WireArray(argv.Items.Take(MaxArgvForActivity));
+            clipped.Items.Add(new WireString("…(truncated for activity log)"));
             output.Set("ffmpeg_argv", clipped);
             output.Set("ffmpeg_argv_truncated", true);
         }
@@ -163,18 +163,18 @@ public static class RemuxPassVisibility
     }
 
     /// <summary>The clipped payload as ASCII JSON, cut at 10,000 characters.</summary>
-    public static string ActivityDetail(PyDict payload, int maxChars = 10_000) =>
-        PyStrings.Slice(PyJsonWriter.Dumps(ClipForActivity(payload), PyJsonFormat.Compact), maxChars);
+    public static string ActivityDetail(WireObject payload, int maxChars = 10_000) =>
+        WireStrings.Slice(WireJsonWriter.Dumps(ClipForActivity(payload), WireJsonFormat.Compact), maxChars);
 
     /// <summary>True when the value is present and not null, false, zero or empty.</summary>
-    public static bool Truthy(PyJson? value) => value is not null && value.IsTruthy;
+    public static bool Truthy(WireValue? value) => value is not null && value.IsTruthy;
 
     /// <summary>The length of a list, string or object value; 0 for anything else, including a missing key.</summary>
-    private static long ListLength(PyJson? value) => value switch
+    private static long ListLength(WireValue? value) => value switch
     {
-        PyList list => list.Items.Count,
-        PyStr text => PyStrings.Length(text.Value),
-        PyDict dict => dict.Count,
+        WireArray list => list.Items.Count,
+        WireString text => WireStrings.Length(text.Value),
+        WireObject dict => dict.Count,
         _ => 0,
     };
 }

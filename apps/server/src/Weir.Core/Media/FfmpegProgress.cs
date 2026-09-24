@@ -47,13 +47,13 @@ public sealed class FfmpegProgressTracker
     public FfmpegProgressUpdate? Feed(string rawLine, double secondsSinceStart)
     {
         ArgumentNullException.ThrowIfNull(rawLine);
-        var elapsed = PyMax(0.0, secondsSinceStart);
+        var elapsed = HigherOf(0.0, secondsSinceStart);
         if (_timeoutSeconds is { } timeout && elapsed > timeout)
         {
             throw new MediaToolException("ffmpeg timed out");
         }
 
-        var line = PyStrings.Strip(rawLine);
+        var line = WireStrings.Strip(rawLine);
         var equals = line.IndexOf('=', StringComparison.Ordinal);
         if (line.Length == 0 || equals < 0)
         {
@@ -70,9 +70,9 @@ public sealed class FfmpegProgressTracker
 
         double? outTime = null;
         var outTimeText = _fields.TryGetValue("out_time_ms", out var ms) ? ms : "0";
-        if (Py.TryFloatFromText(outTimeText) is { } micros)
+        if (RulesJson.TryFloatFromText(outTimeText) is { } micros)
         {
-            outTime = PyMax(0.0, micros / 1_000_000.0);
+            outTime = HigherOf(0.0, micros / 1_000_000.0);
         }
 
         var ended = value == "end";
@@ -80,11 +80,11 @@ public sealed class FfmpegProgressTracker
         long? eta = null;
         if (_durationSeconds is { } duration && duration != 0 && duration > 0 && outTime is { } processed)
         {
-            percent = PyMax(0.0, PyMin(ended ? 100.0 : 99.0, processed / duration * 100.0));
+            percent = HigherOf(0.0, LowerOf(ended ? 100.0 : 99.0, processed / duration * 100.0));
             if (percent > 0 && !ended)
             {
                 var totalEstimate = elapsed / (percent.Value / 100.0);
-                eta = (long)PyMax(0, PyInt(totalEstimate - elapsed));
+                eta = (long)HigherOf(0, TruncateToWhole(totalEstimate - elapsed));
             }
         }
 
@@ -105,7 +105,7 @@ public sealed class FfmpegProgressTracker
         {
             Percent = percent,
             EtaSeconds = eta,
-            ElapsedSeconds = (long)PyInt(elapsed),
+            ElapsedSeconds = (long)TruncateToWhole(elapsed),
             ProcessedSeconds = outTime,
             Speed = _fields.TryGetValue("speed", out var speed) ? speed : null,
             Progress = value,
@@ -113,13 +113,13 @@ public sealed class FfmpegProgressTracker
     }
 
     /// <summary>The first argument unless the second is strictly greater (so a NaN second argument never wins).</summary>
-    private static double PyMax(double a, double b) => b > a ? b : a;
+    private static double HigherOf(double a, double b) => b > a ? b : a;
 
     /// <summary>The first argument unless the second is strictly smaller.</summary>
-    private static double PyMin(double a, double b) => b < a ? b : a;
+    private static double LowerOf(double a, double b) => b < a ? b : a;
 
     /// <summary>Truncates toward zero; throws for NaN, infinity, or a result that will not fit a long.</summary>
-    private static double PyInt(double value)
+    private static double TruncateToWhole(double value)
     {
         if (double.IsNaN(value))
         {

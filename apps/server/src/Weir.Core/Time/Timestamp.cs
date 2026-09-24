@@ -7,7 +7,7 @@ namespace Weir.Core.Time;
 /// A date-time as the database and API carry it: a wall-clock value with microsecond precision and an
 /// optional UTC offset (naive when <see cref="Offset"/> is <see langword="null"/>).
 /// </summary>
-public readonly record struct PyDateTime(DateTime Clock, TimeSpan? Offset)
+public readonly record struct Timestamp(DateTime Clock, TimeSpan? Offset)
 {
     /// <summary>The <c>DATETIME</c> text format stored in SQLite; existing rows use it, so it stays fixed.</summary>
     public const string SqliteFormat = "yyyy-MM-dd HH:mm:ss.ffffff";
@@ -15,15 +15,15 @@ public readonly record struct PyDateTime(DateTime Clock, TimeSpan? Offset)
     public bool IsAware => Offset is not null;
 
     /// <summary>The current instant as an aware UTC value.</summary>
-    public static PyDateTime UtcNow(TimeProvider time)
+    public static Timestamp UtcNow(TimeProvider time)
     {
         ArgumentNullException.ThrowIfNull(time);
         return FromUtc(time.GetUtcNow().UtcDateTime);
     }
 
-    public static PyDateTime FromUtc(DateTime utc) => new(TruncateToMicroseconds(DateTime.SpecifyKind(utc, DateTimeKind.Unspecified)), TimeSpan.Zero);
+    public static Timestamp FromUtc(DateTime utc) => new(TruncateToMicroseconds(DateTime.SpecifyKind(utc, DateTimeKind.Unspecified)), TimeSpan.Zero);
 
-    public static PyDateTime Naive(DateTime clock) => new(TruncateToMicroseconds(DateTime.SpecifyKind(clock, DateTimeKind.Unspecified)), null);
+    public static Timestamp Naive(DateTime clock) => new(TruncateToMicroseconds(DateTime.SpecifyKind(clock, DateTimeKind.Unspecified)), null);
 
     public static DateTime TruncateToMicroseconds(DateTime value) => new(value.Ticks - (value.Ticks % 10), value.Kind);
 
@@ -31,22 +31,22 @@ public readonly record struct PyDateTime(DateTime Clock, TimeSpan? Offset)
     public static DateTimeOffset TruncateToMicroseconds(DateTimeOffset value) => new(value.Ticks - (value.Ticks % 10), value.Offset);
 
     /// <summary>An aware value with <paramref name="value"/>'s wall clock and offset.</summary>
-    public static PyDateTime FromDateTimeOffset(DateTimeOffset value) =>
+    public static Timestamp FromDateTimeOffset(DateTimeOffset value) =>
         new(TruncateToMicroseconds(DateTime.SpecifyKind(value.DateTime, DateTimeKind.Unspecified)), value.Offset);
 
     /// <summary>The instant, treating a naive value as UTC.</summary>
     public DateTime AsUtc => Offset is { } offset ? DateTime.SpecifyKind(Clock - offset, DateTimeKind.Utc) : DateTime.SpecifyKind(Clock, DateTimeKind.Utc);
 
     /// <summary>Converts to UTC; unlike <see cref="AsUtc"/>, a naive value is taken as the machine's local time.</summary>
-    public PyDateTime AstimezoneUtc()
+    public Timestamp AstimezoneUtc()
     {
         if (Offset is { } offset)
         {
-            return new PyDateTime(DateTime.SpecifyKind(Clock - offset, DateTimeKind.Unspecified), TimeSpan.Zero);
+            return new Timestamp(DateTime.SpecifyKind(Clock - offset, DateTimeKind.Unspecified), TimeSpan.Zero);
         }
 
         var utc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(Clock, DateTimeKind.Unspecified), TimeZoneInfo.Local);
-        return new PyDateTime(DateTime.SpecifyKind(utc, DateTimeKind.Unspecified), TimeSpan.Zero);
+        return new Timestamp(DateTime.SpecifyKind(utc, DateTimeKind.Unspecified), TimeSpan.Zero);
     }
 
     /// <summary>The SQLite text form: the wall clock only, offset dropped.</summary>
@@ -59,7 +59,7 @@ public readonly record struct PyDateTime(DateTime Clock, TimeSpan? Offset)
     public string IsoFormat(char separator) => ClockText(separator) + OffsetText(zeroAsZ: false);
 
     /// <summary>The API's JSON form: like <see cref="IsoFormat()"/> but a zero offset is written <c>Z</c>, as existing clients expect.</summary>
-    public string PydanticJson() => ClockText('T') + OffsetText(zeroAsZ: true);
+    public string ToWireText() => ClockText('T') + OffsetText(zeroAsZ: true);
 
     private string ClockText(char separator)
     {
@@ -103,7 +103,7 @@ public readonly record struct PyDateTime(DateTime Clock, TimeSpan? Offset)
     /// <c>YYYYMMDD</c>, optionally a one-character separator and <c>HH[:MM[:SS[.fraction]]]</c>, and an
     /// optional <c>Z</c> or <c>±HH[:MM[:SS[.ffffff]]]</c> offset.
     /// </summary>
-    public static bool TryFromIsoFormat(string text, out PyDateTime value)
+    public static bool TryFromIsoFormat(string text, out Timestamp value)
     {
         value = default;
         if (string.IsNullOrEmpty(text))
@@ -208,7 +208,7 @@ public readonly record struct PyDateTime(DateTime Clock, TimeSpan? Offset)
             return false;
         }
 
-        value = new PyDateTime(new DateTime(year, month, day, hour, minute, second, DateTimeKind.Unspecified).AddTicks(ticks), offset);
+        value = new Timestamp(new DateTime(year, month, day, hour, minute, second, DateTimeKind.Unspecified).AddTicks(ticks), offset);
         return true;
     }
 

@@ -8,7 +8,7 @@ namespace Weir.Infrastructure.Logging;
 /// Weir's log line formats: JSON lines in <c>weir.log</c> and plain console lines. The formats are
 /// fixed so the Logs screen, support bundles, existing log readers and support tooling keep parsing them.
 /// </summary>
-public static class PythonLogFormat
+public static class LogLineFormat
 {
     /// <summary>
     /// Reads <c>WEIR_LOG_LEVEL</c>: a known level name in any case, otherwise INFO. <c>NOTSET</c> logs

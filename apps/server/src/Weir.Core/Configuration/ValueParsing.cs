@@ -8,7 +8,7 @@ namespace Weir.Core.Configuration;
 /// parsing, URL host/port splitting and path expansion/normalization. They are fixed so values that
 /// existing installs already set keep producing the same settings.
 /// </summary>
-internal static class PythonCompat
+internal static class ValueParsing
 {
     /// <summary>
     /// Parses an already-trimmed integer: optional sign, ASCII digits, single underscores between
