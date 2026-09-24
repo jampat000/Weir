@@ -948,7 +948,7 @@ public sealed class RemuxPassRunner
             return (replacedExisting, "validated_hardlink");
         }
 
-        await FileLifecycle.SafeCopyToFinalAsync(src, final, ValidateStaged, progress, ownership: _ownership).ConfigureAwait(false);
+        await FileLifecycle.SafeCopyToFinalAsync(src, final, ValidateStaged, progress, ownership: _ownership, cancellationToken: cancellationToken).ConfigureAwait(false);
         return (replacedExisting, "validated_copy");
     }
 
