@@ -82,6 +82,52 @@ public sealed class MediaToolsTests : IDisposable
     }
 
     [Fact]
+    public async Task One_ffprobe_run_gives_both_the_probe_and_its_warnings()
+    {
+        var media = WriteFile("movie.mkv", new byte[64]);
+        var runner = new ScriptedRunner(_ => new ScriptedRun
+        {
+            Stdout = """{"streams":[]}"""u8.ToArray(),
+            Stderr = "[matroska,webm @ 0x1] Unknown-sized element\n"u8.ToArray(),
+        });
+
+        var probed = await Tools(runner).ProbeWithWarningsAsync(media);
+
+        var request = Assert.Single(runner.Requests);
+        Assert.Equal("warning", request.Argv[request.Argv.ToList().IndexOf("-v") + 1]);
+        Assert.Equal(JsonValueKind.Array, probed.Probe.GetProperty("streams").ValueKind);
+        Assert.Equal(["[matroska,webm @ 0x1] Unknown-sized element"], probed.Warnings);
+    }
+
+    [Fact]
+    public async Task A_failed_combined_probe_is_classified_from_its_error_lines_alone()
+    {
+        var media = WriteFile("movie.mkv", new byte[64]);
+        var runner = new ScriptedRunner(request => request.Argv.Contains("warning")
+            ? new ScriptedRun { ExitCode = 1, Stderr = "Could not find codec parameters for stream 2\nmovie.mkv: Permission denied\n"u8.ToArray() }
+            : new ScriptedRun { ExitCode = 1, Stderr = "movie.mkv: Permission denied\n"u8.ToArray() });
+
+        var error = await Assert.ThrowsAnyAsync<MediaToolException>(() => Tools(runner).ProbeWithWarningsAsync(media));
+
+        Assert.IsNotType<MediaUnreadableException>(error);
+        Assert.Equal(2, runner.Requests.Count);
+    }
+
+    [Fact]
+    public async Task A_probe_with_its_own_window_reads_warnings_with_the_default_one()
+    {
+        var media = WriteFile("movie.mkv", new byte[64]);
+        var runner = new ScriptedRunner(_ => new ScriptedRun { Stdout = """{"streams":[]}"""u8.ToArray() });
+
+        await Tools(runner).ProbeWithWarningsAsync(media, probeSizeMb: 50);
+
+        Assert.Equal(2, runner.Requests.Count);
+        Assert.Equal(
+            (FfmpegCommands.DefaultProbeSizeMb * 1024 * 1024).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            runner.Requests[1].Argv[runner.Requests[1].Argv.ToList().IndexOf("-probesize") + 1]);
+    }
+
+    [Fact]
     public async Task A_missing_or_empty_file_is_not_probed()
     {
         var empty = WriteFile("empty.mkv", []);
@@ -320,6 +366,31 @@ public sealed class MediaToolsTests : IDisposable
         Assert.True(report.Detected);
         Assert.Equal(["cuda", "qsv", "vaapi"], report.AvailableMethods);
         Assert.Equal(["ffmpeg", "-hide_banner", "-hwaccels"], Assert.Single(runner.Requests).Argv);
+    }
+
+    [Fact]
+    public async Task A_known_answer_is_reused_instead_of_asking_ffmpeg_again()
+    {
+        var runner = new ScriptedRunner(_ => new ScriptedRun { Stdout = "Hardware acceleration methods:\ncuda\n"u8.ToArray() });
+        var tools = Tools(runner);
+
+        await tools.KnownAccelerationAsync("ffmpeg");
+        var report = await tools.KnownAccelerationAsync("ffmpeg");
+
+        Assert.Equal(["cuda"], report.AvailableMethods);
+        Assert.Single(runner.Requests);
+    }
+
+    [Fact]
+    public async Task An_answer_that_could_not_be_read_is_asked_for_again()
+    {
+        var runner = new ScriptedRunner(_ => new ScriptedRun { ExitCode = 1 });
+        var tools = Tools(runner);
+
+        await tools.KnownAccelerationAsync("ffmpeg");
+        await tools.KnownAccelerationAsync("ffmpeg");
+
+        Assert.Equal(2, runner.Requests.Count);
     }
 
     [Fact]

@@ -139,10 +139,12 @@ public sealed class LibraryCleanHandler : IJobHandler
         }
 
         ProbeResult probe;
+        IReadOnlyList<string> sourceWarnings;
         try
         {
-            var probed = await _tools.FfprobeJsonAsync(path, cancellationToken: cancellationToken).ConfigureAwait(false);
-            probe = ProbeResult.Parse(probed.GetRawText());
+            var probed = await _tools.ProbeWithWarningsAsync(path, cancellationToken: cancellationToken).ConfigureAwait(false);
+            probe = ProbeResult.Parse(probed.Probe.GetRawText());
+            sourceWarnings = probed.Warnings;
         }
         catch (Exception exception) when (exception is MediaToolException or MediaToolTimeoutException)
         {
@@ -202,8 +204,6 @@ public sealed class LibraryCleanHandler : IJobHandler
             durationSeconds = parsedDuration;
         }
 
-        var sourceWarnings = await _tools.ProbeWarningLinesAsync(path, cancellationToken).ConfigureAwait(false);
-
         var result = await _swap.RunAsync(
             context.Id,
             path,
@@ -221,7 +221,7 @@ public sealed class LibraryCleanHandler : IJobHandler
                     throw;
                 }
             },
-            SwapOptions.Default,
+            SwapOptions.Default with { OriginalDurationSeconds = durationSeconds },
             cancellationToken).ConfigureAwait(false);
 
         switch (result.Outcome)
