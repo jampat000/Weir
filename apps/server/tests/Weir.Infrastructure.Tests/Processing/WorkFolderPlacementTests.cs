@@ -1,0 +1,92 @@
+using Microsoft.Extensions.Logging;
+using Weir.Core.Processing;
+using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Sqlite;
+using Weir.Infrastructure.Tests.Media;
+using Weir.Infrastructure.Tests.Platform;
+
+namespace Weir.Infrastructure.Tests.Processing;
+
+/// <summary>
+/// Whether a library's work folder shares a filesystem with its output folder, and the one log line Weir writes at
+/// startup when it does not (#716).
+/// </summary>
+public sealed class WorkFolderPlacementTests
+{
+    private const string MountInfo =
+        "22 1 8:1 / / rw,relatime - ext4 /dev/sda1 rw\n" +
+        "96 22 0:44 / /data/weir rw,relatime - ext4 /dev/sdb1 rw\n" +
+        "97 22 0:45 /srv/media /media rw,relatime - ext4 /dev/sdc1 rw\n" +
+        "98 22 0:46 / /mnt/My\\040Disk rw,relatime - ext4 /dev/sdd1 rw\n";
+
+    [Fact]
+    public void Mount_points_are_read_from_mountinfo_with_their_spaces_restored()
+    {
+        Assert.Equal(["/", "/data/weir", "/media", "/mnt/My Disk"], FilesystemBoundaries.ParseMountPoints(MountInfo));
+    }
+
+    [Theory]
+    [InlineData("/media/weir/work/movies", "/media")]
+    [InlineData("/media", "/media")]
+    [InlineData("/data/weir/processing/processing-movie-work", "/data/weir")]
+    [InlineData("/mediafiles/x", "/")]
+    [InlineData("/mnt/My Disk/work", "/mnt/My Disk")]
+    public void A_folder_belongs_to_the_deepest_mount_point_it_is_under(string path, string expected)
+    {
+        Assert.Equal(expected, FilesystemBoundaries.MountPointOf(path, FilesystemBoundaries.ParseMountPoints(MountInfo)));
+    }
+
+    [Fact]
+    public void Two_folders_in_the_same_place_are_on_the_same_filesystem()
+    {
+        using var temp = new TempDirectory();
+
+        Assert.NotEqual(false, FilesystemBoundaries.SameFilesystem(temp.Join("work"), temp.Join("output")));
+    }
+
+    [Fact]
+    public async Task A_work_folder_on_another_filesystem_is_reported_once_with_the_advice()
+    {
+        using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "work-folder-placement-1"));
+        await MoviesLibraryAsync(store, store.Home.Join("output"));
+        var logger = new ListLogger<WorkFolderPlacementCheck>();
+        var check = new WorkFolderPlacementCheck(store.Database, store.Options, logger, (_, _) => false);
+
+        await check.StartAsync(CancellationToken.None);
+        await check.ExecuteTask!;
+
+        var line = Assert.Single(logger.Entries, entry => entry.Level == LogLevel.Information);
+        Assert.Contains("on a different filesystem from its output folder", line.Message, StringComparison.Ordinal);
+        Assert.Contains("same volume as the output folder", line.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(null)]
+    public async Task Nothing_is_said_when_the_folders_share_a_filesystem_or_it_cannot_tell(bool? same)
+    {
+        using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "work-folder-placement-2"));
+        await MoviesLibraryAsync(store, store.Home.Join("output"));
+        var logger = new ListLogger<WorkFolderPlacementCheck>();
+        var check = new WorkFolderPlacementCheck(store.Database, store.Options, logger, (_, _) => same);
+
+        await check.StartAsync(CancellationToken.None);
+        await check.ExecuteTask!;
+
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Information);
+    }
+
+    private static async Task MoviesLibraryAsync(StoreFixture store, string output)
+    {
+        await using var uow = await UnitOfWork.OpenAsync(store.Database);
+        var seeded = await LibraryStore.SeededForScopeAsync(uow, ProcessingMediaScopes.Movie) ?? throw new InvalidOperationException("No seeded Movies library.");
+        await LibraryStore.UpdateAsync(uow, seeded, new ProcessingLibraryInput
+        {
+            Name = seeded.Name,
+            MediaType = ProcessingMediaScopes.Movie,
+            WatchedFolder = store.Home.Join("watched"),
+            OutputFolder = output,
+        });
+        await uow.CommitAsync();
+    }
+}
