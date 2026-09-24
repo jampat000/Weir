@@ -173,9 +173,9 @@ public sealed class JobRulesTests
     public void Iso_timestamps_omit_zero_microseconds_and_keep_the_offset()
     {
         var at = new DateTimeOffset(2026, 4, 10, 13, 0, 0, TimeSpan.Zero);
-        Assert.Equal("2026-04-10 13:00:00+00:00", PyDateTime.FromDateTimeOffset(at).IsoFormat(' '));
-        Assert.Equal("2026-04-10T13:00:00.123456+00:00", PyDateTime.FromDateTimeOffset(at.AddTicks(1_234_567)).IsoFormat('T'));
-        Assert.Equal("2026-04-10T13:00:00-05:30", PyDateTime.FromDateTimeOffset(new DateTimeOffset(2026, 4, 10, 13, 0, 0, new TimeSpan(-5, -30, 0))).IsoFormat('T'));
+        Assert.Equal("2026-04-10 13:00:00+00:00", Timestamp.FromDateTimeOffset(at).IsoFormat(' '));
+        Assert.Equal("2026-04-10T13:00:00.123456+00:00", Timestamp.FromDateTimeOffset(at.AddTicks(1_234_567)).IsoFormat('T'));
+        Assert.Equal("2026-04-10T13:00:00-05:30", Timestamp.FromDateTimeOffset(new DateTimeOffset(2026, 4, 10, 13, 0, 0, new TimeSpan(-5, -30, 0))).IsoFormat('T'));
     }
 
     [Fact]

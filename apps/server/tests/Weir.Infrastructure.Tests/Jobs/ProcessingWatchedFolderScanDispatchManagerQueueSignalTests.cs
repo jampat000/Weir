@@ -53,11 +53,11 @@ public sealed class ProcessingWatchedFolderScanDispatchManagerQueueSignalTests
 
     private static async Task RunScanAsync(ProcessingWatchedFolderScanDispatchJobHandler handler, ProcessingJobStore jobs, long libraryId)
     {
-        var payload = new PyDict().Set("enqueue_remux_jobs", true).Set("scan_trigger", "manual").Set("media_scope", "movie").Set("library_id", libraryId);
+        var payload = new WireObject().Set("enqueue_remux_jobs", true).Set("scan_trigger", "manual").Set("media_scope", "movie").Set("library_id", libraryId);
         var job = await jobs.EnqueueOrGetAsync(
             $"scan-test-{Guid.NewGuid():N}",
             ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch,
-            PyJsonWriter.Dumps(payload, PyJsonFormat.Compact));
+            WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
         await handler.HandleAsync(new JobWorkContext(job.Id, job.JobKind, job.PayloadJson, "test-owner"), CancellationToken.None);
     }
 

@@ -132,7 +132,7 @@ public sealed class HandoffScanSingleProcessingTests : IDisposable
     {
         var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
             _fixture.Store.Database, _fixture.Store.Clock, _fixture.Store.Options, _fixture.Jobs, _fixture.Connections);
-        var payload = new PyDict()
+        var payload = new WireObject()
             .Set("enqueue_remux_jobs", true)
             .Set("scan_trigger", "watcher")
             .Set("media_scope", "movie")
@@ -140,7 +140,7 @@ public sealed class HandoffScanSingleProcessingTests : IDisposable
         var job = await _fixture.Jobs.EnqueueOrGetAsync(
             $"scan-test-{Guid.NewGuid():N}",
             ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch,
-            PyJsonWriter.Dumps(payload, PyJsonFormat.Compact));
+            WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
         await handler.HandleAsync(new JobWorkContext(job.Id, job.JobKind, job.PayloadJson, "scan-owner"), CancellationToken.None);
         // The scan ran here rather than through a worker, so finish its own row the way a worker would.
         await _fixture.Store.Execute($"UPDATE jobs SET status = 'completed' WHERE id = {job.Id}");
@@ -190,8 +190,8 @@ public sealed class HandoffScanSingleProcessingTests : IDisposable
         Assert.Equal("processed", await ScalarText($"SELECT status FROM files WHERE relative_path = '{Relative}'"));
 
         var post = Assert.Single(_fixture.Http.RequestsTo(HttpMethod.Post, EventsPath));
-        var body = (PyDict)post.Json!;
-        Assert.Equal(("h1", "completed"), (PyConvert.Str(body["handoffId"]), PyConvert.Str(body["status"])));
+        var body = (WireObject)post.Json!;
+        Assert.Equal(("h1", "completed"), (WireConvert.Str(body["handoffId"]), WireConvert.Str(body["status"])));
         Assert.Equal("completed", (await HandoffStatusAsync()).State);
     }
 
@@ -240,9 +240,9 @@ public sealed class HandoffScanSingleProcessingTests : IDisposable
         // follow the job that will actually process the file.
         Assert.Equal(1, await RemuxJobCountAsync());
         Assert.Equal(IntakeRules.RemuxDedupeKey("deluno", "h1"), await ScalarText("SELECT dedupe_key FROM jobs WHERE job_kind = 'processing.file.remux_pass.v1'"));
-        var payload = (PyDict)PyJsonParser.Parse(await ScalarText("SELECT payload_json FROM jobs WHERE job_kind = 'processing.file.remux_pass.v1'"));
-        Assert.Equal(Relative, PyConvert.Str(payload["relative_media_path"]));
-        Assert.Equal("h1", PyConvert.Str(((PyDict)payload["origin"]).Get("handoff_id")!));
+        var payload = (WireObject)WireJsonParser.Parse(await ScalarText("SELECT payload_json FROM jobs WHERE job_kind = 'processing.file.remux_pass.v1'"));
+        Assert.Equal(Relative, WireConvert.Str(payload["relative_media_path"]));
+        Assert.Equal("h1", WireConvert.Str(((WireObject)payload["origin"]).Get("handoff_id")!));
         var queued = await HandoffStatusAsync();
         Assert.Equal(("queued", (long?)1), (queued.State, queued.QueuePosition));
 

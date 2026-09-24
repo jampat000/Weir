@@ -74,8 +74,8 @@ public sealed class WatchedFolderScanLockTests : IDisposable
 
     private Task ScanAsync(long libraryId, bool enqueueRemuxJobs)
     {
-        var payload = new PyDict().Set("enqueue_remux_jobs", enqueueRemuxJobs).Set("scan_trigger", "manual").Set("media_scope", "movie").Set("library_id", libraryId);
-        return _handler.HandleAsync(new JobWorkContext(1, ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch, PyJsonWriter.Dumps(payload, PyJsonFormat.Compact), "test"), CancellationToken.None);
+        var payload = new WireObject().Set("enqueue_remux_jobs", enqueueRemuxJobs).Set("scan_trigger", "manual").Set("media_scope", "movie").Set("library_id", libraryId);
+        return _handler.HandleAsync(new JobWorkContext(1, ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact), "test"), CancellationToken.None);
     }
 
     /// <summary>
@@ -144,8 +144,8 @@ public sealed class WatchedFolderScanLockTests : IDisposable
             $"INSERT INTO files (library_id, relative_path, status, status_reason, last_seen_at) SELECT {libraryId}, 'Gone/' || i || '.mkv', 'unprocessed', '', '2000-01-01 00:00:00' FROM n");
         for (var index = 0; index < QueuedPasses; index++)
         {
-            var payload = new PyDict().Set("relative_media_path", $"Queued/{index}.mkv").Set("media_scope", "movie").Set("library_id", libraryId);
-            await _jobs.EnqueueOrGetAsync($"queued-{index}", "processing.file.remux_pass.v1", PyJsonWriter.Dumps(payload, PyJsonFormat.Compact));
+            var payload = new WireObject().Set("relative_media_path", $"Queued/{index}.mkv").Set("media_scope", "movie").Set("library_id", libraryId);
+            await _jobs.EnqueueOrGetAsync($"queued-{index}", "processing.file.remux_pass.v1", WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
         }
 
         var sweep = new VanishedFileSweepTask(_store.Database, _store.Options, _store.Clock, NullLogger<VanishedFileSweepTask>.Instance);

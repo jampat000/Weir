@@ -8,7 +8,7 @@ namespace Weir.Core.Tests.MediaManagers;
 /// </summary>
 public sealed class MediaManagerRulesTests
 {
-    private static PyDict Dict(string json) => (PyDict)PyJsonParser.Parse(json);
+    private static WireObject Dict(string json) => (WireObject)WireJsonParser.Parse(json);
 
     // --- hand-off paths ------------------------------------------------------------------------
 
@@ -122,14 +122,14 @@ public sealed class MediaManagerRulesTests
     [Fact]
     public void The_deluno_queue_covers_jobs_and_recent_dispatches_and_drops_rows_without_a_scope()
     {
-        var rows = ManagerDialectRules.ExternalQueueEntries(PyJsonParser.Parse(
+        var rows = ManagerDialectRules.ExternalQueueEntries(WireJsonParser.Parse(
             """{"jobs":[{"mediaType":"movie","status":"downloading","targetPath":"/media/movies/Solaris.mkv","title":"Solaris","year":1972},{"status":"running","path":"/x.mkv"}],"dispatches":[{"mediaType":"series","state":"completed","path":"/tv/Show/S01E01.mkv","id":7}]}"""))
             .Select(ManagerDialectRules.ExternalQueueRow).OfType<ManagerQueueRow>().ToList();
         Assert.Equal(["movie", "tv"], rows.Select(row => row.Scope));
         Assert.Equal(
             """{"status":"downloading","outputPath":"/media/movies/Solaris.mkv","title":"Solaris","media":{"title":"Solaris","year":1972},"entityId":null}""",
-            PyJsonWriter.Dumps(rows[0].Payload, PyJsonFormat.Compact));
-        Assert.Equal("completed", ((PyStr)rows[1].Payload["status"]).Value);
+            WireJsonWriter.Dumps(rows[0].Payload, WireJsonFormat.Compact));
+        Assert.Equal("completed", ((WireString)rows[1].Payload["status"]).Value);
         Assert.Equal("7", rows[1].Payload["entityId"].ToString());
     }
 
@@ -137,7 +137,7 @@ public sealed class MediaManagerRulesTests
     public void A_deluno_manifest_narrows_scopes_and_reads_the_confirmed_library_contract()
     {
         var connection = new ManagerConnection("deluno", "Main", "http://manager.local", "k", 1);
-        var description = ManagerDialectRules.ExternalDescription(connection, ManagerKindProfiles.CapabilitiesForKind("deluno")!, PyJsonParser.Parse(
+        var description = ManagerDialectRules.ExternalDescription(connection, ManagerKindProfiles.CapabilitiesForKind("deluno")!, WireJsonParser.Parse(
             """{"libraries":[{"id":"abc","name":"Films","mediaType":"movie","path":"/media/movies","rootPath":"/media/movies","importWorkflow":"Refine-Before-Import","processorOutputPath":"/data/refined"},{"mediaType":"movie","path":"/nokey"}],"capabilities":[" Handoff-Status ",5,""]}"""));
         Assert.Equal(["movie"], description.Capabilities.Scopes);
         Assert.Equal(["/media/movies", "/nokey"], description.LibraryRoots);
@@ -149,12 +149,12 @@ public sealed class MediaManagerRulesTests
     [Fact]
     public void Arr_answers_read_records_roots_and_nested_files()
     {
-        Assert.Equal(["movie"], ManagerDialectRules.ArrQueueRows(PyJsonParser.Parse("""{"records":[{"status":"downloading"},"junk"]}"""), "movie").Select(r => r.Scope));
-        Assert.Equal(["/media/Solaris/f.mkv"], ManagerDialectRules.ArrLibraryFilePaths(PyJsonParser.Parse("""[{"movieFile":{"path":"/media/Solaris/f.mkv"}},{"movieFile":null},{}]"""), "movieFile"));
-        Assert.Equal(["/tv/Show/S01/e.mkv"], ManagerDialectRules.ArrLibraryFilePaths(PyJsonParser.Parse("""[{"path":"/tv/Show/S01/e.mkv"}]"""), null));
+        Assert.Equal(["movie"], ManagerDialectRules.ArrQueueRows(WireJsonParser.Parse("""{"records":[{"status":"downloading"},"junk"]}"""), "movie").Select(r => r.Scope));
+        Assert.Equal(["/media/Solaris/f.mkv"], ManagerDialectRules.ArrLibraryFilePaths(WireJsonParser.Parse("""[{"movieFile":{"path":"/media/Solaris/f.mkv"}},{"movieFile":null},{}]"""), "movieFile"));
+        Assert.Equal(["/tv/Show/S01/e.mkv"], ManagerDialectRules.ArrLibraryFilePaths(WireJsonParser.Parse("""[{"path":"/tv/Show/S01/e.mkv"}]"""), null));
         // #544 item 4: a root folder with a null path is skipped, not reported as a root literally called "None".
         // A default for a missing key does not cover a key that is present and null.
-        var (roots, libraries) = ManagerDialectRules.ArrRootFolders(PyJsonParser.Parse("""[{"id":3,"path":"/m"},{"id":0,"path":"/z"},{"path":null}]"""), "movie");
+        var (roots, libraries) = ManagerDialectRules.ArrRootFolders(WireJsonParser.Parse("""[{"id":3,"path":"/m"},{"id":0,"path":"/z"},{"path":null}]"""), "movie");
         Assert.Equal(["/m", "/z"], roots);
         Assert.Equal(["3", "/z"], libraries.Select(l => l.Key));
     }
@@ -178,7 +178,7 @@ public sealed class MediaManagerRulesTests
     public void Filtering_rows_to_the_asked_scope_leaves_a_silent_manager_silent()
     {
         var connection = new ManagerConnection("deluno", "Main", "http://m", "k");
-        var reported = new ManagerQueueSignal(connection, SignalStatus.Reported, [new("movie", new PyDict().Set("title", "a film")), new("tv", new PyDict().Set("title", "an episode"))]);
+        var reported = new ManagerQueueSignal(connection, SignalStatus.Reported, [new("movie", new WireObject().Set("title", "a film")), new("tv", new WireObject().Set("title", "an episode"))]);
         Assert.Equal(["movie"], ManagerDialectRules.OnlyRowsForScope(reported, "movie").Rows.Select(r => r.Scope));
         var silent = new ManagerQueueSignal(connection, SignalStatus.Unreachable, [], "down");
         Assert.Same(silent, ManagerDialectRules.OnlyRowsForScope(silent, "movie"));
@@ -195,38 +195,38 @@ public sealed class MediaManagerRulesTests
         var body = CompletionReports.BuildCompletionBody(Origin, Dict("""{"ok":true,"outcome":"live_output_written","output_file":"D:\\Refined\\Blade.Runner.2049\\film.mkv","removed_audio":["fre","deu"],"removed_subtitles":["spa"]}"""));
         Assert.Equal(
             """{"handoffId":"handoff-1","status":"completed","processorName":"Weir","releaseName":"Blade.Runner.2049","outputPath":"D:\\Refined\\Blade.Runner.2049\\film.mkv","message":"Removed 2 audio tracks and 1 subtitle track.","outputFiles":["D:\\Refined\\Blade.Runner.2049\\film.mkv"]}""",
-            PyJsonWriter.Dumps(body, PyJsonFormat.Compact));
+            WireJsonWriter.Dumps(body, WireJsonFormat.Compact));
     }
 
     [Fact]
     public void Success_wording_covers_no_remux_pass_through_and_pass_through_after_failure()
     {
-        Assert.Contains("No remux was needed", ((PyStr)CompletionReports.BuildCompletionBody(Origin, Dict("""{"ok":true,"outcome":"live_skipped_not_required","output_file":"/out/film.mkv"}"""))["message"]).Value, StringComparison.Ordinal);
-        Assert.Contains("passed this file through unchanged", ((PyStr)CompletionReports.BuildCompletionBody(Origin, Dict("""{"ok":true,"outcome":"live_skipped_not_required","pass_through_unchanged":true}"""))["message"]).Value, StringComparison.Ordinal);
-        Assert.StartsWith("Weir could not process this file, so it handed the original back", ((PyStr)CompletionReports.BuildCompletionBody(DelunoOrigin, Dict("""{"ok":true,"outcome":"live_output_written","passed_through_after_failure":true}"""))["message"]).Value, StringComparison.Ordinal);
-        Assert.Equal("/data/refined/film.mkv", ((PyStr)CompletionReports.BuildCompletionBody(DelunoOrigin, Dict("""{"ok":true,"outcome":"live_output_written","output_file":"/local/out/film.mkv"}"""), "/data/refined/film.mkv")["outputPath"]).Value);
+        Assert.Contains("No remux was needed", ((WireString)CompletionReports.BuildCompletionBody(Origin, Dict("""{"ok":true,"outcome":"live_skipped_not_required","output_file":"/out/film.mkv"}"""))["message"]).Value, StringComparison.Ordinal);
+        Assert.Contains("passed this file through unchanged", ((WireString)CompletionReports.BuildCompletionBody(Origin, Dict("""{"ok":true,"outcome":"live_skipped_not_required","pass_through_unchanged":true}"""))["message"]).Value, StringComparison.Ordinal);
+        Assert.StartsWith("Weir could not process this file, so it handed the original back", ((WireString)CompletionReports.BuildCompletionBody(DelunoOrigin, Dict("""{"ok":true,"outcome":"live_output_written","passed_through_after_failure":true}"""))["message"]).Value, StringComparison.Ordinal);
+        Assert.Equal("/data/refined/film.mkv", ((WireString)CompletionReports.BuildCompletionBody(DelunoOrigin, Dict("""{"ok":true,"outcome":"live_output_written","output_file":"/local/out/film.mkv"}"""), "/data/refined/film.mkv")["outputPath"]).Value);
     }
 
     [Fact]
     public void Failures_carry_the_reason_and_what_happened_to_the_source()
     {
         var failed = CompletionReports.BuildCompletionBody(Origin, Dict("""{"ok":false,"outcome":"failed_before_execution","reason":"relative_media_path is required"}"""));
-        Assert.Equal("relative_media_path is required", ((PyStr)failed["message"]).Value);
+        Assert.Equal("relative_media_path is required", ((WireString)failed["message"]).Value);
         Assert.False(failed.ContainsKey("outputPath"));
 
         var guardrail = CompletionReports.BuildCompletionBody(Origin, Dict("""{"ok":true,"outcome":"skipped_guardrail","source_folder_skip_reason":"File is too small."}"""));
-        Assert.Equal(("failed", "File is too small."), (((PyStr)guardrail["status"]).Value, ((PyStr)guardrail["message"]).Value));
+        Assert.Equal(("failed", "File is too small."), (((WireString)guardrail["status"]).Value, ((WireString)guardrail["message"]).Value));
 
         Assert.Equal(
             """{"handoffId":"handoff-1","status":"failed","processorName":"Weir","libraryId":"lib-movies","message":"ffmpeg failed","disposition":"held","sourceRemoved":false,"failureClass":"execution","outputFiles":[]}""",
-            PyJsonWriter.Dumps(CompletionReports.BuildCompletionBody(DelunoOrigin, Dict("""{"ok":false,"outcome":"failed_execution","reason":"ffmpeg failed","failure_class":"execution"}""")), PyJsonFormat.Compact));
+            WireJsonWriter.Dumps(CompletionReports.BuildCompletionBody(DelunoOrigin, Dict("""{"ok":false,"outcome":"failed_execution","reason":"ffmpeg failed","failure_class":"execution"}""")), WireJsonFormat.Compact));
 
         var deleted = CompletionReports.BuildCompletionBody(DelunoOrigin, Dict("""{"ok":false,"outcome":"skipped_rejected","reason":"No wanted audio language.","rejected_cleanup_status":"deleted"}"""));
-        Assert.True(((PyBool)deleted["sourceRemoved"]).Value);
+        Assert.True(((WireBool)deleted["sourceRemoved"]).Value);
         Assert.False(deleted.ContainsKey("disposition"));
 
         var rejected = CompletionReports.BuildCompletionBody(DelunoOrigin, Dict("""{"ok":false,"outcome":"failed","reason":"No usable audio.","failure_class":"preflight"}"""), rejected: true);
-        Assert.Equal(("rejected", true, "preflight"), (((PyStr)rejected["disposition"]).Value, ((PyBool)rejected["sourceRemoved"]).Value, ((PyStr)rejected["failureClass"]).Value));
+        Assert.Equal(("rejected", true, "preflight"), (((WireString)rejected["disposition"]).Value, ((WireBool)rejected["sourceRemoved"]).Value, ((WireString)rejected["failureClass"]).Value));
         Assert.False(CompletionReports.BuildCompletionBody(DelunoOrigin, Dict("""{"ok":true,"outcome":"live_output_written"}""")).ContainsKey("disposition"));
     }
 
@@ -314,8 +314,8 @@ public sealed class MediaManagerRulesTests
         var status = new HandoffStatus("h1", "queued", new DateTimeOffset(2026, 9, 17, 10, 0, 0, TimeSpan.Zero), 1, null, null, null);
         Assert.Equal(
             """{"handoffId":"h1","state":"queued","queuePosition":1,"scheduledFor":null,"lastChangedUtc":"2026-09-17T10:00:00Z","outputPath":null,"outputFiles":null,"message":null}""",
-            PyJsonWriter.Dumps(status.AsJson(), PyJsonFormat.Response));
-        Assert.Equal("2026-09-17T10:00:00.000500Z", ((PyStr)(status with { LastChangedAt = status.LastChangedAt.AddTicks(5000) }).AsJson()["lastChangedUtc"]).Value);
+            WireJsonWriter.Dumps(status.AsJson(), WireJsonFormat.Response));
+        Assert.Equal("2026-09-17T10:00:00.000500Z", ((WireString)(status with { LastChangedAt = status.LastChangedAt.AddTicks(5000) }).AsJson()["lastChangedUtc"]).Value);
     }
 
     // --- intake --------------------------------------------------------------------------------
@@ -383,11 +383,11 @@ public sealed class MediaManagerRulesTests
     {
         Assert.Equal("Mon,Tue", ScheduleCsv.ValidateScheduleDaysCsv(" Mon , ,Tue"));
         Assert.Equal(string.Empty, ScheduleCsv.ValidateScheduleDaysCsv("  "));
-        Assert.Equal("Days must be written like Mon, Tue, Wed with commas between them.", Assert.Throws<PyValueErrorException>(() => ScheduleCsv.ValidateScheduleDaysCsv("monday")).Message);
+        Assert.Equal("Days must be written like Mon, Tue, Wed with commas between them.", Assert.Throws<WireValueException>(() => ScheduleCsv.ValidateScheduleDaysCsv("monday")).Message);
         Assert.Equal("09:05", ScheduleCsv.NormalizeHhmm("9:5", "00:00"));
         Assert.Equal("23:59", ScheduleCsv.NormalizeHhmm("", "23:59"));
-        Assert.Throws<PyValueErrorException>(() => ScheduleCsv.NormalizeHhmm("25:00", "00:00"));
-        Assert.Throws<PyValueErrorException>(() => ScheduleCsv.NormalizeHhmm("9", "00:00"));
+        Assert.Throws<WireValueException>(() => ScheduleCsv.NormalizeHhmm("25:00", "00:00"));
+        Assert.Throws<WireValueException>(() => ScheduleCsv.NormalizeHhmm("9", "00:00"));
     }
 
     [Fact]
@@ -409,7 +409,7 @@ public sealed class MediaManagerRulesTests
     [Fact]
     public void Movie_library_files_carry_the_movies_own_id_and_title()
     {
-        var files = ManagerDialectRules.ArrMovieLibraryFiles(PyJsonParser.Parse(
+        var files = ManagerDialectRules.ArrMovieLibraryFiles(WireJsonParser.Parse(
             """[{"id":7,"title":"Solaris","movieFile":{"path":"/media/Solaris/f.mkv"}},{"id":8,"title":"No File"},{"id":9,"movieFile":{"path":"/media/9/f.mkv"}}]"""));
         Assert.Equal(
             [new ManagerLibraryFile("7", "Solaris", "/media/Solaris/f.mkv"), new ManagerLibraryFile("9", "9", "/media/9/f.mkv")],
@@ -420,7 +420,7 @@ public sealed class MediaManagerRulesTests
     public void Episode_library_files_are_tagged_with_the_series_already_looked_up()
     {
         var files = ManagerDialectRules.ArrEpisodeLibraryFiles(
-            PyJsonParser.Parse("""[{"path":"/tv/Show/S01/e01.mkv"},{"path":"/tv/Show/S01/e02.mkv"},{"seasonNumber":1}]"""), "12", "Show");
+            WireJsonParser.Parse("""[{"path":"/tv/Show/S01/e01.mkv"},{"path":"/tv/Show/S01/e02.mkv"},{"seasonNumber":1}]"""), "12", "Show");
         Assert.Equal(
             [new ManagerLibraryFile("12", "Show", "/tv/Show/S01/e01.mkv"), new ManagerLibraryFile("12", "Show", "/tv/Show/S01/e02.mkv")],
             files);

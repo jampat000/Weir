@@ -47,7 +47,7 @@ public sealed class RedownloadRiskDialectTests
     [Fact]
     public void A_moviefile_payload_reads_its_languages_formats_and_score()
     {
-        var snapshot = RedownloadRiskDialect.ParseFileFormatSnapshot(PyJsonParser.Parse(MovieFileJson), "radarr");
+        var snapshot = RedownloadRiskDialect.ParseFileFormatSnapshot(WireJsonParser.Parse(MovieFileJson), "radarr");
 
         Assert.Equal(["eng", "jpn"], snapshot.AudioLanguages);
         Assert.Equal(50, snapshot.CustomFormatScore);
@@ -67,7 +67,7 @@ public sealed class RedownloadRiskDialectTests
         // RedownloadRiskEvaluator.LanguageImplementation compares against the raw `implementation` value
         // ("LanguageSpecification", the .NET type name Sonarr/Radarr serialize), not `implementationName`
         // ("Language", the display label) — a fixture using the wrong one would silently stop matching anything.
-        var snapshot = RedownloadRiskDialect.ParseFileFormatSnapshot(PyJsonParser.Parse(MovieFileJson), "radarr");
+        var snapshot = RedownloadRiskDialect.ParseFileFormatSnapshot(WireJsonParser.Parse(MovieFileJson), "radarr");
         Assert.Equal("LanguageSpecification", snapshot.CustomFormats[0].Specifications[0].Implementation);
     }
 
@@ -77,7 +77,7 @@ public sealed class RedownloadRiskDialectTests
         const string json = """
             {"languages": [{"id": 999, "name": "Nonsense"}], "customFormats": [], "customFormatScore": 0}
             """;
-        var snapshot = RedownloadRiskDialect.ParseFileFormatSnapshot(PyJsonParser.Parse(json), "radarr");
+        var snapshot = RedownloadRiskDialect.ParseFileFormatSnapshot(WireJsonParser.Parse(json), "radarr");
         Assert.Empty(snapshot.AudioLanguages);
     }
 
@@ -119,7 +119,7 @@ public sealed class RedownloadRiskDialectTests
             }
             """;
 
-        var profile = RedownloadRiskDialect.ParseQualityProfile(PyJsonParser.Parse(json));
+        var profile = RedownloadRiskDialect.ParseQualityProfile(WireJsonParser.Parse(json));
 
         Assert.True(profile.UpgradeAllowed);
         Assert.Equal(60, profile.CutoffFormatScore);
