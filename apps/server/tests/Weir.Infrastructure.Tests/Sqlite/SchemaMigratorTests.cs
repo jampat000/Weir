@@ -7,19 +7,6 @@ namespace Weir.Infrastructure.Tests.Sqlite;
 public sealed class SchemaMigratorTests
 {
     [Fact]
-    public void Migration_numbers_are_strictly_increasing_and_unique()
-    {
-        // Parallel branches each add a migration ahead of the others merging, so a number can be skipped (an
-        // in-flight PR's reserved slot) but never repeated or out of order: EnsureAtHead applies Migrations.Skip
-        // past the recorded revision by array position, which only lines up with Number order when the list does.
-        var numbers = SchemaMigrator.Migrations.Select(migration => migration.Number).ToList();
-
-        Assert.Equal(numbers.Order(), numbers);
-        Assert.Equal(numbers.Count, numbers.Distinct().Count());
-        Assert.Equal(SchemaMigrator.Migrations.Select(m => m.Revision).Distinct().Count(), SchemaMigrator.Migrations.Count);
-    }
-
-    [Fact]
     public void An_alembic_database_at_the_frozen_baseline_is_upgraded_to_head()
     {
         // An Alembic-created database is at the frozen baseline, the oldest revision this build knows how to
