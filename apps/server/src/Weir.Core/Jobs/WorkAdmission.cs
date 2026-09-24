@@ -123,8 +123,18 @@ public sealed record LibraryAdmissionSnapshot(
     string? ScheduleEnd,
     long MaxConcurrentFiles);
 
+/// <summary>The two kinds of work the worker slots run, each on slots of its own, so neither waits for the other (#717).</summary>
+public enum WorkLane
+{
+    /// <summary>Cleaning, passing through or rejecting a file: what "Files at once" and each library's own limit count.</summary>
+    Files,
+
+    /// <summary>Looking after libraries: scans and the maintenance sweeps.</summary>
+    Upkeep,
+}
+
 /// <summary>A leased job as admission counts it.</summary>
-public sealed record LeasedJobSnapshot(long RunnerCost, string? PayloadJson);
+public sealed record LeasedJobSnapshot(long RunnerCost, string? PayloadJson, WorkLane Lane = WorkLane.Files);
 
 /// <summary>What a worker is allowed to pick up on this pass.</summary>
 public sealed record WorkAdmission(
@@ -134,6 +144,12 @@ public sealed record WorkAdmission(
     int AvailableUnits = 0,
     int Capacity = 0)
 {
+    /// <summary>
+    /// Libraries whose upkeep (a scan, a sweep) may not start now: switched off, outside their schedule, or already running
+    /// one, so a library is never scanned twice at once. The files-at-once limits do not apply to upkeep (#717).
+    /// </summary>
+    public IReadOnlySet<long> UpkeepBlockedLibraryIds { get; init; } = new HashSet<long>();
+
     public bool BlocksProcessing => Pause.Paused;
 
     public bool BlocksDetection => Pause.Paused && !Pause.ScanWhilePaused;
@@ -226,23 +242,14 @@ public static class WorkAdmissionRules
         var pause = PauseState.Resolve(suite.ProcessingPaused, suite.ProcessingPausedUntil, suite.ScanWhilePaused, now.UtcDateTime);
         var effectiveBudget = budget ?? RunnerBudget.Default;
 
-        long unitsInUse = 0;
-        var runningPerLibrary = new Dictionary<long, int>();
-        foreach (var job in leasedJobs)
-        {
-            unitsInUse += Math.Max(0, job.RunnerCost);
-            if (JobPayload.LibraryIdForAdmission(job.PayloadJson) is { } libraryId)
-            {
-                runningPerLibrary[libraryId] = runningPerLibrary.GetValueOrDefault(libraryId) + 1;
-            }
-        }
-
+        var (unitsInUse, runningPerLibrary, upkeepBlocked) = Tally(leasedJobs);
         var blocked = new HashSet<long>();
         foreach (var library in libraries)
         {
             if (!library.Enabled || !LibraryWindowOpen(library, timezoneName, now))
             {
                 blocked.Add(library.Id);
+                upkeepBlocked.Add(library.Id);
                 continue;
             }
 
@@ -261,7 +268,42 @@ public static class WorkAdmissionRules
             blocked,
             timezoneName,
             budgetEnabled ? effectiveBudget.Available(unitsInUse) : int.MaxValue,
-            effectiveBudget.Capacity);
+            effectiveBudget.Capacity)
+        {
+            UpkeepBlockedLibraryIds = upkeepBlocked,
+        };
+    }
+
+    /// <summary>
+    /// The budget units and files each library has running, from the file lane only, and the libraries with upkeep running.
+    /// Upkeep takes nothing from the budget or the files-at-once count; it only keeps a second one off its library (#717).
+    /// </summary>
+    private static (long UnitsInUse, Dictionary<long, int> RunningPerLibrary, HashSet<long> UpkeepRunning) Tally(IEnumerable<LeasedJobSnapshot> leasedJobs)
+    {
+        long unitsInUse = 0;
+        var runningPerLibrary = new Dictionary<long, int>();
+        var upkeepRunning = new HashSet<long>();
+        foreach (var job in leasedJobs)
+        {
+            var libraryId = JobPayload.LibraryIdForAdmission(job.PayloadJson);
+            if (job.Lane == WorkLane.Upkeep)
+            {
+                if (libraryId is { } busy)
+                {
+                    upkeepRunning.Add(busy);
+                }
+
+                continue;
+            }
+
+            unitsInUse += Math.Max(0, job.RunnerCost);
+            if (libraryId is { } running)
+            {
+                runningPerLibrary[running] = runningPerLibrary.GetValueOrDefault(running) + 1;
+            }
+        }
+
+        return (unitsInUse, runningPerLibrary, upkeepRunning);
     }
 
     private static string OrDefault(string? value, string fallback) => string.IsNullOrEmpty(value) ? fallback : value;

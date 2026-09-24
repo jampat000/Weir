@@ -102,7 +102,9 @@ public sealed class SystemEndpointsTests
             root.GetProperty("steps").GetRawText());
         Assert.Equal(
             "[{\"module\":\"processing\",\"expected_workers\":10,\"active_workers\":10,\"stale_workers\":0,\"stopped_workers\":0,\"status\":\"healthy\"," +
-            "\"detail\":\"Weir worker heartbeats are current.\"}]",
+            "\"detail\":\"Weir worker heartbeats are current.\"}," +
+            "{\"module\":\"upkeep\",\"expected_workers\":2,\"active_workers\":2,\"stale_workers\":0,\"stopped_workers\":0,\"status\":\"healthy\"," +
+            "\"detail\":\"Upkeep worker heartbeats are current.\"}]",
             root.GetProperty("worker_health").GetRawText());
     }
 

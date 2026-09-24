@@ -30,12 +30,17 @@ public sealed record ReadinessReport(
 /// <param name="StartupComplete">Startup finished and shutdown has not begun.</param>
 /// <param name="WorkerHealth">Worker lanes, or <see langword="null"/> when settings were never loaded.</param>
 /// <param name="WatcherSummary">The filesystem watcher's <c>(ok, sentence)</c>.</param>
+/// <param name="RecoveryComplete">
+/// Startup recovery (#718) has finished, or nothing gates it. It no longer holds up Kestrel from listening, so
+/// while it is still running the worker lanes correctly read as "starting" rather than "failed".
+/// </param>
 public sealed record ReadinessInputs(
     TimeSpan StartupElapsed,
     bool DatabaseReady,
     bool StartupComplete,
     IReadOnlyList<WorkerLaneHealth>? WorkerHealth,
-    (bool Ok, string Detail) WatcherSummary);
+    (bool Ok, string Detail) WatcherSummary,
+    bool RecoveryComplete = true);
 
 /// <summary>Builds the readiness report from the database, startup, worker and watcher state.</summary>
 public static class ReadinessBuilder
@@ -51,7 +56,10 @@ public static class ReadinessBuilder
         var workerHealth = inputs.WorkerHealth ?? [];
         var workersReady = inputs.WorkerHealth is null
             ? startupComplete
-            : startupComplete && workerHealth.All(row => row.Status is "healthy" or "disabled");
+            : startupComplete && inputs.RecoveryComplete && workerHealth.All(row => row.Status is "healthy" or "disabled");
+        // Recovery runs after Kestrel is already listening (#718), so a worker lane waiting on it reads as
+        // still starting, not failed, even once the rest of startup has finished.
+        var workersStillStarting = !startupComplete || !inputs.RecoveryComplete;
 
         List<ReadinessStep> steps =
         [
@@ -65,12 +73,12 @@ public static class ReadinessBuilder
                         : "Weir is preparing the local database."),
             new(
                 "workers",
-                workersReady ? "ready" : startupComplete ? "failed" : "starting",
+                workersReady ? "ready" : workersStillStarting ? "starting" : "failed",
                 workersReady
                     ? "Background workers and schedules are ready."
-                    : startupComplete
-                        ? "One or more background workers are stale or stopped."
-                        : "Weir is starting background workers and schedules."),
+                    : workersStillStarting
+                        ? "Weir is starting background workers and schedules."
+                        : "One or more background workers are stale or stopped."),
             // Falling back to the periodic scan is slower, not broken, so this reports rather than fails.
             new("filesystem_watcher", inputs.WatcherSummary.Ok ? "ready" : "failed", inputs.WatcherSummary.Detail),
         ];

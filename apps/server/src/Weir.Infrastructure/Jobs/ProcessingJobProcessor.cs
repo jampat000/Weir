@@ -105,14 +105,17 @@ public sealed class ProcessingJobProcessor
         string leaseOwner,
         int leaseSeconds = DefaultLeaseSeconds,
         DateTimeOffset? now = null,
+        WorkLane lane = WorkLane.Files,
+        ClaimableKinds? kinds = null,
         CancellationToken cancellationToken = default)
     {
         var when = PyDateTime.TruncateToMicroseconds((now ?? _time.GetUtcNow()).ToUniversalTime());
         var leaseUntil = when + TimeSpan.FromSeconds(leaseSeconds);
 
         // The schedule and the pause are evaluated at lease time, not only at enqueue (#337). A job
-        // already leased is left to finish.
-        var job = await _queue.ClaimNextAdmittedAsync(leaseOwner, leaseUntil, when, Kinds, cancellationToken).ConfigureAwait(false);
+        // already leased is left to finish. A caller running the upkeep lane (#717) passes its own kinds and
+        // lane, so a scan or sweep is never gated by the files-at-once limit it is exempt from.
+        var job = await _queue.ClaimNextAdmittedAsync(leaseOwner, leaseUntil, when, kinds ?? Kinds, lane, cancellationToken).ConfigureAwait(false);
         if (job is null)
         {
             return JobProcessOutcome.Idle;

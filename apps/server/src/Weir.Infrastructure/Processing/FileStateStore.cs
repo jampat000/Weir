@@ -5,6 +5,23 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
 
+/// <summary>What a watched-folder scan writes for one file it looked at (<see cref="FileStateStore.RecordScannedStateAsync"/>).</summary>
+/// <param name="RelativePath">The file, relative to the watched folder.</param>
+/// <param name="RowId">The file's row as the scan read it, or null when Weir had no row for it.</param>
+/// <param name="ExpectedStatus">The status the scan read on that row; the write applies only while the row still has it.</param>
+/// <param name="ResetStatus">For a source whose size changed: the status it starts again from, with its failures cleared. Null leaves them.</param>
+/// <param name="Verdict">The file's new state, or null to leave the state as it is.</param>
+/// <param name="SizeBytes">The size the scan saw.</param>
+/// <param name="SizeChangedAt">When that size was first seen, or null to leave the stored time alone.</param>
+public sealed record ScannedFileWrite(
+    string RelativePath,
+    long? RowId,
+    string? ExpectedStatus,
+    string? ResetStatus,
+    FileStateVerdict? Verdict,
+    long SizeBytes,
+    DateTimeOffset? SizeChangedAt);
+
 /// <summary>SQLite access for <c>files</c>: read, list and forget, plus the upsert and mark-status writes the
 /// watched-folder scan performs.</summary>
 public static class FileStateStore
@@ -15,6 +32,10 @@ public static class FileStateStore
         "hold_until, failure_class, failure_attempts, next_retry_at, output_collision_policy, output_collision_action, " +
         "output_collision_reason, hardware_method, hardware_fell_back_to_software, hardware_reason, last_seen_at, last_attempt_at, " +
         "created_at, updated_at, processed_source_size, processed_source_mtime_ns";
+    private const string InsertSql =
+        "INSERT INTO files (library_id, relative_path, status, status_reason, blocked_by_connection, hold_until, " +
+        "size_bytes, size_changed_at, last_seen_at, last_attempt_at) VALUES (@lib, @path, @status, @reason, @blocked, @hold, " +
+        "@size, @size_changed, @seen, @attempt)";
 
     public static Task<ProcessingFileRecord?> GetAsync(UnitOfWork uow, long id) =>
         uow.QuerySingleAsync($"SELECT {Columns} FROM files WHERE id = @id", Read, ("@id", id));
@@ -116,10 +137,9 @@ public static class FileStateStore
             ("@failed", ProcessingFileStatuses.ProcessingFailed));
     }
 
-    /// <summary>The row a previous scan left, or <see langword="null"/>. Settling compares against this. Same as
-    /// <see cref="FindAsync"/>.</summary>
-    public static Task<ProcessingFileRecord?> ExistingFileRowAsync(UnitOfWork uow, long libraryId, string relativePath) =>
-        FindAsync(uow, libraryId, relativePath);
+    /// <summary>Every row of the library, for a scan that decides about all of its files from one read.</summary>
+    public static Task<List<ProcessingFileRecord>> ListForLibraryAsync(UnitOfWork uow, long libraryId) =>
+        uow.QueryAsync($"SELECT {Columns} FROM files WHERE library_id = @lib", Read, ("@lib", libraryId));
 
     /// <summary>
     /// Upserts one file's state. Safe to call on every scan. <paramref name="sizeBytes"/>
@@ -141,79 +161,71 @@ public static class FileStateStore
         var existingId = await uow.ScalarAsync(
             "SELECT id FROM files WHERE library_id = @lib AND relative_path = @path",
             ("@lib", libraryId), ("@path", relativePath)).ConfigureAwait(false);
-
-        var seen = PyDateTime.FromDateTimeOffset(seenAt);
-        var holdUntil = verdict.HoldUntil is { } hold ? PyDateTime.FromDateTimeOffset(hold) : (PyDateTime?)null;
-        var changedAt = sizeChangedAt is { } changed ? PyDateTime.FromDateTimeOffset(changed) : (PyDateTime?)null;
-
+        var state = new StateWrite(verdict, sizeBytes, sizeChangedAt, PyDateTime.FromDateTimeOffset(seenAt), isAttempt);
         if (existingId is null or DBNull)
         {
-            await uow.ExecuteAsync(
-                "INSERT INTO files (library_id, relative_path, status, status_reason, blocked_by_connection, hold_until, " +
-                "size_bytes, size_changed_at, last_seen_at, last_attempt_at) VALUES (@lib, @path, @status, @reason, @blocked, @hold, " +
-                "@size, @size_changed, @seen, @attempt)",
-                ("@lib", libraryId),
-                ("@path", relativePath),
-                ("@status", verdict.Status),
-                ("@reason", verdict.Reason),
-                ("@blocked", verdict.BlockedByConnection),
-                ("@hold", SqliteValues.ToSqlite(holdUntil)),
-                ("@size", sizeBytes ?? 0),
-                ("@size_changed", SqliteValues.ToSqlite(changedAt)),
-                ("@seen", SqliteValues.ToSqlite(seen)),
-                ("@attempt", isAttempt ? SqliteValues.ToSqlite(seen) : null)).ConfigureAwait(false);
+            await uow.ExecuteAsync(InsertSql, [("@lib", libraryId), ("@path", relativePath), .. state.InsertParameters()]).ConfigureAwait(false);
             return Convert.ToInt64(await uow.ScalarAsync(
                 "SELECT id FROM files WHERE library_id = @lib AND relative_path = @path",
                 ("@lib", libraryId), ("@path", relativePath)).ConfigureAwait(false), System.Globalization.CultureInfo.InvariantCulture);
         }
 
         var id = Convert.ToInt64(existingId, System.Globalization.CultureInfo.InvariantCulture);
-        var sets = new List<string>
-        {
-            "status = @status", "status_reason = @reason", "blocked_by_connection = @blocked", "hold_until = @hold",
-            "last_seen_at = @seen", "updated_at = CURRENT_TIMESTAMP",
-        };
-        var parameters = new List<(string, object?)>
-        {
-            ("@status", verdict.Status),
-            ("@reason", verdict.Reason),
-            ("@blocked", verdict.BlockedByConnection),
-            ("@hold", SqliteValues.ToSqlite(holdUntil)),
-            ("@seen", SqliteValues.ToSqlite(seen)),
-            ("@id", id),
-        };
-        if (sizeBytes is { } size)
-        {
-            sets.Add("size_bytes = @size");
-            parameters.Add(("@size", size));
-        }
-
-        if (changedAt is { } changed2)
-        {
-            sets.Add("size_changed_at = @size_changed");
-            parameters.Add(("@size_changed", SqliteValues.ToSqlite(changed2)));
-        }
-
-        if (isAttempt)
-        {
-            sets.Add("last_attempt_at = @attempt");
-            parameters.Add(("@attempt", SqliteValues.ToSqlite(seen)));
-        }
-
-        await uow.ExecuteAsync($"UPDATE files SET {string.Join(", ", sets)} WHERE id = @id", [.. parameters]).ConfigureAwait(false);
+        var (sets, parameters) = state.Assignments();
+        await uow.ExecuteAsync($"UPDATE files SET {string.Join(", ", sets)} WHERE id = @id", [.. parameters, ("@id", id)]).ConfigureAwait(false);
         return id;
     }
 
     /// <summary>
-    /// Records that a scan saw the row's file on disk at <paramref name="seenAt"/>, changing nothing else. The vanished-file
-    /// sweep (#645) reads this to tell a file that is gone from one a scan simply left alone.
+    /// A watched-folder scan's write for one file, applied only while the row still holds the status the scan read (#708): a
+    /// hand-off, a pass or a person that changed the row since then wins, and nothing it wrote is overwritten. A file the scan
+    /// found no row for is inserted unless something else recorded it first. Returns whether the write was applied.
     /// </summary>
-    public static async Task TouchLastSeenAsync(UnitOfWork uow, long fileId, DateTimeOffset seenAt)
+    public static async Task<bool> RecordScannedStateAsync(UnitOfWork uow, long libraryId, ScannedFileWrite write, DateTimeOffset seenAt)
     {
         ArgumentNullException.ThrowIfNull(uow);
+        ArgumentNullException.ThrowIfNull(write);
+        var seen = PyDateTime.FromDateTimeOffset(seenAt);
+        if (write.RowId is not { } id)
+        {
+            var verdict = write.Verdict ?? throw new ArgumentException("A file with no row needs a state to record.", nameof(write));
+            var insert = new StateWrite(verdict, write.SizeBytes, write.SizeChangedAt, seen, IsAttempt: false);
+            return await uow.ExecuteAsync(
+                InsertSql + " ON CONFLICT (library_id, relative_path) DO NOTHING",
+                [("@lib", libraryId), ("@path", write.RelativePath), .. insert.InsertParameters()]).ConfigureAwait(false) > 0;
+        }
+
+        var (sets, parameters) = write.Verdict is { } next
+            ? new StateWrite(next, write.SizeBytes, write.SizeChangedAt, seen, IsAttempt: false).Assignments()
+            : (["status = @status", "last_seen_at = @seen"], [("@status", write.ResetStatus ?? write.ExpectedStatus), ("@seen", SqliteValues.ToSqlite(seen))]);
+        if (write.ResetStatus is not null)
+        {
+            // A changed source is a new processing opportunity: no failure count or retry carries over from the old bytes.
+            sets.AddRange(["failure_class = NULL", "failure_attempts = 0", "next_retry_at = NULL"]);
+        }
+
+        return await uow.ExecuteAsync(
+            $"UPDATE files SET {string.Join(", ", sets)} WHERE id = @id AND status = @expected",
+            [.. parameters, ("@id", id), ("@expected", write.ExpectedStatus)]).ConfigureAwait(false) > 0;
+    }
+
+    /// <summary>
+    /// Records that a scan saw these rows' files on disk at <paramref name="seenAt"/>, changing nothing else. The vanished-file
+    /// sweep (#645) reads this to tell a file that is gone from one a scan simply left alone.
+    /// </summary>
+    public static async Task TouchLastSeenAsync(UnitOfWork uow, IReadOnlyCollection<long> fileIds, DateTimeOffset seenAt)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        ArgumentNullException.ThrowIfNull(fileIds);
+        if (fileIds.Count == 0)
+        {
+            return;
+        }
+
         await uow.ExecuteAsync(
-            "UPDATE files SET last_seen_at = @seen WHERE id = @id",
-            ("@seen", SqliteValues.ToSqlite(PyDateTime.FromDateTimeOffset(seenAt))), ("@id", fileId)).ConfigureAwait(false);
+            "UPDATE files SET last_seen_at = @seen WHERE id IN (SELECT value FROM json_each(@ids))",
+            ("@seen", SqliteValues.ToSqlite(PyDateTime.FromDateTimeOffset(seenAt))),
+            ("@ids", "[" + string.Join(",", fileIds.Select(id => id.ToString(System.Globalization.CultureInfo.InvariantCulture))) + "]")).ConfigureAwait(false);
     }
 
     /// <summary>Moves a file Weir has already seen into a new state. Does nothing when the row does not
@@ -283,4 +295,61 @@ public static class FileStateStore
         ProcessedSourceSize = reader.IsDBNull(30) ? null : reader.GetInt64(30),
         ProcessedSourceMtimeNs = reader.IsDBNull(31) ? null : reader.GetInt64(31),
     };
+
+    /// <summary>One state write's values, shared by the upsert and the scan's conditional write.</summary>
+    private sealed record StateWrite(FileStateVerdict Verdict, long? SizeBytes, DateTimeOffset? SizeChangedAt, PyDateTime Seen, bool IsAttempt)
+    {
+        private object HoldUntil => SqliteValues.ToSqlite(Verdict.HoldUntil is { } hold ? PyDateTime.FromDateTimeOffset(hold) : (PyDateTime?)null);
+
+        private object ChangedAt => SqliteValues.ToSqlite(SizeChangedAt is { } changed ? PyDateTime.FromDateTimeOffset(changed) : (PyDateTime?)null);
+
+        public (string Name, object? Value)[] InsertParameters() =>
+        [
+            ("@status", Verdict.Status),
+            ("@reason", Verdict.Reason),
+            ("@blocked", Verdict.BlockedByConnection),
+            ("@hold", HoldUntil),
+            ("@size", SizeBytes ?? 0),
+            ("@size_changed", ChangedAt),
+            ("@seen", SqliteValues.ToSqlite(Seen)),
+            ("@attempt", IsAttempt ? SqliteValues.ToSqlite(Seen) : null),
+        ];
+
+        /// <summary>The <c>SET</c> list for an existing row: a size or change time of null leaves the stored value alone.</summary>
+        public (List<string> Sets, List<(string Name, object? Value)> Parameters) Assignments()
+        {
+            var sets = new List<string>
+            {
+                "status = @status", "status_reason = @reason", "blocked_by_connection = @blocked", "hold_until = @hold",
+                "last_seen_at = @seen", "updated_at = CURRENT_TIMESTAMP",
+            };
+            var parameters = new List<(string Name, object? Value)>
+            {
+                ("@status", Verdict.Status),
+                ("@reason", Verdict.Reason),
+                ("@blocked", Verdict.BlockedByConnection),
+                ("@hold", HoldUntil),
+                ("@seen", SqliteValues.ToSqlite(Seen)),
+            };
+            if (SizeBytes is { } size)
+            {
+                sets.Add("size_bytes = @size");
+                parameters.Add(("@size", size));
+            }
+
+            if (SizeChangedAt is not null)
+            {
+                sets.Add("size_changed_at = @size_changed");
+                parameters.Add(("@size_changed", ChangedAt));
+            }
+
+            if (IsAttempt)
+            {
+                sets.Add("last_attempt_at = @attempt");
+                parameters.Add(("@attempt", SqliteValues.ToSqlite(Seen)));
+            }
+
+            return (sets, parameters);
+        }
+    }
 }

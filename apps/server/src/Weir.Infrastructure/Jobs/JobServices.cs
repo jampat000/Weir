@@ -36,7 +36,9 @@ public sealed record WorkerLoopTimings
 }
 
 /// <summary>
-/// Startup crash recovery, run before any worker starts. A failure stops startup.
+/// Startup crash recovery: requeues interrupted jobs and walks library folders for leftovers, in the
+/// background, so a slow NAS never holds up Kestrel from listening (#718). No worker claims a job until it
+/// finishes; nothing else waits on it.
 /// </summary>
 public sealed class JobsStartupRecoveryService : IHostedService
 {
@@ -45,6 +47,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
     private readonly TimeProvider _time;
     private readonly ILogger<JobsStartupRecoveryService> _logger;
     private readonly SwapRecoverySweep? _swapSweep;
+    private TaskCompletionSource? _recoveryCompleted;
 
     public JobsStartupRecoveryService(
         ProcessingJobStore store,
@@ -65,27 +68,61 @@ public sealed class JobsStartupRecoveryService : IHostedService
     /// <summary>The #506 startup sweep's last report, when library mode is registered; null otherwise.</summary>
     public SwapRecoveryReport? LastSwapSweepReport { get; private set; }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
-    {
-        LastReport = await StartupRecovery.RunAsync(_store, _options.WeirHome, _time.GetUtcNow(), _logger, cancellationToken).ConfigureAwait(false);
-        await GiveEveryLibraryAProfileAsync(cancellationToken).ConfigureAwait(false);
-        await WarnAboutReservedLibraryFoldersAsync(cancellationToken).ConfigureAwait(false);
+    /// <summary>
+    /// Completes once recovery and the swap sweep have run, or at once when <see cref="StartAsync"/> was never
+    /// called (a unit test building this service directly, with no gate to honour). The file lanes and the
+    /// upkeep lane (#717, #718) each await this before claiming their first job, so a pass or a scan never
+    /// starts against a library recovery has not yet finished looking at. Nothing else waits on it: <c>/ready</c>
+    /// and the web app answer as soon as Kestrel is listening.
+    /// </summary>
+    public Task RecoveryCompleted => _recoveryCompleted?.Task ?? Task.CompletedTask;
 
-        // #506's startup sweep runs after the existing recovery above and before any worker starts claiming jobs (this
-        // hosted service is registered ahead of the worker lane) — see docs/archive/server-port-notes.md, "Library mode: safe swap".
-        if (_swapSweep is not null)
+    /// <summary>
+    /// Runs recovery and the swap sweep in the background and returns at once, so their folder walks run
+    /// alongside Kestrel starting to listen rather than in front of it (#718). A worker lane must not start
+    /// before they finish, so it awaits <see cref="RecoveryCompleted"/> itself.
+    /// </summary>
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        _recoveryCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _ = RunRecoveryAsync();
+        return Task.CompletedTask;
+    }
+
+    private async Task RunRecoveryAsync()
+    {
+        try
         {
-            var folders = await LibraryFoldersForSweepAsync(cancellationToken).ConfigureAwait(false);
-            try
+            LastReport = await StartupRecovery.RunAsync(_store, _options.WeirHome, _time.GetUtcNow(), _logger, CancellationToken.None).ConfigureAwait(false);
+            await GiveEveryLibraryAProfileAsync(CancellationToken.None).ConfigureAwait(false);
+            await WarnAboutReservedLibraryFoldersAsync(CancellationToken.None).ConfigureAwait(false);
+
+            // #506's startup sweep runs after the recovery above and before any worker starts claiming jobs
+            // (workers await RecoveryCompleted) — see docs/archive/server-port-notes.md, "Library mode: safe swap".
+            if (_swapSweep is not null)
             {
-                LastSwapSweepReport = await _swapSweep.RunAsync(folders, walkFolders: true, cancellationToken).ConfigureAwait(false);
-            }
+                var folders = await LibraryFoldersForSweepAsync(CancellationToken.None).ConfigureAwait(false);
+                try
+                {
+                    LastSwapSweepReport = await _swapSweep.RunAsync(folders, walkFolders: true, CancellationToken.None).ConfigureAwait(false);
+                }
 #pragma warning disable CA1031 // Startup must not fail because a library-mode sweep could not run.
-            catch (Exception exception)
+                catch (Exception exception)
 #pragma warning restore CA1031
-            {
-                _logger.LogWarning(exception, "Library mode's startup sweep could not run; interrupted swaps, if any, are picked up at the next start.");
+                {
+                    _logger.LogWarning(exception, "Library mode's startup sweep could not run; interrupted swaps, if any, are picked up at the next start.");
+                }
             }
+        }
+        // Kestrel is already listening by the time this runs (#718), so a failure here must not crash the host —
+        // only log loudly — or a worker lane waiting on RecoveryCompleted would wait forever.
+        catch (Exception exception) when (exception is SqliteException or IOException or UnauthorizedAccessException)
+        {
+            _logger.LogCritical(exception, "Weir startup recovery failed; passes and scans will start without it once Weir is restarted.");
+        }
+        finally
+        {
+            _recoveryCompleted!.TrySetResult();
         }
     }
 
@@ -189,6 +226,8 @@ public sealed class ProcessingWorkerService : BackgroundService
     private readonly TimeProvider _time;
     private readonly ILogger<ProcessingWorkerService> _logger;
     private readonly WorkerWakeSignals _wakeSignals;
+    private readonly JobHandlerRegistry _handlers;
+    private readonly JobsStartupRecoveryService _recovery;
 
     public ProcessingWorkerService(
         ProcessingJobProcessor processor,
@@ -198,6 +237,8 @@ public sealed class ProcessingWorkerService : BackgroundService
         WorkerLoopTimings timings,
         TimeProvider time,
         ILogger<ProcessingWorkerService> logger,
+        JobHandlerRegistry handlers,
+        JobsStartupRecoveryService recovery,
         WorkerWakeSignals? wakeSignals = null)
     {
         _processor = processor;
@@ -207,6 +248,8 @@ public sealed class ProcessingWorkerService : BackgroundService
         _timings = timings;
         _time = time;
         _logger = logger;
+        _handlers = handlers;
+        _recovery = recovery;
         _wakeSignals = wakeSignals ?? new WorkerWakeSignals();
     }
 
@@ -217,12 +260,25 @@ public sealed class ProcessingWorkerService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await Task.Yield();
+        try
+        {
+            // Startup recovery (#718) must finish looking at a library's folders before a pass can touch them.
+            await _recovery.RecoveryCompleted.WaitAsync(stoppingToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            return;
+        }
+
         // The shipped default is 10 slots; the saved files-at-once value gates how many are active (#329, #633).
         _logger.LogDebug(
             "Worker slot cap is {SlotCap}; the saved files-at-once setting gates how many are active.",
             _options.ProcessingWorkerCount);
+        // Upkeep kinds (scans, maintenance sweeps) are left for the upkeep lane, which claims them without the
+        // files-at-once and per-library limits this lane enforces (#717).
+        var filesKinds = WorkLanes.FilesLaneKinds(_handlers);
         var slots = Enumerable.Range(0, _options.ProcessingWorkerCount)
-            .Select(index => Task.Run(() => RunSlotAsync(index, stoppingToken), CancellationToken.None))
+            .Select(index => Task.Run(() => RunSlotAsync(index, filesKinds, stoppingToken), CancellationToken.None))
             .ToArray();
         await Task.WhenAll(slots).ConfigureAwait(false);
     }
@@ -231,7 +287,7 @@ public sealed class ProcessingWorkerService : BackgroundService
     internal static readonly TimeSpan SettingsReadFailureLogInterval = TimeSpan.FromMinutes(1);
 
     /// <summary>One slot: repeatedly process jobs until stopping.</summary>
-    internal async Task RunSlotAsync(int workerIndex, CancellationToken stoppingToken)
+    internal async Task RunSlotAsync(int workerIndex, ClaimableKinds filesKinds, CancellationToken stoppingToken)
     {
         var owner = LeaseOwner(workerIndex);
         _heartbeats.Started(HeartbeatModule, workerIndex);
@@ -284,7 +340,7 @@ public sealed class ProcessingWorkerService : BackgroundService
                 JobProcessOutcome outcome;
                 try
                 {
-                    outcome = await _processor.ProcessOneAsync(owner, _timings.LeaseSeconds, cancellationToken: stoppingToken).ConfigureAwait(false);
+                    outcome = await _processor.ProcessOneAsync(owner, _timings.LeaseSeconds, kinds: filesKinds, cancellationToken: stoppingToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -346,9 +402,9 @@ public sealed class ProcessingWorkerService : BackgroundService
         await idleTimer.CancelAsync().ConfigureAwait(false);
     }
 
-    /// <summary>The saved "Files at once" value; the operator settings row defaults it to 1.</summary>
+    /// <summary>The saved "Files at once" value; the operator settings row defaults it to 1. A read, so it never takes the write lock.</summary>
     private Task<int> ReadMaxConcurrentFilesAsync(CancellationToken cancellationToken) =>
-        _store.InTransactionAsync(
+        _store.ReadAsync(
             (connection, transaction) =>
             {
                 var value = ProcessingJobStore.Scalar(connection, transaction, "SELECT max_concurrent_files FROM operator_settings WHERE id = 1");
@@ -677,7 +733,7 @@ public sealed class WorkTempStaleSweepEnqueuer : IPeriodicEnqueuer
 
     /// <summary>An interval column of the operator settings row (seconds), or <paramref name="fallback"/> when it is not set.</summary>
     internal static Task<TimeSpan> OperatorSettingIntervalAsync(ProcessingJobStore store, string column, TimeSpan fallback, CancellationToken cancellationToken) =>
-        store.InTransactionAsync(
+        store.ReadAsync(
             (connection, transaction) =>
             {
                 var value = ProcessingJobStore.Scalar(connection, transaction, $"SELECT {column} FROM operator_settings WHERE id = 1");
@@ -687,7 +743,7 @@ public sealed class WorkTempStaleSweepEnqueuer : IPeriodicEnqueuer
 
     /// <summary>A boolean column of the operator settings row, or <paramref name="defaultValue"/> when the row or value is missing.</summary>
     internal static Task<bool> OperatorSettingFlagAsync(ProcessingJobStore store, string column, bool defaultValue, CancellationToken cancellationToken) =>
-        store.InTransactionAsync(
+        store.ReadAsync(
             (connection, transaction) =>
             {
                 var value = ProcessingJobStore.Scalar(connection, transaction, $"SELECT {column} FROM operator_settings WHERE id = 1");
@@ -821,7 +877,7 @@ public static class WeirJobs
         services.AddSingleton<IPeriodicEnqueuer>(sp => new UnclaimedHandbackCleanupEnqueuer(sp.GetRequiredService<ProcessingJobStore>(), "movie"));
         services.AddSingleton<IPeriodicEnqueuer>(sp => new UnclaimedHandbackCleanupEnqueuer(sp.GetRequiredService<ProcessingJobStore>(), "tv"));
 
-        // Hosted services start in this order: recovery completes before any worker claims.
+        // Recovery runs in the background (#718) and completes before either worker lane claims its first job.
         services.AddSingleton<JobsStartupRecoveryService>();
         services.AddHostedService(sp => sp.GetRequiredService<JobsStartupRecoveryService>());
         services.AddSingleton<IPeriodicTask, JobRowsRetentionTask>();
@@ -832,6 +888,8 @@ public static class WeirJobs
         if (options.ProcessingWorkerCount > 0)
         {
             services.AddHostedService<ProcessingWorkerService>();
+            // The upkeep lane (#717): scans and maintenance sweeps, on slots of their own beside the file lane.
+            services.AddHostedService<UpkeepWorkerService>();
         }
 
         return services;

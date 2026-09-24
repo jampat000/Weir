@@ -78,7 +78,9 @@ public sealed class AuthService : IDisposable
 
         if (now.AsUtc - row.LastSeenAt.AsUtc >= SessionRules.LastSeenTouchGap(idle))
         {
-            await AuthStore.TouchSessionAsync(uow, row.Id, now).ConfigureAwait(false);
+            // Its own short transaction: on the request's unit of work, a page load's once-a-minute touch would hold the write
+            // lock until the whole request finished, and every other lane would wait on a read (#708).
+            await WriteOnItsOwnAsync(uow, own => AuthStore.TouchSessionAsync(own, row.Id, now)).ConfigureAwait(false);
             row = row with { LastSeenAt = now };
         }
 
@@ -89,19 +91,25 @@ public sealed class AuthService : IDisposable
     /// Commits the revoke of an expired session on its own, whatever the request's outcome, so the 401 that
     /// follows cannot roll it back (#529).
     /// </summary>
-    private async Task RevokeExpiredAsync(UnitOfWork uow, string sessionId, PyDateTime now)
+    private Task RevokeExpiredAsync(UnitOfWork uow, string sessionId, PyDateTime now) =>
+        WriteOnItsOwnAsync(uow, own => AuthStore.RevokeSessionAsync(own, sessionId, now));
+
+    /// <summary>
+    /// Runs <paramref name="write"/> in a unit of work of its own and commits it at once, unless <paramref name="uow"/> is
+    /// already inside a transaction: it then holds the write lock, and a second connection would wait on it.
+    /// </summary>
+    private async Task WriteOnItsOwnAsync(UnitOfWork uow, Func<UnitOfWork, Task> write)
     {
         if (uow.InTransaction)
         {
-            // The request already holds the write lock; a second connection would wait on it.
-            await AuthStore.RevokeSessionAsync(uow, sessionId, now).ConfigureAwait(false);
+            await write(uow).ConfigureAwait(false);
             return;
         }
 
         var own = await UnitOfWork.OpenAsync(_database).ConfigureAwait(false);
         await using (own.ConfigureAwait(false))
         {
-            await AuthStore.RevokeSessionAsync(own, sessionId, now).ConfigureAwait(false);
+            await write(own).ConfigureAwait(false);
             await own.CommitAsync().ConfigureAwait(false);
         }
     }

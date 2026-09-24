@@ -46,7 +46,7 @@ public sealed class TvSeasonFolderCleanup : ITvSeasonFolderCleanup
         try
         {
             return [.. Directory.EnumerateFiles(seasonFolder)
-                .Where(WatchedFolderScanOps.IsProcessingMediaCandidate)
+                .Where(WatchedFolderListing.IsProcessingMediaCandidate)
                 .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)];
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -161,7 +161,7 @@ public sealed class TvSeasonFolderCleanup : ITvSeasonFolderCleanup
 
             lineParts.Add("Import check passed — no connected media manager still lists this episode.");
 
-            if (await WatchedFolderScanOps.ActiveRemuxPassExistsForRelativePathAsync(uow, rel, ProcessingMediaScopes.Tv, libraryId: null, excludeJobId: context.CurrentJobId).ConfigureAwait(false))
+            if (await ActiveRemuxPasses.ExistsForRelativePathAsync(uow, rel, ProcessingMediaScopes.Tv, libraryId: null, excludeJobId: context.CurrentJobId).ConfigureAwait(false))
             {
                 output.Set("tv_season_folder_skip_reason", $"Another TV job is already queued or running for {name}, so the whole season folder was left in place.");
                 lineParts.Add("Active TV job check failed — a TV remux job is pending or running for this path.");

@@ -93,9 +93,10 @@ public sealed class LibraryScanHandler : IJobHandler
             library = libraryId > 0 ? await LibraryStore.GetAsync(uow, libraryId).ConfigureAwait(false) : null;
             if (library is null)
             {
-                await LibraryScanStore.RecordResultAsync(uow, context.Id, new LibraryScanSnapshot(libraryId, _time.GetUtcNow(), [], []), false, "This library no longer exists.")
+                await LibraryScanStore.RecordResultAsync(uow, context.Id, new LibraryScanOutcome(_time.GetUtcNow(), []), false, "This library no longer exists.")
                     .ConfigureAwait(false);
                 await uow.CommitAsync().ConfigureAwait(false);
+                await LibraryFileIndexWriter.ReplaceAsync(_database, libraryId, [], cancellationToken).ConfigureAwait(false);
                 return;
             }
 
@@ -103,16 +104,17 @@ public sealed class LibraryScanHandler : IJobHandler
             if (settings.Folders.Count == 0)
             {
                 await LibraryScanStore.RecordResultAsync(
-                        uow, context.Id, new LibraryScanSnapshot(libraryId, _time.GetUtcNow(), [], []), false,
+                        uow, context.Id, new LibraryScanOutcome(_time.GetUtcNow(), []), false,
                         "No library folders are configured for this library yet. Add one in Library settings, then scan again.")
                     .ConfigureAwait(false);
                 await uow.CommitAsync().ConfigureAwait(false);
+                await LibraryFileIndexWriter.ReplaceAsync(_database, libraryId, [], cancellationToken).ConfigureAwait(false);
                 return;
             }
 
             var ruleSet = library.RuleSetId is { } ruleSetId ? await LibraryStore.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) : null;
             rules = ruleSet is not null ? RemuxPassPaths.RulesConfigFor(ruleSet) : RuleSetConversion.ToRulesConfig(null);
-            previousFiles = await LibraryScanStore.PreviousFilesForCacheAsync(uow, libraryId).ConfigureAwait(false);
+            previousFiles = await LibraryScanStore.CurrentFilesAsync(uow, libraryId).ConfigureAwait(false);
             connections = await _connections.ConnectionsForScopeAsync(uow, library.MediaType).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
         }
@@ -130,7 +132,7 @@ public sealed class LibraryScanHandler : IJobHandler
         // #551: match each walked file to the title a linked Sonarr/Radarr connection already knows it under.
         errors.AddRange(await MatchManagerTitlesAsync(connections, library.MediaType, settings.Folders, entries, cancellationToken).ConfigureAwait(false));
 
-        var snapshot = new LibraryScanSnapshot(libraryId, _time.GetUtcNow(), entries, errors);
+        var outcome = new LibraryScanOutcome(_time.GetUtcNow(), errors);
         var wouldChange = entries.Count(e => e.Classification == LibraryFileClassification.WouldChange);
         var cannotProcess = entries.Count(e => e.Classification == LibraryFileClassification.CannotProcess);
 
@@ -157,9 +159,10 @@ public sealed class LibraryScanHandler : IJobHandler
                 .ConfigureAwait(false);
         }
 
+        await LibraryFileIndexWriter.ReplaceAsync(_database, libraryId, entries, cancellationToken).ConfigureAwait(false);
         await using (var recordUow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false))
         {
-            await LibraryScanStore.RecordResultAsync(recordUow, context.Id, snapshot, true, null).ConfigureAwait(false);
+            await LibraryScanStore.RecordResultAsync(recordUow, context.Id, outcome, true, null).ConfigureAwait(false);
             var queued = scheduled ? await QueueScheduledCleansAsync(recordUow, libraryId, toClean, preflight).ConfigureAwait(false) : 0;
             var title = $"Scanned {library.Name}: {Plural.Of(entries.Count, "file")}, {wouldChange} would change, {cannotProcess} could not be processed";
             if (scheduled)

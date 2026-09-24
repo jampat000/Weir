@@ -24,25 +24,22 @@ public sealed class FileLogRetentionTask(SqliteDatabase database, TimeProvider t
 
     public async Task RunOnceAsync(CancellationToken cancellationToken)
     {
+        long retentionDays;
         var uow = await UnitOfWork.OpenAsync(database, cancellationToken).ConfigureAwait(false);
         await using (uow.ConfigureAwait(false))
         {
-            var operatorRow = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-            if (operatorRow.FileLogRetentionDays <= 0)
-            {
-                return;
-            }
-
-            var removed = await FileLogStore.PruneAsync(uow, operatorRow.FileLogRetentionDays, time.GetUtcNow()).ConfigureAwait(false);
+            retentionDays = (await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false)).FileLogRetentionDays;
             await uow.CommitAsync().ConfigureAwait(false);
-            if (removed == 1)
-            {
-                logger.LogInformation("Removed {Removed} processing record past its retention window.", removed);
-            }
-            else if (removed > 1)
-            {
-                logger.LogInformation("Removed {Removed} processing records past their retention window.", removed);
-            }
+        }
+
+        var removed = await FileLogStore.PruneAsync(database, retentionDays, time.GetUtcNow(), cancellationToken).ConfigureAwait(false);
+        if (removed == 1)
+        {
+            logger.LogInformation("Removed {Removed} processing record past its retention window.", removed);
+        }
+        else if (removed > 1)
+        {
+            logger.LogInformation("Removed {Removed} processing records past their retention window.", removed);
         }
     }
 }

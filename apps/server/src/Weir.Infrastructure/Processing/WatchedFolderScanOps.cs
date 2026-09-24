@@ -1,274 +1,21 @@
-using Microsoft.Data.Sqlite;
 using Weir.Core.Activity;
-using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Processing;
-using Weir.Core.Rules;
 using Weir.Infrastructure.IO;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
 
-/// <summary>What a watched-folder walk found, and what it decided not to look at.</summary>
-public sealed record WatchedFolderScanCandidates(
-    IReadOnlyList<string> Files,
-    int IgnoredUnsupportedType,
-    IReadOnlyList<string> IgnoredUnsupportedExtensions);
-
 /// <summary>
-/// Filesystem scan helpers and duplicate guards for watched-folder remux scan dispatch: the disk-touching
-/// half of the scan rules (#537), such as checking a candidate file exists and walking the watched folder tree.
+/// Filesystem helpers and duplicate guards for watched-folder remux scan dispatch: the disk-touching half of the scan rules
+/// (#537) that look at one file, its completed output or its library's folders.
 /// </summary>
 public static class WatchedFolderScanOps
 {
-    /// <summary>Files that legitimately sit beside media and are not a failed attempt at it.</summary>
-    private static readonly HashSet<string> NonMediaCompanionSuffixes = new(StringComparer.Ordinal)
-    {
-        ".srt", ".sub", ".idx", ".ass", ".ssa", ".vtt", ".sup", ".nfo", ".txt", ".md", ".log", ".xml", ".json",
-        ".yml", ".yaml", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".tbn", ".bmp", ".par2", ".sfv", ".nzb",
-        ".torrent", ".url", ".db", ".ini", ".bak", ".mp3", ".flac", ".m4a", ".aac", ".ac3", ".dts", ".ogg", ".wav",
-        ".part", ".partial", ".crdownload", ".downloading", ".tmp", ".!ut", ".!qb",
-    };
-
-    private static readonly HashSet<string> DefaultTransientDownloadDirMarkers = new(StringComparer.Ordinal)
-    {
-        ".sabnzbd", "__admin__", "_failed_", "_unpack_", "_repair_", "incomplete",
-    };
-
-    /// <summary>Whether the path is an existing file with a media extension (the allowlist itself is
-    /// <see cref="RemuxRules.MediaExtensions"/>).</summary>
-    public static bool IsProcessingMediaCandidate(string path)
-    {
-        try
-        {
-            return File.Exists(path) && RemuxRules.MediaExtensions.Contains(Path.GetExtension(path).ToLowerInvariant());
-        }
-        catch (IOException)
-        {
-            return false;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return false;
-        }
-    }
-
-    /// <summary>Whether the path looks like a download client's in-progress artifact: a hash-named file, or a
-    /// file under a folder named by one of the exclude markers.</summary>
-    public static bool IsTransientDownloadArtifactMediaPath(string path, IReadOnlyCollection<string>? excludeMarkers)
-    {
-        var stem = Path.GetFileNameWithoutExtension(path).Trim();
-        if (stem.Length is >= 32 and <= 64 && stem.All(Uri.IsHexDigit))
-        {
-            return true;
-        }
-
-        var parts = path.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries)
-            .Select(p => p.Trim().ToLowerInvariant()).ToHashSet(StringComparer.Ordinal);
-        var markers = excludeMarkers is { Count: > 0 }
-            ? excludeMarkers.Select(m => m.Trim().ToLowerInvariant()).Where(m => m.Length > 0).ToHashSet(StringComparer.Ordinal)
-            : DefaultTransientDownloadDirMarkers;
-        return parts.Overlaps(markers);
-    }
-
-    /// <summary>Candidate files under <paramref name="watchedRoot"/>,
-    /// plus a count of what the allowlist rejected. Files only; directories are never returned.</summary>
-    public static WatchedFolderScanCandidates IterWatchedFolderMediaCandidates(
-        string watchedRoot,
-        IReadOnlyCollection<string>? mediaExtensions,
-        IReadOnlyCollection<string>? excludeMarkers,
-        bool excludeHidden,
-        bool topLevelOnly)
-    {
-        var root = Path.GetFullPath(watchedRoot);
-        var found = new List<string>();
-        var rejected = 0;
-        var rejectedSuffixes = new SortedSet<string>(StringComparer.Ordinal);
-        HashSet<string>? configuredExtensions = null;
-        if (mediaExtensions is { Count: > 0 })
-        {
-            configuredExtensions = mediaExtensions
-                .Select(v => v.Trim())
-                .Where(v => v.Length > 0)
-                .Select(v => v.StartsWith('.') ? v.ToLowerInvariant() : "." + v.ToLowerInvariant())
-                .ToHashSet(StringComparer.Ordinal);
-        }
-
-        IEnumerable<string> Walk()
-        {
-            var option = topLevelOnly ? SearchOption.TopDirectoryOnly : SearchOption.AllDirectories;
-            try
-            {
-                return Directory.EnumerateFileSystemEntries(root, "*", option);
-            }
-            catch (IOException)
-            {
-                return [];
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return [];
-            }
-        }
-
-        foreach (var p in Walk().OrderBy(p => p, StringComparer.Ordinal))
-        {
-            if (!File.Exists(p))
-            {
-                continue;
-            }
-
-            string relative;
-            try
-            {
-                relative = Path.GetRelativePath(root, Path.GetFullPath(p));
-            }
-            catch (ArgumentException)
-            {
-                continue;
-            }
-
-            if (relative.StartsWith("..", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var relativeParts = relative.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
-            if (excludeHidden && relativeParts.Any(part => part.StartsWith('.')))
-            {
-                continue;
-            }
-
-            if (IsTransientDownloadArtifactMediaPath(p, excludeMarkers))
-            {
-                continue;
-            }
-
-            var suffix = Path.GetExtension(p).ToLowerInvariant();
-            var accepted = configuredExtensions is not null ? configuredExtensions.Contains(suffix) : IsProcessingMediaCandidate(p);
-            if (!accepted)
-            {
-                if (suffix.Length > 0 && !NonMediaCompanionSuffixes.Contains(suffix))
-                {
-                    rejected++;
-                    rejectedSuffixes.Add(suffix);
-                }
-
-                continue;
-            }
-
-            found.Add(p);
-        }
-
-        return new WatchedFolderScanCandidates(found, rejected, [.. rejectedSuffixes]);
-    }
-
     /// <summary>The file's path relative to the watched folder, with forward slashes.</summary>
     public static string RelativePosixPathUnderWatched(string watchedRoot, string filePath) =>
         Path.GetRelativePath(Path.GetFullPath(watchedRoot), Path.GetFullPath(filePath)).Replace('\\', '/');
-
-    /// <summary>Whether a pending or leased remux pass already names this file.</summary>
-    public static async Task<bool> ActiveRemuxPassExistsForRelativePathAsync(
-        UnitOfWork uow, string relativePosix, string mediaScope, long? libraryId, long? excludeJobId = null)
-    {
-        var wantScope = ProcessingMediaScopes.Normalize(mediaScope);
-        var rows = await uow.QueryAsync(
-            "SELECT id, payload_json FROM jobs WHERE job_kind = @kind AND status IN ('pending', 'leased')",
-            reader => (Id: reader.GetInt64(0), PayloadJson: reader.IsDBNull(1) ? null : reader.GetString(1)),
-            ("@kind", RequeueStore.RemuxPassJobKind)).ConfigureAwait(false);
-
-        foreach (var (id, payloadJson) in rows)
-        {
-            if (excludeJobId is { } exclude && id == exclude)
-            {
-                continue;
-            }
-
-            if (PayloadNamesFile(payloadJson, relativePosix, wantScope, libraryId))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// When a pending remux pass for this file is held back to a later time, that time; otherwise null. A pass is held back
-    /// for another look at a file that would not read to the end (#646) or a hand-off waiting out its minimum age (#632).
-    /// </summary>
-    public static async Task<DateTimeOffset?> HeldBackRemuxPassStartsAtAsync(
-        UnitOfWork uow, string relativePosix, string mediaScope, long? libraryId, DateTimeOffset now)
-    {
-        ArgumentNullException.ThrowIfNull(uow);
-        var wantScope = ProcessingMediaScopes.Normalize(mediaScope);
-        var rows = await uow.QueryAsync(
-            "SELECT payload_json, not_before FROM jobs WHERE job_kind = @kind AND status = 'pending' " +
-            "AND not_before IS NOT NULL AND julianday(not_before) > julianday(@now)",
-            reader => (PayloadJson: reader.IsDBNull(0) ? null : reader.GetString(0), StartsAt: PythonTimestamps.Parse(reader.GetValue(1))),
-            ("@kind", RequeueStore.RemuxPassJobKind),
-            ("@now", PythonTimestamps.Orm(now))).ConfigureAwait(false);
-
-        DateTimeOffset? earliest = null;
-        foreach (var (payloadJson, startsAt) in rows)
-        {
-            if (startsAt is { } at && (earliest is null || at < earliest) && PayloadNamesFile(payloadJson, relativePosix, wantScope, libraryId))
-            {
-                earliest = at;
-            }
-        }
-
-        return earliest;
-    }
-
-    /// <summary>
-    /// The pending or leased remux pass for this file, if any, read inside the caller's write transaction — the
-    /// one identity every automatic enqueue path agrees on (library, relative path, scope), so a check and the
-    /// insert that depends on it cannot be split by another writer. Oldest first.
-    /// </summary>
-    internal static ProcessingJob? ActiveRemuxPassForRelativePath(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        string relativePosix,
-        string mediaScope,
-        long? libraryId)
-    {
-        var wantScope = ProcessingMediaScopes.Normalize(mediaScope);
-        return ProcessingJobStore.ActiveOfKind(connection, transaction, RequeueStore.RemuxPassJobKind)
-            .FirstOrDefault(job => PayloadNamesFile(job.PayloadJson, relativePosix, wantScope, libraryId));
-    }
-
-    /// <summary>Whether a remux-pass payload names this file: same relative path, same scope, and same library when one is given.</summary>
-    private static bool PayloadNamesFile(string? payloadJson, string relativePosix, string wantScope, long? libraryId)
-    {
-        var raw = (payloadJson ?? string.Empty).Trim();
-        if (raw.Length == 0)
-        {
-            return false;
-        }
-
-        PyJson data;
-        try
-        {
-            data = PyJsonParser.Parse(raw);
-        }
-        catch (PyJsonDecodeException)
-        {
-            return false;
-        }
-
-        if (data is not PyDict dict)
-        {
-            return false;
-        }
-
-        var rel = dict.Get("relative_media_path") is PyStr relStr ? relStr.Value : null;
-        long? jobLibraryId = dict.Get("library_id") is PyInt libInt ? (long)libInt.Value : null;
-        var jobScope = dict.Get("media_scope") is PyStr scopeStr ? ProcessingMediaScopes.Normalize(scopeStr.Value) : ProcessingMediaScopes.Movie;
-        var sameLibrary = libraryId is null || jobLibraryId == libraryId;
-        return rel is not null && rel.Trim() == relativePosix && jobScope == wantScope && sameLibrary;
-    }
 
     private static bool ExistingCompletedOutputPathIsSafe(string path)
     {
@@ -311,14 +58,21 @@ public static class WatchedFolderScanOps
         string? outputRoot,
         string? sourcePath)
     {
+        ArgumentNullException.ThrowIfNull(uow);
         var wantScope = ProcessingMediaScopes.Normalize(mediaScope);
-        var rows = await uow.QueryAsync(
-            "SELECT detail FROM activity_events WHERE module = @module AND event_type = @type AND instr(detail, @needle) > 0 " +
-            "ORDER BY id DESC LIMIT 50",
-            reader => reader.IsDBNull(0) ? null : reader.GetString(0),
-            ("@module", "processing"),
-            ("@type", ActivityEventTypes.ProcessingFileRemuxPassCompleted),
-            ("@needle", relativePosix)).ConfigureAwait(false);
+        // relative_path is indexed and holds the detail's own path as the activity writer stored it (#708). The unary plus keeps
+        // SQLite from choosing an index on module or event type instead, which would read every completion Weir ever recorded.
+        // The path inside each detail is still compared exactly below.
+        var column = ActivityClassifier.RelativePathColumn(relativePosix);
+        List<string?> rows = column is null
+            ? []
+            : await uow.QueryAsync(
+                "SELECT detail FROM activity_events WHERE relative_path = @path AND +module = @module AND +event_type = @type " +
+                "ORDER BY id DESC LIMIT 50",
+                reader => reader.IsDBNull(0) ? null : reader.GetString(0),
+                ("@path", column),
+                ("@module", "processing"),
+                ("@type", ActivityEventTypes.ProcessingFileRemuxPassCompleted)).ConfigureAwait(false);
 
         foreach (var raw in rows)
         {
@@ -483,43 +237,23 @@ public static class WatchedFolderScanOps
     }
 
     /// <summary>
-    /// Confirms the source opens for reading and the output folder accepts a write. The read uses .NET's
-    /// file-share enforcement (the Win32 <c>CreateFileW(FILE_SHARE_READ|FILE_SHARE_DELETE)</c> probe on Windows).
-    /// There is no POSIX <c>flock</c> check: it is advisory and does not catch a writer that never calls
-    /// <c>flock</c> itself.
+    /// Why the source cannot be opened for reading, or null when it can. The read uses .NET's file-share enforcement (the
+    /// Win32 <c>CreateFileW(FILE_SHARE_READ|FILE_SHARE_DELETE)</c> probe on Windows). There is no POSIX <c>flock</c> check: it
+    /// is advisory and does not catch a writer that never calls <c>flock</c> itself.
     /// </summary>
-    public static (bool Ok, string? Problem) CheckFileAccess(bool skipAccessTests, string filePath, string? outputFolder)
+    public static string? SourceReadProblem(string filePath)
     {
-        if (skipAccessTests)
-        {
-            return (true, null);
-        }
-
         try
         {
             using var handle = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
             var buffer = new byte[1];
             _ = handle.Read(buffer, 0, 1);
+            return null;
         }
-        catch (IOException exception)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            return (false, $"Weir could not open this file for reading — it is usually locked by whatever is still writing it. The system reported: {exception.Message}.");
+            return $"Weir could not open this file for reading — it is usually locked by whatever is still writing it. The system reported: {exception.Message}.";
         }
-        catch (UnauthorizedAccessException exception)
-        {
-            return (false, $"Weir could not open this file for reading — it is usually locked by whatever is still writing it. The system reported: {exception.Message}.");
-        }
-
-        if (outputFolder is not null)
-        {
-            var problem = OutputRootProblem(outputFolder);
-            if (problem is not null)
-            {
-                return (false, problem);
-            }
-        }
-
-        return (true, null);
     }
 
     /// <summary>Resolved folders for one scan.</summary>
@@ -614,7 +348,11 @@ public static class WatchedFolderScanOps
         return null;
     }
 
-    private static string? OutputRootProblem(string outputFolder)
+    /// <summary>
+    /// Why the output folder does not accept a write, or null when it does. It writes and removes a probe file, so a scan
+    /// asks once for the whole folder rather than once per file.
+    /// </summary>
+    public static string? OutputFolderProblem(string outputFolder)
     {
         var probe = Path.Combine(outputFolder, $".weir-write-test-{Environment.ProcessId}");
         try
