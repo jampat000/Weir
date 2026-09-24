@@ -131,7 +131,8 @@ def test_content_rejection_under_reject_policy_reports_rejected_to_deluno_and_re
     source = release / "film.mkv"
     # A video with no audio at all: the release itself is bad. This is a *preflight* content
     # rejection the fake ffmpeg can simulate directly. An unreadable file needs real ffmpeg to
-    # classify (#494/#539 item 1) and is covered in tests/contract/processing/test_real_ffmpeg_known_bugs.py.
+    # classify (#494/#539 item 1) and is covered in
+    # tests/contract/processing/test_real_ffmpeg_classifies_damaged_media.py.
     source.write_bytes(fake_media_bytes(probe(audio_languages=())))
 
     h.post_handoff(admin, handoff_id="handoff-reject-1", source_path=source)

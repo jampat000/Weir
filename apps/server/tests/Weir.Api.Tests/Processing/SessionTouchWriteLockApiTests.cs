@@ -1,6 +1,7 @@
-using System.Diagnostics;
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Tests.Platform;
+using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Time;
 using Weir.Infrastructure.Sqlite;
@@ -16,24 +17,26 @@ namespace Weir.Api.Tests.Processing;
 /// <c>SessionRules.LastSeenTouchGap</c>. That <c>UPDATE</c> opens the request's transaction and takes SQLite's
 /// single write lock, which is only released by the commit in <c>ApiRoutes.RunAsync</c> — after the handler
 /// returns. A handler that then calls <c>ProcessingJobStore</c> opens a second connection and issues
-/// <c>BEGIN IMMEDIATE</c>, which waits out the full
-/// <see cref="SqliteDatabase.BusyTimeoutMilliseconds"/> and throws, because the first connection cannot commit
-/// until the handler returns and the handler cannot return until the second connection does.
+/// <c>BEGIN IMMEDIATE</c>, which would wait on that lock and throw once its busy timeout expired, because the
+/// first connection cannot commit until the handler returns and the handler cannot return until the second
+/// connection does.
 /// </para>
 ///
 /// <para>
 /// Each test ages <c>last_seen_at</c> past the touch gap so the next request is guaranteed to write the
-/// session, then asserts the endpoint answers <em>promptly</em>. A plain status-code assertion would not catch
-/// this: the bug's signature is the right answer 30 seconds late, or a 500 once the busy timeout expires.
+/// session, then asserts the endpoint still <em>succeeds</em>. The server under test runs with
+/// <see cref="ShortBusyTimeoutMilliseconds"/> instead of the production 30 s, so a regression to the deadlock
+/// fails the request (and the test) in well under a second instead of needing a wall-clock stopwatch to
+/// distinguish "slow" from "hung".
 /// </para>
 /// </summary>
 public sealed class SessionTouchWriteLockApiTests
 {
     /// <summary>
-    /// Comfortably under <see cref="SqliteDatabase.BusyTimeoutMilliseconds"/> (30 s) and far above what these
-    /// endpoints need when nothing is contending, so a slow machine cannot turn a pass into a failure.
+    /// Long enough for a real, uncontended write; short enough that a regression to the cross-connection
+    /// deadlock this class guards fails fast instead of costing the suite 30 real seconds per test.
     /// </summary>
-    private static readonly TimeSpan PromptEnough = TimeSpan.FromSeconds(10);
+    private const int ShortBusyTimeoutMilliseconds = 500;
 
     /// <summary>
     /// Longer than the 60 s touch gap and far inside the 14-day idle window, so the next request is certain to
@@ -42,18 +45,17 @@ public sealed class SessionTouchWriteLockApiTests
     private static readonly TimeSpan AgeBy = TimeSpan.FromMinutes(10);
 
     [Fact]
-    public async Task Cancelling_a_pending_job_on_the_request_that_touches_the_session_answers_promptly()
+    public async Task Cancelling_a_pending_job_on_the_request_that_touches_the_session_succeeds()
     {
-        await using var server = await ApiTestClient.StartServerAsync();
+        await using var server = await StartServerAsync();
         await TestDatabase.SeedAdminAsync(server);
         var client = new ApiTestClient(server);
         await client.SignInAsync();
         var jobId = await SeedJobAsync(server, "processing.file.remux_pass.v1:cancel-me", ProcessingJobStatus.Pending);
 
-        var (response, elapsed) = await TimedPostAfterAgeingSessionAsync(server, client, $"/api/v1/processing/jobs/{jobId}/cancel-pending");
+        var response = await PostAfterAgeingSessionAsync(server, client, $"/api/v1/processing/jobs/{jobId}/cancel-pending");
         using (response)
         {
-            AssertPrompt(elapsed, response);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var body = await ApiTestClient.Json(response);
             Assert.Equal(ProcessingJobStatus.Cancelled, body!["status"]!.GetValue<string>());
@@ -63,18 +65,17 @@ public sealed class SessionTouchWriteLockApiTests
     }
 
     [Fact]
-    public async Task Recovering_a_finalize_failed_job_on_the_request_that_touches_the_session_answers_promptly()
+    public async Task Recovering_a_finalize_failed_job_on_the_request_that_touches_the_session_succeeds()
     {
-        await using var server = await ApiTestClient.StartServerAsync();
+        await using var server = await StartServerAsync();
         await TestDatabase.SeedAdminAsync(server);
         var client = new ApiTestClient(server);
         await client.SignInAsync();
         var jobId = await SeedJobAsync(server, "processing.file.remux_pass.v1:recover-me", ProcessingJobStatus.HandlerOkFinalizeFailed);
 
-        var (response, elapsed) = await TimedPostAfterAgeingSessionAsync(server, client, $"/api/v1/processing/jobs/{jobId}/recover-finalize-failed");
+        var response = await PostAfterAgeingSessionAsync(server, client, $"/api/v1/processing/jobs/{jobId}/recover-finalize-failed");
         using (response)
         {
-            AssertPrompt(elapsed, response);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var body = await ApiTestClient.Json(response);
             Assert.Equal(ProcessingJobStatus.Completed, body!["status"]!.GetValue<string>());
@@ -84,9 +85,9 @@ public sealed class SessionTouchWriteLockApiTests
     }
 
     [Fact]
-    public async Task Moving_a_file_to_the_top_on_the_request_that_touches_the_session_answers_promptly()
+    public async Task Moving_a_file_to_the_top_on_the_request_that_touches_the_session_succeeds()
     {
-        await using var server = await ApiTestClient.StartServerAsync();
+        await using var server = await StartServerAsync();
         await TestDatabase.SeedAdminAsync(server);
         var client = new ApiTestClient(server);
         await client.SignInAsync();
@@ -99,10 +100,9 @@ public sealed class SessionTouchWriteLockApiTests
             ProcessingJobStatus.Pending,
             $$"""{"relative_media_path": "{{relativePath}}", "media_scope": "movie", "library_id": {{libraryId}}}""");
 
-        var (response, elapsed) = await TimedPostAfterAgeingSessionAsync(server, client, $"/api/v1/processing/files/{fileId}/move-to-top");
+        var response = await PostAfterAgeingSessionAsync(server, client, $"/api/v1/processing/files/{fileId}/move-to-top");
         using (response)
         {
-            AssertPrompt(elapsed, response);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var body = await ApiTestClient.Json(response);
             Assert.True(body!["moved"]!.GetValue<bool>());
@@ -112,19 +112,18 @@ public sealed class SessionTouchWriteLockApiTests
     }
 
     [Fact]
-    public async Task Requeueing_one_file_on_the_request_that_touches_the_session_answers_promptly()
+    public async Task Requeueing_one_file_on_the_request_that_touches_the_session_succeeds()
     {
-        await using var server = await ApiTestClient.StartServerAsync();
+        await using var server = await StartServerAsync();
         await TestDatabase.SeedAdminAsync(server);
         var client = new ApiTestClient(server);
         await client.SignInAsync();
         var libraryId = await SeedLibraryAsync(server);
         var fileId = await SeedFileAsync(server, libraryId, "Movie (2021)/requeue-me.mkv");
 
-        var (response, elapsed) = await TimedPostAfterAgeingSessionAsync(server, client, $"/api/v1/processing/files/{fileId}/requeue");
+        var response = await PostAfterAgeingSessionAsync(server, client, $"/api/v1/processing/files/{fileId}/requeue");
         using (response)
         {
-            AssertPrompt(elapsed, response);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var body = await ApiTestClient.Json(response);
             Assert.Equal(1, body!["requeued"]!.GetValue<int>());
@@ -138,9 +137,9 @@ public sealed class SessionTouchWriteLockApiTests
     /// every iteration but the first, which is the one the session touch collides with.
     /// </summary>
     [Fact]
-    public async Task Requeueing_many_files_on_the_request_that_touches_the_session_answers_promptly()
+    public async Task Requeueing_many_files_on_the_request_that_touches_the_session_succeeds()
     {
-        await using var server = await ApiTestClient.StartServerAsync();
+        await using var server = await StartServerAsync();
         await TestDatabase.SeedAdminAsync(server);
         var client = new ApiTestClient(server);
         await client.SignInAsync();
@@ -148,10 +147,9 @@ public sealed class SessionTouchWriteLockApiTests
         await SeedFileAsync(server, libraryId, "Movie (2022)/one.mkv");
         await SeedFileAsync(server, libraryId, "Movie (2022)/two.mkv");
 
-        var (response, elapsed) = await TimedPostAfterAgeingSessionAsync(server, client, "/api/v1/processing/files/requeue");
+        var response = await PostAfterAgeingSessionAsync(server, client, "/api/v1/processing/files/requeue");
         using (response)
         {
-            AssertPrompt(elapsed, response);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var body = await ApiTestClient.Json(response);
             Assert.Equal(2, body!["requeued"]!.GetValue<int>());
@@ -161,20 +159,24 @@ public sealed class SessionTouchWriteLockApiTests
     }
 
     /// <summary>
-    /// Fetch the CSRF token first (that request would otherwise spend the touch), age <c>last_seen_at</c> past
-    /// the gap, then time the POST that is now guaranteed to write the session before its handler runs.
+    /// A server whose <see cref="SqliteDatabase"/> uses <see cref="ShortBusyTimeoutMilliseconds"/> instead of
+    /// production's 30 s, so the deadlock this class guards against fails the request quickly if it regresses.
     /// </summary>
-    private static async Task<(HttpResponseMessage Response, TimeSpan Elapsed)> TimedPostAfterAgeingSessionAsync(
-        WeirTestServer server,
-        ApiTestClient client,
-        string path)
+    private static Task<WeirTestServer> StartServerAsync() =>
+        WeirTestServer.StartAsync(
+            [("WEIR_SESSION_SECRET", ApiTestClient.Secret), ("WEIR_PROCESSING_WORKER_COUNT", "0")],
+            configureServices: services => services.AddSingleton(sp =>
+                new SqliteDatabase(sp.GetRequiredService<WeirOptions>().DbPath, busyTimeoutMilliseconds: ShortBusyTimeoutMilliseconds)));
+
+    /// <summary>
+    /// Fetch the CSRF token first (that request would otherwise spend the touch), age <c>last_seen_at</c> past
+    /// the gap, then send the POST that is now guaranteed to write the session before its handler runs.
+    /// </summary>
+    private static async Task<HttpResponseMessage> PostAfterAgeingSessionAsync(WeirTestServer server, ApiTestClient client, string path)
     {
         var csrf = await client.CsrfAsync();
         await AgeSessionAsync(server);
-        var stopwatch = Stopwatch.StartNew();
-        var response = await client.PostAsync(path, new { csrf_token = csrf });
-        stopwatch.Stop();
-        return (response, stopwatch.Elapsed);
+        return await client.PostAsync(path, new { csrf_token = csrf });
     }
 
     private static Task AgeSessionAsync(WeirTestServer server) =>
@@ -198,13 +200,6 @@ public sealed class SessionTouchWriteLockApiTests
             DateTime.UtcNow - parsed.AsUtc < AgeBy,
             "The request did not refresh the session, so it never took the write lock and these tests prove nothing.");
     }
-
-    private static void AssertPrompt(TimeSpan elapsed, HttpResponseMessage response) =>
-        Assert.True(
-            elapsed < PromptEnough,
-            $"The endpoint answered {(int)response.StatusCode} after {elapsed.TotalSeconds:F1}s. The session touch " +
-            $"held the request's write lock while ProcessingJobStore's own connection waited out SQLite's " +
-            $"{SqliteDatabase.BusyTimeoutMilliseconds / 1000}s busy timeout.");
 
     private static Task<long> SeedLibraryAsync(WeirTestServer server) =>
         TestDatabase.ScalarAsync(

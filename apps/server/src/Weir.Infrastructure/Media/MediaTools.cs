@@ -406,7 +406,16 @@ public sealed partial class MediaTools
     /// mangle text on a locale that is not UTF-8 (#539 item 5). The method names it detects (<c>cuda</c>,
     /// <c>qsv</c>, …) are ASCII, so a mangled heading line is simply filtered out.
     /// </remarks>
-    public async Task<AccelerationReport> DetectAccelerationAsync(string ffmpegBin, CancellationToken cancellationToken = default)
+    public Task<AccelerationReport> DetectAccelerationAsync(string ffmpegBin, CancellationToken cancellationToken = default) =>
+        DetectAccelerationAsync(ffmpegBin, TimeSpan.FromSeconds(FfmpegCommands.HwaccelTimeoutSeconds), cancellationToken);
+
+    /// <summary>
+    /// <see cref="DetectAccelerationAsync(string, CancellationToken)"/> with the wait made explicit. Production
+    /// always goes through that overload, which fixes it at <see cref="FfmpegCommands.HwaccelTimeoutSeconds"/> —
+    /// right for a live settings check, too tight for a real build on a CI runner busy with other tests, which
+    /// needs more room without borrowing the UI's own budget (see <c>RealFfmpegTests</c>).
+    /// </summary>
+    internal async Task<AccelerationReport> DetectAccelerationAsync(string ffmpegBin, TimeSpan timeout, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(ffmpegBin);
         var argv = FfmpegCommands.BuildHwaccelsArgv(ffmpegBin);
@@ -417,7 +426,7 @@ public sealed partial class MediaTools
                 new ProcessRequest
                 {
                     Argv = argv,
-                    Timeout = TimeSpan.FromSeconds(FfmpegCommands.HwaccelTimeoutSeconds),
+                    Timeout = timeout,
                     Stdin = ProcessInput.Inherit,
                     Stdout = ProcessOutput.Capture,
                     Stderr = ProcessOutput.Capture,
@@ -431,7 +440,7 @@ public sealed partial class MediaTools
 
         if (result.TimedOut)
         {
-            return HardwareAcceleration.ReportForRunError(ProbeOutput.TimeoutMessage(argv, FfmpegCommands.HwaccelTimeoutSeconds));
+            return HardwareAcceleration.ReportForRunError(ProbeOutput.TimeoutMessage(argv, timeout.TotalSeconds));
         }
 
         var report = HardwareAcceleration.ReportFromHwaccels(result.ExitCode, ProbeOutput.CapturedText(result.Stdout));
@@ -444,10 +453,11 @@ public sealed partial class MediaTools
     }
 
     /// <summary>
-    /// <see cref="DetectAccelerationAsync"/>, asked once per ffmpeg rather than once per file (#716): the methods an
-    /// ffmpeg build was compiled with do not change while it is installed. An answer that could not be read is not
-    /// kept, so the next pass asks again, and every <see cref="DetectAccelerationAsync"/> (the Settings check) replaces
-    /// the kept answer with a fresh one.
+    /// <see cref="DetectAccelerationAsync(string, CancellationToken)"/>, asked once per ffmpeg rather than once per
+    /// file (#716): the methods an ffmpeg build was compiled with do not change while it is installed. An answer
+    /// that could not be read is not kept, so the next pass asks again, and every
+    /// <see cref="DetectAccelerationAsync(string, CancellationToken)"/> (the Settings check) replaces the kept
+    /// answer with a fresh one.
     /// </summary>
     public Task<AccelerationReport> KnownAccelerationAsync(string ffmpegBin, CancellationToken cancellationToken = default)
     {
@@ -497,9 +507,10 @@ public sealed partial class MediaTools
 
     /// <summary>
     /// Runs one <c>--version</c> argv and reduces whatever happened to a single string. The timeout is
-    /// <see cref="FfmpegCommands.HwaccelTimeoutSeconds"/>, the same one <see cref="DetectAccelerationAsync"/>
-    /// uses for the other "ask the tool about itself" call: printing a version does no I/O and no decoding, so
-    /// a tool that has not answered in ten seconds is not going to.
+    /// <see cref="FfmpegCommands.HwaccelTimeoutSeconds"/>, the same one
+    /// <see cref="DetectAccelerationAsync(string, CancellationToken)"/> uses for the other "ask the tool about
+    /// itself" call: printing a version does no I/O and no decoding, so a tool that has not answered in ten
+    /// seconds is not going to.
     /// </summary>
     private async Task<string> DescribeToolVersionAsync(IReadOnlyList<string> argv, CancellationToken cancellationToken)
     {

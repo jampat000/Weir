@@ -36,7 +36,16 @@ DEFAULT_SESSION_SECRET = "contract-suite-session-secret-at-least-32-chars"
 
 
 def _load_runtime() -> ModuleType:
-    """The E2E runtime helpers, loaded by path so this works from any rootdir or import mode."""
+    """The E2E runtime helpers, loaded by path so this works from any rootdir or import mode.
+
+    ``scripts/screenshot-site.py`` reaches the same module with a plain ``from tests.e2e.weir import
+    _runtime`` — but that script always runs standalone with the repo root explicitly put on
+    ``sys.path`` first (see its own top) in the heavier Playwright environment. The contract suite runs
+    under pytest, invoked with different rootdirs and import modes across its own legs and ad hoc local
+    runs, and only ``tests/contract`` (not ``tests/e2e``) is ever passed to pytest, so nothing guarantees
+    ``tests.e2e.weir`` resolves as a package the same way in every one of them. Loading the single file
+    it needs by path sidesteps that entirely instead of depending on it.
+    """
 
     path = REPO_ROOT / "tests" / "e2e" / "weir" / "_runtime.py"
     spec = importlib.util.spec_from_file_location("weir_e2e_runtime_for_contract", path)

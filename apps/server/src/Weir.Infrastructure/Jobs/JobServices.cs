@@ -500,6 +500,7 @@ public sealed class PeriodicEnqueueService : BackgroundService
     private readonly ILogger<PeriodicEnqueueService> _logger;
     private readonly PeriodicEnqueueClock _clock;
     private readonly TimeSpan _recheck;
+    private readonly Action? _onIterationComplete;
 
     /// <summary>How often a timer looks at its family's switch and interval again.</summary>
     public static readonly TimeSpan DefaultRecheck = TimeSpan.FromSeconds(30);
@@ -511,6 +512,24 @@ public sealed class PeriodicEnqueueService : BackgroundService
         ILogger<PeriodicEnqueueService> logger,
         PeriodicEnqueueClock? clock = null,
         TimeSpan? recheck = null)
+        : this(enqueuers, handlers, time, logger, clock, recheck, onIterationComplete: null)
+    {
+    }
+
+    /// <summary>
+    /// For tests: <paramref name="onIterationComplete"/> fires once per family's loop pass, after that pass's
+    /// switch check and any enqueue it made, right before the loop waits again. A test driving a
+    /// <c>FakeTimeProvider</c> can wait on it instead of a fixed real-time sleep to know a specific
+    /// <c>Advance</c> call has actually been acted on, on a thread-pool schedule no test controls.
+    /// </summary>
+    internal PeriodicEnqueueService(
+        IEnumerable<IPeriodicEnqueuer> enqueuers,
+        JobHandlerRegistry handlers,
+        TimeProvider time,
+        ILogger<PeriodicEnqueueService> logger,
+        PeriodicEnqueueClock? clock,
+        TimeSpan? recheck,
+        Action? onIterationComplete)
     {
         _enqueuers = [.. enqueuers];
         _handlers = handlers;
@@ -518,6 +537,7 @@ public sealed class PeriodicEnqueueService : BackgroundService
         _logger = logger;
         _clock = clock ?? new PeriodicEnqueueClock();
         _recheck = recheck ?? DefaultRecheck;
+        _onIterationComplete = onIterationComplete;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -587,6 +607,8 @@ public sealed class PeriodicEnqueueService : BackgroundService
                 var untilDue = due - _time.GetUtcNow();
                 wait = untilDue >= _recheck ? _recheck : untilDue > TimeSpan.Zero ? untilDue : TimeSpan.Zero;
             }
+
+            _onIterationComplete?.Invoke();
 
             try
             {
