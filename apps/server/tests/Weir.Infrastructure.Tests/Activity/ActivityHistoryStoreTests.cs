@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Time.Testing;
 using Weir.Core.Activity;
 using Weir.Core.Json;
 using Weir.Core.Time;
@@ -95,10 +96,17 @@ public sealed class ActivityHistoryStoreTests
         // A raw insert with no unit of work and no ActivityNotifications.Track call, like `weir recover`'s
         // own connection or a restored backup: only the poll, not a commit signal, can tell the notifier.
         // The poll only checks while a stream is open, so this needs one waiting.
+        //
+        // The wait uses a clock that never advances on its own instead of TimeProvider.System: a real timeout
+        // timer races the poll under CI thread-pool contention and can fire before the poll ever runs, failing
+        // the test even though nothing is actually racy (WaitForChangeAsync registers the waiter synchronously,
+        // before this method's first await, so the poll below always sees it).
         using var fixture = new StoreFixture();
         var notifier = new ActivityLatestNotifier();
         var poll = new ActivityLatestPollTask(fixture.Database, notifier);
-        var waiting = notifier.WaitForChangeAsync(notifier.Snapshot().Version, TimeSpan.FromSeconds(5), TimeProvider.System);
+        var clock = new FakeTimeProvider();
+        var waiting = notifier.WaitForChangeAsync(notifier.Snapshot().Version, TimeSpan.FromSeconds(5), clock);
+        Assert.Equal(1, notifier.WaiterCount);
 
         await fixture.Execute("INSERT INTO activity_events (event_type, module, title) VALUES ('auth.password_changed', 'auth', 'Password changed')");
         var insertedId = await fixture.Scalar("SELECT max(id) FROM activity_events");
