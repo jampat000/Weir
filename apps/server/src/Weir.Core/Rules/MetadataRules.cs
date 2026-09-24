@@ -44,16 +44,16 @@ public static class MetadataStreams
     {
         ArgumentNullException.ThrowIfNull(stream);
         var disposition = stream.Get("disposition");
-        if (Py.IsDict(disposition))
+        if (RulesJson.IsDict(disposition))
         {
-            var attachedPic = Py.Get(disposition!.Value, "attached_pic");
-            if (Py.Truthy(attachedPic) && Py.Int(attachedPic) != 0)
+            var attachedPic = RulesJson.Get(disposition!.Value, "attached_pic");
+            if (RulesJson.Truthy(attachedPic) && RulesJson.Int(attachedPic) != 0)
             {
                 return true;
             }
         }
 
-        var codec = Py.Lower(PyStrings.Strip(Py.StrOr(stream.Get("codec_name"), string.Empty)));
+        var codec = RulesJson.Lower(WireStrings.Strip(RulesJson.StrOr(stream.Get("codec_name"), string.Empty)));
         if (!ImageCodecs.Contains(codec))
         {
             return false;
@@ -61,12 +61,12 @@ public static class MetadataStreams
 
         // A codec alone is not proof: a single frame, or a stream with no frame rate, is a still.
         var frames = stream.Get("nb_frames");
-        if (!Py.IsNone(frames) && Py.TryInt(frames, out var frameCount) && frameCount <= 1)
+        if (!RulesJson.IsNone(frames) && RulesJson.TryInt(frames, out var frameCount) && frameCount <= 1)
         {
             return true;
         }
 
-        var rate = PyStrings.Strip(Py.StrOr(stream.Get("avg_frame_rate"), string.Empty));
+        var rate = WireStrings.Strip(RulesJson.StrOr(stream.Get("avg_frame_rate"), string.Empty));
         return rate is "" or "0/0" or "0/1";
     }
 
@@ -74,7 +74,7 @@ public static class MetadataStreams
     public static bool IsAttachmentStream(ProbeStreamInfo stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
-        return Py.Lower(PyStrings.Strip(Py.StrOr(stream.Get("codec_type"), string.Empty))) == "attachment";
+        return RulesJson.Lower(WireStrings.Strip(RulesJson.StrOr(stream.Get("codec_type"), string.Empty))) == "attachment";
     }
 
     /// <summary>(real video, embedded images). A file of nothing but images keeps its first stream as the picture.</summary>
@@ -99,10 +99,10 @@ public static class MetadataStreams
     public static string DescribeImageStream(ProbeStreamInfo stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
-        var codec = PyStrings.Strip(Py.StrOr(stream.Get("codec_name"), "unknown"));
+        var codec = WireStrings.Strip(RulesJson.StrOr(stream.Get("codec_name"), "unknown"));
         var width = stream.Get("width");
         var height = stream.Get("height");
-        var size = Py.Truthy(width) && Py.Truthy(height) ? $"{Py.Str(width)}x{Py.Str(height)}" : "unknown size";
+        var size = RulesJson.Truthy(width) && RulesJson.Truthy(height) ? $"{RulesJson.Str(width)}x{RulesJson.Str(height)}" : "unknown size";
         return $"embedded image ({codec}, {size})";
     }
 
@@ -111,11 +111,11 @@ public static class MetadataStreams
         ArgumentNullException.ThrowIfNull(stream);
         var tags = stream.Get("tags");
         var name = string.Empty;
-        if (Py.IsDict(tags))
+        if (RulesJson.IsDict(tags))
         {
-            var filename = Py.Get(tags!.Value, "filename");
-            var chosen = Py.Truthy(filename) ? filename : Py.Get(tags.Value, "title");
-            name = PyStrings.Strip(Py.StrOr(chosen, string.Empty));
+            var filename = RulesJson.Get(tags!.Value, "filename");
+            var chosen = RulesJson.Truthy(filename) ? filename : RulesJson.Get(tags.Value, "title");
+            name = WireStrings.Strip(RulesJson.StrOr(chosen, string.Empty));
         }
 
         return name.Length > 0 ? $"attachment ({name})" : "attachment";

@@ -8,10 +8,10 @@ namespace Weir.Core.Processing.RemuxPass;
 public static class RemuxPassMedia
 {
     /// <summary>The value as text, or empty when it is missing, null, false, zero or empty.</summary>
-    public static string TruthyText(JsonElement? value) => Py.Truthy(value) ? Py.Str(value) : string.Empty;
+    public static string TruthyText(JsonElement? value) => RulesJson.Truthy(value) ? RulesJson.Str(value) : string.Empty;
 
     /// <summary>The value as an integer, or 0 when it is empty or not a number.</summary>
-    public static long IntegerOrZero(JsonElement? value) => Py.Truthy(value) && Py.TryInt(value, out var parsed) ? parsed : 0;
+    public static long IntegerOrZero(JsonElement? value) => RulesJson.Truthy(value) && RulesJson.TryInt(value, out var parsed) ? parsed : 0;
 
     /// <summary>(width, height) of the largest video stream, by <c>width</c>/<c>coded_width</c>.</summary>
     public static (long? Width, long? Height) VideoDimensions(IReadOnlyList<ProbeStreamInfo> videoStreams) =>
@@ -24,7 +24,7 @@ public static class RemuxPassMedia
         {
             foreach (var key in keys)
             {
-                if (!Py.TryInt(stream.Get(key), out var value))
+                if (!RulesJson.TryInt(stream.Get(key), out var value))
                 {
                     continue;
                 }
@@ -45,9 +45,9 @@ public static class RemuxPassMedia
     {
         ArgumentNullException.ThrowIfNull(probe);
         var candidates = new List<double>();
-        if (probe.Json.ValueKind == JsonValueKind.Object && Py.Get(probe.Json, "format") is { ValueKind: JsonValueKind.Object } format)
+        if (probe.Json.ValueKind == JsonValueKind.Object && RulesJson.Get(probe.Json, "format") is { ValueKind: JsonValueKind.Object } format)
         {
-            AddFloat(candidates, Py.Get(format, "duration"));
+            AddFloat(candidates, RulesJson.Get(format, "duration"));
         }
 
         foreach (var stream in probe.Streams)
@@ -62,7 +62,7 @@ public static class RemuxPassMedia
     /// <summary>Add the value as a number: 0 when empty, nothing at all when it cannot be read as one.</summary>
     private static void AddFloat(List<double> candidates, JsonElement? value)
     {
-        if (!Py.Truthy(value))
+        if (!RulesJson.Truthy(value))
         {
             candidates.Add(0);
             return;
@@ -77,7 +77,7 @@ public static class RemuxPassMedia
             case JsonValueKind.True:
                 candidates.Add(1);
                 break;
-            case JsonValueKind.String when Py.TryFloatFromText(element.GetString()!) is { } parsed:
+            case JsonValueKind.String when RulesJson.TryFloatFromText(element.GetString()!) is { } parsed:
                 candidates.Add(parsed);
                 break;
         }
@@ -90,8 +90,8 @@ public static class RemuxPassMedia
         var raw = stream.Get("bits_per_raw_sample");
         if (raw is { } element && element.ValueKind is JsonValueKind.String or JsonValueKind.Number)
         {
-            var text = PyStrings.Strip(Py.Str(raw));
-            if (text.Length > 0 && text.All(char.IsAsciiDigit) && Py.TryInt(raw, out var bits) && bits > 0)
+            var text = WireStrings.Strip(RulesJson.Str(raw));
+            if (text.Length > 0 && text.All(char.IsAsciiDigit) && RulesJson.TryInt(raw, out var bits) && bits > 0)
             {
                 return bits;
             }
@@ -152,14 +152,14 @@ public static class RemuxPassMedia
 
     private static string Language(ProbeStreamInfo stream)
     {
-        if (stream.Get("tags") is { ValueKind: JsonValueKind.Object } tags && Py.Get(tags, "language") is { } language && Py.Truthy(language))
+        if (stream.Get("tags") is { ValueKind: JsonValueKind.Object } tags && RulesJson.Get(tags, "language") is { } language && RulesJson.Truthy(language))
         {
-            return Py.Str(language);
+            return RulesJson.Str(language);
         }
 
         return "und";
     }
 
     private static bool Flag(ProbeStreamInfo stream, string name) =>
-        stream.Get("disposition") is { ValueKind: JsonValueKind.Object } disposition && Py.Truthy(Py.Get(disposition, name));
+        stream.Get("disposition") is { ValueKind: JsonValueKind.Object } disposition && RulesJson.Truthy(RulesJson.Get(disposition, name));
 }

@@ -61,7 +61,7 @@ public static class SuiteConfigurationEndpoints
 
         request.RequireConfirmationToken(csrfToken);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        PyDict output;
+        WireObject output;
         SuiteSettingsRecord updated;
         try
         {
@@ -73,7 +73,7 @@ public static class SuiteConfigurationEndpoints
             updated = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
             output = SuiteSettingsRules.BuildOut(updated);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new ApiException(StatusCodes.Status400BadRequest, exception.Message);
         }
@@ -113,7 +113,7 @@ public static class SuiteConfigurationEndpoints
         {
             return ApiRoutes.Ok(await ConfigurationBundleStore.BuildAsync(uow).ConfigureAwait(false));
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new ApiException(StatusCodes.Status500InternalServerError, exception.Message);
         }
@@ -136,7 +136,7 @@ public static class SuiteConfigurationEndpoints
         {
             await ConfigurationBundleStore.ApplyAsync(uow, bundle, request.Service<ITimeZoneResolver>(), request.Options.WeirHome).ConfigureAwait(false);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new ApiException(StatusCodes.Status400BadRequest, exception.Message);
         }
@@ -152,9 +152,9 @@ public static class SuiteConfigurationEndpoints
         var uow = await request.DbAsync().ConfigureAwait(false);
         var backups = request.Service<ConfigurationBackups>();
         var rows = await ConfigurationBackups.ListAsync(uow).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("directory", backups.Directory)
-            .Set("items", new PyList(rows.Select(row => (PyJson)ConfigurationBackups.ItemOut(row)))));
+            .Set("items", new WireArray(rows.Select(row => (WireValue)ConfigurationBackups.ItemOut(row)))));
     }
 
     private static async Task<ApiResult> DownloadBackupAsync(ApiRequest request)
@@ -170,7 +170,7 @@ public static class SuiteConfigurationEndpoints
         {
             (path, row) = await request.Service<ConfigurationBackups>().GetFileAsync(uow, backupId).ConfigureAwait(false);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new ApiException(StatusCodes.Status404NotFound, exception.Message);
         }
@@ -189,7 +189,7 @@ public static class SuiteConfigurationEndpoints
         var mtimeTicks = info.LastWriteTimeUtc.Ticks - DateTime.UnixEpoch.Ticks;
         var mtime = (mtimeTicks / TimeSpan.TicksPerSecond) + ((mtimeTicks % TimeSpan.TicksPerSecond) * 100 * 1e-9);
 #pragma warning disable CA5351 // The ETag is an MD5 of mtime and size; it is not a security control.
-        var etag = Convert.ToHexStringLower(MD5.HashData(Encoding.UTF8.GetBytes(PyJsonWriter.FloatRepr(mtime) + "-" + info.Length.ToString(CultureInfo.InvariantCulture))));
+        var etag = Convert.ToHexStringLower(MD5.HashData(Encoding.UTF8.GetBytes(WireJsonWriter.FloatRepr(mtime) + "-" + info.Length.ToString(CultureInfo.InvariantCulture))));
 #pragma warning restore CA5351
         var quoted = Uri.EscapeDataString(fileName);
         context.Response.StatusCode = StatusCodes.Status200OK;

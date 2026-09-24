@@ -258,9 +258,9 @@ public static class SqliteValues
         return exception.SqliteErrorCode == SqliteConstraint;
     }
 
-    public static object ToSqlite(PyDateTime value) => value.ToSqlite();
+    public static object ToSqlite(Timestamp value) => value.ToSqlite();
 
-    public static object ToSqlite(PyDateTime? value) => value is { } v ? v.ToSqlite() : DBNull.Value;
+    public static object ToSqlite(Timestamp? value) => value is { } v ? v.ToSqlite() : DBNull.Value;
 
     public static string? GetStringOrNull(SqliteDataReader reader, int ordinal)
     {
@@ -293,11 +293,11 @@ public static class SqliteValues
     public static bool? GetBoolOrNull(SqliteDataReader reader, int ordinal)
     {
         ArgumentNullException.ThrowIfNull(reader);
-        return reader.IsDBNull(ordinal) ? null : PyConvert.FromDatabase(reader.GetValue(ordinal)).IsTruthy;
+        return reader.IsDBNull(ordinal) ? null : WireConvert.FromDatabase(reader.GetValue(ordinal)).IsTruthy;
     }
 
     /// <summary>A stored timestamp, parsed from its ISO 8601 text; a value that does not parse throws.</summary>
-    public static PyDateTime? GetDateTimeOrNull(SqliteDataReader reader, int ordinal)
+    public static Timestamp? GetDateTimeOrNull(SqliteDataReader reader, int ordinal)
     {
         ArgumentNullException.ThrowIfNull(reader);
         if (reader.IsDBNull(ordinal))
@@ -306,11 +306,11 @@ public static class SqliteValues
         }
 
         var text = Convert.ToString(reader.GetValue(ordinal), CultureInfo.InvariantCulture) ?? string.Empty;
-        return PyDateTime.TryFromIsoFormat(text, out var value)
+        return Timestamp.TryFromIsoFormat(text, out var value)
             ? value
-            : throw new FormatException($"Invalid isoformat string: {PyStrings.Repr(text)}");
+            : throw new FormatException($"Invalid isoformat string: {WireStrings.Repr(text)}");
     }
 
-    public static PyDateTime GetDateTime(SqliteDataReader reader, int ordinal) =>
+    public static Timestamp GetDateTime(SqliteDataReader reader, int ordinal) =>
         GetDateTimeOrNull(reader, ordinal) ?? throw new FormatException("A required timestamp column is NULL.");
 }

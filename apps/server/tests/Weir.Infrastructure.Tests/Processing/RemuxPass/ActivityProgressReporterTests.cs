@@ -16,14 +16,14 @@ public sealed class ActivityProgressReporterTests
 {
     private readonly FakeTimeProvider _time = new();
     private readonly LiveProgressStore _liveProgress = new();
-    private readonly Channel<PyDict> _saved = Channel.CreateUnbounded<PyDict>();
+    private readonly Channel<WireObject> _saved = Channel.CreateUnbounded<WireObject>();
 
-    private ActivityProgressReporter Reporter(Func<PyDict, Task>? save = null) =>
-        new(save ?? (body => _saved.Writer.WriteAsync(body).AsTask()), jobId: 7, new PyDict().Set("trigger", "scan").Set("relative_media_path", "Film/Film.mkv"), _time, _liveProgress);
+    private ActivityProgressReporter Reporter(Func<WireObject, Task>? save = null) =>
+        new(save ?? (body => _saved.Writer.WriteAsync(body).AsTask()), jobId: 7, new WireObject().Set("trigger", "scan").Set("relative_media_path", "Film/Film.mkv"), _time, _liveProgress);
 
-    private static PyDict Writing(double percent) => new PyDict().Set("status", "processing").Set("percent", percent);
+    private static WireObject Writing(double percent) => new WireObject().Set("status", "processing").Set("percent", percent);
 
-    private static double Percent(PyDict body) => ((PyFloat)body.Get("percent")!).Value;
+    private static double Percent(WireObject body) => ((WireNumber)body.Get("percent")!).Value;
 
     [Fact]
     public async Task The_first_report_is_saved_at_once_with_the_job_and_its_provenance()
@@ -33,8 +33,8 @@ public sealed class ActivityProgressReporterTests
         reporter.Report(Writing(10));
 
         var saved = await _saved.Reader.ReadAsync();
-        Assert.Equal(7L, (long)((PyInt)saved.Get("job_id")!).Value);
-        Assert.Equal("scan", ((PyStr)saved.Get("trigger")!).Value);
+        Assert.Equal(7L, (long)((WireInteger)saved.Get("job_id")!).Value);
+        Assert.Equal("scan", ((WireString)saved.Get("trigger")!).Value);
         Assert.Equal(10, Percent(saved));
     }
 
@@ -71,10 +71,10 @@ public sealed class ActivityProgressReporterTests
         reporter.Report(Writing(99));
         await _saved.Reader.ReadAsync();
 
-        reporter.Report(new PyDict().Set("status", "finishing").Set("percent", 100.0));
+        reporter.Report(new WireObject().Set("status", "finishing").Set("percent", 100.0));
 
         var saved = await _saved.Reader.ReadAsync();
-        Assert.Equal("finishing", ((PyStr)saved.Get("status")!).Value);
+        Assert.Equal("finishing", ((WireString)saved.Get("status")!).Value);
     }
 
     [Fact]
@@ -99,7 +99,7 @@ public sealed class ActivityProgressReporterTests
         var reporter = Reporter();
         reporter.Report(Writing(10));
         await _saved.Reader.ReadAsync();
-        reporter.Report(new PyDict().Set("status", "finished").Set("percent", 100.0));
+        reporter.Report(new WireObject().Set("status", "finished").Set("percent", 100.0));
         await _saved.Reader.ReadAsync();
 
         await reporter.CompleteAsync();
@@ -127,7 +127,7 @@ public sealed class ActivityProgressReporterTests
         {
             lock (saved)
             {
-                saved.Add(((PyStr)body.Get("status")!).Value);
+                saved.Add(((WireString)body.Get("status")!).Value);
             }
 
             firstSaveStarted.TrySetResult();
@@ -136,8 +136,8 @@ public sealed class ActivityProgressReporterTests
         reporter.Report(Writing(10));
         await firstSaveStarted.Task;
 
-        reporter.Report(new PyDict().Set("status", "finishing"));
-        reporter.Report(new PyDict().Set("status", "finished"));
+        reporter.Report(new WireObject().Set("status", "finishing"));
+        reporter.Report(new WireObject().Set("status", "finished"));
         saveCanFinish.SetResult();
         await reporter.CompleteAsync();
 
@@ -161,7 +161,7 @@ public sealed class ActivityProgressReporterTests
     {
         var reporter = Reporter();
 
-        reporter.Report(new PyDict().Set("status", "waiting"));
+        reporter.Report(new WireObject().Set("status", "waiting"));
 
         Assert.False(_liveProgress.Snapshot().ContainsKey("Film/Film.mkv"));
     }

@@ -27,7 +27,7 @@ public static class LibraryModeRedownloadsEndpoints
         return endpoints;
     }
 
-    private static PyDict RemovedTrackOut(RemovedTrackRecord track) => new PyDict()
+    private static WireObject RemovedTrackOut(RemovedTrackRecord track) => new WireObject()
         .Set("language", track.Language)
         .Set("type", track.Type == RemovedTrackType.Audio ? "audio" : "subtitle")
         .Set("codec", track.Codec)
@@ -65,11 +65,11 @@ public static class LibraryModeRedownloadsEndpoints
             scannedByPath.TryGetValue(path, out var scanned);
             var titleName = scanned?.ManagerTitle ?? System.IO.Path.GetFileName(path);
             var canRedownload = ManagerRedownloadRules.CanRedownload(scanned?.ManagerKind, scanned?.ManagerConnectionId, scanned?.ManagerTitleId);
-            return new PyDict()
+            return new WireObject()
                 .Set("path", path)
                 .Set("manager_kind", scanned?.ManagerKind)
                 .Set("manager_title", scanned?.ManagerTitle)
-                .Set("removed_tracks", new PyList(result.TracksNowWanted.Select(t => (PyJson)RemovedTrackOut(t))))
+                .Set("removed_tracks", new WireArray(result.TracksNowWanted.Select(t => (WireValue)RemovedTrackOut(t))))
                 .Set("can_redownload", canRedownload)
                 .Set("confirmation_message", canRedownload ? ManagerRedownloadRules.DestructiveConfirmation(titleName, null) : null)
                 .Set("unavailable_reason", canRedownload
@@ -79,9 +79,9 @@ public static class LibraryModeRedownloadsEndpoints
                         : ManagerRedownloadRules.NoManagerMessage));
         }).ToList();
 
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("library_id", libraryId)
-            .Set("titles", new PyList(items.Select(i => (PyJson)i)))
+            .Set("titles", new WireArray(items.Select(i => (WireValue)i)))
             .Set("total", items.Count));
     }
 
@@ -121,7 +121,7 @@ public static class LibraryModeRedownloadsEndpoints
         if (!ManagerRedownloadRules.CanRedownload(scanned?.ManagerKind, scanned?.ManagerConnectionId, scanned?.ManagerTitleId))
         {
             await request.CommitAsync().ConfigureAwait(false);
-            return ApiRoutes.Ok(new PyDict().Set("path", path).Set("outcome", "unsupported").Set("message", ManagerRedownloadRules.NoManagerMessage));
+            return ApiRoutes.Ok(new WireObject().Set("path", path).Set("outcome", "unsupported").Set("message", ManagerRedownloadRules.NoManagerMessage));
         }
 
         var connections = await request.Service<MediaManagerConnectionService>().ConnectionsByIdAsync(uow, [scanned!.ManagerConnectionId!.Value]).ConfigureAwait(false);
@@ -129,7 +129,7 @@ public static class LibraryModeRedownloadsEndpoints
         await request.CommitAsync().ConfigureAwait(false);
         if (connection is null)
         {
-            return ApiRoutes.Ok(new PyDict().Set("path", path).Set("outcome", "unsupported").Set("message", ManagerRedownloadRules.NoManagerMessage));
+            return ApiRoutes.Ok(new WireObject().Set("path", path).Set("outcome", "unsupported").Set("message", ManagerRedownloadRules.NoManagerMessage));
         }
 
         RedownloadResult result;
@@ -141,7 +141,7 @@ public static class LibraryModeRedownloadsEndpoints
         }
         catch (Exception exception) when (exception is MediaManagerHttpException or MediaManagerUnreachableException)
         {
-            return ApiRoutes.Ok(new PyDict()
+            return ApiRoutes.Ok(new WireObject()
                 .Set("path", path)
                 .Set("outcome", "failed")
                 .Set("message", $"Weir could not ask {connection.Label} to download this again: {exception.Message}"));
@@ -153,6 +153,6 @@ public static class LibraryModeRedownloadsEndpoints
             RedownloadOutcome.DeletedButSearchFailed => "deleted_but_search_failed",
             _ => "unsupported",
         };
-        return ApiRoutes.Ok(new PyDict().Set("path", path).Set("outcome", outcome).Set("message", result.Summary));
+        return ApiRoutes.Ok(new WireObject().Set("path", path).Set("outcome", outcome).Set("message", result.Summary));
     }
 }

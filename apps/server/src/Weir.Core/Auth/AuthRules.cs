@@ -26,11 +26,11 @@ public sealed record UserSessionRecord(
     string Id,
     long UserId,
     string TokenHash,
-    PyDateTime CreatedAt,
-    PyDateTime AbsoluteExpiresAt,
+    Timestamp CreatedAt,
+    Timestamp AbsoluteExpiresAt,
     bool IsTrustedDevice,
-    PyDateTime LastSeenAt,
-    PyDateTime? RevokedAt,
+    Timestamp LastSeenAt,
+    Timestamp? RevokedAt,
     string ClientLabel)
 {
     /// <summary>The hyphenated UUID form the API shows.</summary>
@@ -153,7 +153,7 @@ public static class SessionRules
             platform = "Linux";
         }
 
-        return PyStrings.Slice($"{browser} on {platform}", 80);
+        return WireStrings.Slice($"{browser} on {platform}", 80);
     }
 
     /// <summary>Whether the session cookie gets <c>Secure</c>: in auto mode, only for a request that arrived over HTTPS.</summary>

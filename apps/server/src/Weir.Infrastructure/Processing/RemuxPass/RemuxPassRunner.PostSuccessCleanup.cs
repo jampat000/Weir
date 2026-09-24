@@ -6,13 +6,13 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 public sealed partial class RemuxPassRunner
 {
     /// <summary>Copies the source's sidecars to the output before any source cleanup can delete them.</summary>
-    private async Task MigrateSidecarsBeforeCleanupAsync(string src, string? finalOutputFile, IReadOnlyList<string> patterns, bool preserveTimestamps, PyDict output)
+    private async Task MigrateSidecarsBeforeCleanupAsync(string src, string? finalOutputFile, IReadOnlyList<string> patterns, bool preserveTimestamps, WireObject output)
     {
-        OutputFolderCleanup.SetDefault(output, "sidecars_migrated", new PyList());
-        OutputFolderCleanup.SetDefault(output, "sidecars_skipped", new PyList());
-        OutputFolderCleanup.SetDefault(output, "sidecar_migration_blocked", PyBool.False);
-        OutputFolderCleanup.SetDefault(output, "sidecar_migration_blocked_reason", PyNull.Instance);
-        OutputFolderCleanup.SetDefault(output, "original_timestamps_note", PyNull.Instance);
+        OutputFolderCleanup.SetDefault(output, "sidecars_migrated", new WireArray());
+        OutputFolderCleanup.SetDefault(output, "sidecars_skipped", new WireArray());
+        OutputFolderCleanup.SetDefault(output, "sidecar_migration_blocked", WireBool.False);
+        OutputFolderCleanup.SetDefault(output, "sidecar_migration_blocked_reason", WireNull.Instance);
+        OutputFolderCleanup.SetDefault(output, "original_timestamps_note", WireNull.Instance);
         if (finalOutputFile is null || patterns.Count == 0)
         {
             return;
@@ -40,23 +40,23 @@ public sealed partial class RemuxPassRunner
     public const string KeptOriginalReason =
         "This library keeps the original download after cleaning, so Weir left it in the watched folder for your download client.";
 
-    private static void InitFolderCleanupFields(PyDict output)
+    private static void InitFolderCleanupFields(WireObject output)
     {
-        OutputFolderCleanup.SetDefault(output, "source_folder_deleted", PyBool.False);
-        OutputFolderCleanup.SetDefault(output, "source_folder_path", PyNull.Instance);
-        OutputFolderCleanup.SetDefault(output, "source_folder_skip_reason", PyNull.Instance);
-        OutputFolderCleanup.SetDefault(output, "output_completeness_check", PyNull.Instance);
-        OutputFolderCleanup.SetDefault(output, "output_size_bytes", PyNull.Instance);
-        OutputFolderCleanup.SetDefault(output, "source_size_bytes", PyNull.Instance);
-        OutputFolderCleanup.SetDefault(output, "cascade_folders_deleted", new PyList());
-        OutputFolderCleanup.SetDefault(output, "output_completeness_note", PyNull.Instance);
+        OutputFolderCleanup.SetDefault(output, "source_folder_deleted", WireBool.False);
+        OutputFolderCleanup.SetDefault(output, "source_folder_path", WireNull.Instance);
+        OutputFolderCleanup.SetDefault(output, "source_folder_skip_reason", WireNull.Instance);
+        OutputFolderCleanup.SetDefault(output, "output_completeness_check", WireNull.Instance);
+        OutputFolderCleanup.SetDefault(output, "output_size_bytes", WireNull.Instance);
+        OutputFolderCleanup.SetDefault(output, "source_size_bytes", WireNull.Instance);
+        OutputFolderCleanup.SetDefault(output, "cascade_folders_deleted", new WireArray());
+        OutputFolderCleanup.SetDefault(output, "output_completeness_note", WireNull.Instance);
     }
 
     /// <summary>
     /// Source cleanup after a successful pass: Movies may remove the whole release folder and its empty parents; TV hands
     /// over to the season-folder cleanup.
     /// </summary>
-    private async Task HandleCleanupAfterSuccessAsync(PassContext context, PyDict output, string? finalOutputFile, CancellationToken cancellationToken)
+    private async Task HandleCleanupAfterSuccessAsync(PassContext context, WireObject output, string? finalOutputFile, CancellationToken cancellationToken)
     {
         // The library keeps the original download (a torrent still seeding): nothing in the watched folder is touched —
         // not the file, its release or season folder, nor its sidecars, which were copied, never moved. This is the one
@@ -77,8 +77,8 @@ public sealed partial class RemuxPassRunner
             output.Set("source_deleted_after_success", false);
             output.Set("source_folder_skip_reason", output.Get("sidecar_migration_blocked_reason") is { IsTruthy: true } blocked
                 ? blocked
-                : new PyStr("Weir did not remove the source folder because a file set to travel with the video could not be copied."));
-            _logger.LogWarning("Cleanup blocked by sidecar migration: {Reason}", PyConvert.Str(output["source_folder_skip_reason"]));
+                : new WireString("Weir did not remove the source folder because a file set to travel with the video could not be copied."));
+            _logger.LogWarning("Cleanup blocked by sidecar migration: {Reason}", WireConvert.Str(output["source_folder_skip_reason"]));
             return;
         }
 
@@ -117,7 +117,7 @@ public sealed partial class RemuxPassRunner
         }
 
         output.Set("source_folder_path", movieFolder);
-        if (PyStrings.Strip(context.Request.Runtime.OutputFolder ?? string.Empty).Length == 0)
+        if (WireStrings.Strip(context.Request.Runtime.OutputFolder ?? string.Empty).Length == 0)
         {
             const string NoOutput = "No output folder is configured for Movies, so the release folder was not removed.";
             output.Set("output_completeness_check", "skipped");
@@ -137,13 +137,13 @@ public sealed partial class RemuxPassRunner
             }
         }
 
-        if (check.Get("output_completeness_check") is not PyStr { Value: "passed" })
+        if (check.Get("output_completeness_check") is not WireString { Value: "passed" })
         {
             output.Set("source_folder_skip_reason", check.Get("output_completeness_note") is { IsTruthy: true } note
                 ? note
-                : new PyStr("The output file did not pass the safety check, so the release folder was not removed."));
+                : new WireString("The output file did not pass the safety check, so the release folder was not removed."));
             output.Set("source_deleted_after_success", false);
-            _logger.LogWarning("Movies cleanup: skipped — {Reason}", PyConvert.Str(output["source_folder_skip_reason"]));
+            _logger.LogWarning("Movies cleanup: skipped — {Reason}", WireConvert.Str(output["source_folder_skip_reason"]));
             return;
         }
 
@@ -174,14 +174,14 @@ public sealed partial class RemuxPassRunner
 
         output.Set("source_folder_deleted", true);
         output.Set("source_deleted_after_success", true);
-        output.Set("source_folder_skip_reason", PyNull.Instance);
-        var cascade = output.Get("cascade_folders_deleted") as PyList ?? new PyList();
+        output.Set("source_folder_skip_reason", WireNull.Instance);
+        var cascade = output.Get("cascade_folders_deleted") as WireArray ?? new WireArray();
         OutputFolderCleanup.CascadeDeleteEmptyParents(Path.GetDirectoryName(movieFolder)!, watched, cascade, _logger);
         output.Set("cascade_folders_deleted", cascade);
     }
 
     /// <summary>Checks the output exists, is not empty and is not under 1% of the source.</summary>
-    public static PyDict CheckOutputFileCompleteness(string outputFile, string sourceFile, bool tv = false)
+    public static WireObject CheckOutputFileCompleteness(string outputFile, string sourceFile, bool tv = false)
     {
         if (!File.Exists(outputFile))
         {
@@ -218,14 +218,14 @@ public sealed partial class RemuxPassRunner
 
         return Completeness("passed", outSize, srcSize, null);
 
-        static PyDict Completeness(string check, long? output, long? source, string? note) => new PyDict()
+        static WireObject Completeness(string check, long? output, long? source, string? note) => new WireObject()
             .Set("output_completeness_check", check)
             .Set("output_size_bytes", output)
             .Set("source_size_bytes", source)
             .Set("output_completeness_note", note);
     }
 
-    private Task RunScopeOutputCleanupAsync(PassContext context, PyDict output, string? finalOutputFile, CancellationToken cancellationToken) =>
+    private Task RunScopeOutputCleanupAsync(PassContext context, WireObject output, string? finalOutputFile, CancellationToken cancellationToken) =>
         context.Scope == "tv"
             ? _outputCleanup.RunTvAsync(output, context.Request.Runtime, context.WatchedRoot, context.Source, finalOutputFile, context.Request.CurrentJobId, context.Scope, context.Request.Origin, cancellationToken)
             : _outputCleanup.RunMovieAsync(output, context.Request.Runtime, context.WatchedRoot, context.Source, finalOutputFile, context.RelativeMediaPath, context.Request.CurrentJobId, context.Scope, context.Request.Origin, cancellationToken);

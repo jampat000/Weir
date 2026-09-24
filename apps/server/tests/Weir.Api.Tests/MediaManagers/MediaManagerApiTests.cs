@@ -196,7 +196,7 @@ public sealed class MediaManagerApiTests
 
     /// <summary>
     /// #544 item 2: an invalid lane time (an hour past 23, or a value that is not even <c>HH:MM</c>) answered 500
-    /// from an uncaught <c>PyValueErrorException</c>; it is now a 400 naming the field that could not be read.
+    /// from an uncaught <c>WireValueException</c>; it is now a 400 naming the field that could not be read.
     /// </summary>
     [Fact]
     public async Task An_invalid_lane_time_is_a_400_naming_the_field()

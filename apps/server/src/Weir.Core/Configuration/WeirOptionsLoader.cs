@@ -170,7 +170,7 @@ public static class WeirOptionsLoader
             ArrRadarrApiKey = NullIfEmpty(runtime.Get("WEIR_ARR_RADARR_API_KEY")?.Trim()),
             ArrSonarrBaseUrl = NullIfEmpty(HttpUrlOrEmpty(runtime.Get("WEIR_ARR_SONARR_BASE_URL"))),
             ArrSonarrApiKey = NullIfEmpty(runtime.Get("WEIR_ARR_SONARR_API_KEY")?.Trim()),
-            WebDist = webDist.Length == 0 ? null : PythonCompat.Resolve(PythonCompat.ExpandUser(webDist, runtime), runtime),
+            WebDist = webDist.Length == 0 ? null : ValueParsing.Resolve(ValueParsing.ExpandUser(webDist, runtime), runtime),
             VersionOverride = NullIfEmpty(runtime.Get("WEIR_VERSION")?.Trim()),
             RuntimeKind = runtime.Get("WEIR_RUNTIME"),
             OutputOwnershipChownEnabled = outputOwnershipChown,
@@ -229,7 +229,7 @@ public static class WeirOptionsLoader
         foreach (var origin in origins)
         {
             Add(origin);
-            var parsed = PythonCompat.ParseUrl(origin.Trim());
+            var parsed = ValueParsing.ParseUrl(origin.Trim());
             if (parsed.Scheme is not ("http" or "https"))
             {
                 continue;
@@ -268,7 +268,7 @@ public static class WeirOptionsLoader
     internal static long EnvInt(RuntimeEnvironment runtime, string name, long defaultValue)
     {
         var raw = (runtime.Get(name) ?? string.Empty).Trim();
-        return raw.Length > 0 && PythonCompat.TryParseInt(raw, out var value) ? value : defaultValue;
+        return raw.Length > 0 && ValueParsing.TryParseInt(raw, out var value) ? value : defaultValue;
     }
 
     /// <summary>The first of <paramref name="names"/> that is set to a non-blank, parseable integer; <paramref name="defaultValue"/> otherwise.</summary>
@@ -277,7 +277,7 @@ public static class WeirOptionsLoader
         foreach (var name in names)
         {
             var raw = (runtime.Get(name) ?? string.Empty).Trim();
-            if (raw.Length > 0 && PythonCompat.TryParseInt(raw, out var value))
+            if (raw.Length > 0 && ValueParsing.TryParseInt(raw, out var value))
             {
                 return value;
             }

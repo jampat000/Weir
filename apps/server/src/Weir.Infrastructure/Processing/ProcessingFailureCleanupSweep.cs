@@ -52,7 +52,7 @@ public sealed partial class ProcessingFailureCleanupSweep
 
     public Microsoft.Extensions.Logging.ILogger Logger => _logger;
 
-    public async Task<PyDict> RunForScopeAsync(string mediaScope, CancellationToken cancellationToken)
+    public async Task<WireObject> RunForScopeAsync(string mediaScope, CancellationToken cancellationToken)
     {
         var scope = mediaScope == "tv" ? "tv" : "movie";
         var now = _time.GetUtcNow();
@@ -67,7 +67,7 @@ public sealed partial class ProcessingFailureCleanupSweep
             cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<PyDict> RunForScopeAsync(UnitOfWork uow, string scope, DateTimeOffset olderThan, CancellationToken cancellationToken)
+    private async Task<WireObject> RunForScopeAsync(UnitOfWork uow, string scope, DateTimeOffset olderThan, CancellationToken cancellationToken)
     {
         var library = await RemuxPassHandler.ResolveLibraryAsync(uow, null, scope).ConfigureAwait(false);
         string watchedRaw = string.Empty, outputRaw = string.Empty, workRaw = string.Empty;
@@ -80,16 +80,16 @@ public sealed partial class ProcessingFailureCleanupSweep
         }
 
         var workRoot = RemuxPassPaths.Resolve(workRaw.Length == 0 ? "." : workRaw);
-        var outResult = new PyDict()
+        var outResult = new WireObject()
             .Set("media_scope", scope)
             .Set("cleanup_run_status", "started")
             .Set("grace_period_seconds", (long)Math.Max(0, scope == "tv" ? _options.ProcessingTvFailureCleanupGracePeriodSeconds : _options.ProcessingMovieFailureCleanupGracePeriodSeconds))
             .Set("eligible_failed_jobs", 0L)
             .Set("processed_failed_jobs", 0L)
             .Set("skip_reason", (string?)null)
-            .Set("jobs", new PyList());
+            .Set("jobs", new WireArray());
 
-        if (PyStrings.Strip(watchedRaw).Length == 0 || PyStrings.Strip(outputRaw).Length == 0)
+        if (WireStrings.Strip(watchedRaw).Length == 0 || WireStrings.Strip(outputRaw).Length == 0)
         {
             outResult.Set("cleanup_run_status", "skipped");
             outResult.Set("skip_reason", "Saved watched/output paths are not configured for this scope, so failure cleanup was skipped safely.");
@@ -120,19 +120,19 @@ public sealed partial class ProcessingFailureCleanupSweep
             queueUnreachable = report.SilentDetails[0];
         }
 
-        var jobsList = new PyList();
+        var jobsList = new WireArray();
         var processed = 0L;
         foreach (var (jobId, relNorm, legacyDryRun) in failedRows)
         {
-            var detail = new PyDict()
+            var detail = new WireObject()
                 .Set("job_id", jobId)
                 .Set("relative_media_path", relNorm)
                 .Set($"{scope}_failure_cleanup_ran", false)
                 .Set($"{scope}_failure_cleanup_skip_reason", (string?)null)
                 .Set($"{scope}_failure_cleanup_dry_run", legacyDryRun)
                 .Set($"{scope}_failure_cleanup_queue_check", "skipped")
-                .Set($"{scope}_failure_cleanup_temp_files_deleted", new PyList())
-                .Set($"{scope}_failure_cleanup_cascade_folders_deleted", new PyList());
+                .Set($"{scope}_failure_cleanup_temp_files_deleted", new WireArray())
+                .Set($"{scope}_failure_cleanup_cascade_folders_deleted", new WireArray());
             processed++;
             jobsList.Items.Add(detail);
 
@@ -235,7 +235,7 @@ public sealed partial class ProcessingFailureCleanupSweep
         var result = new List<(long, string, bool)>();
         foreach (var row in rows)
         {
-            var updatedAt = PythonTimestamps.Parse(row.UpdatedAt) ?? DateTimeOffset.MinValue;
+            var updatedAt = TimestampColumns.Parse(row.UpdatedAt) ?? DateTimeOffset.MinValue;
             if (updatedAt >= olderThan)
             {
                 continue;
@@ -246,7 +246,7 @@ public sealed partial class ProcessingFailureCleanupSweep
             {
                 parsed = ParseFailedJobPayload(row.Payload);
             }
-            catch (Exception exception) when (exception is FormatException or PyJsonDecodeException)
+            catch (Exception exception) when (exception is FormatException or WireJsonDecodeException)
             {
                 _logger.LogDebug(exception, "Failure cleanup ignored malformed failed-job payload job_id={JobId}", row.Id);
                 continue;
@@ -270,17 +270,17 @@ public sealed partial class ProcessingFailureCleanupSweep
             throw new FormatException("missing payload_json");
         }
 
-        if (PyJsonParser.Parse(payloadJson) is not PyDict data)
+        if (WireJsonParser.Parse(payloadJson) is not WireObject data)
         {
             throw new FormatException("payload_json must be object");
         }
 
-        if (data.Get("relative_media_path") is not PyStr relStr || PyStrings.Strip(relStr.Value).Length == 0)
+        if (data.Get("relative_media_path") is not WireString relStr || WireStrings.Strip(relStr.Value).Length == 0)
         {
             throw new FormatException("payload missing relative_media_path");
         }
 
-        var scope = data.Get("media_scope") is PyStr scopeStr && string.Equals(PyStrings.Strip(scopeStr.Value), "tv", StringComparison.OrdinalIgnoreCase)
+        var scope = data.Get("media_scope") is WireString scopeStr && string.Equals(WireStrings.Strip(scopeStr.Value), "tv", StringComparison.OrdinalIgnoreCase)
             ? "tv"
             : "movie";
         var legacyDryRun = data.Get("dry_run") is { IsTruthy: true };
@@ -290,7 +290,7 @@ public sealed partial class ProcessingFailureCleanupSweep
     /// <summary>A relative path with forward slashes and no empty or <c>.</c> segments.</summary>
     private static string NormRel(string raw)
     {
-        var trimmed = PyStrings.Strip(raw).Replace('\\', '/');
+        var trimmed = WireStrings.Strip(raw).Replace('\\', '/');
         var parts = trimmed.Split('/').Where(part => part.Length > 0 && part != ".").ToArray();
         return parts.Length == 0 ? string.Empty : string.Join('/', parts);
     }

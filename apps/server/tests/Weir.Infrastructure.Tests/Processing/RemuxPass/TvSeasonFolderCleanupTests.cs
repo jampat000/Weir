@@ -21,9 +21,9 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
 
     public void Dispose() => _folders.Dispose();
 
-    private static string Str(PyDict output, string key) => PyConvert.Str(output[key]);
+    private static string Str(WireObject output, string key) => WireConvert.Str(output[key]);
 
-    private static bool Bool(PyDict output, string key) => ((PyBool)output[key]!).Value;
+    private static bool Bool(WireObject output, string key) => ((WireBool)output[key]!).Value;
 
     private static async Task<(StoreFixture Store, TvSeasonFolderCleanup Cleanup, FakeManagerHttp Http, MediaManagerConnectionService Connections, ProcessingJobStore Jobs)> BuildAsync()
     {
@@ -41,18 +41,18 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
     private static void RouteSonarrQueue(FakeManagerHttp http, string recordsJson) =>
         http.Json(HttpMethod.Get, "/api/v3/queue", "{\"records\":" + recordsJson + "}");
 
-    private static PyDict LiveOkContext(string relativeMediaPath) => new PyDict()
+    private static WireObject LiveOkContext(string relativeMediaPath) => new WireObject()
         .Set("ok", true)
         .Set("dry_run", false)
         .Set("outcome", "live_skipped_not_required")
         .Set("relative_media_path", relativeMediaPath);
 
-    private Task<PyDict> RunAsync(
-        TvSeasonFolderCleanup cleanup, string source, long minFileAgeSeconds = 0, long? currentJobId = null, PyDict? remuxContext = null, string? finalOutputFile = null)
+    private Task<WireObject> RunAsync(
+        TvSeasonFolderCleanup cleanup, string source, long minFileAgeSeconds = 0, long? currentJobId = null, WireObject? remuxContext = null, string? finalOutputFile = null)
     {
-        var output = new PyDict();
+        var output = new WireObject();
         var context = new TvSeasonCleanupContext(
-            output, _folders.Runtime(), source, _folders.Watched, minFileAgeSeconds, currentJobId, remuxContext ?? new PyDict(), finalOutputFile);
+            output, _folders.Runtime(), source, _folders.Watched, minFileAgeSeconds, currentJobId, remuxContext ?? new WireObject(), finalOutputFile);
         return cleanup.RunAsync(context, CancellationToken.None).ContinueWith(_ => output, TaskScheduler.Default);
     }
 
@@ -143,8 +143,8 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(_folders.Out("Serie/S01/e.mkv"))!);
         File.WriteAllBytes(_folders.Out("Serie/S01/e.mkv"), Enumerable.Repeat((byte)'y', 100).ToArray());
 
-        var payload = new PyDict().Set("relative_media_path", "Serie/S01/e.mkv").Set("dry_run", false).Set("media_scope", "tv");
-        await jobs.EnqueueOrGetAsync("k1", "processing.file.remux_pass.v1", PyJsonWriter.Dumps(payload, PyJsonFormat.Compact));
+        var payload = new WireObject().Set("relative_media_path", "Serie/S01/e.mkv").Set("dry_run", false).Set("media_scope", "tv");
+        await jobs.EnqueueOrGetAsync("k1", "processing.file.remux_pass.v1", WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
 
         var output = await RunAsync(cleanup, ep, currentJobId: 999, remuxContext: LiveOkContext("Serie/S01/e.mkv"), finalOutputFile: _folders.Out("Serie/S01/e.mkv"));
 
@@ -164,8 +164,8 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(_folders.Out("Serie/S01/e.mkv"))!);
         File.WriteAllBytes(_folders.Out("Serie/S01/e.mkv"), Enumerable.Repeat((byte)'y', 100).ToArray());
 
-        var payload = new PyDict().Set("relative_media_path", "Serie/S01/e.mkv").Set("dry_run", false).Set("media_scope", "movie");
-        await jobs.EnqueueOrGetAsync("km", "processing.file.remux_pass.v1", PyJsonWriter.Dumps(payload, PyJsonFormat.Compact));
+        var payload = new WireObject().Set("relative_media_path", "Serie/S01/e.mkv").Set("dry_run", false).Set("media_scope", "movie");
+        await jobs.EnqueueOrGetAsync("km", "processing.file.remux_pass.v1", WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
 
         var seasonFolder = Path.GetDirectoryName(ep)!;
         var output = await RunAsync(cleanup, ep, currentJobId: 1, remuxContext: LiveOkContext("Serie/S01/e.mkv"), finalOutputFile: _folders.Out("Serie/S01/e.mkv"));
@@ -243,10 +243,10 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(_folders.Out("Serie/S01/e.mkv"))!);
         File.WriteAllBytes(_folders.Out("Serie/S01/e.mkv"), Enumerable.Repeat((byte)'y', 100).ToArray());
 
-        var detail = PyJsonWriter.Dumps(
-            new PyDict().Set("ok", true).Set("dry_run", false).Set("media_scope", "tv")
+        var detail = WireJsonWriter.Dumps(
+            new WireObject().Set("ok", true).Set("dry_run", false).Set("media_scope", "tv")
                 .Set("relative_media_path", "Serie/S01/e.mkv").Set("outcome", "live_skipped_not_required"),
-            PyJsonFormat.Compact);
+            WireJsonFormat.Compact);
         await store.Execute(
             "INSERT INTO activity_events (event_type, module, title, detail) VALUES ('processing.file_remux_pass_completed', 'processing', 't', '" +
             detail.Replace("'", "''", StringComparison.Ordinal) + "')");
@@ -280,7 +280,7 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
         Assert.False(Directory.Exists(seasonFolder));
         Assert.False(Directory.Exists(showFolder));
         Assert.True(Directory.Exists(_folders.Watched));
-        var cascade = ((PyList)output["tv_cascade_folders_deleted"]!).Items;
-        Assert.Contains(cascade, p => ((PyStr)p).Value.Contains("Serie", StringComparison.Ordinal));
+        var cascade = ((WireArray)output["tv_cascade_folders_deleted"]!).Items;
+        Assert.Contains(cascade, p => ((WireString)p).Value.Contains("Serie", StringComparison.Ordinal));
     }
 }

@@ -14,14 +14,14 @@ namespace Weir.Infrastructure.Jobs;
 /// <c>processing_paused_until</c>. Both are read as UTC. Compare them in SQL with <c>julianday()</c>, not as
 /// text, because the two shapes do not sort correctly against each other as strings (#540).
 /// </remarks>
-public static class PythonTimestamps
+public static class TimestampColumns
 {
     /// <summary>The offset shape, fraction omitted when zero: <c>2026-04-10 13:00:00.123456+00:00</c>.</summary>
     public static string Adapter(DateTimeOffset value) =>
-        PyDateTime.FromDateTimeOffset(value.ToUniversalTime()).IsoFormat(' ');
+        Timestamp.FromDateTimeOffset(value.ToUniversalTime()).IsoFormat(' ');
 
     /// <summary>The offset-less shape, microseconds always present: <c>2026-04-10 12:00:30.123456</c>.</summary>
-    public static string Orm(DateTimeOffset value) => PyDateTime.FromDateTimeOffset(value.ToUniversalTime()).ToSqlite();
+    public static string Orm(DateTimeOffset value) => Timestamp.FromDateTimeOffset(value.ToUniversalTime()).ToSqlite();
 
     /// <summary>Read any of the stored shapes (including <c>CURRENT_TIMESTAMP</c>); a value without an offset is UTC.</summary>
     public static DateTimeOffset? Parse(object? value)

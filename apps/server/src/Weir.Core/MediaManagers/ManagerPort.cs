@@ -31,8 +31,8 @@ public static class MediaManagerKinds
     /// <summary>A connection's label, e.g. <c>"Deluno (Main)"</c>; a connection named after its product is not repeated.</summary>
     public static string LabelForConnection(string? kind, string? name)
     {
-        var product = KindLabels.GetValueOrDefault(PyStrings.Strip(kind ?? string.Empty).ToLowerInvariant(), "Media manager");
-        var label = PyStrings.Strip(name ?? string.Empty);
+        var product = KindLabels.GetValueOrDefault(WireStrings.Strip(kind ?? string.Empty).ToLowerInvariant(), "Media manager");
+        var label = WireStrings.Strip(name ?? string.Empty);
         if (label.Length == 0)
         {
             return product;
@@ -59,7 +59,7 @@ public sealed record ManagerConnection(string Kind, string Name, string BaseUrl,
 }
 
 /// <summary>One in-progress item, tagged with the scope whose dialect can read it.</summary>
-public sealed record ManagerQueueRow(string Scope, PyDict Payload);
+public sealed record ManagerQueueRow(string Scope, WireObject Payload);
 
 /// <summary>What one manager said when asked whether it is mid-import. Only reported-and-empty means clear.</summary>
 public sealed record ManagerQueueSignal(ManagerConnection Connection, string Status, IReadOnlyList<ManagerQueueRow> Rows, string? Detail = null)
@@ -210,7 +210,7 @@ public interface IMediaManagerPort
     Task<ManagerQueueSignal> QueueRowsAsync(ManagerConnection connection, CancellationToken cancellationToken = default);
 
     /// <summary>Remove one queue item and blocklist its release. Throws <see cref="MediaManagerHttpException"/> when refused.</summary>
-    Task RemoveQueueItemAsync(ManagerConnection connection, PyDict row, CancellationToken cancellationToken = default);
+    Task RemoveQueueItemAsync(ManagerConnection connection, WireObject row, CancellationToken cancellationToken = default);
 
     Task<ManagerLibraryTruth> LibraryTruthAsync(ManagerConnection connection, string mediaScope, CancellationToken cancellationToken = default);
 

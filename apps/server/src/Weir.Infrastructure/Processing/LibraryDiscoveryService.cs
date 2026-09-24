@@ -58,7 +58,7 @@ public sealed class LibraryDiscoveryService
     /// </summary>
     public static string? LocalPathProblem(string? rootPath)
     {
-        var raw = PyStrings.Strip(rootPath ?? string.Empty);
+        var raw = WireStrings.Strip(rootPath ?? string.Empty);
         if (raw.Length == 0)
         {
             return "The manager did not say where this library lives, so Weir has no folder to watch. " +
@@ -67,12 +67,12 @@ public sealed class LibraryDiscoveryService
 
         if (!LibraryDiscoveryRules.LooksAbsolute(raw))
         {
-            return $"The manager reported {PyStrings.Repr(raw)}, which is not an absolute path Weir can resolve.";
+            return $"The manager reported {WireStrings.Repr(raw)}, which is not an absolute path Weir can resolve.";
         }
 
         if (!Directory.Exists(raw))
         {
-            return $"The manager sees this library at {PyStrings.Repr(raw)}. That path does not exist on the machine " +
+            return $"The manager sees this library at {WireStrings.Repr(raw)}. That path does not exist on the machine " +
                    "running Weir — both hosts have to see the same folder at the same path. Mount it there, or set " +
                    "Weir's own watched folder after importing.";
         }
@@ -158,7 +158,7 @@ public sealed class LibraryDiscoveryService
             }
         }
 
-        throw new ProcessingDiscoveryException($"Too many libraries already named like {PyStrings.Repr(wanted)}.");
+        throw new ProcessingDiscoveryException($"Too many libraries already named like {WireStrings.Repr(wanted)}.");
     }
 
     /// <summary>
@@ -276,8 +276,8 @@ public sealed class LibraryDiscoveryService
                 continue;
             }
 
-            var managerRoot = PyStrings.Strip(WatchedSource(descriptor) ?? string.Empty);
-            var saved = PyStrings.Strip(row.WatchedFolder ?? string.Empty);
+            var managerRoot = WireStrings.Strip(WatchedSource(descriptor) ?? string.Empty);
+            var saved = WireStrings.Strip(row.WatchedFolder ?? string.Empty);
             if (managerRoot.Length > 0 && saved.Length > 0 &&
                 LibraryDiscoveryRules.Comparable(managerRoot) != LibraryDiscoveryRules.Comparable(saved))
             {
@@ -287,8 +287,8 @@ public sealed class LibraryDiscoveryService
                     row.Name,
                     managerRoot,
                     saved,
-                    $"{connectionRow.Name} now says this library lives at {PyStrings.Repr(managerRoot)}, but Weir is " +
-                    $"watching {PyStrings.Repr(saved)}. Nothing has been changed — Weir deletes source folders after a " +
+                    $"{connectionRow.Name} now says this library lives at {WireStrings.Repr(managerRoot)}, but Weir is " +
+                    $"watching {WireStrings.Repr(saved)}. Nothing has been changed — Weir deletes source folders after a " +
                     "successful pass, so a watched folder only moves when you move it."));
             }
 

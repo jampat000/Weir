@@ -141,8 +141,8 @@ public sealed class QueryIndexesMigrationTests : IDisposable
     [Fact]
     public void A_date_filter_reads_a_range_of_the_created_at_index()
     {
-        Assert.True(PyDateTime.TryFromIsoFormat("2026-01-02T03:04:05", out var from));
-        Assert.True(PyDateTime.TryFromIsoFormat("2026-01-09T03:04:05", out var to));
+        Assert.True(Timestamp.TryFromIsoFormat("2026-01-02T03:04:05", out var from));
+        Assert.True(Timestamp.TryFromIsoFormat("2026-01-09T03:04:05", out var to));
         var (sql, parameters) = ActivityHistoryStore.CountQuery(new ActivityFilter(DateFrom: from, DateTo: to));
 
         var plan = Plan(sql, parameters);

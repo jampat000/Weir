@@ -31,7 +31,7 @@ public sealed class RequestBodyLimitsTests
     public async Task A_body_larger_than_the_limit_is_refused_with_413()
     {
         await using var server = await WeirTestServer.StartAsync([("WEIR_SESSION_SECRET", Secret), ("WEIR_PROCESSING_WORKER_COUNT", "0")]);
-        var padding = new string(' ', PyRequestBody.MaxBodyBytes);
+        var padding = new string(' ', ApiRequestBody.MaxBodyBytes);
 
         using var response = await new ApiTestClient(server).SendAsync(
             HttpMethod.Post, "/api/v1/intake/webhook/sonarr", content: new StringContent("{}" + padding, Encoding.UTF8, "application/json"));
@@ -50,7 +50,7 @@ public sealed class RequestBodyLimitsTests
         using var response = await new ApiTestClient(server).SendAsync(HttpMethod.Post, "/api/v1/intake/webhook/sonarr", content: content);
 
         Assert.Equal(
-            (HttpStatusCode.UnsupportedMediaType, PyRequestBody.UnsupportedContentTypeDetail),
+            (HttpStatusCode.UnsupportedMediaType, ApiRequestBody.UnsupportedContentTypeDetail),
             (response.StatusCode, await Detail(response)));
     }
 
@@ -63,7 +63,7 @@ public sealed class RequestBodyLimitsTests
             HttpMethod.Post, "/api/v1/intake/webhook/sonarr", content: new StringContent("{}", Encoding.UTF8, "text/plain"));
 
         Assert.Equal(
-            (HttpStatusCode.UnsupportedMediaType, PyRequestBody.UnsupportedContentTypeDetail),
+            (HttpStatusCode.UnsupportedMediaType, ApiRequestBody.UnsupportedContentTypeDetail),
             (response.StatusCode, await Detail(response)));
     }
 

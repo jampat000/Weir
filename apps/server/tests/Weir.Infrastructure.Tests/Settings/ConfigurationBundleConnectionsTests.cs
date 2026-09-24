@@ -28,9 +28,9 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
             "INSERT INTO notification_channels (label, provider, url, events_json, enabled) " +
             "VALUES ('Failures', 'discord', 'https://discord.com/api/webhooks/1/token', '[\"job_failed\"]', 1)");
 
-    private Task<PyDict> ExportAsync() => _source.WithUnitOfWork(ConfigurationBundleStore.BuildAsync, commit: false);
+    private Task<WireObject> ExportAsync() => _source.WithUnitOfWork(ConfigurationBundleStore.BuildAsync, commit: false);
 
-    private Task<bool> RestoreAsync(PyDict bundle) => _target.WithUnitOfWork(async uow =>
+    private Task<bool> RestoreAsync(WireObject bundle) => _target.WithUnitOfWork(async uow =>
     {
         await ConfigurationBundleStore.ApplyAsync(uow, bundle, _zones, _target.Options.WeirHome);
         return true;
@@ -43,9 +43,9 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
 
         var bundle = await ExportAsync();
 
-        var connection = (PyDict)((PyList)bundle["media_manager_connections"]).Items.Single();
-        Assert.Equal("Sonarr", ((PyStr)connection["name"]).Value);
-        Assert.Equal("http://sonarr:8989", ((PyStr)connection["base_url"]).Value);
+        var connection = (WireObject)((WireArray)bundle["media_manager_connections"]).Items.Single();
+        Assert.Equal("Sonarr", ((WireString)connection["name"]).Value);
+        Assert.Equal("http://sonarr:8989", ((WireString)connection["base_url"]).Value);
         Assert.DoesNotContain(connection.Keys, key => key.Contains("key", StringComparison.Ordinal) || key.Contains("secret", StringComparison.Ordinal));
     }
 
@@ -56,10 +56,10 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
 
         var bundle = await ExportAsync();
 
-        var alert = (PyDict)((PyList)bundle["notification_channels"]).Items.Single();
-        Assert.Equal("Failures", ((PyStr)alert["label"]).Value);
+        var alert = (WireObject)((WireArray)bundle["notification_channels"]).Items.Single();
+        Assert.Equal("Failures", ((WireString)alert["label"]).Value);
         Assert.False(alert.ContainsKey("url"));
-        Assert.DoesNotContain("discord.com", PyJsonWriter.Dumps(bundle, PyJsonFormat.IndentedSorted), StringComparison.Ordinal);
+        Assert.DoesNotContain("discord.com", WireJsonWriter.Dumps(bundle, WireJsonFormat.IndentedSorted), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -119,9 +119,9 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
     public async Task A_backup_with_an_unknown_kind_of_media_manager_is_refused_in_plain_words()
     {
         var bundle = await ExportAsync();
-        bundle.Set("media_manager_connections", new PyList([new PyDict().Set("kind", "plex").Set("name", "Living room")]));
+        bundle.Set("media_manager_connections", new WireArray([new WireObject().Set("kind", "plex").Set("name", "Living room")]));
 
-        var refused = await Assert.ThrowsAsync<PyValueErrorException>(() => RestoreAsync(bundle));
+        var refused = await Assert.ThrowsAsync<WireValueException>(() => RestoreAsync(bundle));
 
         Assert.Contains("Living room", refused.Message, StringComparison.Ordinal);
     }
@@ -133,9 +133,9 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
         var bundle = await ExportAsync();
         bundle.Set(
             "media_manager_connections",
-            new PyList([new PyDict().Set("kind", "sonarr").Set("name", "Living room").Set("base_url", "not-a-url")]));
+            new WireArray([new WireObject().Set("kind", "sonarr").Set("name", "Living room").Set("base_url", "not-a-url")]));
 
-        var refused = await Assert.ThrowsAsync<PyValueErrorException>(() => RestoreAsync(bundle));
+        var refused = await Assert.ThrowsAsync<WireValueException>(() => RestoreAsync(bundle));
 
         Assert.Contains("Living room", refused.Message, StringComparison.Ordinal);
         Assert.Contains("will not use", refused.Message, StringComparison.Ordinal);
@@ -148,9 +148,9 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
         var bundle = await ExportAsync();
         bundle.Set(
             "media_manager_connections",
-            new PyList([new PyDict().Set("kind", "sonarr").Set("name", new string('a', 201))]));
+            new WireArray([new WireObject().Set("kind", "sonarr").Set("name", new string('a', 201))]));
 
-        var refused = await Assert.ThrowsAsync<PyValueErrorException>(() => RestoreAsync(bundle));
+        var refused = await Assert.ThrowsAsync<WireValueException>(() => RestoreAsync(bundle));
 
         Assert.Contains("too long", refused.Message, StringComparison.Ordinal);
         Assert.Equal(0, await _target.Scalar("SELECT count(*) FROM media_manager_connections"));
@@ -162,9 +162,9 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
         var bundle = await ExportAsync();
         bundle.Set(
             "notification_channels",
-            new PyList([new PyDict().Set("label", new string('a', 256)).Set("provider", "discord").Set("events", new PyList([]))]));
+            new WireArray([new WireObject().Set("label", new string('a', 256)).Set("provider", "discord").Set("events", new WireArray([]))]));
 
-        var refused = await Assert.ThrowsAsync<PyValueErrorException>(() => RestoreAsync(bundle));
+        var refused = await Assert.ThrowsAsync<WireValueException>(() => RestoreAsync(bundle));
 
         Assert.Contains("too long", refused.Message, StringComparison.Ordinal);
         Assert.Equal(0, await _target.Scalar("SELECT count(*) FROM notification_channels"));

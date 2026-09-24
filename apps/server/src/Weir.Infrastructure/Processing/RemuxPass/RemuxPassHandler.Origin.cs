@@ -7,7 +7,7 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 
 public sealed partial class RemuxPassHandler
 {
-    private async Task<PyDict?> CarriedOriginAsync(long jobId, long? libraryId, string rel, string mediaScope)
+    private async Task<WireObject?> CarriedOriginAsync(long jobId, long? libraryId, string rel, string mediaScope)
     {
         try
         {
@@ -26,7 +26,7 @@ public sealed partial class RemuxPassHandler
     }
 
     /// <summary>The origin written onto this job's own row after it started, or null.</summary>
-    private async Task<PyDict?> AdoptedOriginAsync(long jobId)
+    private async Task<WireObject?> AdoptedOriginAsync(long jobId)
     {
         try
         {
@@ -34,10 +34,10 @@ public sealed partial class RemuxPassHandler
             await using (uow.ConfigureAwait(false))
             {
                 var payload = await uow.ScalarAsync("SELECT payload_json FROM jobs WHERE id = @id", ("@id", jobId)).ConfigureAwait(false);
-                return payload is string text && PyJsonParser.Parse(text) is PyDict dict ? dict.Get("origin") as PyDict : null;
+                return payload is string text && WireJsonParser.Parse(text) is WireObject dict ? dict.Get("origin") as WireObject : null;
             }
         }
-        catch (Exception exception) when (exception is SqliteException or InvalidOperationException or PyJsonDecodeException)
+        catch (Exception exception) when (exception is SqliteException or InvalidOperationException or WireJsonDecodeException)
         {
             _logger.LogWarning(exception, "Weir could not check whether a hand-off took over this pass.");
             return null;

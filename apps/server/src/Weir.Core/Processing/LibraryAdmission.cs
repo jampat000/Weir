@@ -84,14 +84,14 @@ public static class LibraryAdmission
             if (rules.CreatedAfter is { } createdAfter && createdAt < createdAfter)
             {
                 return new LibraryAdmissionRejection(
-                    $"Skipped because its filesystem creation time ({PyDateTime.FromDateTimeOffset(createdAt).IsoFormat()}) is before this library's allowed window.",
+                    $"Skipped because its filesystem creation time ({Timestamp.FromDateTimeOffset(createdAt).IsoFormat()}) is before this library's allowed window.",
                     "skipped_before_created_window");
             }
 
             if (rules.CreatedBefore is { } createdBefore && createdAt >= createdBefore)
             {
                 return new LibraryAdmissionRejection(
-                    $"Skipped because its filesystem creation time ({PyDateTime.FromDateTimeOffset(createdAt).IsoFormat()}) is after this library's allowed window.",
+                    $"Skipped because its filesystem creation time ({Timestamp.FromDateTimeOffset(createdAt).IsoFormat()}) is after this library's allowed window.",
                     "skipped_after_created_window");
             }
         }
@@ -101,14 +101,14 @@ public static class LibraryAdmission
             if (rules.ModifiedAfter is { } modifiedAfter && modifiedAt < modifiedAfter)
             {
                 return new LibraryAdmissionRejection(
-                    $"Skipped because its last-modified time ({PyDateTime.FromDateTimeOffset(modifiedAt).IsoFormat()}) is before this library's allowed window.",
+                    $"Skipped because its last-modified time ({Timestamp.FromDateTimeOffset(modifiedAt).IsoFormat()}) is before this library's allowed window.",
                     "skipped_before_modified_window");
             }
 
             if (rules.ModifiedBefore is { } modifiedBefore && modifiedAt >= modifiedBefore)
             {
                 return new LibraryAdmissionRejection(
-                    $"Skipped because its last-modified time ({PyDateTime.FromDateTimeOffset(modifiedAt).IsoFormat()}) is after this library's allowed window.",
+                    $"Skipped because its last-modified time ({Timestamp.FromDateTimeOffset(modifiedAt).IsoFormat()}) is after this library's allowed window.",
                     "skipped_after_modified_window");
             }
         }

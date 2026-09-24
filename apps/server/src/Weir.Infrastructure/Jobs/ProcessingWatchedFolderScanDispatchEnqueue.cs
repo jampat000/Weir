@@ -20,17 +20,17 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
             return ProcessingMediaScopes.Movie;
         }
 
-        PyJson data;
+        WireValue data;
         try
         {
-            data = PyJsonParser.Parse(raw);
+            data = WireJsonParser.Parse(raw);
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
             return ProcessingMediaScopes.Movie;
         }
 
-        if (data is not PyDict dict || dict.Get("media_scope") is not PyStr scope || scope.Value is not ("movie" or "tv"))
+        if (data is not WireObject dict || dict.Get("media_scope") is not WireString scope || scope.Value is not ("movie" or "tv"))
         {
             return ProcessingMediaScopes.Movie;
         }
@@ -46,17 +46,17 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
             return null;
         }
 
-        PyJson data;
+        WireValue data;
         try
         {
-            data = PyJsonParser.Parse(raw);
+            data = WireJsonParser.Parse(raw);
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
             return null;
         }
 
-        if (data is not PyDict dict || dict.Get("library_id") is not PyInt value || value.Value <= 0)
+        if (data is not WireObject dict || dict.Get("library_id") is not WireInteger value || value.Value <= 0)
         {
             return null;
         }
@@ -127,7 +127,7 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
         UnitOfWork uow, ProcessingJobStore jobStore, bool enqueueRemuxJobs, string scanTrigger, string mediaScope, long? libraryId)
     {
         ArgumentNullException.ThrowIfNull(jobStore);
-        var payload = new PyDict()
+        var payload = new WireObject()
             .Set("enqueue_remux_jobs", enqueueRemuxJobs)
             .Set("scan_trigger", ScanDispatchJobPayload.NormalizeTrigger(scanTrigger))
             .Set("media_scope", ProcessingMediaScopes.Normalize(mediaScope));
@@ -140,7 +140,7 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
         return jobStore.EnqueueOrGetAsync(
             dedupe,
             ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch,
-            PyJsonWriter.Dumps(payload, PyJsonFormat.Compact));
+            WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
     }
 
     /// <summary>

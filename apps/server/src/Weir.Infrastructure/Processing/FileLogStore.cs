@@ -20,25 +20,25 @@ public static class FileLogStore
             $"SELECT {Columns} FROM file_logs WHERE relative_path = @path ORDER BY recorded_at DESC, id DESC LIMIT {Math.Max(1, Math.Min(limit, 500))}",
             Read, ("@path", relativePath));
 
-    /// <summary>Parse a stored detail payload as a <see cref="PyDict"/>, never raising.</summary>
-    public static PyDict ParseDetail(string? raw)
+    /// <summary>Parse a stored detail payload as a <see cref="WireObject"/>, never raising.</summary>
+    public static WireObject ParseDetail(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
         {
-            return new PyDict();
+            return new WireObject();
         }
 
         try
         {
-            return PyJsonParser.Parse(raw) switch
+            return WireJsonParser.Parse(raw) switch
             {
-                PyDict dict => dict,
-                PyJson other => new PyDict().Set("detail", other),
+                WireObject dict => dict,
+                WireValue other => new WireObject().Set("detail", other),
             };
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
-            return new PyDict().Set("unparsed_detail", raw);
+            return new WireObject().Set("unparsed_detail", raw);
         }
     }
 
@@ -64,7 +64,7 @@ public static class FileLogStore
         foreach (var row in rows)
         {
             lines.Add(new string('=', 78));
-            lines.Add($"{row.RecordedAt.PydanticJson()}  —  {(row.Outcome.Length > 0 ? row.Outcome : "no outcome recorded")}");
+            lines.Add($"{row.RecordedAt.ToWireText()}  —  {(row.Outcome.Length > 0 ? row.Outcome : "no outcome recorded")}");
             if (row.Title.Length > 0)
             {
                 lines.Add(row.Title);
@@ -75,7 +75,7 @@ public static class FileLogStore
             foreach (var key in detail.Keys.Order(StringComparer.Ordinal))
             {
                 var value = detail[key];
-                var rendered = value is PyDict or PyList ? PyJsonWriter.Dumps(value, PyJsonFormat.Compact) : PlainValue(value);
+                var rendered = value is WireObject or WireArray ? WireJsonWriter.Dumps(value, WireJsonFormat.Compact) : PlainValue(value);
                 lines.Add($"{key}: {rendered}");
             }
 
@@ -85,13 +85,13 @@ public static class FileLogStore
         return string.Join('\n', lines) + "\n";
     }
 
-    private static string PlainValue(PyJson value) => value switch
+    private static string PlainValue(WireValue value) => value switch
     {
-        PyStr s => s.Value,
-        PyInt i => i.Value.ToString(CultureInfo.InvariantCulture),
-        PyFloat f => f.Value.ToString(CultureInfo.InvariantCulture),
-        PyBool b => b.Value ? "True" : "False",
-        PyNull => "None",
+        WireString s => s.Value,
+        WireInteger i => i.Value.ToString(CultureInfo.InvariantCulture),
+        WireNumber f => f.Value.ToString(CultureInfo.InvariantCulture),
+        WireBool b => b.Value ? "True" : "False",
+        WireNull => "None",
         _ => string.Empty,
     };
 
@@ -105,7 +105,7 @@ public static class FileLogStore
 
         var cutoff = now.AddDays(-retentionDays);
         return BatchedDeletes.DeleteAsync(
-            database, "file_logs", "recorded_at < @cutoff", [("@cutoff", SqliteValues.ToSqlite(PyDateTime.FromUtc(cutoff.UtcDateTime)))], cancellationToken);
+            database, "file_logs", "recorded_at < @cutoff", [("@cutoff", SqliteValues.ToSqlite(Timestamp.FromUtc(cutoff.UtcDateTime)))], cancellationToken);
     }
 
     private static ProcessingFileLogRecord Read(SqliteDataReader reader) => new()

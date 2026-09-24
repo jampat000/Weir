@@ -41,7 +41,7 @@ public static class AuthSessionLifecycleEndpoints
             }
         }
 
-        return ApiRoutes.Ok(new PyDict().Set("csrf_token", CsrfTokens.Issue(secret, raw, request.Time)));
+        return ApiRoutes.Ok(new WireObject().Set("csrf_token", CsrfTokens.Issue(secret, raw, request.Time)));
     }
 
     private static async Task<ApiResult> PostLoginAsync(ApiRequest request)
@@ -102,14 +102,14 @@ public static class AuthSessionLifecycleEndpoints
         var (user, session, rawToken) = result.Value;
         AuthEndpoints.Logger(request).LogInformation("auth event: login succeeded (user_id={UserId})", user.Id);
         await ActivityStore.RecordAsync(uow, ActivityEventTypes.AuthLoginSucceeded, "auth", "Signed in", user.Username).ConfigureAwait(false);
-        return SignedIn(request, new PyDict().Set("user", AuthService.UserPublic(user)), session, rawToken);
+        return SignedIn(request, new WireObject().Set("user", AuthService.UserPublic(user)), session, rawToken);
     }
 
     /// <summary>A 200 that hands the browser its new session cookie.</summary>
-    private static JsonApiResult SignedIn(ApiRequest request, PyDict body, UserSessionRecord session, string rawToken)
+    private static JsonApiResult SignedIn(ApiRequest request, WireObject body, UserSessionRecord session, string rawToken)
     {
         WarnIfCookieSecureBlockedByUntranslatedTls(request);
-        var cookie = PyCookies.SetCookieHeader(
+        var cookie = CookieHeaders.SetCookieHeader(
             request.Options.SessionCookieName,
             rawToken,
             maxAge: SessionRules.AbsoluteTimeoutDays(session.IsTrustedDevice, request.Options) * 86400,
@@ -190,7 +190,7 @@ public static class AuthSessionLifecycleEndpoints
 
         var setupCodes = request.Service<SetupCodeGate>();
         var requiresSetupCode = allowed && setupCodes.HasCode && !SetupCodeGate.IsLoopback(request.ClientHost);
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("bootstrap_allowed", allowed)
             .Set("reason", allowed ? "no_admin_user" : "admin_already_exists")
             .Set("requires_setup_code", requiresSetupCode));
@@ -249,7 +249,7 @@ public static class AuthSessionLifecycleEndpoints
         {
             user = await AuthService.CreateInitialAdminAsync(uow, username.Trim(), password).ConfigureAwait(false);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             logger.LogWarning("auth event: bootstrap failed (weak password)");
             throw new ApiException(StatusCodes.Status400BadRequest, exception.Message);
@@ -273,7 +273,7 @@ public static class AuthSessionLifecycleEndpoints
         await ActivityStore.RecordAsync(uow, ActivityEventTypes.AuthLoginSucceeded, "auth", "Signed in", user.Username).ConfigureAwait(false);
         return SignedIn(
             request,
-            new PyDict()
+            new WireObject()
                 .Set("message", "Account created. You are signed in.")
                 .Set("username", user.Username)
                 .Set("user", AuthService.UserPublic(user)),
@@ -286,7 +286,7 @@ public static class AuthSessionLifecycleEndpoints
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         var headerToken = request.FirstHeader("X-CSRF-Token");
         string? bodyToken = null;
-        if (body is not null and not PyNull)
+        if (body is not null and not WireNull)
         {
             var issues = new ValidationIssues();
             var model = new BodyModel(body, issues);
@@ -333,7 +333,7 @@ public static class AuthSessionLifecycleEndpoints
             logger.LogInformation("auth event: logout (no session cookie)");
         }
 
-        var cookie = PyCookies.SetCookieHeader(
+        var cookie = CookieHeaders.SetCookieHeader(
             request.Options.SessionCookieName,
             string.Empty,
             maxAge: 0,

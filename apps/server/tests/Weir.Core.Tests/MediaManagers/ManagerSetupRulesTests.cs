@@ -30,9 +30,9 @@ public sealed class ManagerSetupRulesTests
         """;
 
     private static List<ArrDownloadClientEntry> Clients(string json = SonarrClients, string scope = MediaManagerKinds.Tv) =>
-        ManagerSetupRules.ParseDownloadClients(PyJsonParser.Parse(json), scope);
+        ManagerSetupRules.ParseDownloadClients(WireJsonParser.Parse(json), scope);
 
-    private static List<RemotePathMappingEntry> Mappings(string json) => ManagerSetupRules.ParseMappings(PyJsonParser.Parse(json));
+    private static List<RemotePathMappingEntry> Mappings(string json) => ManagerSetupRules.ParseMappings(WireJsonParser.Parse(json));
 
     private static ArrSetupResult Sonarr(string watched, string output, string mappingsJson, bool? cdh = true, List<ArrDownloadClientEntry>? clients = null) =>
         ManagerSetupRules.EvaluateArr("Sonarr", MediaManagerKinds.Tv, watched, output, Mappings(mappingsJson), clients ?? Clients(), cdh);
@@ -313,7 +313,7 @@ public sealed class ManagerSetupRulesTests
     [Fact]
     public void Deluno_manifests_carry_the_downloads_folder_beside_the_library_root()
     {
-        var descriptor = ManagerDialectRules.ManifestLibraryDescriptor((PyDict)PyJsonParser.Parse(
+        var descriptor = ManagerDialectRules.ManifestLibraryDescriptor((WireObject)WireJsonParser.Parse(
             """{"id":"lib-1","name":"TV","mediaType":"tv","rootPath":"/media/tv","downloadsPath":"/media/downloads/complete/tv","importWorkflow":"refine-before-import","processorOutputPath":"/media/downloads/weir/tv"}"""));
 
         Assert.Equal(RefiningTv with { Key = "lib-1" }, descriptor);

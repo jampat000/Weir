@@ -23,7 +23,7 @@ public static partial class RemuxRules
     {
         try
         {
-            return Py.Truthy(s.Get("bit_rate")) ? Py.Int(s.Get("bit_rate")) : 0;
+            return RulesJson.Truthy(s.Get("bit_rate")) ? RulesJson.Int(s.Get("bit_rate")) : 0;
         }
         catch (RulesInputException)
         {
@@ -37,8 +37,8 @@ public static partial class RemuxRules
         var rawLanguageTag = tags.GetValueOrDefault("language");
         var lang = NormalizeLang(rawLanguageTag);
         var disposition = s.Disposition;
-        var codecName = Py.StrOr(s.Get("codec_name"), string.Empty);
-        var channels = Py.ToInt32(Py.Truthy(s.Get("channels")) ? Py.Int(s.Get("channels")) : 0);
+        var codecName = RulesJson.StrOr(s.Get("codec_name"), string.Empty);
+        var channels = RulesJson.ToInt32(RulesJson.Truthy(s.Get("channels")) ? RulesJson.Int(s.Get("channels")) : 0);
         var bitrate = ReadBitRate(s);
         var flags = TrackFlagsReader.Detect(s);
         // Issue #537 item 5: a non-string title tag (a list, say) is missing, not stringified.

@@ -110,8 +110,8 @@ public sealed class RemuxPassHandlerTests : IDisposable
 
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events"));
         Assert.Equal("processing.file_remux_pass_completed|processing|file.mkv was processed successfully", await ScalarText("SELECT event_type || '|' || module || '|' || title FROM activity_events"));
-        var detail = (PyDict)PyJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events"));
-        Assert.Equal(("live_output_written", "123"), (PyConvert.Str(detail["outcome"]), PyConvert.Str(detail["job_id"])));
+        var detail = (WireObject)WireJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events"));
+        Assert.Equal(("live_output_written", "123"), (WireConvert.Str(detail["outcome"]), WireConvert.Str(detail["job_id"])));
         Assert.Equal("processed|Finished processing this file.", await ScalarText("SELECT status || '|' || status_reason FROM files"));
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM file_logs WHERE outcome = 'live_output_written' AND library_name = 'Movies' AND file_id IS NOT NULL"));
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM files WHERE video_codec = 'h264' AND audio_track_count = 2 AND output_collision_action = 'write'"));
@@ -146,13 +146,13 @@ public sealed class RemuxPassHandlerTests : IDisposable
     {
         var library = await LibraryAsync();
         await _fixture.Store.Execute($"INSERT INTO files (library_id, relative_path, status, failure_class, failure_attempts) VALUES ({library}, 'Testament/file.mkv', 'processing', 'execution', 2)");
-        var result = new PyDict().Set("ok", false).Set("outcome", "source_not_ready").Set("retryable_wait", true)
+        var result = new WireObject().Set("ok", false).Set("outcome", "source_not_ready").Set("retryable_wait", true)
             .Set("relative_media_path", "Testament/file.mkv").Set("reason", "This file is still open for writing by another program.");
 
         await Handler().ApplyFileOutcomeStateAsync(result, library, "movie", null);
 
         Assert.Equal("on_hold|0||", await ScalarText("SELECT status || '|' || failure_attempts || '|' || coalesce(failure_class, '') || '|' || coalesce(next_retry_at, '') FROM files"));
-        Assert.Equal((false, false), (((PyBool)result["quarantined"]).Value, ((PyBool)result["retry_scheduled"]).Value));
+        Assert.Equal((false, false), (((WireBool)result["quarantined"]).Value, ((WireBool)result["retry_scheduled"]).Value));
     }
 
     [Fact]
@@ -183,9 +183,9 @@ public sealed class RemuxPassHandlerTests : IDisposable
         // The second look is a job held back until the file is old enough, carrying the hand-off's origin.
         var secondId = await _fixture.Store.Scalar($"SELECT id FROM jobs WHERE id <> {first}");
         var secondPayload = await ScalarText($"SELECT payload_json FROM jobs WHERE id = {secondId}");
-        var second = (PyDict)PyJsonParser.Parse(secondPayload);
-        Assert.Equal(1, (long)((PyInt)second["minimum_age_waits"]).Value);
-        Assert.Equal("h632", PyConvert.Str(((PyDict)second["origin"])["handoff_id"]));
+        var second = (WireObject)WireJsonParser.Parse(secondPayload);
+        Assert.Equal(1, (long)((WireInteger)second["minimum_age_waits"]).Value);
+        Assert.Equal("h632", WireConvert.Str(((WireObject)second["origin"])["handoff_id"]));
         var notBefore = DateTimeOffset.Parse(await ScalarText($"SELECT not_before FROM jobs WHERE id = {secondId}"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
         Assert.InRange(notBefore, before.AddSeconds(50), before.AddSeconds(70));
 
@@ -212,8 +212,8 @@ public sealed class RemuxPassHandlerTests : IDisposable
 
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM jobs"));
         Assert.StartsWith("on_hold|", await ScalarText("SELECT status || '|' FROM files"), StringComparison.Ordinal);
-        var detail = (PyDict)PyJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.file_remux_pass_completed'"));
-        Assert.Contains("stopped looking", PyConvert.Str(detail["reason"]), StringComparison.Ordinal);
+        var detail = (WireObject)WireJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.file_remux_pass_completed'"));
+        Assert.Contains("stopped looking", WireConvert.Str(detail["reason"]), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -251,8 +251,8 @@ public sealed class RemuxPassHandlerTests : IDisposable
         Assert.Equal("processing_failed|1|execution", await ScalarText("SELECT status || '|' || failure_attempts || '|' || failure_class FROM files"));
         Assert.NotEqual(string.Empty, await ScalarText("SELECT coalesce(next_retry_at, '') FROM files"));
         Assert.Empty(_fixture.Http.RequestsTo(HttpMethod.Post, EventsPath));
-        var retrying = (PyDict)PyJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.file_remux_pass_completed'"));
-        Assert.Equal("retrying", PyConvert.Str(retrying["result"]));
+        var retrying = (WireObject)WireJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.file_remux_pass_completed'"));
+        Assert.Equal("retrying", WireConvert.Str(retrying["result"]));
 
         // #531 item 2: the retry a scan queues has no origin of its own; the pass carries the hand-off's forward.
         var retryPayload = $$"""{"relative_media_path":"Film/film.mkv","media_scope":"movie","library_id":{{library}},"trigger":"scheduled"}""";
@@ -329,9 +329,9 @@ public sealed class RemuxPassHandlerTests : IDisposable
         await Handler().HandleAsync(Context(retry, retryPayload), CancellationToken.None);
 
         var post = Assert.Single(_fixture.Http.RequestsTo(HttpMethod.Post, EventsPath));
-        var body = (PyDict)post.Json!;
-        Assert.Equal(("h2", "completed"), (PyConvert.Str(body["handoffId"]), PyConvert.Str(body["status"])));
-        Assert.Equal(Path.GetFullPath(_folders.Out(Path.Join("Film", "film.mkv"))), PyConvert.Str(body["outputPath"]));
+        var body = (WireObject)post.Json!;
+        Assert.Equal(("h2", "completed"), (WireConvert.Str(body["handoffId"]), WireConvert.Str(body["status"])));
+        Assert.Equal(Path.GetFullPath(_folders.Out(Path.Join("Film", "film.mkv"))), WireConvert.Str(body["outputPath"]));
         Assert.Equal("completed", await ScalarText("SELECT state FROM media_manager_handoffs WHERE handoff_id = 'h2'"));
         Assert.Equal(Path.GetFullPath(_folders.Out(Path.Join("Film", "film.mkv"))), await ScalarText("SELECT output_path FROM media_manager_handoffs WHERE handoff_id = 'h2'"));
     }
@@ -361,10 +361,10 @@ public sealed class RemuxPassHandlerTests : IDisposable
 
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.reject.v1'"));
         Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.pass_through.v1'"));
-        var reject = (PyDict)PyJsonParser.Parse(await ScalarText("SELECT payload_json FROM jobs WHERE job_kind = 'processing.file.reject.v1'"));
-        Assert.Equal("preflight", PyConvert.Str(reject["failure_class"]));
-        var detail = (PyDict)PyJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events"));
-        Assert.Equal((true, "failed"), (((PyBool)detail["reject_queued"]).Value, PyConvert.Str(detail["result"])));
+        var reject = (WireObject)WireJsonParser.Parse(await ScalarText("SELECT payload_json FROM jobs WHERE job_kind = 'processing.file.reject.v1'"));
+        Assert.Equal("preflight", WireConvert.Str(reject["failure_class"]));
+        var detail = (WireObject)WireJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events"));
+        Assert.Equal((true, "failed"), (((WireBool)detail["reject_queued"]).Value, WireConvert.Str(detail["result"])));
         Assert.False(detail.ContainsKey("next_action"));
     }
 
@@ -398,9 +398,9 @@ public sealed class RemuxPassHandlerTests : IDisposable
 
         await Handler().HandleAsync(Context(7, payload), CancellationToken.None);
 
-        var detail = (PyDict)PyJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events"));
-        Assert.Equal("failed_before_execution", PyConvert.Str(detail["outcome"]));
-        Assert.Contains(reason, PyConvert.Str(detail["reason"]), StringComparison.Ordinal);
+        var detail = (WireObject)WireJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events"));
+        Assert.Equal("failed_before_execution", WireConvert.Str(detail["outcome"]));
+        Assert.Contains(reason, WireConvert.Str(detail["reason"]), StringComparison.Ordinal);
         Assert.Empty(_media.Calls);
     }
 
@@ -413,9 +413,9 @@ public sealed class RemuxPassHandlerTests : IDisposable
 
         await Handler().HandleAsync(Context(8, $$"""{"relative_media_path":"a.mkv","library_id":{{library}},"trigger":"manual"}"""), CancellationToken.None);
 
-        var detail = (PyDict)PyJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events"));
-        Assert.Contains("has no output folder set", PyConvert.Str(detail["reason"]), StringComparison.Ordinal);
-        Assert.Equal("manual", PyConvert.Str(detail["trigger"]));
+        var detail = (WireObject)WireJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events"));
+        Assert.Contains("has no output folder set", WireConvert.Str(detail["reason"]), StringComparison.Ordinal);
+        Assert.Equal("manual", WireConvert.Str(detail["trigger"]));
         Assert.Equal("processing_failed|preflight", await ScalarText("SELECT status || '|' || failure_class FROM files"));
     }
 

@@ -43,7 +43,7 @@ public sealed partial class ProcessingFailureCleanupSweep
     }
 
     /// <summary>Removes now-empty ancestor folders, up to (not including) the root.</summary>
-    private static void CascadeUnderRoot(string firstParent, string root, PyList deletedOut)
+    private static void CascadeUnderRoot(string firstParent, string root, WireArray deletedOut)
     {
         var current = RemuxPassPaths.Resolve(firstParent);
         var rr = RemuxPassPaths.Resolve(root);
@@ -69,7 +69,7 @@ public sealed partial class ProcessingFailureCleanupSweep
             try
             {
                 Directory.Delete(current);
-                deletedOut.Items.Add(new PyStr(current));
+                deletedOut.Items.Add(new WireString(current));
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {

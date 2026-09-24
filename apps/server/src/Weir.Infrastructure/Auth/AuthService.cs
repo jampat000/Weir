@@ -43,7 +43,7 @@ public sealed partial class AuthService : IDisposable
 
     public void Dispose() => _argon2Concurrency.Dispose();
 
-    public PyDateTime Now() => PyDateTime.UtcNow(_time);
+    public Timestamp Now() => Timestamp.UtcNow(_time);
 
     /// <summary>The request's session: look up by token hash, enforce revocation and timeouts, and touch <c>last_seen_at</c> at most once a minute.</summary>
     public async Task<SignedInSession?> LoadValidSessionAsync(UnitOfWork uow, string? rawCookieToken)
@@ -95,7 +95,7 @@ public sealed partial class AuthService : IDisposable
     /// Commits the revoke of an expired session on its own, whatever the request's outcome, so the 401 that
     /// follows cannot roll it back (#529).
     /// </summary>
-    private Task RevokeExpiredAsync(UnitOfWork uow, string sessionId, PyDateTime now) =>
+    private Task RevokeExpiredAsync(UnitOfWork uow, string sessionId, Timestamp now) =>
         WriteOnItsOwnAsync(uow, own => AuthStore.RevokeSessionAsync(own, sessionId, now));
 
     /// <summary>

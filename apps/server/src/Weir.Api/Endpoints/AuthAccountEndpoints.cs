@@ -45,14 +45,14 @@ public static class AuthAccountEndpoints
         {
             changed = await request.Auth.ChangeUsernameAsync(uow, user.User.Id, currentPassword, newUsername).ConfigureAwait(false);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new ApiException(StatusCodes.Status400BadRequest, exception.Message);
         }
 
         AuthEndpoints.Logger(request).LogInformation("auth event: username changed (user_id={UserId})", user.User.Id);
         await ActivityStore.RecordAsync(uow, ActivityEventTypes.AuthUsernameChanged, "auth", "Username changed", $"Signed in as {changed}.").ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("message", "Username changed. Use it the next time you sign in.")
             .Set("username", changed));
     }
@@ -81,13 +81,13 @@ public static class AuthAccountEndpoints
         {
             await request.Auth.ChangePasswordAsync(uow, user.User.Id, currentPassword, newPassword).ConfigureAwait(false);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new ApiException(StatusCodes.Status400BadRequest, exception.Message);
         }
 
         AuthEndpoints.Logger(request).LogInformation("auth event: password changed (user_id={UserId})", user.User.Id);
         await ActivityStore.RecordAsync(uow, ActivityEventTypes.AuthPasswordChanged, "auth", "Password changed", user.User.Username).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict().Set("message", "Password changed. Sign in again with your new password."));
+        return ApiRoutes.Ok(new WireObject().Set("message", "Password changed. Sign in again with your new password."));
     }
 }

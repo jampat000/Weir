@@ -120,20 +120,20 @@ public sealed class CredentialCipher
 
     public const string MissingSecretMessage = "Cannot save library API keys until WEIR_CREDENTIALS_SECRET or WEIR_SESSION_SECRET is set.";
 
-    /// <summary>Encrypts an API key into the envelope with the active secret. Throws <see cref="PyValueErrorException"/> when no secret is configured.</summary>
+    /// <summary>Encrypts an API key into the envelope with the active secret. Throws <see cref="WireValueException"/> when no secret is configured.</summary>
     public string Encrypt(string plaintext)
     {
         ArgumentNullException.ThrowIfNull(plaintext);
         var (fernet, keyId) = Active();
         if (fernet is null)
         {
-            throw new PyValueErrorException(MissingSecretMessage);
+            throw new WireValueException(MissingSecretMessage);
         }
 
         var token = fernet.Encrypt(Encoding.UTF8.GetBytes(plaintext.Trim()), _time);
-        return PyJsonWriter.Dumps(
-            new PyDict().Set("version", EnvelopeVersion).Set("key_id", keyId).Set("token", token),
-            PyJsonFormat.Compact);
+        return WireJsonWriter.Dumps(
+            new WireObject().Set("version", EnvelopeVersion).Set("key_id", keyId).Set("token", token),
+            WireJsonFormat.Compact);
     }
 
     /// <summary>Decrypts an envelope (or a bare legacy token); <see langword="null"/> when no configured secret opens it.</summary>
@@ -148,8 +148,8 @@ public sealed class CredentialCipher
         var envelope = DecodeEnvelope(raw);
         if (envelope is not null)
         {
-            var token = envelope.Get("token") is { } t && t.IsTruthy ? PyConvert.Str(t) : string.Empty;
-            var keyId = envelope.Get("key_id") is { } k && k.IsTruthy ? PyConvert.Str(k) : string.Empty;
+            var token = envelope.Get("token") is { } t && t.IsTruthy ? WireConvert.Str(t) : string.Empty;
+            var keyId = envelope.Get("key_id") is { } k && k.IsTruthy ? WireConvert.Str(k) : string.Empty;
             if (token.Length == 0)
             {
                 return null;
@@ -241,7 +241,7 @@ public sealed class CredentialCipher
         }
     }
 
-    private static PyDict? DecodeEnvelope(string raw)
+    private static WireObject? DecodeEnvelope(string raw)
     {
         if (!raw.StartsWith('{'))
         {
@@ -250,9 +250,9 @@ public sealed class CredentialCipher
 
         try
         {
-            return PyJsonParser.Parse(raw) as PyDict;
+            return WireJsonParser.Parse(raw) as WireObject;
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
             return null;
         }

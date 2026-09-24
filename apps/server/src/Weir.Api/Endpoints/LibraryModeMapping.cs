@@ -26,8 +26,8 @@ internal static class LibraryModeMapping
 
     internal static ILogger Logger(ApiRequest request) => request.LoggerFactory.CreateLogger("weir.library_mode.router");
 
-    internal static PyDict SettingsOut(LibrarySettings settings) => new PyDict()
-        .Set("library_folders", new PyList(settings.Folders.Select(f => (PyJson)new PyStr(f))))
+    internal static WireObject SettingsOut(LibrarySettings settings) => new WireObject()
+        .Set("library_folders", new WireArray(settings.Folders.Select(f => (WireValue)new WireString(f))))
         .Set("library_schedule_enabled", settings.ScheduleEnabled)
         .Set("clean_hardlinked_files", settings.CleanHardlinkedFiles)
         .Set("skip_if_manager_would_redownload", settings.SkipIfManagerWouldRedownload)
@@ -38,28 +38,28 @@ internal static class LibraryModeMapping
     /// The scan's own state for the header: which job, what it is doing, when it last finished and anything it
     /// could not do. <c>running</c> is what the "Scan now" button and its progress read.
     /// </summary>
-    internal static async Task<PyJson> ScanOutAsync(UnitOfWork uow, long libraryId, ILogger logger)
+    internal static async Task<WireValue> ScanOutAsync(UnitOfWork uow, long libraryId, ILogger logger)
     {
         var latest = await LibraryScanStore.LatestAsync(uow, libraryId).ConfigureAwait(false);
         var outcome = await LibraryScanStore.OutcomeAsync(uow, libraryId, latest, logger).ConfigureAwait(false);
         if (latest is null)
         {
             return outcome is null
-                ? PyJson.Null
-                : new PyDict().Set("job_id", PyJson.Null).Set("status", "completed").Set("running", false)
-                    .Set("generated_at", outcome.GeneratedAt.ToUnixTimeSeconds()).Set("errors", new PyList([]));
+                ? WireValue.Null
+                : new WireObject().Set("job_id", WireValue.Null).Set("status", "completed").Set("running", false)
+                    .Set("generated_at", outcome.GeneratedAt.ToUnixTimeSeconds()).Set("errors", new WireArray([]));
         }
 
         var running = latest.Status is "pending" or "leased";
-        return new PyDict()
+        return new WireObject()
             .Set("job_id", latest.JobId)
             .Set("status", latest.Status)
             .Set("running", running)
             .Set("generated_at", outcome?.GeneratedAt.ToUnixTimeSeconds())
-            .Set("errors", new PyList((outcome?.Errors ?? []).Select(e => (PyJson)new PyStr(e))));
+            .Set("errors", new WireArray((outcome?.Errors ?? []).Select(e => (WireValue)new WireString(e))));
     }
 
-    internal static PyDict TotalsOut(LibraryTotals totals) => new PyDict()
+    internal static WireObject TotalsOut(LibraryTotals totals) => new WireObject()
         .Set("files", totals.Files)
         .Set("size_bytes", totals.SizeBytes)
         .Set("matches", totals.Matches)
@@ -94,13 +94,13 @@ internal static class LibraryModeMapping
     /// </summary>
     internal static JsonApiResult ConfirmationRequired(int files, int tracks, long bytesSaved, IReadOnlyList<string> warnings) => new(
         StatusCodes.Status400BadRequest,
-        new PyDict()
+        new WireObject()
             .Set("error", "confirm_final_removal_required")
             .Set("detail", $"{files} files, {tracks} tracks will be removed. Removed tracks are gone for good; getting one back means downloading the title again.")
             .Set("files_count", files)
             .Set("tracks_count", tracks)
             .Set("estimated_bytes_saved", bytesSaved)
-            .Set("warnings", new PyList(warnings.Select(w => (PyJson)new PyStr(w)))));
+            .Set("warnings", new WireArray(warnings.Select(w => (WireValue)new WireString(w)))));
 
     /// <summary>Every distinct manager connection a set of scanned files was matched to, resolved once for a preflight pass.</summary>
     internal static async Task<Dictionary<long, ManagerConnection>> ConnectionsForFilesAsync(

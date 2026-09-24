@@ -54,7 +54,7 @@ public static class QueueRowMapping
     /// <summary>Resolve a dialect from a media-scope string, accepting the common spellings.</summary>
     public static QueueDialect DialectForScope(string scope)
     {
-        var key = PyStrings.Strip(scope ?? string.Empty).ToLowerInvariant();
+        var key = WireStrings.Strip(scope ?? string.Empty).ToLowerInvariant();
         if (DialectsByScope.TryGetValue(key, out var dialect))
         {
             return dialect;
@@ -65,14 +65,14 @@ public static class QueueRowMapping
 
     /// <summary>Normalize a path for equality checks (case-insensitive, forward slashes).</summary>
     public static string NormalizeStoragePath(string path) =>
-        PyStrings.Strip(path.Replace('\\', '/')).ToLowerInvariant();
+        WireStrings.Strip(path.Replace('\\', '/')).ToLowerInvariant();
 
     /// <summary>The row's first non-empty status-like field, lower-cased.</summary>
-    public static string PrimaryQueueStatus(PyDict row)
+    public static string PrimaryQueueStatus(WireObject row)
     {
         foreach (var key in (string[])["status", "trackedDownloadStatus", "trackedDownloadState"])
         {
-            if (PyValues.Text(row.Get(key)) is { } found)
+            if (ManagerValues.Text(row.Get(key)) is { } found)
             {
                 return found.ToLowerInvariant();
             }
@@ -82,10 +82,10 @@ public static class QueueRowMapping
     }
 
     /// <summary>The row's download output path, if it reports one.</summary>
-    public static string? OutputPath(PyDict row) => PyValues.FirstText(row, "outputPath", "output_path");
+    public static string? OutputPath(WireObject row) => ManagerValues.FirstText(row, "outputPath", "output_path");
 
     /// <summary>Whether the row's output path is the candidate file's path.</summary>
-    public static bool PathMatchesCandidate(PyDict row, string? candidatePath)
+    public static bool PathMatchesCandidate(WireObject row, string? candidatePath)
     {
         if (candidatePath is null)
         {
@@ -96,11 +96,11 @@ public static class QueueRowMapping
     }
 
     /// <summary>Whether the manager flagged this row as not blocking while it waits to import.</summary>
-    public static bool BlockingSuppressedForImportWait(PyDict row)
+    public static bool BlockingSuppressedForImportWait(WireObject row)
     {
         foreach (var key in (string[])["blockingSuppressedForImportWait", "blocking_suppressed_for_import_wait", "weirBlockingSuppressedForImportWait"])
         {
-            if (row.Get(key) is PyBool flag)
+            if (row.Get(key) is WireBool flag)
             {
                 return flag.Value;
             }
@@ -109,29 +109,29 @@ public static class QueueRowMapping
         return false;
     }
 
-    private static (string? Title, int? Year) QueueTitleAndYear(PyDict row, QueueDialect dialect)
+    private static (string? Title, int? Year) QueueTitleAndYear(WireObject row, QueueDialect dialect)
     {
         foreach (var key in dialect.EntityKeys)
         {
-            if (row.Get(key) is not PyDict entity)
+            if (row.Get(key) is not WireObject entity)
             {
                 continue;
             }
 
-            var title = PyValues.FirstText(entity, [.. dialect.EntityTitleFields]);
+            var title = ManagerValues.FirstText(entity, [.. dialect.EntityTitleFields]);
             if (title is not null)
             {
-                var year = PyValues.FirstNumber(entity, "year");
+                var year = ManagerValues.FirstNumber(entity, "year");
                 return (title, year is { } y ? (int)y : null);
             }
         }
 
         // Year only ever comes from the nested entity: a top-level year on the row is not trusted to
         // describe the entity.
-        return (PyValues.FirstText(row, "title", "name"), null);
+        return (ManagerValues.FirstText(row, "title", "name"), null);
     }
 
-    private static bool AppliesToFile(PyDict row, QueueDialect dialect, string? candidatePath, long? candidateEntityId)
+    private static bool AppliesToFile(WireObject row, QueueDialect dialect, string? candidatePath, long? candidateEntityId)
     {
         if (PathMatchesCandidate(row, candidatePath))
         {
@@ -143,7 +143,7 @@ public static class QueueRowMapping
             return false;
         }
 
-        var rowId = PyValues.FirstNumber(row, [.. dialect.EntityIdFields]);
+        var rowId = ManagerValues.FirstNumber(row, [.. dialect.EntityIdFields]);
         return rowId is not null && (long)rowId == candidateEntityId;
     }
 
@@ -154,7 +154,7 @@ public static class QueueRowMapping
     /// from the nested entity named by the dialect when present, else the row's top-level <c>title</c>/<c>name</c>.
     /// </summary>
     public static ProcessingQueueRowView MapQueueRowToProcessingView(
-        PyDict row, QueueDialect dialect, string? candidatePath = null, long? candidateEntityId = null)
+        WireObject row, QueueDialect dialect, string? candidatePath = null, long? candidateEntityId = null)
     {
         ArgumentNullException.ThrowIfNull(row);
         ArgumentNullException.ThrowIfNull(dialect);

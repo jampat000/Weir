@@ -43,7 +43,7 @@ public static class JobRowsRetention
     {
         var (names, parameters) = InList("s", ProcessingJobStatus.Terminal);
         return BatchedDeletes.DeleteAsync(
-            database, "jobs", $"status IN ({names}) AND updated_at < @cutoff", [.. parameters, ("@cutoff", PythonTimestamps.Orm(cutoff))], cancellationToken);
+            database, "jobs", $"status IN ({names}) AND updated_at < @cutoff", [.. parameters, ("@cutoff", TimestampColumns.Orm(cutoff))], cancellationToken);
     }
 
     private static Task<int> PruneLedgerAsync(SqliteDatabase database, DateTimeOffset now, CancellationToken cancellationToken)
@@ -53,7 +53,7 @@ public static class JobRowsRetention
             database,
             "media_manager_handoffs",
             $"state IN ({names}) AND last_changed_at < @cutoff",
-            [.. parameters, ("@cutoff", PythonTimestamps.Orm(now - TimeSpan.FromDays(LedgerRetentionDays)))],
+            [.. parameters, ("@cutoff", TimestampColumns.Orm(now - TimeSpan.FromDays(LedgerRetentionDays)))],
             cancellationToken);
     }
 
@@ -62,7 +62,7 @@ public static class JobRowsRetention
         retentionDays <= 0
             ? Task.FromResult(0)
             : BatchedDeletes.DeleteAsync(
-                database, "activity_events", "created_at < @cutoff", [("@cutoff", PythonTimestamps.Orm(now - TimeSpan.FromDays(retentionDays)))], cancellationToken);
+                database, "activity_events", "created_at < @cutoff", [("@cutoff", TimestampColumns.Orm(now - TimeSpan.FromDays(retentionDays)))], cancellationToken);
 
     private static async Task<int> ActivityRetentionDaysAsync(SqliteDatabase database, CancellationToken cancellationToken)
     {

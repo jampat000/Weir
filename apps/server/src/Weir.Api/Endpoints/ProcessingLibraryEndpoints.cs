@@ -40,13 +40,13 @@ public static class ProcessingLibraryEndpoints
         await request.RequireUserAsync().ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var rows = await LibraryStore.ListAsync(uow).ConfigureAwait(false);
-        var items = new List<PyJson>();
+        var items = new List<WireValue>();
         foreach (var row in rows)
         {
             items.Add(await ProcessingLibraryMapping.LibraryOutAsync(request, uow, row, request.Service<ScanWakeups>()).ConfigureAwait(false));
         }
 
-        return ApiRoutes.Ok(new PyList(items));
+        return ApiRoutes.Ok(new WireArray(items));
     }
 
     private static async Task<ApiResult> GetLibraryAsync(ApiRequest request)
@@ -79,7 +79,7 @@ public static class ProcessingLibraryEndpoints
         var uow = await request.DbAsync().ConfigureAwait(false);
         var connections = await request.Service<MediaManagerConnectionService>().ConnectionsByIdAsync(uow, connectionIds).ConfigureAwait(false);
         var support = await request.Service<RejectSupportEvaluator>().EvaluateAsync(connections).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict().Set("available", support.Available).Set("reason", support.Reason));
+        return ApiRoutes.Ok(new WireObject().Set("available", support.Available).Set("reason", support.Reason));
     }
 
     /// <summary>
@@ -94,19 +94,19 @@ public static class ProcessingLibraryEndpoints
         var mediaType = ProcessingMediaScopes.Movie;
         if (request.Query("media_type") is not { } rawType)
         {
-            issues.Add(new ValidationIssue("missing", ["query", "media_type"], "Field required", PyJson.Null));
+            issues.Add(new ValidationIssue("missing", ["query", "media_type"], "Field required", WireValue.Null));
         }
-        else if (PydanticRules.TryLiteral(new PyStr(rawType), ["query", "media_type"], ProcessingMediaScopes.All, issues, out var parsedType))
+        else if (FieldRules.TryLiteral(new WireString(rawType), ["query", "media_type"], ProcessingMediaScopes.All, issues, out var parsedType))
         {
             mediaType = parsedType;
         }
 
-        var watchedFolder = PyStrings.Slice(request.Query("watched_folder") ?? string.Empty, 4000);
-        var outputFolder = PyStrings.Slice(request.Query("output_folder") ?? string.Empty, 4000);
+        var watchedFolder = WireStrings.Slice(request.Query("watched_folder") ?? string.Empty, 4000);
+        var outputFolder = WireStrings.Slice(request.Query("output_folder") ?? string.Empty, 4000);
         var removesOriginals = true;
         if (request.Query("remove_original_after_success") is { } rawRemove)
         {
-            if (PydanticRules.TryLiteral(new PyStr(rawRemove.ToLowerInvariant()), ["query", "remove_original_after_success"], ["true", "false"], issues, out var parsedRemove))
+            if (FieldRules.TryLiteral(new WireString(rawRemove.ToLowerInvariant()), ["query", "remove_original_after_success"], ["true", "false"], issues, out var parsedRemove))
             {
                 removesOriginals = parsedRemove == "true";
             }
@@ -118,7 +118,7 @@ public static class ProcessingLibraryEndpoints
         var managers = await request.Service<ManagerSetupCheck>()
             .CheckAsync(uow, mediaType, watchedFolder, outputFolder, removesOriginals, request.Context.RequestAborted)
             .ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict().Set("media_type", mediaType).Set("managers", new PyList(managers.Select(item => (PyJson)item))));
+        return ApiRoutes.Ok(new WireObject().Set("media_type", mediaType).Set("managers", new WireArray(managers.Select(item => (WireValue)item))));
     }
 
     private static async Task<ApiResult> PostLibraryAsync(ApiRequest request)
@@ -227,7 +227,7 @@ public static class ProcessingLibraryEndpoints
         request.Service<ScanSettingsChanges>().Record();
         return new CustomApiResult(context =>
         {
-            PyResponses.NoContentJson(context);
+            ApiResponses.NoContentJson(context);
             return Task.CompletedTask;
         });
     }
@@ -242,7 +242,7 @@ public static class ProcessingLibraryEndpoints
         model.Finish(ExtraFields.Forbid);
         if (orderedIds.Count == 0)
         {
-            issues.Add(new ValidationIssue("too_short", ["body", "library_ids_in_order"], "List should have at least 1 item after validation, not 0", new PyList()));
+            issues.Add(new ValidationIssue("too_short", ["body", "library_ids_in_order"], "List should have at least 1 item after validation, not 0", new WireArray()));
         }
 
         issues.ThrowIfAny();
@@ -262,12 +262,12 @@ public static class ProcessingLibraryEndpoints
         }
 
         await request.CommitAsync().ConfigureAwait(false);
-        var items = new List<PyJson>();
+        var items = new List<WireValue>();
         foreach (var row in rows)
         {
             items.Add(await ProcessingLibraryMapping.LibraryOutAsync(request, uow, row, request.Service<ScanWakeups>()).ConfigureAwait(false));
         }
 
-        return ApiRoutes.Ok(new PyList(items));
+        return ApiRoutes.Ok(new WireArray(items));
     }
 }

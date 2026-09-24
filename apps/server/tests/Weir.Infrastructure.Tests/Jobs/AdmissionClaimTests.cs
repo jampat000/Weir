@@ -222,7 +222,7 @@ public sealed class AdmissionClaimTests : IDisposable
             Remux,
             status: ProcessingJobStatus.Leased,
             leaseOwner: "w0",
-            leaseExpiresAt: PythonTimestamps.Orm(Now.AddHours(1)),
+            leaseExpiresAt: TimestampColumns.Orm(Now.AddHours(1)),
             payloadJson: $"{{\"library_id\": {library}}}");
         await QueueAsync(LibraryScan, library, key: "scan");
 
@@ -246,7 +246,7 @@ public sealed class AdmissionClaimTests : IDisposable
             LibraryScan,
             status: ProcessingJobStatus.Leased,
             leaseOwner: "u0",
-            leaseExpiresAt: PythonTimestamps.Orm(Now.AddHours(1)),
+            leaseExpiresAt: TimestampColumns.Orm(Now.AddHours(1)),
             payloadJson: $"{{\"library_id\": {library}}}");
         await QueueAsync(LibraryScan, library, key: "second-scan");
 

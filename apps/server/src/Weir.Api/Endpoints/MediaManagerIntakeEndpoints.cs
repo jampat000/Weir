@@ -47,14 +47,14 @@ public static class MediaManagerIntakeEndpoints
         var sourceKey = request.RouteValue("source_key") ?? string.Empty;
         var presented = request.FirstHeader("X-Webhook-Secret");
         var issues = new ValidationIssues();
-        PyDict payload = new();
-        if (body is null or PyNull)
+        WireObject payload = new();
+        if (body is null or WireNull)
         {
-            issues.Add(PydanticRules.Missing(["body"], PyNull.Instance));
+            issues.Add(FieldRules.Missing(["body"], WireNull.Instance));
         }
         else
         {
-            PydanticRules.TryDict(body, ["body"], issues, out payload);
+            FieldRules.TryDict(body, ["body"], issues, out payload);
         }
 
         issues.ThrowIfAny();
@@ -67,7 +67,7 @@ public static class MediaManagerIntakeEndpoints
         var importEvent = dialect.Normalize(payload);
         if (importEvent is null)
         {
-            return ApiRoutes.Ok(new PyDict().Set("status", "ignored").Set("source", dialect.Key));
+            return ApiRoutes.Ok(new WireObject().Set("status", "ignored").Set("source", dialect.Key));
         }
 
         if (importEvent.EventKind == MediaManagerImportEvent.Imported)
@@ -78,11 +78,11 @@ public static class MediaManagerIntakeEndpoints
                 .RecordManagerImportAsync(uow, importEvent, ManagerName(dialect.Key), identity.Authenticated).ConfigureAwait(false);
             if (!imported.Matched)
             {
-                return ApiRoutes.Ok(new PyDict().Set("status", "ignored").Set("source", dialect.Key).Set("event", importEvent.EventKind));
+                return ApiRoutes.Ok(new WireObject().Set("status", "ignored").Set("source", dialect.Key).Set("event", importEvent.EventKind));
             }
 
             await request.CommitAsync().ConfigureAwait(false);
-            return ApiRoutes.Ok(new PyDict()
+            return ApiRoutes.Ok(new WireObject()
                 .Set("status", "ok")
                 .Set("source", dialect.Key)
                 .Set("event", importEvent.EventKind)
@@ -93,7 +93,7 @@ public static class MediaManagerIntakeEndpoints
 
         var enqueued = await RefusalsAsApiErrors(() => Intake(request).EnqueueRefineAsync(uow, importEvent, identity.ConnectionId)).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("status", "ok")
             .Set("source", dialect.Key)
             .Set("event", importEvent.EventKind)
@@ -111,7 +111,7 @@ public static class MediaManagerIntakeEndpoints
         var presented = request.FirstHeader("X-Webhook-Secret");
         var uow = await request.DbAsync().ConfigureAwait(false);
         await RefusalsAsApiErrors(() => Intake(request).RequireSecretAsync(uow, presented, null)).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict().Set("capabilities", new PyList(IntakeRules.HandoffCapabilities.Select(c => (PyJson)new PyStr(c)))));
+        return ApiRoutes.Ok(new WireObject().Set("capabilities", new WireArray(IntakeRules.HandoffCapabilities.Select(c => (WireValue)new WireString(c)))));
     }
 
     private static async Task<(UnitOfWork Uow, string Key, HandoffLedgerRow Row)> RequireHandoffAsync(ApiRequest request)
@@ -189,13 +189,13 @@ public static class MediaManagerIntakeEndpoints
         var importedPath = model.OptionalStr("importedPath", maxLength: 4000);
         var reason = model.OptionalStr("reason", maxLength: 2000);
         model.Finish(ExtraFields.Ignore);
-        if (body is PyDict dict)
+        if (body is WireObject dict)
         {
             if (!dict.TryGetValue("occurredUtc", out var raw))
             {
-                issues.Add(PydanticRules.Missing(["body", "occurredUtc"], dict));
+                issues.Add(FieldRules.Missing(["body", "occurredUtc"], dict));
             }
-            else if (raw is PyNull)
+            else if (raw is WireNull)
             {
                 issues.Add(new ValidationIssue("datetime_type", ["body", "occurredUtc"], "Input should be a valid datetime", raw));
             }
@@ -247,7 +247,7 @@ public static class MediaManagerIntakeEndpoints
         return ApiRoutes.Ok(OutcomeOut(row.HandoffId, outcome, result.Released, result.Message));
     }
 
-    private static PyDict OutcomeOut(string handoffId, string outcome, bool released, string message) => new PyDict()
+    private static WireObject OutcomeOut(string handoffId, string outcome, bool released, string message) => new WireObject()
         .Set("handoffId", handoffId)
         .Set("outcome", outcome)
         .Set("released", released)

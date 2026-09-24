@@ -47,7 +47,7 @@ public sealed class FailureCleanupSweepEnqueuer : IPeriodicEnqueuer
                 if (!inserted)
                 {
                     var label = _scope == "tv" ? "TV" : "Movies";
-                    var detail = new PyDict()
+                    var detail = new WireObject()
                         .Set("media_scope", _scope)
                         .Set("cleanup_run_status", "skipped")
                         .Set("reason", "Previous cleanup job is still queued or running.")
@@ -57,7 +57,7 @@ public sealed class FailureCleanupSweepEnqueuer : IPeriodicEnqueuer
                     SqliteActivityWriter.Record(
                         connection,
                         transaction,
-                        new ActivityEventDraft(ActivityEventTypes.ProcessingFailureCleanupSweepCompleted, "processing", $"Cleanup skipped for {label}", PyJsonWriter.Dumps(detail, PyJsonFormat.Compact)));
+                        new ActivityEventDraft(ActivityEventTypes.ProcessingFailureCleanupSweepCompleted, "processing", $"Cleanup skipped for {label}", WireJsonWriter.Dumps(detail, WireJsonFormat.Compact)));
                 }
 
                 return inserted;
@@ -86,7 +86,7 @@ public sealed class FailureCleanupSweepEnqueuer : IPeriodicEnqueuer
         }
 
         var dedupe = $"{dedupeBase}:{Guid.NewGuid():N}";
-        var payload = PyJsonWriter.Dumps(new PyDict().Set("media_scope", scope).Set("trigger", trigger), PyJsonFormat.Compact);
+        var payload = WireJsonWriter.Dumps(new WireObject().Set("media_scope", scope).Set("trigger", trigger), WireJsonFormat.Compact);
         return (store.EnqueueOrGet(connection, transaction, dedupe, jobKind, payload, JobQueueRules.DefaultMaxAttempts, 0, 0), true);
     }
 }

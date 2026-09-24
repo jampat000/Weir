@@ -65,13 +65,13 @@ public static class JobKindGuard
         if (IsRetired(jobKind))
         {
             throw new ArgumentException(
-                $"processing_enqueue_or_get_job refuses a retired job_kind (got {PyStrings.Repr(jobKind)})");
+                $"processing_enqueue_or_get_job refuses a retired job_kind (got {WireStrings.Repr(jobKind)})");
         }
 
         if (!HasProcessingPrefix(jobKind))
         {
             throw new ArgumentException(
-                $"processing_enqueue_or_get_job requires job_kind to start with {PyStrings.Repr(JobKindPrefix)} (got {PyStrings.Repr(jobKind)})");
+                $"processing_enqueue_or_get_job requires job_kind to start with {WireStrings.Repr(JobKindPrefix)} (got {WireStrings.Repr(jobKind)})");
         }
     }
 
@@ -85,7 +85,7 @@ public static class JobKindGuard
         {
             throw new ArgumentException(
                 "Worker handler registry keys must start with " +
-                $"{PyStrings.Repr(JobKindPrefix)} and must not use a retired prefix (offending keys: [{string.Join(", ", bad.Select(PyStrings.Repr))}])");
+                $"{WireStrings.Repr(JobKindPrefix)} and must not use a retired prefix (offending keys: [{string.Join(", ", bad.Select(WireStrings.Repr))}])");
         }
     }
 }

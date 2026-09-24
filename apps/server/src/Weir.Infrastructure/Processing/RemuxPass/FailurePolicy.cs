@@ -17,13 +17,13 @@ public interface IFailurePolicy
     /// Under <c>reject</c>, queues a reject for a file whose content was found unusable. True when
     /// one was queued.
     /// </summary>
-    Task<bool> RejectBadReleaseAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string reason, PyDict? origin);
+    Task<bool> RejectBadReleaseAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string reason, WireObject? origin);
 
     /// <summary>
     /// Acts on a recorded failure once no retry is coming. Returns the follow-up queued,
     /// <c>pass_through</c> or <c>reject</c>, or null.
     /// </summary>
-    Task<string?> ApplyFailurePolicyAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, bool willRetry, PyDict? origin, bool badRelease);
+    Task<string?> ApplyFailurePolicyAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, bool willRetry, WireObject? origin, bool badRelease);
 }
 
 /// <summary>
@@ -44,7 +44,7 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
     }
 
-    public Task<bool> RejectBadReleaseAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string reason, PyDict? origin)
+    public Task<bool> RejectBadReleaseAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string reason, WireObject? origin)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(library);
@@ -56,7 +56,7 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
         var body = Body(library, relativePath, origin);
         if (reason.Length > 0)
         {
-            body.Set("reason", PyStrings.Slice(reason, 1200));
+            body.Set("reason", WireStrings.Slice(reason, 1200));
         }
 
         body.Set("failure_class", "preflight");
@@ -64,7 +64,7 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
         return Task.FromResult(true);
     }
 
-    public async Task<string?> ApplyFailurePolicyAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, bool willRetry, PyDict? origin, bool badRelease)
+    public async Task<string?> ApplyFailurePolicyAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, bool willRetry, WireObject? origin, bool badRelease)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(library);
@@ -94,9 +94,9 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
         return ProcessingFailurePolicies.PassThrough;
     }
 
-    private static PyDict Body(ProcessingLibraryRecord library, string relativePath, PyDict? origin)
+    private static WireObject Body(ProcessingLibraryRecord library, string relativePath, WireObject? origin)
     {
-        var body = new PyDict().Set("relative_media_path", relativePath).Set("library_id", library.Id).Set("trigger", "worker");
+        var body = new WireObject().Set("relative_media_path", relativePath).Set("library_id", library.Id).Set("trigger", "worker");
         if (origin is { IsTruthy: true })
         {
             body.Set("origin", origin);
@@ -105,13 +105,13 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
         return body;
     }
 
-    private void Enqueue(UnitOfWork uow, string dedupeKey, string jobKind, PyDict body, ProcessingLibraryRecord library) =>
+    private void Enqueue(UnitOfWork uow, string dedupeKey, string jobKind, WireObject body, ProcessingLibraryRecord library) =>
         _jobs.EnqueueOrGet(
             uow.Connection,
             uow.WriteTransaction(),
             dedupeKey,
             jobKind,
-            PyJsonWriter.Dumps(body, PyJsonFormat.Compact),
+            WireJsonWriter.Dumps(body, WireJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
             0,
             (int)Math.Clamp(library.Priority, int.MinValue, int.MaxValue));
@@ -138,9 +138,9 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
 /// <summary>A policy that never queues a follow-up: every failure is left held where it is. For tests and diagnostics.</summary>
 public sealed class HoldingFailurePolicy : IFailurePolicy
 {
-    public Task<bool> RejectBadReleaseAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string reason, PyDict? origin) =>
+    public Task<bool> RejectBadReleaseAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string reason, WireObject? origin) =>
         Task.FromResult(false);
 
-    public Task<string?> ApplyFailurePolicyAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, bool willRetry, PyDict? origin, bool badRelease) =>
+    public Task<string?> ApplyFailurePolicyAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, bool willRetry, WireObject? origin, bool badRelease) =>
         Task.FromResult<string?>(null);
 }

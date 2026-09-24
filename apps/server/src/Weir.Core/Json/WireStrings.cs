@@ -12,7 +12,7 @@ namespace Weir.Core.Json;
 /// Lengths and slices count code points, not UTF-16 units: a surrogate pair counts as one code point,
 /// and a lone surrogate counts as one too and is kept as it is.
 /// </remarks>
-public static class PyStrings
+public static class WireStrings
 {
     /// <summary>Whether one UTF-16 unit is whitespace (every whitespace code point in the set is in the BMP).</summary>
     public static bool IsSpace(char c) => c switch

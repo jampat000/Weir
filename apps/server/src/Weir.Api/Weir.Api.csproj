@@ -15,12 +15,12 @@
   </ItemGroup>
   <ItemGroup>
     <!--
-      The committed, FastAPI-generated reference document (apps/web/openapi/weir-openapi.json, kept current
-      by `npm run api:types:check` in apps/web). OpenApiDocument.cs prunes it to the operations the .NET
-      server actually maps (RouteTable), so /openapi.json always reuses Python's own schemas verbatim for
-      everything it serves, with no separate copy to fall out of sync. See ADR-0017 and apps/server/README.md
-      ("Until the switch (#523), apps/backend is the reference").
+      The committed reference document (apps/web/openapi/weir-openapi.json, kept current by `npm run
+      api:types:check` in apps/web). WeirOpenApiDocument.cs prunes it to the operations the .NET server
+      actually maps (RouteTable), so /openapi.json always reuses the committed document's schemas verbatim
+      for everything it serves, with no separate copy to fall out of sync. See ADR-0017 and
+      apps/server/README.md ("Until the switch (#523), apps/backend is the reference").
     -->
-    <EmbeddedResource Include="..\..\..\web\openapi\weir-openapi.json" LogicalName="Weir.Api.OpenApi.python-openapi.json" Link="OpenApi\python-openapi.json" />
+    <EmbeddedResource Include="..\..\..\web\openapi\weir-openapi.json" LogicalName="Weir.Api.OpenApi.committed-openapi.json" Link="OpenApi\committed-openapi.json" />
   </ItemGroup>
 </Project>

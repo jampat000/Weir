@@ -36,8 +36,8 @@ public static partial class ManagerSetupRules
                 "Give each its own Weir library."));
         }
 
-        var downloads = PyStrings.Strip(library.DownloadsPath ?? string.Empty);
-        var watched = PyStrings.Strip(watchedFolder ?? string.Empty);
+        var downloads = WireStrings.Strip(library.DownloadsPath ?? string.Empty);
+        var watched = WireStrings.Strip(watchedFolder ?? string.Empty);
         if (downloads.Length == 0)
         {
             lines.Add(new SetupCheckLine(
@@ -58,8 +58,8 @@ public static partial class ManagerSetupRules
                 $"Use {managerLabel}'s folders."));
         }
 
-        var processed = PyStrings.Strip(library.OutputPath ?? string.Empty);
-        var output = PyStrings.Strip(outputFolder ?? string.Empty);
+        var processed = WireStrings.Strip(library.OutputPath ?? string.Empty);
+        var output = WireStrings.Strip(outputFolder ?? string.Empty);
         if (processed.Length > 0)
         {
             lines.Add(output.Length > 0 && Inside(processed, output) && Inside(output, processed)
@@ -81,5 +81,5 @@ public static partial class ManagerSetupRules
         return root.Length > 0 && (target == root || target.StartsWith(root + "/", StringComparison.Ordinal));
     }
 
-    private static string Comparable(string path) => PyStrings.Strip(path.Replace('\\', '/')).TrimEnd('/').ToLowerInvariant();
+    private static string Comparable(string path) => WireStrings.Strip(path.Replace('\\', '/')).TrimEnd('/').ToLowerInvariant();
 }

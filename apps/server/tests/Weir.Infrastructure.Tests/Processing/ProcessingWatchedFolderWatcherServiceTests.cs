@@ -92,8 +92,8 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
             await Eventually.ThatAsync(() => ScanJobPayloads(store).Count > 0);
             var payloads = ScanJobPayloads(store);
             Assert.Single(payloads);
-            var body = (PyDict)PyJsonParser.Parse(payloads[0]);
-            Assert.Equal("filesystem_event", ((PyStr)body.Get("scan_trigger")!).Value);
+            var body = (WireObject)WireJsonParser.Parse(payloads[0]);
+            Assert.Equal("filesystem_event", ((WireString)body.Get("scan_trigger")!).Value);
         }
         finally
         {
@@ -398,8 +398,8 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
             first.RaiseError(new IOException("simulated overflow"));
 
             await Eventually.ThatAsync(() => ScanJobPayloads(store).Count > 0);
-            var body = (PyDict)PyJsonParser.Parse(ScanJobPayloads(store)[0]);
-            Assert.Equal("filesystem_event", ((PyStr)body.Get("scan_trigger")!).Value);
+            var body = (WireObject)WireJsonParser.Parse(ScanJobPayloads(store)[0]);
+            Assert.Equal("filesystem_event", ((WireString)body.Get("scan_trigger")!).Value);
 
             // The watcher for this folder was replaced, not merely left running after the error.
             await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 2);

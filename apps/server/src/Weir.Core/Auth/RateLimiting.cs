@@ -155,8 +155,8 @@ public static class ClientRateLimitKey
         }
 
         var trusted = trustedProxyIps
-            .Select(raw => PyIpNetwork.TryParse(raw, strict: false, out var network) ? network : null)
-            .OfType<PyIpNetwork>()
+            .Select(raw => NetRange.TryParse(raw, strict: false, out var network) ? network : null)
+            .OfType<NetRange>()
             .ToList();
         if (!InNetworks(host, trusted))
         {
@@ -175,9 +175,9 @@ public static class ClientRateLimitKey
         return chain.Count > 0 ? chain[0] : host;
     }
 
-    public static bool InNetworks(string raw, IReadOnlyList<PyIpNetwork> networks)
+    public static bool InNetworks(string raw, IReadOnlyList<NetRange> networks)
     {
         ArgumentNullException.ThrowIfNull(networks);
-        return PyIpAddress.TryParse(raw, out var address) && networks.Any(network => network.Contains(address));
+        return NetAddress.TryParse(raw, out var address) && networks.Any(network => network.Contains(address));
     }
 }

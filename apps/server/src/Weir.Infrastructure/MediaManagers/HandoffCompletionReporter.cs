@@ -78,7 +78,7 @@ public sealed partial class HandoffCompletionReporter
     }
 
     /// <summary>Send the report: one POST, no redirects, never throws.</summary>
-    public async Task<HandoffReportDelivery> PostHandoffReportAsync(HandoffReportTarget target, PyDict body, CancellationToken cancellationToken = default)
+    public async Task<HandoffReportDelivery> PostHandoffReportAsync(HandoffReportTarget target, WireObject body, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(body);
@@ -90,7 +90,7 @@ public sealed partial class HandoffCompletionReporter
             using var request = new HttpRequestMessage(HttpMethod.Post, target.Url)
             {
                 // Compact, UTF-8, no ASCII escaping: the body bytes managers already receive.
-                Content = new ByteArrayContent(PyJsonWriter.DumpsUtf8(body, PyJsonFormat.Response)),
+                Content = new ByteArrayContent(WireJsonWriter.DumpsUtf8(body, WireJsonFormat.Response)),
             };
             request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
             foreach (var (header, value) in target.Headers)
@@ -112,7 +112,7 @@ public sealed partial class HandoffCompletionReporter
 
         if (status is >= 200 and < 300)
         {
-            return new HandoffReportDelivery(true, $"reported {PyConvert.Str(body["status"])} to {name}");
+            return new HandoffReportDelivery(true, $"reported {WireConvert.Str(body["status"])} to {name}");
         }
 
         _logger.LogWarning("Hand-off report to {Url} returned HTTP {Status}", target.Url, status);
@@ -120,7 +120,7 @@ public sealed partial class HandoffCompletionReporter
     }
 
     /// <summary>Record the report in Activity, in plain words, accepted or not.</summary>
-    public static Task RecordHandoffReportAsync(UnitOfWork uow, HandoffReportTarget target, PyDict body, HandoffReportDelivery delivery, string? relativePath)
+    public static Task RecordHandoffReportAsync(UnitOfWork uow, HandoffReportTarget target, WireObject body, HandoffReportDelivery delivery, string? relativePath)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(body);
@@ -128,17 +128,17 @@ public sealed partial class HandoffCompletionReporter
         var name = target.Connection.Name;
         var fileName = !string.IsNullOrEmpty(relativePath)
             ? MediaPathNames.Name(relativePath, OperatingSystem.IsWindows())
-            : body.Get("releaseName") is { IsTruthy: true } release ? PyConvert.Str(release) : "a handed-over file";
+            : body.Get("releaseName") is { IsTruthy: true } release ? WireConvert.Str(release) : "a handed-over file";
         string title;
         if (!delivery.Accepted)
         {
             title = $"Weir could not tell {name} about {fileName}";
         }
-        else if (body.Get("disposition") is PyStr { Value: "rejected" })
+        else if (body.Get("disposition") is WireString { Value: "rejected" })
         {
             title = $"Told {name} that {fileName} is a bad release and was removed";
         }
-        else if (body.Get("status") is PyStr { Value: "completed" })
+        else if (body.Get("status") is WireString { Value: "completed" })
         {
             title = $"Told {name} that {fileName} is ready to import";
         }
@@ -147,7 +147,7 @@ public sealed partial class HandoffCompletionReporter
             title = $"Told {name} that Weir could not process {fileName}";
         }
 
-        var detail = new PyDict()
+        var detail = new WireObject()
             .Set("relative_media_path", relativePath)
             .Set("manager", name)
             .Set("accepted", delivery.Accepted)
@@ -166,7 +166,7 @@ public sealed partial class HandoffCompletionReporter
             ActivityEventTypes.ProcessingHandoffReported,
             "processing",
             title,
-            PyStrings.Slice(PyJsonWriter.Dumps(detail, PyJsonFormat.Compact), 10_000)));
+            WireStrings.Slice(WireJsonWriter.Dumps(detail, WireJsonFormat.Compact), 10_000)));
     }
 
     /// <summary>
@@ -181,18 +181,18 @@ public sealed partial class HandoffCompletionReporter
     /// </para>
     /// Commits <paramref name="uow"/> (or rolls it back when recording fails).
     /// </summary>
-    public async Task<string> ReportHandoffCompletionAsync(UnitOfWork uow, string? payloadJson, PyDict result, CancellationToken cancellationToken = default)
+    public async Task<string> ReportHandoffCompletionAsync(UnitOfWork uow, string? payloadJson, WireObject result, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(result);
-        PyJson? payload = null;
+        WireValue? payload = null;
         if (!string.IsNullOrEmpty(payloadJson))
         {
             try
             {
-                payload = PyJsonParser.Parse(payloadJson);
+                payload = WireJsonParser.Parse(payloadJson);
             }
-            catch (PyJsonDecodeException)
+            catch (WireJsonDecodeException)
             {
                 return "skipped: job payload is not readable";
             }
@@ -210,24 +210,24 @@ public sealed partial class HandoffCompletionReporter
         }
 
         var succeeded = CompletionReports.IsSucceeded(result);
-        if (!succeeded && result.Get("retry_scheduled") is PyBool { Value: true })
+        if (!succeeded && result.Get("retry_scheduled") is WireBool { Value: true })
         {
             return "skipped: the failure will be retried, so it is not final yet";
         }
 
-        if (!succeeded && result.Get("pass_through_queued") is PyBool { Value: true })
+        if (!succeeded && result.Get("pass_through_queued") is WireBool { Value: true })
         {
             return "skipped: the original is being handed back, which will be reported when it is delivered";
         }
 
-        if (!succeeded && result.Get("reject_queued") is PyBool { Value: true })
+        if (!succeeded && result.Get("reject_queued") is WireBool { Value: true })
         {
             return "skipped: the release is being rejected, which reports on its own";
         }
 
-        var relative = result.Get("relative_media_path") is PyStr text ? text.Value
-            : payload is PyDict named && named.Get("relative_media_path") is PyStr path ? path.Value : null;
-        long? libraryId = payload is PyDict carried && carried.Get("library_id") is PyInt library ? (long)library.Value : null;
+        var relative = result.Get("relative_media_path") is WireString text ? text.Value
+            : payload is WireObject named && named.Get("relative_media_path") is WireString path ? path.Value : null;
+        long? libraryId = payload is WireObject carried && carried.Get("library_id") is WireInteger library ? (long)library.Value : null;
         HandoffTargetFinish finish;
         try
         {
@@ -265,7 +265,7 @@ public sealed partial class HandoffCompletionReporter
     /// hand-off id at all): the file's own result, exactly as it has always been reported. No claim is made here, so
     /// there is nothing durable to leave dangling if the manager cannot be reached.
     /// </summary>
-    private async Task<string> ReportUntrackedFileAsync(UnitOfWork uow, HandoffOrigin origin, PyDict result, string? relative, long? libraryId, CancellationToken cancellationToken)
+    private async Task<string> ReportUntrackedFileAsync(UnitOfWork uow, HandoffOrigin origin, WireObject result, string? relative, long? libraryId, CancellationToken cancellationToken)
     {
         var (target, reason) = await ResolveHandoffTargetAsync(uow, origin).ConfigureAwait(false);
         var outputPath = target is not null && CompletionReports.IsSucceeded(result)
@@ -292,7 +292,7 @@ public sealed partial class HandoffCompletionReporter
     /// A report ready to record: the ledger state it means, the body, the path Activity names it by (the file, or the
     /// folder of a hand-off of several files), and the files whose History waits on it while the manager is not answering.
     /// </summary>
-    private sealed record ReportedOutcome(string State, PyDict Body, string? Subject, IReadOnlyList<string> Files, long? LibraryId);
+    private sealed record ReportedOutcome(string State, WireObject Body, string? Subject, IReadOnlyList<string> Files, long? LibraryId);
 
     /// <summary>
     /// Keep the ledger and Activity in step with a final outcome recorded outside the claim mechanism (a hand-off with
@@ -310,9 +310,9 @@ public sealed partial class HandoffCompletionReporter
                 origin.SourceKey,
                 origin.HandoffId,
                 outcome.State,
-                body.Get("outputPath") is PyStr output ? output.Value : null,
-                body.Get("message") is PyStr message ? message.Value : null,
-                body.Get("outputFiles") is PyList files ? [.. files.Items.OfType<PyStr>().Select(file => file.Value)] : null).ConfigureAwait(false);
+                body.Get("outputPath") is WireString output ? output.Value : null,
+                body.Get("message") is WireString message ? message.Value : null,
+                body.Get("outputFiles") is WireArray files ? [.. files.Items.OfType<WireString>().Select(file => file.Value)] : null).ConfigureAwait(false);
             if (report is { } sent)
             {
                 await RecordHandoffReportAsync(uow, sent.Target, body, sent.Delivery, outcome.Subject).ConfigureAwait(false);

@@ -57,7 +57,7 @@ internal sealed class WeirTestServer : IAsyncDisposable
             builder.WebHost.UseTestServer();
             // TestServer leaves Connection.RemoteIpAddress unset; the tray and every real browser reach
             // Weir over loopback, so default to that here too. A test that needs a different peer sets one
-            // via TestServer.SendAsync before the pipeline runs (see PythonBugFixTests), which this does not override.
+            // via TestServer.SendAsync before the pipeline runs, which this does not override.
             builder.Services.AddSingleton<IStartupFilter, LoopbackConnectionStartupFilter>();
             if (signedIn)
             {

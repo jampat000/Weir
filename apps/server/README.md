@@ -49,7 +49,7 @@ The variables and their defaults are documented in the repository's [`.env.examp
 
 ## Schema and migrations
 
-The numbered SQL scripts in `src/Weir.Infrastructure/Migrations/` are the only source of schema changes. `Weir.Infrastructure.Sqlite.SchemaMigrator` lists them in order, each with the revision it leaves behind, and records the current revision in the `alembic_version` table. The table name is kept from the retired Python backend, so databases from earlier releases are recognised and upgraded.
+The numbered SQL scripts in `src/Weir.Infrastructure/Migrations/` are the only source of schema changes. `Weir.Infrastructure.Sqlite.SchemaMigrator` lists them in order, each with the revision it leaves behind, and records the current revision in the `alembic_version` table. The table name matches what earlier releases wrote, so their databases are recognised and upgraded.
 
 The current head is migration `0020_library_file_probes`, revision `0055_library_file_probes`. The first script, `0001_baseline_0036_drop_pruner_tables.sql`, is the frozen baseline (revision `0036_drop_pruner_tables`).
 
@@ -86,4 +86,4 @@ The product version is `WeirVersion` in `apps/server/Directory.Build.props`. The
 
 ## History
 
-The notes kept while the server was ported from the Python backend, and the per-issue design notes that followed, are in [`docs/archive/server-port-notes.md`](../../docs/archive/server-port-notes.md). They are a historical record, not current documentation. Some code comments and test names still name the Python function a piece of code was ported from; the Python code is in git history before #523.
+The notes kept while the server was ported from the Python backend, and the per-issue design notes that followed, are in [`docs/archive/server-port-notes.md`](../../docs/archive/server-port-notes.md). They are a historical record, not current documentation. The retired Python source itself is in git history before #523.

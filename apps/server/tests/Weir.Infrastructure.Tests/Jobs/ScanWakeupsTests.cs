@@ -83,8 +83,8 @@ public sealed class ScanWakeupsTests
             await uow.CommitAsync();
         }
 
-        var payload = new PyDict().Set("enqueue_remux_jobs", true).Set("scan_trigger", "manual").Set("media_scope", "movie").Set("library_id", libraryId);
-        var job = await jobs.EnqueueOrGetAsync("scan-wakeup", ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch, PyJsonWriter.Dumps(payload, PyJsonFormat.Compact));
+        var payload = new WireObject().Set("enqueue_remux_jobs", true).Set("scan_trigger", "manual").Set("media_scope", "movie").Set("library_id", libraryId);
+        var job = await jobs.EnqueueOrGetAsync("scan-wakeup", ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
         await handler.HandleAsync(new JobWorkContext(job.Id, job.JobKind, job.PayloadJson, "test"), CancellationToken.None);
 
         // Too new to touch, so it is on hold until a known time (first while its size settles, then its minimum age), and
@@ -151,7 +151,7 @@ public sealed class ScanWakeupsTests
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT hold_until FROM files WHERE relative_path = $p";
         command.Parameters.AddWithValue("$p", relative);
-        return PythonTimestamps.Parse(await command.ExecuteScalarAsync());
+        return TimestampColumns.Parse(await command.ExecuteScalarAsync());
     }
 
     private static async Task<string?> StatusAsync(StoreFixture store, string relative)

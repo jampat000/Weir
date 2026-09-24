@@ -216,7 +216,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
     private readonly RecordingFacts _facts = new();
     private readonly FakeCleanupData _cleanup = new();
     private readonly FakeOriginalLanguage _language = new();
-    private readonly List<PyDict> _progress = [];
+    private readonly List<WireObject> _progress = [];
 
     public void Dispose() => _folders.Dispose();
 
@@ -236,7 +236,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
             FreeBytes = freeBytes,
         };
 
-    private Task<PyDict> Run(
+    private Task<WireObject> Run(
         string relative,
         ProcessingPathRuntime? runtime = null,
         long minSizeMb = 0,
@@ -264,9 +264,9 @@ public sealed class RemuxPassRunnerTests : IDisposable
             ManualPlanFingerprint = manualPlanFingerprint,
         });
 
-    private static string Str(PyDict result, string key) => PyConvert.Str(result[key]);
+    private static string Str(WireObject result, string key) => WireConvert.Str(result[key]);
 
-    private static bool? Bool(PyDict result, string key) => result.Get(key) is PyBool value ? value.Value : null;
+    private static bool? Bool(WireObject result, string key) => result.Get(key) is WireBool value ? value.Value : null;
 
     [Fact]
     public async Task A_missing_watched_folder_fails_before_execution()
@@ -355,7 +355,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
         Assert.Equal("write", Assert.Single(_facts.Collisions).Action);
         // #539 item 5: the integrity read runs on every platform, Windows included.
         Assert.Contains(_media.Calls, argv => argv.Contains("null"));
-        Assert.Equal("{\"device\"", PyJsonWriter.Dumps(result["source_fingerprint"], PyJsonFormat.Compact)[..9]);
+        Assert.Equal("{\"device\"", WireJsonWriter.Dumps(result["source_fingerprint"], WireJsonFormat.Compact)[..9]);
     }
 
     [Fact]
@@ -420,10 +420,10 @@ public sealed class RemuxPassRunnerTests : IDisposable
         Assert.True(Bool(result, "output_copied_without_remux"));
         Assert.Equal(4400, new FileInfo(_folders.Out(Path.Join("ForeignLanguageFilm", "film.mkv"))).Length);
         Assert.True(Bool(result, "source_deleted_after_success"));
-        Assert.Contains(_progress, update => update.Get("percent") is PyFloat { Value: 100.0 });
-        Assert.Contains(_progress, update => PyConvert.Str(update.Get("message") ?? PyNull.Instance).Contains("passing this file through unchanged", StringComparison.Ordinal));
+        Assert.Contains(_progress, update => update.Get("percent") is WireNumber { Value: 100.0 });
+        Assert.Contains(_progress, update => WireConvert.Str(update.Get("message") ?? WireNull.Instance).Contains("passing this file through unchanged", StringComparison.Ordinal));
         Assert.False(File.Exists(source));
-        Assert.Equal("[]", PyJsonWriter.Dumps(result["ffmpeg_argv"], PyJsonFormat.Compact));
+        Assert.Equal("[]", WireJsonWriter.Dumps(result["ffmpeg_argv"], WireJsonFormat.Compact));
         Assert.Contains("operator bypassed the rules", Str(result, "reason"), StringComparison.Ordinal);
     }
 
@@ -492,7 +492,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
 
         var result = await Run("sub/d/deep.mkv");
 
-        Assert.True(Bool(result, "ok"), PyJsonWriter.Dumps(result, PyJsonFormat.Compact));
+        Assert.True(Bool(result, "ok"), WireJsonWriter.Dumps(result, WireJsonFormat.Compact));
         Assert.Equal(RemuxPassOutcomes.LiveOutputWritten, Str(result, "outcome"));
         Assert.True(Bool(result, "output_replaced_existing"));
         Assert.True(result.ContainsKey("output_replacement_note"));
@@ -502,9 +502,9 @@ public sealed class RemuxPassRunnerTests : IDisposable
         Assert.True(Bool(result, "source_deleted_after_success"));
         Assert.True(Bool(result, "source_folder_deleted"));
         Assert.Equal(["processing", "processing", "processing", "finishing", "finished"], _progress.Select(update => Str(update, "status")));
-        Assert.Equal(25.0, ((PyFloat)_progress[1]["percent"]).Value);
-        Assert.Equal(100.0, ((PyFloat)_progress[^1]["percent"]).Value);
-        Assert.Single(((PyList)result["removed_audio"]).Items);
+        Assert.Equal(25.0, ((WireNumber)_progress[1]["percent"]).Value);
+        Assert.Equal(100.0, ((WireNumber)_progress[^1]["percent"]).Value);
+        Assert.Single(((WireArray)result["removed_audio"]).Items);
         Assert.Contains("audio out: #1 eng", Str(result, "plan_summary"), StringComparison.Ordinal);
         Assert.Empty(Directory.EnumerateFiles(_folders.Work));
         Assert.Equal(["ok", "outcome", "relative_media_path", "inspected_source_path", "processing_watched_folder_resolved", "stream_counts"], result.Keys.Take(6));
@@ -522,7 +522,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
         _media.DefaultProbe = FakeMediaRunner.EnglishOnly;
 
         var executed = Assert.Single(_media.Remuxes);
-        var recorded = ((PyList)result["ffmpeg_argv"]).Items.Select(PyConvert.Str).ToList();
+        var recorded = ((WireArray)result["ffmpeg_argv"]).Items.Select(WireConvert.Str).ToList();
         Assert.Equal(recorded.TakeWhile(arg => arg != "-i"), executed.TakeWhile(arg => arg != "-i"));
     }
 
@@ -671,7 +671,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
         _folders.Source(Path.Join("X", "a.mkv"), 600);
         var locked = Path.Join(_folders.Watched, "X", "zz-locked.nfo");
         File.WriteAllText(locked, "nfo");
-        PyDict result;
+        WireObject result;
         using (new FileStream(locked, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {
             result = await Run("X/a.mkv", runner: Runner(hardlink: false));
@@ -712,10 +712,10 @@ public sealed class RemuxPassRunnerTests : IDisposable
 
         Assert.Equal(RemuxPassOutcomes.SourceNotReady, Str(young, "outcome"));
         Assert.Equal("waiting", Str(young, "preflight_status"));
-        Assert.True(((PyBool)young["retryable_wait"]).Value);
+        Assert.True(((WireBool)young["retryable_wait"]).Value);
         Assert.Contains("changed too recently", Str(young, "preflight_reason"), StringComparison.Ordinal);
         Assert.Equal(RemuxPassRunner.MinimumAgeWait, Str(young, "not_ready_kind"));
-        Assert.InRange((long)((PyInt)young["not_ready_seconds"]).Value, 590, 600);
+        Assert.InRange((long)((WireInteger)young["not_ready_seconds"]).Value, 590, 600);
         Assert.False(young.ContainsKey("source_folder_deleted"));
     }
 
@@ -728,7 +728,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
 
         var result = await Run("R/one.mkv", _folders.Runtime(workIsDefault: true) with { WorkFolderEffective = work });
 
-        Assert.True(Bool(result, "ok"), PyJsonWriter.Dumps(result, PyJsonFormat.Compact));
+        Assert.True(Bool(result, "ok"), WireJsonWriter.Dumps(result, WireJsonFormat.Compact));
         Assert.True(Directory.Exists(work));
         Assert.True(Bool(result, "source_folder_deleted"));
 
@@ -785,7 +785,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
         Assert.EndsWith("film (2).mkv", Str(result, "output_file"), StringComparison.Ordinal);
         Assert.Equal("existing", File.ReadAllText(_folders.Out(Path.Join("Film", "film.mkv"))));
         Assert.Equal("subs", File.ReadAllText(_folders.Out(Path.Join("Film", "film (2).en.srt"))));
-        Assert.Equal("[\"film (2).en.srt\"]", PyJsonWriter.Dumps(result["sidecars_migrated"], PyJsonFormat.Compact));
+        Assert.Equal("[\"film (2).en.srt\"]", WireJsonWriter.Dumps(result["sidecars_migrated"], WireJsonFormat.Compact));
     }
 
     [Fact]
@@ -804,13 +804,13 @@ public sealed class RemuxPassRunnerTests : IDisposable
 
         var result = await Run("Amelie.2001.1080p/film.mkv", rules: rules);
 
-        Assert.True(Bool(result, "ok"), PyJsonWriter.Dumps(result, PyJsonFormat.Compact));
+        Assert.True(Bool(result, "ok"), WireJsonWriter.Dumps(result, WireJsonFormat.Compact));
         Assert.Equal("movie", Assert.Single(_language.Asked).Scope);
         var executed = Assert.Single(_media.Remuxes);
         Assert.Contains("0:2", executed);
         Assert.DoesNotContain("0:1", executed);
-        Assert.Contains("original language (fre)", string.Join(" ", ((PyList)result["audio_selection_notes"]).Items.Select(PyConvert.Str)), StringComparison.Ordinal);
-        Assert.Equal("[2]", PyJsonWriter.Dumps(((PyDict)result["original_language"])["preferred_audio_indices"], PyJsonFormat.Compact));
+        Assert.Contains("original language (fre)", string.Join(" ", ((WireArray)result["audio_selection_notes"]).Items.Select(WireConvert.Str)), StringComparison.Ordinal);
+        Assert.Equal("[2]", WireJsonWriter.Dumps(((WireObject)result["original_language"])["preferred_audio_indices"], WireJsonFormat.Compact));
 
         // Without the option, the preference list (English first) decides and nobody is asked.
         _language.Asked.Clear();
@@ -818,7 +818,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
         _media.DefaultProbe = FakeMediaRunner.EnglishOnly;
         _folders.Source(Path.Join("Amelie.2001.1080p", "film.mkv"));
         var plain = await Run("Amelie.2001.1080p/film.mkv", rules: RemuxRules.DefaultConfig());
-        Assert.True(Bool(plain, "ok"), PyJsonWriter.Dumps(plain, PyJsonFormat.Compact));
+        Assert.True(Bool(plain, "ok"), WireJsonWriter.Dumps(plain, WireJsonFormat.Compact));
         Assert.Empty(_language.Asked);
         Assert.Contains("0:1", Assert.Single(_media.Remuxes));
         Assert.False(plain.ContainsKey("original_language"));
@@ -844,7 +844,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
 
         var result = await Run("Show/ep.mkv", manualPlan: choice, manualPlanFingerprint: fingerprint);
 
-        Assert.True(Bool(result, "ok"), PyJsonWriter.Dumps(result, PyJsonFormat.Compact));
+        Assert.True(Bool(result, "ok"), WireJsonWriter.Dumps(result, WireJsonFormat.Compact));
         var executed = Assert.Single(_media.Remuxes);
         var maps = executed.Select((token, i) => (token, i)).Where(p => p.token == "-map").Select(p => executed[p.i + 1]).ToList();
         // #547: "-map 0:t?" (an attachment, if any) is added for every Matroska output regardless of the plan.
@@ -854,7 +854,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
         Assert.True(dispositionIndex >= 0);
         // #547: the additive syntax, not the flat "default" this replaced.
         Assert.Equal("+default", executed[dispositionIndex + 1]);
-        Assert.Contains("chose these tracks by hand", string.Join(" ", ((PyList)result["audio_selection_notes"]).Items.Select(PyConvert.Str)), StringComparison.Ordinal);
+        Assert.Contains("chose these tracks by hand", string.Join(" ", ((WireArray)result["audio_selection_notes"]).Items.Select(WireConvert.Str)), StringComparison.Ordinal);
     }
 
     [Fact]

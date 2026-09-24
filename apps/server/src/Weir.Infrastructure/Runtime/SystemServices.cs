@@ -21,7 +21,7 @@ public sealed class UpdateFiles
     }
 
     /// <summary>Read the update settings, with <paramref name="warn"/> called when the file is unreadable.</summary>
-    public PyDict ReadSettings(Action<string>? warn = null)
+    public WireObject ReadSettings(Action<string>? warn = null)
     {
         var path = Path.Join(_options.WeirHome, SettingsFileName);
         if (!File.Exists(path) && !Directory.Exists(path))
@@ -57,7 +57,7 @@ public sealed class UpdateFiles
     }
 
     /// <summary>Save the update settings: written whole to a unique scratch file, then renamed into place.</summary>
-    public PyDict WriteSettings(string mode, bool checkOnStartup, long checkIntervalMinutes)
+    public WireObject WriteSettings(string mode, bool checkOnStartup, long checkIntervalMinutes)
     {
         var path = Path.Join(_options.WeirHome, SettingsFileName);
         var text = UpdateStatus.SerializeUpdateSettings(mode, checkOnStartup, checkIntervalMinutes);
@@ -87,7 +87,7 @@ public sealed class UpdateFiles
     }
 
     /// <summary>Read the update state the tray writes; a missing or unreadable file reads as the default state.</summary>
-    public PyDict ReadState()
+    public WireObject ReadState()
     {
         var path = Path.Join(_options.WeirHome, StateFileName);
         if (!File.Exists(path))

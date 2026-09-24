@@ -51,9 +51,9 @@ public sealed record OperatorFailure(
     string? NextAction,
     string? TechnicalDetail)
 {
-    public PyDict AsDict()
+    public WireObject AsDict()
     {
-        var output = new PyDict()
+        var output = new WireObject()
             .Set("failure_kind", FailureMessages.KindText(Kind))
             .Set("recoverable", Recoverable)
             .Set("what_failed", $"{Module} {Action}")
@@ -187,7 +187,7 @@ public static class FailureMessages
         return new OperatorFailure(
             module, action, kind, recoverable, message, WhyForKind(kind, provider), happensNext,
             NextActionForKind(kind, provider, recoverable),
-            PyStrings.Slice(detail, 1000));
+            WireStrings.Slice(detail, 1000));
     }
 
     /// <summary>A <c>RuntimeError</c> subject: the type name Weir's own refusals are recorded under.</summary>
@@ -203,14 +203,14 @@ public static class FailureMessages
         ArgumentNullException.ThrowIfNull(exception);
         return exception switch
         {
-            Jobs.AlreadyRecordedFailureException => new FailureSubject(Jobs.AlreadyRecordedFailureException.PythonTypeName, exception.Message, ExceptionCategory.Other),
+            Jobs.AlreadyRecordedFailureException => new FailureSubject(Jobs.AlreadyRecordedFailureException.FailureTypeName, exception.Message, ExceptionCategory.Other),
             FileNotFoundException or DirectoryNotFoundException => new FailureSubject("FileNotFoundError", exception.Message, ExceptionCategory.Filesystem),
             UnauthorizedAccessException => new FailureSubject("PermissionError", exception.Message, ExceptionCategory.Filesystem),
             TimeoutException => new FailureSubject("TimeoutError", exception.Message, ExceptionCategory.NetworkOrOs),
             System.Net.Http.HttpRequestException or System.Net.Sockets.SocketException => new FailureSubject("ConnectionError", exception.Message, ExceptionCategory.NetworkOrOs),
             IOException => new FailureSubject("OSError", exception.Message, ExceptionCategory.NetworkOrOs),
-            PyTypeErrorException => new FailureSubject("TypeError", exception.Message, ExceptionCategory.Validation),
-            ArgumentException or FormatException or InvalidCastException or PyValueErrorException =>
+            WireTypeException => new FailureSubject("TypeError", exception.Message, ExceptionCategory.Validation),
+            ArgumentException or FormatException or InvalidCastException or WireValueException =>
                 new FailureSubject("ValueError", exception.Message, ExceptionCategory.Validation),
             _ => new FailureSubject(exception.GetType().Name, exception.Message, ExceptionCategory.Other),
         };

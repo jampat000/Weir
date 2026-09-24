@@ -122,7 +122,7 @@ public sealed class MediaManagerIntake
             return new MediaManagerIntakeIdentity(Authenticated: false, soleConnectionId);
         }
 
-        var provided = PyStrings.Strip(presented ?? string.Empty);
+        var provided = WireStrings.Strip(presented ?? string.Empty);
         if (provided.Length == 0 || !MediaManagerConnectionService.CompareDigest(provided, configured))
         {
             throw new IntakeRefusedException(401, IntakeRules.MissingSecretDetail);
@@ -138,7 +138,7 @@ public sealed class MediaManagerIntake
     /// </summary>
     public async Task<MediaManagerIntakeIdentity> RequireSecretAsync(UnitOfWork uow, string? presented, string? sourceKey)
     {
-        var provided = PyStrings.Strip(presented ?? string.Empty);
+        var provided = WireStrings.Strip(presented ?? string.Empty);
         var rows = await MediaManagerConnectionStore.ListEnabledWithWebhookSecretAsync(uow).ConfigureAwait(false);
         if (sourceKey is not null)
         {
@@ -313,16 +313,16 @@ public sealed class MediaManagerIntake
     /// file is not one this hand-off waits for before it reports. True when the hand-off took the pass over.
     /// </summary>
     private static bool AdoptActivePass(
-        SqliteConnection connection, SqliteTransaction transaction, ProcessingJob active, MediaManagerImportEvent importEvent, string dedupeKey, PyDict handoffPayload)
+        SqliteConnection connection, SqliteTransaction transaction, ProcessingJob active, MediaManagerImportEvent importEvent, string dedupeKey, WireObject handoffPayload)
     {
-        PyDict existing;
+        WireObject existing;
         try
         {
-            existing = PyJsonParser.Parse(string.IsNullOrEmpty(active.PayloadJson) ? "{}" : active.PayloadJson) as PyDict ?? new PyDict();
+            existing = WireJsonParser.Parse(string.IsNullOrEmpty(active.PayloadJson) ? "{}" : active.PayloadJson) as WireObject ?? new WireObject();
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
-            existing = new PyDict();
+            existing = new WireObject();
         }
 
         if (HandoffOrigin.FromPayload(existing) is { HandoffId: { } ownerId } owner &&
@@ -331,7 +331,7 @@ public sealed class MediaManagerIntake
             return false;
         }
 
-        if (handoffPayload.Get("origin") is PyDict origin)
+        if (handoffPayload.Get("origin") is WireObject origin)
         {
             existing.Set("origin", origin);
         }
@@ -382,6 +382,6 @@ public sealed class MediaManagerIntake
             ("$library", library.Id),
             ("$path", relativePath),
             ("$size", size),
-            ("$now", PythonTimestamps.Orm(_time.GetUtcNow()))).ConfigureAwait(false);
+            ("$now", TimestampColumns.Orm(_time.GetUtcNow()))).ConfigureAwait(false);
     }
 }

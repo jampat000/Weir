@@ -115,10 +115,10 @@ public sealed partial class HandoffCompletionReporter
     /// files whose History says Weir is waiting.
     /// </summary>
     private sealed record PendingReport(
-        string? CallbackPath, string? ReleaseName, string? ManagerLibraryId, PyDict Body, long? LibraryId, string? Subject, IReadOnlyList<string> Files)
+        string? CallbackPath, string? ReleaseName, string? ManagerLibraryId, WireObject Body, long? LibraryId, string? Subject, IReadOnlyList<string> Files)
     {
-        public string ToJson() => PyJsonWriter.Dumps(
-            new PyDict()
+        public string ToJson() => WireJsonWriter.Dumps(
+            new WireObject()
                 .Set("callback_path", CallbackPath)
                 .Set("release_name", ReleaseName)
                 .Set("manager_library_id", ManagerLibraryId)
@@ -126,32 +126,32 @@ public sealed partial class HandoffCompletionReporter
                 .Set("library_id", LibraryId)
                 .Set("relative_media_path", Subject)
                 .Set("relative_media_paths", HandoffOutputFiles.ToJson(Files)),
-            PyJsonFormat.Compact);
+            WireJsonFormat.Compact);
 
         /// <summary>The saved report, or null when it cannot be read. One saved before it listed its files names only its own file.</summary>
         public static PendingReport? Parse(string json)
         {
             try
             {
-                if (PyJsonParser.Parse(json) is not PyDict dict || dict.Get("body") is not PyDict body)
+                if (WireJsonParser.Parse(json) is not WireObject dict || dict.Get("body") is not WireObject body)
                 {
                     return null;
                 }
 
                 var subject = HandoffOrigin.OptionalText(dict.Get("relative_media_path"));
-                IReadOnlyList<string> files = dict.Get("relative_media_paths") is PyList listed
-                    ? [.. listed.Items.OfType<PyStr>().Select(item => item.Value)]
+                IReadOnlyList<string> files = dict.Get("relative_media_paths") is WireArray listed
+                    ? [.. listed.Items.OfType<WireString>().Select(item => item.Value)]
                     : subject is null ? [] : [subject];
                 return new PendingReport(
                     HandoffOrigin.OptionalText(dict.Get("callback_path")),
                     HandoffOrigin.OptionalText(dict.Get("release_name")),
                     HandoffOrigin.OptionalText(dict.Get("manager_library_id")),
                     body,
-                    dict.Get("library_id") is PyInt library ? (long)library.Value : null,
+                    dict.Get("library_id") is WireInteger library ? (long)library.Value : null,
                     subject,
                     files);
             }
-            catch (PyJsonDecodeException)
+            catch (WireJsonDecodeException)
             {
                 return null;
             }

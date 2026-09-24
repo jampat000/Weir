@@ -15,10 +15,10 @@ public static class ActivityStore
         SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(eventType, module, title, detail));
 
     /// <summary>Records a failed sign-in: at most one event per username per two minutes.</summary>
-    public static async Task MaybeRecordLoginFailedAsync(UnitOfWork uow, string username, PyDateTime now)
+    public static async Task MaybeRecordLoginFailedAsync(UnitOfWork uow, string username, Timestamp now)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        var cutoff = PyDateTime.FromUtc(now.AsUtc - LoginFailedSuppress);
+        var cutoff = Timestamp.FromUtc(now.AsUtc - LoginFailedSuppress);
         var exists = await uow.ScalarAsync(
             "SELECT activity_events.id FROM activity_events WHERE activity_events.event_type = $type AND activity_events.detail = $detail " +
             "AND activity_events.created_at >= $cutoff LIMIT 1 OFFSET 0",
@@ -34,10 +34,10 @@ public static class ActivityStore
     }
 
     /// <summary>Records a refused bootstrap: at most one event per minute.</summary>
-    public static async Task MaybeRecordBootstrapDeniedAsync(UnitOfWork uow, PyDateTime now)
+    public static async Task MaybeRecordBootstrapDeniedAsync(UnitOfWork uow, Timestamp now)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        var cutoff = PyDateTime.FromUtc(now.AsUtc - BootstrapDeniedSuppress);
+        var cutoff = Timestamp.FromUtc(now.AsUtc - BootstrapDeniedSuppress);
         var exists = await uow.ScalarAsync(
             "SELECT activity_events.id FROM activity_events WHERE activity_events.event_type = $type AND activity_events.created_at >= $cutoff LIMIT 1 OFFSET 0",
             ("$type", ActivityEventTypes.AuthBootstrapDenied),

@@ -27,7 +27,7 @@ public static class OutputCollision
     /// <summary>Anything unrecognised is the default policy, <c>replace</c>.</summary>
     public static string NormalizePolicy(string? raw)
     {
-        var value = PyStrings.Strip(raw ?? string.Empty).ToLowerInvariant();
+        var value = WireStrings.Strip(raw ?? string.Empty).ToLowerInvariant();
         return Policies.Contains(value, StringComparer.Ordinal) ? value : Replace;
     }
 

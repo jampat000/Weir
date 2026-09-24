@@ -9,7 +9,7 @@ public sealed partial class RemuxPassRunner
     /// The two preflight checks that run before ffprobe: minimum input size and minimum file age. Returns the pass's
     /// result when a guardrail fires, or <see langword="null"/> alongside the resolved minimum age to continue with.
     /// </summary>
-    private (PyDict? Result, long MinAge) EvaluateSizeAndAgeGuardrails(
+    private (WireObject? Result, long MinAge) EvaluateSizeAndAgeGuardrails(
         RemuxPassRequest request,
         bool passThrough,
         string src,
@@ -38,7 +38,7 @@ public sealed partial class RemuxPassRunner
                     $"Skipped: file below minimum size ({sourceMb.ToString("F1", CultureInfo.InvariantCulture)} MB < {minSizeMb.ToString(CultureInfo.InvariantCulture)} MB).",
                     "minimum_input_file_size",
                     inspected,
-                    new PyDict()
+                    new WireObject()
                         .Set("source_size_bytes", sourceSize)
                         .Set("source_size_mb", Math.Round(sourceMb, 1, MidpointRounding.ToEven))
                         .Set("minimum_input_file_size_mb", minSizeMb)

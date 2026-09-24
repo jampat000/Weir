@@ -5,39 +5,39 @@ using System.Text;
 namespace Weir.Core.Json;
 
 /// <summary>A value that cannot be converted; callers treat it as bad input. The message wording is fixed because clients see it.</summary>
-public sealed class PyValueErrorException : Exception
+public sealed class WireValueException : Exception
 {
-    public PyValueErrorException()
+    public WireValueException()
     {
     }
 
-    public PyValueErrorException(string message)
+    public WireValueException(string message)
         : base(message)
     {
     }
 
-    public PyValueErrorException(string message, Exception innerException)
+    public WireValueException(string message, Exception innerException)
         : base(message, innerException)
     {
     }
 }
 
 /// <summary>
-/// A value of the wrong type: not caught by the handlers that catch <see cref="PyValueErrorException"/>,
+/// A value of the wrong type: not caught by the handlers that catch <see cref="WireValueException"/>,
 /// so it surfaces as a 500.
 /// </summary>
-public sealed class PyTypeErrorException : Exception
+public sealed class WireTypeException : Exception
 {
-    public PyTypeErrorException()
+    public WireTypeException()
     {
     }
 
-    public PyTypeErrorException(string message)
+    public WireTypeException(string message)
         : base(message)
     {
     }
 
-    public PyTypeErrorException(string message, Exception innerException)
+    public WireTypeException(string message, Exception innerException)
         : base(message, innerException)
     {
     }
@@ -47,70 +47,70 @@ public sealed class PyTypeErrorException : Exception
 /// Text, integer and truthiness conversions of JSON values. Their output (<c>None</c>, <c>True</c>,
 /// quoted reprs) appears in stored data and API messages, so it is kept exactly as earlier releases wrote it.
 /// </summary>
-public static class PyConvert
+public static class WireConvert
 {
     /// <summary>A string as itself; anything else as <see cref="Repr"/>.</summary>
-    public static string Str(PyJson value) => value switch
+    public static string Str(WireValue value) => value switch
     {
-        PyStr s => s.Value,
+        WireString s => s.Value,
         _ => Repr(value),
     };
 
     /// <summary>The display form: <c>None</c>, <c>True</c>/<c>False</c>, quoted strings, <c>[a, b]</c> and <c>{'k': v}</c>.</summary>
-    public static string Repr(PyJson value)
+    public static string Repr(WireValue value)
     {
         ArgumentNullException.ThrowIfNull(value);
         return value switch
         {
-            PyNull => "None",
-            PyBool b => b.Value ? "True" : "False",
-            PyInt i => i.Value.ToString(CultureInfo.InvariantCulture),
-            PyFloat f => FloatRepr(f.Value),
-            PyStr s => PyStrings.Repr(s.Value),
-            PyList l => "[" + string.Join(", ", l.Items.Select(Repr)) + "]",
-            PyDict d => "{" + string.Join(", ", d.Items.Select(p => PyStrings.Repr(p.Key) + ": " + Repr(p.Value))) + "}",
+            WireNull => "None",
+            WireBool b => b.Value ? "True" : "False",
+            WireInteger i => i.Value.ToString(CultureInfo.InvariantCulture),
+            WireNumber f => FloatRepr(f.Value),
+            WireString s => WireStrings.Repr(s.Value),
+            WireArray l => "[" + string.Join(", ", l.Items.Select(Repr)) + "]",
+            WireObject d => "{" + string.Join(", ", d.Items.Select(p => WireStrings.Repr(p.Key) + ": " + Repr(p.Value))) + "}",
             _ => throw new InvalidOperationException("Unknown JSON value."),
         };
     }
 
     /// <summary>A float's display form: shortest round-trip digits, and <c>nan</c>, <c>inf</c>, <c>-inf</c>.</summary>
     public static string FloatRepr(double value) =>
-        double.IsNaN(value) ? "nan" : double.IsInfinity(value) ? (value > 0 ? "inf" : "-inf") : PyJsonWriter.FloatRepr(value);
+        double.IsNaN(value) ? "nan" : double.IsInfinity(value) ? (value > 0 ? "inf" : "-inf") : WireJsonWriter.FloatRepr(value);
 
     /// <summary>
     /// A JSON value as an integer: booleans are 0/1, floats truncate toward zero, strings parse with
     /// <see cref="TryParseIntLiteral"/>; anything else throws.
     /// </summary>
-    public static BigInteger ToInt(PyJson value)
+    public static BigInteger ToInt(WireValue value)
     {
         ArgumentNullException.ThrowIfNull(value);
         switch (value)
         {
-            case PyInt i:
+            case WireInteger i:
                 return i.Value;
-            case PyBool b:
+            case WireBool b:
                 return b.Value ? BigInteger.One : BigInteger.Zero;
-            case PyFloat f:
+            case WireNumber f:
                 if (double.IsNaN(f.Value))
                 {
-                    throw new PyValueErrorException("NaN is not a whole number.");
+                    throw new WireValueException("NaN is not a whole number.");
                 }
 
                 if (double.IsInfinity(f.Value))
                 {
-                    throw new PyTypeErrorException("Infinity is not a whole number.");
+                    throw new WireTypeException("Infinity is not a whole number.");
                 }
 
                 return new BigInteger(Math.Truncate(f.Value));
-            case PyStr s:
+            case WireString s:
                 if (TryParseIntLiteral(s.Value, out var parsed))
                 {
                     return parsed;
                 }
 
-                throw new PyValueErrorException($"{PyStrings.Repr(s.Value)} is not a whole number.");
+                throw new WireValueException($"{WireStrings.Repr(s.Value)} is not a whole number.");
             default:
-                throw new PyTypeErrorException($"Expected a whole number but found {KindText(value)}.");
+                throw new WireTypeException($"Expected a whole number but found {KindText(value)}.");
         }
     }
 
@@ -162,49 +162,49 @@ public static class PyConvert
         return true;
     }
 
-    /// <summary>Whether the value counts as set (<see cref="PyJson.IsTruthy"/>).</summary>
-    public static bool Bool(PyJson value)
+    /// <summary>Whether the value counts as set (<see cref="WireValue.IsTruthy"/>).</summary>
+    public static bool Bool(WireValue value)
     {
         ArgumentNullException.ThrowIfNull(value);
         return value.IsTruthy;
     }
 
     /// <summary>A SQLite storage value from an untyped column as a JSON value; blobs are read as UTF-8 text.</summary>
-    public static PyJson FromDatabase(object? value) => value switch
+    public static WireValue FromDatabase(object? value) => value switch
     {
-        null or DBNull => PyNull.Instance,
-        long l => new PyInt(l),
-        int i => new PyInt(i),
-        double d => new PyFloat(d),
-        string s => new PyStr(s),
-        byte[] bytes => new PyStr(Encoding.UTF8.GetString(bytes)),
-        bool b => PyJson.Of(b),
-        _ => new PyStr(Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty),
+        null or DBNull => WireNull.Instance,
+        long l => new WireInteger(l),
+        int i => new WireInteger(i),
+        double d => new WireNumber(d),
+        string s => new WireString(s),
+        byte[] bytes => new WireString(Encoding.UTF8.GetString(bytes)),
+        bool b => WireValue.Of(b),
+        _ => new WireString(Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty),
     };
 
     /// <summary>A JSON value as a SQLite parameter, the way the sqlite3 driver binds it.</summary>
-    public static object ToDatabase(PyJson value) => value switch
+    public static object ToDatabase(WireValue value) => value switch
     {
-        PyNull => DBNull.Value,
-        PyBool b => b.Value ? 1L : 0L,
-        PyInt i => i.Value >= long.MinValue && i.Value <= long.MaxValue
+        WireNull => DBNull.Value,
+        WireBool b => b.Value ? 1L : 0L,
+        WireInteger i => i.Value >= long.MinValue && i.Value <= long.MaxValue
             ? (long)i.Value
-            : throw new PyTypeErrorException("The number is too large to store."),
-        PyFloat f => f.Value,
-        PyStr s => s.Value,
-        _ => throw new PyTypeErrorException($"Weir cannot store {KindText(value)} in a single database column."),
+            : throw new WireTypeException("The number is too large to store."),
+        WireNumber f => f.Value,
+        WireString s => s.Value,
+        _ => throw new WireTypeException($"Weir cannot store {KindText(value)} in a single database column."),
     };
 
     /// <summary>A JSON value's kind in plain words, for error messages.</summary>
-    private static string KindText(PyJson value) => value switch
+    private static string KindText(WireValue value) => value switch
     {
-        PyNull => "nothing",
-        PyBool => "true or false",
-        PyInt => "a whole number",
-        PyFloat => "a decimal number",
-        PyStr => "text",
-        PyList => "a list",
-        PyDict => "an object",
+        WireNull => "nothing",
+        WireBool => "true or false",
+        WireInteger => "a whole number",
+        WireNumber => "a decimal number",
+        WireString => "text",
+        WireArray => "a list",
+        WireObject => "an object",
         _ => "a date and time",
     };
 }

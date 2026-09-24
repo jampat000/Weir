@@ -9,8 +9,8 @@ public sealed partial class ProcessingRejectHandler
     /// <summary>A manager whose port removes queue items is asked to remove the matching item.</summary>
     private async Task<RejectAttempt> RejectThroughQueueAsync(List<ManagerConnection> connections, string source, CancellationToken cancellationToken)
     {
-        var matches = new List<(ManagerConnection Connection, PyDict Row, bool IsFolder, int Index)>();
-        var rowsByConnection = new Dictionary<int, List<PyDict>>();
+        var matches = new List<(ManagerConnection Connection, WireObject Row, bool IsFolder, int Index)>();
+        var rowsByConnection = new Dictionary<int, List<WireObject>>();
         var wanted = NormalizeStoragePath(source);
         for (var index = 0; index < connections.Count; index++)
         {
@@ -36,7 +36,7 @@ public sealed partial class ProcessingRejectHandler
             rowsByConnection[index] = rows;
             foreach (var row in rows)
             {
-                var outputPath = PyValues.FirstText(row, "outputPath", "output_path");
+                var outputPath = ManagerValues.FirstText(row, "outputPath", "output_path");
                 if (outputPath is null)
                 {
                     continue;
@@ -66,10 +66,10 @@ public sealed partial class ProcessingRejectHandler
 
         var (matchedConnection, matchedRow, isFolder, matchedIndex) = matches[0];
         var label = matchedConnection.Label;
-        var downloadId = PyValues.FirstText(matchedRow, "downloadId");
+        var downloadId = ManagerValues.FirstText(matchedRow, "downloadId");
         if (downloadId is not null)
         {
-            var siblings = rowsByConnection.GetValueOrDefault(matchedIndex, []).Count(row => PyValues.FirstText(row, "downloadId") == downloadId);
+            var siblings = rowsByConnection.GetValueOrDefault(matchedIndex, []).Count(row => ManagerValues.FirstText(row, "downloadId") == downloadId);
             if (siblings > 1)
             {
                 return new RejectAttempt(
@@ -82,7 +82,7 @@ public sealed partial class ProcessingRejectHandler
 
         if (isFolder)
         {
-            var downloadFolder = PyValues.FirstText(matchedRow, "outputPath", "output_path") ?? string.Empty;
+            var downloadFolder = ManagerValues.FirstText(matchedRow, "outputPath", "output_path") ?? string.Empty;
             var only = SingleVideoFileUnder(downloadFolder);
             if (only is null || !string.Equals(only, RemuxPassPaths.Resolve(source), PathComparison))
             {
@@ -108,14 +108,14 @@ public sealed partial class ProcessingRejectHandler
         {
             return new RejectAttempt(
                 false, $"{label} did not accept the rejection, so nothing was removed.", label,
-                new PyDict().Set("technical_detail", PyStrings.Slice(exception.Message, 500)));
+                new WireObject().Set("technical_detail", WireStrings.Slice(exception.Message, 500)));
         }
 
         return new RejectAttempt(
             true,
             $"{label} removed the download and blocklisted the release, so it will not be grabbed again and {label} can search for a different one.",
             label,
-            new PyDict().Set("route", "queue").Set("queue_item", matchedRow.Get("id") ?? PyNull.Instance).Set("download_id", downloadId));
+            new WireObject().Set("route", "queue").Set("queue_item", matchedRow.Get("id") ?? WireNull.Instance).Set("download_id", downloadId));
     }
 
     /// <summary>A path in a form that compares equal across slash direction, surrounding spaces and case.</summary>

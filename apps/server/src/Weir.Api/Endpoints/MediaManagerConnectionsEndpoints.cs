@@ -55,12 +55,12 @@ public static class MediaManagerConnectionsEndpoints
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var rows = await MediaManagerConnectionStore.ListAsync(uow).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyList(rows.Select(row => (PyJson)row.ToOut())));
+        return ApiRoutes.Ok(new WireArray(rows.Select(row => (WireValue)row.ToOut())));
     }
 
     /// <summary>A <c>str</c> field with a default: absent means the default, present must be a string.</summary>
-    private static string StrWithDefault(BodyModel model, PyJson? body, string name, string defaultValue, int? maxLength) =>
-        body is PyDict dict && dict.ContainsKey(name) ? model.Str(name, maxLength: maxLength) : defaultValue;
+    private static string StrWithDefault(BodyModel model, WireValue? body, string name, string defaultValue, int? maxLength) =>
+        body is WireObject dict && dict.ContainsKey(name) ? model.Str(name, maxLength: maxLength) : defaultValue;
 
     private static async Task<ApiResult> CreateConnectionAsync(ApiRequest request)
     {
@@ -98,20 +98,20 @@ public static class MediaManagerConnectionsEndpoints
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var output = new PyList();
+        var output = new WireArray();
         foreach (var described in await Connections(request).DescribeConnectionsAsync(uow, request.Context.RequestAborted).ConfigureAwait(false))
         {
             var capabilities = described.Capabilities;
-            output.Items.Add(new PyDict()
+            output.Items.Add(new WireObject()
                 .Set("connection_id", described.Connection.ConnectionId ?? 0)
                 .Set("kind", described.Connection.Kind)
                 .Set("name", described.Connection.Name)
                 .Set("label", described.Connection.Label)
-                .Set("media_scopes", new PyList(capabilities.Scopes.Order(StringComparer.Ordinal).Select(scope => (PyJson)new PyStr(scope))))
+                .Set("media_scopes", new WireArray(capabilities.Scopes.Order(StringComparer.Ordinal).Select(scope => (WireValue)new WireString(scope))))
                 .Set("reports_import_queue", capabilities.ReportsQueue)
                 .Set("reports_library_truth", capabilities.ReportsLibraryTruth)
                 .Set("reachable", described.Status == SignalStatus.Reported)
-                .Set("library_roots", new PyList(described.LibraryRoots.Select(root => (PyJson)new PyStr(root))))
+                .Set("library_roots", new WireArray(described.LibraryRoots.Select(root => (WireValue)new WireString(root))))
                 .Set("summary", capabilities.Summary)
                 .Set("detail", described.Detail));
         }
@@ -178,7 +178,7 @@ public static class MediaManagerConnectionsEndpoints
         await request.CommitAsync().ConfigureAwait(false);
         return new CustomApiResult(context =>
         {
-            PyResponses.NoContentJson(context);
+            ApiResponses.NoContentJson(context);
             return Task.CompletedTask;
         });
     }
@@ -199,7 +199,7 @@ public static class MediaManagerConnectionsEndpoints
         var row = await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
         var plaintext = await Connections(request).RotateWebhookSecretAsync(uow, row).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("connection_id", row.Id)
             .Set("webhook_secret", plaintext)
             .Set("webhook_url_path", row.WebhookUrlPath)
@@ -212,7 +212,7 @@ public static class MediaManagerConnectionsEndpoints
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var issues = new ValidationIssues();
         var connectionId = ConnectionId(request, issues);
-        PydanticRules.TryLiteral(new PyStr(request.RouteValue("lane") ?? string.Empty), ["path", "lane"], MediaManagerKinds.SearchLanes, issues, out var lane);
+        FieldRules.TryLiteral(new WireString(request.RouteValue("lane") ?? string.Empty), ["path", "lane"], MediaManagerKinds.SearchLanes, issues, out var lane);
         var model = new BodyModel(body, issues);
         var csrfToken = model.Str("csrf_token", minLength: 1);
         var enabled = model.Bool("enabled", defaultValue: false, required: true);
@@ -234,7 +234,7 @@ public static class MediaManagerConnectionsEndpoints
         {
             days = ScheduleCsv.ValidateScheduleDaysCsv(scheduleDays);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new ApiException(StatusCodes.Status400BadRequest, exception.Message);
         }
@@ -245,7 +245,7 @@ public static class MediaManagerConnectionsEndpoints
         {
             start = ScheduleCsv.NormalizeHhmm(scheduleStart, "00:00");
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new ApiException(StatusCodes.Status400BadRequest, $"schedule_start: {exception.Message}");
         }
@@ -255,7 +255,7 @@ public static class MediaManagerConnectionsEndpoints
         {
             end = ScheduleCsv.NormalizeHhmm(scheduleEnd, "23:59");
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new ApiException(StatusCodes.Status400BadRequest, $"schedule_end: {exception.Message}");
         }
@@ -295,11 +295,11 @@ public static class MediaManagerConnectionsEndpoints
         VerifyCsrf(request, csrfToken);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var row = await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
-        var checkedAt = PyDateTime.UtcNow(request.Time);
+        var checkedAt = Timestamp.UtcNow(request.Time);
 
         bool ok;
         string detail;
-        if (PyStrings.Strip(row.BaseUrl).Length == 0)
+        if (WireStrings.Strip(row.BaseUrl).Length == 0)
         {
             (ok, detail) = (false, "Add the address where this app can be reached, then test again.");
         }
@@ -317,10 +317,10 @@ public static class MediaManagerConnectionsEndpoints
         }
 
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("connection_id", row.Id)
             .Set("ok", ok)
             .Set("detail", detail)
-            .Set("checked_at", checkedAt.PydanticJson()));
+            .Set("checked_at", checkedAt.ToWireText()));
     }
 }

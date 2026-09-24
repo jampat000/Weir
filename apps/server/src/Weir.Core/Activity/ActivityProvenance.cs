@@ -18,17 +18,17 @@ public static class ActivityProvenance
     };
 
     /// <summary><c>trigger</c> and <c>run_id</c> from a job payload, only when present and valid.</summary>
-    public static PyDict JobProvenance(PyJson? payload)
+    public static WireObject JobProvenance(WireValue? payload)
     {
-        var output = new PyDict();
-        if (payload is not PyDict dict)
+        var output = new WireObject();
+        if (payload is not WireObject dict)
         {
             return output;
         }
 
-        if (dict.Get("trigger") is PyStr trigger)
+        if (dict.Get("trigger") is WireString trigger)
         {
-            var normalized = PyStrings.Strip(trigger.Value).ToLowerInvariant();
+            var normalized = WireStrings.Strip(trigger.Value).ToLowerInvariant();
             if (ActivityClassifier.Triggers.Contains(normalized))
             {
                 output.Set("trigger", normalized);
@@ -36,7 +36,7 @@ public static class ActivityProvenance
         }
 
         // A string or integer run_id only; a boolean is not a run id.
-        if (dict.Get("run_id") is (PyStr or PyInt) and var runId && PyStrings.Strip(PyConvert.Str(runId)).Length > 0)
+        if (dict.Get("run_id") is (WireString or WireInteger) and var runId && WireStrings.Strip(WireConvert.Str(runId)).Length > 0)
         {
             output.Set("run_id", runId);
         }
@@ -45,7 +45,7 @@ public static class ActivityProvenance
     }
 
     /// <summary>The detail with the payload's provenance added, never overwriting what the detail says.</summary>
-    public static PyDict WithProvenance(PyDict detail, PyJson? payload)
+    public static WireObject WithProvenance(WireObject detail, WireValue? payload)
     {
         ArgumentNullException.ThrowIfNull(detail);
         var output = JobProvenance(payload);

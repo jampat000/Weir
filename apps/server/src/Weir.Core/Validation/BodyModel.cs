@@ -18,24 +18,24 @@ public sealed class BodyModel
 {
     private static readonly object[] BodyLoc = ["body"];
 
-    private readonly PyDict? _dict;
+    private readonly WireObject? _dict;
     private readonly ValidationIssues _issues;
     private readonly HashSet<string> _declared = new(StringComparer.Ordinal);
     private bool _valid = true;
 
     /// <param name="body">The parsed body, or <see langword="null"/> when the request had none.</param>
     /// <param name="issues">Where errors are collected.</param>
-    public BodyModel(PyJson? body, ValidationIssues issues)
+    public BodyModel(WireValue? body, ValidationIssues issues)
     {
         ArgumentNullException.ThrowIfNull(issues);
         _issues = issues;
-        if (body is null or PyNull)
+        if (body is null or WireNull)
         {
-            issues.Add(PydanticRules.Missing(BodyLoc, PyNull.Instance));
+            issues.Add(FieldRules.Missing(BodyLoc, WireNull.Instance));
             _valid = false;
             IsPresent = false;
         }
-        else if (body is PyDict dict)
+        else if (body is WireObject dict)
         {
             _dict = dict;
             IsPresent = true;
@@ -55,49 +55,49 @@ public sealed class BodyModel
     public bool IsValid => _valid;
 
     public string Str(string name, int? minLength = null, int? maxLength = null) =>
-        Read(name, required: true, input => PydanticRules.TryStr(input, Loc(name), minLength, maxLength, _issues, out var v) ? v : null) ?? string.Empty;
+        Read(name, required: true, input => FieldRules.TryStr(input, Loc(name), minLength, maxLength, _issues, out var v) ? v : null) ?? string.Empty;
 
     public string? OptionalStr(string name, string? defaultValue = null, int? minLength = null, int? maxLength = null) =>
-        ReadNullable(name, defaultValue, input => PydanticRules.TryStr(input, Loc(name), minLength, maxLength, _issues, out var v) ? (true, v) : (false, null));
+        ReadNullable(name, defaultValue, input => FieldRules.TryStr(input, Loc(name), minLength, maxLength, _issues, out var v) ? (true, v) : (false, null));
 
     public long Number(string name, long defaultValue, bool required, long? ge = null, long? le = null)
     {
-        var result = Read<long?>(name, required, input => PydanticRules.TryInt(input, Loc(name), ge, le, _issues, out var v) ? Saturate(v) : null);
+        var result = Read<long?>(name, required, input => FieldRules.TryInt(input, Loc(name), ge, le, _issues, out var v) ? Saturate(v) : null);
         return result ?? defaultValue;
     }
 
     public long? OptionalInt(string name, long? ge = null, long? le = null) =>
-        ReadNullableStruct<long>(name, input => PydanticRules.TryInt(input, Loc(name), ge, le, _issues, out var v) ? (true, Saturate(v)) : (false, 0));
+        ReadNullableStruct<long>(name, input => FieldRules.TryInt(input, Loc(name), ge, le, _issues, out var v) ? (true, Saturate(v)) : (false, 0));
 
     public bool Bool(string name, bool defaultValue, bool required = false)
     {
-        var result = Read<bool?>(name, required, input => PydanticRules.TryBool(input, Loc(name), _issues, out var v) ? v : null);
+        var result = Read<bool?>(name, required, input => FieldRules.TryBool(input, Loc(name), _issues, out var v) ? v : null);
         return result ?? defaultValue;
     }
 
     public bool? OptionalBool(string name) =>
-        ReadNullableStruct<bool>(name, input => PydanticRules.TryBool(input, Loc(name), _issues, out var v) ? (true, v) : (false, false));
+        ReadNullableStruct<bool>(name, input => FieldRules.TryBool(input, Loc(name), _issues, out var v) ? (true, v) : (false, false));
 
     public string Literal(string name, IReadOnlyList<string> allowed, string? defaultValue = null) =>
-        Read(name, required: defaultValue is null, input => PydanticRules.TryLiteral(input, Loc(name), allowed, _issues, out var v) ? v : null) ?? defaultValue ?? string.Empty;
+        Read(name, required: defaultValue is null, input => FieldRules.TryLiteral(input, Loc(name), allowed, _issues, out var v) ? v : null) ?? defaultValue ?? string.Empty;
 
     public List<string> StrList(string name, IReadOnlyList<string> defaultValue) =>
-        Read(name, required: false, input => PydanticRules.TryStrList(input, Loc(name), _issues, out var v) ? v : null) ?? [.. defaultValue];
+        Read(name, required: false, input => FieldRules.TryStrList(input, Loc(name), _issues, out var v) ? v : null) ?? [.. defaultValue];
 
-    public PyDict Dict(string name) =>
-        Read(name, required: true, input => PydanticRules.TryDict(input, Loc(name), _issues, out var v) ? v : null) ?? new PyDict();
+    public WireObject Dict(string name) =>
+        Read(name, required: true, input => FieldRules.TryDict(input, Loc(name), _issues, out var v) ? v : null) ?? new WireObject();
 
     /// <summary>Like <see cref="Dict"/>, but a missing key is not an error: it returns <see langword="null"/> so the caller can fall back to defaults.</summary>
-    public PyDict? OptionalDict(string name) =>
-        Read<PyDict>(name, required: false, input => PydanticRules.TryDict(input, Loc(name), _issues, out var v) ? v : null);
+    public WireObject? OptionalDict(string name) =>
+        Read<WireObject>(name, required: false, input => FieldRules.TryDict(input, Loc(name), _issues, out var v) ? v : null);
 
     public List<long> IntList(string name, IReadOnlyList<long>? defaultValue = null) =>
-        Read(name, required: false, input => PydanticRules.TryIntList(input, Loc(name), _issues, out var v) ? v : null) ?? [.. defaultValue ?? []];
+        Read(name, required: false, input => FieldRules.TryIntList(input, Loc(name), _issues, out var v) ? v : null) ?? [.. defaultValue ?? []];
 
-    public Time.PyDateTime? OptionalDateTime(string name) =>
-        ReadNullableStruct<Time.PyDateTime>(name, input =>
+    public Time.Timestamp? OptionalDateTime(string name) =>
+        ReadNullableStruct<Time.Timestamp>(name, input =>
         {
-            var ok = PydanticRules.TryDateTime(input, Loc(name), _issues, out var v);
+            var ok = FieldRules.TryDateTime(input, Loc(name), _issues, out var v);
             return (ok, v ?? default);
         });
 
@@ -124,7 +124,7 @@ public sealed class BodyModel
     private static long Saturate(BigInteger value) =>
         value > long.MaxValue ? long.MaxValue : value < long.MinValue ? long.MinValue : (long)value;
 
-    private T? Read<T>(string name, bool required, Func<PyJson, T?> validate)
+    private T? Read<T>(string name, bool required, Func<WireValue, T?> validate)
     {
         _declared.Add(name);
         if (_dict is null)
@@ -136,7 +136,7 @@ public sealed class BodyModel
         {
             if (required)
             {
-                _issues.Add(PydanticRules.Missing(Loc(name), _dict));
+                _issues.Add(FieldRules.Missing(Loc(name), _dict));
                 _valid = false;
             }
 
@@ -152,7 +152,7 @@ public sealed class BodyModel
         return result;
     }
 
-    private string? ReadNullable(string name, string? defaultValue, Func<PyJson, (bool Ok, string? Value)> validate)
+    private string? ReadNullable(string name, string? defaultValue, Func<WireValue, (bool Ok, string? Value)> validate)
     {
         _declared.Add(name);
         if (_dict is null || !_dict.TryGetValue(name, out var input))
@@ -160,7 +160,7 @@ public sealed class BodyModel
             return defaultValue;
         }
 
-        if (input is PyNull)
+        if (input is WireNull)
         {
             return null;
         }
@@ -170,11 +170,11 @@ public sealed class BodyModel
         return value;
     }
 
-    private T? ReadNullableStruct<T>(string name, Func<PyJson, (bool Ok, T Value)> validate)
+    private T? ReadNullableStruct<T>(string name, Func<WireValue, (bool Ok, T Value)> validate)
         where T : struct
     {
         _declared.Add(name);
-        if (_dict is null || !_dict.TryGetValue(name, out var input) || input is PyNull)
+        if (_dict is null || !_dict.TryGetValue(name, out var input) || input is WireNull)
         {
             return null;
         }

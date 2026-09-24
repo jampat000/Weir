@@ -19,9 +19,9 @@ public sealed record SuiteSettingsRecord
     public bool ConfigurationBackupEnabled { get; init; }
     public long ConfigurationBackupIntervalHours { get; init; } = 24;
     public string ConfigurationBackupPreferredTime { get; init; } = "02:00";
-    public PyDateTime? ConfigurationBackupLastRunAt { get; init; }
+    public Timestamp? ConfigurationBackupLastRunAt { get; init; }
     public bool ProcessingPaused { get; init; }
-    public PyDateTime? ProcessingPausedUntil { get; init; }
+    public Timestamp? ProcessingPausedUntil { get; init; }
     public bool ScanWhilePaused { get; init; } = true;
 
     /// <summary>Processing's optional metadata provider. Empty means none configured.</summary>
@@ -31,7 +31,7 @@ public sealed record SuiteSettingsRecord
     /// <summary>Encrypted at rest with <see cref="Weir.Core.Security.CredentialCipher"/>; never returned by the API.</summary>
     public string MetadataProviderKeyCiphertext { get; init; } = string.Empty;
 
-    public PyDateTime UpdatedAt { get; init; }
+    public Timestamp UpdatedAt { get; init; }
 }
 
 /// <summary>A validated <c>PUT /suite/settings</c> (or bundle restore) request.</summary>
@@ -56,7 +56,7 @@ public static class SuiteSettingsRules
 
     /// <summary>
     /// Validates a settings update. Returns the normalised values, or throws
-    /// <see cref="PyValueErrorException"/> with the operator message.
+    /// <see cref="WireValueException"/> with the operator message.
     /// </summary>
     public static SuiteSettingsUpdate Normalize(SuiteSettingsUpdate update, ITimeZoneResolver zones)
     {
@@ -65,40 +65,40 @@ public static class SuiteSettingsRules
         var name = (update.ProductDisplayName ?? string.Empty).Trim();
         if (name.Length == 0)
         {
-            throw new PyValueErrorException("Product name cannot be empty.");
+            throw new WireValueException("Product name cannot be empty.");
         }
 
         if (CodePoints(name) > 120)
         {
-            throw new PyValueErrorException("Product name is too long (120 characters maximum).");
+            throw new WireValueException("Product name is too long (120 characters maximum).");
         }
 
         var notice = (update.SignedInHomeNotice ?? string.Empty).Trim();
         string? normalizedNotice = notice.Length == 0 ? null : notice;
         if (normalizedNotice is not null && CodePoints(normalizedNotice) > 4000)
         {
-            throw new PyValueErrorException("Home notice is too long (4,000 characters maximum).");
+            throw new WireValueException("Home notice is too long (4,000 characters maximum).");
         }
 
         var tz = (update.AppTimezone ?? string.Empty).Trim();
         if (tz.Length == 0)
         {
-            throw new PyValueErrorException("Timezone cannot be empty.");
+            throw new WireValueException("Timezone cannot be empty.");
         }
 
         if (!zones.TryFind(tz, out _))
         {
-            throw new PyValueErrorException("Choose a valid timezone (for example: UTC, Europe/London, America/New_York).");
+            throw new WireValueException("Choose a valid timezone (for example: UTC, Europe/London, America/New_York).");
         }
 
         if (update.LogRetentionDays is < 1 or > 3650)
         {
-            throw new PyValueErrorException("Log retention must be between 1 and 3650 days.");
+            throw new WireValueException("Log retention must be between 1 and 3650 days.");
         }
 
         if (update.ActivityRetentionDays is { } activity && activity is < 0 or > 3650)
         {
-            throw new PyValueErrorException("Activity history must be kept between 0 (forever) and 3650 days.");
+            throw new WireValueException("Activity history must be kept between 0 (forever) and 3650 days.");
         }
 
         string? wizard = null;
@@ -107,13 +107,13 @@ public static class SuiteSettingsRules
             wizard = update.SetupWizardState.Trim().ToLowerInvariant();
             if (!WizardStates.Contains(wizard))
             {
-                throw new PyValueErrorException("Setup wizard state must be pending, skipped, or completed.");
+                throw new WireValueException("Setup wizard state must be pending, skipped, or completed.");
             }
         }
 
         if (update.ConfigurationBackupIntervalHours is { } hours && hours is < 1 or > 720)
         {
-            throw new PyValueErrorException("Backup interval must be between 1 and 720 hours.");
+            throw new WireValueException("Backup interval must be between 1 and 720 hours.");
         }
 
         var backupTime = update.ConfigurationBackupPreferredTime is null
@@ -157,7 +157,7 @@ public static class SuiteSettingsRules
             return string.Create(CultureInfo.InvariantCulture, $"{hour:00}:{minute:00}");
         }
 
-        throw new PyValueErrorException("Backup time must use HH:MM in 24-hour time.");
+        throw new WireValueException("Backup time must use HH:MM in 24-hour time.");
     }
 
     /// <summary>Splits on the first colon and reads an integer hour (0-23) and minute (0-59); empty means 02:00.</summary>
@@ -173,8 +173,8 @@ public static class SuiteSettingsRules
 
         var colon = value.IndexOf(':', StringComparison.Ordinal);
         if (colon < 0 ||
-            !PyConvert.TryParseIntLiteral(value[..colon], out var h) ||
-            !PyConvert.TryParseIntLiteral(value[(colon + 1)..], out var m) ||
+            !WireConvert.TryParseIntLiteral(value[..colon], out var h) ||
+            !WireConvert.TryParseIntLiteral(value[(colon + 1)..], out var m) ||
             h < 0 || h > 23 || m < 0 || m > 59)
         {
             return false;
@@ -186,7 +186,7 @@ public static class SuiteSettingsRules
     }
 
     /// <summary>The settings as the API returns them, with out-of-range stored values clamped.</summary>
-    public static PyDict BuildOut(SuiteSettingsRecord row)
+    public static WireObject BuildOut(SuiteSettingsRecord row)
     {
         ArgumentNullException.ThrowIfNull(row);
         var wizard = (row.SetupWizardState ?? "pending").Trim().ToLowerInvariant();
@@ -198,7 +198,7 @@ public static class SuiteSettingsRules
         var name = (row.ProductDisplayName ?? "Weir").Trim();
         var tz = (row.AppTimezone ?? "UTC").Trim();
         var interval = row.ConfigurationBackupIntervalHours == 0 ? 24 : row.ConfigurationBackupIntervalHours;
-        return new PyDict()
+        return new WireObject()
             .Set("product_display_name", name.Length == 0 ? "Weir" : name)
             .Set("signed_in_home_notice", row.SignedInHomeNotice)
             .Set("setup_wizard_state", wizard)
@@ -208,8 +208,8 @@ public static class SuiteSettingsRules
             .Set("configuration_backup_enabled", row.ConfigurationBackupEnabled)
             .Set("configuration_backup_interval_hours", Math.Max(1, Math.Min(interval, 720)))
             .Set("configuration_backup_preferred_time", NormalizeBackupPreferredTime(row.ConfigurationBackupPreferredTime))
-            .Set("configuration_backup_last_run_at", row.ConfigurationBackupLastRunAt?.PydanticJson())
-            .Set("updated_at", row.UpdatedAt.PydanticJson());
+            .Set("configuration_backup_last_run_at", row.ConfigurationBackupLastRunAt?.ToWireText())
+            .Set("updated_at", row.UpdatedAt.ToWireText());
     }
 
     private static int CodePoints(string value)
@@ -227,11 +227,11 @@ public static class SuiteSettingsRules
 /// <summary>The read-only security overview: the startup security options in plain language.</summary>
 public static class SecurityOverview
 {
-    public static PyDict Build(WeirOptions options)
+    public static WireObject Build(WeirOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
         var secretOk = (options.SessionSecret ?? string.Empty).Trim().Length > 0;
-        return new PyDict()
+        return new WireObject()
             .Set("session_signing_configured", secretOk)
             .Set("sign_in_cookie_https_mode", SessionRules.SecureModeText(options.SessionCookieSecureMode))
             .Set("sign_in_cookie_https_plain", HttpsCookiePlain(options.SessionCookieSecureMode))
@@ -294,7 +294,7 @@ public static class SecurityOverview
 }
 
 /// <summary>The suite-wide pause, resolved against the clock.</summary>
-public sealed record PauseState(bool Paused, PyDateTime? PausedUntil, bool ScanWhilePaused, bool Expired = false)
+public sealed record PauseState(bool Paused, Timestamp? PausedUntil, bool ScanWhilePaused, bool Expired = false)
 {
     public const string InFlightPolicy = "Work already running finishes. Pausing stops Weir starting anything new.";
 
@@ -324,9 +324,9 @@ public sealed record PauseState(bool Paused, PyDateTime? PausedUntil, bool ScanW
     /// Expiry is applied on read, so a pause set before a restart still lapses.
     /// A naive until time is UTC.
     /// </summary>
-    public static PauseState Resolve(bool processingPaused, PyDateTime? pausedUntil, bool scanWhilePaused, DateTime nowUtc)
+    public static PauseState Resolve(bool processingPaused, Timestamp? pausedUntil, bool scanWhilePaused, DateTime nowUtc)
     {
-        PyDateTime? until = pausedUntil is { } raw && !raw.IsAware ? raw with { Offset = TimeSpan.Zero } : pausedUntil;
+        Timestamp? until = pausedUntil is { } raw && !raw.IsAware ? raw with { Offset = TimeSpan.Zero } : pausedUntil;
         if (!processingPaused)
         {
             return new PauseState(false, null, scanWhilePaused);
@@ -340,9 +340,9 @@ public sealed record PauseState(bool Paused, PyDateTime? PausedUntil, bool ScanW
         return new PauseState(true, until, scanWhilePaused);
     }
 
-    public PyDict ToOut() => new PyDict()
+    public WireObject ToOut() => new WireObject()
         .Set("paused", Paused)
-        .Set("paused_until", Paused ? PausedUntil?.PydanticJson() : null)
+        .Set("paused_until", Paused ? PausedUntil?.ToWireText() : null)
         .Set("scan_while_paused", ScanWhilePaused)
         .Set("reason", Reason)
         .Set("in_flight_policy", InFlightPolicy);

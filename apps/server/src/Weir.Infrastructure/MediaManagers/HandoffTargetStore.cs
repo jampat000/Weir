@@ -78,7 +78,7 @@ public static class HandoffTargetStore
     /// when a retry turns it into a success, as a single file always could. <paramref name="row"/> is null for a job that
     /// carries no hand-off, or one whose hand-off is not recorded at all. The caller commits.
     /// </summary>
-    public static async Task<HandoffTargetFinish> FinishAsync(UnitOfWork uow, HandoffLedgerRow? row, string relativePath, PyDict result)
+    public static async Task<HandoffTargetFinish> FinishAsync(UnitOfWork uow, HandoffLedgerRow? row, string relativePath, WireObject result)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(result);
@@ -87,13 +87,13 @@ public static class HandoffTargetStore
             return new HandoffTargetFinish(HandoffTargetProgress.Untracked);
         }
 
-        var outputFile = CompletionReports.IsSucceeded(result) && result.Get("output_file") is PyStr { Value.Length: > 0 } written ? written.Value : null;
+        var outputFile = CompletionReports.IsSucceeded(result) && result.Get("output_file") is WireString { Value.Length: > 0 } written ? written.Value : null;
         var updated = await uow.ExecuteAsync(
             "UPDATE media_manager_handoff_targets SET result = $result, output_file = $output, message = $message " +
             "WHERE handoff_row_id = $row AND relative_path = $path",
             ("$result", FolderHandoffReports.TargetResult(result)),
             ("$output", outputFile),
-            ("$message", PyStrings.Slice(CompletionReports.MessageFor(result), 2000)),
+            ("$message", WireStrings.Slice(CompletionReports.MessageFor(result), 2000)),
             ("$row", row.Id),
             ("$path", relativePath)).ConfigureAwait(false);
         if (updated == 0)

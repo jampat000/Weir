@@ -36,7 +36,7 @@ public static class NotificationEndpoints
 
     private sealed record ChannelInput(string CsrfToken, string Label, string Provider, string Url, List<string> Events, bool Enabled);
 
-    private static ChannelInput ReadChannel(PyJson? body, ValidationIssues issues)
+    private static ChannelInput ReadChannel(WireValue? body, ValidationIssues issues)
     {
         var model = new BodyModel(body, issues);
         var label = model.Str("label", minLength: 1, maxLength: 255);
@@ -70,7 +70,7 @@ public static class NotificationEndpoints
         {
             NotificationRules.Validate(input.Label, input.Provider, input.Url, input.Events);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new ApiException(StatusCodes.Status400BadRequest, exception.Message);
         }
@@ -97,7 +97,7 @@ public static class NotificationEndpoints
         {
             NotificationRules.Validate(input.Label, input.Provider, input.Url, input.Events);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new ApiException(StatusCodes.Status400BadRequest, exception.Message);
         }
@@ -132,7 +132,7 @@ public static class NotificationEndpoints
         await request.CommitAsync().ConfigureAwait(false);
         return new CustomApiResult(context =>
         {
-            PyResponses.NoContentJson(context);
+            ApiResponses.NoContentJson(context);
             return Task.CompletedTask;
         });
     }
@@ -153,7 +153,7 @@ public static class NotificationEndpoints
         var row = await NotificationChannelStore.GetAsync(uow, channelId).ConfigureAwait(false)
             ?? throw new ApiException(StatusCodes.Status404NotFound, "Notification channel not found.");
         var error = await request.Service<NotificationDispatcher>().TestAsync(row, request.Context.RequestAborted).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict().Set("ok", error is null).Set("error", error));
+        return ApiRoutes.Ok(new WireObject().Set("ok", error is null).Set("error", error));
     }
 
     /// <summary>Metrics access needs a matching bearer token, or an operator or admin session.</summary>
@@ -175,7 +175,7 @@ public static class NotificationEndpoints
         }
 
         var text = request.Service<RuntimeMetricsStore>().RenderPrometheus();
-        return new CustomApiResult(context => PyResponses.WritePlainTextAsync(context, StatusCodes.Status200OK, text, "text/plain; version=0.0.4; charset=utf-8"));
+        return new CustomApiResult(context => ApiResponses.WritePlainTextAsync(context, StatusCodes.Status200OK, text, "text/plain; version=0.0.4; charset=utf-8"));
     }
 
     private static string? BearerToken(string? headerValue)

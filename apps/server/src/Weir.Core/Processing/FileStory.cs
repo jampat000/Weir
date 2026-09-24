@@ -26,14 +26,14 @@ public static class FileStory
     private static readonly HashSet<string> EmptyTrackLines = new(StringComparer.Ordinal) { "", "—", "-", "none", "None" };
 
     /// <summary>The steps of one pass, in the order they happened.</summary>
-    public static IReadOnlyList<StoryStep> NarratePass(PyDict? detail, string libraryName = "")
+    public static IReadOnlyList<StoryStep> NarratePass(WireObject? detail, string libraryName = "")
     {
         if (detail is null)
         {
             return [];
         }
 
-        var ok = !(detail.TryGetValue("ok", out var okValue) && okValue is PyBool { Value: false });
+        var ok = !(detail.TryGetValue("ok", out var okValue) && okValue is WireBool { Value: false });
 
         var candidates = new List<StoryStep?>
         {
@@ -58,19 +58,19 @@ public static class FileStory
         return [.. candidates.Where(step => step is not null).Select(step => step!)];
     }
 
-    private static string Text(PyJson? value) => value switch
+    private static string Text(WireValue? value) => value switch
     {
-        null or PyNull => string.Empty,
-        PyStr s => string.Join(' ', s.Value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)),
-        PyInt i => i.Value.ToString(CultureInfo.InvariantCulture),
-        PyFloat f => f.Value.ToString(CultureInfo.InvariantCulture),
-        PyBool b => b.Value ? "True" : "False",
+        null or WireNull => string.Empty,
+        WireString s => string.Join(' ', s.Value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)),
+        WireInteger i => i.Value.ToString(CultureInfo.InvariantCulture),
+        WireNumber f => f.Value.ToString(CultureInfo.InvariantCulture),
+        WireBool b => b.Value ? "True" : "False",
         _ => string.Empty,
     };
 
-    private static List<string> ListOf(PyJson? value)
+    private static List<string> ListOf(WireValue? value)
     {
-        if (value is not PyList list)
+        if (value is not WireArray list)
         {
             return [];
         }
@@ -78,12 +78,12 @@ public static class FileStory
         return [.. list.Items.Select(Text).Where(text => text.Length > 0)];
     }
 
-    private static double? Number(PyJson? value) => value switch
+    private static double? Number(WireValue? value) => value switch
     {
-        PyInt i => (double)i.Value,
-        PyFloat f => double.IsNaN(f.Value) ? null : f.Value,
-        PyBool b => b.Value ? 1.0 : 0.0,
-        PyStr s when double.TryParse(s.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) => parsed,
+        WireInteger i => (double)i.Value,
+        WireNumber f => double.IsNaN(f.Value) ? null : f.Value,
+        WireBool b => b.Value ? 1.0 : 0.0,
+        WireString s when double.TryParse(s.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) => parsed,
         _ => null,
     };
 
@@ -128,13 +128,13 @@ public static class FileStory
         return $"{hours.ToString("F1", CultureInfo.InvariantCulture)} hours";
     }
 
-    private static string? TrackLine(PyJson? value)
+    private static string? TrackLine(WireValue? value)
     {
         var line = Text(value);
         return EmptyTrackLines.Contains(line) ? null : line;
     }
 
-    private static StoryStep? PickedUp(PyDict detail, string libraryName)
+    private static StoryStep? PickedUp(WireObject detail, string libraryName)
     {
         var where = libraryName.Trim();
         var scope = Text(detail.TryGetValue("media_scope", out var s) ? s : null);
@@ -158,9 +158,9 @@ public static class FileStory
         return new StoryStep("Picked up", $"{sentence}.");
     }
 
-    private static StoryStep? LookedInside(PyDict detail)
+    private static StoryStep? LookedInside(WireObject detail)
     {
-        var counts = detail.TryGetValue("stream_counts", out var raw) && raw is PyDict countsDict ? countsDict : null;
+        var counts = detail.TryGetValue("stream_counts", out var raw) && raw is WireObject countsDict ? countsDict : null;
         var video = (long)(counts is not null && counts.TryGetValue("video", out var v) ? Number(v) ?? 0 : 0);
         var audio = (long)(counts is not null && counts.TryGetValue("audio", out var a) ? Number(a) ?? 0 : 0);
         var subs = (long)(counts is not null && counts.TryGetValue("subtitle", out var sub) ? Number(sub) ?? 0 : 0);
@@ -188,9 +188,9 @@ public static class FileStory
         return new StoryStep("Looked inside", sentence);
     }
 
-    private static StoryStep? Planned(PyDict detail, bool ok)
+    private static StoryStep? Planned(WireObject detail, bool ok)
     {
-        if (detail.TryGetValue("pass_through_unchanged", out var passThrough) && passThrough is PyBool { Value: true })
+        if (detail.TryGetValue("pass_through_unchanged", out var passThrough) && passThrough is WireBool { Value: true })
         {
             return new StoryStep(
                 "Planned",
@@ -205,7 +205,7 @@ public static class FileStory
         var subsAfter = TrackLine(detail.TryGetValue("subs_after", out var sa) ? sa : null);
         var remuxRequired = detail.TryGetValue("remux_required", out var rr) ? rr : null;
 
-        if (remuxRequired is PyBool { Value: false })
+        if (remuxRequired is WireBool { Value: false })
         {
             return new StoryStep("Planned", "Everything already matched your settings, so there was nothing to change.", StoryTone.Good);
         }
@@ -252,7 +252,7 @@ public static class FileStory
             sentence += $" Subtitles kept: {subsAfter}.";
         }
 
-        if (ok && remuxRequired is PyBool { Value: true } && VideoWasStreamCopied(detail))
+        if (ok && remuxRequired is WireBool { Value: true } && VideoWasStreamCopied(detail))
         {
             sentence += " The video is copied, not re-encoded, so picture quality is unchanged.";
         }
@@ -261,9 +261,9 @@ public static class FileStory
     }
 
     /// <summary>True only when the stored ffmpeg command demonstrably copied the video stream.</summary>
-    private static bool VideoWasStreamCopied(PyDict detail)
+    private static bool VideoWasStreamCopied(WireObject detail)
     {
-        if (!detail.TryGetValue("ffmpeg_argv", out var raw) || raw is not PyList list)
+        if (!detail.TryGetValue("ffmpeg_argv", out var raw) || raw is not WireArray list)
         {
             return false;
         }
@@ -288,7 +288,7 @@ public static class FileStory
         return copiesEverything;
     }
 
-    private static StoryStep? Choices(PyDict detail)
+    private static StoryStep? Choices(WireObject detail)
     {
         var notes = ListOf(detail.TryGetValue("audio_selection_notes", out var raw) ? raw : null);
         return notes.Count == 0
@@ -296,7 +296,7 @@ public static class FileStory
             : new StoryStep("Why these tracks", string.Join(' ', notes.Take(4).Select(note => note.TrimEnd('.') + ".")));
     }
 
-    private static StoryStep? Worked(PyDict detail)
+    private static StoryStep? Worked(WireObject detail)
     {
         var elapsed = Number(detail.TryGetValue("elapsed_seconds", out var e) ? e : null);
         var source = Number(detail.TryGetValue("source_size_bytes", out var src) ? src : null);
@@ -341,7 +341,7 @@ public static class FileStory
         return new StoryStep("Worked", sentence, good ? StoryTone.Good : StoryTone.Neutral);
     }
 
-    private static StoryStep? Verified(PyDict detail)
+    private static StoryStep? Verified(WireObject detail)
     {
         var check = Text(detail.TryGetValue("output_completeness_check", out var c) ? c : null).ToLowerInvariant();
         var note = Text(detail.TryGetValue("output_completeness_note", out var n) ? n : null);
@@ -353,7 +353,7 @@ public static class FileStory
         };
     }
 
-    private static StoryStep? Collision(PyDict detail)
+    private static StoryStep? Collision(WireObject detail)
     {
         var reason = Text(detail.TryGetValue("output_collision_reason", out var r) ? r : null);
         if (reason.Length == 0)
@@ -365,7 +365,7 @@ public static class FileStory
         return new StoryStep("An output already existed", reason, action == "skip" ? StoryTone.Warn : StoryTone.Neutral);
     }
 
-    private static StoryStep? HandedBack(PyDict detail, bool ok)
+    private static StoryStep? HandedBack(WireObject detail, bool ok)
     {
         if (!ok)
         {
@@ -378,7 +378,7 @@ public static class FileStory
             : new StoryStep("Handed back", $"The result was written to {destination} for your media manager to import.", StoryTone.Good);
     }
 
-    private static StoryStep Failed(PyDict detail)
+    private static StoryStep Failed(WireObject detail)
     {
         var reason = Text(detail.TryGetValue("reason", out var r) ? r : null);
         if (reason.Length == 0)

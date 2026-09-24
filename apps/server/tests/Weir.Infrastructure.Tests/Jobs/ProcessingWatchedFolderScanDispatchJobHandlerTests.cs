@@ -57,11 +57,11 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
 
     private static async Task RunScanAsync(ProcessingWatchedFolderScanDispatchJobHandler handler, ProcessingJobStore jobs, long libraryId, bool enqueueRemuxJobs)
     {
-        var payload = new PyDict().Set("enqueue_remux_jobs", enqueueRemuxJobs).Set("scan_trigger", "manual").Set("media_scope", "movie").Set("library_id", libraryId);
+        var payload = new WireObject().Set("enqueue_remux_jobs", enqueueRemuxJobs).Set("scan_trigger", "manual").Set("media_scope", "movie").Set("library_id", libraryId);
         var job = await jobs.EnqueueOrGetAsync(
             $"scan-test-{Guid.NewGuid():N}",
             ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch,
-            PyJsonWriter.Dumps(payload, PyJsonFormat.Compact));
+            WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
         await handler.HandleAsync(new JobWorkContext(job.Id, job.JobKind, job.PayloadJson, "test-owner"), CancellationToken.None);
     }
 
@@ -92,11 +92,11 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
 
         Assert.StartsWith("processing.file.remux_pass.v1:scan:", dedupeKey, StringComparison.Ordinal);
         Assert.Equal("pending", status);
-        var body = (PyDict)PyJsonParser.Parse(payloadJson);
-        Assert.Equal("Gate Test 2001.mkv", ((PyStr)body.Get("relative_media_path")!).Value);
-        Assert.Equal("movie", ((PyStr)body.Get("media_scope")!).Value);
-        Assert.Equal("manual", ((PyStr)body.Get("trigger")!).Value);
-        Assert.Equal(libraryId, (long)((PyInt)body.Get("library_id")!).Value);
+        var body = (WireObject)WireJsonParser.Parse(payloadJson);
+        Assert.Equal("Gate Test 2001.mkv", ((WireString)body.Get("relative_media_path")!).Value);
+        Assert.Equal("movie", ((WireString)body.Get("media_scope")!).Value);
+        Assert.Equal("manual", ((WireString)body.Get("trigger")!).Value);
+        Assert.Equal(libraryId, (long)((WireInteger)body.Get("library_id")!).Value);
         Assert.Null(body.Get("dry_run"));
     }
 
@@ -135,8 +135,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         File.WriteAllBytes(Path.Combine(watched, "Already Queued 2001.mkv"), [1]);
         var libraryId = await CreateLibraryAsync(store, watched, output);
 
-        var existingPayload = new PyDict().Set("relative_media_path", "Already Queued 2001.mkv").Set("media_scope", "movie").Set("library_id", libraryId);
-        await jobs.EnqueueOrGetAsync("existing-remux", "processing.file.remux_pass.v1", PyJsonWriter.Dumps(existingPayload, PyJsonFormat.Compact));
+        var existingPayload = new WireObject().Set("relative_media_path", "Already Queued 2001.mkv").Set("media_scope", "movie").Set("library_id", libraryId);
+        await jobs.EnqueueOrGetAsync("existing-remux", "processing.file.remux_pass.v1", WireJsonWriter.Dumps(existingPayload, WireJsonFormat.Compact));
 
         await RunScanAsync(handler, jobs, libraryId, enqueueRemuxJobs: true);
 

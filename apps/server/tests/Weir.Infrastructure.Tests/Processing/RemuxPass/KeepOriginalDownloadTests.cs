@@ -94,9 +94,9 @@ public sealed class KeepOriginalDownloadTests : IDisposable
     {
         var scan = new ProcessingWatchedFolderScanDispatchJobHandler(
             _fixture.Store.Database, _fixture.Store.Clock, _fixture.Store.Options, _fixture.Jobs, _fixture.Connections);
-        var payload = new PyDict().Set("enqueue_remux_jobs", true).Set("scan_trigger", "watcher").Set("media_scope", mediaType).Set("library_id", _libraryId);
+        var payload = new WireObject().Set("enqueue_remux_jobs", true).Set("scan_trigger", "watcher").Set("media_scope", mediaType).Set("library_id", _libraryId);
         var job = await _fixture.Jobs.EnqueueOrGetAsync(
-            $"scan-{Guid.NewGuid():N}", ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch, PyJsonWriter.Dumps(payload, PyJsonFormat.Compact));
+            $"scan-{Guid.NewGuid():N}", ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
         await scan.HandleAsync(new JobWorkContext(job.Id, job.JobKind, job.PayloadJson, "scan-owner"), CancellationToken.None);
         await _fixture.Store.Execute($"UPDATE jobs SET status = 'completed' WHERE id = {job.Id}");
 

@@ -12,11 +12,10 @@
   <ItemGroup>
     <!-- The frozen Alembic-head schema reference (see SchemaParityTests). -->
     <None Include="schema/alembic-head.sql" CopyToOutputDirectory="PreserveNewest" />
-    <!-- A configuration bundle exported by the Python server (format version 4). -->
+    <!-- A configuration bundle exported by an older release (format version 4): a frozen compatibility fixture. -->
     <None Include="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- The ffmpeg layer's golden fixtures, shared with Weir.Core.Tests (checked-in .NET fixtures; see apps/server/README.md). -->
     <None Include="../Weir.Core.Tests/Media/golden/*.json" CopyToOutputDirectory="PreserveNewest" LinkBase="Media/golden" />
-    <!-- Drives the Python job queue for the cross-backend tests. -->
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

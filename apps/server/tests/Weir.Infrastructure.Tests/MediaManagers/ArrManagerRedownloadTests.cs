@@ -45,7 +45,7 @@ public sealed class ArrManagerRedownloadTests
         var deleteRequest = http.RequestsTo(HttpMethod.Delete, "/api/v3/moviefile").Single();
         Assert.Empty(deleteRequest.Body);
         var searchRequest = http.RequestsTo(HttpMethod.Post, "/api/v3/command").Single();
-        Assert.Equal("""{"name":"MoviesSearch","movieIds":[7]}""", PyJsonWriter.Dumps(searchRequest.Json!, PyJsonFormat.Compact));
+        Assert.Equal("""{"name":"MoviesSearch","movieIds":[7]}""", WireJsonWriter.Dumps(searchRequest.Json!, WireJsonFormat.Compact));
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public sealed class ArrManagerRedownloadTests
         Assert.Empty(http.RequestsTo(HttpMethod.Delete, "/api/v3/episodefile/56"));
 
         var searchRequest = http.RequestsTo(HttpMethod.Post, "/api/v3/command").Single();
-        Assert.Equal("""{"name":"SeriesSearch","seriesId":3}""", PyJsonWriter.Dumps(searchRequest.Json!, PyJsonFormat.Compact));
+        Assert.Equal("""{"name":"SeriesSearch","seriesId":3}""", WireJsonWriter.Dumps(searchRequest.Json!, WireJsonFormat.Compact));
     }
 
     [Fact]

@@ -27,11 +27,11 @@ public sealed class ManagerSetupCheck
     }
 
     /// <summary>One entry per enabled connection that covers <paramref name="mediaScope"/>, in connection order.</summary>
-    public async Task<List<PyDict>> CheckAsync(
+    public async Task<List<WireObject>> CheckAsync(
         UnitOfWork uow, string mediaScope, string watchedFolder, string outputFolder, bool removesOriginals = true, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        var results = new List<PyDict>();
+        var results = new List<WireObject>();
         foreach (var row in await MediaManagerConnectionStore.ListEnabledAsync(uow).ConfigureAwait(false))
         {
             var isArr = ManagerKindProfiles.ForKind(row.Kind) is { IsArr: true } profile && profile.ArrScope == mediaScope;
@@ -42,7 +42,7 @@ public sealed class ManagerSetupCheck
             }
 
             var label = MediaManagerKinds.LabelForConnection(row.Kind, row.Name);
-            var entry = new PyDict()
+            var entry = new WireObject()
                 .Set("connection_id", row.Id)
                 .Set("kind", row.Kind)
                 .Set("name", row.Name)
@@ -57,10 +57,10 @@ public sealed class ManagerSetupCheck
             else if (isArr)
             {
                 (var hosts, lines) = await CheckArrAsync(connection, mediaScope, watchedFolder, outputFolder, removesOriginals, cancellationToken).ConfigureAwait(false);
-                entry.Set("mapping", new PyDict()
-                    .Set("hosts", new PyList(hosts.Select(host => (PyJson)new PyStr(host))))
-                    .Set("remote_path", PyStrings.Strip(watchedFolder))
-                    .Set("local_path", PyStrings.Strip(outputFolder)));
+                entry.Set("mapping", new WireObject()
+                    .Set("hosts", new WireArray(hosts.Select(host => (WireValue)new WireString(host))))
+                    .Set("remote_path", WireStrings.Strip(watchedFolder))
+                    .Set("local_path", WireStrings.Strip(outputFolder)));
             }
             else
             {
@@ -70,7 +70,7 @@ public sealed class ManagerSetupCheck
             }
 
             entry.Set("ready", lines.All(line => line.State != SetupCheckLine.Problem));
-            entry.Set("lines", new PyList(lines.Select(line => (PyJson)line.ToOut())));
+            entry.Set("lines", new WireArray(lines.Select(line => (WireValue)line.ToOut())));
             results.Add(entry);
         }
 
@@ -80,8 +80,8 @@ public sealed class ManagerSetupCheck
     private async Task<(IReadOnlyList<string> Hosts, IReadOnlyList<SetupCheckLine> Lines)> CheckArrAsync(
         ManagerConnection connection, string mediaScope, string watchedFolder, string outputFolder, bool removesOriginals, CancellationToken cancellationToken)
     {
-        PyJson? mappings;
-        PyJson? clients;
+        WireValue? mappings;
+        WireValue? clients;
         try
         {
             var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout);
@@ -116,7 +116,7 @@ public sealed class ManagerSetupCheck
 
         var signal = await port.QueueRowsAsync(connection, cancellationToken).ConfigureAwait(false);
         return signal.IsReported
-            ? [.. signal.Rows.Select(row => PyValues.FirstText(row.Payload, "outputPath")).OfType<string>()]
+            ? [.. signal.Rows.Select(row => ManagerValues.FirstText(row.Payload, "outputPath")).OfType<string>()]
             : [];
     }
 
@@ -126,8 +126,8 @@ public sealed class ManagerSetupCheck
         try
         {
             var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout);
-            return await client.GetJsonAsync(ManagerSetupRules.DownloadClientConfigPath, cancellationToken: cancellationToken).ConfigureAwait(false) is PyDict config &&
-                   config.Get("enableCompletedDownloadHandling") is PyBool flag
+            return await client.GetJsonAsync(ManagerSetupRules.DownloadClientConfigPath, cancellationToken: cancellationToken).ConfigureAwait(false) is WireObject config &&
+                   config.Get("enableCompletedDownloadHandling") is WireBool flag
                 ? flag.Value
                 : null;
         }

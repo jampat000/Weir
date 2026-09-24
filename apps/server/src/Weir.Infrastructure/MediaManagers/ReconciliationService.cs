@@ -30,38 +30,38 @@ public static class ReconciliationService
     private sealed record LibraryFolders(long Id, string Name, string WatchedFolder, string OutputFolder, string WorkFolder);
 
     /// <summary>The reconciliation report over every library's processing folders.</summary>
-    public static async Task<PyDict> BuildReportAsync(UnitOfWork uow) =>
+    public static async Task<WireObject> BuildReportAsync(UnitOfWork uow) =>
         ReconciliationRules.Report(await ScanProcessingPathsAsync(uow).ConfigureAwait(false));
 
-    /// <summary>Apply one repair action. Throws <see cref="PyValueErrorException"/> with the operator's sentence.</summary>
-    public static async Task<PyDict> RepairAsync(UnitOfWork uow, string action, long? dbId, string? path, bool confirm)
+    /// <summary>Apply one repair action. Throws <see cref="WireValueException"/> with the operator's sentence.</summary>
+    public static async Task<WireObject> RepairAsync(UnitOfWork uow, string action, long? dbId, string? path, bool confirm)
     {
         _ = dbId;
         if (action == ReconciliationRules.RemoveTempArtifactAction)
         {
             if (!confirm)
             {
-                throw new PyValueErrorException("confirm=true is required before removing a temp artifact.");
+                throw new WireValueException("confirm=true is required before removing a temp artifact.");
             }
 
-            if (path is null || PyStrings.Strip(path).Length == 0)
+            if (path is null || WireStrings.Strip(path).Length == 0)
             {
-                throw new PyValueErrorException("path is required for this repair action.");
+                throw new WireValueException("path is required for this repair action.");
             }
 
             var roots = WorkRoots(await ListLibrariesAsync(uow).ConfigureAwait(false));
             if (!ReconciliationRules.IsTempArtifactName(PurePathName(path)))
             {
-                throw new PyValueErrorException("Refusing to remove a file that does not look like a temp artifact.");
+                throw new WireValueException("Refusing to remove a file that does not look like a temp artifact.");
             }
 
             var removed = SafeUnlinkUnderRoots(path, roots);
-            return new PyDict()
+            return new WireObject()
                 .Set("applied", removed)
                 .Set("message", removed ? "Removed the temp artifact." : "Temp artifact is already gone.");
         }
 
-        throw new PyValueErrorException($"Unknown reconciliation repair action: {action}");
+        throw new WireValueException($"Unknown reconciliation repair action: {action}");
     }
 
     /// <summary>Deletes a file only when it lies strictly inside one of the roots (never a root itself).</summary>
@@ -106,7 +106,7 @@ public static class ReconciliationService
         {
             foreach (var (role, raw) in new[] { ("watched", library.WatchedFolder), ("output", library.OutputFolder), ("work", library.WorkFolder) })
             {
-                if (PyStrings.Strip(raw).Length > 0 && !PathExists(raw))
+                if (WireStrings.Strip(raw).Length > 0 && !PathExists(raw))
                 {
                     issues.Add(new ReconciliationIssue(
                         "configured_folder_missing",
@@ -162,7 +162,7 @@ public static class ReconciliationService
         var roots = new List<string>();
         foreach (var library in libraries)
         {
-            if (PyStrings.Strip(library.WorkFolder).Length == 0)
+            if (WireStrings.Strip(library.WorkFolder).Length == 0)
             {
                 continue;
             }

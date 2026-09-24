@@ -18,11 +18,11 @@ public sealed record HandoffTarget(string RelativePath, string? Result, string? 
 /// <summary>The <c>outputFiles</c> list a report and the hand-off status carry, and how the ledger stores it.</summary>
 public static class HandoffOutputFiles
 {
-    public static PyList ToJson(IEnumerable<string> files) => new(files.Select(file => (PyJson)new PyStr(file)));
+    public static WireArray ToJson(IEnumerable<string> files) => new(files.Select(file => (WireValue)new WireString(file)));
 
-    public static PyJson ToJsonOrNull(IEnumerable<string>? files) => files is null ? PyNull.Instance : ToJson(files);
+    public static WireValue ToJsonOrNull(IEnumerable<string>? files) => files is null ? WireNull.Instance : ToJson(files);
 
-    public static string Serialize(IEnumerable<string> files) => PyJsonWriter.Dumps(ToJson(files), PyJsonFormat.Compact);
+    public static string Serialize(IEnumerable<string> files) => WireJsonWriter.Dumps(ToJson(files), WireJsonFormat.Compact);
 
     /// <summary>The stored list, or null when none is stored or it cannot be read.</summary>
     public static IReadOnlyList<string>? Parse(string? json)
@@ -34,9 +34,9 @@ public static class HandoffOutputFiles
 
         try
         {
-            return PyJsonParser.Parse(json) is PyList list ? [.. list.Items.OfType<PyStr>().Select(item => item.Value)] : null;
+            return WireJsonParser.Parse(json) is WireArray list ? [.. list.Items.OfType<WireString>().Select(item => item.Value)] : null;
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
             return null;
         }
@@ -51,7 +51,7 @@ public static class HandoffOutputFiles
 public static class FolderHandoffReports
 {
     /// <summary>What one pass's result means for its file: delivered, handed back unchanged, or failed.</summary>
-    public static string TargetResult(PyDict result)
+    public static string TargetResult(WireObject result)
     {
         ArgumentNullException.ThrowIfNull(result);
         if (!CompletionReports.IsSucceeded(result))
@@ -59,7 +59,7 @@ public static class FolderHandoffReports
             return HandoffLedgerRules.Failed;
         }
 
-        return result.Get("passed_through_after_failure") is PyBool { Value: true } ? HandoffLedgerRules.PassedThrough : HandoffLedgerRules.Completed;
+        return result.Get("passed_through_after_failure") is WireBool { Value: true } ? HandoffLedgerRules.PassedThrough : HandoffLedgerRules.Completed;
     }
 
     /// <summary>The ledger state for the whole hand-off: as far along as its least finished file.</summary>
@@ -74,7 +74,7 @@ public static class FolderHandoffReports
     /// message says how many succeeded and what went wrong with the rest, while <c>outputFiles</c> still lists the ones
     /// that were delivered.
     /// </summary>
-    public static PyDict BuildBody(HandoffOrigin origin, IReadOnlyList<HandoffTarget> targets, string? outputFolder, IReadOnlyList<string> outputFiles)
+    public static WireObject BuildBody(HandoffOrigin origin, IReadOnlyList<HandoffTarget> targets, string? outputFolder, IReadOnlyList<string> outputFiles)
     {
         ArgumentNullException.ThrowIfNull(targets);
         ArgumentNullException.ThrowIfNull(outputFiles);
@@ -121,7 +121,7 @@ public static class FolderHandoffReports
     private static string FailureMessage(IReadOnlyList<HandoffTarget> targets, List<HandoffTarget> failed)
     {
         var delivered = targets.Count(target => target.Delivered);
-        var reasons = failed.Select(target => $"{MediaPathNames.Name(target.RelativePath, windows: false)}: {PyStrings.Strip(target.Message ?? string.Empty).TrimEnd('.')}");
+        var reasons = failed.Select(target => $"{MediaPathNames.Name(target.RelativePath, windows: false)}: {WireStrings.Strip(target.Message ?? string.Empty).TrimEnd('.')}");
         return $"Weir finished {delivered.ToString(System.Globalization.CultureInfo.InvariantCulture)} of {Plural.Of(targets.Count, "file")}. " +
                $"It could not process {Plural.Of(failed.Count, "file")}: {string.Join("; ", reasons)}.";
     }

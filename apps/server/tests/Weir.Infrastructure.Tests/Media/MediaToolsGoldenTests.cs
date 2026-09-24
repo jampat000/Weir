@@ -164,8 +164,8 @@ public sealed class MediaToolsGoldenTests
                 var e = expectedUpdates[i];
                 var a = updates[i];
                 var label = $"{name} update {i}";
-                Assert.True(ReprOrNull(e.GetProperty("percent")) == (a.Percent is null ? null : PyConvert.FloatRepr(a.Percent.Value)), $"{label}: percent {a.Percent}");
-                Assert.True(ReprOrNull(e.GetProperty("processed_seconds")) == (a.ProcessedSeconds is null ? null : PyConvert.FloatRepr(a.ProcessedSeconds.Value)), $"{label}: processed");
+                Assert.True(ReprOrNull(e.GetProperty("percent")) == (a.Percent is null ? null : WireConvert.FloatRepr(a.Percent.Value)), $"{label}: percent {a.Percent}");
+                Assert.True(ReprOrNull(e.GetProperty("processed_seconds")) == (a.ProcessedSeconds is null ? null : WireConvert.FloatRepr(a.ProcessedSeconds.Value)), $"{label}: processed");
                 Assert.True((e.GetProperty("eta_seconds").ValueKind == JsonValueKind.Null ? null : e.GetProperty("eta_seconds").GetInt64()) == a.EtaSeconds, $"{label}: eta {a.EtaSeconds}");
                 Assert.True(e.GetProperty("elapsed_seconds").GetInt64() == a.ElapsedSeconds, $"{label}: elapsed");
                 Assert.True(ReprOrNull(e.GetProperty("speed")) == a.Speed, $"{label}: speed");
@@ -285,7 +285,7 @@ public sealed class MediaToolsGoldenTests
             MediaCompletenessException => "MediaCompletenessError",
             MediaToolException => "RuntimeError",
             MediaToolTimeoutException => "TimeoutExpired",
-            RulesInputException rules => rules.PythonError,
+            RulesInputException rules => rules.ErrorKind,
             _ => actual.GetType().Name,
         };
         Assert.True(expected.GetProperty("type").GetString() == type, $"{label}: expected {expected.GetRawText()}, got {type}: {actual.Message}");

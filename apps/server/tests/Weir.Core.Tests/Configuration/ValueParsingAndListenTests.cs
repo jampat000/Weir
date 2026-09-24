@@ -13,7 +13,7 @@ public sealed class ValueParsingAndListenTests
     [InlineData("-99999999999999999999999", long.MinValue)]
     public void Parses_signed_integers_with_underscores_and_clamps_overflow(string raw, long expected)
     {
-        Assert.True(PythonCompat.TryParseInt(raw, out var value));
+        Assert.True(ValueParsing.TryParseInt(raw, out var value));
         Assert.Equal(expected, value);
     }
 
@@ -26,7 +26,7 @@ public sealed class ValueParsingAndListenTests
     [InlineData("1.0")]
     [InlineData("0x10")]
     [InlineData("1e3")]
-    public void Rejects_malformed_integers(string raw) => Assert.False(PythonCompat.TryParseInt(raw, out _));
+    public void Rejects_malformed_integers(string raw) => Assert.False(ValueParsing.TryParseInt(raw, out _));
 
     [Theory]
     [InlineData("http://LocalHost:8782/path?q#f", "http", "localhost", 8782)]
@@ -36,7 +36,7 @@ public sealed class ValueParsingAndListenTests
     [InlineData("*", "", null, null)]
     public void Splits_urls_into_their_parts(string raw, string scheme, string? hostname, int? port)
     {
-        var parsed = PythonCompat.ParseUrl(raw);
+        var parsed = ValueParsing.ParseUrl(raw);
         Assert.Equal(scheme, parsed.Scheme);
         Assert.Equal(hostname, parsed.Hostname);
         Assert.Equal(port, parsed.Port);
@@ -46,24 +46,24 @@ public sealed class ValueParsingAndListenTests
     public void Lexical_normalization_collapses_separators_and_dot_segments()
     {
         var posix = TestRuntime.Bare(isWindows: false);
-        Assert.Equal("/srv/media/movies", PythonCompat.NormalizeLexically("/srv//media/./movies/", posix));
-        Assert.Equal("//server/share", PythonCompat.NormalizeLexically("//server/share", posix));
-        Assert.Equal("relative/dir", PythonCompat.NormalizeLexically("relative/./dir/", posix));
-        Assert.Equal(".", PythonCompat.NormalizeLexically("./", posix));
+        Assert.Equal("/srv/media/movies", ValueParsing.NormalizeLexically("/srv//media/./movies/", posix));
+        Assert.Equal("//server/share", ValueParsing.NormalizeLexically("//server/share", posix));
+        Assert.Equal("relative/dir", ValueParsing.NormalizeLexically("relative/./dir/", posix));
+        Assert.Equal(".", ValueParsing.NormalizeLexically("./", posix));
 
         var windows = TestRuntime.Bare(isWindows: true);
-        Assert.Equal(@"D:\media\movies", PythonCompat.NormalizeLexically("D:/media//movies/", windows));
-        Assert.Equal(@"\\nas\share\tv", PythonCompat.NormalizeLexically(@"\\nas\share\tv\", windows));
+        Assert.Equal(@"D:\media\movies", ValueParsing.NormalizeLexically("D:/media//movies/", windows));
+        Assert.Equal(@"\\nas\share\tv", ValueParsing.NormalizeLexically(@"\\nas\share\tv\", windows));
     }
 
     [Fact]
     public void Tilde_expands_only_as_a_leading_segment()
     {
         var runtime = TestRuntime.Bare(isWindows: false);
-        Assert.Equal(runtime.UserHomeDirectory, PythonCompat.ExpandUser("~", runtime));
-        Assert.Equal(Path.Join(runtime.UserHomeDirectory, "x"), PythonCompat.ExpandUser("~/x", runtime));
-        Assert.Equal("a/~/x", PythonCompat.ExpandUser("a/~/x", runtime));
-        Assert.Equal("~other/x", PythonCompat.ExpandUser("~other/x", runtime));
+        Assert.Equal(runtime.UserHomeDirectory, ValueParsing.ExpandUser("~", runtime));
+        Assert.Equal(Path.Join(runtime.UserHomeDirectory, "x"), ValueParsing.ExpandUser("~/x", runtime));
+        Assert.Equal("a/~/x", ValueParsing.ExpandUser("a/~/x", runtime));
+        Assert.Equal("~other/x", ValueParsing.ExpandUser("~other/x", runtime));
     }
 
     [Fact]

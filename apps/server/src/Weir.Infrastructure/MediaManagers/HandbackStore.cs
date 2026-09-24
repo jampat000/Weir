@@ -95,7 +95,7 @@ public static class HandbackStore
             ("$output", outputPath),
             ("$size", size),
             ("$mtime", mtimeNs),
-            ("$now", PythonTimestamps.Orm(now))).ConfigureAwait(false);
+            ("$now", TimestampColumns.Orm(now))).ConfigureAwait(false);
     }
 
     /// <summary>A file's size and modification time (ns since the Unix epoch, as <c>SourceFiles.Fingerprint</c> measures it).</summary>
@@ -172,7 +172,7 @@ public static class HandbackStore
             $"SELECT {Columns} {From} WHERE l.media_type = $scope AND h.outcome IS NULL AND h.settled_at IS NULL AND h.written_at <= $cutoff ORDER BY h.id",
             Read,
             ("$scope", mediaScope),
-            ("$cutoff", PythonTimestamps.Orm(writtenBefore)));
+            ("$cutoff", TimestampColumns.Orm(writtenBefore)));
     }
 
     /// <summary>What a manager said about the copy.</summary>
@@ -184,9 +184,9 @@ public static class HandbackStore
             "updated_at = CURRENT_TIMESTAMP WHERE id = $id",
             ("$outcome", outcome),
             ("$by", by),
-            ("$at", PythonTimestamps.Orm(at)),
-            ("$imported", string.IsNullOrWhiteSpace(importedPath) ? null : PyStrings.Slice(importedPath.Trim(), 4000)),
-            ("$reason", string.IsNullOrWhiteSpace(reason) ? null : PyStrings.Slice(reason.Trim(), 2000)),
+            ("$at", TimestampColumns.Orm(at)),
+            ("$imported", string.IsNullOrWhiteSpace(importedPath) ? null : WireStrings.Slice(importedPath.Trim(), 4000)),
+            ("$reason", string.IsNullOrWhiteSpace(reason) ? null : WireStrings.Slice(reason.Trim(), 2000)),
             ("$id", id));
     }
 
@@ -198,12 +198,12 @@ public static class HandbackStore
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(release);
-        var stamp = PythonTimestamps.Orm(now);
+        var stamp = TimestampColumns.Orm(now);
         return uow.ExecuteAsync(
             "UPDATE handbacks SET released_at = $released, settled_at = $settled, release_note = $note, updated_at = CURRENT_TIMESTAMP WHERE id = $id",
             ("$released", release.Removed ? stamp : null),
             ("$settled", release.Settles ? stamp : null),
-            ("$note", PyStrings.Slice(release.Note, 2000)),
+            ("$note", WireStrings.Slice(release.Note, 2000)),
             ("$id", id));
     }
 
@@ -301,14 +301,14 @@ public static class HandbackStore
     }
 
     /// <summary>The row as the Files and History lists show it (<c>handback</c>), or null when Weir wrote no copy.</summary>
-    public static PyJson ToOut(HandbackRow? row)
+    public static WireValue ToOut(HandbackRow? row)
     {
         if (row is null)
         {
-            return PyNull.Instance;
+            return WireNull.Instance;
         }
 
-        return new PyDict()
+        return new WireObject()
             .Set("output_path", row.OutputPath)
             .Set("written_at", Stamp(row.WrittenAt))
             .Set("outcome", row.Outcome)
@@ -322,7 +322,7 @@ public static class HandbackStore
     }
 
     private static string? Stamp(DateTimeOffset? value) =>
-        value is { } stamp ? PyDateTime.FromDateTimeOffset(stamp.ToUniversalTime()).PydanticJson() : null;
+        value is { } stamp ? Timestamp.FromDateTimeOffset(stamp.ToUniversalTime()).ToWireText() : null;
 
     private static HandbackRow Read(SqliteDataReader reader) => new(
         SqliteValues.GetInt64(reader, 0),
@@ -331,14 +331,14 @@ public static class HandbackStore
         SqliteValues.GetString(reader, 3),
         SqliteValues.GetInt64(reader, 4),
         SqliteValues.GetInt64(reader, 5),
-        PythonTimestamps.Parse(reader.GetValue(6)),
+        TimestampColumns.Parse(reader.GetValue(6)),
         SqliteValues.GetStringOrNull(reader, 7),
         SqliteValues.GetStringOrNull(reader, 8),
-        PythonTimestamps.Parse(reader.GetValue(9)),
+        TimestampColumns.Parse(reader.GetValue(9)),
         SqliteValues.GetStringOrNull(reader, 10),
         SqliteValues.GetStringOrNull(reader, 11),
-        PythonTimestamps.Parse(reader.GetValue(12)),
-        PythonTimestamps.Parse(reader.GetValue(13)),
+        TimestampColumns.Parse(reader.GetValue(12)),
+        TimestampColumns.Parse(reader.GetValue(13)),
         SqliteValues.GetStringOrNull(reader, 14),
         SqliteValues.GetString(reader, 15),
         SqliteValues.GetString(reader, 16),

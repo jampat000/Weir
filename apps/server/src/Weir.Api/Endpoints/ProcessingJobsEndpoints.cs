@@ -31,10 +31,10 @@ public static class ProcessingJobsEndpoints
         return endpoints;
     }
 
-    private static PyDict JobOut(ProcessingJob job)
+    private static WireObject JobOut(ProcessingJob job)
     {
         var (message, nextAction, technicalDetail) = OperatorJobStatus.Build("processing", job.JobKind, job.Status, job.LastError, job.PayloadJson);
-        return new PyDict()
+        return new WireObject()
             .Set("id", job.Id)
             .Set("dedupe_key", job.DedupeKey)
             .Set("job_kind", job.JobKind)
@@ -42,21 +42,21 @@ public static class ProcessingJobsEndpoints
             .Set("attempt_count", job.AttemptCount)
             .Set("max_attempts", job.MaxAttempts)
             .Set("lease_owner", job.LeaseOwner)
-            .Set("lease_expires_at", job.LeaseExpiresAt is { } lease ? PyDateTime.FromDateTimeOffset(lease).PydanticJson() : null)
+            .Set("lease_expires_at", job.LeaseExpiresAt is { } lease ? Timestamp.FromDateTimeOffset(lease).ToWireText() : null)
             .Set("last_error", job.LastError)
             .Set("operator_message", message)
             .Set("next_action", nextAction)
             .Set("technical_detail", technicalDetail)
             .Set("payload_json", job.PayloadJson)
-            .Set("created_at", PyDateTime.FromDateTimeOffset(job.CreatedAt).PydanticJson())
-            .Set("updated_at", PyDateTime.FromDateTimeOffset(job.UpdatedAt).PydanticJson());
+            .Set("created_at", Timestamp.FromDateTimeOffset(job.CreatedAt).ToWireText())
+            .Set("updated_at", Timestamp.FromDateTimeOffset(job.UpdatedAt).ToWireText());
     }
 
     private static async Task<ApiResult> GetInspectionAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
-        var limit = request.Query("limit") is { } rawLimit && PydanticRules.TryInt(new PyStr(rawLimit), ["query", "limit"], 1, 100, issues, out var parsedLimit) ? (int)parsedLimit : 50;
+        var limit = request.Query("limit") is { } rawLimit && FieldRules.TryInt(new WireString(rawLimit), ["query", "limit"], 1, 100, issues, out var parsedLimit) ? (int)parsedLimit : 50;
         var statuses = request.Context.Request.Query["status"].Where(s => s is not null).Select(s => s!).ToList();
         issues.ThrowIfAny();
 
@@ -71,8 +71,8 @@ public static class ProcessingJobsEndpoints
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var (rows, defaultRecentSlice) = await JobsInspectionStore.ListAsync(uow, limit, statuses.Count > 0 ? statuses : null).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict()
-            .Set("jobs", new PyList(rows.Select(r => (PyJson)JobOut(r))))
+        return ApiRoutes.Ok(new WireObject()
+            .Set("jobs", new WireArray(rows.Select(r => (WireValue)JobOut(r))))
             .Set("default_recent_slice", defaultRecentSlice));
     }
 
@@ -114,7 +114,7 @@ public static class ProcessingJobsEndpoints
         }
 
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict().Set("ok", true).Set("job_id", id).Set("status", ProcessingJobStatus.Cancelled));
+        return ApiRoutes.Ok(new WireObject().Set("ok", true).Set("job_id", id).Set("status", ProcessingJobStatus.Cancelled));
     }
 
     private static async Task<ApiResult> PostRecoverFinalizeFailedAsync(ApiRequest request)
@@ -144,7 +144,7 @@ public static class ProcessingJobsEndpoints
             throw new ApiException(StatusCodes.Status409Conflict, "Only a job whose media work completed but finalization failed can be recovered.");
         }
 
-        return ApiRoutes.Ok(new PyDict().Set("ok", true).Set("job_id", id).Set("status", ProcessingJobStatus.Completed));
+        return ApiRoutes.Ok(new WireObject().Set("ok", true).Set("job_id", id).Set("status", ProcessingJobStatus.Completed));
     }
 
     private static async Task<ApiResult> GetWhyHeldAsync(ApiRequest request)
@@ -169,7 +169,7 @@ public static class ProcessingJobsEndpoints
             CandidateGateVerdict.NotHeld => "not_held",
             _ => "no_upstream_signal",
         };
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("file_id", id)
             .Set("relative_path", file.RelativePath)
             .Set("library_name", library.Name)
@@ -182,7 +182,7 @@ public static class ProcessingJobsEndpoints
             .Set("queue_row_count", outcome.QueueRowCount)
             .Set("managers_consulted", outcome.ManagersConsulted)
             .Set("managers_reporting", outcome.ManagersReporting)
-            .Set("managers_without_queue_signal", new PyList(outcome.ManagersWithoutQueueSignal.Select(m => (PyJson)PyJson.Of(m))))
-            .Set("reasons", new PyList(outcome.Reasons.Select(r => (PyJson)PyJson.Of(r)))));
+            .Set("managers_without_queue_signal", new WireArray(outcome.ManagersWithoutQueueSignal.Select(m => (WireValue)WireValue.Of(m))))
+            .Set("reasons", new WireArray(outcome.Reasons.Select(r => (WireValue)WireValue.Of(r)))));
     }
 }

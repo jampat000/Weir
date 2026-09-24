@@ -10,7 +10,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Settings;
 
 /// <summary>A <c>suite_configuration_backup</c> row.</summary>
-public sealed record ConfigurationBackupRecord(long Id, PyDateTime CreatedAt, string FileName, long SizeBytes);
+public sealed record ConfigurationBackupRecord(long Id, Timestamp CreatedAt, string FileName, long SizeBytes);
 
 /// <summary>
 /// Automatic configuration snapshots on disk: writing, listing and pruning them, and the scheduled tick
@@ -43,19 +43,19 @@ public sealed class ConfigurationBackups
             Read);
     }
 
-    public static PyDict ItemOut(ConfigurationBackupRecord row)
+    public static WireObject ItemOut(ConfigurationBackupRecord row)
     {
         ArgumentNullException.ThrowIfNull(row);
-        return new PyDict()
+        return new WireObject()
             .Set("id", row.Id)
-            .Set("created_at", row.CreatedAt.PydanticJson())
+            .Set("created_at", row.CreatedAt.ToWireText())
             .Set("file_name", row.FileName)
             .Set("size_bytes", row.SizeBytes);
     }
 
     /// <summary>
     /// The snapshot's file on disk, refusing a stored name that is not a plain snapshot file name inside the backup
-    /// directory. Throws <see cref="PyValueErrorException"/> (answered as 404).
+    /// directory. Throws <see cref="WireValueException"/> (answered as 404).
     /// </summary>
     public async Task<(string Path, ConfigurationBackupRecord Row)> GetFileAsync(UnitOfWork uow, long backupId)
     {
@@ -63,10 +63,10 @@ public sealed class ConfigurationBackups
         var row = await uow.QuerySingleAsync(
             "SELECT id, created_at, file_name, size_bytes FROM suite_configuration_backup WHERE suite_configuration_backup.id = $id",
             Read,
-            ("$id", backupId)).ConfigureAwait(false) ?? throw new PyValueErrorException("Configuration snapshot not found.");
+            ("$id", backupId)).ConfigureAwait(false) ?? throw new WireValueException("Configuration snapshot not found.");
         if (PurePathName(row.FileName) != row.FileName || !row.FileName.StartsWith("suite-configuration-", StringComparison.Ordinal))
         {
-            throw new PyValueErrorException("Configuration snapshot file name is invalid.");
+            throw new WireValueException("Configuration snapshot file name is invalid.");
         }
 
         var root = Directory;
@@ -74,12 +74,12 @@ public sealed class ConfigurationBackups
         var relative = Path.GetRelativePath(root, path);
         if (relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) || Path.IsPathRooted(relative))
         {
-            throw new PyValueErrorException("Configuration snapshot path is outside the backup directory.");
+            throw new WireValueException("Configuration snapshot path is outside the backup directory.");
         }
 
         if (!File.Exists(path))
         {
-            throw new PyValueErrorException("Configuration snapshot file is missing on disk.");
+            throw new WireValueException("Configuration snapshot file is missing on disk.");
         }
 
         return (path, row);
@@ -91,7 +91,7 @@ public sealed class ConfigurationBackups
         ArgumentNullException.ThrowIfNull(uow);
         var root = Directory;
         System.IO.Directory.CreateDirectory(root);
-        var now = PyDateTime.UtcNow(_time);
+        var now = Timestamp.UtcNow(_time);
         var bundle = await ConfigurationBundleStore.BuildAsync(uow).ConfigureAwait(false);
         var stamp = now.Clock.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
         var fileName = $"suite-configuration-{stamp}.json";
@@ -102,7 +102,7 @@ public sealed class ConfigurationBackups
             path = Path.Join(root, fileName);
         }
 
-        var payload = Encoding.UTF8.GetBytes(PyJsonWriter.Dumps(bundle, PyJsonFormat.IndentedSorted));
+        var payload = Encoding.UTF8.GetBytes(WireJsonWriter.Dumps(bundle, WireJsonFormat.IndentedSorted));
         await File.WriteAllBytesAsync(path, payload).ConfigureAwait(false);
         var id = await uow.ExecuteScalarWriteAsync(
             "INSERT INTO suite_configuration_backup (created_at, file_name, size_bytes) VALUES ($created, $name, $size) RETURNING id",
@@ -129,7 +129,7 @@ public sealed class ConfigurationBackups
 
             await CreateAsync(uow).ConfigureAwait(false);
             await SuiteSettingsStore.UpdateAsync(
-                uow, suite, suite with { ConfigurationBackupLastRunAt = PyDateTime.FromUtc(PyDateTime.TruncateToMicroseconds(when)) }).ConfigureAwait(false);
+                uow, suite, suite with { ConfigurationBackupLastRunAt = Timestamp.FromUtc(Timestamp.TruncateToMicroseconds(when)) }).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
             return 1;
         }

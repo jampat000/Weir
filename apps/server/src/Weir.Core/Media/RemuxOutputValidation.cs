@@ -86,13 +86,13 @@ public static partial class RemuxOutputValidation
             if (want.Default is { } wantDefault && wantDefault != got.Default)
             {
                 throw new MediaToolException(
-                    $"Planned the {want.CodecType} track at position {position} to have default={PyBool(wantDefault)}, output has default={PyBool(got.Default)}.");
+                    $"Planned the {want.CodecType} track at position {position} to have default={BoolText(wantDefault)}, output has default={BoolText(got.Default)}.");
             }
 
             if (want.Forced is { } wantForced && wantForced != got.Forced)
             {
                 throw new MediaToolException(
-                    $"Planned the {want.CodecType} track at position {position} to have forced={PyBool(wantForced)}, output has forced={PyBool(got.Forced)}.");
+                    $"Planned the {want.CodecType} track at position {position} to have forced={BoolText(wantForced)}, output has forced={BoolText(got.Forced)}.");
             }
 
             if (want.Language is { Length: > 0 } wantLanguage)
@@ -120,7 +120,7 @@ public static partial class RemuxOutputValidation
         {
             throw new MediaCompletenessException(
                 "Validation failed: the staged output is incomplete "
-                + $"({PyText.FormatFixed(outputDuration.Value, 1)}s of {PyText.FormatFixed(expectedDurationSeconds, 1)}s expected), so it was not published.");
+                + $"({MediaText.FormatFixed(outputDuration.Value, 1)}s of {MediaText.FormatFixed(expectedDurationSeconds, 1)}s expected), so it was not published.");
         }
 
         // 5. New ffprobe warnings.
@@ -144,5 +144,5 @@ public static partial class RemuxOutputValidation
 
     private static string Describe(string codecType) => codecType.Length > 0 ? codecType : "an untyped stream";
 
-    private static string PyBool(bool value) => value ? "True" : "False";
+    private static string BoolText(bool value) => value ? "True" : "False";
 }

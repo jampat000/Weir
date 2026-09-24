@@ -219,7 +219,7 @@ public static class HandoffOriginCarry
     private static readonly string[] Kinds = [RemuxPassOutcomes.JobKind, IntakeRules.PassThroughJobKind, IntakeRules.RejectJobKind];
 
     /// <summary>The origin to carry for this file, or null.</summary>
-    public static async Task<PyDict?> FindAsync(UnitOfWork uow, long? libraryId, string relativePath, long? excludeJobId = null)
+    public static async Task<WireObject?> FindAsync(UnitOfWork uow, long? libraryId, string relativePath, long? excludeJobId = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var rows = await uow.QueryAsync(
@@ -235,24 +235,24 @@ public static class HandoffOriginCarry
                 continue;
             }
 
-            PyJson parsed;
+            WireValue parsed;
             try
             {
-                parsed = PyJsonParser.Parse(payload);
+                parsed = WireJsonParser.Parse(payload);
             }
-            catch (PyJsonDecodeException)
+            catch (WireJsonDecodeException)
             {
                 continue;
             }
 
-            if (parsed is not PyDict dict ||
-                dict.Get("relative_media_path") is not PyStr path || PyStrings.Strip(path.Value) != PyStrings.Strip(relativePath) ||
-                dict.Get("origin") is not PyDict origin)
+            if (parsed is not WireObject dict ||
+                dict.Get("relative_media_path") is not WireString path || WireStrings.Strip(path.Value) != WireStrings.Strip(relativePath) ||
+                dict.Get("origin") is not WireObject origin)
             {
                 continue;
             }
 
-            if (libraryId is { } wanted && dict.Get("library_id") is PyInt jobLibrary && jobLibrary.Value != wanted)
+            if (libraryId is { } wanted && dict.Get("library_id") is WireInteger jobLibrary && jobLibrary.Value != wanted)
             {
                 continue;
             }

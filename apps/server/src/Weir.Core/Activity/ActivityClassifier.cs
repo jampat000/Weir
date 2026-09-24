@@ -9,9 +9,9 @@ public sealed record ActivityFacts(string? Trigger, string? Result, long? Librar
 
 /// <summary>Derives an activity event's trigger, result, library, path and run key from its type and detail.</summary>
 /// <remarks>
-/// The detail is read with <see cref="PyJsonParser"/>, so details written by earlier releases parse the same
+/// The detail is read with <see cref="WireJsonParser"/>, so details written by earlier releases parse the same
 /// (<c>NaN</c>, integers of any size, the last duplicate key winning), and text is trimmed with
-/// <see cref="PyStrings.Strip"/>.
+/// <see cref="WireStrings.Strip"/>.
 /// </remarks>
 public static class ActivityClassifier
 {
@@ -54,7 +54,7 @@ public static class ActivityClassifier
     /// <summary>The facts for one event; a value the detail does not give, or gives invalidly, is <see langword="null"/>.</summary>
     public static ActivityFacts Classify(string eventType, string? detail)
     {
-        var data = DetailDict(detail) ?? new PyDict();
+        var data = DetailDict(detail) ?? new WireObject();
         var type = eventType ?? string.Empty;
 
         var trigger = Member(data.Get("trigger"), Triggers);
@@ -65,7 +65,7 @@ public static class ActivityClassifier
         }
 
         var result = Member(data.Get("result"), Results);
-        if (result is null && data.Get("ok") is PyBool { Value: false })
+        if (result is null && data.Get("ok") is WireBool { Value: false })
         {
             result = "failed";
         }
@@ -81,16 +81,16 @@ public static class ActivityClassifier
         }
 
         // A JSON integer only (not a boolean); a value beyond SQLite's INTEGER is left out.
-        long? libraryId = data.Get("library_id") is PyInt i && i.Value >= long.MinValue && i.Value <= long.MaxValue ? (long)i.Value : null;
+        long? libraryId = data.Get("library_id") is WireInteger i && i.Value >= long.MinValue && i.Value <= long.MaxValue ? (long)i.Value : null;
 
-        var relativePath = data.Get("relative_media_path") is PyStr path ? RelativePathColumn(path.Value) : null;
+        var relativePath = data.Get("relative_media_path") is WireString path ? RelativePathColumn(path.Value) : null;
 
         // A string or integer run_id only: booleans are rejected, as for library_id above, so
         // run_id: true never becomes the run key "run:True" (#540).
         string? runKey = null;
-        if (data.Get("run_id") is (PyStr or PyInt) and var runId && PyStrings.Strip(PyConvert.Str(runId)).Length > 0)
+        if (data.Get("run_id") is (WireString or WireInteger) and var runId && WireStrings.Strip(WireConvert.Str(runId)).Length > 0)
         {
-            runKey = PyStrings.Slice("run:" + PyConvert.Str(runId), 128);
+            runKey = WireStrings.Slice("run:" + WireConvert.Str(runId), 128);
         }
 
         return new ActivityFacts(trigger, result, libraryId, relativePath, runKey);
@@ -104,25 +104,25 @@ public static class ActivityClassifier
     public static string? RelativePathColumn(string relativeMediaPath)
     {
         ArgumentNullException.ThrowIfNull(relativeMediaPath);
-        var stripped = PyStrings.Strip(relativeMediaPath);
-        return stripped.Length > 0 ? PyStrings.Slice(stripped, RelativePathLimit) : null;
+        var stripped = WireStrings.Strip(relativeMediaPath);
+        return stripped.Length > 0 ? WireStrings.Slice(stripped, RelativePathLimit) : null;
     }
 
-    private static string? Member(PyJson? value, IReadOnlySet<string> allowed)
+    private static string? Member(WireValue? value, IReadOnlySet<string> allowed)
     {
-        if (value is not PyStr text)
+        if (value is not WireString text)
         {
             return null;
         }
 
-        var normalized = PyStrings.Strip(text.Value).ToLowerInvariant();
+        var normalized = WireStrings.Strip(text.Value).ToLowerInvariant();
         return allowed.Contains(normalized) ? normalized : null;
     }
 
     /// <summary>The detail as a JSON object, or <see langword="null"/> when it is not one or does not parse.</summary>
-    private static PyDict? DetailDict(string? detail)
+    private static WireObject? DetailDict(string? detail)
     {
-        var text = PyStrings.Strip(detail ?? string.Empty);
+        var text = WireStrings.Strip(detail ?? string.Empty);
         if (!text.StartsWith('{'))
         {
             return null;
@@ -130,9 +130,9 @@ public static class ActivityClassifier
 
         try
         {
-            return PyJsonParser.Parse(text) as PyDict;
+            return WireJsonParser.Parse(text) as WireObject;
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
             return null;
         }

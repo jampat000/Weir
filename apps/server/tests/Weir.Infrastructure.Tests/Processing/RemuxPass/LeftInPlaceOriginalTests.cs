@@ -101,9 +101,9 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     {
         var scan = new ProcessingWatchedFolderScanDispatchJobHandler(
             _fixture.Store.Database, _fixture.Store.Clock, _fixture.Store.Options, _fixture.Jobs, _fixture.Connections);
-        var payload = new PyDict().Set("enqueue_remux_jobs", true).Set("scan_trigger", "watcher").Set("media_scope", mediaType).Set("library_id", _libraryId);
+        var payload = new WireObject().Set("enqueue_remux_jobs", true).Set("scan_trigger", "watcher").Set("media_scope", mediaType).Set("library_id", _libraryId);
         var job = await _fixture.Jobs.EnqueueOrGetAsync(
-            $"scan-{Guid.NewGuid():N}", ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch, PyJsonWriter.Dumps(payload, PyJsonFormat.Compact));
+            $"scan-{Guid.NewGuid():N}", ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
         try
         {
             await scan.HandleAsync(new JobWorkContext(job.Id, job.JobKind, job.PayloadJson, "scan-owner"), CancellationToken.None);
@@ -176,7 +176,7 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT hold_until FROM files WHERE relative_path = $p";
         command.Parameters.AddWithValue("$p", relative);
-        return PythonTimestamps.Parse(await command.ExecuteScalarAsync());
+        return TimestampColumns.Parse(await command.ExecuteScalarAsync());
     }
 
     private Task<long> LeftActivityAsync() =>

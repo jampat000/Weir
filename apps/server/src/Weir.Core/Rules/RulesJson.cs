@@ -13,7 +13,7 @@ namespace Weir.Core.Rules;
 /// including which inputs throw and with what error class and message, to keep plans and error
 /// texts identical to the golden files.
 /// </summary>
-internal static class Py
+internal static class RulesJson
 {
     /// <summary>Invariant lower-casing.</summary>
     public static string Lower(string value) => value.ToLowerInvariant();
@@ -149,7 +149,7 @@ internal static class Py
             result = Int(value);
             return true;
         }
-        catch (RulesInputException error) when (error.PythonError is "TypeError" or "ValueError")
+        catch (RulesInputException error) when (error.ErrorKind is "TypeError" or "ValueError")
         {
             result = 0;
             return false;
@@ -159,7 +159,7 @@ internal static class Py
     /// <summary>Text as a base-10 integer, surrounding whitespace ignored; throws a <c>ValueError</c> otherwise.</summary>
     public static long IntFromText(string text)
     {
-        if (!PythonCompat.TryParseInt(PyStrings.Strip(text), out var parsed))
+        if (!ValueParsing.TryParseInt(WireStrings.Strip(text), out var parsed))
         {
             throw new RulesInputException("ValueError", $"{Repr(text)} is not a whole number.");
         }
@@ -168,7 +168,7 @@ internal static class Py
     }
 
     /// <summary><see cref="IntFromText"/>, or null where that throws.</summary>
-    public static long? TryIntFromText(string text) => PythonCompat.TryParseInt(PyStrings.Strip(text), out var parsed) ? parsed : null;
+    public static long? TryIntFromText(string text) => ValueParsing.TryParseInt(WireStrings.Strip(text), out var parsed) ? parsed : null;
 
     private static long FloatToInt(double value)
     {
@@ -199,7 +199,7 @@ internal static class Py
     /// <summary>Text as a float (including <c>inf</c>, <c>infinity</c> and <c>nan</c>, any case, optional sign), or null when unreadable.</summary>
     public static double? TryFloatFromText(string text)
     {
-        var s = Lower(PyStrings.Strip(text));
+        var s = Lower(WireStrings.Strip(text));
         var body = s;
         var sign = 1.0;
         if (body.StartsWith('+') || body.StartsWith('-'))
@@ -312,7 +312,7 @@ internal static class Py
         JsonValueKind.True => "True",
         JsonValueKind.False => "False",
         JsonValueKind.String => Repr(value.GetString()!),
-        JsonValueKind.Number when IsFloatNumber(value) => PyConvert.FloatRepr(value.GetDouble()),
+        JsonValueKind.Number when IsFloatNumber(value) => WireConvert.FloatRepr(value.GetDouble()),
         JsonValueKind.Number => BigInteger.Parse(value.GetRawText(), CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture),
         JsonValueKind.Array => "[" + string.Join(", ", value.EnumerateArray().Select(Repr)) + "]",
         JsonValueKind.Object => "{" + string.Join(", ", Items(value).Select(kv => Repr(kv.Key) + ": " + Repr(kv.Value))) + "}",
@@ -320,7 +320,7 @@ internal static class Py
     };
 
     /// <summary>The quoted repr form of a string.</summary>
-    public static string Repr(string text) => PyStrings.Repr(text);
+    public static string Repr(string text) => WireStrings.Repr(text);
 
     private static string KindText(JsonElement? value) => value?.ValueKind switch
     {

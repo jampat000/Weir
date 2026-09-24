@@ -30,15 +30,15 @@ public sealed partial class ProcessingJobStore
         reader.IsDBNull(3) ? null : reader.GetString(3),
         reader.GetString(4),
         reader.IsDBNull(5) ? null : reader.GetString(5),
-        PythonTimestamps.Parse(reader.GetValue(6)),
+        TimestampColumns.Parse(reader.GetValue(6)),
         (int)reader.GetInt64(7),
         (int)reader.GetInt64(8),
         reader.IsDBNull(9) ? null : reader.GetString(9),
-        PythonTimestamps.Parse(reader.GetValue(10)),
+        TimestampColumns.Parse(reader.GetValue(10)),
         (int)reader.GetInt64(11),
         (int)reader.GetInt64(12),
-        PythonTimestamps.Parse(reader.GetValue(13)) ?? DateTimeOffset.MinValue,
-        PythonTimestamps.Parse(reader.GetValue(14)) ?? DateTimeOffset.MinValue);
+        TimestampColumns.Parse(reader.GetValue(13)) ?? DateTimeOffset.MinValue,
+        TimestampColumns.Parse(reader.GetValue(14)) ?? DateTimeOffset.MinValue);
 
     internal static List<ProcessingJob> Query(SqliteConnection connection, SqliteTransaction transaction, string sql, params (string Name, object? Value)[] parameters)
     {

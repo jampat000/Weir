@@ -60,7 +60,7 @@ public sealed partial class ProcessingJobStore
             ("@max_attempts", Math.Max(1, maxAttempts)),
             ("@runner_cost", Math.Max(0, runnerCost)),
             ("@priority", priority),
-            ("@not_before", notBefore is { } when ? PythonTimestamps.Orm(when) : null));
+            ("@not_before", notBefore is { } when ? TimestampColumns.Orm(when) : null));
         if (inserted is not null and not DBNull)
         {
             RecordQueueDepth(connection, transaction);

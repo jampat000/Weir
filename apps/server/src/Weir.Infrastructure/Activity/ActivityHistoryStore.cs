@@ -118,7 +118,7 @@ public static class ActivityHistoryStore
     }
 
     /// <summary>When the oldest event was recorded, or null when there are none.</summary>
-    public static async Task<PyDateTime?> OldestCreatedAtAsync(UnitOfWork uow)
+    public static async Task<Timestamp?> OldestCreatedAtAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var rows = await uow.QueryAsync("SELECT min(activity_events.created_at) AS min_1 FROM activity_events", reader => SqliteValues.GetDateTimeOrNull(reader, 0)).ConfigureAwait(false);
@@ -179,13 +179,13 @@ public static class ActivityHistoryStore
         if (!string.IsNullOrEmpty(filter.Trigger))
         {
             where.Add("activity_events.\"trigger\" = @trigger");
-            parameters.Add(("@trigger", Core.Json.PyStrings.Strip(filter.Trigger).ToLowerInvariant()));
+            parameters.Add(("@trigger", Core.Json.WireStrings.Strip(filter.Trigger).ToLowerInvariant()));
         }
 
         if (!string.IsNullOrEmpty(filter.Result))
         {
             where.Add("activity_events.result = @result");
-            parameters.Add(("@result", Core.Json.PyStrings.Strip(filter.Result).ToLowerInvariant()));
+            parameters.Add(("@result", Core.Json.WireStrings.Strip(filter.Result).ToLowerInvariant()));
         }
 
         if (filter.LibraryId is { } libraryId)
@@ -196,7 +196,7 @@ public static class ActivityHistoryStore
 
         // System › Logs shows Weir's own events and History shows the files: "weir" keeps the events that are
         // not about one file, "files" keeps the ones that are. Anything else filters nothing.
-        switch (Core.Json.PyStrings.Strip(filter.About ?? string.Empty).ToLowerInvariant())
+        switch (Core.Json.WireStrings.Strip(filter.About ?? string.Empty).ToLowerInvariant())
         {
             case "weir":
                 // Written exactly as the partial index ix_activity_events_about_weir_created_at is, so SQLite reads it (#714).
@@ -211,12 +211,12 @@ public static class ActivityHistoryStore
         {
             // A file's whole history: its path, or its name anywhere in a path.
             where.Add("lower(activity_events.relative_path) LIKE lower(@relative_path)");
-            parameters.Add(("@relative_path", "%" + Core.Json.PyStrings.Strip(filter.File) + "%"));
+            parameters.Add(("@relative_path", "%" + Core.Json.WireStrings.Strip(filter.File) + "%"));
         }
 
         if (!string.IsNullOrEmpty(filter.Module))
         {
-            var module = Core.Json.PyStrings.Strip(filter.Module).ToLowerInvariant();
+            var module = Core.Json.WireStrings.Strip(filter.Module).ToLowerInvariant();
             if (module == "system")
             {
                 var names = ActivityHistory.SystemModules.Select((_, index) => $"@module_{index}").ToArray();
@@ -233,7 +233,7 @@ public static class ActivityHistoryStore
         if (!string.IsNullOrEmpty(filter.EventType))
         {
             where.Add("activity_events.event_type = @event_type");
-            parameters.Add(("@event_type", Core.Json.PyStrings.Strip(filter.EventType)));
+            parameters.Add(("@event_type", Core.Json.WireStrings.Strip(filter.EventType)));
         }
 
         if (!string.IsNullOrEmpty(filter.Search))
@@ -241,7 +241,7 @@ public static class ActivityHistoryStore
             where.Add(
                 "(lower(activity_events.title) LIKE lower(@search_title) OR lower(activity_events.detail) LIKE lower(@search_detail) " +
                 "OR lower(activity_events.event_type) LIKE lower(@search_event_type) OR lower(activity_events.module) LIKE lower(@search_module))");
-            var pattern = "%" + Core.Json.PyStrings.Strip(filter.Search) + "%";
+            var pattern = "%" + Core.Json.WireStrings.Strip(filter.Search) + "%";
             parameters.Add(("@search_title", pattern));
             parameters.Add(("@search_detail", pattern));
             parameters.Add(("@search_event_type", pattern));
@@ -257,14 +257,14 @@ public static class ActivityHistoryStore
         {
             where.Add("activity_events.created_at >= @date_from_floor AND julianday(activity_events.created_at) >= julianday(@date_from)");
             parameters.Add(("@date_from_floor", DateFloor(from.AsUtc)));
-            parameters.Add(("@date_from", PyDateTime.FromUtc(from.AsUtc).ToSqlite()));
+            parameters.Add(("@date_from", Timestamp.FromUtc(from.AsUtc).ToSqlite()));
         }
 
         if (filter.DateTo is { } to)
         {
             where.Add("activity_events.created_at < @date_to_ceiling AND julianday(activity_events.created_at) <= julianday(@date_to)");
             parameters.Add(("@date_to_ceiling", DateCeiling(to.AsUtc)));
-            parameters.Add(("@date_to", PyDateTime.FromUtc(to.AsUtc).ToSqlite()));
+            parameters.Add(("@date_to", Timestamp.FromUtc(to.AsUtc).ToSqlite()));
         }
 
         return (where, parameters);
@@ -284,7 +284,7 @@ public static class ActivityHistoryStore
     /// <summary>One file's events: with a library, events that never recorded one still belong to the file.</summary>
     private static (string Clause, (string Name, object? Value)[] Parameters) FileHistoryClause(long? libraryId, string relativePath)
     {
-        var path = Core.Json.PyStrings.Strip(relativePath);
+        var path = Core.Json.WireStrings.Strip(relativePath);
         return libraryId is { } id
             ? ("activity_events.relative_path = @relative_path AND (activity_events.library_id = @library_id OR activity_events.library_id IS NULL)",
                 [("@relative_path", path), ("@library_id", id)])

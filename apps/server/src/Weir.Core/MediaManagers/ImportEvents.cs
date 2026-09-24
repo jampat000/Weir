@@ -43,7 +43,7 @@ public sealed record MediaManagerImportEvent
 }
 
 /// <summary>How one manager phrases an inbound event.</summary>
-public sealed record MediaManagerDialect(string Key, string DisplayName, Func<PyDict, MediaManagerImportEvent?> Normalize);
+public sealed record MediaManagerDialect(string Key, string DisplayName, Func<WireObject, MediaManagerImportEvent?> Normalize);
 
 /// <summary>The inbound dialects.</summary>
 public static class ImportEvents
@@ -59,34 +59,34 @@ public static class ImportEvents
 
     /// <summary>The dialect for a source key, case- and whitespace-insensitive.</summary>
     public static MediaManagerDialect? DialectForSource(string? sourceKey) =>
-        Dialects.GetValueOrDefault(PyStrings.Strip(sourceKey ?? string.Empty).ToLowerInvariant());
+        Dialects.GetValueOrDefault(WireStrings.Strip(sourceKey ?? string.Empty).ToLowerInvariant());
 
     /// <summary>Every source key, sorted.</summary>
     public static IReadOnlyList<string> KnownSourceKeys() => [.. Dialects.Keys.Order(StringComparer.Ordinal)];
 
-    private static PyDict? Mapping(PyDict body, string key) => body.Get(key) as PyDict;
+    private static WireObject? Mapping(WireObject body, string key) => body.Get(key) as WireObject;
 
-    private static MediaManagerImportEvent? NormalizeSonarr(PyDict body)
+    private static MediaManagerImportEvent? NormalizeSonarr(WireObject body)
     {
-        if (PyValues.Text(body.Get("eventType")) != "Download")
+        if (ManagerValues.Text(body.Get("eventType")) != "Download")
         {
             return null;
         }
 
-        if (body.Get("episodes") is not PyList { Items.Count: > 0 } episodes || episodes.Items[0] is not PyDict episode)
+        if (body.Get("episodes") is not WireArray { Items.Count: > 0 } episodes || episodes.Items[0] is not WireObject episode)
         {
             return null;
         }
 
         var episodeFile = Mapping(body, "episodeFile");
-        var path = episodeFile is null ? null : PyValues.Text(episodeFile.Get("path"));
+        var path = episodeFile is null ? null : ManagerValues.Text(episodeFile.Get("path"));
         if (path is null)
         {
             return null;
         }
 
         var series = Mapping(body, "series");
-        var seriesTitle = series is null ? null : PyValues.Text(series.Get("title"));
+        var seriesTitle = series is null ? null : ManagerValues.Text(series.Get("title"));
         return new MediaManagerImportEvent
         {
             SourceKey = "sonarr",
@@ -95,18 +95,18 @@ public static class ImportEvents
             FilePath = path,
             Title = seriesTitle,
             ShowTitle = seriesTitle,
-            SeasonNumber = PyValues.WholeNumber(episode.Get("seasonNumber")),
-            EpisodeNumber = PyValues.WholeNumber(episode.Get("episodeNumber")),
-            EpisodeTitle = PyValues.Text(episode.Get("title")),
-            SourceEntityId = PyValues.WholeNumber(episode.Get("id")),
-            SourcePath = PyValues.Text(episodeFile!.Get("sourcePath")),
-            DownloadId = PyValues.Text(body.Get("downloadId")),
+            SeasonNumber = ManagerValues.WholeNumber(episode.Get("seasonNumber")),
+            EpisodeNumber = ManagerValues.WholeNumber(episode.Get("episodeNumber")),
+            EpisodeTitle = ManagerValues.Text(episode.Get("title")),
+            SourceEntityId = ManagerValues.WholeNumber(episode.Get("id")),
+            SourcePath = ManagerValues.Text(episodeFile!.Get("sourcePath")),
+            DownloadId = ManagerValues.Text(body.Get("downloadId")),
         };
     }
 
-    private static MediaManagerImportEvent? NormalizeRadarr(PyDict body)
+    private static MediaManagerImportEvent? NormalizeRadarr(WireObject body)
     {
-        if (PyValues.Text(body.Get("eventType")) != "Download")
+        if (ManagerValues.Text(body.Get("eventType")) != "Download")
         {
             return null;
         }
@@ -118,7 +118,7 @@ public static class ImportEvents
         }
 
         var movieFile = Mapping(body, "movieFile");
-        var path = movieFile is null ? null : PyValues.Text(movieFile.Get("path"));
+        var path = movieFile is null ? null : ManagerValues.Text(movieFile.Get("path"));
         if (path is null)
         {
             return null;
@@ -130,18 +130,18 @@ public static class ImportEvents
             EventKind = MediaManagerImportEvent.Imported,
             MediaScope = "movie",
             FilePath = path,
-            Title = PyValues.Text(movie.Get("title")),
-            Year = PyValues.WholeNumber(movie.Get("year")),
-            SourceEntityId = PyValues.WholeNumber(movie.Get("id")),
-            SourcePath = PyValues.Text(movieFile!.Get("sourcePath")),
-            DownloadId = PyValues.Text(body.Get("downloadId")),
+            Title = ManagerValues.Text(movie.Get("title")),
+            Year = ManagerValues.WholeNumber(movie.Get("year")),
+            SourceEntityId = ManagerValues.WholeNumber(movie.Get("id")),
+            SourcePath = ManagerValues.Text(movieFile!.Get("sourcePath")),
+            DownloadId = ManagerValues.Text(body.Get("downloadId")),
         };
     }
 
     /// <summary>The scope an inbound media type names (<c>movie</c> or <c>tv</c>), or null for a spelling it does not accept.</summary>
-    public static string? ScopeFromMediaType(PyJson? raw)
+    public static string? ScopeFromMediaType(WireValue? raw)
     {
-        var value = (PyValues.Text(raw) ?? string.Empty).ToLowerInvariant();
+        var value = (ManagerValues.Text(raw) ?? string.Empty).ToLowerInvariant();
         return value switch
         {
             "movie" or "movies" or "film" => "movie",
@@ -150,21 +150,21 @@ public static class ImportEvents
         };
     }
 
-    private static MediaManagerImportEvent? NormalizeDeluno(PyDict body)
+    private static MediaManagerImportEvent? NormalizeDeluno(WireObject body)
     {
-        if (PyValues.Text(body.Get("eventType")) != "deluno.processor-handoff")
+        if (ManagerValues.Text(body.Get("eventType")) != "deluno.processor-handoff")
         {
             return null;
         }
 
-        var path = PyValues.Text(body.Get("sourcePath"));
+        var path = ManagerValues.Text(body.Get("sourcePath"));
         var scope = ScopeFromMediaType(body.Get("mediaType"));
         if (path is null || scope is null)
         {
             return null;
         }
 
-        var releaseName = PyValues.Text(body.Get("releaseName"));
+        var releaseName = ManagerValues.Text(body.Get("releaseName"));
         return new MediaManagerImportEvent
         {
             SourceKey = "deluno",
@@ -173,48 +173,48 @@ public static class ImportEvents
             FilePath = path,
             Title = releaseName,
             ReleaseName = releaseName,
-            HandoffId = PyValues.Text(body.Get("handoffId")),
-            CallbackPath = PyValues.Text(body.Get("callbackPath")),
-            LibraryId = PyValues.Text(body.Get("libraryId")),
-            DownloadId = PyValues.Text(body.Get("downloadId")),
+            HandoffId = ManagerValues.Text(body.Get("handoffId")),
+            CallbackPath = ManagerValues.Text(body.Get("callbackPath")),
+            LibraryId = ManagerValues.Text(body.Get("libraryId")),
+            DownloadId = ManagerValues.Text(body.Get("downloadId")),
         };
     }
 
-    private static MediaManagerImportEvent? NormalizeNative(PyDict body)
+    private static MediaManagerImportEvent? NormalizeNative(WireObject body)
     {
-        var kind = (PyValues.Text(body.Get("event")) ?? MediaManagerImportEvent.Imported).ToLowerInvariant();
+        var kind = (ManagerValues.Text(body.Get("event")) ?? MediaManagerImportEvent.Imported).ToLowerInvariant();
         if (kind is not (MediaManagerImportEvent.Imported or MediaManagerImportEvent.Handoff))
         {
             return null;
         }
 
-        var path = PyValues.Text(body.Get("filePath")) ?? PyValues.Text(body.Get("file_path"));
-        var scope = ScopeFromMediaType(PyValues.Or(body.Get("mediaScope"), body.Get("media_scope")));
+        var path = ManagerValues.Text(body.Get("filePath")) ?? ManagerValues.Text(body.Get("file_path"));
+        var scope = ScopeFromMediaType(ManagerValues.Or(body.Get("mediaScope"), body.Get("media_scope")));
         if (path is null || scope is null)
         {
             return null;
         }
 
-        PyJson? Either(string camel, string snake) => PyValues.Or(body.Get(camel), body.Get(snake));
+        WireValue? Either(string camel, string snake) => ManagerValues.Or(body.Get(camel), body.Get(snake));
         return new MediaManagerImportEvent
         {
             SourceKey = "native",
             EventKind = kind,
             MediaScope = scope,
             FilePath = path,
-            Title = PyValues.Text(body.Get("title")),
-            Year = PyValues.WholeNumber(body.Get("year")),
-            ShowTitle = PyValues.Text(Either("showTitle", "show_title")),
-            SeasonNumber = PyValues.WholeNumber(Either("seasonNumber", "season_number")),
-            EpisodeNumber = PyValues.WholeNumber(Either("episodeNumber", "episode_number")),
-            EpisodeTitle = PyValues.Text(Either("episodeTitle", "episode_title")),
-            SourceEntityId = PyValues.WholeNumber(Either("entityId", "entity_id")),
-            HandoffId = PyValues.Text(Either("handoffId", "handoff_id")),
-            CallbackPath = PyValues.Text(Either("callbackPath", "callback_path")),
-            ReleaseName = PyValues.Text(Either("releaseName", "release_name")),
-            LibraryId = PyValues.Text(Either("libraryId", "library_id")),
-            SourcePath = PyValues.Text(Either("sourcePath", "source_path")),
-            DownloadId = PyValues.Text(Either("downloadId", "download_id")),
+            Title = ManagerValues.Text(body.Get("title")),
+            Year = ManagerValues.WholeNumber(body.Get("year")),
+            ShowTitle = ManagerValues.Text(Either("showTitle", "show_title")),
+            SeasonNumber = ManagerValues.WholeNumber(Either("seasonNumber", "season_number")),
+            EpisodeNumber = ManagerValues.WholeNumber(Either("episodeNumber", "episode_number")),
+            EpisodeTitle = ManagerValues.Text(Either("episodeTitle", "episode_title")),
+            SourceEntityId = ManagerValues.WholeNumber(Either("entityId", "entity_id")),
+            HandoffId = ManagerValues.Text(Either("handoffId", "handoff_id")),
+            CallbackPath = ManagerValues.Text(Either("callbackPath", "callback_path")),
+            ReleaseName = ManagerValues.Text(Either("releaseName", "release_name")),
+            LibraryId = ManagerValues.Text(Either("libraryId", "library_id")),
+            SourcePath = ManagerValues.Text(Either("sourcePath", "source_path")),
+            DownloadId = ManagerValues.Text(Either("downloadId", "download_id")),
         };
     }
 }

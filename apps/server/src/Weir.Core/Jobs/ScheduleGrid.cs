@@ -207,7 +207,7 @@ public static class ScheduleGrid
     internal static bool TryParseInt(string raw, out int value)
     {
         value = 0;
-        if (!PythonCompat.TryParseInt(raw.Trim(), out var parsed) || parsed is < int.MinValue or > int.MaxValue)
+        if (!ValueParsing.TryParseInt(raw.Trim(), out var parsed) || parsed is < int.MinValue or > int.MaxValue)
         {
             return false;
         }

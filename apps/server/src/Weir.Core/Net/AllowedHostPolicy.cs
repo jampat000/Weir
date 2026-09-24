@@ -61,7 +61,7 @@ public static class AllowedHostPolicy
     private static bool IsIpLiteral(string host)
     {
         var candidate = host.Length >= 2 && host[0] == '[' && host[^1] == ']' ? host[1..^1] : host;
-        return PyIpAddress.TryParse(candidate, out _);
+        return NetAddress.TryParse(candidate, out _);
     }
 
     private static bool MatchesConfiguredEntry(string host, IReadOnlyList<string> entries)
@@ -90,7 +90,7 @@ public static class AllowedHostPolicy
     {
         foreach (var origin in origins)
         {
-            if (PythonCompat.ParseUrl(origin.Trim()).Hostname is { } originHost && string.Equals(host, originHost, StringComparison.OrdinalIgnoreCase))
+            if (ValueParsing.ParseUrl(origin.Trim()).Hostname is { } originHost && string.Equals(host, originHost, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }

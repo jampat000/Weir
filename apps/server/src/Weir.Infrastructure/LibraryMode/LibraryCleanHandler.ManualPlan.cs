@@ -19,9 +19,9 @@ public sealed partial class LibraryCleanHandler
     /// Turns one person's track choice into a plan for this file. Their choice names track indices in the file they
     /// were looking at, so a file that has changed since is refused: nothing here could tell which track is which now.
     /// </summary>
-    private static ChosenPlan PlanFromChoice(ProbeResult probe, ManualPlanChoice choice, PyJson? expectedSize, string path)
+    private static ChosenPlan PlanFromChoice(ProbeResult probe, ManualPlanChoice choice, WireValue? expectedSize, string path)
     {
-        if (expectedSize is PyInt expected && CurrentSize(path) != (long)expected.Value)
+        if (expectedSize is WireInteger expected && CurrentSize(path) != (long)expected.Value)
         {
             return new ChosenPlan(null, (LibraryActivityEventTypes.FileFailed,
                 "This file changed after its tracks were chosen, so Weir left it alone. Open it again and choose once more."));

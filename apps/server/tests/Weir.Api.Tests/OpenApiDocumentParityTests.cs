@@ -46,10 +46,10 @@ public sealed class OpenApiDocumentParityTests
         await using var server = await WeirTestServer.StartAsync();
         using var response = await server.Client.GetAsync("/openapi.json");
         var dotnet = PathMethods(JsonNode.Parse(await response.Content.ReadAsStringAsync())!.AsObject());
-        var python = PathMethods(PythonDocument());
+        var committed = PathMethods(CommittedDocument());
 
-        var unexpected = dotnet.Except(python).ToList();
-        Assert.True(unexpected.Count == 0, "The .NET document serves operations Python's does not: " + string.Join(", ", unexpected));
+        var unexpected = dotnet.Except(committed).ToList();
+        Assert.True(unexpected.Count == 0, "The .NET document serves operations the committed document does not: " + string.Join(", ", unexpected));
     }
 
     [Fact]
@@ -58,14 +58,14 @@ public sealed class OpenApiDocumentParityTests
         await using var server = await WeirTestServer.StartAsync();
         using var response = await server.Client.GetAsync("/openapi.json");
         var dotnet = PathMethods(JsonNode.Parse(await response.Content.ReadAsStringAsync())!.AsObject());
-        var python = PathMethods(PythonDocument());
+        var committed = PathMethods(CommittedDocument());
         var allowlisted = KnownGaps.Select(gap => (gap.Method, gap.Path)).ToHashSet();
 
-        var missing = python.Except(dotnet).ToList();
+        var missing = committed.Except(dotnet).ToList();
         var unaccountedFor = missing.Except(allowlisted).ToList();
         Assert.True(
             unaccountedFor.Count == 0,
-            "Python has operations the .NET document is missing without an allowlist reason: " +
+            "The committed document has operations the .NET document is missing without an allowlist reason: " +
             string.Join(", ", unaccountedFor.Select(pair => $"{pair.Method} {pair.Path}")));
 
         var stale = allowlisted.Except(missing).ToList();
@@ -81,18 +81,18 @@ public sealed class OpenApiDocumentParityTests
         await using var server = await WeirTestServer.StartAsync();
         using var response = await server.Client.GetAsync("/openapi.json");
         var dotnet = JsonNode.Parse(await response.Content.ReadAsStringAsync())!.AsObject();
-        var python = PythonDocument();
+        var committed = CommittedDocument();
 
         var dotnetSchemas = ((JsonObject?)dotnet["components"]?["schemas"]) ?? [];
-        var pythonSchemas = ((JsonObject?)python["components"]?["schemas"]) ?? [];
-        Assert.NotEmpty(pythonSchemas);
+        var committedSchemas = ((JsonObject?)committed["components"]?["schemas"]) ?? [];
+        Assert.NotEmpty(committedSchemas);
 
         // Every schema the served document still references must be the committed, unedited shape. (The served
         // document never prunes components, only paths, so this also proves that has not changed by accident.)
         foreach (var (name, schemaNode) in dotnetSchemas)
         {
-            Assert.True(pythonSchemas.ContainsKey(name), $"Schema '{name}' in the .NET document does not exist in Python's.");
-            var expected = ShapeOf(pythonSchemas[name]!.AsObject());
+            Assert.True(committedSchemas.ContainsKey(name), $"Schema '{name}' in the .NET document does not exist in the committed document.");
+            var expected = ShapeOf(committedSchemas[name]!.AsObject());
             var actual = ShapeOf(schemaNode!.AsObject());
             Assert.Equal(expected.Properties, actual.Properties);
             Assert.Equal(expected.Required, actual.Required);
@@ -100,7 +100,7 @@ public sealed class OpenApiDocumentParityTests
         }
     }
 
-    private static JsonObject PythonDocument()
+    private static JsonObject CommittedDocument()
     {
         var root = RepositoryRoot() ?? throw new InvalidOperationException("Could not find the repository root from the test assembly.");
         var path = Path.Join(root, "apps", "web", "openapi", "weir-openapi.json");

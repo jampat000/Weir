@@ -142,7 +142,7 @@ public sealed class AuthAndSettingsStoreTests
         await fixture.WithUnitOfWork(uow => AuthStore.InsertUserAsync(uow, "bob", "x", "viewer", true));
 
         async Task<string> Error(Func<UnitOfWork, Task> work) =>
-            (await Assert.ThrowsAsync<PyValueErrorException>(() => fixture.WithUnitOfWork(async uow => { await work(uow); return 0; }))).Message;
+            (await Assert.ThrowsAsync<WireValueException>(() => fixture.WithUnitOfWork(async uow => { await work(uow); return 0; }))).Message;
 
         Assert.Equal("Current password is incorrect.", await Error(uow => fixture.Auth.ChangeUsernameAsync(uow, id, "wrong", "james")));
         Assert.Equal("Username is required.", await Error(uow => fixture.Auth.ChangeUsernameAsync(uow, id, Password, "  ")));
@@ -170,7 +170,7 @@ public sealed class AuthAndSettingsStoreTests
 
         await fixture.Execute("INSERT INTO suite_configuration_backup (created_at, file_name, size_bytes) VALUES ('2026-01-01 00:00:00.000000', '../outside.json', 2)");
         var id = await fixture.Scalar("SELECT max(id) FROM suite_configuration_backup");
-        var error = await Assert.ThrowsAsync<PyValueErrorException>(() => fixture.WithUnitOfWork(uow => backups.GetFileAsync(uow, id)));
+        var error = await Assert.ThrowsAsync<WireValueException>(() => fixture.WithUnitOfWork(uow => backups.GetFileAsync(uow, id)));
         Assert.Equal("Configuration snapshot file name is invalid.", error.Message);
     }
 
@@ -194,21 +194,21 @@ public sealed class AuthAndSettingsStoreTests
     {
         using var fixture = new StoreFixture();
         var files = new UpdateFiles(fixture.Options);
-        Assert.Equal("{\"mode\":\"Auto\",\"check_on_startup\":true,\"check_interval_minutes\":60}", PyJsonWriter.Dumps(files.ReadSettings(), PyJsonFormat.Response));
+        Assert.Equal("{\"mode\":\"Auto\",\"check_on_startup\":true,\"check_interval_minutes\":60}", WireJsonWriter.Dumps(files.ReadSettings(), WireJsonFormat.Response));
         var foreign = Path.Join(fixture.Home.Path, "update-settings.json.tmp");
         File.WriteAllText(foreign, "{\"mode\": \"Auto\"}");
         files.WriteSettings("DownloadOnly", false, 240);
-        Assert.Equal("{\"mode\":\"DownloadOnly\",\"check_on_startup\":false,\"check_interval_minutes\":240}", PyJsonWriter.Dumps(files.ReadSettings(), PyJsonFormat.Response));
+        Assert.Equal("{\"mode\":\"DownloadOnly\",\"check_on_startup\":false,\"check_interval_minutes\":240}", WireJsonWriter.Dumps(files.ReadSettings(), WireJsonFormat.Response));
         Assert.True(File.Exists(foreign));
         Assert.Empty(Directory.GetFiles(fixture.Home.Path, ".update-settings.json.*.tmp"));
         File.WriteAllText(Path.Join(fixture.Home.Path, "update-settings.json"), "{\"mode\": \"Notify");
         var warned = new List<string>();
-        Assert.Equal("NotifyOnly", ((PyStr)files.ReadSettings(warned.Add)["mode"]).Value);
+        Assert.Equal("NotifyOnly", ((WireString)files.ReadSettings(warned.Add)["mode"]).Value);
         Assert.Single(warned);
 
-        Assert.Equal("{\"downloaded\":false,\"pending_version\":null}", PyJsonWriter.Dumps(files.ReadState(), PyJsonFormat.Response));
+        Assert.Equal("{\"downloaded\":false,\"pending_version\":null}", WireJsonWriter.Dumps(files.ReadState(), WireJsonFormat.Response));
         File.WriteAllText(Path.Join(fixture.Home.Path, "update-state.json"), "{\"downloaded\": true, \"version\": \"2.0.0\"}");
-        Assert.Equal("{\"downloaded\":true,\"pending_version\":\"2.0.0\"}", PyJsonWriter.Dumps(files.ReadState(), PyJsonFormat.Response));
+        Assert.Equal("{\"downloaded\":true,\"pending_version\":\"2.0.0\"}", WireJsonWriter.Dumps(files.ReadState(), WireJsonFormat.Response));
         files.WriteApplyFlag();
         Assert.True(File.Exists(Path.Join(fixture.Home.Path, "update-apply-now")));
     }
@@ -266,15 +266,15 @@ public sealed class AuthAndSettingsStoreTests
     }
 
     [Fact]
-    public void Sqlite_datetimes_use_sqlalchemy_storage_and_pydantic_output()
+    public void Timestamps_round_trip_through_the_fixed_sqlite_storage_and_wire_text_formats()
     {
-        var value = PyDateTime.FromUtc(new DateTime(2026, 9, 17, 2, 19, 51, DateTimeKind.Utc).AddTicks(2553240));
+        var value = Timestamp.FromUtc(new DateTime(2026, 9, 17, 2, 19, 51, DateTimeKind.Utc).AddTicks(2553240));
         Assert.Equal("2026-09-17 02:19:51.255324", value.ToSqlite());
-        Assert.True(PyDateTime.TryFromIsoFormat(value.ToSqlite(), out var read));
-        Assert.Equal("2026-09-17T02:19:51.255324", read.PydanticJson());
-        Assert.Equal("2026-09-17T02:19:51.255324Z", value.PydanticJson());
+        Assert.True(Timestamp.TryFromIsoFormat(value.ToSqlite(), out var read));
+        Assert.Equal("2026-09-17T02:19:51.255324", read.ToWireText());
+        Assert.Equal("2026-09-17T02:19:51.255324Z", value.ToWireText());
         Assert.Equal("2026-09-17T02:19:51.255324+00:00", value.IsoFormat());
-        Assert.True(PyDateTime.TryFromIsoFormat("2026-09-17 02:19:51", out var whole));
-        Assert.Equal("2026-09-17T02:19:51", whole.PydanticJson());
+        Assert.True(Timestamp.TryFromIsoFormat("2026-09-17 02:19:51", out var whole));
+        Assert.Equal("2026-09-17T02:19:51", whole.ToWireText());
     }
 }
