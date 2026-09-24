@@ -17,7 +17,7 @@ Weir is released under AGPL-3.0-or-later. Release artifacts are built from the t
    - `version` in `apps/web/package.json`
 
    The release workflow checks that the tag `vX.Y.Z` matches both and stops if either differs.
-2. Merge to `main` after `Test / weir` passes. The tag's commit must then pass `Test` on `main`
+2. Merge to `main` after `CI / ci-passed` passes. The tag's commit must then pass `CI` on `main`
    as well: the release checks for that run instead of re-running the tests itself (below).
 3. Create user-facing release notes for the target tag before pushing it:
 
@@ -142,7 +142,7 @@ on this workstation. Run the remote validation workflow instead:
 .\scripts\verify-docker-remote.ps1
 ```
 
-That command triggers the `Test` workflow for the current ref and watches it.
+That command triggers the `CI` workflow for the current ref and watches it.
 The Docker image build and Docker smoke test run on GitHub infrastructure.
 
 Pull and run:

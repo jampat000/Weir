@@ -26,7 +26,7 @@
  * merges both into the spawned API env to avoid ``403 Origin not allowed`` on login.
  */
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import path from "node:path";
@@ -39,10 +39,22 @@ const apiScript = path.join(__dirname, "run-api-dev.mjs");
 const viteEntry = path.join(webDir, "node_modules", "vite", "bin", "vite.js");
 const portsPath = path.join(repoRoot, "scripts", "dev-ports.json");
 const serverPropsPath = path.join(repoRoot, "apps", "server", "Directory.Build.props");
+// Recorded so scripts/stop-dev-web-port.mjs can find and verify *this* worktree's Vite process
+// later, instead of stopping whatever else happens to be listening on the web port (another
+// worktree's Vite, or an unrelated program — see that script's header).
+const webPidFilePath = path.join(repoRoot, ".dev-web.pid");
 
 if (!existsSync(viteEntry)) {
   console.error(`Missing ${viteEntry}. Run npm install (or npm ci) in apps/web.`);
   process.exit(1);
+}
+
+function removeWebPidFile() {
+  try {
+    rmSync(webPidFilePath, { force: true });
+  } catch {
+    /* ignore — best-effort cleanup */
+  }
 }
 
 function readDevPorts() {
@@ -452,6 +464,7 @@ function forwardStop(signal) {
 
 process.on("SIGINT", () => forwardStop("SIGINT"));
 process.on("SIGTERM", () => forwardStop("SIGTERM"));
+process.on("exit", removeWebPidFile);
 
 function wireExit(name, child, other) {
   child.on("exit", (code, signal) => {
@@ -577,6 +590,15 @@ async function main() {
     stdio: "inherit",
     env: viteEnvWithPort,
   });
+
+  writeFileSync(
+    webPidFilePath,
+    JSON.stringify(
+      { pid: web.pid, viteEntry, webHost, webPort: chosenWebPort, startedAt: new Date().toISOString() },
+      null,
+      2,
+    ),
+  );
 
   await waitForWebHttpReady(web, api, { webHost, webPort: chosenWebPort, timeoutMs: webWaitMs });
 
