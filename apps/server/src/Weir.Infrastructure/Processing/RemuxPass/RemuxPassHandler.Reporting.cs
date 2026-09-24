@@ -16,7 +16,9 @@ public sealed partial class RemuxPassHandler
 
         try
         {
-            var uow = await UnitOfWork.OpenAsync(_database).ConfigureAwait(false);
+            // CancellationToken.None, deliberately: the outcome being reported is already decided (recorded or
+            // failed before this runs), so a worker shutdown must not stop the manager from being told about it.
+            var uow = await UnitOfWork.OpenAsync(_database, CancellationToken.None).ConfigureAwait(false);
             await using (uow.ConfigureAwait(false))
             {
                 var status = await _reporter.ReportHandoffCompletionAsync(uow, payloadJson, result).ConfigureAwait(false);

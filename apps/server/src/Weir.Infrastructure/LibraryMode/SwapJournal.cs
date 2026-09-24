@@ -71,45 +71,36 @@ public sealed class ProcessingJobSwapJournal : ISwapJournal
     public async Task RecordAsync(SwapJournalEntry entry, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        await using var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using var transaction = connection.BeginTransaction();
-        using (var exists = connection.CreateCommand())
+        var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
+        await using (uow.ConfigureAwait(false))
         {
-            exists.Transaction = transaction;
-            exists.CommandText = "SELECT COUNT(*) FROM jobs WHERE id = $id";
-            exists.Parameters.AddWithValue("$id", entry.JobId);
-            var count = Convert.ToInt64(await exists.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), System.Globalization.CultureInfo.InvariantCulture);
-            if (count == 0)
+            var exists = await uow.CountAsync("SELECT COUNT(*) FROM jobs WHERE id = @id", ("@id", entry.JobId)).ConfigureAwait(false);
+            if (exists == 0)
             {
                 throw new InvalidOperationException(
                     string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Job {entry.JobId} does not exist, so its swap could not be recorded."));
             }
-        }
 
-        using (var upsert = connection.CreateCommand())
-        {
-            upsert.Transaction = transaction;
-            upsert.CommandText =
+            await uow.ExecuteAsync(
                 """
                 INSERT INTO library_swaps (job_id, state, original_path, temp_path, backup_path, committed, kept_original_path, updated_at)
-                VALUES ($job_id, $state, $original_path, $temp_path, $backup_path, $committed, $kept_original_path, CURRENT_TIMESTAMP)
+                VALUES (@job_id, @state, @original_path, @temp_path, @backup_path, @committed, @kept_original_path, CURRENT_TIMESTAMP)
                 ON CONFLICT(job_id) DO UPDATE SET state = excluded.state, original_path = excluded.original_path,
                     temp_path = excluded.temp_path, backup_path = excluded.backup_path,
                     committed = committed OR excluded.committed,
                     kept_original_path = COALESCE(excluded.kept_original_path, library_swaps.kept_original_path),
                     updated_at = CURRENT_TIMESTAMP
-                """;
-            upsert.Parameters.AddWithValue("$job_id", entry.JobId);
-            upsert.Parameters.AddWithValue("$state", StateName(entry.State));
-            upsert.Parameters.AddWithValue("$original_path", entry.OriginalPath);
-            upsert.Parameters.AddWithValue("$temp_path", SafeSwapRules.TempPath(entry.OriginalPath));
-            upsert.Parameters.AddWithValue("$backup_path", SafeSwapRules.BackupPath(entry.OriginalPath));
-            upsert.Parameters.AddWithValue("$committed", entry.State is SwapJournalState.Committed or SwapJournalState.Finished ? 1 : 0);
-            upsert.Parameters.AddWithValue("$kept_original_path", (object?)entry.KeptOriginalPath ?? DBNull.Value);
-            await upsert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
+                """,
+                ("@job_id", entry.JobId),
+                ("@state", StateName(entry.State)),
+                ("@original_path", entry.OriginalPath),
+                ("@temp_path", SafeSwapRules.TempPath(entry.OriginalPath)),
+                ("@backup_path", SafeSwapRules.BackupPath(entry.OriginalPath)),
+                ("@committed", entry.State is SwapJournalState.Committed or SwapJournalState.Finished ? 1 : 0),
+                ("@kept_original_path", entry.KeptOriginalPath)).ConfigureAwait(false);
 
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            await uow.CommitAsync().ConfigureAwait(false);
+        }
     }
 
     public async Task<IReadOnlyList<SwapJournalEntry>> ListUnfinishedAsync(CancellationToken cancellationToken = default)

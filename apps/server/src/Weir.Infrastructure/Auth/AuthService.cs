@@ -110,7 +110,9 @@ public sealed partial class AuthService : IDisposable
             return;
         }
 
-        var own = await UnitOfWork.OpenAsync(_database).ConfigureAwait(false);
+        // CancellationToken.None, deliberately: this write must land whatever the request's outcome (#529),
+        // and that includes the request's own cancellation once its response no longer needs the result.
+        var own = await UnitOfWork.OpenAsync(_database, CancellationToken.None).ConfigureAwait(false);
         await using (own.ConfigureAwait(false))
         {
             await write(own).ConfigureAwait(false);
