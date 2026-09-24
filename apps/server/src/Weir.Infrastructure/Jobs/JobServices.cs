@@ -346,9 +346,9 @@ public sealed class ProcessingWorkerService : BackgroundService
         await idleTimer.CancelAsync().ConfigureAwait(false);
     }
 
-    /// <summary>The saved "Files at once" value; the operator settings row defaults it to 1.</summary>
+    /// <summary>The saved "Files at once" value; the operator settings row defaults it to 1. A read, so it never takes the write lock.</summary>
     private Task<int> ReadMaxConcurrentFilesAsync(CancellationToken cancellationToken) =>
-        _store.InTransactionAsync(
+        _store.ReadAsync(
             (connection, transaction) =>
             {
                 var value = ProcessingJobStore.Scalar(connection, transaction, "SELECT max_concurrent_files FROM operator_settings WHERE id = 1");
@@ -677,7 +677,7 @@ public sealed class WorkTempStaleSweepEnqueuer : IPeriodicEnqueuer
 
     /// <summary>An interval column of the operator settings row (seconds), or <paramref name="fallback"/> when it is not set.</summary>
     internal static Task<TimeSpan> OperatorSettingIntervalAsync(ProcessingJobStore store, string column, TimeSpan fallback, CancellationToken cancellationToken) =>
-        store.InTransactionAsync(
+        store.ReadAsync(
             (connection, transaction) =>
             {
                 var value = ProcessingJobStore.Scalar(connection, transaction, $"SELECT {column} FROM operator_settings WHERE id = 1");
@@ -687,7 +687,7 @@ public sealed class WorkTempStaleSweepEnqueuer : IPeriodicEnqueuer
 
     /// <summary>A boolean column of the operator settings row, or <paramref name="defaultValue"/> when the row or value is missing.</summary>
     internal static Task<bool> OperatorSettingFlagAsync(ProcessingJobStore store, string column, bool defaultValue, CancellationToken cancellationToken) =>
-        store.InTransactionAsync(
+        store.ReadAsync(
             (connection, transaction) =>
             {
                 var value = ProcessingJobStore.Scalar(connection, transaction, $"SELECT {column} FROM operator_settings WHERE id = 1");

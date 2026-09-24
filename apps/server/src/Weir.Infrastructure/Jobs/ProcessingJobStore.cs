@@ -409,10 +409,10 @@ public sealed class ProcessingJobStore
             cancellationToken);
 
     public Task<ProcessingJob?> GetAsync(long jobId, CancellationToken cancellationToken = default) =>
-        InTransactionAsync((connection, transaction) => Get(connection, transaction, jobId), cancellationToken);
+        ReadAsync((connection, transaction) => Get(connection, transaction, jobId), cancellationToken);
 
     public Task<IReadOnlyList<ProcessingJob>> ListAsync(CancellationToken cancellationToken = default) =>
-        InTransactionAsync<IReadOnlyList<ProcessingJob>>(
+        ReadAsync<IReadOnlyList<ProcessingJob>>(
             (connection, transaction) => Query(connection, transaction, $"SELECT {JobColumns} FROM jobs ORDER BY id"),
             cancellationToken);
 
