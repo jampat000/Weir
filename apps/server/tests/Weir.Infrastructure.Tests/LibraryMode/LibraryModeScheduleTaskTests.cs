@@ -1,7 +1,9 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.LibraryMode;
+using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.LibraryMode;
+using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Tests.MediaManagers;
 
 namespace Weir.Infrastructure.Tests.LibraryMode;
@@ -12,11 +14,12 @@ namespace Weir.Infrastructure.Tests.LibraryMode;
 public sealed class LibraryModeScheduleTaskTests : IDisposable
 {
     private readonly MediaManagerFixture _fixture = new();
+    private readonly SuiteSettingsStore _suiteSettings = new(new AuthStore());
 
     public void Dispose() => _fixture.Dispose();
 
     private LibraryModeScheduleTask Timer() =>
-        new(_fixture.Store.Database, _fixture.Jobs, _fixture.Store.Clock, NullLogger<LibraryModeScheduleTask>.Instance);
+        new(_fixture.Store.Database, _fixture.Jobs, _fixture.Store.Clock, _suiteSettings, NullLogger<LibraryModeScheduleTask>.Instance);
 
     private async Task<long> LibraryAsync(bool scheduleOn = true, bool withFolder = true, string name = "Films")
     {
@@ -43,6 +46,7 @@ public sealed class LibraryModeScheduleTaskTests : IDisposable
         _fixture.Db(
             async uow => await LibraryModeScheduling.NextRunAsync(
                 uow,
+                _suiteSettings,
                 (await Weir.Infrastructure.Processing.LibraryStore.GetAsync(uow, library))!,
                 await LibrarySettingsStore.GetAsync(uow, library),
                 _fixture.Store.Clock.GetUtcNow()),

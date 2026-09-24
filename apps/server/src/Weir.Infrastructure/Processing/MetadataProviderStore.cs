@@ -39,17 +39,18 @@ public static class MetadataProviderStore
         return cipher.Encrypt(plaintext);
     }
 
-    public static async Task<SuiteSettingsRecord> ApplyAsync(UnitOfWork uow, WeirOptions options, TimeProvider time, string provider, string baseUrl, string? apiKey)
+    public static async Task<SuiteSettingsRecord> ApplyAsync(
+        UnitOfWork uow, SuiteSettingsStore suiteSettings, WeirOptions options, TimeProvider time, string provider, string baseUrl, string? apiKey)
     {
-        var before = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        var before = await suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
         var after = before with
         {
             MetadataProvider = provider,
             MetadataProviderBaseUrl = baseUrl.Trim(),
             MetadataProviderKeyCiphertext = apiKey is null ? before.MetadataProviderKeyCiphertext : EncryptKey(options, apiKey, time),
         };
-        await SuiteSettingsStore.UpdateAsync(uow, before, after).ConfigureAwait(false);
-        return await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        await suiteSettings.UpdateAsync(uow, before, after).ConfigureAwait(false);
+        return await suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
     }
 
     /// <summary>

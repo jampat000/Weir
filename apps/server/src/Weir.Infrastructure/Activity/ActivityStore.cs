@@ -5,17 +5,17 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Activity;
 
 /// <summary>The auth-side Activity helpers, written through <see cref="SqliteActivityWriter"/>.</summary>
-public static class ActivityStore
+public sealed class ActivityStore
 {
     private static readonly TimeSpan LoginFailedSuppress = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan BootstrapDeniedSuppress = TimeSpan.FromSeconds(60);
 
     /// <summary>Records an event inside the caller's unit of work.</summary>
-    public static Task<long> RecordAsync(UnitOfWork uow, string eventType, string module, string title, string? detail) =>
+    public Task<long> RecordAsync(UnitOfWork uow, string eventType, string module, string title, string? detail) =>
         SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(eventType, module, title, detail));
 
     /// <summary>Records a failed sign-in: at most one event per username per two minutes.</summary>
-    public static async Task MaybeRecordLoginFailedAsync(UnitOfWork uow, string username, Timestamp now)
+    public async Task MaybeRecordLoginFailedAsync(UnitOfWork uow, string username, Timestamp now)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var cutoff = Timestamp.FromUtc(now.AsUtc - LoginFailedSuppress);
@@ -34,7 +34,7 @@ public static class ActivityStore
     }
 
     /// <summary>Records a refused bootstrap: at most one event per minute.</summary>
-    public static async Task MaybeRecordBootstrapDeniedAsync(UnitOfWork uow, Timestamp now)
+    public async Task MaybeRecordBootstrapDeniedAsync(UnitOfWork uow, Timestamp now)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var cutoff = Timestamp.FromUtc(now.AsUtc - BootstrapDeniedSuppress);
@@ -52,7 +52,7 @@ public static class ActivityStore
 }
 
 /// <summary>Previews and resets operational history: all Activity events plus finished job rows.</summary>
-public static class OperationalHistoryStore
+public sealed class OperationalHistoryStore
 {
     private const string TerminalStatuses = "('completed', 'failed', 'handler_ok_finalize_failed', 'cancelled')";
 
@@ -61,7 +61,7 @@ public static class OperationalHistoryStore
         public long TotalDeleted => ActivityEventsDeleted + ProcessingJobsDeleted;
     }
 
-    public static async Task<ResetResult> PreviewAsync(UnitOfWork uow)
+    public async Task<ResetResult> PreviewAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var activity = await uow.CountAsync("SELECT count(*) FROM activity_events").ConfigureAwait(false);
@@ -69,7 +69,7 @@ public static class OperationalHistoryStore
         return new ResetResult(activity, jobs);
     }
 
-    public static async Task<ResetResult> ResetAsync(UnitOfWork uow)
+    public async Task<ResetResult> ResetAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var counts = await PreviewAsync(uow).ConfigureAwait(false);

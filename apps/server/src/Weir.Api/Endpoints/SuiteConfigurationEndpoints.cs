@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Weir.Api.Http;
 using Weir.Core.Auth;
@@ -21,26 +22,79 @@ public static class SuiteConfigurationEndpoints
 {
     public static IEndpointRouteBuilder MapSuiteConfigurationEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        var handlers = endpoints.ServiceProvider.GetRequiredService<SuiteConfigurationEndpointHandlers>();
+
         // Suite settings. One URL per handler, with no alias spellings: the shipped web app is built from
         // this repo, and a second address for the same handler is a second thing to secure, document and test.
-        endpoints.MapV1("GET", "/suite/settings", GetSettingsAsync);
-        endpoints.MapV1("PUT", "/suite/settings", PutSettingsAsync);
-        endpoints.MapV1("GET", "/suite/configuration-bundle", GetBundleAsync);
-        endpoints.MapV1("PUT", "/suite/configuration-bundle", PutBundleAsync);
-        endpoints.MapV1("GET", "/suite/configuration-backups", GetBackupsAsync);
-        endpoints.MapV1("GET", "/suite/configuration-backups/{backup_id}/download", DownloadBackupAsync);
-        endpoints.MapV1("GET", "/suite/security-overview", GetSecurityOverviewAsync);
+        endpoints.MapV1("GET", "/suite/settings", handlers.GetSettingsAsync);
+        endpoints.MapV1("PUT", "/suite/settings", handlers.PutSettingsAsync);
+        endpoints.MapV1("GET", "/suite/configuration-bundle", handlers.GetBundleAsync);
+        endpoints.MapV1("PUT", "/suite/configuration-bundle", handlers.PutBundleAsync);
+        endpoints.MapV1("GET", "/suite/configuration-backups", handlers.GetBackupsAsync);
+        endpoints.MapV1("GET", "/suite/configuration-backups/{backup_id}/download", handlers.DownloadBackupAsync);
+        endpoints.MapV1("GET", "/suite/security-overview", handlers.GetSecurityOverviewAsync);
         return endpoints;
     }
 
-    private static async Task<ApiResult> GetSettingsAsync(ApiRequest request)
+    /// <summary>
+    /// A file download with disposition, length, last-modified and an MD5 ETag of mtime and size, the headers
+    /// existing clients and the contract suite expect.
+    /// </summary>
+    internal static async Task WriteFileAsync(HttpContext context, string path, string fileName, string mediaType)
+    {
+        var info = new FileInfo(path);
+        var bytes = await File.ReadAllBytesAsync(path, context.RequestAborted).ConfigureAwait(false);
+        var mtimeTicks = info.LastWriteTimeUtc.Ticks - DateTime.UnixEpoch.Ticks;
+        var mtime = (mtimeTicks / TimeSpan.TicksPerSecond) + ((mtimeTicks % TimeSpan.TicksPerSecond) * 100 * 1e-9);
+#pragma warning disable CA5351 // The ETag is an MD5 of mtime and size; it is not a security control.
+        var etag = Convert.ToHexStringLower(MD5.HashData(Encoding.UTF8.GetBytes(WireJsonWriter.FloatRepr(mtime) + "-" + info.Length.ToString(CultureInfo.InvariantCulture))));
+#pragma warning restore CA5351
+        var quoted = Uri.EscapeDataString(fileName);
+        context.Response.StatusCode = StatusCodes.Status200OK;
+        context.Response.ContentType = mediaType;
+        context.Response.Headers.ContentDisposition = quoted != fileName ? $"attachment; filename*=utf-8''{quoted}" : $"attachment; filename=\"{fileName}\"";
+        context.Response.ContentLength = bytes.Length;
+        context.Response.Headers.LastModified = info.LastWriteTimeUtc.ToString("ddd, dd MMM yyyy HH:mm:ss 'GMT'", CultureInfo.InvariantCulture);
+        context.Response.Headers.ETag = $"\"{etag}\"";
+        context.Response.Headers.AcceptRanges = "bytes";
+        await context.Response.Body.WriteAsync(bytes, context.RequestAborted).ConfigureAwait(false);
+    }
+}
+
+/// <summary>Handlers for <see cref="SuiteConfigurationEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class SuiteConfigurationEndpointHandlers
+{
+    private readonly SuiteSettingsStore _suiteSettings;
+    private readonly ConfigurationBundleStore _bundle;
+    private readonly ConfigurationBackups _backups;
+    private readonly ITimeZoneResolver _zones;
+    private readonly ScanSettingsChanges _scanSettingsChanges;
+    private readonly WeirLogFile _logFile;
+
+    public SuiteConfigurationEndpointHandlers(
+        SuiteSettingsStore suiteSettings,
+        ConfigurationBundleStore bundle,
+        ConfigurationBackups backups,
+        ITimeZoneResolver zones,
+        ScanSettingsChanges scanSettingsChanges,
+        WeirLogFile logFile)
+    {
+        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+        _bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
+        _backups = backups ?? throw new ArgumentNullException(nameof(backups));
+        _zones = zones ?? throw new ArgumentNullException(nameof(zones));
+        _scanSettingsChanges = scanSettingsChanges ?? throw new ArgumentNullException(nameof(scanSettingsChanges));
+        _logFile = logFile ?? throw new ArgumentNullException(nameof(logFile));
+    }
+
+    public async Task<ApiResult> GetSettingsAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(SuiteSettingsRules.BuildOut(await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false)));
+        return ApiRoutes.Ok(SuiteSettingsRules.BuildOut(await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false)));
     }
 
-    private static async Task<ApiResult> PutSettingsAsync(ApiRequest request)
+    public async Task<ApiResult> PutSettingsAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
@@ -67,10 +121,10 @@ public static class SuiteConfigurationEndpoints
         {
             var normalized = SuiteSettingsRules.Normalize(
                 new SuiteSettingsUpdate(name, notice, timezone, logRetention, wizard, activityRetention, backupEnabled, backupHours, backupTime),
-                request.Service<ITimeZoneResolver>());
-            var before = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-            await SuiteSettingsStore.UpdateAsync(uow, before, SuiteSettingsRules.Apply(before, normalized)).ConfigureAwait(false);
-            updated = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+                _zones);
+            var before = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
+            await _suiteSettings.UpdateAsync(uow, before, SuiteSettingsRules.Apply(before, normalized)).ConfigureAwait(false);
+            updated = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
             output = SuiteSettingsRules.BuildOut(updated);
         }
         catch (WireValueException exception)
@@ -87,12 +141,12 @@ public static class SuiteConfigurationEndpoints
     /// The settings are already saved, so a log that cannot be pruned (for example one holding invalid UTF-8)
     /// is logged and never turns the response into a 500 (#536).
     /// </summary>
-    private static void PruneLog(ApiRequest request, int keepDays)
+    private void PruneLog(ApiRequest request, int keepDays)
     {
         var logger = request.LoggerFactory.CreateLogger("weir.core.logging");
         try
         {
-            if (!request.Service<WeirLogFile>().Prune(keepDays))
+            if (!_logFile.Prune(keepDays))
             {
                 logger.LogWarning("Suite log prune skipped because the active log could not be rewritten.");
             }
@@ -105,13 +159,13 @@ public static class SuiteConfigurationEndpoints
         }
     }
 
-    private static async Task<ApiResult> GetBundleAsync(ApiRequest request)
+    public async Task<ApiResult> GetBundleAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
         try
         {
-            return ApiRoutes.Ok(await ConfigurationBundleStore.BuildAsync(uow).ConfigureAwait(false));
+            return ApiRoutes.Ok(await _bundle.BuildAsync(uow).ConfigureAwait(false));
         }
         catch (WireValueException exception)
         {
@@ -119,7 +173,7 @@ public static class SuiteConfigurationEndpoints
         }
     }
 
-    private static async Task<ApiResult> PutBundleAsync(ApiRequest request)
+    public async Task<ApiResult> PutBundleAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
@@ -134,7 +188,7 @@ public static class SuiteConfigurationEndpoints
         var uow = await request.DbAsync().ConfigureAwait(false);
         try
         {
-            await ConfigurationBundleStore.ApplyAsync(uow, bundle, request.Service<ITimeZoneResolver>(), request.Options.WeirHome).ConfigureAwait(false);
+            await _bundle.ApplyAsync(uow, bundle, _zones, request.Options.WeirHome).ConfigureAwait(false);
         }
         catch (WireValueException exception)
         {
@@ -142,22 +196,21 @@ public static class SuiteConfigurationEndpoints
         }
 
         await request.CommitAsync().ConfigureAwait(false);
-        request.Service<ScanSettingsChanges>().Record();
-        return ApiRoutes.Ok(await ConfigurationBundleStore.BuildAsync(uow).ConfigureAwait(false));
+        _scanSettingsChanges.Record();
+        return ApiRoutes.Ok(await _bundle.BuildAsync(uow).ConfigureAwait(false));
     }
 
-    private static async Task<ApiResult> GetBackupsAsync(ApiRequest request)
+    public async Task<ApiResult> GetBackupsAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var backups = request.Service<ConfigurationBackups>();
         var rows = await ConfigurationBackups.ListAsync(uow).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
-            .Set("directory", backups.Directory)
+            .Set("directory", _backups.Directory)
             .Set("items", new WireArray(rows.Select(row => (WireValue)ConfigurationBackups.ItemOut(row)))));
     }
 
-    private static async Task<ApiResult> DownloadBackupAsync(ApiRequest request)
+    public async Task<ApiResult> DownloadBackupAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -168,41 +221,17 @@ public static class SuiteConfigurationEndpoints
         ConfigurationBackupRecord row;
         try
         {
-            (path, row) = await request.Service<ConfigurationBackups>().GetFileAsync(uow, backupId).ConfigureAwait(false);
+            (path, row) = await _backups.GetFileAsync(uow, backupId).ConfigureAwait(false);
         }
         catch (WireValueException exception)
         {
             throw new ApiException(StatusCodes.Status404NotFound, exception.Message);
         }
 
-        return new CustomApiResult(context => WriteFileAsync(context, path, row.FileName, "application/json"));
+        return new CustomApiResult(context => SuiteConfigurationEndpoints.WriteFileAsync(context, path, row.FileName, "application/json"));
     }
 
-    /// <summary>
-    /// A file download with disposition, length, last-modified and an MD5 ETag of mtime and size, the headers
-    /// existing clients and the contract suite expect.
-    /// </summary>
-    internal static async Task WriteFileAsync(HttpContext context, string path, string fileName, string mediaType)
-    {
-        var info = new FileInfo(path);
-        var bytes = await File.ReadAllBytesAsync(path, context.RequestAborted).ConfigureAwait(false);
-        var mtimeTicks = info.LastWriteTimeUtc.Ticks - DateTime.UnixEpoch.Ticks;
-        var mtime = (mtimeTicks / TimeSpan.TicksPerSecond) + ((mtimeTicks % TimeSpan.TicksPerSecond) * 100 * 1e-9);
-#pragma warning disable CA5351 // The ETag is an MD5 of mtime and size; it is not a security control.
-        var etag = Convert.ToHexStringLower(MD5.HashData(Encoding.UTF8.GetBytes(WireJsonWriter.FloatRepr(mtime) + "-" + info.Length.ToString(CultureInfo.InvariantCulture))));
-#pragma warning restore CA5351
-        var quoted = Uri.EscapeDataString(fileName);
-        context.Response.StatusCode = StatusCodes.Status200OK;
-        context.Response.ContentType = mediaType;
-        context.Response.Headers.ContentDisposition = quoted != fileName ? $"attachment; filename*=utf-8''{quoted}" : $"attachment; filename=\"{fileName}\"";
-        context.Response.ContentLength = bytes.Length;
-        context.Response.Headers.LastModified = info.LastWriteTimeUtc.ToString("ddd, dd MMM yyyy HH:mm:ss 'GMT'", CultureInfo.InvariantCulture);
-        context.Response.Headers.ETag = $"\"{etag}\"";
-        context.Response.Headers.AcceptRanges = "bytes";
-        await context.Response.Body.WriteAsync(bytes, context.RequestAborted).ConfigureAwait(false);
-    }
-
-    private static async Task<ApiResult> GetSecurityOverviewAsync(ApiRequest request)
+    public async Task<ApiResult> GetSecurityOverviewAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(SecurityOverview.Build(request.Options));

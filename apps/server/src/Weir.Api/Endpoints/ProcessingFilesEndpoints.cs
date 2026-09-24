@@ -12,6 +12,7 @@ using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.DirectPlay;
+using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Endpoints;
@@ -121,7 +122,7 @@ public static class ProcessingFilesEndpoints
         var rows = await FileStateStore.ListAsync(uow, filter).ConfigureAwait(false);
         var libraryNames = await FileStateStore.LibraryNamesAsync(uow).ConfigureAwait(false);
         var knownDevices = DeviceProfileLoader.Load(request.Options.WeirHome);
-        var devices = await DirectPlayService.SelectedProfilesAsync(uow, knownDevices).ConfigureAwait(false);
+        var devices = await DirectPlayService.SelectedProfilesAsync(uow, request.Service<SuiteSettingsStore>(), knownDevices).ConfigureAwait(false);
         var progressByPath = request.Service<LiveProgressStore>().Snapshot();
         var handbacks = await HandbackStore.ForLibrariesAsync(uow, rows.Select(row => row.LibraryId)).ConfigureAwait(false);
 

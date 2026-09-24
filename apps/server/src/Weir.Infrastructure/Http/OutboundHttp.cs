@@ -8,6 +8,7 @@ using Microsoft.Data.Sqlite;
 using Weir.Core.Json;
 using Weir.Core.Notifications;
 using Weir.Core.Updates;
+using Weir.Infrastructure.Notifications;
 
 namespace Weir.Infrastructure.Http;
 
@@ -206,12 +207,14 @@ public sealed class NotificationDispatcher
     private static readonly TimeSpan DispatchTimeout = TimeSpan.FromSeconds(10);
     private readonly IExternalJsonPoster _poster;
     private readonly TimeProvider _time;
+    private readonly NotificationChannelStore _channels;
     private readonly ConcurrentDictionary<Task, byte> _inFlight = new();
 
-    public NotificationDispatcher(IExternalJsonPoster poster, TimeProvider time)
+    public NotificationDispatcher(IExternalJsonPoster poster, TimeProvider time, NotificationChannelStore channels)
     {
         _poster = poster;
         _time = time;
+        _channels = channels ?? throw new ArgumentNullException(nameof(channels));
     }
 
     /// <summary>Posts one notification to one channel, in the channel's payload shape; returns the HTTP status.</summary>
@@ -284,11 +287,11 @@ public sealed class NotificationDispatcher
                         }
                     }
 
-                    channels = await Notifications.NotificationChannelStore.ForEventAsync(uow, jobEvent).ConfigureAwait(false);
+                    channels = await _channels.ForEventAsync(uow, jobEvent).ConfigureAwait(false);
                     var generic = jobEvent.StartsWith(module + "_", StringComparison.Ordinal) ? jobEvent[(module.Length + 1)..] : jobEvent;
                     if (generic != jobEvent)
                     {
-                        foreach (var channel in await Notifications.NotificationChannelStore.ForEventAsync(uow, generic).ConfigureAwait(false))
+                        foreach (var channel in await _channels.ForEventAsync(uow, generic).ConfigureAwait(false))
                         {
                             if (!channels.Any(existing => existing.Id == channel.Id))
                             {

@@ -11,26 +11,27 @@ public sealed record DirectPlayBadge(string DeviceId, string DeviceName, string 
 public static class DirectPlayService
 {
     /// <summary>The ids of the devices the operator chose.</summary>
-    public static async Task<List<string>> SelectedDeviceIdsAsync(UnitOfWork uow)
+    public static async Task<List<string>> SelectedDeviceIdsAsync(UnitOfWork uow, SuiteSettingsStore suiteSettings)
     {
-        var row = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        var row = await suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
         return [.. row.DirectPlayDevices.Split(',').Select(p => p.Trim()).Where(p => p.Length > 0)];
     }
 
     /// <summary>Saves the operator's choice, keeping only ids the current device list knows, in its own order.</summary>
-    public static async Task<List<string>> SaveSelectedDeviceIdsAsync(UnitOfWork uow, IReadOnlyList<DeviceProfile> knownDevices, IReadOnlyList<string> selected)
+    public static async Task<List<string>> SaveSelectedDeviceIdsAsync(
+        UnitOfWork uow, SuiteSettingsStore suiteSettings, IReadOnlyList<DeviceProfile> knownDevices, IReadOnlyList<string> selected)
     {
         var wanted = new HashSet<string>(selected, StringComparer.Ordinal);
         var kept = knownDevices.Select(p => p.Id).Where(wanted.Contains).ToList();
-        var before = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-        await SuiteSettingsStore.UpdateAsync(uow, before, before with { DirectPlayDevices = string.Join(",", kept) }).ConfigureAwait(false);
+        var before = await suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
+        await suiteSettings.UpdateAsync(uow, before, before with { DirectPlayDevices = string.Join(",", kept) }).ConfigureAwait(false);
         return kept;
     }
 
     /// <summary>The profiles of the devices the operator chose.</summary>
-    public static async Task<IReadOnlyList<DeviceProfile>> SelectedProfilesAsync(UnitOfWork uow, IReadOnlyList<DeviceProfile> knownDevices)
+    public static async Task<IReadOnlyList<DeviceProfile>> SelectedProfilesAsync(UnitOfWork uow, SuiteSettingsStore suiteSettings, IReadOnlyList<DeviceProfile> knownDevices)
     {
-        var chosen = new HashSet<string>(await SelectedDeviceIdsAsync(uow).ConfigureAwait(false), StringComparer.Ordinal);
+        var chosen = new HashSet<string>(await SelectedDeviceIdsAsync(uow, suiteSettings).ConfigureAwait(false), StringComparer.Ordinal);
         return chosen.Count == 0 ? [] : [.. knownDevices.Where(p => chosen.Contains(p.Id))];
     }
 

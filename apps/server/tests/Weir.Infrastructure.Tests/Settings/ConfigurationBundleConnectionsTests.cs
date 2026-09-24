@@ -1,5 +1,7 @@
 using Weir.Core.Json;
 using Weir.Core.Time;
+using Weir.Infrastructure.Auth;
+using Weir.Infrastructure.Notifications;
 using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Tests.Platform;
 
@@ -11,6 +13,8 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
     private readonly StoreFixture _source = new();
     private readonly StoreFixture _target = new();
     private readonly ITimeZoneResolver _zones = new IanaTimeZoneResolver();
+    private readonly ConfigurationBundleStore _bundle =
+        new(new SuiteSettingsStore(new AuthStore()), new ConfigurationBundleConnections(new NotificationChannelStore()));
 
     public void Dispose()
     {
@@ -28,11 +32,11 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
             "INSERT INTO notification_channels (label, provider, url, events_json, enabled) " +
             "VALUES ('Failures', 'discord', 'https://discord.com/api/webhooks/1/token', '[\"job_failed\"]', 1)");
 
-    private Task<WireObject> ExportAsync() => _source.WithUnitOfWork(ConfigurationBundleStore.BuildAsync, commit: false);
+    private Task<WireObject> ExportAsync() => _source.WithUnitOfWork(_bundle.BuildAsync, commit: false);
 
     private Task<bool> RestoreAsync(WireObject bundle) => _target.WithUnitOfWork(async uow =>
     {
-        await ConfigurationBundleStore.ApplyAsync(uow, bundle, _zones, _target.Options.WeirHome);
+        await _bundle.ApplyAsync(uow, bundle, _zones, _target.Options.WeirHome);
         return true;
     });
 

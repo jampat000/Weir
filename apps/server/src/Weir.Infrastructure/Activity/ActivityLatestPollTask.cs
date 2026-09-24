@@ -16,11 +16,13 @@ public sealed class ActivityLatestPollTask : IPeriodicTask
 {
     private readonly SqliteDatabase _database;
     private readonly ActivityLatestNotifier _notifier;
+    private readonly ActivityHistoryStore _history;
 
-    public ActivityLatestPollTask(SqliteDatabase database, ActivityLatestNotifier notifier)
+    public ActivityLatestPollTask(SqliteDatabase database, ActivityLatestNotifier notifier, ActivityHistoryStore history)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _notifier = notifier ?? throw new ArgumentNullException(nameof(notifier));
+        _history = history ?? throw new ArgumentNullException(nameof(history));
     }
 
     public string Name => "activity-latest-poll";
@@ -42,7 +44,7 @@ public sealed class ActivityLatestPollTask : IPeriodicTask
             return;
         }
 
-        var latest = await ActivityHistoryStore.LatestIdAsync(_database, cancellationToken).ConfigureAwait(false);
+        var latest = await _history.LatestIdAsync(_database, cancellationToken).ConfigureAwait(false);
         if (latest is { } id && id != _notifier.Snapshot().LatestId)
         {
             _notifier.Notify(id);

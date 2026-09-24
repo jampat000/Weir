@@ -5,24 +5,24 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Notifications;
 
 /// <summary>The <c>notification_channels</c> table.</summary>
-public static class NotificationChannelStore
+public sealed class NotificationChannelStore
 {
     private const string Columns = "id, label, provider, url, events_json, enabled, created_at, updated_at";
 
-    public static Task<List<NotificationChannelRecord>> ListAsync(UnitOfWork uow)
+    public Task<List<NotificationChannelRecord>> ListAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QueryAsync($"SELECT {Columns} FROM notification_channels ORDER BY notification_channels.id", Read);
     }
 
-    public static Task<NotificationChannelRecord?> GetAsync(UnitOfWork uow, long id)
+    public Task<NotificationChannelRecord?> GetAsync(UnitOfWork uow, long id)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QuerySingleAsync($"SELECT {Columns} FROM notification_channels WHERE notification_channels.id = $id", Read, ("$id", id));
     }
 
     /// <summary>The enabled channels subscribed to <paramref name="jobEvent"/>.</summary>
-    public static async Task<List<NotificationChannelRecord>> ForEventAsync(UnitOfWork uow, string jobEvent)
+    public async Task<List<NotificationChannelRecord>> ForEventAsync(UnitOfWork uow, string jobEvent)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var rows = await uow.QueryAsync($"SELECT {Columns} FROM notification_channels WHERE notification_channels.enabled IS 1", Read).ConfigureAwait(false);
@@ -30,7 +30,7 @@ public static class NotificationChannelStore
     }
 
     /// <summary>Inserts a channel (validation is the caller's).</summary>
-    public static async Task<NotificationChannelRecord> CreateAsync(UnitOfWork uow, string label, string provider, string url, IReadOnlyList<string> events, bool enabled)
+    public async Task<NotificationChannelRecord> CreateAsync(UnitOfWork uow, string label, string provider, string url, IReadOnlyList<string> events, bool enabled)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var id = await uow.ExecuteScalarWriteAsync(
@@ -45,7 +45,7 @@ public static class NotificationChannelStore
     }
 
     /// <summary>Updates an existing channel row.</summary>
-    public static async Task<NotificationChannelRecord> UpdateAsync(
+    public async Task<NotificationChannelRecord> UpdateAsync(
         UnitOfWork uow, NotificationChannelRecord row, string label, string provider, string url, IReadOnlyList<string> events, bool enabled)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -79,7 +79,7 @@ public static class NotificationChannelStore
         return await GetAsync(uow, row.Id).ConfigureAwait(false) ?? row;
     }
 
-    public static Task<int> DeleteAsync(UnitOfWork uow, long id)
+    public Task<int> DeleteAsync(UnitOfWork uow, long id)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.ExecuteAsync("DELETE FROM notification_channels WHERE notification_channels.id = $id", ("$id", id));

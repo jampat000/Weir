@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
@@ -15,18 +16,30 @@ public static class SuitePauseEndpoints
 {
     public static IEndpointRouteBuilder MapSuitePauseEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/pause", GetPauseAsync);
-        endpoints.MapV1("PUT", "/pause", PutPauseAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<SuitePauseEndpointHandlers>();
+        endpoints.MapV1("GET", "/pause", handlers.GetPauseAsync);
+        endpoints.MapV1("PUT", "/pause", handlers.PutPauseAsync);
         return endpoints;
     }
+}
 
-    private static async Task<ApiResult> GetPauseAsync(ApiRequest request)
+/// <summary>Handlers for <see cref="SuitePauseEndpoints"/>, constructor-injected with the store they need.</summary>
+internal sealed class SuitePauseEndpointHandlers
+{
+    private readonly SuiteSettingsStore _suiteSettings;
+
+    public SuitePauseEndpointHandlers(SuiteSettingsStore suiteSettings)
+    {
+        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+    }
+
+    public async Task<ApiResult> GetPauseAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(await PauseOutAsync(request).ConfigureAwait(false));
     }
 
-    private static async Task<ApiResult> PutPauseAsync(ApiRequest request)
+    public async Task<ApiResult> PutPauseAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
@@ -47,7 +60,7 @@ public static class SuitePauseEndpoints
         }
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        var row = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
         Timestamp? until = null;
         if (paused && minutes is { } m)
         {
@@ -55,19 +68,19 @@ public static class SuitePauseEndpoints
         }
 
         var updated = row with { ProcessingPaused = paused, ScanWhilePaused = scanWhilePaused, ProcessingPausedUntil = until };
-        await SuiteSettingsStore.UpdateAsync(uow, row, updated).ConfigureAwait(false);
+        await _suiteSettings.UpdateAsync(uow, row, updated).ConfigureAwait(false);
         return ApiRoutes.Ok(await PauseOutAsync(request).ConfigureAwait(false));
     }
 
     /// <summary>Resolve the pause, clearing a lapsed one so the row and the screen agree.</summary>
-    private static async Task<WireObject> PauseOutAsync(ApiRequest request)
+    private async Task<WireObject> PauseOutAsync(ApiRequest request)
     {
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        var row = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
         var state = PauseState.Resolve(row, Timestamp.UtcNow(request.Time).AsUtc);
         if (state.Expired)
         {
-            await SuiteSettingsStore.UpdateAsync(uow, row, row with { ProcessingPaused = false, ProcessingPausedUntil = null }).ConfigureAwait(false);
+            await _suiteSettings.UpdateAsync(uow, row, row with { ProcessingPaused = false, ProcessingPausedUntil = null }).ConfigureAwait(false);
         }
 
         return state.ToOut();

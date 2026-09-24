@@ -6,33 +6,33 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Auth;
 
 /// <summary>The <c>users</c> and <c>user_sessions</c> tables and the queries sign-in, sessions and recovery run on them.</summary>
-public static class AuthStore
+public sealed class AuthStore
 {
     private const string UserColumns = "id, username, password_hash, role, is_active";
 
     private const string SessionColumns =
         "id, user_id, token_hash, created_at, absolute_expires_at, is_trusted_device, last_seen_at, revoked_at, client_label";
 
-    public static Task<long> CountActiveAdminsAsync(UnitOfWork uow) =>
+    public Task<long> CountActiveAdminsAsync(UnitOfWork uow) =>
         Checked(uow).CountAsync("SELECT count(*) FROM users WHERE users.role = $role AND users.is_active IS 1", ("$role", UserRoles.Admin));
 
-    public static Task<long> CountUsersAsync(UnitOfWork uow) => Checked(uow).CountAsync("SELECT count(*) FROM users");
+    public Task<long> CountUsersAsync(UnitOfWork uow) => Checked(uow).CountAsync("SELECT count(*) FROM users");
 
-    public static Task<UserRecord?> GetUserAsync(UnitOfWork uow, long id) =>
+    public Task<UserRecord?> GetUserAsync(UnitOfWork uow, long id) =>
         Checked(uow).QuerySingleAsync($"SELECT {UserColumns} FROM users WHERE users.id = $id", ReadUser, ("$id", id));
 
     /// <summary>The first user whose lower-cased username equals <paramref name="folded"/>.</summary>
-    public static Task<UserRecord?> FindUserByLowerUsernameAsync(UnitOfWork uow, string folded) =>
+    public Task<UserRecord?> FindUserByLowerUsernameAsync(UnitOfWork uow, string folded) =>
         Checked(uow).QuerySingleAsync(
             $"SELECT {UserColumns} FROM users WHERE lower(users.username) = $folded LIMIT 1 OFFSET 0",
             ReadUser,
             ("$folded", folded));
 
-    public static Task<int> DeleteAdminsAsync(UnitOfWork uow) =>
+    public Task<int> DeleteAdminsAsync(UnitOfWork uow) =>
         Checked(uow).ExecuteAsync("DELETE FROM users WHERE users.role = $role", ("$role", UserRoles.Admin));
 
     /// <summary>Insert a user; <see cref="SqliteException"/> with a constraint code on a username clash.</summary>
-    public static async Task<long> InsertUserAsync(UnitOfWork uow, string username, string passwordHash, string role, bool isActive)
+    public async Task<long> InsertUserAsync(UnitOfWork uow, string username, string passwordHash, string role, bool isActive)
     {
         var id = await Checked(uow).ExecuteScalarWriteAsync(
             "INSERT INTO users (username, password_hash, role, is_active) VALUES ($username, $hash, $role, $active) RETURNING id",
@@ -43,33 +43,33 @@ public static class AuthStore
         return Convert.ToInt64(id, System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    public static Task<int> UpdatePasswordHashAsync(UnitOfWork uow, long userId, string passwordHash) =>
+    public Task<int> UpdatePasswordHashAsync(UnitOfWork uow, long userId, string passwordHash) =>
         Checked(uow).ExecuteAsync(
             "UPDATE users SET password_hash=$hash, updated_at=CURRENT_TIMESTAMP WHERE users.id = $id",
             ("$hash", passwordHash),
             ("$id", userId));
 
-    public static Task<int> UpdateUsernameAsync(UnitOfWork uow, long userId, string username) =>
+    public Task<int> UpdateUsernameAsync(UnitOfWork uow, long userId, string username) =>
         Checked(uow).ExecuteAsync(
             "UPDATE users SET username=$username, updated_at=CURRENT_TIMESTAMP WHERE users.id = $id",
             ("$username", username),
             ("$id", userId));
 
-    public static Task<int> SetActiveAsync(UnitOfWork uow, long userId, bool isActive) =>
+    public Task<int> SetActiveAsync(UnitOfWork uow, long userId, bool isActive) =>
         Checked(uow).ExecuteAsync(
             "UPDATE users SET is_active=$active, updated_at=CURRENT_TIMESTAMP WHERE users.id = $id",
             ("$active", isActive ? 1 : 0),
             ("$id", userId));
 
     /// <summary>Every account, alphabetically.</summary>
-    public static Task<List<UserRecord>> ListUsersByUsernameAsync(UnitOfWork uow) =>
+    public Task<List<UserRecord>> ListUsersByUsernameAsync(UnitOfWork uow) =>
         Checked(uow).QueryAsync($"SELECT {UserColumns} FROM users ORDER BY users.username", ReadUser);
 
     /// <summary>
     /// The account to recover: the named account (case-insensitive), or — when no username is given — the
     /// very first account by id (only meaningful when exactly one exists, the caller's job to check).
     /// </summary>
-    public static Task<UserRecord?> FindAccountForRecoveryAsync(UnitOfWork uow, string? username)
+    public Task<UserRecord?> FindAccountForRecoveryAsync(UnitOfWork uow, string? username)
     {
         if (string.IsNullOrEmpty(username))
         {
@@ -83,20 +83,20 @@ public static class AuthStore
             ("$folded", folded));
     }
 
-    public static Task<UserSessionRecord?> FindSessionByTokenHashAsync(UnitOfWork uow, string tokenHash) =>
+    public Task<UserSessionRecord?> FindSessionByTokenHashAsync(UnitOfWork uow, string tokenHash) =>
         Checked(uow).QuerySingleAsync(
             $"SELECT {SessionColumns} FROM user_sessions WHERE user_sessions.token_hash = $hash LIMIT 1 OFFSET 0",
             ReadSession,
             ("$hash", tokenHash));
 
-    public static Task<UserSessionRecord?> FindUserSessionAsync(UnitOfWork uow, long userId, string sessionHexId) =>
+    public Task<UserSessionRecord?> FindUserSessionAsync(UnitOfWork uow, long userId, string sessionHexId) =>
         Checked(uow).QuerySingleAsync(
             $"SELECT {SessionColumns} FROM user_sessions WHERE user_sessions.user_id = $user AND user_sessions.id = $id",
             ReadSession,
             ("$user", userId),
             ("$id", sessionHexId));
 
-    public static Task InsertSessionAsync(UnitOfWork uow, UserSessionRecord row)
+    public Task InsertSessionAsync(UnitOfWork uow, UserSessionRecord row)
     {
         ArgumentNullException.ThrowIfNull(row);
         return Checked(uow).ExecuteAsync(
@@ -113,32 +113,32 @@ public static class AuthStore
             ("$label", row.ClientLabel));
     }
 
-    public static Task<int> RevokeSessionAsync(UnitOfWork uow, string sessionHexId, Timestamp at) =>
+    public Task<int> RevokeSessionAsync(UnitOfWork uow, string sessionHexId, Timestamp at) =>
         Checked(uow).ExecuteAsync(
             "UPDATE user_sessions SET revoked_at=$at WHERE user_sessions.id = $id",
             ("$at", at.ToSqlite()),
             ("$id", sessionHexId));
 
-    public static Task<int> TouchSessionAsync(UnitOfWork uow, string sessionHexId, Timestamp at) =>
+    public Task<int> TouchSessionAsync(UnitOfWork uow, string sessionHexId, Timestamp at) =>
         Checked(uow).ExecuteAsync(
             "UPDATE user_sessions SET last_seen_at=$at WHERE user_sessions.id = $id",
             ("$at", at.ToSqlite()),
             ("$id", sessionHexId));
 
     /// <summary>Revokes every unrevoked session of the user.</summary>
-    public static Task<int> RevokeActiveSessionsForUserAsync(UnitOfWork uow, long userId, Timestamp at) =>
+    public Task<int> RevokeActiveSessionsForUserAsync(UnitOfWork uow, long userId, Timestamp at) =>
         Checked(uow).ExecuteAsync(
             "UPDATE user_sessions SET revoked_at=$at WHERE user_sessions.user_id = $user AND user_sessions.revoked_at IS NULL",
             ("$at", at.ToSqlite()),
             ("$user", userId));
 
-    public static Task<long> CountActiveSessionsAsync(UnitOfWork uow, long userId, Timestamp now) =>
+    public Task<long> CountActiveSessionsAsync(UnitOfWork uow, long userId, Timestamp now) =>
         Checked(uow).CountAsync(
             "SELECT count(*) FROM user_sessions WHERE user_sessions.user_id = $user AND user_sessions.revoked_at IS NULL AND user_sessions.absolute_expires_at > $now",
             ("$user", userId),
             ("$now", now.ToSqlite()));
 
-    public static Task<List<UserSessionRecord>> OldestActiveSessionsAsync(UnitOfWork uow, long userId, Timestamp now, long limit) =>
+    public Task<List<UserSessionRecord>> OldestActiveSessionsAsync(UnitOfWork uow, long userId, Timestamp now, long limit) =>
         Checked(uow).QueryAsync(
             $"SELECT {SessionColumns} FROM user_sessions WHERE user_sessions.user_id = $user AND user_sessions.revoked_at IS NULL " +
             "AND user_sessions.absolute_expires_at > $now ORDER BY user_sessions.created_at ASC, user_sessions.id ASC LIMIT $limit OFFSET 0",
@@ -148,7 +148,7 @@ public static class AuthStore
             ("$limit", limit));
 
     /// <summary>Unrevoked, unexpired sessions for the session list, newest activity first.</summary>
-    public static Task<List<UserSessionRecord>> ActiveSessionsNewestFirstAsync(UnitOfWork uow, long userId, Timestamp now) =>
+    public Task<List<UserSessionRecord>> ActiveSessionsNewestFirstAsync(UnitOfWork uow, long userId, Timestamp now) =>
         Checked(uow).QueryAsync(
             $"SELECT {SessionColumns} FROM user_sessions WHERE user_sessions.user_id = $user AND user_sessions.revoked_at IS NULL " +
             "AND user_sessions.absolute_expires_at > $now ORDER BY user_sessions.last_seen_at DESC, user_sessions.created_at DESC",
@@ -156,7 +156,7 @@ public static class AuthStore
             ("$user", userId),
             ("$now", now.ToSqlite()));
 
-    public static Task<List<UserSessionRecord>> ActiveSessionsAsync(UnitOfWork uow, long userId, Timestamp now) =>
+    public Task<List<UserSessionRecord>> ActiveSessionsAsync(UnitOfWork uow, long userId, Timestamp now) =>
         Checked(uow).QueryAsync(
             $"SELECT {SessionColumns} FROM user_sessions WHERE user_sessions.user_id = $user AND user_sessions.revoked_at IS NULL " +
             "AND user_sessions.absolute_expires_at > $now",
@@ -165,7 +165,7 @@ public static class AuthStore
             ("$now", now.ToSqlite()));
 
     /// <summary>Deletes sessions that are revoked, past their absolute expiry, or idle past their cutoff.</summary>
-    public static Task<int> DeleteInactiveSessionsAsync(UnitOfWork uow, Timestamp now, Timestamp idleCutoff, Timestamp trustedIdleCutoff) =>
+    public Task<int> DeleteInactiveSessionsAsync(UnitOfWork uow, Timestamp now, Timestamp idleCutoff, Timestamp trustedIdleCutoff) =>
         Checked(uow).ExecuteAsync(
             "DELETE FROM user_sessions WHERE user_sessions.revoked_at IS NOT NULL OR user_sessions.absolute_expires_at <= $now " +
             "OR user_sessions.is_trusted_device IS 0 AND user_sessions.last_seen_at < $idle " +

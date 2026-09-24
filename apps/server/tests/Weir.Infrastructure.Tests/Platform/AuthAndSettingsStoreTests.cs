@@ -4,8 +4,8 @@ using Weir.Core.Auth;
 using Weir.Core.Json;
 using Weir.Core.Security;
 using Weir.Core.Time;
-using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.Logging;
+using Weir.Infrastructure.Notifications;
 using Weir.Infrastructure.Runtime;
 using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
@@ -20,7 +20,7 @@ public sealed class AuthAndSettingsStoreTests
     public async Task Login_keeps_only_the_newest_five_active_sessions()
     {
         using var fixture = new StoreFixture();
-        await fixture.WithUnitOfWork(uow => AuthStore.InsertUserAsync(uow, "alice", PasswordHasher.Hash(Password), "admin", true));
+        await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "alice", PasswordHasher.Hash(Password), "admin", true));
         for (var i = 0; i < 6; i++)
         {
             fixture.Clock.Set(fixture.Clock.GetUtcNow().AddSeconds(1));
@@ -36,7 +36,7 @@ public sealed class AuthAndSettingsStoreTests
     public async Task The_session_cap_ignores_sessions_past_their_absolute_expiry()
     {
         using var fixture = new StoreFixture();
-        var userId = await fixture.WithUnitOfWork(uow => AuthStore.InsertUserAsync(uow, "alice", "x", "admin", true));
+        var userId = await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "alice", "x", "admin", true));
         var user = new UserRecord(userId, "alice", "x", "admin", true);
         for (var i = 0; i < 5; i++)
         {
@@ -56,7 +56,7 @@ public sealed class AuthAndSettingsStoreTests
     public async Task Last_seen_is_persisted_at_most_once_a_minute()
     {
         using var fixture = new StoreFixture(("WEIR_SESSION_IDLE_MINUTES", "720"));
-        var userId = await fixture.WithUnitOfWork(uow => AuthStore.InsertUserAsync(uow, "alice", "x", "admin", true));
+        var userId = await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "alice", "x", "admin", true));
         var (_, raw) = await fixture.WithUnitOfWork(uow => fixture.Auth.CreateSessionAsync(uow, new UserRecord(userId, "alice", "x", "admin", true), false, "b"));
 
         fixture.Clock.Set(fixture.Clock.GetUtcNow().AddSeconds(30));
@@ -73,7 +73,7 @@ public sealed class AuthAndSettingsStoreTests
     public async Task Refreshing_a_session_leaves_the_request_outside_any_transaction()
     {
         using var fixture = new StoreFixture(("WEIR_SESSION_IDLE_MINUTES", "720"));
-        var userId = await fixture.WithUnitOfWork(uow => AuthStore.InsertUserAsync(uow, "alice", "x", "admin", true));
+        var userId = await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "alice", "x", "admin", true));
         var (_, raw) = await fixture.WithUnitOfWork(uow => fixture.Auth.CreateSessionAsync(uow, new UserRecord(userId, "alice", "x", "admin", true), false, "b"));
         fixture.Clock.Set(new DateTimeOffset(2026, 1, 15, 10, 1, 1, TimeSpan.Zero));
 
@@ -94,7 +94,7 @@ public sealed class AuthAndSettingsStoreTests
     {
         // #529: the revoke is committed on its own, so the request's rollback cannot undo it.
         using var fixture = new StoreFixture();
-        var userId = await fixture.WithUnitOfWork(uow => AuthStore.InsertUserAsync(uow, "alice", "x", "admin", true));
+        var userId = await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "alice", "x", "admin", true));
         var (_, raw) = await fixture.WithUnitOfWork(uow => fixture.Auth.CreateSessionAsync(uow, new UserRecord(userId, "alice", "x", "admin", true), false, "b"));
 
         fixture.Clock.Set(fixture.Clock.GetUtcNow().AddDays(fixture.Options.SessionAbsoluteDays + 1));
@@ -106,7 +106,7 @@ public sealed class AuthAndSettingsStoreTests
     public async Task Cleanup_deletes_revoked_and_expired_sessions()
     {
         using var fixture = new StoreFixture(("WEIR_SESSION_IDLE_MINUTES", "720"));
-        var userId = await fixture.WithUnitOfWork(uow => AuthStore.InsertUserAsync(uow, "alice", "x", "admin", true));
+        var userId = await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "alice", "x", "admin", true));
         var user = new UserRecord(userId, "alice", "x", "admin", true);
         var (revoked, _) = await fixture.WithUnitOfWork(uow => fixture.Auth.CreateSessionAsync(uow, user, false, "b"));
         var (expired, _) = await fixture.WithUnitOfWork(uow => fixture.Auth.CreateSessionAsync(uow, user, false, "b"));
@@ -123,23 +123,23 @@ public sealed class AuthAndSettingsStoreTests
     public async Task An_inactive_sole_admin_reopens_bootstrap_and_recovery_leaves_exactly_one_admin()
     {
         using var fixture = new StoreFixture();
-        await fixture.WithUnitOfWork(uow => AuthStore.InsertUserAsync(uow, "alice", "argon2-placeholder", "admin", true));
-        Assert.False(await fixture.WithUnitOfWork(AuthService.BootstrapAllowedAsync));
+        await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "alice", "argon2-placeholder", "admin", true));
+        Assert.False(await fixture.WithUnitOfWork(fixture.Auth.BootstrapAllowedAsync));
         await fixture.Execute("UPDATE users SET is_active = 0");
-        Assert.True(await fixture.WithUnitOfWork(AuthService.BootstrapAllowedAsync));
+        Assert.True(await fixture.WithUnitOfWork(fixture.Auth.BootstrapAllowedAsync));
 
-        var created = await fixture.WithUnitOfWork(uow => AuthService.CreateInitialAdminAsync(uow, "alice-again", "recovered-password-strong"));
+        var created = await fixture.WithUnitOfWork(uow => fixture.Auth.CreateInitialAdminAsync(uow, "alice-again", "recovered-password-strong"));
         Assert.True(created.IsActive);
         Assert.Equal(1, await fixture.Scalar("SELECT count(*) FROM users WHERE role = 'admin'"));
-        Assert.False(await fixture.WithUnitOfWork(AuthService.BootstrapAllowedAsync));
+        Assert.False(await fixture.WithUnitOfWork(fixture.Auth.BootstrapAllowedAsync));
     }
 
     [Fact]
     public async Task Username_and_password_changes_follow_the_documented_rules()
     {
         using var fixture = new StoreFixture();
-        var id = await fixture.WithUnitOfWork(uow => AuthStore.InsertUserAsync(uow, "alice", PasswordHasher.Hash(Password), "admin", true));
-        await fixture.WithUnitOfWork(uow => AuthStore.InsertUserAsync(uow, "bob", "x", "viewer", true));
+        var id = await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "alice", PasswordHasher.Hash(Password), "admin", true));
+        await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "bob", "x", "viewer", true));
 
         async Task<string> Error(Func<UnitOfWork, Task> work) =>
             (await Assert.ThrowsAsync<WireValueException>(() => fixture.WithUnitOfWork(async uow => { await work(uow); return 0; }))).Message;
@@ -158,7 +158,8 @@ public sealed class AuthAndSettingsStoreTests
     {
         using var fixture = new StoreFixture();
         var zones = new IanaTimeZoneResolver();
-        var backups = new ConfigurationBackups(fixture.Options, fixture.Clock, zones);
+        var suiteSettings = new SuiteSettingsStore(fixture.Users);
+        var backups = new ConfigurationBackups(fixture.Options, fixture.Clock, zones, suiteSettings, new ConfigurationBundleStore(suiteSettings, new ConfigurationBundleConnections(new NotificationChannelStore())));
         await fixture.Execute("UPDATE suite_settings SET configuration_backup_enabled = 1, configuration_backup_interval_hours = 6");
 
         Assert.Equal(1, await backups.RunTickAsync(fixture.Database, new DateTime(2026, 1, 15, 10, 0, 0, DateTimeKind.Utc)));
@@ -178,7 +179,9 @@ public sealed class AuthAndSettingsStoreTests
     public async Task Only_the_newest_five_snapshots_are_kept()
     {
         using var fixture = new StoreFixture();
-        var backups = new ConfigurationBackups(fixture.Options, fixture.Clock, new IanaTimeZoneResolver());
+        var suiteSettings = new SuiteSettingsStore(fixture.Users);
+        var backups = new ConfigurationBackups(
+            fixture.Options, fixture.Clock, new IanaTimeZoneResolver(), suiteSettings, new ConfigurationBundleStore(suiteSettings, new ConfigurationBundleConnections(new NotificationChannelStore())));
         for (var i = 0; i < 7; i++)
         {
             fixture.Clock.Set(fixture.Clock.GetUtcNow().AddMinutes(1));
@@ -260,8 +263,8 @@ public sealed class AuthAndSettingsStoreTests
     public async Task Sqlite_constraint_errors_are_recognised()
     {
         using var fixture = new StoreFixture();
-        await fixture.WithUnitOfWork(uow => AuthStore.InsertUserAsync(uow, "alice", "x", "admin", true));
-        var error = await Assert.ThrowsAsync<SqliteException>(() => fixture.WithUnitOfWork(uow => AuthStore.InsertUserAsync(uow, "ALICE", "x", "admin", true)));
+        await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "alice", "x", "admin", true));
+        var error = await Assert.ThrowsAsync<SqliteException>(() => fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "ALICE", "x", "admin", true)));
         Assert.True(SqliteValues.IsIntegrityError(error));
     }
 

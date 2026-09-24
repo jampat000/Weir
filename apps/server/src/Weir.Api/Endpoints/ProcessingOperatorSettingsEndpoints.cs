@@ -62,7 +62,7 @@ public static class ProcessingOperatorSettingsEndpoints
         await request.RequireUserAsync().ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var row = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-        var suite = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        var suite = await request.Service<SuiteSettingsStore>().EnsureAsync(uow).ConfigureAwait(false);
         return ApiRoutes.Ok(OperatorSettingsOut(row, string.IsNullOrWhiteSpace(suite.AppTimezone) ? "UTC" : suite.AppTimezone.Trim()));
     }
 
@@ -279,7 +279,7 @@ public static class ProcessingOperatorSettingsEndpoints
 
         await OperatorSettingsStore.UpdateAsync(uow, before, after).ConfigureAwait(false);
         var updated = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-        var suite = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        var suite = await request.Service<SuiteSettingsStore>().EnsureAsync(uow).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         // The periodic-scan switches are among these settings; the scheduler reads them again on its next tick.
         request.Service<ScanSettingsChanges>().Record();

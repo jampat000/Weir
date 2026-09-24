@@ -5,9 +5,11 @@ using Weir.Core.Json;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.Processing.RemuxPass;
+using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Tests.Media;
 using Weir.Infrastructure.Tests.MediaManagers;
 
@@ -93,7 +95,7 @@ public sealed class KeepOriginalDownloadTests : IDisposable
     private async Task ScanAndDrainAsync(string mediaType)
     {
         var scan = new ProcessingWatchedFolderScanDispatchJobHandler(
-            _fixture.Store.Database, _fixture.Store.Clock, _fixture.Store.Options, _fixture.Jobs, _fixture.Connections);
+            _fixture.Store.Database, _fixture.Store.Clock, _fixture.Store.Options, _fixture.Jobs, _fixture.Connections, new SuiteSettingsStore(new AuthStore()));
         var payload = new WireObject().Set("enqueue_remux_jobs", true).Set("scan_trigger", "watcher").Set("media_scope", mediaType).Set("library_id", _libraryId);
         var job = await _fixture.Jobs.EnqueueOrGetAsync(
             $"scan-{Guid.NewGuid():N}", ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
