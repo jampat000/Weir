@@ -32,6 +32,10 @@ public sealed class ScanWakeups
         return booked is null ? periodic : periodic is null ? booked : booked < periodic ? booked : periodic;
     }
 
+    /// <summary>The scan timer's next periodic look at <paramref name="libraryId"/> alone, ignoring any booked look
+    /// for a held file (#747) — the moment the periodic scan-dispatch job is next created, not the earliest look.</summary>
+    public DateTimeOffset? NextPeriodicFor(long libraryId) => _periodic.TryGetValue(libraryId, out var next) ? next : null;
+
     /// <summary>Book a look at <paramref name="libraryId"/> at <paramref name="at"/>, unless an earlier one is booked.</summary>
     public void Request(long libraryId, DateTimeOffset at) =>
         _at.AddOrUpdate(libraryId, at, (_, booked) => at < booked ? at : booked);
