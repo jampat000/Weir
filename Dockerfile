@@ -46,9 +46,10 @@ WORKDIR /src
 # The solution-level MSBuild files (Directory.Build.props holds the product version) and, below, only
 # each project's .csproj and packages.lock.json (Directory.Build.props sets RestorePackagesWithLockFile,
 # so restore expects it next to the .csproj): enough for `dotnet restore` to resolve every package,
-# without the .cs source that changes on nearly every build. Restore is then cached (both as its own
-# Docker layer, and by the BuildKit cache mount, which survives a cold layer cache) and skipped by
-# --no-restore below whenever only application code changed.
+# without the .cs source that changes on nearly every build. The restored packages live in the image layer
+# itself, so a restore layer taken from the build cache always comes with the packages the --no-restore
+# publish below needs. A BuildKit cache mount is deliberately not used for them: its contents are not part
+# of the layer, so a cached restore layer would leave the publish step with no packages.
 # .editorconfig carries the analyzer severities the build relies on (warnings are errors), so it must come too.
 COPY apps/server/global.json apps/server/Directory.Build.props apps/server/Directory.Packages.props apps/server/NuGet.Config apps/server/Weir.slnx apps/server/.editorconfig apps/server/
 COPY apps/server/src/Weir.Api/Weir.Api.csproj apps/server/src/Weir.Api/packages.lock.json apps/server/src/Weir.Api/
@@ -62,8 +63,7 @@ COPY apps/server/src/Weir.Infrastructure/Weir.Infrastructure.csproj apps/server/
 # restore here would reject the RID-specific native assets (e.g. SQLitePCLRaw) it needs to add,
 # the same as plain `dotnet publish -p:PublishProfile=...` already did before this change. Weir.Host's
 # ProjectReferences pull Api/Core/Infrastructure into the same restore graph.
-RUN --mount=type=cache,target=/root/.nuget/packages,sharing=locked \
-    case "$TARGETARCH" in \
+RUN case "$TARGETARCH" in \
       amd64) rid=linux-x64 ;; \
       arm64) rid=linux-arm64 ;; \
       *) echo "Dockerfile: unsupported TARGETARCH '$TARGETARCH'" >&2; exit 1 ;; \
@@ -76,8 +76,7 @@ COPY apps/web/openapi apps/web/openapi
 # global property that reaches every project, and the single-file analyzer then fails Weir.Infrastructure
 # with IL3000 on the Assembly.Location check that detects single-file mode on purpose. The profiles scope
 # those properties to Weir.Host. Do not "simplify" this back to explicit flags.
-RUN --mount=type=cache,target=/root/.nuget/packages,sharing=locked \
-    case "$TARGETARCH" in \
+RUN case "$TARGETARCH" in \
       amd64) profile=linux-x64 ;; \
       arm64) profile=linux-arm64 ;; \
       *) echo "Dockerfile: unsupported TARGETARCH '$TARGETARCH'" >&2; exit 1 ;; \
