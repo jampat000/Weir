@@ -84,7 +84,47 @@ function CheckLines({ item }: { item: ProcessingManagerSetupItem }) {
   );
 }
 
-function ArrMapping({ item }: { item: ProcessingManagerSetupItem }) {
+function ArrSuggestedFolder({
+  item,
+  watchedFolder,
+  editable,
+  onUseFolders,
+}: {
+  item: ProcessingManagerSetupItem;
+  watchedFolder: string;
+  editable: boolean;
+  onUseFolders: (watched: string | null, output: string | null) => void;
+}) {
+  const suggested = item.suggested_watched_folder ?? null;
+  if (suggested === null || suggested === watchedFolder.trim()) return null;
+  return (
+    <p className="text-sm text-mm-text2">
+      {item.label} has a download client saving to{" "}
+      <code className="break-all">{suggested}</code>.{" "}
+      {editable ? (
+        <button
+          type="button"
+          className="mm-quiet-link"
+          onClick={() => onUseFolders(suggested, null)}
+        >
+          Use this as the watched folder
+        </button>
+      ) : null}
+    </p>
+  );
+}
+
+function ArrMapping({
+  item,
+  watchedFolder,
+  editable,
+  onUseFolders,
+}: {
+  item: ProcessingManagerSetupItem;
+  watchedFolder: string;
+  editable: boolean;
+  onUseFolders: (watched: string | null, output: string | null) => void;
+}) {
   const mapping = item.mapping;
   if (!mapping) return null;
   const host = mapping.hosts.join(" or ");
@@ -109,6 +149,12 @@ function ArrMapping({ item }: { item: ProcessingManagerSetupItem }) {
   ];
   return (
     <>
+      <ArrSuggestedFolder
+        item={item}
+        watchedFolder={watchedFolder}
+        editable={editable}
+        onUseFolders={onUseFolders}
+      />
       <p className="mm-quiet-note">
         {item.label} imports what Weir writes by looking in Weir&apos;s output
         folder instead of the download client&apos;s. In {item.label}, open
@@ -298,7 +344,12 @@ export function LibraryManagerSetup({
                   onUseFolders={onUseFolders}
                 />
               ) : (
-                <ArrMapping item={item} />
+                <ArrMapping
+                  item={item}
+                  watchedFolder={watchedFolder}
+                  editable={editable}
+                  onUseFolders={onUseFolders}
+                />
               )}
               <CheckLines item={item} />
             </section>

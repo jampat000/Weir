@@ -7,6 +7,7 @@ using Weir.Core.MediaManagers;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.MediaManagers;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Endpoints;
@@ -21,6 +22,7 @@ public static class MediaManagerIntakeEndpoints
     {
         endpoints.MapV1("POST", "/intake/webhook/{source_key}", PostWebhookAsync);
         endpoints.MapV1("GET", "/intake/capabilities", GetIntakeCapabilitiesAsync);
+        endpoints.MapV1("GET", "/intake/library-folders", GetLibraryFoldersAsync);
         endpoints.MapV1("GET", "/intake/handoffs/{source_key}/{handoff_id}", GetHandoffAsync);
         endpoints.MapV1("DELETE", "/intake/handoffs/{source_key}/{handoff_id}", DeleteHandoffAsync);
         endpoints.MapV1("POST", "/intake/handoffs/{source_key}/{handoff_id}/outcome", PostHandoffOutcomeAsync);
@@ -112,6 +114,24 @@ public static class MediaManagerIntakeEndpoints
         var uow = await request.DbAsync().ConfigureAwait(false);
         await RefusalsAsApiErrors(() => Intake(request).RequireSecretAsync(uow, presented, null)).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject().Set("capabilities", new WireArray(IntakeRules.HandoffCapabilities.Select(c => (WireValue)new WireString(c)))));
+    }
+
+    /// <summary>
+    /// <c>GET /intake/library-folders</c> (#768): every enabled library's watched, work and output folders, so a
+    /// media manager reads them instead of a person retyping them. Read only; authenticated like
+    /// <see cref="GetIntakeCapabilitiesAsync"/>, with no source key of its own (any connection's secret, or the
+    /// shared instance-wide secret, proves a caller may read it).
+    /// </summary>
+    private static async Task<ApiResult> GetLibraryFoldersAsync(ApiRequest request)
+    {
+        var presented = request.FirstHeader("X-Webhook-Secret");
+        var uow = await request.DbAsync().ConfigureAwait(false);
+        await RefusalsAsApiErrors(() => Intake(request).RequireSecretAsync(uow, presented, null)).ConfigureAwait(false);
+        var rows = await LibraryStore.ListAsync(uow, enabledOnly: true).ConfigureAwait(false);
+        var libraries = rows
+            .Select(row => new PublishedLibraryFolders(row.Id, row.Name, row.MediaType, row.WatchedFolder, row.WorkFolder, row.OutputFolder))
+            .ToList();
+        return ApiRoutes.Ok(LibraryFolderPublishing.ToOut(libraries));
     }
 
     private static async Task<(UnitOfWork Uow, string Key, HandoffLedgerRow Row)> RequireHandoffAsync(ApiRequest request)

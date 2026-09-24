@@ -9576,7 +9576,7 @@
                 "type": "null"
               }
             ],
-            "description": "Deluno only: where this media type's downloads arrive, as Deluno reports it.",
+            "description": "Deluno: where this media type's downloads arrive, as Deluno reports it. Sonarr/Radarr: the first enabled download client's own directory, when one is set.",
             "title": "Suggested Watched Folder"
           },
           "suggested_output_folder": {

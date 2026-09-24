@@ -388,7 +388,9 @@ public sealed class MediaManagerApiTests
             Assert.Equal((HttpStatusCode.Unauthorized, "Invalid or missing X-Webhook-Secret header."), (noSecret.StatusCode, await Detail(noSecret)));
         }
 
-        Assert.Equal("""{"capabilities":["handoff-status","handoff-cancel","handoff-outcome","handoff-outcome-codes"]}""", await (await manager.GetAsync("/api/v1/intake/capabilities", secret)).Content.ReadAsStringAsync());
+        Assert.Equal(
+            """{"capabilities":["handoff-status","handoff-cancel","handoff-outcome","handoff-outcome-codes","library-folders"]}""",
+            await (await manager.GetAsync("/api/v1/intake/capabilities", secret)).Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.NotFound, (await manager.GetAsync("/api/v1/intake/handoffs/deluno/h1", secret)).StatusCode);
         Assert.Equal("Unknown media manager source 'plex'.", await Detail(await manager.GetAsync("/api/v1/intake/handoffs/plex/h1", secret)));
 
@@ -415,6 +417,46 @@ public sealed class MediaManagerApiTests
         Assert.Equal("cancelled", (await Json(await manager.GetAsync("/api/v1/intake/handoffs/deluno/h1", secret)))["state"]!.GetValue<string>());
         using var again = await manager.SendAsync(HttpMethod.Delete, "/api/v1/intake/handoffs/deluno/h1", headers: secret);
         Assert.Equal((HttpStatusCode.Conflict, "This hand-off is cancelled, so Weir did not cancel it."), (again.StatusCode, await Detail(again)));
+    }
+
+    /// <summary>
+    /// <c>GET /intake/library-folders</c> (#768): every enabled library's watched, work and output folders, so a
+    /// manager reads them instead of a person retyping them; a disabled library is left out, and the route needs
+    /// the same webhook secret as the rest of the intake surface.
+    /// </summary>
+    [Fact]
+    public async Task Library_folders_are_published_to_an_authenticated_manager()
+    {
+        var (server, admin, _) = await StartAsync(("WEIR_MEDIA_MANAGER_WEBHOOK_SECRET", "s3cret"));
+        await using var _server = server;
+        var secret = new Dictionary<string, string> { ["X-Webhook-Secret"] = "s3cret" };
+
+        // A fresh database seeds a Movies and a TV library; give the movie one folders to publish and disable the
+        // TV one, so the published list is exactly one library.
+        await TestDatabase.ExecuteAsync(
+            server,
+            "UPDATE libraries SET watched_folder = $w, work_folder = $k, output_folder = $o WHERE media_type = 'movie'",
+            ("$w", "/media/movies/watched"),
+            ("$k", "/media/movies/work"),
+            ("$o", "/media/movies/output"));
+        await TestDatabase.ExecuteAsync(server, "UPDATE libraries SET enabled = 0 WHERE media_type = 'tv'");
+        var movieId = await TestDatabase.ScalarAsync(server, "SELECT id FROM libraries WHERE media_type = 'movie'");
+
+        using (var unauthenticated = await admin.GetAsync("/api/v1/intake/library-folders"))
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, unauthenticated.StatusCode);
+        }
+
+        using var authenticated = await admin.GetAsync("/api/v1/intake/library-folders", secret);
+        Assert.Equal(HttpStatusCode.OK, authenticated.StatusCode);
+        var body = (await Json(authenticated))!;
+        var library = Assert.Single(body["libraries"]!.AsArray())!;
+        Assert.Equal(movieId, library["id"]!.GetValue<long>());
+        Assert.Equal("Movies", library["name"]!.GetValue<string>());
+        Assert.Equal("movie", library["media_type"]!.GetValue<string>());
+        Assert.Equal("/media/movies/watched", library["watched_folder"]!.GetValue<string>());
+        Assert.Equal("/media/movies/work", library["work_folder"]!.GetValue<string>());
+        Assert.Equal("/media/movies/output", library["output_folder"]!.GetValue<string>());
     }
 
     /// <summary>
