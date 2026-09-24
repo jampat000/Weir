@@ -1,5 +1,6 @@
 using Weir.Core.Json;
 using Weir.Core.Time;
+using Weir.Infrastructure.Notifications;
 using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Tests.Platform;
 
@@ -15,17 +16,24 @@ public sealed class ConfigurationBundleStoreTests : IDisposable
 {
     private readonly StoreFixture _store = new();
     private readonly ITimeZoneResolver _zones = new IanaTimeZoneResolver();
+    private readonly ConfigurationBundleStore _bundle;
+
+    public ConfigurationBundleStoreTests()
+    {
+        var suiteSettings = new SuiteSettingsStore(_store.Users);
+        _bundle = new ConfigurationBundleStore(suiteSettings, new ConfigurationBundleConnections(new NotificationChannelStore()));
+    }
 
     public void Dispose() => _store.Dispose();
 
     private Task SeedMetadataProviderKeyAsync() =>
         _store.Execute("UPDATE suite_settings SET metadata_provider = 'tmdb', metadata_provider_key_ciphertext = 'the-ciphertext' WHERE id = 1");
 
-    private Task<WireObject> BuildBundleAsync() => _store.WithUnitOfWork(ConfigurationBundleStore.BuildAsync, commit: false);
+    private Task<WireObject> BuildBundleAsync() => _store.WithUnitOfWork(_bundle.BuildAsync, commit: false);
 
     private Task<bool> ApplyAsync(WireObject bundle) => _store.WithUnitOfWork(async uow =>
     {
-        await ConfigurationBundleStore.ApplyAsync(uow, bundle, _zones, _store.Options.WeirHome);
+        await _bundle.ApplyAsync(uow, bundle, _zones, _store.Options.WeirHome);
         return true;
     });
 

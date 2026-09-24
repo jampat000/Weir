@@ -17,6 +17,8 @@ namespace Weir.Infrastructure.Tests.Activity;
 /// </summary>
 public sealed class ActivityHistoryStoreTests
 {
+    private readonly ActivityHistoryStore _history = new();
+
     [Fact]
     public async Task Record_activity_event_notifies_only_after_commit()
     {
@@ -103,7 +105,7 @@ public sealed class ActivityHistoryStoreTests
         // before this method's first await, so the poll below always sees it).
         using var fixture = new StoreFixture();
         var notifier = new ActivityLatestNotifier();
-        var poll = new ActivityLatestPollTask(fixture.Database, notifier);
+        var poll = new ActivityLatestPollTask(fixture.Database, notifier, _history);
         var clock = new FakeTimeProvider();
         var waiting = notifier.WaitForChangeAsync(notifier.Snapshot().Version, TimeSpan.FromSeconds(5), clock);
         Assert.Equal(1, notifier.WaiterCount);
@@ -120,7 +122,7 @@ public sealed class ActivityHistoryStoreTests
     {
         using var fixture = new StoreFixture();
         var notifier = new ActivityLatestNotifier();
-        var poll = new ActivityLatestPollTask(fixture.Database, notifier);
+        var poll = new ActivityLatestPollTask(fixture.Database, notifier, _history);
         await fixture.Execute("INSERT INTO activity_events (event_type, module, title) VALUES ('auth.password_changed', 'auth', 'Password changed')");
         var firstWait = notifier.WaitForChangeAsync(notifier.Snapshot().Version, TimeSpan.FromSeconds(5), TimeProvider.System);
         await poll.RunOnceAsync(CancellationToken.None);
@@ -138,7 +140,7 @@ public sealed class ActivityHistoryStoreTests
     {
         using var fixture = new StoreFixture();
         var notifier = new ActivityLatestNotifier();
-        var poll = new ActivityLatestPollTask(fixture.Database, notifier);
+        var poll = new ActivityLatestPollTask(fixture.Database, notifier, _history);
         await fixture.Execute("INSERT INTO activity_events (event_type, module, title) VALUES ('auth.password_changed', 'auth', 'Password changed')");
 
         await poll.RunOnceAsync(CancellationToken.None);
@@ -227,12 +229,12 @@ public sealed class ActivityHistoryStoreTests
             "('2026-01-01 00:00:02', 'a.2', 'processing', 'two'), " +
             "('2026-01-01 00:00:03', 'a.3', 'processing', 'three')");
 
-        Assert.Equal(3, await fixture.WithUnitOfWork(uow => ActivityHistoryStore.CountAsync(uow, ActivityFilter.None)));
+        Assert.Equal(3, await fixture.WithUnitOfWork(uow => _history.CountAsync(uow, ActivityFilter.None)));
 
         var (total, hasMore, pageCount) = await fixture.WithUnitOfWork(async uow =>
         {
-            var page = await ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: null);
-            var count = await ActivityHistoryStore.CountAsync(uow, ActivityFilter.None);
+            var page = await _history.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: null);
+            var count = await _history.CountAsync(uow, ActivityFilter.None);
             var body = ActivityHistory.RecentOut(page.Items, page.HasMore, count, 90, null);
             using var doc = JsonDocument.Parse(WireJsonWriter.DumpsUtf8(body, WireJsonFormat.Response));
             return (doc.RootElement.GetProperty("total").GetInt64(), doc.RootElement.GetProperty("has_more").GetBoolean(), page.Items.Count);
@@ -259,10 +261,10 @@ public sealed class ActivityHistoryStoreTests
             "('2026-01-01 00:00:10', 'a.3', 'processing', 'C'), " + // id 3, ties id 1
             "('2026-01-01 00:00:01', 'a.4', 'processing', 'D')"); // id 4, oldest
 
-        var first = (await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: null))).Items;
+        var first = (await fixture.WithUnitOfWork(uow => _history.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: null))).Items;
         Assert.Equal(["C", "A"], first.Select(r => r.Title)); // the tie broken by id DESC: 3 before 1
 
-        var second = (await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: first[^1].Id))).Items;
+        var second = (await fixture.WithUnitOfWork(uow => _history.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: first[^1].Id))).Items;
         Assert.Equal(["B", "D"], second.Select(r => r.Title)); // never id 1 again, never loses B or D
 
         Assert.Equal(4, first.Concat(second).Select(r => r.Id).Distinct().Count());
@@ -278,7 +280,7 @@ public sealed class ActivityHistoryStoreTests
             "('2026-01-01 00:00:01', 'a.1', 'processing', 'one'), " +
             "('2026-01-01 00:00:02', 'a.2', 'processing', 'two')");
 
-        var rows = (await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 10, beforeId: 999))).Items;
+        var rows = (await fixture.WithUnitOfWork(uow => _history.ListRecentAsync(uow, ActivityFilter.None, limit: 10, beforeId: 999))).Items;
         Assert.Equal(["two", "one"], rows.Select(r => r.Title));
     }
 
@@ -296,18 +298,18 @@ public sealed class ActivityHistoryStoreTests
 
         Assert.True(Timestamp.TryFromIsoFormat("2026-01-02T03:04:05", out var naiveBoundary));
         var atBoundary = new ActivityFilter(DateFrom: naiveBoundary);
-        Assert.Single((await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, atBoundary, limit: 10, beforeId: null))).Items);
+        Assert.Single((await fixture.WithUnitOfWork(uow => _history.ListRecentAsync(uow, atBoundary, limit: 10, beforeId: null))).Items);
 
         // The same instant, named with a +02:00 offset: an ignored offset would compare "05:04:05" against
         // the stored "03:04:05" and wrongly exclude the row.
         Assert.True(Timestamp.TryFromIsoFormat("2026-01-02T05:04:05+02:00", out var sameInstantOffset));
         var atOffsetBoundary = new ActivityFilter(DateFrom: sameInstantOffset);
-        Assert.Single((await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, atOffsetBoundary, limit: 10, beforeId: null))).Items);
+        Assert.Single((await fixture.WithUnitOfWork(uow => _history.ListRecentAsync(uow, atOffsetBoundary, limit: 10, beforeId: null))).Items);
 
         // One second later in the same offset: now past the row, in either timezone.
         Assert.True(Timestamp.TryFromIsoFormat("2026-01-02T06:04:06+02:00", out var pastIt));
         var pastFilter = new ActivityFilter(DateFrom: pastIt);
-        Assert.Empty((await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, pastFilter, limit: 10, beforeId: null))).Items);
+        Assert.Empty((await fixture.WithUnitOfWork(uow => _history.ListRecentAsync(uow, pastFilter, limit: 10, beforeId: null))).Items);
     }
 
     /// <summary>
@@ -325,8 +327,8 @@ public sealed class ActivityHistoryStoreTests
 
         Assert.True(Timestamp.TryFromIsoFormat("2026-01-03T04:00:00+00:00", out var from));
         Assert.True(Timestamp.TryFromIsoFormat("2026-01-02T18:00:00+00:00", out var to));
-        var after = await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, new ActivityFilter(DateFrom: from), limit: 10, beforeId: null));
-        var before = await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, new ActivityFilter(DateTo: to), limit: 10, beforeId: null));
+        var after = await fixture.WithUnitOfWork(uow => _history.ListRecentAsync(uow, new ActivityFilter(DateFrom: from), limit: 10, beforeId: null));
+        var before = await fixture.WithUnitOfWork(uow => _history.ListRecentAsync(uow, new ActivityFilter(DateTo: to), limit: 10, beforeId: null));
 
         Assert.Equal(["written the day before"], after.Items.Select(row => row.Title));
         Assert.Equal(["written the day after"], before.Items.Select(row => row.Title));
@@ -342,8 +344,8 @@ public sealed class ActivityHistoryStoreTests
             "('2026-01-01 00:00:02', 'a.2', 'processing', 'two'), " +
             "('2026-01-01 00:00:03', 'a.3', 'processing', 'three')");
 
-        var first = await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: null));
-        var second = await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: first.Items[^1].Id));
+        var first = await fixture.WithUnitOfWork(uow => _history.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: null));
+        var second = await fixture.WithUnitOfWork(uow => _history.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: first.Items[^1].Id));
 
         Assert.Equal(2, first.Items.Count);
         Assert.True(first.HasMore);
@@ -366,11 +368,11 @@ public sealed class ActivityHistoryStoreTests
         await fixture.Execute(
             "INSERT INTO file_logs (relative_path, recorded_at, library_id) VALUES ('Film/movie.mkv', '2026-01-01 00:00:01', NULL)");
 
-        var counts = await fixture.WithUnitOfWork(uow => ActivityHistoryStore.CountFileHistoryAsync(uow, libraryId: 7, "Film/movie.mkv"));
+        var counts = await fixture.WithUnitOfWork(uow => _history.CountFileHistoryAsync(uow, libraryId: 7, "Film/movie.mkv"));
         Assert.Equal(1, counts.ActivityEvents);
         Assert.Equal(1, counts.ProcessingRecords);
 
-        var deleted = await fixture.WithUnitOfWork(uow => ActivityHistoryStore.DeleteFileHistoryAsync(uow, libraryId: 7, "Film/movie.mkv"));
+        var deleted = await fixture.WithUnitOfWork(uow => _history.DeleteFileHistoryAsync(uow, libraryId: 7, "Film/movie.mkv"));
         Assert.Equal(1, deleted.ActivityEvents);
         Assert.Equal(1, deleted.ProcessingRecords);
     }

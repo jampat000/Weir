@@ -29,7 +29,8 @@ internal sealed class RecoverFixture : IDisposable
         RuntimeDirectories.Ensure(Options);
         Database = new SqliteDatabase(Options.DbPath);
         new SchemaMigrator(Database).EnsureAtHead();
-        Auth = new AuthService(Options, TimeProvider.System, Database, NullLoggerFactory.Instance);
+        Users = new AuthStore();
+        Auth = new AuthService(Options, TimeProvider.System, Database, Users, NullLoggerFactory.Instance);
     }
 
     public TempDirectory Home { get; }
@@ -40,6 +41,8 @@ internal sealed class RecoverFixture : IDisposable
 
     public SqliteDatabase Database { get; }
 
+    public AuthStore Users { get; }
+
     public AuthService Auth { get; }
 
     /// <summary>Inserts a user and, optionally, some active sessions for it (via a real login).</summary>
@@ -48,7 +51,7 @@ internal sealed class RecoverFixture : IDisposable
         var uow = await UnitOfWork.OpenAsync(Database);
         await using (uow.ConfigureAwait(false))
         {
-            var id = await AuthStore.InsertUserAsync(uow, username, PasswordHasher.Hash(password), role, active).ConfigureAwait(false);
+            var id = await Users.InsertUserAsync(uow, username, PasswordHasher.Hash(password), role, active).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
             var user = new UserRecord(id, username, PasswordHasher.Hash(password), role, active);
             for (var i = 0; i < sessions; i++)
@@ -118,7 +121,7 @@ public sealed class RecoverCommandTests
         Assert.Contains("The account is active and has the admin role.", stdout.ToString());
         Assert.Contains("2 signed-in sessions were ended — sign in again with the new password.", stdout.ToString());
 
-        var user = await fixture.WithUnitOfWork(uow => AuthStore.FindUserByLowerUsernameAsync(uow, "james"));
+        var user = await fixture.WithUnitOfWork(uow => fixture.Users.FindUserByLowerUsernameAsync(uow, "james"));
         Assert.NotNull(user);
         Assert.True(user!.IsActive);
         Assert.Equal(PasswordVerification.Match, PasswordHasher.Verify(NewPassword, user.PasswordHash));
@@ -254,7 +257,7 @@ public sealed class RecoverCommandTests
         Assert.Contains("--password stays in your shell history", stderr.ToString());
         Assert.Contains("Could not reset the password:", stderr.ToString());
 
-        var user = await fixture.WithUnitOfWork(uow => AuthStore.FindUserByLowerUsernameAsync(uow, "james"));
+        var user = await fixture.WithUnitOfWork(uow => fixture.Users.FindUserByLowerUsernameAsync(uow, "james"));
         Assert.Equal(PasswordVerification.Match, PasswordHasher.Verify(OldPassword, user!.PasswordHash));
     }
 
@@ -272,7 +275,7 @@ public sealed class RecoverCommandTests
         Assert.Contains("role=admin", stdout.ToString());
         Assert.Contains("INACTIVE", stdout.ToString());
 
-        var user = await fixture.WithUnitOfWork(uow => AuthStore.FindUserByLowerUsernameAsync(uow, "james"));
+        var user = await fixture.WithUnitOfWork(uow => fixture.Users.FindUserByLowerUsernameAsync(uow, "james"));
         Assert.Equal(PasswordVerification.Match, PasswordHasher.Verify(OldPassword, user!.PasswordHash));
         Assert.False(user.IsActive);
     }
@@ -342,7 +345,7 @@ public sealed class RecoverCommandTests
             new FakePasswordPrompt(isInteractive: true, NewPassword, NewPassword));
 
         Assert.Equal(RecoverCommand.ExitOk, exit);
-        var user = await fixture.WithUnitOfWork(uow => AuthStore.FindUserByLowerUsernameAsync(uow, "james"));
+        var user = await fixture.WithUnitOfWork(uow => fixture.Users.FindUserByLowerUsernameAsync(uow, "james"));
         Assert.Equal(PasswordVerification.Match, PasswordHasher.Verify(NewPassword, user!.PasswordHash));
     }
 

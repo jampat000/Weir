@@ -28,7 +28,8 @@ internal sealed class StoreFixture : IDisposable
         Database = new SqliteDatabase(Options.DbPath);
         new SchemaMigrator(Database).EnsureAtHead();
         Clock = new FakeTimeProvider(new DateTimeOffset(2026, 1, 15, 10, 0, 0, TimeSpan.Zero));
-        Auth = new AuthService(Options, Clock, Database, NullLoggerFactory.Instance);
+        Users = new AuthStore();
+        Auth = new AuthService(Options, Clock, Database, Users, NullLoggerFactory.Instance);
     }
 
     public TempDirectory Home { get; }
@@ -38,6 +39,8 @@ internal sealed class StoreFixture : IDisposable
     public SqliteDatabase Database { get; }
 
     public FakeTimeProvider Clock { get; }
+
+    public AuthStore Users { get; }
 
     public AuthService Auth { get; }
 
