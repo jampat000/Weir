@@ -51,7 +51,7 @@
     "node": ">=24.15"
   },
   "overrides": {
-    "image-size": "^2.0.2",
+    "image-size": "^2.0.4",
     "joi": "^18.2.9",
     "fast-uri": "^3.1.7",
     "qs": "^6.16.0",
