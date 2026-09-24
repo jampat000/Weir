@@ -305,6 +305,9 @@
             "title": "Message",
             "type": "string"
           },
+          "user": {
+            "$ref": "#/components/schemas/UserPublic"
+          },
           "username": {
             "title": "Username",
             "type": "string"
@@ -427,6 +430,22 @@
           "username"
         ],
         "title": "ChangeUsernameOut",
+        "type": "object"
+      },
+      "ConfigurationBackupCreateIn": {
+        "additionalProperties": false,
+        "description": "Body for POST /suite/configuration-backups.",
+        "properties": {
+          "csrf_token": {
+            "minLength": 1,
+            "title": "Csrf Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "ConfigurationBackupCreateIn",
         "type": "object"
       },
       "ConfigurationBundleImportIn": {
@@ -10216,7 +10235,7 @@
     },
     "/api/v1/auth/bootstrap": {
       "post": {
-        "description": "Create the first ``admin`` user once per Weir installation (guarded + rate limited).\n\nRequires the same CSRF + Origin/Referer posture as ``POST /login``. After success,\ncallers use ``POST /login`` normally. Not available once any ``admin`` user exists.",
+        "description": "Create the first ``admin`` user once per Weir installation (guarded + rate limited).\n\nRequires the same CSRF + Origin/Referer posture as ``POST /login``. After success,\nthis browser is signed in as the new admin. Not available once any ``admin`` user exists.",
         "operationId": "post_bootstrap_api_v1_auth_bootstrap_post",
         "requestBody": {
           "content": {
@@ -14448,6 +14467,46 @@
         "tags": [
           "suite"
         ]
+      },
+      "post": {
+        "description": "Write a configuration snapshot now, beside the scheduled ones.",
+        "operationId": "post_configuration_backup_api_v1_suite_configuration_backups_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigurationBackupCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuiteConfigurationBackupItemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Configuration Backup",
+        "tags": [
+          "suite"
+        ]
       }
     },
     "/api/v1/suite/configuration-backups/{backup_id}/download": {
@@ -14642,6 +14701,28 @@
           }
         },
         "summary": "Get Suite Logs",
+        "tags": [
+          "suite"
+        ]
+      }
+    },
+    "/api/v1/suite/logs/download": {
+      "get": {
+        "description": "The whole server log as a file, one JSON entry per line.",
+        "operationId": "download_suite_logs_api_v1_suite_logs_download_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/x-ndjson": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Download Suite Logs",
         "tags": [
           "suite"
         ]
