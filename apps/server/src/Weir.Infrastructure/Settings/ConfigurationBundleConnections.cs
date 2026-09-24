@@ -21,6 +21,11 @@ internal static class ConfigurationBundleConnections
     public const string MediaManagersSection = "media_manager_connections";
     public const string AlertsSection = "notification_channels";
 
+    // Matches the create/update request models (MediaManagerEndpoints, NotificationEndpoints): a restored row
+    // must fit the same columns a hand-typed one does.
+    private const int MediaManagerNameMaxLength = 200;
+    private const int AlertLabelMaxLength = 255;
+
     public static async Task<PyList> ExportMediaManagersAsync(UnitOfWork uow)
     {
         var connections = await MediaManagerConnectionStore.ListAsync(uow).ConfigureAwait(false);
@@ -60,17 +65,18 @@ internal static class ConfigurationBundleConnections
         foreach (var row in rows.Items)
         {
             var data = row as PyDict ?? throw new PyValueErrorException("This backup's media managers are not in a form Weir can read.");
-            var name = RequiredText(data, "name");
+            var name = RequiredText(data, "name", MediaManagerNameMaxLength);
             var kind = RequiredText(data, "kind");
             if (!MediaManagerKinds.All.Contains(kind, StringComparer.Ordinal))
             {
                 throw new PyValueErrorException($"This backup has a media manager, {name}, of a kind this version of Weir does not support.");
             }
 
+            var baseUrl = ValidateRestoredBaseUrl(name, OptionalText(data, "base_url"));
             if (!existing.TryGetValue(name, out var id))
             {
                 id = await MediaManagerConnectionStore.InsertAsync(
-                    uow, kind, name, enabled: false, OptionalText(data, "base_url"), apiKeyCiphertext: null).ConfigureAwait(false);
+                    uow, kind, name, enabled: false, baseUrl, apiKeyCiphertext: null).ConfigureAwait(false);
                 existing[name] = id;
             }
 
@@ -97,7 +103,7 @@ internal static class ConfigurationBundleConnections
         foreach (var row in rows.Items)
         {
             var data = row as PyDict ?? throw new PyValueErrorException("This backup's alerts are not in a form Weir can read.");
-            var label = RequiredText(data, "label").Trim();
+            var label = RequiredText(data, "label", AlertLabelMaxLength).Trim();
             var provider = RequiredText(data, "provider");
             if (!NotificationRules.SupportedProviders.Contains(provider, StringComparer.Ordinal))
             {
@@ -142,10 +148,37 @@ internal static class ConfigurationBundleConnections
         return true;
     }
 
-    private static string RequiredText(PyDict data, string key) =>
-        data.Get(key) is PyStr text && text.Value.Trim().Length > 0
-            ? text.Value
-            : throw new PyValueErrorException("This backup is missing part of a media manager or alert. Download a fresh backup and try again.");
+    private static string RequiredText(PyDict data, string key, int? maxLength = null)
+    {
+        if (data.Get(key) is not PyStr text || text.Value.Trim().Length == 0)
+        {
+            throw new PyValueErrorException("This backup is missing part of a media manager or alert. Download a fresh backup and try again.");
+        }
+
+        if (maxLength is { } limit && text.Value.Length > limit)
+        {
+            throw new PyValueErrorException($"This backup's {key} is too long for Weir to store.");
+        }
+
+        return text.Value;
+    }
 
     private static string OptionalText(PyDict data, string key) => data.Get(key) is PyStr text ? text.Value : string.Empty;
+
+    /// <summary>
+    /// The same address policy a hand-typed connection is held to (<see cref="MediaManagerConnectionService.ValidateBaseUrl"/>),
+    /// so a bad address cannot enter through a restore instead. Refuses the whole restore, naming the connection,
+    /// rather than silently dropping or blanking the address.
+    /// </summary>
+    private static string ValidateRestoredBaseUrl(string connectionName, string rawBaseUrl)
+    {
+        try
+        {
+            return MediaManagerConnectionService.ValidateBaseUrl(rawBaseUrl);
+        }
+        catch (MediaManagerConnectionException exception)
+        {
+            throw new PyValueErrorException($"This backup has a media manager, {connectionName}, with an address Weir will not use: {exception.Message}");
+        }
+    }
 }

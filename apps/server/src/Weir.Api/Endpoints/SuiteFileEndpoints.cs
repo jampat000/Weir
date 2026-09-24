@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
@@ -57,21 +56,50 @@ public static class SuiteFileEndpoints
 
     private static async Task<ApiResult> DownloadLogAsync(ApiRequest request)
     {
-        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
+        // Install-level operational data (the whole server log, not just this account's activity): admins only,
+        // like the configuration backup above.
+        await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
         var logFile = request.Service<WeirLogFile>();
-        var text = new StringBuilder();
-        if (File.Exists(logFile.Path) && !logFile.ReadLines(line => text.Append(line).Append('\n')))
+
+        // A snapshot copied aside under the write lock, so the slow part - handing potentially many megabytes to a
+        // browser - runs with the lock already released and logging never waits on a download (#741 review).
+        var snapshotPath = System.IO.Path.Join(
+            System.IO.Path.GetTempPath(), $"weir-log-download-{Guid.NewGuid():N}.tmp");
+        if (!logFile.SnapshotTo(snapshotPath))
         {
             request.LoggerFactory.CreateLogger("weir.platform.suite_settings.logs_service").LogWarning("Log download skipped because the active log could not be opened.");
             throw new ApiException(StatusCodes.Status503ServiceUnavailable, "Weir could not open its log file just now. Try again in a moment.");
         }
 
         var fileName = string.Create(CultureInfo.InvariantCulture, $"weir-log-{request.Time.GetLocalNow():yyyyMMdd-HHmmss}.log");
-        var content = text.ToString();
         return new CustomApiResult(async context =>
         {
-            context.Response.Headers.ContentDisposition = $"attachment; filename=\"{fileName}\"";
-            await PyResponses.WritePlainTextAsync(context, StatusCodes.Status200OK, content, LogMediaType).ConfigureAwait(false);
+            var logger = request.LoggerFactory.CreateLogger("weir.platform.suite_settings.logs_service");
+            try
+            {
+                await using var snapshot = new FileStream(
+                    snapshotPath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 81_920,
+                    options: FileOptions.Asynchronous | FileOptions.DeleteOnClose);
+                context.Response.StatusCode = StatusCodes.Status200OK;
+                context.Response.ContentType = LogMediaType;
+                context.Response.ContentLength = snapshot.Length;
+                context.Response.Headers.ContentDisposition = $"attachment; filename=\"{fileName}\"";
+                // Operational data (paths, request ids): never cached, as auth responses already are not.
+                context.Response.Headers.CacheControl = "no-store, private";
+                await snapshot.CopyToAsync(context.Response.Body, context.RequestAborted).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                logger.LogWarning(exception, "Could not stream the log download snapshot.");
+                try
+                {
+                    File.Delete(snapshotPath);
+                }
+                catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
+                {
+                    // Best effort: FileOptions.DeleteOnClose already handles the common case.
+                }
+            }
         });
     }
 }

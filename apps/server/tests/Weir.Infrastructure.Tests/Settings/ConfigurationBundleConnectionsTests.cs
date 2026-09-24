@@ -125,4 +125,48 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
 
         Assert.Contains("Living room", refused.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task A_backup_with_a_media_manager_address_that_will_not_work_refuses_the_whole_restore()
+    {
+        await SeedSonarrAsync(_source);
+        var bundle = await ExportAsync();
+        bundle.Set(
+            "media_manager_connections",
+            new PyList([new PyDict().Set("kind", "sonarr").Set("name", "Living room").Set("base_url", "not-a-url")]));
+
+        var refused = await Assert.ThrowsAsync<PyValueErrorException>(() => RestoreAsync(bundle));
+
+        Assert.Contains("Living room", refused.Message, StringComparison.Ordinal);
+        Assert.Contains("will not use", refused.Message, StringComparison.Ordinal);
+        Assert.Equal(0, await _target.Scalar("SELECT count(*) FROM media_manager_connections"));
+    }
+
+    [Fact]
+    public async Task A_backup_with_a_media_manager_name_over_two_hundred_characters_is_refused()
+    {
+        var bundle = await ExportAsync();
+        bundle.Set(
+            "media_manager_connections",
+            new PyList([new PyDict().Set("kind", "sonarr").Set("name", new string('a', 201))]));
+
+        var refused = await Assert.ThrowsAsync<PyValueErrorException>(() => RestoreAsync(bundle));
+
+        Assert.Contains("too long", refused.Message, StringComparison.Ordinal);
+        Assert.Equal(0, await _target.Scalar("SELECT count(*) FROM media_manager_connections"));
+    }
+
+    [Fact]
+    public async Task A_backup_with_an_alert_label_over_two_hundred_and_fifty_five_characters_is_refused()
+    {
+        var bundle = await ExportAsync();
+        bundle.Set(
+            "notification_channels",
+            new PyList([new PyDict().Set("label", new string('a', 256)).Set("provider", "discord").Set("events", new PyList([]))]));
+
+        var refused = await Assert.ThrowsAsync<PyValueErrorException>(() => RestoreAsync(bundle));
+
+        Assert.Contains("too long", refused.Message, StringComparison.Ordinal);
+        Assert.Equal(0, await _target.Scalar("SELECT count(*) FROM notification_channels"));
+    }
 }

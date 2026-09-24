@@ -149,6 +149,52 @@ public sealed class WeirLogFile : IDisposable
         }
     }
 
+    /// <summary>
+    /// Copies the log to <paramref name="destinationPath"/> as a byte-for-byte snapshot, so a caller can hand it to
+    /// something slow (a download to a browser) without holding up logging for as long as that takes. The lock is
+    /// held only for the copy itself, not for whatever happens to the destination file afterwards; a plain file
+    /// copy is also far cheaper per line than <see cref="ReadLines"/>, which re-splits and re-allocates every line.
+    /// A log that has not been written yet is not a failure: the destination is created empty. Returns
+    /// <see langword="false"/> only when the log file exists but could not be read.
+    /// </summary>
+    public bool SnapshotTo(string destinationPath)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(destinationPath);
+        lock (_lock)
+        {
+            if (!File.Exists(Path))
+            {
+                using (File.Create(destinationPath))
+                {
+                }
+
+                return true;
+            }
+
+            _stream?.Flush();
+            try
+            {
+                using var source = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var destination = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                source.CopyTo(destination);
+                return true;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                try
+                {
+                    File.Delete(destinationPath);
+                }
+                catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
+                {
+                    // Best effort: a leftover empty or partial temporary file does no harm.
+                }
+
+                return false;
+            }
+        }
+    }
+
     public void Dispose()
     {
         lock (_lock)
