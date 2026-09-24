@@ -110,16 +110,15 @@ def insert_library_file(
     facts = FACTS[probe_json]
     cur = conn.execute(
         "INSERT INTO library_files (library_id, path, size_bytes, mtime, classification, "
-        "removed_audio_tracks, removed_subtitle_tracks, estimated_bytes_saved, probe_json, video_codec, "
+        "removed_audio_tracks, removed_subtitle_tracks, estimated_bytes_saved, video_codec, "
         "video_height, resolution_class, audio_track_count, subtitle_track_count, audio_summary, "
         "subtitle_summary, link_count, problem_kind, manager_kind, manager_title) "
-        "VALUES (?, ?, ?, 1700000000, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "VALUES (?, ?, ?, 1700000000, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             library_id,
             path,
             size_bytes,
             classification,
-            probe_json,
             facts["video_codec"],
             facts["video_height"],
             facts["resolution_class"],
@@ -134,6 +133,7 @@ def insert_library_file(
         ),
     )
     file_id = int(cur.lastrowid or 0)
+    conn.execute("INSERT INTO library_file_probes (library_file_id, probe_json) VALUES (?, ?)", (file_id, probe_json))
     for facet, value in facts["facets"]:
         conn.execute(
             "INSERT OR IGNORE INTO library_file_facets (library_id, library_file_id, facet, value) VALUES (?, ?, ?, ?)",

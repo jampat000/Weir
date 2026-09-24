@@ -15,6 +15,9 @@ public sealed record ActivityFacts(string? Trigger, string? Result, long? Librar
 /// </remarks>
 public static class ActivityClassifier
 {
+    /// <summary>The longest path the <c>relative_path</c> column holds.</summary>
+    public const int RelativePathLimit = 2000;
+
     /// <summary>Allowed triggers: <c>docs/operator-messaging-standard.md</c>, plus <c>webhook</c> and <c>folder_change</c>.</summary>
     public static readonly IReadOnlySet<string> Triggers = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -80,11 +83,7 @@ public static class ActivityClassifier
         // A JSON integer only (not a boolean); a value beyond SQLite's INTEGER is left out.
         long? libraryId = data.Get("library_id") is PyInt i && i.Value >= long.MinValue && i.Value <= long.MaxValue ? (long)i.Value : null;
 
-        string? relativePath = null;
-        if (data.Get("relative_media_path") is PyStr path && PyStrings.Strip(path.Value) is { Length: > 0 } stripped)
-        {
-            relativePath = PyStrings.Slice(stripped, 2000);
-        }
+        var relativePath = data.Get("relative_media_path") is PyStr path ? RelativePathColumn(path.Value) : null;
 
         // A string or integer run_id only: booleans are rejected, as for library_id above, so
         // run_id: true never becomes the run key "run:True" (#540).
@@ -95,6 +94,18 @@ public static class ActivityClassifier
         }
 
         return new ActivityFacts(trigger, result, libraryId, relativePath, runKey);
+    }
+
+    /// <summary>
+    /// What the <c>relative_path</c> column holds for an event whose detail names <paramref name="relativeMediaPath"/>: the
+    /// path stripped and capped at <see cref="RelativePathLimit"/> characters, or null when nothing is left. A lookup by
+    /// that column goes through this too, so it finds exactly the rows the writer filled.
+    /// </summary>
+    public static string? RelativePathColumn(string relativeMediaPath)
+    {
+        ArgumentNullException.ThrowIfNull(relativeMediaPath);
+        var stripped = PyStrings.Strip(relativeMediaPath);
+        return stripped.Length > 0 ? PyStrings.Slice(stripped, RelativePathLimit) : null;
     }
 
     private static string? Member(PyJson? value, IReadOnlySet<string> allowed)

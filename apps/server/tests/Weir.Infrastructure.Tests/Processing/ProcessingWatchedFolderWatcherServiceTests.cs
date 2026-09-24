@@ -17,8 +17,10 @@ namespace Weir.Infrastructure.Tests.Processing;
 /// <c>Category=Integration</c>, since that is the only way to prove the OS actually raises the events Weir
 /// subscribes to; every other test drives the debounce and reconcile-tick logic through
 /// <see cref="FakeWatcherService"/> and a shared <see cref="FakeTimeProvider"/>, so nothing here depends on
-/// real chunk-write timing landing on the right side of a debounce window.
+/// real chunk-write timing landing on the right side of a debounce window. In <see cref="WriteLockTimingGroup"/>: this
+/// class's real timers and OS events must not share the process with a bulk-job test's dedicated hammering thread (#708).
 /// </summary>
+[Collection(WriteLockTimingGroup.Name)]
 public sealed class ProcessingWatchedFolderWatcherServiceTests
 {
     private const string ScanJobKind = ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch;

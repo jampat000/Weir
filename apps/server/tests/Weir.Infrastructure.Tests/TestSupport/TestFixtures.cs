@@ -72,3 +72,25 @@ public sealed class SerialTestGroup
 {
     public const string Name = "Serial: thread-pool heavy";
 }
+
+/// <summary>
+/// Tests that time how long one lane's write waits while another lane's bulk job runs (#708), and the folder watcher's
+/// real-<see cref="FileSystemWatcher"/> tests, which need an OS event delivered and processed inside a wall-clock window.
+/// A bulk-job test here creates thousands of real files and hammers the database on a dedicated thread for as long as the
+/// job runs; grouped with a real-timer test that would otherwise run at the same time, it starved the watcher's own
+/// timers and event delivery on a loaded Windows CI runner (its debounce ticks and the reconcile loop share the process's
+/// thread pool with everything else), which is exactly the interference <c>DisableParallelization</c> exists to remove
+/// among a collection's own members.
+/// </summary>
+/// <remarks>
+/// As with <see cref="SerialTestGroup"/>, <c>DisableParallelization</c> only serializes the members of <em>this</em>
+/// collection against each other; it does not pause every other (default) collection in the assembly. It is still the
+/// right tool here: the two kinds of test in this group are the ones observed to interfere with each other, so keeping
+/// them out of each other's way removes that specific cause of flakiness even though some general CPU contention
+/// from the rest of the assembly can still occur.
+/// </remarks>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class WriteLockTimingGroup
+{
+    public const string Name = "Serial: write-lock timing";
+}

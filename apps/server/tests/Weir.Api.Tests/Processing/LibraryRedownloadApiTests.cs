@@ -25,11 +25,12 @@ public sealed class LibraryRedownloadApiTests
             server,
             "INSERT INTO libraries (name, media_type, watched_folder, output_folder, work_folder, display_order) " +
             "VALUES ('Films', 'movie', '/in', '/out', '/work', 9) RETURNING id");
+        // The ffprobe document lives in library_file_probes, not library_files (#715); these endpoints never read it.
         await TestDatabase.ExecuteAsync(
             server,
             "INSERT INTO library_files (library_id, path, size_bytes, mtime, classification, removed_audio_tracks, " +
-            "removed_subtitle_tracks, estimated_bytes_saved, probe_json) VALUES ($library, $path, 1000, 1700000000, " +
-            "'matches', 0, 0, 0, '{\"streams\": []}')",
+            "removed_subtitle_tracks, estimated_bytes_saved) VALUES ($library, $path, 1000, 1700000000, " +
+            "'matches', 0, 0, 0)",
             ("$library", libraryId),
             ("$path", FilmPath));
         return (server, client, libraryId);

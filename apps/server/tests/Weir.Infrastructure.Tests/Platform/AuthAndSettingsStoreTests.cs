@@ -70,6 +70,26 @@ public sealed class AuthAndSettingsStoreTests
     }
 
     [Fact]
+    public async Task Refreshing_a_session_leaves_the_request_outside_any_transaction()
+    {
+        using var fixture = new StoreFixture(("WEIR_SESSION_IDLE_MINUTES", "720"));
+        var userId = await fixture.WithUnitOfWork(uow => AuthStore.InsertUserAsync(uow, "alice", "x", "admin", true));
+        var (_, raw) = await fixture.WithUnitOfWork(uow => fixture.Auth.CreateSessionAsync(uow, new UserRecord(userId, "alice", "x", "admin", true), false, "b"));
+        fixture.Clock.Set(new DateTimeOffset(2026, 1, 15, 10, 1, 1, TimeSpan.Zero));
+
+        var requestHeldTheLock = await fixture.WithUnitOfWork(
+            async uow =>
+            {
+                await fixture.Auth.LoadValidSessionAsync(uow, raw);
+                return uow.InTransaction;
+            },
+            commit: false);
+
+        Assert.False(requestHeldTheLock);
+        Assert.Equal(1, await fixture.Scalar("SELECT count(*) FROM user_sessions WHERE last_seen_at = '2026-01-15 10:01:01.000000'"));
+    }
+
+    [Fact]
     public async Task An_expired_session_is_revoked_even_when_the_request_rolls_back()
     {
         // #529: the revoke is committed on its own, so the request's rollback cannot undo it.

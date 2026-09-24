@@ -19,7 +19,7 @@ public sealed class WatchedFolderScanOpsTests
         File.WriteAllBytes(Path.Combine(w, "a.mkv"), [1]);
         File.WriteAllBytes(Path.Combine(w, "skip.txt"), [1]);
 
-        var result = WatchedFolderScanOps.IterWatchedFolderMediaCandidates(w, null, null, excludeHidden: false, topLevelOnly: false);
+        var result = WatchedFolderListing.Candidates(w, null, null, excludeHidden: false, topLevelOnly: false);
 
         Assert.Equal(["a.mkv", "b.mkv"], result.Files.Select(Path.GetFileName));
     }
@@ -36,9 +36,26 @@ public sealed class WatchedFolderScanOpsTests
         File.WriteAllBytes(final, "final"u8.ToArray());
         File.WriteAllBytes(transient, "hash"u8.ToArray());
 
-        var result = WatchedFolderScanOps.IterWatchedFolderMediaCandidates(watched, null, null, excludeHidden: false, topLevelOnly: false);
+        var result = WatchedFolderListing.Candidates(watched, null, null, excludeHidden: false, topLevelOnly: false);
 
         Assert.Equal([final], result.Files);
+    }
+
+    [Fact]
+    public void The_walk_reports_each_files_size_and_times_as_the_file_itself_does()
+    {
+        using var dir = new TempDirectory();
+        var watched = dir.Join("watch");
+        Directory.CreateDirectory(watched);
+        var film = Path.Combine(watched, "Film.mkv");
+        File.WriteAllBytes(film, new byte[1234]);
+        File.SetLastWriteTimeUtc(film, new DateTime(2024, 5, 6, 7, 8, 9, DateTimeKind.Utc));
+
+        var entry = Assert.Single(WatchedFolderListing.Candidates(watched, null, null, excludeHidden: false, topLevelOnly: false).Entries);
+
+        Assert.Equal(WatchedMediaFile.Stat(film), entry);
+        Assert.Equal(1234, entry.SizeBytes);
+        Assert.Equal(new DateTime(2024, 5, 6, 7, 8, 9, DateTimeKind.Utc), entry.ModifiedUtc);
     }
 
     [Fact]
@@ -74,9 +91,9 @@ public sealed class WatchedFolderScanOpsTests
         InsertPendingRemuxPassJob(db, "{\"relative_media_path\":\"movies/a.mkv\",\"media_scope\":\"movie\"}");
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
 
-        Assert.True(await WatchedFolderScanOps.ActiveRemuxPassExistsForRelativePathAsync(uow, "movies/a.mkv", "movie", null));
-        Assert.False(await WatchedFolderScanOps.ActiveRemuxPassExistsForRelativePathAsync(uow, "other.mkv", "movie", null));
-        Assert.False(await WatchedFolderScanOps.ActiveRemuxPassExistsForRelativePathAsync(uow, "movies/a.mkv", "tv", null));
+        Assert.True(await ActiveRemuxPasses.ExistsForRelativePathAsync(uow, "movies/a.mkv", "movie", null));
+        Assert.False(await ActiveRemuxPasses.ExistsForRelativePathAsync(uow, "other.mkv", "movie", null));
+        Assert.False(await ActiveRemuxPasses.ExistsForRelativePathAsync(uow, "movies/a.mkv", "tv", null));
     }
 
     [Fact]
@@ -96,7 +113,8 @@ public sealed class WatchedFolderScanOpsTests
             "source_deleted_after_success":false,"inspected_source_path":"{{source.Replace("\\", "\\\\")}}","source_size_bytes":{{new FileInfo(source).Length}}}
             """.Replace("\n", string.Empty);
         db.Execute(
-            "INSERT INTO activity_events (module, event_type, title, detail) VALUES ('processing', 'processing.file_remux_pass_completed', 'x', @detail)",
+            "INSERT INTO activity_events (module, event_type, title, detail, relative_path) " +
+            "VALUES ('processing', 'processing.file_remux_pass_completed', 'x', @detail, json_extract(@detail, '$.relative_media_path'))",
             ("@detail", detail));
 
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
@@ -112,7 +130,8 @@ public sealed class WatchedFolderScanOpsTests
         var missing = dir.Join("missing", "a.mkv");
         var detail = $$"""{"ok":true,"relative_media_path":"movies/a.mkv","media_scope":"movie","output_file":"{{missing.Replace("\\", "\\\\")}}","source_deleted_after_success":false}""";
         db.Execute(
-            "INSERT INTO activity_events (module, event_type, title, detail) VALUES ('processing', 'processing.file_remux_pass_completed', 'x', @detail)",
+            "INSERT INTO activity_events (module, event_type, title, detail, relative_path) " +
+            "VALUES ('processing', 'processing.file_remux_pass_completed', 'x', @detail, json_extract(@detail, '$.relative_media_path'))",
             ("@detail", detail));
 
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
@@ -137,7 +156,8 @@ public sealed class WatchedFolderScanOpsTests
             "source_deleted_after_success":false,"inspected_source_path":"{{source.Replace("\\", "\\\\")}}","source_size_bytes":8}
             """.Replace("\n", string.Empty);
         db.Execute(
-            "INSERT INTO activity_events (module, event_type, title, detail) VALUES ('processing', 'processing.file_remux_pass_completed', 'x', @detail)",
+            "INSERT INTO activity_events (module, event_type, title, detail, relative_path) " +
+            "VALUES ('processing', 'processing.file_remux_pass_completed', 'x', @detail, json_extract(@detail, '$.relative_media_path'))",
             ("@detail", detail));
 
         await using var uow = await UnitOfWork.OpenAsync(db.Database);

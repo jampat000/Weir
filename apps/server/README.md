@@ -51,7 +51,7 @@ The variables and their defaults are documented in the repository's [`.env.examp
 
 The numbered SQL scripts in `src/Weir.Infrastructure/Migrations/` are the only source of schema changes. `Weir.Infrastructure.Sqlite.SchemaMigrator` lists them in order, each with the revision it leaves behind, and records the current revision in the `alembic_version` table. The table name is kept from the retired Python backend, so databases from earlier releases are recognised and upgraded.
 
-The current head is migration `0018_query_indexes`, revision `0053_query_indexes`. The first script, `0001_baseline_0036_drop_pruner_tables.sql`, is the frozen baseline (revision `0036_drop_pruner_tables`).
+The current head is migration `0020_library_file_probes`, revision `0055_library_file_probes`. The first script, `0001_baseline_0036_drop_pruner_tables.sql`, is the frozen baseline (revision `0036_drop_pruner_tables`).
 
 On startup the server:
 
@@ -60,7 +60,7 @@ On startup the server:
 - upgrades a database at any earlier revision in the list by applying every later migration, in order, in one transaction;
 - refuses anything else (an unknown revision, usually from a newer release, or a pre-baseline revision) with a message, and changes nothing.
 
-To change the schema, add the next numbered script (`0019_…sql`; the project embeds every `Migrations/*.sql`), append it to `SchemaMigrator.Migrations` with the next revision (`0054_…`), and add a migration test under `tests/Weir.Infrastructure.Tests/Sqlite/Migrations/` that builds a database at the previous head, writes a row in the old shape, upgrades and reads it back through the real store. `SchemaParityTests` stays pinned to the baseline and compares it against the frozen reference in `tests/Weir.Infrastructure.Tests/schema/alembic-head.sql`, which is never edited.
+To change the schema, add the next numbered script (`0021_…sql`; the project embeds every `Migrations/*.sql`), append it to `SchemaMigrator.Migrations` with the next revision (`0056_…`), and add a migration test under `tests/Weir.Infrastructure.Tests/Sqlite/Migrations/` that builds a database at the previous head, writes a row in the old shape, upgrades and reads it back through the real store. `SchemaParityTests` stays pinned to the baseline and compares it against the frozen reference in `tests/Weir.Infrastructure.Tests/schema/alembic-head.sql`, which is never edited.
 
 ## API contract
 

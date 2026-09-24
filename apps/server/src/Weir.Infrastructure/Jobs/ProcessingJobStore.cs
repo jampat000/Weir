@@ -139,29 +139,33 @@ public sealed class ProcessingJobStore
         DateTimeOffset? now = null,
         WorkAdmission? admission = null,
         ClaimableKinds? kinds = null,
+        WorkLane lane = WorkLane.Files,
         CancellationToken cancellationToken = default)
     {
         var when = now ?? _time.GetUtcNow();
         return InTransactionAsync(
-            (connection, transaction) => ClaimNext(connection, transaction, leaseOwner, leaseExpiresAt, when, admission, kinds),
+            (connection, transaction) => ClaimNext(connection, transaction, leaseOwner, leaseExpiresAt, when, admission, kinds, lane),
             cancellationToken);
     }
 
     /// <summary>
     /// The worker's claim: evaluate admission (pause, schedules, budget) and claim in the same write
-    /// transaction, so two workers cannot both see room for one more job.
+    /// transaction, so two workers cannot both see room for one more job. <paramref name="lane"/> picks which
+    /// admission rules apply: the files lane is gated by the resolution budget and each library's pass limit,
+    /// the upkeep lane by neither (#717).
     /// </summary>
     public Task<ProcessingJob?> ClaimNextAdmittedAsync(
         string leaseOwner,
         DateTimeOffset leaseExpiresAt,
         DateTimeOffset now,
         ClaimableKinds? kinds,
+        WorkLane lane = WorkLane.Files,
         CancellationToken cancellationToken = default) =>
         InTransactionAsync(
             (connection, transaction) =>
             {
                 var admission = WorkAdmissionReader.Evaluate(connection, transaction, now);
-                return ClaimNext(connection, transaction, leaseOwner, leaseExpiresAt, now, admission, kinds);
+                return ClaimNext(connection, transaction, leaseOwner, leaseExpiresAt, now, admission, kinds, lane);
             },
             cancellationToken);
 
@@ -409,10 +413,10 @@ public sealed class ProcessingJobStore
             cancellationToken);
 
     public Task<ProcessingJob?> GetAsync(long jobId, CancellationToken cancellationToken = default) =>
-        InTransactionAsync((connection, transaction) => Get(connection, transaction, jobId), cancellationToken);
+        ReadAsync((connection, transaction) => Get(connection, transaction, jobId), cancellationToken);
 
     public Task<IReadOnlyList<ProcessingJob>> ListAsync(CancellationToken cancellationToken = default) =>
-        InTransactionAsync<IReadOnlyList<ProcessingJob>>(
+        ReadAsync<IReadOnlyList<ProcessingJob>>(
             (connection, transaction) => Query(connection, transaction, $"SELECT {JobColumns} FROM jobs ORDER BY id"),
             cancellationToken);
 
@@ -508,7 +512,8 @@ public sealed class ProcessingJobStore
         DateTimeOffset leaseExpiresAt,
         DateTimeOffset now,
         WorkAdmission? admission,
-        ClaimableKinds? kinds)
+        ClaimableKinds? kinds,
+        WorkLane lane = WorkLane.Files)
     {
         ArgumentNullException.ThrowIfNull(leaseOwner);
         var parameters = new List<(string, object?)>
@@ -519,7 +524,7 @@ public sealed class ProcessingJobStore
             ("@lease_exp", PythonTimestamps.Adapter(leaseExpiresAt)),
             ("@now", PythonTimestamps.Adapter(now)),
         };
-        var predicate = AdmissionPredicate(admission, parameters);
+        var predicate = AdmissionPredicate(admission, lane, parameters);
         var kindsPredicate = KindsPredicate(kinds, parameters);
         var sql = ClaimSqlTemplate
             .Replace("{admission}", predicate, StringComparison.Ordinal)
@@ -538,9 +543,11 @@ public sealed class ProcessingJobStore
 
     /// <summary>
     /// SQL narrowing the claim to work this pass may start. Library ids are integers formatted into the
-    /// statement because a variable-length <c>IN</c> list cannot be one bound parameter.
+    /// statement because a variable-length <c>IN</c> list cannot be one bound parameter. The files lane is
+    /// gated by each library's pass limit and the resolution budget; the upkeep lane is gated by neither,
+    /// only by a library already running its own upkeep (#717).
     /// </summary>
-    internal static string AdmissionPredicate(WorkAdmission? admission, List<(string Name, object? Value)> parameters)
+    internal static string AdmissionPredicate(WorkAdmission? admission, WorkLane lane, List<(string Name, object? Value)> parameters)
     {
         if (admission is null)
         {
@@ -548,7 +555,8 @@ public sealed class ProcessingJobStore
         }
 
         var clauses = new List<string>();
-        var ids = admission.BlockedLibraryIds.Distinct().Order().ToList();
+        var blockedIds = lane == WorkLane.Upkeep ? admission.UpkeepBlockedLibraryIds : admission.BlockedLibraryIds;
+        var ids = blockedIds.Distinct().Order().ToList();
         if (ids.Count > 0)
         {
             // A job with no library_id predates libraries or is suite-wide; COALESCE keeps it claimable.
@@ -556,8 +564,11 @@ public sealed class ProcessingJobStore
             clauses.Add($"AND COALESCE(json_extract(payload_json, '$.library_id'), -1) NOT IN ({rendered})");
         }
 
-        clauses.Add("AND runner_cost <= @available_units");
-        parameters.Add(("@available_units", Math.Max(0, admission.AvailableUnits)));
+        if (lane == WorkLane.Files)
+        {
+            clauses.Add("AND runner_cost <= @available_units");
+            parameters.Add(("@available_units", Math.Max(0, admission.AvailableUnits)));
+        }
 
         if (admission.Pause.Paused)
         {
@@ -768,12 +779,15 @@ public static class WorkAdmissionReader
         }
 
         var leased = new List<LeasedJobSnapshot>();
-        using (var command = Command(connection, transaction, "SELECT runner_cost, payload_json FROM jobs WHERE status = 'leased'"))
+        using (var command = Command(connection, transaction, "SELECT runner_cost, payload_json, job_kind FROM jobs WHERE status = 'leased'"))
         using (var reader = command.ExecuteReader())
         {
             while (reader.Read())
             {
-                leased.Add(new LeasedJobSnapshot(Long(reader.GetValue(0)), reader.IsDBNull(1) ? null : reader.GetString(1)));
+                leased.Add(new LeasedJobSnapshot(
+                    Long(reader.GetValue(0)),
+                    reader.IsDBNull(1) ? null : reader.GetString(1),
+                    WorkLanes.LaneOf(reader.GetString(2))));
             }
         }
 
