@@ -31,6 +31,8 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
     private readonly ILogger<ProcessingWatchedFolderScanDispatchScheduleTask> _logger;
     private readonly Dictionary<long, DateTimeOffset> _nextRunByLibrary = [];
     private readonly ScanWakeups? _wakeups;
+    private readonly LibraryChanges? _libraryChanges;
+    private ScheduleInputs? _inputs;
 
     public ProcessingWatchedFolderScanDispatchScheduleTask(
         SqliteDatabase database,
@@ -38,9 +40,11 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
         ProcessingJobStore jobStore,
         TimeProvider time,
         ILogger<ProcessingWatchedFolderScanDispatchScheduleTask> logger,
-        ScanWakeups? wakeups = null)
+        ScanWakeups? wakeups = null,
+        LibraryChanges? libraryChanges = null)
     {
         _wakeups = wakeups;
+        _libraryChanges = libraryChanges;
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _jobStore = jobStore ?? throw new ArgumentNullException(nameof(jobStore));
@@ -51,9 +55,15 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
     public string Name => "processing-watched-folder-remux-scan-dispatch-enqueue";
 
     /// <summary>A short, fixed poll. Each library's due time is tracked separately, so a 1s poll is simpler
-    /// and easier to test than sleeping until the nearest due library, at the cost of a slightly busier idle
-    /// loop.</summary>
+    /// and easier to test than sleeping until the nearest due library. The poll only compares due times; the
+    /// libraries and switches it compares against are read far less often (<see cref="InputsRefresh"/>).</summary>
     public TimeSpan Interval => TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// How long the libraries and the scan switches are trusted before they are read again, unless a library change is
+    /// recorded first (<see cref="LibraryChanges"/>). Reading them on every one-second tick was idle load for nothing (#720).
+    /// </summary>
+    public static readonly TimeSpan InputsRefresh = TimeSpan.FromSeconds(20);
 
     public bool RunAtStart => true;
 
@@ -78,13 +88,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
 
         var now = _time.GetUtcNow();
         await using var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
-        var libraries = (await LibraryStore.ListAsync(uow, enabledOnly: true).ConfigureAwait(false))
-            .Where(ScanDispatchScheduleGateEnabled)
-            .ToList();
-        var operatorSettings = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-        // Release any write lock EnsureAsync took creating the singleton row on first run: the enqueue
-        // below opens its own connection through ProcessingJobStore, and SQLite allows only one writer.
-        await uow.CommitAsync().ConfigureAwait(false);
+        var (libraries, operatorSettings) = await ReadInputsAsync(uow, now).ConfigureAwait(false);
 
         var activeIds = libraries.Select(l => l.Id).ToHashSet();
         foreach (var staleId in _nextRunByLibrary.Keys.Where(id => !activeIds.Contains(id)).ToList())
@@ -153,6 +157,32 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
             _wakeups?.RecordNextPeriodic(library.Id, now + nextDelay);
         }
     }
+
+    /// <summary>The enabled libraries and the scan switches, read again only when they may have changed.</summary>
+    private async Task<(IReadOnlyList<ProcessingLibraryRecord> Libraries, ProcessingOperatorSettingsRecord Settings)> ReadInputsAsync(UnitOfWork uow, DateTimeOffset now)
+    {
+        var version = _libraryChanges?.Version ?? 0;
+        if (_inputs is { } known && known.LibraryVersion == version && now >= known.ReadAt && now - known.ReadAt < InputsRefresh)
+        {
+            return (known.Libraries, known.Settings);
+        }
+
+        var libraries = (await LibraryStore.ListAsync(uow, enabledOnly: true).ConfigureAwait(false))
+            .Where(ScanDispatchScheduleGateEnabled)
+            .ToList();
+        var operatorSettings = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        // Release any write lock EnsureAsync took creating the singleton row on first run: the enqueue
+        // below opens its own connection through ProcessingJobStore, and SQLite allows only one writer.
+        await uow.CommitAsync().ConfigureAwait(false);
+        _inputs = new ScheduleInputs(libraries, operatorSettings, version, now);
+        return (libraries, operatorSettings);
+    }
+
+    private sealed record ScheduleInputs(
+        IReadOnlyList<ProcessingLibraryRecord> Libraries,
+        ProcessingOperatorSettingsRecord Settings,
+        long LibraryVersion,
+        DateTimeOffset ReadAt);
 
     private static bool ScanDispatchScheduleGateEnabled(ProcessingLibraryRecord library) =>
         ScanDispatchScheduleGate.LibraryPeriodicScanEnabled(library.Enabled);

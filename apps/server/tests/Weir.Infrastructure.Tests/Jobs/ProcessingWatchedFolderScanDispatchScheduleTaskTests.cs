@@ -140,6 +140,40 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTaskTests
     }
 
     [Fact]
+    public async Task A_recorded_library_change_is_scheduled_on_the_next_tick()
+    {
+        using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "schedule-task-tests-secret-5"));
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        var libraryId = await CreateLibraryAsync(store, watched, output);
+        await SetLibraryEnabledAsync(store, libraryId, watched, output, enabled: false);
+        await SetMovieScheduleEnabledAsync(store, enabled: true);
+        var changes = new LibraryChanges();
+        var task = new ProcessingWatchedFolderScanDispatchScheduleTask(
+            store.Database, store.Options, new ProcessingJobStore(store.Database, store.Clock), store.Clock,
+            NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance, libraryChanges: changes);
+        await task.RunOnceAsync(CancellationToken.None);
+
+        await SetLibraryEnabledAsync(store, libraryId, watched, output, enabled: true);
+        changes.Record();
+        store.Clock.Set(store.Clock.GetUtcNow() + TimeSpan.FromSeconds(1));
+        await task.RunOnceAsync(CancellationToken.None);
+
+        var count = await store.Scalar("SELECT COUNT(*) FROM jobs WHERE job_kind = 'processing.watched_folder.remux_scan_dispatch.v1'");
+        Assert.Equal(1, count);
+    }
+
+    private static async Task SetLibraryEnabledAsync(StoreFixture store, long libraryId, string watched, string output, bool enabled)
+    {
+        await using var uow = await UnitOfWork.OpenAsync(store.Database);
+        var library = await LibraryStore.GetAsync(uow, libraryId) ?? throw new InvalidOperationException();
+        await LibraryStore.UpdateAsync(uow, library, new ProcessingLibraryInput { Name = library.Name, MediaType = library.MediaType, WatchedFolder = watched, OutputFolder = output, Enabled = enabled });
+        await uow.CommitAsync();
+    }
+
+    [Fact]
     public async Task Manual_enqueue_works_even_while_the_scope_schedule_switch_is_off()
     {
         using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "schedule-task-tests-secret-4"));
