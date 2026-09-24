@@ -6,7 +6,7 @@ import {
   NavIconChevronRight,
   NavIconLibrary,
   NavIconHistory,
-  NavIconLive,
+  NavIconProcessing,
   NavIconSettings,
   NavIconSystem,
   NavIconSignOut,
@@ -17,7 +17,7 @@ import { useAppSettingsQuery } from "../lib/settings/queries";
 import { useSystemReadinessQuery } from "../lib/system/readiness-queries";
 
 // Between phone width (a drawer below 921px) and 1400px the side menu shrinks to icons by itself, so
-// Live keeps its lanes; a click on Collapse or Expand overrides it until the page is reloaded.
+// the Processing lanes keep their room; a click on Collapse or Expand overrides it until a reload.
 const LAPTOP_WIDTH = "(min-width: 921px) and (max-width: 1400px)";
 
 function useMediaQuery(query: string): boolean {
@@ -49,7 +49,7 @@ export function AppShell() {
   const [collapsedChoice, setCollapsedChoice] = useState<boolean | null>(null);
   const laptop = useMediaQuery(LAPTOP_WIDTH);
   const sidebarCollapsed = collapsedChoice ?? laptop;
-  // How many files are being written right now, beside Live wherever you are in the app.
+  // How many files are being written right now, beside Processing wherever you are in the app.
   const working = useProcessingFilesAtOnceQuery().data?.running ?? 0;
   const productTitle =
     (suite.data?.product_display_name ?? "Weir").trim() || "Weir";
@@ -60,11 +60,8 @@ export function AppShell() {
   }, [location.pathname, location.search]);
 
   const handleSignOut = () => {
-    logout.mutate(undefined, {
-      onSettled: () => {
-        void navigate("/login", { replace: true });
-      },
-    });
+    // The sign-in page shows at once; the session ends on the server behind it.
+    logout.mutate();
     void navigate("/login", { replace: true });
   };
 
@@ -73,9 +70,7 @@ export function AppShell() {
       <aside
         id="mm-primary-sidebar"
         className={`mm-sidebar${sidebarOpen ? " mm-sidebar--open" : ""}${sidebarCollapsed ? " mm-sidebar--collapsed" : ""}`}
-        // Named for the app it belongs to. It used to be "Product", from when the sidebar listed
-        // the separate products of a suite; there is one product now and a landmark announced as
-        // "Product, complementary" told a screen-reader user nothing about where they were.
+        // Named for the app, so a screen reader announces where the user is.
         aria-label={productTitle}
       >
         <button
@@ -88,8 +83,7 @@ export function AppShell() {
           aria-expanded={!sidebarCollapsed}
           onClick={() => setCollapsedChoice(!sidebarCollapsed)}
         >
-          {/* The chevron says it on its own; aria-label carries the words for anyone who needs
-              them (James, 23 Sep 2026). */}
+          {/* The chevron says it on its own; aria-label carries the words for anyone who needs them. */}
           <span className="mm-sidebar-collapse__icon" aria-hidden="true">
             {sidebarCollapsed ? (
               <NavIconChevronRight />
@@ -100,8 +94,8 @@ export function AppShell() {
         </button>
         <div className="mm-sidebar-inner">
           <BrandHeaderLink to="/" productTitle={productTitle} />
-          {/* Five places since 3.2: what Weir is doing now, every file it has worked on, the files
-              already imported, how Weir treats your media, and Weir itself. */}
+          {/* Five places: what Weir is doing now, every file it has worked on, the files already
+              imported, how Weir treats your media, and Weir itself. */}
           <nav className="mm-sidebar-nav" aria-label="Primary">
             <NavLink
               to="/"
@@ -114,7 +108,7 @@ export function AppShell() {
               onClick={() => setSidebarOpen(false)}
             >
               <span className="mm-sidebar-link-icon" aria-hidden="true">
-                <NavIconLive />
+                <NavIconProcessing />
               </span>
               <span className="mm-sidebar-link-label">Processing</span>
               {working > 0 ? (

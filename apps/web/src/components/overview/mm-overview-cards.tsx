@@ -19,7 +19,7 @@ export function MmJobsPagination({
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-mm-border pt-3">
-      <div className="flex min-w-0 items-center gap-2 text-xs text-mm-text3">
+      <label className="flex min-w-0 items-center gap-2 text-xs text-mm-text3">
         <span>Rows per page</span>
         <select
           className="max-w-full rounded border border-mm-border bg-mm-card-bg px-2 py-1 text-xs text-mm-text2"
@@ -32,7 +32,7 @@ export function MmJobsPagination({
             </option>
           ))}
         </select>
-      </div>
+      </label>
       <div className="flex min-w-0 flex-wrap gap-2">
         <p className="self-center text-xs text-mm-text3">
           Page {page} of {totalPages}

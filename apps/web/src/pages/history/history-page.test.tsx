@@ -14,6 +14,7 @@ const files: {
   status_counts: Record<string, number>;
 } = { files: [], status_counts: {} };
 const requeue = vi.fn();
+const processNow = vi.fn();
 const fetchLog = vi.fn<(id: number) => Promise<ProcessingFileLog>>();
 
 vi.mock("../../lib/processing/files-queries", async (importOriginal) => {
@@ -36,7 +37,7 @@ vi.mock("../../lib/processing/files-queries", async (importOriginal) => {
     useForgetProcessingFile: () => mutation(),
     useMoveProcessingFileToTop: () => mutation(),
     useProcessingWhyHeld: () => mutation(),
-    useProcessProcessingFileNow: () => mutation(),
+    useProcessProcessingFileNow: () => mutation(processNow),
     useProcessingCheckLibraryAgain: () => mutation(),
     useProcessingFileTracks: () => mutation(),
     useSubmitProcessingManualPlan: () => mutation(),
@@ -113,6 +114,7 @@ function renderPage(entry = "/history") {
 describe("HistoryPage", () => {
   beforeEach(() => {
     requeue.mockReset();
+    processNow.mockReset();
     fetchLog.mockReset();
     files.files = [
       file({ id: 1 }),
@@ -213,5 +215,41 @@ describe("HistoryPage", () => {
       await within(detail).findByText("Queued again."),
     ).toBeInTheDocument();
     expect(requeue).toHaveBeenCalledWith(2);
+  });
+
+  it("asks before passing a file through unchanged, and does nothing when told not now", async () => {
+    fetchLog.mockResolvedValue({
+      file_id: 2,
+      relative_path: "",
+      retention_days: 90,
+      entries: [],
+    });
+    processNow.mockResolvedValue({});
+    renderPage("/history?file=2");
+    const detail = screen.getByTestId("history-detail");
+    const passThrough = within(detail).getByRole("button", {
+      name: "Pass through unchanged",
+    });
+
+    fireEvent.click(passThrough);
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+    expect(processNow).not.toHaveBeenCalled();
+
+    fireEvent.click(passThrough);
+    const dialog = screen.getByRole("dialog", {
+      name: "Pass this file through unchanged?",
+    });
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Pass through unchanged" }),
+    );
+
+    expect(
+      await within(detail).findByText(
+        "Queued to pass through unchanged. Weir checks the copy before removing the original.",
+      ),
+    ).toBeInTheDocument();
+    expect(processNow).toHaveBeenCalledWith(
+      expect.objectContaining({ library_id: 1, pass_through_unchanged: true }),
+    );
   });
 });
