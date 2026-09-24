@@ -37,7 +37,33 @@ public sealed class ManagerHttpAndPortTests
         var client = new MediaManagerHttpClient("http://127.0.0.1:8989", "api-key", http);
         var error = await Assert.ThrowsAsync<MediaManagerRateLimitedException>(() => client.GetJsonAsync("/api/v3/queue"));
         Assert.Equal(expected, error.RetryAfterSeconds);
-        Assert.Equal("HTTP 429: slow down", error.Message);
+        // The response body ("slow down") is never echoed back: a manager's answer must not leak through a status
+        // report an unauthenticated or lower-privilege screen can read.
+        Assert.Equal("HTTP 429", error.Message);
+    }
+
+    [Fact]
+    public async Task A_redirect_is_refused_instead_of_followed()
+    {
+        var http = new FakeManagerHttp().Route(HttpMethod.Get, "/api/v3/queue", _ => FakeManagerHttp.Response(HttpStatusCode.Found, headers: [("Location", "http://elsewhere.example/")]));
+        var client = new MediaManagerHttpClient("http://127.0.0.1:8989", "api-key", http);
+
+        var redirected = await Assert.ThrowsAsync<MediaManagerRedirectedException>(() => client.GetJsonAsync("/api/v3/queue"));
+
+        Assert.Equal("answered with a redirect to another address. Use the address it redirects to.", redirected.Message);
+        Assert.False(Assert.Single(http.Requests).FollowRedirects);
+    }
+
+    [Fact]
+    public async Task A_refusal_never_echoes_the_response_body()
+    {
+        var http = new FakeManagerHttp().Json(HttpMethod.Get, "/api/v3/queue", "internal admin page: token=SECRET-FROM-INTERNAL-SERVICE", HttpStatusCode.InternalServerError);
+        var client = new MediaManagerHttpClient("http://127.0.0.1:8989", "api-key", http);
+
+        var error = await Assert.ThrowsAsync<MediaManagerHttpException>(() => client.GetJsonAsync("/api/v3/queue"));
+
+        Assert.Equal("HTTP 500", error.Message);
+        Assert.DoesNotContain("SECRET", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]

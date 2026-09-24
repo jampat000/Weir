@@ -2649,6 +2649,18 @@
             "title": "Name",
             "type": "string"
           },
+          "unsigned_webhook_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when this connection has no secret of its own, so its webhook is accepted unsigned.",
+            "title": "Unsigned Webhook Warning"
+          },
           "webhook_secret_is_set": {
             "description": "Whether this manager must present a secret when it posts to the intake webhook.",
             "title": "Webhook Secret Is Set",

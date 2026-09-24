@@ -6,7 +6,6 @@ using System.Net.Sockets;
 using System.Security.Authentication;
 using Microsoft.Data.Sqlite;
 using Weir.Core.Json;
-using Weir.Core.Net;
 using Weir.Core.Notifications;
 using Weir.Core.Updates;
 
@@ -173,20 +172,15 @@ public sealed class ExternalJsonPoster : IExternalJsonPoster
             throw new ExternalEndpointException(ExternalUrlPolicy.InvalidPort, exception);
         }
 
-        IPAddress[] addresses;
-        try
+        var resolved = await OutboundAddressGuard.ResolveAllowedAsync(hostname, OutboundAddressGuard.IsPublic, resolveHost: null, cancellationToken).ConfigureAwait(false);
+        if (resolved.CouldNotResolve)
         {
-            addresses = PyIpAddress.TryParse(hostname, out _) && IPAddress.TryParse(hostname, out var literal)
-                ? [literal]
-                : await Dns.GetHostAddressesAsync(hostname, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception exception) when (exception is SocketException or ArgumentException)
-        {
-            throw new ExternalEndpointException(ExternalUrlPolicy.CouldNotResolve, exception);
+            throw new ExternalEndpointException(ExternalUrlPolicy.CouldNotResolve);
         }
 
-        var distinct = addresses.Select(a => a.IsIPv4MappedToIPv6 ? a.MapToIPv4() : a).Distinct().ToList();
-        if (distinct.Count == 0 || distinct.Any(address => !PyIpAddress.FromIpAddress(address).IsGlobal))
+        // Every resolved address must be global, not merely the first one: a name that resolves to both a public
+        // and a private address must not be trusted just because the public one happened to come first.
+        if (resolved.Allowed.Count == 0)
         {
             throw new ExternalEndpointException(ExternalUrlPolicy.NonPublicAddress);
         }
@@ -199,7 +193,7 @@ public sealed class ExternalJsonPoster : IExternalJsonPoster
 
         var host = hostname.Contains(':', StringComparison.Ordinal) ? $"[{hostname}]" : hostname;
         var uri = new Uri($"{parsed.Scheme}://{host}:{port}{path}");
-        return new ResolvedEndpoint(uri, distinct[0], port);
+        return new ResolvedEndpoint(uri, resolved.Allowed[0], port);
     }
 }
 

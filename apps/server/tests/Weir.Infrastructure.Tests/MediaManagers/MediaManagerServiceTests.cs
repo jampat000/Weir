@@ -702,6 +702,72 @@ public sealed class MediaManagerServiceTests
         Assert.Equal(401, wrong.StatusCode);
     }
 
+    /// <summary>
+    /// The connection-less native source has no address of its own to prove who is calling, so unlike a real
+    /// manager connection it refuses an unsigned write once nobody has ever configured a secret for it.
+    /// </summary>
+    [Fact]
+    public async Task The_native_source_refuses_writes_with_no_secret_configured_anywhere()
+    {
+        using var fixture = new MediaManagerFixture();
+        var refused = await Assert.ThrowsAsync<IntakeRefusedException>(
+            () => fixture.Db(async uow => { await fixture.Intake.AuthoriseAsync(uow, "native", null); return 0; }));
+        Assert.Equal((401, IntakeRules.NativeNeedsSecretDetail), (refused.StatusCode, refused.Message));
+
+        // A real connection of another kind is unaffected: it keeps accepting an unsigned write.
+        var identity = await fixture.Db(uow => fixture.Intake.AuthoriseAsync(uow, "radarr", null));
+        Assert.False(identity.Authenticated);
+    }
+
+    /// <summary>A hand-off's callback path is later joined onto the manager's own base URL and carries its API key back.</summary>
+    [Theory]
+    [InlineData("/../etc/passwd")]
+    [InlineData("//evil.example/callback")]
+    [InlineData("callback")]
+    [InlineData("/call\\back")]
+    [InlineData("/call@back")]
+    [InlineData("/callback?x=1")]
+    [InlineData("/call:back")]
+    public async Task A_hand_off_with_an_unsafe_callback_path_is_refused(string callbackPath)
+    {
+        using var fixture = new MediaManagerFixture();
+        var watched = fixture.Store.Home.Join("movies");
+        await fixture.LibraryAsync("movie", watched);
+        var handoff = Handoff("h1", Path.Join(watched, "Film", "film.mkv")) with { CallbackPath = callbackPath };
+
+        var refused = await Assert.ThrowsAsync<IntakeRefusedException>(() => fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, handoff)));
+
+        Assert.Equal(422, refused.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delunos_own_callback_path_is_accepted()
+    {
+        using var fixture = new MediaManagerFixture();
+        var watched = fixture.Store.Home.Join("movies");
+        await fixture.LibraryAsync("movie", watched);
+        var handoff = Handoff("h1", Path.Join(watched, "Film", "film.mkv")) with { CallbackPath = "/api/integrations/processors/events" };
+
+        await fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, handoff));
+
+        Assert.Single(await Jobs(fixture));
+    }
+
+    [Fact]
+    public async Task A_connection_with_no_secret_of_its_own_carries_a_warning_and_one_with_a_secret_does_not()
+    {
+        using var fixture = new MediaManagerFixture();
+        var id = await fixture.AddConnectionAsync("deluno", "Deluno");
+        var row = (await fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id)))!;
+        Assert.True(row.AcceptsUnsignedWebhooks);
+        Assert.Contains("Create a secret and add it to Deluno", ((PyStr)row.ToOut()["unsigned_webhook_warning"]).Value, StringComparison.Ordinal);
+
+        await fixture.Db(uow => fixture.Connections.RotateWebhookSecretAsync(uow, row));
+        var secured = (await fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id)))!;
+        Assert.False(secured.AcceptsUnsignedWebhooks);
+        Assert.Equal(PyNull.Instance, secured.ToOut()["unsigned_webhook_warning"]);
+    }
+
     // --- reconciliation ------------------------------------------------------------------------
 
     [Fact]

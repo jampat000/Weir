@@ -62,7 +62,7 @@ internal sealed class FakeManagerHttp : IManagerHttpHandlerFactory
         }
     }
 
-    public HttpMessageHandler Handler(bool followRedirects) => new RecordingHandler(this, followRedirects);
+    public HttpMessageHandler Handler(bool followRedirects, ManagerAddressPolicy policy = ManagerAddressPolicy.Local) => new RecordingHandler(this, followRedirects);
 
     private sealed class RecordingHandler(FakeManagerHttp fake, bool followRedirects) : HttpMessageHandler
     {
