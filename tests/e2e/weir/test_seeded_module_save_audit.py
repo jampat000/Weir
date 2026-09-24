@@ -23,8 +23,12 @@ def test_saved_state_persists_across_settings_and_processing(
     weir_home: str,
 ) -> None:
     base = weir_shell.rstrip("/")
-    tv_watch = Path(weir_home) / "e2e" / "tv-watch-missing"
-    tv_output = Path(weir_home) / "e2e" / "tv-output"
+    # Sibling of weir_home, not inside it: Weir refuses its own data folder as a library folder (#723),
+    # and a real install never keeps media there either.
+    home_path = Path(weir_home)
+    tv_media_root = home_path.parent / f"{home_path.name}-tv-media"
+    tv_watch = tv_media_root / "tv-watch-missing"
+    tv_output = tv_media_root / "tv-output"
     tv_output.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)

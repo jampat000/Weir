@@ -127,8 +127,9 @@ try {
   # Prove the exact packaged server can pass an intentional edge-case file
   # through unchanged, publish it to the configured processed tree, and only
   # then remove the watched source. This is a real filesystem lifecycle test,
-  # not an API-shape assertion.
-  $fixtureRoot = Join-Path $runtimeHome "pass-through-fixture"
+  # not an API-shape assertion. A sibling of $runtimeHome, not inside it: Weir refuses its own
+  # data folder as a library folder, and a real install never keeps media there either.
+  $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("weir-package-smoke-fixture-" + [System.Guid]::NewGuid().ToString("N"))
   $watchedRoot = Join-Path $fixtureRoot "watch"
   $workRoot = Join-Path $fixtureRoot "work"
   $outputRoot = Join-Path $fixtureRoot "processed"
@@ -292,6 +293,7 @@ try {
   if ($null -ne $oldFfmpegDir) { $env:WEIR_FFMPEG_DIR = $oldFfmpegDir } else { Remove-Item Env:\WEIR_FFMPEG_DIR -ErrorAction SilentlyContinue }
   $env:PATH = $oldPath
   Remove-Item -LiteralPath $runtimeHome -Recurse -Force -ErrorAction SilentlyContinue
+  if ($fixtureRoot) { Remove-Item -LiteralPath $fixtureRoot -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
 # The packaged tray, started the way a scripted or remote (WinRM) install starts it: the port is
