@@ -85,6 +85,8 @@ it("undoes an added existing-files folder when the editor is left without saving
     library_schedule_enabled: false,
     clean_hardlinked_files: false,
     skip_if_manager_would_redownload: true,
+    keep_original_after_clean: false,
+    originals_folder: "",
   });
   const saveFolders = vi.spyOn(modeApi, "saveLibrarySettings");
 

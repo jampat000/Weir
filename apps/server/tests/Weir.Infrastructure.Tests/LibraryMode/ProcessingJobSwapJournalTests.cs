@@ -107,6 +107,34 @@ public sealed class ProcessingJobSwapJournalTests : IDisposable
     }
 
     [Fact]
+    public async Task A_kept_original_path_is_recorded_and_survives_a_later_write_that_does_not_know_it()
+    {
+        var id = Job("a", null);
+
+        await _journal.RecordAsync(new SwapJournalEntry(id, "/lib/a.mkv", SwapJournalState.Committing, "/lib/.weir-originals/a.mkv"));
+        Assert.Equal(
+            "/lib/.weir-originals/a.mkv",
+            (await _journal.ListUnfinishedAsync()).Single(entry => entry.JobId == id).KeptOriginalPath);
+
+        // The Committed write for a job whose keep path was already decided always passes it again; this proves a
+        // write that (hypothetically) did not know it yet could not erase it.
+        await _journal.RecordAsync(new SwapJournalEntry(id, "/lib/a.mkv", SwapJournalState.Committed));
+        Assert.Equal(
+            "/lib/.weir-originals/a.mkv",
+            (await _journal.ListUnfinishedAsync()).Single(entry => entry.JobId == id).KeptOriginalPath);
+    }
+
+    [Fact]
+    public async Task A_swap_with_the_setting_off_records_no_kept_original_path()
+    {
+        var id = Job("a", null);
+
+        await _journal.RecordAsync(new SwapJournalEntry(id, "/lib/a.mkv", SwapJournalState.Committing));
+
+        Assert.Null((await _journal.ListUnfinishedAsync()).Single(entry => entry.JobId == id).KeptOriginalPath);
+    }
+
+    [Fact]
     public async Task A_missing_job_row_is_an_error()
     {
         var error = await Assert.ThrowsAsync<InvalidOperationException>(

@@ -37,6 +37,10 @@ const setAside = vi.fn();
 const rescan = vi.fn();
 let filesResult: LibraryFilesResult;
 let overviewResult: LibraryOverview;
+let librarySettingsResult: {
+  keep_original_after_clean: boolean;
+  originals_folder: string;
+};
 const lastFilters: Record<string, unknown>[] = [];
 
 vi.mock("../../lib/processing/libraries-queries", () => ({
@@ -68,6 +72,7 @@ vi.mock(
       isPending: false,
     }),
     useTriggerLibraryScan: () => ({ mutate: rescan, isPending: false }),
+    useLibrarySettingsQuery: () => ({ data: librarySettingsResult }),
   }),
 );
 vi.mock("../../lib/processing/rules-preview-api", () => ({
@@ -177,6 +182,10 @@ describe("LibraryPage", () => {
     setAside.mockReset();
     rescan.mockReset();
     lastFilters.length = 0;
+    librarySettingsResult = {
+      keep_original_after_clean: false,
+      originals_folder: "",
+    };
     overviewResult = {
       library_id: 1,
       folders_configured: 1,
@@ -448,6 +457,28 @@ describe("LibraryPage", () => {
     expect(
       within(drawer).getByRole("button", { name: "Clean this file" }),
     ).toBeEnabled();
+  });
+
+  it("says removed tracks are gone for good, or recoverable when the library keeps originals", async () => {
+    renderLibrary();
+    fireEvent.click(
+      screen.getByRole("button", { name: "The.Quiet.Harbour.S01E01.mkv" }),
+    );
+    const drawer = await screen.findByTestId("library-file-drawer");
+    expect(drawer).toHaveTextContent("Removed tracks are gone for good");
+
+    fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
+    librarySettingsResult = {
+      keep_original_after_clean: true,
+      originals_folder: "D:\\Media\\Movies\\.weir-originals",
+    };
+    fireEvent.click(
+      screen.getByRole("button", { name: "The.Quiet.Harbour.S01E01.mkv" }),
+    );
+    const reopened = await screen.findByTestId("library-file-drawer");
+    expect(reopened).toHaveTextContent(
+      "Removed tracks are recoverable: Weir keeps the original in D:\\Media\\Movies\\.weir-originals.",
+    );
   });
 
   it("lets you pick the tracks for one file yourself, and sends exactly those", async () => {

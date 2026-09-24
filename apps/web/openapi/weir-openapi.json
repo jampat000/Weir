@@ -2069,6 +2069,11 @@
             "title": "Clean Hardlinked Files",
             "type": "boolean"
           },
+          "keep_original_after_clean": {
+            "description": "#735: keep the pre-clean original instead of deleting it once the swap commits. Default false.",
+            "title": "Keep Original After Clean",
+            "type": "boolean"
+          },
           "library_folders": {
             "items": {
               "type": "string"
@@ -2080,6 +2085,11 @@
             "title": "Library Schedule Enabled",
             "type": "boolean"
           },
+          "originals_folder": {
+            "description": "#735: where a kept original goes. Blank means the default .weir-originals folder inside whichever library folder held the file.",
+            "title": "Originals Folder",
+            "type": "string"
+          },
           "skip_if_manager_would_redownload": {
             "description": "#508 step 2: skip a clean that would make a manager re-download the title. Default true.",
             "title": "Skip If Manager Would Redownload",
@@ -2090,14 +2100,16 @@
           "library_folders",
           "library_schedule_enabled",
           "clean_hardlinked_files",
-          "skip_if_manager_would_redownload"
+          "skip_if_manager_would_redownload",
+          "keep_original_after_clean",
+          "originals_folder"
         ],
         "title": "LibrarySettingsOut",
         "type": "object"
       },
       "LibrarySettingsUpdateIn": {
         "additionalProperties": false,
-        "description": "Library mode (#505 point 1, #508 steps 1-2). Weir server (.NET) only.",
+        "description": "Library mode (#505 point 1, #508 steps 1-2, #735). Weir server (.NET) only.",
         "properties": {
           "clean_hardlinked_files": {
             "description": "Left out to keep the saved value.",
@@ -2109,12 +2121,22 @@
             "title": "Csrf Token",
             "type": "string"
           },
+          "keep_original_after_clean": {
+            "description": "Left out to keep the saved value.",
+            "title": "Keep Original After Clean",
+            "type": "boolean"
+          },
           "library_folders": {
             "items": {
               "type": "string"
             },
             "title": "Library Folders",
             "type": "array"
+          },
+          "originals_folder": {
+            "description": "Left out to keep the saved value. Blank resets it to the default.",
+            "title": "Originals Folder",
+            "type": "string"
           },
           "skip_if_manager_would_redownload": {
             "description": "Left out to keep the saved value.",

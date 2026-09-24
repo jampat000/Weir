@@ -173,6 +173,9 @@ public sealed class SchemaMigratorTests
                 "DROP INDEX ix_jobs_active_remux_pass_path; " +
                 "ALTER TABLE library_files ADD COLUMN probe_json TEXT; " +
                 "DROP TABLE library_file_probes; " +
+                "ALTER TABLE libraries DROP COLUMN keep_original_after_clean; " +
+                "ALTER TABLE libraries DROP COLUMN originals_folder; " +
+                "ALTER TABLE library_swaps DROP COLUMN kept_original_path; " +
                 $"DELETE FROM alembic_version; INSERT INTO alembic_version (version_num) VALUES ('{eighteen}');";
             command.ExecuteNonQuery();
         }
@@ -184,6 +187,8 @@ public sealed class SchemaMigratorTests
         Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'media_manager_handoff_targets'"));
         Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM pragma_table_info('media_manager_handoffs') WHERE name = 'reported_status'"));
         Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'library_file_probes'"));
+        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM pragma_table_info('libraries') WHERE name = 'keep_original_after_clean'"));
+        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM pragma_table_info('library_swaps') WHERE name = 'kept_original_path'"));
         Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, $"SELECT COUNT(*) FROM alembic_version WHERE version_num = '{SchemaMigrator.HeadRevision}'"));
     }
 

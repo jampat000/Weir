@@ -110,6 +110,7 @@ public sealed class SchemaMigrator
         new(18, "0053_query_indexes", "Weir.Infrastructure.Migrations.0018_query_indexes.sql"),
         new(19, "0054_handoff_targets", "Weir.Infrastructure.Migrations.0019_handoff_targets.sql"),
         new(20, "0055_library_file_probes", "Weir.Infrastructure.Migrations.0020_library_file_probes.sql"),
+        new(21, "0056_keep_original_after_clean", "Weir.Infrastructure.Migrations.0021_keep_original_after_clean.sql"),
     ];
 
     /// <summary>

@@ -2916,10 +2916,20 @@ export interface components {
        * @description #508 step 1: clean a file even while another name still shares its data (seeding). Default false.
        */
       clean_hardlinked_files: boolean;
+      /**
+       * Keep Original After Clean
+       * @description #735: keep the pre-clean original instead of deleting it once the swap commits. Default false.
+       */
+      keep_original_after_clean: boolean;
       /** Library Folders */
       library_folders: string[];
       /** Library Schedule Enabled */
       library_schedule_enabled: boolean;
+      /**
+       * Originals Folder
+       * @description #735: where a kept original goes. Blank means the default .weir-originals folder inside whichever library folder held the file.
+       */
+      originals_folder: string;
       /**
        * Skip If Manager Would Redownload
        * @description #508 step 2: skip a clean that would make a manager re-download the title. Default true.
@@ -2928,7 +2938,7 @@ export interface components {
     };
     /**
      * LibrarySettingsUpdateIn
-     * @description Library mode (#505 point 1, #508 steps 1-2). Weir server (.NET) only.
+     * @description Library mode (#505 point 1, #508 steps 1-2, #735). Weir server (.NET) only.
      */
     LibrarySettingsUpdateIn: {
       /**
@@ -2938,8 +2948,18 @@ export interface components {
       clean_hardlinked_files?: boolean;
       /** Csrf Token */
       csrf_token: string;
+      /**
+       * Keep Original After Clean
+       * @description Left out to keep the saved value.
+       */
+      keep_original_after_clean?: boolean;
       /** Library Folders */
       library_folders: string[];
+      /**
+       * Originals Folder
+       * @description Left out to keep the saved value. Blank resets it to the default.
+       */
+      originals_folder?: string;
       /**
        * Skip If Manager Would Redownload
        * @description Left out to keep the saved value.
