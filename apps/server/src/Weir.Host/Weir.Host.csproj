@@ -9,16 +9,28 @@
     <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
     <PublishDocumentationFiles>false</PublishDocumentationFiles>
     <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
+    <!--
+      Workstation GC (#711). Server GC keeps a heap per core: under the same load it held 1,289 MB where
+      workstation GC held 427 MB, with no measured difference in throughput. Concurrent (background) GC stays on
+      so collections do not pause requests.
+    -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- Compacts the heap more readily for a little extra GC work: 427 MB became 364 MB under the same load (#711). -->
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="5" />
+  </ItemGroup>
   <!--
     Publishing for a runtime (-r win-x64 | linux-x64 | linux-arm64, or a profile in
-    Properties/PublishProfiles) produces one self-contained executable.
+    Properties/PublishProfiles) produces one self-contained executable. It is not compressed: a compressed
+    bundle is unpacked into memory at every start (70 MB private at idle against 30 MB), and the release
+    downloads are compressed anyway, so their size does not change (#711).
   -->
   <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Weir.Api\Weir.Api.csproj" />
