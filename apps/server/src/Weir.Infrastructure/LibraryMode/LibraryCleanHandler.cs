@@ -32,6 +32,7 @@ public sealed partial class LibraryCleanHandler : IJobHandler
     private readonly IRemovedTrackStore _removedTrackStore;
     private readonly LibrarySettingsStore _librarySettings;
     private readonly LibraryFileMarksStore _fileMarks;
+    private readonly LibraryStore _libraries;
     private readonly TimeProvider _time;
     private readonly ILogger<LibraryCleanHandler> _logger;
 
@@ -44,6 +45,7 @@ public sealed partial class LibraryCleanHandler : IJobHandler
         IRemovedTrackStore removedTrackStore,
         LibrarySettingsStore librarySettings,
         LibraryFileMarksStore fileMarks,
+        LibraryStore libraries,
         TimeProvider time,
         ILogger<LibraryCleanHandler> logger)
     {
@@ -55,6 +57,7 @@ public sealed partial class LibraryCleanHandler : IJobHandler
         _removedTrackStore = removedTrackStore ?? throw new ArgumentNullException(nameof(removedTrackStore));
         _librarySettings = librarySettings ?? throw new ArgumentNullException(nameof(librarySettings));
         _fileMarks = fileMarks ?? throw new ArgumentNullException(nameof(fileMarks));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -92,7 +95,7 @@ public sealed partial class LibraryCleanHandler : IJobHandler
         bool leftAlone;
         await using (var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false))
         {
-            library = libraryId > 0 ? await LibraryStore.GetAsync(uow, libraryId).ConfigureAwait(false) : null;
+            library = libraryId > 0 ? await _libraries.GetAsync(uow, libraryId).ConfigureAwait(false) : null;
             if (library is null)
             {
                 await RecordAsync(libraryId, path, trigger, LibraryActivityEventTypes.FileFailed, "This library no longer exists.").ConfigureAwait(false);
@@ -100,7 +103,7 @@ public sealed partial class LibraryCleanHandler : IJobHandler
                 return;
             }
 
-            var ruleSet = library.RuleSetId is { } ruleSetId ? await LibraryStore.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) : null;
+            var ruleSet = library.RuleSetId is { } ruleSetId ? await _libraries.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) : null;
             rules = ruleSet is not null ? RemuxPassPaths.RulesConfigFor(ruleSet) : RuleSetConversion.ToRulesConfig(null);
             settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
             leftAlone = await _fileMarks.IsLeftAloneAsync(uow, libraryId, path).ConfigureAwait(false);

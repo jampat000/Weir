@@ -12,6 +12,13 @@ namespace Weir.Infrastructure.Processing;
 /// </summary>
 public sealed class HoldDiagnosticStore
 {
+    private readonly LibraryStore _libraries;
+
+    public HoldDiagnosticStore(LibraryStore libraries)
+    {
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
+    }
+
     /// <summary>The release title for a relative path: the folder name, or the file stem at the root.</summary>
     public string ReleaseTitleFromRelativePath(string relativePath)
     {
@@ -44,7 +51,7 @@ public sealed class HoldDiagnosticStore
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(connections);
         var scope = ProcessingMediaScopes.Normalize(library.MediaType);
-        var connectionIds = await LibraryStore.ManagerConnectionIdsAsync(uow, library.Id).ConfigureAwait(false);
+        var connectionIds = await _libraries.ManagerConnectionIdsAsync(uow, library.Id).ConfigureAwait(false);
         // Unlike the watched-folder scan (which must ask nobody when a library links nothing), this
         // diagnostic falls back to every connection covering the scope when the library names none.
         var signals = await connections.CollectQueueSignalsAsync(

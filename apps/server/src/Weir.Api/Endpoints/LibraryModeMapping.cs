@@ -72,9 +72,9 @@ internal static class LibraryModeMapping
         .Set("left_alone", totals.LeftAlone);
 
     /// <summary>The library's rules, exactly as the scan and clean handlers resolve them (no rule set = the defaults).</summary>
-    internal static async Task<ProcessingRulesConfig> RulesForAsync(UnitOfWork uow, ProcessingLibraryRecord library)
+    internal static async Task<ProcessingRulesConfig> RulesForAsync(UnitOfWork uow, LibraryStore libraries, ProcessingLibraryRecord library)
     {
-        var ruleSet = library.RuleSetId is { } ruleSetId ? await LibraryStore.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) : null;
+        var ruleSet = library.RuleSetId is { } ruleSetId ? await libraries.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) : null;
         return ruleSet is not null ? RemuxPassPaths.RulesConfigFor(ruleSet) : RuleSetConversion.ToRulesConfig(null);
     }
 

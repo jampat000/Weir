@@ -17,8 +17,8 @@ internal static class EndpointLookups
     public const string NoSuchConnection = "That media manager connection does not exist.";
 
     /// <summary>The library with <paramref name="id"/>, or a 404 carrying <paramref name="notFoundDetail"/>.</summary>
-    public static async Task<ProcessingLibraryRecord> RequireLibraryAsync(UnitOfWork uow, long id, string notFoundDetail = NoSuchLibrary) =>
-        await LibraryStore.GetAsync(uow, id).ConfigureAwait(false)
+    public static async Task<ProcessingLibraryRecord> RequireLibraryAsync(UnitOfWork uow, LibraryStore libraries, long id, string notFoundDetail = NoSuchLibrary) =>
+        await libraries.GetAsync(uow, id).ConfigureAwait(false)
         ?? throw new ApiException(StatusCodes.Status404NotFound, notFoundDetail);
 
     /// <summary>The <c>connection_id</c> route value as an integer of at least 1; 0 with a validation issue otherwise.</summary>
@@ -32,7 +32,7 @@ internal static class EndpointLookups
     }
 
     /// <summary>The media manager connection with <paramref name="connectionId"/>, or a 404.</summary>
-    public static async Task<MediaManagerConnectionRecord> RequireConnectionAsync(UnitOfWork uow, long connectionId) =>
-        await MediaManagerConnectionStore.GetAsync(uow, connectionId).ConfigureAwait(false)
+    public static async Task<MediaManagerConnectionRecord> RequireConnectionAsync(UnitOfWork uow, MediaManagerConnectionStore connections, long connectionId) =>
+        await connections.GetAsync(uow, connectionId).ConfigureAwait(false)
         ?? throw new ApiException(StatusCodes.Status404NotFound, NoSuchConnection);
 }

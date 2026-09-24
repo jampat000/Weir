@@ -21,13 +21,15 @@ public sealed partial class VanishedFileSweepTask : IPeriodicTask
 {
     private readonly SqliteDatabase _database;
     private readonly WeirOptions _options;
+    private readonly LibraryStore _libraries;
     private readonly TimeProvider _time;
     private readonly ILogger<VanishedFileSweepTask> _logger;
 
-    public VanishedFileSweepTask(SqliteDatabase database, WeirOptions options, TimeProvider time, ILogger<VanishedFileSweepTask> logger)
+    public VanishedFileSweepTask(SqliteDatabase database, WeirOptions options, LibraryStore libraries, TimeProvider time, ILogger<VanishedFileSweepTask> logger)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -49,7 +51,7 @@ public sealed partial class VanishedFileSweepTask : IPeriodicTask
         var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
         await using (uow.ConfigureAwait(false))
         {
-            libraries = await LibraryStore.ListAsync(uow, enabledOnly: false).ConfigureAwait(false);
+            libraries = await _libraries.ListAsync(uow, enabledOnly: false).ConfigureAwait(false);
         }
 
         foreach (var library in libraries)

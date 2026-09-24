@@ -21,15 +21,18 @@ namespace Weir.Infrastructure.Tests.Jobs;
 /// </summary>
 public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
 {
+    private static readonly LibraryStore Libraries = new();
+    private static readonly FileStateStore Files = new();
+
     private static async Task<(StoreFixture Store, ProcessingJobStore Jobs, ProcessingWatchedFolderScanDispatchJobHandler Handler)> BuildAsync()
     {
         var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "handler-tests-credentials-secret"));
         var cipher = new CredentialCipher(store.Options.CredentialsSecret, store.Options.SessionSecret, store.Options.PreviousCredentialsSecrets, store.Clock);
         var ports = new HttpMediaManagerPorts(new FakeManagerHttp());
-        var connections = new MediaManagerConnectionService(store.Options, cipher, ports);
+        var connections = new MediaManagerConnectionService(store.Options, cipher, ports, new MediaManagerConnectionStore());
         var jobs = new ProcessingJobStore(store.Database, store.Clock);
         var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
-            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore());
+            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore(), Libraries, Files);
         // Zero out the operator-wide minimum age/size so these tests assert scan
         // dispatch itself, not the settling/hold-timer gates a freshly written test file would otherwise trip.
         await store.Execute(
@@ -43,7 +46,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         string rejectedFileAction = "leave", string excludePatternsCsv = "")
     {
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
-        var created = await LibraryStore.CreateAsync(uow, new ProcessingLibraryInput
+        var created = await Libraries.CreateAsync(uow, new ProcessingLibraryInput
         {
             Name = "Movies " + Guid.NewGuid().ToString("N")[..8],
             MediaType = ProcessingMediaScopes.Movie,
@@ -121,7 +124,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         Assert.Equal(0, remuxCount);
 
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
-        var file = await FileStateStore.FindAsync(uow, libraryId, "Check Only 2001.mkv");
+        var file = await Files.FindAsync(uow, libraryId, "Check Only 2001.mkv");
         Assert.NotNull(file);
         Assert.Equal(ProcessingFileStatuses.Unprocessed, file!.Status);
     }
@@ -169,7 +172,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         Assert.Equal(0, remuxCount);
 
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
-        var file = await FileStateStore.FindAsync(uow, libraryId, "Bad Release/sample.mkv");
+        var file = await Files.FindAsync(uow, libraryId, "Bad Release/sample.mkv");
         Assert.NotNull(file);
         Assert.Equal(ProcessingFileStatuses.Skipped, file!.Status);
     }

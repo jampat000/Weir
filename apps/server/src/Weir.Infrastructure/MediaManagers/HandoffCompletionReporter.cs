@@ -9,6 +9,7 @@ using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Text;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
@@ -26,18 +27,27 @@ public sealed partial class HandoffCompletionReporter
     private const string NotAnsweringPrefix = "failed: could not reach ";
 
     private readonly MediaManagerConnectionService _connections;
+    private readonly MediaManagerConnectionStore _connectionStore;
     private readonly HandoffLedgerStore _ledger;
+    private readonly HandoffTargetStore _targets;
+    private readonly LibraryStore _libraries;
     private readonly IManagerHttpHandlerFactory _handlers;
     private readonly ILogger _logger;
 
     public HandoffCompletionReporter(
         MediaManagerConnectionService connections,
+        MediaManagerConnectionStore connectionStore,
         HandoffLedgerStore ledger,
+        HandoffTargetStore targets,
+        LibraryStore libraries,
         IManagerHttpHandlerFactory handlers,
         ILogger<HandoffCompletionReporter>? logger = null)
     {
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
+        _connectionStore = connectionStore ?? throw new ArgumentNullException(nameof(connectionStore));
         _ledger = ledger ?? throw new ArgumentNullException(nameof(ledger));
+        _targets = targets ?? throw new ArgumentNullException(nameof(targets));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
         _logger = (ILogger?)logger ?? NullLogger.Instance;
     }
@@ -51,7 +61,7 @@ public sealed partial class HandoffCompletionReporter
             return (null, "the hand-off named no callback path");
         }
 
-        var connection = await MediaManagerConnectionStore.FirstEnabledForKindAsync(uow, origin.SourceKey).ConfigureAwait(false);
+        var connection = await _connectionStore.FirstEnabledForKindAsync(uow, origin.SourceKey).ConfigureAwait(false);
         if (connection is null)
         {
             return (null, $"no enabled {origin.SourceKey} connection is configured to report back to");
@@ -232,7 +242,7 @@ public sealed partial class HandoffCompletionReporter
         try
         {
             var row = string.IsNullOrEmpty(origin.HandoffId) ? null : await HandoffLedgerStore.FindAsync(uow, origin.SourceKey, origin.HandoffId).ConfigureAwait(false);
-            finish = await HandoffTargetStore.FinishAsync(uow, row, relative ?? string.Empty, result).ConfigureAwait(false);
+            finish = await _targets.FinishAsync(uow, row, relative ?? string.Empty, result).ConfigureAwait(false);
             // Durable regardless of outcome: the next pass to finish must see this file's result even if it is not
             // the one that makes the hand-off ready.
             await uow.CommitAsync().ConfigureAwait(false);

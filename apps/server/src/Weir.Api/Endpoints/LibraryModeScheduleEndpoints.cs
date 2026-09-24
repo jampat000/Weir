@@ -5,6 +5,7 @@ using Weir.Core.Auth;
 using Weir.Core.Validation;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.MediaManagers;
+using Weir.Infrastructure.Processing;
 using static Weir.Api.Endpoints.EndpointLookups;
 
 namespace Weir.Api.Endpoints;
@@ -32,19 +33,22 @@ internal sealed class LibraryModeScheduleEndpointHandlers
     private readonly MediaManagerConnectionService _connections;
     private readonly IHardlinkInspector _hardlinkInspector;
     private readonly RedownloadRiskChecker _riskChecker;
+    private readonly LibraryStore _libraries;
 
     public LibraryModeScheduleEndpointHandlers(
         LibrarySettingsStore librarySettings,
         LibraryScanStore scans,
         MediaManagerConnectionService connections,
         IHardlinkInspector hardlinkInspector,
-        RedownloadRiskChecker riskChecker)
+        RedownloadRiskChecker riskChecker,
+        LibraryStore libraries)
     {
         _librarySettings = librarySettings ?? throw new ArgumentNullException(nameof(librarySettings));
         _scans = scans ?? throw new ArgumentNullException(nameof(scans));
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
         _hardlinkInspector = hardlinkInspector ?? throw new ArgumentNullException(nameof(hardlinkInspector));
         _riskChecker = riskChecker ?? throw new ArgumentNullException(nameof(riskChecker));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
     }
 
     public async Task<ApiResult> PostScheduleAsync(ApiRequest request)
@@ -63,7 +67,7 @@ internal sealed class LibraryModeScheduleEndpointHandlers
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, _libraries, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
         var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
 
         if (enabled && !settings.ScheduleEnabled)
@@ -73,7 +77,7 @@ internal sealed class LibraryModeScheduleEndpointHandlers
             var (removingFiles, removingTracks, bytesSaved) = LibraryModeMapping.RemovalTotals(files);
             if (removingFiles > 0 && !confirmed)
             {
-                var rules = await LibraryModeMapping.RulesForAsync(uow, library).ConfigureAwait(false);
+                var rules = await LibraryModeMapping.RulesForAsync(uow, _libraries, library).ConfigureAwait(false);
                 var connectionsById = await LibraryModeMapping.ConnectionsForFilesAsync(uow, _connections, files).ConfigureAwait(false);
                 var preflight = await LibraryCleanPreflightRunner.RunAsync(
                         files, settings, rules, library.MediaType, _hardlinkInspector,

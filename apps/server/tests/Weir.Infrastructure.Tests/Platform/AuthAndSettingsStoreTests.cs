@@ -159,7 +159,7 @@ public sealed class AuthAndSettingsStoreTests
         using var fixture = new StoreFixture();
         var zones = new IanaTimeZoneResolver();
         var suiteSettings = new SuiteSettingsStore(fixture.Users);
-        var backups = new ConfigurationBackups(fixture.Options, fixture.Clock, zones, suiteSettings, new ConfigurationBundleStore(suiteSettings, new ConfigurationBundleConnections(new NotificationChannelStore())));
+        var backups = new ConfigurationBackups(fixture.Options, fixture.Clock, zones, suiteSettings, new ConfigurationBundleStore(suiteSettings, new ConfigurationBundleConnections(new NotificationChannelStore(), new Weir.Infrastructure.MediaManagers.MediaManagerConnectionStore())));
         await fixture.Execute("UPDATE suite_settings SET configuration_backup_enabled = 1, configuration_backup_interval_hours = 6");
 
         Assert.Equal(1, await backups.RunTickAsync(fixture.Database, new DateTime(2026, 1, 15, 10, 0, 0, DateTimeKind.Utc)));
@@ -181,7 +181,7 @@ public sealed class AuthAndSettingsStoreTests
         using var fixture = new StoreFixture();
         var suiteSettings = new SuiteSettingsStore(fixture.Users);
         var backups = new ConfigurationBackups(
-            fixture.Options, fixture.Clock, new IanaTimeZoneResolver(), suiteSettings, new ConfigurationBundleStore(suiteSettings, new ConfigurationBundleConnections(new NotificationChannelStore())));
+            fixture.Options, fixture.Clock, new IanaTimeZoneResolver(), suiteSettings, new ConfigurationBundleStore(suiteSettings, new ConfigurationBundleConnections(new NotificationChannelStore(), new Weir.Infrastructure.MediaManagers.MediaManagerConnectionStore())));
         for (var i = 0; i < 7; i++)
         {
             fixture.Clock.Set(fixture.Clock.GetUtcNow().AddMinutes(1));

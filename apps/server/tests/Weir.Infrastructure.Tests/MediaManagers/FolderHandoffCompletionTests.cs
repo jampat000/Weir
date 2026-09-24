@@ -2,7 +2,6 @@ using System.Net;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Infrastructure.MediaManagers;
-using Weir.Infrastructure.Processing;
 
 namespace Weir.Infrastructure.Tests.MediaManagers;
 
@@ -272,7 +271,7 @@ public sealed class FolderHandoffCompletionTests
 
         var cancelledJob = jobs[0];
         var goingOnJob = jobs[1];
-        await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, fixture.Reporter, cancelledJob.Id));
+        await fixture.Db(uow => fixture.Cancellation.CancelAsync(uow, cancelledJob.Id));
 
         var relative = RelativeOf(goingOnJob);
         var finalStatus = await fixture.Db(
@@ -356,7 +355,7 @@ public sealed class FolderHandoffCompletionTests
         await MarkDeliveredInWeirAsync(fixture, finishingJob.Id, finishingRelative);
         Assert.Empty(fixture.Http.RequestsTo(HttpMethod.Post, ReportPath));
 
-        await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, fixture.Reporter, cancelledJob.Id));
+        await fixture.Db(uow => fixture.Cancellation.CancelAsync(uow, cancelledJob.Id));
 
         // Nothing is delivered synchronously from a cancellation; the heartbeat sends the report it now owes.
         Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM media_manager_handoffs WHERE handoff_id = 'finish-then-cancel' AND pending_report_json IS NOT NULL"));
@@ -392,7 +391,7 @@ public sealed class FolderHandoffCompletionTests
 
         foreach (var job in jobs)
         {
-            await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, fixture.Reporter, job.Id));
+            await fixture.Db(uow => fixture.Cancellation.CancelAsync(uow, job.Id));
         }
 
         var answered = await fixture.Db(uow => fixture.Reporter.SendWaitingReportsAsync(uow, "deluno"));

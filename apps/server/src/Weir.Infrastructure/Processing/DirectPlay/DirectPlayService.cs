@@ -8,30 +8,33 @@ namespace Weir.Infrastructure.Processing.DirectPlay;
 public sealed record DirectPlayBadge(string DeviceId, string DeviceName, string Verdict, IReadOnlyList<string> Reasons);
 
 /// <summary>The operator's chosen direct-play devices, and each file's verdict for them (read-only per file).</summary>
-public static class DirectPlayService
+public sealed class DirectPlayService
 {
+    private readonly SuiteSettingsStore _suiteSettings;
+
+    public DirectPlayService(SuiteSettingsStore suiteSettings) => _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+
     /// <summary>The ids of the devices the operator chose.</summary>
-    public static async Task<List<string>> SelectedDeviceIdsAsync(UnitOfWork uow, SuiteSettingsStore suiteSettings)
+    public async Task<List<string>> SelectedDeviceIdsAsync(UnitOfWork uow)
     {
-        var row = await suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
+        var row = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
         return [.. row.DirectPlayDevices.Split(',').Select(p => p.Trim()).Where(p => p.Length > 0)];
     }
 
     /// <summary>Saves the operator's choice, keeping only ids the current device list knows, in its own order.</summary>
-    public static async Task<List<string>> SaveSelectedDeviceIdsAsync(
-        UnitOfWork uow, SuiteSettingsStore suiteSettings, IReadOnlyList<DeviceProfile> knownDevices, IReadOnlyList<string> selected)
+    public async Task<List<string>> SaveSelectedDeviceIdsAsync(UnitOfWork uow, IReadOnlyList<DeviceProfile> knownDevices, IReadOnlyList<string> selected)
     {
         var wanted = new HashSet<string>(selected, StringComparer.Ordinal);
         var kept = knownDevices.Select(p => p.Id).Where(wanted.Contains).ToList();
-        var before = await suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
-        await suiteSettings.UpdateAsync(uow, before, before with { DirectPlayDevices = string.Join(",", kept) }).ConfigureAwait(false);
+        var before = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
+        await _suiteSettings.UpdateAsync(uow, before, before with { DirectPlayDevices = string.Join(",", kept) }).ConfigureAwait(false);
         return kept;
     }
 
     /// <summary>The profiles of the devices the operator chose.</summary>
-    public static async Task<IReadOnlyList<DeviceProfile>> SelectedProfilesAsync(UnitOfWork uow, SuiteSettingsStore suiteSettings, IReadOnlyList<DeviceProfile> knownDevices)
+    public async Task<IReadOnlyList<DeviceProfile>> SelectedProfilesAsync(UnitOfWork uow, IReadOnlyList<DeviceProfile> knownDevices)
     {
-        var chosen = new HashSet<string>(await SelectedDeviceIdsAsync(uow, suiteSettings).ConfigureAwait(false), StringComparer.Ordinal);
+        var chosen = new HashSet<string>(await SelectedDeviceIdsAsync(uow).ConfigureAwait(false), StringComparer.Ordinal);
         return chosen.Count == 0 ? [] : [.. knownDevices.Where(p => chosen.Contains(p.Id))];
     }
 

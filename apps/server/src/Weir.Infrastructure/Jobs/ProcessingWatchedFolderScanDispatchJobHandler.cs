@@ -31,6 +31,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
     private readonly MediaManagerConnectionService _managerConnections;
     private readonly SuiteSettingsStore _suiteSettings;
     private readonly OperatorSettingsStore _operatorSettings;
+    private readonly LibraryStore _libraries;
+    private readonly FileStateStore _files;
 
     private readonly ScanWakeups? _wakeups;
 
@@ -42,6 +44,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         MediaManagerConnectionService managerConnections,
         SuiteSettingsStore suiteSettings,
         OperatorSettingsStore operatorSettings,
+        LibraryStore libraries,
+        FileStateStore files,
         ScanWakeups? wakeups = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
@@ -51,6 +55,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         _managerConnections = managerConnections ?? throw new ArgumentNullException(nameof(managerConnections));
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
         _operatorSettings = operatorSettings ?? throw new ArgumentNullException(nameof(operatorSettings));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
+        _files = files ?? throw new ArgumentNullException(nameof(files));
         _wakeups = wakeups;
     }
 
@@ -77,8 +83,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         var reads = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
         await using (reads.ConfigureAwait(false))
         {
-            var lookups = await WatchedFolderScanLookups.ReadAsync(reads, scan).ConfigureAwait(false);
-            var run = new WatchedFolderScanRun(_database, _jobStore, scan, lookups, reads, new ScanPassRequest(context.Id, request.Trigger, budget));
+            var lookups = await WatchedFolderScanLookups.ReadAsync(reads, _files, scan).ConfigureAwait(false);
+            var run = new WatchedFolderScanRun(_database, _jobStore, _files, scan, lookups, reads, new ScanPassRequest(context.Id, request.Trigger, budget));
             await run.RunAsync(candidates.Entries, cancellationToken).ConfigureAwait(false);
 
             // #645: a file that left the watched folder before Weir finished with it stops being listed. Only while the watched
@@ -112,8 +118,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
         await using (uow.ConfigureAwait(false))
         {
-            var library = request.LibraryId is { } wantedId ? await LibraryStore.GetAsync(uow, wantedId).ConfigureAwait(false) : null;
-            library ??= await LibraryStore.SeededForScopeAsync(uow, request.MediaScope).ConfigureAwait(false);
+            var library = request.LibraryId is { } wantedId ? await _libraries.GetAsync(uow, wantedId).ConfigureAwait(false) : null;
+            library ??= await _libraries.SeededForScopeAsync(uow, request.MediaScope).ConfigureAwait(false);
             if (library is null)
             {
                 var label = request.MediaScope == ProcessingMediaScopes.Tv ? "TV" : "Movies";
@@ -129,7 +135,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             // Manager queue signals: ask every manager linked to this library, and note who did not answer. Always the
             // library's own linked connections, even when that is none: an empty selector means "ask nobody", not "fall back
             // to every connection for the scope".
-            var connectionIds = await LibraryStore.ManagerConnectionIdsAsync(uow, library.Id).ConfigureAwait(false);
+            var connectionIds = await _libraries.ManagerConnectionIdsAsync(uow, library.Id).ConfigureAwait(false);
             var signals = await _managerConnections.CollectQueueSignalsAsync(uow, request.MediaScope, connectionIds, cancellationToken).ConfigureAwait(false);
 
             var operatorSettings = await _operatorSettings.EnsureAsync(uow).ConfigureAwait(false);

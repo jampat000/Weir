@@ -40,12 +40,14 @@ public sealed class MediaManagerConnectionService
     private readonly WeirOptions _options;
     private readonly CredentialCipher _cipher;
     private readonly IMediaManagerPorts _ports;
+    private readonly MediaManagerConnectionStore _store;
 
-    public MediaManagerConnectionService(WeirOptions options, CredentialCipher cipher, IMediaManagerPorts ports)
+    public MediaManagerConnectionService(WeirOptions options, CredentialCipher cipher, IMediaManagerPorts ports, MediaManagerConnectionStore store)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _cipher = cipher ?? throw new ArgumentNullException(nameof(cipher));
         _ports = ports ?? throw new ArgumentNullException(nameof(ports));
+        _store = store ?? throw new ArgumentNullException(nameof(store));
     }
 
     public CredentialCipher Cipher => _cipher;
@@ -63,7 +65,7 @@ public sealed class MediaManagerConnectionService
             throw new MediaManagerConnectionException(NeedsNameMessage);
         }
 
-        if (await MediaManagerConnectionStore.NameExistsAsync(uow, label).ConfigureAwait(false))
+        if (await _store.NameExistsAsync(uow, label).ConfigureAwait(false))
         {
             throw new MediaManagerConnectionException($"A connection named {WireStrings.Repr(label)} already exists.");
         }
@@ -72,7 +74,7 @@ public sealed class MediaManagerConnectionService
         var validKind = ValidateKind(kind);
         var validUrl = ValidateBaseUrl(baseUrl);
         var ciphertext = key.Length > 0 ? EncryptApiKey(key) : null;
-        return await MediaManagerConnectionStore.InsertAsync(uow, validKind, label, enabled, validUrl, ciphertext, downloadedScanEnabled).ConfigureAwait(false);
+        return await _store.InsertAsync(uow, validKind, label, enabled, validUrl, ciphertext, downloadedScanEnabled).ConfigureAwait(false);
     }
 
     /// <summary>Update a connection: <see langword="null"/> leaves a field alone; an empty <paramref name="apiKey"/> clears the key.</summary>
@@ -91,7 +93,7 @@ public sealed class MediaManagerConnectionService
                 throw new MediaManagerConnectionException(NeedsNameMessage);
             }
 
-            if (await MediaManagerConnectionStore.NameExistsAsync(uow, label, row.Id).ConfigureAwait(false))
+            if (await _store.NameExistsAsync(uow, label, row.Id).ConfigureAwait(false))
             {
                 throw new MediaManagerConnectionException($"A connection named {WireStrings.Repr(label)} already exists.");
             }
@@ -141,7 +143,7 @@ public sealed class MediaManagerConnectionService
             changes.Add(("downloaded_scan_enabled", scan ? 1 : 0));
         }
 
-        await MediaManagerConnectionStore.UpdateColumnsAsync(uow, row.Id, changes).ConfigureAwait(false);
+        await _store.UpdateColumnsAsync(uow, row.Id, changes).ConfigureAwait(false);
     }
 
     /// <summary>A fresh inbound webhook secret, stored encrypted and returned once.</summary>
@@ -149,7 +151,7 @@ public sealed class MediaManagerConnectionService
     {
         ArgumentNullException.ThrowIfNull(row);
         var plaintext = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        await MediaManagerConnectionStore.UpdateColumnsAsync(uow, row.Id, [("webhook_secret_ciphertext", _cipher.Encrypt(plaintext))]).ConfigureAwait(false);
+        await _store.UpdateColumnsAsync(uow, row.Id, [("webhook_secret_ciphertext", _cipher.Encrypt(plaintext))]).ConfigureAwait(false);
         return plaintext;
     }
 
@@ -204,7 +206,7 @@ public sealed class MediaManagerConnectionService
     /// <summary>Every enabled, credentialed manager for the scope; the environment only when nothing claims it.</summary>
     public async Task<List<ManagerConnection>> ConnectionsForScopeAsync(UnitOfWork uow, string mediaScope)
     {
-        var rows = await MediaManagerConnectionStore.ListEnabledAsync(uow).ConfigureAwait(false);
+        var rows = await _store.ListEnabledAsync(uow).ConfigureAwait(false);
         var serving = rows.Where(row => _ports.PortForKind(row.Kind) is { } port && port.Capabilities().Scopes.Contains(mediaScope)).ToList();
         var resolved = serving.Select(ConnectionFromRow).OfType<ManagerConnection>().ToList();
         if (resolved.Count > 0)
@@ -222,7 +224,7 @@ public sealed class MediaManagerConnectionService
 
     /// <summary>Every enabled connection that has an address and a key that decrypts.</summary>
     public async Task<List<ManagerConnection>> AllEnabledConnectionsAsync(UnitOfWork uow) =>
-        [.. (await MediaManagerConnectionStore.ListEnabledAsync(uow).ConfigureAwait(false)).Select(ConnectionFromRow).OfType<ManagerConnection>()];
+        [.. (await _store.ListEnabledAsync(uow).ConfigureAwait(false)).Select(ConnectionFromRow).OfType<ManagerConnection>()];
 
     /// <summary>Exactly the enabled connections named, in id order; half-configured ones dropped.</summary>
     public async Task<List<ManagerConnection>> ConnectionsByIdAsync(UnitOfWork uow, IEnumerable<long> connectionIds)
@@ -234,7 +236,7 @@ public sealed class MediaManagerConnectionService
             return [];
         }
 
-        var rows = await MediaManagerConnectionStore.ListEnabledAsync(uow).ConfigureAwait(false);
+        var rows = await _store.ListEnabledAsync(uow).ConfigureAwait(false);
         return [.. rows.Where(row => wanted.Contains(row.Id)).Select(ConnectionFromRow).OfType<ManagerConnection>()];
     }
 

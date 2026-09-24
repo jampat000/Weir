@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
@@ -20,25 +21,25 @@ public static class MediaManagerConnectionsEndpoints
 {
     internal const string InvalidCsrf = "Invalid or expired CSRF token.";
 
-    private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(15);
-
     public static IEndpointRouteBuilder MapMediaManagerConnectionsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/media-managers/connections", ListConnectionsAsync);
-        endpoints.MapV1("POST", "/media-managers/connections", CreateConnectionAsync);
-        endpoints.MapV1("GET", "/media-managers/capabilities", GetCapabilitiesAsync);
-        endpoints.MapV1("GET", "/media-managers/connections/{connection_id}", GetConnectionAsync);
-        endpoints.MapV1("PUT", "/media-managers/connections/{connection_id}", UpdateConnectionAsync);
-        endpoints.MapV1("DELETE", "/media-managers/connections/{connection_id}", DeleteConnectionAsync);
-        endpoints.MapV1("POST", "/media-managers/connections/{connection_id}/webhook-secret", PostWebhookSecretAsync);
-        endpoints.MapV1("PUT", "/media-managers/connections/{connection_id}/lanes/{lane}", PutLaneAsync);
-        endpoints.MapV1("POST", "/media-managers/connections/{connection_id}/test", PostConnectionTestAsync);
-        endpoints.MapV1("GET", "/media-managers/connections/{connection_id}/folder-chain", GetConnectionFolderChainAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<MediaManagerConnectionsEndpointHandlers>();
+        endpoints.MapV1("GET", "/media-managers/connections", handlers.ListConnectionsAsync);
+        endpoints.MapV1("POST", "/media-managers/connections", handlers.CreateConnectionAsync);
+        endpoints.MapV1("GET", "/media-managers/capabilities", handlers.GetCapabilitiesAsync);
+        endpoints.MapV1("GET", "/media-managers/connections/{connection_id}", handlers.GetConnectionAsync);
+        endpoints.MapV1("PUT", "/media-managers/connections/{connection_id}", handlers.UpdateConnectionAsync);
+        endpoints.MapV1("DELETE", "/media-managers/connections/{connection_id}", handlers.DeleteConnectionAsync);
+        endpoints.MapV1("POST", "/media-managers/connections/{connection_id}/webhook-secret", handlers.PostWebhookSecretAsync);
+        endpoints.MapV1("PUT", "/media-managers/connections/{connection_id}/lanes/{lane}", handlers.PutLaneAsync);
+        endpoints.MapV1("POST", "/media-managers/connections/{connection_id}/test", handlers.PostConnectionTestAsync);
+        endpoints.MapV1("GET", "/media-managers/connections/{connection_id}/folder-chain", handlers.GetConnectionFolderChainAsync);
         return endpoints;
     }
 
     /// <summary>Browser origin, session secret, then a session-bound CSRF token; 400 on a bad token. Shared
-    /// with <see cref="MediaManagerReconciliationEndpoints"/>, which guards its repair route the same way.</summary>
+    /// with <see cref="MediaManagerReconciliationEndpoints"/> and <see cref="DownloadClientConnectionsEndpoints"/>,
+    /// which guard their own routes the same way.</summary>
     internal static void VerifyCsrf(ApiRequest request, string? token)
     {
         request.ValidateBrowserPostOrigin();
@@ -48,14 +49,32 @@ public static class MediaManagerConnectionsEndpoints
             throw new ApiException(StatusCodes.Status400BadRequest, InvalidCsrf);
         }
     }
+}
 
-    private static MediaManagerConnectionService Connections(ApiRequest request) => request.Service<MediaManagerConnectionService>();
+/// <summary>Handlers for <see cref="MediaManagerConnectionsEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class MediaManagerConnectionsEndpointHandlers
+{
+    private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(15);
 
-    private static async Task<ApiResult> ListConnectionsAsync(ApiRequest request)
+    private readonly MediaManagerConnectionService _connections;
+    private readonly MediaManagerConnectionStore _connectionStore;
+    private readonly LibraryFolderChainCheck _folderChainCheck;
+    private readonly IManagerHttpHandlerFactory _handlers;
+
+    public MediaManagerConnectionsEndpointHandlers(
+        MediaManagerConnectionService connections, MediaManagerConnectionStore connectionStore, LibraryFolderChainCheck folderChainCheck, IManagerHttpHandlerFactory handlers)
+    {
+        _connections = connections ?? throw new ArgumentNullException(nameof(connections));
+        _connectionStore = connectionStore ?? throw new ArgumentNullException(nameof(connectionStore));
+        _folderChainCheck = folderChainCheck ?? throw new ArgumentNullException(nameof(folderChainCheck));
+        _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
+    }
+
+    public async Task<ApiResult> ListConnectionsAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var rows = await MediaManagerConnectionStore.ListAsync(uow).ConfigureAwait(false);
+        var rows = await _connectionStore.ListAsync(uow).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireArray(rows.Select(row => (WireValue)row.ToOut())));
     }
 
@@ -63,7 +82,7 @@ public static class MediaManagerConnectionsEndpoints
     private static string StrWithDefault(BodyModel model, WireValue? body, string name, string defaultValue, int? maxLength) =>
         body is WireObject dict && dict.ContainsKey(name) ? model.Str(name, maxLength: maxLength) : defaultValue;
 
-    private static async Task<ApiResult> CreateConnectionAsync(ApiRequest request)
+    public async Task<ApiResult> CreateConnectionAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
@@ -79,12 +98,12 @@ public static class MediaManagerConnectionsEndpoints
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
-        VerifyCsrf(request, csrfToken);
+        MediaManagerConnectionsEndpoints.VerifyCsrf(request, csrfToken);
         var uow = await request.DbAsync().ConfigureAwait(false);
         long id;
         try
         {
-            id = await Connections(request)
+            id = await _connections
                 .CreateAsync(uow, kind, name, baseUrl, apiKey.Length > 0 ? apiKey : null, enabled, downloadedScanEnabled).ConfigureAwait(false);
         }
         catch (MediaManagerConnectionException exception)
@@ -93,16 +112,16 @@ public static class MediaManagerConnectionsEndpoints
         }
 
         await request.CommitAsync().ConfigureAwait(false);
-        var row = await RequireConnectionAsync(uow, id).ConfigureAwait(false);
+        var row = await RequireConnectionAsync(uow, _connectionStore, id).ConfigureAwait(false);
         return new JsonApiResult(StatusCodes.Status201Created, row.ToOut());
     }
 
-    private static async Task<ApiResult> GetCapabilitiesAsync(ApiRequest request)
+    public async Task<ApiResult> GetCapabilitiesAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var output = new WireArray();
-        foreach (var described in await Connections(request).DescribeConnectionsAsync(uow, request.Context.RequestAborted).ConfigureAwait(false))
+        foreach (var described in await _connections.DescribeConnectionsAsync(uow, request.Context.RequestAborted).ConfigureAwait(false))
         {
             var capabilities = described.Capabilities;
             output.Items.Add(new WireObject()
@@ -122,14 +141,14 @@ public static class MediaManagerConnectionsEndpoints
         return ApiRoutes.Ok(output);
     }
 
-    private static async Task<ApiResult> GetConnectionAsync(ApiRequest request)
+    public async Task<ApiResult> GetConnectionAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var issues = new ValidationIssues();
         var connectionId = ConnectionId(request, issues);
         issues.ThrowIfAny();
         var uow = await request.DbAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok((await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false)).ToOut());
+        return ApiRoutes.Ok((await RequireConnectionAsync(uow, _connectionStore, connectionId).ConfigureAwait(false)).ToOut());
     }
 
     /// <summary>
@@ -137,7 +156,7 @@ public static class MediaManagerConnectionsEndpoints
     /// folder-chain check <c>ProcessingLibraryEndpoints.GetLibraryFolderChainAsync</c> exposes per library, run for
     /// every library linked to this connection — "which of this connection's libraries are fully chained".
     /// </summary>
-    private static async Task<ApiResult> GetConnectionFolderChainAsync(ApiRequest request)
+    public async Task<ApiResult> GetConnectionFolderChainAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -145,14 +164,14 @@ public static class MediaManagerConnectionsEndpoints
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
-        var chain = await request.Service<LibraryFolderChainCheck>()
+        await RequireConnectionAsync(uow, _connectionStore, connectionId).ConfigureAwait(false);
+        var chain = await _folderChainCheck
             .CheckForConnectionAsync(uow, connectionId, request.Context.RequestAborted)
             .ConfigureAwait(false);
         return ApiRoutes.Ok(new WireArray(chain.Select(item => (WireValue)item)));
     }
 
-    private static async Task<ApiResult> UpdateConnectionAsync(ApiRequest request)
+    public async Task<ApiResult> UpdateConnectionAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
@@ -168,12 +187,12 @@ public static class MediaManagerConnectionsEndpoints
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
-        VerifyCsrf(request, csrfToken);
+        MediaManagerConnectionsEndpoints.VerifyCsrf(request, csrfToken);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
+        var row = await RequireConnectionAsync(uow, _connectionStore, connectionId).ConfigureAwait(false);
         try
         {
-            await Connections(request).UpdateAsync(uow, row, name, baseUrl, apiKey, enabled, downloadedScanEnabled).ConfigureAwait(false);
+            await _connections.UpdateAsync(uow, row, name, baseUrl, apiKey, enabled, downloadedScanEnabled).ConfigureAwait(false);
         }
         catch (MediaManagerConnectionException exception)
         {
@@ -181,10 +200,10 @@ public static class MediaManagerConnectionsEndpoints
         }
 
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok((await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false)).ToOut());
+        return ApiRoutes.Ok((await RequireConnectionAsync(uow, _connectionStore, connectionId).ConfigureAwait(false)).ToOut());
     }
 
-    private static async Task<ApiResult> DeleteConnectionAsync(ApiRequest request)
+    public async Task<ApiResult> DeleteConnectionAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
@@ -195,10 +214,10 @@ public static class MediaManagerConnectionsEndpoints
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
-        VerifyCsrf(request, csrfToken);
+        MediaManagerConnectionsEndpoints.VerifyCsrf(request, csrfToken);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
-        await MediaManagerConnectionStore.DeleteAsync(uow, connectionId).ConfigureAwait(false);
+        await RequireConnectionAsync(uow, _connectionStore, connectionId).ConfigureAwait(false);
+        await _connectionStore.DeleteAsync(uow, connectionId).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return new CustomApiResult(context =>
         {
@@ -207,7 +226,7 @@ public static class MediaManagerConnectionsEndpoints
         });
     }
 
-    private static async Task<ApiResult> PostWebhookSecretAsync(ApiRequest request)
+    public async Task<ApiResult> PostWebhookSecretAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
@@ -218,10 +237,10 @@ public static class MediaManagerConnectionsEndpoints
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
-        VerifyCsrf(request, csrfToken);
+        MediaManagerConnectionsEndpoints.VerifyCsrf(request, csrfToken);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
-        var plaintext = await Connections(request).RotateWebhookSecretAsync(uow, row).ConfigureAwait(false);
+        var row = await RequireConnectionAsync(uow, _connectionStore, connectionId).ConfigureAwait(false);
+        var plaintext = await _connections.RotateWebhookSecretAsync(uow, row).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
             .Set("connection_id", row.Id)
@@ -230,7 +249,7 @@ public static class MediaManagerConnectionsEndpoints
             .Set("header_name", "X-Webhook-Secret"));
     }
 
-    private static async Task<ApiResult> PutLaneAsync(ApiRequest request)
+    public async Task<ApiResult> PutLaneAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
@@ -250,9 +269,9 @@ public static class MediaManagerConnectionsEndpoints
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
-        VerifyCsrf(request, csrfToken);
+        MediaManagerConnectionsEndpoints.VerifyCsrf(request, csrfToken);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
+        await RequireConnectionAsync(uow, _connectionStore, connectionId).ConfigureAwait(false);
         string days;
         try
         {
@@ -284,7 +303,7 @@ public static class MediaManagerConnectionsEndpoints
             throw new ApiException(StatusCodes.Status400BadRequest, $"schedule_end: {exception.Message}");
         }
 
-        var saved = await MediaManagerConnectionStore.SaveLaneAsync(uow, new MediaManagerSearchLaneRecord(
+        var saved = await _connectionStore.SaveLaneAsync(uow, new MediaManagerSearchLaneRecord(
             0,
             connectionId,
             lane,
@@ -301,11 +320,10 @@ public static class MediaManagerConnectionsEndpoints
     }
 
     /// <summary>The connection test, shared with the heartbeat (<see cref="ManagerHealthProbe"/>).</summary>
-    private static Task<(bool Ok, string Detail)> ProbeAsync(ApiRequest request, string name, string kind, string baseUrl, string? apiKey) =>
-        ManagerHealthProbe.ProbeAsync(
-            request.Service<IManagerHttpHandlerFactory>(), name, kind, baseUrl, apiKey, TestTimeout, request.Context.RequestAborted);
+    private Task<(bool Ok, string Detail)> ProbeAsync(ApiRequest request, string name, string kind, string baseUrl, string? apiKey) =>
+        ManagerHealthProbe.ProbeAsync(_handlers, name, kind, baseUrl, apiKey, TestTimeout, request.Context.RequestAborted);
 
-    private static async Task<ApiResult> PostConnectionTestAsync(ApiRequest request)
+    public async Task<ApiResult> PostConnectionTestAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
@@ -316,9 +334,9 @@ public static class MediaManagerConnectionsEndpoints
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
-        VerifyCsrf(request, csrfToken);
+        MediaManagerConnectionsEndpoints.VerifyCsrf(request, csrfToken);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
+        var row = await RequireConnectionAsync(uow, _connectionStore, connectionId).ConfigureAwait(false);
         var checkedAt = Timestamp.UtcNow(request.Time);
 
         bool ok;
@@ -329,12 +347,12 @@ public static class MediaManagerConnectionsEndpoints
         }
         else
         {
-            var apiKey = string.IsNullOrEmpty(row.ApiKeyCiphertext) ? null : Connections(request).Cipher.Decrypt(row.ApiKeyCiphertext);
+            var apiKey = string.IsNullOrEmpty(row.ApiKeyCiphertext) ? null : _connections.Cipher.Decrypt(row.ApiKeyCiphertext);
             (ok, detail) = await ProbeAsync(request, row.Name, row.Kind, row.BaseUrl, apiKey).ConfigureAwait(false);
         }
 
         // The probe can take seconds and the connection may be removed meanwhile, so the write is conditional.
-        if (await MediaManagerConnectionStore.RecordTestResultAsync(uow, connectionId, ok, checkedAt, detail).ConfigureAwait(false) == 0)
+        if (await _connectionStore.RecordTestResultAsync(uow, connectionId, ok, checkedAt, detail).ConfigureAwait(false) == 0)
         {
             await uow.RollbackAsync().ConfigureAwait(false);
             throw new ApiException(StatusCodes.Status404NotFound, "That media manager connection was removed while its connection test was running.");

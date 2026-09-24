@@ -57,9 +57,11 @@ public sealed class RemuxPassHandlerTests : IDisposable
             runner,
             policy ?? new QueueingFailurePolicy(_fixture.Jobs),
             _fixture.OperatorSettings,
+            _fixture.Handback,
+            _fixture.Libraries,
             TimeProvider.System,
             NullLogger<RemuxPassHandler>.Instance,
-            new DownloadedScanNotifier(_fixture.Connections, _fixture.Http, NullLogger<DownloadedScanNotifier>.Instance),
+            new DownloadedScanNotifier(_fixture.Connections, _fixture.ConnectionStore, _fixture.Libraries, _fixture.Http, NullLogger<DownloadedScanNotifier>.Instance),
             _fixture.Reporter,
             _fixture.Jobs);
     }
@@ -427,7 +429,7 @@ public sealed class RemuxPassHandlerTests : IDisposable
     {
         var library = await LibraryAsync(maxAttempts: 1);
         await FileRowAsync(library, "crash.mkv");
-        var recorder = new RemuxPassFailureRecorder(_fixture.Store.Database, new QueueingFailurePolicy(_fixture.Jobs), TimeProvider.System, NullLogger<RemuxPassFailureRecorder>.Instance);
+        var recorder = new RemuxPassFailureRecorder(_fixture.Store.Database, new QueueingFailurePolicy(_fixture.Jobs), _fixture.Libraries, TimeProvider.System, NullLogger<RemuxPassFailureRecorder>.Instance);
         var payload = $$$"""{"relative_media_path":"crash.mkv","library_id":{{{library}}},"origin":{"source_key":"deluno","handoff_id":"h9"}}""";
 
         var willRetry = await recorder.RecordAsync(new UnhandledJobFailure(Context(1, payload), library, "movie", "crash.mkv", "boom"), CancellationToken.None);

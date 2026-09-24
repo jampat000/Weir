@@ -9,6 +9,8 @@ namespace Weir.Infrastructure.Tests.Jobs;
 /// prerequisite checks.</summary>
 public sealed class ProcessingWatchedFolderScanDispatchEnqueueTests
 {
+    private static readonly LibraryStore Libraries = new();
+
     /// <summary>Inserts a library row directly, bypassing <see cref="LibraryRules.ValidateFolders"/> — the
     /// enqueue prerequisite checks under test are exactly what stands in for that validation for a scan,
     /// so tests need to reach states the store's own create/update guards would otherwise refuse.</summary>
@@ -18,7 +20,7 @@ public sealed class ProcessingWatchedFolderScanDispatchEnqueueTests
             "INSERT INTO libraries (name, media_type, watched_folder, output_folder) VALUES (@name, @type, @watched, @output)",
             ("@name", name), ("@type", mediaType), ("@watched", watched), ("@output", output));
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        return (await LibraryStore.GetByNameAsync(uow, name))?.Id ?? throw new InvalidOperationException("Library insert failed.");
+        return (await Libraries.GetByNameAsync(uow, name))?.Id ?? throw new InvalidOperationException("Library insert failed.");
     }
 
     [Fact]
@@ -86,7 +88,7 @@ public sealed class ProcessingWatchedFolderScanDispatchEnqueueTests
         await CreateLibraryAsync(db, "Movies", ProcessingMediaScopes.Movie, watched: "", output: "out");
 
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var (ok, error) = await ProcessingWatchedFolderScanDispatchEnqueue.ValidatePrerequisitesAsync(uow, enqueueRemuxJobs: false, "movie", null);
+        var (ok, error) = await ProcessingWatchedFolderScanDispatchEnqueue.ValidatePrerequisitesAsync(uow, Libraries, enqueueRemuxJobs: false, "movie", null);
 
         Assert.False(ok);
         Assert.Equal(ScanDispatchPrerequisiteError.NoSavedWatchedFolder, error);
@@ -102,10 +104,10 @@ public sealed class ProcessingWatchedFolderScanDispatchEnqueueTests
         await CreateLibraryAsync(db, "Movies", ProcessingMediaScopes.Movie, watched: watched, output: "");
 
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var (checkOnlyOk, _) = await ProcessingWatchedFolderScanDispatchEnqueue.ValidatePrerequisitesAsync(uow, enqueueRemuxJobs: false, "movie", null);
+        var (checkOnlyOk, _) = await ProcessingWatchedFolderScanDispatchEnqueue.ValidatePrerequisitesAsync(uow, Libraries, enqueueRemuxJobs: false, "movie", null);
         Assert.True(checkOnlyOk);
 
-        var (liveOk, liveError) = await ProcessingWatchedFolderScanDispatchEnqueue.ValidatePrerequisitesAsync(uow, enqueueRemuxJobs: true, "movie", null);
+        var (liveOk, liveError) = await ProcessingWatchedFolderScanDispatchEnqueue.ValidatePrerequisitesAsync(uow, Libraries, enqueueRemuxJobs: true, "movie", null);
         Assert.False(liveOk);
         Assert.Equal(ScanDispatchPrerequisiteError.MissingOutputForLiveRemux, liveError);
     }
@@ -150,7 +152,7 @@ public sealed class ProcessingWatchedFolderScanDispatchEnqueueTests
             ("@payload", $"{{\"media_scope\":\"movie\",\"library_id\":{libraryId}}}"));
 
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var (inserted, skip) = await ProcessingWatchedFolderScanDispatchEnqueue.TryEnqueuePeriodicAsync(uow, db.Store, library, enqueueRemuxJobs: true);
+        var (inserted, skip) = await ProcessingWatchedFolderScanDispatchEnqueue.TryEnqueuePeriodicAsync(uow, db.Store, Libraries, library, enqueueRemuxJobs: true);
 
         Assert.False(inserted);
         Assert.StartsWith("active_scan_already_queued_", skip, StringComparison.Ordinal);
@@ -169,7 +171,7 @@ public sealed class ProcessingWatchedFolderScanDispatchEnqueueTests
         var library = await GetLibraryAsync(db, libraryId);
 
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var (inserted, skip) = await ProcessingWatchedFolderScanDispatchEnqueue.TryEnqueuePeriodicAsync(uow, db.Store, library, enqueueRemuxJobs: true);
+        var (inserted, skip) = await ProcessingWatchedFolderScanDispatchEnqueue.TryEnqueuePeriodicAsync(uow, db.Store, Libraries, library, enqueueRemuxJobs: true);
         await uow.CommitAsync();
 
         Assert.True(inserted);
@@ -181,7 +183,7 @@ public sealed class ProcessingWatchedFolderScanDispatchEnqueueTests
     private static async Task<ProcessingLibraryRecord> GetLibraryAsync(JobsTestDatabase db, long id)
     {
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        return await LibraryStore.GetAsync(uow, id) ?? throw new InvalidOperationException("Library not found.");
+        return await Libraries.GetAsync(uow, id) ?? throw new InvalidOperationException("Library not found.");
     }
 
     // --- the watcher's own enqueue path: identical apart from the trigger label ------------------------

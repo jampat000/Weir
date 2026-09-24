@@ -32,10 +32,10 @@ public sealed record HandoffTargetFinish(HandoffTargetProgress Progress, Handoff
 /// pass came to. A hand-off of several files is reported once, when the last of them finishes, and a manager's
 /// "imported" releases only the copies that report named.
 /// </summary>
-public static class HandoffTargetStore
+public sealed class HandoffTargetStore
 {
     /// <summary>Record the files a hand-off covers. A resend of a hand-off still under way keeps what its files have already done.</summary>
-    public static async Task AddAsync(UnitOfWork uow, long handoffRowId, IEnumerable<string> relativePaths)
+    public async Task AddAsync(UnitOfWork uow, long handoffRowId, IEnumerable<string> relativePaths)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(relativePaths);
@@ -50,14 +50,14 @@ public static class HandoffTargetStore
     }
 
     /// <summary>Forget a finished hand-off's files, so a resend of it starts over.</summary>
-    public static Task ClearAsync(UnitOfWork uow, long handoffRowId)
+    public Task ClearAsync(UnitOfWork uow, long handoffRowId)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.ExecuteAsync("DELETE FROM media_manager_handoff_targets WHERE handoff_row_id = $row", ("$row", handoffRowId));
     }
 
     /// <summary>The files a hand-off covers, in path order.</summary>
-    public static Task<List<HandoffTarget>> ListAsync(UnitOfWork uow, long handoffRowId)
+    public Task<List<HandoffTarget>> ListAsync(UnitOfWork uow, long handoffRowId)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QueryAsync(
@@ -78,7 +78,7 @@ public static class HandoffTargetStore
     /// when a retry turns it into a success, as a single file always could. <paramref name="row"/> is null for a job that
     /// carries no hand-off, or one whose hand-off is not recorded at all. The caller commits.
     /// </summary>
-    public static async Task<HandoffTargetFinish> FinishAsync(UnitOfWork uow, HandoffLedgerRow? row, string relativePath, WireObject result)
+    public async Task<HandoffTargetFinish> FinishAsync(UnitOfWork uow, HandoffLedgerRow? row, string relativePath, WireObject result)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(result);
@@ -110,7 +110,7 @@ public static class HandoffTargetStore
     /// Runs the same readiness check and claim as <see cref="FinishAsync"/>, so a cancellation that turns out to be the
     /// hand-off's last unresolved file also reports it, instead of leaving the others' copies un-releasable forever.
     /// </summary>
-    public static async Task<HandoffTargetFinish> MarkCancelledAsync(UnitOfWork uow, HandoffLedgerRow row, string relativePath)
+    public async Task<HandoffTargetFinish> MarkCancelledAsync(UnitOfWork uow, HandoffLedgerRow row, string relativePath)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(row);
@@ -125,7 +125,7 @@ public static class HandoffTargetStore
     }
 
     /// <summary>Whether every target now has a final result and, if so, who claims reporting it.</summary>
-    private static async Task<HandoffTargetFinish> EvaluateAsync(UnitOfWork uow, HandoffLedgerRow row)
+    private async Task<HandoffTargetFinish> EvaluateAsync(UnitOfWork uow, HandoffLedgerRow row)
     {
         var targets = await ListAsync(uow, row.Id).ConfigureAwait(false);
         if (targets.Count == 0)
@@ -152,7 +152,7 @@ public static class HandoffTargetStore
     /// Whether the manager was told about this copy: the hand-off reported the file, naming exactly this copy. A hand-off
     /// that records no files of its own named only the one file it was for.
     /// </summary>
-    public static async Task<Func<HandbackRow, bool>> ReportedCopiesAsync(UnitOfWork uow, HandoffLedgerRow row)
+    public async Task<Func<HandbackRow, bool>> ReportedCopiesAsync(UnitOfWork uow, HandoffLedgerRow row)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(row);

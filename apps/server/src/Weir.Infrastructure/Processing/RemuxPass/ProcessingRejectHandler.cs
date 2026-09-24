@@ -41,6 +41,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
     private readonly HandoffLedgerStore _ledger;
     private readonly ProcessingJobStore _jobs;
     private readonly RejectPacing _pacing;
+    private readonly LibraryStore _libraries;
     private readonly TimeProvider _time;
     private readonly ILogger<ProcessingRejectHandler> _logger;
 
@@ -52,6 +53,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
         HandoffLedgerStore ledger,
         ProcessingJobStore jobs,
         RejectPacing pacing,
+        LibraryStore libraries,
         TimeProvider time,
         ILogger<ProcessingRejectHandler> logger)
     {
@@ -62,6 +64,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
         _ledger = ledger ?? throw new ArgumentNullException(nameof(ledger));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _pacing = pacing ?? throw new ArgumentNullException(nameof(pacing));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -102,7 +105,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
             _database,
             async uow =>
             {
-                var library = await RemuxPassHandler.ResolveLibraryAsync(uow, libraryId, null).ConfigureAwait(false);
+                var library = await RemuxPassHandler.ResolveLibraryAsync(uow, _libraries, libraryId, null).ConfigureAwait(false);
                 if (library is null)
                 {
                     throw new InvalidOperationException($"Library {libraryId} no longer exists.");
@@ -114,7 +117,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
                     (target, targetRefusalReason) = await _reporter.ResolveHandoffTargetAsync(uow, origin).ConfigureAwait(false);
                 }
 
-                var connectionIds = await LibraryStore.ManagerConnectionIdsAsync(uow, library.Id).ConfigureAwait(false);
+                var connectionIds = await _libraries.ManagerConnectionIdsAsync(uow, library.Id).ConfigureAwait(false);
                 var linked = await _connections.ConnectionsByIdAsync(uow, connectionIds).ConfigureAwait(false);
                 queueConnections = [.. linked.Where(connection => _ports.PortForKind(connection.Kind)?.Capabilities().RemovesQueueItems == true)];
             },
@@ -189,7 +192,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
                 }
                 else
                 {
-                    var liveLibrary = await RemuxPassHandler.ResolveLibraryAsync(uow, libraryId, null).ConfigureAwait(false);
+                    var liveLibrary = await RemuxPassHandler.ResolveLibraryAsync(uow, _libraries, libraryId, null).ConfigureAwait(false);
                     if (liveLibrary is not null)
                     {
                         EnqueuePassThroughFallback(uow, liveLibrary, relativePath, originRaw);

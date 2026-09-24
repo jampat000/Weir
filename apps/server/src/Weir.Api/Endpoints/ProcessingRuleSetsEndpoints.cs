@@ -102,16 +102,18 @@ internal sealed class ProcessingRuleSetsEndpointHandlers
     private readonly LibrarySettingsStore _librarySettings;
     private readonly LibraryScanStore _scans;
     private readonly ProcessingJobStore _jobs;
+    private readonly LibraryStore _libraries;
 
-    public ProcessingRuleSetsEndpointHandlers(LibrarySettingsStore librarySettings, LibraryScanStore scans, ProcessingJobStore jobs)
+    public ProcessingRuleSetsEndpointHandlers(LibrarySettingsStore librarySettings, LibraryScanStore scans, ProcessingJobStore jobs, LibraryStore libraries)
     {
         _librarySettings = librarySettings ?? throw new ArgumentNullException(nameof(librarySettings));
         _scans = scans ?? throw new ArgumentNullException(nameof(scans));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
     }
 
-    private static async Task<ProcessingRuleSetRecord> RequireRuleSetAsync(UnitOfWork uow, long id) =>
-        await LibraryStore.GetRuleSetAsync(uow, id).ConfigureAwait(false)
+    private async Task<ProcessingRuleSetRecord> RequireRuleSetAsync(UnitOfWork uow, long id) =>
+        await _libraries.GetRuleSetAsync(uow, id).ConfigureAwait(false)
         ?? throw new ApiException(StatusCodes.Status404NotFound, "That rule set does not exist.");
 
     private static WireObject RuleSetOut(ProcessingRuleSetRecord row, int usedByLibraryCount) => new WireObject()
@@ -159,11 +161,11 @@ internal sealed class ProcessingRuleSetsEndpointHandlers
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var rows = await LibraryStore.ListRuleSetsAsync(uow).ConfigureAwait(false);
+        var rows = await _libraries.ListRuleSetsAsync(uow).ConfigureAwait(false);
         var items = new List<WireValue>();
         foreach (var row in rows)
         {
-            items.Add(RuleSetOut(row, await LibraryStore.RuleSetUsageCountAsync(uow, row.Id).ConfigureAwait(false)));
+            items.Add(RuleSetOut(row, await _libraries.RuleSetUsageCountAsync(uow, row.Id).ConfigureAwait(false)));
         }
 
         return ApiRoutes.Ok(new WireArray(items));
@@ -186,7 +188,7 @@ internal sealed class ProcessingRuleSetsEndpointHandlers
         ProcessingRuleSetRecord row;
         try
         {
-            row = await LibraryStore.CreateRuleSetAsync(uow, body).ConfigureAwait(false);
+            row = await _libraries.CreateRuleSetAsync(uow, body).ConfigureAwait(false);
         }
         catch (ProcessingLibraryException exception)
         {
@@ -194,7 +196,7 @@ internal sealed class ProcessingRuleSetsEndpointHandlers
         }
 
         await request.CommitAsync().ConfigureAwait(false);
-        return new JsonApiResult(StatusCodes.Status201Created, RuleSetOut(row, await LibraryStore.RuleSetUsageCountAsync(uow, row.Id).ConfigureAwait(false)));
+        return new JsonApiResult(StatusCodes.Status201Created, RuleSetOut(row, await _libraries.RuleSetUsageCountAsync(uow, row.Id).ConfigureAwait(false)));
     }
 
     public async Task<ApiResult> PutRuleSetAsync(ApiRequest request)
@@ -218,7 +220,7 @@ internal sealed class ProcessingRuleSetsEndpointHandlers
         ProcessingRuleSetRecord updated;
         try
         {
-            updated = await LibraryStore.UpdateRuleSetAsync(uow, existing, body).ConfigureAwait(false);
+            updated = await _libraries.UpdateRuleSetAsync(uow, existing, body).ConfigureAwait(false);
         }
         catch (ProcessingLibraryException exception)
         {
@@ -228,7 +230,7 @@ internal sealed class ProcessingRuleSetsEndpointHandlers
         // #505 point 6: saving rules on a library with library folders runs a background re-plan (a normal scan, trigger
         // "rule_change"); the web shows "Apply to library? N files would change" once it finishes. Nothing runs on its own.
         var rescanJobIds = new List<long>();
-        foreach (var library in await LibraryStore.ListAsync(uow).ConfigureAwait(false))
+        foreach (var library in await _libraries.ListAsync(uow).ConfigureAwait(false))
         {
             if (library.RuleSetId != updated.Id)
             {
@@ -246,7 +248,7 @@ internal sealed class ProcessingRuleSetsEndpointHandlers
         }
 
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(RuleSetOut(updated, await LibraryStore.RuleSetUsageCountAsync(uow, updated.Id).ConfigureAwait(false))
+        return ApiRoutes.Ok(RuleSetOut(updated, await _libraries.RuleSetUsageCountAsync(uow, updated.Id).ConfigureAwait(false))
             .Set("library_rescan_job_ids", new WireArray(rescanJobIds.Select(id => (WireValue)new WireInteger(id)))));
     }
 
@@ -267,7 +269,7 @@ internal sealed class ProcessingRuleSetsEndpointHandlers
         var row = await RequireRuleSetAsync(uow, id).ConfigureAwait(false);
         try
         {
-            await LibraryStore.DeleteRuleSetAsync(uow, row).ConfigureAwait(false);
+            await _libraries.DeleteRuleSetAsync(uow, row).ConfigureAwait(false);
         }
         catch (ProcessingLibraryException exception)
         {

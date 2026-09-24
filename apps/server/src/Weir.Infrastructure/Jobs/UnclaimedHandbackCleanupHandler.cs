@@ -27,14 +27,16 @@ public sealed partial class UnclaimedHandbackCleanupHandler : IJobHandler
 {
     private readonly ProcessingJobStore _store;
     private readonly OperatorSettingsStore _operatorSettings;
+    private readonly HandbackStore _handback;
     private readonly TimeProvider _time;
     private readonly ILogger<UnclaimedHandbackCleanupHandler> _logger;
 
     public UnclaimedHandbackCleanupHandler(
-        ProcessingJobStore store, OperatorSettingsStore operatorSettings, TimeProvider time, ILogger<UnclaimedHandbackCleanupHandler> logger)
+        ProcessingJobStore store, OperatorSettingsStore operatorSettings, HandbackStore handback, TimeProvider time, ILogger<UnclaimedHandbackCleanupHandler> logger)
     {
         _store = store;
         _operatorSettings = operatorSettings;
+        _handback = handback;
         _time = time;
         _logger = logger;
     }
@@ -55,7 +57,7 @@ public sealed partial class UnclaimedHandbackCleanupHandler : IJobHandler
         {
             var settings = await _operatorSettings.GetAsync(read).ConfigureAwait(false);
             days = OperatorSettingsRules.ClampUnclaimedHandbackWindowDays(settings?.UnclaimedHandbackWindowDays ?? HandbackRules.DefaultUnclaimedWindowDays);
-            rows = await HandbackStore.UnclaimedAsync(read, scope, _time.GetUtcNow() - TimeSpan.FromDays(days)).ConfigureAwait(false);
+            rows = await _handback.UnclaimedAsync(read, scope, _time.GetUtcNow() - TimeSpan.FromDays(days)).ConfigureAwait(false);
         }
 
         int removed = 0, gone = 0, kept = 0, inUse = 0;
@@ -76,7 +78,7 @@ public sealed partial class UnclaimedHandbackCleanupHandler : IJobHandler
                         HandbackReleaseKind.AlreadyGone => decided with { Note = HandbackRules.UnclaimedGoneNote },
                         _ => decided,
                     };
-                    await HandbackStore.RecordReleaseAsync(uow, row.Id, decided, _time.GetUtcNow()).ConfigureAwait(false);
+                    await _handback.RecordReleaseAsync(uow, row.Id, decided, _time.GetUtcNow()).ConfigureAwait(false);
                     return decided;
                 },
                 _logger,

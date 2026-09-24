@@ -2,7 +2,6 @@ using Weir.Core.Jobs;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Infrastructure.Jobs;
-using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
@@ -46,7 +45,7 @@ public sealed partial class HandoffLedgerStore
         {
             foreach (var file in await FileRowsAsync(uow, row).ConfigureAwait(false))
             {
-                await FileStateStore.MarkCancelledAsync(uow, libraryId, file.RelativePath, CancelledFileReasons.ByManager).ConfigureAwait(false);
+                await _files.MarkCancelledAsync(uow, libraryId, file.RelativePath, CancelledFileReasons.ByManager).ConfigureAwait(false);
             }
         }
 

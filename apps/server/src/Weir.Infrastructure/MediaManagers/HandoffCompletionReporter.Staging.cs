@@ -2,7 +2,6 @@ using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
-using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Sqlite;
 
@@ -67,7 +66,7 @@ public sealed partial class HandoffCompletionReporter
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(origin);
         ArgumentNullException.ThrowIfNull(row);
-        var finish = await HandoffTargetStore.MarkCancelledAsync(uow, row, relativePath).ConfigureAwait(false);
+        var finish = await _targets.MarkCancelledAsync(uow, row, relativePath).ConfigureAwait(false);
         if (finish.Progress != HandoffTargetProgress.Ready)
         {
             return;
@@ -131,14 +130,14 @@ public sealed partial class HandoffCompletionReporter
     }
 
     /// <summary>The library's output folder as Weir sees it: from the pass that just finished, else from the library itself.</summary>
-    private static async Task<string?> LocalOutputFolderAsync(UnitOfWork uow, HandoffLedgerRow row, WireObject? result)
+    private async Task<string?> LocalOutputFolderAsync(UnitOfWork uow, HandoffLedgerRow row, WireObject? result)
     {
         if (result?.Get("processing_output_folder_resolved") is WireString { Value.Length: > 0 } resolved)
         {
             return resolved.Value;
         }
 
-        return row.LibraryId is { } libraryId && await LibraryStore.GetAsync(uow, libraryId).ConfigureAwait(false) is { OutputFolder.Length: > 0 } library
+        return row.LibraryId is { } libraryId && await _libraries.GetAsync(uow, libraryId).ConfigureAwait(false) is { OutputFolder.Length: > 0 } library
             ? RemuxPassPaths.Resolve(library.OutputFolder.Trim())
             : null;
     }

@@ -21,7 +21,7 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
     }
 
     private ProcessingFailureCleanupSweep Sweep() =>
-        new(_fixture.Store.Database, _fixture.Store.Options, _fixture.Connections, TimeProvider.System, NullLogger<ProcessingFailureCleanupSweep>.Instance);
+        new(_fixture.Store.Database, _fixture.Store.Options, _fixture.Connections, _fixture.Libraries, TimeProvider.System, NullLogger<ProcessingFailureCleanupSweep>.Instance);
 
     private string P(string relative) => Directory.CreateDirectory(_root.Join(relative)).FullName;
 

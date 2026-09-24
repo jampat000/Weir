@@ -3,6 +3,7 @@ using Microsoft.Data.Sqlite;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Infrastructure.Jobs;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
@@ -52,10 +53,14 @@ public sealed partial class HandoffLedgerStore
         "outcome_released, download_id, created_at, connection_id, reported_status, output_files_json";
 
     private readonly TimeProvider _time;
+    private readonly HandoffTargetStore _targets;
+    private readonly FileStateStore _files;
 
-    public HandoffLedgerStore(TimeProvider time)
+    public HandoffLedgerStore(TimeProvider time, HandoffTargetStore targets, FileStateStore files)
     {
         _time = time ?? throw new ArgumentNullException(nameof(time));
+        _targets = targets ?? throw new ArgumentNullException(nameof(targets));
+        _files = files ?? throw new ArgumentNullException(nameof(files));
     }
 
     /// <summary>The ledger row for a manager's hand-off id, or null.</summary>
@@ -113,7 +118,7 @@ public sealed partial class HandoffLedgerStore
                 ("$download", string.IsNullOrWhiteSpace(downloadId) ? null : downloadId.Trim()),
                 ("$connection", connectionId),
                 ("$row", row.Id)).ConfigureAwait(false);
-            await HandoffTargetStore.ClearAsync(uow, row.Id).ConfigureAwait(false);
+            await _targets.ClearAsync(uow, row.Id).ConfigureAwait(false);
         }
 
         return row.Id;

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Activity;
 using Weir.Core.Auth;
@@ -12,6 +13,7 @@ using Weir.Core.Validation;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 
 namespace Weir.Api.Endpoints;
@@ -26,9 +28,30 @@ public static class ProcessingFileTracksEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingFileTracksEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/processing/files/{file_id}/tracks", GetFileTracksAsync);
-        endpoints.MapV1("POST", "/processing/files/{file_id}/manual-plan", PostManualPlanAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<ProcessingFileTracksEndpointHandlers>();
+        endpoints.MapV1("GET", "/processing/files/{file_id}/tracks", handlers.GetFileTracksAsync);
+        endpoints.MapV1("POST", "/processing/files/{file_id}/manual-plan", handlers.PostManualPlanAsync);
         return endpoints;
+    }
+}
+
+/// <summary>Handlers for <see cref="ProcessingFileTracksEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class ProcessingFileTracksEndpointHandlers
+{
+    private readonly FileStateStore _files;
+    private readonly LibraryStore _libraries;
+    private readonly MediaTools _mediaTools;
+    private readonly ProcessingJobStore _jobs;
+    private readonly ActivityStore _activity;
+
+    public ProcessingFileTracksEndpointHandlers(
+        FileStateStore files, LibraryStore libraries, MediaTools mediaTools, ProcessingJobStore jobs, ActivityStore activity)
+    {
+        _files = files ?? throw new ArgumentNullException(nameof(files));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
+        _mediaTools = mediaTools ?? throw new ArgumentNullException(nameof(mediaTools));
+        _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+        _activity = activity ?? throw new ArgumentNullException(nameof(activity));
     }
 
     private static WireObject StreamOut(int index, string kind, ProbeStreamInfo stream, TrackDecision? decision)
@@ -54,7 +77,7 @@ public static class ProcessingFileTracksEndpoints
             .Set("rule_reason", decision?.Reason ?? "This pass does not act on this stream type.");
     }
 
-    private static async Task<ApiResult> GetFileTracksAsync(ApiRequest request)
+    public async Task<ApiResult> GetFileTracksAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -65,7 +88,7 @@ public static class ProcessingFileTracksEndpoints
         ManualPlanFileContext context;
         try
         {
-            context = await ManualPlanSupport.LoadAsync(uow, request.Service<MediaTools>(), request.Options, id, request.Context.RequestAborted)
+            context = await ManualPlanSupport.LoadAsync(uow, _files, _libraries, _mediaTools, request.Options, id, request.Context.RequestAborted)
                 .ConfigureAwait(false);
         }
         catch (ManualPlanEnqueueException exception)
@@ -169,7 +192,7 @@ public static class ProcessingFileTracksEndpoints
             .Set("streams", new WireArray(rows.Select(r => (WireValue)r.Row))));
     }
 
-    private static async Task<ApiResult> PostManualPlanAsync(ApiRequest request)
+    public async Task<ApiResult> PostManualPlanAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -222,7 +245,7 @@ public static class ProcessingFileTracksEndpoints
         ManualPlanFileContext context;
         try
         {
-            context = await ManualPlanSupport.LoadAsync(uow, request.Service<MediaTools>(), request.Options, id, request.Context.RequestAborted)
+            context = await ManualPlanSupport.LoadAsync(uow, _files, _libraries, _mediaTools, request.Options, id, request.Context.RequestAborted)
                 .ConfigureAwait(false);
         }
         catch (ManualPlanEnqueueException exception)
@@ -254,9 +277,9 @@ public static class ProcessingFileTracksEndpoints
             throw new ApiException(StatusCodes.Status400BadRequest, $"Weir could not read this file safely: {exception.Message}");
         }
 
-        var job = ManualPlanSupport.EnqueueManualPlan(uow, request.Service<ProcessingJobStore>(), context, choice, fingerprint);
+        var job = ManualPlanSupport.EnqueueManualPlan(uow, _jobs, context, choice, fingerprint);
         var name = System.IO.Path.GetFileName(context.File.RelativePath);
-        await request.Service<ActivityStore>().RecordAsync(
+        await _activity.RecordAsync(
             uow,
             ActivityEventTypes.ProcessingFileManualPlanQueued,
             "processing",

@@ -77,7 +77,7 @@ public sealed partial class ConfigurationBundleStore
             .Set("operator_settings", processingOperator[0])
             .Set("rule_sets", new WireArray(ruleSets))
             .Set("libraries", new WireArray(libraries))
-            .Set(ConfigurationBundleConnections.MediaManagersSection, await ConfigurationBundleConnections.ExportMediaManagersAsync(uow).ConfigureAwait(false))
+            .Set(ConfigurationBundleConnections.MediaManagersSection, await _connections.ExportMediaManagersAsync(uow).ConfigureAwait(false))
             .Set(ConfigurationBundleConnections.AlertsSection, await _connections.ExportAlertsAsync(uow).ConfigureAwait(false));
     }
 
@@ -112,7 +112,7 @@ public sealed partial class ConfigurationBundleStore
         await ApplySuiteSettingsAsync(uow, bundle[SuiteTable], zones).ConfigureAwait(false);
         await ApplySingletonAsync(uow, ArrTable, bundle[ArrTable]).ConfigureAwait(false);
         await ApplySingletonAsync(uow, ProcessingOperatorTable, bundle[ProcessingOperatorTable]).ConfigureAwait(false);
-        var restoredConnectionIds = await ConfigurationBundleConnections.RestoreMediaManagersAsync(uow, bundle).ConfigureAwait(false);
+        var restoredConnectionIds = await _connections.RestoreMediaManagersAsync(uow, bundle).ConfigureAwait(false);
         await RestoreProcessingLibrariesAsync(uow, bundle, weirHome, restoredConnectionIds).ConfigureAwait(false);
         await _connections.RestoreAlertsAsync(uow, bundle).ConfigureAwait(false);
     }

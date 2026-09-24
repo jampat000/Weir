@@ -63,7 +63,7 @@ public sealed record HandbackRelease(HandbackReleaseKind Kind, string Note)
 /// "imported" (Sonarr's and Radarr's webhook, Deluno's outcome) and the Cleanup job's "nobody claimed it" all remove a
 /// copy only by <see cref="Release"/>.
 /// </summary>
-public static class HandbackStore
+public sealed class HandbackStore
 {
     private const string Columns =
         "h.id, h.library_id, h.relative_path, h.output_path, h.output_size, h.output_mtime_ns, h.written_at, h.outcome, h.outcome_by, " +
@@ -76,7 +76,7 @@ public static class HandbackStore
     /// wrote. A new copy of the same file starts its story over. A copy Weir cannot measure is not recorded, so it can
     /// never be removed.
     /// </summary>
-    public static async Task RecordWrittenAsync(UnitOfWork uow, long libraryId, string relativePath, string outputPath, DateTimeOffset now)
+    public async Task RecordWrittenAsync(UnitOfWork uow, long libraryId, string relativePath, string outputPath, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(uow);
         if (string.IsNullOrWhiteSpace(outputPath) || !TryMeasure(outputPath, out var size, out var mtimeNs))
@@ -121,7 +121,7 @@ public static class HandbackStore
         }
     }
 
-    public static Task<HandbackRow?> FindAsync(UnitOfWork uow, long libraryId, string relativePath)
+    public Task<HandbackRow?> FindAsync(UnitOfWork uow, long libraryId, string relativePath)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QuerySingleAsync(
@@ -132,7 +132,7 @@ public static class HandbackStore
     }
 
     /// <summary>Every copy in these libraries, by file, for the Files and History lists.</summary>
-    public static async Task<Dictionary<(long LibraryId, string RelativePath), HandbackRow>> ForLibrariesAsync(UnitOfWork uow, IEnumerable<long> libraryIds)
+    public async Task<Dictionary<(long LibraryId, string RelativePath), HandbackRow>> ForLibrariesAsync(UnitOfWork uow, IEnumerable<long> libraryIds)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var ids = libraryIds.Distinct().ToList();
@@ -155,7 +155,7 @@ public static class HandbackStore
     }
 
     /// <summary>Copies whose file name is <paramref name="fileName"/> (compared without case, so a match is only a candidate).</summary>
-    public static Task<List<HandbackRow>> WithFileNameAsync(UnitOfWork uow, string fileName)
+    public Task<List<HandbackRow>> WithFileNameAsync(UnitOfWork uow, string fileName)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QueryAsync(
@@ -165,7 +165,7 @@ public static class HandbackStore
     }
 
     /// <summary>Copies of one kind of library that nobody has said anything about and Weir still looks after, written before <paramref name="writtenBefore"/>.</summary>
-    public static Task<List<HandbackRow>> UnclaimedAsync(UnitOfWork uow, string mediaScope, DateTimeOffset writtenBefore)
+    public Task<List<HandbackRow>> UnclaimedAsync(UnitOfWork uow, string mediaScope, DateTimeOffset writtenBefore)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QueryAsync(
@@ -176,7 +176,7 @@ public static class HandbackStore
     }
 
     /// <summary>What a manager said about the copy.</summary>
-    public static Task RecordOutcomeAsync(UnitOfWork uow, long id, string outcome, string by, DateTimeOffset at, string? importedPath, string? reason)
+    public Task RecordOutcomeAsync(UnitOfWork uow, long id, string outcome, string by, DateTimeOffset at, string? importedPath, string? reason)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.ExecuteAsync(
@@ -194,7 +194,7 @@ public static class HandbackStore
     /// What the release rule did. A copy that settles is never looked at again; one Weir could not remove this time keeps
     /// its note and stays in the Cleanup job's care.
     /// </summary>
-    public static Task RecordReleaseAsync(UnitOfWork uow, long id, HandbackRelease release, DateTimeOffset now)
+    public Task RecordReleaseAsync(UnitOfWork uow, long id, HandbackRelease release, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(release);

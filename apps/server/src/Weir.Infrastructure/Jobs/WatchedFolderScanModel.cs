@@ -35,9 +35,9 @@ internal sealed record WatchedFolderScanLookups(
     HashSet<string> ActivePasses,
     IReadOnlyDictionary<string, DateTimeOffset> HeldBackPasses)
 {
-    public static async Task<WatchedFolderScanLookups> ReadAsync(UnitOfWork reads, WatchedFolderScan scan)
+    public static async Task<WatchedFolderScanLookups> ReadAsync(UnitOfWork reads, FileStateStore files, WatchedFolderScan scan)
     {
-        var rows = await FileStateStore.ListForLibraryAsync(reads, scan.Library.Id).ConfigureAwait(false);
+        var rows = await files.ListForLibraryAsync(reads, scan.Library.Id).ConfigureAwait(false);
         return new WatchedFolderScanLookups(
             rows.ToDictionary(row => row.RelativePath, StringComparer.Ordinal),
             await ActiveRemuxPasses.PathsAsync(reads, scan.MediaScope, scan.Library.Id).ConfigureAwait(false),
