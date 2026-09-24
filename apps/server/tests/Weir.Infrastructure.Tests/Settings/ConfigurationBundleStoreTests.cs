@@ -23,7 +23,7 @@ public sealed class ConfigurationBundleStoreTests : IDisposable
 
     private Task<PyDict> BuildBundleAsync() => _store.WithUnitOfWork(ConfigurationBundleStore.BuildAsync, commit: false);
 
-    private Task ApplyAsync(PyDict bundle) => _store.WithUnitOfWork(async uow =>
+    private Task<bool> ApplyAsync(PyDict bundle) => _store.WithUnitOfWork(async uow =>
     {
         await ConfigurationBundleStore.ApplyAsync(uow, bundle, _zones, _store.Options.WeirHome);
         return true;
