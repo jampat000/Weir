@@ -25,7 +25,7 @@ Then::
 
     python scripts/capture-readme-screenshots.py <output-dir>
 
-Copy the results over ``screenshots/`` once they have been looked at.
+Copy the results over ``docs/assets/screenshots/`` once they have been looked at.
 """
 
 from __future__ import annotations

@@ -9,7 +9,7 @@ type Props = {
  * The Weir mark (#581), inline so it follows the theme tokens. Three streams in one colour: the
  * Windows tray icon is a single-colour mask, and the sidebar never draws the mark small enough for
  * the streams to fuse (packaging/brand/README.md). The paths are generated: change the geometry in
- * design-options/logos-round4/build/mark.py and paste the path data its build.py prints.
+ * packaging/brand/build/mark.py and paste the path data its build.py prints.
  */
 function WeirMark({ className }: { className?: string }) {
   return (
