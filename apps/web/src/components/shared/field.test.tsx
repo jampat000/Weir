@@ -20,13 +20,21 @@ describe("Field", () => {
       </>,
     );
 
-    expect(screen.getByRole("textbox", { name: "Output folder" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Work folder" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Output folder" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Work folder" }),
+    ).toBeInTheDocument();
   });
 
   it("links the hint to the control with aria-describedby", () => {
     render(
-      <Field label="Work folder" width="wide" hint="Leave empty to use Weir's private temporary folder.">
+      <Field
+        label="Work folder"
+        width="wide"
+        hint="Leave empty to use Weir's private temporary folder."
+      >
         <input />
       </Field>,
     );
