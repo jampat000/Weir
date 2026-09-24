@@ -34,9 +34,21 @@ const EMPTY_PROGRESS: Readonly<Record<string, LiveProgressEntry>> = {};
 let liveProgressByPath: Readonly<Record<string, LiveProgressEntry>> =
   EMPTY_PROGRESS;
 const progressSubscribers = new Set<LiveProgressSubscriber>();
+/** A progress frame arrived while the tab was hidden and has not been shown yet. */
+let progressChangedWhileHidden = false;
 
 function emitActivityLatest(): void {
   subscribers.forEach((subscriber) => subscriber());
+}
+
+function emitLiveProgress(): void {
+  progressSubscribers.forEach((subscriber) => subscriber());
+}
+
+function tabIsHidden(): boolean {
+  return (
+    typeof document !== "undefined" && document.visibilityState === "hidden"
+  );
 }
 
 function parseLatestPayload(data: string): LatestPayload | null {
@@ -127,14 +139,20 @@ function closeActivityStream(): void {
   source = null;
 }
 
-/** Stop the connection while the tab is hidden, and pick it back up once anyone still wants it. */
+/**
+ * The connection stays open while the tab is hidden, so coming back to Weir shows what is true now
+ * instead of catching up in front of you. Activity still refreshes each screen's data in the
+ * background as it happens. Live progress, which changes every second, is only stored while hidden,
+ * and is drawn once when the tab is shown again.
+ */
 function onVisibilityChange(): void {
-  if (document.visibilityState === "hidden") {
-    closeActivityStream();
-    return;
-  }
+  if (tabIsHidden()) return;
   if (subscribers.size > 0 || progressSubscribers.size > 0) {
     ensureActivityStream();
+  }
+  if (progressChangedWhileHidden) {
+    progressChangedWhileHidden = false;
+    emitLiveProgress();
   }
 }
 
@@ -153,12 +171,6 @@ function ensureActivityStream(): EventSource | null {
   if (typeof EventSource === "undefined") {
     return null;
   }
-  if (
-    typeof document !== "undefined" &&
-    document.visibilityState === "hidden"
-  ) {
-    return null;
-  }
   source = new EventSource("/api/v1/activity/stream");
   source.addEventListener("activity.latest", (ev) => {
     const payload = parseLatestPayload((ev as MessageEvent<string>).data);
@@ -174,7 +186,11 @@ function ensureActivityStream(): EventSource | null {
     const next: Record<string, LiveProgressEntry> = {};
     for (const entry of entries) next[entry.relativePath] = entry;
     liveProgressByPath = next;
-    progressSubscribers.forEach((subscriber) => subscriber());
+    if (tabIsHidden()) {
+      progressChangedWhileHidden = true;
+      return;
+    }
+    emitLiveProgress();
   });
   return source;
 }
@@ -185,6 +201,7 @@ function closeIfNobodyIsWatching(): void {
     closeActivityStream();
     lastSeen = null;
     liveProgressByPath = EMPTY_PROGRESS;
+    progressChangedWhileHidden = false;
   }
 }
 
