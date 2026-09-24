@@ -1,5 +1,19 @@
+# Every text file is normalised to LF on checkin, regardless of
+# which platform checked it out, so a Windows checkout and Prettier's default no longer disagree.
+* text=auto eol=lf
+
+# cmd.exe's own scripts stay CRLF: some Windows tools that read .bat/.cmd files still mishandle a
+# bare LF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
 # Shell entrypoints must use LF so Linux containers do not see /bin/sh^M.
 docker/*.sh text eol=lf
+
 # The .NET server's SQL migrations become sqlite_master text, which the schema parity test compares
 # byte for byte with the frozen reference, so these stay LF on every checkout.
 apps/server/**/*.sql text eol=lf
+
+# Binary assets: never diff, never touch line endings.
+*.png binary
+*.ico binary

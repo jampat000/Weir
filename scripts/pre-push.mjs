@@ -46,7 +46,7 @@ if (!existsSync(prettier)) {
 } else {
   step("prettier");
   const files = ["src/**/*.{ts,tsx,css}", "index.html", "vite.config.ts"];
-  if (!run(process.execPath, [prettier, "--check", "--end-of-line", "auto", ...files], { cwd: webDir })) {
+  if (!run(process.execPath, [prettier, "--check", ...files], { cwd: webDir })) {
     fail("prettier check failed", "npm run format:fix in apps/web");
   }
 
