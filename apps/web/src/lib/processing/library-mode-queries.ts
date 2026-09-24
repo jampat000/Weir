@@ -18,6 +18,10 @@ import {
   type LibraryFileFilters,
   type LibraryManualPlan,
 } from "./library-mode-api";
+import {
+  fetchLibraryRedownloads,
+  requestLibraryRedownload,
+} from "./library-redownload-api";
 import { previewProcessingRules } from "./rules-preview-api";
 import { processingKeys } from "./query-keys";
 
@@ -153,6 +157,31 @@ export function useSetLibraryFileLeaveAlone(libraryId: number) {
     mutationFn: ({ path, leaveAlone }: { path: string; leaveAlone: boolean }) =>
       setLibraryFileLeaveAlone(libraryId, path, leaveAlone),
     onSuccess: () => invalidateLibraryViews(qc, libraryId),
+  });
+}
+
+/**
+ * The files a past clean left missing a track the rules now keep. Read only while a file panel is open, since
+ * that is the one place "Download again" is offered.
+ */
+export function useLibraryRedownloadsQuery(libraryId: number) {
+  return useQuery({
+    queryKey: processingKeys.libraryRedownloads(libraryId),
+    queryFn: () => fetchLibraryRedownloads(libraryId),
+    enabled: libraryId > 0,
+  });
+}
+
+export function useRequestLibraryRedownload(libraryId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (path: string) => requestLibraryRedownload(libraryId, path),
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: processingKeys.libraryRedownloads(libraryId),
+      });
+      invalidateLibraryViews(qc, libraryId);
+    },
   });
 }
 

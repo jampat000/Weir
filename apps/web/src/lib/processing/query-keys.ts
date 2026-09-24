@@ -57,4 +57,6 @@ export const processingKeys = {
     ["processing", "library-overview", libraryId] as const,
   libraryFilePreview: (libraryId: number, path: string) =>
     ["processing", "library-file-preview", libraryId, path] as const,
+  libraryRedownloads: (libraryId: number) =>
+    ["processing", "library-redownloads", libraryId] as const,
 };
