@@ -44,7 +44,8 @@ public sealed record MediaManagerConnectionRecord(
     string? WebhookSecretCiphertext,
     bool? LastTestOk,
     Timestamp? LastTestAt,
-    string? LastTestDetail)
+    string? LastTestDetail,
+    bool DownloadedScanEnabled = false)
 {
     public IReadOnlyList<MediaManagerSearchLaneRecord> Lanes { get; init; } = [];
 
@@ -75,6 +76,7 @@ public sealed record MediaManagerConnectionRecord(
         .Set("last_test_ok", LastTestOk is { } ok ? WireValue.Of(ok) : WireValue.Null)
         .Set("last_test_at", LastTestAt is { } at ? at.ToWireText() : null)
         .Set("last_test_detail", LastTestDetail)
+        .Set("downloaded_scan_enabled", DownloadedScanEnabled)
         .Set("lanes", new WireArray(Lanes.OrderBy(lane => lane.Lane, StringComparer.Ordinal).Select(lane => (WireValue)lane.ToOut())));
 }
 
@@ -99,7 +101,7 @@ public static class MediaManagerConnectionStore
 {
     private const string ConnectionColumns =
         "id, kind, name, enabled, base_url, api_key_ciphertext, webhook_secret_ciphertext, " +
-        "last_connection_test_ok, last_connection_test_at, last_connection_test_detail";
+        "last_connection_test_ok, last_connection_test_at, last_connection_test_detail, downloaded_scan_enabled";
 
     private const string LaneColumns =
         "id, connection_id, lane, enabled, max_items_per_run, retry_delay_minutes, schedule_enabled, schedule_days, " +
@@ -169,19 +171,21 @@ public static class MediaManagerConnectionStore
     }
 
     /// <summary>Insert a connection and its two default lanes; returns the new id.</summary>
-    public static async Task<long> InsertAsync(UnitOfWork uow, string kind, string name, bool enabled, string baseUrl, string? apiKeyCiphertext)
+    public static async Task<long> InsertAsync(
+        UnitOfWork uow, string kind, string name, bool enabled, string baseUrl, string? apiKeyCiphertext, bool downloadedScanEnabled = false)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var id = Convert.ToInt64(
             await uow.ExecuteScalarWriteAsync(
                 "INSERT INTO media_manager_connections (kind, name, enabled, base_url, api_key_ciphertext, webhook_secret_ciphertext, " +
-                "last_connection_test_ok, last_connection_test_at, last_connection_test_detail) " +
-                "VALUES ($kind, $name, $enabled, $base_url, $key, NULL, NULL, NULL, NULL) RETURNING id",
+                "last_connection_test_ok, last_connection_test_at, last_connection_test_detail, downloaded_scan_enabled) " +
+                "VALUES ($kind, $name, $enabled, $base_url, $key, NULL, NULL, NULL, NULL, $scan) RETURNING id",
                 ("$kind", kind),
                 ("$name", name),
                 ("$enabled", enabled ? 1 : 0),
                 ("$base_url", baseUrl),
-                ("$key", apiKeyCiphertext)).ConfigureAwait(false),
+                ("$key", apiKeyCiphertext),
+                ("$scan", downloadedScanEnabled ? 1 : 0)).ConfigureAwait(false),
             System.Globalization.CultureInfo.InvariantCulture);
         foreach (var lane in MediaManagerKinds.SearchLanes)
         {
@@ -300,7 +304,8 @@ public static class MediaManagerConnectionStore
         SqliteValues.GetStringOrNull(reader, 6),
         SqliteValues.GetBoolOrNull(reader, 7),
         SqliteValues.GetDateTimeOrNull(reader, 8),
-        SqliteValues.GetStringOrNull(reader, 9));
+        SqliteValues.GetStringOrNull(reader, 9),
+        SqliteValues.GetBool(reader, 10));
 
     private static MediaManagerSearchLaneRecord ReadLane(SqliteDataReader reader) => new(
         SqliteValues.GetInt64(reader, 0),

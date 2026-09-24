@@ -33,6 +33,7 @@ public static class MediaManagerConnectionsEndpoints
         endpoints.MapV1("POST", "/media-managers/connections/{connection_id}/webhook-secret", PostWebhookSecretAsync);
         endpoints.MapV1("PUT", "/media-managers/connections/{connection_id}/lanes/{lane}", PutLaneAsync);
         endpoints.MapV1("POST", "/media-managers/connections/{connection_id}/test", PostConnectionTestAsync);
+        endpoints.MapV1("GET", "/media-managers/connections/{connection_id}/folder-chain", GetConnectionFolderChainAsync);
         return endpoints;
     }
 
@@ -74,6 +75,7 @@ public static class MediaManagerConnectionsEndpoints
         var enabled = model.Bool("enabled", defaultValue: true);
         var baseUrl = StrWithDefault(model, body, "base_url", string.Empty, 2000);
         var apiKey = StrWithDefault(model, body, "api_key", string.Empty, 2000);
+        var downloadedScanEnabled = model.Bool("downloaded_scan_enabled", defaultValue: false);
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
@@ -82,7 +84,8 @@ public static class MediaManagerConnectionsEndpoints
         long id;
         try
         {
-            id = await Connections(request).CreateAsync(uow, kind, name, baseUrl, apiKey.Length > 0 ? apiKey : null, enabled).ConfigureAwait(false);
+            id = await Connections(request)
+                .CreateAsync(uow, kind, name, baseUrl, apiKey.Length > 0 ? apiKey : null, enabled, downloadedScanEnabled).ConfigureAwait(false);
         }
         catch (MediaManagerConnectionException exception)
         {
@@ -129,6 +132,26 @@ public static class MediaManagerConnectionsEndpoints
         return ApiRoutes.Ok((await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false)).ToOut());
     }
 
+    /// <summary>
+    /// <c>GET /api/v1/media-managers/connections/{connection_id}/folder-chain</c>: the same per-library
+    /// folder-chain check <c>ProcessingLibraryEndpoints.GetLibraryFolderChainAsync</c> exposes per library, run for
+    /// every library linked to this connection — "which of this connection's libraries are fully chained".
+    /// </summary>
+    private static async Task<ApiResult> GetConnectionFolderChainAsync(ApiRequest request)
+    {
+        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
+        var issues = new ValidationIssues();
+        var connectionId = ConnectionId(request, issues);
+        issues.ThrowIfAny();
+
+        var uow = await request.DbAsync().ConfigureAwait(false);
+        await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
+        var chain = await request.Service<LibraryFolderChainCheck>()
+            .CheckForConnectionAsync(uow, connectionId, request.Context.RequestAborted)
+            .ConfigureAwait(false);
+        return ApiRoutes.Ok(new WireArray(chain.Select(item => (WireValue)item)));
+    }
+
     private static async Task<ApiResult> UpdateConnectionAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
@@ -141,6 +164,7 @@ public static class MediaManagerConnectionsEndpoints
         var enabled = model.OptionalBool("enabled");
         var baseUrl = model.OptionalStr("base_url", maxLength: 2000);
         var apiKey = model.OptionalStr("api_key", maxLength: 2000);
+        var downloadedScanEnabled = model.OptionalBool("downloaded_scan_enabled");
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
@@ -149,7 +173,7 @@ public static class MediaManagerConnectionsEndpoints
         var row = await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
         try
         {
-            await Connections(request).UpdateAsync(uow, row, name, baseUrl, apiKey, enabled).ConfigureAwait(false);
+            await Connections(request).UpdateAsync(uow, row, name, baseUrl, apiKey, enabled, downloadedScanEnabled).ConfigureAwait(false);
         }
         catch (MediaManagerConnectionException exception)
         {

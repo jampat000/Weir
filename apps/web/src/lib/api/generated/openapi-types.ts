@@ -327,6 +327,89 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/download-clients/connections": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Download Client Connections
+     * @description Every bare download-client connection. Read only; secrets are reported only as saved or not.
+     */
+    get: operations["get_download_client_connections_api_v1_download_clients_connections_get"];
+    put?: never;
+    /**
+     * Post Download Client Connection
+     * @description Add a direct, outbound-only connection to a bare download client, used only to suggest watched folders.
+     */
+    post: operations["post_download_client_connection_api_v1_download_clients_connections_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/download-clients/connections/{connection_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Download Client Connection */
+    get: operations["get_download_client_connection_api_v1_download_clients_connections__connection_id__get"];
+    /** Put Download Client Connection */
+    put: operations["put_download_client_connection_api_v1_download_clients_connections__connection_id__put"];
+    post?: never;
+    /** Delete Download Client Connection */
+    delete: operations["delete_download_client_connection_api_v1_download_clients_connections__connection_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/download-clients/connections/{connection_id}/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Download Client Connection Test
+     * @description Test the connection: reach the client and, if credentials are needed, check they are accepted. Records the result.
+     */
+    post: operations["post_download_client_connection_test_api_v1_download_clients_connections__connection_id__test_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/download-clients/suggestions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Download Client Suggestions
+     * @description One suggested watched folder per enabled download-client connection, shaped like the manager-based suggestions so both feed the same list. media_type is accepted for route consistency but does not filter the result — a download client's completed folder does not depend on it.
+     */
+    get: operations["get_download_client_suggestions_api_v1_download_clients_suggestions_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/intake/capabilities": {
     parameters: {
       query?: never;
@@ -339,6 +422,26 @@ export interface paths {
      * @description What a media manager may ask Weir about its hand-offs.
      */
     get: operations["get_intake_capabilities_api_v1_intake_capabilities_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/intake/library-folders": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Intake Library Folders
+     * @description Every enabled library's watched, work and output folders, so a media manager can read them instead of a person retyping them. Read only.
+     */
+    get: operations["get_intake_library_folders_api_v1_intake_library_folders_get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -476,6 +579,26 @@ export interface paths {
     post?: never;
     /** Delete Media Manager Connection */
     delete: operations["delete_media_manager_connection_api_v1_media_managers_connections__connection_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/media-managers/connections/{connection_id}/folder-chain": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Media Manager Connection Folder Chain
+     * @description The folder chain for every library linked to this connection, in library order.
+     */
+    get: operations["get_media_manager_connection_folder_chain_api_v1_media_managers_connections__connection_id__folder_chain_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -1070,6 +1193,26 @@ export interface paths {
      * @description Remove a library. Refused while it still has queued or running work.
      */
     delete: operations["delete_processing_library_api_v1_libraries__library_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/processing/libraries/{library_id}/folder-chain": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Processing Library Folder Chain
+     * @description One library's folder chain: whether its watched, work and output folders are usable, plus whether every connected media manager will pick up what Weir writes. Read only.
+     */
+    get: operations["get_processing_library_folder_chain_api_v1_processing_libraries__library_id__folder_chain_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -2373,6 +2516,167 @@ export interface components {
        */
       root_path?: string | null;
     };
+    /**
+     * DownloadClientCategoryFolderOut
+     * @description One category/label a download client organizes downloads by, and the folder it reports for it.
+     */
+    DownloadClientCategoryFolderOut: {
+      /** Category */
+      category: string;
+      /** Folder */
+      folder: string;
+    };
+    /** DownloadClientConnectionCreateIn */
+    DownloadClientConnectionCreateIn: {
+      /**
+       * Api Key
+       * @description SABnzbd only. Stored encrypted. Empty means no key.
+       * @default
+       */
+      api_key: string;
+      /**
+       * Base Url
+       * @default
+       */
+      base_url: string;
+      /** Csrf Token */
+      csrf_token: string;
+      /**
+       * Enabled
+       * @default true
+       */
+      enabled: boolean;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "sabnzbd" | "nzbget" | "qbittorrent" | "deluge" | "transmission";
+      /** Name */
+      name: string;
+      /**
+       * Password
+       * @description NZBGet/qBittorrent/Deluge/Transmission. Stored encrypted. Empty means no password.
+       * @default
+       */
+      password: string;
+      /**
+       * Username
+       * @description NZBGet/qBittorrent/Transmission only.
+       * @default
+       */
+      username: string;
+    };
+    /** DownloadClientConnectionDeleteIn */
+    DownloadClientConnectionDeleteIn: {
+      /** Csrf Token */
+      csrf_token: string;
+    };
+    /**
+     * DownloadClientConnectionOut
+     * @description A direct, outbound-only connection to a bare download client, used only to suggest watched folders. Secrets are reported only as saved or not.
+     */
+    DownloadClientConnectionOut: {
+      /** Id */
+      id: number;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "sabnzbd" | "nzbget" | "qbittorrent" | "deluge" | "transmission";
+      /** Name */
+      name: string;
+      /** Enabled */
+      enabled: boolean;
+      /**
+       * Base Url
+       * @description Address Weir uses to reach this client. Empty means not set.
+       */
+      base_url: string;
+      /** Username */
+      username?: string | null;
+      /** Password Is Saved */
+      password_is_saved: boolean;
+      /** Api Key Is Saved */
+      api_key_is_saved: boolean;
+      /** Last Test Ok */
+      last_test_ok?: boolean | null;
+      /** Last Test At */
+      last_test_at?: string | null;
+      /** Last Test Detail */
+      last_test_detail?: string | null;
+    };
+    /** DownloadClientConnectionTestIn */
+    DownloadClientConnectionTestIn: {
+      /** Csrf Token */
+      csrf_token: string;
+    };
+    /** DownloadClientConnectionTestOut */
+    DownloadClientConnectionTestOut: {
+      /** Connection Id */
+      connection_id: number;
+      /** Ok */
+      ok: boolean;
+      /** Detail */
+      detail: string;
+      /**
+       * Checked At
+       * Format: date-time
+       */
+      checked_at: string;
+    };
+    /** DownloadClientConnectionUpdateIn */
+    DownloadClientConnectionUpdateIn: {
+      /**
+       * Api Key
+       * @description Omit to leave the saved key alone. Send an empty string to clear it.
+       */
+      api_key?: string | null;
+      /** Base Url */
+      base_url?: string | null;
+      /** Csrf Token */
+      csrf_token: string;
+      /** Enabled */
+      enabled?: boolean | null;
+      /** Name */
+      name?: string | null;
+      /**
+       * Password
+       * @description Omit to leave the saved password alone. Send an empty string to clear it.
+       */
+      password?: string | null;
+      /** Username */
+      username?: string | null;
+    };
+    /**
+     * DownloadClientSuggestionOut
+     * @description One enabled download-client connection's suggested watched folder, shaped like the manager-based suggestions (see ManagerSetupItemOut) so both feed the same suggestion list in the library editor.
+     */
+    DownloadClientSuggestionOut: {
+      /** Connection Id */
+      connection_id: number;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "sabnzbd" | "nzbget" | "qbittorrent" | "deluge" | "transmission";
+      /** Name */
+      name: string;
+      /** Label */
+      label: string;
+      /**
+       * Flow
+       * @enum {string}
+       */
+      flow: "download_client";
+      /** Ready */
+      ready: boolean;
+      /** Lines */
+      lines: components["schemas"]["ManagerSetupLineOut"][];
+      /** Suggested Watched Folder */
+      suggested_watched_folder?: string | null;
+      /** Category Folders */
+      category_folders: components["schemas"]["DownloadClientCategoryFolderOut"][];
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -2701,6 +3005,63 @@ export interface components {
       total_removed_subtitle_tracks: number;
       /** Would Change */
       would_change: number;
+    };
+    /**
+     * LibraryFolderChainLocalOut
+     * @description Weir's own side of the folder chain: the watched, work and output folders.
+     */
+    LibraryFolderChainLocalOut: {
+      /**
+       * Ready
+       * @description True when no line is a problem.
+       */
+      ready: boolean;
+      /** Lines */
+      lines: components["schemas"]["ManagerSetupLineOut"][];
+    };
+    /**
+     * LibraryFolderChainDownloadClientOut
+     * @description One bare download-client connection's own link in the folder chain: whether any of its folders is this library's watched folder.
+     */
+    LibraryFolderChainDownloadClientOut: {
+      /** Connection Id */
+      connection_id: number;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "sabnzbd" | "nzbget" | "qbittorrent" | "deluge" | "transmission";
+      /** Name */
+      name: string;
+      /** Label */
+      label: string;
+      /** Ready */
+      ready: boolean;
+      /** Lines */
+      lines: components["schemas"]["ManagerSetupLineOut"][];
+    };
+    /**
+     * LibraryFolderChainOut
+     * @description One library's folder chain: Weir's own local folders plus every connected media manager's own setup check and every bare download client's own folder link, folded into one read-only view. With no manager or download client connected, ready reflects only the local folders.
+     */
+    LibraryFolderChainOut: {
+      /** Library Id */
+      library_id: number;
+      local: components["schemas"]["LibraryFolderChainLocalOut"];
+      /** Managers */
+      managers: components["schemas"]["ManagerSetupItemOut"][];
+      /** Download Clients */
+      download_clients: components["schemas"]["LibraryFolderChainDownloadClientOut"][];
+      /** Ready */
+      ready: boolean;
+    };
+    /**
+     * LibraryFoldersOut
+     * @description Every enabled library's published folders.
+     */
+    LibraryFoldersOut: {
+      /** Libraries */
+      libraries: components["schemas"]["PublishedLibraryFoldersOut"][];
     };
     /**
      * LibraryLeaveAloneIn
@@ -3191,6 +3552,12 @@ export interface components {
       /** Csrf Token */
       csrf_token: string;
       /**
+       * Downloaded Scan Enabled
+       * @description Sonarr/Radarr only: after Weir cleans a file, ask this connection to run its Downloaded Scan command over it.
+       * @default false
+       */
+      downloaded_scan_enabled: boolean;
+      /**
        * Enabled
        * @default true
        */
@@ -3220,6 +3587,11 @@ export interface components {
        * @description Address Weir uses to reach this manager. Empty means not set.
        */
       base_url: string;
+      /**
+       * Downloaded Scan Enabled
+       * @description Sonarr/Radarr only: after Weir cleans a file, ask this connection to run its Downloaded Scan command over it.
+       */
+      downloaded_scan_enabled: boolean;
       /** Enabled */
       enabled: boolean;
       /** Id */
@@ -3285,6 +3657,11 @@ export interface components {
       base_url?: string | null;
       /** Csrf Token */
       csrf_token: string;
+      /**
+       * Downloaded Scan Enabled
+       * @description Sonarr/Radarr only: after Weir cleans a file, ask this connection to run its Downloaded Scan command over it. Omit to leave it alone.
+       */
+      downloaded_scan_enabled?: boolean | null;
       /** Enabled */
       enabled?: boolean | null;
       /** Name */
@@ -3561,6 +3938,27 @@ export interface components {
       ready: boolean;
       /** Status */
       status: string;
+    };
+    /**
+     * PublishedLibraryFoldersOut
+     * @description One library's watched, work and output folders, as published for a media manager to read.
+     */
+    PublishedLibraryFoldersOut: {
+      /** Id */
+      id: number;
+      /** Name */
+      name: string;
+      /**
+       * Media Type
+       * @enum {string}
+       */
+      media_type: "movie" | "tv";
+      /** Watched Folder */
+      watched_folder: string;
+      /** Work Folder */
+      work_folder: string;
+      /** Output Folder */
+      output_folder: string;
     };
     /** ReadinessResponse */
     ReadinessResponse: {
@@ -6714,7 +7112,7 @@ export interface components {
       mapping?: components["schemas"]["ManagerSetupMappingOut"] | null;
       /**
        * Suggested Watched Folder
-       * @description Deluno only: where this media type's downloads arrive, as Deluno reports it.
+       * @description Deluno: where this media type's downloads arrive, as Deluno reports it. Sonarr/Radarr: the first enabled download client's own directory, when one is set.
        */
       suggested_watched_folder?: string | null;
       /**
@@ -7277,6 +7675,224 @@ export interface operations {
       };
     };
   };
+  get_download_client_connections_api_v1_download_clients_connections_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DownloadClientConnectionOut"][];
+        };
+      };
+    };
+  };
+  post_download_client_connection_api_v1_download_clients_connections_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DownloadClientConnectionCreateIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DownloadClientConnectionOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_download_client_connection_api_v1_download_clients_connections__connection_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DownloadClientConnectionOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  put_download_client_connection_api_v1_download_clients_connections__connection_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DownloadClientConnectionUpdateIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DownloadClientConnectionOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_download_client_connection_api_v1_download_clients_connections__connection_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DownloadClientConnectionDeleteIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_download_client_connection_test_api_v1_download_clients_connections__connection_id__test_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DownloadClientConnectionTestIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DownloadClientConnectionTestOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_download_client_suggestions_api_v1_download_clients_suggestions_get: {
+    parameters: {
+      query: {
+        media_type: "movie" | "tv";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DownloadClientSuggestionOut"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   get_intake_capabilities_api_v1_intake_capabilities_get: {
     parameters: {
       query?: never;
@@ -7297,6 +7913,37 @@ export interface operations {
           "application/json": {
             [key: string]: string[];
           };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_intake_library_folders_api_v1_intake_library_folders_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        "X-Webhook-Secret"?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LibraryFoldersOut"];
         };
       };
       /** @description Validation Error */
@@ -7624,6 +8271,37 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_media_manager_connection_folder_chain_api_v1_media_managers_connections__connection_id__folder_chain_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LibraryFolderChainOut"][];
+        };
       };
       /** @description Validation Error */
       422: {
@@ -8675,6 +9353,37 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_processing_library_folder_chain_api_v1_processing_libraries__library_id__folder_chain_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        library_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LibraryFolderChainOut"];
+        };
       };
       /** @description Validation Error */
       422: {

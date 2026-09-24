@@ -7,6 +7,8 @@
 
 import { useState } from "react";
 import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
+import { type DownloadClientSuggestion } from "../../../../lib/download-clients/download-clients-api";
+import { useDownloadClientSuggestionsQuery } from "../../../../lib/download-clients/queries";
 import {
   PROCESSING_MEDIA_TYPE_LABELS,
   type ProcessingMediaType,
@@ -42,13 +44,16 @@ function CopyLink({ value, label }: { value: string; label: string }) {
   );
 }
 
-function CheckLines({ item }: { item: ProcessingManagerSetupItem }) {
+function CheckLines({
+  label,
+  lines,
+}: {
+  label: string;
+  lines: ProcessingManagerSetupItem["lines"];
+}) {
   return (
-    <ul
-      className="space-y-1.5 text-sm leading-5"
-      aria-label={`${item.label} check`}
-    >
-      {item.lines.map((line, index) => (
+    <ul className="space-y-1.5 text-sm leading-5" aria-label={`${label} check`}>
+      {lines.map((line, index) => (
         <li key={index} className="flex gap-2">
           <span
             aria-hidden="true"
@@ -84,7 +89,92 @@ function CheckLines({ item }: { item: ProcessingManagerSetupItem }) {
   );
 }
 
-function ArrMapping({ item }: { item: ProcessingManagerSetupItem }) {
+function ArrSuggestedFolder({
+  item,
+  watchedFolder,
+  editable,
+  onUseFolders,
+}: {
+  item: ProcessingManagerSetupItem;
+  watchedFolder: string;
+  editable: boolean;
+  onUseFolders: (watched: string | null, output: string | null) => void;
+}) {
+  const suggested = item.suggested_watched_folder ?? null;
+  if (suggested === null || suggested === watchedFolder.trim()) return null;
+  return (
+    <p className="text-sm text-mm-text2">
+      {item.label} has a download client saving to{" "}
+      <code className="break-all">{suggested}</code>.{" "}
+      {editable ? (
+        <button
+          type="button"
+          className="mm-quiet-link"
+          onClick={() => onUseFolders(suggested, null)}
+        >
+          Use this as the watched folder
+        </button>
+      ) : null}
+    </p>
+  );
+}
+
+function DownloadClientSuggestionSection({
+  item,
+  watchedFolder,
+  editable,
+  onUseFolders,
+}: {
+  item: DownloadClientSuggestion;
+  watchedFolder: string;
+  editable: boolean;
+  onUseFolders: (watched: string | null, output: string | null) => void;
+}) {
+  const suggested = item.suggested_watched_folder ?? null;
+  const differs = suggested !== null && suggested !== watchedFolder.trim();
+  return (
+    <section aria-label={item.label} className="space-y-3">
+      <p className="text-sm font-medium text-mm-text1">
+        {item.label}
+        <span
+          className={`ml-2 text-xs ${
+            item.ready ? "mm-status-text--healthy" : "mm-status-text--warning"
+          }`}
+        >
+          {item.ready ? "Ready" : "Needs attention"}
+        </span>
+      </p>
+      {differs ? (
+        <p className="text-sm text-mm-text2">
+          {item.label}&apos;s completed-downloads folder is{" "}
+          <code className="break-all">{suggested}</code>.{" "}
+          {editable ? (
+            <button
+              type="button"
+              className="mm-quiet-link"
+              onClick={() => onUseFolders(suggested, null)}
+            >
+              Use this as the watched folder
+            </button>
+          ) : null}
+        </p>
+      ) : null}
+      <CheckLines label={item.label} lines={item.lines} />
+    </section>
+  );
+}
+
+function ArrMapping({
+  item,
+  watchedFolder,
+  editable,
+  onUseFolders,
+}: {
+  item: ProcessingManagerSetupItem;
+  watchedFolder: string;
+  editable: boolean;
+  onUseFolders: (watched: string | null, output: string | null) => void;
+}) {
   const mapping = item.mapping;
   if (!mapping) return null;
   const host = mapping.hosts.join(" or ");
@@ -109,6 +199,12 @@ function ArrMapping({ item }: { item: ProcessingManagerSetupItem }) {
   ];
   return (
     <>
+      <ArrSuggestedFolder
+        item={item}
+        watchedFolder={watchedFolder}
+        editable={editable}
+        onUseFolders={onUseFolders}
+      />
       <p className="mm-quiet-note">
         {item.label} imports what Weir writes by looking in Weir&apos;s output
         folder instead of the download client&apos;s. In {item.label}, open
@@ -236,8 +332,12 @@ export function LibraryManagerSetup({
     removeOriginal,
     true,
   );
+  const downloadClients = useDownloadClientSuggestionsQuery(mediaType);
   const scope = PROCESSING_MEDIA_TYPE_LABELS[mediaType];
   const managers = setup.data?.managers ?? [];
+  const downloadClientItems = downloadClients.data ?? [];
+  const nothingCovers =
+    managers.length === 0 && downloadClientItems.length === 0;
 
   return (
     <QuietFieldGroup
@@ -264,45 +364,61 @@ export function LibraryManagerSetup({
             Weir could not check your media managers just now. Try Check again
             in a moment.
           </p>
-        ) : managers.length === 0 ? (
+        ) : nothingCovers ? (
           <p className="mm-quiet-note">
             No Sonarr, Radarr or Deluno connection covers {scope}. Connect one
             under Settings → Media managers and this shows exactly how to hand
             it the files this library writes.
           </p>
         ) : (
-          managers.map((item) => (
-            <section
-              key={item.connection_id}
-              aria-label={item.label}
-              className="space-y-3"
-            >
-              <p className="text-sm font-medium text-mm-text1">
-                {item.label}
-                <span
-                  className={`ml-2 text-xs ${
-                    item.ready
-                      ? "mm-status-text--healthy"
-                      : "mm-status-text--warning"
-                  }`}
-                >
-                  {item.ready ? "Ready" : "Needs attention"}
-                </span>
-              </p>
-              {item.flow === "handoff" ? (
-                <DelunoHandoff
-                  item={item}
-                  watchedFolder={watchedFolder}
-                  outputFolder={outputFolder}
-                  editable={editable}
-                  onUseFolders={onUseFolders}
-                />
-              ) : (
-                <ArrMapping item={item} />
-              )}
-              <CheckLines item={item} />
-            </section>
-          ))
+          <>
+            {managers.map((item) => (
+              <section
+                key={item.connection_id}
+                aria-label={item.label}
+                className="space-y-3"
+              >
+                <p className="text-sm font-medium text-mm-text1">
+                  {item.label}
+                  <span
+                    className={`ml-2 text-xs ${
+                      item.ready
+                        ? "mm-status-text--healthy"
+                        : "mm-status-text--warning"
+                    }`}
+                  >
+                    {item.ready ? "Ready" : "Needs attention"}
+                  </span>
+                </p>
+                {item.flow === "handoff" ? (
+                  <DelunoHandoff
+                    item={item}
+                    watchedFolder={watchedFolder}
+                    outputFolder={outputFolder}
+                    editable={editable}
+                    onUseFolders={onUseFolders}
+                  />
+                ) : (
+                  <ArrMapping
+                    item={item}
+                    watchedFolder={watchedFolder}
+                    editable={editable}
+                    onUseFolders={onUseFolders}
+                  />
+                )}
+                <CheckLines label={item.label} lines={item.lines} />
+              </section>
+            ))}
+            {downloadClientItems.map((item) => (
+              <DownloadClientSuggestionSection
+                key={item.connection_id}
+                item={item}
+                watchedFolder={watchedFolder}
+                editable={editable}
+                onUseFolders={onUseFolders}
+              />
+            ))}
+          </>
         )}
       </div>
     </QuietFieldGroup>

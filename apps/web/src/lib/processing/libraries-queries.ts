@@ -20,6 +20,10 @@ import {
   unlinkDiscoveredProcessingLibrary,
 } from "./library-managers-api";
 import {
+  fetchConnectionFolderChain,
+  fetchLibraryFolderChain,
+} from "./library-folder-chain-api";
+import {
   createProcessingRuleSet,
   deleteProcessingRuleSet,
   fetchProcessingRuleSets,
@@ -69,6 +73,46 @@ export function useProcessingManagerSetupQuery(
         removeOriginal,
       ),
     enabled,
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+/**
+ * The folder chain for one saved library: Weir's own watched/work/output folders plus every connected manager's
+ * setup, in one read-only view. Keyed on the folders and media type too (not only the id) so an edit made in the
+ * library editor, once it settles, is checked again — including right after Save, which changes the saved folders
+ * under the same id.
+ */
+export function useLibraryFolderChainQuery(
+  libraryId: number | undefined,
+  watchedFolder: string,
+  workFolder: string,
+  outputFolder: string,
+  mediaType: ProcessingMediaType,
+) {
+  return useQuery({
+    queryKey: [
+      "processing",
+      "library-folder-chain",
+      libraryId,
+      mediaType,
+      watchedFolder,
+      workFolder,
+      outputFolder,
+    ] as const,
+    queryFn: () => fetchLibraryFolderChain(libraryId as number),
+    enabled: libraryId !== undefined,
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+/** The same folder chain for every library linked to one media manager connection (Settings › Media managers). */
+export function useConnectionFolderChainQuery(connectionId: number) {
+  return useQuery({
+    queryKey: ["processing", "connection-folder-chain", connectionId] as const,
+    queryFn: () => fetchConnectionFolderChain(connectionId),
     staleTime: 30_000,
     retry: false,
   });

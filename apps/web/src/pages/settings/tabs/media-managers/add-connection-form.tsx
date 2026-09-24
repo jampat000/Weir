@@ -57,7 +57,10 @@ export function AddConnectionForm({
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        create.mutate({ ...form, enabled: true }, { onSuccess: onCreated });
+        create.mutate(
+          { ...form, enabled: true, downloaded_scan_enabled: false },
+          { onSuccess: onCreated },
+        );
       }}
     >
       <QuietFieldGroup title="Add a media manager">

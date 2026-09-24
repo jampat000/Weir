@@ -56,11 +56,12 @@ public sealed class ManagerSetupCheck
             }
             else if (isArr)
             {
-                (var hosts, lines) = await CheckArrAsync(connection, mediaScope, watchedFolder, outputFolder, removesOriginals, cancellationToken).ConfigureAwait(false);
+                (var hosts, lines, var suggestedWatchedFolder) = await CheckArrAsync(connection, mediaScope, watchedFolder, outputFolder, removesOriginals, cancellationToken).ConfigureAwait(false);
                 entry.Set("mapping", new WireObject()
                     .Set("hosts", new WireArray(hosts.Select(host => (WireValue)new WireString(host))))
                     .Set("remote_path", WireStrings.Strip(watchedFolder))
                     .Set("local_path", WireStrings.Strip(outputFolder)));
+                entry.Set("suggested_watched_folder", suggestedWatchedFolder);
             }
             else
             {
@@ -77,7 +78,7 @@ public sealed class ManagerSetupCheck
         return results;
     }
 
-    private async Task<(IReadOnlyList<string> Hosts, IReadOnlyList<SetupCheckLine> Lines)> CheckArrAsync(
+    private async Task<(IReadOnlyList<string> Hosts, IReadOnlyList<SetupCheckLine> Lines, string? SuggestedWatchedFolder)> CheckArrAsync(
         ManagerConnection connection, string mediaScope, string watchedFolder, string outputFolder, bool removesOriginals, CancellationToken cancellationToken)
     {
         WireValue? mappings;
@@ -90,20 +91,21 @@ public sealed class ManagerSetupCheck
         }
         catch (Exception exception) when (exception is MediaManagerHttpException or MediaManagerUnreachableException)
         {
-            return ([], [new SetupCheckLine(SetupCheckLine.Problem, ManagerDialectRules.Unreachable(connection, exception, "its remote path mappings"))]);
+            return ([], [new SetupCheckLine(SetupCheckLine.Problem, ManagerDialectRules.Unreachable(connection, exception, "its remote path mappings"))], null);
         }
 
+        var parsedClients = ManagerSetupRules.ParseDownloadClients(clients, mediaScope);
         var result = ManagerSetupRules.EvaluateArr(
             connection.Label,
             mediaScope,
             watchedFolder,
             outputFolder,
             ManagerSetupRules.ParseMappings(mappings),
-            ManagerSetupRules.ParseDownloadClients(clients, mediaScope),
+            parsedClients,
             await CompletedDownloadHandlingAsync(connection, cancellationToken).ConfigureAwait(false),
             await QueueOutputPathsAsync(connection, cancellationToken).ConfigureAwait(false),
             removesOriginals);
-        return (result.Hosts, result.Lines);
+        return (result.Hosts, result.Lines, WatchFolderSuggestionRules.SuggestArrWatchedFolder(parsedClients));
     }
 
     /// <summary>Queued downloads' <c>outputPath</c>s, through the manager port's own queue read; none when the queue cannot be read.</summary>

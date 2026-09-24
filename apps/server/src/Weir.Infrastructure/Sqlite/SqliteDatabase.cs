@@ -239,11 +239,21 @@ public sealed class SqliteDatabase
     }
 
     /// <summary>
-    /// The health probe: <c>SELECT 1</c> with a one second busy timeout, so a long writer makes
-    /// health slow for at most a second instead of thirty. Never throws.
+    /// The health probe: the database file is still there, and <c>SELECT 1</c> answers with a one second
+    /// busy timeout, so a long writer makes health slow for at most a second instead of thirty. Never throws.
     /// </summary>
+    /// <remarks>
+    /// The file check comes first because a pooled connection keeps working on a file that has been deleted
+    /// or replaced underneath it (Linux lets an open file be unlinked), so <c>SELECT 1</c> alone would report
+    /// a database that no new connection can open as healthy.
+    /// </remarks>
     public async Task<bool> IsConnectedAsync(CancellationToken cancellationToken = default)
     {
+        if (!File.Exists(DatabasePath))
+        {
+            return false;
+        }
+
         try
         {
             var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);

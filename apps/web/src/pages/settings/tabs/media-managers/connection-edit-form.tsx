@@ -3,42 +3,70 @@ import { useState } from "react";
 import { Field } from "../../../../components/shared/field";
 import { quietActionRowClass } from "../../../../components/shared/quiet-section";
 import { errorMessage } from "../../../../lib/api/error-message";
-import type {
-  MediaManagerConnection,
-  MediaManagerConnectionUpdate,
+import {
+  MEDIA_MANAGER_KIND_LABELS,
+  type MediaManagerConnection,
+  type MediaManagerConnectionUpdate,
 } from "../../../../lib/media-managers/media-managers-api";
 import { useUpdateMediaManagerConnection } from "../../../../lib/media-managers/queries";
 import {
   mmActionButtonClass,
+  mmCheckboxControlClass,
   mmEditableTextFieldClass,
 } from "../../../../lib/ui/mm-control-roles";
 import { useLeaveConfirmation, useUnsavedChanges } from "../../unsaved-changes";
 
 const SAVE_FAILURE = "This media manager could not be saved.";
 
+/** Only Radarr and Sonarr run the remote-path-mapping flow the Downloaded Scan command helps with; Deluno always uses its own hand-off. */
+const DOWNLOADED_SCAN_KINDS = new Set<MediaManagerConnection["kind"]>([
+  "radarr",
+  "sonarr",
+]);
+
 type EditForm = {
   name: string;
   base_url: string;
   api_key: string;
+  downloaded_scan_enabled: boolean;
 };
 
 function formFrom(connection: MediaManagerConnection): EditForm {
-  return { name: connection.name, base_url: connection.base_url, api_key: "" };
+  return {
+    name: connection.name,
+    base_url: connection.base_url,
+    api_key: "",
+    downloaded_scan_enabled: connection.downloaded_scan_enabled,
+  };
 }
 
 function sameForm(a: EditForm, b: EditForm): boolean {
   return (
-    a.name === b.name && a.base_url === b.base_url && a.api_key === b.api_key
+    a.name === b.name &&
+    a.base_url === b.base_url &&
+    a.api_key === b.api_key &&
+    a.downloaded_scan_enabled === b.downloaded_scan_enabled
   );
 }
 
-/** A blank API key means "leave the saved one alone" — it is only sent when someone typed one. */
-function changesFrom(form: EditForm): MediaManagerConnectionUpdate {
+/**
+ * A blank API key means "leave the saved one alone" — it is only sent when someone typed one.
+ * `downloaded_scan_enabled` is only sent for a kind that offers it; a Deluno connection never shows
+ * the toggle, so its own hand-off setup is never touched by editing name or address.
+ */
+function changesFrom(
+  form: EditForm,
+  kind: MediaManagerConnection["kind"],
+): MediaManagerConnectionUpdate {
   const changes: MediaManagerConnectionUpdate = {
     name: form.name.trim(),
     base_url: form.base_url.trim(),
   };
   if (form.api_key.trim()) changes.api_key = form.api_key.trim();
+  if (DOWNLOADED_SCAN_KINDS.has(kind)) {
+    changes.downloaded_scan_enabled = form.downloaded_scan_enabled;
+  }
+
   return changes;
 }
 
@@ -66,7 +94,7 @@ export function ConnectionEditForm({
 
   const save = () =>
     update.mutate(
-      { id: connection.id, data: changesFrom(form) },
+      { id: connection.id, data: changesFrom(form, connection.kind) },
       { onSuccess: onClose },
     );
 
@@ -106,6 +134,30 @@ export function ConnectionEditForm({
           onChange={(e) => change("api_key", e.target.value)}
         />
       </Field>
+
+      {DOWNLOADED_SCAN_KINDS.has(connection.kind) ? (
+        <label className="mm-library-toggle">
+          <input
+            data-testid="media-manager-edit-downloaded-scan"
+            type="checkbox"
+            className={mmCheckboxControlClass}
+            checked={form.downloaded_scan_enabled}
+            onChange={(e) =>
+              change("downloaded_scan_enabled", e.target.checked)
+            }
+          />
+          <span>
+            <span className="mm-library-toggle__label">
+              Scan for downloaded files after cleaning
+            </span>
+            <span className="mm-library-toggle__hint">
+              After Weir cleans a file, ask{" "}
+              {MEDIA_MANAGER_KIND_LABELS[connection.kind]} to import it with its
+              Downloaded Scan command. Off by default.
+            </span>
+          </span>
+        </label>
+      ) : null}
 
       {update.isError ? (
         <p className="mm-status-text--failed text-sm" role="alert">

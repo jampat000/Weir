@@ -1,0 +1,70 @@
+using Weir.Core.Json;
+
+namespace Weir.Core.MediaManagers;
+
+/// <summary>
+/// The pure half of the optional downloaded-scan hand-back: for a Sonarr/Radarr connection that does not use
+/// Weir's own hand-off protocol, what to call the manager's Downloaded Scan command and where to tell it to look,
+/// once a live pass has written a file to the library's output folder.
+/// </summary>
+public static class DownloadedScanRules
+{
+    public const string CommandPath = "/api/v3/command";
+
+    public const string MoviesCommand = "DownloadedMoviesScan";
+    public const string EpisodesCommand = "DownloadedEpisodesScan";
+
+    /// <summary>Sonarr's and Radarr's own move-in-place import after a scan.</summary>
+    public const string ImportMode = "Move";
+
+    /// <summary>The command name for an Arr scope (<see cref="ManagerKindProfile.ArrScope"/>): movies or TV episodes.</summary>
+    public static string CommandName(string arrScope) => arrScope == MediaManagerKinds.Tv ? EpisodesCommand : MoviesCommand;
+
+    /// <summary>
+    /// Where the manager would look for <paramref name="outputPath"/>, using the first remote path mapping (in the
+    /// manager's own order) whose Local Path contains it. This is <see cref="ArrOsPath.Remap"/> in reverse: that
+    /// method computes <c>LocalPath + (path - RemotePath)</c> to judge what the manager will do with a path it
+    /// reports; here Weir starts from its own local path and wants <c>RemotePath + (path - LocalPath)</c>, so the
+    /// mapping's two paths swap roles in the same call. No matching mapping means Weir sends its own path unchanged
+    /// — the manager and Weir may still share a filesystem view (the same host, or the same bind mount).
+    /// </summary>
+    public static string TranslateOutputPath(string outputPath, IReadOnlyList<RemotePathMappingEntry> mappings)
+    {
+        ArgumentNullException.ThrowIfNull(outputPath);
+        ArgumentNullException.ThrowIfNull(mappings);
+        var local = new ArrOsPath(WireStrings.Strip(outputPath));
+        if (!local.IsRooted)
+        {
+            return outputPath;
+        }
+
+        foreach (var mapping in mappings)
+        {
+            var mappingLocal = new ArrOsPath(mapping.LocalPath);
+            if (mappingLocal.IsRooted && mappingLocal.Contains(local))
+            {
+                return local.Remap(mappingLocal, new ArrOsPath(mapping.RemotePath)).ToString();
+            }
+        }
+
+        return outputPath;
+    }
+
+    /// <summary>
+    /// The <c>POST /api/v3/command</c> body. <c>downloadClientId</c> is present only when Weir knows it; Sonarr and
+    /// Radarr treat a missing field as "unknown", not as zero.
+    /// </summary>
+    public static WireObject CommandBody(string arrScope, string managerPath, int? downloadClientId)
+    {
+        var body = new WireObject()
+            .Set("name", CommandName(arrScope))
+            .Set("path", managerPath)
+            .Set("importMode", ImportMode);
+        if (downloadClientId is { } id)
+        {
+            body.Set("downloadClientId", id);
+        }
+
+        return body;
+    }
+}

@@ -18,6 +18,7 @@ import { useLeaveConfirmation, useUnsavedChanges } from "../../unsaved-changes";
 import { effectiveGrid, windowNow } from "../schedule/schedule-model";
 import { useLibraryCleaningDraft } from "./library-cleaning-draft";
 import { LibraryCleaningSettings } from "./library-cleaning-settings";
+import { LibraryFolderChain } from "./library-folder-chain";
 import { LibraryFoldersGroup } from "./library-folders-group";
 import { sameLibraryForm, type LibraryForm } from "./library-form";
 import { LibraryHardwareFold } from "./library-hardware-fold";
@@ -123,6 +124,13 @@ export function LibraryEditor({
                 output_folder: output ?? form.output_folder,
               })
             }
+          />
+          <LibraryFolderChain
+            libraryId={library?.id}
+            watchedFolder={form.watched_folder}
+            workFolder={form.work_folder}
+            outputFolder={form.output_folder}
+            mediaType={form.media_type}
           />
           <LibraryIntakeGroup binding={binding} />
           <LibraryReadinessGroup binding={binding} />

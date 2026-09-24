@@ -51,6 +51,21 @@ public static partial class LibraryStore
         return rows;
     }
 
+    /// <summary>The libraries linked to one connection, in <c>display_order</c> then id (the reverse of <see cref="ManagerConnectionIdsAsync"/>).</summary>
+    public static async Task<List<ProcessingLibraryRecord>> LibrariesForConnectionIdAsync(UnitOfWork uow, long connectionId)
+    {
+        var ids = await uow.QueryAsync(
+            "SELECT library_id FROM library_manager_links WHERE connection_id = @id",
+            reader => reader.GetInt64(0), ("@id", connectionId)).ConfigureAwait(false);
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        var wanted = ids.ToHashSet();
+        return [.. (await ListAsync(uow).ConfigureAwait(false)).Where(library => wanted.Contains(library.Id))];
+    }
+
     public static async Task<HashSet<long>> KnownConnectionIdsAsync(UnitOfWork uow, IReadOnlyList<long> ids)
     {
         if (ids.Count == 0)
