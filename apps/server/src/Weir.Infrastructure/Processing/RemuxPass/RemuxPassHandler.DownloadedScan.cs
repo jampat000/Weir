@@ -12,14 +12,14 @@ public sealed partial class RemuxPassHandler
     /// every enabled, opted-in Sonarr/Radarr connection linked to that library to run its Downloaded Scan over it.
     /// Best effort; never throws, and does nothing for a pass that did not itself write or confirm an output file.
     /// </summary>
-    private async Task DownloadedScanAsync(PyDict result, string mediaScope, PyDict? origin)
+    private async Task DownloadedScanAsync(WireObject result, string mediaScope, WireObject? origin)
     {
-        if (_downloadedScan is null || !PassWroteOutput(result, out var outputPath) || result.Get("library_id") is not PyInt libraryValue)
+        if (_downloadedScan is null || !PassWroteOutput(result, out var outputPath) || result.Get("library_id") is not WireInteger libraryValue)
         {
             return;
         }
 
-        var relativePath = result.Get("relative_media_path") is PyStr rel ? rel.Value : string.Empty;
+        var relativePath = result.Get("relative_media_path") is WireString rel ? rel.Value : string.Empty;
         try
         {
             var uow = await UnitOfWork.OpenAsync(_database).ConfigureAwait(false);
@@ -38,20 +38,20 @@ public sealed partial class RemuxPassHandler
     }
 
     /// <summary>Whether this pass actually wrote, or confirmed, an output file, and where.</summary>
-    private static bool PassWroteOutput(PyDict result, out string outputPath)
+    private static bool PassWroteOutput(WireObject result, out string outputPath)
     {
         outputPath = string.Empty;
-        if (result.Get("ok") is not PyBool { Value: true })
+        if (result.Get("ok") is not WireBool { Value: true })
         {
             return false;
         }
 
-        if (result.Get("outcome") is not PyStr { Value: RemuxPassOutcomes.LiveOutputWritten or RemuxPassOutcomes.LiveSkippedNotRequired })
+        if (result.Get("outcome") is not WireString { Value: RemuxPassOutcomes.LiveOutputWritten or RemuxPassOutcomes.LiveSkippedNotRequired })
         {
             return false;
         }
 
-        if (result.Get("output_file") is not PyStr { Value.Length: > 0 } output)
+        if (result.Get("output_file") is not WireString { Value.Length: > 0 } output)
         {
             return false;
         }
@@ -65,6 +65,6 @@ public sealed partial class RemuxPassHandler
     /// carry one. Today that is never the case for these connections (they run the remote-path-mapping flow, not a
     /// hand-off), so this is usually null; the command is sent without <c>downloadClientId</c> either way.
     /// </summary>
-    private static int? DownloadClientId(PyDict? origin) =>
-        origin?.Get("download_id") is { IsTruthy: true } value && int.TryParse(PyConvert.Str(value), out var id) ? id : null;
+    private static int? DownloadClientId(WireObject? origin) =>
+        origin?.Get("download_id") is { IsTruthy: true } value && int.TryParse(WireConvert.Str(value), out var id) ? id : null;
 }

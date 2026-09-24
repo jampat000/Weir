@@ -117,22 +117,22 @@ public sealed class RemuxPassHandlerDownloadedScanTests : IDisposable
         var library = await LibraryAsync();
         await ArrConnectionAsync(library, downloadedScanEnabled: true);
         _fixture.Http
-            .Json(HttpMethod.Get, MappingPath, $$"""[{"host":"qbittorrent","remotePath":"/downloads/complete","localPath":{{PyJsonWriter.Dumps(new PyStr(_folders.Output), PyJsonFormat.Compact)}},"id":1}]""")
+            .Json(HttpMethod.Get, MappingPath, $$"""[{"host":"qbittorrent","remotePath":"/downloads/complete","localPath":{{WireJsonWriter.Dumps(new WireString(_folders.Output), WireJsonFormat.Compact)}},"id":1}]""")
             .Json(HttpMethod.Post, CommandPath, "{}");
 
         await RunPassAsync(library);
 
         var request = Assert.Single(_fixture.Http.RequestsTo(HttpMethod.Post, CommandPath));
-        var body = (PyDict)request.Json!;
-        Assert.Equal("DownloadedMoviesScan", PyConvert.Str(body["name"]));
-        Assert.Equal("/downloads/complete/Movie/file.mkv", PyConvert.Str(body["path"]));
-        Assert.Equal("Move", PyConvert.Str(body["importMode"]));
+        var body = (WireObject)request.Json!;
+        Assert.Equal("DownloadedMoviesScan", WireConvert.Str(body["name"]));
+        Assert.Equal("/downloads/complete/Movie/file.mkv", WireConvert.Str(body["path"]));
+        Assert.Equal("Move", WireConvert.Str(body["importMode"]));
         Assert.False(body.ContainsKey("downloadClientId"));
         Assert.Equal("key", request.Headers["X-Api-Key"]);
         Assert.Equal("processed", await ScalarText("SELECT status FROM files"));
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.downloaded_scan_requested'"));
-        var detail = (PyDict)PyJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.downloaded_scan_requested'"));
-        Assert.Equal("success", PyConvert.Str(detail["result"]));
+        var detail = (WireObject)WireJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.downloaded_scan_requested'"));
+        Assert.Equal("success", WireConvert.Str(detail["result"]));
     }
 
     [Fact]
@@ -162,10 +162,10 @@ public sealed class RemuxPassHandlerDownloadedScanTests : IDisposable
 
         // The pass itself succeeded on disk regardless of the manager's answer.
         Assert.Equal("processed", await ScalarText("SELECT status FROM files"));
-        var detail = (PyDict)PyJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.downloaded_scan_requested'"));
-        Assert.Equal("failed", PyConvert.Str(detail["result"]));
-        Assert.False(((PyBool)detail["accepted"]).Value);
-        Assert.Contains("HTTP 500", PyConvert.Str(detail["reason"]), StringComparison.Ordinal);
+        var detail = (WireObject)WireJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.downloaded_scan_requested'"));
+        Assert.Equal("failed", WireConvert.Str(detail["result"]));
+        Assert.False(((WireBool)detail["accepted"]).Value);
+        Assert.Contains("HTTP 500", WireConvert.Str(detail["reason"]), StringComparison.Ordinal);
     }
 
     [Fact]

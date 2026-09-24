@@ -32,7 +32,7 @@ public static class DownloadedScanRules
     {
         ArgumentNullException.ThrowIfNull(outputPath);
         ArgumentNullException.ThrowIfNull(mappings);
-        var local = new ArrOsPath(PyStrings.Strip(outputPath));
+        var local = new ArrOsPath(WireStrings.Strip(outputPath));
         if (!local.IsRooted)
         {
             return outputPath;
@@ -54,9 +54,9 @@ public static class DownloadedScanRules
     /// The <c>POST /api/v3/command</c> body. <c>downloadClientId</c> is present only when Weir knows it; Sonarr and
     /// Radarr treat a missing field as "unknown", not as zero.
     /// </summary>
-    public static PyDict CommandBody(string arrScope, string managerPath, int? downloadClientId)
+    public static WireObject CommandBody(string arrScope, string managerPath, int? downloadClientId)
     {
-        var body = new PyDict()
+        var body = new WireObject()
             .Set("name", CommandName(arrScope))
             .Set("path", managerPath)
             .Set("importMode", ImportMode);

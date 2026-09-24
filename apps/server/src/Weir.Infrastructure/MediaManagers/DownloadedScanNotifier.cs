@@ -103,13 +103,13 @@ public sealed class DownloadedScanNotifier
         }
     }
 
-    private static Task<long> RecordAsync(UnitOfWork uow, ManagerConnection connection, string relativeMediaPath, PyDict body, bool accepted, string? failureReason)
+    private static Task<long> RecordAsync(UnitOfWork uow, ManagerConnection connection, string relativeMediaPath, WireObject body, bool accepted, string? failureReason)
     {
         var fileName = relativeMediaPath.Length > 0 ? MediaPathNames.Name(relativeMediaPath, OperatingSystem.IsWindows()) : "a file Weir just wrote";
         var title = accepted
             ? $"Asked {connection.Label} to scan for {fileName}"
             : $"Weir could not ask {connection.Label} to scan for {fileName}";
-        var detail = new PyDict()
+        var detail = new WireObject()
             .Set("relative_media_path", relativeMediaPath)
             .Set("manager", connection.Label)
             .Set("command", body)
@@ -125,6 +125,6 @@ public sealed class DownloadedScanNotifier
             ActivityEventTypes.ProcessingDownloadedScanRequested,
             "processing",
             title,
-            PyStrings.Slice(PyJsonWriter.Dumps(detail, PyJsonFormat.Compact), 10_000)));
+            WireStrings.Slice(WireJsonWriter.Dumps(detail, WireJsonFormat.Compact), 10_000)));
     }
 }

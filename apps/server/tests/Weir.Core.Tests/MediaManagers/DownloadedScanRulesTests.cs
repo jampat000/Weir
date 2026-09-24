@@ -9,7 +9,7 @@ namespace Weir.Core.Tests.MediaManagers;
 /// </summary>
 public sealed class DownloadedScanRulesTests
 {
-    private static List<RemotePathMappingEntry> Mappings(string json) => ManagerSetupRules.ParseMappings(PyJsonParser.Parse(json));
+    private static List<RemotePathMappingEntry> Mappings(string json) => ManagerSetupRules.ParseMappings(WireJsonParser.Parse(json));
 
     [Theory]
     [InlineData(MediaManagerKinds.Movie, DownloadedScanRules.MoviesCommand)]
@@ -69,9 +69,9 @@ public sealed class DownloadedScanRulesTests
     {
         var body = DownloadedScanRules.CommandBody(MediaManagerKinds.Tv, "/complete/tv/Show.S01E01.mkv", null);
 
-        Assert.Equal("DownloadedEpisodesScan", PyConvert.Str(body["name"]));
-        Assert.Equal("/complete/tv/Show.S01E01.mkv", PyConvert.Str(body["path"]));
-        Assert.Equal("Move", PyConvert.Str(body["importMode"]));
+        Assert.Equal("DownloadedEpisodesScan", WireConvert.Str(body["name"]));
+        Assert.Equal("/complete/tv/Show.S01E01.mkv", WireConvert.Str(body["path"]));
+        Assert.Equal("Move", WireConvert.Str(body["importMode"]));
         Assert.False(body.ContainsKey("downloadClientId"));
     }
 
@@ -81,7 +81,7 @@ public sealed class DownloadedScanRulesTests
         var known = DownloadedScanRules.CommandBody(MediaManagerKinds.Movie, "/complete/movie.mkv", 7);
         var unknown = DownloadedScanRules.CommandBody(MediaManagerKinds.Movie, "/complete/movie.mkv", null);
 
-        Assert.Equal(7L, (long)((PyInt)known["downloadClientId"]).Value);
+        Assert.Equal(7L, (long)((WireInteger)known["downloadClientId"]).Value);
         Assert.False(unknown.ContainsKey("downloadClientId"));
     }
 }
