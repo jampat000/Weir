@@ -30,7 +30,7 @@ public sealed class NzbgetPort : IDownloadClientPort
                 return (false, $"Weir reached {connection.Label}, but the username or password was refused. Check them and save again.");
             }
 
-            return response.Status is >= 200 and < 300 && response.Json() is PyDict { } dict && dict.Get("result") is PyList
+            return response.Status is >= 200 and < 300 && response.Json() is WireObject { } dict && dict.Get("result") is WireArray
                 ? (true, $"Connected. Weir can reach {connection.Label}.")
                 : (false, $"Weir reached {connection.Label} but did not get the answer it expected. Check the address points at NZBGet itself.");
         }
@@ -57,7 +57,7 @@ public sealed class NzbgetPort : IDownloadClientPort
     private Task<DownloadClientHttpResponse> CallConfigAsync(DownloadClientConnection connection, CancellationToken cancellationToken)
     {
         var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers);
-        var body = new PyDict().Set("method", "config").Set("params", new PyList());
+        var body = new WireObject().Set("method", "config").Set("params", new WireArray());
         return client.SendAsync(
             HttpMethod.Post, "/jsonrpc", content: DownloadClientHttpClient.JsonContent(body), headers: BasicAuthHeader(connection), cancellationToken: cancellationToken);
     }

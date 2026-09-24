@@ -10,8 +10,8 @@ namespace Weir.Core.MediaManagers;
 public static class SabnzbdRules
 {
     /// <summary>The base completed-downloads folder, from <c>section=misc</c>.</summary>
-    public static string? ParseCompleteDir(PyJson? miscConfig) =>
-        Config(miscConfig)?.Get("misc") is PyDict misc ? PyValues.Text(misc.Get("complete_dir")) : null;
+    public static string? ParseCompleteDir(WireValue? miscConfig) =>
+        Config(miscConfig)?.Get("misc") is WireObject misc ? ManagerValues.Text(misc.Get("complete_dir")) : null;
 
     /// <summary>
     /// Each category's own folder, from <c>section=categories</c>. A category's <c>dir</c> is relative to
@@ -19,18 +19,18 @@ public static class SabnzbdRules
     /// The default category (<c>"*"</c>) is not a folder suggestion of its own — its downloads are already
     /// covered by <see cref="ParseCompleteDir"/>.
     /// </summary>
-    public static List<DownloadClientCategoryFolder> ParseCategoryFolders(PyJson? categoriesConfig, string? completeDir)
+    public static List<DownloadClientCategoryFolder> ParseCategoryFolders(WireValue? categoriesConfig, string? completeDir)
     {
-        if (Config(categoriesConfig)?.Get("categories") is not PyList categories)
+        if (Config(categoriesConfig)?.Get("categories") is not WireArray categories)
         {
             return [];
         }
 
         var folders = new List<DownloadClientCategoryFolder>();
-        foreach (var row in categories.Items.OfType<PyDict>())
+        foreach (var row in categories.Items.OfType<WireObject>())
         {
-            var name = PyValues.Text(row.Get("name"));
-            var dir = PyValues.Text(row.Get("dir"));
+            var name = ManagerValues.Text(row.Get("name"));
+            var dir = ManagerValues.Text(row.Get("dir"));
             if (name is null || dir is null || name == "*")
             {
                 continue;
@@ -42,7 +42,7 @@ public static class SabnzbdRules
         return folders;
     }
 
-    private static PyDict? Config(PyJson? payload) => payload is PyDict dict && dict.Get("config") is PyDict config ? config : null;
+    private static WireObject? Config(WireValue? payload) => payload is WireObject dict && dict.Get("config") is WireObject config ? config : null;
 
     private static string JoinUnderComplete(string? completeDir, string relativeOrAbsolute) =>
         DownloadClientPaths.IsAbsolute(relativeOrAbsolute) || string.IsNullOrEmpty(completeDir)

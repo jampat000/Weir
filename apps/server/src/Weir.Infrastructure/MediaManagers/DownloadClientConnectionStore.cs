@@ -16,11 +16,11 @@ public sealed record DownloadClientConnectionRecord(
     string? PasswordCiphertext,
     string? ApiKeyCiphertext,
     bool? LastTestOk,
-    PyDateTime? LastTestAt,
+    Timestamp? LastTestAt,
     string? LastTestDetail)
 {
     /// <summary>The connection as the API returns it: secrets are reported only as saved or not.</summary>
-    public PyDict ToOut() => new PyDict()
+    public WireObject ToOut() => new WireObject()
         .Set("id", Id)
         .Set("kind", Kind)
         .Set("name", Name)
@@ -29,8 +29,8 @@ public sealed record DownloadClientConnectionRecord(
         .Set("username", Username)
         .Set("password_is_saved", !string.IsNullOrEmpty(PasswordCiphertext))
         .Set("api_key_is_saved", !string.IsNullOrEmpty(ApiKeyCiphertext))
-        .Set("last_test_ok", LastTestOk is { } ok ? PyJson.Of(ok) : PyJson.Null)
-        .Set("last_test_at", LastTestAt is { } at ? at.PydanticJson() : null)
+        .Set("last_test_ok", LastTestOk is { } ok ? WireValue.Of(ok) : WireValue.Null)
+        .Set("last_test_at", LastTestAt is { } at ? at.ToWireText() : null)
         .Set("last_test_detail", LastTestDetail);
 }
 
@@ -109,7 +109,7 @@ public static class DownloadClientConnectionStore
     }
 
     /// <summary>The conditional test-result write: 0 when the connection was removed meanwhile.</summary>
-    public static Task<int> RecordTestResultAsync(UnitOfWork uow, long connectionId, bool ok, PyDateTime checkedAt, string detail)
+    public static Task<int> RecordTestResultAsync(UnitOfWork uow, long connectionId, bool ok, Timestamp checkedAt, string detail)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.ExecuteAsync(

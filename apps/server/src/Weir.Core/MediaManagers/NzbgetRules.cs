@@ -14,7 +14,7 @@ public static partial class NzbgetRules
     [GeneratedRegex(@"^Category(\d+)\.(Name|DestDir)$")]
     private static partial Regex CategoryOptionKey();
 
-    public static DownloadClientFolders ParseConfig(PyJson? response)
+    public static DownloadClientFolders ParseConfig(WireValue? response)
     {
         var options = FlattenOptions(response);
         var destDir = options.GetValueOrDefault("DestDir");
@@ -42,19 +42,19 @@ public static partial class NzbgetRules
             .Select(entry => new DownloadClientCategoryFolder(entry.Name!, entry.DestDir!))];
     }
 
-    private static Dictionary<string, string> FlattenOptions(PyJson? response)
+    private static Dictionary<string, string> FlattenOptions(WireValue? response)
     {
         var options = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (response is not PyDict dict || dict.Get("result") is not PyList result)
+        if (response is not WireObject dict || dict.Get("result") is not WireArray result)
         {
             return options;
         }
 
-        foreach (var row in result.Items.OfType<PyDict>())
+        foreach (var row in result.Items.OfType<WireObject>())
         {
-            if (PyValues.Text(row.Get("Name")) is { } name)
+            if (ManagerValues.Text(row.Get("Name")) is { } name)
             {
-                options[name] = PyValues.Text(row.Get("Value")) ?? string.Empty;
+                options[name] = ManagerValues.Text(row.Get("Value")) ?? string.Empty;
             }
         }
 

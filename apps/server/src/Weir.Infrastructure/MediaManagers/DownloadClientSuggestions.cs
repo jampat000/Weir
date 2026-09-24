@@ -21,10 +21,10 @@ public sealed class DownloadClientSuggestions
         _ports = ports ?? throw new ArgumentNullException(nameof(ports));
     }
 
-    public async Task<List<PyDict>> SuggestAsync(UnitOfWork uow, CancellationToken cancellationToken = default)
+    public async Task<List<WireObject>> SuggestAsync(UnitOfWork uow, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        var results = new List<PyDict>();
+        var results = new List<WireObject>();
         foreach (var row in await DownloadClientConnectionStore.ListEnabledAsync(uow).ConfigureAwait(false))
         {
             if (_connections.ConnectionFromRow(row) is not { } connection || _ports.PortForKind(row.Kind) is not { } port)
@@ -44,7 +44,7 @@ public sealed class DownloadClientSuggestions
         return results;
     }
 
-    private static PyDict Entry(DownloadClientConnectionRecord row, DownloadClientFolders folders)
+    private static WireObject Entry(DownloadClientConnectionRecord row, DownloadClientFolders folders)
     {
         var label = DownloadClientKinds.LabelForConnection(row.Kind, row.Name);
         var lines = new List<SetupCheckLine>();
@@ -58,16 +58,16 @@ public sealed class DownloadClientSuggestions
             lines.Add(new SetupCheckLine(SetupCheckLine.Note, $"{label} saves the \"{category.Category}\" category to {category.Folder}."));
         }
 
-        return new PyDict()
+        return new WireObject()
             .Set("connection_id", row.Id)
             .Set("kind", row.Kind)
             .Set("name", row.Name)
             .Set("label", label)
             .Set("flow", "download_client")
             .Set("ready", !string.IsNullOrEmpty(folders.CompletedFolder))
-            .Set("lines", new PyList(lines.Select(line => (PyJson)line.ToOut())))
+            .Set("lines", new WireArray(lines.Select(line => (WireValue)line.ToOut())))
             .Set("suggested_watched_folder", folders.CompletedFolder)
-            .Set("category_folders", new PyList(folders.CategoryFolders.Select(category =>
-                (PyJson)new PyDict().Set("category", category.Category).Set("folder", category.Folder))));
+            .Set("category_folders", new WireArray(folders.CategoryFolders.Select(category =>
+                (WireValue)new WireObject().Set("category", category.Category).Set("folder", category.Folder))));
     }
 }

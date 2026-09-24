@@ -9,7 +9,7 @@ public sealed class TransmissionRulesTests
     [Fact]
     public void The_only_folder_is_download_dir()
     {
-        var folders = TransmissionRules.Parse(PyJsonParser.Parse("""{"arguments":{"download-dir":"/downloads/complete"},"result":"success"}"""));
+        var folders = TransmissionRules.Parse(WireJsonParser.Parse("""{"arguments":{"download-dir":"/downloads/complete"},"result":"success"}"""));
         Assert.Equal("/downloads/complete", folders.CompletedFolder);
         Assert.Empty(folders.CategoryFolders);
     }
@@ -17,7 +17,7 @@ public sealed class TransmissionRulesTests
     [Fact]
     public void No_arguments_yields_no_folder()
     {
-        var folders = TransmissionRules.Parse(PyJsonParser.Parse("""{"result":"success"}"""));
+        var folders = TransmissionRules.Parse(WireJsonParser.Parse("""{"result":"success"}"""));
         Assert.Null(folders.CompletedFolder);
     }
 }

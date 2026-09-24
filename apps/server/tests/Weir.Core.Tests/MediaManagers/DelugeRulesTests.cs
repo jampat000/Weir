@@ -17,28 +17,28 @@ public sealed class DelugeRulesTests
     [Fact]
     public void The_base_folder_is_move_completed_path()
     {
-        var folders = DelugeRules.Parse(PyJsonParser.Parse(CoreConfig), PyJsonParser.Parse(LabelConfig));
+        var folders = DelugeRules.Parse(WireJsonParser.Parse(CoreConfig), WireJsonParser.Parse(LabelConfig));
         Assert.Equal("/downloads/complete", folders.CompletedFolder);
     }
 
     [Fact]
     public void A_label_with_its_own_move_completed_path_is_reported()
     {
-        var folders = DelugeRules.Parse(PyJsonParser.Parse(CoreConfig), PyJsonParser.Parse(LabelConfig));
+        var folders = DelugeRules.Parse(WireJsonParser.Parse(CoreConfig), WireJsonParser.Parse(LabelConfig));
         Assert.Equal([new DownloadClientCategoryFolder("tv-sonarr", "/downloads/complete/tv")], folders.CategoryFolders);
     }
 
     [Fact]
     public void A_label_with_no_move_completed_path_of_its_own_is_not_reported()
     {
-        var folders = DelugeRules.Parse(PyJsonParser.Parse(CoreConfig), PyJsonParser.Parse(LabelConfig));
+        var folders = DelugeRules.Parse(WireJsonParser.Parse(CoreConfig), WireJsonParser.Parse(LabelConfig));
         Assert.DoesNotContain(folders.CategoryFolders, label => label.Category == "movies");
     }
 
     [Fact]
     public void The_label_plugin_being_disabled_means_no_labels_not_a_failed_read()
     {
-        var folders = DelugeRules.Parse(PyJsonParser.Parse(CoreConfig), PyJsonParser.Parse(LabelPluginDisabled));
+        var folders = DelugeRules.Parse(WireJsonParser.Parse(CoreConfig), WireJsonParser.Parse(LabelPluginDisabled));
         Assert.Equal("/downloads/complete", folders.CompletedFolder);
         Assert.Empty(folders.CategoryFolders);
     }

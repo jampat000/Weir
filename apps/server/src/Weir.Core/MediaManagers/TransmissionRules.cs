@@ -9,10 +9,10 @@ namespace Weir.Core.MediaManagers;
 /// </summary>
 public static class TransmissionRules
 {
-    public static DownloadClientFolders Parse(PyJson? sessionGetResponse)
+    public static DownloadClientFolders Parse(WireValue? sessionGetResponse)
     {
-        var downloadDir = sessionGetResponse is PyDict dict && dict.Get("arguments") is PyDict arguments
-            ? PyValues.Text(arguments.Get("download-dir"))
+        var downloadDir = sessionGetResponse is WireObject dict && dict.Get("arguments") is WireObject arguments
+            ? ManagerValues.Text(arguments.Get("download-dir"))
             : null;
         return new DownloadClientFolders(downloadDir, []);
     }

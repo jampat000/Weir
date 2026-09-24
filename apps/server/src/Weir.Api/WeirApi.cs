@@ -55,6 +55,7 @@ public static class WeirApi
         // Registered before AddWeirJobs, whose TryAdd would otherwise install the version that sends nothing.
         services.AddSingleton<IJobNotifications, WebhookJobNotifications>();
         services.AddWeirMediaManagers(options);
+        services.AddWeirDownloadClients();
         services.AddWeirProcessingApis();
         services.AddWeirProcessingFailureFollowUps(options);
         services.AddWeirLibraryMode(options);
@@ -123,6 +124,7 @@ public static class WeirApi
             endpoints.MapReconciliationEndpoints();
             endpoints.MapMediaManagerConnectionsEndpoints();
             endpoints.MapMediaManagerIntakeEndpoints();
+            endpoints.MapDownloadClientConnectionsEndpoints();
             endpoints.MapNotificationEndpoints();
             endpoints.MapActivityEndpoints();
             endpoints.MapWeirProcessingApis();

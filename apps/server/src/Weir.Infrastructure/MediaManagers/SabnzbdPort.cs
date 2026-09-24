@@ -69,7 +69,7 @@ public sealed class SabnzbdPort : IDownloadClientPort
 
     private static (bool Ok, string Detail) Classify(DownloadClientHttpResponse response, DownloadClientConnection connection)
     {
-        if (response.Status is >= 200 and < 300 && response.Json() is PyDict dict && dict.Get("config") is PyDict)
+        if (response.Status is >= 200 and < 300 && response.Json() is WireObject dict && dict.Get("config") is WireObject)
         {
             return (true, $"Connected. Weir can reach {connection.Label}.");
         }

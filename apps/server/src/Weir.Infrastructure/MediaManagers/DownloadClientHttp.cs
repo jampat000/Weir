@@ -12,7 +12,7 @@ public sealed record DownloadClientHttpResponse(int Status, byte[] Body, IReadOn
     public string BodyText => Body.Length == 0 ? string.Empty : new UTF8Encoding(false, false).GetString(Body);
 
     /// <summary>The body parsed as JSON, or null for an empty body or one that is not valid JSON.</summary>
-    public PyJson? Json()
+    public WireValue? Json()
     {
         if (Body.Length == 0)
         {
@@ -21,9 +21,9 @@ public sealed record DownloadClientHttpResponse(int Status, byte[] Body, IReadOn
 
         try
         {
-            return PyJsonParser.Parse(BodyText);
+            return WireJsonParser.Parse(BodyText);
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
             return null;
         }
@@ -53,7 +53,7 @@ public sealed class DownloadClientHttpClient
         {
             _base = ExternalUrlPolicy.NormalizeLocalServiceBaseUrl(baseUrl);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new DownloadClientHttpException(exception.Message, exception);
         }
@@ -74,10 +74,10 @@ public sealed class DownloadClientHttpClient
     }
 
     /// <summary>A JSON request body, matching how every JSON-RPC dialect here builds one.</summary>
-    public static ByteArrayContent JsonContent(PyDict body)
+    public static ByteArrayContent JsonContent(WireObject body)
     {
         ArgumentNullException.ThrowIfNull(body);
-        var content = new ByteArrayContent(PyJsonWriter.DumpsUtf8(body, PyJsonFormat.Default));
+        var content = new ByteArrayContent(WireJsonWriter.DumpsUtf8(body, WireJsonFormat.Default));
         content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
         return content;
     }

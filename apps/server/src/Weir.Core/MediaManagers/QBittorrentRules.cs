@@ -9,15 +9,15 @@ namespace Weir.Core.MediaManagers;
 /// </summary>
 public static class QBittorrentRules
 {
-    public static DownloadClientFolders Parse(PyJson? categoriesResponse, PyJson? preferencesResponse)
+    public static DownloadClientFolders Parse(WireValue? categoriesResponse, WireValue? preferencesResponse)
     {
-        var savePath = preferencesResponse is PyDict preferences ? PyValues.Text(preferences.Get("save_path")) : null;
+        var savePath = preferencesResponse is WireObject preferences ? ManagerValues.Text(preferences.Get("save_path")) : null;
         var categories = new List<DownloadClientCategoryFolder>();
-        if (categoriesResponse is PyDict dict)
+        if (categoriesResponse is WireObject dict)
         {
             foreach (var (name, value) in dict.Items)
             {
-                if (value is PyDict row && PyValues.Text(row.Get("savePath")) is { } folder)
+                if (value is WireObject row && ManagerValues.Text(row.Get("savePath")) is { } folder)
                 {
                     categories.Add(new DownloadClientCategoryFolder(name, folder));
                 }

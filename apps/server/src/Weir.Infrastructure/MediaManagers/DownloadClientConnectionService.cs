@@ -47,7 +47,7 @@ public sealed class DownloadClientConnectionService
         UnitOfWork uow, string kind, string name, string baseUrl = "", string? username = null, string? password = null, string? apiKey = null, bool enabled = true)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        var label = PyStrings.Strip(name ?? string.Empty);
+        var label = WireStrings.Strip(name ?? string.Empty);
         if (label.Length == 0)
         {
             throw new DownloadClientConnectionException(NeedsNameMessage);
@@ -55,12 +55,12 @@ public sealed class DownloadClientConnectionService
 
         if (await DownloadClientConnectionStore.NameExistsAsync(uow, label).ConfigureAwait(false))
         {
-            throw new DownloadClientConnectionException($"A connection named {PyStrings.Repr(label)} already exists.");
+            throw new DownloadClientConnectionException($"A connection named {WireStrings.Repr(label)} already exists.");
         }
 
         var validKind = ValidateKind(kind);
         var validUrl = ValidateBaseUrl(baseUrl);
-        var trimmedUsername = PyStrings.Strip(username ?? string.Empty);
+        var trimmedUsername = WireStrings.Strip(username ?? string.Empty);
         return await DownloadClientConnectionStore.InsertAsync(
             uow,
             validKind,
@@ -88,7 +88,7 @@ public sealed class DownloadClientConnectionService
         var changes = new List<(string Column, object? Value)>();
         if (name is not null)
         {
-            var label = PyStrings.Strip(name);
+            var label = WireStrings.Strip(name);
             if (label.Length == 0)
             {
                 throw new DownloadClientConnectionException(NeedsNameMessage);
@@ -96,7 +96,7 @@ public sealed class DownloadClientConnectionService
 
             if (await DownloadClientConnectionStore.NameExistsAsync(uow, label, row.Id).ConfigureAwait(false))
             {
-                throw new DownloadClientConnectionException($"A connection named {PyStrings.Repr(label)} already exists.");
+                throw new DownloadClientConnectionException($"A connection named {WireStrings.Repr(label)} already exists.");
             }
 
             if (label != row.Name)
@@ -129,7 +129,7 @@ public sealed class DownloadClientConnectionService
 
         if (username is not null)
         {
-            var trimmed = PyStrings.Strip(username);
+            var trimmed = WireStrings.Strip(username);
             var value = trimmed.Length > 0 ? trimmed : null;
             if (value != row.Username)
             {
@@ -165,7 +165,7 @@ public sealed class DownloadClientConnectionService
     public DownloadClientConnection? ConnectionFromRow(DownloadClientConnectionRecord row)
     {
         ArgumentNullException.ThrowIfNull(row);
-        var url = PyStrings.Strip(row.BaseUrl);
+        var url = WireStrings.Strip(row.BaseUrl);
         if (url.Length == 0)
         {
             return null;
@@ -178,12 +178,12 @@ public sealed class DownloadClientConnectionService
 
     private string? EncryptOrNull(string? plaintext)
     {
-        var stripped = PyStrings.Strip(plaintext ?? string.Empty);
+        var stripped = WireStrings.Strip(plaintext ?? string.Empty);
         return stripped.Length == 0 ? null : Encrypt(stripped);
     }
 
     /// <summary>
-    /// Encryption throws a plain <see cref="PyValueErrorException"/> when no <c>WEIR_CREDENTIALS_SECRET</c> or
+    /// Encryption throws a plain <see cref="WireValueException"/> when no <c>WEIR_CREDENTIALS_SECRET</c> or
     /// <c>WEIR_SESSION_SECRET</c> is configured, exactly like <see cref="MediaManagerConnectionService"/>'s
     /// <c>EncryptApiKey</c> (#544 item 3). It becomes a <see cref="DownloadClientConnectionException"/> so the
     /// operator gets a readable 400 naming the env var to set, not a 500.
@@ -194,7 +194,7 @@ public sealed class DownloadClientConnectionService
         {
             return _cipher.Encrypt(plaintext);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new DownloadClientConnectionException(exception.Message, exception);
         }
@@ -202,11 +202,11 @@ public sealed class DownloadClientConnectionService
 
     private static string ValidateKind(string? kind)
     {
-        var value = PyStrings.Strip(kind ?? string.Empty).ToLowerInvariant();
+        var value = WireStrings.Strip(kind ?? string.Empty).ToLowerInvariant();
         if (!DownloadClientKinds.All.Contains(value))
         {
             throw new DownloadClientConnectionException(
-                $"Unknown download client kind {PyStrings.Repr(kind ?? string.Empty)}. Known kinds: {string.Join(", ", DownloadClientKinds.All)}.");
+                $"Unknown download client kind {WireStrings.Repr(kind ?? string.Empty)}. Known kinds: {string.Join(", ", DownloadClientKinds.All)}.");
         }
 
         return value;
@@ -214,7 +214,7 @@ public sealed class DownloadClientConnectionService
 
     private static string ValidateBaseUrl(string? baseUrl)
     {
-        var raw = PyStrings.Strip(baseUrl ?? string.Empty);
+        var raw = WireStrings.Strip(baseUrl ?? string.Empty);
         if (raw.Length == 0)
         {
             return string.Empty;
@@ -224,7 +224,7 @@ public sealed class DownloadClientConnectionService
         {
             return ExternalUrlPolicy.NormalizeLocalServiceBaseUrl(raw);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new DownloadClientConnectionException($"That address will not work: {exception.Message}", exception);
         }

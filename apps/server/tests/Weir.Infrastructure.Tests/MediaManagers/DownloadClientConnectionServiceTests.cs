@@ -22,7 +22,7 @@ public sealed class DownloadClientConnectionServiceTests
         Assert.NotNull(row);
         Assert.NotEqual("plain-api-key", row!.ApiKeyCiphertext);
         var output = row.ToOut();
-        Assert.True(((PyBool)output["api_key_is_saved"]).Value);
+        Assert.True(((WireBool)output["api_key_is_saved"]).Value);
         Assert.False(output.ContainsKey("api_key"));
 
         var resolved = fixture.Connections.ConnectionFromRow(row);
@@ -82,19 +82,19 @@ public sealed class DownloadClientConnectionServiceTests
         var suggestions = await fixture.Db(uow => fixture.Suggestions.SuggestAsync(uow), commit: false);
 
         var entry = Assert.Single(suggestions);
-        Assert.Equal((BigInteger)id, ((PyInt)entry["connection_id"]).Value);
-        Assert.Equal("qbittorrent", ((PyStr)entry["kind"]).Value);
-        Assert.Equal("My qBittorrent", ((PyStr)entry["name"]).Value);
-        Assert.Equal("qBittorrent (My qBittorrent)", ((PyStr)entry["label"]).Value);
-        Assert.Equal("download_client", ((PyStr)entry["flow"]).Value);
-        Assert.True(((PyBool)entry["ready"]).Value);
-        Assert.Equal("/downloads/complete", ((PyStr)entry["suggested_watched_folder"]).Value);
-        var categoryFolders = (PyList)entry["category_folders"];
-        var category = (PyDict)categoryFolders.Items[0];
-        Assert.Equal("tv-sonarr", ((PyStr)category["category"]).Value);
-        Assert.Equal("/downloads/complete/tv", ((PyStr)category["folder"]).Value);
-        var lines = (PyList)entry["lines"];
-        Assert.Contains(lines.Items, line => ((PyStr)((PyDict)line)["state"]).Value == "ok");
+        Assert.Equal((BigInteger)id, ((WireInteger)entry["connection_id"]).Value);
+        Assert.Equal("qbittorrent", ((WireString)entry["kind"]).Value);
+        Assert.Equal("My qBittorrent", ((WireString)entry["name"]).Value);
+        Assert.Equal("qBittorrent (My qBittorrent)", ((WireString)entry["label"]).Value);
+        Assert.Equal("download_client", ((WireString)entry["flow"]).Value);
+        Assert.True(((WireBool)entry["ready"]).Value);
+        Assert.Equal("/downloads/complete", ((WireString)entry["suggested_watched_folder"]).Value);
+        var categoryFolders = (WireArray)entry["category_folders"];
+        var category = (WireObject)categoryFolders.Items[0];
+        Assert.Equal("tv-sonarr", ((WireString)category["category"]).Value);
+        Assert.Equal("/downloads/complete/tv", ((WireString)category["folder"]).Value);
+        var lines = (WireArray)entry["lines"];
+        Assert.Contains(lines.Items, line => ((WireString)((WireObject)line)["state"]).Value == "ok");
     }
 
     [Fact]

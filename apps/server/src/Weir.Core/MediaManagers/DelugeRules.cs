@@ -10,15 +10,15 @@ namespace Weir.Core.MediaManagers;
 /// </summary>
 public static class DelugeRules
 {
-    public static DownloadClientFolders Parse(PyJson? coreConfigResponse, PyJson? labelConfigResponse)
+    public static DownloadClientFolders Parse(WireValue? coreConfigResponse, WireValue? labelConfigResponse)
     {
-        var moveCompletedPath = RpcResult(coreConfigResponse) is { } core ? PyValues.Text(core.Get("move_completed_path")) : null;
+        var moveCompletedPath = RpcResult(coreConfigResponse) is { } core ? ManagerValues.Text(core.Get("move_completed_path")) : null;
         var labels = new List<DownloadClientCategoryFolder>();
         if (RpcResult(labelConfigResponse) is { } labelConfig)
         {
             foreach (var (label, value) in labelConfig.Items)
             {
-                if (value is PyDict options && PyValues.Text(options.Get("move_completed_path")) is { } folder)
+                if (value is WireObject options && ManagerValues.Text(options.Get("move_completed_path")) is { } folder)
                 {
                     labels.Add(new DownloadClientCategoryFolder(label, folder));
                 }
@@ -29,6 +29,6 @@ public static class DelugeRules
     }
 
     /// <summary>A JSON-RPC <c>result</c> object, or null when the call answered an <c>error</c> instead.</summary>
-    private static PyDict? RpcResult(PyJson? response) =>
-        response is PyDict dict && dict.Get("error") is null or PyNull && dict.Get("result") is PyDict result ? result : null;
+    private static WireObject? RpcResult(WireValue? response) =>
+        response is WireObject dict && dict.Get("error") is null or WireNull && dict.Get("result") is WireObject result ? result : null;
 }

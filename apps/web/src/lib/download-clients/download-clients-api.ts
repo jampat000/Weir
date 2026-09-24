@@ -1,5 +1,6 @@
 import { sendJson } from "../api/send-json";
 import { apiFetch, readJson, requireOk } from "../api/client";
+import type { RequestBody, Schema } from "../api/types";
 
 /**
  * The five bare download clients Weir can read a watched-folder suggestion from when there is no
@@ -7,8 +8,7 @@ import { apiFetch, readJson, requireOk } from "../api/client";
  * client's own configuration to suggest a folder, never controls it and never applies anything
  * automatically.
  */
-export type DownloadClientKind =
-  "sabnzbd" | "nzbget" | "qbittorrent" | "deluge" | "transmission";
+export type DownloadClientKind = Schema<"DownloadClientConnectionOut">["kind"];
 
 export const DOWNLOAD_CLIENT_KIND_LABELS: Record<DownloadClientKind, string> = {
   sabnzbd: "SABnzbd",
@@ -30,72 +30,20 @@ export const DOWNLOAD_CLIENT_KIND_CREDENTIALS: Record<
   transmission: "username_password",
 };
 
-/**
- * Hand-written to match the server's plain JSON (no generated OpenAPI type exists for this route
- * yet). Secrets are reported only as saved or not, never their value.
- */
-export interface DownloadClientConnection {
-  id: number;
-  kind: DownloadClientKind;
-  name: string;
-  enabled: boolean;
-  base_url: string;
-  username: string | null;
-  password_is_saved: boolean;
-  api_key_is_saved: boolean;
-  last_test_ok: boolean | null;
-  last_test_at: string | null;
-  last_test_detail: string | null;
-}
+/** Secrets are reported only as saved or not, never their value. */
+export type DownloadClientConnection = Schema<"DownloadClientConnectionOut">;
 
-export interface DownloadClientConnectionCreate {
-  kind: DownloadClientKind;
-  name: string;
-  base_url: string;
-  username?: string;
-  password?: string;
-  api_key?: string;
-  enabled?: boolean;
-}
-
+export type DownloadClientConnectionCreate =
+  RequestBody<"DownloadClientConnectionCreateIn">;
 /** Leave a secret out to keep the saved one; send "" to clear it. */
-export interface DownloadClientConnectionUpdate {
-  name?: string;
-  base_url?: string;
-  username?: string;
-  password?: string;
-  api_key?: string;
-  enabled?: boolean;
-}
-
-export interface DownloadClientConnectionTest {
-  connection_id: number;
-  ok: boolean;
-  detail: string;
-  checked_at: string;
-}
-
-export interface DownloadClientCategoryFolder {
-  category: string;
-  folder: string;
-}
-
-export interface DownloadClientSuggestionLine {
-  state: "ok" | "problem" | "note";
-  text: string;
-}
-
-export interface DownloadClientSuggestion {
-  connection_id: number;
-  kind: DownloadClientKind;
-  name: string;
-  label: string;
-  flow: "download_client";
-  ready: boolean;
-  lines: DownloadClientSuggestionLine[];
-  suggested_watched_folder: string | null;
-  category_folders: DownloadClientCategoryFolder[];
-}
+export type DownloadClientConnectionUpdate =
+  RequestBody<"DownloadClientConnectionUpdateIn">;
+export type DownloadClientConnectionTest =
+  Schema<"DownloadClientConnectionTestOut">;
+export type DownloadClientCategoryFolder =
+  Schema<"DownloadClientCategoryFolderOut">;
+export type DownloadClientSuggestionLine = Schema<"ManagerSetupLineOut">;
+export type DownloadClientSuggestion = Schema<"DownloadClientSuggestionOut">;
 
 export const downloadClientConnectionsPath = () =>
   "/api/v1/download-clients/connections";

@@ -820,6 +820,412 @@
         "title": "DiscoverableLibraryOut",
         "type": "object"
       },
+      "DownloadClientCategoryFolderOut": {
+        "description": "One category/label a download client organizes downloads by, and the folder it reports for it (#768).",
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "folder": {
+            "title": "Folder",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "folder"
+        ],
+        "title": "DownloadClientCategoryFolderOut",
+        "type": "object"
+      },
+      "DownloadClientConnectionCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "api_key": {
+            "default": "",
+            "description": "SABnzbd only. Stored encrypted. Empty means no key.",
+            "maxLength": 2000,
+            "title": "Api Key",
+            "type": "string"
+          },
+          "base_url": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Base Url",
+            "type": "string"
+          },
+          "csrf_token": {
+            "minLength": 1,
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "sabnzbd",
+              "nzbget",
+              "qbittorrent",
+              "deluge",
+              "transmission"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "password": {
+            "default": "",
+            "description": "NZBGet/qBittorrent/Deluge/Transmission. Stored encrypted. Empty means no password.",
+            "maxLength": 2000,
+            "title": "Password",
+            "type": "string"
+          },
+          "username": {
+            "default": "",
+            "description": "NZBGet/qBittorrent/Transmission only.",
+            "maxLength": 200,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token",
+          "kind",
+          "name"
+        ],
+        "title": "DownloadClientConnectionCreateIn",
+        "type": "object"
+      },
+      "DownloadClientConnectionDeleteIn": {
+        "additionalProperties": false,
+        "properties": {
+          "csrf_token": {
+            "minLength": 1,
+            "title": "Csrf Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "DownloadClientConnectionDeleteIn",
+        "type": "object"
+      },
+      "DownloadClientConnectionOut": {
+        "description": "A direct, outbound-only connection to a bare download client, used only to suggest watched folders (#768). Secrets are reported only as saved or not.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "sabnzbd",
+              "nzbget",
+              "qbittorrent",
+              "deluge",
+              "transmission"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "base_url": {
+            "description": "Address Weir uses to reach this client. Empty means not set.",
+            "title": "Base Url",
+            "type": "string"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "password_is_saved": {
+            "title": "Password Is Saved",
+            "type": "boolean"
+          },
+          "api_key_is_saved": {
+            "title": "Api Key Is Saved",
+            "type": "boolean"
+          },
+          "last_test_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Test Ok"
+          },
+          "last_test_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Test At"
+          },
+          "last_test_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Test Detail"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "enabled",
+          "base_url",
+          "password_is_saved",
+          "api_key_is_saved"
+        ],
+        "title": "DownloadClientConnectionOut",
+        "type": "object"
+      },
+      "DownloadClientConnectionTestIn": {
+        "additionalProperties": false,
+        "properties": {
+          "csrf_token": {
+            "minLength": 1,
+            "title": "Csrf Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "DownloadClientConnectionTestIn",
+        "type": "object"
+      },
+      "DownloadClientConnectionTestOut": {
+        "properties": {
+          "connection_id": {
+            "title": "Connection Id",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "connection_id",
+          "ok",
+          "detail",
+          "checked_at"
+        ],
+        "title": "DownloadClientConnectionTestOut",
+        "type": "object"
+      },
+      "DownloadClientConnectionUpdateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Omit to leave the saved key alone. Send an empty string to clear it.",
+            "title": "Api Key"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "csrf_token": {
+            "minLength": 1,
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Omit to leave the saved password alone. Send an empty string to clear it.",
+            "title": "Password"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "DownloadClientConnectionUpdateIn",
+        "type": "object"
+      },
+      "DownloadClientSuggestionOut": {
+        "description": "One enabled download-client connection's suggested watched folder (#768), shaped like the manager-based suggestions (see ManagerSetupItemOut) so both feed the same suggestion list in the library editor.",
+        "properties": {
+          "connection_id": {
+            "title": "Connection Id",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "sabnzbd",
+              "nzbget",
+              "qbittorrent",
+              "deluge",
+              "transmission"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "flow": {
+            "enum": [
+              "download_client"
+            ],
+            "title": "Flow",
+            "type": "string"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ManagerSetupLineOut"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "suggested_watched_folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Watched Folder"
+          },
+          "category_folders": {
+            "items": {
+              "$ref": "#/components/schemas/DownloadClientCategoryFolderOut"
+            },
+            "title": "Category Folders",
+            "type": "array"
+          }
+        },
+        "required": [
+          "connection_id",
+          "kind",
+          "name",
+          "label",
+          "flow",
+          "ready",
+          "lines",
+          "category_folders"
+        ],
+        "title": "DownloadClientSuggestionOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -10856,6 +11262,315 @@
         "summary": "Post Revoke Session",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/download-clients/connections": {
+      "get": {
+        "description": "Every bare download-client connection (#768). Read only; secrets are reported only as saved or not.",
+        "operationId": "get_download_client_connections_api_v1_download_clients_connections_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DownloadClientConnectionOut"
+                  },
+                  "title": "Response Get Download Client Connections",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Download Client Connections",
+        "tags": [
+          "download-clients"
+        ]
+      },
+      "post": {
+        "description": "Add a direct, outbound-only connection to a bare download client, used only to suggest watched folders.",
+        "operationId": "post_download_client_connection_api_v1_download_clients_connections_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DownloadClientConnectionCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadClientConnectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Download Client Connection",
+        "tags": [
+          "download-clients"
+        ]
+      }
+    },
+    "/api/v1/download-clients/connections/{connection_id}": {
+      "get": {
+        "operationId": "get_download_client_connection_api_v1_download_clients_connections__connection_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Connection Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadClientConnectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Download Client Connection",
+        "tags": [
+          "download-clients"
+        ]
+      },
+      "put": {
+        "operationId": "put_download_client_connection_api_v1_download_clients_connections__connection_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Connection Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DownloadClientConnectionUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadClientConnectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Download Client Connection",
+        "tags": [
+          "download-clients"
+        ]
+      },
+      "delete": {
+        "operationId": "delete_download_client_connection_api_v1_download_clients_connections__connection_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Connection Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DownloadClientConnectionDeleteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Download Client Connection",
+        "tags": [
+          "download-clients"
+        ]
+      }
+    },
+    "/api/v1/download-clients/connections/{connection_id}/test": {
+      "post": {
+        "description": "Test the connection: reach the client and, if credentials are needed, check they are accepted. Records the result.",
+        "operationId": "post_download_client_connection_test_api_v1_download_clients_connections__connection_id__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Connection Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DownloadClientConnectionTestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadClientConnectionTestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Download Client Connection Test",
+        "tags": [
+          "download-clients"
+        ]
+      }
+    },
+    "/api/v1/download-clients/suggestions": {
+      "get": {
+        "description": "One suggested watched folder per enabled download-client connection (#768), shaped like the manager-based suggestions so both feed the same list. media_type is accepted for route consistency but does not filter the result — a download client's completed folder does not depend on it.",
+        "operationId": "get_download_client_suggestions_api_v1_download_clients_suggestions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "media_type",
+            "required": true,
+            "schema": {
+              "enum": [
+                "movie",
+                "tv"
+              ],
+              "title": "Media Type",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DownloadClientSuggestionOut"
+                  },
+                  "title": "Response Get Download Client Suggestions",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Download Client Suggestions",
+        "tags": [
+          "download-clients"
         ]
       }
     },

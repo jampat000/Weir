@@ -21,18 +21,18 @@ public sealed class SabnzbdRulesTests
     [Fact]
     public void The_base_completed_folder_comes_from_the_misc_section()
     {
-        Assert.Equal("/downloads/complete", SabnzbdRules.ParseCompleteDir(PyJsonParser.Parse(Misc)));
+        Assert.Equal("/downloads/complete", SabnzbdRules.ParseCompleteDir(WireJsonParser.Parse(Misc)));
     }
 
     [Fact]
     public void No_misc_section_yields_no_base_folder() =>
-        Assert.Null(SabnzbdRules.ParseCompleteDir(PyJsonParser.Parse("""{"config":{}}""")));
+        Assert.Null(SabnzbdRules.ParseCompleteDir(WireJsonParser.Parse("""{"config":{}}""")));
 
     [Fact]
     public void A_relative_category_folder_is_joined_onto_the_base_folder()
     {
-        var completeDir = SabnzbdRules.ParseCompleteDir(PyJsonParser.Parse(Misc));
-        var folders = SabnzbdRules.ParseCategoryFolders(PyJsonParser.Parse(Categories), completeDir);
+        var completeDir = SabnzbdRules.ParseCompleteDir(WireJsonParser.Parse(Misc));
+        var folders = SabnzbdRules.ParseCategoryFolders(WireJsonParser.Parse(Categories), completeDir);
 
         Assert.Equal(new DownloadClientCategoryFolder("tv-sonarr", "/downloads/complete/tv"), folders[0]);
     }
@@ -40,8 +40,8 @@ public sealed class SabnzbdRulesTests
     [Fact]
     public void An_absolute_category_folder_replaces_the_base_folder_instead_of_joining_it()
     {
-        var completeDir = SabnzbdRules.ParseCompleteDir(PyJsonParser.Parse(Misc));
-        var folders = SabnzbdRules.ParseCategoryFolders(PyJsonParser.Parse(Categories), completeDir);
+        var completeDir = SabnzbdRules.ParseCompleteDir(WireJsonParser.Parse(Misc));
+        var folders = SabnzbdRules.ParseCategoryFolders(WireJsonParser.Parse(Categories), completeDir);
 
         Assert.Equal(new DownloadClientCategoryFolder("movies", "/media/movies-complete"), folders[1]);
     }
@@ -49,8 +49,8 @@ public sealed class SabnzbdRulesTests
     [Fact]
     public void The_default_category_is_not_reported_as_a_folder_of_its_own()
     {
-        var completeDir = SabnzbdRules.ParseCompleteDir(PyJsonParser.Parse(Misc));
-        var folders = SabnzbdRules.ParseCategoryFolders(PyJsonParser.Parse(Categories), completeDir);
+        var completeDir = SabnzbdRules.ParseCompleteDir(WireJsonParser.Parse(Misc));
+        var folders = SabnzbdRules.ParseCategoryFolders(WireJsonParser.Parse(Categories), completeDir);
 
         Assert.DoesNotContain(folders, folder => folder.Category == "*");
         Assert.Equal(2, folders.Count);

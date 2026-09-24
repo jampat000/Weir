@@ -34,7 +34,7 @@ public sealed class TransmissionPort : IDownloadClientPort
                 return (false, $"Weir reached {connection.Label}, but the username or password was refused. Check them and save again.");
             }
 
-            return response.Status is >= 200 and < 300 && response.Json() is PyDict dict && dict.Get("result") is PyStr { Value: "success" }
+            return response.Status is >= 200 and < 300 && response.Json() is WireObject dict && dict.Get("result") is WireString { Value: "success" }
                 ? (true, $"Connected. Weir can reach {connection.Label}.")
                 : (false, $"Weir reached {connection.Label} but did not get the answer it expected. Check the address points at Transmission itself.");
         }
@@ -82,7 +82,7 @@ public sealed class TransmissionPort : IDownloadClientPort
     private static Task<DownloadClientHttpResponse> SendSessionGetAsync(
         DownloadClientHttpClient client, IReadOnlyList<KeyValuePair<string, string>>? headers, CancellationToken cancellationToken)
     {
-        var body = new PyDict().Set("method", "session-get").Set("arguments", new PyDict().Set("fields", new PyList([PyJson.Of("download-dir")])));
+        var body = new WireObject().Set("method", "session-get").Set("arguments", new WireObject().Set("fields", new WireArray([WireValue.Of("download-dir")])));
         return client.SendAsync(HttpMethod.Post, "/transmission/rpc", content: DownloadClientHttpClient.JsonContent(body), headers: headers, cancellationToken: cancellationToken);
     }
 

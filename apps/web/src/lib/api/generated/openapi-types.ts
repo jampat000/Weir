@@ -327,6 +327,89 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/download-clients/connections": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Download Client Connections
+     * @description Every bare download-client connection (#768). Read only; secrets are reported only as saved or not.
+     */
+    get: operations["get_download_client_connections_api_v1_download_clients_connections_get"];
+    put?: never;
+    /**
+     * Post Download Client Connection
+     * @description Add a direct, outbound-only connection to a bare download client, used only to suggest watched folders.
+     */
+    post: operations["post_download_client_connection_api_v1_download_clients_connections_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/download-clients/connections/{connection_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Download Client Connection */
+    get: operations["get_download_client_connection_api_v1_download_clients_connections__connection_id__get"];
+    /** Put Download Client Connection */
+    put: operations["put_download_client_connection_api_v1_download_clients_connections__connection_id__put"];
+    post?: never;
+    /** Delete Download Client Connection */
+    delete: operations["delete_download_client_connection_api_v1_download_clients_connections__connection_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/download-clients/connections/{connection_id}/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Download Client Connection Test
+     * @description Test the connection: reach the client and, if credentials are needed, check they are accepted. Records the result.
+     */
+    post: operations["post_download_client_connection_test_api_v1_download_clients_connections__connection_id__test_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/download-clients/suggestions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Download Client Suggestions
+     * @description One suggested watched folder per enabled download-client connection (#768), shaped like the manager-based suggestions so both feed the same list. media_type is accepted for route consistency but does not filter the result — a download client's completed folder does not depend on it.
+     */
+    get: operations["get_download_client_suggestions_api_v1_download_clients_suggestions_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/intake/capabilities": {
     parameters: {
       query?: never;
@@ -2432,6 +2515,167 @@ export interface components {
        * @description Where the manager sees this library, on the manager's host.
        */
       root_path?: string | null;
+    };
+    /**
+     * DownloadClientCategoryFolderOut
+     * @description One category/label a download client organizes downloads by, and the folder it reports for it (#768).
+     */
+    DownloadClientCategoryFolderOut: {
+      /** Category */
+      category: string;
+      /** Folder */
+      folder: string;
+    };
+    /** DownloadClientConnectionCreateIn */
+    DownloadClientConnectionCreateIn: {
+      /**
+       * Api Key
+       * @description SABnzbd only. Stored encrypted. Empty means no key.
+       * @default
+       */
+      api_key: string;
+      /**
+       * Base Url
+       * @default
+       */
+      base_url: string;
+      /** Csrf Token */
+      csrf_token: string;
+      /**
+       * Enabled
+       * @default true
+       */
+      enabled: boolean;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "sabnzbd" | "nzbget" | "qbittorrent" | "deluge" | "transmission";
+      /** Name */
+      name: string;
+      /**
+       * Password
+       * @description NZBGet/qBittorrent/Deluge/Transmission. Stored encrypted. Empty means no password.
+       * @default
+       */
+      password: string;
+      /**
+       * Username
+       * @description NZBGet/qBittorrent/Transmission only.
+       * @default
+       */
+      username: string;
+    };
+    /** DownloadClientConnectionDeleteIn */
+    DownloadClientConnectionDeleteIn: {
+      /** Csrf Token */
+      csrf_token: string;
+    };
+    /**
+     * DownloadClientConnectionOut
+     * @description A direct, outbound-only connection to a bare download client, used only to suggest watched folders (#768). Secrets are reported only as saved or not.
+     */
+    DownloadClientConnectionOut: {
+      /** Id */
+      id: number;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "sabnzbd" | "nzbget" | "qbittorrent" | "deluge" | "transmission";
+      /** Name */
+      name: string;
+      /** Enabled */
+      enabled: boolean;
+      /**
+       * Base Url
+       * @description Address Weir uses to reach this client. Empty means not set.
+       */
+      base_url: string;
+      /** Username */
+      username?: string | null;
+      /** Password Is Saved */
+      password_is_saved: boolean;
+      /** Api Key Is Saved */
+      api_key_is_saved: boolean;
+      /** Last Test Ok */
+      last_test_ok?: boolean | null;
+      /** Last Test At */
+      last_test_at?: string | null;
+      /** Last Test Detail */
+      last_test_detail?: string | null;
+    };
+    /** DownloadClientConnectionTestIn */
+    DownloadClientConnectionTestIn: {
+      /** Csrf Token */
+      csrf_token: string;
+    };
+    /** DownloadClientConnectionTestOut */
+    DownloadClientConnectionTestOut: {
+      /** Connection Id */
+      connection_id: number;
+      /** Ok */
+      ok: boolean;
+      /** Detail */
+      detail: string;
+      /**
+       * Checked At
+       * Format: date-time
+       */
+      checked_at: string;
+    };
+    /** DownloadClientConnectionUpdateIn */
+    DownloadClientConnectionUpdateIn: {
+      /**
+       * Api Key
+       * @description Omit to leave the saved key alone. Send an empty string to clear it.
+       */
+      api_key?: string | null;
+      /** Base Url */
+      base_url?: string | null;
+      /** Csrf Token */
+      csrf_token: string;
+      /** Enabled */
+      enabled?: boolean | null;
+      /** Name */
+      name?: string | null;
+      /**
+       * Password
+       * @description Omit to leave the saved password alone. Send an empty string to clear it.
+       */
+      password?: string | null;
+      /** Username */
+      username?: string | null;
+    };
+    /**
+     * DownloadClientSuggestionOut
+     * @description One enabled download-client connection's suggested watched folder (#768), shaped like the manager-based suggestions (see ManagerSetupItemOut) so both feed the same suggestion list in the library editor.
+     */
+    DownloadClientSuggestionOut: {
+      /** Connection Id */
+      connection_id: number;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "sabnzbd" | "nzbget" | "qbittorrent" | "deluge" | "transmission";
+      /** Name */
+      name: string;
+      /** Label */
+      label: string;
+      /**
+       * Flow
+       * @enum {string}
+       */
+      flow: "download_client";
+      /** Ready */
+      ready: boolean;
+      /** Lines */
+      lines: components["schemas"]["ManagerSetupLineOut"][];
+      /** Suggested Watched Folder */
+      suggested_watched_folder?: string | null;
+      /** Category Folders */
+      category_folders: components["schemas"]["DownloadClientCategoryFolderOut"][];
     };
     /** HTTPValidationError */
     HTTPValidationError: {
@@ -7395,6 +7639,224 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["SessionActionOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_download_client_connections_api_v1_download_clients_connections_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DownloadClientConnectionOut"][];
+        };
+      };
+    };
+  };
+  post_download_client_connection_api_v1_download_clients_connections_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DownloadClientConnectionCreateIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DownloadClientConnectionOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_download_client_connection_api_v1_download_clients_connections__connection_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DownloadClientConnectionOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  put_download_client_connection_api_v1_download_clients_connections__connection_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DownloadClientConnectionUpdateIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DownloadClientConnectionOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_download_client_connection_api_v1_download_clients_connections__connection_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DownloadClientConnectionDeleteIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_download_client_connection_test_api_v1_download_clients_connections__connection_id__test_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DownloadClientConnectionTestIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DownloadClientConnectionTestOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_download_client_suggestions_api_v1_download_clients_suggestions_get: {
+    parameters: {
+      query: {
+        media_type: "movie" | "tv";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DownloadClientSuggestionOut"][];
         };
       };
       /** @description Validation Error */

@@ -30,8 +30,8 @@ public static class DownloadClientKinds
     /// <summary>A connection's label, e.g. <c>"qBittorrent (Living room)"</c>; a connection named after its product is not repeated.</summary>
     public static string LabelForConnection(string? kind, string? name)
     {
-        var product = KindLabels.GetValueOrDefault(PyStrings.Strip(kind ?? string.Empty).ToLowerInvariant(), "Download client");
-        var label = PyStrings.Strip(name ?? string.Empty);
+        var product = KindLabels.GetValueOrDefault(WireStrings.Strip(kind ?? string.Empty).ToLowerInvariant(), "Download client");
+        var label = WireStrings.Strip(name ?? string.Empty);
         if (label.Length == 0)
         {
             return product;

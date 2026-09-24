@@ -21,7 +21,7 @@ type Formatter = (iso: string | null) => string;
 
 /** A result only counts with a time behind it, the same rule the media-manager card uses. */
 function lastResult(connection: DownloadClientConnection): boolean | null {
-  return connection.last_test_at ? connection.last_test_ok : null;
+  return connection.last_test_at ? (connection.last_test_ok ?? null) : null;
 }
 
 function headline(connection: DownloadClientConnection): string {

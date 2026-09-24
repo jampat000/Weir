@@ -62,15 +62,15 @@ public sealed class DelugePort : IDownloadClientPort
 
     private static async Task<(bool Ok, string? Cookie)> LoginAsync(DownloadClientHttpClient client, DownloadClientConnection connection, CancellationToken cancellationToken)
     {
-        var response = await CallAsync(client, "auth.login", null, 1, cancellationToken, new PyList([PyJson.Of(connection.Password ?? string.Empty)])).ConfigureAwait(false);
-        var ok = response.Status is >= 200 and < 300 && response.Json() is PyDict dict && dict.Get("result") is PyBool { Value: true };
+        var response = await CallAsync(client, "auth.login", null, 1, cancellationToken, new WireArray([WireValue.Of(connection.Password ?? string.Empty)])).ConfigureAwait(false);
+        var ok = response.Status is >= 200 and < 300 && response.Json() is WireObject dict && dict.Get("result") is WireBool { Value: true };
         return (ok, ok ? response.Headers.GetValueOrDefault("Set-Cookie") : null);
     }
 
     private static Task<DownloadClientHttpResponse> CallAsync(
-        DownloadClientHttpClient client, string method, IReadOnlyList<KeyValuePair<string, string>>? headers, int id, CancellationToken cancellationToken, PyList? parameters = null)
+        DownloadClientHttpClient client, string method, IReadOnlyList<KeyValuePair<string, string>>? headers, int id, CancellationToken cancellationToken, WireArray? parameters = null)
     {
-        var body = new PyDict().Set("method", method).Set("params", parameters ?? new PyList()).Set("id", id);
+        var body = new WireObject().Set("method", method).Set("params", parameters ?? new WireArray()).Set("id", id);
         return client.SendAsync(HttpMethod.Post, "/json", content: DownloadClientHttpClient.JsonContent(body), headers: headers, cancellationToken: cancellationToken);
     }
 

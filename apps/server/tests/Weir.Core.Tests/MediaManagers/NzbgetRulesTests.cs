@@ -20,14 +20,14 @@ public sealed class NzbgetRulesTests
     [Fact]
     public void The_base_folder_is_DestDir()
     {
-        var folders = NzbgetRules.ParseConfig(PyJsonParser.Parse(Config));
+        var folders = NzbgetRules.ParseConfig(WireJsonParser.Parse(Config));
         Assert.Equal("/downloads/complete", folders.CompletedFolder);
     }
 
     [Fact]
     public void Each_numbered_category_is_paired_with_its_own_destination()
     {
-        var folders = NzbgetRules.ParseConfig(PyJsonParser.Parse(Config));
+        var folders = NzbgetRules.ParseConfig(WireJsonParser.Parse(Config));
         Assert.Equal(
             [
                 new DownloadClientCategoryFolder("tv-sonarr", "/downloads/complete/tv"),
@@ -39,14 +39,14 @@ public sealed class NzbgetRulesTests
     [Fact]
     public void A_category_with_no_destination_is_skipped_rather_than_reported_with_a_blank_folder()
     {
-        var folders = NzbgetRules.ParseConfig(PyJsonParser.Parse(Config));
+        var folders = NzbgetRules.ParseConfig(WireJsonParser.Parse(Config));
         Assert.DoesNotContain(folders.CategoryFolders, category => category.Category == "empty-category");
     }
 
     [Fact]
     public void No_result_array_yields_no_folders_at_all()
     {
-        var folders = NzbgetRules.ParseConfig(PyJsonParser.Parse("""{"version":"1.1"}"""));
+        var folders = NzbgetRules.ParseConfig(WireJsonParser.Parse("""{"version":"1.1"}"""));
         Assert.Null(folders.CompletedFolder);
         Assert.Empty(folders.CategoryFolders);
     }

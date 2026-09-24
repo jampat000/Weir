@@ -42,12 +42,12 @@ public static class DownloadClientConnectionsEndpoints
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var rows = await DownloadClientConnectionStore.ListAsync(uow).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyList(rows.Select(row => (PyJson)row.ToOut())));
+        return ApiRoutes.Ok(new WireArray(rows.Select(row => (WireValue)row.ToOut())));
     }
 
     /// <summary>A <c>str</c> field with a default: absent means the default, present must be a string.</summary>
-    private static string StrWithDefault(BodyModel model, PyJson? body, string name, string defaultValue, int? maxLength) =>
-        body is PyDict dict && dict.ContainsKey(name) ? model.Str(name, maxLength: maxLength) : defaultValue;
+    private static string StrWithDefault(BodyModel model, WireValue? body, string name, string defaultValue, int? maxLength) =>
+        body is WireObject dict && dict.ContainsKey(name) ? model.Str(name, maxLength: maxLength) : defaultValue;
 
     private static async Task<ApiResult> CreateConnectionAsync(ApiRequest request)
     {
@@ -146,7 +146,7 @@ public static class DownloadClientConnectionsEndpoints
         await request.CommitAsync().ConfigureAwait(false);
         return new CustomApiResult(context =>
         {
-            PyResponses.NoContentJson(context);
+            ApiResponses.NoContentJson(context);
             return Task.CompletedTask;
         });
     }
@@ -165,7 +165,7 @@ public static class DownloadClientConnectionsEndpoints
         MediaManagerConnectionsEndpoints.VerifyCsrf(request, csrfToken);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var row = await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
-        var checkedAt = PyDateTime.UtcNow(request.Time);
+        var checkedAt = Timestamp.UtcNow(request.Time);
 
         bool ok;
         string detail;
@@ -194,11 +194,11 @@ public static class DownloadClientConnectionsEndpoints
         }
 
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("connection_id", row.Id)
             .Set("ok", ok)
             .Set("detail", detail)
-            .Set("checked_at", checkedAt.PydanticJson()));
+            .Set("checked_at", checkedAt.ToWireText()));
     }
 
     /// <summary>
@@ -214,25 +214,25 @@ public static class DownloadClientConnectionsEndpoints
         var issues = new ValidationIssues();
         if (request.Query("media_type") is { } rawType)
         {
-            PydanticRules.TryLiteral(new PyStr(rawType), ["query", "media_type"], ProcessingMediaScopes.All, issues, out _);
+            FieldRules.TryLiteral(new WireString(rawType), ["query", "media_type"], ProcessingMediaScopes.All, issues, out _);
         }
         else
         {
-            issues.Add(new ValidationIssue("missing", ["query", "media_type"], "Field required", PyJson.Null));
+            issues.Add(new ValidationIssue("missing", ["query", "media_type"], "Field required", WireValue.Null));
         }
 
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var suggestions = await request.Service<DownloadClientSuggestions>().SuggestAsync(uow, request.Context.RequestAborted).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyList(suggestions.Select(item => (PyJson)item)));
+        return ApiRoutes.Ok(new WireArray(suggestions.Select(item => (WireValue)item)));
     }
 
     /// <summary>The <c>connection_id</c> route value as an integer of at least 1; 0 with a validation issue otherwise.</summary>
     private static long ConnectionId(ApiRequest request, ValidationIssues issues)
     {
         var raw = request.RouteValue("connection_id") ?? string.Empty;
-        return PydanticRules.TryInt(new PyStr(raw), ["path", "connection_id"], 1, null, issues, out var value)
+        return FieldRules.TryInt(new WireString(raw), ["path", "connection_id"], 1, null, issues, out var value)
             ? value > long.MaxValue ? long.MaxValue : (long)value
             : 0;
     }

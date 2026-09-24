@@ -15,28 +15,28 @@ public sealed class QBittorrentRulesTests
     [Fact]
     public void The_default_folder_is_the_preferences_save_path()
     {
-        var folders = QBittorrentRules.Parse(PyJsonParser.Parse(Categories), PyJsonParser.Parse(Preferences));
+        var folders = QBittorrentRules.Parse(WireJsonParser.Parse(Categories), WireJsonParser.Parse(Preferences));
         Assert.Equal("/downloads/complete", folders.CompletedFolder);
     }
 
     [Fact]
     public void A_category_with_its_own_save_path_is_reported()
     {
-        var folders = QBittorrentRules.Parse(PyJsonParser.Parse(Categories), PyJsonParser.Parse(Preferences));
+        var folders = QBittorrentRules.Parse(WireJsonParser.Parse(Categories), WireJsonParser.Parse(Preferences));
         Assert.Contains(new DownloadClientCategoryFolder("tv-sonarr", "/downloads/complete/tv"), folders.CategoryFolders);
     }
 
     [Fact]
     public void A_category_with_an_empty_save_path_is_not_reported_as_a_folder_of_its_own()
     {
-        var folders = QBittorrentRules.Parse(PyJsonParser.Parse(Categories), PyJsonParser.Parse(Preferences));
+        var folders = QBittorrentRules.Parse(WireJsonParser.Parse(Categories), WireJsonParser.Parse(Preferences));
         Assert.DoesNotContain(folders.CategoryFolders, category => category.Category == "movies");
     }
 
     [Fact]
     public void No_categories_object_yields_an_empty_category_list()
     {
-        var folders = QBittorrentRules.Parse(null, PyJsonParser.Parse(Preferences));
+        var folders = QBittorrentRules.Parse(null, WireJsonParser.Parse(Preferences));
         Assert.Empty(folders.CategoryFolders);
         Assert.Equal("/downloads/complete", folders.CompletedFolder);
     }

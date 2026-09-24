@@ -75,7 +75,7 @@ public sealed class DownloadClientPortsTests
         var request = Assert.Single(http.Requests);
         var expectedAuth = "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes("user:pass"));
         Assert.Equal(expectedAuth, request.Headers["Authorization"]);
-        Assert.Equal("config", ((PyStr)((PyDict)request.Json!)["method"]).Value);
+        Assert.Equal("config", ((WireString)((WireObject)request.Json!)["method"]).Value);
     }
 
     [Fact]
@@ -137,7 +137,7 @@ public sealed class DownloadClientPortsTests
     private static FakeManagerHttp DelugeHttp(string labelAnswer) =>
         new FakeManagerHttp().Route(HttpMethod.Post, "/json", request =>
         {
-            var method = ((PyStr)((PyDict)request.Json!)["method"]).Value;
+            var method = ((WireString)((WireObject)request.Json!)["method"]).Value;
             return method switch
             {
                 "auth.login" => FakeManagerHttp.Response(HttpStatusCode.OK, """{"result":true,"error":null,"id":1}""", ("Set-Cookie", "_session_id=deluge-session")),
@@ -157,8 +157,8 @@ public sealed class DownloadClientPortsTests
 
         Assert.Equal("/downloads/complete", folders.CompletedFolder);
         Assert.Equal([new DownloadClientCategoryFolder("tv-sonarr", "/downloads/complete/tv")], folders.CategoryFolders);
-        var loginRequest = http.Requests.First(r => ((PyStr)((PyDict)r.Json!)["method"]).Value == "auth.login");
-        Assert.Equal("deluge-password", ((PyStr)((PyList)((PyDict)loginRequest.Json!)["params"]).Items[0]).Value);
+        var loginRequest = http.Requests.First(r => ((WireString)((WireObject)r.Json!)["method"]).Value == "auth.login");
+        Assert.Equal("deluge-password", ((WireString)((WireArray)((WireObject)loginRequest.Json!)["params"]).Items[0]).Value);
     }
 
     [Fact]
