@@ -10,6 +10,14 @@ it from outside, with a positive control so a quiet timer cannot pass for a work
 The switched-off case is watched for two intervals rather than read from the API: a library's
 ``next_look_at`` is null when no periodic look is scheduled, but it is also null before the scheduler's
 first tick, and nothing reports that the tick has happened.
+
+#747 looked at replacing this with a state read, the way ``test_resilience.py``'s pause and
+schedule-window waits now use ``GET /processing/files-at-once``'s ``waiting_for``. That endpoint
+describes a job already sitting in the queue; this test is about whether the scan dispatch job is
+ever *created* in the first place, which needs the scheduler's own tick state (last run, next run)
+to observe directly rather than infer from a job's absence. Exposing that is real design (what the
+scheduler reports, and where), not a field add to an existing endpoint, so it was left as a
+``never_within`` wait rather than done as part of that cleanup.
 """
 
 from __future__ import annotations
