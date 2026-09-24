@@ -49,6 +49,12 @@ the proxy over HTTPS, `WEIR_SECURITY_ENABLE_HSTS=1`. Plain HTTP localhost
 development may explicitly set `WEIR_SESSION_COOKIE_SECURE=false`; System ›
 Security reports this trade-off.
 
+Weir compresses its own responses: JSON and CSV with Brotli or gzip, and the
+web app's files from copies compressed at build time. It never compresses
+`/api/v1/auth/*`, because those responses carry the CSRF token. A proxy does
+not need to compress anything for Weir; if it does, leave `/api/v1/auth/*`
+out for the same reason.
+
 ## CORS
 
 Credentialed browser requests require explicit origins. `WEIR_CORS_ORIGINS=*` is rejected at startup.
