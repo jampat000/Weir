@@ -437,16 +437,16 @@
         "dependencies": {
           "Microsoft.Extensions.Hosting.Systemd": "[10.0.12, )",
           "Microsoft.Extensions.Hosting.WindowsServices": "[10.0.12, )",
-          "Weir.Api": "[3.2.4, )",
-          "Weir.Core": "[3.2.4, )",
-          "Weir.Infrastructure": "[3.2.4, )"
+          "Weir.Api": "[3.2.5, )",
+          "Weir.Core": "[3.2.5, )",
+          "Weir.Infrastructure": "[3.2.5, )"
         }
       },
       "weir.api": {
         "type": "Project",
         "dependencies": {
-          "Weir.Core": "[3.2.4, )",
-          "Weir.Infrastructure": "[3.2.4, )"
+          "Weir.Core": "[3.2.5, )",
+          "Weir.Infrastructure": "[3.2.5, )"
         }
       },
       "weir.core": {
@@ -459,7 +459,7 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.12, )",
-          "Weir.Core": "[3.2.4, )"
+          "Weir.Core": "[3.2.5, )"
         }
       },
       "Microsoft.Data.Sqlite": {
