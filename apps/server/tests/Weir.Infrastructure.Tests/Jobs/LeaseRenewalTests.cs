@@ -38,23 +38,26 @@ public sealed class LeaseRenewalTests : IDisposable
         });
         var intruderHandler = new DelegateHandler(Kind, _ => Interlocked.Increment(ref intruderRuns));
 
-        var runningProcessor = Processor(runningHandler);
+        using var heartbeatWaiting = new SemaphoreSlim(0);
+        var runningProcessor = Processor(runningHandler, heartbeatWaiting);
         var intruderProcessor = Processor(intruderHandler);
 
         // A one-second lease; the handler outlives it by design, so only a working renewal keeps it safe.
         const int leaseSeconds = 1;
         var runningTask = runningProcessor.ProcessOneAsync("worker-running", leaseSeconds, _time.GetUtcNow());
         await claimed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await WaitForHeartbeatAsync(heartbeatWaiting);
 
-        // Step past the original lease in heartbeat-sized increments (lease/3), giving the renewal
-        // heartbeat a chance to fire before each intruder claim attempt at the same "now". Whether or not
-        // a given step happens to land on a renewal, the intruder can only ever see a lease that is either
-        // still within its original window or has already been pushed out further - never expired.
+        // Step past the original lease in heartbeat-sized increments (lease/3), so each step fires one
+        // renewal, and try to claim with the intruder at the same "now" after each one. Waiting for the
+        // heartbeat to be waiting again (rather than sleeping) means this step's renewal has been written
+        // and the next tick's timer is set before the intruder reads the lease or the clock moves on. The
+        // intruder must only ever see a lease that has been pushed out ahead of "now" - never expired.
         var intruderOutcomes = new List<JobProcessOutcome>();
         for (var step = 0; step < 6; step++)
         {
             _time.Advance(TimeSpan.FromSeconds(leaseSeconds / 3.0));
-            await Task.Delay(20); // let the heartbeat's renewal write land before the intruder reads it
+            await WaitForHeartbeatAsync(heartbeatWaiting);
             intruderOutcomes.Add(await intruderProcessor.ProcessOneAsync("worker-intruder", leaseSeconds, _time.GetUtcNow()));
         }
 
@@ -78,20 +81,24 @@ public sealed class LeaseRenewalTests : IDisposable
             started.TrySetResult();
             await release.Task;
         });
-        var processor = Processor(handler);
+        using var heartbeatWaiting = new SemaphoreSlim(0);
+        var processor = Processor(handler, heartbeatWaiting);
 
         const int leaseSeconds = 1;
         var runTask = processor.ProcessOneAsync("worker", leaseSeconds, _time.GetUtcNow());
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await WaitForHeartbeatAsync(heartbeatWaiting);
         var originalExpiry = (await _db.Store.GetAsync(1))!.LeaseExpiresAt;
 
         // Step forward in heartbeat-sized increments (lease/3), same as the intruder test: renewing the
         // lease only ever succeeds while it hasn't already expired, so a single jump straight past the
         // full lease would (correctly) find nothing left to renew instead of proving the heartbeat works.
+        // After each step, wait until the heartbeat is waiting again: its renewal for that step is written
+        // by then, and its next timer is set before the clock moves again.
         for (var step = 0; step < 3; step++)
         {
             _time.Advance(TimeSpan.FromSeconds(leaseSeconds / 3.0));
-            await Task.Delay(20);
+            await WaitForHeartbeatAsync(heartbeatWaiting);
         }
 
         var renewedExpiry = (await _db.Store.GetAsync(1))!.LeaseExpiresAt;
@@ -101,7 +108,16 @@ public sealed class LeaseRenewalTests : IDisposable
         Assert.Equal(JobProcessOutcome.Processed, await runTask);
     }
 
-    private ProcessingJobProcessor Processor(IJobHandler handler) =>
+    /// <summary>
+    /// Wait for the heartbeat's next "waiting for my next tick" signal. A missing signal means the heartbeat
+    /// stopped renewing (it lost the lease, or crashed), which is exactly what these tests must catch.
+    /// </summary>
+    private static async Task WaitForHeartbeatAsync(SemaphoreSlim heartbeatWaiting) =>
+        Assert.True(
+            await heartbeatWaiting.WaitAsync(TimeSpan.FromSeconds(5)),
+            "The lease-renewal heartbeat did not renew and wait for its next tick in time.");
+
+    private ProcessingJobProcessor Processor(IJobHandler handler, SemaphoreSlim? heartbeatWaiting = null) =>
         new(
             new ProcessingJobStore(new SqliteDatabase(_db.DbPath, pooling: false), _time),
             new JobHandlerRegistry([handler]),
@@ -109,5 +125,8 @@ public sealed class LeaseRenewalTests : IDisposable
             new NoUnhandledJobFailureRecorder(),
             new NoJobNotifications(),
             _time,
-            NullLogger<ProcessingJobProcessor>.Instance);
+            NullLogger<ProcessingJobProcessor>.Instance)
+        {
+            LeaseRenewalWaiting = heartbeatWaiting is null ? null : () => heartbeatWaiting.Release(),
+        };
 }
