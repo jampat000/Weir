@@ -292,11 +292,7 @@ public sealed class JobPayloadMigrationTests : IDisposable
         // row, is due for pruning.
         var jobStore = new ProcessingJobStore(_database, TimeProvider.System);
         await JobRowsRetention.RunTickAsync(jobStore, jobRowsRetentionDays: 0, DateTimeOffset.UtcNow);
-        await using (var pruneUow = await UnitOfWork.OpenAsync(_database))
-        {
-            await FileLogStore.PruneAsync(pruneUow, retentionDays: 0, DateTimeOffset.UtcNow);
-            await pruneUow.CommitAsync();
-        }
+        await FileLogStore.PruneAsync(_database, retentionDays: 0, DateTimeOffset.UtcNow);
 
         // The scan job row (a job's own bookkeeping) may now be gone, but the file index it produced is not.
         await using var uow = await UnitOfWork.OpenAsync(_database);

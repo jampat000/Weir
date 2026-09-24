@@ -1,6 +1,6 @@
 using System.Globalization;
-using Microsoft.Data.Sqlite;
 using Weir.Core.Jobs;
+using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Jobs;
 
@@ -12,7 +12,8 @@ public sealed record JobRowsPruneCounts(int Processing, int HandoffLedger, int A
 
 /// <summary>
 /// Periodic pruning of terminal job rows: terminal <c>jobs</c> rows past <c>WEIR_JOB_ROWS_RETENTION_DAYS</c>, terminal hand-off ledger
-/// rows past 90 days, and Activity past the suite's <c>activity_retention_days</c>, in one transaction.
+/// rows past 90 days, and Activity past the suite's <c>activity_retention_days</c>, each a batch per transaction
+/// (<see cref="BatchedDeletes"/>).
 /// </summary>
 public static class JobRowsRetention
 {
@@ -25,67 +26,56 @@ public static class JobRowsRetention
     /// <summary>The ledger's terminal states.</summary>
     public static readonly IReadOnlyList<string> LedgerTerminalStates = ["cancelled", "completed", "failed", "passed-through", "rejected"];
 
-    /// <summary>Delete terminal rows whose <c>updated_at</c> is older than <paramref name="cutoff"/>.</summary>
-    public static int PruneJobRows(SqliteConnection connection, SqliteTransaction transaction, DateTimeOffset cutoff)
-    {
-        var statuses = ProcessingJobStatus.Terminal;
-        var names = statuses.Select((_, index) => $"@s{index}").ToArray();
-        var parameters = statuses.Select((status, index) => ($"@s{index}", (object?)status))
-            .Append(("@cutoff", PythonTimestamps.Orm(cutoff)))
-            .ToArray();
-        return ProcessingJobStore.Execute(
-            connection,
-            transaction,
-            $"DELETE FROM jobs WHERE status IN ({string.Join(", ", names)}) AND updated_at < @cutoff",
-            parameters);
-    }
-
-    /// <summary>One retention tick: jobs, hand-off ledger and Activity, in one transaction.</summary>
-    public static Task<JobRowsPruneCounts> RunTickAsync(ProcessingJobStore queue, int jobRowsRetentionDays, DateTimeOffset now, CancellationToken cancellationToken = default)
+    /// <summary>One retention tick: jobs, hand-off ledger and Activity.</summary>
+    public static async Task<JobRowsPruneCounts> RunTickAsync(ProcessingJobStore queue, int jobRowsRetentionDays, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(queue);
-        return queue.InTransactionAsync(
-            (connection, transaction) =>
-            {
-                var processing = PruneJobRows(connection, transaction, now - TimeSpan.FromDays(jobRowsRetentionDays));
-                var ledger = PruneLedger(connection, transaction, now);
-                var activity = PruneActivity(connection, transaction, ActivityRetentionDays(connection, transaction), now);
-                return new JobRowsPruneCounts(processing, ledger, activity);
-            },
+        var database = queue.Database;
+        var processing = await PruneJobRowsAsync(database, now - TimeSpan.FromDays(jobRowsRetentionDays), cancellationToken).ConfigureAwait(false);
+        var ledger = await PruneLedgerAsync(database, now, cancellationToken).ConfigureAwait(false);
+        var activity = await PruneActivityAsync(database, await ActivityRetentionDaysAsync(database, cancellationToken).ConfigureAwait(false), now, cancellationToken)
+            .ConfigureAwait(false);
+        return new JobRowsPruneCounts(processing, ledger, activity);
+    }
+
+    /// <summary>Delete terminal rows whose <c>updated_at</c> is older than <paramref name="cutoff"/>.</summary>
+    private static Task<int> PruneJobRowsAsync(SqliteDatabase database, DateTimeOffset cutoff, CancellationToken cancellationToken)
+    {
+        var (names, parameters) = InList("s", ProcessingJobStatus.Terminal);
+        return BatchedDeletes.DeleteAsync(
+            database, "jobs", $"status IN ({names}) AND updated_at < @cutoff", [.. parameters, ("@cutoff", PythonTimestamps.Orm(cutoff))], cancellationToken);
+    }
+
+    private static Task<int> PruneLedgerAsync(SqliteDatabase database, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var (names, parameters) = InList("state", LedgerTerminalStates);
+        return BatchedDeletes.DeleteAsync(
+            database,
+            "media_manager_handoffs",
+            $"state IN ({names}) AND last_changed_at < @cutoff",
+            [.. parameters, ("@cutoff", PythonTimestamps.Orm(now - TimeSpan.FromDays(LedgerRetentionDays)))],
             cancellationToken);
     }
 
-    private static int PruneLedger(SqliteConnection connection, SqliteTransaction transaction, DateTimeOffset now)
-    {
-        var names = LedgerTerminalStates.Select((_, index) => $"@state{index}").ToArray();
-        var parameters = LedgerTerminalStates.Select((state, index) => ($"@state{index}", (object?)state))
-            .Append(("@cutoff", PythonTimestamps.Orm(now - TimeSpan.FromDays(LedgerRetentionDays))))
-            .ToArray();
-        return ProcessingJobStore.Execute(
-            connection,
-            transaction,
-            $"DELETE FROM media_manager_handoffs WHERE state IN ({string.Join(", ", names)}) AND last_changed_at < @cutoff",
-            parameters);
-    }
-
     /// <summary>Delete Activity older than <paramref name="retentionDays"/>; zero or less keeps everything.</summary>
-    private static int PruneActivity(SqliteConnection connection, SqliteTransaction transaction, int retentionDays, DateTimeOffset now)
+    private static Task<int> PruneActivityAsync(SqliteDatabase database, int retentionDays, DateTimeOffset now, CancellationToken cancellationToken) =>
+        retentionDays <= 0
+            ? Task.FromResult(0)
+            : BatchedDeletes.DeleteAsync(
+                database, "activity_events", "created_at < @cutoff", [("@cutoff", PythonTimestamps.Orm(now - TimeSpan.FromDays(retentionDays)))], cancellationToken);
+
+    private static async Task<int> ActivityRetentionDaysAsync(SqliteDatabase database, CancellationToken cancellationToken)
     {
-        if (retentionDays <= 0)
+        var uow = await UnitOfWork.OpenAsync(database, cancellationToken).ConfigureAwait(false);
+        await using (uow.ConfigureAwait(false))
         {
-            return 0;
+            var value = await uow.ScalarAsync("SELECT activity_retention_days FROM suite_settings WHERE id = 1").ConfigureAwait(false);
+            return value is null or DBNull ? DefaultActivityRetentionDays : (int)Convert.ToInt64(value, CultureInfo.InvariantCulture);
         }
-
-        return ProcessingJobStore.Execute(
-            connection,
-            transaction,
-            "DELETE FROM activity_events WHERE created_at < @cutoff",
-            ("@cutoff", PythonTimestamps.Orm(now - TimeSpan.FromDays(retentionDays))));
     }
 
-    private static int ActivityRetentionDays(SqliteConnection connection, SqliteTransaction transaction)
-    {
-        var value = ProcessingJobStore.Scalar(connection, transaction, "SELECT activity_retention_days FROM suite_settings WHERE id = 1");
-        return value is null or DBNull ? DefaultActivityRetentionDays : (int)Convert.ToInt64(value, CultureInfo.InvariantCulture);
-    }
+    /// <summary>Named parameters for an <c>IN (…)</c> list: <c>@{prefix}0, @{prefix}1, …</c> and their values.</summary>
+    private static (string Names, (string Name, object? Value)[] Parameters) InList(string prefix, IReadOnlyList<string> values) =>
+        (string.Join(", ", values.Select((_, index) => $"@{prefix}{index}")),
+         [.. values.Select((value, index) => ($"@{prefix}{index}", (object?)value))]);
 }

@@ -6,6 +6,7 @@ using Weir.Core.Jobs;
 using Weir.Core.Workers;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
+using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Tests.Jobs;
 
@@ -117,6 +118,21 @@ public sealed class JobServicesTests : IDisposable
         Assert.Equal(1, counts.Activity);
         Assert.Equal(5, counts.Total);
         Assert.Equal(["new-done", "old-leased", "old-pending"], (await _db.Store.ListAsync()).Select(j => j.DedupeKey).Order(StringComparer.Ordinal));
+        Assert.Equal(1, _db.Count("SELECT count(*) FROM activity_events"));
+    }
+
+    [Fact]
+    public async Task Retention_removes_more_old_rows_than_one_batch_holds()
+    {
+        var old = (BatchedDeletes.BatchSize * 2) + 1;
+        _db.Execute(
+            $"WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < {old}) " +
+            "INSERT INTO activity_events (created_at, event_type, module, title) SELECT '2025-01-01 00:00:00', 'x', 'processing', 'old' FROM n");
+        _db.Execute("INSERT INTO activity_events (created_at, event_type, module, title) VALUES (CURRENT_TIMESTAMP, 'x', 'processing', 'new')");
+
+        var counts = await JobRowsRetention.RunTickAsync(_db.Store, 90, DateTimeOffset.UtcNow);
+
+        Assert.Equal(old, counts.Activity);
         Assert.Equal(1, _db.Count("SELECT count(*) FROM activity_events"));
     }
 
