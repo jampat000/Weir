@@ -309,7 +309,7 @@ public sealed class MediaManagerServiceTests
         Assert.Equal("k1", post.Headers["X-Api-Key"]);
         Assert.False(post.FollowRedirects);
         Assert.Equal(
-            """{"handoffId":"h1","status":"completed","processorName":"Weir","libraryId":"lib-movies","outputPath":"/out/b.mkv","message":"Remux finished."}""",
+            """{"handoffId":"h1","status":"completed","processorName":"Weir","libraryId":"lib-movies","outputPath":"/out/b.mkv","message":"Remux finished.","outputFiles":["/out/b.mkv"]}""",
             post.Body);
         Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.handoff_reported' AND title = 'Told Deluno that film.mkv is ready to import'"));
     }
@@ -323,7 +323,7 @@ public sealed class MediaManagerServiceTests
         Assert.StartsWith("failed: could not reach Deluno", await Report(fixture, HandoffPayload, ok), StringComparison.Ordinal);
         fixture.Http.Json(HttpMethod.Post, "/api/integrations/processors/events", string.Empty, HttpStatusCode.Conflict);
         Assert.Equal("failed: Deluno answered HTTP 409", await Report(fixture, HandoffPayload, ok));
-        Assert.Equal(2, await fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE title = 'Weir could not tell Deluno about a handed-over file'"));
+        Assert.Equal(2, await fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE title = 'Weir could not tell Deluno about b.mkv'"));
     }
 
     [Theory]
