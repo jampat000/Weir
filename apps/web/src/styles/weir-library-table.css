@@ -71,10 +71,26 @@
   color: var(--mm-text3);
 }
 
+/* The box is drawn at the text's size; the label around it is the 24px target a finger or a shaky hand needs. */
+.mm-library-check-target {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+}
+
 .mm-library-check {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
+  margin: 0;
   accent-color: var(--mm-accent);
+  cursor: inherit;
+}
+
+.mm-library-check:disabled {
+  cursor: default;
 }
 
 .mm-library-name button {
@@ -111,12 +127,6 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-.mm-library-more {
-  margin: 12px 0 0;
-  font-size: var(--mm-type-caption);
-  color: var(--mm-text3);
 }
 
 /* Compact rows: the one density choice that changes what fits rather than how big everything is. */
