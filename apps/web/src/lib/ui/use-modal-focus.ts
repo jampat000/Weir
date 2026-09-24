@@ -1,7 +1,21 @@
 import { useEffect, useRef, type RefObject } from "react";
 
-/** Open modals, newest last. Escape closes only the newest, so a dialog over a panel leaves the panel open. */
-const openLayers: symbol[] = [];
+/**
+ * Open modals, newest last. Escape closes only the newest, so a dialog over a panel leaves the
+ * panel open. Tracked by the layer's own DOM element rather than an opaque token (#749): removing a
+ * modal's element from the document happens synchronously when React commits the unmount, before its
+ * `useEffect` cleanup runs, so a stale entry — one whose cleanup is still pending, or that a test left
+ * mounted at teardown — is always identifiable and pruned before it can outrank the real topmost layer.
+ */
+const openLayers: HTMLElement[] = [];
+
+/** Drops any layer whose element has already left the document, then returns what remains on top. */
+function topOpenLayer(): HTMLElement | undefined {
+  for (let index = openLayers.length - 1; index >= 0; index -= 1) {
+    if (!openLayers[index].isConnected) openLayers.splice(index, 1);
+  }
+  return openLayers[openLayers.length - 1];
+}
 
 /** Everything Tab can land on. */
 const TABBABLE = [
@@ -76,14 +90,14 @@ export function useModalFocus<T extends HTMLElement>({
   });
 
   useEffect(() => {
-    if (!open) return undefined;
+    const layer = target.current;
+    if (!open || !layer) return undefined;
     const returnTo = document.activeElement;
-    const layer = Symbol("modal");
     const locksScroll = latest.current.lockScroll;
     openLayers.push(layer);
     (latest.current.initialFocus?.current ?? target.current)?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (openLayers[openLayers.length - 1] !== layer) return;
+      if (topOpenLayer() !== layer) return;
       if (event.key === "Escape" && !latest.current.busy) {
         latest.current.onClose();
       } else if (event.key === "Tab" && target.current) {
@@ -93,7 +107,8 @@ export function useModalFocus<T extends HTMLElement>({
     document.addEventListener("keydown", onKey);
     if (locksScroll) document.body.classList.add("mm-drawer-open");
     return () => {
-      openLayers.splice(openLayers.indexOf(layer), 1);
+      const index = openLayers.indexOf(layer);
+      if (index !== -1) openLayers.splice(index, 1);
       document.removeEventListener("keydown", onKey);
       if (locksScroll) document.body.classList.remove("mm-drawer-open");
       if (returnTo instanceof HTMLElement && returnTo.isConnected) {
