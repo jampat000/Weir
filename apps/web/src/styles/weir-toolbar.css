@@ -11,7 +11,7 @@
 }
 
 .mm-pause-badge {
-  border-radius: 999px;
+  border-radius: var(--mm-radius-pill);
   border: 1px solid var(--mm-warning-border, var(--mm-border));
   background: var(--mm-warning-bg, transparent);
   color: var(--mm-warning-text, var(--mm-text1));

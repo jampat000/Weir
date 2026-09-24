@@ -18,11 +18,11 @@
 }
 *::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.06);
-  border-radius: 999px;
+  border-radius: var(--mm-radius-pill);
 }
 *::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--mm-stone) 38%, transparent);
-  border-radius: 999px;
+  border-radius: var(--mm-radius-pill);
   border: 2px solid rgba(0, 0, 0, 0);
   background-clip: padding-box;
 }
@@ -279,7 +279,7 @@ body.mm-body {
   bottom: 0.18rem;
   left: 0.7rem;
   height: 2px;
-  border-radius: 999px;
+  border-radius: var(--mm-radius-pill);
   background: linear-gradient(90deg, var(--mm-gold-bright), var(--mm-indigo));
   box-shadow: 0 0 8px color-mix(in srgb, var(--mm-gold) 28%, transparent);
 }
@@ -308,14 +308,16 @@ body.mm-body {
   background: var(--mm-status-failed-bg);
 }
 
-.mm-status-text--healthy {
-  color: var(--mm-status-healthy-text) !important;
+/* Each class is doubled so the status colour outranks the one- and two-part rules that colour the text it
+   marks (a table cell, a note, a caption), without !important. */
+.mm-status-text--healthy.mm-status-text--healthy {
+  color: var(--mm-status-healthy-text);
 }
 
-.mm-status-text--warning {
-  color: var(--mm-status-warning-text) !important;
+.mm-status-text--warning.mm-status-text--warning {
+  color: var(--mm-status-warning-text);
 }
 
-.mm-status-text--failed {
-  color: var(--mm-status-failed-text) !important;
+.mm-status-text--failed.mm-status-text--failed {
+  color: var(--mm-status-failed-text);
 }

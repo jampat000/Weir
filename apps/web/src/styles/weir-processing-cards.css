@@ -254,7 +254,7 @@
   padding: 3px 7px;
   border-radius: var(--mm-radius-pill);
   border: 1px solid color-mix(in srgb, var(--mm-text1) 12%, transparent);
-  font-size: 0.6875rem;
+  font-size: var(--mm-type-eyebrow);
   white-space: nowrap;
   color: var(--mm-text3);
 }

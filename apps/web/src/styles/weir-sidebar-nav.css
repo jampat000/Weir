@@ -175,7 +175,7 @@
 }
 
 .mm-sidebar-meta {
-  font-size: 0.6875rem;
+  font-size: var(--mm-type-eyebrow);
   color: var(--mm-gold);
   font-weight: 600;
   letter-spacing: 0.18em;

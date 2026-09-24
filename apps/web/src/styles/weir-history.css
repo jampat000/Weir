@@ -28,7 +28,7 @@
   gap: 6px;
   height: 30px;
   padding: 0 12px;
-  border-radius: 999px;
+  border-radius: var(--mm-radius-pill);
   border: 1px solid var(--mm-line);
   background: transparent;
   color: var(--mm-text2);
@@ -96,7 +96,7 @@
   height: 32px;
   padding: 0 10px;
   text-align: left;
-  font-size: 0.6875rem;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -203,7 +203,7 @@
 
 .mm-history-detail__eyebrow {
   margin: 0;
-  font-size: 0.6875rem;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -232,7 +232,7 @@
 }
 
 .mm-history-figures dt {
-  font-size: 0.6875rem;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -258,7 +258,7 @@
 
 .mm-history-progress__bar {
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--mm-radius-pill);
   background: var(--mm-border);
   overflow: hidden;
 }
@@ -266,7 +266,7 @@
 .mm-history-progress__bar i {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--mm-radius-pill);
   background: var(--mm-accent);
   transition: width 0.6s ease;
 }

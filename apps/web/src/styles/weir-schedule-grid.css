@@ -34,7 +34,7 @@
 }
 
 .mm-schedule-grid-day {
-  font-size: 0.6875rem;
+  font-size: var(--mm-type-eyebrow);
   color: var(--mm-text2);
 }
 

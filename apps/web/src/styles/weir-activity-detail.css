@@ -94,7 +94,7 @@
   height: 0.62rem;
   overflow: hidden;
   border: 1px solid rgba(230, 193, 92, 0.26);
-  border-radius: 999px;
+  border-radius: var(--mm-radius-pill);
   background: color-mix(in srgb, var(--mm-slate) 88%, transparent);
 }
 
@@ -137,7 +137,7 @@
 .mm-activity-processing__metrics > span {
   padding: 0.3rem 0.55rem;
   border: 1px solid var(--mm-border);
-  border-radius: 999px;
+  border-radius: var(--mm-radius-pill);
   background: color-mix(in srgb, var(--mm-card-bg) 88%, transparent);
   overflow-wrap: anywhere;
   white-space: normal;
@@ -298,7 +298,7 @@
   display: inline-flex;
   align-items: center;
   padding: 0.28rem 0.55rem;
-  border-radius: 999px;
+  border-radius: var(--mm-radius-pill);
   border: 1px solid color-mix(in srgb, var(--mm-stone) 8%, transparent);
   font-size: 0.74rem;
   line-height: 1.2;

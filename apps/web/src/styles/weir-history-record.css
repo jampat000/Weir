@@ -76,7 +76,7 @@
 
 .mm-history-tracks th {
   width: 88px;
-  font-size: 0.6875rem;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
