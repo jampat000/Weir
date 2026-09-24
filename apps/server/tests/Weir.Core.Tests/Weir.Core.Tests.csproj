@@ -10,18 +10,18 @@
     <ProjectReference Include="..\..\src\Weir.Core\Weir.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Values the retired Python backend made (argon2-cffi, itsdangerous, cryptography): frozen compatibility fixtures. -->
+    <!-- Values in formats earlier releases wrote (argon2 password hashes, itsdangerous-signed tokens, Fernet-encrypted values): frozen compatibility fixtures. -->
     <None Include="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Answers first recorded from the retired Python rules engine; now maintained as .NET fixtures (apps/server/README.md). -->
+    <!-- Answers first recorded from the rules engine's earlier releases; now maintained as .NET fixtures (apps/server/README.md). -->
     <None Include="Rules/golden/*.json" CopyToOutputDirectory="PreserveNewest" LinkBase="Rules/golden" />
-    <!-- Issue #537: golden cases whose correct answer now deliberately differs from Python's recorded one. See GoldenParityTests for the mechanism. -->
+    <!-- Issue #537: golden cases whose correct answer now deliberately differs from the one an earlier release recorded. See GoldenParityTests for the mechanism. -->
     <None Include="Rules/golden/overrides/*.json" CopyToOutputDirectory="PreserveNewest" LinkBase="Rules/golden/overrides" />
-    <!-- Answers first recorded from the retired Python ffmpeg layer; now maintained as .NET fixtures (apps/server/README.md). -->
+    <!-- Answers first recorded from the ffmpeg layer's earlier releases; now maintained as .NET fixtures (apps/server/README.md). -->
     <None Include="Media/golden/*.json" CopyToOutputDirectory="PreserveNewest" LinkBase="Media/golden" />
   </ItemGroup>
 </Project>

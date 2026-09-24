@@ -197,8 +197,8 @@ public sealed class ProcessingJobStoreTests : IDisposable
     {
         // A raw row in the legacy timestamp shape earlier releases wrote (no offset, always six fraction
         // digits) — not a row this store itself produced — claimable at its exact second.
-        _db.InsertRawJob("python-written", Kind, maxAttempts: 5);
-        _db.Execute("UPDATE jobs SET not_before = '2026-04-10 12:00:30.000000' WHERE dedupe_key = 'python-written'");
+        _db.InsertRawJob("legacy-written", Kind, maxAttempts: 5);
+        _db.Execute("UPDATE jobs SET not_before = '2026-04-10 12:00:30.000000' WHERE dedupe_key = 'legacy-written'");
 
         Assert.Null(await _db.Store.ClaimNextAsync("w", T0.AddHours(1), T0.AddSeconds(29)));
         Assert.NotNull(await _db.Store.ClaimNextAsync("w", T0.AddHours(1), T0.AddSeconds(30)));

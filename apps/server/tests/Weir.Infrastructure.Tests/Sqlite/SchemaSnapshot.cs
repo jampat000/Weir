@@ -86,7 +86,7 @@ internal static partial class SchemaSnapshot
         return connection;
     }
 
-    /// <summary>Build a database by running a SQL script (the checked-in reference) with foreign keys off, as Alembic seeded it.</summary>
+    /// <summary>Runs a SQL script (the checked-in reference, or a set of migrations) to build a database, with foreign keys off so its statements can insert in any order.</summary>
     public static void Execute(string databasePath, string sql)
     {
         using var connection = OpenConnection(databasePath);

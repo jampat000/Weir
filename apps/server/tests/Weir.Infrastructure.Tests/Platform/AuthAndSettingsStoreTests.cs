@@ -266,7 +266,7 @@ public sealed class AuthAndSettingsStoreTests
     }
 
     [Fact]
-    public void Sqlite_datetimes_use_sqlalchemy_storage_and_pydantic_output()
+    public void Timestamps_round_trip_through_the_fixed_sqlite_storage_and_wire_text_formats()
     {
         var value = Timestamp.FromUtc(new DateTime(2026, 9, 17, 2, 19, 51, DateTimeKind.Utc).AddTicks(2553240));
         Assert.Equal("2026-09-17 02:19:51.255324", value.ToSqlite());
