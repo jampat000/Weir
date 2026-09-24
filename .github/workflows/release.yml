@@ -333,6 +333,9 @@ jobs:
           WEIR_LIVE_BASE_URL: http://127.0.0.1:9347
           WEIR_LIVE_EXPECTED_VERSION: ${{ steps.version.outputs.plain }}
           WEIR_LIVE_E2E_ARTIFACTS: artifacts/docker-release-candidate-e2e
+          # The container sees the audit's browser as the Docker bridge gateway, not loopback, so
+          # bootstrap needs the one-time setup code; the audit reads it from this container's own log.
+          WEIR_LIVE_E2E_DOCKER_CONTAINER: weir-release-candidate
         run: python scripts/live-packaged-e2e.py
 
       - name: Upload Docker release-candidate evidence

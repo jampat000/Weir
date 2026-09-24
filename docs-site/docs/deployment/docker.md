@@ -30,7 +30,8 @@ Then run:
 docker compose up -d
 ```
 
-Open **http://your-server-ip:9347** and create your account. That's it.
+Open **http://your-server-ip:9347** and create your account. The form also asks for a **setup
+code** — get it with `docker logs weir`, or from the `setup-code` file in `./weir-data`. That's it.
 
 `./weir-data` holds Weir's database, settings, logs and backups. Keep it and you keep everything.
 
