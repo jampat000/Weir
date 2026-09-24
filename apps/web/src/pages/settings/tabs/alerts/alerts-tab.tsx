@@ -26,7 +26,7 @@ function AlertIntro() {
       <p className="mm-quiet-note">
         An alert is a message Weir posts to Discord, or to any address that
         takes a webhook, when something happens you would want to know about
-        without opening Weir. Nothing is sent until you add a channel.
+        without opening Weir. Nothing is sent until you add an alert.
       </p>
       <ol className="mm-alert-steps" aria-label="How an alert is sent">
         <li>
@@ -35,11 +35,11 @@ function AlertIntro() {
           sent until the last try.
         </li>
         <li>
-          <b>Weir checks each channel.</b> Only channels ticked for that event,
-          and switched on, get it.
+          <b>Weir checks each alert.</b> Only alerts ticked for that event, and
+          switched on, get it.
         </li>
         <li>
-          <b>It posts the message.</b> If a channel does not answer, Weir notes
+          <b>It posts the message.</b> If an alert does not answer, Weir notes
           it in System › Logs, under Server log.
         </li>
       </ol>
@@ -92,7 +92,7 @@ export function AlertsTab() {
       <QuietSection
         level={3}
         headingId="suite-settings-notifications-heading"
-        heading="Channels"
+        heading="Alerts"
         aside={
           !adding && editingId === null ? (
             <button
@@ -106,8 +106,8 @@ export function AlertsTab() {
         }
       >
         <p className="mm-quiet-note">
-          Tick what each channel should hear about; a change saves straight
-          away. Use &ldquo;Send test&rdquo; before relying on a new alert.
+          Tick what each alert should hear about; a change saves straight away.
+          Use &ldquo;Send test&rdquo; before relying on a new alert.
         </p>
 
         {channels.length > 0 ? (

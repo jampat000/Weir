@@ -66,5 +66,5 @@ export const FAILURE_POLICY_HINTS: Record<ProcessingFailurePolicy, string> = {
     "Your media manager still gets the file, exactly as it arrived. The original stays in the watched folder.",
   hold: "The file stays with Weir and will not reach your media manager until you deal with it.",
   reject:
-    "Weir tells your media manager the release is bad and removes the download once the manager accepts, so it can find a different one. If that cannot be done safely, the original is handed back unchanged instead.",
+    "Weir tells your media manager the release is bad and removes the download once the media manager accepts, so it can find a different one. If that cannot be done safely, the original is passed through unchanged instead.",
 };

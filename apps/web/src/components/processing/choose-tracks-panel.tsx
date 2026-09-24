@@ -79,8 +79,9 @@ export function ChooseTracksPanel({
           <p className="mm-story-panel__note">
             Weir just re-read this file&apos;s tracks. Choose what to keep, mark
             one default audio track and, if you want, one default subtitle
-            track, then submit. Weir checks the file again right before running
-            the pass, and will ask you to choose again if it changed since now.
+            track, then submit. Weir checks the file again right before
+            processing it, and will ask you to choose again if it changed since
+            now.
           </p>
 
           <TrackTable choice={choice} />
