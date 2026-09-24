@@ -32,11 +32,15 @@ Remux pass publishing and pass-through delivery both go through these methods. F
 3. The cleaned copy is written as `<name>.weir-tmp<ext>` beside the original and validated.
 4. The original is fingerprinted again. If it changed, the copy is discarded and nothing is replaced.
 5. The original is renamed to `<name>.weir-bak<ext>`, then the copy is renamed to the original name. That second rename is the commit.
-6. The backup is deleted. A backup that cannot be deleted is retried by the startup sweep.
+6. The backup is deleted — or, when the library's "keep the original after clean" setting (#735) is on, moved into its originals folder instead (`Weir.Infrastructure.LibraryMode.OriginalsMover`). Either way, a backup that cannot be dealt with is retried by the startup sweep.
 
 Every rename is a same-directory rename that never overwrites: on Windows `MoveFileExW` is called without `MOVEFILE_REPLACE_EXISTING` or `MOVEFILE_COPY_ALLOWED`, and elsewhere `File.Move` is called without overwrite. A file that appears at the destination while Weir works (for example, a media manager importing a newer copy) is never replaced, and a rename can never silently become a copy.
 
 Each step is journalled. A failure before the commit rolls back from the files on disk: the backup is renamed back and the temporary copy is deleted. A crash skips the rollback, and `SwapRecoverySweep` applies the same rules at the next start. Either way exactly one intact file is left under the original name.
+
+**Keeping the original (#735).** Where the backup goes when the setting is on — a per-library originals folder, or a `.weir-originals` folder inside whichever library folder held the file, by default — is atomically reserved (`OriginalsMover.Reserve`, an exclusive create, never a check-then-write) and journalled before the commit rename, so a crash after that point always finds the same destination rather than losing the setting's intent, and two cleans reserving a name at the same moment can never both write to it. Filling the reservation is a same-volume rename when possible; otherwise (`OriginalsMover.Fill`) a copy verified against the backup's whole content — not just its size, which a same-size corrupt or preallocated copy would pass — before the backup is deleted; the same copy-verify-delete shape this document's cross-volume rule asks for elsewhere. A name already at the destination is never overwritten: a numbered suffix is reserved instead. A kept original the recovery sweep finds already at its destination but not matching the backup's content (a crash mid-copy, not just an unfilled reservation) is never guessed at: it is recorded once as an Activity event and left for a person.
+
+The originals folder is always excluded from the library scan (`LibraryFileWalker`), whether or not the setting is currently on — an upgrade note, since a library that already had a `.weir-originals` folder (from files placed there by hand, say) will see it disappear from the Library screen even with the setting off. A custom folder inside a library folder must be dot-prefixed, for the same reason a media manager watching that folder must not import it; outside a library folder it can be excluded from the media manager directly, or any name.
 
 A file held by another program is not a failure: the swap reports it as in use and the job is requeued.
 

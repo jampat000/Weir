@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Weir.Core.LibraryMode;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.Processing.RemuxPass;
@@ -71,6 +73,14 @@ internal sealed class FakeSwapFileSystem : ISwapFileSystem
 
     /// <summary>Paths whose rename (or delete) fails with a sharing violation.</summary>
     public HashSet<string> LockedForRename { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>A folder prefix <see cref="Move"/> treats as a different volume from everywhere else, so moving between the
+    /// two throws <see cref="CrossVolumeException"/> and the #735 copy-verify-delete fallback runs instead.</summary>
+    public string? OtherVolumeFolder { get; set; }
+
+    /// <summary>Makes the next <see cref="CopyOverReservation"/> write one byte short, to test that a corrupt copy is
+    /// caught by its content before the source is deleted. Resets itself after firing once.</summary>
+    public bool CorruptNextCopy { get; set; }
 
     public bool Crashed => _dead;
 
@@ -214,6 +224,11 @@ internal sealed class FakeSwapFileSystem : ISwapFileSystem
             throw new FileInUseException("The process cannot access the file because it is being used by another process.");
         }
 
+        if (IsOtherVolume(source) != IsOtherVolume(destination))
+        {
+            throw new CrossVolumeException($"'{source}' and '{destination}' are on different volumes.");
+        }
+
         var node = Get(source);
         if (_files.ContainsKey(destination))
         {
@@ -236,6 +251,61 @@ internal sealed class FakeSwapFileSystem : ISwapFileSystem
         _files.Remove(path);
         effect();
     }
+
+    public void EnsureDirectory(string directory) => Step($"EnsureDirectory({directory})")();
+
+    public string ContentHash(string path)
+    {
+        Step($"ContentHash({path})")();
+        return Hash(Get(path).Content);
+    }
+
+    public bool TryReserve(string path)
+    {
+        var effect = Step($"TryReserve({path})");
+        if (_files.ContainsKey(path))
+        {
+            effect();
+            return false;
+        }
+
+        _files[path] = new Node { Content = string.Empty, ModifiedTimeNs = Tick(), Inode = _nextInode++ };
+        effect();
+        return true;
+    }
+
+    public void ReplaceReservation(string source, string destination)
+    {
+        var effect = Step($"ReplaceReservation({source} -> {destination})");
+        if (LockedForRename.Contains(source))
+        {
+            throw new FileInUseException("The process cannot access the file because it is being used by another process.");
+        }
+
+        if (IsOtherVolume(source) != IsOtherVolume(destination))
+        {
+            throw new CrossVolumeException($"'{source}' and '{destination}' are on different volumes.");
+        }
+
+        var node = Get(source);
+        _files.Remove(source);
+        _files[destination] = node;
+        effect();
+    }
+
+    public void CopyOverReservation(string source, string destination)
+    {
+        var effect = Step($"CopyOverReservation({source} -> {destination})");
+        var node = Get(source);
+        var content = CorruptNextCopy ? node.Content[..^1] : node.Content;
+        CorruptNextCopy = false;
+        _files[destination] = new Node { Content = content, ModifiedTimeNs = Tick(), Inode = _nextInode++, Permissions = node.Permissions };
+        effect();
+    }
+
+    private static string Hash(string content) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
+
+    private bool IsOtherVolume(string path) => OtherVolumeFolder is not null && path.StartsWith(OtherVolumeFolder, StringComparison.Ordinal);
 
     public IEnumerable<string> EnumerateLeftovers(string folder)
     {

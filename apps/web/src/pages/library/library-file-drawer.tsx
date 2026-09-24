@@ -16,13 +16,17 @@ import type {
   LibraryFile,
   LibraryManualPlan,
 } from "../../lib/processing/library-mode-api";
-import { useLibraryFilePreviewQuery } from "../../lib/processing/library-mode-queries";
+import {
+  useLibraryFilePreviewQuery,
+  useLibrarySettingsQuery,
+} from "../../lib/processing/library-mode-queries";
+import { originalsFolderLabel } from "../../lib/processing/library-mode-api";
 import { baseName } from "../../lib/format/path";
 import { errorMessage } from "../../lib/api/error-message";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { plural } from "../../lib/ui/mm-plural";
 import { LibraryCleanOutcome } from "./library-clean-dialog";
-import { REMOVAL_IS_FINAL } from "./library-clean-model";
+import { REMOVAL_IS_FINAL, removalIsRecoverable } from "./library-clean-model";
 import { TrackList, rulesKeep, toggled } from "./library-drawer-tracks";
 import { LibraryLeaveAlone, useLeaveAlone } from "./library-leave-alone";
 import { LibraryRedownload } from "./library-redownload";
@@ -111,6 +115,7 @@ export function LibraryFileDrawer({
   const [keep, setKeep] = useState<Set<number> | null>(null);
   const leaveAlone = useLeaveAlone(libraryId, file);
   const preview = useLibraryFilePreviewQuery(libraryId, file.path);
+  const settings = useLibrarySettingsQuery(libraryId);
 
   const tracks = preview.data?.tracks ?? [];
   const positions = positionsByKind(tracks);
@@ -260,7 +265,12 @@ export function LibraryFileDrawer({
 
         <p className="mm-drawer__note">
           Cleaning rewrites this file where it sits and tells your media manager
-          to look at it again. {REMOVAL_IS_FINAL}
+          to look at it again.{" "}
+          {settings.data?.keep_original_after_clean
+            ? removalIsRecoverable(
+                originalsFolderLabel(settings.data.originals_folder),
+              )
+            : REMOVAL_IS_FINAL}
         </p>
 
         <LibraryRedownload libraryId={libraryId} path={file.path} />

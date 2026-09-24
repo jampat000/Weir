@@ -363,6 +363,24 @@
   font-size: var(--mm-type-caption);
 }
 
+.mm-library-cleaning__originals-folder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.mm-library-cleaning__originals-folder .mm-library-cleaning__hint {
+  flex-basis: 100%;
+  margin-top: 0;
+}
+
+.mm-library-cleaning__originals-folder .mm-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 28rem;
+}
+
 .mm-library-cleaning__confirm {
   padding: 0.75rem 0 0.75rem 0.9rem;
   border-left: 2px solid var(--mm-status-warning-text);

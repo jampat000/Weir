@@ -52,16 +52,32 @@ public static class LibraryModePriority
 }
 
 /// <summary>
-/// One library's #505 settings: where it looks, whether the off-by-default schedule runs, and #508's two
+/// One library's #505 settings: where it looks, whether the off-by-default schedule runs, #508's two
 /// preflight settings — whether cleaning touches a file still shared with a download (default false, since
 /// cleaning one doubles disk use instead of reducing it) and whether a clean that would make a manager
-/// re-download the title is skipped rather than performed (default true, the safer default).
+/// re-download the title is skipped rather than performed (default true, the safer default) — and #735's
+/// "keep the original after clean" (default false, so an upgrade changes nothing).
 /// </summary>
+/// <param name="Folders">The #505 library folders Weir scans and cleans in place.</param>
+/// <param name="ScheduleEnabled">The off-by-default "Scheduled scan and clean".</param>
+/// <param name="CleanHardlinkedFiles">#508 step 1: clean a file even while another name still shares its data (seeding).</param>
+/// <param name="SkipIfManagerWouldRedownload">#508 step 2: skip a clean that would make a manager re-download the title.</param>
+/// <param name="KeepOriginalAfterClean">
+/// Off by default: a clean's pre-clean original is deleted once the cleaned copy is safely in place, as it
+/// always has been. On: the original is moved into <see cref="OriginalsFolder"/> instead, so a removed track
+/// can be recovered from it. See <see cref="Weir.Core.LibraryMode.OriginalsPathPlanner"/>.
+/// </param>
+/// <param name="OriginalsFolder">
+/// Where a kept original goes; blank (the default) means the <see cref="Weir.Core.LibraryMode.OriginalsPathPlanner.DefaultFolderName"/>
+/// folder inside whichever library folder held the file. Ignored while <see cref="KeepOriginalAfterClean"/> is off.
+/// </param>
 public sealed record LibrarySettings(
     IReadOnlyList<string> Folders,
     bool ScheduleEnabled,
     bool CleanHardlinkedFiles = false,
-    bool SkipIfManagerWouldRedownload = true)
+    bool SkipIfManagerWouldRedownload = true,
+    bool KeepOriginalAfterClean = false,
+    string OriginalsFolder = "")
 {
     public static LibrarySettings Empty { get; } = new([], false);
 
@@ -70,7 +86,9 @@ public sealed record LibrarySettings(
         .Set("library_folders", new PyList(Folders.Select(f => (PyJson)new PyStr(f))))
         .Set("library_schedule_enabled", ScheduleEnabled)
         .Set("clean_hardlinked_files", CleanHardlinkedFiles)
-        .Set("skip_if_manager_would_redownload", SkipIfManagerWouldRedownload);
+        .Set("skip_if_manager_would_redownload", SkipIfManagerWouldRedownload)
+        .Set("keep_original_after_clean", KeepOriginalAfterClean)
+        .Set("originals_folder", OriginalsFolder);
 
     public static LibrarySettings FromPayload(PyDict? payload)
     {
@@ -86,7 +104,11 @@ public sealed record LibrarySettings(
         // Absent on a settings row written before #508 (or a brand-new library): the documented defaults.
         var cleanHardlinkedFiles = payload.Get("clean_hardlinked_files") is PyBool { Value: true };
         var skipIfManagerWouldRedownload = payload.Get("skip_if_manager_would_redownload") is not PyBool { Value: false };
-        return new LibrarySettings(folders, scheduleEnabled, cleanHardlinkedFiles, skipIfManagerWouldRedownload);
+        // Absent on a settings row written before #735: off, and the default originals folder.
+        var keepOriginalAfterClean = payload.Get("keep_original_after_clean") is PyBool { Value: true };
+        var originalsFolder = payload.Get("originals_folder") is PyStr originalsFolderValue ? originalsFolderValue.Value : "";
+        return new LibrarySettings(
+            folders, scheduleEnabled, cleanHardlinkedFiles, skipIfManagerWouldRedownload, keepOriginalAfterClean, originalsFolder);
     }
 }
 
@@ -125,34 +147,114 @@ public static class LibraryFolderRules
         var result = new List<string>();
         foreach (var folder in trimmed)
         {
-            try
-            {
-                LibraryRules.ValidateFolderPath("library", folder, weirHome);
-            }
-            catch (ProcessingLibraryException exception)
-            {
-                throw new LibraryModeException(exception.Message);
-            }
-
+            ValidateOne("library", folder, library, weirHome);
             var normalized = LibraryRules.NormalizeFolder(folder);
             if (normalized is null || !normalizedSeen.Add(normalized))
             {
                 continue;
             }
 
-            foreach (var (label, other) in new[] { ("watched", library.WatchedFolder), ("work", library.WorkFolder), ("output", library.OutputFolder) })
-            {
-                var otherNormalized = LibraryRules.NormalizeFolder(other);
-                if (otherNormalized is not null && LibraryRules.FoldersOverlap(normalized, otherNormalized))
-                {
-                    throw new LibraryModeException(
-                        $"Library folder '{folder}' overlaps this library's {label} folder. Library folders must be separate from the folders the download pipeline uses.");
-                }
-            }
-
             result.Add(folder);
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// #735's per-library originals folder, validated exactly like a library folder above (same path rules, same
+    /// watched/work/output overlap check), plus two checks specific to sitting near a scan folder. Blank means "use the
+    /// default <see cref="OriginalsPathPlanner.DefaultFolderName"/> folder inside whichever library folder holds the file",
+    /// so an empty or whitespace-only value is normalized to blank rather than rejected.
+    /// </summary>
+    /// <param name="raw">The originals folder an operator submitted, or blank for the default.</param>
+    /// <param name="scanFolders">
+    /// This library's already-validated #505 scan folders (<see cref="Validate"/>'s return value): sitting inside one of
+    /// them is the supported, default-shaped case, but being equal to or an ancestor of one would make
+    /// <c>Weir.Infrastructure.LibraryMode.LibraryFileWalker</c>'s exclusion swallow the whole scan folder, so that is
+    /// refused. A custom folder inside a scan folder must be dot-prefixed, so a media manager watching that folder
+    /// does not import the originals it holds.
+    /// </param>
+    /// <param name="library">The library it belongs to, for the watched/work/output overlap check.</param>
+    /// <param name="weirHome">Weir's own data folder, passed through to <see cref="LibraryRules.ValidateFolderPath"/>.</param>
+    public static string ValidateOriginalsFolder(string? raw, IReadOnlyList<string> scanFolders, ProcessingLibraryRecord library, string? weirHome = null)
+    {
+        ArgumentNullException.ThrowIfNull(scanFolders);
+        ArgumentNullException.ThrowIfNull(library);
+        var trimmed = (raw ?? string.Empty).Trim();
+        if (trimmed.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        ValidateOne("originals", trimmed, library, weirHome);
+
+        var normalized = LibraryRules.NormalizeFolder(trimmed);
+        if (normalized is null)
+        {
+            return trimmed;
+        }
+
+        var dotPrefixed = LastSegment(trimmed).StartsWith('.');
+        foreach (var scanFolder in scanFolders)
+        {
+            var scanNormalized = LibraryRules.NormalizeFolder(scanFolder);
+            if (scanNormalized is null)
+            {
+                continue;
+            }
+
+            if (string.Equals(normalized, scanNormalized, StringComparison.Ordinal) || LibraryRules.IsAncestor(normalized, scanNormalized))
+            {
+                throw new LibraryModeException(
+                    $"The originals folder can't be the same as, or contain, library folder '{scanFolder}'. It can sit inside a library folder, just not around one.");
+            }
+
+            if (!dotPrefixed && LibraryRules.IsAncestor(scanNormalized, normalized))
+            {
+                throw new LibraryModeException(
+                    "Inside a library folder, the originals folder's name must start with a dot (e.g. .weir-originals) so media managers don't import the originals.");
+            }
+        }
+
+        return trimmed;
+    }
+
+    /// <summary>The last path segment of <paramref name="path"/>, under either separator style.</summary>
+    private static string LastSegment(string path)
+    {
+        var trimmedPath = path.TrimEnd('\\', '/');
+        var lastSeparator = trimmedPath.LastIndexOfAny(['\\', '/']);
+        return lastSeparator < 0 ? trimmedPath : trimmedPath[(lastSeparator + 1)..];
+    }
+
+    /// <summary>The checks a single library-folder-shaped path must pass: Weir's general folder rules, plus no overlap
+    /// with this library's own watched/work/output folders.</summary>
+    private static void ValidateOne(string label, string folder, ProcessingLibraryRecord library, string? weirHome)
+    {
+        try
+        {
+            LibraryRules.ValidateFolderPath(label, folder, weirHome);
+        }
+        catch (ProcessingLibraryException exception)
+        {
+            throw new LibraryModeException(exception.Message);
+        }
+
+        var normalized = LibraryRules.NormalizeFolder(folder);
+        if (normalized is null)
+        {
+            return;
+        }
+
+        var subject = label == "originals" ? "The originals folder" : "Library folder";
+        foreach (var (otherLabel, other) in new[] { ("watched", library.WatchedFolder), ("work", library.WorkFolder), ("output", library.OutputFolder) })
+        {
+            var otherNormalized = LibraryRules.NormalizeFolder(other);
+            if (otherNormalized is not null && LibraryRules.FoldersOverlap(normalized, otherNormalized))
+            {
+                throw new LibraryModeException(
+                    $"{subject} '{folder}' overlaps this library's {otherLabel} folder. Library folders must be separate from the folders the download pipeline uses.");
+            }
+        }
     }
 }

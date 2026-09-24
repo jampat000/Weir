@@ -266,7 +266,7 @@ public sealed class PhysicalSwapTests : IDisposable
         File.WriteAllText(decoy, "not Weir's");
 
         var logger = new ListLogger<SwapRecoverySweep>();
-        var report = await new SwapRecoverySweep(PhysicalSwapFileSystem.Instance, _journal, logger).RunAsync([_library], walkFolders: true);
+        var report = await new SwapRecoverySweep(PhysicalSwapFileSystem.Instance, _journal, new RecordingActivityWriter(), logger).RunAsync([_library], walkFolders: true);
 
         Assert.Equal(new SwapRecoveryReport(2, 1, 1, 0), report);
         Assert.Equal(
@@ -286,7 +286,7 @@ public sealed class PhysicalSwapTests : IDisposable
         File.Move(_original, Backup);
         File.WriteAllText(Temp, "cleaned content");
 
-        var report = await new SwapRecoverySweep(PhysicalSwapFileSystem.Instance, _journal, new ListLogger<SwapRecoverySweep>())
+        var report = await new SwapRecoverySweep(PhysicalSwapFileSystem.Instance, _journal, new RecordingActivityWriter(), new ListLogger<SwapRecoverySweep>())
             .RunAsync([], walkFolders: false);
 
         Assert.Equal(new SwapRecoveryReport(1, 0, 1, 0), report);

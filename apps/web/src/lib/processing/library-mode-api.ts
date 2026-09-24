@@ -79,11 +79,21 @@ export async function fetchLibrarySettings(
   return readJson<LibrarySettings>(r);
 }
 
+/** #735: the folder a kept original goes in when a library has not set one of its own. */
+export const DEFAULT_ORIGINALS_FOLDER_NAME = ".weir-originals";
+
+/** What the "Keep the original after cleaning" hint and the file drawer's recoverability note both show. */
+export function originalsFolderLabel(originalsFolder: string): string {
+  return originalsFolder.trim().length > 0
+    ? originalsFolder
+    : `a ${DEFAULT_ORIGINALS_FOLDER_NAME} folder inside each library folder`;
+}
+
 /**
  * PUTs library-mode settings. `library_folders` is required on every call (the API replaces the whole list, not
  * just the fields sent, when it is present — an absent list is read as "no folders", not "leave unchanged"), so a
- * checkbox-only save must still pass the library's current folders. `clean_hardlinked_files` and
- * `skip_if_manager_would_redownload` are each optional and keep their saved value when left out.
+ * checkbox-only save must still pass the library's current folders. Every other field is optional and keeps its
+ * saved value when left out.
  */
 export async function saveLibrarySettings(
   libraryId: number,
@@ -91,6 +101,8 @@ export async function saveLibrarySettings(
     library_folders: string[];
     clean_hardlinked_files?: boolean;
     skip_if_manager_would_redownload?: boolean;
+    keep_original_after_clean?: boolean;
+    originals_folder?: string;
   },
 ): Promise<LibrarySettings> {
   const path = librarySettingsPath(libraryId);

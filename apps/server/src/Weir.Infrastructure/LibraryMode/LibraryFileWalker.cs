@@ -1,3 +1,4 @@
+using Weir.Core.LibraryMode;
 using Weir.Core.Processing;
 
 namespace Weir.Infrastructure.LibraryMode;
@@ -12,12 +13,19 @@ public sealed record LibraryWalkedFile(string Path, long SizeBytes, long Modifie
 /// </summary>
 public static class LibraryFileWalker
 {
-    public static IReadOnlyList<LibraryWalkedFile> Walk(ProcessingLibraryRecord library, IReadOnlyList<string> folders)
+    public static IReadOnlyList<LibraryWalkedFile> Walk(ProcessingLibraryRecord library, LibrarySettings settings)
     {
         ArgumentNullException.ThrowIfNull(library);
-        ArgumentNullException.ThrowIfNull(folders);
+        ArgumentNullException.ThrowIfNull(settings);
+        var folders = settings.Folders;
         var extensions = SplitCsv(library.MediaExtensionsCsv).Select(NormalizeExtension).Where(e => e.Length > 0).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var excludeMarkers = SplitCsv(library.ExcludeMarkersCsv);
+        // #735: a kept original sits inside the library folder it came from by default, but it must never be read back
+        // in as a library file of its own — each library folder gets its own originals folder excluded here.
+        var excludedFolders = folders
+            .Where(folder => !string.IsNullOrWhiteSpace(folder))
+            .Select(folder => OriginalsPathPlanner.DestinationFolder(folder, settings.OriginalsFolder))
+            .ToList();
         var found = new List<LibraryWalkedFile>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -48,6 +56,11 @@ public static class LibraryFileWalker
 
                 var name = Path.GetFileName(path);
                 if (library.ExcludeHidden && name.StartsWith('.'))
+                {
+                    continue;
+                }
+
+                if (excludedFolders.Any(excluded => OriginalsPathPlanner.IsWithin(excluded, path)))
                 {
                     continue;
                 }

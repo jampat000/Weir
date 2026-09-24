@@ -23,10 +23,25 @@ public enum SwapJournalState
 
     /// <summary>Left unfinished by a crash and put right by the startup sweep.</summary>
     Recovered,
+
+    /// <summary>
+    /// #735: the startup sweep found a kept original already at its destination whose content did not match its backup —
+    /// a crash mid-copy a retry cannot resolve on its own. Recorded once, with an Activity event; the sweep does not
+    /// retry it again, so both files are left for a person to look at.
+    /// </summary>
+    KeepConflict,
 }
 
 /// <summary>One job's swap record.</summary>
-public sealed record SwapJournalEntry(long JobId, string OriginalPath, SwapJournalState State)
+/// <param name="JobId">The job this swap belongs to.</param>
+/// <param name="OriginalPath">The library file being replaced.</param>
+/// <param name="State">Where the swap had got to when this was recorded.</param>
+/// <param name="KeptOriginalPath">
+/// #735: where the original will go (or has gone) instead of being deleted, decided and recorded before the commit
+/// rename so a crash after that point can always finish the same move rather than losing the setting's intent.
+/// Null while the library's "keep the original after clean" setting is off.
+/// </param>
+public sealed record SwapJournalEntry(long JobId, string OriginalPath, SwapJournalState State, string? KeptOriginalPath = null)
 {
     public bool IsUnfinished => State is SwapJournalState.Writing or SwapJournalState.Committing or SwapJournalState.Committed;
 }
@@ -76,11 +91,13 @@ public sealed class ProcessingJobSwapJournal : ISwapJournal
             upsert.Transaction = transaction;
             upsert.CommandText =
                 """
-                INSERT INTO library_swaps (job_id, state, original_path, temp_path, backup_path, committed, updated_at)
-                VALUES ($job_id, $state, $original_path, $temp_path, $backup_path, $committed, CURRENT_TIMESTAMP)
+                INSERT INTO library_swaps (job_id, state, original_path, temp_path, backup_path, committed, kept_original_path, updated_at)
+                VALUES ($job_id, $state, $original_path, $temp_path, $backup_path, $committed, $kept_original_path, CURRENT_TIMESTAMP)
                 ON CONFLICT(job_id) DO UPDATE SET state = excluded.state, original_path = excluded.original_path,
                     temp_path = excluded.temp_path, backup_path = excluded.backup_path,
-                    committed = committed OR excluded.committed, updated_at = CURRENT_TIMESTAMP
+                    committed = committed OR excluded.committed,
+                    kept_original_path = COALESCE(excluded.kept_original_path, library_swaps.kept_original_path),
+                    updated_at = CURRENT_TIMESTAMP
                 """;
             upsert.Parameters.AddWithValue("$job_id", entry.JobId);
             upsert.Parameters.AddWithValue("$state", StateName(entry.State));
@@ -88,6 +105,7 @@ public sealed class ProcessingJobSwapJournal : ISwapJournal
             upsert.Parameters.AddWithValue("$temp_path", SafeSwapRules.TempPath(entry.OriginalPath));
             upsert.Parameters.AddWithValue("$backup_path", SafeSwapRules.BackupPath(entry.OriginalPath));
             upsert.Parameters.AddWithValue("$committed", entry.State is SwapJournalState.Committed or SwapJournalState.Finished ? 1 : 0);
+            upsert.Parameters.AddWithValue("$kept_original_path", (object?)entry.KeptOriginalPath ?? DBNull.Value);
             await upsert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
@@ -99,7 +117,7 @@ public sealed class ProcessingJobSwapJournal : ISwapJournal
         var entries = new List<SwapJournalEntry>();
         await using var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT job_id, original_path, state FROM library_swaps ORDER BY job_id";
+        command.CommandText = "SELECT job_id, original_path, state, kept_original_path FROM library_swaps ORDER BY job_id";
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -108,7 +126,8 @@ public sealed class ProcessingJobSwapJournal : ISwapJournal
                 continue;
             }
 
-            var entry = new SwapJournalEntry(reader.GetInt64(0), reader.GetString(1), parsed);
+            var keptOriginalPath = reader.IsDBNull(3) ? null : reader.GetString(3);
+            var entry = new SwapJournalEntry(reader.GetInt64(0), reader.GetString(1), parsed, keptOriginalPath);
             if (entry.IsUnfinished)
             {
                 entries.Add(entry);
@@ -126,6 +145,7 @@ public sealed class ProcessingJobSwapJournal : ISwapJournal
         SwapJournalState.Finished => "finished",
         SwapJournalState.RolledBack => "rolled_back",
         SwapJournalState.Recovered => "recovered",
+        SwapJournalState.KeepConflict => "keep_conflict",
         _ => throw new ArgumentOutOfRangeException(nameof(state), state, null),
     };
 

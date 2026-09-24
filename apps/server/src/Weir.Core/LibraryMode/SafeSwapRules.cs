@@ -145,6 +145,10 @@ public static class SafeSwapRules
     public static string FailedMessage(string stage, string detail) =>
         $"Weir could not finish replacing the file while {stage}, so the original was kept. The system reported: {detail}";
 
+    /// <summary>#735: the file was cleaned, but moving its original into the originals folder failed; the startup sweep retries it.</summary>
+    public static string OriginalKeepFailedMessage(string destination, string detail) =>
+        $"Weir replaced the file but could not move the original into {destination}; it will try again when it next starts. The system reported: {detail}";
+
     /// <summary>Bytes as the operator reads them: binary units, one decimal from KB up.</summary>
     public static string FormatBytes(long bytes)
     {

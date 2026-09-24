@@ -25,6 +25,8 @@ const settings: api.LibrarySettings = {
   library_schedule_enabled: false,
   clean_hardlinked_files: false,
   skip_if_manager_would_redownload: true,
+  keep_original_after_clean: false,
+  originals_folder: "",
 };
 
 /** The settings as the library editor holds them, with the editor's Save standing in as a button. */
@@ -85,6 +87,41 @@ it("adds a folder to the ones already saved, and saves it only with the library"
       library_folders: ["D:\\Media\\Movies", "E:\\More Movies"],
       clean_hardlinked_files: false,
       skip_if_manager_would_redownload: true,
+      keep_original_after_clean: false,
+      originals_folder: "",
+    }),
+  );
+});
+
+it("shows the originals folder field only once keep-the-original is switched on, and saves it", async () => {
+  vi.spyOn(api, "fetchLibrarySettings").mockResolvedValue(settings);
+  const save = vi.spyOn(api, "saveLibrarySettings").mockResolvedValue(settings);
+
+  render(<Editor />, { wrapper });
+  await screen.findByText("D:\\Media\\Movies");
+  expect(screen.queryByLabelText("Originals folder")).not.toBeInTheDocument();
+
+  const keepOriginal = screen.getByRole("radiogroup", {
+    name: "Keep the original after cleaning",
+  });
+  fireEvent.click(within(keepOriginal).getByRole("radio", { name: "On" }));
+
+  expect(screen.getByText(/Weir moves the original into/)).toBeInTheDocument();
+  expect(
+    screen.getByText(/must start with a dot \(like \.weir-originals\)/),
+  ).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Originals folder"), {
+    target: { value: "D:\\Media\\Movies\\.weir-originals" },
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: "Editor save" }));
+  await waitFor(() =>
+    expect(save).toHaveBeenCalledWith(3, {
+      library_folders: ["D:\\Media\\Movies"],
+      clean_hardlinked_files: false,
+      skip_if_manager_would_redownload: true,
+      keep_original_after_clean: true,
+      originals_folder: "D:\\Media\\Movies\\.weir-originals",
     }),
   );
 });

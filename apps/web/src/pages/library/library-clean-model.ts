@@ -12,6 +12,14 @@ import { plural } from "../../lib/ui/mm-plural";
 export const REMOVAL_IS_FINAL =
   "Removed tracks are gone for good: the only way to get one back is to download the title again.";
 
+/**
+ * #735: when a library keeps the pre-clean original, removed tracks stay recoverable from it, so the file panel's
+ * wording is conditional on that setting rather than always warning that removal is final.
+ */
+export function removalIsRecoverable(originalsFolder: string): string {
+  return `Removed tracks are recoverable: Weir keeps the original in ${originalsFolder}.`;
+}
+
 /** "4 tracks will come out of 1 file, giving back about 318 MB." */
 export function confirmationSummary(
   asked: LibraryConfirmationRequired,

@@ -45,11 +45,15 @@ public sealed class LibraryModeSettingsTests
     [Fact]
     public void Settings_round_trip_through_json()
     {
-        var settings = new LibrarySettings(["/data/library-a", "/data/library-b"], ScheduleEnabled: true);
+        var settings = new LibrarySettings(
+            ["/data/library-a", "/data/library-b"], ScheduleEnabled: true,
+            KeepOriginalAfterClean: true, OriginalsFolder: "/data/originals");
         var payload = settings.ToPayload(libraryId: 7);
         var restored = LibrarySettings.FromPayload(payload);
         Assert.Equal(settings.Folders, restored.Folders);
         Assert.Equal(settings.ScheduleEnabled, restored.ScheduleEnabled);
+        Assert.Equal(settings.KeepOriginalAfterClean, restored.KeepOriginalAfterClean);
+        Assert.Equal(settings.OriginalsFolder, restored.OriginalsFolder);
     }
 
     [Fact]
@@ -58,6 +62,93 @@ public sealed class LibraryModeSettingsTests
         var restored = LibrarySettings.FromPayload(null);
         Assert.Empty(restored.Folders);
         Assert.False(restored.ScheduleEnabled);
+        Assert.False(restored.KeepOriginalAfterClean);
+        Assert.Equal(string.Empty, restored.OriginalsFolder);
+    }
+
+    [Fact]
+    public void A_settings_row_written_before_735_keeps_the_original_off_and_the_default_folder()
+    {
+        var payload = new LibrarySettings([], ScheduleEnabled: false).ToPayload(libraryId: 1);
+        payload.Remove("keep_original_after_clean");
+        payload.Remove("originals_folder");
+
+        var restored = LibrarySettings.FromPayload(payload);
+
+        Assert.False(restored.KeepOriginalAfterClean);
+        Assert.Equal(string.Empty, restored.OriginalsFolder);
+    }
+
+    [Fact]
+    public void A_blank_originals_folder_is_accepted_as_the_default()
+    {
+        var validated = LibraryFolderRules.ValidateOriginalsFolder("   ", ["/data/library-a"], Library());
+        Assert.Equal(string.Empty, validated);
+    }
+
+    [Fact]
+    public void An_originals_folder_is_trimmed_and_validated_like_any_other_library_folder()
+    {
+        var validated = LibraryFolderRules.ValidateOriginalsFolder(" /data/originals ", ["/data/library-a"], Library());
+        Assert.Equal("/data/originals", validated);
+    }
+
+    [Fact]
+    public void An_originals_folder_that_is_not_absolute_is_refused()
+    {
+        Assert.Throws<LibraryModeException>(() => LibraryFolderRules.ValidateOriginalsFolder("relative/path", [], Library()));
+    }
+
+    [Fact]
+    public void An_originals_folder_that_overlaps_the_watched_folder_is_refused()
+    {
+        var exception = Assert.Throws<LibraryModeException>(
+            () => LibraryFolderRules.ValidateOriginalsFolder("/data/watched/sub", [], Library()));
+        Assert.Contains("watched", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_originals_folder_may_sit_inside_a_library_folder()
+    {
+        // The default location does exactly this; an explicit choice inside a library folder is just as valid,
+        // as long as the scan excludes it (LibraryFileWalkerTests covers that side) and it is dot-prefixed.
+        var validated = LibraryFolderRules.ValidateOriginalsFolder("/data/library-a/.weir-originals", ["/data/library-a"], Library());
+        Assert.Equal("/data/library-a/.weir-originals", validated);
+    }
+
+    [Fact]
+    public void An_originals_folder_that_is_a_scan_folder_itself_is_refused()
+    {
+        // Equal to a scan folder: LibraryFileWalker's exclusion would swallow the whole folder, so the library
+        // would silently stop scanning.
+        var exception = Assert.Throws<LibraryModeException>(
+            () => LibraryFolderRules.ValidateOriginalsFolder("/data/library-a", ["/data/library-a"], Library()));
+        Assert.Contains("library-a", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_originals_folder_that_is_an_ancestor_of_a_scan_folder_is_refused()
+    {
+        // A scan folder outside "/data" so this exercises the scan-folder ancestor check itself, not the
+        // pre-existing watched/work/output overlap check ("/data" is already an ancestor of "/data/watched").
+        var exception = Assert.Throws<LibraryModeException>(
+            () => LibraryFolderRules.ValidateOriginalsFolder("/movies", ["/movies/library-a"], Library()));
+        Assert.Contains("library-a", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_originals_folder_inside_a_scan_folder_must_be_dot_prefixed()
+    {
+        var exception = Assert.Throws<LibraryModeException>(
+            () => LibraryFolderRules.ValidateOriginalsFolder("/data/library-a/backups", ["/data/library-a"], Library()));
+        Assert.Contains("must start with a dot", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_originals_folder_outside_every_scan_folder_needs_no_dot()
+    {
+        var validated = LibraryFolderRules.ValidateOriginalsFolder("/backups/originals", ["/data/library-a"], Library());
+        Assert.Equal("/backups/originals", validated);
     }
 
     [Fact]

@@ -123,7 +123,7 @@ public sealed class LibraryScanHandler : IJobHandler
 
         var entries = new List<LibraryScanFileEntry>();
         var errors = new List<string>();
-        foreach (var walked in LibraryFileWalker.Walk(library, settings.Folders))
+        foreach (var walked in LibraryFileWalker.Walk(library, settings))
         {
             cancellationToken.ThrowIfCancellationRequested();
             entries.Add(await ClassifyOneAsync(walked, rules, previousByPath, cancellationToken).ConfigureAwait(false));

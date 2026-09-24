@@ -14,6 +14,8 @@ export type CleaningDraft = Pick<
   | "clean_hardlinked_files"
   | "skip_if_manager_would_redownload"
   | "library_schedule_enabled"
+  | "keep_original_after_clean"
+  | "originals_folder"
 >;
 
 function draftOf(settings: LibrarySettings): CleaningDraft {
@@ -22,6 +24,8 @@ function draftOf(settings: LibrarySettings): CleaningDraft {
     clean_hardlinked_files: settings.clean_hardlinked_files,
     skip_if_manager_would_redownload: settings.skip_if_manager_would_redownload,
     library_schedule_enabled: settings.library_schedule_enabled,
+    keep_original_after_clean: settings.keep_original_after_clean,
+    originals_folder: settings.originals_folder,
   };
 }
 
@@ -34,7 +38,9 @@ function checksChanged(draft: CleaningDraft, saved: CleaningDraft): boolean {
     !sameFolders(draft.library_folders, saved.library_folders) ||
     draft.clean_hardlinked_files !== saved.clean_hardlinked_files ||
     draft.skip_if_manager_would_redownload !==
-      saved.skip_if_manager_would_redownload
+      saved.skip_if_manager_would_redownload ||
+    draft.keep_original_after_clean !== saved.keep_original_after_clean ||
+    draft.originals_folder !== saved.originals_folder
   );
 }
 
@@ -73,6 +79,8 @@ export function useLibraryCleaningDraft(libraryId: number | undefined) {
         clean_hardlinked_files: draft.clean_hardlinked_files,
         skip_if_manager_would_redownload:
           draft.skip_if_manager_would_redownload,
+        keep_original_after_clean: draft.keep_original_after_clean,
+        originals_folder: draft.originals_folder,
       });
     }
     if (draft.library_schedule_enabled !== saved.library_schedule_enabled) {

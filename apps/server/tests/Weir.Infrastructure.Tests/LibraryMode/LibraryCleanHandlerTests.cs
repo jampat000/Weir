@@ -199,6 +199,38 @@ public sealed class LibraryCleanHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task Keeping_the_original_puts_it_in_dot_weir_originals_and_still_cleans_the_file()
+    {
+        var library = await LibraryAsync();
+        await _fixture.Db(async uow =>
+        {
+            await LibrarySettingsStore.SetAsync(
+                uow, library, new LibrarySettings([_libraryFolder.Path], ScheduleEnabled: false, KeepOriginalAfterClean: true));
+            return 0;
+        });
+        var path = _libraryFolder.Join("film.mkv");
+        var originalBytes = new byte[] { 0xAA, 0xBB, 0xCC, 0xDD };
+        await File.WriteAllBytesAsync(path, originalBytes);
+        _media.Probes["film.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+
+        var jobId = await EnqueueCleanAsync(library, path, confirmFinalRemoval: true);
+        await RunCleanAsync(jobId);
+
+        var kept = Path.Combine(_libraryFolder.Path, ".weir-originals", "film.mkv");
+        Assert.True(File.Exists(path));
+        Assert.NotEqual(originalBytes, await File.ReadAllBytesAsync(path));
+        Assert.True(File.Exists(kept));
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(kept));
+        Assert.False(File.Exists(SafeSwapRules.TempPath(path)));
+        Assert.False(File.Exists(SafeSwapRules.BackupPath(path)));
+
+        var title = await _fixture.Db(async uow => Convert.ToString(
+            await uow.ScalarAsync($"SELECT title FROM activity_events WHERE event_type = '{LibraryActivityEventTypes.FileCleaned}'"),
+            CultureInfo.InvariantCulture));
+        Assert.Contains($"The original was kept at {kept}", title, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_cleaned_copy_that_fails_the_staged_output_check_is_never_swapped_in()
     {
         // #500: the copy still carries the Japanese track the plan drops, so the staged-output check rejects it before
