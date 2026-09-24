@@ -9,7 +9,7 @@ namespace Weir.Core.MediaManagers;
 /// </summary>
 public sealed record PublishedLibraryFolders(long Id, string Name, string MediaType, string WatchedFolder, string WorkFolder, string OutputFolder)
 {
-    public PyDict ToOut() => new PyDict()
+    public WireObject ToOut() => new WireObject()
         .Set("id", Id)
         .Set("name", Name)
         .Set("media_type", MediaType)
@@ -24,9 +24,9 @@ public static class LibraryFolderPublishing
     /// <summary>The intake capability that says Weir takes <c>GET /intake/library-folders</c>.</summary>
     public const string Capability = "library-folders";
 
-    public static PyDict ToOut(IReadOnlyList<PublishedLibraryFolders> libraries)
+    public static WireObject ToOut(IReadOnlyList<PublishedLibraryFolders> libraries)
     {
         ArgumentNullException.ThrowIfNull(libraries);
-        return new PyDict().Set("libraries", new PyList(libraries.Select(library => (PyJson)library.ToOut())));
+        return new WireObject().Set("libraries", new WireArray(libraries.Select(library => (WireValue)library.ToOut())));
     }
 }

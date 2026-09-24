@@ -18,7 +18,7 @@ public static class WatchFolderSuggestionRules
         ArgumentNullException.ThrowIfNull(clients);
         foreach (var client in clients.Where(client => client.Enabled))
         {
-            var directory = new ArrOsPath(PyStrings.Strip(client.Directory ?? string.Empty));
+            var directory = new ArrOsPath(WireStrings.Strip(client.Directory ?? string.Empty));
             if (directory.IsRooted)
             {
                 return directory.Text;

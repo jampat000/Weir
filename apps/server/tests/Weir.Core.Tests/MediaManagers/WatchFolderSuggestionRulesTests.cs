@@ -7,7 +7,7 @@ namespace Weir.Core.Tests.MediaManagers;
 public sealed class WatchFolderSuggestionRulesTests
 {
     private static List<ArrDownloadClientEntry> Clients(string json, string scope = MediaManagerKinds.Tv) =>
-        ManagerSetupRules.ParseDownloadClients(PyJsonParser.Parse(json), scope);
+        ManagerSetupRules.ParseDownloadClients(WireJsonParser.Parse(json), scope);
 
     [Fact]
     public void An_enabled_clients_own_directory_is_suggested()
