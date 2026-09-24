@@ -111,6 +111,27 @@ public sealed class LibraryFileIndexWriterTests : IDisposable
     }
 
     [Fact]
+    public async Task A_problem_set_between_the_walk_and_the_write_survives_the_scan()
+    {
+        // The scan reads every row once up front, then writes chunks over time (#715); a preflight that records a
+        // problem in that window (a user clicking Clean mid-scan) must not be reset by a chunk still holding the
+        // row as the walk first saw it.
+        await LibraryAsync();
+        await ReplaceAsync(File("/lib/a.mkv", HevcProbe));
+        var walked = await LibraryFileIndexWriter.ExistingRowsAsync(_store.Database, _libraryId, CancellationToken.None);
+
+        await _store.WithUnitOfWork(async uow =>
+        {
+            await LibraryViewStore.RecordPreflightProblemAsync(uow, _libraryId, "/lib/a.mkv", LibraryProblemKind.Seeding);
+            return 0;
+        });
+
+        await LibraryFileIndexWriter.WriteChunkAsync(_store.Database, _libraryId, [File("/lib/a.mkv", HevcProbe)], walked, CancellationToken.None);
+
+        Assert.Equal(LibraryProblemKind.Seeding, Assert.Single(await CurrentAsync()).ProblemKind);
+    }
+
+    [Fact]
     public async Task A_file_without_a_probe_document_has_none_stored_and_reads_as_unknown()
     {
         await LibraryAsync();

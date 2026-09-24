@@ -32,20 +32,31 @@ public static class LibraryFileIndexWriter
         $"INSERT INTO library_files (library_id, path, {StoredColumns}) VALUES (@library_id, @path, " +
         string.Join(", ", StoredColumnNames.Select(column => "@" + column)) + ") RETURNING id";
 
-    /// <summary>Changes a row only when one of its columns differs, so an unchanged row costs a comparison, not a write.</summary>
+    /// <summary>
+    /// Changes a row only when one of its columns differs from the scan's new values, and only while every stored column
+    /// still holds what the walk read for it: a preflight or another lane that set one of them (<c>problem_kind</c>,
+    /// recorded by <see cref="LibraryViewStore.RecordPreflightProblemAsync"/>, is the one known writer today) since then
+    /// wins, the same way <see cref="Weir.Infrastructure.Processing.FileStateStore.RecordScannedStateAsync"/> and the
+    /// vanished-file sweep condition their writes on the status they read. A row that no longer matches is left for the
+    /// next scan.
+    /// </summary>
     private static readonly string UpdateSql =
         "UPDATE library_files SET " + string.Join(", ", StoredColumnNames.Select(column => $"{column} = @{column}")) +
         ", scanned_at = CURRENT_TIMESTAMP WHERE id = @id AND NOT (" +
-        string.Join(" AND ", StoredColumnNames.Select(column => $"{column} IS @{column}")) + ")";
+        string.Join(" AND ", StoredColumnNames.Select(column => $"{column} IS @{column}")) + ") AND " +
+        string.Join(" AND ", StoredColumnNames.Select(column => $"{column} IS @old_{column}"));
+
+    /// <summary>One row as the walk read it, before deciding what the scan would write.</summary>
+    internal sealed record ExistingLibraryFile(long Id, IReadOnlyList<object?> StoredValues);
 
     /// <summary>Makes the library's index hold exactly <paramref name="files"/>.</summary>
     public static async Task ReplaceAsync(SqliteDatabase database, long libraryId, IReadOnlyList<LibraryScanFileEntry> files, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(files);
-        var existing = await ExistingIdsAsync(database, libraryId, cancellationToken).ConfigureAwait(false);
+        var existing = await ExistingRowsAsync(database, libraryId, cancellationToken).ConfigureAwait(false);
         var kept = files.Select(file => file.Path).ToHashSet(StringComparer.Ordinal);
-        var gone = existing.Where(pair => !kept.Contains(pair.Key)).Select(pair => pair.Value).ToList();
+        var gone = existing.Where(pair => !kept.Contains(pair.Key)).Select(pair => pair.Value.Id).ToList();
         foreach (var chunk in gone.Chunk(ChunkSize))
         {
             await WriteLockTurns.TakeAsync(() => DeleteAsync(database, chunk, cancellationToken), cancellationToken).ConfigureAwait(false);
@@ -57,31 +68,46 @@ public static class LibraryFileIndexWriter
         }
     }
 
-    private static async Task WriteChunkAsync(
-        SqliteDatabase database, long libraryId, LibraryScanFileEntry[] chunk, Dictionary<string, long> existing, CancellationToken cancellationToken)
+    /// <summary>
+    /// Writes one chunk against a snapshot of what a scan's walk found. Exposed for <see cref="ReplaceAsync"/> and for
+    /// tests that need to hold a snapshot across a write elsewhere, to exercise the race the conditional write in
+    /// <see cref="UpdateSql"/> guards against.
+    /// </summary>
+    internal static async Task WriteChunkAsync(
+        SqliteDatabase database, long libraryId, LibraryScanFileEntry[] chunk, Dictionary<string, ExistingLibraryFile> existing, CancellationToken cancellationToken)
     {
         var uow = await UnitOfWork.OpenAsync(database, cancellationToken).ConfigureAwait(false);
         await using (uow.ConfigureAwait(false))
         {
             foreach (var file in chunk)
             {
-                await WriteAsync(uow, libraryId, file, existing.TryGetValue(file.Path, out var id) ? id : null).ConfigureAwait(false);
+                await WriteAsync(uow, libraryId, file, existing.GetValueOrDefault(file.Path)).ConfigureAwait(false);
             }
 
             await uow.CommitAsync().ConfigureAwait(false);
         }
     }
 
-    private static async Task<Dictionary<string, long>> ExistingIdsAsync(SqliteDatabase database, long libraryId, CancellationToken cancellationToken)
+    /// <summary>Every row a scan's walk would compare against, as of now. Exposed for tests; see <see cref="WriteChunkAsync"/>.</summary>
+    internal static async Task<Dictionary<string, ExistingLibraryFile>> ExistingRowsAsync(SqliteDatabase database, long libraryId, CancellationToken cancellationToken)
     {
         var uow = await UnitOfWork.OpenAsync(database, cancellationToken).ConfigureAwait(false);
         await using (uow.ConfigureAwait(false))
         {
             var rows = await uow.QueryAsync(
-                "SELECT path, id FROM library_files WHERE library_id = @id",
-                reader => (Path: reader.GetString(0), Id: reader.GetInt64(1)),
+                $"SELECT path, id, {StoredColumns} FROM library_files WHERE library_id = @id",
+                reader =>
+                {
+                    var values = new object?[StoredColumnNames.Length];
+                    for (var index = 0; index < values.Length; index++)
+                    {
+                        values[index] = reader.IsDBNull(index + 2) ? null : reader.GetValue(index + 2);
+                    }
+
+                    return (Path: reader.GetString(0), Row: new ExistingLibraryFile(reader.GetInt64(1), values));
+                },
                 ("@id", libraryId)).ConfigureAwait(false);
-            return rows.ToDictionary(row => row.Path, row => row.Id, StringComparer.Ordinal);
+            return rows.ToDictionary(row => row.Path, row => row.Row, StringComparer.Ordinal);
         }
     }
 
@@ -98,45 +124,49 @@ public static class LibraryFileIndexWriter
         }
     }
 
-    private static async Task WriteAsync(UnitOfWork uow, long libraryId, LibraryScanFileEntry file, long? existingId)
+    private static async Task WriteAsync(UnitOfWork uow, long libraryId, LibraryScanFileEntry file, ExistingLibraryFile? existing)
     {
         var facts = LibraryFileFactsReader.Derive(file.ProbeJson);
         var values = RowValues(file, facts);
         long fileId;
-        bool rowChanged;
-        if (existingId is not { } rowId)
+        if (existing is null)
         {
             fileId = Convert.ToInt64(
                 await uow.ExecuteScalarWriteAsync(InsertSql, [("@library_id", libraryId), ("@path", file.Path), .. values]).ConfigureAwait(false),
                 CultureInfo.InvariantCulture);
-            rowChanged = true;
         }
         else
         {
-            fileId = rowId;
-            rowChanged = await uow.ExecuteAsync(UpdateSql, [("@id", rowId), .. values]).ConfigureAwait(false) > 0;
+            var oldValues = StoredColumnNames.Zip(existing.StoredValues, (column, value) => ($"@old_{column}", value));
+            var applied = await uow.ExecuteAsync(UpdateSql, [("@id", existing.Id), .. values, .. oldValues]).ConfigureAwait(false) > 0;
+            if (!applied)
+            {
+                // Nothing differs from what the walk found, or a column it read (problem_kind, today) changed since:
+                // the row and its probe/facets are left alone either way, and a genuinely stale row is caught next scan.
+                return;
+            }
+
+            fileId = existing.Id;
         }
 
-        var probeChanged = await WriteProbeAsync(uow, fileId, file.ProbeJson).ConfigureAwait(false);
-        if (rowChanged || probeChanged)
-        {
-            await WriteFacetsAsync(uow, libraryId, fileId, facts).ConfigureAwait(false);
-        }
+        await WriteProbeAsync(uow, fileId, file.ProbeJson).ConfigureAwait(false);
+        await WriteFacetsAsync(uow, libraryId, fileId, facts).ConfigureAwait(false);
     }
 
-    /// <summary>Stores the file's probe document when it differs from the one on record; returns whether it did.</summary>
-    private static async Task<bool> WriteProbeAsync(UnitOfWork uow, long fileId, string? probeJson)
+    /// <summary>Stores the file's probe document, only writing when it differs from the one on record.</summary>
+    private static async Task WriteProbeAsync(UnitOfWork uow, long fileId, string? probeJson)
     {
         if (probeJson is null)
         {
-            return await uow.ExecuteAsync("DELETE FROM library_file_probes WHERE library_file_id = @id", ("@id", fileId)).ConfigureAwait(false) > 0;
+            await uow.ExecuteAsync("DELETE FROM library_file_probes WHERE library_file_id = @id", ("@id", fileId)).ConfigureAwait(false);
+            return;
         }
 
-        return await uow.ExecuteAsync(
+        await uow.ExecuteAsync(
             "INSERT INTO library_file_probes (library_file_id, probe_json) VALUES (@id, @probe) " +
             "ON CONFLICT (library_file_id) DO UPDATE SET probe_json = excluded.probe_json WHERE library_file_probes.probe_json IS NOT excluded.probe_json",
             ("@id", fileId),
-            ("@probe", probeJson)).ConfigureAwait(false) > 0;
+            ("@probe", probeJson)).ConfigureAwait(false);
     }
 
     private static async Task WriteFacetsAsync(UnitOfWork uow, long libraryId, long fileId, LibraryFileFacts facts)
