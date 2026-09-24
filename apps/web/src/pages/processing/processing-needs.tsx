@@ -47,8 +47,8 @@ function stuckNeed(stuck: ProcessingFile[]): Need | null {
       stuck.length === 1
         ? `${prettyName(stuck[0].relative_path)} is stuck, so your media manager is still missing it. The original is untouched.`
         : `${stuck.length} files are stuck, so your media manager is still missing them. The originals are untouched.`,
-    to: "/system?tab=history&show=downloads&status=processing_failed",
-    action: "Deal with them",
+    to: "/history?show=failed",
+    action: "Open in History",
   };
 }
 

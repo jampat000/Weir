@@ -3742,6 +3742,12 @@
             "title": "Id",
             "type": "integer"
           },
+          "kind": {
+            "const": "download",
+            "description": "Which kind of History entry this is: always a download here.",
+            "title": "Kind",
+            "type": "string"
+          },
           "last_attempt_at": {
             "anyOf": [
               {
@@ -4043,6 +4049,7 @@
           }
         },
         "required": [
+          "kind",
           "id",
           "library_id",
           "library_name",
@@ -4445,6 +4452,15 @@
             "title": "Csrf Token",
             "type": "string"
           },
+          "file_ids": {
+            "description": "Only these files, when given: the exact set a person chose. The other filters still apply; limit does not.",
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 1000,
+            "title": "File Ids",
+            "type": "array"
+          },
           "file_status": {
             "anyOf": [
               {
@@ -4821,6 +4837,108 @@
           "default_recent_slice"
         ],
         "title": "ProcessingJobsInspectionOut",
+        "type": "object"
+      },
+      "ProcessingLibraryCleanOut": {
+        "description": "What the newest library clean did to one file, as History lists it.",
+        "properties": {
+          "detail": {
+            "description": "What happened, in the clean's own words.",
+            "title": "Detail",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "const": "library_clean",
+            "title": "Kind",
+            "type": "string"
+          },
+          "library_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Library Id"
+          },
+          "library_name": {
+            "title": "Library Name",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "cleaned",
+              "skipped",
+              "failed"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "relative_path": {
+            "title": "Relative Path",
+            "type": "string"
+          },
+          "trigger": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "library_id",
+          "library_name",
+          "relative_path",
+          "outcome",
+          "detail",
+          "recorded_at"
+        ],
+        "title": "ProcessingLibraryCleanOut",
+        "type": "object"
+      },
+      "ProcessingLibraryCleansOut": {
+        "description": "Library cleans for History, newest first, one per file.",
+        "properties": {
+          "cleans": {
+            "items": {
+              "$ref": "#/components/schemas/ProcessingLibraryCleanOut"
+            },
+            "title": "Cleans",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "returned": {
+            "title": "Returned",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cleans",
+          "returned",
+          "limit"
+        ],
+        "title": "ProcessingLibraryCleansOut",
         "type": "object"
       },
       "ProcessingLibraryCreateIn": {
@@ -13567,6 +13685,105 @@
           }
         },
         "summary": "Post Processing Library Unlink",
+        "tags": [
+          "processing",
+          "processing"
+        ]
+      }
+    },
+    "/api/v1/processing/library-cleans": {
+      "get": {
+        "description": "What the newest library clean did to each library file, filtered the way the file list is.",
+        "operationId": "get_library_cleans_api_v1_library_cleans_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "library_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Library Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path_contains",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 400,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Path Contains"
+            }
+          },
+          {
+            "in": "query",
+            "name": "within_days",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 3650,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Within Days"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingLibraryCleansOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Library Cleans",
         "tags": [
           "processing",
           "processing"

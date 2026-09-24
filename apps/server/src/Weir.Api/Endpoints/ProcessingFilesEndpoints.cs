@@ -29,6 +29,9 @@ namespace Weir.Api.Endpoints;
 /// </summary>
 public static class ProcessingFilesEndpoints
 {
+    /// <summary>The most files one bulk requeue takes, matching the most one list request returns.</summary>
+    private const int BulkRequeueMaxFiles = 1000;
+
     public static IEndpointRouteBuilder MapProcessingFilesEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapV1("GET", "/processing/files", GetFilesAsync);
@@ -47,6 +50,7 @@ public static class ProcessingFilesEndpoints
     {
         var quarantined = row.Status == ProcessingFileStatuses.OnHold && row.FailureAttempts >= RetryPolicy.QuarantineAfterFailures;
         return new PyDict()
+            .Set("kind", HistoryEntryKinds.Download)
             .Set("id", row.Id)
             .Set("library_id", row.LibraryId)
             .Set("library_name", libraryName)
@@ -290,7 +294,18 @@ public static class ProcessingFilesEndpoints
         }
 
         var pathContains = model.OptionalStr("path_contains", maxLength: 500);
-        var limit = model.Number("limit", 200, required: false, ge: 1, le: 1000);
+        var limit = model.Number("limit", 200, required: false, ge: 1, le: BulkRequeueMaxFiles);
+        var fileIds = model.IntList("file_ids");
+        if (fileIds.Count > BulkRequeueMaxFiles)
+        {
+            issues.Add(new ValidationIssue(
+                "too_long",
+                ["body", "file_ids"],
+                $"List should have at most {BulkRequeueMaxFiles} items after validation, not {fileIds.Count}",
+                PyJson.Null,
+                new PyDict().Set("field_type", "List").Set("max_length", BulkRequeueMaxFiles).Set("actual_length", fileIds.Count)));
+        }
+
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
@@ -298,12 +313,15 @@ public static class ProcessingFilesEndpoints
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
+        // file_ids is the exact set a person chose on screen, so the other filters still narrow it but the limit
+        // never cuts it short.
         var rows = await FileStateStore.ListAsync(uow, new ProcessingFileListFilter
         {
             LibraryId = libraryId,
             Status = fileStatus,
             PathContains = pathContains,
-            Limit = (int)limit,
+            Ids = fileIds.Count > 0 ? fileIds : null,
+            Limit = fileIds.Count > 0 ? BulkRequeueMaxFiles : (int)limit,
         }).ConfigureAwait(false);
         var result = await new RequeueStore(request.Service<ProcessingJobStore>()).RequeueFilesAsync(uow, rows).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);

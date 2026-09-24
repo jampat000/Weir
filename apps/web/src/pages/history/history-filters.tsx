@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import type { ProcessingLibrary } from "../../lib/processing/libraries-api";
-import { HISTORY_GROUPS, type HistoryGroup } from "./history-model";
+import { HISTORY_GROUPS, type HistoryGroup } from "./history-entries";
 
 /** How far back History looks, as the server's within_days. */
 export const PERIODS: { id: string; label: string; days?: number }[] = [

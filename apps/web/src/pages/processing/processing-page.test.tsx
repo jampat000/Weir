@@ -17,6 +17,10 @@ const jobs: Record<string, { jobs: unknown[] }> = {
   failed: { jobs: [] },
 };
 const activity: Record<string, { items: unknown[] }> = {};
+const fileLogState: { isError: boolean; error: unknown } = {
+  isError: false,
+  error: null,
+};
 const pause = {
   paused: false,
   reason: "",
@@ -61,7 +65,8 @@ vi.mock("../../lib/processing/files-queries", () => ({
     mutate: vi.fn(),
     data: undefined,
     isPending: false,
-    isError: false,
+    isError: fileLogState.isError,
+    error: fileLogState.error,
   }),
 }));
 vi.mock("../../lib/processing/queries", () => ({
@@ -168,6 +173,8 @@ describe("ProcessingPage", () => {
     readiness.worker_health = [];
     refetchFiles.mockClear();
     refetchLibraries.mockClear();
+    fileLogState.isError = false;
+    fileLogState.error = null;
   });
 
   it("fetches fresh data once a countdown runs out, instead of saying it is checking for ever", () => {
@@ -264,7 +271,7 @@ describe("ProcessingPage", () => {
       "Seoul Nights S01E08",
     );
     expect(screen.getByTestId("live-lane-working")).toHaveTextContent(
-      "of 2 lanes",
+      "of 2 at once",
     );
   });
 
@@ -401,11 +408,8 @@ describe("ProcessingPage", () => {
     );
     expect(needs).toHaveTextContent("Ember and Ash S01E02 is stuck");
     expect(
-      within(needs).getByRole("link", { name: /Deal with them/ }),
-    ).toHaveAttribute(
-      "href",
-      "/system?tab=history&show=downloads&status=processing_failed",
-    );
+      within(needs).getByRole("link", { name: /Open in History/ }),
+    ).toHaveAttribute("href", "/history?show=failed");
   });
 
   it("says when processing is paused, and what that means for work already running", () => {
@@ -454,6 +458,40 @@ describe("ProcessingPage", () => {
     expect(screen.getByTestId("live-done-today")).toHaveTextContent("38");
   });
 
+  it("announces a newly finished file to a screen reader, but not the ones already on screen at load", () => {
+    const { rerender } = renderLive();
+    expect(screen.getByTestId("live-finished-announcement")).toHaveTextContent(
+      "",
+    );
+
+    activity["processing.file_remux_pass_completed"] = {
+      items: [
+        {
+          id: 701,
+          created_at: "2026-08-18T09:59:00",
+          event_type: "processing.file_remux_pass_completed",
+          title: "x",
+          library_id: 1,
+          relative_path: "Northbound.S04E10.mkv",
+          detail: JSON.stringify({
+            outcome: "live_output_written",
+            ok: true,
+            relative_media_path: "Northbound.S04E10.mkv",
+          }),
+        },
+      ],
+    };
+    rerender(
+      <MemoryRouter>
+        <ProcessingPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("live-finished-announcement")).toHaveTextContent(
+      "Northbound S04E10 finished: Cleaned",
+    );
+  });
+
   it("says in words what the last two hours handed back, split the way Just finished colours it", () => {
     activity["processing.file_remux_pass_completed"] = {
       items: [
@@ -493,6 +531,32 @@ describe("ProcessingPage", () => {
     expect(sum).toHaveTextContent("1 cleaned");
     expect(sum).toHaveTextContent("1 already right");
     expect(sum).not.toHaveTextContent("need a look");
+  });
+
+  it('links the last two hours\' "need a look" count straight to the failed files in History', () => {
+    activity["processing.file_remux_pass_completed"] = {
+      items: [
+        {
+          id: 611,
+          created_at: "2026-08-18T09:40:00",
+          event_type: "processing.file_remux_pass_completed",
+          title: "x",
+          library_id: 1,
+          relative_path: "Starlit.Relay.S02E04.mkv",
+          detail: JSON.stringify({
+            outcome: "failed",
+            ok: false,
+            relative_media_path: "Starlit.Relay.S02E04.mkv",
+          }),
+        },
+      ],
+    };
+    renderLive();
+
+    const figure = screen.getByTestId("live-handed-back");
+    expect(
+      within(figure).getByRole("link", { name: /need a look/ }),
+    ).toHaveAttribute("href", "/history?show=failed");
   });
 
   it("says nothing was handed back rather than drawing a row of empty bars", () => {
@@ -546,5 +610,29 @@ describe("ProcessingPage", () => {
     expect(figure.querySelector(".mm-live-trend__pointed")).toHaveTextContent(
       "1 cleaned",
     );
+  });
+
+  it("says a file's story could not load, through the shared load-error wording", () => {
+    files.files = [
+      file({
+        id: 3,
+        status: "processing",
+        relative_path: "Glass.Orchard.S01E04.2160p.WEB-DL.mkv",
+        progress_percent: 46,
+      }),
+    ];
+    fileLogState.isError = true;
+    fileLogState.error = new Error("boom");
+    renderLive();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Glass Orchard S01E04" }),
+    );
+
+    expect(
+      screen.getByText(
+        "Weir couldn't load what happened to this file. Reload the page to try again.",
+      ),
+    ).toBeInTheDocument();
   });
 });

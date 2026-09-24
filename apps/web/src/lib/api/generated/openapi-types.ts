@@ -1303,6 +1303,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/processing/library-cleans": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Library Cleans
+     * @description What the newest library clean did to each library file, filtered the way the file list is.
+     */
+    get: operations["get_library_cleans_api_v1_library_cleans_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/processing/maintenance": {
     parameters: {
       query?: never;
@@ -3666,6 +3686,12 @@ export interface components {
       hold_until?: string | null;
       /** Id */
       id: number;
+      /**
+       * Kind
+       * @description Which kind of History entry this is: always a download here.
+       * @constant
+       */
+      kind: "download";
       /** Last Attempt At */
       last_attempt_at?: string | null;
       /** Last Seen At */
@@ -3975,6 +4001,11 @@ export interface components {
     ProcessingFilesBulkRequeueIn: {
       /** Csrf Token */
       csrf_token: string;
+      /**
+       * File Ids
+       * @description Only these files, when given: the exact set a person chose. The other filters still apply; limit does not.
+       */
+      file_ids?: number[];
       /** File Status */
       file_status?:
         | (
@@ -4157,6 +4188,54 @@ export interface components {
       default_recent_slice: boolean;
       /** Jobs */
       jobs: components["schemas"]["ProcessingJobInspectionRow"][];
+    };
+    /**
+     * ProcessingLibraryCleanOut
+     * @description What the newest library clean did to one file, as History lists it.
+     */
+    ProcessingLibraryCleanOut: {
+      /**
+       * Detail
+       * @description What happened, in the clean's own words.
+       */
+      detail: string;
+      /** Id */
+      id: number;
+      /**
+       * Kind
+       * @constant
+       */
+      kind: "library_clean";
+      /** Library Id */
+      library_id: number | null;
+      /** Library Name */
+      library_name: string;
+      /**
+       * Outcome
+       * @enum {string}
+       */
+      outcome: "cleaned" | "skipped" | "failed";
+      /**
+       * Recorded At
+       * Format: date-time
+       */
+      recorded_at: string;
+      /** Relative Path */
+      relative_path: string;
+      /** Trigger */
+      trigger?: string | null;
+    };
+    /**
+     * ProcessingLibraryCleansOut
+     * @description Library cleans for History, newest first, one per file.
+     */
+    ProcessingLibraryCleansOut: {
+      /** Cleans */
+      cleans: components["schemas"]["ProcessingLibraryCleanOut"][];
+      /** Limit */
+      limit: number;
+      /** Returned */
+      returned: number;
     };
     /** ProcessingLibraryCreateIn */
     ProcessingLibraryCreateIn: {
@@ -9037,6 +9116,40 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ProcessingLibraryOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_library_cleans_api_v1_library_cleans_get: {
+    parameters: {
+      query?: {
+        library_id?: number | null;
+        path_contains?: string | null;
+        within_days?: number | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProcessingLibraryCleansOut"];
         };
       };
       /** @description Validation Error */

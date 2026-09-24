@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import { postProcessingFileRemuxPassEnqueue } from "./file-remux-pass-api";
 import {
@@ -16,6 +21,10 @@ import {
   type ProcessingFilesQuery,
   type ProcessingManualPlanChoice,
 } from "./files-api";
+import {
+  fetchLibraryCleans,
+  type LibraryCleansQuery,
+} from "./library-cleans-api";
 import { postProcessingWatchedFolderRemuxScanDispatchEnqueue } from "./watched-folder-scan-api";
 import { processingKeys } from "./query-keys";
 
@@ -23,6 +32,34 @@ export function useProcessingFilesQuery(query: ProcessingFilesQuery = {}) {
   return useQuery<ProcessingFilesPage>({
     queryKey: processingKeys.fileList(query),
     queryFn: () => fetchProcessingFiles(query),
+  });
+}
+
+/** How often History follows a running pass. */
+const HISTORY_REFRESH_MS = 5000;
+
+/**
+ * History's downloads. The list on screen stays while a new filter loads, and it refreshes by itself only while a
+ * file is being processed: a queued file changes nothing worth a thousand-row read until it starts (#719).
+ */
+export function useFileHistoryQuery(query: ProcessingFilesQuery) {
+  return useQuery<ProcessingFilesPage>({
+    queryKey: processingKeys.fileList(query),
+    queryFn: () => fetchProcessingFiles(query),
+    placeholderData: keepPreviousData,
+    refetchInterval: (q) =>
+      q.state.data?.files.some((file) => file.status === "processing")
+        ? HISTORY_REFRESH_MS
+        : false,
+  });
+}
+
+/** History's library cleans (#695), kept on screen while a new filter loads. */
+export function useLibraryCleansQuery(query: LibraryCleansQuery) {
+  return useQuery({
+    queryKey: processingKeys.libraryCleans(query),
+    queryFn: () => fetchLibraryCleans(query),
+    placeholderData: keepPreviousData,
   });
 }
 

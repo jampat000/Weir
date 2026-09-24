@@ -752,7 +752,25 @@ class LiveAudit:
         self.open_sidebar("History")
         self.visible(self.page.get_by_test_id("history-page"), "History page")
         chips = self.page.get_by_role("group", name="Show").get_by_role("button")
-        self.require(chips.count() == 5, f"History shows {chips.count()} Show choices, not 5")
+        # Six groups since library cleans joined downloads in History (#695): a skip is its own
+        # neutral group rather than counting as Failed, and on_hold sits under Needs you.
+        expected_chip_labels = [
+            "All",
+            "In progress",
+            "Finished",
+            "Needs you",
+            "Skipped",
+            "Failed",
+        ]
+        chip_texts = chips.all_inner_texts()
+        self.require(
+            len(chip_texts) == len(expected_chip_labels)
+            and all(
+                text.startswith(label)
+                for text, label in zip(chip_texts, expected_chip_labels)
+            ),
+            f"History shows {chip_texts!r}, not {expected_chip_labels!r} in order",
+        )
         # A fresh install has no files, so assert whichever of the two states is real, and never
         # that the page rendered nothing at all.
         if self.page.get_by_test_id("history-detail").count():

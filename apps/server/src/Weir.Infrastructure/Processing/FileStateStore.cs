@@ -60,6 +60,13 @@ public static class FileStateStore
             parameters.Add(("@since", SqliteValues.ToSqlite(since)));
         }
 
+        if (filter.Ids is { } ids)
+        {
+            var names = ids.Select((_, index) => $"@id_{index}").ToArray();
+            clauses.Add(names.Length == 0 ? "0" : $"id IN ({string.Join(", ", names)})");
+            parameters.AddRange(ids.Select((id, index) => ($"@id_{index}", (object?)id)));
+        }
+
         var where = clauses.Count > 0 ? "WHERE " + string.Join(" AND ", clauses) : string.Empty;
         return ($"SELECT {Columns} FROM files {where} ORDER BY last_seen_at DESC, id DESC LIMIT {filter.ClampedLimit}", [.. parameters]);
     }

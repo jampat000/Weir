@@ -1,4 +1,5 @@
 import type { ProcessingFilesQuery } from "./files-api";
+import type { LibraryCleansQuery } from "./library-cleans-api";
 import type { ProcessingJobsInspectionFilter } from "./jobs-inspection/queries";
 import type { ProcessingMediaType } from "./libraries-api";
 import type { LibraryFileFilters } from "./library-mode-api";
@@ -14,6 +15,8 @@ export const processingKeys = {
     ["processing", "files", query] as const,
   fileLog: (fileId: number, updatedAt: string) =>
     ["processing", "files", fileId, "log", updatedAt] as const,
+  libraryCleans: (query: LibraryCleansQuery) =>
+    ["processing", "library-cleans", query] as const,
   filesAtOnce: ["processing", "files-at-once"] as const,
   jobs: ["processing", "jobs"] as const,
   jobsInspection: ["processing", "jobs", "inspection"] as const,

@@ -28,6 +28,13 @@ public sealed class RequeueStore(ProcessingJobStore jobStore)
             return new RequeueResult(0, 1, "The library this file belonged to no longer exists, so there is nowhere to queue it.");
         }
 
+        // A queued pass on a missing original only fails later with a confusing reason, so a file Weir is done with
+        // is refused here while its original is gone.
+        if (ProcessingFileStatuses.Concluded.Contains(row.Status) && !OriginalIsInWatchedFolder(library, row.RelativePath))
+        {
+            return new RequeueResult(0, 1, OriginalGoneDetail);
+        }
+
         var payload = new PyDict()
             .Set("relative_media_path", row.RelativePath)
             .Set("media_scope", library.MediaType == "tv" ? "tv" : "movie")
@@ -84,8 +91,27 @@ public sealed class RequeueStore(ProcessingJobStore jobStore)
     internal static string BulkDetail(int requeued, int skipped) => (requeued, skipped) switch
     {
         (> 0, 0) => $"Queued {Plural.Of(requeued, "file")} again. {(requeued == 1 ? "It starts" : "They start")} as capacity frees up.",
-        (> 0, _) => $"Queued {Plural.Of(requeued, "file")} again. {skipped} could not be queued because {(skipped == 1 ? "its" : "their")} library is gone.",
-        (0, > 0) => $"Nothing was queued: {Plural.Of(skipped, "file")} {Plural.Noun(skipped, "belongs", "belong")} to a library that no longer exists.",
+        (> 0, _) => $"Queued {Plural.Of(requeued, "file")} again. {skipped} could not be queued because {(skipped == 1 ? "its" : "their")} library or original is gone.",
+        (0, > 0) => $"Nothing was queued: {Plural.Of(skipped, "file")} {Plural.Noun(skipped, "has", "have")} lost {(skipped == 1 ? "its" : "their")} library or original.",
         _ => "Nothing matched, so nothing was queued.",
     };
+
+    internal const string OriginalGoneDetail =
+        "The original of this file is no longer in the watched folder, so Weir has nothing to process again.";
+
+    /// <summary>
+    /// Whether the file's original is still where the pass would read it. A watched folder that is gone, or a path that
+    /// would leave it, has no original to read either.
+    /// </summary>
+    private static bool OriginalIsInWatchedFolder(ProcessingLibraryRecord library, string relativePath)
+    {
+        try
+        {
+            return File.Exists(RemuxPass.RemuxPassPaths.ResolveMediaFileUnderRoot(library.WatchedFolder, relativePath));
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
 }

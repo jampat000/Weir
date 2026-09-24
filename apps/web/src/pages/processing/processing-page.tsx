@@ -14,6 +14,7 @@ import { PageHeader } from "../../components/shell/page-header";
 import type { FinishedFile } from "../../lib/activity/processing-outcome";
 import { activityKeys } from "../../lib/activity/query-keys";
 import { useActivityStreamInvalidations } from "../../lib/activity/use-activity-stream-invalidation";
+import { loadErrorMessage } from "../../lib/api/error-message";
 import { usePauseQuery } from "../../lib/pause/pause-queries";
 import type { ProcessingFile } from "../../lib/processing/files-api";
 import {
@@ -25,7 +26,6 @@ import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-quer
 import { useProcessingFilesAtOnceQuery } from "../../lib/processing/queries";
 import { processingKeys } from "../../lib/processing/query-keys";
 import { parseAppTime } from "../../lib/ui/mm-format-date";
-import { plural } from "../../lib/ui/mm-plural";
 import { useNow } from "../../lib/ui/use-now";
 import { FinishedLane } from "./finished-lane";
 import { EmptyLane, Lane, More } from "./lane";
@@ -165,7 +165,7 @@ export function ProcessingPage(): React.ReactElement {
       void navigate(
         item.source === "library"
           ? `/library?path=${path}`
-          : `/system?tab=history&show=downloads&path=${path}`,
+          : `/history?q=${path}`,
       );
     },
     [files.data, navigate, openFile],
@@ -240,7 +240,7 @@ export function ProcessingPage(): React.ReactElement {
               active={waiting.length > 0}
               label="Waiting"
               count={waiting.length}
-              hint="Ready, queued for the next free lane"
+              hint="Ready, and next in line to start"
             >
               {waiting.length ? (
                 <ul className="mm-live-lane__body">
@@ -266,7 +266,7 @@ export function ProcessingPage(): React.ReactElement {
               <span className="mm-live-lane__count">
                 {working.length}
                 {lanesAtOnce != null ? (
-                  <small> of {plural(lanesAtOnce, "lane", "lanes")}</small>
+                  <small> of {lanesAtOnce} at once</small>
                 ) : null}
               </span>
             }
@@ -284,7 +284,7 @@ export function ProcessingPage(): React.ReactElement {
                 <EmptyLane>
                   {pause.data?.paused
                     ? "Paused. Nothing new starts until you resume."
-                    : "A lane is free. The next file starts as soon as it is ready."}
+                    : "Room for one more. The next file starts as soon as it is ready."}
                 </EmptyLane>
               )}
             </div>
@@ -323,7 +323,11 @@ export function ProcessingPage(): React.ReactElement {
         fileName={storyFile ? prettyName(storyFile.name) : ""}
         log={fileLog.data}
         loading={fileLog.isPending}
-        error={fileLog.isError ? fileLog.error.message : null}
+        error={
+          fileLog.isError
+            ? loadErrorMessage(fileLog.error, "what happened to this file")
+            : null
+        }
         onClose={() => setStoryFile(null)}
       />
     </div>

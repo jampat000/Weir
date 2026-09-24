@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import {
   LIBRARY_FILE_CLEANED_EVENT,
@@ -193,12 +194,31 @@ function Sparkline({
   );
 }
 
+/** The count for one tone, e.g. "4 need a look" — a link to History's failed files for the tone that means one. */
+function LegendPart({ tone, count }: { tone: HandedBackTone; count: number }) {
+  const words = `${count.toLocaleString()} ${TONE_WORDS[tone]}`;
+  const dot = (
+    <i className={`mm-live-dot mm-live-dot--${tone}`} aria-hidden="true" />
+  );
+  if (tone !== "warn") {
+    return (
+      <span className="mm-live-trend__part">
+        {dot}
+        {words}
+      </span>
+    );
+  }
+  return (
+    <Link className="mm-live-trend__part" to="/history?show=failed">
+      {dot}
+      {words}
+    </Link>
+  );
+}
+
 function Legend({ handed }: { handed: HandedBack }) {
   return TONES.filter((tone) => handed.totals[tone] > 0).map((tone) => (
-    <span key={tone} className="mm-live-trend__part">
-      <i className={`mm-live-dot mm-live-dot--${tone}`} aria-hidden="true" />
-      {handed.totals[tone].toLocaleString()} {TONE_WORDS[tone]}
-    </span>
+    <LegendPart key={tone} tone={tone} count={handed.totals[tone]} />
   ));
 }
 
@@ -243,7 +263,12 @@ export function HandedBackFigure({
       ) : (
         <span className="mm-live-spark__bars" aria-hidden="true" />
       )}
-      <p className="mm-live-trend__legend" aria-hidden="true">
+      {/* The legend's dots and, when nothing is pointed at, the "need a look" link are the only parts
+          worth reaching directly: the rest repeats the sr-only summary below. */}
+      <p
+        className="mm-live-trend__legend"
+        aria-hidden={total > 0 && !bucket ? undefined : true}
+      >
         {total === 0 ? (
           NOTHING_HANDED_BACK
         ) : bucket ? (
