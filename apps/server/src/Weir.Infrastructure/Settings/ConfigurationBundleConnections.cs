@@ -16,7 +16,7 @@ namespace Weir.Infrastructure.Settings;
 /// this install does not have yet, switched off and without those secrets, and leaves the ones it already has,
 /// secrets included, exactly as they are.
 /// </remarks>
-internal static class ConfigurationBundleConnections
+public sealed class ConfigurationBundleConnections
 {
     public const string MediaManagersSection = "media_manager_connections";
     public const string AlertsSection = "notification_channels";
@@ -25,6 +25,13 @@ internal static class ConfigurationBundleConnections
     // must fit the same columns a hand-typed one does.
     private const int MediaManagerNameMaxLength = 200;
     private const int AlertLabelMaxLength = 255;
+
+    private readonly NotificationChannelStore _channels;
+
+    public ConfigurationBundleConnections(NotificationChannelStore channels)
+    {
+        _channels = channels ?? throw new ArgumentNullException(nameof(channels));
+    }
 
     public static async Task<WireArray> ExportMediaManagersAsync(UnitOfWork uow)
     {
@@ -37,9 +44,9 @@ internal static class ConfigurationBundleConnections
             .Set("base_url", connection.BaseUrl)));
     }
 
-    public static async Task<WireArray> ExportAlertsAsync(UnitOfWork uow)
+    public async Task<WireArray> ExportAlertsAsync(UnitOfWork uow)
     {
-        var channels = await NotificationChannelStore.ListAsync(uow).ConfigureAwait(false);
+        var channels = await _channels.ListAsync(uow).ConfigureAwait(false);
         return new WireArray(channels.Select(channel => (WireValue)new WireObject()
             .Set("label", channel.Label)
             .Set("provider", channel.Provider)
@@ -90,14 +97,14 @@ internal static class ConfigurationBundleConnections
     }
 
     /// <summary>Adds the bundle's alerts this install does not have (matched by label and provider).</summary>
-    public static async Task RestoreAlertsAsync(UnitOfWork uow, WireObject bundle)
+    public async Task RestoreAlertsAsync(UnitOfWork uow, WireObject bundle)
     {
         if (bundle.Get(AlertsSection) is not WireArray rows)
         {
             return;
         }
 
-        var existing = (await NotificationChannelStore.ListAsync(uow).ConfigureAwait(false))
+        var existing = (await _channels.ListAsync(uow).ConfigureAwait(false))
             .Select(channel => (channel.Label, channel.Provider))
             .ToHashSet();
         foreach (var row in rows.Items)
@@ -118,7 +125,7 @@ internal static class ConfigurationBundleConnections
             var events = data.Get("events") is WireArray list
                 ? list.Items.OfType<WireString>().Select(item => item.Value).Where(e => NotificationRules.SupportedEvents.Contains(e, StringComparer.Ordinal)).ToList()
                 : [];
-            await NotificationChannelStore.CreateAsync(uow, label, provider, url: string.Empty, events, enabled: false).ConfigureAwait(false);
+            await _channels.CreateAsync(uow, label, provider, url: string.Empty, events, enabled: false).ConfigureAwait(false);
         }
     }
 

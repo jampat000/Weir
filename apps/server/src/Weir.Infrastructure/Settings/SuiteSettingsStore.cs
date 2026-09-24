@@ -6,7 +6,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Settings;
 
 /// <summary>The <c>suite_settings</c> singleton row: reading it, creating it with defaults, and updating it.</summary>
-public static class SuiteSettingsStore
+public sealed class SuiteSettingsStore
 {
     private const string Columns =
         "product_display_name, signed_in_home_notice, setup_wizard_state, app_timezone, log_retention_days, activity_retention_days, " +
@@ -14,14 +14,21 @@ public static class SuiteSettingsStore
         "configuration_backup_last_run_at, processing_paused, processing_paused_until, scan_while_paused, " +
         "metadata_provider, metadata_provider_base_url, metadata_provider_key_ciphertext, updated_at";
 
-    public static Task<SuiteSettingsRecord?> GetAsync(UnitOfWork uow)
+    private readonly AuthStore _users;
+
+    public SuiteSettingsStore(AuthStore users)
+    {
+        _users = users ?? throw new ArgumentNullException(nameof(users));
+    }
+
+    public Task<SuiteSettingsRecord?> GetAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QuerySingleAsync($"SELECT {Columns} FROM suite_settings WHERE suite_settings.id = 1", Read);
     }
 
     /// <summary>The row, created with its defaults first when it does not exist yet.</summary>
-    public static async Task<SuiteSettingsRecord> EnsureAsync(UnitOfWork uow)
+    public async Task<SuiteSettingsRecord> EnsureAsync(UnitOfWork uow)
     {
         var row = await GetAsync(uow).ConfigureAwait(false);
         if (row is not null)
@@ -29,7 +36,7 @@ public static class SuiteSettingsStore
             return row;
         }
 
-        var users = await AuthStore.CountUsersAsync(uow).ConfigureAwait(false);
+        var users = await _users.CountUsersAsync(uow).ConfigureAwait(false);
         await uow.ExecuteAsync(
             "INSERT INTO suite_settings (id, product_display_name, signed_in_home_notice, setup_wizard_state, app_timezone, log_retention_days, " +
             "activity_retention_days, configuration_backup_enabled, configuration_backup_interval_hours, configuration_backup_preferred_time, " +
@@ -42,7 +49,7 @@ public static class SuiteSettingsStore
     /// Write the columns that differ between <paramref name="before"/> and <paramref name="after"/>, bumping
     /// <c>updated_at</c> only when anything changed.
     /// </summary>
-    public static async Task UpdateAsync(UnitOfWork uow, SuiteSettingsRecord before, SuiteSettingsRecord after)
+    public async Task UpdateAsync(UnitOfWork uow, SuiteSettingsRecord before, SuiteSettingsRecord after)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(before);

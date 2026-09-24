@@ -37,6 +37,11 @@ dotnet_diagnostic.CA2100.severity = none
 dotnet_diagnostic.CA1848.severity = none
 dotnet_diagnostic.CA1873.severity = none
 
+# Store services are instance types by design (constructor-injected in DI, so endpoints and other
+# services stop reaching them through statics or request.Service<T>()) even where a given member's body
+# happens not to touch a field, e.g. a method that only takes a UnitOfWork.
+dotnet_diagnostic.CA1822.severity = none
+
 [tests/**.cs]
 # Test names read as sentences.
 dotnet_diagnostic.CA1707.severity = none

@@ -6,7 +6,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Settings;
 
 /// <summary>Restoring <c>libraries</c> and <c>rule_sets</c> from a bundle, and the validation that runs before any row is written.</summary>
-public static partial class ConfigurationBundleStore
+public sealed partial class ConfigurationBundleStore
 {
     /// <summary>
     /// Replaces <c>libraries</c> and <c>rule_sets</c> from the bundle's own rows. When the bundle carries its media
