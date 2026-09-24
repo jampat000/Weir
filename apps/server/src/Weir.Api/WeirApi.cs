@@ -109,6 +109,7 @@ public static class WeirApi
             endpoints.MapMetricsEndpoint();
             endpoints.MapAuthEndpoints();
             endpoints.MapSuiteEndpoints();
+            endpoints.MapSuiteFileEndpoints();
             endpoints.MapReconciliationEndpoints();
             endpoints.MapMediaManagerEndpoints();
             endpoints.MapNotificationEndpoints();

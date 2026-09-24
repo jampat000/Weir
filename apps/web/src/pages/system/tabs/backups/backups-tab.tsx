@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { ConfirmDialog } from "../../../../components/ui/confirm-dialog";
-import { errorMessage } from "../../../../lib/api/error-message";
 import { useConfigurationBackupsQuery } from "../../../../lib/settings/queries";
 import { settingsKeys } from "../../../../lib/settings/query-keys";
 import type { AppSettings } from "../../../../lib/settings/types";
@@ -24,23 +24,25 @@ export function BackupsTab({
   const backupsQ = useConfigurationBackupsQuery(editable);
   const actions = useBackupActions();
   const blocked = actions.busy || form.save.isPending;
+  // The schedule's own failure already shows beside its Save button (form.save.isError); this is
+  // only the success line, so it can sit right there too instead of in a shared banner.
+  const [scheduleSaved, setScheduleSaved] = useState(false);
 
   const saveSchedule = () => {
-    actions.setProblem(null);
-    actions.setMessage(null);
+    setScheduleSaved(false);
     form.saveFrom("backup", {
       onSaved: () => {
-        actions.setMessage("Backup schedule saved.");
+        setScheduleSaved(true);
         void queryClient.invalidateQueries({
           queryKey: settingsKeys.configurationBackups,
         });
       },
-      onFailed: (error) =>
-        actions.setProblem(
-          errorMessage(error, "Could not save backup schedule."),
-        ),
+      onFailed: () => setScheduleSaved(false),
     });
   };
+
+  const exportResult = actions.resultFor("export");
+  const snapshotResult = actions.resultFor("snapshot");
 
   return (
     <div className="mm-quiet-stack">
@@ -55,8 +57,12 @@ export function BackupsTab({
               lastRunAt={settings.configuration_backup_last_run_at}
               busy={actions.busy}
               onSaveSchedule={saveSchedule}
+              scheduleSaved={scheduleSaved}
+              onBackUpNow={() => void actions.backUpNow()}
               onDownload={() => void actions.downloadConfiguration()}
               onChooseFile={(file) => void actions.chooseRestoreFile(file)}
+              resultMessage={exportResult.message}
+              resultProblem={exportResult.problem}
             />
             <BackupListSection
               backupsQ={backupsQ}
@@ -64,29 +70,16 @@ export function BackupsTab({
               onDownload={(id, fileName) =>
                 void actions.downloadSnapshot(id, fileName)
               }
+              onRestore={(id) => void actions.chooseSavedBackup(id)}
+              resultMessage={snapshotResult.message}
+              resultProblem={snapshotResult.problem}
             />
-            {actions.message ? (
-              <p
-                className="mm-status-text--healthy mm-backups-grid__wide text-sm"
-                role="status"
-              >
-                {actions.message}
-              </p>
-            ) : null}
-            {actions.problem ? (
-              <p
-                className="mm-status-text--failed mm-backups-grid__wide text-sm"
-                role="alert"
-              >
-                {actions.problem}
-              </p>
-            ) : null}
           </div>
         ) : null}
       </div>
       {actions.pendingRestore ? (
         <ConfirmDialog
-          title="Replace the settings on this server from this file?"
+          title="Replace the settings on this server with this backup?"
           description="This cannot be undone."
           confirmLabel="Replace settings"
           cancelLabel="Keep current settings"

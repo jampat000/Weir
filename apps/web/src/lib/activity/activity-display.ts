@@ -37,10 +37,11 @@ const EVENT_LABELS: Record<string, string> = {
   "processing.file_remux_pass_completed": "File processing finished",
   "processing.work_temp_stale_sweep_completed":
     "Temporary files cleanup finished",
-  "processing.failure_cleanup_sweep_completed": "Failed-remux cleanup finished",
-  "processing.handback_outcome": "What became of a hand-back",
+  "processing.failure_cleanup_sweep_completed":
+    "Cleanup after failed processing finished",
+  "processing.handback_outcome": "What happened to a cleaned copy",
   "processing.unclaimed_handback_cleanup_completed":
-    "Unclaimed hand-backs cleanup finished",
+    "Cleanup of copies nobody picked up finished",
 };
 
 /** Routine processing events: one fixed title, a compact row. */
@@ -58,7 +59,7 @@ const ROUTINE_PROCESSING: Record<string, { title: string; summary: string }> = {
     summary: "Background cleanup result",
   },
   "processing.failure_cleanup_sweep_completed": {
-    title: "Failed-remux cleanup finished",
+    title: "Cleanup after failed processing finished",
     summary: "Background cleanup result",
   },
 };
@@ -69,17 +70,6 @@ export function eventLabel(eventType: string): string {
     EVENT_LABELS[eventType] ??
     eventType.split(".").slice(-1)[0].replaceAll("_", " ")
   );
-}
-
-/** Long titles keep their start and their end, which is where a file name differs. */
-export function compactActivityTitle(text: string, maxLength = 92): string {
-  const normalized = text.trim();
-  if (normalized.length <= maxLength) {
-    return normalized;
-  }
-  const tail = Math.max(14, Math.min(28, maxLength - 24));
-  const head = Math.max(20, maxLength - tail - 3);
-  return `${normalized.slice(0, head).trimEnd()}...${normalized.slice(-tail).trimStart()}`;
 }
 
 function progressDisplay(ev: ActivityEventItem): ActivityDisplay {

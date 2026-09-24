@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { AuthPasswordField } from "../../components/auth/auth-password-field";
 import { AuthBrandStack } from "../../components/brand/auth-brand-stack";
 import { ApiEntryError } from "../../components/shared/api-entry-error";
 import { PageLoading } from "../../components/shared/page-loading";
@@ -17,6 +18,7 @@ export function SetupPage() {
   const bootstrap = useBootstrapMutation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [setupCode, setSetupCode] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -59,6 +61,10 @@ export function SetupPage() {
       setValidationError("Password must be at least 8 characters.");
       return;
     }
+    if (password !== confirmPassword) {
+      setValidationError("Passwords do not match.");
+      return;
+    }
     setValidationError(null);
     try {
       await bootstrap.mutateAsync({
@@ -66,7 +72,9 @@ export function SetupPage() {
         password,
         setupCode: setupCode.trim() || undefined,
       });
-      void navigate("/login?bootstrap=created", { replace: true });
+      // Bootstrap signs the new admin in as part of creating the account (#704), so the next
+      // stop is the app itself: `RequireSetupWizard` sends a fresh account straight to the wizard.
+      void navigate("/", { replace: true });
     } catch {
       /* surfaced below */
     }
@@ -78,11 +86,10 @@ export function SetupPage() {
         <AuthBrandStack />
         <div className="mm-auth-card">
           <p className="mm-auth-eyebrow">First run</p>
-          <h1 className="mm-auth-title">Create admin</h1>
+          <h1 className="mm-auth-title">Create your account</h1>
           <p className="mm-auth-lead">
-            Weir has no administrator yet. Choose credentials for the initial
-            account. After you sign in, Weir will run the first-run setup
-            wizard.
+            Choose the username and password you&apos;ll use to sign in. Weir
+            will sign you in right away and then run the first-run setup wizard.
           </p>
 
           <form
@@ -109,19 +116,34 @@ export function SetupPage() {
               required
               maxLength={64}
             />
-            <label className="mm-auth-label" htmlFor="setup-pass">
-              Password (min. 8 characters)
-            </label>
-            <input
+            <AuthPasswordField
               id="setup-pass"
-              data-testid="setup-password"
+              testId="setup-password"
               name="password"
-              type="password"
+              label="Password (min. 8 characters)"
+              revealLabel="password"
               autoComplete="new-password"
-              className="mm-auth-input"
               value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
+              onChange={(value) => {
+                setPassword(value);
+                if (validationError) {
+                  setValidationError(null);
+                }
+              }}
+              required
+              minLength={8}
+              maxLength={512}
+            />
+            <AuthPasswordField
+              id="setup-confirm-pass"
+              testId="setup-confirm-password"
+              name="confirm_password"
+              label="Confirm password"
+              revealLabel="confirmation"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(value) => {
+                setConfirmPassword(value);
                 if (validationError) {
                   setValidationError(null);
                 }
@@ -173,12 +195,15 @@ export function SetupPage() {
               className="mm-auth-submit"
               disabled={bootstrap.isPending}
             >
-              {bootstrap.isPending ? "Creating..." : "Create admin account"}
+              {bootstrap.isPending ? "Creating..." : "Create your account"}
             </button>
           </form>
 
           <p className="mm-auth-footer-link">
-            Already have an account? <Link to="/login">Sign in</Link>
+            Already have an account?{" "}
+            <Link to="/login" state={{ manualSignIn: true }}>
+              Sign in
+            </Link>
           </p>
         </div>
       </div>

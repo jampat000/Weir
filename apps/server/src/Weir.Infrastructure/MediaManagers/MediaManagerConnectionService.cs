@@ -99,18 +99,28 @@ public sealed class MediaManagerConnectionService
             }
         }
 
+        string? validatedBaseUrl = null;
         if (baseUrl is not null)
         {
-            var validUrl = ValidateBaseUrl(baseUrl);
-            if (validUrl != row.BaseUrl)
+            validatedBaseUrl = ValidateBaseUrl(baseUrl);
+            if (validatedBaseUrl != row.BaseUrl)
             {
-                changes.Add(("base_url", validUrl));
+                changes.Add(("base_url", validatedBaseUrl));
             }
         }
 
         if (enabled is { } flag && flag != row.Enabled)
         {
             changes.Add(("enabled", flag ? 1 : 0));
+        }
+
+        // A connection going live must still have an address ExternalUrlPolicy accepts, even when this call
+        // only flips `enabled` and never touched base_url: the stored value could predate this check, or come
+        // from a restored backup. Re-validating on every enable (not only a change of state) costs nothing and
+        // needs no extra branch to get right.
+        if (enabled == true)
+        {
+            ValidateBaseUrl(validatedBaseUrl ?? row.BaseUrl);
         }
 
         if (apiKey is not null)
@@ -306,7 +316,12 @@ public sealed class MediaManagerConnectionService
         return value;
     }
 
-    private static string ValidateBaseUrl(string? baseUrl)
+    /// <summary>
+    /// The stored form of a base URL, or throws when it is not empty and does not pass
+    /// <see cref="ExternalUrlPolicy.NormalizeLocalServiceBaseUrl"/>. Internal so a restore (which must refuse the
+    /// same addresses, not just the create/update endpoints) can reuse it without a second copy of the policy.
+    /// </summary>
+    internal static string ValidateBaseUrl(string? baseUrl)
     {
         var raw = PyStrings.Strip(baseUrl ?? string.Empty);
         if (raw.Length == 0)

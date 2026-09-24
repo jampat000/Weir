@@ -49,15 +49,15 @@ describe("LoginPage", () => {
     ).toBeVisible();
   });
 
-  it("offers trust this device and enables it by default", () => {
+  it("offers trust this device, off by default", () => {
     render(wrap(<LoginPage />));
 
     const checkbox = screen.getByLabelText(
       "Trust this device",
     ) as HTMLInputElement;
-    expect(checkbox.checked).toBe(true);
+    expect(checkbox.checked).toBe(false);
 
     fireEvent.click(checkbox);
-    expect(checkbox.checked).toBe(false);
+    expect(checkbox.checked).toBe(true);
   });
 });

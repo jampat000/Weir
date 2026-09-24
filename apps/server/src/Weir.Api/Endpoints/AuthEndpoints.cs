@@ -116,6 +116,12 @@ public static class AuthEndpoints
         var (user, session, rawToken) = result.Value;
         Logger(request).LogInformation("auth event: login succeeded (user_id={UserId})", user.Id);
         await ActivityStore.RecordAsync(uow, ActivityEventTypes.AuthLoginSucceeded, "auth", "Signed in", user.Username).ConfigureAwait(false);
+        return SignedIn(request, new PyDict().Set("user", AuthService.UserPublic(user)), session, rawToken);
+    }
+
+    /// <summary>A 200 that hands the browser its new session cookie.</summary>
+    private static JsonApiResult SignedIn(ApiRequest request, PyDict body, UserSessionRecord session, string rawToken)
+    {
         var cookie = PyCookies.SetCookieHeader(
             request.Options.SessionCookieName,
             rawToken,
@@ -124,7 +130,7 @@ public static class AuthEndpoints
             httpOnly: true,
             secure: SessionRules.ResolveCookieSecure(request.Context.Request.Scheme, request.Options.SessionCookieSecureMode),
             sameSite: SessionRules.SameSiteText(request.Options.SessionCookieSameSite));
-        return new JsonApiResult(StatusCodes.Status200OK, new PyDict().Set("user", AuthService.UserPublic(user)))
+        return new JsonApiResult(StatusCodes.Status200OK, body)
         {
             Headers = [new("Set-Cookie", cookie), new("Cache-Control", "no-store, private")],
         };
@@ -249,9 +255,20 @@ public static class AuthEndpoints
         setupCodes.Clear();
         var suite = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
         await SuiteSettingsStore.UpdateAsync(uow, suite, suite with { SetupWizardState = "pending" }).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict()
-            .Set("message", "Bootstrap complete. Sign in with POST /api/v1/auth/login.")
-            .Set("username", user.Username));
+
+        // The person who just chose this password is the one at the browser, so asking for it again straight away
+        // would add a step and nothing else (#704). A standard session: trusting the device is a sign-in choice.
+        var (session, rawToken) = await request.Auth.CreateSessionAsync(
+            uow, user, trustedDevice: false, SessionRules.ClientLabelFromUserAgent(request.FirstHeader("User-Agent"))).ConfigureAwait(false);
+        await ActivityStore.RecordAsync(uow, ActivityEventTypes.AuthLoginSucceeded, "auth", "Signed in", user.Username).ConfigureAwait(false);
+        return SignedIn(
+            request,
+            new PyDict()
+                .Set("message", "Account created. You are signed in.")
+                .Set("username", user.Username)
+                .Set("user", AuthService.UserPublic(user)),
+            session,
+            rawToken);
     }
 
     private static async Task<ApiResult> PostLogoutAsync(ApiRequest request)

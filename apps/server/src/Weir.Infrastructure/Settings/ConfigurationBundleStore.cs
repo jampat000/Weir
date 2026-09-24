@@ -10,7 +10,8 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Settings;
 
 /// <summary>
-/// Export and restore of the settings rows, format version 4 only.
+/// Export and restore of the settings rows, format version 4 only. Media managers and alerts travel without their
+/// secrets; see <see cref="ConfigurationBundleConnections"/>.
 /// </summary>
 /// <remarks>
 /// Bundles in the older format version 3 are refused rather than converted: conversion code that only runs on
@@ -68,7 +69,9 @@ public static class ConfigurationBundleStore
             .Set("arr_library_operator_settings", arr[0])
             .Set("operator_settings", processingOperator[0])
             .Set("rule_sets", new PyList(ruleSets))
-            .Set("libraries", new PyList(libraries));
+            .Set("libraries", new PyList(libraries))
+            .Set(ConfigurationBundleConnections.MediaManagersSection, await ConfigurationBundleConnections.ExportMediaManagersAsync(uow).ConfigureAwait(false))
+            .Set(ConfigurationBundleConnections.AlertsSection, await ConfigurationBundleConnections.ExportAlertsAsync(uow).ConfigureAwait(false));
     }
 
     /// <summary>
@@ -88,21 +91,23 @@ public static class ConfigurationBundleStore
         };
         if (!supported)
         {
-            throw new PyValueErrorException($"Unsupported configuration bundle format_version (this build reads {FormatVersion}).");
+            throw new PyValueErrorException("This backup was made by a version of Weir that this one cannot restore.");
         }
 
         foreach (var key in new[] { SuiteTable, ArrTable, ProcessingOperatorTable })
         {
             if (!bundle.ContainsKey(key))
             {
-                throw new PyValueErrorException($"Bundle is missing required section: {key}");
+                throw new PyValueErrorException("This file is not a complete Weir backup.");
             }
         }
 
         await ApplySuiteSettingsAsync(uow, bundle[SuiteTable], zones).ConfigureAwait(false);
         await ApplySingletonAsync(uow, ArrTable, bundle[ArrTable]).ConfigureAwait(false);
         await ApplySingletonAsync(uow, ProcessingOperatorTable, bundle[ProcessingOperatorTable]).ConfigureAwait(false);
-        await RestoreProcessingLibrariesAsync(uow, bundle, weirHome).ConfigureAwait(false);
+        var restoredConnectionIds = await ConfigurationBundleConnections.RestoreMediaManagersAsync(uow, bundle).ConfigureAwait(false);
+        await RestoreProcessingLibrariesAsync(uow, bundle, weirHome, restoredConnectionIds).ConfigureAwait(false);
+        await ConfigurationBundleConnections.RestoreAlertsAsync(uow, bundle).ConfigureAwait(false);
     }
 
     private static async Task ApplySuiteSettingsAsync(UnitOfWork uow, PyJson section, ITimeZoneResolver zones)
@@ -189,7 +194,8 @@ public static class ConfigurationBundleStore
     }
 
     /// <summary>
-    /// Replaces <c>libraries</c> and <c>rule_sets</c> from the bundle's own rows.
+    /// Replaces <c>libraries</c> and <c>rule_sets</c> from the bundle's own rows. When the bundle carries its media
+    /// managers, a library found through one points at that connection's id on this install.
     /// </summary>
     /// <remarks>
     /// Rows are inserted as they are, with no renaming (such as <c>media_scope</c> to <c>media_type</c>, #557):
@@ -198,7 +204,8 @@ public static class ConfigurationBundleStore
     /// <c>POST /processing/libraries</c> runs: a bad row refuses the whole restore rather than leaving the
     /// table partly replaced.
     /// </remarks>
-    private static async Task RestoreProcessingLibrariesAsync(UnitOfWork uow, PyDict bundle, string weirHome)
+    private static async Task RestoreProcessingLibrariesAsync(
+        UnitOfWork uow, PyDict bundle, string weirHome, IReadOnlyDictionary<long, long>? restoredConnectionIds)
     {
         if (!bundle.ContainsKey(LibrariesTable))
         {
@@ -222,6 +229,11 @@ public static class ConfigurationBundleStore
 
         foreach (var data in libraryRows)
         {
+            if (restoredConnectionIds is not null)
+            {
+                ConfigurationBundleConnections.RemapLibraryConnection(data, restoredConnectionIds);
+            }
+
             await InsertAsync(uow, LibrariesTable, libraryColumns, ToKwargs(libraryColumns, data)).ConfigureAwait(false);
         }
     }

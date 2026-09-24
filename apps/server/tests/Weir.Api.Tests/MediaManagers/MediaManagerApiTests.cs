@@ -139,6 +139,26 @@ public sealed class MediaManagerApiTests
         Assert.Equal(0, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM media_manager_search_lanes WHERE connection_id = 2"));
     }
 
+    /// <summary>
+    /// A connection whose stored address predates today's validation (or arrived through a restore): flipping
+    /// it on must still be refused, the same way saving a bad address is. Only the address is bypassed here to
+    /// set up the scenario; the request under test is a normal PUT.
+    /// </summary>
+    [Fact]
+    public async Task Enabling_a_connection_re_validates_its_stored_address()
+    {
+        var (server, client, _) = await StartAsync();
+        await using var _server = server;
+        await CreateAsync(client);
+        await TestDatabase.ExecuteAsync(server, "UPDATE media_manager_connections SET base_url = 'not-a-url', enabled = 0 WHERE id = 1");
+
+        using var enabled = await client.PutAsync($"{Connections}/1", new { csrf_token = await client.CsrfAsync(), enabled = true });
+
+        Assert.Equal(HttpStatusCode.BadRequest, enabled.StatusCode);
+        Assert.Contains("will not work", await Detail(enabled), StringComparison.Ordinal);
+        Assert.Equal(0, await TestDatabase.ScalarAsync(server, "SELECT enabled FROM media_manager_connections WHERE id = 1"));
+    }
+
     [Fact]
     public async Task Routes_need_an_operator_session()
     {
