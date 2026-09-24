@@ -4,8 +4,9 @@ import {
   postProcessingJobCancelPending,
   postProcessingJobRecoverFinalizeFailed,
 } from "./api";
+import { processingKeys } from "../query-keys";
 
-/** ``recent`` = no status filter — server returns newest rows across all statuses. */
+/** `recent` applies no status filter: the server returns the newest rows across all statuses. */
 export type ProcessingJobsInspectionFilter =
   | "recent"
   | "pending"
@@ -15,13 +16,8 @@ export type ProcessingJobsInspectionFilter =
   | "handler_ok_finalize_failed"
   | "cancelled"
   | "terminal"
-  /** Queued or running: what Live shows as waiting and working. */
+  /** Queued or running: what Processing shows as waiting and working. */
   | "active";
-
-export const processingJobsInspectionQueryKey = (
-  filter: ProcessingJobsInspectionFilter,
-  limit = 100,
-) => ["processing", "jobs", "inspection", filter, limit] as const;
 
 function statusesForFilter(
   filter: ProcessingJobsInspectionFilter,
@@ -43,7 +39,7 @@ export function useProcessingJobsInspectionQuery(
   limit = 100,
 ) {
   return useQuery({
-    queryKey: processingJobsInspectionQueryKey(filter, limit),
+    queryKey: processingKeys.jobsInspectionList(filter, limit),
     queryFn: () =>
       fetchProcessingJobsInspection({
         limit,
@@ -58,9 +54,7 @@ export function useProcessingJobCancelPendingMutation() {
   return useMutation({
     mutationFn: (jobId: number) => postProcessingJobCancelPending(jobId),
     onSuccess: () => {
-      void qc.invalidateQueries({
-        queryKey: ["processing", "jobs", "inspection"],
-      });
+      void qc.invalidateQueries({ queryKey: processingKeys.jobsInspection });
     },
   });
 }
@@ -71,9 +65,7 @@ export function useProcessingJobRecoverFinalizeFailedMutation() {
     mutationFn: (jobId: number) =>
       postProcessingJobRecoverFinalizeFailed(jobId),
     onSuccess: () => {
-      void qc.invalidateQueries({
-        queryKey: ["processing", "jobs", "inspection"],
-      });
+      void qc.invalidateQueries({ queryKey: processingKeys.jobsInspection });
     },
   });
 }

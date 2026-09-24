@@ -1,4 +1,4 @@
-import { fetchCsrfToken } from "../../api/auth-api";
+import { sendJson } from "../../api/send-json";
 import { apiFetch, readJson, requireOk } from "../../api/client";
 import type {
   ProcessingJobCancelPendingOut,
@@ -37,27 +37,15 @@ export async function fetchProcessingJobsInspection(
 export async function postProcessingJobCancelPending(
   jobId: number,
 ): Promise<ProcessingJobCancelPendingOut> {
-  const csrf_token = await fetchCsrfToken();
   const path = `/api/v1/processing/jobs/${jobId}/cancel-pending`;
-  const r = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ csrf_token }),
-  });
-  await requireOk(path, r, "Could not cancel job");
+  const r = await sendJson(path, "POST", {}, "Could not cancel job");
   return readJson<ProcessingJobCancelPendingOut>(r);
 }
 
 export async function postProcessingJobRecoverFinalizeFailed(
   jobId: number,
 ): Promise<ProcessingJobRecoverFinalizeFailedOut> {
-  const csrf_token = await fetchCsrfToken();
   const path = `/api/v1/processing/jobs/${jobId}/recover-finalize-failed`;
-  const r = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ csrf_token }),
-  });
-  await requireOk(path, r, "Could not recover that result");
+  const r = await sendJson(path, "POST", {}, "Could not recover that result");
   return readJson<ProcessingJobRecoverFinalizeFailedOut>(r);
 }

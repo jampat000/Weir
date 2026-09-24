@@ -1,10 +1,6 @@
 import { Navigate, useSearchParams } from "react-router-dom";
 
-/**
- * Where the pre-3.2 Processing tabs live now (docs/archive/live-and-library.md).
- * 3.0.0 dropped every old address because nobody had installed it yet; 3.1 has been installed,
- * so its bookmarks and any links a user saved land on the same thing in its new place.
- */
+/** Where each former Processing tab lives now, so a saved bookmark lands on the same thing. */
 const PROCESSING_TAB_HOMES: Record<string, string> = {
   overview: "/",
   files: "/history",
@@ -16,7 +12,7 @@ const PROCESSING_TAB_HOMES: Record<string, string> = {
   maintenance: "/settings?tab=cleanup",
 };
 
-/** Settings tabs from 3.1 that moved to System in 3.2, so an old bookmark lands on the same thing. */
+/** Former Settings tabs that now live under System, so an old bookmark lands on the same thing. */
 const SETTINGS_TABS_MOVED_TO_SYSTEM: Record<string, string> = {
   upgrade: "/system?tab=about",
   support: "/system?tab=about",
@@ -34,7 +30,7 @@ export function systemAddressForSettingsTab(
   );
 }
 
-/** Filters the old Files and Jobs tabs understood, carried over so a saved filter still works. */
+/** Filters the former Files and Jobs tabs understood, carried over so a saved filter still works. */
 const CARRIED_PARAMS = ["status", "path"];
 
 export function LegacyProcessingRedirect() {

@@ -15,11 +15,9 @@ import {
 
 const routeErrorElement = <RouteErrorScreen />;
 
-// Four places since 3.2: Processing (/), Library, Settings and System.
-// 3.0.0 carried no redirects because nobody had installed it yet. 3.1 has been installed, so its
-// two retired addresses redirect: /activity to System › History and logs, and each old
-// Processing tab to wherever that tab lives now (legacy-redirects.tsx). Anything older than 3.1,
-// such as /dashboard, still gets the Not found page.
+// Five places: Processing (/), History, Library, Settings and System. Addresses bookmarked from an
+// installed release that no longer exist redirect to where their page lives now
+// (legacy-redirects.tsx); anything older gets the Not found page.
 const router = createBrowserRouter([
   {
     path: "/login",
@@ -60,7 +58,7 @@ const router = createBrowserRouter([
             errorElement: routeErrorElement,
             children: [
               {
-                // Live: every file Weir is working on, moving as it moves. The landing screen,
+                // Processing: every file Weir is working on, moving as it moves. The landing screen,
                 // because what Weir is doing right now is what an operator opens the app to see.
                 index: true,
                 lazy: async () => ({

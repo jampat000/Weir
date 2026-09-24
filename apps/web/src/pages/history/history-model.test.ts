@@ -39,8 +39,8 @@ function file(partial: Partial<ProcessingFile>): ProcessingFile {
     progress_eta_seconds: null,
     hold_until: null,
     size_changed_at: null,
-    created_at: "2026-09-23T04:00:00",
-    updated_at: "2026-09-23T04:00:00",
+    created_at: "2026-08-19T04:00:00",
+    updated_at: "2026-08-19T04:00:00",
     last_seen_at: null,
     last_attempt_at: null,
     ...partial,
@@ -149,10 +149,10 @@ describe("tracks from a pass record", () => {
 });
 
 describe("what became of the copy Weir handed back", () => {
-  const now = Date.parse("2026-09-23T04:06:00Z");
+  const now = Date.parse("2026-08-19T04:06:00Z");
   const copy = {
     output_path: "/hand-back/Show/Show.S01E01.mkv",
-    written_at: "2026-09-23T03:00:00",
+    written_at: "2026-08-19T03:00:00",
     outcome: null,
     outcome_by: null,
     outcome_at: null,
@@ -168,10 +168,10 @@ describe("what became of the copy Weir handed back", () => {
       ...copy,
       outcome: "imported" as const,
       outcome_by: "Sonarr",
-      outcome_at: "2026-09-23T04:00:00",
+      outcome_at: "2026-08-19T04:00:00",
       imported_path: "/tv/Show/Season 01/Show - S01E01.mkv",
-      released_at: "2026-09-23T04:00:00",
-      settled_at: "2026-09-23T04:00:00",
+      released_at: "2026-08-19T04:00:00",
+      settled_at: "2026-08-19T04:00:00",
       release_note:
         "Weir removed its copy from the hand-back folder, because Sonarr has the file now.",
     };
@@ -210,7 +210,7 @@ describe("what became of the copy Weir handed back", () => {
 
 describe("ago", () => {
   it("reads the server's zone-less times as UTC", () => {
-    const now = Date.parse("2026-09-23T04:06:00Z");
-    expect(agoWords("2026-09-23T04:00:00", now)).toBe("6 min ago");
+    const now = Date.parse("2026-08-19T04:06:00Z");
+    expect(agoWords("2026-08-19T04:00:00", now)).toBe("6 min ago");
   });
 });

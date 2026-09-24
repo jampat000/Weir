@@ -1,15 +1,10 @@
 /**
- * One library file, opened from the table: what is in it, what your rules would take out of it and why, and
- * the things you can do about it. The track list is the same "try on a file" preview the rule-set editor
- * uses (#502), so this screen and that one can never disagree about a file.
- *
- * Two of those things are yours rather than the rules': you can pick the tracks for this one file, the way a
- * held download already lets you (#501), and you can set the file aside so nothing cleans it at all.
- *
- * A slide-over, like the file story on Live: close it and the table is exactly where it was.
+ * One library file, opened from the table: what is in it, what your rules would take out of it and why,
+ * and what you can do about it. The track list is the rule-set editor's own preview (#502), so the two can
+ * never disagree about a file. You can also pick the tracks for this one file (#501), or set it aside so
+ * nothing cleans it.
  */
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { SidePanel } from "../../components/shared/side-panel";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
@@ -18,16 +13,13 @@ import { formatBytes } from "../../lib/format/bytes";
 import type {
   LibraryFile,
   LibraryManualPlan,
-} from "../../lib/processing/library-api";
-import {
-  previewProcessingRules,
-  type ProcessingRulesPreviewTrack,
-} from "../../lib/processing/rules-preview-api";
-
-function when(iso: string): string {
-  const at = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`);
-  return Number.isNaN(at.getTime()) ? iso : at.toLocaleString();
-}
+} from "../../lib/processing/library-mode-api";
+import { useLibraryFilePreviewQuery } from "../../lib/processing/library-mode-queries";
+import type { ProcessingRulesPreviewTrack } from "../../lib/processing/rules-preview-api";
+import { baseName } from "../../lib/format/path";
+import { errorMessage } from "../../lib/api/error-message";
+import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
+import { plural } from "../../lib/ui/mm-plural";
 
 function trackLabel(track: ProcessingRulesPreviewTrack): string {
   return [
@@ -63,31 +55,16 @@ export function LibraryFileDrawer({
   const open = file !== null;
   // The tracks you have said to keep, once you start choosing; null while the rules are deciding.
   const [keep, setKeep] = useState<Set<number> | null>(null);
+  const when = useAppDateFormatter();
 
-  const preview = useQuery({
-    queryKey: [
-      "processing",
-      "library-file-preview",
-      libraryId,
-      file?.path ?? "",
-    ],
-    queryFn: () =>
-      previewProcessingRules({ libraryId, absolutePath: file!.path }),
-    // A preview runs a real read of a real file, so it is asked for once per opened file, not on a timer.
-    enabled: open,
-    staleTime: 5 * 60 * 1000,
-    retry: false,
-  });
+  const preview = useLibraryFilePreviewQuery(libraryId, file?.path ?? null);
   const history = useActivityRecentQuery(
     open ? { limit: 6, file: file.path } : undefined,
   );
 
-  // Opening another file starts again: a choice is about the file you were looking at, and nothing else.
-  useEffect(() => setKeep(null), [file?.path]);
-
   if (!file) return null;
 
-  const name = file.path.split(/[\\/]/).filter(Boolean).at(-1) ?? file.path;
+  const name = baseName(file.path);
   const tracks = preview.data?.tracks ?? [];
   const audio = tracks.filter((track) => track.type === "audio");
   const subtitles = tracks.filter((track) => track.type === "subtitle");
@@ -177,18 +154,18 @@ export function LibraryFileDrawer({
         ) : preview.isError ? (
           <p className="mm-drawer__note">
             Weir could not read this file just now:{" "}
-            {(preview.error as Error).message}
+            {errorMessage(preview.error, "it could not be opened.")}
           </p>
         ) : (
           <>
             <TrackList
-              title={`Audio · ${audio.length} ${audio.length === 1 ? "track" : "tracks"}`}
+              title={`Audio · ${plural(audio.length, "track", "tracks")}`}
               tracks={audio}
               kept={choosing ? kept : null}
               onToggle={(index) => setKeep(toggled(kept, index))}
             />
             <TrackList
-              title={`Subtitles · ${subtitles.length} ${subtitles.length === 1 ? "track" : "tracks"}`}
+              title={`Subtitles · ${plural(subtitles.length, "track", "tracks")}`}
               tracks={subtitles}
               kept={choosing ? kept : null}
               onToggle={(index) => setKeep(toggled(kept, index))}

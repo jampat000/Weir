@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
 import { setUnauthorizedHandler } from "../lib/api/client";
-import { qk } from "../lib/auth/queries";
+import { authKeys } from "../lib/auth/query-keys";
 
 export function AppProviders({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -21,10 +21,10 @@ export function AppProviders({ children }: { children: ReactNode }) {
   );
   useEffect(() => {
     setUnauthorizedHandler(() => {
-      client.setQueryData(qk.me, null);
-      client.setQueryData(qk.session, null);
-      void client.cancelQueries({ queryKey: qk.me });
-      void client.cancelQueries({ queryKey: qk.session });
+      client.setQueryData(authKeys.me, null);
+      client.setQueryData(authKeys.session, null);
+      void client.cancelQueries({ queryKey: authKeys.me });
+      void client.cancelQueries({ queryKey: authKeys.session });
       if (
         window.location.pathname !== "/login" &&
         window.location.pathname !== "/setup"

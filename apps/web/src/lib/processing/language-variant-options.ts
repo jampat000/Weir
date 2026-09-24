@@ -1,11 +1,8 @@
 /**
- * Issue #496: the regional language variants `Weir.Core.Rules.LanguageVariants` can detect and
- * match on, so the web audio/subtitle language pickers can offer a variant identifier (e.g.
- * `fre-CA`) alongside its base language (`fre`) — a rule that names a variant only matches that
- * variant; a rule that names the base language still matches every variant, unchanged.
- *
- * Kept in sync by hand with the C# table (`apps/server/src/Weir.Core/Rules/LanguageVariants.cs`):
- * same identifiers, same display names, same base language per entry.
+ * The regional language variants the server can match on (#496), so the language pickers can offer
+ * a variant (`fre-CA`) beside its base language (`fre`). A rule naming a variant matches only it; a
+ * rule naming the base language matches every variant. Kept in step by hand with
+ * apps/server/src/Weir.Core/Rules/LanguageVariants.cs.
  */
 export interface ProcessingLanguageVariantOption {
   /** The identifier a rule set stores, e.g. "fre-CA". */

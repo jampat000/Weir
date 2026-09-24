@@ -1,10 +1,7 @@
 /**
- * One way to say a size, everywhere. Two screens that read the same number must print it the same way, or a
- * person reasonably wonders which one is right: Live's "saved 318 MB" and Library's "318 MB back" come from
- * here, as does every size in a file's panel.
- *
- * Binary units, because that is what a disk reports. Enough decimals to be useful and no more: whole numbers
- * once a figure is big enough for a decimal to be noise.
+ * One way to say a size, everywhere, so two screens that show the same number print it the same way.
+ * Binary units, because that is what a disk reports, with whole numbers once a figure is big enough
+ * for a decimal to be noise.
  */
 export function formatBytes(bytes: number | null | undefined): string {
   if (bytes == null || !Number.isFinite(bytes)) return "";

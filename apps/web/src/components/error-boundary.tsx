@@ -44,16 +44,9 @@ export class ErrorBoundary extends Component<
 }
 
 /**
- * The screen a user sees when a route — or the whole app — has already failed.
- *
- * It deliberately renders as little as possible: a title, one line of plain explanation,
- * two ways out, and the real error text for a bug report. It used to render a copy of the
- * signed-in shell's navigation aside as well, which was wrong twice over. It borrowed
- * `.mm-sidebar`, whose styles assume the app shell (a full `100dvh` panel above 920px, an
- * off-canvas drawer below it), so the message itself was pushed below the fold on a
- * 1440x900 screen and the aside vanished entirely on a narrow one. And rendering more of
- * the app inside the failure is a second chance to fail. The layout classes here are the
- * `mm-auth-*` family the other shell-less screens use (login, setup, `ApiEntryError`).
+ * The screen shown when a route, or the whole app, has already failed. As little as possible: a
+ * title, one line of plain explanation, two ways out, and the error text for a bug report. No shell
+ * navigation, since rendering more of the app inside the failure is a second chance to fail.
  */
 export function AppErrorScreen({
   error,
@@ -65,10 +58,9 @@ export function AppErrorScreen({
   const reload = onReload ?? (() => window.location.reload());
   const mainRef = useRef<HTMLElement>(null);
 
-  // After a client-side route error, focus is left wherever it was — often on a control in
-  // a shell that no longer exists — so a keyboard or screen reader user is stranded with no
-  // announcement that anything changed. Moving focus to the container makes the heading the
-  // next thing read. The `tabIndex={-1}` that makes this possible was already here, unused.
+  // After a client-side route error, focus is left wherever it was, often on a control that is
+  // gone, so a keyboard or screen reader user hears nothing change. Moving focus to the container
+  // makes the heading the next thing read.
   useEffect(() => {
     mainRef.current?.focus();
   }, []);
@@ -103,17 +95,17 @@ export function AppErrorScreen({
               load is the right escape from a crashed app in any case.
             */}
             <a
-              className="text-sm font-medium text-[var(--mm-accent)] underline-offset-4 hover:underline"
+              className="text-sm font-medium text-mm-accent underline-offset-4 hover:underline"
               href="/"
             >
               Go to Processing
             </a>
           </div>
-          <details className="mt-5 text-sm text-[var(--mm-text2)]">
-            <summary className="cursor-pointer select-none rounded-[var(--mm-radius-sm)] py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mm-accent-ring)]">
+          <details className="mt-5 text-sm text-mm-text2">
+            <summary className="cursor-pointer select-none rounded-mm-sm py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mm-accent-ring">
               Show technical details
             </summary>
-            <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-[var(--mm-radius-sm)] border border-[var(--mm-border)] bg-[var(--mm-surface-2)] p-3 font-mono text-xs text-[var(--mm-text3)]">
+            <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-mm-sm border border-mm-border bg-mm-surface-2 p-3 font-mono text-xs text-mm-text3">
               {error.message || "Unknown error"}
             </pre>
           </details>

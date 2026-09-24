@@ -1,0 +1,258 @@
+/* Sign-in, first-run and start-up screens. */
+
+/* ---- Auth screens -------------------------------------------------------- */
+
+.mm-auth-body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--mm-space);
+  background: var(--mm-bg);
+}
+
+.mm-auth-frame {
+  width: 100%;
+  max-width: 420px;
+}
+
+.mm-setup-wizard-frame {
+  max-width: min(1120px, calc(100vw - 2rem));
+}
+
+.mm-setup-wizard-card {
+  width: 100%;
+}
+
+.mm-auth-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 1.15rem;
+}
+
+.mm-auth-brand-logo {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin-bottom: 0;
+}
+
+.mm-auth-brand-tagline {
+  margin: 0.5rem 0 0;
+  max-width: 24rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--mm-text3);
+}
+
+.mm-auth-card {
+  padding: 1.75rem 1.85rem;
+  background: var(--mm-card-bg);
+  border: 1px solid var(--mm-border);
+  border-radius: var(--mm-radius);
+  box-shadow: var(--mm-shadow-card);
+}
+
+.mm-auth-eyebrow {
+  margin: 0 0 0.75rem;
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 600;
+  letter-spacing: var(--mm-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--mm-text3);
+}
+
+.mm-auth-title {
+  margin: 0 0 0.5rem;
+  font-size: var(--mm-type-title);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--mm-text);
+}
+
+.mm-auth-title--caution {
+  color: var(--mm-status-warning-text);
+}
+
+.mm-auth-title--alert {
+  color: var(--mm-status-failed-text);
+}
+
+.mm-auth-lead {
+  margin: 0 0 1.1rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--mm-text2);
+}
+
+.mm-auth-banner {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.85rem;
+  border-radius: var(--mm-radius-sm);
+  background: var(--mm-status-failed-bg);
+  border: 1px solid var(--mm-status-failed-text);
+  color: var(--mm-status-failed-text);
+}
+
+.mm-auth-banner--ok {
+  background: var(--mm-status-healthy-bg);
+  border-color: var(--mm-status-healthy-text);
+  color: var(--mm-status-healthy-text);
+}
+
+.mm-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+/* A field label, in sentence case like every form in the app. The uppercase eyebrow is
+ * kept for group titles and column heads (`.mm-auth-eyebrow` above the card title). */
+.mm-auth-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--mm-text2);
+}
+
+.mm-auth-hint {
+  margin-top: -0.375rem;
+  font-size: 0.8125rem;
+  color: var(--mm-text3);
+}
+
+/* The start-up screen (app/startup-gate.tsx), shown until the server says it is ready. */
+.mm-startup {
+  min-height: 100vh;
+  padding: 2.5rem 1.5rem;
+  background: var(--mm-bg);
+  color: var(--mm-text);
+}
+
+.mm-startup__inner {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 36rem;
+  min-height: 70vh;
+  margin: 0 auto;
+}
+
+.mm-startup__eyebrow {
+  color: var(--mm-accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  line-height: 1rem;
+  text-transform: uppercase;
+}
+
+.mm-startup__title {
+  margin-top: 1rem;
+  font-size: 1.875rem;
+  font-weight: 600;
+  line-height: 2.25rem;
+}
+
+.mm-startup__lead {
+  margin-top: 0.75rem;
+  color: var(--mm-text3);
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+}
+
+.mm-startup__card {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--mm-border);
+  border-radius: 0.25rem;
+  background: var(--mm-card-bg);
+}
+
+.mm-startup__track {
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: var(--mm-radius-pill);
+  background: var(--mm-input-bg);
+}
+
+.mm-startup__fill {
+  height: 100%;
+  border-radius: var(--mm-radius-pill);
+  background: var(--mm-accent);
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mm-startup__steps {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.mm-startup__step {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.mm-startup__dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  margin-top: 0.25rem;
+  border-radius: var(--mm-radius-pill);
+  background: var(--mm-accent);
+}
+
+.mm-startup__dot--ready {
+  background: var(--mm-status-healthy-text);
+}
+
+.mm-startup__dot--failed {
+  background: var(--mm-status-failed-text);
+}
+
+.mm-startup__step-name {
+  display: block;
+  color: var(--mm-text);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.mm-startup__step-detail {
+  color: var(--mm-text3);
+}
+
+.mm-startup__retry {
+  width: fit-content;
+  margin-top: 1.25rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--mm-accent);
+  border-radius: 0.25rem;
+  background: var(--mm-accent);
+  color: #000;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+}
+
+/* Commands and paths in the connection help (components/shared/api-entry-error.tsx). */
+.mm-entry-code {
+  font-size: 0.85em;
+}
+
+.mm-entry-code--chip {
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--mm-text);
+}
+
+.mm-entry-detail {
+  font-family: var(--mm-font-mono);
+}

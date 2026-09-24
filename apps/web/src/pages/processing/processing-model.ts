@@ -1,13 +1,13 @@
 /**
- * Which lane each file belongs in on Live, and the words and numbers each card shows. Pure functions,
- * so the rules are tested on their own (live-model.test.ts). Every value comes from the server: file
- * states and the running pass's own progress from `GET /api/v1/processing/files`, library cleans from
- * the job queue, finished files from their Activity entries.
+ * Which lane each file belongs in on the Processing page, and the words each card shows. Pure
+ * functions, so the rules are tested on their own. Every value comes from the server: file states and
+ * the running pass's own progress from `GET /api/v1/processing/files`, library cleans from the job queue.
  */
-import type { FinishedFile } from "../../lib/activity/processing-outcome";
 import { formatBytes } from "../../lib/format/bytes";
 import type { ProcessingFile } from "../../lib/processing/files-api";
 import type { ProcessingJobInspectionRow } from "../../lib/processing/jobs-inspection/types";
+import { baseName } from "../../lib/format/path";
+import { parseAppTime } from "../../lib/ui/mm-format-date";
 
 export const LIBRARY_CLEAN_JOB_KIND = "processing.library.clean.v1";
 
@@ -95,7 +95,7 @@ function words(raw: string): string {
 
 /** "The.Quiet.Harbour.S01E03.1080p.WEB-DL.mkv" reads as "The Quiet Harbour S01E03". */
 export function prettyName(path: string): string {
-  const base = path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
+  const base = baseName(path);
   const stem = base.replace(/\.[a-z0-9]{2,4}$/i, "");
   const episode = EPISODE.exec(stem);
   if (episode) return `${words(episode[1])} ${episode[2].toUpperCase()}`;
@@ -119,14 +119,6 @@ export function firstSentence(text: string | null | undefined): string {
   const t = (text ?? "").trim();
   const end = t.search(/[.!?](\s|$)/);
   return end > 0 ? t.slice(0, end + 1) : t;
-}
-
-function parseTime(value: string | null | undefined): number | null {
-  if (!value) return null;
-  const ms = Date.parse(
-    /[zZ]|[+-]\d\d:?\d\d$/.test(value) ? value : `${value}Z`,
-  );
-  return Number.isNaN(ms) ? null : ms;
 }
 
 /** Seconds until a wait ends, rounded up, never negative. Null when there is no clock on it. */
@@ -158,16 +150,10 @@ function libraryJobParts(row: ProcessingJobInspectionRow): {
 }
 
 /**
- * Sorts files and library clean jobs into Live's lanes.
- *
- * - Arriving: on hold for a reason that ends by itself (a file still being written, or inside its
- *   library's minimum age), or still held by the media manager.
- * - Waiting: ready, or outside its library's hours, and waiting for a free lane.
- * - Working: a pass is writing it. Handing back: the pass has written it and is on its final checks.
- * - Stuck: failed, or on hold after repeated failures. These are what "Needs you" is made of.
- *
- * Library cleans come from the job queue: leased is working, pending is waiting. They do not report a
- * percentage yet, so their card says what is happening without a number rather than invent one.
+ * Sorts files and library clean jobs into the lanes. Arriving: held for a reason that ends by itself,
+ * or still with the media manager. Waiting: ready, or outside its hours. Working: a pass is writing it.
+ * Handing back: on its final checks. Stuck: failed, or held after repeated failures. Library cleans
+ * come from the job queue and report no percentage, so their card says what is happening without one.
  */
 export function buildLanes(
   files: ProcessingFile[],
@@ -196,9 +182,9 @@ export function buildLanes(
           lanes.stuck.push(file);
           break;
         }
-        const holdUntil = parseTime(file.hold_until);
+        const holdUntil = parseAppTime(file.hold_until);
         const since =
-          parseTime(file.size_changed_at) ?? parseTime(file.updated_at);
+          parseAppTime(file.size_changed_at) ?? parseAppTime(file.updated_at);
         const minAge = minAgeByLibrary.get(file.library_id) ?? null;
         const holdTotal =
           holdUntil != null && since != null && holdUntil > since
@@ -323,199 +309,4 @@ export function buildLanes(
       (arrivingDeadline(a) ?? Infinity) - (arrivingDeadline(b) ?? Infinity),
   );
   return lanes;
-}
-
-/** How a handed-back file turned out, in the three tones Just finished uses for its dots. */
-export type HandedBackTone = "ok" | "same" | "warn";
-
-export function handedBackTone(item: FinishedFile): HandedBackTone {
-  if (item.kind === "passed" || item.kind === "failed") return "warn";
-  return item.kind === "already" ? "same" : "ok";
-}
-
-export type HandedBackBucket = Record<HandedBackTone, number> & {
-  /** Start of the five minutes, in ms since the epoch. */
-  from: number;
-  total: number;
-};
-
-export type HandedBack = {
-  /** Oldest first; the last one is the five minutes happening now. */
-  buckets: HandedBackBucket[];
-  totals: Record<HandedBackTone, number> & { all: number };
-  /** The fullest five minutes, never below 1 so a scale can be drawn from it. */
-  peak: number;
-};
-
-export const HANDED_BACK_BUCKET_MS = 5 * 60_000;
-export const HANDED_BACK_BUCKETS = 24;
-
-/**
- * The first instant the chart covers: 24 five-minute buckets on clock boundaries, the last one being
- * the five minutes happening now. Stable for five minutes, so a query keyed on it is not refetched
- * every second.
- */
-export function handedBackSince(now: number): number {
-  const current =
-    Math.floor(now / HANDED_BACK_BUCKET_MS) * HANDED_BACK_BUCKET_MS;
-  return current - (HANDED_BACK_BUCKETS - 1) * HANDED_BACK_BUCKET_MS;
-}
-
-/** Files handed back per five minutes over the last two hours, split by how each turned out. */
-export function handedBack(finished: FinishedFile[], now: number): HandedBack {
-  const since = handedBackSince(now);
-  const buckets: HandedBackBucket[] = Array.from(
-    { length: HANDED_BACK_BUCKETS },
-    (_, index) => ({
-      from: since + index * HANDED_BACK_BUCKET_MS,
-      ok: 0,
-      same: 0,
-      warn: 0,
-      total: 0,
-    }),
-  );
-  const totals = { ok: 0, same: 0, warn: 0, all: 0 };
-  for (const item of finished) {
-    const at = parseTime(item.finishedAt);
-    if (at == null || at < since || at > now) continue;
-    const bucket =
-      buckets[
-        Math.min(
-          buckets.length - 1,
-          Math.floor((at - since) / HANDED_BACK_BUCKET_MS),
-        )
-      ];
-    const tone = handedBackTone(item);
-    bucket[tone] += 1;
-    bucket.total += 1;
-    totals[tone] += 1;
-    totals.all += 1;
-  }
-  return {
-    buckets,
-    totals,
-    peak: Math.max(1, ...buckets.map((bucket) => bucket.total)),
-  };
-}
-
-/** "Saved 318 MB · removed 4 audio, 6 subtitles", in the words each outcome deserves. */
-export function finishedLine(item: FinishedFile): string {
-  if (item.sentence) return item.sentence;
-  switch (item.kind) {
-    case "already":
-      return "Already right · handed back as it was";
-    case "passed":
-      return "Passed through untouched · Weir could not process it";
-    case "failed":
-      return "Could not be finished · the original is untouched";
-    default: {
-      const removed: string[] = [];
-      if (item.removedAudio) removed.push(`${item.removedAudio} audio`);
-      if (item.removedSubtitles)
-        removed.push(
-          `${item.removedSubtitles} ${item.removedSubtitles === 1 ? "subtitle" : "subtitles"}`,
-        );
-      const saved = item.savedBytes
-        ? `Saved ${formatBytes(item.savedBytes)}`
-        : "Cleaned";
-      return removed.length
-        ? `${saved} · removed ${removed.join(", ")}`
-        : saved;
-    }
-  }
-}
-
-/** "just now", "4 min ago", "2 h ago". */
-export function ago(iso: string, now: number): string {
-  const at = parseTime(iso);
-  if (at == null) return "";
-  const seconds = Math.max(0, (now - at) / 1000);
-  if (seconds < 45) return "just now";
-  if (seconds < 90 * 60)
-    return `${Math.max(1, Math.round(seconds / 60))} min ago`;
-  return `${Math.round(seconds / 3600)} h ago`;
-}
-
-/** "0:41 left", "12 min left". */
-export function timeLeft(seconds: number | null): string {
-  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return "";
-  if (seconds < 90) return `${Math.round(seconds)} s left`;
-  const minutes = Math.round(seconds / 60);
-  return minutes < 90
-    ? `${minutes} min left`
-    : `${Math.round(minutes / 60)} h left`;
-}
-
-/**
- * ffmpeg's speed ("1.26e+03x", "35.2x", "0.8x") as a person reads it: "1,260×", "35×", "0.8×". ffmpeg
- * switches to scientific notation past 999, which reached the screen as it was.
- */
-export function speedWords(raw: string | null | undefined): string | null {
-  const value = Number.parseFloat((raw ?? "").trim().replace(/x$/i, ""));
-  if (!Number.isFinite(value) || value <= 0) return null;
-  const shown =
-    value >= 10
-      ? Math.round(value).toLocaleString("en-US")
-      : value.toFixed(1).replace(/\.0$/, "");
-  return `${shown}×`;
-}
-
-/** How fast the source is being read, from how far through it the pass is: bytes a second, or null. */
-export function readRate(
-  sizeBytes: number | null | undefined,
-  percent: number | null | undefined,
-  elapsedSeconds: number | null | undefined,
-): number | null {
-  if (!sizeBytes || percent == null || !elapsedSeconds || elapsedSeconds < 1)
-    return null;
-  const rate =
-    (sizeBytes * Math.min(100, Math.max(0, percent))) / 100 / elapsedSeconds;
-  return rate > 0 && Number.isFinite(rate) ? rate : null;
-}
-
-/** A running length as a player shows it: "4:05", "18:40", "1:02:03". */
-export function clock(seconds: number | null | undefined): string {
-  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return "";
-  const whole = Math.floor(seconds);
-  const h = Math.floor(whole / 3600);
-  const m = Math.floor((whole % 3600) / 60);
-  const sec = String(whole % 60).padStart(2, "0");
-  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
-}
-
-/** How long something has been running: "41 s", "2 min 14 s", "1 h 5 min". */
-export function runningFor(seconds: number | null | undefined): string {
-  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return "";
-  const whole = Math.floor(seconds);
-  if (whole < 60) return `${whole} s`;
-  if (whole < 3600) {
-    const rest = whole % 60;
-    return rest
-      ? `${Math.floor(whole / 60)} min ${rest} s`
-      : `${whole / 60} min`;
-  }
-  const minutes = Math.floor((whole % 3600) / 60);
-  return minutes
-    ? `${Math.floor(whole / 3600)} h ${minutes} min`
-    : `${whole / 3600} h`;
-}
-
-/** The few characters that fit inside a countdown ring: "58s", "9m", "2h". */
-export function ringLabel(seconds: number): string {
-  if (seconds < 100) return `${Math.round(seconds)}s`;
-  if (seconds < 100 * 60) return `${Math.round(seconds / 60)}m`;
-  return `${Math.round(seconds / 3600)}h`;
-}
-
-/**
- * What an arriving file's ring can honestly say, from the seconds left to its deadline (its own hold, or Weir's next
- * look at its library). Counting: that moment is ahead. Checking: it has come, and Weir is looking now (a scan books the
- * next look for the end of every hold it sets), so the ring turns because something is happening. Unknown: no time at
- * all is known, so the ring stays still and the reason underneath says why.
- */
-export function ringState(
-  left: number | null,
-): "counting" | "checking" | "unknown" {
-  if (left == null) return "unknown";
-  return left > 0 ? "counting" : "checking";
 }

@@ -27,14 +27,14 @@ describe("activity-api paths", () => {
       before_id: 9,
       module: "processing",
       trigger: "webhook",
-      date_from: "2026-09-16T08:00:00.000Z",
+      date_from: "2026-08-12T08:00:00.000Z",
     });
     const url = new URL(path, "http://x");
     expect(url.pathname).toBe("/api/v1/activity/export");
     expect(url.searchParams.get("format")).toBe("json");
     expect(url.searchParams.get("module")).toBe("processing");
     expect(url.searchParams.get("trigger")).toBe("webhook");
-    expect(url.searchParams.get("date_from")).toBe("2026-09-16T08:00:00.000Z");
+    expect(url.searchParams.get("date_from")).toBe("2026-08-12T08:00:00.000Z");
     expect(url.searchParams.has("limit")).toBe(false);
     expect(url.searchParams.has("before_id")).toBe(false);
   });

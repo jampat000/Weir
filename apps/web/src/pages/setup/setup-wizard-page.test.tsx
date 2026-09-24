@@ -4,20 +4,20 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { qk } from "../../lib/auth/queries";
+import { authKeys } from "../../lib/auth/query-keys";
 import type { ProcessingLibrary } from "../../lib/processing/libraries-api";
-import { suiteSettingsQueryKey } from "../../lib/suite/queries";
+import { settingsKeys } from "../../lib/settings/query-keys";
 import { SetupWizardPage } from "./setup-wizard-page";
 
 const {
   navigateMock,
-  suiteMutateAsyncMock,
+  settingsMutateAsyncMock,
   createLibraryMock,
   updateLibraryMock,
   librariesState,
 } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
-  suiteMutateAsyncMock: vi.fn(),
+  settingsMutateAsyncMock: vi.fn(),
   createLibraryMock: vi.fn(),
   updateLibraryMock: vi.fn(),
   librariesState: { data: [] as ProcessingLibrary[] },
@@ -48,14 +48,14 @@ vi.mock("react-router-dom", async (importOriginal) => {
   };
 });
 
-vi.mock("../../lib/suite/queries", async (importOriginal) => {
+vi.mock("../../lib/settings/queries", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("../../lib/suite/queries")>();
+    await importOriginal<typeof import("../../lib/settings/queries")>();
   return {
     ...actual,
-    useSuiteSettingsSaveMutation: () => ({
+    useAppSettingsSaveMutation: () => ({
       isPending: false,
-      mutateAsync: suiteMutateAsyncMock,
+      mutateAsync: settingsMutateAsyncMock,
     }),
   };
 });
@@ -96,8 +96,8 @@ function renderWizard() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
-  client.setQueryData(qk.me, { id: 1, username: "admin", role: "admin" });
-  client.setQueryData(suiteSettingsQueryKey, {
+  client.setQueryData(authKeys.me, { id: 1, username: "admin", role: "admin" });
+  client.setQueryData(settingsKeys.app, {
     product_display_name: "Weir",
     signed_in_home_notice: null,
     setup_wizard_state: "pending",
@@ -115,11 +115,11 @@ function renderWizard() {
 describe("SetupWizardPage", () => {
   beforeEach(() => {
     navigateMock.mockReset();
-    suiteMutateAsyncMock.mockReset();
+    settingsMutateAsyncMock.mockReset();
     createLibraryMock.mockReset();
     updateLibraryMock.mockReset();
     librariesState.data = [];
-    suiteMutateAsyncMock.mockResolvedValue({});
+    settingsMutateAsyncMock.mockResolvedValue({});
     createLibraryMock.mockResolvedValue({});
     updateLibraryMock.mockResolvedValue({});
   });
@@ -143,7 +143,7 @@ describe("SetupWizardPage", () => {
     fireEvent.click(screen.getByTestId("setup-wizard-skip"));
 
     await waitFor(() => {
-      expect(suiteMutateAsyncMock).toHaveBeenCalledWith(
+      expect(settingsMutateAsyncMock).toHaveBeenCalledWith(
         expect.objectContaining({
           setup_wizard_state: "skipped",
           app_timezone: "UTC",
@@ -174,7 +174,7 @@ describe("SetupWizardPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Finish setup" }));
 
     await waitFor(() => {
-      expect(suiteMutateAsyncMock).toHaveBeenCalledWith(
+      expect(settingsMutateAsyncMock).toHaveBeenCalledWith(
         expect.objectContaining({
           setup_wizard_state: "completed",
           configuration_backup_preferred_time: "03:30",
