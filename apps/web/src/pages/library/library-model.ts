@@ -1,7 +1,9 @@
+import { formatBytes } from "../../lib/format/bytes";
 import type {
   LibraryFile,
   LibraryModeSchedule,
   LibraryProblemKind,
+  LibraryTotals,
 } from "../../lib/processing/library-mode-api";
 import { parseAppDate } from "../../lib/ui/mm-format-date";
 import { plural } from "../../lib/ui/mm-plural";
@@ -49,7 +51,7 @@ export function groupFiles(files: LibraryFile[]): [string, LibraryFile[]][] {
 
 /** The table says what would happen in as few words as fit the column; the panel carries the whole sentence. */
 export function verdictOf(file: LibraryFile): string {
-  if (file.classification === "matches") return "Matches the rules";
+  if (file.classification === "matches") return "Matches your rules";
   if (file.classification === "cannot_process") {
     const text = (
       file.reason ??
@@ -68,6 +70,22 @@ export function verdictOf(file: LibraryFile): string {
     parts.push(plural(file.removed_subtitle_tracks, "subtitle", "subtitles"));
   }
   return parts.length ? `Removes ${parts.join(", ")}` : "Would change";
+}
+
+/**
+ * The line under the title: how much is here, and when Weir changes a file. With the daily clean on, Weir
+ * changes files without being asked, so the line must not promise otherwise.
+ */
+export function headerLead(
+  totals: LibraryTotals | undefined,
+  dailyClean: boolean,
+): string {
+  const when = dailyClean
+    ? "cleans what would change once a day, on this library’s schedule."
+    : "only changes one when you ask.";
+  return totals
+    ? `${totals.files.toLocaleString()} files, ${formatBytes(totals.size_bytes)} on your storage. Weir reads them where they are and ${when}`
+    : `Weir reads your library where it is and ${when}`;
 }
 
 /**

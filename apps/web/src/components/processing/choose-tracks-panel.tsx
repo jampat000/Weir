@@ -86,7 +86,7 @@ export function ChooseTracksPanel({
           <TrackTable choice={choice} />
           <OtherStreams tracks={choice.other} />
           <TrackOrder choice={choice} />
-          <DroppedTracks tracks={choice.dropped} />
+          <DroppedTracks choice={choice} />
 
           {choice.validationError ? (
             <FailedNote text={choice.validationError} />

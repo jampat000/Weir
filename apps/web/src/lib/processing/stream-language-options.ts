@@ -34,14 +34,3 @@ export const PROCESSING_STREAM_LANGUAGE_OPTIONS: readonly {
   { code: "msa", label: "Malay" },
   { code: "und", label: "Undetermined" },
 ] as const;
-
-export function processingStreamLanguageLabel(
-  code: string | null | undefined,
-): string {
-  const c = (code ?? "").trim().toLowerCase();
-  if (!c) {
-    return "—";
-  }
-  const hit = PROCESSING_STREAM_LANGUAGE_OPTIONS.find((o) => o.code === c);
-  return hit ? hit.label : c;
-}

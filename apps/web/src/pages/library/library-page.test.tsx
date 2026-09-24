@@ -338,6 +338,98 @@ describe("LibraryPage", () => {
     );
   });
 
+  it("cleans exactly the selection it confirmed, even if the checkboxes change before you confirm", () => {
+    // A second file to change the selection into, after the confirmation has already been asked for.
+    filesResult = {
+      ...filesResult,
+      files: [
+        ...filesResult.files,
+        file({
+          path: "D:/tv/The Quiet Harbour/Season 01/The.Quiet.Harbour.S01E03.mkv",
+        }),
+      ],
+      total: filesResult.files.length + 1,
+    };
+    clean.mockImplementation(
+      (
+        vars: { paths: string[]; confirm: boolean },
+        options?: { onSuccess?: (result: unknown) => void },
+      ) => {
+        if (!vars.confirm) {
+          options?.onSuccess?.({
+            kind: "confirmation_required",
+            detail: "",
+            files_count: vars.paths.length,
+            tracks_count: 1,
+            estimated_bytes_saved: 0,
+          });
+        }
+      },
+    );
+    renderLibrary();
+    const box = (name: string) =>
+      within(
+        screen
+          .getAllByTestId("library-row")
+          .find((row) => row.textContent?.includes(name))!,
+      ).getByRole("checkbox");
+
+    fireEvent.click(box("The.Quiet.Harbour.S01E01.mkv"));
+    fireEvent.click(screen.getByRole("button", { name: "Clean these files" }));
+
+    // Checking another file while the confirmation is open must not widen what gets cleaned (#700).
+    fireEvent.click(box("The.Quiet.Harbour.S01E03.mkv"));
+    fireEvent.click(screen.getByTestId("library-confirm-confirm"));
+
+    expect(clean).toHaveBeenLastCalledWith(
+      {
+        paths: [
+          "D:/tv/The Quiet Harbour/Season 01/The.Quiet.Harbour.S01E01.mkv",
+        ],
+        confirm: true,
+        manual: undefined,
+      },
+      expect.anything(),
+    );
+  });
+
+  it("shows a clean's warnings in its confirmation, before anything is cleaned", () => {
+    clean.mockImplementation(
+      (
+        vars: { confirm: boolean },
+        options?: { onSuccess?: (result: unknown) => void },
+      ) => {
+        if (!vars.confirm) {
+          options?.onSuccess?.({
+            kind: "confirmation_required",
+            detail: "",
+            files_count: 1,
+            tracks_count: 4,
+            estimated_bytes_saved: 0,
+            warnings: ["This file is still shared with a download."],
+          });
+        }
+      },
+    );
+    renderLibrary();
+    fireEvent.click(
+      within(
+        screen
+          .getAllByTestId("library-row")
+          .find((row) => row.textContent?.includes("S01E01.mkv"))!,
+      ).getByRole("checkbox"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Clean these files" }));
+
+    expect(screen.getByTestId("library-confirm-warnings")).toHaveTextContent(
+      "This file is still shared with a download.",
+    );
+    expect(clean).not.toHaveBeenCalledWith(
+      expect.objectContaining({ confirm: true }),
+      expect.anything(),
+    );
+  });
+
   it("opens a file and says track by track what would go, and why", async () => {
     renderLibrary();
 
@@ -350,7 +442,7 @@ describe("LibraryPage", () => {
       "Would remove 4 audio and 2 subtitle tracks",
     );
     await waitFor(() =>
-      expect(drawer).toHaveTextContent("English · EAC3 · 6ch"),
+      expect(drawer).toHaveTextContent("Audio 1 · English · 5.1 E-AC-3"),
     );
     expect(drawer).toHaveTextContent("Not a language your rules keep");
     expect(
@@ -359,19 +451,35 @@ describe("LibraryPage", () => {
   });
 
   it("lets you pick the tracks for one file yourself, and sends exactly those", async () => {
+    // Single-file clean asks the same confirmation as bulk clean (#690): the server is asked what the
+    // clean would remove before anything runs, and the actual clean only follows once that is confirmed.
+    clean.mockImplementation(
+      (
+        vars: { paths: string[]; confirm: boolean; manual?: unknown },
+        options?: { onSuccess?: (result: unknown) => void },
+      ) => {
+        if (!vars.confirm) {
+          options?.onSuccess?.({
+            kind: "confirmation_required",
+            detail: "",
+            files_count: vars.paths.length,
+            tracks_count: 1,
+            estimated_bytes_saved: 0,
+          });
+        }
+      },
+    );
     renderLibrary();
     fireEvent.click(
       screen.getByRole("button", { name: "The.Quiet.Harbour.S01E01.mkv" }),
     );
     const drawer = await screen.findByTestId("library-file-drawer");
     await waitFor(() =>
-      expect(drawer).toHaveTextContent("English · EAC3 · 6ch"),
+      expect(drawer).toHaveTextContent("Audio 1 · English · 5.1 E-AC-3"),
     );
 
     fireEvent.click(
-      within(drawer).getByRole("button", {
-        name: "Choose the tracks yourself",
-      }),
+      within(drawer).getByRole("button", { name: "Choose tracks" }),
     );
     // Seeded from what the rules would do, so "choose it yourself" starts from the answer you were shown.
     const boxes = within(drawer).getAllByRole("checkbox");
@@ -385,8 +493,12 @@ describe("LibraryPage", () => {
       within(drawer).getByRole("button", { name: "Clean with these tracks" }),
     );
 
-    expect(clean).toHaveBeenCalledTimes(1);
-    const [[sent]] = clean.mock.calls as [
+    const confirm = await screen.findByTestId("library-confirm");
+    fireEvent.click(within(confirm).getByTestId("library-confirm-confirm"));
+
+    expect(clean).toHaveBeenCalledTimes(2);
+    const [, [sent]] = clean.mock.calls as [
+      unknown,
       [{ paths: string[]; confirm: boolean; manual?: unknown }],
     ];
     expect(sent.paths).toEqual([
@@ -408,12 +520,10 @@ describe("LibraryPage", () => {
     );
     const drawer = await screen.findByTestId("library-file-drawer");
     await waitFor(() =>
-      expect(drawer).toHaveTextContent("English · EAC3 · 6ch"),
+      expect(drawer).toHaveTextContent("Audio 1 · English · 5.1 E-AC-3"),
     );
     fireEvent.click(
-      within(drawer).getByRole("button", {
-        name: "Choose the tracks yourself",
-      }),
+      within(drawer).getByRole("button", { name: "Choose tracks" }),
     );
     const clean1 = within(drawer).getByRole("button", {
       name: "Clean with these tracks",
@@ -432,7 +542,7 @@ describe("LibraryPage", () => {
     expect(drawer).toHaveTextContent("Keep at least one audio track");
   });
 
-  it("sets a file aside, and says so", async () => {
+  it("leaves a file alone, and says so", async () => {
     renderLibrary();
     fireEvent.click(
       screen.getByRole("button", { name: "The.Quiet.Harbour.S01E01.mkv" }),
@@ -440,7 +550,7 @@ describe("LibraryPage", () => {
     const drawer = await screen.findByTestId("library-file-drawer");
 
     fireEvent.click(
-      within(drawer).getByRole("checkbox", { name: /Leave this file alone/ }),
+      within(drawer).getByRole("checkbox", { name: /Left alone/ }),
     );
 
     expect(setAside).toHaveBeenCalledWith({
@@ -479,7 +589,9 @@ describe("LibraryPage", () => {
 
     const said = screen.getByTestId("library-outcome");
     expect(said).toHaveTextContent("1 file is queued to clean");
-    expect(said).toHaveTextContent("Weir left 1 alone: Northbound.S01E01.mkv");
+    expect(said).toHaveTextContent(
+      "Weir skipped 1 that is still seeding: Northbound.S01E01.mkv",
+    );
     expect(said).toHaveTextContent("still shared with a download");
   });
 

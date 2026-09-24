@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { describeTrack, positionsByKind } from "../../lib/format/track";
 import type {
   ProcessingFileTrack,
   ProcessingFileTracks,
@@ -27,16 +28,6 @@ function initialRowState(track: ProcessingFileTrack): RowState {
     default: track.rule_would_keep && track.default,
     forced: track.rule_would_keep && track.forced,
   };
-}
-
-export function trackLabel(track: ProcessingFileTrack): string {
-  const bits: string[] = [];
-  if (track.language) bits.push(track.language);
-  if (track.codec) bits.push(track.codec);
-  if (track.channels) bits.push(`${track.channels} ch`);
-  if (track.title) bits.push(`"${track.title}"`);
-  const detail = bits.length > 0 ? bits.join(" · ") : "no tags";
-  return `#${track.index} ${track.type} (${detail})`;
 }
 
 function validationOf(kept: ProcessingFileTrack[]): string | null {
@@ -72,6 +63,7 @@ export function useTrackChoice(tracks: ProcessingFileTracks | undefined) {
   }, [tracks]);
 
   const streams = tracks?.streams ?? [];
+  const positions = positionsByKind(streams);
   const selectable = streams.filter((track) => isSelectable(track.type));
   const other = streams.filter((track) => !isSelectable(track.type));
   const keptTracks = order
@@ -91,7 +83,8 @@ export function useTrackChoice(tracks: ProcessingFileTracks | undefined) {
     });
   };
 
-  const setDefault = (type: SelectableType, index: number) => {
+  /** Makes `index` the one default of its kind; null leaves that kind with no default at all. */
+  const setDefault = (type: SelectableType, index: number | null) => {
     setRows((previous) => {
       const next = { ...previous };
       for (const track of selectable) {
@@ -141,6 +134,16 @@ export function useTrackChoice(tracks: ProcessingFileTracks | undefined) {
 
   return {
     rows,
+    /** "Audio 2 · Japanese · 2.0 AAC": the track in words, numbered among its own kind. */
+    labelOf: (track: ProcessingFileTrack) =>
+      describeTrack(track, positions.get(track.index) ?? 1),
+    /** Whether a kept subtitle is marked default; with none, players show no subtitles until asked. */
+    hasDefaultSubtitle: selectable.some(
+      (track) =>
+        track.type === "subtitle" &&
+        (rows[track.index]?.keep ?? false) &&
+        (rows[track.index]?.default ?? false),
+    ),
     selectable,
     other,
     keptTracks,

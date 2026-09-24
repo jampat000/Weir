@@ -1,6 +1,15 @@
 import type { ProcessingFileTrack } from "../../lib/processing/files-api";
 import { plural } from "../../lib/ui/mm-plural";
-import { trackLabel, type TrackChoice } from "./use-track-choice";
+import type { TrackChoice } from "./use-track-choice";
+
+/** The table's column names, also shown beside each value once a narrow screen stacks the rows. */
+const COLUMNS = {
+  keep: "Keep",
+  track: "Track",
+  default: "Default",
+  forced: "Forced",
+  rule: "What the saved rules would do",
+} as const;
 
 function TrackRow({
   track,
@@ -11,46 +20,55 @@ function TrackRow({
 }) {
   const state = choice.rows[track.index];
   const kept = state?.keep ?? false;
-  const label = trackLabel(track);
+  const label = choice.labelOf(track);
   const type = track.type;
   return (
     <tr data-testid={`choose-tracks-row-${track.index}`}>
-      <td>
-        <input
-          type="checkbox"
-          checked={kept}
-          onChange={(e) => choice.setKeep(track, e.target.checked)}
-          aria-label={`Keep ${label}`}
-          data-testid={`choose-tracks-keep-${track.index}`}
-        />
-      </td>
-      <td className="mm-tracks-table__track">{label}</td>
-      <td>
-        {type === "audio" || type === "subtitle" ? (
-          <input
-            type="radio"
-            name={`choose-tracks-default-${type}`}
-            checked={state?.default ?? false}
-            disabled={!kept}
-            onChange={() => choice.setDefault(type, track.index)}
-            aria-label={`Make ${label} the default ${type} track`}
-            data-testid={`choose-tracks-default-${track.index}`}
-          />
-        ) : null}
-      </td>
-      <td>
-        {track.type === "subtitle" ? (
+      <td data-label={COLUMNS.keep}>
+        {/* The label is the target: a 24px square around a box drawn at the text's own size. */}
+        <label className="mm-tracks-check-target">
           <input
             type="checkbox"
-            checked={state?.forced ?? false}
-            disabled={!kept}
-            onChange={(e) => choice.setForced(track.index, e.target.checked)}
-            aria-label={`Mark ${label} forced`}
-            data-testid={`choose-tracks-forced-${track.index}`}
+            checked={kept}
+            onChange={(e) => choice.setKeep(track, e.target.checked)}
+            aria-label={`Keep ${label}`}
+            data-testid={`choose-tracks-keep-${track.index}`}
           />
+        </label>
+      </td>
+      <td data-label={COLUMNS.track} className="mm-tracks-table__track">
+        {label}
+      </td>
+      <td data-label={COLUMNS.default}>
+        {type === "audio" || type === "subtitle" ? (
+          <label className="mm-tracks-check-target">
+            <input
+              type="radio"
+              name={`choose-tracks-default-${type}`}
+              checked={state?.default ?? false}
+              disabled={!kept}
+              onChange={() => choice.setDefault(type, track.index)}
+              aria-label={`Make ${label} the default ${type} track`}
+              data-testid={`choose-tracks-default-${track.index}`}
+            />
+          </label>
         ) : null}
       </td>
-      <td className="mm-tracks-table__rule">
+      <td data-label={COLUMNS.forced}>
+        {track.type === "subtitle" ? (
+          <label className="mm-tracks-check-target">
+            <input
+              type="checkbox"
+              checked={state?.forced ?? false}
+              disabled={!kept}
+              onChange={(e) => choice.setForced(track.index, e.target.checked)}
+              aria-label={`Mark ${label} forced`}
+              data-testid={`choose-tracks-forced-${track.index}`}
+            />
+          </label>
+        ) : null}
+      </td>
+      <td data-label={COLUMNS.rule} className="mm-tracks-table__rule">
         <strong>{track.rule_would_keep ? "Would keep" : "Would remove"}</strong>{" "}
         — {track.rule_reason}
       </td>
@@ -58,18 +76,40 @@ function TrackRow({
   );
 }
 
-/** Every video, audio and subtitle track with its keep, default and forced choices. */
+/** Choosing one subtitle as the default can be undone: this is the choice of none. */
+function NoDefaultSubtitle({ choice }: { choice: TrackChoice }) {
+  if (!choice.selectable.some((track) => track.type === "subtitle")) {
+    return null;
+  }
+  return (
+    <label className="mm-tracks-no-default">
+      <input
+        type="radio"
+        name="choose-tracks-default-subtitle"
+        checked={!choice.hasDefaultSubtitle}
+        onChange={() => choice.setDefault("subtitle", null)}
+        data-testid="choose-tracks-default-none"
+      />
+      No default subtitle
+    </label>
+  );
+}
+
+/**
+ * Every video, audio and subtitle track with its keep, default and forced choices. On a narrow screen each
+ * row stacks into a card of labelled values rather than scrolling sideways.
+ */
 export function TrackTable({ choice }: { choice: TrackChoice }) {
   return (
     <div className="mm-tracks-table-wrap">
       <table className="mm-tracks-table">
         <thead>
           <tr>
-            <th scope="col">Keep</th>
-            <th scope="col">Track</th>
-            <th scope="col">Default</th>
-            <th scope="col">Forced</th>
-            <th scope="col">What the saved rules would do</th>
+            {Object.values(COLUMNS).map((column) => (
+              <th key={column} scope="col">
+                {column}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -78,9 +118,15 @@ export function TrackTable({ choice }: { choice: TrackChoice }) {
           ))}
         </tbody>
       </table>
+      <NoDefaultSubtitle choice={choice} />
     </div>
   );
 }
+
+const OTHER_KINDS: Record<string, string> = {
+  image: "Cover image",
+  attachment: "Attachment",
+};
 
 /** Images and attachments follow the saved rules, so they are listed but not offered. */
 export function OtherStreams({ tracks }: { tracks: ProcessingFileTrack[] }) {
@@ -90,16 +136,16 @@ export function OtherStreams({ tracks }: { tracks: ProcessingFileTrack[] }) {
       <summary>
         {plural(
           tracks.length,
-          "embedded image or attachment stream",
-          "embedded image or attachment streams",
+          "embedded image or attachment",
+          "embedded images or attachments",
         )}{" "}
-        not shown above — these are handled by the saved rules, not by this
-        choice
+        not shown above — the saved rules decide these, not this choice
       </summary>
       <ul>
         {tracks.map((track) => (
           <li key={track.index}>
-            #{track.index} {track.type} —{" "}
+            {OTHER_KINDS[track.type] ?? "Other stream"}
+            {track.title ? ` “${track.title}”` : ""} —{" "}
             {track.rule_would_keep ? "kept" : "removed"}: {track.rule_reason}
           </li>
         ))}
@@ -126,13 +172,13 @@ export function TrackOrder({ choice }: { choice: TrackChoice }) {
               key={track.index}
               data-testid={`choose-tracks-order-${track.index}`}
             >
-              <span>{trackLabel(track)}</span>
+              <span>{choice.labelOf(track)}</span>
               <span className="mm-tracks-order__buttons">
                 <button
                   type="button"
                   onClick={() => choice.move(track.index, -1)}
                   disabled={position === 0}
-                  aria-label={`Move ${trackLabel(track)} earlier`}
+                  aria-label={`Move ${choice.labelOf(track)} earlier`}
                   data-testid={`choose-tracks-move-up-${track.index}`}
                 >
                   ↑
@@ -141,7 +187,7 @@ export function TrackOrder({ choice }: { choice: TrackChoice }) {
                   type="button"
                   onClick={() => choice.move(track.index, 1)}
                   disabled={position === kept.length - 1}
-                  aria-label={`Move ${trackLabel(track)} later`}
+                  aria-label={`Move ${choice.labelOf(track)} later`}
                   data-testid={`choose-tracks-move-down-${track.index}`}
                 >
                   ↓
@@ -155,7 +201,8 @@ export function TrackOrder({ choice }: { choice: TrackChoice }) {
   );
 }
 
-export function DroppedTracks({ tracks }: { tracks: ProcessingFileTrack[] }) {
+export function DroppedTracks({ choice }: { choice: TrackChoice }) {
+  const tracks = choice.dropped;
   return (
     <section
       className="mm-tracks-dropped"
@@ -172,7 +219,7 @@ export function DroppedTracks({ tracks }: { tracks: ProcessingFileTrack[] }) {
           data-testid="choose-tracks-dropped-list"
         >
           {tracks.map((track) => (
-            <li key={track.index}>{trackLabel(track)}</li>
+            <li key={track.index}>{choice.labelOf(track)}</li>
           ))}
         </ul>
       )}
