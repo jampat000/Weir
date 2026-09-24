@@ -14,6 +14,9 @@ public sealed record LibraryScanJobView(long JobId, string Status, string? LastE
 /// <summary>The most recently created scan row for a library, whatever its status.</summary>
 public sealed record LibraryScanJobRow(long JobId, string Status, string? PayloadJson);
 
+/// <summary>When the library's scan index was made and what that scan could not do, without the index itself.</summary>
+public sealed record LibraryScanOutcome(DateTimeOffset GeneratedAt, IReadOnlyList<string> Errors);
+
 /// <summary>
 /// Requests a #505 library scan and reads back the latest one's result. Each request is an ordinary
 /// <see cref="LibraryModeJobKinds.ScanKind"/> job row; the newest completed row for a library is the file index / plan cache
@@ -164,53 +167,66 @@ public static class LibraryScanStore
     }
 
     /// <summary>
-    /// The latest completed scan's snapshot (the file index / plan cache), or null when nothing has ever
-    /// been scanned. The job payload carries only <c>generated_at</c>/<c>errors</c> (the file list lives in
-    /// <c>library_files</c>, #557), so those two come from the latest completed job's payload when it still
-    /// exists, but <c>library_files</c> itself is read unconditionally: job-row retention can prune the
-    /// tracking job long after a scan completed, and that must not lose the file index the scan produced.
+    /// When the library's file index was made and what that scan could not do, given its <paramref name="latest"/> scan
+    /// row; null when nothing has ever been scanned. The job payload carries only <c>generated_at</c>/<c>errors</c> (the
+    /// file list lives in <c>library_files</c>, #557). Job-row retention can prune the tracking job long after a scan
+    /// completed, so rows in <c>library_files</c> are proof on their own that one ran. Only their existence is read: the
+    /// Library screen asks for this on every refresh, and reading the index itself cost a full-table read (#709).
     /// </summary>
-    public static async Task<LibraryScanSnapshot?> LatestSnapshotAsync(UnitOfWork uow, long libraryId, ILogger logger)
+    public static async Task<LibraryScanOutcome?> OutcomeAsync(UnitOfWork uow, long libraryId, LibraryScanJobRow? latest, ILogger logger)
     {
-        var files = await FilesForLibraryAsync(uow, libraryId).ConfigureAwait(false);
-        var latest = await LatestAsync(uow, libraryId).ConfigureAwait(false);
+        ArgumentNullException.ThrowIfNull(uow);
+        ArgumentNullException.ThrowIfNull(logger);
         if (latest is not { Status: ProcessingJobStatus.Completed })
         {
-            // No completed job survives to say a scan ever ran. If library_files still has rows for this
-            // library (its own tracking job was pruned), that is itself proof one did; otherwise, nothing
-            // has been scanned yet.
-            return files.Count == 0 ? null : new LibraryScanSnapshot(libraryId, DateTimeOffset.UnixEpoch, files, []);
+            return await HasFilesAsync(uow, libraryId).ConfigureAwait(false)
+                ? new LibraryScanOutcome(DateTimeOffset.UnixEpoch, [])
+                : null;
         }
 
-        var generatedAt = DateTimeOffset.UnixEpoch;
-        IReadOnlyList<string> errors = [];
-        if (latest.PayloadJson is { Length: > 0 } json)
+        if (latest.PayloadJson is not { Length: > 0 } json)
         {
-            try
-            {
-                if (PyJsonParser.Parse(json) is PyDict dict && LibraryScanSnapshot.FromPayload(dict, libraryId) is { } parsed)
-                {
-                    generatedAt = parsed.GeneratedAt;
-                    errors = parsed.Errors;
-                }
-            }
-            catch (PyJsonDecodeException exception)
-            {
-                // The file index still comes from library_files; only the scan time and its errors are lost.
-                logger.LogWarning(exception, "Library scan job_id={JobId} has an unreadable payload; showing its files without the scan time or errors.", latest.JobId);
-            }
+            return new LibraryScanOutcome(DateTimeOffset.UnixEpoch, []);
         }
 
-        return new LibraryScanSnapshot(libraryId, generatedAt, files, errors);
+        try
+        {
+            return PyJsonParser.Parse(json) is PyDict dict && LibraryScanSnapshot.FromPayload(dict, libraryId) is { } parsed
+                ? new LibraryScanOutcome(parsed.GeneratedAt, parsed.Errors)
+                : new LibraryScanOutcome(DateTimeOffset.UnixEpoch, []);
+        }
+        catch (PyJsonDecodeException exception)
+        {
+            // The file index still comes from library_files; only the scan time and its errors are lost.
+            logger.LogWarning(exception, "Library scan job_id={JobId} has an unreadable payload; showing its files without the scan time or errors.", latest.JobId);
+            return new LibraryScanOutcome(DateTimeOffset.UnixEpoch, []);
+        }
     }
 
     /// <summary>
-    /// The library's current file index, which seeds the next scan's ffprobe cache. <c>library_files</c>
-    /// always holds whatever the previous scan recorded (a scan in progress has not written its own new rows
-    /// yet, #557), so this is simply the table's current contents for the library.
+    /// The library's current file index. <c>library_files</c> always holds whatever the previous scan recorded (a scan in
+    /// progress has not written its own new rows yet, #557), so this is simply the table's current contents for the
+    /// library: what the next scan's ffprobe cache is seeded from, and what a whole-library confirmation counts.
     /// </summary>
-    public static async Task<IReadOnlyList<LibraryScanFileEntry>> PreviousFilesForCacheAsync(UnitOfWork uow, long libraryId) =>
+    public static async Task<IReadOnlyList<LibraryScanFileEntry>> CurrentFilesAsync(UnitOfWork uow, long libraryId) =>
         await FilesForLibraryAsync(uow, libraryId).ConfigureAwait(false);
+
+    /// <summary>The index entries for <paramref name="paths"/>, keyed by path; a path the index does not hold is absent.</summary>
+    public static async Task<IReadOnlyDictionary<string, LibraryScanFileEntry>> FilesAtPathsAsync(UnitOfWork uow, long libraryId, IEnumerable<string> paths)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        ArgumentNullException.ThrowIfNull(paths);
+        var wanted = new PyList(paths.Distinct(StringComparer.Ordinal).Select(path => (PyJson)new PyStr(path)));
+        var rows = await uow.QueryAsync(
+            $"SELECT {FileColumns} FROM library_files WHERE library_id = @id AND path IN (SELECT value FROM json_each(@paths))",
+            ReadFile,
+            ("@id", libraryId),
+            ("@paths", PyJsonWriter.Dumps(wanted, PyJsonFormat.Compact))).ConfigureAwait(false);
+        return rows.ToDictionary(file => file.Path, StringComparer.Ordinal);
+    }
+
+    private static async Task<bool> HasFilesAsync(UnitOfWork uow, long libraryId) =>
+        await uow.CountAsync("SELECT EXISTS (SELECT 1 FROM library_files WHERE library_id = @id)", ("@id", libraryId)).ConfigureAwait(false) != 0;
 
     /// <summary>
     /// Records the job's own small outcome (<c>ok</c>/<c>reason</c>/<c>generated_at</c>/<c>errors</c>) on its
@@ -250,11 +266,15 @@ public static class LibraryScanStore
         await ReplaceFilesAsync(uow, snapshot.LibraryId, snapshot.Files).ConfigureAwait(false);
     }
 
+    /// <summary>The <c>library_files</c> columns <see cref="ReadFile"/> reads, in its order.</summary>
+    private const string FileColumns =
+        "path, size_bytes, mtime, classification, summary, reason, removed_audio_tracks, removed_subtitle_tracks, " +
+        "manager_kind, manager_title, probe_json, estimated_bytes_saved, manager_connection_id, manager_title_id, " +
+        "manager_file_id, manager_quality_profile_id, problem_kind, link_count";
+
     private static async Task<List<LibraryScanFileEntry>> FilesForLibraryAsync(UnitOfWork uow, long libraryId) =>
         await uow.QueryAsync(
-            "SELECT path, size_bytes, mtime, classification, summary, reason, removed_audio_tracks, removed_subtitle_tracks, " +
-            "manager_kind, manager_title, probe_json, estimated_bytes_saved, manager_connection_id, manager_title_id, " +
-            "manager_file_id, manager_quality_profile_id, problem_kind, link_count FROM library_files WHERE library_id = @id ORDER BY path",
+            $"SELECT {FileColumns} FROM library_files WHERE library_id = @id ORDER BY path",
             ReadFile,
             ("@id", libraryId)).ConfigureAwait(false);
 

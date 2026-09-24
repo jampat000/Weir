@@ -112,7 +112,7 @@ public sealed class LibraryScanHandler : IJobHandler
 
             var ruleSet = library.RuleSetId is { } ruleSetId ? await LibraryStore.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) : null;
             rules = ruleSet is not null ? RemuxPassPaths.RulesConfigFor(ruleSet) : RuleSetConversion.ToRulesConfig(null);
-            previousFiles = await LibraryScanStore.PreviousFilesForCacheAsync(uow, libraryId).ConfigureAwait(false);
+            previousFiles = await LibraryScanStore.CurrentFilesAsync(uow, libraryId).ConfigureAwait(false);
             connections = await _connections.ConnectionsForScopeAsync(uow, library.MediaType).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
         }

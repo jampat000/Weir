@@ -510,4 +510,80 @@ public sealed class LibraryViewApiTests
             body["page_size"]!.GetValue<int>().ToString(CultureInfo.InvariantCulture));
         Assert.Equal(1, body["page"]!.GetValue<int>());
     }
+
+    private static Task<long> SeedScanJobAsync(WeirTestServer server, long libraryId, string status, string payloadJson) =>
+        TestDatabase.ScalarAsync(
+            server,
+            "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status) VALUES ($dedupe, 'processing.library.scan.v1', $payload, $status) RETURNING id",
+            ("$dedupe", $"processing.library.scan.v1:{libraryId}:{Guid.NewGuid():N}"),
+            ("$payload", payloadJson),
+            ("$status", status));
+
+    [Fact]
+    public async Task Indexed_files_whose_scan_row_was_pruned_read_as_a_completed_scan_of_unknown_time()
+    {
+        var (server, client, libraryId) = await StartAsync();
+        await using var _ = server;
+        await SeedFileAsync(server, libraryId, "/lib/a.mkv", "matches", ShowProbe);
+
+        using var response = await client.GetAsync(FilesPath(libraryId));
+
+        var scan = (await Json(response))["scan"]!;
+        Assert.Null(scan["job_id"]);
+        Assert.Equal("completed", scan["status"]!.GetValue<string>());
+        Assert.False(scan["running"]!.GetValue<bool>());
+        Assert.Equal(0L, scan["generated_at"]!.GetValue<long>());
+        Assert.Empty(scan["errors"]!.AsArray());
+    }
+
+    [Fact]
+    public async Task The_latest_completed_scan_reports_its_time_and_what_it_could_not_do()
+    {
+        var (server, client, libraryId) = await StartAsync();
+        await using var _ = server;
+        var jobId = await SeedScanJobAsync(
+            server, libraryId, "completed", "{\"library_id\":1,\"ok\":true,\"scan_result\":{\"generated_at\":1700000000,\"errors\":[\"Radarr did not answer.\"]}}");
+
+        using var response = await client.GetAsync(ProblemsPath(libraryId));
+
+        var scan = (await Json(response))["scan"]!;
+        Assert.Equal(jobId, scan["job_id"]!.GetValue<long>());
+        Assert.Equal("completed", scan["status"]!.GetValue<string>());
+        Assert.False(scan["running"]!.GetValue<bool>());
+        Assert.Equal(1_700_000_000L, scan["generated_at"]!.GetValue<long>());
+        Assert.Equal(["Radarr did not answer."], scan["errors"]!.AsArray().Select(error => error!.GetValue<string>()));
+    }
+
+    [Fact]
+    public async Task A_queued_scan_over_an_existing_index_is_running_with_no_scan_time_yet()
+    {
+        var (server, client, libraryId) = await StartAsync();
+        await using var _ = server;
+        await SeedFileAsync(server, libraryId, "/lib/a.mkv", "matches", ShowProbe);
+        await SeedScanJobAsync(server, libraryId, "completed", "{\"scan_result\":{\"generated_at\":1700000000,\"errors\":[]}}");
+        var queued = await SeedScanJobAsync(server, libraryId, "pending", "{\"library_id\":1,\"trigger\":\"manual\"}");
+
+        using var response = await client.GetAsync(OverviewPath(libraryId));
+
+        var scan = (await Json(response))["scan"]!;
+        Assert.Equal(queued, scan["job_id"]!.GetValue<long>());
+        Assert.True(scan["running"]!.GetValue<bool>());
+        Assert.Equal(0L, scan["generated_at"]!.GetValue<long>());
+        Assert.Empty(scan["errors"]!.AsArray());
+    }
+
+    [Fact]
+    public async Task A_first_scan_still_queued_has_no_scan_time_at_all()
+    {
+        var (server, client, libraryId) = await StartAsync();
+        await using var _ = server;
+        await SeedScanJobAsync(server, libraryId, "pending", "{\"library_id\":1,\"trigger\":\"manual\"}");
+
+        using var response = await client.GetAsync(OverviewPath(libraryId));
+
+        var scan = (await Json(response))["scan"]!;
+        Assert.Equal("pending", scan["status"]!.GetValue<string>());
+        Assert.Null(scan["generated_at"]);
+        Assert.Empty(scan["errors"]!.AsArray());
+    }
 }
