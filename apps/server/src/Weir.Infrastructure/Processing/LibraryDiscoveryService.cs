@@ -29,11 +29,13 @@ public sealed class LibraryDiscoveryService
 {
     private readonly MediaManagerConnectionService _connections;
     private readonly IMediaManagerPorts _ports;
+    private readonly LibraryStore _libraries;
 
-    public LibraryDiscoveryService(MediaManagerConnectionService connections, IMediaManagerPorts ports)
+    public LibraryDiscoveryService(MediaManagerConnectionService connections, IMediaManagerPorts ports, LibraryStore libraries)
     {
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
         _ports = ports ?? throw new ArgumentNullException(nameof(ports));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
     }
 
     /// <summary>
@@ -114,7 +116,7 @@ public sealed class LibraryDiscoveryService
         ArgumentNullException.ThrowIfNull(connectionRow);
 
         var imported = new HashSet<(long? ConnectionId, string Key)>();
-        foreach (var row in await LibraryStore.ListAsync(uow).ConfigureAwait(false))
+        foreach (var row in await _libraries.ListAsync(uow).ConfigureAwait(false))
         {
             if (!string.IsNullOrEmpty(row.DiscoveredLibraryKey))
             {
@@ -195,7 +197,7 @@ public sealed class LibraryDiscoveryService
                 $"{connectionRow.Name} no longer reports a library with id {missing[0]}. Refresh the list and try again.");
         }
 
-        var existingLibraries = await LibraryStore.ListAsync(uow).ConfigureAwait(false);
+        var existingLibraries = await _libraries.ListAsync(uow).ConfigureAwait(false);
         var order = existingLibraries.Count == 0 ? 0 : existingLibraries.Max(row => row.DisplayOrder);
         var existingNames = existingLibraries.Select(row => row.Name).ToHashSet(StringComparer.Ordinal);
 
@@ -236,7 +238,7 @@ public sealed class LibraryDiscoveryService
                 DiscoveredLibraryKey = key,
             };
 
-            created.Add(await LibraryStore.CreateDiscoveredAsync(uow, row).ConfigureAwait(false));
+            created.Add(await _libraries.CreateDiscoveredAsync(uow, row).ConfigureAwait(false));
         }
 
         return created;
@@ -256,7 +258,7 @@ public sealed class LibraryDiscoveryService
             descriptorsByKey[descriptor.Key] = descriptor;
         }
 
-        var linked = (await LibraryStore.ListAsync(uow).ConfigureAwait(false))
+        var linked = (await _libraries.ListAsync(uow).ConfigureAwait(false))
             .Where(row => row.DiscoveredFromConnectionId == connectionRow.Id && !string.IsNullOrEmpty(row.DiscoveredLibraryKey))
             .ToList();
 
@@ -326,6 +328,6 @@ public sealed class LibraryDiscoveryService
     }
 
     /// <summary>Forgets where a library came from, keeping the library itself untouched.</summary>
-    public static Task<ProcessingLibraryRecord> UnlinkLibraryAsync(UnitOfWork uow, ProcessingLibraryRecord row) =>
-        LibraryStore.UnlinkAsync(uow, row);
+    public Task<ProcessingLibraryRecord> UnlinkLibraryAsync(UnitOfWork uow, ProcessingLibraryRecord row) =>
+        _libraries.UnlinkAsync(uow, row);
 }

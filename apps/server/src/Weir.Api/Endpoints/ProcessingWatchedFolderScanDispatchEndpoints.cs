@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
 using Weir.Core.Processing;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Jobs;
+using Weir.Infrastructure.Processing;
 
 namespace Weir.Api.Endpoints;
 
@@ -14,11 +16,25 @@ public static class ProcessingWatchedFolderScanDispatchEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingWatchedFolderScanDispatchEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("POST", "/processing/jobs/watched-folder-remux-scan-dispatch/enqueue", PostEnqueueAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<ProcessingWatchedFolderScanDispatchEndpointHandlers>();
+        endpoints.MapV1("POST", "/processing/jobs/watched-folder-remux-scan-dispatch/enqueue", handlers.PostEnqueueAsync);
         return endpoints;
     }
+}
 
-    private static async Task<ApiResult> PostEnqueueAsync(ApiRequest request)
+/// <summary>Handlers for <see cref="ProcessingWatchedFolderScanDispatchEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class ProcessingWatchedFolderScanDispatchEndpointHandlers
+{
+    private readonly ProcessingJobStore _jobs;
+    private readonly LibraryStore _libraries;
+
+    public ProcessingWatchedFolderScanDispatchEndpointHandlers(ProcessingJobStore jobs, LibraryStore libraries)
+    {
+        _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
+    }
+
+    public async Task<ApiResult> PostEnqueueAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -35,7 +51,7 @@ public static class ProcessingWatchedFolderScanDispatchEndpoints
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var (ok, error) = await ProcessingWatchedFolderScanDispatchEnqueue.ValidatePrerequisitesAsync(
-            uow, enqueueRemuxJobs, mediaScope, libraryId).ConfigureAwait(false);
+            uow, _libraries, enqueueRemuxJobs, mediaScope, libraryId).ConfigureAwait(false);
         if (!ok)
         {
             if (error == ScanDispatchPrerequisiteError.MissingOutputForLiveRemux)
@@ -49,9 +65,8 @@ public static class ProcessingWatchedFolderScanDispatchEndpoints
                 $"{label} watched folder is not set in saved path settings. This scan reads media files under that folder — configure it first.");
         }
 
-        var jobStore = request.Service<ProcessingJobStore>();
         var job = await ProcessingWatchedFolderScanDispatchEnqueue.EnqueueScanDispatchJobAsync(
-            uow, jobStore, enqueueRemuxJobs, "manual", mediaScope, libraryId).ConfigureAwait(false);
+            uow, _jobs, enqueueRemuxJobs, "manual", mediaScope, libraryId).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
 
         return ApiRoutes.Ok(new WireObject()

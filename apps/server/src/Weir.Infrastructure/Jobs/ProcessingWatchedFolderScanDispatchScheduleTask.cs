@@ -28,6 +28,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
     private readonly WeirOptions _options;
     private readonly ProcessingJobStore _jobStore;
     private readonly OperatorSettingsStore _operatorSettings;
+    private readonly LibraryStore _libraries;
     private readonly TimeProvider _time;
     private readonly ILogger<ProcessingWatchedFolderScanDispatchScheduleTask> _logger;
     private readonly Dictionary<long, DateTimeOffset> _nextRunByLibrary = [];
@@ -40,6 +41,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
         WeirOptions options,
         ProcessingJobStore jobStore,
         OperatorSettingsStore operatorSettings,
+        LibraryStore libraries,
         TimeProvider time,
         ILogger<ProcessingWatchedFolderScanDispatchScheduleTask> logger,
         ScanWakeups? wakeups = null,
@@ -51,6 +53,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _jobStore = jobStore ?? throw new ArgumentNullException(nameof(jobStore));
         _operatorSettings = operatorSettings ?? throw new ArgumentNullException(nameof(operatorSettings));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -143,7 +146,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
             try
             {
                 var (inserted, skip) = await ProcessingWatchedFolderScanDispatchEnqueue.TryEnqueuePeriodicAsync(
-                    uow, _jobStore, library, _options.ProcessingWatchedFolderRemuxScanDispatchPeriodicEnqueueRemuxJobs).ConfigureAwait(false);
+                    uow, _jobStore, _libraries, library, _options.ProcessingWatchedFolderRemuxScanDispatchPeriodicEnqueueRemuxJobs).ConfigureAwait(false);
                 await uow.CommitAsync().ConfigureAwait(false);
                 var activeSkip = !inserted && skip is not null && skip.StartsWith("active_scan_already_queued_", StringComparison.Ordinal);
                 nextDelay = activeSkip ? TimeSpan.FromSeconds(Math.Min(interval.TotalSeconds, 5.0)) : interval;
@@ -170,7 +173,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
             return (known.Libraries, known.Settings);
         }
 
-        var libraries = (await LibraryStore.ListAsync(uow, enabledOnly: true).ConfigureAwait(false))
+        var libraries = (await _libraries.ListAsync(uow, enabledOnly: true).ConfigureAwait(false))
             .Where(ScanDispatchScheduleGateEnabled)
             .ToList();
         var operatorSettings = await _operatorSettings.EnsureAsync(uow).ConfigureAwait(false);

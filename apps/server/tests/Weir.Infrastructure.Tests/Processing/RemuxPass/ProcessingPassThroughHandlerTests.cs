@@ -26,7 +26,7 @@ public sealed class ProcessingPassThroughHandlerTests : IDisposable
     }
 
     private ProcessingPassThroughHandler Handler() =>
-        new(_fixture.Store.Database, TimeProvider.System, NullLogger<ProcessingPassThroughHandler>.Instance, _fixture.Reporter);
+        new(_fixture.Store.Database, TimeProvider.System, NullLogger<ProcessingPassThroughHandler>.Instance, _fixture.Handback, _fixture.Libraries, _fixture.Reporter);
 
     private async Task<long> LibraryAsync(string collision = "replace")
     {

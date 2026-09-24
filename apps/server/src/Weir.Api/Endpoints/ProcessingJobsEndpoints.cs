@@ -38,26 +38,29 @@ public static class ProcessingJobsEndpoints
 internal sealed class ProcessingJobsEndpointHandlers
 {
     private readonly JobsInspectionStore _jobsInspection;
-    private readonly HandoffLedgerStore _handoffLedger;
-    private readonly HandoffCompletionReporter _handoffReporter;
+    private readonly PendingJobCancellation _pendingJobCancellation;
     private readonly ProcessingJobStore _jobs;
     private readonly HoldDiagnosticStore _holdDiagnostic;
     private readonly MediaManagerConnectionService _connections;
+    private readonly FileStateStore _files;
+    private readonly LibraryStore _libraries;
 
     public ProcessingJobsEndpointHandlers(
         JobsInspectionStore jobsInspection,
-        HandoffLedgerStore handoffLedger,
-        HandoffCompletionReporter handoffReporter,
+        PendingJobCancellation pendingJobCancellation,
         ProcessingJobStore jobs,
         HoldDiagnosticStore holdDiagnostic,
-        MediaManagerConnectionService connections)
+        MediaManagerConnectionService connections,
+        FileStateStore files,
+        LibraryStore libraries)
     {
         _jobsInspection = jobsInspection ?? throw new ArgumentNullException(nameof(jobsInspection));
-        _handoffLedger = handoffLedger ?? throw new ArgumentNullException(nameof(handoffLedger));
-        _handoffReporter = handoffReporter ?? throw new ArgumentNullException(nameof(handoffReporter));
+        _pendingJobCancellation = pendingJobCancellation ?? throw new ArgumentNullException(nameof(pendingJobCancellation));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _holdDiagnostic = holdDiagnostic ?? throw new ArgumentNullException(nameof(holdDiagnostic));
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
+        _files = files ?? throw new ArgumentNullException(nameof(files));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
     }
 
     private static WireObject JobOut(ProcessingJob job)
@@ -121,7 +124,7 @@ internal sealed class ProcessingJobsEndpointHandlers
         // together or not at all. Nothing here opens a second connection, so the session touch RequireUserAsync may have
         // written cannot hold a lock this handler then waits for.
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var result = await PendingJobCancellation.CancelAsync(uow, _handoffLedger, _handoffReporter, id).ConfigureAwait(false);
+        var result = await _pendingJobCancellation.CancelAsync(uow, id).ConfigureAwait(false);
         if (result.Outcome == JobActionOutcome.NotFound)
         {
             throw new ApiException(StatusCodes.Status404NotFound, "Job not found.");
@@ -183,9 +186,9 @@ internal sealed class ProcessingJobsEndpointHandlers
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var file = await FileStateStore.GetAsync(uow, id).ConfigureAwait(false)
+        var file = await _files.GetAsync(uow, id).ConfigureAwait(false)
             ?? throw new ApiException(StatusCodes.Status404NotFound, "Weir has no record of that file.");
-        var library = await LibraryStore.GetAsync(uow, file.LibraryId).ConfigureAwait(false)
+        var library = await _libraries.GetAsync(uow, file.LibraryId).ConfigureAwait(false)
             ?? throw new ApiException(StatusCodes.Status404NotFound, "The library this file belonged to no longer exists.");
 
         var outcome = await _holdDiagnostic.EvaluateAsync(uow, file, library, _connections, request.Context.RequestAborted).ConfigureAwait(false);

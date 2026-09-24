@@ -5,7 +5,6 @@ using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Rules;
 using Weir.Infrastructure.MediaManagers;
-using Weir.Infrastructure.Processing;
 
 namespace Weir.Infrastructure.Tests.MediaManagers;
 
@@ -107,7 +106,7 @@ public sealed class MediaManagerServiceTests
     {
         using var fixture = new MediaManagerFixture();
         var noSecretCipher = new Core.Security.CredentialCipher(null, null, [], TimeProvider.System);
-        var service = new MediaManagerConnectionService(fixture.Store.Options, noSecretCipher, fixture.Ports);
+        var service = new MediaManagerConnectionService(fixture.Store.Options, noSecretCipher, fixture.Ports, fixture.ConnectionStore);
 
         var created = await Assert.ThrowsAsync<MediaManagerConnectionException>(
             () => fixture.Db(uow => service.CreateAsync(uow, "radarr", "No Secret", "http://192.0.2.20:7878", "some-api-key")));
@@ -119,7 +118,7 @@ public sealed class MediaManagerServiceTests
         var id = await fixture.Db(uow => service.CreateAsync(uow, "radarr", "No Key Needed", "http://192.0.2.21:7878"));
         Assert.True(id > 0);
 
-        var row = (await fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id)))!;
+        var row = (await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id)))!;
         var updated = await Assert.ThrowsAsync<MediaManagerConnectionException>(
             () => fixture.Db(async uow => { await service.UpdateAsync(uow, row, apiKey: "new-key"); return 0; }));
         Assert.Equal(Core.Security.CredentialCipher.MissingSecretMessage, updated.Message);
@@ -196,8 +195,8 @@ public sealed class MediaManagerServiceTests
         using var fixture = new MediaManagerFixture();
         var id1 = await fixture.AddConnectionAsync("radarr", "1080p", "http://192.0.2.20:7878");
         var id2 = await fixture.AddConnectionAsync("radarr", "4K", "http://192.0.2.21:7878");
-        var row1 = (await fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id1)))!;
-        var row2 = (await fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id2)))!;
+        var row1 = (await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id1)))!;
+        var row2 = (await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id2)))!;
         var secret1 = await fixture.Db(uow => fixture.Connections.RotateWebhookSecretAsync(uow, row1));
         var secret2 = await fixture.Db(uow => fixture.Connections.RotateWebhookSecretAsync(uow, row2));
         Assert.NotEqual(secret1, secret2);
@@ -227,7 +226,7 @@ public sealed class MediaManagerServiceTests
     {
         using var fixture = new MediaManagerFixture();
         var id = await fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.10:5099/", "deluno_secret_key");
-        var saved = (await fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id)))!;
+        var saved = (await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id)))!;
         Assert.Equal("http://192.0.2.10:5099", saved.BaseUrl);
         Assert.Equal(["missing", "upgrade"], saved.Lanes.Select(l => l.Lane));
         Assert.Equal("deluno_secret_key", fixture.Cipher.Decrypt(saved.ApiKeyCiphertext));
@@ -239,10 +238,10 @@ public sealed class MediaManagerServiceTests
         await Assert.ThrowsAsync<MediaManagerConnectionException>(() => fixture.AddConnectionAsync("radarr", "  "));
 
         await fixture.Db(async uow => { await fixture.Connections.UpdateAsync(uow, saved, name: "Deluno renamed"); return 0; });
-        var renamed = (await fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id)))!;
+        var renamed = (await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id)))!;
         Assert.Equal(("Deluno renamed", saved.ApiKeyCiphertext), (renamed.Name, renamed.ApiKeyCiphertext));
         await fixture.Db(async uow => { await fixture.Connections.UpdateAsync(uow, renamed, apiKey: " "); return 0; });
-        Assert.Null((await fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id)))!.ApiKeyCiphertext);
+        Assert.Null((await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id)))!.ApiKeyCiphertext);
     }
 
     [Fact]
@@ -250,11 +249,11 @@ public sealed class MediaManagerServiceTests
     {
         using var fixture = new MediaManagerFixture();
         var id = await fixture.AddConnectionAsync("deluno", "Deluno");
-        var row = (await fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id)))!;
+        var row = (await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id)))!;
         Assert.True(fixture.Connections.WebhookSecretMatches(row, null));
         var secret = await fixture.Db(uow => fixture.Connections.RotateWebhookSecretAsync(uow, row));
         Assert.Matches("^[A-Za-z0-9_-]{43}$", secret);
-        var stored = (await fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id)))!;
+        var stored = (await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id)))!;
         Assert.DoesNotContain(secret, stored.WebhookSecretCiphertext, StringComparison.Ordinal);
         Assert.True(fixture.Connections.WebhookSecretMatches(stored, $" {secret} "));
         Assert.False(fixture.Connections.WebhookSecretMatches(stored, "wrong"));
@@ -265,8 +264,8 @@ public sealed class MediaManagerServiceTests
     {
         using var fixture = new MediaManagerFixture();
         await fixture.Store.Execute("DELETE FROM arr_library_operator_settings");
-        await fixture.Db(async uow => { await ArrLibraryOperatorSettingsStore.EnsureRowAsync(uow); return 0; });
-        await fixture.Db(async uow => { await ArrLibraryOperatorSettingsStore.EnsureRowAsync(uow); return 0; });
+        await fixture.Db(async uow => { await new ArrLibraryOperatorSettingsStore().EnsureRowAsync(uow); return 0; });
+        await fixture.Db(async uow => { await new ArrLibraryOperatorSettingsStore().EnsureRowAsync(uow); return 0; });
         Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM arr_library_operator_settings WHERE id = 1 AND radarr_missing_search_max_items_per_run = 50"));
     }
 
@@ -610,7 +609,7 @@ public sealed class MediaManagerServiceTests
         await fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, Handoff("h1", Path.Join(watched, "Film", "film.mkv"))));
         var job = Assert.Single(await fixture.Jobs.ListAsync());
 
-        var result = await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, fixture.Reporter, job.Id));
+        var result = await fixture.Db(uow => fixture.Cancellation.CancelAsync(uow, job.Id));
 
         Assert.Equal(JobActionOutcome.Ok, result.Outcome);
         Assert.Equal("h1", result.EndedHandoff?.HandoffId);
@@ -621,9 +620,9 @@ public sealed class MediaManagerServiceTests
         Assert.Equal("cancelled", (await fixture.Jobs.ListAsync()).Single().Status);
 
         // A job that is not pending is refused, and nothing changes.
-        var again = await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, fixture.Reporter, job.Id));
+        var again = await fixture.Db(uow => fixture.Cancellation.CancelAsync(uow, job.Id));
         Assert.Equal(JobActionOutcome.WrongStatus, again.Outcome);
-        Assert.Equal(JobActionOutcome.NotFound, (await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, fixture.Reporter, 999_999))).Outcome);
+        Assert.Equal(JobActionOutcome.NotFound, (await fixture.Db(uow => fixture.Cancellation.CancelAsync(uow, 999_999))).Outcome);
     }
 
     [Fact]
@@ -644,7 +643,7 @@ public sealed class MediaManagerServiceTests
         Assert.Equal("queued", (await fixture.Db(uow => fixture.Ledger.CurrentStatusAsync(uow, row))).State);
 
         var job = Assert.Single(await fixture.Jobs.ListAsync());
-        await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, fixture.Reporter, job.Id));
+        await fixture.Db(uow => fixture.Cancellation.CancelAsync(uow, job.Id));
 
         var ended = (await fixture.Db(uow => HandoffLedgerStore.FindAsync(uow, "deluno", "h2")))!;
         var status = await fixture.Db(uow => fixture.Ledger.CurrentStatusAsync(uow, ended));
@@ -668,7 +667,7 @@ public sealed class MediaManagerServiceTests
         Assert.Equal(2, jobs.Count);
 
         // One episode cancelled in Weir: the other is still queued, so the hand-off goes on.
-        var first = await fixture.Db(uow => PendingJobCancellation.CancelAsync(uow, fixture.Ledger, fixture.Reporter, jobs[0].Id));
+        var first = await fixture.Db(uow => fixture.Cancellation.CancelAsync(uow, jobs[0].Id));
         Assert.Null(first.EndedHandoff);
         var row = (await fixture.Db(uow => HandoffLedgerStore.FindAsync(uow, "deluno", "pack")))!;
         Assert.Equal("queued", (await fixture.Db(uow => fixture.Ledger.CurrentStatusAsync(uow, row))).State);
@@ -693,7 +692,7 @@ public sealed class MediaManagerServiceTests
         await Assert.ThrowsAsync<IntakeRefusedException>(() => instance.Db(async uow => { await instance.Intake.AuthoriseAsync(uow, "radarr", "wrong"); return 0; }));
         await instance.Db(async uow => { await instance.Intake.AuthoriseAsync(uow, "radarr", " s3cret "); return 0; });
         var id = await instance.AddConnectionAsync("deluno", "Deluno");
-        var row = (await instance.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id)))!;
+        var row = (await instance.Db(uow => instance.ConnectionStore.GetAsync(uow, id)))!;
         var secret = await instance.Db(uow => instance.Connections.RotateWebhookSecretAsync(uow, row));
         await Assert.ThrowsAsync<IntakeRefusedException>(() => instance.Db(async uow => { await instance.Intake.AuthoriseAsync(uow, "deluno", "s3cret"); return 0; }));
         await instance.Db(async uow => { await instance.Intake.AuthoriseAsync(uow, "deluno", secret); return 0; });
@@ -738,7 +737,7 @@ public sealed class MediaManagerServiceTests
         var stillUnsigned = await fixture.Db(uow => fixture.Intake.AuthoriseAsync(uow, "radarr", null));
         Assert.False(stillUnsigned.Authenticated);
 
-        var row = (await fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id)))!;
+        var row = (await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id)))!;
         var secret = await fixture.Db(uow => fixture.Connections.RotateWebhookSecretAsync(uow, row));
         var signed = await fixture.Db(uow => fixture.Intake.AuthoriseAsync(uow, "radarr", secret));
         Assert.True(signed.Authenticated);
@@ -784,12 +783,12 @@ public sealed class MediaManagerServiceTests
     {
         using var fixture = new MediaManagerFixture();
         var id = await fixture.AddConnectionAsync("deluno", "Deluno");
-        var row = (await fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id)))!;
+        var row = (await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id)))!;
         Assert.True(row.AcceptsUnsignedWebhooks);
         Assert.Contains("Create a secret and add it to Deluno", ((WireString)row.ToOut()["unsigned_webhook_warning"]).Value, StringComparison.Ordinal);
 
         await fixture.Db(uow => fixture.Connections.RotateWebhookSecretAsync(uow, row));
-        var secured = (await fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id)))!;
+        var secured = (await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id)))!;
         Assert.False(secured.AcceptsUnsignedWebhooks);
         Assert.Equal(WireNull.Instance, secured.ToOut()["unsigned_webhook_warning"]);
     }

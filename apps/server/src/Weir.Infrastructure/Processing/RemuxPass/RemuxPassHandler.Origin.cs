@@ -14,7 +14,7 @@ public sealed partial class RemuxPassHandler
             var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
             await using (uow.ConfigureAwait(false))
             {
-                var library = await ResolveLibraryAsync(uow, libraryId, mediaScope).ConfigureAwait(false);
+                var library = await ResolveLibraryAsync(uow, _libraries, libraryId, mediaScope).ConfigureAwait(false);
                 return await HandoffOriginCarry.FindAsync(uow, library?.Id ?? libraryId, rel, jobId).ConfigureAwait(false);
             }
         }

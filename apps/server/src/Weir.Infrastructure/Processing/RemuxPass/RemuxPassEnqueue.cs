@@ -39,6 +39,7 @@ public static class RemuxPassEnqueue
     public static async Task<ProcessingJob> EnqueueManualAsync(
         UnitOfWork uow,
         ProcessingJobStore jobs,
+        LibraryStore libraries,
         string relativeMediaPath,
         string mediaScope,
         long? libraryId,
@@ -46,7 +47,7 @@ public static class RemuxPassEnqueue
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(jobs);
-        var library = await RemuxPassHandler.ResolveLibraryAsync(uow, libraryId, mediaScope).ConfigureAwait(false);
+        var library = await RemuxPassHandler.ResolveLibraryAsync(uow, libraries, libraryId, mediaScope).ConfigureAwait(false);
         if (libraryId is not null && (library is null || library.Id != libraryId))
         {
             throw new RemuxPassEnqueueException(404, "The selected library no longer exists. Refresh Libraries and try again.");

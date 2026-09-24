@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Jobs;
@@ -12,7 +13,6 @@ using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.DirectPlay;
-using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Endpoints;
@@ -25,17 +25,50 @@ namespace Weir.Api.Endpoints;
 /// </summary>
 public static class ProcessingFilesEndpoints
 {
+    public static IEndpointRouteBuilder MapProcessingFilesEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var handlers = endpoints.ServiceProvider.GetRequiredService<ProcessingFilesEndpointHandlers>();
+        endpoints.MapV1("GET", "/processing/files", handlers.GetFilesAsync);
+        endpoints.MapV1("DELETE", "/processing/files/{file_id}", handlers.DeleteFileAsync);
+        endpoints.MapV1("POST", "/processing/files/{file_id}/move-to-top", handlers.MoveToTopAsync);
+        endpoints.MapV1("POST", "/processing/files/{file_id}/requeue", handlers.RequeueOneAsync);
+        endpoints.MapV1("POST", "/processing/files/requeue", handlers.RequeueManyAsync);
+        return endpoints;
+    }
+
+    /// <summary>Shared with <see cref="ProcessingFileLogEndpoints"/> and <see cref="ProcessingFileTracksEndpoints"/>.</summary>
+    internal static async Task<ProcessingFileRecord> RequireFileAsync(UnitOfWork uow, FileStateStore files, long id) =>
+        await files.GetAsync(uow, id).ConfigureAwait(false)
+        ?? throw new ApiException(StatusCodes.Status404NotFound, "Weir has no record of that file.");
+}
+
+/// <summary>Handlers for <see cref="ProcessingFilesEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class ProcessingFilesEndpointHandlers
+{
     /// <summary>The most files one bulk requeue takes, matching the most one list request returns.</summary>
     private const int BulkRequeueMaxFiles = 1000;
 
-    public static IEndpointRouteBuilder MapProcessingFilesEndpoints(this IEndpointRouteBuilder endpoints)
+    private readonly FileStateStore _files;
+    private readonly DirectPlayService _directPlay;
+    private readonly LiveProgressStore _liveProgress;
+    private readonly HandbackStore _handback;
+    private readonly ProcessingJobStore _jobs;
+    private readonly LibraryStore _libraries;
+
+    public ProcessingFilesEndpointHandlers(
+        FileStateStore files,
+        DirectPlayService directPlay,
+        LiveProgressStore liveProgress,
+        HandbackStore handback,
+        ProcessingJobStore jobs,
+        LibraryStore libraries)
     {
-        endpoints.MapV1("GET", "/processing/files", GetFilesAsync);
-        endpoints.MapV1("DELETE", "/processing/files/{file_id}", DeleteFileAsync);
-        endpoints.MapV1("POST", "/processing/files/{file_id}/move-to-top", MoveToTopAsync);
-        endpoints.MapV1("POST", "/processing/files/{file_id}/requeue", RequeueOneAsync);
-        endpoints.MapV1("POST", "/processing/files/requeue", RequeueManyAsync);
-        return endpoints;
+        _files = files ?? throw new ArgumentNullException(nameof(files));
+        _directPlay = directPlay ?? throw new ArgumentNullException(nameof(directPlay));
+        _liveProgress = liveProgress ?? throw new ArgumentNullException(nameof(liveProgress));
+        _handback = handback ?? throw new ArgumentNullException(nameof(handback));
+        _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
     }
 
     private static WireObject FileOut(ProcessingFileRecord row, string libraryName, List<DirectPlayBadge> directPlay, LiveProgress? progress)
@@ -87,7 +120,7 @@ public static class ProcessingFilesEndpoints
             .Set("last_attempt_at", row.LastAttemptAt?.ToWireText());
     }
 
-    private static async Task<ApiResult> GetFilesAsync(ApiRequest request)
+    public async Task<ApiResult> GetFilesAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -119,12 +152,12 @@ public static class ProcessingFilesEndpoints
             Since = withinDays is { } days ? Timestamp.FromUtc(request.Time.GetUtcNow().AddDays(-days).UtcDateTime) : null,
             Limit = limit,
         };
-        var rows = await FileStateStore.ListAsync(uow, filter).ConfigureAwait(false);
-        var libraryNames = await FileStateStore.LibraryNamesAsync(uow).ConfigureAwait(false);
+        var rows = await _files.ListAsync(uow, filter).ConfigureAwait(false);
+        var libraryNames = await _files.LibraryNamesAsync(uow).ConfigureAwait(false);
         var knownDevices = DeviceProfileLoader.Load(request.Options.WeirHome);
-        var devices = await DirectPlayService.SelectedProfilesAsync(uow, request.Service<SuiteSettingsStore>(), knownDevices).ConfigureAwait(false);
-        var progressByPath = request.Service<LiveProgressStore>().Snapshot();
-        var handbacks = await HandbackStore.ForLibrariesAsync(uow, rows.Select(row => row.LibraryId)).ConfigureAwait(false);
+        var devices = await _directPlay.SelectedProfilesAsync(uow, knownDevices).ConfigureAwait(false);
+        var progressByPath = _liveProgress.Snapshot();
+        var handbacks = await _handback.ForLibrariesAsync(uow, rows.Select(row => row.LibraryId)).ConfigureAwait(false);
 
         var files = new List<WireValue>();
         foreach (var row in rows)
@@ -137,7 +170,7 @@ public static class ProcessingFilesEndpoints
             files.Add(FileOut(row, libraryName, directPlay, progress).Set("handback", HandbackStore.ToOut(handback)));
         }
 
-        var counts = await FileStateStore.StatusCountsAsync(uow, libraryId).ConfigureAwait(false);
+        var counts = await _files.StatusCountsAsync(uow, libraryId).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
             .Set("files", new WireArray(files))
             .Set("status_counts", new WireObject().Also(dict =>
@@ -151,11 +184,7 @@ public static class ProcessingFilesEndpoints
             .Set("limit", limit));
     }
 
-    internal static async Task<ProcessingFileRecord> RequireFileAsync(UnitOfWork uow, long id) =>
-        await FileStateStore.GetAsync(uow, id).ConfigureAwait(false)
-        ?? throw new ApiException(StatusCodes.Status404NotFound, "Weir has no record of that file.");
-
-    private static async Task<ApiResult> DeleteFileAsync(ApiRequest request)
+    public async Task<ApiResult> DeleteFileAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -169,8 +198,8 @@ public static class ProcessingFilesEndpoints
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await RequireFileAsync(uow, id).ConfigureAwait(false);
-        await FileStateStore.ForgetAsync(uow, id).ConfigureAwait(false);
+        await ProcessingFilesEndpoints.RequireFileAsync(uow, _files, id).ConfigureAwait(false);
+        await _files.ForgetAsync(uow, id).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return new CustomApiResult(context =>
         {
@@ -179,7 +208,7 @@ public static class ProcessingFilesEndpoints
         });
     }
 
-    private static async Task<ApiResult> MoveToTopAsync(ApiRequest request)
+    public async Task<ApiResult> MoveToTopAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -193,7 +222,7 @@ public static class ProcessingFilesEndpoints
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await RequireFileAsync(uow, id).ConfigureAwait(false);
+        var row = await ProcessingFilesEndpoints.RequireFileAsync(uow, _files, id).ConfigureAwait(false);
         var job = await FindPendingRemuxJobAsync(uow, row.RelativePath).ConfigureAwait(false);
         if (job is null)
         {
@@ -203,13 +232,12 @@ public static class ProcessingFilesEndpoints
                 .Set("detail", "There is no queued work for this file to move. It may already be running, or it may not have been picked up by a scan yet."));
         }
 
-        var jobStore = request.Service<ProcessingJobStore>();
         // Commit before MoveToTopAsync, or the request deadlocks against the store's own connection:
         // RequireUserAsync may have refreshed user_sessions.last_seen_at, and that write holds SQLite's single
         // write lock until this commit runs, while the store's BEGIN IMMEDIATE waits for it. Everything above is
         // a read apart from that session touch, so committing here changes nothing else.
         await request.CommitAsync().ConfigureAwait(false);
-        var outcome = await jobStore.MoveToTopAsync(job.Value.Id).ConfigureAwait(false);
+        var outcome = await _jobs.MoveToTopAsync(job.Value.Id).ConfigureAwait(false);
         if (outcome != JobActionOutcome.Ok)
         {
             return ApiRoutes.Ok(new WireObject().Set("moved", false).Set("detail", "This file's work has already started, so it cannot be moved ahead of anything."));
@@ -251,7 +279,7 @@ public static class ProcessingFilesEndpoints
         return null;
     }
 
-    private static async Task<ApiResult> RequeueOneAsync(ApiRequest request)
+    public async Task<ApiResult> RequeueOneAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -265,13 +293,13 @@ public static class ProcessingFilesEndpoints
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await RequireFileAsync(uow, id).ConfigureAwait(false);
-        var result = await new RequeueStore(request.Service<ProcessingJobStore>()).RequeueFileAsync(uow, row).ConfigureAwait(false);
+        var row = await ProcessingFilesEndpoints.RequireFileAsync(uow, _files, id).ConfigureAwait(false);
+        var result = await new RequeueStore(_jobs, _libraries).RequeueFileAsync(uow, row).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject().Set("requeued", result.Requeued).Set("skipped", result.Skipped).Set("detail", result.Detail));
     }
 
-    private static async Task<ApiResult> RequeueManyAsync(ApiRequest request)
+    public async Task<ApiResult> RequeueManyAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -307,7 +335,7 @@ public static class ProcessingFilesEndpoints
         var uow = await request.DbAsync().ConfigureAwait(false);
         // file_ids is the exact set a person chose on screen, so the other filters still narrow it but the limit
         // never cuts it short.
-        var rows = await FileStateStore.ListAsync(uow, new ProcessingFileListFilter
+        var rows = await _files.ListAsync(uow, new ProcessingFileListFilter
         {
             LibraryId = libraryId,
             Status = fileStatus,
@@ -315,7 +343,7 @@ public static class ProcessingFilesEndpoints
             Ids = fileIds.Count > 0 ? fileIds : null,
             Limit = fileIds.Count > 0 ? BulkRequeueMaxFiles : (int)limit,
         }).ConfigureAwait(false);
-        var result = await new RequeueStore(request.Service<ProcessingJobStore>()).RequeueFilesAsync(uow, rows).ConfigureAwait(false);
+        var result = await new RequeueStore(_jobs, _libraries).RequeueFilesAsync(uow, rows).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject().Set("requeued", result.Requeued).Set("skipped", result.Skipped).Set("detail", result.Detail));
     }

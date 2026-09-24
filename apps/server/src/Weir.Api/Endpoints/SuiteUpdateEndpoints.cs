@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Weir.Api.Http;
 using Weir.Core;
@@ -16,15 +17,29 @@ public static class SuiteUpdateEndpoints
 {
     public static IEndpointRouteBuilder MapSuiteUpdateEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/suite/update-status", GetUpdateStatusAsync);
-        endpoints.MapV1("GET", "/suite/update-settings", GetUpdateSettingsAsync);
-        endpoints.MapV1("PUT", "/suite/update-settings", PutUpdateSettingsAsync);
-        endpoints.MapV1("GET", "/suite/update-state", GetUpdateStateAsync);
-        endpoints.MapV1("POST", "/suite/apply-update", PostApplyUpdateAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<SuiteUpdateEndpointHandlers>();
+        endpoints.MapV1("GET", "/suite/update-status", handlers.GetUpdateStatusAsync);
+        endpoints.MapV1("GET", "/suite/update-settings", handlers.GetUpdateSettingsAsync);
+        endpoints.MapV1("PUT", "/suite/update-settings", handlers.PutUpdateSettingsAsync);
+        endpoints.MapV1("GET", "/suite/update-state", handlers.GetUpdateStateAsync);
+        endpoints.MapV1("POST", "/suite/apply-update", handlers.PostApplyUpdateAsync);
         return endpoints;
     }
+}
 
-    private static async Task<ApiResult> GetUpdateStatusAsync(ApiRequest request)
+/// <summary>Handlers for <see cref="SuiteUpdateEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class SuiteUpdateEndpointHandlers
+{
+    private readonly IReleaseCatalogClient _releaseCatalog;
+    private readonly UpdateFiles _files;
+
+    public SuiteUpdateEndpointHandlers(IReleaseCatalogClient releaseCatalog, UpdateFiles files)
+    {
+        _releaseCatalog = releaseCatalog ?? throw new ArgumentNullException(nameof(releaseCatalog));
+        _files = files ?? throw new ArgumentNullException(nameof(files));
+    }
+
+    public async Task<ApiResult> GetUpdateStatusAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var installType = UpdateFiles.DetectInstallType(request.Options.RuntimeKind);
@@ -36,7 +51,7 @@ public static class SuiteUpdateEndpoints
 
         try
         {
-            var release = await request.Service<IReleaseCatalogClient>().FetchLatestAsync(currentVersion, request.Context.RequestAborted).ConfigureAwait(false);
+            var release = await _releaseCatalog.FetchLatestAsync(currentVersion, request.Context.RequestAborted).ConfigureAwait(false);
             return ApiRoutes.Ok(UpdateStatus.FromRelease(currentVersion, installType, release));
         }
         catch (ReleaseFetchException exception) when (exception.StatusCode == 404)
@@ -51,16 +66,16 @@ public static class SuiteUpdateEndpoints
         }
     }
 
-    private static async Task<ApiResult> GetUpdateSettingsAsync(ApiRequest request)
+    public async Task<ApiResult> GetUpdateSettingsAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var logger = request.LoggerFactory.CreateLogger("weir.platform.suite_settings.update_service");
-        return ApiRoutes.Ok(request.Service<UpdateFiles>().ReadSettings(path => logger.LogWarning(
+        return ApiRoutes.Ok(_files.ReadSettings(path => logger.LogWarning(
             "Update settings at {Path} could not be read. Falling back to notify-only so a damaged file cannot install an update the operator did not choose.",
             path)));
     }
 
-    private static async Task<ApiResult> PutUpdateSettingsAsync(ApiRequest request)
+    public async Task<ApiResult> PutUpdateSettingsAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
@@ -74,16 +89,16 @@ public static class SuiteUpdateEndpoints
         issues.ThrowIfAny();
 
         request.RequireConfirmationToken(csrfToken);
-        return ApiRoutes.Ok(request.Service<UpdateFiles>().WriteSettings(mode, checkOnStartup, interval));
+        return ApiRoutes.Ok(_files.WriteSettings(mode, checkOnStartup, interval));
     }
 
-    private static async Task<ApiResult> GetUpdateStateAsync(ApiRequest request)
+    public async Task<ApiResult> GetUpdateStateAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(request.Service<UpdateFiles>().ReadState());
+        return ApiRoutes.Ok(_files.ReadState());
     }
 
-    private static async Task<ApiResult> PostApplyUpdateAsync(ApiRequest request)
+    public async Task<ApiResult> PostApplyUpdateAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
@@ -94,14 +109,13 @@ public static class SuiteUpdateEndpoints
         issues.ThrowIfAny();
 
         request.RequireConfirmationToken(csrfToken);
-        var files = request.Service<UpdateFiles>();
-        var state = files.ReadState();
+        var state = _files.ReadState();
         if (!(state.Get("downloaded")?.IsTruthy ?? false))
         {
             throw new ApiException(StatusCodes.Status409Conflict, "No downloaded update is pending.");
         }
 
-        files.WriteApplyFlag();
+        _files.WriteApplyFlag();
         return ApiRoutes.Ok(state);
     }
 }

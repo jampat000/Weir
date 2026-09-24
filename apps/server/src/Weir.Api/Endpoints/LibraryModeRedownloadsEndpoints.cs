@@ -10,6 +10,7 @@ using Weir.Core.Rules;
 using Weir.Core.Validation;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.MediaManagers;
+using Weir.Infrastructure.Processing;
 using static Weir.Api.Endpoints.EndpointLookups;
 
 namespace Weir.Api.Endpoints;
@@ -37,14 +38,16 @@ internal sealed class LibraryModeRedownloadsEndpointHandlers
     private readonly IRemovedTrackStore _removedTrackStore;
     private readonly MediaManagerConnectionService _connections;
     private readonly IManagerRedownload _redownload;
+    private readonly LibraryStore _libraries;
 
     public LibraryModeRedownloadsEndpointHandlers(
-        LibraryScanStore scans, IRemovedTrackStore removedTrackStore, MediaManagerConnectionService connections, IManagerRedownload redownload)
+        LibraryScanStore scans, IRemovedTrackStore removedTrackStore, MediaManagerConnectionService connections, IManagerRedownload redownload, LibraryStore libraries)
     {
         _scans = scans ?? throw new ArgumentNullException(nameof(scans));
         _removedTrackStore = removedTrackStore ?? throw new ArgumentNullException(nameof(removedTrackStore));
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
         _redownload = redownload ?? throw new ArgumentNullException(nameof(redownload));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
     }
 
     private static WireObject RemovedTrackOut(RemovedTrackRecord track) => new WireObject()
@@ -69,8 +72,8 @@ internal sealed class LibraryModeRedownloadsEndpointHandlers
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
-        var rules = await LibraryModeMapping.RulesForAsync(uow, library).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, _libraries, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
+        var rules = await LibraryModeMapping.RulesForAsync(uow, _libraries, library).ConfigureAwait(false);
 
         var allRemoved = await _removedTrackStore.GetAllAsync().ConfigureAwait(false);
         var forLibrary = allRemoved.Where(kv => kv.Key.LibraryId == libraryId).ToDictionary(kv => kv.Key, kv => kv.Value);
@@ -134,7 +137,7 @@ internal sealed class LibraryModeRedownloadsEndpointHandlers
         }
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, _libraries, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
         var scanned = (await _scans.FilesAtPathsAsync(uow, libraryId, [path!]).ConfigureAwait(false)).GetValueOrDefault(path!);
 
         if (!ManagerRedownloadRules.CanRedownload(scanned?.ManagerKind, scanned?.ManagerConnectionId, scanned?.ManagerTitleId))

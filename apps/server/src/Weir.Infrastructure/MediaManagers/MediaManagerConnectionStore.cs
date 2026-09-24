@@ -83,10 +83,10 @@ public sealed record MediaManagerConnectionRecord(
 /// <summary>
 /// The legacy <c>arr_library_operator_settings</c> singleton that migration 0009 copied out of but did not drop.
 /// </summary>
-public static class ArrLibraryOperatorSettingsStore
+public sealed class ArrLibraryOperatorSettingsStore
 {
     /// <summary>Row 1 with its defaults, created when missing.</summary>
-    public static async Task EnsureRowAsync(UnitOfWork uow)
+    public async Task EnsureRowAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
         if (await uow.ScalarAsync("SELECT id FROM arr_library_operator_settings WHERE id = 1").ConfigureAwait(false) is null or DBNull)
@@ -97,7 +97,7 @@ public static class ArrLibraryOperatorSettingsStore
 }
 
 /// <summary>Explicit SQL over <c>media_manager_connections</c> and <c>media_manager_search_lanes</c>.</summary>
-public static class MediaManagerConnectionStore
+public sealed class MediaManagerConnectionStore
 {
     private const string ConnectionColumns =
         "id, kind, name, enabled, base_url, api_key_ciphertext, webhook_secret_ciphertext, " +
@@ -108,7 +108,7 @@ public static class MediaManagerConnectionStore
         "schedule_start, schedule_end, schedule_interval_seconds";
 
     /// <summary>Every connection with its lanes, by id.</summary>
-    public static async Task<List<MediaManagerConnectionRecord>> ListAsync(UnitOfWork uow)
+    public async Task<List<MediaManagerConnectionRecord>> ListAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var rows = await uow.QueryAsync($"SELECT {ConnectionColumns} FROM media_manager_connections ORDER BY id", ReadConnection).ConfigureAwait(false);
@@ -116,14 +116,14 @@ public static class MediaManagerConnectionStore
     }
 
     /// <summary>Enabled connections by id, without their lanes.</summary>
-    public static async Task<List<MediaManagerConnectionRecord>> ListEnabledAsync(UnitOfWork uow)
+    public async Task<List<MediaManagerConnectionRecord>> ListEnabledAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return await uow.QueryAsync($"SELECT {ConnectionColumns} FROM media_manager_connections WHERE enabled IS 1 ORDER BY id", ReadConnection).ConfigureAwait(false);
     }
 
     /// <summary>One connection with its lanes, or null.</summary>
-    public static async Task<MediaManagerConnectionRecord?> GetAsync(UnitOfWork uow, long connectionId)
+    public async Task<MediaManagerConnectionRecord?> GetAsync(UnitOfWork uow, long connectionId)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var row = await uow.QuerySingleAsync($"SELECT {ConnectionColumns} FROM media_manager_connections WHERE id = $id", ReadConnection, ("$id", connectionId)).ConfigureAwait(false);
@@ -131,7 +131,7 @@ public static class MediaManagerConnectionStore
     }
 
     /// <summary>The first enabled connection of a kind.</summary>
-    public static Task<MediaManagerConnectionRecord?> FirstEnabledForKindAsync(UnitOfWork uow, string kind)
+    public Task<MediaManagerConnectionRecord?> FirstEnabledForKindAsync(UnitOfWork uow, string kind)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QuerySingleAsync(
@@ -145,7 +145,7 @@ public static class MediaManagerConnectionStore
     /// connection's own secret was presented, so a second connection of the same kind (a 4K Radarr alongside a
     /// 1080p one, say) can authenticate too, not only <see cref="FirstEnabledForKindAsync"/>'s row (#544 item 6).
     /// </summary>
-    public static Task<List<MediaManagerConnectionRecord>> ListEnabledForKindAsync(UnitOfWork uow, string kind)
+    public Task<List<MediaManagerConnectionRecord>> ListEnabledForKindAsync(UnitOfWork uow, string kind)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QueryAsync(
@@ -155,7 +155,7 @@ public static class MediaManagerConnectionStore
     }
 
     /// <summary>Enabled connections that have a webhook secret saved.</summary>
-    public static Task<List<MediaManagerConnectionRecord>> ListEnabledWithWebhookSecretAsync(UnitOfWork uow)
+    public Task<List<MediaManagerConnectionRecord>> ListEnabledWithWebhookSecretAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QueryAsync(
@@ -163,7 +163,7 @@ public static class MediaManagerConnectionStore
             ReadConnection);
     }
 
-    public static async Task<bool> NameExistsAsync(UnitOfWork uow, string name, long? exceptId = null)
+    public async Task<bool> NameExistsAsync(UnitOfWork uow, string name, long? exceptId = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var id = await uow.ScalarAsync("SELECT id FROM media_manager_connections WHERE name = $name LIMIT 1", ("$name", name)).ConfigureAwait(false);
@@ -171,7 +171,7 @@ public static class MediaManagerConnectionStore
     }
 
     /// <summary>Insert a connection and its two default lanes; returns the new id.</summary>
-    public static async Task<long> InsertAsync(
+    public async Task<long> InsertAsync(
         UnitOfWork uow, string kind, string name, bool enabled, string baseUrl, string? apiKeyCiphertext, bool downloadedScanEnabled = false)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -199,7 +199,7 @@ public static class MediaManagerConnectionStore
     }
 
     /// <summary>Write the changed columns and stamp <c>updated_at</c>. Nothing changed, nothing written.</summary>
-    public static async Task UpdateColumnsAsync(UnitOfWork uow, long connectionId, IReadOnlyList<(string Column, object? Value)> changes)
+    public async Task UpdateColumnsAsync(UnitOfWork uow, long connectionId, IReadOnlyList<(string Column, object? Value)> changes)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(changes);
@@ -216,7 +216,7 @@ public static class MediaManagerConnectionStore
     }
 
     /// <summary>Delete the lanes first, then the connection, so no lane is left without its connection.</summary>
-    public static async Task DeleteAsync(UnitOfWork uow, long connectionId)
+    public async Task DeleteAsync(UnitOfWork uow, long connectionId)
     {
         ArgumentNullException.ThrowIfNull(uow);
         await uow.ExecuteAsync("DELETE FROM media_manager_search_lanes WHERE connection_id = $id", ("$id", connectionId)).ConfigureAwait(false);
@@ -224,7 +224,7 @@ public static class MediaManagerConnectionStore
     }
 
     /// <summary>The conditional test-result write: 0 when the connection was removed meanwhile.</summary>
-    public static Task<int> RecordTestResultAsync(UnitOfWork uow, long connectionId, bool ok, Timestamp checkedAt, string detail)
+    public Task<int> RecordTestResultAsync(UnitOfWork uow, long connectionId, bool ok, Timestamp checkedAt, string detail)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.ExecuteAsync(
@@ -236,7 +236,7 @@ public static class MediaManagerConnectionStore
             ("$id", connectionId));
     }
 
-    public static Task<MediaManagerSearchLaneRecord?> GetLaneAsync(UnitOfWork uow, long connectionId, string lane)
+    public Task<MediaManagerSearchLaneRecord?> GetLaneAsync(UnitOfWork uow, long connectionId, string lane)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QuerySingleAsync(
@@ -247,7 +247,7 @@ public static class MediaManagerConnectionStore
     }
 
     /// <summary>Save one lane whole: insert it when missing, otherwise update what changed.</summary>
-    public static async Task<MediaManagerSearchLaneRecord> SaveLaneAsync(UnitOfWork uow, MediaManagerSearchLaneRecord wanted)
+    public async Task<MediaManagerSearchLaneRecord> SaveLaneAsync(UnitOfWork uow, MediaManagerSearchLaneRecord wanted)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(wanted);
@@ -283,7 +283,7 @@ public static class MediaManagerConnectionStore
         return (await GetLaneAsync(uow, wanted.ConnectionId, wanted.Lane).ConfigureAwait(false))!;
     }
 
-    private static async Task<List<MediaManagerConnectionRecord>> WithLanesAsync(UnitOfWork uow, List<MediaManagerConnectionRecord> rows)
+    private async Task<List<MediaManagerConnectionRecord>> WithLanesAsync(UnitOfWork uow, List<MediaManagerConnectionRecord> rows)
     {
         if (rows.Count == 0)
         {

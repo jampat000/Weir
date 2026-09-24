@@ -47,6 +47,12 @@ public static class WeirPlatformServices
         services.TryAddSingleton<ConfigurationBundleConnections>();
         services.TryAddSingleton<ConfigurationBundleStore>();
 
+        // Processing's core file/library stores (#745 part 5): stateless SQL access over the caller's
+        // UnitOfWork, so a singleton is as cheap as a static class was. Reached from Jobs, LibraryMode,
+        // MediaManagers and Processing alike, so they live here rather than in any one area's own registration.
+        services.TryAddSingleton<LibraryStore>();
+        services.TryAddSingleton<FileStateStore>();
+
         // #555: WEIR_CHOWN_OUTPUT/WEIR_FILE_MODE_OUTPUT/WEIR_DIR_MODE_OUTPUT. Windows gets a no-op tools
         // implementation (there is no POSIX owner or mode there) and, when an operator actually set one of these,
         // a one-time warning at startup rather than a silent no-op.

@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Jobs;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 
 namespace Weir.Api.Endpoints;
@@ -14,11 +16,25 @@ public static class ProcessingRemuxPassEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingRemuxPassEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("POST", "/processing/jobs/file-remux-pass/enqueue", PostEnqueueAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<ProcessingRemuxPassEndpointHandlers>();
+        endpoints.MapV1("POST", "/processing/jobs/file-remux-pass/enqueue", handlers.PostEnqueueAsync);
         return endpoints;
     }
+}
 
-    private static async Task<ApiResult> PostEnqueueAsync(ApiRequest request)
+/// <summary>Handlers for <see cref="ProcessingRemuxPassEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class ProcessingRemuxPassEndpointHandlers
+{
+    private readonly ProcessingJobStore _jobs;
+    private readonly LibraryStore _libraries;
+
+    public ProcessingRemuxPassEndpointHandlers(ProcessingJobStore jobs, LibraryStore libraries)
+    {
+        _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
+    }
+
+    public async Task<ApiResult> PostEnqueueAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -38,7 +54,7 @@ public static class ProcessingRemuxPassEndpoints
         ProcessingJob job;
         try
         {
-            job = await RemuxPassEnqueue.EnqueueManualAsync(uow, request.Service<ProcessingJobStore>(), relativeMediaPath, mediaScope, libraryId, passThrough)
+            job = await RemuxPassEnqueue.EnqueueManualAsync(uow, _jobs, _libraries, relativeMediaPath, mediaScope, libraryId, passThrough)
                 .ConfigureAwait(false);
         }
         catch (RemuxPassEnqueueException exception)

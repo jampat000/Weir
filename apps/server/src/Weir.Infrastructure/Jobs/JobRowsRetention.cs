@@ -15,7 +15,7 @@ public sealed record JobRowsPruneCounts(int Processing, int HandoffLedger, int A
 /// rows past 90 days, and Activity past the suite's <c>activity_retention_days</c>, each a batch per transaction
 /// (<see cref="BatchedDeletes"/>).
 /// </summary>
-public static class JobRowsRetention
+public sealed class JobRowsRetention
 {
     /// <summary>How long terminal hand-off ledger rows are kept: hand-off answers outlive job rows on purpose (#480).</summary>
     public const int LedgerRetentionDays = 90;
@@ -26,11 +26,14 @@ public static class JobRowsRetention
     /// <summary>The ledger's terminal states.</summary>
     public static readonly IReadOnlyList<string> LedgerTerminalStates = ["cancelled", "completed", "failed", "passed-through", "rejected"];
 
+    private readonly ProcessingJobStore _queue;
+
+    public JobRowsRetention(ProcessingJobStore queue) => _queue = queue ?? throw new ArgumentNullException(nameof(queue));
+
     /// <summary>One retention tick: jobs, hand-off ledger and Activity.</summary>
-    public static async Task<JobRowsPruneCounts> RunTickAsync(ProcessingJobStore queue, int jobRowsRetentionDays, DateTimeOffset now, CancellationToken cancellationToken = default)
+    public async Task<JobRowsPruneCounts> RunTickAsync(int jobRowsRetentionDays, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(queue);
-        var database = queue.Database;
+        var database = _queue.Database;
         var processing = await PruneJobRowsAsync(database, now - TimeSpan.FromDays(jobRowsRetentionDays), cancellationToken).ConfigureAwait(false);
         var ledger = await PruneLedgerAsync(database, now, cancellationToken).ConfigureAwait(false);
         var activity = await PruneActivityAsync(database, await ActivityRetentionDaysAsync(database, cancellationToken).ConfigureAwait(false), now, cancellationToken)

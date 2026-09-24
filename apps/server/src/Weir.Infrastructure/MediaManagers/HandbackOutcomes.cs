@@ -26,11 +26,15 @@ public sealed record HandoffOutcomeResult(bool Released, string Message);
 public sealed class HandbackOutcomes
 {
     private readonly HandoffLedgerStore _ledger;
+    private readonly HandoffTargetStore _targets;
+    private readonly HandbackStore _handback;
     private readonly TimeProvider _time;
 
-    public HandbackOutcomes(HandoffLedgerStore ledger, TimeProvider time)
+    public HandbackOutcomes(HandoffLedgerStore ledger, HandoffTargetStore targets, HandbackStore handback, TimeProvider time)
     {
         _ledger = ledger ?? throw new ArgumentNullException(nameof(ledger));
+        _targets = targets ?? throw new ArgumentNullException(nameof(targets));
+        _handback = handback ?? throw new ArgumentNullException(nameof(handback));
         _time = time ?? throw new ArgumentNullException(nameof(time));
     }
 
@@ -56,7 +60,7 @@ public sealed class HandbackOutcomes
         }
 
         var now = _time.GetUtcNow();
-        await HandbackStore.RecordOutcomeAsync(uow, row.Id, HandbackRules.Imported, manager, now, importEvent.FilePath, null).ConfigureAwait(false);
+        await _handback.RecordOutcomeAsync(uow, row.Id, HandbackRules.Imported, manager, now, importEvent.FilePath, null).ConfigureAwait(false);
         if (row.SettledAt is not null)
         {
             // Weir already stopped looking after this copy (the Cleanup job removed it, say): the import is recorded, and
@@ -69,7 +73,7 @@ public sealed class HandbackOutcomes
         var release = authenticated
             ? HandbackStore.Release(row, manager, importEvent.FilePath)
             : new HandbackRelease(HandbackReleaseKind.Kept, HandbackRules.UnsignedNote(manager));
-        await HandbackStore.RecordReleaseAsync(uow, row.Id, release, now).ConfigureAwait(false);
+        await _handback.RecordReleaseAsync(uow, row.Id, release, now).ConfigureAwait(false);
         await RecordActivityAsync(uow, manager, HandbackRules.Imported, row.LibraryId, row.RelativePath, importEvent.FilePath, null, release.Removed, release.Note, "webhook")
             .ConfigureAwait(false);
         return new ManagerImportResult(true, release.Removed, release.Note, row.RelativePath);
@@ -92,16 +96,16 @@ public sealed class HandbackOutcomes
         string? firstKeptNote = null;
         if (row.LibraryId is { } libraryId)
         {
-            var wasReported = await HandoffTargetStore.ReportedCopiesAsync(uow, row).ConfigureAwait(false);
+            var wasReported = await _targets.ReportedCopiesAsync(uow, row).ConfigureAwait(false);
             foreach (var file in await HandoffLedgerStore.FileRowsAsync(uow, row).ConfigureAwait(false))
             {
-                var copy = await HandbackStore.FindAsync(uow, libraryId, file.RelativePath).ConfigureAwait(false);
+                var copy = await _handback.FindAsync(uow, libraryId, file.RelativePath).ConfigureAwait(false);
                 if (copy is null || !wasReported(copy))
                 {
                     continue;
                 }
 
-                await HandbackStore.RecordOutcomeAsync(uow, copy.Id, outcome, manager, occurredAt, importedPath, reason).ConfigureAwait(false);
+                await _handback.RecordOutcomeAsync(uow, copy.Id, outcome, manager, occurredAt, importedPath, reason).ConfigureAwait(false);
                 HandbackRelease release;
                 if (outcome == HandbackRules.NotImported)
                 {
@@ -118,7 +122,7 @@ public sealed class HandbackOutcomes
                     release = HandbackStore.Release(copy, manager, importedPath);
                 }
 
-                await HandbackStore.RecordReleaseAsync(uow, copy.Id, release, now).ConfigureAwait(false);
+                await _handback.RecordReleaseAsync(uow, copy.Id, release, now).ConfigureAwait(false);
                 switch (release.Kind)
                 {
                     case HandbackReleaseKind.Removed:
@@ -148,11 +152,11 @@ public sealed class HandbackOutcomes
     /// translation <c>HandoffCompletionReporter.TranslateOutputPath</c> makes is reversed from the other end). Then by the
     /// manager's download id, when a hand-off recorded it.
     /// </summary>
-    private static async Task<HandbackRow?> MatchAsync(UnitOfWork uow, MediaManagerImportEvent importEvent)
+    private async Task<HandbackRow?> MatchAsync(UnitOfWork uow, MediaManagerImportEvent importEvent)
     {
         if (!string.IsNullOrWhiteSpace(importEvent.SourcePath) && HandbackRules.FileName(importEvent.SourcePath) is { Length: > 0 } name)
         {
-            var rows = await HandbackStore.WithFileNameAsync(uow, name).ConfigureAwait(false);
+            var rows = await _handback.WithFileNameAsync(uow, name).ConfigureAwait(false);
             var exact = rows.Where(row => HandbackRules.SameManagerPath(importEvent.SourcePath, row.OutputPath)).ToList();
             var candidates = exact.Count > 0
                 ? exact
@@ -175,7 +179,7 @@ public sealed class HandbackOutcomes
 
                 foreach (var file in await HandoffLedgerStore.FileRowsAsync(uow, handoff).ConfigureAwait(false))
                 {
-                    if (await HandbackStore.FindAsync(uow, libraryId, file.RelativePath).ConfigureAwait(false) is { } copy)
+                    if (await _handback.FindAsync(uow, libraryId, file.RelativePath).ConfigureAwait(false) is { } copy)
                     {
                         found.Add(copy);
                     }

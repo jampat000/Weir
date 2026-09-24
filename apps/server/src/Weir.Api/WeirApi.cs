@@ -38,6 +38,9 @@ public static class WeirApi
         services.AddSingleton<AuthRateLimiters>();
         services.AddSingleton<SetupCodeGate>();
         services.AddSingleton<ConfigurationBackups>();
+        // The processing.progress SSE stream (#745 part 5): wraps LiveProgressStore so the one caller that
+        // frames it takes a single dependency instead of holding the store only to forward it.
+        services.TryAddSingleton<ActivityProgressFrames>();
 
         // Endpoint handler groups: one instance per group, constructor-injected with the stores it needs.
         services.AddSingleton<AuthAccountEndpointHandlers>();
@@ -46,8 +49,13 @@ public static class WeirApi
         services.AddSingleton<ActivityEndpointHandlers>();
         services.AddSingleton<NotificationEndpointHandlers>();
         services.AddSingleton<SuiteConfigurationEndpointHandlers>();
+        services.AddSingleton<SuiteDiagnosticsEndpointHandlers>();
+        services.AddSingleton<SuiteFileEndpointHandlers>();
+        services.AddSingleton<SuiteUpdateEndpointHandlers>();
         services.AddSingleton<SuiteOperationalHistoryEndpointHandlers>();
         services.AddSingleton<SuitePauseEndpointHandlers>();
+        services.AddSingleton<MediaManagerConnectionsEndpointHandlers>();
+        services.AddSingleton<MediaManagerIntakeEndpointHandlers>();
         services.AddSingleton<UpdateFiles>();
         services.AddSingleton<IReleaseCatalogClient, GitHubReleaseCatalogClient>();
         services.AddSingleton<IExternalJsonPoster, ExternalJsonPoster>();

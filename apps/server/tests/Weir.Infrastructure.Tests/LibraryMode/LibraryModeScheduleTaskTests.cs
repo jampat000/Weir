@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.LibraryMode;
 using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.LibraryMode;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Tests.MediaManagers;
 
@@ -17,11 +18,12 @@ public sealed class LibraryModeScheduleTaskTests : IDisposable
     private readonly SuiteSettingsStore _suiteSettings = new(new AuthStore());
     private readonly LibraryScanStore _scans = new();
     private readonly LibrarySettingsStore _librarySettings = new();
+    private readonly LibraryStore _libraries = new();
 
     public void Dispose() => _fixture.Dispose();
 
     private LibraryModeScheduleTask Timer() => new(
-        _fixture.Store.Database, _fixture.Jobs, _scans, _librarySettings, _fixture.Store.Clock, _suiteSettings, NullLogger<LibraryModeScheduleTask>.Instance);
+        _fixture.Store.Database, _fixture.Jobs, _scans, _librarySettings, _libraries, _fixture.Store.Clock, _suiteSettings, NullLogger<LibraryModeScheduleTask>.Instance);
 
     private async Task<long> LibraryAsync(bool scheduleOn = true, bool withFolder = true, string name = "Films")
     {
@@ -50,7 +52,7 @@ public sealed class LibraryModeScheduleTaskTests : IDisposable
                 uow,
                 _suiteSettings,
                 _scans,
-                (await Weir.Infrastructure.Processing.LibraryStore.GetAsync(uow, library))!,
+                (await _libraries.GetAsync(uow, library))!,
                 await _librarySettings.GetAsync(uow, library),
                 _fixture.Store.Clock.GetUtcNow()),
             commit: false);

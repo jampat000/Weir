@@ -32,7 +32,7 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
         var cipher = new CredentialCipher(store.Options.CredentialsSecret, store.Options.SessionSecret, store.Options.PreviousCredentialsSecrets, store.Clock);
         var http = new FakeManagerHttp();
         var ports = new HttpMediaManagerPorts(http);
-        var connections = new MediaManagerConnectionService(store.Options, cipher, ports);
+        var connections = new MediaManagerConnectionService(store.Options, cipher, ports, new MediaManagerConnectionStore());
         var cleanup = new TvSeasonFolderCleanup(store.Database, connections, store.Clock, NullLogger<TvSeasonFolderCleanup>.Instance);
         var jobs = new ProcessingJobStore(store.Database, store.Clock);
         return (store, cleanup, http, connections, jobs);

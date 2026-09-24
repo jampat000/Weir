@@ -50,6 +50,7 @@ public static class WeirJobs
         // Recovery runs in the background (#718) and completes before either worker lane claims its first job.
         services.AddSingleton<JobsStartupRecoveryService>();
         services.AddHostedService(sp => sp.GetRequiredService<JobsStartupRecoveryService>());
+        services.TryAddSingleton<JobRowsRetention>();
         services.AddSingleton<IPeriodicTask, JobRowsRetentionTask>();
         services.AddWeirPeriodicTasks();
         // When each Cleanup family next runs, for Settings › Cleanup.

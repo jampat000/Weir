@@ -14,7 +14,7 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
     private readonly StoreFixture _target = new();
     private readonly ITimeZoneResolver _zones = new IanaTimeZoneResolver();
     private readonly ConfigurationBundleStore _bundle =
-        new(new SuiteSettingsStore(new AuthStore()), new ConfigurationBundleConnections(new NotificationChannelStore()));
+        new(new SuiteSettingsStore(new AuthStore()), new ConfigurationBundleConnections(new NotificationChannelStore(), new Weir.Infrastructure.MediaManagers.MediaManagerConnectionStore()));
 
     public void Dispose()
     {

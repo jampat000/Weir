@@ -24,13 +24,14 @@ namespace Weir.Infrastructure.Tests.Processing;
 public sealed class ProcessingWatchedFolderWatcherServiceTests
 {
     private const string ScanJobKind = ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch;
+    private static readonly LibraryStore Libraries = new();
 
     private static async Task<long> CreateLibraryAsync(
         StoreFixture store, string watched, string output, bool fileSystemEventsEnabled = true)
     {
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
-        var seeded = await LibraryStore.SeededForScopeAsync(uow, ProcessingMediaScopes.Movie) ?? throw new InvalidOperationException("No seeded Movies library.");
-        var updated = await LibraryStore.UpdateAsync(uow, seeded, new ProcessingLibraryInput
+        var seeded = await Libraries.SeededForScopeAsync(uow, ProcessingMediaScopes.Movie) ?? throw new InvalidOperationException("No seeded Movies library.");
+        var updated = await Libraries.UpdateAsync(uow, seeded, new ProcessingLibraryInput
         {
             Name = seeded.Name,
             MediaType = ProcessingMediaScopes.Movie,
@@ -59,7 +60,7 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
     }
 
     private static ProcessingWatchedFolderWatcherService Service(StoreFixture store, WatcherStateStore state, TimeProvider? time = null) =>
-        new(store.Database, store.Options, new ProcessingJobStore(store.Database, time ?? TimeProvider.System), state,
+        new(store.Database, store.Options, new ProcessingJobStore(store.Database, time ?? TimeProvider.System), state, Libraries,
             time ?? TimeProvider.System, NullLogger<ProcessingWatchedFolderWatcherService>.Instance);
 
     // --- one admission implementation: a settled burst becomes one scan --------------------------------
@@ -278,7 +279,7 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
         var state = new WatcherStateStore();
         var changes = new ScanSettingsChanges();
         var service = new ProcessingWatchedFolderWatcherService(
-            store.Database, store.Options, new ProcessingJobStore(store.Database, time), state,
+            store.Database, store.Options, new ProcessingJobStore(store.Database, time), state, Libraries,
             time, NullLogger<ProcessingWatchedFolderWatcherService>.Instance, changes);
         await service.StartAsync(CancellationToken.None);
         try
@@ -388,7 +389,7 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
         await CreateLibraryAsync(store, watched, output);
 
         var service = new FakeWatcherService(store.Database, store.Options, new ProcessingJobStore(store.Database, TimeProvider.System),
-            new WatcherStateStore(), TimeProvider.System, NullLogger<ProcessingWatchedFolderWatcherService>.Instance);
+            new WatcherStateStore(), Libraries, TimeProvider.System, NullLogger<ProcessingWatchedFolderWatcherService>.Instance);
         await service.StartAsync(CancellationToken.None);
         try
         {
@@ -419,9 +420,9 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
     }
 
     private sealed class FakeWatcherService(
-        SqliteDatabase database, Weir.Core.Configuration.WeirOptions options, ProcessingJobStore jobStore, WatcherStateStore state, TimeProvider time,
-        Microsoft.Extensions.Logging.ILogger<ProcessingWatchedFolderWatcherService> logger)
-        : ProcessingWatchedFolderWatcherService(database, options, jobStore, state, time, logger)
+        SqliteDatabase database, Weir.Core.Configuration.WeirOptions options, ProcessingJobStore jobStore, WatcherStateStore state, LibraryStore libraries,
+        TimeProvider time, Microsoft.Extensions.Logging.ILogger<ProcessingWatchedFolderWatcherService> logger)
+        : ProcessingWatchedFolderWatcherService(database, options, jobStore, state, libraries, time, logger)
     {
         private readonly ConcurrentDictionary<string, List<FakeFileSystemWatcher>> _created = new(StringComparer.Ordinal);
 

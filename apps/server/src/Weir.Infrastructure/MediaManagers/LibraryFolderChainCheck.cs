@@ -19,20 +19,22 @@ public sealed class LibraryFolderChainCheck
 {
     private readonly ManagerSetupCheck _managerSetupCheck;
     private readonly DownloadClientSuggestions _downloadClientSuggestions;
+    private readonly LibraryStore _libraries;
     private readonly WeirOptions _options;
     private readonly IFolderProbe _probe;
 
-    public LibraryFolderChainCheck(ManagerSetupCheck managerSetupCheck, DownloadClientSuggestions downloadClientSuggestions, WeirOptions options)
-        : this(managerSetupCheck, downloadClientSuggestions, options, new FilesystemFolderProbe())
+    public LibraryFolderChainCheck(ManagerSetupCheck managerSetupCheck, DownloadClientSuggestions downloadClientSuggestions, LibraryStore libraries, WeirOptions options)
+        : this(managerSetupCheck, downloadClientSuggestions, libraries, options, new FilesystemFolderProbe())
     {
     }
 
     /// <summary>For tests: the filesystem comes from <paramref name="probe"/> instead of the real disk.</summary>
     internal LibraryFolderChainCheck(
-        ManagerSetupCheck managerSetupCheck, DownloadClientSuggestions downloadClientSuggestions, WeirOptions options, IFolderProbe probe)
+        ManagerSetupCheck managerSetupCheck, DownloadClientSuggestions downloadClientSuggestions, LibraryStore libraries, WeirOptions options, IFolderProbe probe)
     {
         _managerSetupCheck = managerSetupCheck ?? throw new ArgumentNullException(nameof(managerSetupCheck));
         _downloadClientSuggestions = downloadClientSuggestions ?? throw new ArgumentNullException(nameof(downloadClientSuggestions));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _probe = probe ?? throw new ArgumentNullException(nameof(probe));
     }
@@ -98,7 +100,7 @@ public sealed class LibraryFolderChainCheck
     public async Task<List<WireObject>> CheckForConnectionAsync(UnitOfWork uow, long connectionId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        var libraries = await LibraryStore.LibrariesForConnectionIdAsync(uow, connectionId).ConfigureAwait(false);
+        var libraries = await _libraries.LibrariesForConnectionIdAsync(uow, connectionId).ConfigureAwait(false);
         var results = new List<WireObject>();
         foreach (var library in libraries)
         {

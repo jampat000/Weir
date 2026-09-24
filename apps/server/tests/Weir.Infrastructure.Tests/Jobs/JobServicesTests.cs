@@ -7,6 +7,7 @@ using Weir.Core.Workers;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.LibraryMode;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Tests.Jobs;
@@ -15,6 +16,9 @@ namespace Weir.Infrastructure.Tests.Jobs;
 public sealed class JobServicesTests : IDisposable
 {
     private readonly JobsTestDatabase _db = new(keepSeedRows: true);
+    private readonly JobRowsRetention _retention;
+
+    public JobServicesTests() => _retention = new JobRowsRetention(_db.Store);
 
     public void Dispose() => _db.Dispose();
 
@@ -113,7 +117,7 @@ public sealed class JobServicesTests : IDisposable
         _db.Execute("UPDATE jobs SET updated_at = '2025-01-01 00:00:00' WHERE dedupe_key LIKE 'old-%'");
         _db.Execute("INSERT INTO activity_events (created_at, event_type, module, title) VALUES ('2025-01-01 00:00:00', 'x', 'processing', 'old'), (CURRENT_TIMESTAMP, 'x', 'processing', 'new')");
 
-        var counts = await JobRowsRetention.RunTickAsync(_db.Store, 90, DateTimeOffset.UtcNow);
+        var counts = await _retention.RunTickAsync(90, DateTimeOffset.UtcNow);
 
         Assert.Equal(4, counts.Processing);
         Assert.Equal(1, counts.Activity);
@@ -131,7 +135,7 @@ public sealed class JobServicesTests : IDisposable
             "INSERT INTO activity_events (created_at, event_type, module, title) SELECT '2025-01-01 00:00:00', 'x', 'processing', 'old' FROM n");
         _db.Execute("INSERT INTO activity_events (created_at, event_type, module, title) VALUES (CURRENT_TIMESTAMP, 'x', 'processing', 'new')");
 
-        var counts = await JobRowsRetention.RunTickAsync(_db.Store, 90, DateTimeOffset.UtcNow);
+        var counts = await _retention.RunTickAsync(90, DateTimeOffset.UtcNow);
 
         Assert.Equal(old, counts.Activity);
         Assert.Equal(1, _db.Count("SELECT count(*) FROM activity_events"));
@@ -143,7 +147,7 @@ public sealed class JobServicesTests : IDisposable
         _db.Execute("UPDATE suite_settings SET activity_retention_days = 0");
         _db.Execute("INSERT INTO activity_events (created_at, event_type, module, title) VALUES ('2000-01-01 00:00:00', 'x', 'processing', 'old')");
 
-        Assert.Equal(0, (await JobRowsRetention.RunTickAsync(_db.Store, 90, DateTimeOffset.UtcNow)).Activity);
+        Assert.Equal(0, (await _retention.RunTickAsync(90, DateTimeOffset.UtcNow)).Activity);
     }
 
     [Fact]
@@ -348,7 +352,7 @@ public sealed class JobServicesTests : IDisposable
             TimeProvider.System,
             NullLogger<ProcessingJobProcessor>.Instance);
         // Never started, so RecoveryCompleted reads as already done and this slot never waits on it.
-        var recovery = new JobsStartupRecoveryService(_db.Store, options, new LibrarySettingsStore(), TimeProvider.System, NullLogger<JobsStartupRecoveryService>.Instance);
+        var recovery = new JobsStartupRecoveryService(_db.Store, options, new LibrarySettingsStore(), new LibraryStore(), TimeProvider.System, NullLogger<JobsStartupRecoveryService>.Instance);
         return new ProcessingWorkerService(processor, _db.Store, heartbeats, options, timings, TimeProvider.System, logger ?? NullLogger<ProcessingWorkerService>.Instance, registry, recovery);
     }
 

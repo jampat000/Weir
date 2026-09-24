@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
@@ -14,22 +15,39 @@ public static class ProcessingRuntimeEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingRuntimeEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/processing/runtime-settings", GetRuntimeSettingsAsync);
-        endpoints.MapV1("GET", "/processing/files-at-once", GetFilesAtOnceAsync);
-        endpoints.MapV1("GET", "/processing/hardware", GetHardwareAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<ProcessingRuntimeEndpointHandlers>();
+        endpoints.MapV1("GET", "/processing/runtime-settings", handlers.GetRuntimeSettingsAsync);
+        endpoints.MapV1("GET", "/processing/files-at-once", handlers.GetFilesAtOnceAsync);
+        endpoints.MapV1("GET", "/processing/hardware", handlers.GetHardwareAsync);
         return endpoints;
+    }
+}
+
+/// <summary>Handlers for <see cref="ProcessingRuntimeEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class ProcessingRuntimeEndpointHandlers
+{
+    private readonly ProcessingJobStore _jobs;
+    private readonly TimeProvider _time;
+    private readonly IMediaToolResolver _resolver;
+    private readonly MediaTools _mediaTools;
+
+    public ProcessingRuntimeEndpointHandlers(ProcessingJobStore jobs, TimeProvider time, IMediaToolResolver resolver, MediaTools mediaTools)
+    {
+        _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+        _time = time ?? throw new ArgumentNullException(nameof(time));
+        _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
+        _mediaTools = mediaTools ?? throw new ArgumentNullException(nameof(mediaTools));
     }
 
     /// <summary>What is running, what is waiting and which limit the waiting files are waiting on (#633).</summary>
-    private static async Task<ApiResult> GetFilesAtOnceAsync(ApiRequest request)
+    public async Task<ApiResult> GetFilesAtOnceAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
-        var store = request.Service<ProcessingJobStore>();
-        var now = request.Service<TimeProvider>().GetUtcNow();
+        var now = _time.GetUtcNow();
         var slots = request.Options.ProcessingWorkerCount;
         // A read, so never the queue's write transaction (#636): under several remuxes that queued behind the workers
         // until it timed out with "database is locked".
-        var readout = await store.ReadAsync(
+        var readout = await _jobs.ReadAsync(
             (connection, transaction) => WorkAdmissionReader.ReadFilesAtOnce(connection, transaction, now, slots)).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
             .Set("files_at_once", readout.FilesAtOnce)
@@ -42,7 +60,7 @@ public static class ProcessingRuntimeEndpoints
             .Set("slots_note", readout.SlotsNote));
     }
 
-    private static async Task<ApiResult> GetRuntimeSettingsAsync(ApiRequest request)
+    public async Task<ApiResult> GetRuntimeSettingsAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var settings = RuntimeVisibility.From(request.Options);
@@ -79,14 +97,13 @@ public static class ProcessingRuntimeEndpoints
             .Set("work_temp_stale_sweep_periodic_configuration_note", settings.WorkTempStaleSweepPeriodicConfigurationNote));
     }
 
-    private static async Task<ApiResult> GetHardwareAsync(ApiRequest request)
+    public async Task<ApiResult> GetHardwareAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
-        IMediaToolResolver resolver = request.Service<IMediaToolResolver>();
         string ffmpeg;
         try
         {
-            (_, ffmpeg) = resolver.Resolve();
+            (_, ffmpeg) = _resolver.Resolve();
         }
         catch (MediaToolException exception)
         {
@@ -99,8 +116,7 @@ public static class ProcessingRuntimeEndpoints
                 .Set("detail", $"Weir could not find ffmpeg, so it cannot report acceleration methods. {exception.Message}"));
         }
 
-        var mediaTools = request.Service<MediaTools>();
-        var report = await mediaTools.DetectAccelerationAsync(ffmpeg, request.Context.RequestAborted).ConfigureAwait(false);
+        var report = await _mediaTools.DetectAccelerationAsync(ffmpeg, request.Context.RequestAborted).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
             .Set("detected", report.Detected)
             .Set("available_methods", new WireArray(report.AvailableMethods.Select(m => (WireValue)WireValue.Of(m))))

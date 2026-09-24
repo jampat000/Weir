@@ -9,7 +9,7 @@ namespace Weir.Api.Endpoints;
 /// client instead of any of them polling. <see cref="ActivityEndpoints"/> maps the route and wires this in
 /// alongside <c>activity.latest</c>; kept in its own file so that one stays a reasonable size.
 /// </summary>
-public static class ActivityProgressFrames
+public sealed class ActivityProgressFrames
 {
     /// <summary>The most often the live-progress frame goes out, however fast a pass reports.</summary>
     public static readonly TimeSpan Throttle = TimeSpan.FromSeconds(1);
@@ -17,12 +17,13 @@ public static class ActivityProgressFrames
     /// <summary>How long the stream waits for a change before it just loops and checks cancellation.</summary>
     private static readonly TimeSpan IdlePoll = TimeSpan.FromMinutes(2);
 
-    /// <summary>Frames <paramref name="liveProgress"/> for one open stream, using its own <see cref="Throttle"/> and idle-poll window.</summary>
-    public static IAsyncEnumerable<string> ForAsync(LiveProgressStore liveProgress, TimeProvider time, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(liveProgress);
-        return FramesAsync(() => liveProgress.Version, liveProgress.WaitForChangeAsync, liveProgress.Snapshot, time, Throttle, IdlePoll, cancellationToken);
-    }
+    private readonly LiveProgressStore _liveProgress;
+
+    public ActivityProgressFrames(LiveProgressStore liveProgress) => _liveProgress = liveProgress ?? throw new ArgumentNullException(nameof(liveProgress));
+
+    /// <summary>Frames the live-progress store for one open stream, using its own <see cref="Throttle"/> and idle-poll window.</summary>
+    public IAsyncEnumerable<string> ForAsync(TimeProvider time, CancellationToken cancellationToken) =>
+        FramesAsync(() => _liveProgress.Version, _liveProgress.WaitForChangeAsync, _liveProgress.Snapshot, time, Throttle, IdlePoll, cancellationToken);
 
     /// <summary>
     /// One <c>processing.progress</c> frame at most every <paramref name="throttle"/>, carrying every file's current

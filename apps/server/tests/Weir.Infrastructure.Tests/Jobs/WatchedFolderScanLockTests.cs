@@ -37,16 +37,18 @@ public sealed class WatchedFolderScanLockTests : IDisposable
     private readonly StoreFixture _store = new(("WEIR_CREDENTIALS_SECRET", "scan-lock-tests-credentials-secret"));
     private readonly ProcessingJobStore _jobs;
     private readonly ProcessingWatchedFolderScanDispatchJobHandler _handler;
+    private readonly LibraryStore _libraries = new();
+    private readonly FileStateStore _files = new();
     private readonly string _watched;
     private readonly string _output;
 
     public WatchedFolderScanLockTests()
     {
         var cipher = new CredentialCipher(_store.Options.CredentialsSecret, _store.Options.SessionSecret, _store.Options.PreviousCredentialsSecrets, _store.Clock);
-        var connections = new MediaManagerConnectionService(_store.Options, cipher, new HttpMediaManagerPorts(new FakeManagerHttp()));
+        var connections = new MediaManagerConnectionService(_store.Options, cipher, new HttpMediaManagerPorts(new FakeManagerHttp()), new MediaManagerConnectionStore());
         _jobs = new ProcessingJobStore(_store.Database, _store.Clock);
         _handler = new ProcessingWatchedFolderScanDispatchJobHandler(
-            _store.Database, _store.Clock, _store.Options, _jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore());
+            _store.Database, _store.Clock, _store.Options, _jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore(), _libraries, _files);
         _watched = _store.Home.Join("watch");
         _output = _store.Home.Join("out");
         Directory.CreateDirectory(_watched);
@@ -61,7 +63,7 @@ public sealed class WatchedFolderScanLockTests : IDisposable
             "INSERT INTO operator_settings (id, min_file_age_seconds, min_input_file_size_mb, minimum_free_disk_space_mb) VALUES (1, 0, 0, 0) " +
             "ON CONFLICT(id) DO UPDATE SET min_file_age_seconds = 0, min_input_file_size_mb = 0, minimum_free_disk_space_mb = 0");
         await using var uow = await UnitOfWork.OpenAsync(_store.Database);
-        var created = await LibraryStore.CreateAsync(uow, new ProcessingLibraryInput
+        var created = await _libraries.CreateAsync(uow, new ProcessingLibraryInput
         {
             Name = "Scan lock tests",
             MediaType = ProcessingMediaScopes.Movie,
@@ -151,7 +153,7 @@ public sealed class WatchedFolderScanLockTests : IDisposable
             await _jobs.EnqueueOrGetAsync($"queued-{index}", "processing.file.remux_pass.v1", WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
         }
 
-        var sweep = new VanishedFileSweepTask(_store.Database, _store.Options, _store.Clock, NullLogger<VanishedFileSweepTask>.Instance);
+        var sweep = new VanishedFileSweepTask(_store.Database, _store.Options, _libraries, _store.Clock, NullLogger<VanishedFileSweepTask>.Instance);
 
         var (longest, alongside) = await WriteAlongsideAsync(Task.Run(() => sweep.RunOnceAsync(CancellationToken.None)));
 
@@ -164,10 +166,10 @@ public sealed class WatchedFolderScanLockTests : IDisposable
     public async Task A_status_another_lane_set_after_the_scan_read_the_row_is_kept()
     {
         var libraryId = await LibraryAsync();
-        var rowId = await _store.WithUnitOfWork(uow => FileStateStore.RecordFileStateAsync(
+        var rowId = await _store.WithUnitOfWork(uow => _files.RecordFileStateAsync(
             uow, libraryId, "Film.mkv", new FileStateVerdict(ProcessingFileStatuses.Unprocessed, "Waiting."), 10, null, _store.Clock.GetUtcNow()));
         await _store.Execute($"UPDATE files SET status = 'processing', status_reason = 'A pass started.' WHERE id = {rowId}");
-        var batch = new WatchedFolderScanBatch(_store.Database, libraryId, _store.Clock.GetUtcNow());
+        var batch = new WatchedFolderScanBatch(_store.Database, _files, libraryId, _store.Clock.GetUtcNow());
         var queued = false;
 
         batch.Record(
@@ -187,8 +189,8 @@ public sealed class WatchedFolderScanLockTests : IDisposable
     public async Task A_file_a_hand_off_recorded_after_the_scan_read_the_library_keeps_the_hand_offs_state()
     {
         var libraryId = await LibraryAsync();
-        var batch = new WatchedFolderScanBatch(_store.Database, libraryId, _store.Clock.GetUtcNow());
-        await _store.WithUnitOfWork(uow => FileStateStore.RecordFileStateAsync(
+        var batch = new WatchedFolderScanBatch(_store.Database, _files, libraryId, _store.Clock.GetUtcNow());
+        await _store.WithUnitOfWork(uow => _files.RecordFileStateAsync(
             uow, libraryId, "Film.mkv", new FileStateVerdict(ProcessingFileStatuses.Unprocessed, "Handed over by Radarr."), 10, null, _store.Clock.GetUtcNow()));
 
         batch.Record(new ScannedFileWrite("Film.mkv", null, null, null, new FileStateVerdict(ProcessingFileStatuses.OnHold, "Still being written."), 10, null));
@@ -201,10 +203,10 @@ public sealed class WatchedFolderScanLockTests : IDisposable
     public async Task A_state_the_scan_read_is_replaced_by_its_new_verdict()
     {
         var libraryId = await LibraryAsync();
-        var rowId = await _store.WithUnitOfWork(uow => FileStateStore.RecordFileStateAsync(
+        var rowId = await _store.WithUnitOfWork(uow => _files.RecordFileStateAsync(
             uow, libraryId, "Film.mkv", new FileStateVerdict(ProcessingFileStatuses.ProcessingFailed, "It failed."), 10, null, _store.Clock.GetUtcNow()));
         await _store.Execute($"UPDATE files SET failure_attempts = 3 WHERE id = {rowId}");
-        var batch = new WatchedFolderScanBatch(_store.Database, libraryId, _store.Clock.GetUtcNow());
+        var batch = new WatchedFolderScanBatch(_store.Database, _files, libraryId, _store.Clock.GetUtcNow());
 
         batch.Record(new ScannedFileWrite(
             "Film.mkv", rowId, ProcessingFileStatuses.ProcessingFailed, ProcessingFileStatuses.Unprocessed, new FileStateVerdict(ProcessingFileStatuses.OnHold, "Changed; settling."), 20, null));

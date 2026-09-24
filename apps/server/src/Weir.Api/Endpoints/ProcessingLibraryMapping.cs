@@ -18,18 +18,26 @@ namespace Weir.Api.Endpoints;
 /// back out as, and the checks a save runs before it commits.</summary>
 internal static class ProcessingLibraryMapping
 {
-    internal static async Task<WireObject> LibraryOutAsync(ApiRequest request, UnitOfWork uow, ProcessingLibraryRecord row, ScanWakeups? looks = null)
+    internal static async Task<WireObject> LibraryOutAsync(
+        ApiRequest request,
+        UnitOfWork uow,
+        ProcessingLibraryRecord row,
+        LibraryStore libraries,
+        MediaManagerConnectionStore connections,
+        OperatorSettingsStore operatorSettings,
+        SuiteSettingsStore suiteSettings,
+        ScanWakeups? looks = null)
     {
-        var managerIds = await LibraryStore.ManagerConnectionIdsAsync(uow, row.Id).ConfigureAwait(false);
-        var activeJobs = await LibraryStore.ActiveJobCountAsync(uow, row).ConfigureAwait(false);
-        var periodicScan = await PeriodicScanStatusAsync(request, uow, row, looks).ConfigureAwait(false);
+        var managerIds = await libraries.ManagerConnectionIdsAsync(uow, row.Id).ConfigureAwait(false);
+        var activeJobs = await libraries.ActiveJobCountAsync(uow, row).ConfigureAwait(false);
+        var periodicScan = await PeriodicScanStatusAsync(request, uow, row, operatorSettings, suiteSettings, looks).ConfigureAwait(false);
 
         // manager_coverage: the linked connections' last saved connection-test result (no live call — a
         // listing must not depend on every linked manager answering right now).
         var managerRows = new List<MediaManagerConnectionRecord?>(managerIds.Count);
         foreach (var connectionId in managerIds)
         {
-            managerRows.Add(await MediaManagerConnectionStore.GetAsync(uow, connectionId).ConfigureAwait(false));
+            managerRows.Add(await connections.GetAsync(uow, connectionId).ConfigureAwait(false));
         }
 
         string coverage;
@@ -128,12 +136,13 @@ internal static class ProcessingLibraryMapping
 
     /// <summary>Resolves <see cref="PeriodicScanStatus"/> for one library from the same switches and schedule window
     /// the periodic scan-dispatch scheduler and the worker's upkeep admission read.</summary>
-    private static async Task<PeriodicScanStatus> PeriodicScanStatusAsync(ApiRequest request, UnitOfWork uow, ProcessingLibraryRecord row, ScanWakeups? looks)
+    private static async Task<PeriodicScanStatus> PeriodicScanStatusAsync(
+        ApiRequest request, UnitOfWork uow, ProcessingLibraryRecord row, OperatorSettingsStore operatorSettingsStore, SuiteSettingsStore suiteSettingsStore, ScanWakeups? looks)
     {
-        var operatorSettings = await request.Service<OperatorSettingsStore>().EnsureAsync(uow).ConfigureAwait(false);
-        var suite = await request.Service<SuiteSettingsStore>().EnsureAsync(uow).ConfigureAwait(false);
+        var operatorSettings = await operatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        var suite = await suiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
         var timezoneName = string.IsNullOrWhiteSpace(suite.AppTimezone) ? "UTC" : suite.AppTimezone.Trim();
-        var now = request.Service<TimeProvider>().GetUtcNow();
+        var now = request.Time.GetUtcNow();
         return PeriodicScanStatus.Resolve(
             row,
             request.Options.ProcessingWatchedFolderRemuxScanDispatchScheduleEnabled,
@@ -297,16 +306,17 @@ internal static class ProcessingLibraryMapping
     /// can take one for. Called after the row is written (so the manager links it was just given are the ones checked)
     /// but before the transaction commits.
     /// </summary>
-    internal static async Task RefuseUnsupportedRejectAsync(ApiRequest request, UnitOfWork uow, ProcessingLibraryRecord row)
+    internal static async Task RefuseUnsupportedRejectAsync(
+        UnitOfWork uow, ProcessingLibraryRecord row, LibraryStore libraries, MediaManagerConnectionService connectionService, RejectSupportEvaluator rejectSupport)
     {
         if (ProcessingFailurePolicies.Normalize(row.FailurePolicy) != ProcessingFailurePolicies.Reject)
         {
             return;
         }
 
-        var connectionIds = await LibraryStore.ManagerConnectionIdsAsync(uow, row.Id).ConfigureAwait(false);
-        var connections = await request.Service<MediaManagerConnectionService>().ConnectionsByIdAsync(uow, connectionIds).ConfigureAwait(false);
-        var support = await request.Service<RejectSupportEvaluator>().EvaluateAsync(connections).ConfigureAwait(false);
+        var connectionIds = await libraries.ManagerConnectionIdsAsync(uow, row.Id).ConfigureAwait(false);
+        var connections = await connectionService.ConnectionsByIdAsync(uow, connectionIds).ConfigureAwait(false);
+        var support = await rejectSupport.EvaluateAsync(connections).ConfigureAwait(false);
         if (!support.Available)
         {
             await uow.RollbackAsync().ConfigureAwait(false);

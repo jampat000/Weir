@@ -10,14 +10,14 @@ namespace Weir.Infrastructure.Jobs;
 /// </summary>
 public sealed class JobRowsRetentionTask : IPeriodicTask
 {
-    private readonly ProcessingJobStore _store;
+    private readonly JobRowsRetention _retention;
     private readonly WeirOptions _options;
     private readonly TimeProvider _time;
     private readonly ILogger<JobRowsRetentionTask> _logger;
 
-    public JobRowsRetentionTask(ProcessingJobStore store, WeirOptions options, TimeProvider time, ILogger<JobRowsRetentionTask> logger)
+    public JobRowsRetentionTask(JobRowsRetention retention, WeirOptions options, TimeProvider time, ILogger<JobRowsRetentionTask> logger)
     {
-        _store = store;
+        _retention = retention;
         _options = options;
         _time = time;
         _logger = logger;
@@ -36,7 +36,7 @@ public sealed class JobRowsRetentionTask : IPeriodicTask
     public async Task RunOnceAsync(CancellationToken cancellationToken)
     {
         var counts = await Task.Run(
-            () => JobRowsRetention.RunTickAsync(_store, _options.JobRowsRetentionDays, _time.GetUtcNow(), cancellationToken),
+            () => _retention.RunTickAsync(_options.JobRowsRetentionDays, _time.GetUtcNow(), cancellationToken),
             cancellationToken).ConfigureAwait(false);
         if (counts.Total > 0)
         {

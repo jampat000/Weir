@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Activity;
 using Weir.Core.Json;
@@ -21,16 +22,30 @@ public static class MediaManagerIntakeEndpoints
 {
     public static IEndpointRouteBuilder MapMediaManagerIntakeEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("POST", "/intake/webhook/{source_key}", PostWebhookAsync);
-        endpoints.MapV1("GET", "/intake/capabilities", GetIntakeCapabilitiesAsync);
-        endpoints.MapV1("GET", "/intake/library-folders", GetLibraryFoldersAsync);
-        endpoints.MapV1("GET", "/intake/handoffs/{source_key}/{handoff_id}", GetHandoffAsync);
-        endpoints.MapV1("DELETE", "/intake/handoffs/{source_key}/{handoff_id}", DeleteHandoffAsync);
-        endpoints.MapV1("POST", "/intake/handoffs/{source_key}/{handoff_id}/outcome", PostHandoffOutcomeAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<MediaManagerIntakeEndpointHandlers>();
+        endpoints.MapV1("POST", "/intake/webhook/{source_key}", handlers.PostWebhookAsync);
+        endpoints.MapV1("GET", "/intake/capabilities", handlers.GetIntakeCapabilitiesAsync);
+        endpoints.MapV1("GET", "/intake/library-folders", handlers.GetLibraryFoldersAsync);
+        endpoints.MapV1("GET", "/intake/handoffs/{source_key}/{handoff_id}", handlers.GetHandoffAsync);
+        endpoints.MapV1("DELETE", "/intake/handoffs/{source_key}/{handoff_id}", handlers.DeleteHandoffAsync);
+        endpoints.MapV1("POST", "/intake/handoffs/{source_key}/{handoff_id}/outcome", handlers.PostHandoffOutcomeAsync);
         return endpoints;
     }
+}
 
-    private static MediaManagerIntake Intake(ApiRequest request) => request.Service<MediaManagerIntake>();
+/// <summary>Handlers for <see cref="MediaManagerIntakeEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class MediaManagerIntakeEndpointHandlers
+{
+    private readonly MediaManagerIntake _intake;
+    private readonly HandbackOutcomes _handbackOutcomes;
+    private readonly LibraryStore _libraries;
+
+    public MediaManagerIntakeEndpointHandlers(MediaManagerIntake intake, HandbackOutcomes handbackOutcomes, LibraryStore libraries)
+    {
+        _intake = intake ?? throw new ArgumentNullException(nameof(intake));
+        _handbackOutcomes = handbackOutcomes ?? throw new ArgumentNullException(nameof(handbackOutcomes));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
+    }
 
     private static async Task<T> RefusalsAsApiErrors<T>(Func<Task<T>> work)
     {
@@ -44,7 +59,7 @@ public static class MediaManagerIntakeEndpoints
         }
     }
 
-    private static async Task<ApiResult> PostWebhookAsync(ApiRequest request)
+    public async Task<ApiResult> PostWebhookAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         var sourceKey = request.RouteValue("source_key") ?? string.Empty;
@@ -65,7 +80,7 @@ public static class MediaManagerIntakeEndpoints
         var dialect = ImportEvents.DialectForSource(sourceKey)
             ?? throw new ApiException(StatusCodes.Status404NotFound, IntakeRules.UnknownSourceDetail(sourceKey));
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var identity = await RefusalsAsApiErrors(() => Intake(request).AuthoriseAsync(uow, dialect.Key, presented)).ConfigureAwait(false);
+        var identity = await RefusalsAsApiErrors(() => _intake.AuthoriseAsync(uow, dialect.Key, presented)).ConfigureAwait(false);
 
         var importEvent = dialect.Normalize(payload);
         if (importEvent is null)
@@ -77,7 +92,7 @@ public static class MediaManagerIntakeEndpoints
         {
             // #652: Sonarr's and Radarr's "imported" is heard now. A file Weir handed back is recorded, and Weir's copy
             // released when that is safe; anything else is answered as before and changes nothing.
-            var imported = await request.Service<HandbackOutcomes>()
+            var imported = await _handbackOutcomes
                 .RecordManagerImportAsync(uow, importEvent, ManagerName(dialect.Key), identity.Authenticated).ConfigureAwait(false);
             if (!imported.Matched)
             {
@@ -94,7 +109,7 @@ public static class MediaManagerIntakeEndpoints
                 .Set("message", imported.Message));
         }
 
-        var enqueued = await RefusalsAsApiErrors(() => Intake(request).EnqueueRefineAsync(uow, importEvent, identity.ConnectionId)).ConfigureAwait(false);
+        var enqueued = await RefusalsAsApiErrors(() => _intake.EnqueueRefineAsync(uow, importEvent, identity.ConnectionId)).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
             .Set("status", "ok")
@@ -109,11 +124,11 @@ public static class MediaManagerIntakeEndpoints
         ImportEvents.DialectForSource(sourceKey)?.Key
         ?? throw new ApiException(StatusCodes.Status404NotFound, IntakeRules.UnknownSourceShortDetail(sourceKey));
 
-    private static async Task<ApiResult> GetIntakeCapabilitiesAsync(ApiRequest request)
+    public async Task<ApiResult> GetIntakeCapabilitiesAsync(ApiRequest request)
     {
         var presented = request.FirstHeader("X-Webhook-Secret");
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await RefusalsAsApiErrors(() => Intake(request).RequireSecretAsync(uow, presented, null)).ConfigureAwait(false);
+        await RefusalsAsApiErrors(() => _intake.RequireSecretAsync(uow, presented, null)).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject().Set("capabilities", new WireArray(IntakeRules.HandoffCapabilities.Select(c => (WireValue)new WireString(c)))));
     }
 
@@ -123,12 +138,12 @@ public static class MediaManagerIntakeEndpoints
     /// <see cref="GetIntakeCapabilitiesAsync"/>, with no source key of its own (any connection's secret, or the
     /// shared instance-wide secret, proves a caller may read it).
     /// </summary>
-    private static async Task<ApiResult> GetLibraryFoldersAsync(ApiRequest request)
+    public async Task<ApiResult> GetLibraryFoldersAsync(ApiRequest request)
     {
         var presented = request.FirstHeader("X-Webhook-Secret");
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await RefusalsAsApiErrors(() => Intake(request).RequireSecretAsync(uow, presented, null)).ConfigureAwait(false);
-        var rows = await LibraryStore.ListAsync(uow, enabledOnly: true).ConfigureAwait(false);
+        await RefusalsAsApiErrors(() => _intake.RequireSecretAsync(uow, presented, null)).ConfigureAwait(false);
+        var rows = await _libraries.ListAsync(uow, enabledOnly: true).ConfigureAwait(false);
         var weirHome = request.Options.WeirHome;
         var libraries = rows
             .Select(row => new PublishedLibraryFolders(
@@ -143,14 +158,14 @@ public static class MediaManagerIntakeEndpoints
         return ApiRoutes.Ok(LibraryFolderPublishing.ToOut(libraries));
     }
 
-    private static async Task<(UnitOfWork Uow, string Key, HandoffLedgerRow Row)> RequireHandoffAsync(ApiRequest request)
+    private async Task<(UnitOfWork Uow, string Key, HandoffLedgerRow Row)> RequireHandoffAsync(ApiRequest request)
     {
         var sourceKey = request.RouteValue("source_key") ?? string.Empty;
         var handoffId = request.RouteValue("handoff_id") ?? string.Empty;
         var presented = request.FirstHeader("X-Webhook-Secret");
         var key = Source(sourceKey);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var identity = await RefusalsAsApiErrors(() => Intake(request).RequireSecretAsync(uow, presented, key)).ConfigureAwait(false);
+        var identity = await RefusalsAsApiErrors(() => _intake.RequireSecretAsync(uow, presented, key)).ConfigureAwait(false);
         var row = await HandoffLedgerStore.FindAsync(uow, key, handoffId).ConfigureAwait(false)
             ?? throw new ApiException(StatusCodes.Status404NotFound, IntakeRules.NeverReceivedDetail);
 
@@ -164,19 +179,18 @@ public static class MediaManagerIntakeEndpoints
         return (uow, key, row);
     }
 
-    private static async Task<ApiResult> GetHandoffAsync(ApiRequest request)
+    public async Task<ApiResult> GetHandoffAsync(ApiRequest request)
     {
         var (uow, _, row) = await RequireHandoffAsync(request).ConfigureAwait(false);
-        var answer = await Intake(request).Ledger.CurrentStatusAsync(uow, row).ConfigureAwait(false);
+        var answer = await _intake.Ledger.CurrentStatusAsync(uow, row).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(answer.AsJson());
     }
 
-    private static async Task<ApiResult> DeleteHandoffAsync(ApiRequest request)
+    public async Task<ApiResult> DeleteHandoffAsync(ApiRequest request)
     {
         var (uow, key, row) = await RequireHandoffAsync(request).ConfigureAwait(false);
-        var intake = Intake(request);
-        var (cancelled, sentence) = await intake.Ledger.CancelAsync(uow, intake.Jobs, row).ConfigureAwait(false);
+        var (cancelled, sentence) = await _intake.Ledger.CancelAsync(uow, _intake.Jobs, row).ConfigureAwait(false);
         if (!cancelled)
         {
             await uow.RollbackAsync().ConfigureAwait(false);
@@ -208,7 +222,7 @@ public static class MediaManagerIntakeEndpoints
     /// <c>code</c> saying which (#664); a body that cannot be read is 422. Authenticated by <c>X-Webhook-Secret</c>, like
     /// the other hand-off routes.
     /// </summary>
-    private static async Task<ApiResult> PostHandoffOutcomeAsync(ApiRequest request)
+    public async Task<ApiResult> PostHandoffOutcomeAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -255,7 +269,7 @@ public static class MediaManagerIntakeEndpoints
             return ApiRoutes.Ok(OutcomeOut(row.HandoffId, recorded, row.OutcomeReleased, row.OutcomeMessage ?? string.Empty));
         }
 
-        var status = await Intake(request).Ledger.CurrentStatusAsync(uow, row).ConfigureAwait(false);
+        var status = await _intake.Ledger.CurrentStatusAsync(uow, row).ConfigureAwait(false);
         if (status.State is not (HandoffLedgerRules.Completed or HandoffLedgerRules.PassedThrough))
         {
             await request.CommitAsync().ConfigureAwait(false);
@@ -270,7 +284,7 @@ public static class MediaManagerIntakeEndpoints
             };
         }
 
-        var result = await request.Service<HandbackOutcomes>().RecordHandoffOutcomeAsync(
+        var result = await _handbackOutcomes.RecordHandoffOutcomeAsync(
             uow, row, manager, outcome, occurred!.Value.AsUtc, importedPath, reason).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(OutcomeOut(row.HandoffId, outcome, result.Released, result.Message));

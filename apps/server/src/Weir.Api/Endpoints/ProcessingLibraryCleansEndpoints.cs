@@ -31,10 +31,12 @@ internal sealed class ProcessingLibraryCleansEndpointHandlers
     private const int WithinDaysMax = 3650;
 
     private readonly LibraryCleanHistoryStore _cleanHistory;
+    private readonly FileStateStore _files;
 
-    public ProcessingLibraryCleansEndpointHandlers(LibraryCleanHistoryStore cleanHistory)
+    public ProcessingLibraryCleansEndpointHandlers(LibraryCleanHistoryStore cleanHistory, FileStateStore files)
     {
         _cleanHistory = cleanHistory ?? throw new ArgumentNullException(nameof(cleanHistory));
+        _files = files ?? throw new ArgumentNullException(nameof(files));
     }
 
     public async Task<ApiResult> GetLibraryCleansAsync(ApiRequest request)
@@ -63,7 +65,7 @@ internal sealed class ProcessingLibraryCleansEndpointHandlers
             Since = withinDays is { } days ? Timestamp.FromUtc(request.Time.GetUtcNow().AddDays(-days).UtcDateTime) : null,
             Limit = limit,
         }).ConfigureAwait(false);
-        var libraryNames = await FileStateStore.LibraryNamesAsync(uow).ConfigureAwait(false);
+        var libraryNames = await _files.LibraryNamesAsync(uow).ConfigureAwait(false);
 
         var cleans = rows.Select(row => (WireValue)new WireObject()
             .Set("kind", HistoryEntryKinds.LibraryClean)

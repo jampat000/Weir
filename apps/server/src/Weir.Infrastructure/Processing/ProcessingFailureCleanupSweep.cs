@@ -33,14 +33,17 @@ public sealed partial class ProcessingFailureCleanupSweep
     private readonly SqliteDatabase _database;
     private readonly WeirOptions _options;
     private readonly MediaManagerConnectionService _connections;
+    private readonly LibraryStore _libraries;
     private readonly TimeProvider _time;
     private readonly ILogger<ProcessingFailureCleanupSweep> _logger;
 
-    public ProcessingFailureCleanupSweep(SqliteDatabase database, WeirOptions options, MediaManagerConnectionService connections, TimeProvider time, ILogger<ProcessingFailureCleanupSweep> logger)
+    public ProcessingFailureCleanupSweep(
+        SqliteDatabase database, WeirOptions options, MediaManagerConnectionService connections, LibraryStore libraries, TimeProvider time, ILogger<ProcessingFailureCleanupSweep> logger)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -69,7 +72,7 @@ public sealed partial class ProcessingFailureCleanupSweep
 
     private async Task<WireObject> RunForScopeAsync(UnitOfWork uow, string scope, DateTimeOffset olderThan, CancellationToken cancellationToken)
     {
-        var library = await RemuxPassHandler.ResolveLibraryAsync(uow, null, scope).ConfigureAwait(false);
+        var library = await RemuxPassHandler.ResolveLibraryAsync(uow, _libraries, null, scope).ConfigureAwait(false);
         string watchedRaw = string.Empty, outputRaw = string.Empty, workRaw = string.Empty;
         if (library is not null)
         {

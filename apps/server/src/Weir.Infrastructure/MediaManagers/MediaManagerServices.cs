@@ -20,6 +20,12 @@ public static class MediaManagerServices
             options.CredentialsSecret, options.SessionSecret, options.PreviousCredentialsSecrets, sp.GetRequiredService<TimeProvider>()));
         services.TryAddSingleton<IManagerHttpHandlerFactory, SocketsManagerHttpHandlerFactory>();
         services.TryAddSingleton<IMediaManagerPorts, HttpMediaManagerPorts>();
+        // Media manager stores (#745 part 5): stateless SQL access over the caller's UnitOfWork, so a
+        // singleton is as cheap as a static class was and lets callers take them by constructor.
+        services.TryAddSingleton<MediaManagerConnectionStore>();
+        services.TryAddSingleton<ArrLibraryOperatorSettingsStore>();
+        services.TryAddSingleton<HandbackStore>();
+        services.TryAddSingleton<HandoffTargetStore>();
         services.TryAddSingleton<MediaManagerConnectionService>();
         // Every minute, each manager's connection test, so Weir knows within a minute when one goes quiet.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IPeriodicTask, ManagerHeartbeatTask>());
@@ -29,6 +35,9 @@ public static class MediaManagerServices
         services.AddWeirJobStore();
         services.TryAddSingleton<MediaManagerIntake>();
         services.TryAddSingleton<HandoffCompletionReporter>();
+        // Cancelling one queued job from the Jobs screen (#745 part 5): the ledger, the report and the file
+        // state it touches, constructor-injected instead of passed in on every call.
+        services.TryAddSingleton<PendingJobCancellation>();
         // #652: what a manager said about a file Weir handed back, and the one rule that releases Weir's copy.
         services.TryAddSingleton<HandbackOutcomes>();
         // The optional downloaded-scan hand-back for a Sonarr/Radarr connection outside Weir's own hand-off flow.

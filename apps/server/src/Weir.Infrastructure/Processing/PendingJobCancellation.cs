@@ -22,13 +22,22 @@ public sealed record PendingJobCancelResult(JobActionOutcome Outcome, HandoffLed
 /// caller's unit of work, in one transaction.
 /// </para>
 /// </summary>
-public static class PendingJobCancellation
+public sealed class PendingJobCancellation
 {
-    public static async Task<PendingJobCancelResult> CancelAsync(UnitOfWork uow, HandoffLedgerStore ledger, HandoffCompletionReporter reporter, long jobId)
+    private readonly HandoffLedgerStore _ledger;
+    private readonly HandoffCompletionReporter _reporter;
+    private readonly FileStateStore _files;
+
+    public PendingJobCancellation(HandoffLedgerStore ledger, HandoffCompletionReporter reporter, FileStateStore files)
+    {
+        _ledger = ledger ?? throw new ArgumentNullException(nameof(ledger));
+        _reporter = reporter ?? throw new ArgumentNullException(nameof(reporter));
+        _files = files ?? throw new ArgumentNullException(nameof(files));
+    }
+
+    public async Task<PendingJobCancelResult> CancelAsync(UnitOfWork uow, long jobId)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        ArgumentNullException.ThrowIfNull(ledger);
-        ArgumentNullException.ThrowIfNull(reporter);
         var found = await uow.QuerySingleAsync(
             "SELECT id, dedupe_key, job_kind, payload_json, status, created_at FROM jobs WHERE id = $id",
             reader => new PendingJobRow(
@@ -62,7 +71,7 @@ public static class PendingJobCancellation
             payload?.Get("library_id") is WireInteger library && library.Value > 0 &&
             payload.Get("relative_media_path") is WireString { Value.Length: > 0 } path)
         {
-            await FileStateStore.MarkCancelledAsync(uow, (long)library.Value, path.Value, CancelledFileReasons.InWeir).ConfigureAwait(false);
+            await _files.MarkCancelledAsync(uow, (long)library.Value, path.Value, CancelledFileReasons.InWeir).ConfigureAwait(false);
         }
 
         if (HandoffOrigin.FromPayload(payload) is { HandoffId: { Length: > 0 } handoffId } origin)
@@ -74,10 +83,10 @@ public static class PendingJobCancellation
                 {
                     // So a later file of the same pack finishing still sees this one settled, instead of waiting on it
                     // forever; and so cancelling the pack's last unresolved file still reports the ones that delivered.
-                    await reporter.StageReportAfterCancellationAsync(uow, origin, handoff, targetPath.Value).ConfigureAwait(false);
+                    await _reporter.StageReportAfterCancellationAsync(uow, origin, handoff, targetPath.Value).ConfigureAwait(false);
                 }
 
-                if (await ledger.SettleAfterJobCancelledAsync(
+                if (await _ledger.SettleAfterJobCancelledAsync(
                     uow, handoff, found.CreatedAt ?? DateTimeOffset.MinValue, HandoffLedgerRules.CancelledInWeirMessage).ConfigureAwait(false))
                 {
                     return new PendingJobCancelResult(JobActionOutcome.Ok, handoff);
