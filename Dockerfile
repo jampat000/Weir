@@ -18,7 +18,7 @@
 #     "https://mcr.microsoft.com/v2/dotnet/runtime-deps/manifests/10.0-noble" | grep -i docker-content-digest
 # (Docker Hub images such as node need a bearer token first: GET
 # https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/node:pull.)
-FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS web
+FROM node:25-bookworm-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370 AS web
 WORKDIR /src/apps/web
 COPY apps/web/package.json apps/web/package-lock.json ./
 # Resilient installs in CI/buildx (registry flakes, slow links); lockfile must stay in sync with package.json.
@@ -36,7 +36,7 @@ RUN npm run build
 # a self-contained app for another runtime without emulation (it only downloads the target runtime pack),
 # so this stage stays fast even when the final stage is emulated for a second architecture.
 # Pinned to the exact SDK in apps/server/global.json so image builds match CI.
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.400-noble@sha256:4beef5b8919dcaa2dc924233bd069257e883cc7a061e09088a97d152d6a48510 AS server-build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.401-noble@sha256:35d40304542c8689331f8cab17c65926cdf48fe711e289321d71924b230a7d29 AS server-build
 ARG TARGETARCH
 WORKDIR /src
 # The solution-level MSBuild files (Directory.Build.props holds the product version) and the server source.
