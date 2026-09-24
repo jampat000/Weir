@@ -220,8 +220,8 @@ function getLiveProgressSnapshot(): Readonly<
 
 /**
  * Every file's live progress, straight from the shared `processing.progress` stream frame, updated at
- * most once a second (#750). Empty for a file that is not being worked on right now, or once its pass
- * ends: the snapshot the stream sends is the whole current set, not an accumulating log.
+ * most once a second (#750). Empty for a file that is not being worked on, or once its pass ends: the
+ * snapshot the stream sends is the whole set in progress, not an accumulating log.
  */
 export function useLiveProgress(): Readonly<Record<string, LiveProgressEntry>> {
   return useSyncExternalStore(

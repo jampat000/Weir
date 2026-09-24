@@ -393,7 +393,7 @@ public sealed class ActivityApiTests
         var store = new LiveProgressStore();
         var time = new FakeTimeProvider();
         var throttle = TimeSpan.FromSeconds(1);
-        await using var enumerator = ActivityEndpoints.ProcessingProgressFramesAsync(
+        await using var enumerator = ActivityProgressFrames.FramesAsync(
             () => store.Version,
             store.WaitForChangeAsync,
             store.Snapshot,

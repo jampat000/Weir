@@ -380,7 +380,7 @@ describe("useLiveProgress", () => {
     });
   });
 
-  it("replaces the whole snapshot, so a file the stream no longer mentions disappears", () => {
+  it("replaces the whole snapshot, so a file missing from a later frame disappears", () => {
     vi.stubGlobal(
       "EventSource",
       FakeEventSource as unknown as typeof EventSource,

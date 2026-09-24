@@ -125,7 +125,7 @@ public sealed class LiveProgressStore
         Notify(() => _byPath.Remove(relativeMediaPath));
     }
 
-    /// <summary>A snapshot of every file with live progress right now, safe to enumerate without holding the lock.</summary>
+    /// <summary>A snapshot of every file with live progress, safe to enumerate without holding the lock.</summary>
     public IReadOnlyDictionary<string, LiveProgress> Snapshot()
     {
         lock (_gate)

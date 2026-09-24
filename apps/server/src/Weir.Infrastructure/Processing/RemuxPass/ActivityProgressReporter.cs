@@ -16,9 +16,8 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 /// Reports arrive on the tool's output reader, twice a second from ffmpeg. <see cref="Report"/> hands every one to
 /// <see cref="LiveProgressStore"/> at once (in memory, so this is cheap), and only saves to the database on the first
 /// report, when the reported status changes (started, finishing, finished, failed), and at
-/// <see cref="CompleteAsync"/> (#750). A percent-only update inside the same stage never reaches the database, so a
-/// long pass no longer takes the write lock while it runs (#710 covered the same goal by throttling to once every two
-/// seconds; this replaces that throttle with reporting nothing at all in between).
+/// <see cref="CompleteAsync"/>. Live progress stays in memory and streams to clients; the database is written only
+/// at start, stage changes and the end, so a long pass never competes for the write lock (#710, #750).
 /// </remarks>
 public sealed class ActivityProgressReporter
 {
@@ -128,7 +127,7 @@ public sealed class ActivityProgressReporter
         }
     }
 
-    /// <summary>Saves whatever is queued now, and returns once it is saved.</summary>
+    /// <summary>Saves whatever is currently queued, and returns once it is saved.</summary>
     public Task FlushAsync()
     {
         lock (_lock)

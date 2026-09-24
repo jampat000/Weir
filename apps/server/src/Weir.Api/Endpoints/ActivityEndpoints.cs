@@ -31,12 +31,6 @@ public static class ActivityEndpoints
     /// <summary>How long the stream waits before trying its first read again when it fails.</summary>
     public static readonly TimeSpan StreamReadRetry = TimeSpan.FromSeconds(2);
 
-    /// <summary>The most often the live-progress frame goes out, however fast a pass reports (#750).</summary>
-    public static readonly TimeSpan ProcessingProgressThrottle = TimeSpan.FromSeconds(1);
-
-    /// <summary>How long the progress side of the stream waits for a change before it just loops and checks cancellation.</summary>
-    private static readonly TimeSpan ProcessingProgressIdlePoll = TimeSpan.FromMinutes(2);
-
     private const string FormatPattern = "^(csv|json)$";
 
     public static IEndpointRouteBuilder MapActivityEndpoints(this IEndpointRouteBuilder endpoints)
@@ -225,14 +219,7 @@ public static class ActivityEndpoints
                     StreamKeepalive,
                     logger,
                     context.RequestAborted));
-                var progressLoop = PumpAsync(ProcessingProgressFramesAsync(
-                    () => liveProgress.Version,
-                    liveProgress.WaitForChangeAsync,
-                    liveProgress.Snapshot,
-                    time,
-                    ProcessingProgressThrottle,
-                    ProcessingProgressIdlePoll,
-                    context.RequestAborted));
+                var progressLoop = PumpAsync(ActivityProgressFrames.ForAsync(liveProgress, time, context.RequestAborted));
                 await Task.WhenAll(activityLoop, progressLoop).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
@@ -240,62 +227,6 @@ public static class ActivityEndpoints
                 // The client went away.
             }
         });
-    }
-
-    /// <summary>
-    /// One <c>processing.progress</c> frame at most every <paramref name="throttle"/>, carrying every file's current
-    /// live progress. Every open stream calls <paramref name="waitForChange"/> on the same shared store, so one
-    /// process-wide change wakes every client at once and nothing here polls on a timer (#750).
-    /// </summary>
-    public static async IAsyncEnumerable<string> ProcessingProgressFramesAsync(
-        Func<long> currentVersion,
-        Func<long, TimeSpan, TimeProvider, CancellationToken, Task<long?>> waitForChange,
-        Func<IReadOnlyDictionary<string, LiveProgress>> snapshot,
-        TimeProvider time,
-        TimeSpan throttle,
-        TimeSpan idlePoll,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(currentVersion);
-        ArgumentNullException.ThrowIfNull(waitForChange);
-        ArgumentNullException.ThrowIfNull(snapshot);
-        ArgumentNullException.ThrowIfNull(time);
-
-        var version = currentVersion();
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            if (await waitForChange(version, idlePoll, time, cancellationToken).ConfigureAwait(false) is null)
-            {
-                // Nothing changed within the idle window; the activity side of the stream keeps the connection alive.
-                continue;
-            }
-
-            if (throttle > TimeSpan.Zero)
-            {
-                // Coalesces a burst of reports into the one frame sent after the throttle window (#750).
-                await Task.Delay(throttle, time, cancellationToken).ConfigureAwait(false);
-            }
-
-            version = currentVersion();
-            yield return ProcessingProgressFrame(snapshot());
-        }
-    }
-
-    /// <summary>The <c>processing.progress</c> SSE frame: every file with live progress right now, keyed by its relative path.</summary>
-    private static string ProcessingProgressFrame(IReadOnlyDictionary<string, LiveProgress> files)
-    {
-        var entries = files.Select(pair => (PyJson)new PyDict()
-            .Set("relative_path", pair.Key)
-            .Set("status", pair.Value.Status)
-            .Set("percent", pair.Value.Percent is { } percent ? PyJson.Of(percent) : PyJson.Null)
-            .Set("eta_seconds", pair.Value.EtaSeconds is { } eta ? PyJson.Of(eta) : PyJson.Null)
-            .Set("message", pair.Value.Message)
-            .Set("speed", pair.Value.Speed)
-            .Set("elapsed_seconds", pair.Value.ElapsedSeconds is { } elapsed ? PyJson.Of(elapsed) : PyJson.Null)
-            .Set("removed_audio", new PyList(pair.Value.RemovedAudio.Select(t => (PyJson)PyJson.Of(t))))
-            .Set("removed_subtitles", new PyList(pair.Value.RemovedSubtitles.Select(t => (PyJson)PyJson.Of(t)))));
-        var json = PyJsonWriter.Dumps(new PyDict().Set("files", new PyList(entries)), PyJsonFormat.Compact);
-        return $"event: processing.progress\ndata: {json}\n\n";
     }
 
     /// <summary>
