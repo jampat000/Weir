@@ -10,8 +10,16 @@ import {
   useUpdateMediaManagerConnection,
 } from "../../../../lib/media-managers/queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
+import { ConnectionEditForm } from "./connection-edit-form";
 import { ConnectionSetup } from "./connection-setup";
-import { ConnectionStatusPanel, LinkedLibraries } from "./connection-status";
+import {
+  ConnectionStatusPanel,
+  LinkedLibraries,
+  UnsignedWebhookWarning,
+} from "./connection-status";
+
+const TEST_FAILURE = "The media manager could not be tested.";
+const TOGGLE_FAILURE = "This media manager could not be turned on or off.";
 
 function RemoveConnectionDialog({
   connection,
@@ -52,7 +60,12 @@ function RemoveConnectionDialog({
   );
 }
 
-/** One connected app: whether it answers, what depends on it, and how to wire it up. */
+function toggleLabel(connection: MediaManagerConnection, pending: boolean) {
+  if (pending) return connection.enabled ? "Disabling…" : "Enabling…";
+  return connection.enabled ? "Disable" : "Enable";
+}
+
+/** One connected media manager: whether it answers, what depends on it, and how to wire it up. */
 export function ConnectionCard({
   connection,
   fmt,
@@ -66,8 +79,10 @@ export function ConnectionCard({
   const secret = useGenerateMediaManagerWebhookSecret();
   // Remove asks first. Nothing is deleted until the dialog is confirmed.
   const [confirmingRemoval, setConfirmingRemoval] = useState(false);
+  const [editing, setEditing] = useState(false);
   const busy =
     update.isPending || remove.isPending || test.isPending || secret.isPending;
+  const locked = busy || editing;
 
   return (
     <section className="mm-quiet-section" data-testid="media-manager-card">
@@ -83,6 +98,7 @@ export function ConnectionCard({
       </div>
       <div className="mm-quiet-section__body">
         <ConnectionStatusPanel connection={connection} fmt={fmt} />
+        <UnsignedWebhookWarning connection={connection} />
         <LinkedLibraries connectionId={connection.id} />
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -90,15 +106,24 @@ export function ConnectionCard({
             type="button"
             data-testid="media-manager-test"
             className={mmActionButtonClass({ variant: "primary" })}
-            disabled={busy}
+            disabled={locked}
             onClick={() => test.mutate(connection.id)}
           >
-            {test.isPending ? "Testing…" : "Test connection"}
+            {test.isPending ? "Testing…" : "Test"}
+          </button>
+          <button
+            type="button"
+            data-testid="media-manager-edit"
+            className={mmActionButtonClass({ variant: "secondary" })}
+            disabled={locked}
+            onClick={() => setEditing(true)}
+          >
+            Edit
           </button>
           <button
             type="button"
             className={mmActionButtonClass({ variant: "secondary" })}
-            disabled={busy}
+            disabled={locked}
             onClick={() =>
               update.mutate({
                 id: connection.id,
@@ -106,13 +131,13 @@ export function ConnectionCard({
               })
             }
           >
-            {connection.enabled ? "Disable" : "Enable"}
+            {toggleLabel(connection, update.isPending)}
           </button>
           <button
             type="button"
             data-testid="media-manager-remove"
             className={mmActionButtonClass({ variant: "tertiary" })}
-            disabled={busy}
+            disabled={locked}
             aria-haspopup="dialog"
             onClick={() => {
               remove.reset();
@@ -122,6 +147,25 @@ export function ConnectionCard({
             Remove
           </button>
         </div>
+
+        {test.isError ? (
+          <p className="mm-status-text--failed mt-2 text-sm" role="alert">
+            {errorMessage(test.error, TEST_FAILURE)}
+          </p>
+        ) : null}
+
+        {update.isError ? (
+          <p className="mm-status-text--failed mt-2 text-sm" role="alert">
+            {errorMessage(update.error, TOGGLE_FAILURE)}
+          </p>
+        ) : null}
+
+        {editing ? (
+          <ConnectionEditForm
+            connection={connection}
+            onClose={() => setEditing(false)}
+          />
+        ) : null}
 
         {confirmingRemoval ? (
           <RemoveConnectionDialog

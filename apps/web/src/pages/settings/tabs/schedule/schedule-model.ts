@@ -2,12 +2,51 @@ import type { ProcessingLibrary } from "../../../../lib/processing/libraries-api
 
 /** The server's grid: 7 days of 96 quarter-hours, Monday first (ScheduleGrid.cs). */
 export const SLOTS_PER_HOUR = 4;
-export const SLOTS_PER_DAY = 24 * SLOTS_PER_HOUR;
+export const HOURS_PER_DAY = 24;
+export const SLOTS_PER_DAY = HOURS_PER_DAY * SLOTS_PER_HOUR;
 export const SLOTS_PER_WEEK = 7 * SLOTS_PER_DAY;
 export const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+export const DAY_FULL_NAMES = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
 function usable(grid: string): boolean {
   return grid.length === SLOTS_PER_WEEK && !/[^01]/.test(grid);
+}
+
+/**
+ * A grid the editor can change. Anything unusable is "no restriction", which is what the server does
+ * with it too: an editor that invented a schedule would be worse than one that shows none.
+ */
+function editable(grid: string): string {
+  return usable(grid) ? grid : "1".repeat(SLOTS_PER_WEEK);
+}
+
+/** Whether an hour is on in the editor: it is when any of its quarters is. */
+export function hourIsOn(grid: string, day: number, hour: number): boolean {
+  const start = day * SLOTS_PER_DAY + hour * SLOTS_PER_HOUR;
+  return editable(grid)
+    .slice(start, start + SLOTS_PER_HOUR)
+    .includes("1");
+}
+
+/** The grid with one hour switched on or off: all four of its quarters, so nothing is lost in the round trip. */
+export function withHour(
+  grid: string,
+  day: number,
+  hour: number,
+  on: boolean,
+): string {
+  const base = editable(grid);
+  const start = day * SLOTS_PER_DAY + hour * SLOTS_PER_HOUR;
+  const quarters = (on ? "1" : "0").repeat(SLOTS_PER_HOUR);
+  return `${base.slice(0, start)}${quarters}${base.slice(start + SLOTS_PER_HOUR)}`;
 }
 
 function hhmm(text: string, fallback: [number, number]): [number, number] {
@@ -82,13 +121,10 @@ export function effectiveGrid(library: ScheduleFields): string {
 
 /** Which of the 168 hours are on: an hour counts when any of its quarters is. */
 export function weekHours(grid: string): boolean[][] {
-  const on = usable(grid);
   return DAY_NAMES.map((_, day) =>
-    Array.from({ length: 24 }, (_, hour) => {
-      if (!on) return true;
-      const start = day * SLOTS_PER_DAY + hour * SLOTS_PER_HOUR;
-      return grid.slice(start, start + SLOTS_PER_HOUR).includes("1");
-    }),
+    Array.from({ length: HOURS_PER_DAY }, (_, hour) =>
+      hourIsOn(grid, day, hour),
+    ),
   );
 }
 

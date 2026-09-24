@@ -442,4 +442,100 @@ describe("SettingsMediaManagersTab", () => {
       expect(screen.getAllByTestId("media-manager-card")).toHaveLength(3);
     });
   });
+
+  it("shows a loading state before the media managers arrive", () => {
+    vi.spyOn(api, "fetchMediaManagerConnections").mockReturnValue(
+      new Promise(() => {}),
+    );
+    render(<MediaManagersTab />, { wrapper });
+
+    expect(screen.getByText("Loading media managers")).toBeInTheDocument();
+  });
+
+  it("shows a plain error instead of the empty state when the load fails", async () => {
+    vi.spyOn(api, "fetchMediaManagerConnections").mockRejectedValue(
+      new Error("boom"),
+    );
+    render(<MediaManagersTab />, { wrapper });
+
+    expect(
+      await screen.findByTestId("settings-load-error"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Nothing is connected yet/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("calls a media manager by that name, never an app", async () => {
+    vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([]);
+    render(<MediaManagersTab />, { wrapper });
+    await screen.findByText(/Nothing is connected yet/i);
+
+    expect(screen.getByTestId("media-manager-add")).toHaveTextContent(
+      "Add a media manager",
+    );
+    fireEvent.click(screen.getByTestId("media-manager-add"));
+    expect(screen.getByText("Which media manager is it?")).toBeInTheDocument();
+  });
+
+  describe("after adding a media manager", () => {
+    function fillAndSubmit(name: string) {
+      fireEvent.change(screen.getByTestId("media-manager-name"), {
+        target: { value: name },
+      });
+      fireEvent.change(screen.getByTestId("media-manager-base-url"), {
+        target: { value: "http://192.0.2.10:5099" },
+      });
+      fireEvent.click(screen.getByTestId("media-manager-save"));
+    }
+
+    it("offers to create its secret right away", async () => {
+      vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([]);
+      vi.spyOn(api, "createMediaManagerConnection").mockResolvedValue(
+        connection({ name: "New One" }),
+      );
+      const generate = vi
+        .spyOn(api, "generateMediaManagerWebhookSecret")
+        .mockResolvedValue({
+          connection_id: 1,
+          webhook_secret: "brand-new-secret",
+          webhook_url_path: "/api/v1/intake/webhook/deluno",
+          header_name: "X-Webhook-Secret",
+        });
+
+      render(<MediaManagersTab />, { wrapper });
+      fireEvent.click(await screen.findByTestId("media-manager-add"));
+      fillAndSubmit("New One");
+
+      expect(
+        await screen.findByText("Create a secret for New One now?"),
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("media-manager-new-secret-create"));
+
+      await waitFor(() => expect(generate).toHaveBeenCalledWith(1));
+      expect(
+        await screen.findByTestId("media-manager-secret"),
+      ).toHaveTextContent("brand-new-secret");
+    });
+
+    it("goes away without creating a secret when declined", async () => {
+      vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([]);
+      vi.spyOn(api, "createMediaManagerConnection").mockResolvedValue(
+        connection({ name: "New One" }),
+      );
+
+      render(<MediaManagersTab />, { wrapper });
+      fireEvent.click(await screen.findByTestId("media-manager-add"));
+      fillAndSubmit("New One");
+
+      fireEvent.click(
+        await screen.findByTestId("media-manager-new-secret-dismiss"),
+      );
+
+      expect(
+        screen.queryByTestId("media-manager-new-secret-prompt"),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

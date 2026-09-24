@@ -2,6 +2,7 @@ import type { NotificationChannelOut } from "../../../../lib/settings/types";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { eventLabel } from "./alert-events";
 import { ALERT_CHECKBOX_CLASS } from "./channel-form";
+import { maskWebhookUrl } from "./webhook-url-mask";
 
 export type TestResult = { ok: boolean; error: string | null };
 
@@ -14,7 +15,7 @@ function TestOutcome({ result }: { result: TestResult }) {
       role="alert"
     >
       {result.ok
-        ? "Test notification sent successfully."
+        ? "Test alert sent successfully."
         : `Test failed: ${result.error ?? "Unknown error"}`}
     </p>
   );
@@ -53,7 +54,9 @@ export function ChannelRow({
         {!channel.enabled ? (
           <span className="mm-quiet-badge mm-quiet-badge--off">Disabled</span>
         ) : null}
-        <span className="mm-quiet-table__sub font-mono">{channel.url}</span>
+        <span className="mm-quiet-table__sub font-mono">
+          {maskWebhookUrl(channel.url)}
+        </span>
       </th>
       {events.map((event) => (
         <td
@@ -79,7 +82,7 @@ export function ChannelRow({
             disabled={testing || deleting}
             onClick={onTest}
           >
-            {testing ? "Testing..." : "Send test"}
+            {testing ? "Testing…" : "Send test"}
           </button>
           <button
             type="button"
@@ -96,7 +99,7 @@ export function ChannelRow({
             aria-haspopup="dialog"
             onClick={onDelete}
           >
-            {deleting ? "Removing..." : "Remove"}
+            {deleting ? "Removing…" : "Remove"}
           </button>
         </div>
         {testResult ? <TestOutcome result={testResult} /> : null}

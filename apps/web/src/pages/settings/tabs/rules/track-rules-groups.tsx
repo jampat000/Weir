@@ -24,7 +24,7 @@ const DEFAULT_SLOTS = [
 ];
 
 const AUDIO_KEEP_MODES = [
-  { value: "single", label: "One winning track (today's behavior)" },
+  { value: "single", label: "Only the best track" },
   { value: "per_language", label: "Best track of each configured language" },
 ];
 
@@ -35,7 +35,10 @@ const SUBTITLE_MODES = [
 ];
 
 const SUBTITLE_STRATEGIES = [
-  { value: "text_first", label: "Text subtitles first (SRT/ASS over PGS)" },
+  {
+    value: "text_first",
+    label: "Text subtitles first (smaller, restylable)",
+  },
   { value: "image_first", label: "Image subtitles first (PGS over SRT/ASS)" },
   { value: "accessibility", label: "Hearing-impaired (SDH) first" },
 ];
@@ -52,7 +55,7 @@ export function AudioRulesGroup({ binding }: { binding: RuleSetBinding }) {
       <RuleSelect
         binding={binding}
         name="audio_preference_mode"
-        label="Selection strategy"
+        label="How to choose audio"
         options={AUDIO_STRATEGIES}
         // A new strategy starts from its own default order.
         onChange={(mode) => {
@@ -116,7 +119,7 @@ function SubtitleCapFields({ binding }: { binding: RuleSetBinding }) {
       <Field
         label="Limit subtitles kept per language"
         width="short"
-        hint="0 means unlimited (today's behavior). A forced track kept above doesn't count toward this cap."
+        hint="0 keeps every one. A forced track kept above doesn't count toward this cap."
       >
         <input
           type="number"

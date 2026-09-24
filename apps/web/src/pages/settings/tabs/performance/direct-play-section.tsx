@@ -18,6 +18,7 @@ import {
 } from "../../../../lib/processing/direct-play-queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { errorMessage } from "../../../../lib/api/error-message";
+import { SaveModelNote } from "../../save-model-note";
 
 /** Splits "https://… (checked 2026-08-13)" into its link and its date. */
 function parseSource(source: string): {
@@ -120,6 +121,7 @@ export function DirectPlaySection() {
       summaryWhenClosed="Reference"
       data-testid="processing-direct-play-section"
     >
+      <SaveModelNote model="explicit" />
       <p className="mm-quiet-note">
         Shows which of your devices can play each file without your media server
         converting it. Information only — Weir never changes a file because of

@@ -6,10 +6,6 @@ import {
   SettingsGroup,
 } from "../../../../components/shared/settings-group";
 import { MmOnOffSwitch } from "../../../../components/ui/mm-on-off-switch";
-import {
-  isHttpErrorFromApi,
-  isLikelyNetworkFailure,
-} from "../../../../lib/api/error-guards";
 import { canEdit } from "../../../../lib/auth/can-edit";
 import { useMeQuery } from "../../../../lib/auth/queries";
 import {
@@ -19,9 +15,24 @@ import {
 } from "../../../../lib/processing/queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { errorMessage } from "../../../../lib/api/error-message";
+import { SaveModelNote } from "../../save-model-note";
+import { SettingsLoadError } from "../../settings-load-error";
 
 /** Files at once goes from one to ten (#633). */
 const FILES_AT_ONCE = Array.from({ length: 10 }, (_, i) => i + 1);
+
+/** 1024 MB to a GB, for the free-space setting a person reads and types in GB. */
+const MB_PER_GB = 1024;
+/** Free-space GB never needs more precision than this to read sensibly. */
+const FREE_SPACE_GB_DECIMALS = 2;
+
+/** The minimum free disk space, in GB, rounded so it never reads as a repeating decimal. */
+function formatFreeSpaceGb(minimumFreeDiskSpaceMb: number): string {
+  const gb = Math.max(0, minimumFreeDiskSpaceMb / MB_PER_GB).toFixed(
+    FREE_SPACE_GB_DECIMALS,
+  );
+  return gb.replace(/\.?0+$/, "");
+}
 
 /**
  * Settings › Performance: how hard Weir works, what it checks before it starts a file, and what it keeps when
@@ -61,7 +72,7 @@ export function ProcessSettingsSection() {
     setMinFileAgeSeconds(String(q.data.min_file_age_seconds));
     setMinInputFileSizeMb(String(q.data.min_input_file_size_mb));
     setMinimumFreeDiskSpaceGb(
-      String(Math.max(0, q.data.minimum_free_disk_space_mb / 1024)),
+      formatFreeSpaceGb(q.data.minimum_free_disk_space_mb),
     );
     setKeepFailedWorkFiles(q.data.keep_failed_work_files);
   }, [q.data]);
@@ -70,22 +81,7 @@ export function ProcessSettingsSection() {
     return <PageLoading label="Loading performance settings" />;
   }
   if (q.isError) {
-    return (
-      <ul className="mm-interrupt" role="alert">
-        <li className="mm-interrupt__item">
-          <span className="mm-interrupt__text">
-            <strong className="font-semibold">
-              Could not load performance settings.
-            </strong>{" "}
-            {isLikelyNetworkFailure(q.error)
-              ? "Check that the Weir API is running."
-              : isHttpErrorFromApi(q.error)
-                ? "Sign in, then try again."
-                : "Request failed."}
-          </span>
-        </li>
-      </ul>
-    );
+    return <SettingsLoadError what="performance settings" />;
   }
   if (!q.data) return null;
 
@@ -123,7 +119,8 @@ export function ProcessSettingsSection() {
     runnerBudgetEnabled !== q.data.runner_budget_enabled ||
     minFileAgeSeconds !== String(q.data.min_file_age_seconds) ||
     minInputFileSizeMb !== String(q.data.min_input_file_size_mb) ||
-    minimumFreeMb !== q.data.minimum_free_disk_space_mb ||
+    minimumFreeDiskSpaceGb !==
+      formatFreeSpaceGb(q.data.minimum_free_disk_space_mb) ||
     keepFailedWorkFiles !== q.data.keep_failed_work_files;
   const locked = !editable || save.isPending;
 
@@ -143,6 +140,7 @@ export function ProcessSettingsSection() {
 
   return (
     <div data-testid="processing-process-settings">
+      <SaveModelNote model="explicit" />
       <p className="mm-quiet-note">
         How hard Weir works, what it checks before it starts a file, and what it
         keeps when one fails. The defaults suit most machines.

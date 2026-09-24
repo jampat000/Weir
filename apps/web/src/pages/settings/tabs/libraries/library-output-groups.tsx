@@ -23,13 +23,13 @@ export function LibraryOutputGroup({
   return (
     <QuietFieldGroup
       title="Output safety"
-      detail="Control sidecars, timestamps, and what happens when the destination already exists."
+      detail="Control the files that travel with the video, timestamps, and what happens when the destination already exists."
     >
       <div className="mm-field-row">
         <TextSetting
           binding={binding}
           name="sidecar_patterns_csv"
-          label="Sidecar file types"
+          label="Files that travel with the video"
           width="medium"
           placeholder=".srt,.nfo,.jpg"
         />
@@ -124,12 +124,12 @@ export function LibraryCapacityGroup({
           name="max_concurrent_files"
           label="Files at once"
           options={FILES_AT_ONCE_OPTIONS}
-          hint="Only to hold this library below Files at once in Process settings, so it cannot take every slot."
+          hint="Only to hold this library below Files at once in Performance, so it cannot take every slot."
         />
         <TextSetting
           binding={binding}
           name="priority"
-          label="Queue priority"
+          label="Priority (higher goes first)"
           width="short"
           placeholder="0"
         />
@@ -157,7 +157,7 @@ export function LibraryCapacityGroup({
         <ToggleSetting
           binding={binding}
           name="retry_preflight_failures"
-          label="Retry preflight rejections"
+          label="Retry files that failed the pre-check"
           hint="Usually leave this off: retrying does not repair an unsupported or malformed file."
         />
       </div>

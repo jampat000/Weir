@@ -20,7 +20,7 @@ function LibrarySource({
   connections: MediaManagerConnection[];
 }) {
   const nameOf = (id: number) =>
-    connections.find((c) => c.id === id)?.name ?? `manager #${id}`;
+    connections.find((c) => c.id === id)?.name ?? "a removed media manager";
   const linked = library.manager_connection_ids;
   const unreachable = library.manager_coverage === "unreachable";
   const lastWord = linked
@@ -177,6 +177,7 @@ function LibraryRow({
             className={tertiary}
             onClick={() => actions.onRemove(library)}
             disabled={!editable}
+            aria-haspopup="dialog"
             data-testid={`processing-library-remove-${library.id}`}
           >
             Remove
@@ -224,8 +225,8 @@ export function LibraryListSection({
       <p className="mm-quiet-note">
         A library is a folder Weir watches and a folder it hands clean files
         back to. A library from a media manager is kept in step with it; one
-        added in Weir is yours alone, and can still be linked to a manager in
-        its editor. A 4K library and a kids library are separate libraries.
+        added in Weir is yours alone, and can still be linked to a media manager
+        in its editor. A 4K library and a kids library are separate libraries.
       </p>
       {libraries.length === 0 ? (
         <p className="mm-quiet-note mt-4">

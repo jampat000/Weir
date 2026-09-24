@@ -110,14 +110,14 @@ it("edits ordered rules, original-language behavior, metadata cleanup, and the p
     screen.getByRole("heading", { name: "Subtitles" }),
   ).toBeInTheDocument();
   expect(screen.getByText("Original language")).toBeInTheDocument();
-  expect(screen.getByText("Remove from container")).toBeInTheDocument();
+  expect(screen.getByText("Also remove")).toBeInTheDocument();
   expect(screen.getByText("Metadata provider")).toBeInTheDocument();
 
   const orderedSections = [
     "Audio",
     "Subtitles",
     "Original language",
-    "Remove from container",
+    "Also remove",
   ].map((name) => screen.getByRole("heading", { name }));
   orderedSections.slice(0, -1).forEach((heading, index) => {
     expect(heading.compareDocumentPosition(orderedSections[index + 1]!)).toBe(
@@ -231,4 +231,66 @@ it("edits ordered rules, original-language behavior, metadata cleanup, and the p
     expect(testProvider).toHaveBeenCalled();
     expect(screen.getByText("TMDb answered successfully.")).toBeInTheDocument();
   });
+});
+
+it("shows a load error when the profiles fail to load", async () => {
+  vi.spyOn(authQueries, "useMeQuery").mockReturnValue({
+    data: { role: "operator" },
+  } as ReturnType<typeof authQueries.useMeQuery>);
+  vi.spyOn(ruleSetsApi, "fetchProcessingRuleSets").mockRejectedValue(
+    new Error("network down"),
+  );
+  vi.spyOn(providerApi, "fetchProcessingMetadataProvider").mockResolvedValue({
+    provider: "",
+    base_url: "https://api.themoviedb.org/3",
+    key_configured: false,
+    known_providers: ["tmdb"],
+  });
+
+  render(<RulesTab />, { wrapper });
+
+  expect(await screen.findByTestId("settings-load-error")).toHaveTextContent(
+    "Weir couldn’t load your profiles.",
+  );
+});
+
+it("asks before switching profiles with unsaved edits, and keeps them when told to stay", async () => {
+  vi.spyOn(authQueries, "useMeQuery").mockReturnValue({
+    data: { role: "operator" },
+  } as ReturnType<typeof authQueries.useMeQuery>);
+  vi.spyOn(ruleSetsApi, "fetchProcessingRuleSets").mockResolvedValue([
+    ruleSet,
+    { ...ruleSet, id: 5, name: "TV shows", used_by_library_count: 0 },
+  ]);
+  vi.spyOn(providerApi, "fetchProcessingMetadataProvider").mockResolvedValue({
+    provider: "",
+    base_url: "https://api.themoviedb.org/3",
+    key_configured: false,
+    known_providers: ["tmdb"],
+  });
+
+  render(<RulesTab />, { wrapper });
+
+  const nameField = await screen.findByPlaceholderText("English feature films");
+  fireEvent.change(nameField, { target: { value: "Feature films (edited)" } });
+
+  fireEvent.change(screen.getByRole("combobox", { name: "Profile" }), {
+    target: { value: "5" },
+  });
+
+  expect(screen.getByTestId("settings-unsaved-changes")).toHaveTextContent(
+    "You have unsaved changes to Feature films. Leave without saving?",
+  );
+  fireEvent.click(screen.getByTestId("settings-unsaved-changes-cancel"));
+  expect(screen.getByPlaceholderText("English feature films")).toHaveValue(
+    "Feature films (edited)",
+  );
+
+  fireEvent.change(screen.getByRole("combobox", { name: "Profile" }), {
+    target: { value: "5" },
+  });
+  fireEvent.click(screen.getByTestId("settings-unsaved-changes-confirm"));
+  expect(screen.getByPlaceholderText("English feature films")).toHaveValue(
+    "TV shows",
+  );
 });
