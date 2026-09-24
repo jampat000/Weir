@@ -94,7 +94,8 @@ jobs:
             apps/server/**/packages.lock.json
             apps/tray/**/packages.lock.json
 
-      # Same caches as ci-packaging.yml: both FFmpeg and MKVToolNix are pinned in build-velopack.ps1,
+      # Same caches as ci-packaging.yml: both FFmpeg and MKVToolNix are pinned in
+      # packaging/windows/build-velopack-vendored-media-tools.ps1 (dot-sourced from build-velopack.ps1),
       # so both keys come from that file's own pin. The build script re-checks the vendored copy either way.
       - name: FFmpeg build checksum
         id: ffmpeg
@@ -111,7 +112,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: packaging/windows/vendor/mkvtoolnix
-          key: mkvtoolnix-vendor-${{ runner.os }}-${{ hashFiles('packaging/windows/build-velopack.ps1') }}
+          key: mkvtoolnix-vendor-${{ runner.os }}-${{ hashFiles('packaging/windows/build-velopack-vendored-media-tools.ps1') }}
           restore-keys: |
             mkvtoolnix-vendor-${{ runner.os }}-
 

@@ -1,21 +1,39 @@
 """Black-box processing: work that is interrupted, paused, or outside its schedule.
 
-Pause and the schedule window are checked when a worker claims a job and leave no trace in the API, so
-the "nothing starts" claims here are watched with ``never_within`` rather than read from state.
+Pause and the schedule window are checked when a worker claims a job; the claim itself leaves no trace,
+but ``GET /processing/files-at-once`` (#633) reads the same admission rules and says which one a due,
+queued file is waiting on, so the "nothing starts" claims here are read from that state (``waiting_for``)
+rather than watched for an absence with ``never_within``. Server-side coverage: ``FilesAtOnceTests`` (the
+rule) and ``ProcessingFilesAtOnceApiTests`` (the endpoint), both in the .NET test suite.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from tests.contract.processing import _helpers as h
-from tests.contract.support.client import API
+from tests.contract.support.client import API, WeirClient
 from tests.contract.support.fake_ffmpeg import fake_media_bytes, probe
-from tests.contract.support.polling import never_within, wait_until
+from tests.contract.support.polling import wait_until
 
 SLOTS_PER_DAY = 96
+
+
+def _waiting_for(admin: WeirClient) -> dict[str, Any]:
+    r = admin.get(f"{API}/processing/files-at-once")
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def _wait_for_waiting_reason(admin: WeirClient, reason: str, *, timeout_s: float = 15.0) -> dict[str, Any]:
+    def probe() -> dict[str, Any] | None:
+        body = _waiting_for(admin)
+        return body if body["waiting_for"] == reason else None
+
+    return wait_until(probe, timeout_s=timeout_s, what=f"the read-out to say {reason!r}")
 
 
 def _source(folders: h.Folders, release: str) -> Path:
@@ -74,8 +92,8 @@ def test_pause_stops_new_work_until_resumed(
     source = _source(folders, "Paused.Film.2021")
 
     h.post_handoff(admin, handoff_id="handoff-paused-1", source_path=source)
-    # Several worker passes happen in this time; none may start the file.
-    never_within(fake_ffmpeg.calls, seconds=12, what="ffprobe/ffmpeg running while paused")
+    waiting = _wait_for_waiting_reason(admin, "paused")
+    assert waiting["message"] == "1 file is waiting because processing is paused."
     assert h.handoff_status(admin, "handoff-paused-1")["state"] == "queued"
     assert [j["status"] for j in h.jobs(admin, kind=h.REMUX_KIND)] == ["pending"]
     assert h.callbacks(fake, "handoff-paused-1") == []
@@ -113,7 +131,8 @@ def test_schedule_window_blocks_work_outside_its_hours(
     source = _source(folders, "Night.Only.2022")
 
     h.post_handoff(admin, handoff_id="handoff-window-1", source_path=source)
-    never_within(fake_ffmpeg.calls, seconds=12, what="ffprobe/ffmpeg running outside the window")
+    waiting = _wait_for_waiting_reason(admin, "library_closed")
+    assert waiting["message"] == f"1 file is waiting for {library['name']}'s schedule to open."
     assert h.handoff_status(admin, "handoff-window-1")["state"] == "queued"
     assert [j["status"] for j in h.jobs(admin, kind=h.REMUX_KIND)] == ["pending"]
 

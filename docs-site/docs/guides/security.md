@@ -49,7 +49,7 @@ The docs build runs an image-format preflight and rejects ICNS, JXL, HEIC, and H
 ## Repository controls
 
 - `main` is protected by GitHub branch rules
-- Required checks: `weir`, `docker-smoke`, `windows-package-smoke`
+- Required check: `ci-passed` (the CI workflow's verdict job)
 - Security vulnerabilities are reported privately through `SECURITY.md`
 
 ## Pre-release checklist
