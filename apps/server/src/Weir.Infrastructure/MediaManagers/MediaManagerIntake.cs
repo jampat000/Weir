@@ -83,7 +83,10 @@ public sealed class MediaManagerIntake
     /// <remarks>
     /// An unchecked "imported" is still recorded, but it never removes a file (#652). The connection-less native
     /// source has no address of its own to prove who is calling, so it refuses a write once nobody has ever
-    /// configured a secret for it, rather than accepting one unchecked as a real connection does.
+    /// configured a secret for it, rather than accepting one unchecked as a real connection does. A kind with no
+    /// connection at all is refused the same way: an existing connection that never rotated its secret keeps
+    /// accepting unsigned webhooks (upgrades must not break), but there is nothing to attribute a webhook to
+    /// when the kind was never set up in the first place.
     /// </remarks>
     public async Task<MediaManagerIntakeIdentity> AuthoriseAsync(UnitOfWork uow, string sourceKey, string? presented)
     {
@@ -109,6 +112,11 @@ public sealed class MediaManagerIntake
             if (sourceKey == MediaManagerKinds.Native)
             {
                 throw new IntakeRefusedException(401, IntakeRules.NativeNeedsSecretDetail);
+            }
+
+            if (connections.Count == 0)
+            {
+                throw new IntakeRefusedException(401, IntakeRules.NoConnectionDetail(sourceKey));
             }
 
             return new MediaManagerIntakeIdentity(Authenticated: false, soleConnectionId);

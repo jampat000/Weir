@@ -327,8 +327,10 @@ public sealed class MediaManagerApiTests
     [Fact]
     public async Task The_intake_webhook_ignores_what_is_not_its_business_and_names_unknown_sources()
     {
-        var (server, _, _) = await StartAsync();
+        var (server, admin, _) = await StartAsync();
         await using var _server = server;
+        await CreateAsync(admin, "sonarr", "Sonarr", "http://192.0.2.30:8989");
+        await CreateAsync(admin, "radarr", "Radarr", "http://192.0.2.20:7878");
         var client = new ApiTestClient(server);
         using (var grab = await client.PostAsync("/api/v1/intake/webhook/sonarr", new { eventType = "Grab", episodes = new[] { new { id = 1 } } }))
         {
@@ -360,10 +362,12 @@ public sealed class MediaManagerApiTests
             Assert.Equal(HttpStatusCode.OK, (await client.PostAsync("/api/v1/intake/webhook/radarr", new { eventType = "Grab" }, new Dictionary<string, string> { ["X-Webhook-Secret"] = "s3cret" })).StatusCode);
         }
 
-        // WEIR_SUBBER_WEBHOOK_SECRET is a retired name that configures nothing, so the webhook is simply
-        // unguarded here rather than demanding a secret the caller would have no way to know about.
-        await using (var server = await WeirTestServer.StartAsync([("WEIR_SESSION_SECRET", Secret), ("WEIR_PROCESSING_WORKER_COUNT", "0"), ("WEIR_SUBBER_WEBHOOK_SECRET", "s3cret")]))
+        // WEIR_SUBBER_WEBHOOK_SECRET is a retired name that configures nothing, so an existing connection
+        // behaves exactly as it would with no instance secret at all: it keeps accepting an unsigned write.
         {
+            var (server, admin, _) = await StartAsync(("WEIR_SUBBER_WEBHOOK_SECRET", "s3cret"));
+            await using var _server = server;
+            await CreateAsync(admin, "radarr", "Radarr", "http://192.0.2.20:7878");
             var client = new ApiTestClient(server);
             Assert.Equal(HttpStatusCode.OK, (await client.PostAsync("/api/v1/intake/webhook/radarr", new { eventType = "Grab" })).StatusCode);
         }

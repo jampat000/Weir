@@ -30,6 +30,23 @@ public sealed class PlatformRulesTests
     public void Cookie_secure_flag_follows_the_mode_and_scheme(string scheme, CookieSecureMode mode, bool expected) =>
         Assert.Equal(expected, SessionRules.ResolveCookieSecure(scheme, mode));
 
+    [Theory]
+    [InlineData("http", "https://weir.example", null, false, true)]
+    [InlineData("http", null, "https://weir.example/login", false, true)]
+    [InlineData("http", "http://weir.example", null, false, false)]
+    [InlineData("https", "https://weir.example", null, false, false)]
+    [InlineData("http", "https://weir.example", null, true, false)]
+    [InlineData("http", null, null, false, false)]
+    public void Cookie_secure_warning_needs_https_evidence_plain_http_and_no_trusted_proxy(
+        string scheme, string? origin, string? referer, bool hasTrustedProxy, bool expected) =>
+        Assert.Equal(expected, SessionRules.CookieSecureBlockedByUntranslatedTls(CookieSecureMode.Auto, scheme, origin, referer, hasTrustedProxy));
+
+    [Theory]
+    [InlineData(CookieSecureMode.Always)]
+    [InlineData(CookieSecureMode.Never)]
+    public void Cookie_secure_warning_never_fires_outside_auto_mode(CookieSecureMode mode) =>
+        Assert.False(SessionRules.CookieSecureBlockedByUntranslatedTls(mode, "http", "https://weir.example", null, hasTrustedProxy: false));
+
     [Fact]
     public void Session_validity_checks_revocation_absolute_expiry_then_idle()
     {

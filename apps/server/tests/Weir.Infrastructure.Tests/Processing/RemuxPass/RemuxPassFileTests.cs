@@ -419,6 +419,34 @@ public sealed class RemuxPassPathsTests : IDisposable
     }
 
     [Fact]
+    public void A_nul_character_is_refused()
+    {
+        var media = Directory.CreateDirectory(_root.Join("media")).FullName;
+
+        Assert.Equal(
+            "relative_media_path must not contain a NUL character or a colon",
+            Assert.Throws<ArgumentException>(() => RemuxPassPaths.ResolveMediaFileUnderRoot(media, "a\0.mkv")).Message);
+    }
+
+    [Fact]
+    public void A_colon_is_refused_on_windows_only()
+    {
+        var media = Directory.CreateDirectory(_root.Join("media")).FullName;
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal(
+                "relative_media_path must not contain a NUL character or a colon",
+                Assert.Throws<ArgumentException>(() => RemuxPassPaths.ResolveMediaFileUnderRoot(media, "a.mkv:hidden")).Message);
+        }
+        else
+        {
+            File.WriteAllText(Path.Join(media, "a.mkv:hidden"), "x");
+            Assert.Equal(Path.GetFullPath(Path.Join(media, "a.mkv:hidden")), RemuxPassPaths.ResolveMediaFileUnderRoot(media, "a.mkv:hidden"));
+        }
+    }
+
+    [Fact]
     public void A_file_under_the_root_resolves()
     {
         var media = Directory.CreateDirectory(_root.Join("media")).FullName;

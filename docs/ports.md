@@ -21,7 +21,7 @@ Vite reads it from [`apps/web/vite.config.ts`](../apps/web/vite.config.ts). The 
 
 | Role | Host | Port | URL example |
 |------|------|------|-------------|
-| Web app (Vite **dev** and **preview**) | all interfaces (`host: true` in `vite.config.ts`) | **8782** | `http://127.0.0.1:8782` or `http://localhost:8782` |
+| Web app (Vite **dev** and **preview**) | `127.0.0.1` (local only) | **8782** | `http://127.0.0.1:8782` |
 | API (the .NET server, `dotnet watch run` via `npm run dev` or `scripts/dev-backend.ps1`) | `127.0.0.1` | **18788** | `http://127.0.0.1:18788` |
 
 The browser should use the **web** URL. `/api` is proxied to the API origin above (same-origin cookies).
@@ -37,12 +37,16 @@ free port and prints the URL it used. `npm run dev:stop-web` stops the dev web s
 `dev:stop-api` stops the dev API: only by the PID it recorded when it started that process
 (`.dev-web.pid` at the repo root, read by `scripts/stop-dev-web-port.mjs`), never by scanning the port.
 
-**Windows / `ERR_CONNECTION_REFUSED`:** Vite listens on **all interfaces** so both **`127.0.0.1`** and **`localhost`** work. If `localhost` resolved to IPv6 (`::1`) while Vite listened only on IPv4, the browser showed connection refused; that mismatch is what the `host: true` dev bind fixes.
+**Windows / `ERR_CONNECTION_REFUSED`:** Vite binds only `127.0.0.1` (IPv4), so use
+`http://127.0.0.1:8782`, not `http://localhost:8782` — on Windows `localhost` can resolve to `::1`
+(IPv6), which nothing is listening on.
 
 **Overrides (temporary):**
 
 - API port: `WEIR_DEV_API_PORT` when running `dev-backend.ps1`.
 - Vite proxy target: `VITE_DEV_API_PROXY_TARGET` (must match wherever the .NET server listens).
+- Web dev/preview host: `VITE_HOST`, or pass `--host` to Vite, to expose it beyond localhost on
+  purpose (for example to test from a phone on the same network).
 
 **Changing defaults:** edit `scripts/dev-ports.json` and restart dev servers.
 

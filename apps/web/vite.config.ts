@@ -29,6 +29,9 @@ const devPorts = JSON.parse(
 ) as DevPortsFile;
 const dev = devPorts.development;
 
+/** Local-only unless someone deliberately opts into exposing the dev server on the network. */
+const devHost = (process.env.VITE_HOST || "").trim() || "127.0.0.1";
+
 /** ``run-dev-stack.mjs`` may bump the port when the default from ``dev-ports.json`` is busy. */
 const devWebPort = (() => {
   const raw = (process.env.WEIR_DEV_WEB_PORT || "").trim();
@@ -91,18 +94,17 @@ export default defineConfig(({ mode }) => {
         process.env.WEIR_BUILD_SOURCEMAPS === "true" ? "hidden" : false,
     },
     server: {
-      // ``true`` = listen on all interfaces (0.0.0.0). Required so **http://localhost:<port>**
-      // works on Windows: ``localhost`` often resolves to ``::1`` (IPv6) while binding only
-      // ``127.0.0.1`` leaves IPv6 loopback with nothing listening → ERR_CONNECTION_REFUSED.
-      // ``http://127.0.0.1:<port>`` still works. Default port from ``dev-ports.json`` unless overridden.
-      host: true,
+      // Local-only: binds to 127.0.0.1, not every interface, so the dev server isn't reachable
+      // from the rest of the network by default. Set VITE_HOST (env) or pass --host to Vite to
+      // expose it on purpose. Default port from ``dev-ports.json`` unless overridden.
+      host: devHost,
       port: devWebPort,
       strictPort: true,
       proxy: { ...apiProxy },
     },
     /** Same-origin cookies in dev/preview: browser hits the Vite port; /api is forwarded. */
     preview: {
-      host: true,
+      host: devHost,
       port: devWebPort,
       strictPort: true,
       proxy: { ...apiProxy },

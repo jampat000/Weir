@@ -162,6 +162,10 @@ recipes above — so the database, settings, logs and backups survive a containe
 `WEIR_SESSION_SECRET` stable across upgrades so browser sessions remain valid; if you don't set
 one, Weir generates one and keeps it in that same volume.
 
+That folder is protected from other local accounts by whichever install method you use: in Docker
+the entrypoint writes secrets with `umask 077` and runs the server as a non-root user; on Windows
+the tray locks the folder to its owner; a bare source install should restrict `WEIR_HOME` itself.
+
 ## Common changes
 
 | I want to… | Do this |
