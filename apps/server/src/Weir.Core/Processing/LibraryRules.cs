@@ -335,7 +335,7 @@ public static class LibraryRules
 
     /// <summary>
     /// The closed enumerations a create/update request already validates at the HTTP boundary
-    /// (<c>BodyModel.Literal</c>, in <c>ProcessingLibraryEndpoints.ReadLibraryBody</c>). Restoring a
+    /// (<c>BodyModel.Literal</c>, in <c>ProcessingLibraryMapping.ReadLibraryBody</c>). Restoring a
     /// configuration bundle writes rows directly rather than going through that endpoint, so it calls
     /// this instead, against the same allowed-value lists, to get the same guarantee.
     /// </summary>
