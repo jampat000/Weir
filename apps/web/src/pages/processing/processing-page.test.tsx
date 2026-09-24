@@ -53,6 +53,7 @@ const refetchLibraries = vi.fn();
 
 vi.mock("../../lib/activity/use-activity-stream-invalidation", () => ({
   useActivityStreamInvalidations: () => undefined,
+  useLiveProgress: () => ({}),
 }));
 vi.mock("../../lib/processing/files-queries", () => ({
   useProcessingFilesQuery: () => ({

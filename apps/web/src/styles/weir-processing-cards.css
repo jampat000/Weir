@@ -239,7 +239,9 @@
   );
   transform: scaleX(calc(var(--mm-live-fill) / 100));
   transform-origin: left center;
-  transition: transform 0.25s linear;
+  /* The live-progress stream sends a fresh value about once a second (#750); a transition almost as
+     long as that gap reads as steady movement rather than a dart followed by a pause. */
+  transition: transform 0.9s linear;
 }
 
 /* A band of light crossing the fill, moved instead of the gradient's own position (#719). */
