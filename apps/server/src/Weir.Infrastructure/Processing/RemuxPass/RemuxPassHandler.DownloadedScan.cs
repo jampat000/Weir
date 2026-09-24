@@ -14,7 +14,7 @@ public sealed partial class RemuxPassHandler
     /// </summary>
     private async Task DownloadedScanAsync(WireObject result, string mediaScope, WireObject? origin)
     {
-        if (_downloadedScan is null || !PassWroteOutput(result, out var outputPath) || result.Get("library_id") is not WireInteger libraryValue)
+        if (!PassWroteOutput(result, out var outputPath) || result.Get("library_id") is not WireInteger libraryValue)
         {
             return;
         }

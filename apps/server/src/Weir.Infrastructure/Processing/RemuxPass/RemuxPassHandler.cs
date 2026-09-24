@@ -28,7 +28,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
     private readonly RemuxPassRunner _runner;
     private readonly IFailurePolicy _failurePolicy;
     private readonly HandoffCompletionReporter? _reporter;
-    private readonly DownloadedScanNotifier? _downloadedScan;
+    private readonly DownloadedScanNotifier _downloadedScan;
     private readonly ProcessingJobStore? _jobs;
     private readonly OperatorSettingsStore _operatorSettings;
     private readonly TimeProvider _time;
@@ -43,10 +43,10 @@ public sealed partial class RemuxPassHandler : IJobHandler
         OperatorSettingsStore operatorSettings,
         TimeProvider time,
         ILogger<RemuxPassHandler> logger,
+        DownloadedScanNotifier downloadedScan,
         HandoffCompletionReporter? reporter = null,
         ProcessingJobStore? jobs = null,
-        LiveProgressStore? liveProgress = null,
-        DownloadedScanNotifier? downloadedScan = null)
+        LiveProgressStore? liveProgress = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -55,10 +55,10 @@ public sealed partial class RemuxPassHandler : IJobHandler
         _operatorSettings = operatorSettings ?? throw new ArgumentNullException(nameof(operatorSettings));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _downloadedScan = downloadedScan ?? throw new ArgumentNullException(nameof(downloadedScan));
         _reporter = reporter;
         _jobs = jobs;
         _liveProgress = liveProgress ?? new LiveProgressStore();
-        _downloadedScan = downloadedScan;
     }
 
     /// <summary>

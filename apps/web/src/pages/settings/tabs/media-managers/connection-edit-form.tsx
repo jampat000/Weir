@@ -49,14 +49,24 @@ function sameForm(a: EditForm, b: EditForm): boolean {
   );
 }
 
-/** A blank API key means "leave the saved one alone" — it is only sent when someone typed one. */
-function changesFrom(form: EditForm): MediaManagerConnectionUpdate {
+/**
+ * A blank API key means "leave the saved one alone" — it is only sent when someone typed one.
+ * `downloaded_scan_enabled` is only sent for a kind that offers it; a Deluno connection never shows
+ * the toggle, so its own hand-off setup is never touched by editing name or address.
+ */
+function changesFrom(
+  form: EditForm,
+  kind: MediaManagerConnection["kind"],
+): MediaManagerConnectionUpdate {
   const changes: MediaManagerConnectionUpdate = {
     name: form.name.trim(),
     base_url: form.base_url.trim(),
-    downloaded_scan_enabled: form.downloaded_scan_enabled,
   };
   if (form.api_key.trim()) changes.api_key = form.api_key.trim();
+  if (DOWNLOADED_SCAN_KINDS.has(kind)) {
+    changes.downloaded_scan_enabled = form.downloaded_scan_enabled;
+  }
+
   return changes;
 }
 
@@ -84,7 +94,7 @@ export function ConnectionEditForm({
 
   const save = () =>
     update.mutate(
-      { id: connection.id, data: changesFrom(form) },
+      { id: connection.id, data: changesFrom(form, connection.kind) },
       { onSuccess: onClose },
     );
 
@@ -141,8 +151,9 @@ export function ConnectionEditForm({
               Scan for downloaded files after cleaning
             </span>
             <span className="mm-library-toggle__hint">
-              After Weir cleans a file, ask {MEDIA_MANAGER_KIND_LABELS[connection.kind]}{" "}
-              to import it with its Downloaded Scan command. Off by default.
+              After Weir cleans a file, ask{" "}
+              {MEDIA_MANAGER_KIND_LABELS[connection.kind]} to import it with its
+              Downloaded Scan command. Off by default.
             </span>
           </span>
         </label>

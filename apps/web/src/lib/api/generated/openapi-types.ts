@@ -3219,6 +3219,12 @@ export interface components {
       /** Csrf Token */
       csrf_token: string;
       /**
+       * Downloaded Scan Enabled
+       * @description Sonarr/Radarr only: after Weir cleans a file, ask this connection to run its Downloaded Scan command over it.
+       * @default false
+       */
+      downloaded_scan_enabled: boolean;
+      /**
        * Enabled
        * @default true
        */
@@ -3248,6 +3254,11 @@ export interface components {
        * @description Address Weir uses to reach this manager. Empty means not set.
        */
       base_url: string;
+      /**
+       * Downloaded Scan Enabled
+       * @description Sonarr/Radarr only: after Weir cleans a file, ask this connection to run its Downloaded Scan command over it.
+       */
+      downloaded_scan_enabled: boolean;
       /** Enabled */
       enabled: boolean;
       /** Id */
@@ -3313,6 +3324,11 @@ export interface components {
       base_url?: string | null;
       /** Csrf Token */
       csrf_token: string;
+      /**
+       * Downloaded Scan Enabled
+       * @description Sonarr/Radarr only: after Weir cleans a file, ask this connection to run its Downloaded Scan command over it. Omit to leave it alone.
+       */
+      downloaded_scan_enabled?: boolean | null;
       /** Enabled */
       enabled?: boolean | null;
       /** Name */

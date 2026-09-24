@@ -59,9 +59,9 @@ public sealed class RemuxPassHandlerDownloadedScanTests : IDisposable
             new QueueingFailurePolicy(_fixture.Jobs),
             TimeProvider.System,
             NullLogger<RemuxPassHandler>.Instance,
+            downloadedScan,
             _fixture.Reporter,
-            _fixture.Jobs,
-            downloadedScan: downloadedScan);
+            _fixture.Jobs);
     }
 
     private async Task<long> LibraryAsync()

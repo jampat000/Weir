@@ -2601,6 +2601,12 @@
             "title": "Csrf Token",
             "type": "string"
           },
+          "downloaded_scan_enabled": {
+            "default": false,
+            "description": "Sonarr/Radarr only: after Weir cleans a file, ask this connection to run its Downloaded Scan command over it.",
+            "title": "Downloaded Scan Enabled",
+            "type": "boolean"
+          },
           "enabled": {
             "default": true,
             "title": "Enabled",
@@ -2657,6 +2663,11 @@
             "description": "Address Weir uses to reach this manager. Empty means not set.",
             "title": "Base Url",
             "type": "string"
+          },
+          "downloaded_scan_enabled": {
+            "description": "Sonarr/Radarr only: after Weir cleans a file, ask this connection to run its Downloaded Scan command over it.",
+            "title": "Downloaded Scan Enabled",
+            "type": "boolean"
           },
           "enabled": {
             "title": "Enabled",
@@ -2752,7 +2763,8 @@
           "base_url",
           "api_key_is_saved",
           "webhook_secret_is_set",
-          "webhook_url_path"
+          "webhook_url_path",
+          "downloaded_scan_enabled"
         ],
         "title": "MediaManagerConnectionOut",
         "type": "object"
@@ -2833,6 +2845,18 @@
             "minLength": 1,
             "title": "Csrf Token",
             "type": "string"
+          },
+          "downloaded_scan_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sonarr/Radarr only: after Weir cleans a file, ask this connection to run its Downloaded Scan command over it. Omit to leave it alone.",
+            "title": "Downloaded Scan Enabled"
           },
           "enabled": {
             "anyOf": [

@@ -89,6 +89,7 @@ public sealed class HandoffScanSingleProcessingTests : IDisposable
             _fixture.OperatorSettings,
             TimeProvider.System,
             NullLogger<RemuxPassHandler>.Instance,
+            new DownloadedScanNotifier(_fixture.Connections, _fixture.Http, NullLogger<DownloadedScanNotifier>.Instance),
             _fixture.Reporter);
     }
 
