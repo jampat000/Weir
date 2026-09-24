@@ -183,6 +183,7 @@ If you want to override defaults with an env file instead of inline `environment
 | `WEIR_SESSION_COOKIE_SECURE` | Whether the session cookie is marked HTTPS-only. Defaults to `auto`: the cookie is HTTPS-only when the request arrives over HTTPS (directly, or through a proxy listed in `WEIR_TRUSTED_PROXY_IPS`), so plain `http://` LAN access keeps working. Set `true` to always require HTTPS, or `false` to never require it. |
 | `WEIR_TRUSTED_PROXY_IPS` | The IP or CIDR of your immediate reverse proxy. Weir only trusts `X-Forwarded-For` and `X-Forwarded-Proto` from these addresses. Set it when you put Weir behind a proxy. |
 | `WEIR_CORS_ORIGINS` | Allowed browser origins for credentialed cross-origin requests. Weir refuses to start with `WEIR_CORS_ORIGINS=*` — list real origins instead. |
+| `WEIR_ALLOWED_HOSTS` | Extra `Host` header values Weir accepts, beyond IP literals, `localhost`, single-label and local-network names, and the CORS/trusted-browser origins above. Set it to your reverse-proxy domain; a leading `*.` also allows its subdomains. |
 
 ### File ownership
 

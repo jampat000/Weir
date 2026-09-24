@@ -25,7 +25,9 @@ public static class WeirOptionsLoader
     {
         ArgumentNullException.ThrowIfNull(runtime);
 
-        var env = Or(runtime.Get("WEIR_ENV"), "development").Trim().ToLowerInvariant();
+        // An unset WEIR_ENV means production: a source or systemd install that never set it should get
+        // ASP.NET's production error handling, not the developer exception page.
+        var env = Or(runtime.Get("WEIR_ENV"), "production").Trim().ToLowerInvariant();
         var level = Or(Or(runtime.Get("WEIR_LOG_LEVEL"), "INFO").Trim(), "INFO");
         var cors = ParseCsv(runtime.Get("WEIR_CORS_ORIGINS"));
         var session = NullIfEmpty(runtime.Get("WEIR_SESSION_SECRET")?.Trim());
@@ -65,6 +67,7 @@ public static class WeirOptionsLoader
         }
 
         var trustedProxyIps = ParseCsv(runtime.Get("WEIR_TRUSTED_PROXY_IPS"));
+        var allowedHosts = ParseCsv(runtime.Get("WEIR_ALLOWED_HOSTS"));
         var loginMax = Math.Max(1, EnvInt(runtime, "WEIR_AUTH_LOGIN_RATE_MAX_ATTEMPTS", 10));
         var loginWindow = Math.Max(1, EnvInt(runtime, "WEIR_AUTH_LOGIN_RATE_WINDOW_SECONDS", 60));
         var bootstrapMax = Math.Max(1, EnvInt(runtime, "WEIR_BOOTSTRAP_RATE_MAX_ATTEMPTS", 10));
@@ -115,6 +118,7 @@ public static class WeirOptionsLoader
             SessionTrustedAbsoluteDays = trustedAbsoluteDays,
             TrustedBrowserOriginsOverride = trustedOverride,
             TrustedProxyIps = trustedProxyIps,
+            AllowedHosts = allowedHosts,
             AuthLoginRateMaxAttempts = loginMax,
             AuthLoginRateWindowSeconds = loginWindow,
             BootstrapRateMaxAttempts = bootstrapMax,

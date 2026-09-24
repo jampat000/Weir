@@ -42,6 +42,13 @@ public sealed record WeirOptions
     public required long SessionTrustedAbsoluteDays { get; init; }
     public required IReadOnlyList<string> TrustedBrowserOriginsOverride { get; init; }
     public required IReadOnlyList<string> TrustedProxyIps { get; init; }
+
+    /// <summary>
+    /// Extra Host header values the allow-list middleware accepts beyond IP literals, <c>localhost</c>,
+    /// single-label and local-network names, and the CORS/trusted-browser origins (<c>WEIR_ALLOWED_HOSTS</c>,
+    /// comma-separated). A reverse-proxy domain belongs here. A leading <c>*.</c> also allows its subdomains.
+    /// </summary>
+    public required IReadOnlyList<string> AllowedHosts { get; init; }
     public required long AuthLoginRateMaxAttempts { get; init; }
     public required long AuthLoginRateWindowSeconds { get; init; }
     public required long BootstrapRateMaxAttempts { get; init; }

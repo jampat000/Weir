@@ -1,4 +1,5 @@
 using System.Net;
+using Weir.Api.Http;
 using Weir.Api.Web;
 
 namespace Weir.Api.Tests;
@@ -115,9 +116,11 @@ public sealed class WebAppTests
         Assert.Equal("public, max-age=31536000, immutable", Header(brotli, "Cache-Control"));
         Assert.Equal("Accept-Encoding", Header(brotli, "Vary"));
         Assert.Equal("application/javascript", brotli.Content.Headers.ContentType?.ToString());
-        // Static assets are served outside the security-header middleware.
+        // Static assets are served outside RequestContextMiddleware, but the asset middleware applies
+        // the baseline security headers itself since it answers before SecurityHeadersMiddleware runs.
         Assert.Equal(string.Empty, Header(brotli, "X-Request-ID"));
-        Assert.Equal(string.Empty, Header(brotli, "Content-Security-Policy"));
+        Assert.Equal(SecurityHeadersMiddleware.ApiContentSecurityPolicy, Header(brotli, "Content-Security-Policy"));
+        Assert.Equal("nosniff", Header(brotli, "X-Content-Type-Options"));
 
         using var gzip = await Get(server, "/assets/app-abc123.js", acceptEncoding: "br;q=0, gzip");
         Assert.Equal("gzip-bytes", await gzip.Content.ReadAsStringAsync());

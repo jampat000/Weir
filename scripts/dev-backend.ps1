@@ -21,6 +21,11 @@ if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
 
 Import-WeirDotEnv -RepoRoot $repoRoot
 
+if (-not ($env:WEIR_ENV -and $env:WEIR_ENV.Trim())) {
+    # An unset WEIR_ENV now means production (the developer exception page and the loopback
+    # origin pairing below are development-only), so this local launcher opts in explicitly.
+    $env:WEIR_ENV = "development"
+}
 if (-not ($env:WEIR_HOME -and $env:WEIR_HOME.Trim())) {
     $env:WEIR_HOME = Join-Path $repoRoot ".local-dev-home"
 }

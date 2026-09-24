@@ -35,6 +35,7 @@ public static class WeirApi
         services.TryAddSingleton<RuntimeMetricsStore>();
         services.AddSingleton<AuthService>();
         services.AddSingleton<AuthRateLimiters>();
+        services.AddSingleton<SetupCodeGate>();
         services.AddSingleton<ConfigurationBackups>();
         services.AddSingleton<UpdateFiles>();
         services.AddSingleton<IReleaseCatalogClient, GitHubReleaseCatalogClient>();
@@ -59,10 +60,10 @@ public static class WeirApi
     }
 
     /// <summary>
-    /// The middleware, outermost first: the server's error response, forwarded headers (trusted proxies only), compressed
-    /// assets, CORS (when origins are configured), the trusted-proxy scheme, HEAD-as-GET, the
-    /// X-Requested-With check, request context, security headers, then routes, the static mount and the
-    /// 404 handler.
+    /// The middleware, outermost first: the server's error response, forwarded headers (trusted proxies only),
+    /// the Host allow-list, compressed assets, CORS (when origins are configured), the trusted-proxy scheme,
+    /// HEAD-as-GET, the X-Requested-With check, request context, security headers, then routes, the static
+    /// mount and the 404 handler.
     /// </summary>
     public static WebApplication UseWeirApi(this WebApplication app)
     {
@@ -71,6 +72,9 @@ public static class WeirApi
         var webDist = app.Services.GetRequiredService<WebDist>();
         app.UseMiddleware<ServerErrorMiddleware>();
         app.UseTrustedForwardedHeaders(options);
+        // Before everything else that could answer a request: a rejected Host never reaches static
+        // assets, CORS or routing.
+        app.UseMiddleware<HostAllowListMiddleware>();
         if (webDist.MountedAtStartup)
         {
             app.UseMiddleware<CompressedStaticAssetsMiddleware>();

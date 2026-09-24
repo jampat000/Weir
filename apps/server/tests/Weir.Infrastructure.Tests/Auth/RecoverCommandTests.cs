@@ -113,7 +113,7 @@ public sealed class RecoverCommandTests
             new FakePasswordPrompt(isInteractive: false));
 
         Assert.Equal(RecoverCommand.ExitOk, exit);
-        Assert.Equal(string.Empty, stderr.ToString());
+        Assert.Contains("--password stays in your shell history", stderr.ToString());
         Assert.Contains("Password reset for 'james'.", stdout.ToString());
         Assert.Contains("The account is active and has the admin role.", stdout.ToString());
         Assert.Contains("2 signed-in sessions were ended — sign in again with the new password.", stdout.ToString());
@@ -251,7 +251,8 @@ public sealed class RecoverCommandTests
             new FakePasswordPrompt(isInteractive: false));
 
         Assert.Equal(RecoverCommand.ExitFailed, exit);
-        Assert.StartsWith("Could not reset the password:", stderr.ToString());
+        Assert.Contains("--password stays in your shell history", stderr.ToString());
+        Assert.Contains("Could not reset the password:", stderr.ToString());
 
         var user = await fixture.WithUnitOfWork(uow => AuthStore.FindUserByLowerUsernameAsync(uow, "james"));
         Assert.Equal(PasswordVerification.Match, PasswordHasher.Verify(OldPassword, user!.PasswordHash));
