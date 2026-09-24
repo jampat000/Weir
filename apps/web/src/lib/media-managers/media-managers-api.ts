@@ -34,6 +34,7 @@ export interface MediaManagerConnection {
   api_key_is_saved: boolean;
   webhook_secret_is_set: boolean;
   webhook_url_path: string;
+  unsigned_webhook_warning: string | null;
   last_test_ok: boolean | null;
   last_test_at: string | null;
   last_test_detail: string | null;
