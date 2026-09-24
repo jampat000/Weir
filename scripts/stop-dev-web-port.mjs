@@ -1,62 +1,80 @@
 #!/usr/bin/env node
 /**
- * Stops **this worktree's** dev web server (Vite) and nothing else.
+ * Stops **this worktree's** dev web server (Vite) — the one
+ * `apps/web/scripts/run-dev-stack.mjs` spawned and recorded in `.dev-web.pid` at the repo root —
+ * and nothing else.
  *
  * Like stop-dev-api-port.mjs, it identifies the exact process before touching it, and never stops
- * something merely because it holds the port: another worktree's Vite, or any other program, can be
- * listening on the same number. The process `npm run dev` starts for the web app runs this worktree's
- * `apps/web/node_modules/vite/bin/vite.js` (apps/web/scripts/run-dev-stack.mjs), so a listener on the dev
- * web port is stopped only when its command line names that file.
+ * whatever happens to be *listening on the dev web port*: another worktree's Vite, an installed
+ * Weir's static file server, or any other program can be listening on that same number.
  *
- * Use when `npm run dev` fails with "Port 8782 is already in use" (a leftover Vite from this worktree).
- * The port comes from scripts/dev-ports.json, or WEIR_DEV_WEB_PORT.
+ * Use when `npm run dev` fails with "Port 8782 is already in use" (a leftover Vite from this
+ * worktree), or the port is otherwise stuck. Then run `npm run dev` again from `apps/web`.
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { platform } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const viteEntry = path.join(repoRoot, "apps", "web", "node_modules", "vite", "bin", "vite.js");
+const pidFilePath = path.join(repoRoot, ".dev-web.pid");
 const isWindows = platform() === "win32";
 
-function readWebPort() {
-  const forced = (process.env.WEIR_DEV_WEB_PORT || "").trim();
-  const raw = forced || JSON.parse(readFileSync(path.join(repoRoot, "scripts", "dev-ports.json"), "utf8")).development.webPort;
-  const port = Number(raw);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error(`Not a port: ${raw}`);
+function removePidFile() {
+  try {
+    rmSync(pidFilePath, { force: true });
+  } catch {
+    /* ignore — best-effort cleanup */
   }
-  return port;
 }
 
-function output(command, args) {
+function readRecordedProcess() {
+  if (!existsSync(pidFilePath)) {
+    return null;
+  }
   try {
-    return execFileSync(command, args, { encoding: "utf8", windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
+    const raw = JSON.parse(readFileSync(pidFilePath, "utf8"));
+    const pid = Number(raw?.pid);
+    const viteEntry = String(raw?.viteEntry || "");
+    if (!Number.isInteger(pid) || pid <= 0 || !viteEntry) {
+      return null;
+    }
+    return { pid, viteEntry };
   } catch {
-    // No listener (lsof exits 1) or the tool is missing: either way, nothing identified.
-    return "";
+    return null;
   }
 }
 
 function powershell(script) {
-  return output("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script]);
+  try {
+    return execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
+      encoding: "utf8",
+      windowsHide: true,
+    });
+  } catch {
+    return "";
+  }
 }
 
-/** Process ids listening on the port. */
-function listeners(port) {
-  const out = isWindows
-    ? powershell(`Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique`)
-    : output("lsof", ["-i", `TCP:${port}`, "-sTCP:LISTEN", "-t"]);
-  return [...new Set(out.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^\d+$/.test(line)))].map(Number);
-}
-
-/** The full command line of a running process, or "" when it is gone or unreadable. */
+/**
+ * The full command line of a running process, or "" when it is gone or unreadable. On Windows,
+ * `Get-CimInstance Win32_Process` is what lets us tell "this PID is Node running *our* Vite
+ * entrypoint" apart from "this PID happens to exist and answers to the same number" (PIDs are
+ * recycled by the OS soon after a process exits, so the bare fact that some process has this PID
+ * proves nothing on its own).
+ */
 function commandLine(pid) {
-  return isWindows
-    ? powershell(`(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}" -ErrorAction SilentlyContinue).CommandLine`).trim()
-    : output("ps", ["-p", String(pid), "-o", "command="]).trim();
+  if (isWindows) {
+    return powershell(
+      `(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}" -ErrorAction SilentlyContinue).CommandLine`,
+    ).trim();
+  }
+  try {
+    return execFileSync("ps", ["-p", String(pid), "-o", "command="], { encoding: "utf8" }).trim();
+  } catch {
+    return "";
+  }
 }
 
 /** Compares paths the way the platform does: case-insensitive with either slash on Windows. */
@@ -66,7 +84,7 @@ function mentions(line, file) {
   return normalize(line).includes(normalize(file));
 }
 
-function stop(pid) {
+function stopProcessTree(pid) {
   try {
     if (isWindows) {
       execFileSync("taskkill", ["/T", "/F", "/PID", String(pid)], { stdio: "inherit" });
@@ -79,28 +97,45 @@ function stop(pid) {
   }
 }
 
-const port = readWebPort();
-const pids = listeners(port);
-if (pids.length === 0) {
-  console.error(`[stop-dev-web-port] Nothing is listening on port ${port}.`);
+const recorded = readRecordedProcess();
+
+if (!recorded) {
+  console.error(
+    "[stop-dev-web-port] No recorded dev web process for this worktree (.dev-web.pid missing " +
+      "or unreadable) — nothing to stop. This only stops a process `npm run dev` itself started; " +
+      "it never scans the port for arbitrary listeners (that could be an installed Weir or " +
+      "another worktree's Vite).",
+  );
   process.exit(0);
 }
 
-for (const pid of pids) {
-  const line = commandLine(pid);
-  if (!line) {
-    console.error(`[stop-dev-web-port] PID ${pid} on port ${port} is gone or its command line cannot be read; leaving it.`);
-    continue;
-  }
-  if (!mentions(line, viteEntry)) {
-    console.error(
-      `[stop-dev-web-port] PID ${pid} on port ${port} is not this worktree's dev web server (its command line does not ` +
-        `run ${viteEntry}); leaving it alone. Stop it yourself, or set WEIR_DEV_WEB_PORT to use another port.`,
-    );
-    continue;
-  }
-  console.error(`[stop-dev-web-port] Stopping this worktree's dev web server (PID ${pid}, port ${port}).`);
-  if (!stop(pid)) {
-    console.error(`[stop-dev-web-port] Could not stop PID ${pid}; close the terminal running Vite, or use an elevated shell.`);
-  }
+const line = commandLine(recorded.pid);
+
+if (!line) {
+  console.error(
+    `[stop-dev-web-port] Recorded PID ${recorded.pid} is not running (already stopped, or the ` +
+      "machine restarted) — clearing the stale record.",
+  );
+  removePidFile();
+  process.exit(0);
 }
+
+if (!mentions(line, recorded.viteEntry)) {
+  console.error(
+    `[stop-dev-web-port] PID ${recorded.pid} is running but is not this worktree's dev web server ` +
+      `— its command line does not reference ${recorded.viteEntry}. The OS likely reused the PID ` +
+      "for an unrelated process after the dev web server exited. Leaving it alone: not knowing is " +
+      "not permission. Clearing the stale record.",
+  );
+  removePidFile();
+  process.exit(0);
+}
+
+console.error(`[stop-dev-web-port] Stopping this worktree's dev web server (PID ${recorded.pid}).`);
+if (!stopProcessTree(recorded.pid)) {
+  console.error(
+    `[stop-dev-web-port] Could not stop PID ${recorded.pid} — close the terminal running Vite, ` +
+      "or run this from an elevated shell.",
+  );
+}
+removePidFile();

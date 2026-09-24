@@ -66,6 +66,9 @@ Optional path overrides (defaults are under `WEIR_HOME`):
 
 - `WEIR_HOME`, `WEIR_DB_PATH`, `WEIR_BACKUP_DIR`, `WEIR_LOG_DIR`, `WEIR_TEMP_DIR`
 
+`WEIR_ENV` defaults to `production` when unset, so the developer exception page only appears when
+you set `WEIR_ENV=development` yourself — `npm run dev` and `dev-backend.ps1` already do this for you.
+
 ### Build and test
 
 ```powershell
@@ -167,7 +170,7 @@ cd ../..
 Contract suite:
 
 ```powershell
-python -m pytest tests/contract -q --contract-required-only
+python -m pytest tests/contract -q
 ```
 
 E2E:
