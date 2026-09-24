@@ -65,7 +65,7 @@ const STATE_CHIPS: {
   {
     id: "left_alone",
     label: "Left alone",
-    hint: "You set these aside; nothing cleans them until you say otherwise",
+    hint: "You marked these Left alone; nothing cleans them until you clear it",
     count: (totals) => totals.left_alone,
   },
 ];

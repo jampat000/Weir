@@ -57,14 +57,15 @@ body.mm-drawer-open {
   font-weight: 600;
   line-height: 1.3;
   color: var(--mm-text1);
+  /* A file name is one long word to the browser: break it anywhere rather than push the panel sideways. */
+  overflow-wrap: anywhere;
 }
 
+/* The whole path, wrapped: the folder it sits in is the part that tells two copies apart. */
 .mm-drawer__path {
   margin: 4px 0 0;
-  overflow: hidden;
   font-size: 0.75rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   color: var(--mm-text3);
 }
 
@@ -175,6 +176,7 @@ body.mm-drawer-open {
 .mm-drawer__track-name {
   font-size: var(--mm-type-body);
   color: var(--mm-text1);
+  overflow-wrap: anywhere;
 }
 
 .mm-drawer__track-why {
@@ -194,6 +196,9 @@ body.mm-drawer-open {
 .mm-drawer__track--choosable > input {
   grid-row: span 2;
   align-self: center;
+  /* A 24px target for a finger or a shaky hand, not just the native box's own size. */
+  width: 24px;
+  height: 24px;
   accent-color: var(--mm-accent);
 }
 
@@ -214,8 +219,51 @@ body.mm-drawer-open {
 }
 
 .mm-drawer__aside input {
-  margin-top: 2px;
+  flex-shrink: 0;
+  /* A 24px target for a finger or a shaky hand, not just the native box's own size. */
+  width: 24px;
+  height: 24px;
   accent-color: var(--mm-accent);
+}
+
+.mm-drawer__aside-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* How an action in the panel went: quiet while it works or once it has, marked when it failed. */
+.mm-drawer__status {
+  margin: 0;
+  font-size: var(--mm-type-caption);
+  line-height: 1.5;
+  color: var(--mm-text2);
+}
+
+.mm-drawer__status:empty {
+  display: none;
+}
+
+.mm-drawer__failure {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--mm-radius-sm);
+  border: 1px solid var(--mm-warning-border);
+  background: var(--mm-status-failed-bg);
+  font-size: var(--mm-type-caption);
+  line-height: 1.5;
+  color: var(--mm-text1);
+}
+
+/* Download again: what a past clean took that the rules now keep, and the one way to get it back. */
+.mm-drawer__redownload {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--mm-border);
+  border-radius: var(--mm-radius-sm);
 }
 
 .mm-drawer__actions {
