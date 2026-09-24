@@ -107,6 +107,7 @@ public sealed class SchemaMigrator
         new(14, "0049_link_imported_libraries", "Weir.Infrastructure.Migrations.0014_link_imported_libraries.sql"),
         new(15, "0050_handback_outcomes", "Weir.Infrastructure.Migrations.0015_handback_outcomes.sql"),
         new(16, "0051_handoff_owning_connection", "Weir.Infrastructure.Migrations.0016_handoff_owning_connection.sql"),
+        new(17, "0052_handoff_targets", "Weir.Infrastructure.Migrations.0017_handoff_targets.sql"),
         new(18, "0053_query_indexes", "Weir.Infrastructure.Migrations.0018_query_indexes.sql"),
     ];
 
