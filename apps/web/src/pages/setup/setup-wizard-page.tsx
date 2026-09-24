@@ -20,6 +20,7 @@ import {
   FolderInput,
   WizardLoadFailed,
   WizardSection,
+  WizardWhatsNext,
 } from "./setup-wizard-parts";
 import {
   firstLibraryOfType,
@@ -88,10 +89,12 @@ function WizardForm({
 }) {
   const [draft, setDraft] = useState(() => initialDraft(settings, libraries));
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const { save, pending } = useWizardSave({
+  const [finished, setFinished] = useState(false);
+  const { finish, skip, pending } = useWizardSave({
     settings,
     libraries,
     onMessage: setStatusMessage,
+    onFinished: () => setFinished(true),
   });
   const timezoneOptions = useMemo(
     () =>
@@ -104,6 +107,10 @@ function WizardForm({
   const setFolders = (key: "movie" | "tv", folders: LibraryFolders) =>
     setDraft((current) => ({ ...current, [key]: folders }));
 
+  if (finished) {
+    return <WizardWhatsNext />;
+  }
+
   return (
     <main className="mm-auth-body" id="mm-main-content" tabIndex={-1}>
       <div className="mm-auth-frame mm-setup-wizard-frame">
@@ -113,7 +120,7 @@ function WizardForm({
           <h1 className="mm-auth-title">Set up Weir</h1>
           <p className="mm-auth-lead">
             A few basics to get Weir going. Everything here can be changed later
-            in Settings and Processing, and you can skip it for now.
+            in Settings, and you can skip it for now.
           </p>
 
           <div className="mm-quiet-stack mt-5">
@@ -144,7 +151,7 @@ function WizardForm({
             <WizardSection
               headingId="setup-wizard-libraries-heading"
               title="Libraries"
-              description="Where your downloader finishes files, and where Weir puts them once cleaned for your media manager to import. This fills in your first Movies and TV library. Add more under Settings › Libraries, and set their audio and subtitle rules under Settings › Rules."
+              description="Where your downloader finishes files, and where Weir puts them once cleaned for your media manager to import. This fills in your first Movies and TV library. Add more libraries in Settings › Libraries, and choose which tracks to keep in Settings › Rules."
             >
               <div className="mm-wizard-libraries">
                 {LIBRARY_GROUPS.map((group) => (
@@ -207,7 +214,7 @@ function WizardForm({
             <button
               type="button"
               className="mm-auth-submit"
-              onClick={() => void save(draft, "completed")}
+              onClick={() => void finish(draft)}
               disabled={pending}
             >
               {pending
@@ -220,7 +227,7 @@ function WizardForm({
               type="button"
               data-testid="setup-wizard-skip"
               className={mmActionButtonClass({ variant: "secondary" })}
-              onClick={() => void save(draft, "skipped")}
+              onClick={() => void skip()}
               disabled={pending}
             >
               Skip for now

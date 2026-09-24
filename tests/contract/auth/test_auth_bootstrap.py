@@ -6,10 +6,25 @@ from collections.abc import Iterator
 
 import pytest
 
-from tests.contract.auth import _helpers as h
 from tests.contract.support import seed
-from tests.contract.support.client import API, WeirClient
+from tests.contract.support.client import ADMIN_USERNAME, API, WeirClient
 from tests.contract.support.launcher import ServerUnderTest
+
+
+def test_bootstrap_returns_a_working_session(server_factory, client_factory) -> None:
+    """The cookie bootstrap sets already signs the new admin in: no separate login step (#704)."""
+
+    sut = server_factory()
+    c = client_factory(sut)
+    assert c.bootstrap().status_code == 200
+
+    r_me = c.get(f"{API}/auth/me")
+    assert r_me.status_code == 200, r_me.text
+    assert r_me.json()["user"]["username"] == ADMIN_USERNAME
+
+    r_session = c.get(f"{API}/auth/session")
+    assert r_session.status_code == 200, r_session.text
+    assert r_session.json()["current"] is True
 
 
 def test_bootstrap_allowed_when_no_admin(server_factory, client_factory) -> None:
@@ -22,8 +37,13 @@ def test_bootstrap_allowed_when_no_admin(server_factory, client_factory) -> None
     assert r_b.status_code == 200, r_b.text
     assert r_b.json()["username"] == "owner1"
     assert c.get(f"{API}/auth/bootstrap/status").json()["bootstrap_allowed"] is False
-    r_login = h.post_login(c, "owner1", "first-owner-pass-min8")
-    assert r_login.status_code == 200, r_login.text
+
+    # Bootstrap signs the new admin in directly (#704): the cookie it just set already works, with
+    # no separate login required.
+    r_me = c.get(f"{API}/auth/me")
+    assert r_me.status_code == 200, r_me.text
+    assert r_me.json()["user"]["username"] == "owner1"
+
     r_act = c.get(f"{API}/activity/recent")
     assert r_act.status_code == 200, r_act.text
     et = {x["event_type"] for x in r_act.json()["items"]}

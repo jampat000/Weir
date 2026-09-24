@@ -118,7 +118,7 @@ export interface paths {
      * @description Create the first ``admin`` user once per Weir installation (guarded + rate limited).
      *
      *     Requires the same CSRF + Origin/Referer posture as ``POST /login``. After success,
-     *     callers use ``POST /login`` normally. Not available once any ``admin`` user exists.
+     *     this browser is signed in as the new admin. Not available once any ``admin`` user exists.
      */
     post: operations["post_bootstrap_api_v1_auth_bootstrap_post"];
     delete?: never;
@@ -1573,7 +1573,11 @@ export interface paths {
     /** Get Configuration Backups */
     get: operations["get_configuration_backups_api_v1_suite_configuration_backups_get"];
     put?: never;
-    post?: never;
+    /**
+     * Post Configuration Backup
+     * @description Write a configuration snapshot now, beside the scheduled ones.
+     */
+    post: operations["post_configuration_backup_api_v1_suite_configuration_backups_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1630,6 +1634,26 @@ export interface paths {
     };
     /** Get Suite Logs */
     get: operations["get_suite_logs_api_v1_suite_logs_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/suite/logs/download": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Download Suite Logs
+     * @description The whole server log as a file, one JSON entry per line.
+     */
+    get: operations["download_suite_logs_api_v1_suite_logs_download_get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -2123,6 +2147,7 @@ export interface components {
     BootstrapOut: {
       /** Message */
       message: string;
+      user: components["schemas"]["UserPublic"];
       /** Username */
       username: string;
     };
@@ -2170,6 +2195,14 @@ export interface components {
       message: string;
       /** Username */
       username: string;
+    };
+    /**
+     * ConfigurationBackupCreateIn
+     * @description Body for POST /suite/configuration-backups.
+     */
+    ConfigurationBackupCreateIn: {
+      /** Csrf Token */
+      csrf_token: string;
     };
     /**
      * ConfigurationBundleImportIn
@@ -9646,6 +9679,39 @@ export interface operations {
       };
     };
   };
+  post_configuration_backup_api_v1_suite_configuration_backups_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ConfigurationBackupCreateIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SuiteConfigurationBackupItemOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   download_configuration_backup_api_v1_suite_configuration_backups__backup_id__download_get: {
     parameters: {
       query?: never;
@@ -9764,6 +9830,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  download_suite_logs_api_v1_suite_logs_download_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/x-ndjson": string;
         };
       };
     };

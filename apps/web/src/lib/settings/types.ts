@@ -23,6 +23,7 @@ export type AppSettingsPutBody = RequestBody<"SuiteSettingsPutIn">;
 
 export type SecurityOverview = Schema<"SuiteSecurityOverviewOut">;
 export type ConfigurationBackupList = Schema<"SuiteConfigurationBackupListOut">;
+export type ConfigurationBackupItem = Schema<"SuiteConfigurationBackupItemOut">;
 export type UpdateStatus = Schema<"SuiteUpdateStatusOut">;
 export type UpdateSettingsOut = Schema<"UpdateSettingsOut">;
 export type UpdateMode = UpdateSettingsOut["mode"];

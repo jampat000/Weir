@@ -316,6 +316,8 @@ html[data-mm-theme="light"] .mm-activity-item__structured {
   color: var(--mm-text2);
   font-size: 0.74rem;
   line-height: 1.35;
+  /* A long release name wraps rather than being cut mid-title. */
+  overflow-wrap: anywhere;
 }
 
 .mm-activity-cluster__summary:focus-visible {

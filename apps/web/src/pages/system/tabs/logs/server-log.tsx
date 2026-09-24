@@ -2,6 +2,8 @@ import { useState } from "react";
 
 import { FactTable, type Fact } from "../../../../components/shared/fact-table";
 import { useServerLogsQuery } from "../../../../lib/settings/queries";
+import { useDebouncedValue } from "../../../../lib/ui/use-debounced-value";
+import { DownloadLogSection } from "./download-log-section";
 import { LogListSection } from "./log-list-section";
 import {
   EMPTY_LOG_SEARCH,
@@ -11,12 +13,19 @@ import {
 import { ServerDiagnostics } from "./server-diagnostics";
 import { SERVER_LOG_PAGE_SIZE } from "./server-log-format";
 
+/** How long typing pauses before the search text itself is sent; level and tracebacks apply at once. */
+const SEARCH_TEXT_DEBOUNCE_MS = 400;
+
 /** Weir's own server log (System › Logs › Server log): counts, diagnostics, search and the entries. */
 export function ServerLog() {
   const [search, setSearch] = useState<LogSearch>(EMPTY_LOG_SEARCH);
+  const debouncedText = useDebouncedValue(
+    search.text.trim(),
+    SEARCH_TEXT_DEBOUNCE_MS,
+  );
   const logsQ = useServerLogsQuery({
     level: search.level || undefined,
-    search: search.text.trim() || undefined,
+    search: debouncedText || undefined,
     has_exception: search.tracebacksOnly ? true : undefined,
     limit: SERVER_LOG_PAGE_SIZE,
   });
@@ -56,6 +65,7 @@ export function ServerLog() {
         onRefresh={() => void logsQ.refetch()}
       />
       <LogListSection logsQ={logsQ} />
+      <DownloadLogSection />
     </div>
   );
 }

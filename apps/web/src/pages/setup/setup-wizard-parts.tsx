@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { AuthBrandStack } from "../../components/brand/auth-brand-stack";
 import { ServerFolderPickerButton } from "../../components/ui/server-folder-picker-button";
+import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 
 const BACKUP_INTERVAL_OPTIONS = [
   { value: "24", label: "Every day" },
@@ -143,6 +144,58 @@ export function BackupFields({
         </label>
       </div>
     </>
+  );
+}
+
+const NEXT_STEPS = [
+  {
+    label: "Choose which tracks to keep",
+    to: "/settings?tab=rules",
+  },
+  {
+    label: "Connect Sonarr, Radarr or Deluno",
+    to: "/settings?tab=media-managers",
+  },
+  {
+    label: "Clean files you already have",
+    to: "/library",
+  },
+] as const;
+
+/** The wizard's last screen: setup is done, and here is what is worth doing next. */
+export function WizardWhatsNext() {
+  return (
+    <main className="mm-auth-body" id="mm-main-content" tabIndex={-1}>
+      <div className="mm-auth-frame">
+        <AuthBrandStack />
+        <div className="mm-auth-card">
+          <p className="mm-auth-eyebrow">First run</p>
+          <h1 className="mm-auth-title">What&apos;s next</h1>
+          <p className="mm-auth-lead">
+            Weir is set up and watching your folders. A few things are worth
+            doing next, whenever you are ready.
+          </p>
+          <ul className="mm-quiet-stack mt-4 list-none">
+            {NEXT_STEPS.map((step) => (
+              <li key={step.to}>
+                <Link
+                  to={step.to}
+                  className="font-medium text-mm-accent-bright hover:underline"
+                >
+                  {step.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <Link
+            to="/"
+            className={`${mmActionButtonClass({ variant: "primary" })} mt-6 inline-flex`}
+          >
+            Continue to Weir
+          </Link>
+        </div>
+      </div>
+    </main>
   );
 }
 

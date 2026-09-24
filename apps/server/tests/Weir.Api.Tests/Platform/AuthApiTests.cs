@@ -193,13 +193,14 @@ public sealed class AuthApiTests
         Assert.Contains("common", (await Detail(common)).ToLowerInvariant(), StringComparison.Ordinal);
 
         using var created = await client.PostAsync("/api/v1/auth/bootstrap", new { username = "owner1", password = "first-owner-pass-min8", csrf_token = await client.CsrfAsync() });
-        Assert.Equal("{\"message\":\"Bootstrap complete. Sign in with POST /api/v1/auth/login.\",\"username\":\"owner1\"}", await created.Content.ReadAsStringAsync());
+        Assert.Equal("owner1", (await Json(created))["username"]!.GetValue<string>());
         using var closed = await client.GetAsync("/api/v1/auth/bootstrap/status");
         Assert.Equal(
             "{\"bootstrap_allowed\":false,\"reason\":\"admin_already_exists\",\"requires_setup_code\":false}",
             await closed.Content.ReadAsStringAsync());
         await client.SignInAsync("owner1", "first-owner-pass-min8");
-        Assert.Equal(2, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE event_type IN ('auth.bootstrap_succeeded', 'auth.login_succeeded')"));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE event_type = 'auth.bootstrap_succeeded'"));
+        Assert.Equal(2, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE event_type = 'auth.login_succeeded'"));
         using var settings = await client.GetAsync("/api/v1/suite/settings");
         Assert.Equal("pending", (await Json(settings))["setup_wizard_state"]!.GetValue<string>());
 
@@ -213,6 +214,20 @@ public sealed class AuthApiTests
         }
 
         Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE event_type = 'auth.bootstrap_denied'"));
+    }
+
+    [Fact]
+    public async Task Creating_the_first_admin_signs_that_browser_in()
+    {
+        await using var server = await StartServerAsync();
+        var client = new ApiTestClient(server);
+
+        using var created = await client.PostAsync("/api/v1/auth/bootstrap", new { username = "owner1", password = "first-owner-pass-min8", csrf_token = await client.CsrfAsync() });
+
+        Assert.Matches("^weir_session=[A-Za-z0-9_-]{43}; HttpOnly; Max-Age=\\d+; Path=/; SameSite=lax$", Header(created, "Set-Cookie"));
+        using var me = await client.GetAsync("/api/v1/auth/me");
+        Assert.Equal(HttpStatusCode.OK, me.StatusCode);
+        Assert.Equal("owner1", (await Json(me))["user"]!["username"]!.GetValue<string>());
     }
 
     [Fact]

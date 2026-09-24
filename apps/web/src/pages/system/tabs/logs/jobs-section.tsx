@@ -1,13 +1,10 @@
 import { useId, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { LoadError } from "../../../../components/shared/load-error";
 import { MmJobsPagination } from "../../../../components/overview/mm-overview-cards";
 import { MmListboxPicker } from "../../../../components/ui/mm-listbox-picker";
 import { errorMessage } from "../../../../lib/api/error-message";
-import {
-  isHttpErrorFromApi,
-  isLikelyNetworkFailure,
-} from "../../../../lib/api/error-guards";
 import { canEdit } from "../../../../lib/auth/can-edit";
 import { useMeQuery } from "../../../../lib/auth/queries";
 import { usePauseQuery } from "../../../../lib/pause/pause-queries";
@@ -35,16 +32,6 @@ function FailedLine({ text, testId }: { text: string; testId: string }) {
       {text}
     </p>
   );
-}
-
-function loadErrorWords(error: unknown): string {
-  if (isLikelyNetworkFailure(error)) {
-    return "Could not reach the Weir API. Check that the backend is running.";
-  }
-  if (isHttpErrorFromApi(error)) {
-    return "The server refused this request. Sign in again, then try this page.";
-  }
-  return errorMessage(error, "Could not load jobs.");
 }
 
 /**
@@ -180,12 +167,7 @@ export function JobsSection() {
           {q.isPending || me.isPending ? (
             <p className="text-sm text-mm-text2">Loading jobs…</p>
           ) : null}
-          {q.isError ? (
-            <FailedLine
-              text={loadErrorWords(q.error)}
-              testId="processing-jobs-inspection-error"
-            />
-          ) : null}
+          {q.isError ? <LoadError thing="jobs" error={q.error} /> : null}
           {cancel.isError ? (
             <FailedLine
               text={errorMessage(cancel.error, "Cancel failed.")}

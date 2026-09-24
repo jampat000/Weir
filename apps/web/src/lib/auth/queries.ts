@@ -133,8 +133,15 @@ export function useBootstrapMutation() {
       password: string;
       setupCode?: string;
     }) => postBootstrap(username, password, setupCode),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Creating the account also signs it in (#704): hydrate /me from the response, the same way
+      // sign-in does, rather than invalidating it and racing the new cookie's first request.
+      if (data.user) {
+        markLoginSucceeded();
+        qc.setQueryData(authKeys.me, data.user);
+      }
       void qc.invalidateQueries({ queryKey: authKeys.bootstrap });
+      void qc.invalidateQueries({ queryKey: authKeys.session });
       void qc.invalidateQueries({ queryKey: activityKeys.recent });
     },
   });

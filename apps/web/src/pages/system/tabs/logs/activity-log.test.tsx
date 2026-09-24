@@ -251,7 +251,33 @@ describe("ActivityLog", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps long titles whole in the title attribute and shortens the heading", () => {
+  it("shows a connection check's JSON detail as plain fields, never as raw JSON", () => {
+    mocks.useActivityRecentQuery.mockReturnValue(
+      recentResult([
+        event({
+          id: 4,
+          event_type: "arr_library.connection_test_failed",
+          module: "arr_library",
+          title: "Connection check failed",
+          detail: JSON.stringify({
+            manager_name: "Sonarr",
+            reason: "Timed out",
+          }),
+        }),
+      ]),
+    );
+
+    renderLog();
+
+    expect(screen.queryByText(/"manager_name"/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\{.*"reason".*\}/)).not.toBeInTheDocument();
+    expect(screen.getByText("Manager name")).toBeInTheDocument();
+    expect(screen.getByText("Sonarr")).toBeInTheDocument();
+    expect(screen.getByText("Reason")).toBeInTheDocument();
+    expect(screen.getByText("Timed out")).toBeInTheDocument();
+  });
+
+  it("shows a long file name in full, wrapped rather than cut mid-title", () => {
     const fileName =
       "An.Example.Feature.With.A.Very.Long.Release.Name.2024.UHD.BluRay.2160p.TrueHD.Atmos.EXAMPLE.mkv";
     const longTitle = `${fileName} was processed successfully`;
@@ -274,7 +300,8 @@ describe("ActivityLog", () => {
     const heading = screen.getByTitle(longTitle);
     expect(heading.tagName).toBe("H2");
     expect(heading).toHaveClass("mm-activity-item__title");
-    expect(heading.textContent).toContain("...");
+    // The full name is present, not cut down to a head-and-tail summary.
+    expect(heading.textContent).toBe(longTitle);
   });
 
   it("sends trigger and result filters to the server", () => {

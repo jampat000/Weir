@@ -2,7 +2,6 @@ import { useSearchParams } from "react-router-dom";
 
 import type { SystemSettingsForm } from "../../use-system-settings-form";
 import { ActivityLog } from "./activity-log";
-import { HistoryResetSection } from "./history-reset-section";
 import { JobsSection } from "./jobs-section";
 import { RetentionSection } from "./retention-section";
 import { ServerLog } from "./server-log";
@@ -76,7 +75,6 @@ export function LogsTab({
           editable={editable}
           savedLogDays={savedLogDays}
         />
-        {editable ? <HistoryResetSection /> : null}
       </div>
     </div>
   );

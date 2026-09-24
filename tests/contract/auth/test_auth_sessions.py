@@ -83,7 +83,9 @@ def test_second_browser_login_does_not_revoke_first_browser_session(
 
 def test_login_keeps_only_newest_five_active_sessions(server_factory, client_factory) -> None:
     sut = server_factory()
-    h.ensure_admin_account(client_factory(sut))
+    # ensure_admin_account's own bootstrap sign-in (#704) is itself a session, so it is one of the
+    # seven vying for the newest-5 slots below: it and the oldest of the six logins get revoked.
+    bootstrap_session_id = h.ensure_admin_account(client_factory(sut))
     clients = [client_factory(sut) for _ in range(6)]
     for c in clients:
         login = h.post_login(c)
@@ -95,14 +97,15 @@ def test_login_keeps_only_newest_five_active_sessions(server_factory, client_fac
 
     with seed.stopped(sut, restart=False) as conn:
         active = seed.scalar(conn, "SELECT COUNT(*) FROM user_sessions WHERE revoked_at IS NULL")
-        revoked = seed.scalar(conn, "SELECT COUNT(*) FROM user_sessions WHERE revoked_at IS NOT NULL")
+        revoked_ids = [r["id"] for r in seed.rows(conn, "SELECT id FROM user_sessions WHERE revoked_at IS NOT NULL")]
     assert active == 5
-    assert revoked == 1
+    assert len(revoked_ids) == 2
+    assert bootstrap_session_id in revoked_ids
 
 
 def test_session_limit_ignores_absolute_expired_sessions(server_factory, client_factory) -> None:
     sut = server_factory()
-    h.ensure_admin_account(client_factory(sut))
+    bootstrap_session_id = h.ensure_admin_account(client_factory(sut))
     now = datetime.now(UTC)
     expires = now + _EXPIRY_MARGIN
     with seed.stopped(sut) as conn:
@@ -127,7 +130,10 @@ def test_session_limit_ignores_absolute_expired_sessions(server_factory, client_
         rows = seed.rows(conn, "SELECT id, revoked_at FROM user_sessions")
     by_id = {r["id"]: r for r in rows}
     assert set(expired_ids) <= set(by_id), "the expired sessions were cleaned up before the login ran"
-    live_rows = [r for sid, r in by_id.items() if sid not in expired_ids]
+    # ensure_admin_account's own sign-in (#704) is a session too, live and unexpired just like the
+    # one this test's own login creates; both are excluded from the deliberately-expired set here.
+    other_ids = set(expired_ids) | {bootstrap_session_id}
+    live_rows = [r for sid, r in by_id.items() if sid not in other_ids]
     assert len(live_rows) == 1
     assert live_rows[0]["revoked_at"] is None
     assert all(by_id[sid]["revoked_at"] is None for sid in expired_ids)
@@ -186,7 +192,10 @@ def test_session_cleanup_deletes_revoked_and_expired_sessions(server_factory, cl
     """The cleanup runs at server start (and hourly); a restart is the black-box trigger."""
 
     sut = server_factory(env={"WEIR_SESSION_IDLE_MINUTES": "720"})
-    h.ensure_admin_account(client_factory(sut))
+    # ensure_admin_account's own bootstrap sign-in (#704) is itself a still-live, unexpired session,
+    # alongside the ones seeded directly below; cleanup must leave both it and the active one, and
+    # delete only the revoked and expired rows.
+    bootstrap_session_id = h.ensure_admin_account(client_factory(sut))
     now = datetime.now(UTC)
     with seed.stopped(sut) as conn:
         uid = h.user_id(conn, ADMIN_USERNAME)
@@ -199,4 +208,4 @@ def test_session_cleanup_deletes_revoked_and_expired_sessions(server_factory, cl
 
     with seed.stopped(sut, restart=False) as conn:
         ids = [r["id"] for r in seed.rows(conn, "SELECT id FROM user_sessions")]
-    assert ids == [active_id]
+    assert set(ids) == {active_id, bootstrap_session_id}

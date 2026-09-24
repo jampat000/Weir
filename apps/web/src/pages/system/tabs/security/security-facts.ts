@@ -73,7 +73,7 @@ export function currentSignInFacts(
 export function signInProtectionFacts(overview: SecurityOverview): Fact[] {
   return [
     {
-      label: "Session signing",
+      label: "Sign-in security key",
       value: overview.session_signing_configured ? "On" : "Needs attention",
       toneClass: overview.session_signing_configured
         ? "mm-status-text--healthy"
@@ -88,7 +88,7 @@ export function signInProtectionFacts(overview: SecurityOverview): Fact[] {
           : "mm-status-text--healthy",
     },
     {
-      label: "Same-site cookie policy",
+      label: "Cross-site cookie protection",
       value: overview.sign_in_cookie_same_site,
     },
     {
@@ -100,7 +100,7 @@ export function signInProtectionFacts(overview: SecurityOverview): Fact[] {
       value: `Idle ${overview.trusted_session_idle_timeout_plain}; max ${overview.trusted_session_absolute_timeout_plain}`,
     },
     {
-      label: "Strict transport hardening",
+      label: "Extra HTTPS protection",
       value: overview.extra_https_hardening_enabled
         ? "On"
         : "Off — review HTTPS deployment",
@@ -109,15 +109,15 @@ export function signInProtectionFacts(overview: SecurityOverview): Fact[] {
         : "mm-status-text--warning",
     },
     {
-      label: "Sign-in rate limit",
+      label: "Sign-in attempts allowed",
       value: `${overview.sign_in_attempt_limit} attempts / ${overview.sign_in_attempt_window_plain}`,
     },
     {
-      label: "First-time setup rate limit",
+      label: "First-time setup attempts allowed",
       value: `${overview.first_time_setup_attempt_limit} attempts / ${overview.first_time_setup_attempt_window_plain}`,
     },
     {
-      label: "Allowed browser origins",
+      label: "Allowed web addresses",
       value: plural(
         overview.allowed_browser_origins_count,
         "configured origin",
@@ -125,4 +125,12 @@ export function signInProtectionFacts(overview: SecurityOverview): Fact[] {
       ),
     },
   ];
+}
+
+/** A row's own tone counts as needing attention when it is not the healthy one. */
+export function needsAttention(fact: Fact): boolean {
+  return (
+    fact.toneClass === "mm-status-text--failed" ||
+    fact.toneClass === "mm-status-text--warning"
+  );
 }

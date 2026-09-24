@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { LoadError } from "../../../../components/shared/load-error";
 import {
   QuietSection,
   quietActionRowClass,
@@ -142,7 +143,9 @@ export function UpdateModeSection() {
       {settingsQ.isPending ? (
         <p className="mm-quiet-note mt-3">Loading update preferences...</p>
       ) : settingsQ.isError ? (
-        <p className="mm-quiet-note mt-3">Could not load update preferences.</p>
+        <div className="mt-3">
+          <LoadError thing="update preferences" error={settingsQ.error} />
+        </div>
       ) : (
         <div className="mt-4 max-w-2xl space-y-5">
           <ModeChoices
