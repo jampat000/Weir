@@ -1,0 +1,70 @@
+using Microsoft.Extensions.Logging;
+using Weir.Core.Json;
+using Weir.Core.Processing.RemuxPass;
+using Weir.Infrastructure.Sqlite;
+
+namespace Weir.Infrastructure.Processing.RemuxPass;
+
+public sealed partial class RemuxPassHandler
+{
+    /// <summary>
+    /// The optional downloaded-scan hand-back (#768): after a pass writes a file to a library's output folder, ask
+    /// every enabled, opted-in Sonarr/Radarr connection linked to that library to run its Downloaded Scan over it.
+    /// Best effort; never throws, and does nothing for a pass that did not itself write or confirm an output file.
+    /// </summary>
+    private async Task DownloadedScanAsync(PyDict result, string mediaScope, PyDict? origin)
+    {
+        if (_downloadedScan is null || !PassWroteOutput(result, out var outputPath) || result.Get("library_id") is not PyInt libraryValue)
+        {
+            return;
+        }
+
+        var relativePath = result.Get("relative_media_path") is PyStr rel ? rel.Value : string.Empty;
+        try
+        {
+            var uow = await UnitOfWork.OpenAsync(_database).ConfigureAwait(false);
+            await using (uow.ConfigureAwait(false))
+            {
+                await _downloadedScan.NotifyLibraryAsync(
+                    uow, (long)libraryValue.Value, mediaScope, outputPath, relativePath, DownloadClientId(origin)).ConfigureAwait(false);
+            }
+        }
+#pragma warning disable CA1031 // Best effort: a manager that cannot be reached must never fail a pass that already succeeded.
+        catch (Exception exception)
+#pragma warning restore CA1031
+        {
+            _logger.LogError(exception, "Downloaded-scan hand-back raised unexpectedly.");
+        }
+    }
+
+    /// <summary>Whether this pass actually wrote, or confirmed, an output file, and where.</summary>
+    private static bool PassWroteOutput(PyDict result, out string outputPath)
+    {
+        outputPath = string.Empty;
+        if (result.Get("ok") is not PyBool { Value: true })
+        {
+            return false;
+        }
+
+        if (result.Get("outcome") is not PyStr { Value: RemuxPassOutcomes.LiveOutputWritten or RemuxPassOutcomes.LiveSkippedNotRequired })
+        {
+            return false;
+        }
+
+        if (result.Get("output_file") is not PyStr { Value.Length: > 0 } output)
+        {
+            return false;
+        }
+
+        outputPath = output.Value;
+        return true;
+    }
+
+    /// <summary>
+    /// Sonarr's/Radarr's own id for the download client that owns this download, when the job's origin happens to
+    /// carry one. Today that is never the case for these connections (they run the remote-path-mapping flow, not a
+    /// hand-off), so this is usually null; the command is sent without <c>downloadClientId</c> either way.
+    /// </summary>
+    private static int? DownloadClientId(PyDict? origin) =>
+        origin?.Get("download_id") is { IsTruthy: true } value && int.TryParse(PyConvert.Str(value), out var id) ? id : null;
+}

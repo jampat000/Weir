@@ -55,6 +55,9 @@ public static class ActivityEventTypes
 
     /// <summary>The Cleanup job for hand-back copies nobody claimed finished a run (#652).</summary>
     public const string ProcessingUnclaimedHandbackCleanupCompleted = "processing.unclaimed_handback_cleanup_completed";
+
+    /// <summary>Weir asked a Sonarr/Radarr connection to run its Downloaded Scan over a file it just wrote (#768).</summary>
+    public const string ProcessingDownloadedScanRequested = "processing.downloaded_scan_requested";
 }
 
 /// <summary>
