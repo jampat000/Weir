@@ -101,6 +101,13 @@ public sealed class ProcessingJobProcessor
     /// <summary>Test seam replacing <see cref="ProcessingJobStore.CompleteClaimedAsync"/>.</summary>
     internal Func<long, string, DateTimeOffset, Task<bool>>? CompleteOverride { get; init; }
 
+    /// <summary>
+    /// Test seam: called each time the lease-renewal heartbeat has started waiting for its next tick, which
+    /// is after any previous renewal has been written. A test on a fake clock waits for it between advances
+    /// instead of sleeping and hoping the renewal landed and the next timer was registered.
+    /// </summary>
+    internal Action? LeaseRenewalWaiting { get; init; }
+
     public async Task<JobProcessOutcome> ProcessOneAsync(
         string leaseOwner,
         int leaseSeconds = DefaultLeaseSeconds,
@@ -290,7 +297,9 @@ public sealed class ProcessingJobProcessor
         {
             while (true)
             {
-                await Task.Delay(interval, _time, cancellationToken).ConfigureAwait(false);
+                var tick = Task.Delay(interval, _time, cancellationToken);
+                LeaseRenewalWaiting?.Invoke();
+                await tick.ConfigureAwait(false);
                 var now = _time.GetUtcNow();
                 var renewed = await _queue.RenewLeaseAsync(jobId, leaseOwner, now + TimeSpan.FromSeconds(leaseSeconds), now, CancellationToken.None).ConfigureAwait(false);
                 if (!renewed)
