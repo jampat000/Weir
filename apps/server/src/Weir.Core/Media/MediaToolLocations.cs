@@ -8,9 +8,6 @@ namespace Weir.Core.Media;
 /// </summary>
 public static class MediaToolLocations
 {
-    /// <summary>The PATHEXT used on Windows when the variable is unset or empty.</summary>
-    public const string WindowsDefaultPathExt = ".COM;.EXE;.BAT;.CMD;.VBS;.JS;.WS;.MSC";
-
     /// <summary>glibc's default search path (<c>CS_PATH</c>), used when PATH is unset.</summary>
     public const string PosixDefaultPath = "/bin:/usr/bin";
 
@@ -35,22 +32,21 @@ public static class MediaToolLocations
 
     /// <summary>
     /// #548: the directories checked for mkvmerge, in order, mirroring <see cref="CandidateDirectories"/>:
-    /// <c>WEIR_MKVTOOLNIX_DIR</c> (expanded, not resolved), <c>&lt;home&gt;/bin/mkvtoolnix</c>, then, for a
-    /// packaged app, <c>&lt;app&gt;/bin/mkvtoolnix</c> and <c>&lt;app&gt;/_internal/bin/mkvtoolnix</c>.
+    /// <c>WEIR_MKVTOOLNIX_DIR</c> (expanded, not resolved), then, for a packaged app, the tools bundled beside
+    /// the executable (<c>&lt;app&gt;/bin/mkvtoolnix</c> and <c>&lt;app&gt;/_internal/bin/mkvtoolnix</c>).
+    /// Weir's data folder (<c>WEIR_HOME</c>) is never searched: on Windows it is writable by every local
+    /// account by default, so a tool found there cannot be trusted over the one Weir ships.
     /// </summary>
-    /// <param name="resolvedWeirHome">The Weir home, already made absolute.</param>
     /// <param name="mkvtoolnixDirEnvironment">The raw <c>WEIR_MKVTOOLNIX_DIR</c> value, or null.</param>
     /// <param name="userHome">What <c>~</c> expands to.</param>
     /// <param name="packagedAppDirectory">The packaged executable's directory, or null when not packaged.</param>
     /// <param name="windows">Windows path rules.</param>
     public static IReadOnlyList<string> MkvtoolnixCandidateDirectories(
-        string resolvedWeirHome,
         string? mkvtoolnixDirEnvironment,
         string userHome,
         string? packagedAppDirectory,
         bool windows)
     {
-        ArgumentNullException.ThrowIfNull(resolvedWeirHome);
         ArgumentNullException.ThrowIfNull(userHome);
         var candidates = new List<string>();
         var rawEnvDir = PyStrings.Strip(mkvtoolnixDirEnvironment ?? string.Empty);
@@ -59,7 +55,6 @@ public static class MediaToolLocations
             candidates.Add(Normalize(ExpandUser(rawEnvDir, userHome, windows), windows));
         }
 
-        candidates.Add(Join(windows, resolvedWeirHome, "bin", MkvtoolnixBundleDirectory));
         if (packagedAppDirectory is not null)
         {
             candidates.Add(Join(windows, packagedAppDirectory, "bin", MkvtoolnixBundleDirectory));
@@ -71,22 +66,21 @@ public static class MediaToolLocations
 
     /// <summary>
     /// The directories checked in order, lexically normalized (see <see cref="Normalize"/>): <c>WEIR_FFMPEG_DIR</c>
-    /// (expanded, not resolved), <c>&lt;home&gt;/bin/ffmpeg</c>, then, for a packaged app, <c>&lt;app&gt;/bin/ffmpeg</c>
-    /// and <c>&lt;app&gt;/_internal/bin/ffmpeg</c>.
+    /// (expanded, not resolved), then, for a packaged app, the tools bundled beside the executable
+    /// (<c>&lt;app&gt;/bin/ffmpeg</c> and <c>&lt;app&gt;/_internal/bin/ffmpeg</c>). Weir's data folder
+    /// (<c>WEIR_HOME</c>) is never searched: on Windows it is writable by every local account by default, so a
+    /// tool found there cannot be trusted over the one Weir ships.
     /// </summary>
-    /// <param name="resolvedWeirHome">The Weir home, already made absolute.</param>
     /// <param name="ffmpegDirEnvironment">The raw <c>WEIR_FFMPEG_DIR</c> value, or null.</param>
     /// <param name="userHome">What <c>~</c> expands to.</param>
     /// <param name="packagedAppDirectory">The packaged executable's directory; null when not running packaged.</param>
     /// <param name="windows">Windows path rules.</param>
     public static IReadOnlyList<string> CandidateDirectories(
-        string resolvedWeirHome,
         string? ffmpegDirEnvironment,
         string userHome,
         string? packagedAppDirectory,
         bool windows)
     {
-        ArgumentNullException.ThrowIfNull(resolvedWeirHome);
         ArgumentNullException.ThrowIfNull(userHome);
         var candidates = new List<string>();
         var rawEnvDir = PyStrings.Strip(ffmpegDirEnvironment ?? string.Empty);
@@ -95,7 +89,6 @@ public static class MediaToolLocations
             candidates.Add(Normalize(ExpandUser(rawEnvDir, userHome, windows), windows));
         }
 
-        candidates.Add(Join(windows, resolvedWeirHome, "bin", "ffmpeg"));
         if (packagedAppDirectory is not null)
         {
             candidates.Add(Join(windows, packagedAppDirectory, "bin", "ffmpeg"));
@@ -200,39 +193,27 @@ public static class MediaToolLocations
     }
 
     /// <summary>
-    /// The PATH search for a bare command name: on Windows the current directory first and each PATHEXT
-    /// extension; directories deduplicated case-insensitively on Windows.
+    /// The PATH search for a bare command name. On Windows this looks only for an <c>.exe</c> — PATHEXT is
+    /// never consulted, and the current directory is never searched — so a <c>.bat</c>/<c>.cmd</c> file, or a
+    /// program planted in the working directory, can never run in place of the real tool. Directories are
+    /// deduplicated case-insensitively on Windows.
     /// </summary>
     /// <param name="command">A bare command name such as <c>ffprobe</c>.</param>
     /// <param name="pathEnvironment">PATH, or null when unset.</param>
-    /// <param name="pathExtEnvironment">PATHEXT, or null when unset (Windows only).</param>
     /// <param name="windows">Windows rules.</param>
     /// <param name="isExecutableFile">True when the candidate exists, is executable and is not a directory.</param>
-    public static string? Which(string command, string? pathEnvironment, string? pathExtEnvironment, bool windows, Func<string, bool> isExecutableFile)
+    public static string? Which(string command, string? pathEnvironment, bool windows, Func<string, bool> isExecutableFile)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(isExecutableFile);
-        var path = pathEnvironment ?? (windows ? ".;C:\\bin" : PosixDefaultPath);
+        var path = pathEnvironment ?? (windows ? "C:\\bin" : PosixDefaultPath);
         if (path.Length == 0)
         {
             return null;
         }
 
-        var directories = path.Split(windows ? ';' : ':').ToList();
-        IReadOnlyList<string> files = [command];
-        if (windows)
-        {
-            if (!directories.Contains("."))
-            {
-                directories.Insert(0, ".");
-            }
-
-            var source = string.IsNullOrEmpty(pathExtEnvironment) ? WindowsDefaultPathExt : pathExtEnvironment;
-            var extensions = source.Split(';').Where(e => e.Length > 0).ToList();
-            files = extensions.Any(ext => command.ToLowerInvariant().EndsWith(ext.ToLowerInvariant(), StringComparison.Ordinal))
-                ? [command]
-                : extensions.Select(ext => command + ext).ToList();
-        }
+        var directories = path.Split(windows ? ';' : ':');
+        var file = windows && !command.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? command + ".exe" : command;
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var directory in directories)
@@ -243,13 +224,10 @@ public static class MediaToolLocations
                 continue;
             }
 
-            foreach (var file in files)
+            var candidate = OsPathJoin(directory, file, windows);
+            if (isExecutableFile(candidate))
             {
-                var candidate = OsPathJoin(directory, file, windows);
-                if (isExecutableFile(candidate))
-                {
-                    return candidate;
-                }
+                return candidate;
             }
         }
 
