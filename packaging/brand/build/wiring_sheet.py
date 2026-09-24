@@ -1,11 +1,11 @@
-"""Draw design-options/logos-round4/wiring-comparison.png from the files that actually ship.
+"""Draw packaging/brand/wiring-comparison.png from the files that actually ship.
 
 The top row is the three primary SVGs at 512. The bottom row is the real frames unpacked
 out of the committed .ico files and magnified, so the sheet cannot drift from what the
 icons contain: if the cutoff in scripts/generate-brand-icons.py moves, re-running this
 shows the move rather than describing it.
 
-    python design-options/logos-round4/build/wiring_sheet.py
+    python packaging/brand/build/wiring_sheet.py
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw, ImageFont
 from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-OUT = ROOT / "design-options" / "logos-round4" / "wiring-comparison.png"
+OUT = ROOT / "packaging" / "brand" / "wiring-comparison.png"
 
 BG = (11, 20, 24)
 INK = (232, 241, 244)
