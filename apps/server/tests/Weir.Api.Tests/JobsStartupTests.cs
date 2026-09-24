@@ -60,7 +60,7 @@ public sealed class JobsStartupTests
                 database.ClearPool();
             });
 
-        // Recovery now runs in the background so it never holds up Kestrel from listening (#718).
+        // Recovery runs in the background, alongside Kestrel already listening (#718), so it must be awaited here.
         var recovery = server.Services.GetRequiredService<JobsStartupRecoveryService>();
         await recovery.RecoveryCompleted.WaitAsync(TimeSpan.FromSeconds(10));
         var report = recovery.LastReport;

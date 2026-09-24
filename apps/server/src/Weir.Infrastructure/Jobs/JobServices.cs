@@ -72,15 +72,15 @@ public sealed class JobsStartupRecoveryService : IHostedService
     /// Completes once recovery and the swap sweep have run, or at once when <see cref="StartAsync"/> was never
     /// called (a unit test building this service directly, with no gate to honour). The file lanes and the
     /// upkeep lane (#717, #718) each await this before claiming their first job, so a pass or a scan never
-    /// starts against a library recovery has not yet finished looking at; nothing else waits on it, so
-    /// <c>/ready</c> and the web app answer as soon as Kestrel is listening.
+    /// starts against a library recovery has not yet finished looking at. Nothing else waits on it: <c>/ready</c>
+    /// and the web app answer as soon as Kestrel is listening.
     /// </summary>
     public Task RecoveryCompleted => _recoveryCompleted?.Task ?? Task.CompletedTask;
 
     /// <summary>
-    /// Kicks recovery and the swap sweep off in the background and returns at once: the folder walks they do
-    /// (#718) no longer hold up Kestrel from listening. A worker lane must not start before they finish, so it
-    /// awaits <see cref="RecoveryCompleted"/> itself.
+    /// Runs recovery and the swap sweep in the background and returns at once, so their folder walks run
+    /// alongside Kestrel starting to listen rather than in front of it (#718). A worker lane must not start
+    /// before they finish, so it awaits <see cref="RecoveryCompleted"/> itself.
     /// </summary>
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -114,8 +114,8 @@ public sealed class JobsStartupRecoveryService : IHostedService
                 }
             }
         }
-        // Recovery no longer gates Kestrel listening (#718): a failure here must not crash the host, only keep
-        // being logged loudly, since a worker lane waiting on RecoveryCompleted would otherwise wait for ever.
+        // Kestrel is already listening by the time this runs (#718), so a failure here must not crash the host —
+        // only log loudly — or a worker lane waiting on RecoveryCompleted would wait forever.
         catch (Exception exception) when (exception is SqliteException or IOException or UnauthorizedAccessException)
         {
             _logger.LogCritical(exception, "Weir startup recovery failed; passes and scans will start without it once Weir is restarted.");
