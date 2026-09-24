@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Activity;
 using Weir.Core.Auth;
@@ -24,11 +25,39 @@ public static class ProcessingJobsEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingJobsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/processing/jobs/inspection", GetInspectionAsync);
-        endpoints.MapV1("POST", "/processing/jobs/{job_id}/cancel-pending", PostCancelPendingAsync);
-        endpoints.MapV1("POST", "/processing/jobs/{job_id}/recover-finalize-failed", PostRecoverFinalizeFailedAsync);
-        endpoints.MapV1("GET", "/processing/files/{file_id}/why-held", GetWhyHeldAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<ProcessingJobsEndpointHandlers>();
+        endpoints.MapV1("GET", "/processing/jobs/inspection", handlers.GetInspectionAsync);
+        endpoints.MapV1("POST", "/processing/jobs/{job_id}/cancel-pending", handlers.PostCancelPendingAsync);
+        endpoints.MapV1("POST", "/processing/jobs/{job_id}/recover-finalize-failed", handlers.PostRecoverFinalizeFailedAsync);
+        endpoints.MapV1("GET", "/processing/files/{file_id}/why-held", handlers.GetWhyHeldAsync);
         return endpoints;
+    }
+}
+
+/// <summary>Handlers for <see cref="ProcessingJobsEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class ProcessingJobsEndpointHandlers
+{
+    private readonly JobsInspectionStore _jobsInspection;
+    private readonly HandoffLedgerStore _handoffLedger;
+    private readonly HandoffCompletionReporter _handoffReporter;
+    private readonly ProcessingJobStore _jobs;
+    private readonly HoldDiagnosticStore _holdDiagnostic;
+    private readonly MediaManagerConnectionService _connections;
+
+    public ProcessingJobsEndpointHandlers(
+        JobsInspectionStore jobsInspection,
+        HandoffLedgerStore handoffLedger,
+        HandoffCompletionReporter handoffReporter,
+        ProcessingJobStore jobs,
+        HoldDiagnosticStore holdDiagnostic,
+        MediaManagerConnectionService connections)
+    {
+        _jobsInspection = jobsInspection ?? throw new ArgumentNullException(nameof(jobsInspection));
+        _handoffLedger = handoffLedger ?? throw new ArgumentNullException(nameof(handoffLedger));
+        _handoffReporter = handoffReporter ?? throw new ArgumentNullException(nameof(handoffReporter));
+        _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+        _holdDiagnostic = holdDiagnostic ?? throw new ArgumentNullException(nameof(holdDiagnostic));
+        _connections = connections ?? throw new ArgumentNullException(nameof(connections));
     }
 
     private static WireObject JobOut(ProcessingJob job)
@@ -52,7 +81,7 @@ public static class ProcessingJobsEndpoints
             .Set("updated_at", Timestamp.FromDateTimeOffset(job.UpdatedAt).ToWireText());
     }
 
-    private static async Task<ApiResult> GetInspectionAsync(ApiRequest request)
+    public async Task<ApiResult> GetInspectionAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -62,7 +91,7 @@ public static class ProcessingJobsEndpoints
 
         try
         {
-            JobsInspectionStore.ValidateStatuses(statuses);
+            _jobsInspection.ValidateStatuses(statuses);
         }
         catch (ArgumentException exception)
         {
@@ -70,13 +99,13 @@ public static class ProcessingJobsEndpoints
         }
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var (rows, defaultRecentSlice) = await JobsInspectionStore.ListAsync(uow, limit, statuses.Count > 0 ? statuses : null).ConfigureAwait(false);
+        var (rows, defaultRecentSlice) = await _jobsInspection.ListAsync(uow, limit, statuses.Count > 0 ? statuses : null).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
             .Set("jobs", new WireArray(rows.Select(r => (WireValue)JobOut(r))))
             .Set("default_recent_slice", defaultRecentSlice));
     }
 
-    private static async Task<ApiResult> PostCancelPendingAsync(ApiRequest request)
+    public async Task<ApiResult> PostCancelPendingAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -92,7 +121,7 @@ public static class ProcessingJobsEndpoints
         // together or not at all. Nothing here opens a second connection, so the session touch RequireUserAsync may have
         // written cannot hold a lock this handler then waits for.
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var result = await PendingJobCancellation.CancelAsync(uow, request.Service<HandoffLedgerStore>(), request.Service<HandoffCompletionReporter>(), id).ConfigureAwait(false);
+        var result = await PendingJobCancellation.CancelAsync(uow, _handoffLedger, _handoffReporter, id).ConfigureAwait(false);
         if (result.Outcome == JobActionOutcome.NotFound)
         {
             throw new ApiException(StatusCodes.Status404NotFound, "Job not found.");
@@ -117,7 +146,7 @@ public static class ProcessingJobsEndpoints
         return ApiRoutes.Ok(new WireObject().Set("ok", true).Set("job_id", id).Set("status", ProcessingJobStatus.Cancelled));
     }
 
-    private static async Task<ApiResult> PostRecoverFinalizeFailedAsync(ApiRequest request)
+    public async Task<ApiResult> PostRecoverFinalizeFailedAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -129,11 +158,10 @@ public static class ProcessingJobsEndpoints
 
         var user = await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         request.RequireConfirmationToken(csrfToken);
-        var jobStore = request.Service<ProcessingJobStore>();
         // Same reason as the cancel-pending handler above: the session touch is the only write in this
         // request's transaction, and it must be committed before the store's own connection asks for the lock.
         await request.CommitAsync().ConfigureAwait(false);
-        var outcome = await jobStore.RecoverHandlerOkFinalizeFailedToCompletedAsync(id, user.User.Username).ConfigureAwait(false);
+        var outcome = await _jobs.RecoverHandlerOkFinalizeFailedToCompletedAsync(id, user.User.Username).ConfigureAwait(false);
         if (outcome == JobActionOutcome.NotFound)
         {
             throw new ApiException(StatusCodes.Status404NotFound, "Job not found.");
@@ -147,7 +175,7 @@ public static class ProcessingJobsEndpoints
         return ApiRoutes.Ok(new WireObject().Set("ok", true).Set("job_id", id).Set("status", ProcessingJobStatus.Completed));
     }
 
-    private static async Task<ApiResult> GetWhyHeldAsync(ApiRequest request)
+    public async Task<ApiResult> GetWhyHeldAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -160,8 +188,7 @@ public static class ProcessingJobsEndpoints
         var library = await LibraryStore.GetAsync(uow, file.LibraryId).ConfigureAwait(false)
             ?? throw new ApiException(StatusCodes.Status404NotFound, "The library this file belonged to no longer exists.");
 
-        var connections = request.Service<MediaManagerConnectionService>();
-        var outcome = await HoldDiagnosticStore.EvaluateAsync(uow, file, library, connections, request.Context.RequestAborted).ConfigureAwait(false);
+        var outcome = await _holdDiagnostic.EvaluateAsync(uow, file, library, _connections, request.Context.RequestAborted).ConfigureAwait(false);
         var verdict = outcome.Verdict switch
         {
             CandidateGateVerdict.Proceed => "proceed",

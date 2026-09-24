@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Json;
 using Weir.Core.LibraryMode;
@@ -21,9 +22,28 @@ public static class LibraryModeOverviewEndpoints
 {
     public static IEndpointRouteBuilder MapLibraryModeOverviewEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/processing/libraries/{library_id}/library-overview", GetOverviewAsync);
-        endpoints.MapV1("GET", "/processing/libraries/{library_id}/library-problems", GetProblemsAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<LibraryModeOverviewEndpointHandlers>();
+        endpoints.MapV1("GET", "/processing/libraries/{library_id}/library-overview", handlers.GetOverviewAsync);
+        endpoints.MapV1("GET", "/processing/libraries/{library_id}/library-problems", handlers.GetProblemsAsync);
         return endpoints;
+    }
+}
+
+/// <summary>Handlers for <see cref="LibraryModeOverviewEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class LibraryModeOverviewEndpointHandlers
+{
+    private readonly LibrarySettingsStore _librarySettings;
+    private readonly LibraryViewStore _libraryView;
+    private readonly LibraryScanStore _scans;
+    private readonly SuiteSettingsStore _suiteSettings;
+
+    public LibraryModeOverviewEndpointHandlers(
+        LibrarySettingsStore librarySettings, LibraryViewStore libraryView, LibraryScanStore scans, SuiteSettingsStore suiteSettings)
+    {
+        _librarySettings = librarySettings ?? throw new ArgumentNullException(nameof(librarySettings));
+        _libraryView = libraryView ?? throw new ArgumentNullException(nameof(libraryView));
+        _scans = scans ?? throw new ArgumentNullException(nameof(scans));
+        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
     }
 
     /// <summary>
@@ -31,10 +51,9 @@ public static class LibraryModeOverviewEndpoints
     /// cannot run (no library folders, the library switched off, a window that never opens); a run that is due is
     /// reported as now, since the timer starts it within half a minute.
     /// </summary>
-    private static async Task<WireObject> ScheduleOutAsync(
-        ApiRequest request, UnitOfWork uow, ProcessingLibraryRecord library, LibrarySettings settings, DateTimeOffset now)
+    private async Task<WireObject> ScheduleOutAsync(UnitOfWork uow, ProcessingLibraryRecord library, LibrarySettings settings, DateTimeOffset now)
     {
-        var next = await LibraryModeScheduling.NextRunAsync(uow, request.Service<SuiteSettingsStore>(), library, settings, now).ConfigureAwait(false);
+        var next = await LibraryModeScheduling.NextRunAsync(uow, _suiteSettings, _scans, library, settings, now).ConfigureAwait(false);
         return new WireObject()
             .Set("enabled", settings.ScheduleEnabled)
             .Set("next_run_at", next is { } at ? Timestamp.FromDateTimeOffset(at < now ? now : at).ToWireText() : null);
@@ -60,7 +79,7 @@ public static class LibraryModeOverviewEndpoints
     /// codec, resolution class and language. Every number is a SQL aggregate over <c>library_files</c> and its
     /// facet rows (issue #568 point 7) — this never sends thousands of file rows for the browser to add up.
     /// </summary>
-    private static async Task<ApiResult> GetOverviewAsync(ApiRequest request)
+    public async Task<ApiResult> GetOverviewAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -69,10 +88,10 @@ public static class LibraryModeOverviewEndpoints
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
-        var settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
-        var totals = await LibraryViewStore.TotalsAsync(uow, libraryId).ConfigureAwait(false);
-        var breakdowns = await LibraryViewStore.AllBreakdownsAsync(uow, libraryId).ConfigureAwait(false);
-        var problems = await LibraryViewStore.ProblemsAsync(uow, libraryId, settings.CleanHardlinkedFiles).ConfigureAwait(false);
+        var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
+        var totals = await _libraryView.TotalsAsync(uow, libraryId).ConfigureAwait(false);
+        var breakdowns = await _libraryView.AllBreakdownsAsync(uow, libraryId).ConfigureAwait(false);
+        var problems = await _libraryView.ProblemsAsync(uow, libraryId, settings.CleanHardlinkedFiles).ConfigureAwait(false);
 
         var breakdownsOut = new WireObject();
         foreach (var facet in LibraryFacets.All)
@@ -84,15 +103,15 @@ public static class LibraryModeOverviewEndpoints
         return ApiRoutes.Ok(new WireObject()
             .Set("library_id", libraryId)
             .Set("folders_configured", settings.Folders.Count)
-            .Set("scan", await LibraryModeMapping.ScanOutAsync(uow, libraryId, LibraryModeMapping.Logger(request)).ConfigureAwait(false))
-            .Set("schedule", await ScheduleOutAsync(request, uow, library, settings, request.Time.GetUtcNow()).ConfigureAwait(false))
+            .Set("scan", await LibraryModeMapping.ScanOutAsync(uow, _scans, libraryId, LibraryModeMapping.Logger(request)).ConfigureAwait(false))
+            .Set("schedule", await ScheduleOutAsync(uow, library, settings, request.Time.GetUtcNow()).ConfigureAwait(false))
             .Set("totals", LibraryModeMapping.TotalsOut(totals))
             .Set("breakdowns", breakdownsOut)
             .Set("problems", new WireArray(problems.Select(group => (WireValue)ProblemGroupOut(group)))));
     }
 
     /// <summary>#568's Problems view: every reason a file is not something Weir will clean, grouped, with advice.</summary>
-    private static async Task<ApiResult> GetProblemsAsync(ApiRequest request)
+    public async Task<ApiResult> GetProblemsAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -101,11 +120,11 @@ public static class LibraryModeOverviewEndpoints
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
-        var settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
-        var groups = await LibraryViewStore.ProblemsAsync(uow, libraryId, settings.CleanHardlinkedFiles).ConfigureAwait(false);
+        var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
+        var groups = await _libraryView.ProblemsAsync(uow, libraryId, settings.CleanHardlinkedFiles).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
             .Set("library_id", libraryId)
-            .Set("scan", await LibraryModeMapping.ScanOutAsync(uow, libraryId, LibraryModeMapping.Logger(request)).ConfigureAwait(false))
+            .Set("scan", await LibraryModeMapping.ScanOutAsync(uow, _scans, libraryId, LibraryModeMapping.Logger(request)).ConfigureAwait(false))
             .Set("groups", new WireArray(groups.Select(group => (WireValue)ProblemGroupOut(group))))
             .Set("total", groups.Sum(group => group.Files)));
     }

@@ -40,6 +40,10 @@ public sealed class LibraryScanHandler : IJobHandler
     private readonly IHardlinkInspector _hardlinks;
     private readonly ProcessingJobStore _jobs;
     private readonly RedownloadRiskChecker _riskChecker;
+    private readonly LibraryScanStore _scans;
+    private readonly LibrarySettingsStore _librarySettings;
+    private readonly LibraryFileMarksStore _fileMarks;
+    private readonly LibraryViewStore _libraryView;
     private readonly TimeProvider _time;
 
     public LibraryScanHandler(
@@ -49,6 +53,10 @@ public sealed class LibraryScanHandler : IJobHandler
         IHardlinkInspector hardlinks,
         ProcessingJobStore jobs,
         RedownloadRiskChecker riskChecker,
+        LibraryScanStore scans,
+        LibrarySettingsStore librarySettings,
+        LibraryFileMarksStore fileMarks,
+        LibraryViewStore libraryView,
         TimeProvider time,
         ILogger<LibraryScanHandler> logger)
     {
@@ -58,6 +66,10 @@ public sealed class LibraryScanHandler : IJobHandler
         _hardlinks = hardlinks ?? throw new ArgumentNullException(nameof(hardlinks));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _riskChecker = riskChecker ?? throw new ArgumentNullException(nameof(riskChecker));
+        _scans = scans ?? throw new ArgumentNullException(nameof(scans));
+        _librarySettings = librarySettings ?? throw new ArgumentNullException(nameof(librarySettings));
+        _fileMarks = fileMarks ?? throw new ArgumentNullException(nameof(fileMarks));
+        _libraryView = libraryView ?? throw new ArgumentNullException(nameof(libraryView));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         // Kept in the constructor for DI symmetry with LibraryCleanHandler; nothing here logs yet.
         ArgumentNullException.ThrowIfNull(logger);
@@ -93,17 +105,17 @@ public sealed class LibraryScanHandler : IJobHandler
             library = libraryId > 0 ? await LibraryStore.GetAsync(uow, libraryId).ConfigureAwait(false) : null;
             if (library is null)
             {
-                await LibraryScanStore.RecordResultAsync(uow, context.Id, new LibraryScanOutcome(_time.GetUtcNow(), []), false, "This library no longer exists.")
+                await _scans.RecordResultAsync(uow, context.Id, new LibraryScanOutcome(_time.GetUtcNow(), []), false, "This library no longer exists.")
                     .ConfigureAwait(false);
                 await uow.CommitAsync().ConfigureAwait(false);
                 await LibraryFileIndexWriter.ReplaceAsync(_database, libraryId, [], cancellationToken).ConfigureAwait(false);
                 return;
             }
 
-            settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
+            settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
             if (settings.Folders.Count == 0)
             {
-                await LibraryScanStore.RecordResultAsync(
+                await _scans.RecordResultAsync(
                         uow, context.Id, new LibraryScanOutcome(_time.GetUtcNow(), []), false,
                         "No library folders are configured for this library yet. Add one in Library settings, then scan again.")
                     .ConfigureAwait(false);
@@ -114,7 +126,7 @@ public sealed class LibraryScanHandler : IJobHandler
 
             var ruleSet = library.RuleSetId is { } ruleSetId ? await LibraryStore.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) : null;
             rules = ruleSet is not null ? RemuxPassPaths.RulesConfigFor(ruleSet) : RuleSetConversion.ToRulesConfig(null);
-            previousFiles = await LibraryScanStore.CurrentFilesAsync(uow, libraryId).ConfigureAwait(false);
+            previousFiles = await _scans.CurrentFilesAsync(uow, libraryId).ConfigureAwait(false);
             connections = await _connections.ConnectionsForScopeAsync(uow, library.MediaType).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
         }
@@ -147,7 +159,7 @@ public sealed class LibraryScanHandler : IJobHandler
             IReadOnlyDictionary<string, LibraryFileMark> marks;
             await using (var marksUow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false))
             {
-                marks = await LibraryFileMarksStore.ForLibraryAsync(marksUow, libraryId).ConfigureAwait(false);
+                marks = await _fileMarks.ForLibraryAsync(marksUow, libraryId).ConfigureAwait(false);
             }
 
             toClean = entries
@@ -162,7 +174,7 @@ public sealed class LibraryScanHandler : IJobHandler
         await LibraryFileIndexWriter.ReplaceAsync(_database, libraryId, entries, cancellationToken).ConfigureAwait(false);
         await using (var recordUow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false))
         {
-            await LibraryScanStore.RecordResultAsync(recordUow, context.Id, outcome, true, null).ConfigureAwait(false);
+            await _scans.RecordResultAsync(recordUow, context.Id, outcome, true, null).ConfigureAwait(false);
             var queued = scheduled ? await QueueScheduledCleansAsync(recordUow, libraryId, toClean, preflight).ConfigureAwait(false) : 0;
             var title = $"Scanned {library.Name}: {Plural.Of(entries.Count, "file")}, {wouldChange} would change, {cannotProcess} could not be processed";
             if (scheduled)
@@ -193,7 +205,7 @@ public sealed class LibraryScanHandler : IJobHandler
     private async Task<int> QueueScheduledCleansAsync(
         UnitOfWork uow, long libraryId, List<LibraryScanFileEntry> toClean, List<LibraryFilePreflightResult> preflight)
     {
-        if (!(await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false)).ScheduleEnabled)
+        if (!(await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false)).ScheduleEnabled)
         {
             return 0;
         }
@@ -201,14 +213,14 @@ public sealed class LibraryScanHandler : IJobHandler
         // What the preflight found is recorded for the Problems view, as Clean records it.
         foreach (var result in preflight)
         {
-            await LibraryViewStore.RecordPreflightProblemAsync(uow, libraryId, result.FilePath, result.ProblemKind).ConfigureAwait(false);
+            await _libraryView.RecordPreflightProblemAsync(uow, libraryId, result.FilePath, result.ProblemKind).ConfigureAwait(false);
         }
 
         var skipped = preflight.Where(r => r.Skip).Select(r => r.FilePath).ToHashSet(StringComparer.Ordinal);
         var queued = 0;
         foreach (var entry in toClean.Where(e => !skipped.Contains(e.Path)))
         {
-            await LibraryScanStore.EnqueueCleanAsync(uow, _jobs, libraryId, entry.Path, LibraryModeSchedule.Trigger, confirmFinalRemoval: true)
+            await _scans.EnqueueCleanAsync(uow, _jobs, libraryId, entry.Path, LibraryModeSchedule.Trigger, confirmFinalRemoval: true)
                 .ConfigureAwait(false);
             queued++;
         }

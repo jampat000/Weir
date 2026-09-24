@@ -17,10 +17,12 @@ public static class LibraryModeScheduling
     /// Null when it will not run: the schedule is off, the library has no library folders to scan, the library is
     /// switched off, or its window never opens. May be in the past, which means it is due now.
     /// </summary>
-    public static async Task<DateTimeOffset?> NextRunAsync(UnitOfWork uow, SuiteSettingsStore suiteSettings, ProcessingLibraryRecord library, LibrarySettings settings, DateTimeOffset now)
+    public static async Task<DateTimeOffset?> NextRunAsync(
+        UnitOfWork uow, SuiteSettingsStore suiteSettings, LibraryScanStore scans, ProcessingLibraryRecord library, LibrarySettings settings, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(suiteSettings);
+        ArgumentNullException.ThrowIfNull(scans);
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(settings);
         if (!settings.ScheduleEnabled || settings.Folders.Count == 0)
@@ -30,7 +32,7 @@ public static class LibraryModeScheduling
 
         var suite = await suiteSettings.GetAsync(uow).ConfigureAwait(false);
         var timezone = suite?.AppTimezone is { } zone && !string.IsNullOrWhiteSpace(zone) ? zone.Trim() : "UTC";
-        var last = await LibraryScanStore.LastScheduledRunAtAsync(uow, library.Id).ConfigureAwait(false);
+        var last = await scans.LastScheduledRunAtAsync(uow, library.Id).ConfigureAwait(false);
         var window = new LibraryAdmissionSnapshot(
             library.Id, library.Enabled, library.ScheduleEnabled, library.ScheduleGrid, library.ScheduleHoursLimited,
             library.ScheduleDays, library.ScheduleStart, library.ScheduleEnd, library.MaxConcurrentFiles);
@@ -56,14 +58,25 @@ public sealed partial class LibraryModeScheduleTask : IPeriodicTask
 
     private readonly SqliteDatabase _database;
     private readonly ProcessingJobStore _jobs;
+    private readonly LibraryScanStore _scans;
+    private readonly LibrarySettingsStore _librarySettings;
     private readonly TimeProvider _time;
     private readonly SuiteSettingsStore _suiteSettings;
     private readonly ILogger<LibraryModeScheduleTask> _logger;
 
-    public LibraryModeScheduleTask(SqliteDatabase database, ProcessingJobStore jobs, TimeProvider time, SuiteSettingsStore suiteSettings, ILogger<LibraryModeScheduleTask> logger)
+    public LibraryModeScheduleTask(
+        SqliteDatabase database,
+        ProcessingJobStore jobs,
+        LibraryScanStore scans,
+        LibrarySettingsStore librarySettings,
+        TimeProvider time,
+        SuiteSettingsStore suiteSettings,
+        ILogger<LibraryModeScheduleTask> logger)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+        _scans = scans ?? throw new ArgumentNullException(nameof(scans));
+        _librarySettings = librarySettings ?? throw new ArgumentNullException(nameof(librarySettings));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -87,13 +100,13 @@ public sealed partial class LibraryModeScheduleTask : IPeriodicTask
         {
             foreach (var library in await LibraryStore.ListAsync(uow, enabledOnly: true).ConfigureAwait(false))
             {
-                var settings = await LibrarySettingsStore.GetAsync(uow, library.Id).ConfigureAwait(false);
-                if (await LibraryModeScheduling.NextRunAsync(uow, _suiteSettings, library, settings, now).ConfigureAwait(false) is not { } due || due > now)
+                var settings = await _librarySettings.GetAsync(uow, library.Id).ConfigureAwait(false);
+                if (await LibraryModeScheduling.NextRunAsync(uow, _suiteSettings, _scans, library, settings, now).ConfigureAwait(false) is not { } due || due > now)
                 {
                     continue;
                 }
 
-                if (await LibraryScanStore.ActiveScanAsync(uow, library.Id).ConfigureAwait(false) is not null)
+                if (await _scans.ActiveScanAsync(uow, library.Id).ConfigureAwait(false) is not null)
                 {
                     // A scan someone asked for is already under way; the scheduled one follows once it is done.
                     continue;
@@ -102,7 +115,7 @@ public sealed partial class LibraryModeScheduleTask : IPeriodicTask
                 // On time, the run keeps the time it was due so the next is exactly a day later; a run that was missed
                 // (Weir was off) starts the day again from now rather than queueing one scan per missed day.
                 var scheduledAt = now - due <= OnTime ? due : now;
-                await LibraryScanStore.RequestScanAsync(uow, _jobs, library.Id, LibraryModeSchedule.Trigger, scheduledAt).ConfigureAwait(false);
+                await _scans.RequestScanAsync(uow, _jobs, library.Id, LibraryModeSchedule.Trigger, scheduledAt).ConfigureAwait(false);
                 LogScheduledScanQueued(library.Name);
             }
 

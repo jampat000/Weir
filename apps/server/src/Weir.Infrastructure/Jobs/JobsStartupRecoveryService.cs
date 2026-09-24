@@ -18,6 +18,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
 {
     private readonly ProcessingJobStore _store;
     private readonly WeirOptions _options;
+    private readonly LibrarySettingsStore _librarySettings;
     private readonly TimeProvider _time;
     private readonly ILogger<JobsStartupRecoveryService> _logger;
     private readonly SwapRecoverySweep? _swapSweep;
@@ -26,12 +27,14 @@ public sealed class JobsStartupRecoveryService : IHostedService
     public JobsStartupRecoveryService(
         ProcessingJobStore store,
         WeirOptions options,
+        LibrarySettingsStore librarySettings,
         TimeProvider time,
         ILogger<JobsStartupRecoveryService> logger,
         SwapRecoverySweep? swapSweep = null)
     {
         _store = store;
         _options = options;
+        _librarySettings = librarySettings;
         _time = time;
         _logger = logger;
         _swapSweep = swapSweep;
@@ -171,7 +174,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
             var uow = await UnitOfWork.OpenAsync(_store.Database, cancellationToken).ConfigureAwait(false);
             await using (uow.ConfigureAwait(false))
             {
-                return await LibrarySettingsStore.AllFoldersAsync(uow).ConfigureAwait(false);
+                return await _librarySettings.AllFoldersAsync(uow).ConfigureAwait(false);
             }
         }
         catch (Exception exception) when (exception is SqliteException or InvalidOperationException)

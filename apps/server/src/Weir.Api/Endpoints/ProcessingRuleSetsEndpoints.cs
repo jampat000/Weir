@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
@@ -19,70 +20,12 @@ public static class ProcessingRuleSetsEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingRuleSetsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/processing/rule-sets", GetRuleSetsAsync);
-        endpoints.MapV1("POST", "/processing/rule-sets", PostRuleSetAsync);
-        endpoints.MapV1("PUT", "/processing/rule-sets/{rule_set_id}", PutRuleSetAsync);
-        endpoints.MapV1("DELETE", "/processing/rule-sets/{rule_set_id}", DeleteRuleSetAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<ProcessingRuleSetsEndpointHandlers>();
+        endpoints.MapV1("GET", "/processing/rule-sets", handlers.GetRuleSetsAsync);
+        endpoints.MapV1("POST", "/processing/rule-sets", handlers.PostRuleSetAsync);
+        endpoints.MapV1("PUT", "/processing/rule-sets/{rule_set_id}", handlers.PutRuleSetAsync);
+        endpoints.MapV1("DELETE", "/processing/rule-sets/{rule_set_id}", handlers.DeleteRuleSetAsync);
         return endpoints;
-    }
-
-    private static async Task<ProcessingRuleSetRecord> RequireRuleSetAsync(UnitOfWork uow, long id) =>
-        await LibraryStore.GetRuleSetAsync(uow, id).ConfigureAwait(false)
-        ?? throw new ApiException(StatusCodes.Status404NotFound, "That rule set does not exist.");
-
-    private static WireObject RuleSetOut(ProcessingRuleSetRecord row, int usedByLibraryCount) => new WireObject()
-        .Set("id", row.Id)
-        .Set("name", row.Name)
-        .Set("primary_audio_lang", row.PrimaryAudioLang)
-        .Set("secondary_audio_lang", row.SecondaryAudioLang)
-        .Set("tertiary_audio_lang", row.TertiaryAudioLang)
-        .Set("default_audio_slot", row.DefaultAudioSlot)
-        .Set("remove_commentary", row.RemoveCommentary)
-        .Set("subtitle_mode", row.SubtitleMode)
-        .Set("subtitle_langs_csv", row.SubtitleLangsCsv)
-        .Set("preserve_forced_subs", row.PreserveForcedSubs)
-        .Set("preserve_default_subs", row.PreserveDefaultSubs)
-        .Set("audio_preference_mode", row.AudioPreferenceMode)
-        .Set("audio_sorters_json", row.AudioSortersJson)
-        .Set("subtitle_sorters_json", row.SubtitleSortersJson)
-        .Set("keep_original_language", row.KeepOriginalLanguage)
-        .Set("original_language_additional_csv", row.OriginalLanguageAdditionalCsv)
-        .Set("original_language_keep_only_first", row.OriginalLanguageKeepOnlyFirst)
-        .Set("original_language_first_if_none", row.OriginalLanguageFirstIfNone)
-        .Set("original_language_treat_empty_as_original", row.OriginalLanguageTreatEmptyAsOriginal)
-        .Set("remove_images", row.RemoveImages)
-        .Set("remove_attachments", row.RemoveAttachments)
-        .Set("remove_title", row.RemoveTitle)
-        .Set("remove_language_tags", row.RemoveLanguageTags)
-        .Set("remove_other_metadata", row.RemoveOtherMetadata)
-        .Set("remove_hearing_impaired_subs", row.RemoveHearingImpairedSubs)
-        .Set("audio_keep_mode", row.AudioKeepMode)
-        .Set("subtitle_max_per_language", row.SubtitleMaxPerLanguage)
-        .Set("subtitle_quality_strategy", row.SubtitleQualityStrategy)
-        .Set("standardize_track_names", row.StandardizeTrackNames)
-        .Set("track_name_template", row.TrackNameTemplate)
-        .Set("track_name_overrides", new WireObject()
-            .Set("forced", row.TrackNameOverrides.Forced)
-            .Set("hearing_impaired", row.TrackNameOverrides.HearingImpaired)
-            .Set("commentary", row.TrackNameOverrides.Commentary)
-            .Set("audio_description", row.TrackNameOverrides.AudioDescription))
-        .Set("clear_video_track_names", row.ClearVideoTrackNames)
-        .Set("remove_chapters", row.RemoveChapters)
-        .Set("used_by_library_count", usedByLibraryCount)
-        .Set("updated_at", row.UpdatedAt.ToWireText());
-
-    private static async Task<ApiResult> GetRuleSetsAsync(ApiRequest request)
-    {
-        await request.RequireUserAsync().ConfigureAwait(false);
-        var uow = await request.DbAsync().ConfigureAwait(false);
-        var rows = await LibraryStore.ListRuleSetsAsync(uow).ConfigureAwait(false);
-        var items = new List<WireValue>();
-        foreach (var row in rows)
-        {
-            items.Add(RuleSetOut(row, await LibraryStore.RuleSetUsageCountAsync(uow, row.Id).ConfigureAwait(false)));
-        }
-
-        return ApiRoutes.Ok(new WireArray(items));
     }
 
     /// <summary>Shared with <see cref="ProcessingRulesPreviewEndpoints"/>, which validates an unsaved rules
@@ -151,14 +94,88 @@ public static class ProcessingRuleSetsEndpoints
             RemoveChapters = model.Bool("remove_chapters", defaultValue: false),
         };
     }
+}
 
-    private static async Task<ApiResult> PostRuleSetAsync(ApiRequest request)
+/// <summary>Handlers for <see cref="ProcessingRuleSetsEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class ProcessingRuleSetsEndpointHandlers
+{
+    private readonly LibrarySettingsStore _librarySettings;
+    private readonly LibraryScanStore _scans;
+    private readonly ProcessingJobStore _jobs;
+
+    public ProcessingRuleSetsEndpointHandlers(LibrarySettingsStore librarySettings, LibraryScanStore scans, ProcessingJobStore jobs)
+    {
+        _librarySettings = librarySettings ?? throw new ArgumentNullException(nameof(librarySettings));
+        _scans = scans ?? throw new ArgumentNullException(nameof(scans));
+        _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+    }
+
+    private static async Task<ProcessingRuleSetRecord> RequireRuleSetAsync(UnitOfWork uow, long id) =>
+        await LibraryStore.GetRuleSetAsync(uow, id).ConfigureAwait(false)
+        ?? throw new ApiException(StatusCodes.Status404NotFound, "That rule set does not exist.");
+
+    private static WireObject RuleSetOut(ProcessingRuleSetRecord row, int usedByLibraryCount) => new WireObject()
+        .Set("id", row.Id)
+        .Set("name", row.Name)
+        .Set("primary_audio_lang", row.PrimaryAudioLang)
+        .Set("secondary_audio_lang", row.SecondaryAudioLang)
+        .Set("tertiary_audio_lang", row.TertiaryAudioLang)
+        .Set("default_audio_slot", row.DefaultAudioSlot)
+        .Set("remove_commentary", row.RemoveCommentary)
+        .Set("subtitle_mode", row.SubtitleMode)
+        .Set("subtitle_langs_csv", row.SubtitleLangsCsv)
+        .Set("preserve_forced_subs", row.PreserveForcedSubs)
+        .Set("preserve_default_subs", row.PreserveDefaultSubs)
+        .Set("audio_preference_mode", row.AudioPreferenceMode)
+        .Set("audio_sorters_json", row.AudioSortersJson)
+        .Set("subtitle_sorters_json", row.SubtitleSortersJson)
+        .Set("keep_original_language", row.KeepOriginalLanguage)
+        .Set("original_language_additional_csv", row.OriginalLanguageAdditionalCsv)
+        .Set("original_language_keep_only_first", row.OriginalLanguageKeepOnlyFirst)
+        .Set("original_language_first_if_none", row.OriginalLanguageFirstIfNone)
+        .Set("original_language_treat_empty_as_original", row.OriginalLanguageTreatEmptyAsOriginal)
+        .Set("remove_images", row.RemoveImages)
+        .Set("remove_attachments", row.RemoveAttachments)
+        .Set("remove_title", row.RemoveTitle)
+        .Set("remove_language_tags", row.RemoveLanguageTags)
+        .Set("remove_other_metadata", row.RemoveOtherMetadata)
+        .Set("remove_hearing_impaired_subs", row.RemoveHearingImpairedSubs)
+        .Set("audio_keep_mode", row.AudioKeepMode)
+        .Set("subtitle_max_per_language", row.SubtitleMaxPerLanguage)
+        .Set("subtitle_quality_strategy", row.SubtitleQualityStrategy)
+        .Set("standardize_track_names", row.StandardizeTrackNames)
+        .Set("track_name_template", row.TrackNameTemplate)
+        .Set("track_name_overrides", new WireObject()
+            .Set("forced", row.TrackNameOverrides.Forced)
+            .Set("hearing_impaired", row.TrackNameOverrides.HearingImpaired)
+            .Set("commentary", row.TrackNameOverrides.Commentary)
+            .Set("audio_description", row.TrackNameOverrides.AudioDescription))
+        .Set("clear_video_track_names", row.ClearVideoTrackNames)
+        .Set("remove_chapters", row.RemoveChapters)
+        .Set("used_by_library_count", usedByLibraryCount)
+        .Set("updated_at", row.UpdatedAt.ToWireText());
+
+    public async Task<ApiResult> GetRuleSetsAsync(ApiRequest request)
+    {
+        await request.RequireUserAsync().ConfigureAwait(false);
+        var uow = await request.DbAsync().ConfigureAwait(false);
+        var rows = await LibraryStore.ListRuleSetsAsync(uow).ConfigureAwait(false);
+        var items = new List<WireValue>();
+        foreach (var row in rows)
+        {
+            items.Add(RuleSetOut(row, await LibraryStore.RuleSetUsageCountAsync(uow, row.Id).ConfigureAwait(false)));
+        }
+
+        return ApiRoutes.Ok(new WireArray(items));
+    }
+
+    public async Task<ApiResult> PostRuleSetAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
         var model = new BodyModel(payload, issues);
         var csrfToken = model.Str("csrf_token", minLength: 1);
-        var body = ReadRuleSetBody(model, issues);
+        var body = ProcessingRuleSetsEndpoints.ReadRuleSetBody(model, issues);
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
@@ -180,7 +197,7 @@ public static class ProcessingRuleSetsEndpoints
         return new JsonApiResult(StatusCodes.Status201Created, RuleSetOut(row, await LibraryStore.RuleSetUsageCountAsync(uow, row.Id).ConfigureAwait(false)));
     }
 
-    private static async Task<ApiResult> PutRuleSetAsync(ApiRequest request)
+    public async Task<ApiResult> PutRuleSetAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -188,7 +205,7 @@ public static class ProcessingRuleSetsEndpoints
         var id = request.PathInt("rule_set_id", pathIssues);
         var model = new BodyModel(payload, issues);
         var csrfToken = model.Str("csrf_token", minLength: 1);
-        var body = ReadRuleSetBody(model, issues);
+        var body = ProcessingRuleSetsEndpoints.ReadRuleSetBody(model, issues);
         model.Finish(ExtraFields.Forbid);
         pathIssues.ThrowIfAny();
         issues.ThrowIfAny();
@@ -211,7 +228,6 @@ public static class ProcessingRuleSetsEndpoints
         // #505 point 6: saving rules on a library with library folders runs a background re-plan (a normal scan, trigger
         // "rule_change"); the web shows "Apply to library? N files would change" once it finishes. Nothing runs on its own.
         var rescanJobIds = new List<long>();
-        var jobStore = request.Service<ProcessingJobStore>();
         foreach (var library in await LibraryStore.ListAsync(uow).ConfigureAwait(false))
         {
             if (library.RuleSetId != updated.Id)
@@ -219,13 +235,13 @@ public static class ProcessingRuleSetsEndpoints
                 continue;
             }
 
-            var librarySettings = await LibrarySettingsStore.GetAsync(uow, library.Id).ConfigureAwait(false);
-            if (librarySettings.Folders.Count == 0)
+            var settingsForLibrary = await _librarySettings.GetAsync(uow, library.Id).ConfigureAwait(false);
+            if (settingsForLibrary.Folders.Count == 0)
             {
                 continue;
             }
 
-            var job = await LibraryScanStore.RequestScanAsync(uow, jobStore, library.Id, "rule_change").ConfigureAwait(false);
+            var job = await _scans.RequestScanAsync(uow, _jobs, library.Id, "rule_change").ConfigureAwait(false);
             rescanJobIds.Add(job.Id);
         }
 
@@ -234,7 +250,7 @@ public static class ProcessingRuleSetsEndpoints
             .Set("library_rescan_job_ids", new WireArray(rescanJobIds.Select(id => (WireValue)new WireInteger(id)))));
     }
 
-    private static async Task<ApiResult> DeleteRuleSetAsync(ApiRequest request)
+    public async Task<ApiResult> DeleteRuleSetAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();

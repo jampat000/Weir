@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
@@ -22,13 +23,29 @@ public static class LibraryModeEndpoints
 {
     public static IEndpointRouteBuilder MapLibraryModeEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/processing/libraries/{library_id}/library-settings", GetSettingsAsync);
-        endpoints.MapV1("PUT", "/processing/libraries/{library_id}/library-settings", PutSettingsAsync);
-        endpoints.MapV1("POST", "/processing/libraries/{library_id}/library-scan", PostScanAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<LibraryModeEndpointHandlers>();
+        endpoints.MapV1("GET", "/processing/libraries/{library_id}/library-settings", handlers.GetSettingsAsync);
+        endpoints.MapV1("PUT", "/processing/libraries/{library_id}/library-settings", handlers.PutSettingsAsync);
+        endpoints.MapV1("POST", "/processing/libraries/{library_id}/library-scan", handlers.PostScanAsync);
         return endpoints;
     }
+}
 
-    private static async Task<ApiResult> GetSettingsAsync(ApiRequest request)
+/// <summary>Handlers for <see cref="LibraryModeEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class LibraryModeEndpointHandlers
+{
+    private readonly LibrarySettingsStore _librarySettings;
+    private readonly LibraryScanStore _scans;
+    private readonly ProcessingJobStore _jobs;
+
+    public LibraryModeEndpointHandlers(LibrarySettingsStore librarySettings, LibraryScanStore scans, ProcessingJobStore jobs)
+    {
+        _librarySettings = librarySettings ?? throw new ArgumentNullException(nameof(librarySettings));
+        _scans = scans ?? throw new ArgumentNullException(nameof(scans));
+        _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+    }
+
+    public async Task<ApiResult> GetSettingsAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -37,11 +54,11 @@ public static class LibraryModeEndpoints
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
-        var settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
+        var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
         return ApiRoutes.Ok(LibraryModeMapping.SettingsOut(settings));
     }
 
-    private static async Task<ApiResult> PutSettingsAsync(ApiRequest request)
+    public async Task<ApiResult> PutSettingsAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -76,7 +93,7 @@ public static class LibraryModeEndpoints
             throw new ApiException(StatusCodes.Status400BadRequest, exception.Message);
         }
 
-        var existing = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
+        var existing = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
         var updated = existing with
         {
             Folders = validated,
@@ -85,12 +102,12 @@ public static class LibraryModeEndpoints
             KeepOriginalAfterClean = keepOriginalAfterClean ?? existing.KeepOriginalAfterClean,
             OriginalsFolder = validatedOriginalsFolder ?? existing.OriginalsFolder,
         };
-        await LibrarySettingsStore.SetAsync(uow, libraryId, updated).ConfigureAwait(false);
+        await _librarySettings.SetAsync(uow, libraryId, updated).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(LibraryModeMapping.SettingsOut(updated));
     }
 
-    private static async Task<ApiResult> PostScanAsync(ApiRequest request)
+    public async Task<ApiResult> PostScanAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -105,21 +122,20 @@ public static class LibraryModeEndpoints
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
-        var settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
+        var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
         if (settings.Folders.Count == 0)
         {
             throw new ApiException(StatusCodes.Status400BadRequest, "Add at least one library folder before scanning.");
         }
 
-        var active = await LibraryScanStore.ActiveScanAsync(uow, library.Id).ConfigureAwait(false);
+        var active = await _scans.ActiveScanAsync(uow, library.Id).ConfigureAwait(false);
         if (active is not null)
         {
             await request.CommitAsync().ConfigureAwait(false);
             return ApiRoutes.Ok(new WireObject().Set("job_id", active.JobId).Set("status", active.Status).Set("already_running", true));
         }
 
-        var jobStore = request.Service<ProcessingJobStore>();
-        var job = await LibraryScanStore.RequestScanAsync(uow, jobStore, library.Id, "manual").ConfigureAwait(false);
+        var job = await _scans.RequestScanAsync(uow, _jobs, library.Id, "manual").ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject().Set("job_id", job.Id).Set("status", job.Status).Set("already_running", false));
     }
