@@ -21,16 +21,19 @@ namespace Weir.Infrastructure.Tests.Jobs;
 /// </summary>
 public sealed class ProcessingWatchedFolderScanDispatchManagerQueueSignalTests
 {
+    private static readonly LibraryStore Libraries = new();
+    private static readonly FileStateStore Files = new();
+
     private static async Task<(StoreFixture Store, ProcessingJobStore Jobs, ProcessingWatchedFolderScanDispatchJobHandler Handler, FakeManagerHttp Http, MediaManagerConnectionService Connections)> BuildAsync()
     {
         var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "queue-signal-tests-credentials-secret"));
         var cipher = new CredentialCipher(store.Options.CredentialsSecret, store.Options.SessionSecret, store.Options.PreviousCredentialsSecrets, store.Clock);
         var http = new FakeManagerHttp();
         var ports = new HttpMediaManagerPorts(http);
-        var connections = new MediaManagerConnectionService(store.Options, cipher, ports);
+        var connections = new MediaManagerConnectionService(store.Options, cipher, ports, new MediaManagerConnectionStore());
         var jobs = new ProcessingJobStore(store.Database, store.Clock);
         var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
-            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore());
+            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore(), Libraries, Files);
         await store.Execute(
             "INSERT INTO operator_settings (id, min_file_age_seconds, min_input_file_size_mb, minimum_free_disk_space_mb) " +
             "VALUES (1, 0, 0, 0) ON CONFLICT(id) DO UPDATE SET min_file_age_seconds = 0, min_input_file_size_mb = 0, minimum_free_disk_space_mb = 0");
@@ -40,7 +43,7 @@ public sealed class ProcessingWatchedFolderScanDispatchManagerQueueSignalTests
     private static async Task<long> CreateLibraryAsync(StoreFixture store, string watched, string output, IReadOnlyList<long> managerConnectionIds)
     {
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
-        var created = await LibraryStore.CreateAsync(uow, new ProcessingLibraryInput
+        var created = await Libraries.CreateAsync(uow, new ProcessingLibraryInput
         {
             Name = "Movies " + Guid.NewGuid().ToString("N")[..8],
             MediaType = ProcessingMediaScopes.Movie,
@@ -90,7 +93,7 @@ public sealed class ProcessingWatchedFolderScanDispatchManagerQueueSignalTests
         Assert.Equal(0, remuxCount);
 
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
-        var file = await FileStateStore.FindAsync(uow, libraryId, "Held By Radarr 2001.mkv");
+        var file = await Files.FindAsync(uow, libraryId, "Held By Radarr 2001.mkv");
         Assert.NotNull(file);
         Assert.Equal(ProcessingFileStatuses.BlockedUpstream, file!.Status);
         Assert.Equal("Radarr (Main)", file.BlockedByConnection);

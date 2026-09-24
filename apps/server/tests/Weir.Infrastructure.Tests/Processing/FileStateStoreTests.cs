@@ -12,6 +12,8 @@ namespace Weir.Infrastructure.Tests.Processing;
 /// </summary>
 public sealed class FileStateStoreTests
 {
+    private static readonly FileStateStore Store = new();
+
     private static long InsertLibrary(JobsTestDatabase db, string name = "Movies bug530")
     {
         db.Execute(
@@ -35,7 +37,7 @@ public sealed class FileStateStoreTests
         InsertFile(db, libraryId, "Movie (2020)/movie.mkv", status);
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
 
-        var rows = await FileStateStore.ListAsync(uow, new ProcessingFileListFilter { Status = status });
+        var rows = await Store.ListAsync(uow, new ProcessingFileListFilter { Status = status });
 
         var row = Assert.Single(rows);
         Assert.Equal(status, row.Status);
@@ -52,7 +54,7 @@ public sealed class FileStateStoreTests
         InsertFile(db, libraryId, "c.mkv", ProcessingFileStatuses.Processed);
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
 
-        var counts = await FileStateStore.StatusCountsAsync(uow, libraryId);
+        var counts = await Store.StatusCountsAsync(uow, libraryId);
 
         Assert.Equal(ProcessingFileStatuses.All.Count, counts.Count);
         Assert.Equal(1, counts[ProcessingFileStatuses.PassedThrough]);
@@ -70,7 +72,7 @@ public sealed class FileStateStoreTests
         InsertFile(db, libraryId, "b.mkv", ProcessingFileStatuses.Unprocessed);
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
 
-        var rows = await FileStateStore.ListAsync(uow, new ProcessingFileListFilter());
+        var rows = await Store.ListAsync(uow, new ProcessingFileListFilter());
 
         Assert.Equal(2, rows.Count);
     }
@@ -84,7 +86,7 @@ public sealed class FileStateStoreTests
         InsertFile(db, libraryId, "Other/file.mkv", ProcessingFileStatuses.Processed);
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
 
-        var rows = await FileStateStore.ListAsync(uow, new ProcessingFileListFilter { PathContains = "show" });
+        var rows = await Store.ListAsync(uow, new ProcessingFileListFilter { PathContains = "show" });
 
         var row = Assert.Single(rows);
         Assert.Equal("Show/S01E01.mkv", row.RelativePath);
@@ -97,10 +99,10 @@ public sealed class FileStateStoreTests
         var libraryId = InsertLibrary(db);
         InsertFile(db, libraryId, "a.mkv", ProcessingFileStatuses.Processed);
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var row = Assert.Single(await FileStateStore.ListAsync(uow, new ProcessingFileListFilter()));
+        var row = Assert.Single(await Store.ListAsync(uow, new ProcessingFileListFilter()));
 
-        await FileStateStore.ForgetAsync(uow, row.Id);
+        await Store.ForgetAsync(uow, row.Id);
 
-        Assert.Null(await FileStateStore.GetAsync(uow, row.Id));
+        Assert.Null(await Store.GetAsync(uow, row.Id));
     }
 }

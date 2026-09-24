@@ -37,12 +37,17 @@ internal sealed class AuthSessionLifecycleEndpointHandlers
     private readonly AuthStore _users;
     private readonly ActivityStore _activity;
     private readonly SuiteSettingsStore _suiteSettings;
+    private readonly AuthRateLimiters _limiters;
+    private readonly SetupCodeGate _setupCodes;
 
-    public AuthSessionLifecycleEndpointHandlers(AuthStore users, ActivityStore activity, SuiteSettingsStore suiteSettings)
+    public AuthSessionLifecycleEndpointHandlers(
+        AuthStore users, ActivityStore activity, SuiteSettingsStore suiteSettings, AuthRateLimiters limiters, SetupCodeGate setupCodes)
     {
         _users = users ?? throw new ArgumentNullException(nameof(users));
         _activity = activity ?? throw new ArgumentNullException(nameof(activity));
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+        _limiters = limiters ?? throw new ArgumentNullException(nameof(limiters));
+        _setupCodes = setupCodes ?? throw new ArgumentNullException(nameof(setupCodes));
     }
 
     public async Task<ApiResult> GetCsrfAsync(ApiRequest request)
@@ -73,7 +78,7 @@ internal sealed class AuthSessionLifecycleEndpointHandlers
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
-        var limiters = request.Service<AuthRateLimiters>();
+        var limiters = _limiters;
         if (!limiters.Login.Allow(request.RateLimitKey()))
         {
             throw new ApiException(
@@ -123,7 +128,7 @@ internal sealed class AuthSessionLifecycleEndpointHandlers
     }
 
     /// <summary>A 200 that hands the browser its new session cookie.</summary>
-    private static JsonApiResult SignedIn(ApiRequest request, WireObject body, UserSessionRecord session, string rawToken)
+    private JsonApiResult SignedIn(ApiRequest request, WireObject body, UserSessionRecord session, string rawToken)
     {
         WarnIfCookieSecureBlockedByUntranslatedTls(request);
         var cookie = CookieHeaders.SetCookieHeader(
@@ -146,7 +151,7 @@ internal sealed class AuthSessionLifecycleEndpointHandlers
     /// protected. This logs it once per process, the first time a sign-in shows the tell (an https Origin or
     /// Referer on a request that otherwise reads as plain http).
     /// </summary>
-    private static void WarnIfCookieSecureBlockedByUntranslatedTls(ApiRequest request)
+    private void WarnIfCookieSecureBlockedByUntranslatedTls(ApiRequest request)
     {
         var blocked = SessionRules.CookieSecureBlockedByUntranslatedTls(
             request.Options.SessionCookieSecureMode,
@@ -154,7 +159,7 @@ internal sealed class AuthSessionLifecycleEndpointHandlers
             request.FirstHeader("Origin"),
             request.FirstHeader("Referer"),
             request.Options.TrustedProxyIps.Count > 0);
-        if (blocked && request.Service<AuthRateLimiters>().ShouldWarnCookieNotSecure())
+        if (blocked && _limiters.ShouldWarnCookieNotSecure())
         {
             AuthEndpoints.Logger(request).LogWarning(
                 "The session cookie could not be marked Secure: this request reads as plain http even though " +
@@ -205,7 +210,7 @@ internal sealed class AuthSessionLifecycleEndpointHandlers
                 "the database, and verify WEIR_HOME / WEIR_DB_PATH.");
         }
 
-        var setupCodes = request.Service<SetupCodeGate>();
+        var setupCodes = _setupCodes;
         var requiresSetupCode = allowed && setupCodes.HasCode && !SetupCodeGate.IsLoopback(request.ClientHost);
         return ApiRoutes.Ok(new WireObject()
             .Set("bootstrap_allowed", allowed)
@@ -225,7 +230,7 @@ internal sealed class AuthSessionLifecycleEndpointHandlers
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
-        var limiters = request.Service<AuthRateLimiters>();
+        var limiters = _limiters;
         if (!limiters.Bootstrap.Allow(request.RateLimitKey()))
         {
             throw new ApiException(
@@ -241,7 +246,7 @@ internal sealed class AuthSessionLifecycleEndpointHandlers
             throw new ApiException(StatusCodes.Status400BadRequest, AuthEndpoints.InvalidCsrf);
         }
 
-        var setupCodes = request.Service<SetupCodeGate>();
+        var setupCodes = _setupCodes;
         if (setupCodes.HasCode && !SetupCodeGate.IsLoopback(request.ClientHost) && !setupCodes.Validate(setupCode))
         {
             throw new ApiException(

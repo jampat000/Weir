@@ -107,10 +107,11 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
     /// Shared checks for manual HTTP and periodic enqueue (library found; watched folder saved; output folder saved when live remux is on).
     /// </summary>
     public static async Task<(bool Ok, ScanDispatchPrerequisiteError? Error)> ValidatePrerequisitesAsync(
-        UnitOfWork uow, bool enqueueRemuxJobs, string mediaScope, long? libraryId)
+        UnitOfWork uow, LibraryStore libraries, bool enqueueRemuxJobs, string mediaScope, long? libraryId)
     {
-        var library = libraryId is { } id ? await LibraryStore.GetAsync(uow, id).ConfigureAwait(false) : null;
-        library ??= await LibraryStore.SeededForScopeAsync(uow, mediaScope).ConfigureAwait(false);
+        ArgumentNullException.ThrowIfNull(libraries);
+        var library = libraryId is { } id ? await libraries.GetAsync(uow, id).ConfigureAwait(false) : null;
+        library ??= await libraries.SeededForScopeAsync(uow, mediaScope).ConfigureAwait(false);
         if (library is null)
         {
             // Libraries are the only store (#363): a database with no library covering this scope is one
@@ -149,7 +150,7 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
     /// <paramref name="enqueueRemuxJobs"/> is the operator's <c>..._periodic_enqueue_remux_jobs</c> setting.
     /// </summary>
     public static async Task<(bool Inserted, string? Skip)> TryEnqueuePeriodicAsync(
-        UnitOfWork uow, ProcessingJobStore jobStore, ProcessingLibraryRecord library, bool enqueueRemuxJobs)
+        UnitOfWork uow, ProcessingJobStore jobStore, LibraryStore libraries, ProcessingLibraryRecord library, bool enqueueRemuxJobs)
     {
         ArgumentNullException.ThrowIfNull(library);
         var scope = ProcessingMediaScopes.Normalize(library.MediaType);
@@ -158,7 +159,7 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
             return (false, $"active_scan_already_queued_library_{library.Id}");
         }
 
-        var (ok, error) = await ValidatePrerequisitesAsync(uow, enqueueRemuxJobs, scope, library.Id).ConfigureAwait(false);
+        var (ok, error) = await ValidatePrerequisitesAsync(uow, libraries, enqueueRemuxJobs, scope, library.Id).ConfigureAwait(false);
         if (!ok)
         {
             return (false, error switch

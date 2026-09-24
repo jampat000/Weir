@@ -21,13 +21,16 @@ public sealed class RemuxPassFailureRecorder : IUnhandledJobFailureRecorder
 {
     private readonly SqliteDatabase _database;
     private readonly IFailurePolicy _policy;
+    private readonly LibraryStore _libraries;
     private readonly TimeProvider _time;
     private readonly ILogger<RemuxPassFailureRecorder> _logger;
 
-    public RemuxPassFailureRecorder(SqliteDatabase database, IFailurePolicy policy, TimeProvider time, ILogger<RemuxPassFailureRecorder> logger)
+    public RemuxPassFailureRecorder(
+        SqliteDatabase database, IFailurePolicy policy, LibraryStore libraries, TimeProvider time, ILogger<RemuxPassFailureRecorder> logger)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _policy = policy ?? throw new ArgumentNullException(nameof(policy));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -39,7 +42,7 @@ public sealed class RemuxPassFailureRecorder : IUnhandledJobFailureRecorder
             _database,
             async uow =>
             {
-                var library = await RemuxPassHandler.ResolveLibraryAsync(uow, failure.LibraryId, failure.MediaScope).ConfigureAwait(false);
+                var library = await RemuxPassHandler.ResolveLibraryAsync(uow, _libraries, failure.LibraryId, failure.MediaScope).ConfigureAwait(false);
                 if (library is null || failure.RelativeMediaPath is null)
                 {
                     return null;
@@ -110,6 +113,8 @@ public static class RemuxPassServices
             sp.GetRequiredService<RemuxPassRunner>(),
             sp.GetRequiredService<IFailurePolicy>(),
             sp.GetRequiredService<OperatorSettingsStore>(),
+            sp.GetRequiredService<HandbackStore>(),
+            sp.GetRequiredService<LibraryStore>(),
             sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredService<ILogger<RemuxPassHandler>>(),
             sp.GetRequiredService<DownloadedScanNotifier>(),

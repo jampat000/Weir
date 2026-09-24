@@ -8,6 +8,7 @@ using Weir.Core.LibraryMode;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.LibraryMode;
+using Weir.Infrastructure.Processing;
 using static Weir.Api.Endpoints.EndpointLookups;
 
 namespace Weir.Api.Endpoints;
@@ -37,12 +38,14 @@ internal sealed class LibraryModeEndpointHandlers
     private readonly LibrarySettingsStore _librarySettings;
     private readonly LibraryScanStore _scans;
     private readonly ProcessingJobStore _jobs;
+    private readonly LibraryStore _libraries;
 
-    public LibraryModeEndpointHandlers(LibrarySettingsStore librarySettings, LibraryScanStore scans, ProcessingJobStore jobs)
+    public LibraryModeEndpointHandlers(LibrarySettingsStore librarySettings, LibraryScanStore scans, ProcessingJobStore jobs, LibraryStore libraries)
     {
         _librarySettings = librarySettings ?? throw new ArgumentNullException(nameof(librarySettings));
         _scans = scans ?? throw new ArgumentNullException(nameof(scans));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
     }
 
     public async Task<ApiResult> GetSettingsAsync(ApiRequest request)
@@ -53,7 +56,7 @@ internal sealed class LibraryModeEndpointHandlers
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
+        await RequireLibraryAsync(uow, _libraries, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
         var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
         return ApiRoutes.Ok(LibraryModeMapping.SettingsOut(settings));
     }
@@ -77,7 +80,7 @@ internal sealed class LibraryModeEndpointHandlers
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, _libraries, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
         IReadOnlyList<string> validated;
         string? validatedOriginalsFolder = null;
         try
@@ -121,7 +124,7 @@ internal sealed class LibraryModeEndpointHandlers
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, _libraries, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
         var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
         if (settings.Folders.Count == 0)
         {

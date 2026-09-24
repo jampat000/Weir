@@ -29,11 +29,13 @@ internal sealed class ProcessingFileLogEndpointHandlers
 {
     private readonly OperatorSettingsStore _operatorSettings;
     private readonly FileLogStore _fileLogs;
+    private readonly FileStateStore _files;
 
-    public ProcessingFileLogEndpointHandlers(OperatorSettingsStore operatorSettings, FileLogStore fileLogs)
+    public ProcessingFileLogEndpointHandlers(OperatorSettingsStore operatorSettings, FileLogStore fileLogs, FileStateStore files)
     {
         _operatorSettings = operatorSettings ?? throw new ArgumentNullException(nameof(operatorSettings));
         _fileLogs = fileLogs ?? throw new ArgumentNullException(nameof(fileLogs));
+        _files = files ?? throw new ArgumentNullException(nameof(files));
     }
 
     public async Task<ApiResult> GetFileLogAsync(ApiRequest request)
@@ -45,7 +47,7 @@ internal sealed class ProcessingFileLogEndpointHandlers
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await ProcessingFilesEndpoints.RequireFileAsync(uow, id).ConfigureAwait(false);
+        var row = await ProcessingFilesEndpoints.RequireFileAsync(uow, _files, id).ConfigureAwait(false);
         var operatorRow = await _operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
         var rows = await _fileLogs.LogsForFileAsync(uow, row.RelativePath, limit).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
@@ -83,7 +85,7 @@ internal sealed class ProcessingFileLogEndpointHandlers
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await ProcessingFilesEndpoints.RequireFileAsync(uow, id).ConfigureAwait(false);
+        var row = await ProcessingFilesEndpoints.RequireFileAsync(uow, _files, id).ConfigureAwait(false);
         var rows = await _fileLogs.LogsForFileAsync(uow, row.RelativePath, 500).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
 

@@ -17,15 +17,17 @@ internal sealed class WatchedFolderScanBatch
     internal const int TouchesPerBatch = 2_000;
 
     private readonly SqliteDatabase _database;
+    private readonly FileStateStore _files;
     private readonly long _libraryId;
     private readonly DateTimeOffset _seenAt;
     private readonly List<long> _touched = [];
     private readonly List<(ScannedFileWrite Write, Func<Task>? WhenApplied)> _writes = [];
     private readonly List<Func<Task>> _afterCommit = [];
 
-    public WatchedFolderScanBatch(SqliteDatabase database, long libraryId, DateTimeOffset seenAt)
+    public WatchedFolderScanBatch(SqliteDatabase database, FileStateStore files, long libraryId, DateTimeOffset seenAt)
     {
         _database = database;
+        _files = files;
         _libraryId = libraryId;
         _seenAt = seenAt;
     }
@@ -55,10 +57,10 @@ internal sealed class WatchedFolderScanBatch
                 var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
                 await using (uow.ConfigureAwait(false))
                 {
-                    await FileStateStore.TouchLastSeenAsync(uow, _touched, _seenAt).ConfigureAwait(false);
+                    await _files.TouchLastSeenAsync(uow, _touched, _seenAt).ConfigureAwait(false);
                     foreach (var (write, whenApplied) in _writes)
                     {
-                        if (await FileStateStore.RecordScannedStateAsync(uow, _libraryId, write, _seenAt).ConfigureAwait(false) && whenApplied is not null)
+                        if (await _files.RecordScannedStateAsync(uow, _libraryId, write, _seenAt).ConfigureAwait(false) && whenApplied is not null)
                         {
                             followUps.Add(whenApplied);
                         }

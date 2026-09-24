@@ -8,6 +8,8 @@ namespace Weir.Infrastructure.Tests.Processing;
 /// <summary>Real-SQLite proof of <c>LibraryStore</c>, the library persistence layer (ADR-0014).</summary>
 public sealed class LibraryStoreTests
 {
+    private static readonly LibraryStore Store = new();
+
     private static ProcessingLibraryInput NewLibrary(string name, string watched = "", string output = "", string mediaType = "movie") => new()
     {
         Name = name,
@@ -22,7 +24,7 @@ public sealed class LibraryStoreTests
         using var db = new JobsTestDatabase(keepSeedRows: true);
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
 
-        var rows = await LibraryStore.ListAsync(uow);
+        var rows = await Store.ListAsync(uow);
 
         Assert.Equal(["Movies", "TV"], rows.Select(r => r.Name));
         Assert.Equal(["movie", "tv"], rows.Select(r => r.MediaType));
@@ -34,7 +36,7 @@ public sealed class LibraryStoreTests
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
 
-        var created = await LibraryStore.CreateAsync(uow, NewLibrary("4K", watched: @"c:\media\4k-in", output: @"c:\media\4k-out"));
+        var created = await Store.CreateAsync(uow, NewLibrary("4K", watched: @"c:\media\4k-in", output: @"c:\media\4k-out"));
 
         Assert.True(created.Id > 0);
         Assert.Equal("4K", created.Name);
@@ -42,7 +44,7 @@ public sealed class LibraryStoreTests
         Assert.Equal(@"c:\media\4k-in", created.WatchedFolder);
         Assert.Equal(ProcessingFailurePolicies.PassThrough, created.FailurePolicy);
 
-        var reloaded = await LibraryStore.GetAsync(uow, created.Id);
+        var reloaded = await Store.GetAsync(uow, created.Id);
         Assert.NotNull(reloaded);
         Assert.Equal(created.Name, reloaded!.Name);
     }
@@ -52,9 +54,9 @@ public sealed class LibraryStoreTests
     {
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        await LibraryStore.CreateAsync(uow, NewLibrary("Anime"));
+        await Store.CreateAsync(uow, NewLibrary("Anime"));
 
-        var exception = await Assert.ThrowsAsync<ProcessingLibraryException>(() => LibraryStore.CreateAsync(uow, NewLibrary("Anime")));
+        var exception = await Assert.ThrowsAsync<ProcessingLibraryException>(() => Store.CreateAsync(uow, NewLibrary("Anime")));
         Assert.Contains("already exists", exception.Message, StringComparison.Ordinal);
     }
 
@@ -63,10 +65,10 @@ public sealed class LibraryStoreTests
     {
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        await LibraryStore.CreateAsync(uow, NewLibrary("Anime", watched: @"c:\media\anime-in", output: @"c:\media\anime-out"));
+        await Store.CreateAsync(uow, NewLibrary("Anime", watched: @"c:\media\anime-in", output: @"c:\media\anime-out"));
 
         var exception = await Assert.ThrowsAsync<ProcessingLibraryException>(() =>
-            LibraryStore.CreateAsync(uow, NewLibrary("Anime 4K", watched: @"c:\media\anime-out", output: @"c:\media\anime4k-out")));
+            Store.CreateAsync(uow, NewLibrary("Anime 4K", watched: @"c:\media\anime-out", output: @"c:\media\anime4k-out")));
         Assert.Contains("Anime", exception.Message, StringComparison.Ordinal);
     }
 
@@ -75,16 +77,16 @@ public sealed class LibraryStoreTests
     {
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var library = await LibraryStore.CreateAsync(uow, NewLibrary("Anime"));
+        var library = await Store.CreateAsync(uow, NewLibrary("Anime"));
         await uow.CommitAsync(); // release the write lock before the raw connection below takes it
         db.Execute(
             "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status) VALUES ('k1', 'processing.file.remux_pass.v1', @payload, 'pending')",
             ("@payload", $"{{\"library_id\": {library.Id}}}"));
 
-        var exception = await Assert.ThrowsAsync<ProcessingLibraryException>(() => LibraryStore.DeleteAsync(uow, library));
+        var exception = await Assert.ThrowsAsync<ProcessingLibraryException>(() => Store.DeleteAsync(uow, library));
         Assert.Contains("1 job", exception.Message, StringComparison.Ordinal);
 
-        Assert.NotNull(await LibraryStore.GetAsync(uow, library.Id));
+        Assert.NotNull(await Store.GetAsync(uow, library.Id));
     }
 
     [Fact]
@@ -92,11 +94,11 @@ public sealed class LibraryStoreTests
     {
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var library = await LibraryStore.CreateAsync(uow, NewLibrary("Anime"));
+        var library = await Store.CreateAsync(uow, NewLibrary("Anime"));
 
-        await LibraryStore.DeleteAsync(uow, library);
+        await Store.DeleteAsync(uow, library);
 
-        Assert.Null(await LibraryStore.GetAsync(uow, library.Id));
+        Assert.Null(await Store.GetAsync(uow, library.Id));
     }
 
     [Fact]
@@ -104,10 +106,10 @@ public sealed class LibraryStoreTests
     {
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var a = await LibraryStore.CreateAsync(uow, NewLibrary("A"));
-        var b = await LibraryStore.CreateAsync(uow, NewLibrary("B"));
+        var a = await Store.CreateAsync(uow, NewLibrary("A"));
+        var b = await Store.CreateAsync(uow, NewLibrary("B"));
 
-        var reordered = await LibraryStore.ReorderAsync(uow, [b.Id, a.Id]);
+        var reordered = await Store.ReorderAsync(uow, [b.Id, a.Id]);
 
         Assert.Equal(["B", "A"], reordered.Select(r => r.Name));
     }
@@ -117,10 +119,10 @@ public sealed class LibraryStoreTests
     {
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var a = await LibraryStore.CreateAsync(uow, NewLibrary("A"));
-        await LibraryStore.CreateAsync(uow, NewLibrary("B"));
+        var a = await Store.CreateAsync(uow, NewLibrary("A"));
+        await Store.CreateAsync(uow, NewLibrary("B"));
 
-        await Assert.ThrowsAsync<ProcessingLibraryException>(() => LibraryStore.ReorderAsync(uow, [a.Id]));
+        await Assert.ThrowsAsync<ProcessingLibraryException>(() => Store.ReorderAsync(uow, [a.Id]));
     }
 
     [Fact]
@@ -128,15 +130,15 @@ public sealed class LibraryStoreTests
     {
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var library = await LibraryStore.CreateAsync(uow, NewLibrary("Anime"));
+        var library = await Store.CreateAsync(uow, NewLibrary("Anime"));
         await uow.CommitAsync(); // release the write lock before the raw connection below takes it
         db.Execute("INSERT INTO media_manager_connections (id, kind, name) VALUES (1, 'sonarr', 'Sonarr')");
 
-        await LibraryStore.SetManagerLinksAsync(uow, library.Id, [1]);
-        Assert.Equal([1L], await LibraryStore.ManagerConnectionIdsAsync(uow, library.Id));
+        await Store.SetManagerLinksAsync(uow, library.Id, [1]);
+        Assert.Equal([1L], await Store.ManagerConnectionIdsAsync(uow, library.Id));
 
-        await LibraryStore.SetManagerLinksAsync(uow, library.Id, []);
-        Assert.Empty(await LibraryStore.ManagerConnectionIdsAsync(uow, library.Id));
+        await Store.SetManagerLinksAsync(uow, library.Id, []);
+        Assert.Empty(await Store.ManagerConnectionIdsAsync(uow, library.Id));
     }
 
     [Fact]
@@ -144,9 +146,9 @@ public sealed class LibraryStoreTests
     {
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var library = await LibraryStore.CreateAsync(uow, NewLibrary("Anime"));
+        var library = await Store.CreateAsync(uow, NewLibrary("Anime"));
 
-        await Assert.ThrowsAsync<ProcessingLibraryException>(() => LibraryStore.SetManagerLinksAsync(uow, library.Id, [999]));
+        await Assert.ThrowsAsync<ProcessingLibraryException>(() => Store.SetManagerLinksAsync(uow, library.Id, [999]));
     }
 
     [Fact]
@@ -154,10 +156,10 @@ public sealed class LibraryStoreTests
     {
         using var db = new JobsTestDatabase(keepSeedRows: true);
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var ruleSet = await LibraryStore.GetRuleSetAsync(uow, 1);
+        var ruleSet = await Store.GetRuleSetAsync(uow, 1);
         Assert.NotNull(ruleSet);
 
-        var exception = await Assert.ThrowsAsync<ProcessingLibraryException>(() => LibraryStore.DeleteRuleSetAsync(uow, ruleSet!));
+        var exception = await Assert.ThrowsAsync<ProcessingLibraryException>(() => Store.DeleteRuleSetAsync(uow, ruleSet!));
         Assert.Contains("still used", exception.Message, StringComparison.Ordinal);
     }
 
@@ -166,11 +168,11 @@ public sealed class LibraryStoreTests
     {
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var ruleSet = await LibraryStore.CreateRuleSetAsync(uow, new Weir.Core.Processing.LibraryRules.RuleSetInput { Name = "Spare" });
+        var ruleSet = await Store.CreateRuleSetAsync(uow, new Weir.Core.Processing.LibraryRules.RuleSetInput { Name = "Spare" });
 
-        await LibraryStore.DeleteRuleSetAsync(uow, ruleSet);
+        await Store.DeleteRuleSetAsync(uow, ruleSet);
 
-        Assert.Null(await LibraryStore.GetRuleSetAsync(uow, ruleSet.Id));
+        Assert.Null(await Store.GetRuleSetAsync(uow, ruleSet.Id));
     }
 
     [Fact]
@@ -179,7 +181,7 @@ public sealed class LibraryStoreTests
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
 
-        var ruleSet = await LibraryStore.CreateRuleSetAsync(uow, new Weir.Core.Processing.LibraryRules.RuleSetInput { Name = "Custom" });
+        var ruleSet = await Store.CreateRuleSetAsync(uow, new Weir.Core.Processing.LibraryRules.RuleSetInput { Name = "Custom" });
 
         Assert.False(string.IsNullOrWhiteSpace(ruleSet.AudioSortersJson));
         Assert.NotEqual("[]", ruleSet.AudioSortersJson.Trim());
@@ -211,8 +213,8 @@ public sealed class LibraryStoreTests
             RemoveChapters = true,
         };
 
-        var created = await LibraryStore.CreateRuleSetAsync(uow, input);
-        var reloadedAfterCreate = await LibraryStore.GetRuleSetAsync(uow, created.Id);
+        var created = await Store.CreateRuleSetAsync(uow, input);
+        var reloadedAfterCreate = await Store.GetRuleSetAsync(uow, created.Id);
 
         foreach (var row in new[] { created, reloadedAfterCreate })
         {
@@ -233,11 +235,11 @@ public sealed class LibraryStoreTests
         Assert.False(string.IsNullOrWhiteSpace(reloadedAfterCreate!.SubtitleSortersJson));
         Assert.Equal(created.SubtitleSortersJson, reloadedAfterCreate.SubtitleSortersJson);
 
-        var updated = await LibraryStore.UpdateRuleSetAsync(
+        var updated = await Store.UpdateRuleSetAsync(
             uow,
             created,
             input with { RemoveHearingImpairedSubs = false, AudioKeepMode = Weir.Core.Rules.RemuxRuleValues.AudioKeepModeSingle, SubtitleMaxPerLanguage = 0 });
-        var reloadedAfterUpdate = await LibraryStore.GetRuleSetAsync(uow, created.Id);
+        var reloadedAfterUpdate = await Store.GetRuleSetAsync(uow, created.Id);
 
         Assert.False(updated.RemoveHearingImpairedSubs);
         Assert.Equal(Weir.Core.Rules.RemuxRuleValues.AudioKeepModeSingle, updated.AudioKeepMode);
@@ -253,7 +255,7 @@ public sealed class LibraryStoreTests
     {
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var created = await LibraryStore.CreateRuleSetAsync(uow, new Weir.Core.Processing.LibraryRules.RuleSetInput { Name = "Legacy row" });
+        var created = await Store.CreateRuleSetAsync(uow, new Weir.Core.Processing.LibraryRules.RuleSetInput { Name = "Legacy row" });
         await uow.CommitAsync(); // release the write lock before the raw connection below takes it
 
         // Simulate a row written before #495/#497/#498 existed: subtitle_sorters_json holds only the
@@ -261,7 +263,7 @@ public sealed class LibraryStoreTests
         const string legacySorters = """[{"field":"forced","value":null,"reversed":false}]""";
         db.Execute("UPDATE rule_sets SET subtitle_sorters_json = @json WHERE id = @id", ("@json", legacySorters), ("@id", created.Id));
 
-        var reloaded = await LibraryStore.GetRuleSetAsync(uow, created.Id);
+        var reloaded = await Store.GetRuleSetAsync(uow, created.Id);
 
         Assert.Equal(legacySorters, reloaded!.SubtitleSortersJson);
         Assert.False(reloaded.RemoveHearingImpairedSubs);
@@ -280,7 +282,7 @@ public sealed class LibraryStoreTests
     {
         using var db = new JobsTestDatabase();
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var library = await LibraryStore.CreateAsync(uow, NewLibrary("Anime"));
+        var library = await Store.CreateAsync(uow, NewLibrary("Anime"));
         await uow.CommitAsync(); // release the write lock before the raw connection below takes it
         db.Execute(
             "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status) VALUES ('k1', 'processing.file.remux_pass.v1', @payload, 'leased')",
@@ -289,8 +291,8 @@ public sealed class LibraryStoreTests
             "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status) VALUES ('k2', 'processing.file.remux_pass.v1', @payload, 'completed')",
             ("@payload", $"{{\"library_id\": {library.Id}}}"));
 
-        var reloaded = await LibraryStore.GetAsync(uow, library.Id);
-        var active = await LibraryStore.ActiveJobCountAsync(uow, reloaded!);
+        var reloaded = await Store.GetAsync(uow, library.Id);
+        var active = await Store.ActiveJobCountAsync(uow, reloaded!);
 
         Assert.Equal(1, active);
     }

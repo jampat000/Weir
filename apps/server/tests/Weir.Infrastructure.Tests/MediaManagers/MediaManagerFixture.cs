@@ -18,12 +18,18 @@ internal sealed class MediaManagerFixture : IDisposable
         Cipher = new CredentialCipher(Store.Options.CredentialsSecret, Store.Options.SessionSecret, Store.Options.PreviousCredentialsSecrets, Store.Clock);
         Http = new FakeManagerHttp();
         Ports = new HttpMediaManagerPorts(Http);
-        Connections = new MediaManagerConnectionService(Store.Options, Cipher, Ports);
-        Ledger = new HandoffLedgerStore(Store.Clock);
+        ConnectionStore = new MediaManagerConnectionStore();
+        Connections = new MediaManagerConnectionService(Store.Options, Cipher, Ports, ConnectionStore);
+        Targets = new HandoffTargetStore();
+        Files = new FileStateStore();
+        Libraries = new LibraryStore();
+        Handback = new HandbackStore();
+        Ledger = new HandoffLedgerStore(Store.Clock, Targets, Files);
         Jobs = new ProcessingJobStore(Store.Database, Store.Clock);
-        Intake = new MediaManagerIntake(Store.Options, Connections, Ledger, Jobs, Store.Clock);
-        Reporter = new HandoffCompletionReporter(Connections, Ledger, Http);
+        Intake = new MediaManagerIntake(Store.Options, Connections, ConnectionStore, Ledger, Targets, Jobs, Store.Clock);
+        Reporter = new HandoffCompletionReporter(Connections, ConnectionStore, Ledger, Targets, Libraries, Http);
         OperatorSettings = new OperatorSettingsStore();
+        Cancellation = new PendingJobCancellation(Ledger, Reporter, Files);
     }
 
     public StoreFixture Store { get; }
@@ -36,6 +42,16 @@ internal sealed class MediaManagerFixture : IDisposable
 
     public MediaManagerConnectionService Connections { get; }
 
+    public MediaManagerConnectionStore ConnectionStore { get; }
+
+    public HandoffTargetStore Targets { get; }
+
+    public FileStateStore Files { get; }
+
+    public LibraryStore Libraries { get; }
+
+    public HandbackStore Handback { get; }
+
     public HandoffLedgerStore Ledger { get; }
 
     public ProcessingJobStore Jobs { get; }
@@ -45,6 +61,8 @@ internal sealed class MediaManagerFixture : IDisposable
     public HandoffCompletionReporter Reporter { get; }
 
     public OperatorSettingsStore OperatorSettings { get; }
+
+    public PendingJobCancellation Cancellation { get; }
 
     public Task<T> Db<T>(Func<UnitOfWork, Task<T>> work, bool commit = true) => Store.WithUnitOfWork(work, commit);
 

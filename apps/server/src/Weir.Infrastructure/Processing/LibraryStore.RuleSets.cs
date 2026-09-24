@@ -6,7 +6,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing;
 
 /// <summary>Rule-set CRUD, and the default-profile bookkeeping a library falls back to when it has none.</summary>
-public static partial class LibraryStore
+public sealed partial class LibraryStore
 {
     private const string RuleSetColumns =
         "id, name, primary_audio_lang, secondary_audio_lang, tertiary_audio_lang, default_audio_slot, remove_commentary, " +
@@ -18,13 +18,13 @@ public static partial class LibraryStore
         "track_name_override_forced, track_name_override_hearing_impaired, track_name_override_commentary, " +
         "track_name_override_audio_description, clear_video_track_names, remove_chapters, created_at, updated_at";
 
-    public static async Task<List<ProcessingRuleSetRecord>> ListRuleSetsAsync(UnitOfWork uow) =>
+    public async Task<List<ProcessingRuleSetRecord>> ListRuleSetsAsync(UnitOfWork uow) =>
         await uow.QueryAsync($"SELECT {RuleSetColumns} FROM rule_sets ORDER BY id", ReadRuleSet).ConfigureAwait(false);
 
-    public static Task<ProcessingRuleSetRecord?> GetRuleSetAsync(UnitOfWork uow, long id) =>
+    public Task<ProcessingRuleSetRecord?> GetRuleSetAsync(UnitOfWork uow, long id) =>
         uow.QuerySingleAsync($"SELECT {RuleSetColumns} FROM rule_sets WHERE id = @id", ReadRuleSet, ("@id", id));
 
-    public static Task<ProcessingRuleSetRecord?> GetRuleSetByNameAsync(UnitOfWork uow, string name) =>
+    public Task<ProcessingRuleSetRecord?> GetRuleSetByNameAsync(UnitOfWork uow, string name) =>
         uow.QuerySingleAsync($"SELECT {RuleSetColumns} FROM rule_sets WHERE name = @name", ReadRuleSet, ("@name", name));
 
     /// <summary>The profile a library of <paramref name="mediaScope"/> gets when none is chosen: "Movies default" or "TV default".</summary>
@@ -36,7 +36,7 @@ public static partial class LibraryStore
     /// until 3.2: new downloads followed the first library of the kind's profile when it had one, and otherwise Weir's
     /// built-in rules, which become the "Movies default" or "TV default" profile (made once, then reused).
     /// </summary>
-    public static async Task<long> DefaultProfileIdAsync(UnitOfWork uow, string mediaScope)
+    public async Task<long> DefaultProfileIdAsync(UnitOfWork uow, string mediaScope)
     {
         if (await SeededForScopeAsync(uow, mediaScope).ConfigureAwait(false) is { RuleSetId: { } followed }
             && await GetRuleSetAsync(uow, followed).ConfigureAwait(false) is not null)
@@ -59,7 +59,7 @@ public static partial class LibraryStore
     /// handled in display order, so each gets the same profile its rules already came from. Returns how many libraries
     /// got one.
     /// </summary>
-    public static async Task<int> GiveEveryLibraryAProfileAsync(UnitOfWork uow)
+    public async Task<int> GiveEveryLibraryAProfileAsync(UnitOfWork uow)
     {
         var given = 0;
         foreach (var library in (await ListAsync(uow).ConfigureAwait(false)).Where(l => l.RuleSetId is null))
@@ -74,10 +74,10 @@ public static partial class LibraryStore
         return given;
     }
 
-    public static async Task<int> RuleSetUsageCountAsync(UnitOfWork uow, long ruleSetId) =>
+    public async Task<int> RuleSetUsageCountAsync(UnitOfWork uow, long ruleSetId) =>
         (int)await uow.CountAsync("SELECT COUNT(*) FROM libraries WHERE rule_set_id = @id", ("@id", ruleSetId)).ConfigureAwait(false);
 
-    public static async Task<ProcessingRuleSetRecord> CreateRuleSetAsync(UnitOfWork uow, LibraryRules.RuleSetInput body)
+    public async Task<ProcessingRuleSetRecord> CreateRuleSetAsync(UnitOfWork uow, LibraryRules.RuleSetInput body)
     {
         var label = (body.Name ?? string.Empty).Trim();
         if (await GetRuleSetByNameAsync(uow, label).ConfigureAwait(false) is not null)
@@ -90,7 +90,7 @@ public static partial class LibraryStore
         return await GetRuleSetByNameAsync(uow, label).ConfigureAwait(false) ?? throw new InvalidOperationException("Rule set insert race.");
     }
 
-    public static async Task<ProcessingRuleSetRecord> UpdateRuleSetAsync(UnitOfWork uow, ProcessingRuleSetRecord existing, LibraryRules.RuleSetInput body)
+    public async Task<ProcessingRuleSetRecord> UpdateRuleSetAsync(UnitOfWork uow, ProcessingRuleSetRecord existing, LibraryRules.RuleSetInput body)
     {
         var label = (body.Name ?? string.Empty).Trim();
         var clash = await GetRuleSetByNameAsync(uow, label).ConfigureAwait(false);
@@ -104,7 +104,7 @@ public static partial class LibraryStore
         return await GetRuleSetAsync(uow, existing.Id).ConfigureAwait(false) ?? throw new InvalidOperationException("Rule set disappeared during update.");
     }
 
-    public static async Task DeleteRuleSetAsync(UnitOfWork uow, ProcessingRuleSetRecord row)
+    public async Task DeleteRuleSetAsync(UnitOfWork uow, ProcessingRuleSetRecord row)
     {
         var used = await RuleSetUsageCountAsync(uow, row.Id).ConfigureAwait(false);
         if (used > 0)
@@ -117,7 +117,7 @@ public static partial class LibraryStore
         await uow.ExecuteAsync("DELETE FROM rule_sets WHERE id = @id", ("@id", row.Id)).ConfigureAwait(false);
     }
 
-    private static async Task InsertRuleSetAsync(UnitOfWork uow, ProcessingRuleSetRecord row)
+    private async Task InsertRuleSetAsync(UnitOfWork uow, ProcessingRuleSetRecord row)
     {
         await uow.ExecuteAsync(
             "INSERT INTO rule_sets (name, primary_audio_lang, secondary_audio_lang, tertiary_audio_lang, default_audio_slot, " +
@@ -139,7 +139,7 @@ public static partial class LibraryStore
             RuleSetParameters(row)).ConfigureAwait(false);
     }
 
-    private static async Task UpdateRuleSetRowAsync(UnitOfWork uow, ProcessingRuleSetRecord row)
+    private async Task UpdateRuleSetRowAsync(UnitOfWork uow, ProcessingRuleSetRecord row)
     {
         await uow.ExecuteAsync(
             "UPDATE rule_sets SET name=@name, primary_audio_lang=@primary_audio_lang, secondary_audio_lang=@secondary_audio_lang, " +

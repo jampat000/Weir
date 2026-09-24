@@ -19,6 +19,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
     private readonly ProcessingJobStore _store;
     private readonly WeirOptions _options;
     private readonly LibrarySettingsStore _librarySettings;
+    private readonly LibraryStore _libraries;
     private readonly TimeProvider _time;
     private readonly ILogger<JobsStartupRecoveryService> _logger;
     private readonly SwapRecoverySweep? _swapSweep;
@@ -28,6 +29,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
         ProcessingJobStore store,
         WeirOptions options,
         LibrarySettingsStore librarySettings,
+        LibraryStore libraries,
         TimeProvider time,
         ILogger<JobsStartupRecoveryService> logger,
         SwapRecoverySweep? swapSweep = null)
@@ -35,6 +37,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
         _store = store;
         _options = options;
         _librarySettings = librarySettings;
+        _libraries = libraries;
         _time = time;
         _logger = logger;
         _swapSweep = swapSweep;
@@ -114,7 +117,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
             var uow = await UnitOfWork.OpenAsync(_store.Database, cancellationToken).ConfigureAwait(false);
             await using (uow.ConfigureAwait(false))
             {
-                var given = await LibraryStore.GiveEveryLibraryAProfileAsync(uow).ConfigureAwait(false);
+                var given = await _libraries.GiveEveryLibraryAProfileAsync(uow).ConfigureAwait(false);
                 await uow.CommitAsync().ConfigureAwait(false);
                 if (given > 0)
                 {
@@ -140,7 +143,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
             var uow = await UnitOfWork.OpenAsync(_store.Database, cancellationToken).ConfigureAwait(false);
             await using (uow.ConfigureAwait(false))
             {
-                var libraries = await LibraryStore.ListAsync(uow).ConfigureAwait(false);
+                var libraries = await _libraries.ListAsync(uow).ConfigureAwait(false);
                 foreach (var library in libraries)
                 {
                     foreach (var (label, folder) in new[] { ("watched", library.WatchedFolder), ("work", library.WorkFolder), ("output", library.OutputFolder) })

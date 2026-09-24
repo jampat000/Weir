@@ -1,12 +1,15 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
 using Weir.Core.Processing;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Jobs;
+using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Settings;
 using static Weir.Api.Endpoints.EndpointLookups;
 
 namespace Weir.Api.Endpoints;
@@ -18,12 +21,46 @@ public static class ProcessingLibraryDiscoveryEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingLibraryDiscoveryEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/processing/libraries/discover/{connection_id}", GetDiscoverableLibrariesAsync);
-        endpoints.MapV1("POST", "/processing/libraries/discover/{connection_id}/import", PostImportLibrariesAsync);
-        endpoints.MapV1("GET", "/processing/libraries/discover/{connection_id}/drift", GetLibraryDriftAsync);
-        endpoints.MapV1("POST", "/processing/libraries/{library_id}/unlink", PostLibraryUnlinkAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<ProcessingLibraryDiscoveryEndpointHandlers>();
+        endpoints.MapV1("GET", "/processing/libraries/discover/{connection_id}", handlers.GetDiscoverableLibrariesAsync);
+        endpoints.MapV1("POST", "/processing/libraries/discover/{connection_id}/import", handlers.PostImportLibrariesAsync);
+        endpoints.MapV1("GET", "/processing/libraries/discover/{connection_id}/drift", handlers.GetLibraryDriftAsync);
+        endpoints.MapV1("POST", "/processing/libraries/{library_id}/unlink", handlers.PostLibraryUnlinkAsync);
         return endpoints;
     }
+}
+
+/// <summary>Handlers for <see cref="ProcessingLibraryDiscoveryEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class ProcessingLibraryDiscoveryEndpointHandlers
+{
+    private readonly LibraryStore _libraries;
+    private readonly MediaManagerConnectionStore _connectionStore;
+    private readonly OperatorSettingsStore _operatorSettings;
+    private readonly SuiteSettingsStore _suiteSettings;
+    private readonly ScanWakeups _scanWakeups;
+    private readonly LibraryDiscoveryService _discovery;
+    private readonly ScanSettingsChanges _scanSettingsChanges;
+
+    public ProcessingLibraryDiscoveryEndpointHandlers(
+        LibraryStore libraries,
+        MediaManagerConnectionStore connectionStore,
+        OperatorSettingsStore operatorSettings,
+        SuiteSettingsStore suiteSettings,
+        ScanWakeups scanWakeups,
+        LibraryDiscoveryService discovery,
+        ScanSettingsChanges scanSettingsChanges)
+    {
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
+        _connectionStore = connectionStore ?? throw new ArgumentNullException(nameof(connectionStore));
+        _operatorSettings = operatorSettings ?? throw new ArgumentNullException(nameof(operatorSettings));
+        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+        _scanWakeups = scanWakeups ?? throw new ArgumentNullException(nameof(scanWakeups));
+        _discovery = discovery ?? throw new ArgumentNullException(nameof(discovery));
+        _scanSettingsChanges = scanSettingsChanges ?? throw new ArgumentNullException(nameof(scanSettingsChanges));
+    }
+
+    private Task<WireObject> LibraryOutAsync(ApiRequest request, Weir.Infrastructure.Sqlite.UnitOfWork uow, ProcessingLibraryRecord row) =>
+        ProcessingLibraryMapping.LibraryOutAsync(request, uow, row, _libraries, _connectionStore, _operatorSettings, _suiteSettings, _scanWakeups);
 
     private static WireObject DiscoverableLibraryOut(DiscoverableLibrary item) => new WireObject()
         .Set("key", item.Key)
@@ -46,7 +83,7 @@ public static class ProcessingLibraryDiscoveryEndpoints
 
     /// <summary><c>GET /processing/libraries/discover/{connection_id}</c>: what this manager says it looks
     /// after, and whether Weir already has it.</summary>
-    private static async Task<ApiResult> GetDiscoverableLibrariesAsync(ApiRequest request)
+    public async Task<ApiResult> GetDiscoverableLibrariesAsync(ApiRequest request)
     {
         var issues = new ValidationIssues();
         var connectionId = ConnectionId(request, issues);
@@ -55,11 +92,11 @@ public static class ProcessingLibraryDiscoveryEndpoints
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var connection = await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
+        var connection = await RequireConnectionAsync(uow, _connectionStore, connectionId).ConfigureAwait(false);
         List<DiscoverableLibrary> found;
         try
         {
-            found = await request.Service<LibraryDiscoveryService>()
+            found = await _discovery
                 .DiscoverableLibrariesAsync(uow, connection, request.Context.RequestAborted).ConfigureAwait(false);
         }
         catch (ProcessingDiscoveryException exception)
@@ -72,7 +109,7 @@ public static class ProcessingLibraryDiscoveryEndpoints
 
     /// <summary><c>POST /processing/libraries/discover/{connection_id}/import</c>: create a Processing library per
     /// selected manager library.</summary>
-    private static async Task<ApiResult> PostImportLibrariesAsync(ApiRequest request)
+    public async Task<ApiResult> PostImportLibrariesAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -93,11 +130,11 @@ public static class ProcessingLibraryDiscoveryEndpoints
         request.RequireConfirmationToken(csrfToken, "Invalid or expired CSRF token.");
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var connection = await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
+        var connection = await RequireConnectionAsync(uow, _connectionStore, connectionId).ConfigureAwait(false);
         List<ProcessingLibraryRecord> created;
         try
         {
-            created = await request.Service<LibraryDiscoveryService>()
+            created = await _discovery
                 .ImportLibrariesAsync(uow, connection, keys, request.Context.RequestAborted).ConfigureAwait(false);
         }
         catch (ProcessingDiscoveryException exception)
@@ -106,11 +143,11 @@ public static class ProcessingLibraryDiscoveryEndpoints
         }
 
         await request.CommitAsync().ConfigureAwait(false);
-        request.Service<ScanSettingsChanges>().Record();
+        _scanSettingsChanges.Record();
         var items = new List<WireValue>();
         foreach (var row in created)
         {
-            items.Add(await ProcessingLibraryMapping.LibraryOutAsync(request, uow, row, request.Service<ScanWakeups>()).ConfigureAwait(false));
+            items.Add(await LibraryOutAsync(request, uow, row).ConfigureAwait(false));
         }
 
         return new JsonApiResult(StatusCodes.Status201Created, new WireArray(items));
@@ -118,7 +155,7 @@ public static class ProcessingLibraryDiscoveryEndpoints
 
     /// <summary><c>GET /processing/libraries/discover/{connection_id}/drift</c>: differences between the manager
     /// and Weir. Reported only — nothing is applied.</summary>
-    private static async Task<ApiResult> GetLibraryDriftAsync(ApiRequest request)
+    public async Task<ApiResult> GetLibraryDriftAsync(ApiRequest request)
     {
         var issues = new ValidationIssues();
         var connectionId = ConnectionId(request, issues);
@@ -127,11 +164,11 @@ public static class ProcessingLibraryDiscoveryEndpoints
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var connection = await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
+        var connection = await RequireConnectionAsync(uow, _connectionStore, connectionId).ConfigureAwait(false);
         List<LibraryDrift> drift;
         try
         {
-            drift = await request.Service<LibraryDiscoveryService>()
+            drift = await _discovery
                 .ResyncDriftAsync(uow, connection, request.Context.RequestAborted).ConfigureAwait(false);
         }
         catch (ProcessingDiscoveryException exception)
@@ -144,7 +181,7 @@ public static class ProcessingLibraryDiscoveryEndpoints
 
     /// <summary><c>POST /processing/libraries/{library_id}/unlink</c>: forget where a library came from. The
     /// library itself is untouched.</summary>
-    private static async Task<ApiResult> PostLibraryUnlinkAsync(ApiRequest request)
+    public async Task<ApiResult> PostLibraryUnlinkAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -159,9 +196,9 @@ public static class ProcessingLibraryDiscoveryEndpoints
         request.RequireConfirmationToken(csrfToken, "Invalid or expired CSRF token.");
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await RequireLibraryAsync(uow, id).ConfigureAwait(false);
-        var updated = await LibraryDiscoveryService.UnlinkLibraryAsync(uow, row).ConfigureAwait(false);
+        var row = await RequireLibraryAsync(uow, _libraries, id).ConfigureAwait(false);
+        var updated = await _discovery.UnlinkLibraryAsync(uow, row).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(await ProcessingLibraryMapping.LibraryOutAsync(request, uow, updated, request.Service<ScanWakeups>()).ConfigureAwait(false));
+        return ApiRoutes.Ok(await LibraryOutAsync(request, uow, updated).ConfigureAwait(false));
     }
 }

@@ -20,6 +20,7 @@ internal sealed class WatchedFolderScanRun
 {
     private readonly SqliteDatabase _database;
     private readonly ProcessingJobStore _jobStore;
+    private readonly FileStateStore _files;
     private readonly WatchedFolderScan _scan;
     private readonly WatchedFolderScanLookups _lookups;
     private readonly UnitOfWork _reads;
@@ -29,16 +30,18 @@ internal sealed class WatchedFolderScanRun
     private readonly List<RejectedFileRemoval> _removals = [];
 
     public WatchedFolderScanRun(
-        SqliteDatabase database, ProcessingJobStore jobStore, WatchedFolderScan scan, WatchedFolderScanLookups lookups, UnitOfWork reads, ScanPassRequest passes)
+        SqliteDatabase database, ProcessingJobStore jobStore, FileStateStore files, WatchedFolderScan scan, WatchedFolderScanLookups lookups, UnitOfWork reads,
+        ScanPassRequest passes)
     {
         _database = database;
         _jobStore = jobStore;
+        _files = files;
         _scan = scan;
         _lookups = lookups;
         _reads = reads;
         _passes = passes;
         _decider = new WatchedFileDecider(scan, lookups, reads);
-        _batch = new WatchedFolderScanBatch(database, scan.Library.Id, scan.Now);
+        _batch = new WatchedFolderScanBatch(database, files, scan.Library.Id, scan.Now);
     }
 
     /// <summary>The earliest moment a file this scan held stops being held; the next look is booked for then.</summary>
@@ -84,7 +87,7 @@ internal sealed class WatchedFolderScanRun
             var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
             await using (uow.ConfigureAwait(false))
             {
-                await FileStateStore.MarkFileStatusAsync(uow, _scan.Library.Id, removal.RelativePath, ProcessingFileStatuses.Skipped, $"{removal.Reason} {detail}")
+                await _files.MarkFileStatusAsync(uow, _scan.Library.Id, removal.RelativePath, ProcessingFileStatuses.Skipped, $"{removal.Reason} {detail}")
                     .ConfigureAwait(false);
                 await uow.CommitAsync().ConfigureAwait(false);
             }
@@ -102,7 +105,7 @@ internal sealed class WatchedFolderScanRun
         {
             // Earlier files' writes land first, and the removal itself runs with no transaction open.
             await _batch.FlushAsync(cancellationToken).ConfigureAwait(false);
-            await CompletedMovieRemoval.FinishAsync(_database, _scan, decision, file, cancellationToken).ConfigureAwait(false);
+            await CompletedMovieRemoval.FinishAsync(_database, _files, _scan, decision, file, cancellationToken).ConfigureAwait(false);
             return;
         }
 

@@ -26,7 +26,7 @@ public sealed partial class RemuxPassHandler
             async uow =>
             {
                 var operatorSettings = await _operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
-                var library = await ResolveLibraryAsync(uow, libraryId, mediaScope).ConfigureAwait(false);
+                var library = await ResolveLibraryAsync(uow, _libraries, libraryId, mediaScope).ConfigureAwait(false);
                 var rules = library is not null ? await RulesConfigForAsync(uow, library).ConfigureAwait(false) : null;
                 rules ??= await LoadScopeRulesConfigAsync(uow, mediaScope).ConfigureAwait(false);
                 ProcessingPathRuntime? runtime;
@@ -65,26 +65,27 @@ public sealed partial class RemuxPassHandler
             cancellationToken);
 
     /// <summary>The pass's library: by id when the payload carries one, else the seeded library for its scope.</summary>
-    public static async Task<ProcessingLibraryRecord?> ResolveLibraryAsync(UnitOfWork uow, long? libraryId, string? mediaScope)
+    public static async Task<ProcessingLibraryRecord?> ResolveLibraryAsync(UnitOfWork uow, LibraryStore libraries, long? libraryId, string? mediaScope)
     {
-        if (libraryId is { } id && await LibraryStore.GetAsync(uow, id).ConfigureAwait(false) is { } found)
+        ArgumentNullException.ThrowIfNull(libraries);
+        if (libraryId is { } id && await libraries.GetAsync(uow, id).ConfigureAwait(false) is { } found)
         {
             return found;
         }
 
-        return await LibraryStore.SeededForScopeAsync(uow, mediaScope ?? "movie").ConfigureAwait(false);
+        return await libraries.SeededForScopeAsync(uow, mediaScope ?? "movie").ConfigureAwait(false);
     }
 
-    private static async Task<ProcessingRulesConfig?> RulesConfigForAsync(UnitOfWork uow, ProcessingLibraryRecord library) =>
-        library.RuleSetId is { } ruleSetId && await LibraryStore.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) is { } ruleSet
+    private async Task<ProcessingRulesConfig?> RulesConfigForAsync(UnitOfWork uow, ProcessingLibraryRecord library) =>
+        library.RuleSetId is { } ruleSetId && await _libraries.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) is { } ruleSet
             ? RemuxPassPaths.RulesConfigFor(ruleSet)
             : null;
 
     /// <summary>The seeded library's rule set for the scope, or the shipped defaults.</summary>
-    private static async Task<ProcessingRulesConfig> LoadScopeRulesConfigAsync(UnitOfWork uow, string mediaScope)
+    private async Task<ProcessingRulesConfig> LoadScopeRulesConfigAsync(UnitOfWork uow, string mediaScope)
     {
-        var seeded = await LibraryStore.SeededForScopeAsync(uow, mediaScope).ConfigureAwait(false);
-        var ruleSet = seeded?.RuleSetId is { } id ? await LibraryStore.GetRuleSetAsync(uow, id).ConfigureAwait(false) : null;
+        var seeded = await _libraries.SeededForScopeAsync(uow, mediaScope).ConfigureAwait(false);
+        var ruleSet = seeded?.RuleSetId is { } id ? await _libraries.GetRuleSetAsync(uow, id).ConfigureAwait(false) : null;
         return RuleSetConversion.ToRulesConfig(ruleSet);
     }
 }

@@ -11,6 +11,7 @@ using Weir.Core.Validation;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.MediaManagers;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 using static Weir.Api.Endpoints.EndpointLookups;
 
@@ -45,6 +46,7 @@ internal sealed class LibraryModeFilesEndpointHandlers
     private readonly IHardlinkInspector _hardlinkInspector;
     private readonly RedownloadRiskChecker _riskChecker;
     private readonly ProcessingJobStore _jobs;
+    private readonly LibraryStore _libraries;
 
     public LibraryModeFilesEndpointHandlers(
         LibraryScanStore scans,
@@ -54,7 +56,8 @@ internal sealed class LibraryModeFilesEndpointHandlers
         MediaManagerConnectionService connections,
         IHardlinkInspector hardlinkInspector,
         RedownloadRiskChecker riskChecker,
-        ProcessingJobStore jobs)
+        ProcessingJobStore jobs,
+        LibraryStore libraries)
     {
         _scans = scans ?? throw new ArgumentNullException(nameof(scans));
         _fileMarks = fileMarks ?? throw new ArgumentNullException(nameof(fileMarks));
@@ -63,6 +66,7 @@ internal sealed class LibraryModeFilesEndpointHandlers
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
         _hardlinkInspector = hardlinkInspector ?? throw new ArgumentNullException(nameof(hardlinkInspector));
         _riskChecker = riskChecker ?? throw new ArgumentNullException(nameof(riskChecker));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
     }
 
@@ -142,7 +146,7 @@ internal sealed class LibraryModeFilesEndpointHandlers
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
+        await RequireLibraryAsync(uow, _libraries, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
 
         var query = QueryFrom(request);
         var overall = await _libraryView.TotalsAsync(uow, libraryId).ConfigureAwait(false);
@@ -246,7 +250,7 @@ internal sealed class LibraryModeFilesEndpointHandlers
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, _libraries, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
         var byPath = await _scans.FilesAtPathsAsync(uow, libraryId, paths).ConfigureAwait(false);
         var selected = paths.Select(p => byPath.GetValueOrDefault(p)).OfType<LibraryScanFileEntry>().ToList();
         if (selected.Count == 0)
@@ -268,7 +272,7 @@ internal sealed class LibraryModeFilesEndpointHandlers
         }
 
         var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
-        var rules = await LibraryModeMapping.RulesForAsync(uow, library).ConfigureAwait(false);
+        var rules = await LibraryModeMapping.RulesForAsync(uow, _libraries, library).ConfigureAwait(false);
         var connectionsById = await LibraryModeMapping.ConnectionsForFilesAsync(uow, _connections, selected).ConfigureAwait(false);
         var preflightResults = await LibraryCleanPreflightRunner.RunAsync(
                 selected, settings, rules, library.MediaType, _hardlinkInspector,
@@ -367,7 +371,7 @@ internal sealed class LibraryModeFilesEndpointHandlers
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         request.RequireConfirmationToken(csrfToken);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
+        var library = await RequireLibraryAsync(uow, _libraries, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
         await _fileMarks.SetLeaveAloneAsync(uow, library.Id, filePath!, leaveAlone, request.Time.GetUtcNow()).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject().Set("path", filePath).Set("leave_alone", leaveAlone));

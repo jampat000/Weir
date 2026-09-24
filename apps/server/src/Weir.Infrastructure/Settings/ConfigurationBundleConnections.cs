@@ -27,15 +27,17 @@ public sealed class ConfigurationBundleConnections
     private const int AlertLabelMaxLength = 255;
 
     private readonly NotificationChannelStore _channels;
+    private readonly MediaManagerConnectionStore _connections;
 
-    public ConfigurationBundleConnections(NotificationChannelStore channels)
+    public ConfigurationBundleConnections(NotificationChannelStore channels, MediaManagerConnectionStore connections)
     {
         _channels = channels ?? throw new ArgumentNullException(nameof(channels));
+        _connections = connections ?? throw new ArgumentNullException(nameof(connections));
     }
 
-    public static async Task<WireArray> ExportMediaManagersAsync(UnitOfWork uow)
+    public async Task<WireArray> ExportMediaManagersAsync(UnitOfWork uow)
     {
-        var connections = await MediaManagerConnectionStore.ListAsync(uow).ConfigureAwait(false);
+        var connections = await _connections.ListAsync(uow).ConfigureAwait(false);
         return new WireArray(connections.Select(connection => (WireValue)new WireObject()
             .Set("id", connection.Id)
             .Set("kind", connection.Kind)
@@ -59,14 +61,14 @@ public sealed class ConfigurationBundleConnections
     /// connection id mapped to the id it has here, or <see langword="null"/> when the bundle has no media managers
     /// section, so the libraries that name a connection can be pointed at the right row.
     /// </summary>
-    public static async Task<Dictionary<long, long>?> RestoreMediaManagersAsync(UnitOfWork uow, WireObject bundle)
+    public async Task<Dictionary<long, long>?> RestoreMediaManagersAsync(UnitOfWork uow, WireObject bundle)
     {
         if (bundle.Get(MediaManagersSection) is not WireArray rows)
         {
             return null;
         }
 
-        var existing = (await MediaManagerConnectionStore.ListAsync(uow).ConfigureAwait(false))
+        var existing = (await _connections.ListAsync(uow).ConfigureAwait(false))
             .ToDictionary(connection => connection.Name, connection => connection.Id, StringComparer.Ordinal);
         var restoredIds = new Dictionary<long, long>();
         foreach (var row in rows.Items)
@@ -82,7 +84,7 @@ public sealed class ConfigurationBundleConnections
             var baseUrl = ValidateRestoredBaseUrl(name, OptionalText(data, "base_url"));
             if (!existing.TryGetValue(name, out var id))
             {
-                id = await MediaManagerConnectionStore.InsertAsync(
+                id = await _connections.InsertAsync(
                     uow, kind, name, enabled: false, baseUrl, apiKeyCiphertext: null).ConfigureAwait(false);
                 existing[name] = id;
             }
