@@ -523,8 +523,8 @@ public sealed class RealFfmpegTests : IDisposable
         var fixture = await GenerateFixtureAsync();
         var tools = Tools();
 
-        await tools.ValidateRemuxOutputAsync(fixture, expectedAudio: 2, expectedDurationSeconds: 3.0);
-        await tools.ValidateMediaIntegrityAsync(fixture);
+        Assert.Null(await Record.ExceptionAsync(() => tools.ValidateRemuxOutputAsync(fixture, expectedAudio: 2, expectedDurationSeconds: 3.0)));
+        Assert.Null(await Record.ExceptionAsync(() => tools.ValidateMediaIntegrityAsync(fixture)));
     }
 
     [RequiresFfmpegFact]
@@ -562,7 +562,7 @@ public sealed class RealFfmpegTests : IDisposable
         var truncated = Path.Combine(_root, "truncated.mkv");
         await File.WriteAllBytesAsync(truncated, bytes[..(bytes.Length / 2)]);
 
-        await Tools().ValidateRemuxOutputAsync(truncated, expectedAudio: 2, expectedDurationSeconds: 3.0);
+        Assert.Null(await Record.ExceptionAsync(() => Tools().ValidateRemuxOutputAsync(truncated, expectedAudio: 2, expectedDurationSeconds: 3.0)));
     }
 
     [RequiresFfmpegFact]
