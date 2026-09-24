@@ -10,7 +10,7 @@ public sealed class WeirOptionsDefaultsTests
     [Fact]
     public void Environment_log_level_and_secrets()
     {
-        Assert.Equal("development", Defaults.Env);
+        Assert.Equal("production", Defaults.Env);
         Assert.Equal("INFO", Defaults.LogLevel);
         Assert.Null(Defaults.SessionSecret);
         Assert.Null(Defaults.CredentialsSecret);

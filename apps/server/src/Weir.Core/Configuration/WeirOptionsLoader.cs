@@ -25,7 +25,9 @@ public static class WeirOptionsLoader
     {
         ArgumentNullException.ThrowIfNull(runtime);
 
-        var env = Or(runtime.Get("WEIR_ENV"), "development").Trim().ToLowerInvariant();
+        // An unset WEIR_ENV means production: a source or systemd install that never set it should get
+        // ASP.NET's production error handling, not the developer exception page.
+        var env = Or(runtime.Get("WEIR_ENV"), "production").Trim().ToLowerInvariant();
         var level = Or(Or(runtime.Get("WEIR_LOG_LEVEL"), "INFO").Trim(), "INFO");
         var cors = ParseCsv(runtime.Get("WEIR_CORS_ORIGINS"));
         var session = NullIfEmpty(runtime.Get("WEIR_SESSION_SECRET")?.Trim());
