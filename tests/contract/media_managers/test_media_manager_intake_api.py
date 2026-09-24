@@ -256,7 +256,9 @@ def test_native_handoff_event_enqueues_a_processing_pass(
 
 
 def test_native_event_missing_required_fields_is_ignored(client: WeirClient, native_secret: dict[str, str]) -> None:
-    r = client.post(f"{API}/intake/webhook/native", json={"event": "imported", "title": "no path"}, headers=native_secret)
+    r = client.post(
+        f"{API}/intake/webhook/native", json={"event": "imported", "title": "no path"}, headers=native_secret
+    )
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "ignored"
 
