@@ -44,6 +44,7 @@ public sealed class LibraryScanHandler : IJobHandler
     private readonly LibrarySettingsStore _librarySettings;
     private readonly LibraryFileMarksStore _fileMarks;
     private readonly LibraryViewStore _libraryView;
+    private readonly LibraryStore _libraries;
     private readonly TimeProvider _time;
 
     public LibraryScanHandler(
@@ -57,6 +58,7 @@ public sealed class LibraryScanHandler : IJobHandler
         LibrarySettingsStore librarySettings,
         LibraryFileMarksStore fileMarks,
         LibraryViewStore libraryView,
+        LibraryStore libraries,
         TimeProvider time,
         ILogger<LibraryScanHandler> logger)
     {
@@ -70,6 +72,7 @@ public sealed class LibraryScanHandler : IJobHandler
         _librarySettings = librarySettings ?? throw new ArgumentNullException(nameof(librarySettings));
         _fileMarks = fileMarks ?? throw new ArgumentNullException(nameof(fileMarks));
         _libraryView = libraryView ?? throw new ArgumentNullException(nameof(libraryView));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         // Kept in the constructor for DI symmetry with LibraryCleanHandler; nothing here logs yet.
         ArgumentNullException.ThrowIfNull(logger);
@@ -102,7 +105,7 @@ public sealed class LibraryScanHandler : IJobHandler
 
             libraryId = payload.Get("library_id") is WireInteger idValue ? (long)idValue.Value : 0;
             trigger = payload.Get("trigger") is WireString { Value.Length: > 0 } triggerValue ? triggerValue.Value : "manual";
-            library = libraryId > 0 ? await LibraryStore.GetAsync(uow, libraryId).ConfigureAwait(false) : null;
+            library = libraryId > 0 ? await _libraries.GetAsync(uow, libraryId).ConfigureAwait(false) : null;
             if (library is null)
             {
                 await _scans.RecordResultAsync(uow, context.Id, new LibraryScanOutcome(_time.GetUtcNow(), []), false, "This library no longer exists.")
@@ -124,7 +127,7 @@ public sealed class LibraryScanHandler : IJobHandler
                 return;
             }
 
-            var ruleSet = library.RuleSetId is { } ruleSetId ? await LibraryStore.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) : null;
+            var ruleSet = library.RuleSetId is { } ruleSetId ? await _libraries.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) : null;
             rules = ruleSet is not null ? RemuxPassPaths.RulesConfigFor(ruleSet) : RuleSetConversion.ToRulesConfig(null);
             previousFiles = await _scans.CurrentFilesAsync(uow, libraryId).ConfigureAwait(false);
             connections = await _connections.ConnectionsForScopeAsync(uow, library.MediaType).ConfigureAwait(false);

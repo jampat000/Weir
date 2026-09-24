@@ -37,15 +37,17 @@ public sealed record ManualPlanFileContext(
 public static class ManualPlanSupport
 {
     public static async Task<ManualPlanFileContext> LoadAsync(
-        UnitOfWork uow, MediaTools mediaTools, WeirOptions options, long fileId, CancellationToken cancellationToken)
+        UnitOfWork uow, FileStateStore files, LibraryStore libraries, MediaTools mediaTools, WeirOptions options, long fileId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(uow);
+        ArgumentNullException.ThrowIfNull(files);
+        ArgumentNullException.ThrowIfNull(libraries);
         ArgumentNullException.ThrowIfNull(mediaTools);
         ArgumentNullException.ThrowIfNull(options);
 
-        var file = await FileStateStore.GetAsync(uow, fileId).ConfigureAwait(false)
+        var file = await files.GetAsync(uow, fileId).ConfigureAwait(false)
             ?? throw new ManualPlanEnqueueException(404, "Weir has no record of that file.");
-        var library = await LibraryStore.GetAsync(uow, file.LibraryId).ConfigureAwait(false)
+        var library = await libraries.GetAsync(uow, file.LibraryId).ConfigureAwait(false)
             ?? throw new ManualPlanEnqueueException(404, "The library for this file no longer exists.");
 
         var (runtime, problem) = RemuxPassPaths.RuntimeForLibrary(library, options.WeirHome);
@@ -81,7 +83,7 @@ public static class ManualPlanSupport
             throw new ManualPlanEnqueueException(400, $"Weir could not read this file's tracks: {exception.Message}");
         }
 
-        var rules = library.RuleSetId is { } ruleSetId && await LibraryStore.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) is { } ruleSet
+        var rules = library.RuleSetId is { } ruleSetId && await libraries.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) is { } ruleSet
             ? RemuxPassPaths.RulesConfigFor(ruleSet)
             : RemuxRules.DefaultConfig();
 

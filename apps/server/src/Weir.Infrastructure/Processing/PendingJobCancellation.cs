@@ -24,11 +24,13 @@ public sealed record PendingJobCancelResult(JobActionOutcome Outcome, HandoffLed
 /// </summary>
 public static class PendingJobCancellation
 {
-    public static async Task<PendingJobCancelResult> CancelAsync(UnitOfWork uow, HandoffLedgerStore ledger, HandoffCompletionReporter reporter, long jobId)
+    public static async Task<PendingJobCancelResult> CancelAsync(
+        UnitOfWork uow, HandoffLedgerStore ledger, HandoffCompletionReporter reporter, FileStateStore files, long jobId)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(ledger);
         ArgumentNullException.ThrowIfNull(reporter);
+        ArgumentNullException.ThrowIfNull(files);
         var found = await uow.QuerySingleAsync(
             "SELECT id, dedupe_key, job_kind, payload_json, status, created_at FROM jobs WHERE id = $id",
             reader => new PendingJobRow(
@@ -62,7 +64,7 @@ public static class PendingJobCancellation
             payload?.Get("library_id") is WireInteger library && library.Value > 0 &&
             payload.Get("relative_media_path") is WireString { Value.Length: > 0 } path)
         {
-            await FileStateStore.MarkCancelledAsync(uow, (long)library.Value, path.Value, CancelledFileReasons.InWeir).ConfigureAwait(false);
+            await files.MarkCancelledAsync(uow, (long)library.Value, path.Value, CancelledFileReasons.InWeir).ConfigureAwait(false);
         }
 
         if (HandoffOrigin.FromPayload(payload) is { HandoffId: { Length: > 0 } handoffId } origin)

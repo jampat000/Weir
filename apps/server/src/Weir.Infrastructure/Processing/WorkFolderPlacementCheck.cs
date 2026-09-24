@@ -18,19 +18,22 @@ public sealed class WorkFolderPlacementCheck : BackgroundService
 {
     private readonly SqliteDatabase _database;
     private readonly WeirOptions _options;
+    private readonly LibraryStore _libraries;
     private readonly ILogger<WorkFolderPlacementCheck> _logger;
     private readonly Func<string, string, bool?> _sameFilesystem;
 
-    public WorkFolderPlacementCheck(SqliteDatabase database, WeirOptions options, ILogger<WorkFolderPlacementCheck> logger)
-        : this(database, options, logger, FilesystemBoundaries.SameFilesystem)
+    public WorkFolderPlacementCheck(SqliteDatabase database, WeirOptions options, LibraryStore libraries, ILogger<WorkFolderPlacementCheck> logger)
+        : this(database, options, libraries, logger, FilesystemBoundaries.SameFilesystem)
     {
     }
 
     /// <summary>For tests: whether two folders share a filesystem comes from <paramref name="sameFilesystem"/>.</summary>
-    internal WorkFolderPlacementCheck(SqliteDatabase database, WeirOptions options, ILogger<WorkFolderPlacementCheck> logger, Func<string, string, bool?> sameFilesystem)
+    internal WorkFolderPlacementCheck(
+        SqliteDatabase database, WeirOptions options, LibraryStore libraries, ILogger<WorkFolderPlacementCheck> logger, Func<string, string, bool?> sameFilesystem)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _sameFilesystem = sameFilesystem ?? throw new ArgumentNullException(nameof(sameFilesystem));
     }
@@ -43,7 +46,7 @@ public sealed class WorkFolderPlacementCheck : BackgroundService
             var uow = await UnitOfWork.OpenAsync(_database, stoppingToken).ConfigureAwait(false);
             await using (uow.ConfigureAwait(false))
             {
-                libraries = await LibraryStore.ListAsync(uow, enabledOnly: true).ConfigureAwait(false);
+                libraries = await _libraries.ListAsync(uow, enabledOnly: true).ConfigureAwait(false);
             }
         }
         catch (SqliteException exception)

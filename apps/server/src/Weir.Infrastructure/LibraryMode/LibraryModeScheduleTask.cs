@@ -60,6 +60,7 @@ public sealed partial class LibraryModeScheduleTask : IPeriodicTask
     private readonly ProcessingJobStore _jobs;
     private readonly LibraryScanStore _scans;
     private readonly LibrarySettingsStore _librarySettings;
+    private readonly LibraryStore _libraries;
     private readonly TimeProvider _time;
     private readonly SuiteSettingsStore _suiteSettings;
     private readonly ILogger<LibraryModeScheduleTask> _logger;
@@ -69,6 +70,7 @@ public sealed partial class LibraryModeScheduleTask : IPeriodicTask
         ProcessingJobStore jobs,
         LibraryScanStore scans,
         LibrarySettingsStore librarySettings,
+        LibraryStore libraries,
         TimeProvider time,
         SuiteSettingsStore suiteSettings,
         ILogger<LibraryModeScheduleTask> logger)
@@ -77,6 +79,7 @@ public sealed partial class LibraryModeScheduleTask : IPeriodicTask
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _scans = scans ?? throw new ArgumentNullException(nameof(scans));
         _librarySettings = librarySettings ?? throw new ArgumentNullException(nameof(librarySettings));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -98,7 +101,7 @@ public sealed partial class LibraryModeScheduleTask : IPeriodicTask
         var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
         await using (uow.ConfigureAwait(false))
         {
-            foreach (var library in await LibraryStore.ListAsync(uow, enabledOnly: true).ConfigureAwait(false))
+            foreach (var library in await _libraries.ListAsync(uow, enabledOnly: true).ConfigureAwait(false))
             {
                 var settings = await _librarySettings.GetAsync(uow, library.Id).ConfigureAwait(false);
                 if (await LibraryModeScheduling.NextRunAsync(uow, _suiteSettings, _scans, library, settings, now).ConfigureAwait(false) is not { } due || due > now)

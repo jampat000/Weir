@@ -25,6 +25,8 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
     private readonly SqliteDatabase _database;
     private readonly TimeProvider _time;
     private readonly ILogger<ProcessingPassThroughHandler> _logger;
+    private readonly HandbackStore _handback;
+    private readonly LibraryStore _libraries;
     private readonly HandoffCompletionReporter? _reporter;
     private readonly IOutputOwnership? _ownership;
 
@@ -32,12 +34,16 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
         SqliteDatabase database,
         TimeProvider time,
         ILogger<ProcessingPassThroughHandler> logger,
+        HandbackStore handback,
+        LibraryStore libraries,
         HandoffCompletionReporter? reporter = null,
         IOutputOwnership? ownership = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _handback = handback ?? throw new ArgumentNullException(nameof(handback));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _reporter = reporter;
         _ownership = ownership;
     }
@@ -60,7 +66,7 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
             _database,
             async uow =>
             {
-                var library = await RemuxPassHandler.ResolveLibraryAsync(uow, libraryId, null).ConfigureAwait(false);
+                var library = await RemuxPassHandler.ResolveLibraryAsync(uow, _libraries, libraryId, null).ConfigureAwait(false);
                 if (library is null)
                 {
                     throw new InvalidOperationException($"Library {libraryId} no longer exists, so there is nowhere to hand the file back to.");
@@ -142,14 +148,14 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
     }
 
     /// <summary>The short bookkeeping transaction after a delivery.</summary>
-    private static async Task RecordDeliveryAsync(UnitOfWork uow, PassThroughDeliverySettings settings, string relativePath, PassThroughDeliveryResult result, long jobId, DateTimeOffset now)
+    private async Task RecordDeliveryAsync(UnitOfWork uow, PassThroughDeliverySettings settings, string relativePath, PassThroughDeliveryResult result, long jobId, DateTimeOffset now)
     {
         await RemuxPassFileState.RecordOutputCollisionAsync(uow, relativePath, result.Collision, settings.LibraryId).ConfigureAwait(false);
         await RemuxPassFileState.MarkFileStatusAsync(uow, settings.LibraryId, relativePath, ProcessingFileStatuses.PassedThrough, result.Sentence, now).ConfigureAwait(false);
         if (result.Delivered)
         {
             // #652: the copy handed back, so it can be released safely once a manager has it.
-            await HandbackStore.RecordWrittenAsync(uow, settings.LibraryId, relativePath, result.Destination, now).ConfigureAwait(false);
+            await _handback.RecordWrittenAsync(uow, settings.LibraryId, relativePath, result.Destination, now).ConfigureAwait(false);
         }
 
         var detail = new WireObject()

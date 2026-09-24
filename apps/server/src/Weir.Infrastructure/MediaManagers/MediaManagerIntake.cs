@@ -53,15 +53,26 @@ public sealed class MediaManagerIntake
 {
     private readonly WeirOptions _options;
     private readonly MediaManagerConnectionService _connections;
+    private readonly MediaManagerConnectionStore _connectionStore;
     private readonly HandoffLedgerStore _ledger;
+    private readonly HandoffTargetStore _targets;
     private readonly ProcessingJobStore _jobs;
     private readonly TimeProvider _time;
 
-    public MediaManagerIntake(WeirOptions options, MediaManagerConnectionService connections, HandoffLedgerStore ledger, ProcessingJobStore jobs, TimeProvider time)
+    public MediaManagerIntake(
+        WeirOptions options,
+        MediaManagerConnectionService connections,
+        MediaManagerConnectionStore connectionStore,
+        HandoffLedgerStore ledger,
+        HandoffTargetStore targets,
+        ProcessingJobStore jobs,
+        TimeProvider time)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
+        _connectionStore = connectionStore ?? throw new ArgumentNullException(nameof(connectionStore));
         _ledger = ledger ?? throw new ArgumentNullException(nameof(ledger));
+        _targets = targets ?? throw new ArgumentNullException(nameof(targets));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _time = time ?? throw new ArgumentNullException(nameof(time));
     }
@@ -90,7 +101,7 @@ public sealed class MediaManagerIntake
     /// </remarks>
     public async Task<MediaManagerIntakeIdentity> AuthoriseAsync(UnitOfWork uow, string sourceKey, string? presented)
     {
-        var connections = await MediaManagerConnectionStore.ListEnabledForKindAsync(uow, sourceKey).ConfigureAwait(false);
+        var connections = await _connectionStore.ListEnabledForKindAsync(uow, sourceKey).ConfigureAwait(false);
         var withSecret = connections.Where(connection => !string.IsNullOrEmpty(connection.WebhookSecretCiphertext)).ToList();
         if (withSecret.Count > 0)
         {
@@ -139,7 +150,7 @@ public sealed class MediaManagerIntake
     public async Task<MediaManagerIntakeIdentity> RequireSecretAsync(UnitOfWork uow, string? presented, string? sourceKey)
     {
         var provided = WireStrings.Strip(presented ?? string.Empty);
-        var rows = await MediaManagerConnectionStore.ListEnabledWithWebhookSecretAsync(uow).ConfigureAwait(false);
+        var rows = await _connectionStore.ListEnabledWithWebhookSecretAsync(uow).ConfigureAwait(false);
         if (sourceKey is not null)
         {
             rows = [.. rows.Where(row => row.Kind == sourceKey)];
@@ -289,7 +300,7 @@ public sealed class MediaManagerIntake
         {
             var rowId = await _ledger.RecordReceivedAsync(
                 uow, importEvent.SourceKey, importEvent.HandoffId, library?.Id, relativePath, ownerConnectionId, importEvent.DownloadId).ConfigureAwait(false);
-            await HandoffTargetStore.AddAsync(uow, rowId, covered).ConfigureAwait(false);
+            await _targets.AddAsync(uow, rowId, covered).ConfigureAwait(false);
         }
 
         if (library is not null)

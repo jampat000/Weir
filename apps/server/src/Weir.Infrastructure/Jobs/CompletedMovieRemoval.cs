@@ -14,7 +14,8 @@ internal static class CompletedMovieRemoval
     /// Removes the file (and its release folder when nothing else in it is a video), then records what happened. The removal
     /// runs with no transaction open; the rows are written afterwards in one short one.
     /// </summary>
-    public static async Task FinishAsync(SqliteDatabase database, WatchedFolderScan scan, WatchedFileDecision decision, WatchedMediaFile file, CancellationToken cancellationToken)
+    public static async Task FinishAsync(
+        SqliteDatabase database, FileStateStore files, WatchedFolderScan scan, WatchedFileDecision decision, WatchedMediaFile file, CancellationToken cancellationToken)
     {
         var library = scan.Library;
         var (removed, folderRemoved, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(scan.Paths.WatchedFolder, file.FullPath, library.MediaExtensionsCsv);
@@ -23,7 +24,7 @@ internal static class CompletedMovieRemoval
         {
             if (decision.Write is { ResetStatus: not null } reset)
             {
-                await FileStateStore.RecordScannedStateAsync(uow, library.Id, reset with { Verdict = null }, scan.Now).ConfigureAwait(false);
+                await files.RecordScannedStateAsync(uow, library.Id, reset with { Verdict = null }, scan.Now).ConfigureAwait(false);
             }
 
             var verdict = !removed
@@ -42,7 +43,7 @@ internal static class CompletedMovieRemoval
                 await MarkReleaseFolderProcessedAsync(uow, library.Id, decision.RelativePath).ConfigureAwait(false);
             }
 
-            await FileStateStore.RecordFileStateAsync(
+            await files.RecordFileStateAsync(
                 uow, library.Id, decision.RelativePath, verdict, file.SizeBytes, decision.Settling?.SizeChangedAt, scan.Now).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
         }

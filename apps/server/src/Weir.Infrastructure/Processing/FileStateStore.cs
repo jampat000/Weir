@@ -24,7 +24,7 @@ public sealed record ScannedFileWrite(
 
 /// <summary>SQLite access for <c>files</c>: read, list and forget, plus the upsert and mark-status writes the
 /// watched-folder scan performs.</summary>
-public static class FileStateStore
+public sealed class FileStateStore
 {
     private const string Columns =
         "id, library_id, relative_path, status, status_reason, blocked_by_connection, size_bytes, video_width, video_height, " +
@@ -37,16 +37,16 @@ public static class FileStateStore
         "size_bytes, size_changed_at, last_seen_at, last_attempt_at) VALUES (@lib, @path, @status, @reason, @blocked, @hold, " +
         "@size, @size_changed, @seen, @attempt)";
 
-    public static Task<ProcessingFileRecord?> GetAsync(UnitOfWork uow, long id) =>
+    public Task<ProcessingFileRecord?> GetAsync(UnitOfWork uow, long id) =>
         uow.QuerySingleAsync($"SELECT {Columns} FROM files WHERE id = @id", Read, ("@id", id));
 
-    public static Task<ProcessingFileRecord?> FindAsync(UnitOfWork uow, long libraryId, string relativePath) =>
+    public Task<ProcessingFileRecord?> FindAsync(UnitOfWork uow, long libraryId, string relativePath) =>
         uow.QuerySingleAsync(
             $"SELECT {Columns} FROM files WHERE library_id = @lib AND relative_path = @path",
             Read, ("@lib", libraryId), ("@path", relativePath));
 
     /// <summary>The files matching <paramref name="filter"/>.</summary>
-    public static Task<List<ProcessingFileRecord>> ListAsync(UnitOfWork uow, ProcessingFileListFilter filter)
+    public Task<List<ProcessingFileRecord>> ListAsync(UnitOfWork uow, ProcessingFileListFilter filter)
     {
         var (sql, parameters) = ListQuery(filter);
         return uow.QueryAsync(sql, Read, parameters);
@@ -93,7 +93,7 @@ public static class FileStateStore
     }
 
     /// <summary>A count per known status, zero-filled.</summary>
-    public static async Task<Dictionary<string, long>> StatusCountsAsync(UnitOfWork uow, long? libraryId)
+    public async Task<Dictionary<string, long>> StatusCountsAsync(UnitOfWork uow, long? libraryId)
     {
         var counts = ProcessingFileStatuses.All.ToDictionary(s => s, _ => 0L, StringComparer.Ordinal);
         var sql = "SELECT status, COUNT(*) FROM files" + (libraryId is not null ? " WHERE library_id = @lib" : string.Empty) + " GROUP BY status";
@@ -112,14 +112,14 @@ public static class FileStateStore
     }
 
     /// <summary>Removes Weir's record; never touches the file on disk.</summary>
-    public static Task ForgetAsync(UnitOfWork uow, long id) => uow.ExecuteAsync("DELETE FROM files WHERE id = @id", ("@id", id));
+    public Task ForgetAsync(UnitOfWork uow, long id) => uow.ExecuteAsync("DELETE FROM files WHERE id = @id", ("@id", id));
 
     /// <summary>
     /// A queued pass for this file was cancelled before Weir started on it (#643): the file reads cancelled, with
     /// <paramref name="reason"/>, and no retry is owed. Only a file still waiting, held or failed changes. One that is being
     /// processed, or already has an outcome, keeps it.
     /// </summary>
-    public static Task MarkCancelledAsync(UnitOfWork uow, long libraryId, string relativePath, string reason)
+    public Task MarkCancelledAsync(UnitOfWork uow, long libraryId, string relativePath, string reason)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.ExecuteAsync(
@@ -138,7 +138,7 @@ public static class FileStateStore
     }
 
     /// <summary>Every row of the library, for a scan that decides about all of its files from one read.</summary>
-    public static Task<List<ProcessingFileRecord>> ListForLibraryAsync(UnitOfWork uow, long libraryId) =>
+    public Task<List<ProcessingFileRecord>> ListForLibraryAsync(UnitOfWork uow, long libraryId) =>
         uow.QueryAsync($"SELECT {Columns} FROM files WHERE library_id = @lib", Read, ("@lib", libraryId));
 
     /// <summary>
@@ -146,7 +146,7 @@ public static class FileStateStore
     /// and <paramref name="sizeChangedAt"/> of <see langword="null"/> mean "not supplied" (leave the
     /// stored value alone), distinct from a genuine zero.
     /// </summary>
-    public static async Task<long> RecordFileStateAsync(
+    public async Task<long> RecordFileStateAsync(
         UnitOfWork uow,
         long libraryId,
         string relativePath,
@@ -181,7 +181,7 @@ public static class FileStateStore
     /// hand-off, a pass or a person that changed the row since then wins, and nothing it wrote is overwritten. A file the scan
     /// found no row for is inserted unless something else recorded it first. Returns whether the write was applied.
     /// </summary>
-    public static async Task<bool> RecordScannedStateAsync(UnitOfWork uow, long libraryId, ScannedFileWrite write, DateTimeOffset seenAt)
+    public async Task<bool> RecordScannedStateAsync(UnitOfWork uow, long libraryId, ScannedFileWrite write, DateTimeOffset seenAt)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(write);
@@ -213,7 +213,7 @@ public static class FileStateStore
     /// Records that a scan saw these rows' files on disk at <paramref name="seenAt"/>, changing nothing else. The vanished-file
     /// sweep (#645) reads this to tell a file that is gone from one a scan simply left alone.
     /// </summary>
-    public static async Task TouchLastSeenAsync(UnitOfWork uow, IReadOnlyCollection<long> fileIds, DateTimeOffset seenAt)
+    public async Task TouchLastSeenAsync(UnitOfWork uow, IReadOnlyCollection<long> fileIds, DateTimeOffset seenAt)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(fileIds);
@@ -230,7 +230,7 @@ public static class FileStateStore
 
     /// <summary>Moves a file Weir has already seen into a new state. Does nothing when the row does not
     /// exist.</summary>
-    public static async Task MarkFileStatusAsync(UnitOfWork uow, long libraryId, string relativePath, string status, string reason)
+    public async Task MarkFileStatusAsync(UnitOfWork uow, long libraryId, string relativePath, string status, string reason)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var sets = new List<string> { "status = @status", "status_reason = @reason", "updated_at = CURRENT_TIMESTAMP" };
@@ -256,7 +256,7 @@ public static class FileStateStore
     }
 
     /// <summary>Every library's name, keyed by id (for the Files list's <c>library_name</c> field).</summary>
-    public static Task<Dictionary<long, string>> LibraryNamesAsync(UnitOfWork uow) =>
+    public Task<Dictionary<long, string>> LibraryNamesAsync(UnitOfWork uow) =>
         uow.QueryAsync("SELECT id, name FROM libraries", reader => (Id: reader.GetInt64(0), Name: reader.GetString(1)))
            .ContinueWith(t => t.Result.ToDictionary(x => x.Id, x => x.Name), TaskScheduler.Default);
 

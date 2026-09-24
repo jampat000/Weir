@@ -5,7 +5,6 @@ using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Time;
 using Weir.Infrastructure.Jobs;
-using Weir.Infrastructure.MediaManagers;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
@@ -28,7 +27,7 @@ public sealed partial class RemuxPassHandler
                 async uow =>
                 {
                     updates = new WireObject();
-                    var library = await ResolveLibraryAsync(uow, libraryId, mediaScope).ConfigureAwait(false);
+                    var library = await ResolveLibraryAsync(uow, _libraries, libraryId, mediaScope).ConfigureAwait(false);
                     if (library is null)
                     {
                         return;
@@ -123,7 +122,7 @@ public sealed partial class RemuxPassHandler
                     if (result.Get("output_file") is WireString { Value.Length: > 0 } handedBack &&
                         result.Get("output_collision_action") is WireString { Value: "write" })
                     {
-                        await HandbackStore.RecordWrittenAsync(uow, library.Id, rel, handedBack.Value, now).ConfigureAwait(false);
+                        await _handback.RecordWrittenAsync(uow, library.Id, rel, handedBack.Value, now).ConfigureAwait(false);
                     }
                 },
                 _logger,

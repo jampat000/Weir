@@ -5,9 +5,9 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing;
 
 /// <summary>The <c>libraries</c> row's insert/update SQL, its parameter binding, and reading it back.</summary>
-public static partial class LibraryStore
+public sealed partial class LibraryStore
 {
-    private static async Task InsertAsync(UnitOfWork uow, ProcessingLibraryRecord row)
+    private async Task InsertAsync(UnitOfWork uow, ProcessingLibraryRecord row)
     {
         await uow.ExecuteAsync(
             "INSERT INTO libraries (name, enabled, media_type, display_order, watched_folder, work_folder, output_folder, " +
@@ -32,7 +32,7 @@ public static partial class LibraryStore
             LibraryParameters(row)).ConfigureAwait(false);
     }
 
-    private static async Task UpdateRowAsync(UnitOfWork uow, ProcessingLibraryRecord row)
+    private async Task UpdateRowAsync(UnitOfWork uow, ProcessingLibraryRecord row)
     {
         await uow.ExecuteAsync(
             "UPDATE libraries SET name=@name, enabled=@enabled, media_type=@media_type, watched_folder=@watched_folder, " +

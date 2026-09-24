@@ -18,11 +18,13 @@ namespace Weir.Infrastructure.MediaManagers;
 public sealed class ManagerSetupCheck
 {
     private readonly MediaManagerConnectionService _connections;
+    private readonly MediaManagerConnectionStore _connectionStore;
     private readonly IManagerHttpHandlerFactory _handlers;
 
-    public ManagerSetupCheck(MediaManagerConnectionService connections, IManagerHttpHandlerFactory handlers)
+    public ManagerSetupCheck(MediaManagerConnectionService connections, MediaManagerConnectionStore connectionStore, IManagerHttpHandlerFactory handlers)
     {
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
+        _connectionStore = connectionStore ?? throw new ArgumentNullException(nameof(connectionStore));
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
     }
 
@@ -32,7 +34,7 @@ public sealed class ManagerSetupCheck
     {
         ArgumentNullException.ThrowIfNull(uow);
         var results = new List<WireObject>();
-        foreach (var row in await MediaManagerConnectionStore.ListEnabledAsync(uow).ConfigureAwait(false))
+        foreach (var row in await _connectionStore.ListEnabledAsync(uow).ConfigureAwait(false))
         {
             var isArr = ManagerKindProfiles.ForKind(row.Kind) is { IsArr: true } profile && profile.ArrScope == mediaScope;
             var isDeluno = string.Equals(row.Kind, "deluno", StringComparison.OrdinalIgnoreCase);

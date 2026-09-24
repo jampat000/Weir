@@ -51,6 +51,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
     private readonly WeirOptions _options;
     private readonly ProcessingJobStore _jobStore;
     private readonly WatcherStateStore _state;
+    private readonly LibraryStore _libraries;
     private readonly TimeProvider _time;
     private readonly ILogger<ProcessingWatchedFolderWatcherService> _logger;
     private readonly ScanSettingsChanges _scanSettingsChanges;
@@ -60,6 +61,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
         WeirOptions options,
         ProcessingJobStore jobStore,
         WatcherStateStore state,
+        LibraryStore libraries,
         TimeProvider time,
         ILogger<ProcessingWatchedFolderWatcherService> logger,
         ScanSettingsChanges? scanSettingsChanges = null)
@@ -68,6 +70,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _jobStore = jobStore ?? throw new ArgumentNullException(nameof(jobStore));
         _state = state ?? throw new ArgumentNullException(nameof(state));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _scanSettingsChanges = scanSettingsChanges ?? new ScanSettingsChanges();
@@ -157,7 +160,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
         List<ProcessingLibraryRecord> libraries;
         await using (var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false))
         {
-            libraries = await LibraryStore.ListAsync(uow, enabledOnly: true).ConfigureAwait(false);
+            libraries = await _libraries.ListAsync(uow, enabledOnly: true).ConfigureAwait(false);
         }
 
         var toWatch = libraries.Where(row => HasWatchedFolder(row) && row.FileSystemEventsEnabled).ToDictionary(row => row.Id);
@@ -315,7 +318,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
             await using var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
             foreach (var libraryId in libraryIds)
             {
-                var fresh = await LibraryStore.GetAsync(uow, libraryId).ConfigureAwait(false);
+                var fresh = await _libraries.GetAsync(uow, libraryId).ConfigureAwait(false);
                 if (fresh is null || !fresh.Enabled)
                 {
                     continue;

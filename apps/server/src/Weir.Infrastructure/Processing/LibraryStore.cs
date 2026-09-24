@@ -9,7 +9,7 @@ namespace Weir.Infrastructure.Processing;
 /// needs for a discovered library's create and unlink. The reject-support gate lives in <c>RejectSupportEvaluator</c>.
 /// Rule-set CRUD and its default-profile bookkeeping live in the <c>.RuleSets</c> partial.
 /// </summary>
-public static partial class LibraryStore
+public sealed partial class LibraryStore
 {
     private const string LibraryColumns =
         "id, name, enabled, media_type, display_order, watched_folder, work_folder, output_folder, " +
@@ -24,26 +24,26 @@ public static partial class LibraryStore
         // #548: appended, not inserted - ReadLibrary reads by position.
         "remux_writer, rewrite_with_ffmpeg, remove_original_after_success";
 
-    public static async Task<List<ProcessingLibraryRecord>> ListAsync(UnitOfWork uow, bool enabledOnly = false)
+    public async Task<List<ProcessingLibraryRecord>> ListAsync(UnitOfWork uow, bool enabledOnly = false)
     {
         var sql = $"SELECT {LibraryColumns} FROM libraries" + (enabledOnly ? " WHERE enabled = 1" : string.Empty) +
                   " ORDER BY display_order, id";
         return await uow.QueryAsync(sql, ReadLibrary).ConfigureAwait(false);
     }
 
-    public static Task<ProcessingLibraryRecord?> GetAsync(UnitOfWork uow, long id) =>
+    public Task<ProcessingLibraryRecord?> GetAsync(UnitOfWork uow, long id) =>
         uow.QuerySingleAsync($"SELECT {LibraryColumns} FROM libraries WHERE id = @id", ReadLibrary, ("@id", id));
 
-    public static Task<ProcessingLibraryRecord?> GetByNameAsync(UnitOfWork uow, string name) =>
+    public Task<ProcessingLibraryRecord?> GetByNameAsync(UnitOfWork uow, string name) =>
         uow.QuerySingleAsync($"SELECT {LibraryColumns} FROM libraries WHERE name = @name", ReadLibrary, ("@name", name));
 
     /// <summary>The first library covering a scope, in display order.</summary>
-    public static Task<ProcessingLibraryRecord?> SeededForScopeAsync(UnitOfWork uow, string mediaScope) =>
+    public Task<ProcessingLibraryRecord?> SeededForScopeAsync(UnitOfWork uow, string mediaScope) =>
         uow.QuerySingleAsync(
             $"SELECT {LibraryColumns} FROM libraries WHERE media_type = @scope ORDER BY display_order, id LIMIT 1",
             ReadLibrary, ("@scope", ProcessingMediaScopes.Normalize(mediaScope)));
 
-    public static async Task<List<long>> ManagerConnectionIdsAsync(UnitOfWork uow, long libraryId)
+    public async Task<List<long>> ManagerConnectionIdsAsync(UnitOfWork uow, long libraryId)
     {
         var rows = await uow.QueryAsync(
             "SELECT connection_id FROM library_manager_links WHERE library_id = @id ORDER BY connection_id",
@@ -52,7 +52,7 @@ public static partial class LibraryStore
     }
 
     /// <summary>The libraries linked to one connection, in <c>display_order</c> then id (the reverse of <see cref="ManagerConnectionIdsAsync"/>).</summary>
-    public static async Task<List<ProcessingLibraryRecord>> LibrariesForConnectionIdAsync(UnitOfWork uow, long connectionId)
+    public async Task<List<ProcessingLibraryRecord>> LibrariesForConnectionIdAsync(UnitOfWork uow, long connectionId)
     {
         var ids = await uow.QueryAsync(
             "SELECT library_id FROM library_manager_links WHERE connection_id = @id",
@@ -66,7 +66,7 @@ public static partial class LibraryStore
         return [.. (await ListAsync(uow).ConfigureAwait(false)).Where(library => wanted.Contains(library.Id))];
     }
 
-    public static async Task<HashSet<long>> KnownConnectionIdsAsync(UnitOfWork uow, IReadOnlyList<long> ids)
+    public async Task<HashSet<long>> KnownConnectionIdsAsync(UnitOfWork uow, IReadOnlyList<long> ids)
     {
         if (ids.Count == 0)
         {
@@ -82,7 +82,7 @@ public static partial class LibraryStore
     }
 
     /// <summary>How many queued or leased Processing jobs belong to this library.</summary>
-    public static async Task<int> ActiveJobCountAsync(UnitOfWork uow, ProcessingLibraryRecord library)
+    public async Task<int> ActiveJobCountAsync(UnitOfWork uow, ProcessingLibraryRecord library)
     {
         var libraries = await ListAsync(uow).ConfigureAwait(false);
         var seededForScope = libraries.FirstOrDefault(row => row.MediaType == library.MediaType);
@@ -140,7 +140,7 @@ public static partial class LibraryStore
         return count;
     }
 
-    public static async Task<ProcessingLibraryRecord> CreateAsync(UnitOfWork uow, ProcessingLibraryInput body, string? weirHome = null)
+    public async Task<ProcessingLibraryRecord> CreateAsync(UnitOfWork uow, ProcessingLibraryInput body, string? weirHome = null)
     {
         var existingNames = (await ListAsync(uow).ConfigureAwait(false)).Select(l => l.Name).ToHashSet(StringComparer.Ordinal);
         var name = LibraryRules.ValidateName(body.Name, existingNames);
@@ -165,7 +165,7 @@ public static partial class LibraryStore
         return created;
     }
 
-    public static async Task<ProcessingLibraryRecord> UpdateAsync(UnitOfWork uow, ProcessingLibraryRecord existing, ProcessingLibraryInput body, string? weirHome = null)
+    public async Task<ProcessingLibraryRecord> UpdateAsync(UnitOfWork uow, ProcessingLibraryRecord existing, ProcessingLibraryInput body, string? weirHome = null)
     {
         var existingNames = (await ListAsync(uow).ConfigureAwait(false))
             .Where(l => l.Id != existing.Id).Select(l => l.Name).ToHashSet(StringComparer.Ordinal);
@@ -192,7 +192,7 @@ public static partial class LibraryStore
     /// Columns the descriptor does not set keep their schema defaults, mirrored by
     /// <see cref="ProcessingLibraryRecord"/>'s own property defaults.
     /// </remarks>
-    public static async Task<ProcessingLibraryRecord> CreateDiscoveredAsync(UnitOfWork uow, ProcessingLibraryRecord row)
+    public async Task<ProcessingLibraryRecord> CreateDiscoveredAsync(UnitOfWork uow, ProcessingLibraryRecord row)
     {
         if (row.RuleSetId is null)
         {
@@ -211,7 +211,7 @@ public static partial class LibraryStore
     }
 
     /// <summary>Forgets where a library came from, keeping the library itself untouched.</summary>
-    public static async Task<ProcessingLibraryRecord> UnlinkAsync(UnitOfWork uow, ProcessingLibraryRecord row)
+    public async Task<ProcessingLibraryRecord> UnlinkAsync(UnitOfWork uow, ProcessingLibraryRecord row)
     {
         await uow.ExecuteAsync(
             "UPDATE libraries SET discovered_from_connection_id = NULL, discovered_library_key = NULL, " +
@@ -221,7 +221,7 @@ public static partial class LibraryStore
             ?? throw new InvalidOperationException("Library disappeared during unlink.");
     }
 
-    public static async Task DeleteAsync(UnitOfWork uow, ProcessingLibraryRecord row)
+    public async Task DeleteAsync(UnitOfWork uow, ProcessingLibraryRecord row)
     {
         var active = await ActiveJobCountAsync(uow, row).ConfigureAwait(false);
         if (active > 0)
@@ -234,7 +234,7 @@ public static partial class LibraryStore
         await uow.ExecuteAsync("DELETE FROM libraries WHERE id = @id", ("@id", row.Id)).ConfigureAwait(false);
     }
 
-    public static async Task<List<ProcessingLibraryRecord>> ReorderAsync(UnitOfWork uow, IReadOnlyList<long> orderedIds)
+    public async Task<List<ProcessingLibraryRecord>> ReorderAsync(UnitOfWork uow, IReadOnlyList<long> orderedIds)
     {
         var rows = (await ListAsync(uow).ConfigureAwait(false)).ToDictionary(r => r.Id);
         var unknown = orderedIds.Where(id => !rows.ContainsKey(id)).ToList();
@@ -258,7 +258,7 @@ public static partial class LibraryStore
         return await ListAsync(uow).ConfigureAwait(false);
     }
 
-    public static async Task SetManagerLinksAsync(UnitOfWork uow, long libraryId, IReadOnlyList<long> connectionIds)
+    public async Task SetManagerLinksAsync(UnitOfWork uow, long libraryId, IReadOnlyList<long> connectionIds)
     {
         var known = await KnownConnectionIdsAsync(uow, connectionIds).ConfigureAwait(false);
         var wanted = LibraryRules.ValidateManagerConnections(connectionIds, known);
@@ -278,7 +278,7 @@ public static partial class LibraryStore
         }
     }
 
-    private static async Task<List<OtherLibraryFolders>> OtherFoldersAsync(UnitOfWork uow, long? excludeId)
+    private async Task<List<OtherLibraryFolders>> OtherFoldersAsync(UnitOfWork uow, long? excludeId)
     {
         var rows = await ListAsync(uow).ConfigureAwait(false);
         return [.. rows.Where(r => r.Id != excludeId).Select(r => new OtherLibraryFolders(r.Id, r.Name, r.WatchedFolder, r.OutputFolder))];

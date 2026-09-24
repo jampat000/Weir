@@ -67,6 +67,7 @@ public static class ManagerHealthProbe
 public sealed partial class ManagerHeartbeatTask(
     SqliteDatabase database,
     MediaManagerConnectionService connections,
+    MediaManagerConnectionStore connectionStore,
     IManagerHttpHandlerFactory handlers,
     TimeProvider time,
     ILogger<ManagerHeartbeatTask> logger,
@@ -91,7 +92,7 @@ public sealed partial class ManagerHeartbeatTask(
         var read = await UnitOfWork.OpenAsync(database, cancellationToken).ConfigureAwait(false);
         await using (read.ConfigureAwait(false))
         {
-            rows = await MediaManagerConnectionStore.ListAsync(read).ConfigureAwait(false);
+            rows = await connectionStore.ListAsync(read).ConfigureAwait(false);
         }
 
         foreach (var row in rows.Where(r => r.Enabled))
@@ -109,7 +110,7 @@ public sealed partial class ManagerHeartbeatTask(
             var write = await UnitOfWork.OpenAsync(database, cancellationToken).ConfigureAwait(false);
             await using (write.ConfigureAwait(false))
             {
-                await MediaManagerConnectionStore.RecordTestResultAsync(write, row.Id, ok, Timestamp.UtcNow(time), detail).ConfigureAwait(false);
+                await connectionStore.RecordTestResultAsync(write, row.Id, ok, Timestamp.UtcNow(time), detail).ConfigureAwait(false);
                 await write.CommitAsync().ConfigureAwait(false);
             }
 

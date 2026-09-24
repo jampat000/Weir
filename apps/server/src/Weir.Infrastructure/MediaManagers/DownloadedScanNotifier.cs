@@ -19,12 +19,21 @@ namespace Weir.Infrastructure.MediaManagers;
 public sealed class DownloadedScanNotifier
 {
     private readonly MediaManagerConnectionService _connections;
+    private readonly MediaManagerConnectionStore _connectionStore;
+    private readonly LibraryStore _libraries;
     private readonly IManagerHttpHandlerFactory _handlers;
     private readonly ILogger _logger;
 
-    public DownloadedScanNotifier(MediaManagerConnectionService connections, IManagerHttpHandlerFactory handlers, ILogger<DownloadedScanNotifier>? logger = null)
+    public DownloadedScanNotifier(
+        MediaManagerConnectionService connections,
+        MediaManagerConnectionStore connectionStore,
+        LibraryStore libraries,
+        IManagerHttpHandlerFactory handlers,
+        ILogger<DownloadedScanNotifier>? logger = null)
     {
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
+        _connectionStore = connectionStore ?? throw new ArgumentNullException(nameof(connectionStore));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
         _logger = (ILogger?)logger ?? NullLogger.Instance;
     }
@@ -40,9 +49,9 @@ public sealed class DownloadedScanNotifier
     {
         ArgumentNullException.ThrowIfNull(uow);
         var wroteAnything = false;
-        foreach (var connectionId in await LibraryStore.ManagerConnectionIdsAsync(uow, libraryId).ConfigureAwait(false))
+        foreach (var connectionId in await _libraries.ManagerConnectionIdsAsync(uow, libraryId).ConfigureAwait(false))
         {
-            var row = await MediaManagerConnectionStore.GetAsync(uow, connectionId).ConfigureAwait(false);
+            var row = await _connectionStore.GetAsync(uow, connectionId).ConfigureAwait(false);
             if (row is null || !row.Enabled || !row.DownloadedScanEnabled)
             {
                 continue;

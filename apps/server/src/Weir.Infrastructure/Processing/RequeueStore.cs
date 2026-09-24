@@ -13,7 +13,7 @@ public sealed record RequeueResult(int Requeued, int Skipped, string Detail);
 /// Putting a failed file back to work by hand. Automatic, policy-governed retries are decided by the remux-pass
 /// failure handling, not here.
 /// </summary>
-public sealed class RequeueStore(ProcessingJobStore jobStore)
+public sealed class RequeueStore(ProcessingJobStore jobStore, LibraryStore libraries)
 {
     /// <summary>Job kind of a manual remux requeue, run by
     /// <see cref="RemuxPass.RemuxPassHandler"/>.</summary>
@@ -22,7 +22,7 @@ public sealed class RequeueStore(ProcessingJobStore jobStore)
     /// <summary>Manual reset: attempt count cleared, backoff ignored.</summary>
     public async Task<RequeueResult> RequeueFileAsync(UnitOfWork uow, ProcessingFileRecord row)
     {
-        var library = await LibraryStore.GetAsync(uow, row.LibraryId).ConfigureAwait(false);
+        var library = await libraries.GetAsync(uow, row.LibraryId).ConfigureAwait(false);
         if (library is null)
         {
             return new RequeueResult(0, 1, "The library this file belonged to no longer exists, so there is nowhere to queue it.");
