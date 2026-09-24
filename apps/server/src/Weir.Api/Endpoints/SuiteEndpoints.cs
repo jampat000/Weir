@@ -137,7 +137,7 @@ public static class SuiteEndpoints
 
     private static async Task<ApiResult> GetBundleAsync(ApiRequest request)
     {
-        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
+        await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
         try
         {
@@ -152,7 +152,7 @@ public static class SuiteEndpoints
     private static async Task<ApiResult> PutBundleAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
-        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
+        await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
         var issues = new ValidationIssues();
         var model = new BodyModel(body, issues);
         var csrfToken = model.Str("csrf_token", minLength: 1);
@@ -188,7 +188,7 @@ public static class SuiteEndpoints
 
     private static async Task<ApiResult> DownloadBackupAsync(ApiRequest request)
     {
-        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
+        await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
         var issues = new ValidationIssues();
         var backupId = request.PathInt("backup_id", issues);
         issues.ThrowIfAny();
@@ -259,7 +259,7 @@ public static class SuiteEndpoints
 
     private static async Task<ApiResult> GetDirectoriesAsync(ApiRequest request)
     {
-        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
+        await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
         try
         {
             return ApiRoutes.Ok(DirectoryBrowser.Browse(request.Query("path")));
@@ -315,7 +315,7 @@ public static class SuiteEndpoints
     private static async Task<ApiResult> PutUpdateSettingsAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
-        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
+        await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
         var issues = new ValidationIssues();
         var model = new BodyModel(body, issues);
         var csrfToken = model.Str("csrf_token", minLength: 1);
@@ -338,7 +338,7 @@ public static class SuiteEndpoints
     private static async Task<ApiResult> PostApplyUpdateAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
-        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
+        await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
         var issues = new ValidationIssues();
         var model = new BodyModel(body, issues);
         var csrfToken = model.Str("csrf_token", minLength: 1);
@@ -367,7 +367,7 @@ public static class SuiteEndpoints
     private static async Task<ApiResult> PostOperationalHistoryResetAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
-        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
+        await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
         var issues = new ValidationIssues();
         var model = new BodyModel(body, issues);
         var csrfToken = model.Str("csrf_token", minLength: 1);

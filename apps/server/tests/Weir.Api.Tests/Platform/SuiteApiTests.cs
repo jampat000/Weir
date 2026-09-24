@@ -186,7 +186,7 @@ public sealed class SuiteApiTests
     }
 
     [Fact]
-    public async Task Local_browse_needs_an_operator_lists_roots_and_reports_missing_folders()
+    public async Task Local_browse_is_admin_only_lists_roots_and_reports_missing_folders()
     {
         var (server, client) = await SignedInAdminAsync();
         await using var _ = server;
@@ -208,7 +208,7 @@ public sealed class SuiteApiTests
     }
 
     [Fact]
-    public async Task The_configuration_bundle_is_operator_only_and_round_trips()
+    public async Task The_configuration_bundle_is_admin_only_and_round_trips()
     {
         var (server, client) = await SignedInAdminAsync();
         await using var _ = server;
@@ -405,6 +405,47 @@ public sealed class SuiteApiTests
         var body = (await Json(response)).AsObject();
         Assert.False(string.IsNullOrWhiteSpace(body["ffmpeg"]!.GetValue<string>()));
         Assert.False(string.IsNullOrWhiteSpace(body["mkvmerge"]!.GetValue<string>()));
+    }
+
+    [Fact]
+    public async Task Install_level_routes_refuse_an_operator_and_allow_only_admin()
+    {
+        var (server, admin) = await SignedInAdminAsync();
+        await using var _ = server;
+        await TestDatabase.SeedUserAsync(server, "opal", "operator-password-here", "operator");
+        var operatorClient = new ApiTestClient(server);
+        await operatorClient.SignInAsync("opal", "operator-password-here");
+
+        foreach (var path in new[] { "/api/v1/system/directories", "/api/v1/suite/configuration-bundle" })
+        {
+            using var response = await operatorClient.GetAsync(path);
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        using var applyUpdate = await operatorClient.PostAsync("/api/v1/suite/apply-update", new { csrf_token = await operatorClient.CsrfAsync() });
+        Assert.Equal(HttpStatusCode.Forbidden, applyUpdate.StatusCode);
+
+        using var updateSettings = await operatorClient.PutAsync(
+            "/api/v1/suite/update-settings",
+            new { csrf_token = await operatorClient.CsrfAsync(), mode = "notify", check_on_startup = true });
+        Assert.Equal(HttpStatusCode.Forbidden, updateSettings.StatusCode);
+
+        using var historyReset = await operatorClient.PostAsync(
+            "/api/v1/suite/operational-history/reset", new { csrf_token = await operatorClient.CsrfAsync(), confirm = "RESET" });
+        Assert.Equal(HttpStatusCode.Forbidden, historyReset.StatusCode);
+
+        using var createChannel = await operatorClient.PostAsync(
+            "/api/v1/suite/notification-channels",
+            new { csrf_token = await operatorClient.CsrfAsync(), label = "Ops", provider = "webhook", url = "https://hooks.example.com/weir", events = new[] { "job_failed" } });
+        Assert.Equal(HttpStatusCode.Forbidden, createChannel.StatusCode);
+
+        using var createConnection = await operatorClient.PostAsync(
+            "/api/v1/media-managers/connections",
+            new { csrf_token = await operatorClient.CsrfAsync(), kind = "sonarr", name = "Sonarr", base_url = "https://sonarr.example", api_key = "key" });
+        Assert.Equal(HttpStatusCode.Forbidden, createConnection.StatusCode);
+
+        using var adminStillWorks = await admin.GetAsync("/api/v1/system/directories");
+        Assert.Equal(HttpStatusCode.OK, adminStillWorks.StatusCode);
     }
 
     private sealed class FakeReleaseCatalog : IReleaseCatalogClient

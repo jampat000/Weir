@@ -59,7 +59,7 @@ public static class NotificationEndpoints
     private static async Task<ApiResult> CreateAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
-        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
+        await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
         var issues = new ValidationIssues();
         var input = ReadChannel(body, issues);
         issues.ThrowIfAny();
@@ -83,7 +83,7 @@ public static class NotificationEndpoints
     private static async Task<ApiResult> UpdateAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
-        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
+        await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
         var issues = new ValidationIssues();
         var channelId = request.PathInt("channel_id", issues);
         var input = ReadChannel(body, issues);
