@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 import { quietActionRowClass } from "../../../../components/shared/quiet-section";
 import { errorMessage } from "../../../../lib/api/error-message";
 import {
@@ -159,33 +157,44 @@ export function LibraryHoursRow({
       <td data-label="Looks for new files">
         Every {everyWords(library.scan_interval_seconds)}
       </td>
-      <td data-label="Actions" className="mm-schedule-actions">
-        <button
-          type="button"
-          className={mmActionButtonClass({ variant: "secondary" })}
-          aria-expanded={editing}
-          onClick={onToggleEdit}
-        >
-          Change hours
-        </button>
-        <ScanNowButton library={library} editable={editable} />
+      <td data-label="">
+        <div className="mm-schedule-actions">
+          <button
+            type="button"
+            className={mmActionButtonClass({ variant: "secondary" })}
+            aria-expanded={editing}
+            onClick={onToggleEdit}
+          >
+            Change hours
+          </button>
+          <ScanNowButton library={library} editable={editable} />
+        </div>
       </td>
     </tr>
   );
 }
 
-/** The hours editor for one library, under the table. Saving it is the whole of that library's schedule. */
+/**
+ * The hours editor for one library, under the table. Saving it is the whole of that library's
+ * schedule. The drawn week is held by the section, so it can ask before another library's hours
+ * replace unsaved ones.
+ */
 export function LibraryHoursEditor({
   library,
+  grid,
+  onGrid,
   editable,
-  onDone,
+  onSaved,
+  onClose,
 }: {
   library: ProcessingLibrary;
+  grid: string;
+  onGrid: (grid: string) => void;
   editable: boolean;
-  onDone: () => void;
+  onSaved: () => void;
+  onClose: () => void;
 }) {
   const update = useUpdateProcessingLibrary();
-  const [grid, setGrid] = useState(() => effectiveGrid(library));
   const dirty = grid !== effectiveGrid(library);
 
   const save = () =>
@@ -201,7 +210,7 @@ export function LibraryHoursEditor({
           schedule_hours_limited: false,
         },
       },
-      { onSuccess: onDone },
+      { onSuccess: onSaved },
     );
 
   return (
@@ -215,7 +224,7 @@ export function LibraryHoursEditor({
       </h4>
       <ScheduleGridEditor
         value={grid}
-        onChange={setGrid}
+        onChange={onGrid}
         disabled={!editable || update.isPending}
       />
       {update.isError ? (
@@ -236,7 +245,7 @@ export function LibraryHoursEditor({
         <button
           type="button"
           className={mmActionButtonClass({ variant: "tertiary" })}
-          onClick={onDone}
+          onClick={onClose}
         >
           Close
         </button>

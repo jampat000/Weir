@@ -2,40 +2,23 @@ import { useId, useState } from "react";
 
 import { PageLoading } from "../../../../components/shared/page-loading";
 import { QuietSection } from "../../../../components/shared/quiet-section";
-import {
-  isHttpErrorFromApi,
-  isLikelyNetworkFailure,
-} from "../../../../lib/api/error-guards";
 import { canEdit } from "../../../../lib/auth/can-edit";
 import { useMeQuery } from "../../../../lib/auth/queries";
 import type { ProcessingLibrary } from "../../../../lib/processing/libraries-api";
 import { useProcessingLibrariesQuery } from "../../../../lib/processing/libraries-queries";
 import { useAppSettingsQuery } from "../../../../lib/settings/queries";
 import { useNow } from "../../../../lib/ui/use-now";
+import { SaveModelNote } from "../../save-model-note";
+import { SettingsLoadError } from "../../settings-load-error";
+import { useLeaveConfirmation, useUnsavedChanges } from "../../unsaved-changes";
 import { LibraryHoursEditor, LibraryHoursRow } from "./library-hours";
+import { effectiveGrid } from "./schedule-model";
 import { savedZone, TimeZoneRow } from "./time-zone-row";
 import { TimersSection } from "./timers-section";
 
 /** Often enough that "open until" and "it is 14:32 there" stay true while the page is open. */
 const CLOCK_TICK_MS = 30_000;
 const FALLBACK_ZONE = "UTC";
-
-function LoadFailed({ error }: { error: unknown }) {
-  return (
-    <ul className="mm-interrupt" role="alert">
-      <li className="mm-interrupt__item">
-        <span className="mm-interrupt__text">
-          <strong className="font-semibold">Could not load schedules.</strong>{" "}
-          {isLikelyNetworkFailure(error)
-            ? "Check that the Weir API is running."
-            : isHttpErrorFromApi(error)
-              ? "Sign in, then try again."
-              : "Request failed."}
-        </span>
-      </li>
-    </ul>
-  );
-}
 
 function LibrariesSection({
   headingId,
@@ -51,10 +34,28 @@ function LibrariesSection({
   editable: boolean;
 }) {
   const [editing, setEditing] = useState<number | null>(null);
+  const [grid, setGrid] = useState("");
   const ordered = [...libraries].sort(
     (x, y) => x.display_order - y.display_order,
   );
   const editingLibrary = ordered.find((l) => l.id === editing) ?? null;
+  const dirty =
+    editingLibrary !== null && grid !== effectiveGrid(editingLibrary);
+  const thing = editingLibrary ? `${editingLibrary.name}'s hours` : null;
+  useUnsavedChanges(dirty ? thing : null);
+  const { confirmLeave, dialog } = useLeaveConfirmation();
+
+  const openEditor = (library: ProcessingLibrary) => {
+    setEditing(library.id);
+    setGrid(effectiveGrid(library));
+  };
+  const closeEditor = () => setEditing(null);
+  const requestClose = () => confirmLeave(dirty ? thing : null, closeEditor);
+  const toggleEdit = (library: ProcessingLibrary) => {
+    if (editing === library.id) requestClose();
+    else confirmLeave(dirty ? thing : null, () => openEditor(library));
+  };
+
   return (
     <QuietSection headingId={headingId} heading="Libraries">
       <p className="mm-quiet-note">
@@ -88,9 +89,7 @@ function LibrariesSection({
                   now={now}
                   editing={editing === library.id}
                   editable={editable}
-                  onToggleEdit={() =>
-                    setEditing(editing === library.id ? null : library.id)
-                  }
+                  onToggleEdit={() => toggleEdit(library)}
                 />
               ))}
             </tbody>
@@ -101,10 +100,14 @@ function LibrariesSection({
         <LibraryHoursEditor
           key={editingLibrary.id}
           library={editingLibrary}
+          grid={grid}
+          onGrid={setGrid}
           editable={editable}
-          onDone={() => setEditing(null)}
+          onSaved={closeEditor}
+          onClose={requestClose}
         />
       ) : null}
+      {dialog}
     </QuietSection>
   );
 }
@@ -125,11 +128,12 @@ export function ScheduleTab() {
     return <PageLoading label="Loading schedules" />;
   }
   if (settings.isError || libraries.isError) {
-    return <LoadFailed error={settings.error ?? libraries.error} />;
+    return <SettingsLoadError what="schedules" />;
   }
 
   return (
     <div className="mm-quiet-stack" data-testid="processing-schedules-section">
+      <SaveModelNote model="explicit" />
       <TimeZoneRow
         key={savedZone(settings.data)}
         settings={settings.data}
