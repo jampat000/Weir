@@ -48,6 +48,38 @@ public sealed class DirectPlayEvaluationTests
     }
 
     [Fact]
+    public void An_unchanged_list_is_parsed_once_and_reused()
+    {
+        using var temp = new TempDirectory();
+        File.WriteAllText(Path.Combine(temp.Path, DirectPlayEvaluation.OverrideFileName), OneDevice("shield"));
+
+        var first = DeviceProfileLoader.Load(temp.Path);
+        var second = DeviceProfileLoader.Load(temp.Path);
+
+        Assert.Same(first, second);
+        Assert.Same(DeviceProfileLoader.Load(null), DeviceProfileLoader.Load(null));
+    }
+
+    [Fact]
+    public void An_edited_own_list_is_read_again()
+    {
+        using var temp = new TempDirectory();
+        var path = Path.Combine(temp.Path, DirectPlayEvaluation.OverrideFileName);
+        File.WriteAllText(path, OneDevice("shield"));
+        DeviceProfileLoader.Load(temp.Path);
+
+        File.WriteAllText(path, OneDevice("chromecast"));
+        File.SetLastWriteTimeUtc(path, File.GetLastWriteTimeUtc(path).AddMinutes(1));
+        var loaded = DeviceProfileLoader.Load(temp.Path);
+
+        Assert.Equal(["chromecast"], loaded.Select(p => p.Id));
+    }
+
+    private static string OneDevice(string id) =>
+        """{"devices": [{"id": "DEVICE", "name": "DEVICE", "containers": {"yes": ["mkv"]}, "video": {"hevc": {}}, "audio": {"yes": ["aac"]}}]}"""
+            .Replace("DEVICE", id, StringComparison.Ordinal);
+
+    [Fact]
     public void An_unreadable_own_list_falls_back_to_the_shipped_one()
     {
         using var temp = new TempDirectory();

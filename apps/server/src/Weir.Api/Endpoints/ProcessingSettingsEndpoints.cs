@@ -294,6 +294,8 @@ public static class ProcessingSettingsEndpoints
         var updated = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
         var suite = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
+        // The periodic-scan switches are among these settings; the scheduler reads them again on its next tick.
+        request.Service<ScanSettingsChanges>().Record();
         return ApiRoutes.Ok(OperatorSettingsOut(updated, string.IsNullOrWhiteSpace(suite.AppTimezone) ? "UTC" : suite.AppTimezone.Trim()));
     }
 

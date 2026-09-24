@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Json;
+using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
@@ -523,6 +524,44 @@ public sealed class RemuxPassRunnerTests : IDisposable
         var executed = Assert.Single(_media.Remuxes);
         var recorded = ((PyList)result["ffmpeg_argv"]).Items.Select(PyConvert.Str).ToList();
         Assert.Equal(recorded.TakeWhile(arg => arg != "-i"), executed.TakeWhile(arg => arg != "-i"));
+    }
+
+    [Fact]
+    public async Task A_pass_probes_its_source_once()
+    {
+        var source = _folders.Source("one.mkv");
+        _media.Probes["one.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+
+        await Run("one.mkv");
+
+        Assert.Single(_media.Probed, argv => argv[^1] == source);
+    }
+
+    [Fact]
+    public async Task With_hardware_decoding_off_ffmpeg_is_not_asked_what_it_can_accelerate()
+    {
+        _folders.Source("one.mkv");
+        _media.Probes["one.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+
+        await Run("one.mkv", _folders.Runtime() with { HardwareDecodeMode = HardwareAcceleration.ModeOff });
+
+        Assert.DoesNotContain(_media.Calls, argv => argv.Contains("-hwaccels"));
+    }
+
+    [Fact]
+    public async Task With_hardware_decoding_on_ffmpeg_is_asked_once_for_every_pass()
+    {
+        _folders.Source("one.mkv");
+        _folders.Source("two.mkv");
+        _media.Probes["one.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+        _media.Probes["two.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+        var runner = Runner();
+        var runtime = _folders.Runtime() with { HardwareDecodeMode = HardwareAcceleration.ModeAuto };
+
+        await Run("one.mkv", runtime, runner: runner);
+        await Run("two.mkv", runtime, runner: runner);
+
+        Assert.Single(_media.Calls, argv => argv.Contains("-hwaccels"));
     }
 
     [Fact]

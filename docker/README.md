@@ -222,6 +222,21 @@ that can already write to them.
 - changing `WEIR_SESSION_SECRET` can require re-entering any credentials that were still encrypted
   with the old session secret
 
+## Work folder placement
+
+A library's work folder defaults to a private folder under `WEIR_HOME` (`/data/weir`), which is
+usually a different volume from your media in Docker. Weir still finishes files that way, but each
+one is copied from the work folder to the output folder rather than moved, roughly doubling the
+time the clean's last step takes on a large file. Put the work folder on the same volume as the
+output folder — for example both under the `/media` bind mount used elsewhere in this file — and
+that copy becomes an instant move instead:
+
+```yaml
+volumes:
+  - ./weir-data:/data/weir
+  - /srv/media:/media   # set the library's work_folder and output_folder both under here
+```
+
 ## Health
 
 The image exposes `GET /health` and includes a Docker `HEALTHCHECK`.

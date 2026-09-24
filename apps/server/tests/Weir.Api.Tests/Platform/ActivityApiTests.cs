@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Api.Endpoints;
 using Weir.Core.Activity;
+using Weir.Infrastructure.Activity;
 using static Weir.Api.Tests.Platform.ApiTestClient;
 
 namespace Weir.Api.Tests.Platform;
@@ -59,8 +60,8 @@ public sealed class ActivityApiTests
         Assert.NotNull(body["oldest_event_at"]);
         Assert.NotEmpty(body["items"]![0]!["relative_path"]!.GetValue<string>());
         Assert.Equal(4, body["total"]!.GetValue<int>());
-        Assert.Equal(1, body["system_events"]!.GetValue<int>());
         Assert.False(body["has_more"]!.GetValue<bool>());
+        Assert.Equal(["items", "total", "has_more", "retention_days", "oldest_event_at"], body.AsObject().Select(pair => pair.Key));
         var item = body["items"]![0]!.AsObject();
         Assert.Equal(
             ["id", "created_at", "event_type", "module", "title", "detail", "trigger", "result", "library_id", "relative_path", "run_key"],
@@ -83,6 +84,26 @@ public sealed class ActivityApiTests
         using var next = await client.GetAsync($"/api/v1/activity/recent?module=processing&limit=2&before_id={ids.Min()}");
         var rest = (await Json(next))["items"]!.AsArray().Select(item => item!["id"]!.GetValue<long>()).ToList();
         Assert.All(rest, id => Assert.True(id < ids.Min()));
+    }
+
+    [Fact]
+    public async Task A_later_page_says_whether_more_remain_without_a_total()
+    {
+        await using var server = await SeededServerAsync();
+        var client = await AdminAsync(server);
+        using var first = await client.GetAsync("/api/v1/activity/recent?module=processing&limit=1");
+        var oldestShown = (await Json(first))["items"]![0]!["id"]!.GetValue<long>();
+
+        using var middle = await client.GetAsync($"/api/v1/activity/recent?module=processing&limit=2&before_id={oldestShown}");
+        var middlePage = await Json(middle);
+        var middleIds = middlePage["items"]!.AsArray().Select(item => item!["id"]!.GetValue<long>()).ToList();
+        using var last = await client.GetAsync($"/api/v1/activity/recent?module=processing&limit=2&before_id={middleIds.Min()}");
+        var lastPage = await Json(last);
+
+        Assert.False(middlePage.AsObject().ContainsKey("total"));
+        Assert.True(middlePage["has_more"]!.GetValue<bool>());
+        Assert.Single(lastPage["items"]!.AsArray());
+        Assert.False(lastPage["has_more"]!.GetValue<bool>());
     }
 
     [Fact]
@@ -265,36 +286,53 @@ public sealed class ActivityApiTests
     }
 
     [Fact]
-    public async Task The_stream_generator_emits_newer_ids_and_the_same_id_when_the_revision_changes()
+    public async Task An_event_written_outside_the_apps_own_connection_still_reaches_the_stream_and_the_list()
+    {
+        // A raw insert on its own connection, like `weir recover` or a restored backup: nobody calls
+        // ActivityNotifications.Track for it, so only the shared poll (ActivityLatestPollTask), not a commit
+        // signal, tells the open stream about it.
+        await using var server = await SeededServerAsync();
+        var client = await AdminAsync(server);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/activity/stream");
+        request.Headers.Add("Cookie", string.Join("; ", client.Cookies.Select(pair => $"{pair.Key}={pair.Value}")));
+        using var response = await server.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        using var reader = new StreamReader(await response.Content.ReadAsStreamAsync());
+        await NextBlockAsync(reader); // "retry: ..."
+        await NextBlockAsync(reader); // the opening activity.latest frame
+
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO activity_events (created_at, event_type, module, title, detail) " +
+            "VALUES (CURRENT_TIMESTAMP, 'auth.password_changed', 'auth', 'Password changed', 'from outside')");
+        var insertedId = await TestDatabase.ScalarAsync(server, "SELECT max(id) FROM activity_events");
+
+        var poll = server.Services.GetRequiredService<ActivityLatestPollTask>();
+        await poll.RunOnceAsync(CancellationToken.None);
+
+        var block = await NextBlockAsync(reader);
+        Assert.Contains($"\"latest_event_id\":{insertedId}", block[1], StringComparison.Ordinal);
+        Assert.Contains("Password changed", await TitlesAboutWeirAsync(client));
+    }
+
+    [Fact]
+    public async Task The_stream_sends_each_change_and_its_latest_id_never_goes_backwards()
     {
         var notifier = new ActivityLatestNotifier();
-        using var cancel = new CancellationTokenSource();
-        long?[] values = [10, 10, 11, 11];
-        var reads = 0;
+        long[] notifications = [11, 11, 9];
         var frames = new List<string>();
+
         await foreach (var frame in ActivityEndpoints.LatestFramesAsync(
-            _ => Task.FromResult(reads < values.Length ? values[reads++] : 11),
-            notifier,
-            TimeProvider.System,
-            TimeSpan.Zero,
-            100,
-            NullLogger.Instance,
-            cancel.Token))
+            _ => Task.FromResult<long?>(10), notifier, TimeProvider.System, TimeSpan.FromMinutes(1), NullLogger.Instance, CancellationToken.None))
         {
             frames.Add(frame);
-            if (frames.Count == 3)
-            {
-                notifier.Notify(11);
-            }
-
-            if (frames.Count == 4)
-            {
-                notifier.Notify(11);
-            }
-
             if (frames.Count == 5)
             {
                 break;
+            }
+
+            if (frames.Count >= 2)
+            {
+                notifier.Notify(notifications[frames.Count - 2]);
             }
         }
 
@@ -302,11 +340,32 @@ public sealed class ActivityApiTests
             [
                 "retry: 5000\n\n",
                 "event: activity.latest\ndata: {\"latest_event_id\":10,\"activity_revision\":0}\n\n",
-                "event: activity.latest\ndata: {\"latest_event_id\":11,\"activity_revision\":0}\n\n",
                 "event: activity.latest\ndata: {\"latest_event_id\":11,\"activity_revision\":1}\n\n",
                 "event: activity.latest\ndata: {\"latest_event_id\":11,\"activity_revision\":2}\n\n",
+                "event: activity.latest\ndata: {\"latest_event_id\":11,\"activity_revision\":3}\n\n",
             ],
             frames);
+    }
+
+    [Fact]
+    public async Task The_stream_reads_the_database_once_and_then_follows_the_shared_notifier()
+    {
+        var notifier = new ActivityLatestNotifier();
+        var reads = 0;
+        var frames = 0;
+
+        await foreach (var _ in ActivityEndpoints.LatestFramesAsync(
+            _ => Task.FromResult<long?>(++reads), notifier, TimeProvider.System, TimeSpan.FromMinutes(1), NullLogger.Instance, CancellationToken.None))
+        {
+            if (++frames == 6)
+            {
+                break;
+            }
+
+            notifier.Notify(100 + frames);
+        }
+
+        Assert.Equal(1, reads);
     }
 
     [Fact]
@@ -314,7 +373,7 @@ public sealed class ActivityApiTests
     {
         var notifier = new ActivityLatestNotifier();
         var frames = new List<string>();
-        await foreach (var frame in ActivityEndpoints.LatestFramesAsync(_ => Task.FromResult<long?>(null), notifier, TimeProvider.System, TimeSpan.Zero, 2, NullLogger.Instance, CancellationToken.None))
+        await foreach (var frame in ActivityEndpoints.LatestFramesAsync(_ => Task.FromResult<long?>(null), notifier, TimeProvider.System, TimeSpan.Zero, NullLogger.Instance, CancellationToken.None))
         {
             frames.Add(frame);
             if (frames.Count == 3)
@@ -401,5 +460,12 @@ public sealed class ActivityApiTests
         using var response = await client.GetAsync("/api/v1/activity/recent?module=processing" + (query.Length > 0 ? "&" + query : string.Empty));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return [.. (await Json(response))["items"]!.AsArray().Select(item => item!["title"]!.GetValue<string>()).Order(StringComparer.Ordinal)];
+    }
+
+    private static async Task<List<string>> TitlesAboutWeirAsync(ApiTestClient client)
+    {
+        using var response = await client.GetAsync("/api/v1/activity/recent?about=weir");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return [.. (await Json(response))["items"]!.AsArray().Select(item => item!["title"]!.GetValue<string>())];
     }
 }

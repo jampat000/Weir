@@ -496,6 +496,34 @@ public sealed class FileLifecycleTests : IDisposable
     }
 
     [Fact]
+    public async Task A_cancelled_copy_leaves_nothing_behind()
+    {
+        var source = _root.Join("src.mkv");
+        File.WriteAllBytes(source, new byte[100]);
+        var final = _root.Join("out", "final.mkv");
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => FileLifecycle.SafeCopyToFinalAsync(source, final, cancellationToken: cancelled.Token));
+
+        Assert.Empty(Directory.EnumerateFileSystemEntries(_root.Join("out")));
+    }
+
+    [Fact]
+    public async Task A_copy_larger_than_one_chunk_arrives_whole()
+    {
+        var source = _root.Join("src.mkv");
+        var content = new byte[(8 * 1024 * 1024) + 12345];
+        new Random(7).NextBytes(content);
+        File.WriteAllBytes(source, content);
+        var final = _root.Join("out", "final.mkv");
+
+        await FileLifecycle.SafeCopyToFinalAsync(source, final);
+
+        Assert.Equal(content, await File.ReadAllBytesAsync(final));
+    }
+
+    [Fact]
     public async Task A_validated_copy_replaces_the_destination_and_reports_progress()
     {
         var source = _root.Join("src.mkv");

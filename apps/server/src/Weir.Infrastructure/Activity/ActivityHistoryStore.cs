@@ -6,6 +6,12 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Activity;
 
+/// <summary>One page of events, newest first, and whether older matching events remain.</summary>
+public sealed record ActivityPage(List<ActivityEventRow> Items, bool HasMore);
+
+/// <summary>Where the next page starts: after the row <paramref name="Id"/>, created at <paramref name="CreatedAt"/> (null when that row is gone).</summary>
+internal sealed record PageCursor(long Id, string? CreatedAt);
+
 /// <summary>
 /// Reading and removing Activity history: the event queries plus the processing-record statements that go
 /// with a file's history. The count, date filter, paging order and file-history library fallback follow the
@@ -13,48 +19,73 @@ namespace Weir.Infrastructure.Activity;
 /// </summary>
 public static class ActivityHistoryStore
 {
+    private const string DateOnlyFormat = "yyyy-MM-dd";
+
+    /// <summary>How far a stored time's written date can be from its UTC date (a UTC offset is at most 14 hours).</summary>
+    private static readonly TimeSpan StoredDateSlack = TimeSpan.FromDays(1);
+
     private const string Columns =
         "activity_events.id, activity_events.created_at, activity_events.event_type, activity_events.module, activity_events.title, " +
         "activity_events.detail, activity_events.\"trigger\", activity_events.result, activity_events.library_id, " +
         "activity_events.relative_path, activity_events.run_key";
 
     /// <summary>
-    /// Newest first, at most 100. Ordered by <c>(created_at DESC, id DESC)</c>, a total order that does not
-    /// depend on which plan SQLite chooses for ties (#543). <paramref name="beforeId"/> pages by that same
-    /// key: everything strictly after the cursor row in the order, not just a smaller id, so a row tied on
-    /// <c>created_at</c> with the cursor is never skipped or repeated.
+    /// Newest first, at most <see cref="ActivityHistory.RecentMaxLimit"/>. Ordered by <c>(created_at DESC, id DESC)</c>,
+    /// a total order that does not depend on which plan SQLite chooses for ties (#543). <paramref name="beforeId"/>
+    /// pages by that same key: everything strictly after the cursor row in the order, not just a smaller id, so a row
+    /// tied on <c>created_at</c> with the cursor is never skipped or repeated.
     /// </summary>
-    public static async Task<List<ActivityEventRow>> ListRecentAsync(UnitOfWork uow, ActivityFilter filter, long limit, long? beforeId)
+    public static async Task<ActivityPage> ListRecentAsync(UnitOfWork uow, ActivityFilter filter, long limit, long? beforeId)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        var (where, parameters) = Where(filter);
+        PageCursor? cursor = null;
         if (beforeId is { } before)
         {
-            var cursor = await uow.ScalarAsync(
+            var createdAt = await uow.ScalarAsync(
                 "SELECT activity_events.created_at FROM activity_events WHERE activity_events.id = @before_id",
                 ("@before_id", before)).ConfigureAwait(false);
-            if (cursor is string beforeCreatedAt)
-            {
-                where.Add(
-                    "(activity_events.created_at < @before_created_at OR " +
-                    "(activity_events.created_at = @before_created_at AND activity_events.id < @before_id))");
-                parameters.Add(("@before_created_at", beforeCreatedAt));
-                parameters.Add(("@before_id", before));
-            }
-            else
-            {
-                // The cursor row is gone (deleted since the page it came from was read): no created_at to
-                // anchor on, so fall back to the best available guess, an id-only cursor.
-                where.Add("activity_events.id < @before_id");
-                parameters.Add(("@before_id", before));
-            }
+            cursor = new PageCursor(before, createdAt as string);
         }
 
-        parameters.Add(("@limit", Math.Max(1, Math.Min(limit, 100))));
-        return await uow.QueryAsync(
+        var pageSize = (int)Math.Clamp(limit, 1, ActivityHistory.RecentMaxLimit);
+        var (sql, parameters) = PageQuery(filter, cursor, pageSize);
+        var rows = await uow.QueryAsync(sql, ReadRow, parameters).ConfigureAwait(false);
+        var hasMore = rows.Count > pageSize;
+        if (hasMore)
+        {
+            rows.RemoveAt(pageSize);
+        }
+
+        return new ActivityPage(rows, hasMore);
+    }
+
+    /// <summary>
+    /// One page, plus one row more than <paramref name="pageSize"/>: that extra row is how the page knows older
+    /// events remain, without counting them.
+    /// </summary>
+    internal static (string Sql, (string Name, object? Value)[] Parameters) PageQuery(ActivityFilter filter, PageCursor? cursor, int pageSize)
+    {
+        var (where, parameters) = Where(filter);
+        if (cursor is { CreatedAt: { } beforeCreatedAt })
+        {
+            where.Add(
+                "(activity_events.created_at < @before_created_at OR " +
+                "(activity_events.created_at = @before_created_at AND activity_events.id < @before_id))");
+            parameters.Add(("@before_created_at", beforeCreatedAt));
+            parameters.Add(("@before_id", cursor.Id));
+        }
+        else if (cursor is not null)
+        {
+            // The cursor row is gone (deleted since the page it came from was read): no created_at to
+            // anchor on, so fall back to the best available guess, an id-only cursor.
+            where.Add("activity_events.id < @before_id");
+            parameters.Add(("@before_id", cursor.Id));
+        }
+
+        parameters.Add(("@limit", pageSize + 1));
+        return (
             $"SELECT {Columns} FROM activity_events{WhereText(where)} ORDER BY activity_events.created_at DESC, activity_events.id DESC LIMIT @limit OFFSET 0",
-            ReadRow,
-            [.. parameters]).ConfigureAwait(false);
+            [.. parameters]);
     }
 
     /// <summary>Events for export: oldest first, up to <see cref="ActivityHistory.ExportMaxRows"/>.</summary>
@@ -76,15 +107,14 @@ public static class ActivityHistoryStore
     public static Task<long> CountAsync(UnitOfWork uow, ActivityFilter filter)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        var (where, parameters) = Where(filter);
-        return uow.CountAsync($"SELECT count(*) AS count_1 FROM activity_events{WhereText(where)}", [.. parameters]);
+        var (sql, parameters) = CountQuery(filter);
+        return uow.CountAsync(sql, parameters);
     }
 
-    /// <summary>Counts system events: everything outside Processing, with the other filters that apply to it.</summary>
-    public static Task<long> CountSystemAsync(UnitOfWork uow, ActivityFilter filter)
+    internal static (string Sql, (string Name, object? Value)[] Parameters) CountQuery(ActivityFilter filter)
     {
-        ArgumentNullException.ThrowIfNull(filter);
-        return CountAsync(uow, new ActivityFilter(Module: "system", EventType: filter.EventType, Search: filter.Search, DateFrom: filter.DateFrom, DateTo: filter.DateTo));
+        var (where, parameters) = Where(filter);
+        return ($"SELECT count(*) AS count_1 FROM activity_events{WhereText(where)}", [.. parameters]);
     }
 
     /// <summary>When the oldest event was recorded, or null when there are none.</summary>
@@ -169,7 +199,8 @@ public static class ActivityHistoryStore
         switch (Core.Json.PyStrings.Strip(filter.About ?? string.Empty).ToLowerInvariant())
         {
             case "weir":
-                where.Add("(activity_events.relative_path IS NULL OR activity_events.relative_path = '')");
+                // Written exactly as the partial index ix_activity_events_about_weir_created_at is, so SQLite reads it (#714).
+                where.Add("coalesce(activity_events.relative_path, '') = ''");
                 break;
             case "files":
                 where.Add("(activity_events.relative_path IS NOT NULL AND activity_events.relative_path <> '')");
@@ -220,20 +251,33 @@ public static class ActivityHistoryStore
         // Dates compare as instants, not raw text (#543): the query value is normalized to UTC (a naive value
         // is already the server's own clock; only an aware one needs converting) and both sides go through
         // julianday(), so a stored row without ".000000" (an exact second) still matches the same instant.
+        // julianday() cannot use an index, so a day-granular text range on created_at comes first and narrows
+        // the rows it has to check (#714).
         if (filter.DateFrom is { } from)
         {
-            where.Add("julianday(activity_events.created_at) >= julianday(@date_from)");
+            where.Add("activity_events.created_at >= @date_from_floor AND julianday(activity_events.created_at) >= julianday(@date_from)");
+            parameters.Add(("@date_from_floor", DateFloor(from.AsUtc)));
             parameters.Add(("@date_from", PyDateTime.FromUtc(from.AsUtc).ToSqlite()));
         }
 
         if (filter.DateTo is { } to)
         {
-            where.Add("julianday(activity_events.created_at) <= julianday(@date_to)");
+            where.Add("activity_events.created_at < @date_to_ceiling AND julianday(activity_events.created_at) <= julianday(@date_to)");
+            parameters.Add(("@date_to_ceiling", DateCeiling(to.AsUtc)));
             parameters.Add(("@date_to", PyDateTime.FromUtc(to.AsUtc).ToSqlite()));
         }
 
         return (where, parameters);
     }
+
+    /// <summary>
+    /// The lowest stored text an event at or after <paramref name="utc"/> can have. Stored times begin with their date,
+    /// and one written with a UTC offset can carry the day before its UTC date, hence the day of slack.
+    /// </summary>
+    private static string DateFloor(DateTime utc) => utc.Date.Subtract(StoredDateSlack).ToString(DateOnlyFormat, CultureInfo.InvariantCulture);
+
+    /// <summary>Text every event at or before <paramref name="utc"/> sorts below: the day after its date, plus the day of slack.</summary>
+    private static string DateCeiling(DateTime utc) => utc.Date.AddDays(1).Add(StoredDateSlack).ToString(DateOnlyFormat, CultureInfo.InvariantCulture);
 
     private static string WhereText(List<string> where) => where.Count == 0 ? string.Empty : " WHERE " + string.Join(" AND ", where);
 

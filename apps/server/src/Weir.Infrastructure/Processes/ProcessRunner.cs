@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.ComponentModel;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using Weir.Core.Media;
 
 namespace Weir.Infrastructure.Processes;
@@ -69,6 +70,12 @@ public sealed record ProcessRequest
     public TimeSpan? ExitTimeoutAfterStdoutClosed { get; init; }
 
     public string? WorkingDirectory { get; init; }
+
+    /// <summary>
+    /// The child's scheduling priority. Below normal by default (#716): a remux or a full read can keep every core busy
+    /// for an hour, and the web app, the database and anything else on the machine should still get the CPU first.
+    /// </summary>
+    public ProcessPriorityClass Priority { get; init; } = ProcessPriorityClass.BelowNormal;
 }
 
 /// <summary>How a child process ended and what it wrote.</summary>
@@ -98,7 +105,7 @@ public interface IProcessRunner
 }
 
 /// <summary><see cref="IProcessRunner"/> over <see cref="Process"/>, for Windows and Linux.</summary>
-public sealed class ProcessRunner : IProcessRunner
+public sealed partial class ProcessRunner(ILogger<ProcessRunner>? logger = null) : IProcessRunner
 {
     /// <summary>
     /// How long to wait for pipes to drain after a kill before giving up on them. Internal (not private)
@@ -135,6 +142,7 @@ public sealed class ProcessRunner : IProcessRunner
 
         using var process = new Process { StartInfo = startInfo };
         process.Start();
+        SetPriority(process, request.Priority, request.Argv[0]);
         if (request.Stdin == ProcessInput.Null)
         {
             process.StandardInput.Close();
@@ -239,6 +247,35 @@ public sealed class ProcessRunner : IProcessRunner
             // Reported through HasExited.
         }
     }
+
+    /// <summary>
+    /// Set straight after start, since <see cref="ProcessStartInfo"/> has no priority. On Linux, BelowNormal is nice 10 on
+    /// the child's main thread, which the threads a tool starts afterwards inherit.
+    /// </summary>
+    private void SetPriority(Process process, ProcessPriorityClass priority, string tool)
+    {
+        if (priority == ProcessPriorityClass.Normal)
+        {
+            return;
+        }
+
+        try
+        {
+            process.PriorityClass = priority;
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or Win32Exception)
+        {
+            // It has already exited, or this system does not allow it (a locked-down container, say). The tool then runs at
+            // its normal priority, which only slows everything else down.
+            if (logger is not null)
+            {
+                LogPriorityNotSet(logger, exception, tool, priority);
+            }
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Could not lower the priority of {Tool} to {Priority}; it runs at normal priority.")]
+    private static partial void LogPriorityNotSet(ILogger logger, Exception exception, string tool, ProcessPriorityClass priority);
 
     private static void KillTree(Process process)
     {

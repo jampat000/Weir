@@ -5,7 +5,6 @@ using Weir.Core.Activity;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
-using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
@@ -147,26 +146,35 @@ public sealed class RemuxPassHandler : IJobHandler
         }
 
         var progress = new ActivityProgressReporter(_database, context.Id, provenance, _logger, _time);
-        var result = await _runner.RunAsync(
-            new RemuxPassRequest
-            {
-                Runtime = claim.Runtime!,
-                RelativeMediaPath = rel,
-                LibraryId = claim.Library?.Id ?? libraryId,
-                RulesConfig = claim.Rules,
-                MinFileAgeSeconds = claim.Operator!.MinFileAgeSeconds,
-                MinInputFileSizeMb = Math.Max(claim.Operator.ProcessingMinInputFileSizeMb, claim.Library?.MinFileSizeMb ?? 0),
-                MinimumFreeDiskSpaceMb = claim.Operator.MinimumFreeDiskSpaceMb,
-                KeepFailedWorkFiles = claim.Operator.KeepFailedWorkFiles,
-                MediaScope = mediaScope,
-                CurrentJobId = context.Id,
-                ProgressReporter = progress.Report,
-                PassThroughUnchanged = passThrough,
-                Origin = HandoffOrigin.FromPayload(origin is null ? null : new PyDict().Set("origin", origin)),
-                ManualPlan = manualPlan,
-                ManualPlanFingerprint = manualPlanFingerprint,
-            },
-            cancellationToken).ConfigureAwait(false);
+        var request = new RemuxPassRequest
+        {
+            Runtime = claim.Runtime!,
+            RelativeMediaPath = rel,
+            LibraryId = claim.Library?.Id ?? libraryId,
+            RulesConfig = claim.Rules,
+            MinFileAgeSeconds = claim.Operator!.MinFileAgeSeconds,
+            MinInputFileSizeMb = Math.Max(claim.Operator.ProcessingMinInputFileSizeMb, claim.Library?.MinFileSizeMb ?? 0),
+            MinimumFreeDiskSpaceMb = claim.Operator.MinimumFreeDiskSpaceMb,
+            KeepFailedWorkFiles = claim.Operator.KeepFailedWorkFiles,
+            MediaScope = mediaScope,
+            CurrentJobId = context.Id,
+            ProgressReporter = progress.Report,
+            PassThroughUnchanged = passThrough,
+            Origin = HandoffOrigin.FromPayload(origin is null ? null : new PyDict().Set("origin", origin)),
+            ManualPlan = manualPlan,
+            ManualPlanFingerprint = manualPlanFingerprint,
+        };
+        PyDict result;
+        try
+        {
+            result = await _runner.RunAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            // Before RecordAsync turns the progress row into the completed row, so no late progress save overwrites it.
+            await progress.CompleteAsync().ConfigureAwait(false);
+        }
+
         // A hand-off that arrived while this pass was running took the pass over (MediaManagerIntake.AdoptActivePass)
         // and wrote its origin onto this job's row; pick it up now so the outcome is recorded and called back for it.
         if (origin is null && await AdoptedOriginAsync(context.Id).ConfigureAwait(false) is { } adopted)
@@ -747,105 +755,4 @@ public sealed class RemuxPassHandler : IJobHandler
     /// <summary><c>" ".join(text.split())</c>.</summary>
     private static string CollapseWhitespace(string text) =>
         string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-}
-
-/// <summary>
-/// <c>ProcessingActivityProgressReporter</c>: one live <c>processing.file_processing_progress</c> row per pass, inserted on the first
-/// update and rewritten after. A failed write never interrupts ffprobe or ffmpeg.
-/// </summary>
-public sealed class ActivityProgressReporter
-{
-    private readonly SqliteDatabase _database;
-    private readonly long _jobId;
-    private readonly PyDict _extra;
-    private readonly ILogger _logger;
-    private readonly TimeProvider _time;
-    private readonly Lock _lock = new();
-
-    public ActivityProgressReporter(SqliteDatabase database, long jobId, PyDict extra, ILogger logger, TimeProvider time)
-    {
-        _database = database ?? throw new ArgumentNullException(nameof(database));
-        _jobId = jobId;
-        _extra = extra ?? new PyDict();
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _time = time ?? throw new ArgumentNullException(nameof(time));
-    }
-
-    /// <summary>The progress row, once written; the handler turns it into the completed row.</summary>
-    public long? ActivityId { get; private set; }
-
-    public void Report(PyDict payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var body = new PyDict().Set("job_id", _jobId);
-        foreach (var (key, value) in _extra.Items.Concat(payload.Items))
-        {
-            body.Set(key, value);
-        }
-
-        // The row is rewritten in place, so its created_at stays at the pass's start. This is how a reader
-        // tells a long pass that is still reporting from one that died (LiveProgressStore).
-        body.Set("reported_at", PyDateTime.UtcNow(_time).PydanticJson());
-
-        lock (_lock)
-        {
-            var delay = TimeSpan.FromSeconds(0.1);
-            for (var attempt = 0; attempt < 4; attempt++)
-            {
-                try
-                {
-                    Write(body);
-                    return;
-                }
-                catch (SqliteException exception) when (LockedWrites.IsLock(exception) && attempt < 3)
-                {
-                    Thread.Sleep(delay);
-                    delay *= 2;
-                }
-#pragma warning disable CA1031 // A progress update must never interrupt the media pass.
-                catch (Exception exception)
-#pragma warning restore CA1031
-                {
-                    _logger.LogWarning(exception, "Weir could not save a progress update; continuing the media pass.");
-                    return;
-                }
-            }
-        }
-    }
-
-    private void Write(PyDict body)
-    {
-        using var connection = _database.Open();
-        using var transaction = connection.BeginTransaction(deferred: false);
-        var name = FileName(body.Get("relative_media_path"));
-        var detail = PyStrings.Slice(PyJsonWriter.Dumps(body, PyJsonFormat.Compact), 6000);
-        if (ActivityId is null)
-        {
-            var id = SqliteActivityWriter.Record(connection, transaction, new ActivityEventDraft(ActivityEventTypes.ProcessingFileProcessingProgress, "processing", $"Processing {name}", detail));
-            transaction.Commit();
-            ActivityNotifications.TransactionCommitted(_database, transaction);
-            ActivityId = id;
-            return;
-        }
-
-        var title = (body.Get("status") is { IsTruthy: true } status ? PyConvert.Str(status) : "processing") switch
-        {
-            "waiting" => $"Waiting to process {name}",
-            "finishing" => $"Finishing {name}",
-            "finished" => $"{name} finished processing",
-            "failed" => $"{name} could not be processed",
-            _ => $"Processing {name}",
-        };
-        SqliteActivityWriter.Update(connection, transaction, ActivityId.Value, title: title, detail: detail);
-        transaction.Commit();
-        ActivityNotifications.TransactionCommitted(_database, transaction);
-    }
-
-    /// <summary><c>Path(str(relative_media_path or "")).name or "this file"</c>.</summary>
-    private static string FileName(PyJson? value)
-    {
-        var text = value is { IsTruthy: true } ? PyConvert.Str(value) : string.Empty;
-        var name = MediaPathNames.Name(text, OperatingSystem.IsWindows());
-        return name.Length > 0 ? name : "this file";
-    }
 }

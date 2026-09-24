@@ -8,7 +8,11 @@ namespace Weir.Infrastructure.LibraryMode;
 /// <summary>Whether a written cleaned copy may replace the original (#500's full output check plugs in here).</summary>
 public interface ISwapOutputValidator
 {
-    Task<SwapValidation> ValidateAsync(string originalPath, string outputPath, CancellationToken cancellationToken);
+    /// <param name="originalPath">The file being replaced.</param>
+    /// <param name="outputPath">The cleaned copy.</param>
+    /// <param name="originalDurationSeconds">The original's probed duration, when the caller knows it.</param>
+    /// <param name="cancellationToken">Cancellation.</param>
+    Task<SwapValidation> ValidateAsync(string originalPath, string outputPath, double? originalDurationSeconds, CancellationToken cancellationToken);
 }
 
 /// <summary>An output check's answer.</summary>
@@ -22,9 +26,13 @@ public sealed record SwapValidation(bool Passed, string? Problem)
 /// <summary>Writes the cleaned copy of the original to <paramref name="tempPath"/> (ffmpeg, for the remux pass).</summary>
 public delegate Task SwapOutputWriter(string tempPath, CancellationToken cancellationToken);
 
-/// <summary>Per-library choices that change preflight.</summary>
+/// <summary>Per-library choices that change preflight, and what the caller already knows about the original.</summary>
 /// <param name="AllowHardlinked"><c>clean_hardlinked_files</c> (#508): replace a file that has other hard links anyway.</param>
-public sealed record SwapOptions(bool AllowHardlinked = false)
+/// <param name="OriginalDurationSeconds">
+/// The original's duration from the caller's own probe, which the output check compares the copy against, so the
+/// original is not probed a second time (#716).
+/// </param>
+public sealed record SwapOptions(bool AllowHardlinked = false, double? OriginalDurationSeconds = null)
 {
     public static SwapOptions Default { get; } = new();
 }
@@ -238,7 +246,7 @@ public sealed class SafeSwap
             }
 
             stage = "checking the cleaned copy";
-            var validation = await _validator.ValidateAsync(originalPath, temp, cancellationToken).ConfigureAwait(false);
+            var validation = await _validator.ValidateAsync(originalPath, temp, options?.OriginalDurationSeconds, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             if (!validation.Passed)
             {
