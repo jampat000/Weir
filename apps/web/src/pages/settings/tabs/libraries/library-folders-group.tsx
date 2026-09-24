@@ -109,7 +109,6 @@ export function LibraryFoldersGroup({
           binding={binding}
           name="work_folder"
           label="Work folder"
-          width="wide"
           hint="Leave empty to use Weir's private temporary folder; put it on the same volume as the output folder so finished files move instead of copying."
         />
       </div>
