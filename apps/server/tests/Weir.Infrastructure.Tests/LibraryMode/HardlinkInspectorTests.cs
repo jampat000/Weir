@@ -1,6 +1,6 @@
-using System.Runtime.InteropServices;
 using Weir.Core.LibraryMode;
 using Weir.Infrastructure.LibraryMode;
+using Weir.Infrastructure.Processing.RemuxPass;
 
 namespace Weir.Infrastructure.Tests.LibraryMode;
 
@@ -41,7 +41,7 @@ public sealed class HardlinkInspectorTests : IDisposable
         var link = Path.Join(_folder, "Movie (2020).seeding.mkv");
         File.WriteAllText(original, "content");
 
-        if (!TestHardLinks.TryCreate(link, original))
+        if (!FileLifecycle.CreateHardLink(link, original))
         {
             return; // e.g. no admin/dev-mode privilege on this CI runner's filesystem; not what this test proves.
         }
@@ -59,42 +59,4 @@ public sealed class HardlinkInspectorTests : IDisposable
         var missing = Path.Join(_folder, "missing.mkv");
         Assert.ThrowsAny<IOException>(() => PhysicalHardlinkInspector.Instance.LinkCount(missing));
     }
-}
-
-/// <summary>
-/// A hard link, for tests only. Mirrors <c>Weir.Infrastructure.Processing.RemuxPass.FileLifecycle.CreateHardLink</c>'s
-/// approach on the branches that already carry it (issue #522 part 3 / #506, neither on <c>main</c> yet) rather
-/// than depending on either. Classic <see cref="DllImportAttribute"/> here (not the source-generated
-/// <c>LibraryImportAttribute</c> production code uses) so this test-only helper needs no <c>AllowUnsafeBlocks</c>.
-/// </summary>
-internal static class TestHardLinks
-{
-    public static bool TryCreate(string link, string existing)
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return CreateHardLinkW(link, existing, IntPtr.Zero);
-        }
-
-        if (OperatingSystem.IsLinux())
-        {
-            try
-            {
-                return UnixLink(existing, link) == 0;
-            }
-            catch (Exception exception) when (exception is DllNotFoundException or EntryPointNotFoundException)
-            {
-                return false;
-            }
-        }
-
-        return false;
-    }
-
-    [DllImport("kernel32.dll", EntryPoint = "CreateHardLinkW", SetLastError = true, CharSet = CharSet.Unicode)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool CreateHardLinkW(string newFileName, string existingFileName, IntPtr securityAttributes);
-
-    [DllImport("libc", EntryPoint = "link", SetLastError = true, CharSet = CharSet.Ansi)]
-    private static extern int UnixLink(string existing, string link);
 }

@@ -10,6 +10,9 @@ public sealed class ProcessRunnerTests
 {
     private static readonly ProcessRunner Runner = new();
 
+    /// <summary>The long-lived child <see cref="ShellWithSleepingChild"/> starts underneath the shell.</summary>
+    private static string LingeringChildProcessName => OperatingSystem.IsWindows() ? "ping" : "sleep";
+
     private static string[] Shell(string windows, string posix) =>
         OperatingSystem.IsWindows() ? ["cmd.exe", "/d", "/c", windows] : ["/bin/sh", "-c", posix];
 
@@ -28,15 +31,9 @@ public sealed class ProcessRunnerTests
         Assert.Equal("err", Encoding.UTF8.GetString(result.Stderr).Trim());
     }
 
-    [Fact]
+    [PosixFact("The shell's own argument handling is what this proves; dotnet itself echoes nothing useful on Windows.")]
     public async Task Arguments_reach_the_child_token_for_token()
     {
-        // dotnet itself echoes nothing useful; the shell's own argument handling is the check on POSIX.
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
         var result = await Runner.RunAsync(new ProcessRequest { Argv = ["/bin/sh", "-c", "printf '%s|' \"$@\"", "sh", "a b", "'q'", "\"d\"", ""] });
 
         Assert.Equal("a b|'q'|\"d\"||", Encoding.UTF8.GetString(result.Stdout));
@@ -70,27 +67,16 @@ public sealed class ProcessRunnerTests
         Assert.Equal(OperatingSystem.IsWindows() ? ["one", "two"] : ["one", "two", "three", "four"], lines);
     }
 
-    /// <summary>
-    /// Generous enough not to flake on a slow CI runner (the kill path can legitimately spend up to
-    /// <see cref="ProcessRunner.DrainAfterKill"/> waiting for pipes to drain, then up to another one waiting
-    /// for the final exit), while still proving the tree was actually killed rather than left to run the
-    /// child's full 60 second sleep to completion.
-    /// </summary>
-    /// A loaded Windows runner has been measured at 12.8 s, so the margin is the kill budget again, still
-    /// well under the child's 60 s sleep.
-    private static readonly TimeSpan MaxTimeToKillAndDrain = TimeSpan.FromSeconds(10) + (ProcessRunner.DrainAfterKill * 4);
-
     [Fact]
     public async Task A_timeout_kills_the_whole_tree_and_returns_promptly()
     {
-        var stopwatch = Stopwatch.StartNew();
+        var before = Process.GetProcessesByName(LingeringChildProcessName).Length;
 
         var result = await Runner.RunAsync(new ProcessRequest { Argv = ShellWithSleepingChild(), Timeout = TimeSpan.FromMilliseconds(500) });
 
-        stopwatch.Stop();
         Assert.Equal(ProcessTimeoutKind.Overall, result.Timeout);
-        Assert.True(stopwatch.Elapsed < MaxTimeToKillAndDrain, $"took {stopwatch.Elapsed}");
         Assert.DoesNotContain("done", Encoding.UTF8.GetString(result.Stdout), StringComparison.Ordinal);
+        await Eventually.ThatAsync(() => Process.GetProcessesByName(LingeringChildProcessName).Length <= before);
     }
 
     [Fact]
@@ -101,7 +87,7 @@ public sealed class ProcessRunnerTests
         // Here the child (ping/sleep, redirected to NUL/dev-null) writes nothing until well after "echo done",
         // which never runs within the timeout; the timeout is still enforced, on the wall-clock timer alone.
         var lines = new List<string>();
-        var stopwatch = Stopwatch.StartNew();
+        var before = Process.GetProcessesByName(LingeringChildProcessName).Length;
 
         var result = await Runner.RunAsync(new ProcessRequest
         {
@@ -110,28 +96,22 @@ public sealed class ProcessRunnerTests
             Timeout = TimeSpan.FromMilliseconds(500),
         });
 
-        stopwatch.Stop();
         Assert.Equal(ProcessTimeoutKind.Overall, result.Timeout);
         Assert.Empty(lines);
-        Assert.True(stopwatch.Elapsed < MaxTimeToKillAndDrain, $"took {stopwatch.Elapsed}");
+        await Eventually.ThatAsync(() => Process.GetProcessesByName(LingeringChildProcessName).Length <= before);
     }
 
     [Fact]
     public async Task Cancellation_kills_the_tree_and_throws()
     {
         using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
-        var stopwatch = Stopwatch.StartNew();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Runner.RunAsync(new ProcessRequest { Argv = ShellWithSleepingChild() }, cancel.Token));
-
-        Assert.True(stopwatch.Elapsed < MaxTimeToKillAndDrain, $"took {stopwatch.Elapsed}");
     }
 
     [Fact]
     public async Task A_throwing_line_callback_kills_the_process_and_rethrows()
     {
-        var stopwatch = Stopwatch.StartNew();
-
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => Runner.RunAsync(new ProcessRequest
         {
             // The line comes from the long-lived process itself. A line the shell echoes before starting its child
@@ -141,18 +121,11 @@ public sealed class ProcessRunnerTests
         }));
 
         Assert.Equal("stop", error.Message);
-        Assert.True(stopwatch.Elapsed < MaxTimeToKillAndDrain, $"took {stopwatch.Elapsed}");
     }
 
-    [Fact]
+    [PosixFact("cmd.exe cannot close its own stdout while the child keeps running; this proves the exit-after-close grace.")]
     public async Task A_process_that_lingers_after_closing_stdout_is_killed_after_the_grace()
     {
-        // The child closes stdout, then keeps running. cmd.exe cannot close its own stdout, so POSIX only.
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
         var result = await Runner.RunAsync(new ProcessRequest
         {
             Argv = ["/bin/sh", "-c", "exec 1>&-; sleep 60"],

@@ -8,7 +8,7 @@ using Xunit.Abstractions;
 namespace Weir.Infrastructure.Tests.Sqlite;
 
 /// <summary>
-/// #640 without reflection: the pool race itself, provoked the way the CI test provokes it — several threads opening
+/// The pool race itself, without reflection, provoked the way it was first found in CI — several threads opening
 /// at once on a pool that is still growing. Every round starts a brand-new pool, lets eight threads open together
 /// and hold their connections, and checks that no two of them were given the same native handle.
 /// </summary>
@@ -19,7 +19,8 @@ namespace Weir.Infrastructure.Tests.Sqlite;
 /// seconds — the race is Microsoft.Data.Sqlite's and is still there underneath. <c>WEIR_640_SECONDS</c> sets how long
 /// to run (default 5).
 /// </remarks>
-public sealed class Issue640PoolRaceStressTests(ITestOutputHelper output)
+/// <seealso href="https://github.com/jampat000/Weir/issues/640"/>
+public sealed class SqlitePoolRaceStressTests(ITestOutputHelper output)
 {
     [Fact]
     [Trait("Category", "Stress")]

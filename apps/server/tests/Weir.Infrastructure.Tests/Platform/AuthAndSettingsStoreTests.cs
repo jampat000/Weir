@@ -1,8 +1,6 @@
 using System.Text;
 using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Auth;
-using Weir.Core.Configuration;
 using Weir.Core.Json;
 using Weir.Core.Security;
 using Weir.Core.Time;
@@ -13,87 +11,6 @@ using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Tests.Platform;
-
-/// <summary>A temporary WEIR_HOME with a database at head, the options for it and a clock the test moves.</summary>
-internal sealed class StoreFixture : IDisposable
-{
-    public StoreFixture(params (string Name, string Value)[] variables)
-    {
-        Home = new TempDirectory();
-        var dictionary = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["WEIR_HOME"] = Home.Path,
-            ["WEIR_SESSION_SECRET"] = "store-tests-session-secret-0123456789",
-        };
-        foreach (var (name, value) in variables)
-        {
-            dictionary[name] = value;
-        }
-
-        Options = WeirOptionsLoader.Load(new RuntimeEnvironment(dictionary, OperatingSystem.IsWindows(), Home.Path, Home.Path));
-        RuntimeDirectories.Ensure(Options);
-        Database = new SqliteDatabase(Options.DbPath);
-        new SchemaMigrator(Database).EnsureAtHead();
-        Clock = new MovableClock(new DateTimeOffset(2026, 1, 15, 10, 0, 0, TimeSpan.Zero));
-        Auth = new AuthService(Options, Clock, Database, NullLoggerFactory.Instance);
-    }
-
-    public TempDirectory Home { get; }
-
-    public WeirOptions Options { get; }
-
-    public SqliteDatabase Database { get; }
-
-    public MovableClock Clock { get; }
-
-    public AuthService Auth { get; }
-
-    public async Task<T> WithUnitOfWork<T>(Func<UnitOfWork, Task<T>> work, bool commit = true)
-    {
-        var uow = await UnitOfWork.OpenAsync(Database);
-        await using (uow)
-        {
-            var result = await work(uow);
-            if (commit)
-            {
-                await uow.CommitAsync();
-            }
-
-            return result;
-        }
-    }
-
-    public async Task<long> Scalar(string sql)
-    {
-        using var connection = Database.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        return Convert.ToInt64(await command.ExecuteScalarAsync(), System.Globalization.CultureInfo.InvariantCulture);
-    }
-
-    public async Task Execute(string sql)
-    {
-        using var connection = Database.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        await command.ExecuteNonQueryAsync();
-    }
-
-    public void Dispose()
-    {
-        Database.ClearPool();
-        Home.Dispose();
-    }
-}
-
-internal sealed class MovableClock(DateTimeOffset start) : TimeProvider
-{
-    private DateTimeOffset _now = start;
-
-    public override DateTimeOffset GetUtcNow() => _now;
-
-    public void Set(DateTimeOffset now) => _now = now;
-}
 
 public sealed class AuthAndSettingsStoreTests
 {

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Time.Testing;
 using Weir.Core.Readiness;
 using Weir.Core.Workers;
 
@@ -10,7 +11,7 @@ public sealed class ReadinessTests
     [Fact]
     public void Workers_that_never_started_read_as_degraded()
     {
-        var lanes = new WorkerHeartbeats(new ManualTimeProvider()).Snapshot(EightProcessingWorkers);
+        var lanes = new WorkerHeartbeats(new FakeTimeProvider()).Snapshot(EightProcessingWorkers);
         var lane = Assert.Single(lanes);
         Assert.Equal(
             new WorkerLaneHealth(
@@ -22,7 +23,7 @@ public sealed class ReadinessTests
     [Fact]
     public void Zero_expected_workers_read_as_disabled()
     {
-        var lane = Assert.Single(new WorkerHeartbeats(new ManualTimeProvider()).Snapshot([new("processing", 0)]));
+        var lane = Assert.Single(new WorkerHeartbeats(new FakeTimeProvider()).Snapshot([new("processing", 0)]));
         Assert.Equal(
             new WorkerLaneHealth("processing", 0, 0, 0, 0, "disabled", "Weir is turned off in Settings, so no new background work will run."),
             lane);
@@ -31,7 +32,7 @@ public sealed class ReadinessTests
     [Fact]
     public void Heartbeats_are_healthy_until_stale_and_stopped_workers_count_separately()
     {
-        var time = new ManualTimeProvider();
+        var time = new FakeTimeProvider();
         var heartbeats = new WorkerHeartbeats(time);
         heartbeats.Started("processing", 0);
         heartbeats.Started("processing", 1);
@@ -81,7 +82,7 @@ public sealed class ReadinessTests
     [Fact]
     public void Failed_after_startup_when_workers_are_degraded()
     {
-        var workers = new WorkerHeartbeats(new ManualTimeProvider()).Snapshot(EightProcessingWorkers);
+        var workers = new WorkerHeartbeats(new FakeTimeProvider()).Snapshot(EightProcessingWorkers);
         var report = ReadinessBuilder.Build(new ReadinessInputs(TimeSpan.Zero, true, true, workers, ReadinessBuilder.NoWatchedLibraries), "1.0.0");
         Assert.False(report.Ready);
         Assert.Equal("failed", report.Status);

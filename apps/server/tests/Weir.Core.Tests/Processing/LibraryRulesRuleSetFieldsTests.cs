@@ -101,5 +101,6 @@ public sealed class LibraryRulesRuleSetFieldsTests
 
     [Fact]
     public void A_default_template_and_overrides_never_throw() =>
-        LibraryRules.ApplyRuleSetFields(new ProcessingRuleSetRecord { Name = "Test" }, new LibraryRules.RuleSetInput { Name = "Test" });
+        Assert.Null(Record.Exception(() =>
+            LibraryRules.ApplyRuleSetFields(new ProcessingRuleSetRecord { Name = "Test" }, new LibraryRules.RuleSetInput { Name = "Test" })));
 }

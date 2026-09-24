@@ -6,20 +6,22 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Tests.Sqlite.Migrations;
 
 /// <summary>
-/// Issue #568's migration (<c>0007_library_file_facets.sql</c>) back-fills the Library view's codec, resolution
-/// and language facts from the ffprobe JSON already on each <c>library_files</c> row, so an existing install does
-/// not have to rescan before the view has anything to show.
+/// Migration <c>0007_library_file_facets.sql</c> back-fills the Library view's codec, resolution and language
+/// facts from the ffprobe JSON already on each <c>library_files</c> row, so an existing install does not have
+/// to rescan before the view has anything to show.
 ///
 /// <para>The back-fill is SQL, and the live path is
 /// <see cref="LibraryFileFactsReader"/>; the two would drift silently, so every test here compares the migrated
 /// rows against what the C# reader produces for the same probe JSON rather than against hand-written expectations.
 /// A change to either needs the same change to the other.</para>
 ///
-/// <para>Each test starts at the frozen baseline (the pre-#557 head, which has no <c>library_files</c> table at
-/// all), seeds a completed scan job in the shape #557's own migration reads, and upgrades to head — so the row
-/// under test arrives the way a real upgrade would deliver it, through <c>0004</c> and then <c>0007</c>.</para>
+/// <para>Each test starts at the frozen baseline (the head before the job-payload migrations, which has no
+/// <c>library_files</c> table at all), seeds a completed scan job in the shape the earlier job-payload
+/// migration reads, and upgrades to head — so the row under test arrives the way a real upgrade would deliver
+/// it, through <c>0004</c> and then <c>0007</c>.</para>
 /// </summary>
-public sealed class Issue568MigrationTests : IDisposable
+/// <seealso href="https://github.com/jampat000/Weir/issues/568"/>
+public sealed class LibraryFileFacetsMigrationTests : IDisposable
 {
     private const string FilmProbe = """
     {"streams": [
@@ -45,7 +47,7 @@ public sealed class Issue568MigrationTests : IDisposable
     private readonly TempDirectory _temp = new();
     private readonly SqliteDatabase _database;
 
-    public Issue568MigrationTests()
+    public LibraryFileFacetsMigrationTests()
     {
         _database = new SqliteDatabase(_temp.Join("weir.sqlite3"));
         Assert.Equal(SchemaStartupOutcome.Created, new SchemaMigrator(_database).EnsureAtBaseline());
@@ -61,7 +63,7 @@ public sealed class Issue568MigrationTests : IDisposable
         _temp.Dispose();
     }
 
-    /// <summary>Seeds the completed scan job #557's <c>0004</c> migration copies into <c>library_files</c>.</summary>
+    /// <summary>Seeds the completed scan job the <c>0004</c> migration copies into <c>library_files</c>.</summary>
     private void SeedScan(params (string Path, string ProbeJson, string Classification, string? Reason)[] files)
     {
         var entries = files.Select(file => new PyDictLike(file.Path, file.ProbeJson, file.Classification, file.Reason).ToJson());

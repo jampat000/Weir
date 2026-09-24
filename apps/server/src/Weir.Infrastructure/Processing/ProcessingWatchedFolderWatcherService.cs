@@ -111,7 +111,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
 
                 try
                 {
-                    await Task.Delay(TickInterval, stoppingToken).ConfigureAwait(false);
+                    await Task.Delay(TickInterval, _time, stoppingToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {

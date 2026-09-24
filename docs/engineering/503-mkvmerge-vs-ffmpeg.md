@@ -20,17 +20,18 @@ says so; ffmpeg keeps probing, validation and non-Matroska containers either way
 1. Generated a 15-file corpus locally with the bundled ffmpeg
    (`dist/windows/WeirServer/_internal/bin/ffmpeg`, `N-126416-g9997fd0606`,
    2026-09-05) using `-f lavfi` sources — script:
-   `apps/server/tests/Trial503Harness/generate-corpus.sh`.
+   `apps/server/tests/Trial503Harness/generate-corpus.sh` (see below).
 2. For each file, built a representative plan (drop one audio track — the
    commentary-flagged one where present, else the last — keep every subtitle,
    set default/forced from the source's own disposition) and ran it through
    **the real production code**, `Weir.Core.Media.FfmpegCommands.BuildRemuxArgv`,
    token for token as the remux pass would call it. A throwaway console harness,
-   `apps/server/tests/Trial503Harness` (not in `Weir.slnx`, not built by CI, not
-   referenced by any production project), does this and builds the equivalent
-   `mkvmerge` command line for the same kept tracks/order/flags
-   (`-d`/`-a`/`-s`, `--default-track-flag`, `--forced-display-flag`,
-   `--track-order`), then runs both tools for real.
+   `Trial503Harness` (not in `Weir.slnx`, not built by CI, not referenced by any
+   production project — removed after this trial concluded; its source is at
+   commit [`d26e4743`](https://github.com/jampat000/Weir/commit/d26e4743)), does
+   this and builds the equivalent `mkvmerge` command line for the same kept
+   tracks/order/flags (`-d`/`-a`/`-s`, `--default-track-flag`,
+   `--forced-display-flag`, `--track-order`), then runs both tools for real.
 3. Compared outputs with `ffprobe -show_streams -show_format -show_chapters`
    (JSON) and `mkvinfo`: track count/order/codec/language/title, disposition
    flags, attachments, chapters, HDR-relevant colorimetry, file size and wall
@@ -40,7 +41,8 @@ says so; ffmpeg keeps probing, validation and non-Matroska containers either way
    alongside it. No other tool was downloaded (no `dovi_tool`, no
    `hdr10plus_tool`); where a check needed one, it is marked as a gap below.
 
-Run it yourself:
+Run it yourself (check out commit `d26e4743` first, or cherry-pick
+`apps/server/tests/Trial503Harness` from it — the harness itself is not on `main`):
 
 ```powershell
 bash apps/server/tests/Trial503Harness/generate-corpus.sh <ffmpeg-dir> <scratch>/corpus

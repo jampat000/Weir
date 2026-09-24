@@ -66,14 +66,14 @@ public sealed class LibraryRulesTests
     public void Unrelated_folders_across_libraries_are_accepted()
     {
         var others = new[] { new OtherLibraryFolders(1, "Movies", @"C:\media\movies", @"C:\media\movies-out") };
-        LibraryRules.ValidateFolders(@"C:\media\tv", @"C:\work", @"C:\media\tv-out", others);
+        Assert.Null(Record.Exception(() => LibraryRules.ValidateFolders(@"C:\media\tv", @"C:\work", @"C:\media\tv-out", others)));
     }
 
     [Fact]
     public void Empty_folders_never_overlap_anything()
     {
         var others = new[] { new OtherLibraryFolders(1, "Movies", string.Empty, string.Empty) };
-        LibraryRules.ValidateFolders(string.Empty, string.Empty, string.Empty, others);
+        Assert.Null(Record.Exception(() => LibraryRules.ValidateFolders(string.Empty, string.Empty, string.Empty, others)));
     }
 
     [Theory]

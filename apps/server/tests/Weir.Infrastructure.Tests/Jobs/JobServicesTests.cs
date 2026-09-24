@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Weir.Core.Activity;
 using Weir.Core.Jobs;
 using Weir.Core.Workers;
@@ -21,11 +23,11 @@ public sealed class JobServicesTests : IDisposable
         var seen = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         var heartbeats = new WorkerHeartbeats(TimeProvider.System);
         var service = WorkerService([new DelegateHandler("processing.test.loop_ok.v1", context => seen.TrySetResult(context.JobKind))], heartbeats, workerCount: 1);
-        _db.Clock.Now = DateTimeOffset.UtcNow;
+        _db.Clock.SetUtcNow(DateTimeOffset.UtcNow);
 
         await service.StartAsync(CancellationToken.None);
         Assert.Equal("processing.test.loop_ok.v1", await seen.Task.WaitAsync(TimeSpan.FromSeconds(10)));
-        await WaitUntilAsync(async () => (await _db.Store.GetAsync(1))!.Status == ProcessingJobStatus.Completed);
+        await Eventually.ThatAsync(async () => (await _db.Store.GetAsync(1))!.Status == ProcessingJobStatus.Completed);
         Assert.Equal("healthy", heartbeats.Snapshot([new("processing", 1)])[0].Status);
         await service.StopAsync(CancellationToken.None);
 
@@ -41,7 +43,7 @@ public sealed class JobServicesTests : IDisposable
         var service = WorkerService([], heartbeats, workerCount: 8);
 
         await service.StartAsync(CancellationToken.None);
-        await WaitUntilAsync(() => Task.FromResult(heartbeats.Snapshot([new("processing", 8)])[0].ActiveWorkers == 8));
+        await Eventually.ThatAsync(() => heartbeats.Snapshot([new("processing", 8)])[0].ActiveWorkers == 8);
         var lane = heartbeats.Snapshot([new("processing", 8)])[0];
         await service.StopAsync(CancellationToken.None);
 
@@ -59,10 +61,10 @@ public sealed class JobServicesTests : IDisposable
 
         var owners = new System.Collections.Concurrent.ConcurrentBag<string>();
         var service = WorkerService([new DelegateHandler("processing.test.owner.v1", context => owners.Add(context.LeaseOwner))], new WorkerHeartbeats(TimeProvider.System), workerCount: 8);
-        _db.Clock.Now = DateTimeOffset.UtcNow;
+        _db.Clock.SetUtcNow(DateTimeOffset.UtcNow);
 
         await service.StartAsync(CancellationToken.None);
-        await WaitUntilAsync(() => Task.FromResult(_db.Count("SELECT count(*) FROM jobs WHERE status = 'completed'") == 12));
+        await Eventually.ThatAsync(() => _db.Count("SELECT count(*) FROM jobs WHERE status = 'completed'") == 12);
         await service.StopAsync(CancellationToken.None);
 
         Assert.Subset(new HashSet<string> { ProcessingWorkerService.LeaseOwner(0), ProcessingWorkerService.LeaseOwner(1) }, owners.ToHashSet());
@@ -76,11 +78,15 @@ public sealed class JobServicesTests : IDisposable
         await _db.Store.EnqueueOrGetAsync("after", "processing.test.after.v1");
         var ran = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _db.Execute("ALTER TABLE jobs RENAME TO jobs_hidden");
-        var service = WorkerService([new DelegateHandler("processing.test.after.v1", _ => ran.TrySetResult())], new WorkerHeartbeats(TimeProvider.System), workerCount: 1);
-        _db.Clock.Now = DateTimeOffset.UtcNow;
+        var logger = new RecordingLogger<ProcessingWorkerService>();
+        var service = WorkerService([new DelegateHandler("processing.test.after.v1", _ => ran.TrySetResult())], new WorkerHeartbeats(TimeProvider.System), workerCount: 1, logger);
+        _db.Clock.SetUtcNow(DateTimeOffset.UtcNow);
 
         await service.StartAsync(CancellationToken.None);
-        await Task.Delay(200);
+        // Wait for the tick to actually crash against the renamed table, rather than guessing how long
+        // that takes: restoring the table too early would let the worker succeed without ever exercising
+        // the crash-and-continue path this test exists to prove.
+        await Eventually.ThatAsync(() => logger.Errors.Count >= 1);
         _db.Execute("ALTER TABLE jobs_hidden RENAME TO jobs");
         await ran.Task.WaitAsync(TimeSpan.FromSeconds(10));
         await service.StopAsync(CancellationToken.None);
@@ -126,11 +132,13 @@ public sealed class JobServicesTests : IDisposable
     [Fact]
     public async Task Periodic_enqueue_skips_families_this_server_cannot_run()
     {
+        // JobHandlerRegistry.Empty has no handler for the enqueuer's job kind, so
+        // PeriodicEnqueueService.ExecuteAsync's own handler check never even starts this family's loop:
+        // there is nothing to wait for, on any clock.
         var enqueuer = new WorkTempStaleSweepEnqueuer(_db.Store, "movie", TimeSpan.FromMilliseconds(50), killSwitch: false);
         var service = new PeriodicEnqueueService([enqueuer], JobHandlerRegistry.Empty, TimeProvider.System, NullLogger<PeriodicEnqueueService>.Instance);
 
         await service.StartAsync(CancellationToken.None);
-        await Task.Delay(300);
         await service.StopAsync(CancellationToken.None);
 
         Assert.Equal(0, _db.Count("SELECT count(*) FROM jobs"));
@@ -139,17 +147,27 @@ public sealed class JobServicesTests : IDisposable
     [Fact]
     public async Task Periodic_work_temp_sweep_enqueue_keeps_one_row_per_scope()
     {
+        var time = new FakeTimeProvider();
+        var interval = TimeSpan.FromMilliseconds(20);
         var registry = new JobHandlerRegistry([new DelegateHandler(PeriodicJobKinds.WorkTempStaleSweep, _ => { })]);
         IPeriodicEnqueuer[] enqueuers =
         [
-            new WorkTempStaleSweepEnqueuer(_db.Store, "movie", TimeSpan.FromMilliseconds(20), killSwitch: false),
-            new WorkTempStaleSweepEnqueuer(_db.Store, "TV", TimeSpan.FromMilliseconds(20), killSwitch: false),
+            new WorkTempStaleSweepEnqueuer(_db.Store, "movie", interval, killSwitch: false),
+            new WorkTempStaleSweepEnqueuer(_db.Store, "TV", interval, killSwitch: false),
         ];
-        var service = new PeriodicEnqueueService(enqueuers, registry, TimeProvider.System, NullLogger<PeriodicEnqueueService>.Instance);
+        var service = new PeriodicEnqueueService(enqueuers, registry, time, NullLogger<PeriodicEnqueueService>.Instance);
 
         await service.StartAsync(CancellationToken.None);
-        await WaitUntilAsync(() => Task.FromResult(_db.Count("SELECT count(*) FROM jobs") == 2));
-        await Task.Delay(150);
+        await Eventually.ThatAsync(() => _db.Count("SELECT count(*) FROM jobs") == 2);
+
+        // The dedupe key keeps this to one row per scope; force several more due ticks (an idempotent
+        // enqueuer would otherwise only prove that by luck of how much real time happened to pass).
+        for (var i = 0; i < 5; i++)
+        {
+            time.Advance(interval);
+            await Task.Delay(10);
+        }
+
         await service.StopAsync(CancellationToken.None);
 
         var rows = (await _db.Store.ListAsync()).OrderBy(j => j.DedupeKey, StringComparer.Ordinal).ToList();
@@ -178,24 +196,39 @@ public sealed class JobServicesTests : IDisposable
     public async Task A_family_switched_on_while_weir_runs_starts_without_a_restart()
     {
         _db.Execute("UPDATE operator_settings SET work_temp_stale_sweep_enabled = 0");
+        var time = new FakeTimeProvider();
+        var recheck = TimeSpan.FromMilliseconds(50);
         var registry = new JobHandlerRegistry([new DelegateHandler(PeriodicJobKinds.WorkTempStaleSweep, _ => { })]);
         var clock = new PeriodicEnqueueClock();
         var sweep = new WorkTempStaleSweepEnqueuer(_db.Store, "movie", TimeSpan.FromHours(1), killSwitch: false);
-        var service = new PeriodicEnqueueService([sweep], registry, TimeProvider.System, NullLogger<PeriodicEnqueueService>.Instance, clock, TimeSpan.FromMilliseconds(50));
+        var service = new PeriodicEnqueueService([sweep], registry, time, NullLogger<PeriodicEnqueueService>.Instance, clock, recheck);
 
         await service.StartAsync(CancellationToken.None);
-        await Task.Delay(300);
+        // Force several recheck ticks while switched off, rather than hoping a fixed real delay covered
+        // enough of them: the loop rereads the switch on the fake clock, so each advance is a tick.
+        for (var i = 0; i < 5; i++)
+        {
+            time.Advance(recheck);
+            await Task.Delay(10);
+        }
+
         Assert.Equal(0, _db.Count("SELECT count(*) FROM jobs"));
         Assert.Null(clock.NextRunFor([PeriodicJobKinds.WorkTempStaleSweep]));
 
         _db.Execute("UPDATE operator_settings SET work_temp_stale_sweep_enabled = 1");
-        await WaitUntilAsync(() => Task.FromResult(_db.Count("SELECT count(*) FROM jobs") == 1));
+        for (var i = 0; i < 5 && _db.Count("SELECT count(*) FROM jobs") == 0; i++)
+        {
+            time.Advance(recheck);
+            await Task.Delay(10);
+        }
+
+        Assert.Equal(1, _db.Count("SELECT count(*) FROM jobs"));
         await service.StopAsync(CancellationToken.None);
 
         var next = clock.NextRunFor([PeriodicJobKinds.WorkTempStaleSweep]);
         Assert.NotNull(next);
         Assert.Equal(TimeSpan.FromHours(1), next.Value.Interval);
-        Assert.InRange(next.Value.NextRunAt, DateTimeOffset.UtcNow.AddMinutes(59), DateTimeOffset.UtcNow.AddMinutes(61));
+        Assert.Equal(time.GetUtcNow().AddHours(1), next.Value.NextRunAt);
     }
 
     [Fact]
@@ -232,20 +265,21 @@ public sealed class JobServicesTests : IDisposable
         Assert.Equal("skipped", entry.Result);
     }
 
+    /// <summary>A periodic enqueuer's failed tick is retried after <see cref="PeriodicSchedule.FailureCooldown"/>.</summary>
     [Fact]
     public async Task A_failing_periodic_enqueue_retries_after_its_cooldown()
     {
+        var time = new FakeTimeProvider();
         var registry = new JobHandlerRegistry([new DelegateHandler("processing.flaky.v1", _ => { })]);
         var flaky = new FlakyEnqueuer();
-        var service = new PeriodicEnqueueService([flaky], registry, TimeProvider.System, NullLogger<PeriodicEnqueueService>.Instance);
+        var service = new PeriodicEnqueueService([flaky], registry, time, NullLogger<PeriodicEnqueueService>.Instance);
 
         await service.StartAsync(CancellationToken.None);
-        // The retry is due two seconds after the failure, on the real clock. The ceiling is for busy runners, where
-        // 10 s ran out twice (#639); a passing run still takes about two seconds.
-        await WaitUntilAsync(() => Task.FromResult(flaky.Calls >= 2), TimeSpan.FromSeconds(30));
-        await service.StopAsync(CancellationToken.None);
+        await Eventually.ThatAsync(() => flaky.Calls >= 1);
 
-        Assert.True(flaky.Calls >= 2);
+        time.Advance(PeriodicSchedule.FailureCooldown);
+        await Eventually.ThatAsync(() => flaky.Calls >= 2);
+        await service.StopAsync(CancellationToken.None);
     }
 
     [Fact]
@@ -261,7 +295,8 @@ public sealed class JobServicesTests : IDisposable
             ("@id", id)));
     }
 
-    private ProcessingWorkerService WorkerService(IEnumerable<IJobHandler> handlers, WorkerHeartbeats heartbeats, int workerCount)
+    private ProcessingWorkerService WorkerService(
+        IEnumerable<IJobHandler> handlers, WorkerHeartbeats heartbeats, int workerCount, ILogger<ProcessingWorkerService>? logger = null)
     {
         var options = Weir.Core.Configuration.WeirOptionsLoader.Load(new Weir.Core.Configuration.RuntimeEnvironment(
             new Dictionary<string, string>(StringComparer.Ordinal)
@@ -281,21 +316,7 @@ public sealed class JobServicesTests : IDisposable
             new NoJobNotifications(),
             TimeProvider.System,
             NullLogger<ProcessingJobProcessor>.Instance);
-        return new ProcessingWorkerService(processor, _db.Store, heartbeats, options, timings, TimeProvider.System, NullLogger<ProcessingWorkerService>.Instance);
-    }
-
-    private static async Task WaitUntilAsync(Func<Task<bool>> condition, TimeSpan? timeout = null)
-    {
-        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(15));
-        while (!await condition())
-        {
-            if (DateTime.UtcNow > deadline)
-            {
-                Assert.Fail("condition was not met in time");
-            }
-
-            await Task.Delay(20);
-        }
+        return new ProcessingWorkerService(processor, _db.Store, heartbeats, options, timings, TimeProvider.System, logger ?? NullLogger<ProcessingWorkerService>.Instance);
     }
 
     private sealed class FlakyEnqueuer : IPeriodicEnqueuer
