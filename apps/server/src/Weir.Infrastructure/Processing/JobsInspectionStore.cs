@@ -44,13 +44,15 @@ public static class JobsInspectionStore
             return (rows, false);
         }
 
-        var recent = await uow.QueryAsync(
-            $"SELECT {columns} FROM jobs WHERE NOT (status = @completed AND job_kind = @scan_kind) ORDER BY updated_at DESC LIMIT {limit}",
-            Read,
-            ("@completed", ProcessingJobStatus.Completed),
-            ("@scan_kind", "processing.watched_folder.remux_scan_dispatch.v1")).ConfigureAwait(false);
+        var (sql, recentParameters) = RecentQuery(limit);
+        var recent = await uow.QueryAsync(sql, Read, recentParameters).ConfigureAwait(false);
         return (recent, true);
     }
+
+    /// <summary>The default slice: the most recently changed jobs, leaving out completed scan dispatches.</summary>
+    internal static (string Sql, (string Name, object? Value)[] Parameters) RecentQuery(int limit) =>
+        ($"SELECT {ProcessingJobStore.JobColumns} FROM jobs WHERE NOT (status = @completed AND job_kind = @scan_kind) ORDER BY updated_at DESC LIMIT {limit}",
+            [("@completed", ProcessingJobStatus.Completed), ("@scan_kind", "processing.watched_folder.remux_scan_dispatch.v1")]);
 
     private static DateTimeOffset? ToOffset(PyDateTime? value) => value is { } v ? new DateTimeOffset(v.AsUtc, TimeSpan.Zero) : null;
 

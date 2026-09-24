@@ -27,6 +27,13 @@ public static class FileStateStore
     /// <summary>The files matching <paramref name="filter"/>.</summary>
     public static Task<List<ProcessingFileRecord>> ListAsync(UnitOfWork uow, ProcessingFileListFilter filter)
     {
+        var (sql, parameters) = ListQuery(filter);
+        return uow.QueryAsync(sql, Read, parameters);
+    }
+
+    internal static (string Sql, (string Name, object? Value)[] Parameters) ListQuery(ProcessingFileListFilter filter)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
         var clauses = new List<string>();
         var parameters = new List<(string, object?)>();
         if (filter.LibraryId is { } libraryId)
@@ -54,8 +61,7 @@ public static class FileStateStore
         }
 
         var where = clauses.Count > 0 ? "WHERE " + string.Join(" AND ", clauses) : string.Empty;
-        var sql = $"SELECT {Columns} FROM files {where} ORDER BY last_seen_at DESC, id DESC LIMIT {filter.ClampedLimit}";
-        return uow.QueryAsync(sql, Read, [.. parameters]);
+        return ($"SELECT {Columns} FROM files {where} ORDER BY last_seen_at DESC, id DESC LIMIT {filter.ClampedLimit}", [.. parameters]);
     }
 
     /// <summary>A count per known status, zero-filled.</summary>

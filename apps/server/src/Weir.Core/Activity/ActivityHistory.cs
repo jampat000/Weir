@@ -48,6 +48,9 @@ public static class ActivityHistory
     /// <summary>How many events the recent list returns when no limit is given.</summary>
     public const int RecentDefaultLimit = 50;
 
+    /// <summary>The most events one page of the recent list returns.</summary>
+    public const int RecentMaxLimit = 100;
+
     /// <summary>The most rows one export returns.</summary>
     public const int ExportMaxRows = 50_000;
 
@@ -80,17 +83,20 @@ public static class ActivityHistory
     }
 
     /// <summary>
-    /// The recent-events response: the total is never smaller than the page, and <c>has_more</c> compares
-    /// the unclamped count with the page.
+    /// The recent-events response. <paramref name="total"/> is counted for the first page only (#714), so a later
+    /// page, which has no use for it, leaves <c>total</c> out; when present it is never smaller than the page.
     /// </summary>
-    public static PyDict RecentOut(IReadOnlyList<ActivityEventRow> rows, long total, long systemEvents, long retentionDays, PyDateTime? oldestEventAt)
+    public static PyDict RecentOut(IReadOnlyList<ActivityEventRow> rows, bool hasMore, long? total, long retentionDays, PyDateTime? oldestEventAt)
     {
         ArgumentNullException.ThrowIfNull(rows);
-        return new PyDict()
-            .Set("items", new PyList(rows.Select(row => (PyJson)ItemOut(row))))
-            .Set("total", Math.Max(total, rows.Count))
-            .Set("system_events", systemEvents)
-            .Set("has_more", total > rows.Count)
+        var body = new PyDict().Set("items", new PyList(rows.Select(row => (PyJson)ItemOut(row))));
+        if (total is { } count)
+        {
+            body.Set("total", Math.Max(count, rows.Count));
+        }
+
+        return body
+            .Set("has_more", hasMore)
             .Set("retention_days", retentionDays)
             .Set("oldest_event_at", oldestEventAt?.PydanticJson());
     }

@@ -59,8 +59,8 @@ public sealed class ActivityApiTests
         Assert.NotNull(body["oldest_event_at"]);
         Assert.NotEmpty(body["items"]![0]!["relative_path"]!.GetValue<string>());
         Assert.Equal(4, body["total"]!.GetValue<int>());
-        Assert.Equal(1, body["system_events"]!.GetValue<int>());
         Assert.False(body["has_more"]!.GetValue<bool>());
+        Assert.Equal(["items", "total", "has_more", "retention_days", "oldest_event_at"], body.AsObject().Select(pair => pair.Key));
         var item = body["items"]![0]!.AsObject();
         Assert.Equal(
             ["id", "created_at", "event_type", "module", "title", "detail", "trigger", "result", "library_id", "relative_path", "run_key"],
@@ -83,6 +83,26 @@ public sealed class ActivityApiTests
         using var next = await client.GetAsync($"/api/v1/activity/recent?module=processing&limit=2&before_id={ids.Min()}");
         var rest = (await Json(next))["items"]!.AsArray().Select(item => item!["id"]!.GetValue<long>()).ToList();
         Assert.All(rest, id => Assert.True(id < ids.Min()));
+    }
+
+    [Fact]
+    public async Task A_later_page_says_whether_more_remain_without_a_total()
+    {
+        await using var server = await SeededServerAsync();
+        var client = await AdminAsync(server);
+        using var first = await client.GetAsync("/api/v1/activity/recent?module=processing&limit=1");
+        var oldestShown = (await Json(first))["items"]![0]!["id"]!.GetValue<long>();
+
+        using var middle = await client.GetAsync($"/api/v1/activity/recent?module=processing&limit=2&before_id={oldestShown}");
+        var middlePage = await Json(middle);
+        var middleIds = middlePage["items"]!.AsArray().Select(item => item!["id"]!.GetValue<long>()).ToList();
+        using var last = await client.GetAsync($"/api/v1/activity/recent?module=processing&limit=2&before_id={middleIds.Min()}");
+        var lastPage = await Json(last);
+
+        Assert.False(middlePage.AsObject().ContainsKey("total"));
+        Assert.True(middlePage["has_more"]!.GetValue<bool>());
+        Assert.Single(lastPage["items"]!.AsArray());
+        Assert.False(lastPage["has_more"]!.GetValue<bool>());
     }
 
     [Fact]

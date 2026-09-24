@@ -46,7 +46,7 @@ public static class ActivityEndpoints
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
-        var limit = QueryInt(request, "limit", issues, ge: 1, le: 100) ?? ActivityHistory.RecentDefaultLimit;
+        var limit = QueryInt(request, "limit", issues, ge: 1, le: ActivityHistory.RecentMaxLimit) ?? ActivityHistory.RecentDefaultLimit;
         var module = QueryStr(request, "module", issues, 1, 32);
         var eventType = QueryStr(request, "event_type", issues, 1, 64);
         var search = QueryStr(request, "search", issues, 1, 200);
@@ -62,12 +62,13 @@ public static class ActivityEndpoints
 
         var filter = new ActivityFilter(module, eventType, search, ParseWhen(dateFrom, "date_from"), ParseWhen(dateTo, "date_to"), trigger, result, libraryId, file, about);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var rows = await ActivityHistoryStore.ListRecentAsync(uow, filter, limit, beforeId).ConfigureAwait(false);
-        var total = await ActivityHistoryStore.CountAsync(uow, filter).ConfigureAwait(false);
-        var systemEvents = await ActivityHistoryStore.CountSystemAsync(uow, filter).ConfigureAwait(false);
+        var page = await ActivityHistoryStore.ListRecentAsync(uow, filter, limit, beforeId).ConfigureAwait(false);
+        // Only the first page is counted: a count walks every matching row, and later pages know whether more
+        // remain from the page itself (#714).
+        long? total = beforeId is null ? await ActivityHistoryStore.CountAsync(uow, filter).ConfigureAwait(false) : null;
         var settings = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
         var oldest = await ActivityHistoryStore.OldestCreatedAtAsync(uow).ConfigureAwait(false);
-        return ApiRoutes.Ok(ActivityHistory.RecentOut(rows, total, systemEvents, settings.ActivityRetentionDays, oldest));
+        return ApiRoutes.Ok(ActivityHistory.RecentOut(page.Items, page.HasMore, total, settings.ActivityRetentionDays, oldest));
     }
 
     private static async Task<ApiResult> GetExportAsync(ApiRequest request)
