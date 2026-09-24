@@ -14,7 +14,7 @@ import {
   timeLeft,
 } from "./processing-words";
 
-const STEPS = ["Checked", "Planned", "Writing", "Verify", "Hand back"];
+const STEPS = ["Check", "Plan", "Write", "Verify", "Hand back"];
 /** The step a pass is on once it is writing; the ones before it are done. */
 const WRITING_STEP = 2;
 /** The thinnest the progress bar's fill gets, so a pass that has just started still shows. */
@@ -97,7 +97,7 @@ function ProgressBar({
         className="mm-live-bar__fill"
         style={
           {
-            "--mm-live-fill": `${Math.max(MIN_FILL_PERCENT, item.percent ?? 0)}%`,
+            "--mm-live-fill": Math.max(MIN_FILL_PERCENT, item.percent ?? 0),
           } as CSSProperties
         }
       />

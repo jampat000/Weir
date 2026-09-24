@@ -191,7 +191,7 @@ export function FinishedRow({
           <span className="mm-live-done__ago">{ago(item.finishedAt, now)}</span>
         </span>
         <FileName path={item.relativePath} className="mm-live-card__file" />
-        <span className="mm-live-card__sub" title={line}>
+        <span className="mm-live-card__sub mm-live-card__sub--wrap">
           {line}
         </span>
       </div>

@@ -3,7 +3,6 @@ import type { ProcessingFile } from "../../lib/processing/files-api";
 import {
   agoWords,
   handbackStory,
-  historyGroupOf,
   importedLabel,
   readableTrack,
   detailSizes,
@@ -46,22 +45,6 @@ function file(partial: Partial<ProcessingFile>): ProcessingFile {
     ...partial,
   };
 }
-
-describe("history groups", () => {
-  it("puts a file that waits on a person under Needs you, whatever its status", () => {
-    expect(
-      historyGroupOf(file({ status: "processing_failed", quarantined: true })),
-    ).toBe("needs");
-    expect(historyGroupOf(file({ status: "blocked_upstream" }))).toBe("needs");
-  });
-
-  it("sorts the rest by what is happening to them", () => {
-    expect(historyGroupOf(file({ status: "on_hold" }))).toBe("working");
-    expect(historyGroupOf(file({ status: "passed_through" }))).toBe("finished");
-    expect(historyGroupOf(file({ status: "rejected" }))).toBe("failed");
-    expect(historyGroupOf(file({ status: "disabled" }))).toBeNull();
-  });
-});
 
 describe("readable tracks", () => {
   it("names the language, the layout and the codec, and drops the stream number", () => {

@@ -55,6 +55,7 @@ public static class ProcessingApi
     {
         endpoints.MapProcessingLibraryEndpoints();
         endpoints.MapProcessingFilesEndpoints();
+        endpoints.MapProcessingLibraryCleansEndpoints();
         endpoints.MapProcessingDirectPlayEndpoints();
         endpoints.MapProcessingJobsEndpoints();
         endpoints.MapProcessingRemuxPassEndpoints();

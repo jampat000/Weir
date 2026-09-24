@@ -1,10 +1,21 @@
 /* Finished rows, the trend figure beside today's totals, and the page's motion. */
 
+/* A steady dot with a ring that expands and fades away from it, on a loop. The ring is a separate layer
+   scaled and faded rather than a growing box-shadow, which repaints the whole element every frame (#719). */
 .mm-live-pulse {
+  position: relative;
   display: inline-block;
   flex-shrink: 0;
   width: 7px;
   height: 7px;
+  border-radius: 50%;
+  background: var(--mm-accent);
+}
+
+.mm-live-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
   background: var(--mm-accent);
   animation: mm-live-pulse 1.8s ease-out infinite;
@@ -210,22 +221,25 @@
 
 @keyframes mm-live-pulse {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--mm-accent) 60%, transparent);
+    transform: scale(1);
+    opacity: 0.6;
   }
   70% {
-    box-shadow: 0 0 0 8px transparent;
+    transform: scale(2.2);
+    opacity: 0;
   }
   100% {
-    box-shadow: 0 0 0 0 transparent;
+    transform: scale(2.2);
+    opacity: 0;
   }
 }
 
 @keyframes mm-live-shimmer {
   from {
-    background-position: 0 0;
+    transform: translateX(-120%);
   }
   to {
-    background-position: 220px 0;
+    transform: translateX(320%);
   }
 }
 
@@ -265,11 +279,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mm-live-pulse,
+  .mm-live-pulse::after,
   .mm-live-spin,
   .mm-live-done,
-  .mm-live-bar__fill,
-  .mm-live-bar--busy .mm-live-bar__fill,
+  .mm-live-bar__fill::after,
+  .mm-live-bar--busy .mm-live-bar__fill::before,
   .mm-live-ring--checking .mm-live-ring__fill {
     animation: none;
   }
@@ -289,7 +303,7 @@
   max-width: 100%;
   margin-top: 1px;
   color: var(--mm-text3);
-  font-size: 0.71875rem;
+  font-size: 0.78125rem;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }

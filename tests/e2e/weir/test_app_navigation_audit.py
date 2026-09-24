@@ -61,7 +61,18 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
             open_sidebar(page, "History")
             expect(page).to_have_url(re.compile(r".*/history(?:$|[?#])"))
             expect(page.get_by_test_id("history-page")).to_be_visible()
-            expect(page.get_by_role("group", name="Show").get_by_role("button")).to_have_count(5)
+            # Six groups since library cleans joined downloads in History (#695): a skip is its own
+            # neutral group rather than counting as Failed, and on_hold sits under Needs you.
+            expect(page.get_by_role("group", name="Show").get_by_role("button")).to_have_text(
+                [
+                    re.compile(r"^All\s"),
+                    re.compile(r"^In progress\s"),
+                    re.compile(r"^Finished\s"),
+                    re.compile(r"^Needs you\s"),
+                    re.compile(r"^Skipped\s"),
+                    re.compile(r"^Failed\s"),
+                ]
+            )
 
             open_sidebar(page, "Library")
             expect(page).to_have_url(re.compile(r".*/library(?:$|[?#])"))

@@ -52,7 +52,7 @@ export function More({ count, what }: { count: number; what: string }) {
   if (count <= 0) return null;
   return (
     <li className="mm-live-lane__more">
-      <Link to="/system?tab=history&show=downloads">
+      <Link to="/history?show=working">
         {count.toLocaleString()} more {what} →
       </Link>
     </li>

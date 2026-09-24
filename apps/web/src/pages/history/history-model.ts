@@ -2,7 +2,6 @@ import type {
   ProcessingFile,
   ProcessingFileHandback,
   ProcessingFileLogEntry,
-  ProcessingFileStatus,
 } from "../../lib/processing/files-api";
 import {
   audioCodecName,
@@ -14,57 +13,6 @@ import { parseAppDate } from "../../lib/ui/mm-format-date";
 /** A server time as epoch ms. Its times carry no zone and are UTC. */
 export function serverMs(iso: string): number {
   return parseAppDate(iso).getTime();
-}
-
-/** The five ways History sorts a file, in the order the chips read. */
-export type HistoryGroup = "all" | "working" | "finished" | "needs" | "failed";
-
-export const HISTORY_GROUPS: { id: HistoryGroup; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "working", label: "In progress" },
-  { id: "finished", label: "Finished" },
-  { id: "needs", label: "Needs you" },
-  { id: "failed", label: "Failed" },
-];
-
-const WORKING: readonly ProcessingFileStatus[] = [
-  "unprocessed",
-  "processing",
-  "on_hold",
-  "out_of_schedule",
-];
-const FINISHED: readonly ProcessingFileStatus[] = [
-  "processed",
-  "passed_through",
-];
-const FAILED: readonly ProcessingFileStatus[] = [
-  "processing_failed",
-  "rejected",
-  "skipped",
-];
-
-/**
- * Where a file belongs. A file held after repeated failures, or one its media manager still has, waits on a
- * person, so it is "Needs you" whatever its status says; a library that is off or a cancelled pass is neither
- * working nor finished, so it only shows under All.
- */
-export function historyGroupOf(file: ProcessingFile): HistoryGroup | null {
-  if (file.quarantined || file.status === "blocked_upstream") return "needs";
-  if (WORKING.includes(file.status)) return "working";
-  if (FINISHED.includes(file.status)) return "finished";
-  if (FAILED.includes(file.status)) return "failed";
-  return null;
-}
-
-export function inGroup(file: ProcessingFile, group: HistoryGroup): boolean {
-  return group === "all" || historyGroupOf(file) === group;
-}
-
-/** Newest change first, so what just happened is at the top. */
-export function newestFirst(files: ProcessingFile[]): ProcessingFile[] {
-  return [...files].sort(
-    (a, b) => serverMs(b.updated_at) - serverMs(a.updated_at),
-  );
 }
 
 /** "just now", "6 min ago", "2 h ago", "3 days ago". */

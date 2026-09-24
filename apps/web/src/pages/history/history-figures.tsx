@@ -59,7 +59,7 @@ export function SizeFigures({ sizes }: { sizes: DetailSizes }) {
         <div>
           <dt>After</dt>
           <dd>
-            {sizes.after == null ? "Not written" : formatBytes(sizes.after)}
+            {sizes.after == null ? "No new copy" : formatBytes(sizes.after)}
           </dd>
         </div>
         <div>

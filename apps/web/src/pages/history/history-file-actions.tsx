@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { ChooseTracksPanel } from "../../components/processing/choose-tracks-panel";
 import { ConfirmDialog } from "../../components/ui/confirm-dialog";
+import { errorMessage } from "../../lib/api/error-message";
 import type {
   ProcessingFile,
+  ProcessingFileStatus,
   ProcessingFileTracks,
   ProcessingManualPlanChoice,
 } from "../../lib/processing/files-api";
@@ -22,86 +24,28 @@ import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 const PASS_THROUGH_EXPLAINED =
   "Weir will skip the audio, subtitle and metadata rules, copy and check the original in this library's output folder, then remove the watched original the way it does after any finished file. Readiness checks still apply, so a download still being written is left alone.";
 
-/** A file checked while processing was paused carries that reason until something looks at it again. */
-export function pausedWhenChecked(file: ProcessingFile): boolean {
-  return (
-    file.status === "out_of_schedule" &&
-    file.status_reason.toLowerCase().includes("processing is paused")
-  );
-}
+/** States Weir is done with a file in, one way or another: it can only be processed again from here. */
+const CONCLUDED: readonly ProcessingFileStatus[] = [
+  "processed",
+  "passed_through",
+  "rejected",
+  "cancelled",
+];
 
 /**
- * What a person can do about a file, in the words of the buttons beside it.
- */
-export function fileGuidance(
-  file: ProcessingFile,
-  processingPaused: boolean,
-): { title: string; next: string } {
-  if (pausedWhenChecked(file)) {
-    return processingPaused
-      ? {
-          title: "Processing is paused.",
-          next: "Resume it at the top of the page when you want queued work to continue. Check again is only needed after changing this file or its library.",
-        }
-      : {
-          title: "Refresh this file's status.",
-          next: "Use Check again. Weir will apply the current schedule, readiness, size, and path rules without deleting the original file.",
-        };
-  }
-  switch (file.status) {
-    case "unprocessed":
-      return {
-        title: "Ready to process.",
-        next: "Start it now or move it to the front of the queue.",
-      };
-    case "processing_failed":
-      return {
-        title: "This attempt failed.",
-        next: "Fix the reason and use Try again, or use Pass through unchanged when this is an intentional edge case you want delivered without your rules.",
-      };
-    case "skipped":
-      return {
-        title: "This file does not match the library rules.",
-        next: "Change the named library rule and use Check again, or pass this one file through unchanged when it is a legitimate exception.",
-      };
-    case "on_hold":
-      return {
-        title: "Waiting for the file to settle.",
-        next: "Finish the copy or import, then use Check again. Weir will not touch a changing file.",
-      };
-    case "blocked_upstream":
-      return {
-        title: "The media manager still has this file.",
-        next: "Use Why is this held? for the manager's answer right now, or Check again after the import finishes.",
-      };
-    case "out_of_schedule":
-      return {
-        title: "This library is outside its hours.",
-        next: "It is picked up when its hours start; use Check again if you changed them.",
-      };
-    case "disabled":
-      return {
-        title: "This library is switched off.",
-        next: "Turn the library on in Settings › Libraries before processing its files.",
-      };
-    default:
-      return {
-        title: "",
-        next: "",
-      };
-  }
-}
-
-/**
- * Every action for the file open in History. Each shows only where it can do something: a running file cannot be started earlier, and a button that looked
- * like it worked would be worse than no button.
+ * Every action for the file open in History. Each shows only where it can do something: a running file cannot be
+ * started earlier, and a button that looked like it worked would be worse than no button. Every action disables the
+ * whole row while it runs and shows what it is doing, so nothing looks like it did nothing (#699).
  */
 export function HistoryFileActions({
   file,
   editable,
+  onRemoved,
 }: {
   file: ProcessingFile;
   editable: boolean;
+  /** Called instead of showing a local notice, since removing a file usually changes what is selected. */
+  onRemoved: (message: string) => void;
 }) {
   const libraries = useProcessingLibrariesQuery();
   const forget = useForgetProcessingFile();
@@ -126,12 +70,20 @@ export function HistoryFileActions({
       ? "tv"
       : "movie";
 
+  const anyPending =
+    forget.isPending ||
+    moveToTop.isPending ||
+    requeue.isPending ||
+    whyHeld.isPending ||
+    processNow.isPending ||
+    checkAgain.isPending;
+
   async function run(action: () => Promise<string>, failed: string) {
     setNotice(null);
     try {
       setNotice(await action());
-    } catch {
-      setNotice(failed);
+    } catch (error) {
+      setNotice(errorMessage(error, failed));
     }
   }
 
@@ -143,9 +95,12 @@ export function HistoryFileActions({
     setPlanError(null);
     try {
       setTracks(await fileTracks.mutateAsync(file.id));
-    } catch {
+    } catch (error) {
       setTracksError(
-        "Weir could not read this file's tracks. Refresh and try again.",
+        errorMessage(
+          error,
+          "Weir could not read this file's tracks. Refresh and try again.",
+        ),
       );
     }
   }
@@ -158,27 +113,42 @@ export function HistoryFileActions({
         "Queued your track choice. Weir will check the file again before running the pass.",
       );
       setTracksOpen(false);
-    } catch {
+    } catch (error) {
       setPlanError(
-        "That track choice could not be queued. Fix the reported problem, or refresh the tracks and try again.",
+        errorMessage(
+          error,
+          "That track choice could not be queued. Refresh the tracks and try again.",
+        ),
       );
     }
   }
 
   const status = file.status;
+  const queueAgain = () =>
+    void run(
+      async () => (await requeue.mutateAsync(file.id)).detail,
+      "That file could not be queued again.",
+    );
   const button = (
     label: string,
     title: string,
     onClick: () => void,
-    variant: "secondary" | "tertiary" = "secondary",
+    options: {
+      variant?: "secondary" | "tertiary";
+      pending?: boolean;
+      pendingLabel?: string;
+    } = {},
   ) => (
     <button
       type="button"
-      className={mmActionButtonClass({ variant })}
+      className={mmActionButtonClass({
+        variant: options.variant ?? "secondary",
+      })}
       title={title}
+      disabled={anyPending}
       onClick={onClick}
     >
-      {label}
+      {options.pending ? (options.pendingLabel ?? label) : label}
     </button>
   );
 
@@ -189,11 +159,16 @@ export function HistoryFileActions({
           ? button(
               "Try again",
               "Tries this file again now, ignoring the automatic wait and attempt limit.",
-              () =>
-                void run(
-                  async () => (await requeue.mutateAsync(file.id)).detail,
-                  "That file could not be queued again.",
-                ),
+              queueAgain,
+              { pending: requeue.isPending, pendingLabel: "Queueing…" },
+            )
+          : null}
+        {CONCLUDED.includes(status)
+          ? button(
+              "Process again",
+              "Queues this file to be processed again, from its original in the watched folder.",
+              queueAgain,
+              { pending: requeue.isPending, pendingLabel: "Queueing…" },
             )
           : null}
         {status === "unprocessed"
@@ -207,8 +182,9 @@ export function HistoryFileActions({
                     media_scope: scope,
                     library_id: file.library_id,
                   });
-                  return "Queued this file. It starts as soon as a lane is free.";
+                  return "Queued this file. It starts as soon as Weir finishes what it is working on.";
                 }, "That file could not be queued."),
+              { pending: processNow.isPending, pendingLabel: "Queueing…" },
             )
           : null}
         {status === "unprocessed"
@@ -220,7 +196,11 @@ export function HistoryFileActions({
                   async () => (await moveToTop.mutateAsync(file.id)).detail,
                   "That file could not be moved to the front of the queue.",
                 ),
-              "tertiary",
+              {
+                variant: "tertiary",
+                pending: moveToTop.isPending,
+                pendingLabel: "Moving…",
+              },
             )
           : null}
         {status === "on_hold"
@@ -245,6 +225,7 @@ export function HistoryFileActions({
                   });
                   return "Weir is checking this library again and will queue the file when it is ready.";
                 }, "That library could not be checked again. Review its watched folder and try again."),
+              { pending: checkAgain.isPending, pendingLabel: "Checking…" },
             )
           : null}
         {status === "blocked_upstream" || status === "on_hold"
@@ -258,7 +239,11 @@ export function HistoryFileActions({
                     ? answer.reasons.join(" ")
                     : "The media managers had nothing to say about this file.";
                 }, "Weir could not ask why that file is held."),
-              "tertiary",
+              {
+                variant: "tertiary",
+                pending: whyHeld.isPending,
+                pendingLabel: "Asking…",
+              },
             )
           : null}
         {status !== "processing" &&
@@ -268,7 +253,7 @@ export function HistoryFileActions({
               "Pass through unchanged",
               "Skips your track rules, places a checked, unchanged copy in the output folder, then tidies the original as after any finished file.",
               () => setConfirmingPassThrough(true),
-              "tertiary",
+              { variant: "tertiary" },
             )
           : null}
         {status !== "processing"
@@ -277,10 +262,17 @@ export function HistoryFileActions({
               "Forgets Weir's record of this file. The file on disk is untouched.",
               () =>
                 void run(async () => {
+                  const message =
+                    "Removed from the list. The file on disk is untouched.";
                   await forget.mutateAsync(file.id);
-                  return "Removed from the list. The file on disk is untouched.";
+                  onRemoved(message);
+                  return message;
                 }, "That file could not be removed from the list."),
-              "tertiary",
+              {
+                variant: "tertiary",
+                pending: forget.isPending,
+                pendingLabel: "Removing…",
+              },
             )
           : null}
       </div>
