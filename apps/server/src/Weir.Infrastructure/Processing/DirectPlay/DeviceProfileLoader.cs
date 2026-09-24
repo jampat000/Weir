@@ -8,32 +8,68 @@ namespace Weir.Infrastructure.Processing.DirectPlay;
 /// Loads the Direct Play device list: the operator's <c>WEIR_HOME/direct-play-devices.json</c> override
 /// when present and readable, otherwise the shipped <c>devices.json</c> embedded resource.
 /// </summary>
+/// <remarks>
+/// Every Processing file list reads it, so each list is parsed once and kept (#716): the shipped one for the life of the
+/// process, the operator's until the file's size or modification time changes.
+/// </remarks>
 public static class DeviceProfileLoader
 {
     private const string EmbeddedResourceName = "Weir.Infrastructure.Processing.DirectPlay.devices.json";
+
+    private static readonly Lazy<IReadOnlyList<DeviceProfile>> Shipped = new(LoadShipped);
+
+    private static readonly Lock OverrideLock = new();
+
+    private static ParsedOverride? _lastOverride;
 
     public static IReadOnlyList<DeviceProfile> Load(string? weirHome, ILogger? logger = null)
     {
         if (!string.IsNullOrEmpty(weirHome))
         {
-            var overridePath = Path.Combine(weirHome, DirectPlayEvaluation.OverrideFileName);
-            if (File.Exists(overridePath))
+            var overrideFile = new FileInfo(Path.Combine(weirHome, DirectPlayEvaluation.OverrideFileName));
+            if (overrideFile.Exists)
             {
+                lock (OverrideLock)
+                {
+                    if (_lastOverride is { } known && known.Matches(overrideFile))
+                    {
+                        return known.Profiles;
+                    }
+                }
+
                 try
                 {
-                    return ParseDocument(File.ReadAllText(overridePath));
+                    var profiles = ParseDocument(File.ReadAllText(overrideFile.FullName));
+                    lock (OverrideLock)
+                    {
+                        _lastOverride = new ParsedOverride(overrideFile.FullName, overrideFile.Length, overrideFile.LastWriteTimeUtc, profiles);
+                    }
+
+                    return profiles;
                 }
                 catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException or FormatException)
                 {
-                    logger?.LogWarning(exception, "Ignoring {Path}: it is not a readable device list.", overridePath);
+                    logger?.LogWarning(exception, "Ignoring {Path}: it is not a readable device list.", overrideFile.FullName);
                 }
             }
         }
 
+        return Shipped.Value;
+    }
+
+    private static List<DeviceProfile> LoadShipped()
+    {
         using var stream = typeof(DeviceProfileLoader).Assembly.GetManifestResourceStream(EmbeddedResourceName)
             ?? throw new InvalidOperationException($"Embedded resource {EmbeddedResourceName} was not found.");
         using var reader = new StreamReader(stream);
         return ParseDocument(reader.ReadToEnd());
+    }
+
+    /// <summary>An operator's list as parsed, and the file it came from as it was then.</summary>
+    private sealed record ParsedOverride(string Path, long Length, DateTime LastWriteUtc, IReadOnlyList<DeviceProfile> Profiles)
+    {
+        public bool Matches(FileInfo file) =>
+            string.Equals(Path, file.FullName, StringComparison.Ordinal) && Length == file.Length && LastWriteUtc == file.LastWriteTimeUtc;
     }
 
     private static List<DeviceProfile> ParseDocument(string text)
