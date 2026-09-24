@@ -102,7 +102,9 @@
      background leaves a control visible only by its border. */
   --mm-input-bg: rgba(232, 241, 244, 0.055);
   --mm-input-bg-hover: rgba(232, 241, 244, 0.085);
-  --mm-input-border: rgba(232, 241, 244, 0.22);
+  /* A field's edge is what shows where to type, so it meets the 3:1 non-text contrast WCAG asks
+     for: 3.3:1 to 3.5:1 on the dark surfaces, and 3.05:1 to 3.2:1 on the light ones below (#697). */
+  --mm-input-border: rgba(232, 241, 244, 0.4);
   --mm-input-border-hover: rgba(62, 215, 200, 0.45);
   --mm-input-border-focus: rgba(62, 215, 200, 0.45);
   /* Focus halo for `.mm-input` / picker triggers — calmer than global `--mm-accent-soft` fills. */
@@ -171,7 +173,7 @@ html[data-mm-theme="light"] {
   --mm-shadow-shell: 0 22px 60px rgba(16, 54, 64, 0.14);
   --mm-input-bg: rgba(255, 255, 255, 0.96);
   --mm-input-bg-hover: rgba(255, 255, 255, 1);
-  --mm-input-border: rgba(17, 36, 43, 0.28);
+  --mm-input-border: rgba(17, 36, 43, 0.5);
   --mm-input-border-hover: rgba(13, 111, 104, 0.5);
   --mm-input-border-focus: rgba(13, 111, 104, 0.55);
   --mm-input-focus-ring: rgba(13, 111, 104, 0.18);
