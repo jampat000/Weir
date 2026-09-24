@@ -141,6 +141,7 @@ one, Weir generates one and keeps it in that same volume.
 | Use a different port | Change the left number: `"8080:9347"` puts Weir at `http://your-server-ip:8080` |
 | Pin a version instead of `latest` | `image: ghcr.io/jampat000/weir:3.2.4` |
 | Use HTTPS through a reverse proxy | Set `WEIR_TRUSTED_PROXY_IPS=<your proxy's IP>`. The sign-in cookie becomes HTTPS-only on its own once requests arrive over HTTPS; set `WEIR_SESSION_COOKIE_SECURE=true` only to force it. See [Reverse proxy](reverse-proxy) |
+| Reach Weir by a domain name through a reverse proxy | Add it to `WEIR_ALLOWED_HOSTS` — Weir refuses a `Host` header it doesn't recognise. See [Host header allow-list](reverse-proxy#host-header-allow-list) |
 | Protect saved API keys with their own secret | Set `WEIR_CREDENTIALS_SECRET` to a long random value (`openssl rand -hex 32`) **before** you add Sonarr or Radarr |
 | Use a GPU | See [hardware acceleration](https://github.com/jampat000/Weir/blob/main/docker/README.md#hardware-acceleration-and-device-passthrough) in the Docker reference. It's optional; Weir doesn't re-encode, so you usually don't need it |
 

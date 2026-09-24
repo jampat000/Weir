@@ -65,6 +65,7 @@ public static class WeirOptionsLoader
         }
 
         var trustedProxyIps = ParseCsv(runtime.Get("WEIR_TRUSTED_PROXY_IPS"));
+        var allowedHosts = ParseCsv(runtime.Get("WEIR_ALLOWED_HOSTS"));
         var loginMax = Math.Max(1, EnvInt(runtime, "WEIR_AUTH_LOGIN_RATE_MAX_ATTEMPTS", 10));
         var loginWindow = Math.Max(1, EnvInt(runtime, "WEIR_AUTH_LOGIN_RATE_WINDOW_SECONDS", 60));
         var bootstrapMax = Math.Max(1, EnvInt(runtime, "WEIR_BOOTSTRAP_RATE_MAX_ATTEMPTS", 10));
@@ -115,6 +116,7 @@ public static class WeirOptionsLoader
             SessionTrustedAbsoluteDays = trustedAbsoluteDays,
             TrustedBrowserOriginsOverride = trustedOverride,
             TrustedProxyIps = trustedProxyIps,
+            AllowedHosts = allowedHosts,
             AuthLoginRateMaxAttempts = loginMax,
             AuthLoginRateWindowSeconds = loginWindow,
             BootstrapRateMaxAttempts = bootstrapMax,

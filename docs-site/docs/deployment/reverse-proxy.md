@@ -17,6 +17,25 @@ WEIR_TRUSTED_PROXY_IPS=172.18.0.1,10.0.0.0/24
 
 When the immediate peer is trusted, Weir uses the right-most untrusted address in `X-Forwarded-For` as the client key. Forwarded headers from untrusted peers are ignored.
 
+## Host header allow-list
+
+Weir only answers a request whose `Host` header is an IP literal, `localhost`, a single-label
+name, a `.local`/`.lan`/`.home`/`.home.arpa`/`.internal`/`.localdomain` name, a host from
+`WEIR_CORS_ORIGINS`/`WEIR_TRUSTED_BROWSER_ORIGINS`, or an entry in `WEIR_ALLOWED_HOSTS`. This
+closes a DNS-rebinding gap: without it, a page the operator visits could rebind an attacker's
+domain to Weir's address and read or change anything an unauthenticated route allows.
+
+A request whose peer is in `WEIR_TRUSTED_PROXY_IPS` skips this check — the proxy is the one
+deciding which domains reach Weir. Otherwise, list your reverse-proxy domain:
+
+```
+WEIR_ALLOWED_HOSTS=weir.example.com
+```
+
+A leading `*.` also allows its subdomains (`WEIR_ALLOWED_HOSTS=*.weir.example.com`). A request for
+an address not on this list gets a 400 naming the address it received, so a misconfigured proxy is
+easy to diagnose from the response itself.
+
 ## HTTPS and the sign-in cookie
 
 `WEIR_SESSION_COOKIE_SECURE` defaults to `auto`: the sign-in cookie is marked HTTPS-only when a
