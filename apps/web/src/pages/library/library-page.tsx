@@ -1,13 +1,8 @@
 /**
  * Library: the files already on your storage, and what Weir would do to each (library mode, #505/#568).
- * The second of Weir's two jobs: not the hand-off with a media manager, but the shelves themselves.
- *
- * The title is the picker, "Library › TV ▾", so one library needs no chooser at all and many need no
- * second menu. Under it, one row of chips holds the numbers and the filters together, because a count
- * nobody can act on is decoration. The table groups a library the way a person thinks of it, by title
- * and season, and a file opens a panel that says track by track what would go and why.
- *
- * Every number here comes from the library scan on the server; nothing is counted in the browser.
+ * The title is the picker; one row of chips holds the numbers and the filters together, because a count
+ * nobody can act on is decoration; the table groups files by title and season. Every number comes from
+ * the library scan on the server; nothing is counted in the browser.
  */
 import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -245,7 +240,9 @@ export function LibraryPage(): React.ReactElement {
         />
       )}
 
+      {/* Keyed by the file, so opening another one starts its track choice again. */}
       <LibraryFileDrawer
+        key={openPath ?? ""}
         libraryId={chosen.id}
         libraryName={chosen.name}
         file={loaded.find((f) => f.path === openPath) ?? null}

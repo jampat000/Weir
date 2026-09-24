@@ -76,7 +76,7 @@
   width: 8.5rem;
 }
 
-/* System › About: what Weir works with, its updates, and its time zone and setup, side by side (canvas board 11). */
+/* System › About: what Weir works with, its updates, and its time zone and setup, side by side. */
 .mm-about-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -126,7 +126,7 @@
   overflow-wrap: anywhere;
 }
 
-/* System › Backups: what and when on the left, the backups on this machine on the right (canvas board 12). */
+/* System › Backups: what and when on the left, the backups on this machine on the right. */
 .mm-backups-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -144,7 +144,7 @@
   }
 }
 
-/* System › Security: changing the username and the password, side by side (canvas board 13). */
+/* System › Security: changing the username and the password, side by side. */
 .mm-security-pair {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -173,7 +173,7 @@
   overflow-wrap: anywhere;
 }
 
-/* Settings › Rules: which profile, its name, and who uses it, on one line (canvas board 5A). */
+/* Settings › Rules: which profile, its name, and who uses it, on one line. */
 .mm-profile-bar {
   display: flex;
   flex-wrap: wrap;
@@ -188,7 +188,7 @@
   color: var(--mm-text2);
 }
 
-/* Settings › Schedule (canvas board 6): the time zone on one line, a week per library, its editor underneath. */
+/* Settings › Schedule: the time zone on one line, a week per library, its editor underneath. */
 .mm-schedule-zone {
   display: flex;
   align-items: center;

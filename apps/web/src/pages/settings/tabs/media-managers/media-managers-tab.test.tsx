@@ -197,7 +197,7 @@ describe("SettingsMediaManagersTab", () => {
       connection_id: 1,
       ok: false,
       detail: "Could not reach Deluno.",
-      checked_at: "2026-09-01T07:00:00Z",
+      checked_at: "2026-07-28T07:00:00Z",
     });
     await waitFor(() =>
       expect(screen.getByTestId("media-manager-remove")).toBeEnabled(),
@@ -241,8 +241,7 @@ describe("SettingsMediaManagersTab", () => {
     const { container } = render(<MediaManagersTab />, { wrapper });
     await screen.findByText(/Nothing is connected yet/i);
 
-    // The intro used to explain Radarr, Sonarr, Deluno and Processing in one
-    // breath. None of that helps someone deciding what this screen is for.
+    // The intro says what this screen is for, not how every app and Processing fit together.
     const text = container.textContent ?? "";
     expect(text).not.toContain("Processing");
   });
@@ -283,8 +282,8 @@ describe("SettingsMediaManagersTab", () => {
     expect(screen.getByTestId("media-manager-save")).toBeDisabled();
   });
 
-  // #599 follow-up: Remove used to delete on the first click. What matters is not that a
-  // dialog appears — it is that nothing is deleted until the dialog is confirmed.
+  // #599: what matters is not that a dialog appears, but that nothing is deleted until the
+  // dialog is confirmed.
   describe("removing a connection", () => {
     function threeConnections() {
       return [

@@ -31,13 +31,7 @@ export const updateSettingsPath = () => "/api/v1/suite/update-settings";
 export const updateStatePath = () => "/api/v1/suite/update-state";
 export const applyUpdatePath = () => "/api/v1/suite/apply-update";
 
-/**
- * GET/PUT configuration bundle. This used to be a list of three addresses tried in turn — the
- * `/suite/settings/...` and `/system/suite-configuration-bundle` spellings the Python suite also
- * answered on — so an older web bundle or a proxy forwarding only part of the API would still find
- * one. 3.0.0 serves the one address and the client asks for the one address; a 404 here now means
- * the request is genuinely wrong, instead of being swallowed and retried against an alias.
- */
+/** GET/PUT configuration bundle, at its one address: a 404 here means the request is wrong. */
 export const configurationBundlePath = () =>
   "/api/v1/suite/configuration-bundle";
 export const configurationBackupsPath = () =>

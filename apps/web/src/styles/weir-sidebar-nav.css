@@ -20,9 +20,8 @@
   height: 1.75em;
 }
 
-/* Both paths of the mark, one colour (#581). It used to be a two-tone mark (water over a wall) with the
-   water as a stroke; it is now filled shapes in a single tone, because the Windows tray icon is a
-   single-colour mask and a stroke rasterises differently from a fill at 16px. See
+/* Every path of the mark, one colour (#581): filled shapes in a single tone, because the Windows tray
+   icon is a single-colour mask and a stroke rasterises differently from a fill at 16px. See
    components/brand/weir-logo.tsx. */
 .mm-logo-mark__stream {
   fill: var(--mm-brand-water);

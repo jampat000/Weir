@@ -1,10 +1,8 @@
 /**
- * The confirmation in front of an action that cannot be undone (#599).
- *
- * Focus lands on the cancel button, never on the confirming one, so Enter on a freshly opened dialog
- * keeps things as they are. Escape cancels, except mid-request, when the cancel button is disabled too.
- *
- * `title` must name the thing acted on: "Remove this connection?" is useless with three on screen.
+ * The confirmation in front of an action that cannot be undone (#599). Focus lands on the cancel
+ * button, so Enter on a freshly opened dialog keeps things as they are; Escape cancels, except
+ * mid-request. `title` names the thing acted on: "Remove this connection?" is useless with three
+ * on screen.
  */
 import { useId, useRef, type ReactNode } from "react";
 

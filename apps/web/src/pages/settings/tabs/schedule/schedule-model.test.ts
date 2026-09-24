@@ -64,12 +64,12 @@ describe("the week a library runs to", () => {
 describe("right now", () => {
   it("says when a closed library opens, in the app's zone", () => {
     // Wednesday 12:00 UTC.
-    const state = windowNow(nights, "UTC", new Date("2026-09-23T12:00:00Z"));
+    const state = windowNow(nights, "UTC", new Date("2026-08-19T12:00:00Z"));
     expect(state).toEqual({ kind: "closed", opens: "Wed 22:00" });
   });
 
   it("says when an open library closes", () => {
-    const state = windowNow(nights, "UTC", new Date("2026-09-23T23:10:00Z"));
+    const state = windowNow(nights, "UTC", new Date("2026-08-19T23:10:00Z"));
     expect(state).toEqual({ kind: "open", until: "Thu 06:00" });
   });
 
@@ -78,7 +78,7 @@ describe("right now", () => {
     const state = windowNow(
       nights,
       "Australia/Sydney",
-      new Date("2026-09-23T12:00:00Z"),
+      new Date("2026-08-19T12:00:00Z"),
     );
     expect(state.kind).toBe("open");
   });

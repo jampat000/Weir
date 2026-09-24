@@ -40,7 +40,7 @@
   padding: calc(14px * var(--mm-density-ui-scale)) 0
     calc(14px * var(--mm-density-ui-scale));
   overflow-y: auto;
-  /* The menu may scroll down when it is long; it never scrolls sideways (James, 23 Sep 2026). */
+  /* The menu may scroll down when it is long; it never scrolls sideways. */
   overflow-x: clip;
 }
 
@@ -105,9 +105,9 @@
   opacity: 0.98;
 }
 
-/* On the divider, at the top: the handle sits centred on the line between the menu and the page
-   (James, 23 Sep 2026, pointing at the spot). It is outside .mm-sidebar-inner, the part that
-   scrolls, so straddling the edge cannot give the menu a sideways scrollbar. */
+/* On the divider, at the top: the handle sits centred on the line between the menu and the page.
+   It is outside .mm-sidebar-inner, the part that scrolls, so straddling the edge cannot give the
+   menu a sideways scrollbar. */
 .mm-sidebar-collapse {
   position: absolute;
   top: 0.85rem;
@@ -153,9 +153,8 @@
 }
 
 /* Collapsing hides the words beside the mark; it does not move the mark. The brand keeps the
-   inset it has when open, so the one thing on screen in both states stays exactly where it was
-   (James, 23 Sep 2026). Only the room to the right of the mark goes, because there is none in a
-   rail this narrow — keeping it made the brand 9px wider than the rail. */
+   inset it has when open, so the one thing on screen in both states stays exactly where it was.
+   Only the room to the right of the mark goes, because a rail this narrow has none to give. */
 .mm-sidebar--collapsed .mm-sidebar-brand {
   width: auto;
   margin-right: 0;
@@ -180,7 +179,7 @@
   border-radius: 16px;
 }
 
-/* "● 2 working" beside Live; just the pulsing dot, on the icon's corner, when the menu is icons. */
+/* "● 2 working" beside Processing; just the pulsing dot, on the icon's corner, when the menu is icons. */
 .mm-sidebar-link-badge {
   display: inline-flex;
   align-items: center;
@@ -204,8 +203,7 @@
   display: none;
 }
 
-/* The handle is the same handle whether the panel is open or shut — it used to be widened to 40px
-   when collapsed while its height stayed put, which made a circle into an egg (James, 23 Sep 2026). */
+/* The handle is the same size whether the panel is open or shut, so it stays a circle. */
 
 .mm-sidebar-collapse__icon {
   display: inline-flex;

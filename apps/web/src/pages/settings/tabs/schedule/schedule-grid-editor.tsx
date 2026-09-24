@@ -47,13 +47,9 @@ export interface ScheduleGridEditorProps {
 }
 
 /**
- * A 7x24 schedule.
- *
- * The stored grid is quarter-hour resolution, but the *editor* works in whole hours:
- * 168 targets are usable with a mouse and 672 are not, and an hour toggle writes all
- * four of its quarters so nothing is lost in the round trip. Anyone needing a 15-minute
- * boundary can still set it through the API, which is the honest trade rather than
- * pretending the grid is hourly.
+ * A 7x24 schedule. The stored grid is quarter-hour resolution, but the editor works in whole hours:
+ * 168 targets are usable with a mouse and 672 are not. An hour toggle writes all four of its quarters,
+ * and a 15-minute boundary can still be set through the API.
  */
 export function ScheduleGridEditor({
   value,

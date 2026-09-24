@@ -23,7 +23,7 @@ import {
   timeLeft,
 } from "./processing-words";
 
-const NOW = Date.parse("2026-09-22T10:00:00Z");
+const NOW = Date.parse("2026-08-18T10:00:00Z");
 
 function file(overrides: Partial<ProcessingFile>): ProcessingFile {
   return {
@@ -53,8 +53,8 @@ function file(overrides: Partial<ProcessingFile>): ProcessingFile {
     progress_eta_seconds: null,
     hold_until: null,
     size_changed_at: null,
-    created_at: "2026-09-22T09:50:00",
-    updated_at: "2026-09-22T09:59:00",
+    created_at: "2026-08-18T09:50:00",
+    updated_at: "2026-08-18T09:59:00",
     last_seen_at: null,
     last_attempt_at: null,
     ...overrides,
@@ -78,8 +78,8 @@ function job(
       library_id: 1,
       path: "Paper Lanterns (2023)/Paper.Lanterns.2023.1080p.BluRay.mkv",
     }),
-    created_at: "2026-09-22T09:40:00",
-    updated_at: "2026-09-22T09:40:00",
+    created_at: "2026-08-18T09:40:00",
+    updated_at: "2026-08-18T09:40:00",
     ...overrides,
   } as ProcessingJobInspectionRow;
 }
@@ -135,8 +135,8 @@ describe("buildLanes", () => {
           status: "on_hold",
           status_reason:
             "This file changed too recently. Weir waits 60s after the last change.",
-          size_changed_at: "2026-09-22T09:59:30",
-          hold_until: "2026-09-22T10:00:30",
+          size_changed_at: "2026-08-18T09:59:30",
+          hold_until: "2026-08-18T10:00:30",
         }),
       ],
       [],
@@ -145,7 +145,7 @@ describe("buildLanes", () => {
     );
     expect(lanes.arriving).toHaveLength(1);
     expect(lanes.arriving[0].holdUntil).toBe(
-      Date.parse("2026-09-22T10:00:30Z"),
+      Date.parse("2026-08-18T10:00:30Z"),
     );
     expect(lanes.arriving[0].holdTotal).toBe(60);
     expect(lanes.arriving[0].note).toBe("This file changed too recently.");
@@ -280,9 +280,9 @@ describe("buildLanes", () => {
   it("orders Arriving by who starts first", () => {
     const lanes = buildLanes(
       [
-        file({ id: 1, status: "on_hold", hold_until: "2026-09-22T10:02:00" }),
+        file({ id: 1, status: "on_hold", hold_until: "2026-08-18T10:02:00" }),
         file({ id: 2, status: "blocked_upstream" }),
-        file({ id: 3, status: "on_hold", hold_until: "2026-09-22T10:00:20" }),
+        file({ id: 3, status: "on_hold", hold_until: "2026-08-18T10:00:20" }),
       ],
       [],
       NAMES,
@@ -318,17 +318,17 @@ describe("handedBack", () => {
   it("counts files per five minutes on clock boundaries, oldest first, the last being now", () => {
     const result = handedBack(
       [
-        finished("2026-09-22T10:01:00"),
-        finished("2026-09-22T10:00:00"),
-        finished("2026-09-22T09:57:00"),
-        finished("2026-09-22T08:05:00"),
-        finished("2026-09-22T08:04:59"),
+        finished("2026-08-18T10:01:00"),
+        finished("2026-08-18T10:00:00"),
+        finished("2026-08-18T09:57:00"),
+        finished("2026-08-18T08:05:00"),
+        finished("2026-08-18T08:04:59"),
       ],
       at,
     );
     expect(result.buckets).toHaveLength(24);
     expect(new Date(result.buckets[0].from).toISOString()).toBe(
-      "2026-09-22T08:05:00.000Z",
+      "2026-08-18T08:05:00.000Z",
     );
     expect(result.buckets.at(-1)?.total).toBe(2);
     expect(result.buckets.at(-2)?.total).toBe(1);
@@ -340,10 +340,10 @@ describe("handedBack", () => {
   it("splits each bucket by how the file turned out, in Just finished's three tones", () => {
     const result = handedBack(
       [
-        finished("2026-09-22T10:01:00", "cleaned"),
-        finished("2026-09-22T10:01:10", "already"),
-        finished("2026-09-22T10:01:20", "passed"),
-        finished("2026-09-22T10:01:30", "failed"),
+        finished("2026-08-18T10:01:00", "cleaned"),
+        finished("2026-08-18T10:01:10", "already"),
+        finished("2026-08-18T10:01:20", "passed"),
+        finished("2026-08-18T10:01:30", "failed"),
       ],
       at,
     );
@@ -364,7 +364,7 @@ describe("handedBack", () => {
 
   it("starts the window 23 buckets before the current one, and holds it for five minutes", () => {
     expect(new Date(handedBackSince(at)).toISOString()).toBe(
-      "2026-09-22T08:05:00.000Z",
+      "2026-08-18T08:05:00.000Z",
     );
     expect(handedBackSince(NOW + 4 * 60_000 + 59_000)).toBe(
       handedBackSince(at),
@@ -384,7 +384,7 @@ describe("words and numbers", () => {
       removedAudio: 4,
       removedSubtitles: 6,
       sentence: null,
-      finishedAt: "2026-09-22T09:59:00",
+      finishedAt: "2026-08-18T09:59:00",
     };
     expect(finishedLine(base)).toBe(
       "Saved 318 MB · removed 4 audio, 6 subtitles",
@@ -404,9 +404,9 @@ describe("words and numbers", () => {
     expect(secondsLeft(NOW + 12_400, NOW)).toBe(13);
     expect(secondsLeft(NOW - 5_000, NOW)).toBe(0);
     expect(secondsLeft(null, NOW)).toBeNull();
-    expect(ago("2026-09-22T09:59:40", NOW)).toBe("just now");
-    expect(ago("2026-09-22T09:56:00", NOW)).toBe("4 min ago");
-    expect(ago("2026-09-22T07:50:00", NOW)).toBe("2 h ago");
+    expect(ago("2026-08-18T09:59:40", NOW)).toBe("just now");
+    expect(ago("2026-08-18T09:56:00", NOW)).toBe("4 min ago");
+    expect(ago("2026-08-18T07:50:00", NOW)).toBe("2 h ago");
     expect(timeLeft(41)).toBe("41 s left");
     expect(timeLeft(720)).toBe("12 min left");
     expect(timeLeft(null)).toBe("");
@@ -458,7 +458,7 @@ describe("an arriving file's ring", () => {
   });
 
   it("counts a wait with no clock of its own down to Weir's next look at the library", () => {
-    const at = Date.parse("2026-09-22T10:03:12Z");
+    const at = Date.parse("2026-08-18T10:03:12Z");
     const lanes = buildLanes(
       [
         file({
@@ -476,7 +476,7 @@ describe("an arriving file's ring", () => {
         file({
           id: 3,
           status: "on_hold",
-          hold_until: "2026-09-22T10:00:30Z",
+          hold_until: "2026-08-18T10:00:30Z",
           library_id: 1,
         }),
       ],
@@ -494,7 +494,7 @@ describe("an arriving file's ring", () => {
     expect(arrivingDeadline(upstream)).toBe(at);
     expect(arrivingDeadline(unreadable)).toBe(at);
     // A file with its own hold counts down to that, not to the next look.
-    expect(arrivingDeadline(timed)).toBe(Date.parse("2026-09-22T10:00:30Z"));
+    expect(arrivingDeadline(timed)).toBe(Date.parse("2026-08-18T10:00:30Z"));
     expect(timed.nextLook).toBeNull();
   });
 });

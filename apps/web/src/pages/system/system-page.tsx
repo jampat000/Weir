@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { PageLoading } from "../../components/shared/page-loading";
@@ -73,18 +72,11 @@ export function SystemPage() {
   const settingsQ = useAppSettingsQuery();
   const form = useSystemSettingsForm(settingsQ.data);
   const blocker = useUnsavedChangesGuard(form.isDirty);
-  const [tab, setTab] = useState<TabId>(() =>
-    systemTabFrom(searchParams.get("tab")),
-  );
+  // The address is the tab, so Back, Forward and the side menu move between tabs too.
+  const tab = systemTabFrom(searchParams.get("tab"));
   const editable = canEdit(me.data?.role);
 
-  // Back, Forward and the side menu change the address without remounting the page.
-  useEffect(() => {
-    setTab(systemTabFrom(searchParams.get("tab")));
-  }, [searchParams]);
-
   function selectTab(nextTab: TabId): void {
-    setTab(nextTab);
     const nextParams = new URLSearchParams(searchParams);
     // About is where System opens, so it needs no tab in the address.
     if (nextTab === "about") nextParams.delete("tab");

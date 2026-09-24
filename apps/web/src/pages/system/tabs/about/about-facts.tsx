@@ -5,9 +5,8 @@ import {
 } from "../../../../lib/system/media-tools";
 
 /**
- * System › About's first column (was This instance; canvas board 11, 23 Sep 2026): what this Weir is and what it works
- * with, as facts, one per line. It replaced three paragraphs about worker modes and SQLite that James found hard to
- * read; those facts come from the environment, so nothing here is editable.
+ * System › About's first column: what this Weir is and what it works with, as facts, one per line. They come
+ * from the environment, so nothing here is editable.
  */
 export function AboutFacts() {
   const runtime = useProcessingRuntimeSettingsQuery();

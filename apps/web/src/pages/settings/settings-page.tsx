@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { systemAddressForSettingsTab } from "../../app/legacy-redirects";
 import {
@@ -9,25 +8,12 @@ import {
 } from "../../components/shared/workspace-shell";
 import { MediaManagersTab } from "./tabs/media-managers/media-managers-tab";
 import { AlertsTab } from "./tabs/alerts/alerts-tab";
-import { DirectPlaySection } from "./tabs/performance/direct-play-section";
 import { LibrariesTab } from "./tabs/libraries/libraries-tab";
 import { CleanupTab } from "./tabs/cleanup/cleanup-tab";
-import { ProcessSettingsSection } from "./tabs/performance/process-settings-section";
+import { PerformanceTab } from "./tabs/performance/performance-tab";
 import { RulesTab } from "./tabs/rules/rules-tab";
 import { ScheduleTab } from "./tabs/schedule/schedule-tab";
 
-/**
- * Settings: how Weir treats your media. Where it lives, what to keep, who to tell about it, how hard
- * to work and when, and what to say when something needs you.
- *
- * Weir itself — what it is running, what it keeps, who can sign in — is the System screen beside this
- * one in the menu (James, 23 Sep 2026). Splitting them turned one row of nine tabs into two short
- * rows, and stopped a page about your library sitting next to a page about restoring a backup.
- *
- * The order is the order someone sets Weir up in: say where the media is, say what to keep, say who
- * to tell, then tune how hard it works and when. James chose tabs across the top over a second side
- * menu ("I dont like 2 side menus", 2026-09-22).
- */
 type TabId =
   | "libraries"
   | "rules"
@@ -74,19 +60,17 @@ function normalizeSettingsTab(candidate: string | null | undefined): TabId {
   }
 }
 
+/**
+ * Settings: how Weir treats your media, in the order someone sets Weir up in: where the media is, what
+ * to keep, who to tell, then how hard to work and when. Weir itself (what it runs, what it keeps, who
+ * can sign in) is the System screen, so a page about your library never sits beside one about backups.
+ */
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [tab, setTab] = useState<TabId>(() =>
-    normalizeSettingsTab(searchParams.get("tab")),
-  );
-
-  // Back, Forward and the side menu change the address without remounting the page.
-  useEffect(() => {
-    setTab(normalizeSettingsTab(searchParams.get("tab")));
-  }, [searchParams]);
+  // The address is the tab, so Back, Forward and the side menu move between tabs too.
+  const tab = normalizeSettingsTab(searchParams.get("tab"));
 
   function setSettingsTab(nextTab: TabId): void {
-    setTab(nextTab);
     const nextParams = new URLSearchParams(searchParams);
     // Libraries is where Settings opens, so it needs no tab in the address.
     if (nextTab === "libraries") {
@@ -126,10 +110,7 @@ export function SettingsPage() {
         ) : tab === "media-managers" ? (
           <MediaManagersTab />
         ) : tab === "performance" ? (
-          <div className="mm-quiet-stack">
-            <ProcessSettingsSection />
-            <DirectPlaySection />
-          </div>
+          <PerformanceTab />
         ) : tab === "cleanup" ? (
           <CleanupTab />
         ) : tab === "schedule" ? (

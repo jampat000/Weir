@@ -1,14 +1,11 @@
 /**
- * How the connected media manager picks up what a library writes, shown inside the library editor.
- *
- * Deluno hands each download to Weir over its API and imports the result itself, so it only needs the
- * right folders — which Weir reads from Deluno and offers to fill in. Sonarr and Radarr are set up by hand
- * with a remote path mapping from the watched folder to the output folder (the FileFlows-style setup); this
- * shows exactly what to type and then checks it against the saved connection. The check is read only:
- * Weir only ever sends Sonarr, Radarr and Deluno GET requests and never changes their settings.
+ * How the connected media manager picks up what a library writes, inside the library editor. Deluno only
+ * needs the right folders, which Weir reads from it and offers to fill in. Sonarr and Radarr need a remote
+ * path mapping from the watched folder to the output folder; this shows what to type and checks it. The
+ * check only ever sends GET requests and never changes a manager's settings.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
 import {
   PROCESSING_MEDIA_TYPE_LABELS,
@@ -16,16 +13,10 @@ import {
 } from "../../../../lib/processing/libraries-api";
 import { type ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { useProcessingManagerSetupQuery } from "../../../../lib/processing/libraries-queries";
+import { useDebouncedValue } from "../../../../lib/ui/use-debounced-value";
 
-/** The folders as the user types them, settled for a moment before each check. */
-function useSettled<T>(value: T, delayMs = 700): T {
-  const [settled, setSettled] = useState(value);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setSettled(value), delayMs);
-    return () => window.clearTimeout(timer);
-  }, [value, delayMs]);
-  return settled;
-}
+/** The folders as the user types them settle for a moment before each check. */
+const SETTLE_MS = 700;
 
 function CopyLink({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
@@ -234,11 +225,10 @@ export function LibraryManagerSetup({
   editable: boolean;
   onUseFolders: (watched: string | null, output: string | null) => void;
 }) {
-  const settled = useSettled({
-    mediaType,
-    watched: watchedFolder.trim(),
-    output: outputFolder.trim(),
-  });
+  const settled = useDebouncedValue(
+    { mediaType, watched: watchedFolder.trim(), output: outputFolder.trim() },
+    SETTLE_MS,
+  );
   const setup = useProcessingManagerSetupQuery(
     settled.mediaType,
     settled.watched,

@@ -1,14 +1,10 @@
 /**
- * One library file, opened from the table: what is in it, what your rules would take out of it and why, and
- * the things you can do about it. The track list is the same "try on a file" preview the rule-set editor
- * uses (#502), so this screen and that one can never disagree about a file.
- *
- * Two of those things are yours rather than the rules': you can pick the tracks for this one file, the way a
- * held download already lets you (#501), and you can set the file aside so nothing cleans it at all.
- *
- * A slide-over, like the file story on the Processing page: close it and the table is exactly where it was.
+ * One library file, opened from the table: what is in it, what your rules would take out of it and why,
+ * and what you can do about it. The track list is the rule-set editor's own preview (#502), so the two can
+ * never disagree about a file. You can also pick the tracks for this one file (#501), or set it aside so
+ * nothing cleans it.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { SidePanel } from "../../components/shared/side-panel";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
@@ -64,9 +60,6 @@ export function LibraryFileDrawer({
   const history = useActivityRecentQuery(
     open ? { limit: 6, file: file.path } : undefined,
   );
-
-  // Opening another file starts again: a choice is about the file you were looking at, and nothing else.
-  useEffect(() => setKeep(null), [file?.path]);
 
   if (!file) return null;
 

@@ -91,7 +91,7 @@ export interface ProcessingFile {
   progress_percent: number | null;
   progress_message: string | null;
   progress_eta_seconds: number | null;
-  /** `processing` while the file is written, `finishing` during the final checks. What Live's lanes key on. */
+  /** `processing` while the file is written, `finishing` during the final checks. What the Processing lanes key on. */
   progress_status?: string | null;
   /** ffmpeg's speed as it reports it, for example "148x". */
   progress_speed?: string | null;

@@ -90,8 +90,8 @@ function file(partial: Partial<ProcessingFile>): ProcessingFile {
     progress_eta_seconds: null,
     hold_until: null,
     size_changed_at: null,
-    created_at: "2026-09-23T04:00:00",
-    updated_at: "2026-09-23T04:00:00",
+    created_at: "2026-08-19T04:00:00",
+    updated_at: "2026-08-19T04:00:00",
     last_seen_at: null,
     last_attempt_at: null,
     ...partial,
@@ -123,7 +123,7 @@ describe("HistoryPage", () => {
         relative_path: "Glass Orchard/Glass.Orchard.S03E03.mkv",
         status: "processing_failed",
         status_reason: "The download ended early.",
-        updated_at: "2026-09-23T03:00:00",
+        updated_at: "2026-08-19T03:00:00",
       }),
     ];
   });
@@ -156,7 +156,7 @@ describe("HistoryPage", () => {
       entries: [
         {
           id: 9,
-          recorded_at: "2026-09-23T04:00:00",
+          recorded_at: "2026-08-19T04:00:00",
           outcome: "live_output_written",
           title: "",
           library_name: "TV",

@@ -1,6 +1,6 @@
 /**
- * Browser API client — cookie session auth with ``credentials: 'include'``.
- * No localStorage tokens; backend ``UserSession`` + cookie are authoritative.
+ * Browser API client: cookie session auth with `credentials: 'include'`. No tokens in
+ * localStorage; the server's session and its cookie are authoritative.
  */
 
 const API_PREFIX = "/api/v1";
@@ -42,12 +42,9 @@ export class ApiHttpError extends Error {
 }
 
 /**
- * Plain-language message for when `fetch` rejects because the server could not be reached
- * at all (connection refused, DNS failure, offline, the process exited mid-session) — not
- * because the server answered with an error. Browsers report this case as a bare
- * `TypeError` whose text is an implementation detail ("Failed to fetch" in Chromium,
- * "NetworkError when attempting to fetch resource." in Firefox, "Load failed" in Safari)
- * that tells a user nothing. See docs/design/content-language.md.
+ * What to say when `fetch` rejects because the server could not be reached at all, rather than
+ * answering with an error. Browsers report that as a bare `TypeError` whose text ("Failed to
+ * fetch", "NetworkError…", "Load failed") tells a user nothing.
  */
 export const NETWORK_UNREACHABLE_MESSAGE =
   "Can't reach Weir. Check it's still running, then try again.";
@@ -90,10 +87,10 @@ export function resetUnauthorizedHandlingForTests(): void {
 }
 
 function baseUrl(): string {
-  // In ``vite dev``, always use same-origin ``/api`` so the dev proxy applies (including
-  // ``WEIR_DEV_STACK_API_PROXY_TARGET`` when the API moved to a fallback port). A pinned
-  // ``VITE_API_BASE_URL=http://127.0.0.1:9347`` in ``.env`` would otherwise bypass the proxy and
-  // keep talking to an old API process on 9347 while the new API listens on 9348, and every call 404s.
+  // In `vite dev`, always use same-origin `/api` so the dev proxy applies (including
+  // `WEIR_DEV_STACK_API_PROXY_TARGET` when the API moved to a fallback port). A pinned
+  // `VITE_API_BASE_URL` in `.env` would otherwise bypass the proxy and keep talking to an old API
+  // process on the previous port.
   if (import.meta.env.DEV) {
     return "";
   }
@@ -280,8 +277,8 @@ export async function requireOk(
 }
 
 /**
- * The API's ``detail`` may be a string, a validation error array, or (rarely) a nested object.
- * Never pass ``detail`` straight into ``new Error()`` — non-strings become ``"[object Object]"``.
+ * The API's `detail` may be a string, a validation error array, or (rarely) a nested object.
+ * Never pass `detail` straight into `new Error()`: non-strings become `"[object Object]"`.
  */
 export function apiErrorDetailToString(detail: unknown): string {
   if (detail === undefined || detail === null) {

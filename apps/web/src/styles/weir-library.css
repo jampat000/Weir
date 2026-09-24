@@ -22,8 +22,8 @@
   gap: calc(10px * var(--mm-density-ui-scale));
   font-size: clamp(1.35rem, 2.8vw, 1.75rem);
   font-weight: 600;
-  /* The title's own line height: a taller picker stretched the header row and dropped the title
-     5px below where every other page has it, so switching screens made Library jump (James, 23 Sep). */
+  /* The title's own line height: a taller picker would stretch the header row and drop the title
+     below where every other page has it, so switching screens would make Library jump. */
   line-height: 1.25;
   letter-spacing: -0.02em;
   color: var(--mm-text1);

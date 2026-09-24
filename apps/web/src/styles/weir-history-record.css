@@ -1,7 +1,7 @@
 /* The chosen file's record in History: its tracks, the story of its last pass, and what to do next. */
 
 /* What Weir kept and removed: the heading carries both counts, each track reads in full text with a Kept or Removed
-   label, and a coloured edge tells the two apart at a glance (James, 23 Sep 2026: it read as hidden). */
+   label, and a coloured edge tells the two apart at a glance. */
 .mm-history-trackset {
   display: flex;
   flex-direction: column;

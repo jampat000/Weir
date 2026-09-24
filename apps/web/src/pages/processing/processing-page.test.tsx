@@ -138,8 +138,8 @@ function file(overrides: Partial<ProcessingFile>): ProcessingFile {
     progress_eta_seconds: null,
     hold_until: null,
     size_changed_at: null,
-    created_at: "2026-09-22T09:50:00",
-    updated_at: "2026-09-22T09:59:00",
+    created_at: "2026-08-18T09:50:00",
+    updated_at: "2026-08-18T09:59:00",
     last_seen_at: null,
     last_attempt_at: null,
     ...overrides,
@@ -157,7 +157,7 @@ function renderLive() {
 describe("ProcessingPage", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.setSystemTime(new Date("2026-09-22T10:00:00Z"));
+    vi.setSystemTime(new Date("2026-08-18T10:00:00Z"));
     files.files = [];
     files.status_counts = {};
     jobs.active = { jobs: [] };
@@ -176,7 +176,7 @@ describe("ProcessingPage", () => {
         id: 1,
         status: "on_hold",
         status_reason: "This file changed too recently.",
-        hold_until: "2026-09-22T09:59:55Z",
+        hold_until: "2026-08-18T09:59:55Z",
       }),
     ];
     renderLive();
@@ -191,7 +191,7 @@ describe("ProcessingPage", () => {
   it("counts a file waiting on its manager down to Weir's next look", () => {
     libraries[0] = {
       ...libraries[0],
-      next_look_at: "2026-09-22T10:03:12Z",
+      next_look_at: "2026-08-18T10:03:12Z",
       scan_interval_seconds: 300,
     } as (typeof libraries)[number];
     files.files = [
@@ -216,8 +216,8 @@ describe("ProcessingPage", () => {
         status: "on_hold",
         status_reason:
           "This file changed too recently. Weir waits 60s after the last change.",
-        hold_until: "2026-09-22T10:00:21",
-        size_changed_at: "2026-09-22T09:59:21",
+        hold_until: "2026-08-18T10:00:21",
+        size_changed_at: "2026-08-18T09:59:21",
       }),
       file({
         id: 2,
@@ -282,7 +282,7 @@ describe("ProcessingPage", () => {
       items: [
         {
           id: 701,
-          created_at: "2026-09-22T09:58:00",
+          created_at: "2026-08-18T09:58:00",
           event_type: "processing.file_remux_pass_completed",
           title: "x",
           library_id: 1,
@@ -345,8 +345,8 @@ describe("ProcessingPage", () => {
             library_id: 2,
             path: "Paper Lanterns (2023)/Paper.Lanterns.2023.mkv",
           }),
-          created_at: "2026-09-22T09:40:00",
-          updated_at: "2026-09-22T09:40:00",
+          created_at: "2026-08-18T09:40:00",
+          updated_at: "2026-08-18T09:40:00",
         },
       ],
     };
@@ -426,7 +426,7 @@ describe("ProcessingPage", () => {
       items: [
         {
           id: 501,
-          created_at: "2026-09-22T09:58:00",
+          created_at: "2026-08-18T09:58:00",
           event_type: "processing.file_remux_pass_completed",
           title: "x",
           library_id: 1,
@@ -459,7 +459,7 @@ describe("ProcessingPage", () => {
       items: [
         {
           id: 601,
-          created_at: "2026-09-22T09:40:00",
+          created_at: "2026-08-18T09:40:00",
           event_type: "processing.file_remux_pass_completed",
           title: "x",
           library_id: 1,
@@ -473,7 +473,7 @@ describe("ProcessingPage", () => {
         },
         {
           id: 602,
-          created_at: "2026-09-22T09:35:00",
+          created_at: "2026-08-18T09:35:00",
           event_type: "processing.file_remux_pass_completed",
           title: "x",
           library_id: 1,
@@ -512,7 +512,7 @@ describe("ProcessingPage", () => {
       items: [
         {
           id: 601,
-          created_at: "2026-09-22T09:40:00",
+          created_at: "2026-08-18T09:40:00",
           event_type: "processing.file_remux_pass_completed",
           title: "x",
           library_id: 1,

@@ -14,14 +14,14 @@ const devices: DirectPlayDevices = {
     {
       id: "apple_tv_4k",
       name: "Apple TV 4K",
-      source: "https://www.apple.com/apple-tv-4k/specs/ (checked 2026-09-17)",
+      source: "https://www.apple.com/apple-tv-4k/specs/ (checked 2026-08-13)",
       note: "Apple's built-in player.",
       selected: true,
     },
     {
       id: "iphone",
       name: "iPhone",
-      source: "https://support.apple.com/specs/iphone (checked 2026-09-10)",
+      source: "https://support.apple.com/specs/iphone (checked 2026-08-06)",
       note: "The built-in video player.",
       selected: false,
     },
@@ -66,7 +66,7 @@ it("lists each device with its note and source, and saves the chosen ids", async
     "href",
     "https://www.apple.com/apple-tv-4k/specs/",
   );
-  expect(screen.getByText(/checked 2026-09-17/)).toBeInTheDocument();
+  expect(screen.getByText(/checked 2026-08-13/)).toBeInTheDocument();
   expect(
     screen.queryByTestId("processing-direct-play-customised"),
   ).not.toBeInTheDocument();

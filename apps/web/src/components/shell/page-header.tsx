@@ -4,21 +4,18 @@ import { ThemeToggle } from "./theme-toggle";
 
 type PageHeaderProps = {
   title: ReactNode;
-  /** One sentence under the title row. Optional: Live and Library say it with their content. */
+  /** One sentence under the title row. Optional: Processing and Library say it with their content. */
   lead?: ReactNode;
   /** Sits right after the title on the same line, e.g. Library's library picker. */
   titleAfter?: ReactNode;
-  /** A second line beside the lead, right-aligned, e.g. Live's figures. */
+  /** A second line beside the lead, right-aligned, e.g. the library's scan status. */
   aside?: ReactNode;
   dataTestId?: string;
 };
 
 /**
- * Every page's title row: the title on the left, Pause and the theme switch on the right.
- *
- * Until 3.2 those two controls had a bar of their own above every title. James chose to put
- * them in the title's row instead (2026-09-22, the "top menus" board), so a page starts with
- * what it is rather than with a toolbar. See docs/archive/live-and-library.md.
+ * Every page's title row: the title on the left, Pause and the theme switch on the right, so a
+ * page starts with what it is rather than with a toolbar.
  */
 export function PageHeader({
   title,

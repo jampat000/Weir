@@ -6,9 +6,9 @@ import {
 } from "../../lib/ui/app-theme";
 
 /**
- * Light or dark, from the title row of every page. It sits beside Pause at the same height
- * (James, 2026-09-22: "provided they are aligned height wise"), so both share
- * `.mm-head-control`. The icon shows the theme you are in; the label says where a click goes.
+ * Light or dark, from the title row of every page. It sits beside Pause at the same height, so
+ * both share `.mm-head-control`. The icon shows the theme you are in; the label says where a
+ * click goes.
  */
 export function ThemeToggle() {
   const [theme, setTheme] = useState<AppTheme>(() => readStoredAppTheme());

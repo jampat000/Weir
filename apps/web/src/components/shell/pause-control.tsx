@@ -12,12 +12,9 @@ const DURATIONS: { label: string; minutes: number | null }[] = [
 ];
 
 /**
- * Pause processing, from anywhere in the app.
- *
- * It sits in every page's title row (PageHeader) rather than on one page, because the reason
- * to reach for it — the machine is busy and you want it back — has nothing to do with which
- * screen you happen to be on. It shares `.mm-head-control` with the theme switch so the two
- * are exactly the same height.
+ * Pause processing, from every page's title row: the reason to reach for it, a busy machine,
+ * has nothing to do with which screen you are on. It shares `.mm-head-control` with the theme
+ * switch so the two are exactly the same height.
  */
 export function PauseControl() {
   const editable = useCanEdit();

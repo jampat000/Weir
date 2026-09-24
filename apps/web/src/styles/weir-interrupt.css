@@ -43,8 +43,8 @@
   vertical-align: -0.15em;
 }
 
-/* Settings › History and logs: the one "Show" choice that picks what the list holds. It sits on
-   the list's own line; a second row of tabs under the Settings tabs is what James turned down. */
+/* System › History and logs: the one "Show" choice that picks what the list holds. It sits on
+   the list's own line rather than as a second row of tabs. */
 .mm-history-show {
   display: inline-flex;
   align-items: center;

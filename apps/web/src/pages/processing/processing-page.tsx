@@ -1,15 +1,8 @@
 /**
- * Every file Weir is working on, from the moment it lands to the moment the media manager has it
- * back, moving without a reload.
- *
- * Five lanes on a wide screen: Arriving, Waiting, Working, Handing back, Just finished. On a laptop the
- * lanes fold into three columns and on a phone into one, by container query in weir-processing.css, so
- * nothing ever scrolls sideways.
- *
- * Every number comes from the server: file states and the running pass's progress, library clean
- * jobs, the files-at-once read-out, today's totals, and the Activity entry written when a file
- * finished. The page follows the Activity stream rather than polling, and ticks once a second so the
- * countdowns and "min ago" labels move between updates.
+ * Every file Weir is working on, from the moment it lands to the moment the media manager has it back,
+ * in five lanes that fold to the width they are given (weir-processing-board.css). Every number comes
+ * from the server; the page follows the Activity stream rather than polling, and ticks once a second so
+ * countdowns and "min ago" move between updates.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";

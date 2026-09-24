@@ -1,12 +1,7 @@
 /**
- * Weir-wide **control roles** (action buttons + section tabs).
- *
- * Hierarchy (primary / secondary / tertiary):
- * - **primary** — commit/save (Save, Apply, Confirm, …)
- * - **secondary** — non-commit utilities (Test, Open, Run now, Queue …, Retry, Refresh)
- * - **tertiary** — lower-emphasis helpers (Show/Hide, Clear, compact row actions)
- *
- * Binary booleans use the segmented On/Off control (`MmOnOffSwitch`), not these classes.
+ * Control roles across Weir. Primary commits (Save, Apply, Confirm); secondary runs a utility
+ * (Test, Open, Run now, Retry); tertiary is a lower-emphasis helper (Show, Clear, row actions).
+ * An on/off choice uses `MmOnOffSwitch`, not these classes.
  */
 
 const actionBase =
@@ -29,7 +24,7 @@ const mmNativeFieldShell =
   "mm-input w-full min-w-0 text-sm text-mm-text transition-[border-color,background-color,box-shadow] duration-150 " +
   "focus-visible:outline-none disabled:cursor-not-allowed";
 
-/** Native dropdown / listbox-style ``<select>`` — use under a field label (includes top spacing). */
+/** A native `<select>` under a field label; includes the top spacing. */
 export const mmSelectFieldClass = `${mmNativeFieldShell} mt-1 cursor-pointer`;
 
 /** Anchored picker button (custom listbox) — visually aligned with {@link mmSelectFieldClass}.
@@ -72,18 +67,10 @@ export function mmSectionTabClass(active: boolean): string {
 }
 
 /**
- * The classes for one action button.
- *
- * A disabled button looks disabled because it *is* disabled: the `disabled:` rules below read the element's own
- * state, so `<button disabled>` is the whole story and there is no second flag to keep in step. It used to take a
- * `disabled` option instead, and 138 of 145 call sites never passed it — every one of those buttons refused the
- * click while still showing a gold border, a shadow and a pointer cursor.
- *
- * `disabled:hover:*` repeats each hover property that would otherwise still fire: CSS `:hover` matches a disabled
- * button, and `.disabled\:hover\:x:disabled:hover` outranks `.hover\:y:hover` on specificity, so the outcome does
- * not depend on the order Tailwind happens to emit its variants in.
- *
- * Only form controls have a disabled state. The one `<a>` styled this way (a log download) is never disabled.
+ * The classes for one action button. A disabled button looks disabled from the element's own state,
+ * so `<button disabled>` is the whole story. `disabled:hover:*` repeats each hover property: CSS
+ * `:hover` matches a disabled button, and the doubled variant outranks the plain hover on specificity,
+ * so the outcome does not depend on the order Tailwind emits its variants in.
  */
 export function mmActionButtonClass(opts: {
   variant: "primary" | "secondary" | "tertiary";

@@ -69,9 +69,8 @@ html[data-mm-theme="light"] .mm-activity-item__structured {
   color: var(--mm-status-failed-text);
 }
 
-/* Activity list: one compact row per entry, borderless. The card this used to sit
- * in is gone (docs/design/content-language.md rule 3); the hairline between rows is
- * what separates them now. */
+/* Activity list: one compact row per entry, borderless; the hairline between rows is what
+ * separates them. */
 .mm-activity-list > * + * {
   border-top: 1px solid var(--mm-border);
 }

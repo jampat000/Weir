@@ -1,11 +1,7 @@
 /* One shape for a setting: its label, its control and the line that explains it. */
 
-/* ── 3e · One shape for a setting ────────────────────────────────────────────
- * A label, its control, and the line under it that explains the control. Every setting in
- * Settings is this shape, and a control is one of three widths chosen by what goes in it, so
- * two fields that do the same job are the same size on every screen (James, 23 Sep 2026: "its
- * not aligned, its not uniform, its not standardised").
- */
+/* A control is one of three widths chosen by what goes in it, so two fields that do the same job
+ * are the same size on every screen. */
 .mm-field {
   display: flex;
   min-width: 0;
@@ -56,7 +52,7 @@
 }
 
 /*
- * Settings groups (3.2): the group's name and why it matters on the left, one setting per row on the right,
+ * Settings groups: the group's name and why it matters on the left, one setting per row on the right,
  * hairlines between. components/shared/settings-group.tsx. Two groups sit side by side above 1180px
  * (.mm-setgroups--columns), because a page too long for the screen uses the width, not more boxes.
  */

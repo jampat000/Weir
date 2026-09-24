@@ -24,9 +24,8 @@ import { errorMessage } from "../../../../lib/api/error-message";
 const FILES_AT_ONCE = Array.from({ length: 10 }, (_, i) => i + 1);
 
 /**
- * Settings › Performance (was Running; canvas board 7, 23 Sep 2026): how hard Weir works, what it checks before it
- * starts a file, and what it keeps when one fails. The cleanup switches that used to sit here are on Cleanup, each
- * beside its own timer, and "Verbose file-detection records" is gone because nothing ever read it.
+ * Settings › Performance: how hard Weir works, what it checks before it starts a file, and what it keeps when
+ * one fails. The cleanup switches are on Cleanup, each beside its own timer.
  */
 export function ProcessSettingsSection() {
   const me = useMeQuery();

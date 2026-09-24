@@ -281,9 +281,9 @@
   }
 }
 
-/* The file's own name under the friendly title, in full (James, 23 Sep 2026: "we need to ensure we see the file
-   label"). The title stays on one line so the lanes line up; this line wraps between the parts of the name (see
-   FileName), so the part that tells two releases apart, such as REPACK2, is always there to read. */
+/* The file's own name under the friendly title, in full. The title stays on one line so the lanes line up;
+   this line wraps between the parts of the name (see FileName), so the part that tells two releases apart,
+   such as REPACK2, is always there to read. */
 .mm-live-card__file {
   display: block;
   max-width: 100%;

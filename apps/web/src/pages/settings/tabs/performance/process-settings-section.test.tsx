@@ -47,7 +47,7 @@ const settings: ProcessingOperatorSettingsOut = {
   tv_schedule_start: "00:00",
   tv_schedule_end: "23:59",
   schedule_timezone: "Australia/Sydney",
-  updated_at: "2026-09-01T04:00:00Z",
+  updated_at: "2026-07-28T04:00:00Z",
 };
 
 const readout: ProcessingFilesAtOnceOut = {
@@ -102,7 +102,7 @@ it("saves Files at once up to ten, and the budget and checks with it", async () 
     60,
   );
 
-  // #633 promised ten; the page refused to save more than eight until 3.2.
+  // #633: files at once goes up to ten.
   fireEvent.click(screen.getByRole("button", { name: "10" }));
   fireEvent.click(
     screen.getByRole("button", { name: "Save performance settings" }),

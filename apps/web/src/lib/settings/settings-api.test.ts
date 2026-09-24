@@ -22,9 +22,7 @@ describe("suite settings API paths", () => {
     expect(configurationBackupsPath()).toBe(
       "/api/v1/suite/configuration-backups",
     );
-    // One address per handler since 3.0.0. The `/suite/settings/configuration-bundle` and
-    // `/system/suite-configuration-bundle` aliases the Python suite also answered on are gone,
-    // and so is the client loop that tried each one until something was not a 404.
+    // One address per handler, so a 404 means the request is wrong rather than a missing alias.
     expect(updateStatusPath()).toBe("/api/v1/suite/update-status");
   });
 

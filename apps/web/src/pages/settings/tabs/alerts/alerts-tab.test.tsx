@@ -18,8 +18,8 @@ function channel(over: Partial<NotificationChannelOut> = {}) {
     url: "https://example.invalid/hook",
     events: ["job_failed"],
     enabled: true,
-    created_at: "2026-09-01T07:00:00Z",
-    updated_at: "2026-09-01T07:00:00Z",
+    created_at: "2026-07-28T07:00:00Z",
+    updated_at: "2026-07-28T07:00:00Z",
     ...over,
   } satisfies NotificationChannelOut;
 }
@@ -62,8 +62,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// #599 follow-up: Remove used to delete on the first click. The point of these tests is
-// not that a dialog shows up — it is that nothing is deleted until it is confirmed.
+// #599: the point of these tests is not that a dialog shows up, but that nothing is deleted
+// until it is confirmed.
 describe("SettingsNotificationsTab removal confirmation", () => {
   it("does not delete anything on the first click", async () => {
     vi.spyOn(api, "fetchNotificationChannels").mockResolvedValue(

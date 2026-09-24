@@ -54,7 +54,7 @@ const ruleSet: ProcessingRuleSet = {
   clear_video_track_names: false,
   remove_chapters: false,
   used_by_library_count: 2,
-  updated_at: "2026-09-01T04:00:00Z",
+  updated_at: "2026-07-28T04:00:00Z",
 };
 
 function wrapper({ children }: { children: ReactNode }) {

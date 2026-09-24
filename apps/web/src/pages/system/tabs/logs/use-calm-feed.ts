@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ActivityRecentResponse } from "../../../../lib/api/types";
 
 /**
- * Live, but calm: fresh entries only land in the list while the reader is at the top with nothing
+ * Updates as they happen, but calmly: fresh entries only land in the list while the reader is at the top with nothing
  * opened and no older pages loaded. Otherwise the list they are reading stays put, and the caller
  * offers the new entries with a button.
  */

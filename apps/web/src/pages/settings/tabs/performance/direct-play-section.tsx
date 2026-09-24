@@ -19,7 +19,7 @@ import {
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { errorMessage } from "../../../../lib/api/error-message";
 
-/** Splits "https://… (checked 2026-09-17)" into its link and its date. */
+/** Splits "https://… (checked 2026-08-13)" into its link and its date. */
 function parseSource(source: string): {
   url: string | null;
   checked: string | null;

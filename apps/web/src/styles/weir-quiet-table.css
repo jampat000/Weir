@@ -2,14 +2,9 @@
 
 /* ── 3a · The borderless table ─────────────────────────────────────────────── */
 
-/* `position: relative` is not decoration: the wrapper scrolls, so anything absolutely
- * positioned inside it — a `.sr-only` column heading, most often — needs this box as its
- * containing block or it is laid out against the nearest positioned ancestor instead, at
- * the scrolled-out position of the column it belongs to, and stretches the page.
- * Measured on Library -> Files at 1024: `.mm-app-layout` scrollWidth 1248 against
- * clientWidth 1024, all of it one `.sr-only` span sitting at x=1247. It is invisible
- * because the layout clips, which is exactly why it stays fixed here rather than on the
- * `th` of whichever table happens to have one today. */
+/* `position: relative` is not decoration: the wrapper scrolls, so anything absolutely positioned
+ * inside it, most often a `.sr-only` column heading, needs this box as its containing block, or it
+ * is laid out at its column's scrolled-out position and stretches the page sideways. */
 .mm-quiet-table-wrap {
   position: relative;
   overflow-x: auto;

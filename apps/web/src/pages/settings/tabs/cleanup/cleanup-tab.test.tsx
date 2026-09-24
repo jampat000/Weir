@@ -38,7 +38,7 @@ function state(over: Partial<MaintenanceState> = {}): MaintenanceState {
         last_failed_at: null,
         last_error: null,
         interval_seconds: 3600,
-        next_run_at: "2026-09-23T05:00:00",
+        next_run_at: "2026-08-19T05:00:00",
       },
       {
         family: "failure_cleanup",

@@ -44,8 +44,8 @@
   min-width: 0;
 }
 
-/* One line each: wrapped names made the lanes ragged (James, 23 Sep 2026). The lanes are wide enough
-   for an ordinary name; a very long one ends in "…" and shows in full on hover. */
+/* One line each, so the lanes stay even. The lanes are wide enough for an ordinary name; a very long
+   one ends in "…" and shows in full on hover. */
 .mm-live-card__title {
   max-width: 100%;
   overflow: hidden;

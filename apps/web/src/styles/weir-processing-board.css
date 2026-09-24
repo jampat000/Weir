@@ -1,12 +1,6 @@
-/*
- * The board and its lanes. The lanes follow the board's own width, not the window's, so a collapsed
- * sidebar or a narrow window gets the layout that fits the space actually left:
- *   under 600px   one column, Working first
- *   600px up      Working across the top, then Up next and Finished side by side
- *   940px up      three columns: Arriving over Waiting, Working, Handing back over Just finished
- *   1320px up     all five lanes side by side
- *   2000px up     the same, with Working wide enough for two cards side by side
- */
+/* The board and its lanes, which follow the board's own width, not the window's: one column under
+ * 600px, Working across the top from 600px, three columns from 940px, all five lanes from 1320px, and
+ * room for two Working cards side by side from 2000px. */
 
 /* The board. Its width, not the window's, picks the layout. */
 .mm-live-board {
@@ -148,7 +142,7 @@
 }
 
 /* A lane lights up while it holds a file, so the eye goes where the work is; Just finished is a
-   record, not work, and never does (James, 23 Sep 2026). */
+   record, not work, and never does. */
 .mm-live-lane--active {
   border-color: color-mix(in srgb, var(--mm-accent) 24%, transparent);
   background: color-mix(in srgb, var(--mm-surface1) 78%, transparent);

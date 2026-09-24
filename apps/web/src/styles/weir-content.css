@@ -68,18 +68,9 @@
   margin-top: 0.9rem;
 }
 
-/* ── 3a · The field group ────────────────────────────────────────────────────
- * Rule 3 takes the box off a form, and a forty-field form that loses its grouping with
- * it becomes unusable — so the grouping has to survive as type and whitespace. The
- * treatment is the one the language already gives a table's header row: an uppercase
- * eyebrow over a hairline, labelling the block beneath it. It reads clearly under a
- * `.mm-quiet-section__title` without ever becoming a second box, and the
- * `.mm-quiet-stack` these sit in supplies the space between groups.
- *
- * This is a group *inside* a section, not a second kind of section: the heading is an
- * `h3`, it is quieter than `.mm-quiet-section__title`, and it carries no links of its
- * own beyond what `__head` allows.
- */
+/* The field group: a form without boxes keeps its grouping as an uppercase eyebrow over a hairline,
+ * like a table's header row. It is a group inside a section, not a second kind of section: an h3,
+ * quieter than .mm-quiet-section__title, with `.mm-quiet-stack` supplying the space between groups. */
 
 .mm-quiet-group {
   min-width: 0;

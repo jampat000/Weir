@@ -80,8 +80,8 @@ select.mm-input {
   cursor: pointer;
   padding: 0.625rem 3rem 0.625rem 0.75rem;
   /* The mark is the accent colour and it stands in a tinted well behind a hairline, so a control
-     that opens is told apart from one you type into at a glance, not by looking for a 11px grey
-     chevron (James, 23 Sep 2026: "things need to be made obvious and look obvious"). */
+     that opens is told apart from one you type into at a glance, not by looking for a small grey
+     chevron. */
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' viewBox='0 0 14 14'%3E%3Cpath stroke='%233ED7C8' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m3.5 5.5 3.5 3.5 3.5-3.5'/%3E%3C/svg%3E"),
     linear-gradient(
@@ -130,9 +130,9 @@ select.mm-input::-ms-expand {
   display: none;
 }
 
-/* The open list is drawn by the browser. On Windows Chrome it took a white background from the OS while the
-   options kept the field's pale dark-theme text, so every choice but the highlighted one was unreadable
-   (James, 23 Sep 2026). The options carry the theme's own surface and text, on every select, whatever its class. */
+/* The open list is drawn by the browser. On Windows Chrome it takes a white background from the OS while the
+   options keep the field's pale dark-theme text, which leaves every choice but the highlighted one unreadable.
+   The options carry the theme's own surface and text, on every select, whatever its class. */
 select option,
 select optgroup {
   background-color: var(--mm-surface-2);

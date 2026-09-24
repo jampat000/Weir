@@ -6,7 +6,7 @@ import {
 } from "./api";
 import { processingKeys } from "../query-keys";
 
-/** ``recent`` = no status filter — server returns newest rows across all statuses. */
+/** `recent` applies no status filter: the server returns the newest rows across all statuses. */
 export type ProcessingJobsInspectionFilter =
   | "recent"
   | "pending"
@@ -16,7 +16,7 @@ export type ProcessingJobsInspectionFilter =
   | "handler_ok_finalize_failed"
   | "cancelled"
   | "terminal"
-  /** Queued or running: what Live shows as waiting and working. */
+  /** Queued or running: what Processing shows as waiting and working. */
   | "active";
 
 function statusesForFilter(

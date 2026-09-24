@@ -150,16 +150,10 @@ function libraryJobParts(row: ProcessingJobInspectionRow): {
 }
 
 /**
- * Sorts files and library clean jobs into the Processing lanes.
- *
- * - Arriving: on hold for a reason that ends by itself (a file still being written, or inside its
- *   library's minimum age), or still held by the media manager.
- * - Waiting: ready, or outside its library's hours, and waiting for a free lane.
- * - Working: a pass is writing it. Handing back: the pass has written it and is on its final checks.
- * - Stuck: failed, or on hold after repeated failures. These are what "Needs you" is made of.
- *
- * Library cleans come from the job queue: leased is working, pending is waiting. They do not report a
- * percentage yet, so their card says what is happening without a number rather than invent one.
+ * Sorts files and library clean jobs into the lanes. Arriving: held for a reason that ends by itself,
+ * or still with the media manager. Waiting: ready, or outside its hours. Working: a pass is writing it.
+ * Handing back: on its final checks. Stuck: failed, or held after repeated failures. Library cleans
+ * come from the job queue and report no percentage, so their card says what is happening without one.
  */
 export function buildLanes(
   files: ProcessingFile[],

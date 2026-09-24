@@ -1,14 +1,8 @@
 /**
- * Detects a sign-in that succeeded but did not stick (#453).
- *
- * A browser can accept a 200 from `/auth/login` and then discard the session cookie — most often
- * because the cookie is marked `Secure` while Weir is served over plain HTTP. The next call
- * to `/auth/me` returns 401, `RequireAuth` redirects, and the operator lands back on an empty
- * form with a correct password and nothing explaining why.
- *
- * The app knows both halves of that, so it can say so. This records the successful sign-in for a
- * few seconds; `RequireAuth` reads it when `/auth/me` comes back empty and sends the operator to
- * the login page with a reason instead of silently.
+ * Detects a sign-in that succeeded but did not stick (#453): a browser can accept a 200 from
+ * `/auth/login` and then discard the session cookie, most often a `Secure` cookie over plain
+ * HTTP. This records the successful sign-in for a few seconds; `RequireAuth` reads it when
+ * `/auth/me` comes back empty and sends the operator to the login page with the reason.
  */
 
 const KEY = "mm:login-succeeded-at";

@@ -236,7 +236,7 @@ export function sizesFromRecord(detail: Record<string, unknown>): {
   return { before, after, saved: Math.max(0, before - after) };
 }
 
-/** A file's sizes as History shows them: always all three, with "not written" rather than a gap (James, 23 Sep 2026). */
+/** A file's sizes as History shows them: always all three, with "not written" rather than a gap. */
 export type DetailSizes = {
   before: number | null;
   /** Null when Weir wrote no new copy of the file. */

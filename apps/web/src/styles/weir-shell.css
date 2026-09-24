@@ -83,7 +83,7 @@ body.mm-body {
 }
 
 /* Phones only: holds the menu button. Pause and the theme switch live in each page's title
-   row (.mm-page-head) since 3.2, so on a desktop this bar has nothing left to carry. */
+   row (.mm-page-head), so on a desktop this bar has nothing to carry. */
 .mm-shell-toolbar {
   display: none;
   align-items: center;
@@ -95,7 +95,7 @@ body.mm-body {
 
 /* Every page's title row (components/shell/page-header.tsx): the title on the left, Pause
    and the theme switch on the right. The two controls are one class so they are exactly the
-   same height, which was the condition James set when he chose this layout. */
+   same height. */
 .mm-page-head {
   display: flex;
   flex-direction: column;
@@ -137,9 +137,9 @@ body.mm-body {
   min-width: 0;
 }
 
-/* Top-aligned, so the lead sits straight under the title on every page. Bottom-aligned, a taller aside
-   (Processing's figures, Library's scan) pulled the lead down to meet it, and the same line sat at a
-   different height on each screen (James, 23 Sep 2026). */
+/* Top-aligned, so the lead sits straight under the title on every page: bottom-aligned, a taller aside
+   (Library's scan) would pull the lead down to meet it, and the same line would sit at a different height
+   on each screen. */
 .mm-page-head__sub {
   display: flex;
   align-items: flex-start;
@@ -233,8 +233,8 @@ body.mm-body {
     0 10px 28px rgba(0, 0, 0, 0.1);
 }
 
-/* Wraps onto a second line when the row is too narrow. It used to scroll sideways, and
-   nothing in Weir may scroll left to right at any width (sign-off condition, 2026-09-22). */
+/* Wraps onto a second line when the row is too narrow: nothing in Weir scrolls left to right
+   at any width. */
 .mm-workspace-tabs__list {
   display: flex;
   flex-wrap: wrap;

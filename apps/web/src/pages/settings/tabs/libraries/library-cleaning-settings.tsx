@@ -12,9 +12,8 @@ import { errorMessage } from "../../../../lib/api/error-message";
 
 /**
  * The files already on your storage, for one library: the folders the Library screen reads, the two safety checks
- * a clean makes, and the once-a-day check and clean. The 3.2 redesign retired the screen these lived on, which left
- * the Library screen telling people to set folders somewhere that no longer offered them. They sit in the library's
- * own editor now, and each saves as soon as it is changed, as it always did.
+ * a clean makes, and the once-a-day check and clean. They sit in the library's own editor, and each saves as soon
+ * as it is changed.
  */
 export function LibraryCleaningSettings({
   libraryId,

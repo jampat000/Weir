@@ -1,9 +1,6 @@
 /**
- * The action button's contract: a disabled button looks disabled on its own, from the DOM attribute alone.
- *
- * This is here because the opposite was true for a long time. The helper used to take a `disabled` option that
- * changed the look, and 81 of 145 call sites never passed it, so those buttons refused the click while still
- * showing a gold border, a shadow and a pointer cursor. The option is gone; these tests pin what replaced it.
+ * The action button's contract: a disabled button looks disabled on its own, from the DOM attribute alone,
+ * with no second flag for a call site to forget.
  */
 import { describe, expect, it } from "vitest";
 import { mmActionButtonClass } from "./mm-control-roles";
