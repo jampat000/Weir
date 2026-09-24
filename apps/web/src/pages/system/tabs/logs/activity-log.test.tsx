@@ -95,7 +95,6 @@ function recentResult(
   const data = {
     items,
     total: items.length,
-    system_events: 0,
     has_more: false,
     retention_days: 90,
     oldest_event_at: null,

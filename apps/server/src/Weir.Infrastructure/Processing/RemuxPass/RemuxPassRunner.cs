@@ -258,9 +258,10 @@ public sealed class RemuxPassRunner
         }
 
         JsonElement probeJson;
+        IReadOnlyList<string> sourceWarnings;
         try
         {
-            probeJson = await _tools.FfprobeJsonAsync(src, probeSizeMb: _settings.ProbeSizeMb, analyzeDurationSeconds: _settings.AnalyzeDurationSeconds, cancellationToken: cancellationToken)
+            (probeJson, sourceWarnings) = await _tools.ProbeWithWarningsAsync(src, _settings.ProbeSizeMb, _settings.AnalyzeDurationSeconds, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (MediaUnreadableException exception)
@@ -277,21 +278,6 @@ public sealed class RemuxPassRunner
 #pragma warning restore CA1031
         {
             return FailBefore(relativeMediaPath, $"ffprobe failed: {exception.Message}", inspected);
-        }
-
-        IReadOnlyList<string> sourceWarnings;
-        try
-        {
-            sourceWarnings = await _tools.ProbeWarningLinesAsync(src, cancellationToken).ConfigureAwait(false);
-        }
-#pragma warning disable CA1031 // A baseline that cannot be read counts as no known warnings (#500).
-        catch (Exception exception) when (exception is not OperationCanceledException)
-#pragma warning restore CA1031
-        {
-            // #500: a baseline that could not be read is treated as "no known warnings", so a genuine new warning on
-            // the output still fails validation instead of being silently accepted.
-            _logger.LogWarning(exception, "Weir could not read the source file's ffprobe warnings for {Path}.", relativeMediaPath);
-            sourceWarnings = [];
         }
 
         var probe = new ProbeResult(probeJson);
@@ -330,7 +316,7 @@ public sealed class RemuxPassRunner
 
         try
         {
-            // Read the whole primary video on every platform, so a truncated file is caught (#539).
+            // A full read of its own, before the write reads it again, so a truncated source is caught before anything is written (#539).
             await _tools.ValidateMediaIntegrityAsync(src, duration, cancellationToken).ConfigureAwait(false);
             AssertSourceUnchanged(src, expected);
         }
@@ -400,16 +386,19 @@ public sealed class RemuxPassRunner
         if (!passThrough)
         {
             var (_, ffmpeg) = _resolver.Resolve();
+            var hardwareSettings = new HardwareSettings
+            {
+                Mode = HardwareAcceleration.NormalizeDecodeMode(runtime.HardwareDecodeMode),
+                Device = runtime.HardwareDevice ?? string.Empty,
+                DisabledVendors = HardwareAcceleration.ParseDisabledVendors(runtime.HardwareDisabledVendorsCsv),
+                Strictness = HardwareAcceleration.NormalizeStrictness(runtime.FfmpegStrictness),
+            };
             // Decided before the argv is built, because the flags go into it; a device that is busy or absent falls back (#345).
             hardware = HardwareAcceleration.Decide(
-                new HardwareSettings
-                {
-                    Mode = HardwareAcceleration.NormalizeDecodeMode(runtime.HardwareDecodeMode),
-                    Device = runtime.HardwareDevice ?? string.Empty,
-                    DisabledVendors = HardwareAcceleration.ParseDisabledVendors(runtime.HardwareDisabledVendorsCsv),
-                    Strictness = HardwareAcceleration.NormalizeStrictness(runtime.FfmpegStrictness),
-                },
-                await _tools.DetectAccelerationAsync(ffmpeg, cancellationToken).ConfigureAwait(false));
+                hardwareSettings,
+                hardwareSettings.WantsHardware
+                    ? await _tools.KnownAccelerationAsync(ffmpeg, cancellationToken).ConfigureAwait(false)
+                    : HardwareAcceleration.NotAsked);
             argv = FfmpegCommands.BuildRemuxArgv(ffmpeg, src, Path.Join(workDir, PlaceholderName), plan, hardware.ArgvFlags);
         }
 
@@ -959,7 +948,7 @@ public sealed class RemuxPassRunner
             return (replacedExisting, "validated_hardlink");
         }
 
-        await FileLifecycle.SafeCopyToFinalAsync(src, final, ValidateStaged, progress, ownership: _ownership).ConfigureAwait(false);
+        await FileLifecycle.SafeCopyToFinalAsync(src, final, ValidateStaged, progress, ownership: _ownership, cancellationToken: cancellationToken).ConfigureAwait(false);
         return (replacedExisting, "validated_copy");
     }
 

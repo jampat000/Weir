@@ -2074,12 +2074,8 @@ export interface components {
        */
       retention_days: number;
       /**
-       * System Events
-       * @default 0
-       */
-      system_events: number;
-      /**
        * Total
+       * @description Every event that matches the filters. Counted for the first page only: a page requested with before_id leaves it out.
        * @default 0
        */
       total: number;

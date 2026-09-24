@@ -119,6 +119,33 @@ A folder layout that works well:
 └── tv
 ```
 
+## Work folder placement
+
+By default a library's work folder is a private folder inside `/data/weir`, which in Docker is
+usually a different volume from your media. Weir can still finish files that way, but each one is
+*copied* from the work folder to the output folder rather than moved, which on a large file takes
+about as long again as the clean itself. Put the work folder on the same volume as the output
+folder and that last step becomes an instant move:
+
+```yaml
+services:
+  weir:
+    image: ghcr.io/jampat000/weir:latest
+    container_name: weir
+    ports:
+      - "9347:9347"
+    environment:
+      - WEIR_PUID=1000
+      - WEIR_PGID=1000
+    volumes:
+      - ./weir-data:/data/weir
+      - /srv/media:/media   # work_folder and output_folder both live under here
+    restart: unless-stopped
+```
+
+Then, in the library's settings, set **Work folder** to something like `/media/weir/movies-work` —
+alongside `/media/weir/movies` (the output folder) rather than under `/data/weir`.
+
 ## What's in the image
 
 - Images are published for **linux/amd64** and **linux/arm64** (`ghcr.io/jampat000/weir:latest` and `:X.Y.Z`)

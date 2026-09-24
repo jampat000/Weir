@@ -88,6 +88,13 @@ public static class HardwareAcceleration
     /// <summary>Auto mode's preference order, so the same machine picks the same device every run.</summary>
     public static IReadOnlyList<string> AutoPreference { get; } = ["cuda", "qsv", "vaapi", "videotoolbox", "d3d11va", "amf"];
 
+    /// <summary>The report when hardware decoding is off: ffmpeg is not asked, because the answer would not be used.</summary>
+    public static AccelerationReport NotAsked { get; } = new()
+    {
+        Detected = false,
+        Detail = "Hardware decoding is switched off, so Weir did not ask ffmpeg which acceleration methods it supports.",
+    };
+
     /// <summary>The report when ffmpeg could not be run at all.</summary>
     public static AccelerationReport ReportForRunError(string errorText) => new()
     {

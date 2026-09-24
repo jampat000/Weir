@@ -60,7 +60,7 @@ public static partial class FileLifecycle
 
     /// <summary>
     /// Copies into a hidden <c>.{name}.XXXXXXXX.partial</c> beside the destination, validates it, then atomically
-    /// replaces the destination. A failed copy or validation leaves nothing behind.
+    /// replaces the destination. A failed or cancelled copy, or a failed validation, leaves nothing behind.
     /// </summary>
     public static async Task SafeCopyToFinalAsync(
         string source,
@@ -68,7 +68,8 @@ public static partial class FileLifecycle
         Func<string, Task>? validateStaged = null,
         Action<long, long>? progressCallback = null,
         bool preserveMetadata = true,
-        IOutputOwnership? ownership = null)
+        IOutputOwnership? ownership = null,
+        CancellationToken cancellationToken = default)
     {
         var src = Path.GetFullPath(source);
         var directory = Path.GetDirectoryName(Path.GetFullPath(final))!;
@@ -82,32 +83,7 @@ public static partial class FileLifecycle
         var tmp = CreateTempFile(directory, "." + Path.GetFileName(final) + ".", ".partial");
         try
         {
-            var total = new FileInfo(src).Length;
-            long copied = 0;
-            using (var input = new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1, FileOptions.SequentialScan))
-            using (var output = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None, 1))
-            {
-                var buffer = new byte[Math.Min(CopyChunkBytes, Math.Max(4096, total))];
-                int read;
-                while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
-                {
-                    output.Write(buffer, 0, read);
-                    copied += read;
-                    if (progressCallback is not null)
-                    {
-                        try
-                        {
-                            progressCallback(copied, total);
-                        }
-#pragma warning disable CA1031 // Progress is optional observability; it must never invalidate a safe copy.
-                        catch (Exception)
-#pragma warning restore CA1031
-                        {
-                        }
-                    }
-                }
-            }
-
+            await CopyContentAsync(src, tmp, progressCallback, cancellationToken).ConfigureAwait(false);
             if (preserveMetadata)
             {
                 File.SetLastWriteTimeUtc(tmp, File.GetLastWriteTimeUtc(src));
@@ -118,6 +94,11 @@ public static partial class FileLifecycle
         {
             BestEffortDelete(tmp);
             throw new FileLifecycleException($"Could not safely copy {src} to {final}: {exception.Message}", exception);
+        }
+        catch (OperationCanceledException)
+        {
+            BestEffortDelete(tmp);
+            throw;
         }
 
         if (validateStaged is not null)
@@ -144,6 +125,56 @@ public static partial class FileLifecycle
         }
 
         ownership?.ApplyToFile(Path.GetFullPath(final));
+    }
+
+    /// <summary>
+    /// The bytes of <paramref name="source"/> into <paramref name="destination"/>, a chunk at a time. Asynchronous, so a
+    /// copy of a large file over a slow share does not hold a thread-pool thread for minutes (#716).
+    /// </summary>
+    /// <remarks>
+    /// Not <see cref="File.Copy(string, string, bool)"/>, although it can offload a same-share copy to the server: it
+    /// reports no progress, and it carries over what this copy deliberately does not (Windows attributes and alternate
+    /// streams, Unix permission bits), which would change what lands in the output folder.
+    /// </remarks>
+    private static async Task CopyContentAsync(string source, string destination, Action<long, long>? progressCallback, CancellationToken cancellationToken)
+    {
+        var total = new FileInfo(source).Length;
+        long copied = 0;
+        var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1, FileOptions.Asynchronous | FileOptions.SequentialScan);
+        await using (input.ConfigureAwait(false))
+        {
+            var output = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None, 1, FileOptions.Asynchronous);
+            await using (output.ConfigureAwait(false))
+            {
+                var buffer = new byte[Math.Min(CopyChunkBytes, Math.Max(4096, total))];
+                int read;
+                while ((read = await input.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+                {
+                    await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                    copied += read;
+                    ReportCopyProgress(progressCallback, copied, total);
+                }
+            }
+        }
+    }
+
+    private static void ReportCopyProgress(Action<long, long>? progressCallback, long copied, long total)
+    {
+        if (progressCallback is null)
+        {
+            return;
+        }
+
+        try
+        {
+            progressCallback(copied, total);
+        }
+#pragma warning disable CA1031 // Progress is optional observability; it must never invalidate a safe copy.
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+            // The copy carries on; a reporter that fails says so in its own log.
+        }
     }
 
     /// <summary>

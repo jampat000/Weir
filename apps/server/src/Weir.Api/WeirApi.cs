@@ -8,6 +8,7 @@ using Weir.Api.Web;
 using Weir.Core.Configuration;
 using Weir.Core.Metrics;
 using Weir.Infrastructure;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.Http;
 using Weir.Infrastructure.Jobs;
@@ -52,9 +53,12 @@ public static class WeirApi
         services.AddSingleton<SessionCleanupTask>();
         services.AddSingleton<LogRetentionTask>();
         services.AddSingleton<ConfigurationBackupTask>();
+        services.AddSingleton<ActivityLatestPollTask>();
         services.AddSingleton<IPeriodicTask>(provider => provider.GetRequiredService<SessionCleanupTask>());
         services.AddSingleton<IPeriodicTask>(provider => provider.GetRequiredService<LogRetentionTask>());
         services.AddSingleton<IPeriodicTask>(provider => provider.GetRequiredService<ConfigurationBackupTask>());
+        services.AddSingleton<IPeriodicTask>(provider => provider.GetRequiredService<ActivityLatestPollTask>());
+        services.AddWeirResponseCompression();
         services.AddRouting();
         return services;
     }
@@ -62,8 +66,8 @@ public static class WeirApi
     /// <summary>
     /// The middleware, outermost first: the server's error response, forwarded headers (trusted proxies only),
     /// the Host allow-list, compressed assets, CORS (when origins are configured), the trusted-proxy scheme,
-    /// HEAD-as-GET, the X-Requested-With check, request context, security headers, then routes, the static
-    /// mount and the 404 handler.
+    /// HEAD-as-GET, the X-Requested-With check, request context, security headers, response compression, then
+    /// routes, the static mount and the 404 handler.
     /// </summary>
     public static WebApplication UseWeirApi(this WebApplication app)
     {
@@ -91,6 +95,7 @@ public static class WeirApi
         app.UseMiddleware<RequestContextMiddleware>();
         app.UseMiddleware<SecurityHeadersMiddleware>();
         app.UseMiddleware<MethodNotAllowedBodyMiddleware>();
+        app.UseWeirResponseCompression();
         app.UseRouting();
         // Static files run between routing and endpoints so matched routes win over files, and the 404
         // handler runs only after both.

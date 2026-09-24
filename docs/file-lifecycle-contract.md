@@ -17,7 +17,7 @@ Server code places final media files through these seams only, never through dir
 
 ### Processing output: `Weir.Infrastructure.Processing.RemuxPass.FileLifecycle`
 
-- `SafeCopyToFinalAsync` copies the source into a hidden `.{name}.XXXXXXXX.partial` file beside the destination, runs the optional staged-file validation, then renames the partial onto the destination. A failed copy or validation deletes the partial and leaves the destination untouched.
+- `SafeCopyToFinalAsync` copies the source into a hidden `.{name}.XXXXXXXX.partial` file beside the destination, runs the optional staged-file validation, then renames the partial onto the destination. A failed or cancelled copy, or a failed validation, deletes the partial and leaves the destination untouched.
 - `TryHardlinkToFinalAsync` is the same-volume fast path: it creates a hidden `.{name}.XXXXXXXX.link` hard link beside the destination, validates it and renames it onto the destination. It returns false when the link is refused, and the caller falls back to `SafeCopyToFinalAsync`.
 - `SafeFinalizeFile` publishes a file Weir has already written in its work folder: the staged file is moved to a hidden `.partial` beside the destination (copied instead if it cannot be moved), then renamed onto the destination. On the same volume this is two renames and no copy.
 

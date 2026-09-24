@@ -90,6 +90,55 @@ public sealed class ActivityHistoryStoreTests
     }
 
     [Fact]
+    public async Task The_latest_poll_notifies_of_a_row_written_on_a_connection_the_notifier_never_saw_commit()
+    {
+        // A raw insert with no unit of work and no ActivityNotifications.Track call, like `weir recover`'s
+        // own connection or a restored backup: only the poll, not a commit signal, can tell the notifier.
+        // The poll only checks while a stream is open, so this needs one waiting.
+        using var fixture = new StoreFixture();
+        var notifier = new ActivityLatestNotifier();
+        var poll = new ActivityLatestPollTask(fixture.Database, notifier);
+        var waiting = notifier.WaitForChangeAsync(notifier.Snapshot().Version, TimeSpan.FromSeconds(5), TimeProvider.System);
+
+        await fixture.Execute("INSERT INTO activity_events (event_type, module, title) VALUES ('auth.password_changed', 'auth', 'Password changed')");
+        var insertedId = await fixture.Scalar("SELECT max(id) FROM activity_events");
+        await poll.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(new ActivityLatest(insertedId, 1), await waiting);
+    }
+
+    [Fact]
+    public async Task The_latest_poll_does_nothing_when_the_latest_id_has_not_moved()
+    {
+        using var fixture = new StoreFixture();
+        var notifier = new ActivityLatestNotifier();
+        var poll = new ActivityLatestPollTask(fixture.Database, notifier);
+        await fixture.Execute("INSERT INTO activity_events (event_type, module, title) VALUES ('auth.password_changed', 'auth', 'Password changed')");
+        var firstWait = notifier.WaitForChangeAsync(notifier.Snapshot().Version, TimeSpan.FromSeconds(5), TimeProvider.System);
+        await poll.RunOnceAsync(CancellationToken.None);
+        var afterFirstPoll = await firstWait;
+
+        var secondWait = notifier.WaitForChangeAsync(afterFirstPoll!.Value.Version, TimeSpan.FromMilliseconds(50), TimeProvider.System);
+        await poll.RunOnceAsync(CancellationToken.None);
+
+        Assert.Null(await secondWait);
+        Assert.Equal(afterFirstPoll, notifier.Snapshot());
+    }
+
+    [Fact]
+    public async Task The_latest_poll_checks_nothing_while_no_stream_is_open()
+    {
+        using var fixture = new StoreFixture();
+        var notifier = new ActivityLatestNotifier();
+        var poll = new ActivityLatestPollTask(fixture.Database, notifier);
+        await fixture.Execute("INSERT INTO activity_events (event_type, module, title) VALUES ('auth.password_changed', 'auth', 'Password changed')");
+
+        await poll.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(new ActivityLatest(null, 0), notifier.Snapshot());
+    }
+
+    [Fact]
     public async Task Processing_records_past_their_retention_are_pruned_and_zero_keeps_everything()
     {
         using var db = new JobsTestDatabase(keepSeedRows: true);
@@ -153,11 +202,11 @@ public sealed class ActivityHistoryStoreTests
 
         var (total, hasMore, pageCount) = await fixture.WithUnitOfWork(async uow =>
         {
-            var rows = await ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: null);
+            var page = await ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: null);
             var count = await ActivityHistoryStore.CountAsync(uow, ActivityFilter.None);
-            var body = ActivityHistory.RecentOut(rows, count, 0, 90, null);
+            var body = ActivityHistory.RecentOut(page.Items, page.HasMore, count, 90, null);
             using var doc = JsonDocument.Parse(PyJsonWriter.DumpsUtf8(body, PyJsonFormat.Response));
-            return (doc.RootElement.GetProperty("total").GetInt64(), doc.RootElement.GetProperty("has_more").GetBoolean(), rows.Count);
+            return (doc.RootElement.GetProperty("total").GetInt64(), doc.RootElement.GetProperty("has_more").GetBoolean(), page.Items.Count);
         });
         Assert.Equal(3, total);
         Assert.True(hasMore);
@@ -181,10 +230,10 @@ public sealed class ActivityHistoryStoreTests
             "('2026-01-01 00:00:10', 'a.3', 'processing', 'C'), " + // id 3, ties id 1
             "('2026-01-01 00:00:01', 'a.4', 'processing', 'D')"); // id 4, oldest
 
-        var first = await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: null));
+        var first = (await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: null))).Items;
         Assert.Equal(["C", "A"], first.Select(r => r.Title)); // the tie broken by id DESC: 3 before 1
 
-        var second = await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: first[^1].Id));
+        var second = (await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: first[^1].Id))).Items;
         Assert.Equal(["B", "D"], second.Select(r => r.Title)); // never id 1 again, never loses B or D
 
         Assert.Equal(4, first.Concat(second).Select(r => r.Id).Distinct().Count());
@@ -200,7 +249,7 @@ public sealed class ActivityHistoryStoreTests
             "('2026-01-01 00:00:01', 'a.1', 'processing', 'one'), " +
             "('2026-01-01 00:00:02', 'a.2', 'processing', 'two')");
 
-        var rows = await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 10, beforeId: 999));
+        var rows = (await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 10, beforeId: 999))).Items;
         Assert.Equal(["two", "one"], rows.Select(r => r.Title));
     }
 
@@ -218,18 +267,59 @@ public sealed class ActivityHistoryStoreTests
 
         Assert.True(PyDateTime.TryFromIsoFormat("2026-01-02T03:04:05", out var naiveBoundary));
         var atBoundary = new ActivityFilter(DateFrom: naiveBoundary);
-        Assert.Single(await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, atBoundary, limit: 10, beforeId: null)));
+        Assert.Single((await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, atBoundary, limit: 10, beforeId: null))).Items);
 
         // The same instant, named with a +02:00 offset: an ignored offset would compare "05:04:05" against
         // the stored "03:04:05" and wrongly exclude the row.
         Assert.True(PyDateTime.TryFromIsoFormat("2026-01-02T05:04:05+02:00", out var sameInstantOffset));
         var atOffsetBoundary = new ActivityFilter(DateFrom: sameInstantOffset);
-        Assert.Single(await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, atOffsetBoundary, limit: 10, beforeId: null)));
+        Assert.Single((await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, atOffsetBoundary, limit: 10, beforeId: null))).Items);
 
         // One second later in the same offset: now past the row, in either timezone.
         Assert.True(PyDateTime.TryFromIsoFormat("2026-01-02T06:04:06+02:00", out var pastIt));
         var pastFilter = new ActivityFilter(DateFrom: pastIt);
-        Assert.Empty(await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, pastFilter, limit: 10, beforeId: null)));
+        Assert.Empty((await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, pastFilter, limit: 10, beforeId: null))).Items);
+    }
+
+    /// <summary>
+    /// The date filters narrow by the stored text before julianday() checks the instant (#714). A time written with a
+    /// UTC offset can carry a different date from its UTC date, and must still be found from either side.
+    /// </summary>
+    [Fact]
+    public async Task Date_filters_find_a_time_stored_with_an_offset_whose_written_date_is_another_day()
+    {
+        using var fixture = new StoreFixture();
+        await fixture.Execute(
+            "INSERT INTO activity_events (created_at, event_type, module, title) VALUES " +
+            "('2026-01-02 23:30:00-05:00', 'a.1', 'processing', 'written the day before'), " + // 2026-01-03 04:30 UTC
+            "('2026-01-03 03:00:00+10:00', 'a.2', 'processing', 'written the day after')"); // 2026-01-02 17:00 UTC
+
+        Assert.True(PyDateTime.TryFromIsoFormat("2026-01-03T04:00:00+00:00", out var from));
+        Assert.True(PyDateTime.TryFromIsoFormat("2026-01-02T18:00:00+00:00", out var to));
+        var after = await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, new ActivityFilter(DateFrom: from), limit: 10, beforeId: null));
+        var before = await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, new ActivityFilter(DateTo: to), limit: 10, beforeId: null));
+
+        Assert.Equal(["written the day before"], after.Items.Select(row => row.Title));
+        Assert.Equal(["written the day after"], before.Items.Select(row => row.Title));
+    }
+
+    [Fact]
+    public async Task A_page_knows_whether_older_events_remain()
+    {
+        using var fixture = new StoreFixture();
+        await fixture.Execute(
+            "INSERT INTO activity_events (created_at, event_type, module, title) VALUES " +
+            "('2026-01-01 00:00:01', 'a.1', 'processing', 'one'), " +
+            "('2026-01-01 00:00:02', 'a.2', 'processing', 'two'), " +
+            "('2026-01-01 00:00:03', 'a.3', 'processing', 'three')");
+
+        var first = await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: null));
+        var second = await fixture.WithUnitOfWork(uow => ActivityHistoryStore.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: first.Items[^1].Id));
+
+        Assert.Equal(2, first.Items.Count);
+        Assert.True(first.HasMore);
+        Assert.Equal(["one"], second.Items.Select(row => row.Title));
+        Assert.False(second.HasMore);
     }
 
     /// <summary>

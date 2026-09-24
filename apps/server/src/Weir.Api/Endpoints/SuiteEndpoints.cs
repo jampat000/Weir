@@ -19,6 +19,7 @@ using Weir.Infrastructure.Browse;
 using Weir.Infrastructure.Http;
 using Weir.Infrastructure.Logging;
 using Weir.Infrastructure.Media;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Runtime;
 using Weir.Infrastructure.Settings;
 
@@ -172,6 +173,7 @@ public static class SuiteEndpoints
         }
 
         await request.CommitAsync().ConfigureAwait(false);
+        request.Service<ScanSettingsChanges>().Record();
         return ApiRoutes.Ok(await ConfigurationBundleStore.BuildAsync(uow).ConfigureAwait(false));
     }
 

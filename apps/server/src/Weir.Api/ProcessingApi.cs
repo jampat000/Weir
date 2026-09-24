@@ -46,6 +46,7 @@ public static class ProcessingApi
         // the same scan-dispatch enqueue above. Runs independently of the periodic scheduler — see
         // ProcessingWatchedFolderWatcherService's own docs for what it does.
         services.AddHostedService<ProcessingWatchedFolderWatcherService>();
+        services.AddHostedService<WorkFolderPlacementCheck>();
         return services;
     }
 

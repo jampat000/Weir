@@ -96,12 +96,14 @@ public sealed class ProcessingJobStore
     private readonly SqliteDatabase _database;
     private readonly TimeProvider _time;
     private readonly IJobQueueMetrics _metrics;
+    private readonly WorkerWakeSignals? _wakeSignals;
 
-    public ProcessingJobStore(SqliteDatabase database, TimeProvider time, IJobQueueMetrics? metrics = null)
+    public ProcessingJobStore(SqliteDatabase database, TimeProvider time, IJobQueueMetrics? metrics = null, WorkerWakeSignals? wakeSignals = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _metrics = metrics ?? NoJobQueueMetrics.Instance;
+        _wakeSignals = wakeSignals;
     }
 
     public SqliteDatabase Database => _database;
@@ -490,6 +492,9 @@ public sealed class ProcessingJobStore
         if (inserted is not null and not DBNull)
         {
             RecordQueueDepth(connection, transaction);
+            // Woken before this transaction commits, which is safe: a woken slot claims under BEGIN IMMEDIATE, so its claim
+            // waits for this write lock and sees the job once it is committed, or nothing if it rolls back.
+            _wakeSignals?.WakeAll();
         }
 
         return GetByDedupeKey(connection, transaction, dedupeKey)
