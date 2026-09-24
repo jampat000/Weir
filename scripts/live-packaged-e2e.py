@@ -14,6 +14,13 @@ The audit covers the authenticated routes, every Settings and System tab,
 the safe CRUD/test controls, responsive shell controls, and the public HTTP
 contract.  Screenshots and a machine-readable summary are written under the
 ignored ``artifacts/live-packaged-e2e`` directory.
+
+Against a Docker target, the container sees the audit's browser as the bridge
+gateway rather than loopback, so first-run bootstrap asks for a setup code.
+Set ``WEIR_LIVE_E2E_DOCKER_CONTAINER`` to the running container's name and
+the audit reads the code the way a remote operator would: from ``docker
+logs``, or the ``setup-code`` file under ``WEIR_LIVE_E2E_DOCKER_HOME``
+(default ``/data/weir``) if the log has rotated past it.
 """
 
 from __future__ import annotations
@@ -57,6 +64,11 @@ FIXTURE_SERVER_ROOT = os.environ.get(
     "WEIR_LIVE_E2E_FIXTURE_SERVER_ROOT", ""
 ).strip()
 FIXTURE_FFMPEG = os.environ.get("WEIR_LIVE_E2E_FFMPEG", "ffmpeg").strip()
+# The candidate's peer, seen from inside a Docker container, is the bridge gateway rather than
+# loopback, so bootstrap needs the one-time setup code the same way a remote operator would get it.
+# Unset for a target the audit reaches over real loopback (the developer fixture, a Windows smoke).
+DOCKER_CONTAINER = os.environ.get("WEIR_LIVE_E2E_DOCKER_CONTAINER", "").strip()
+DOCKER_WEIR_HOME = os.environ.get("WEIR_LIVE_E2E_DOCKER_HOME", "/data/weir").strip()
 TIMEOUT_MS = 30_000
 
 
@@ -74,6 +86,38 @@ def project_version() -> str:
 
 
 EXPECTED_VERSION = project_version()
+
+SETUP_CODE_LOG_PATTERN = re.compile(r"enter this setup code:\s*([A-Z0-9]{4}-[A-Z0-9]{4})")
+
+
+def read_docker_setup_code(container: str) -> str:
+    """Reads the one-time setup code the way a remote operator is told to: from the container's
+    own log line, or the setup-code file in its data folder if the log has since rotated past it."""
+
+    logs = subprocess.run(
+        ["docker", "logs", container],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    match = SETUP_CODE_LOG_PATTERN.search(logs.stdout + logs.stderr)
+    if match:
+        return match.group(1)
+
+    cat = subprocess.run(
+        ["docker", "exec", container, "cat", f"{DOCKER_WEIR_HOME}/setup-code"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    code = cat.stdout.strip()
+    if not code:
+        raise RuntimeError(
+            f"Found no setup code in {container}'s log or {DOCKER_WEIR_HOME}/setup-code."
+        )
+    return code
 
 
 class LiveAudit:
@@ -350,6 +394,16 @@ class LiveAudit:
             self.visible(setup_user, "first-time setup form is visible")
             setup_user.fill(AUDIT_USER)
             self.page.get_by_test_id("setup-password").fill(AUDIT_PASSWORD)
+            setup_code = self.page.get_by_test_id("setup-code")
+            if setup_code.count():
+                self.visible(
+                    setup_code, "setup code field is visible for this non-loopback peer"
+                )
+                self.require(
+                    bool(DOCKER_CONTAINER),
+                    "the target asked for a setup code but WEIR_LIVE_E2E_DOCKER_CONTAINER is not set",
+                )
+                setup_code.fill(read_docker_setup_code(DOCKER_CONTAINER))
             self.click(
                 self.page.get_by_test_id("setup-submit"), "first-time setup submit"
             )

@@ -1,4 +1,6 @@
+using System.Net;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -52,6 +54,10 @@ internal sealed class WeirTestServer : IAsyncDisposable
         var app = WeirServer.Build([], runtime, builder =>
         {
             builder.WebHost.UseTestServer();
+            // TestServer leaves Connection.RemoteIpAddress unset; the tray and every real browser reach
+            // Weir over loopback, so default to that here too. A test that needs a different peer sets one
+            // via TestServer.SendAsync before the pipeline runs (see PythonBugFixTests), which this does not override.
+            builder.Services.AddSingleton<IStartupFilter, LoopbackConnectionStartupFilter>();
             if (signedIn)
             {
                 builder.Services.AddSingleton<IOperatorAuthentication, SignedInAuthentication>();
@@ -137,5 +143,18 @@ internal sealed class WeirTestServer : IAsyncDisposable
     {
         public ValueTask<OperatorAuthenticationResult> AuthenticateAsync(HttpContext context) =>
             ValueTask.FromResult(OperatorAuthenticationResult.SignedIn);
+    }
+
+    private sealed class LoopbackConnectionStartupFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use((context, nextMiddleware) =>
+            {
+                context.Connection.RemoteIpAddress ??= IPAddress.Loopback;
+                return nextMiddleware(context);
+            });
+            next(app);
+        };
     }
 }

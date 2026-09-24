@@ -64,7 +64,7 @@ public static class AuthEndpoints
         var issues = new ValidationIssues();
         var model = new BodyModel(body, issues);
         var username = model.Str("username", minLength: 1, maxLength: 64);
-        var password = model.Str("password", minLength: 1);
+        var password = model.Str("password", minLength: 1, maxLength: 512);
         var csrfToken = model.Str("csrf_token", minLength: 1);
         var trustedDevice = model.Bool("trusted_device", defaultValue: false);
         model.Finish(ExtraFields.Forbid);
@@ -79,6 +79,16 @@ public static class AuthEndpoints
                 new Dictionary<string, string> { ["Retry-After"] = Math.Max(1, request.Options.AuthLoginRateWindowSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture) });
         }
 
+        var uname = username.Trim();
+        var accountWait = limiters.LoginUsernameBackoff.TimeUntilAllowed(uname);
+        if (accountWait > TimeSpan.Zero)
+        {
+            throw new ApiException(
+                StatusCodes.Status429TooManyRequests,
+                "Too many sign-in attempts for this account. Wait a few minutes, then try again.",
+                new Dictionary<string, string> { ["Retry-After"] = Math.Max(1, (long)Math.Ceiling(accountWait.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture) });
+        }
+
         var secret = request.RequireSessionSecret();
         request.ValidateBrowserPostOrigin();
         if (!request.VerifyCsrf(secret, csrfToken, allowAnonymous: true))
@@ -86,18 +96,23 @@ public static class AuthEndpoints
             throw new ApiException(StatusCodes.Status400BadRequest, InvalidCsrf);
         }
 
-        var uname = username.Trim();
         var uow = await request.DbAsync().ConfigureAwait(false);
         var result = await request.Auth.LoginAsync(
             uow, uname, password, trustedDevice, SessionRules.ClientLabelFromUserAgent(request.FirstHeader("User-Agent"))).ConfigureAwait(false);
         if (result is null)
         {
             Logger(request).LogWarning("auth event: login failed");
-            await ActivityStore.MaybeRecordLoginFailedAsync(uow, uname, request.Auth.Now()).ConfigureAwait(false);
+            limiters.LoginUsernameBackoff.RecordFailure(uname);
+            // A guess that also happens to name a real account is worth an activity trail entry; a typed
+            // password (people sometimes swap the two fields) is not something Weir writes to a log a
+            // viewer can read.
+            var existingAccount = await AuthStore.FindUserByLowerUsernameAsync(uow, uname.ToLowerInvariant()).ConfigureAwait(false);
+            await ActivityStore.MaybeRecordLoginFailedAsync(uow, existingAccount?.Username ?? "an unknown username", request.Auth.Now()).ConfigureAwait(false);
             await request.CommitAsync().ConfigureAwait(false);
             throw new ApiException(StatusCodes.Status401Unauthorized, "Invalid username or password.");
         }
 
+        limiters.LoginUsernameBackoff.RecordSuccess(uname);
         var (user, session, rawToken) = result.Value;
         Logger(request).LogInformation("auth event: login succeeded (user_id={UserId})", user.Id);
         await ActivityStore.RecordAsync(uow, ActivityEventTypes.AuthLoginSucceeded, "auth", "Signed in", user.Username).ConfigureAwait(false);
@@ -157,9 +172,12 @@ public static class AuthEndpoints
                 "the database, and verify WEIR_HOME / WEIR_DB_PATH.");
         }
 
+        var setupCodes = request.Service<SetupCodeGate>();
+        var requiresSetupCode = allowed && setupCodes.HasCode && !SetupCodeGate.IsLoopback(request.ClientHost);
         return ApiRoutes.Ok(new PyDict()
             .Set("bootstrap_allowed", allowed)
-            .Set("reason", allowed ? "no_admin_user" : "admin_already_exists"));
+            .Set("reason", allowed ? "no_admin_user" : "admin_already_exists")
+            .Set("requires_setup_code", requiresSetupCode));
     }
 
     private static async Task<ApiResult> PostBootstrapAsync(ApiRequest request)
@@ -170,6 +188,7 @@ public static class AuthEndpoints
         var username = model.Str("username", minLength: 1, maxLength: 64);
         var password = model.Str("password", minLength: PasswordPolicy.MinPasswordLength, maxLength: 512);
         var csrfToken = model.Str("csrf_token", minLength: 1);
+        var setupCode = model.OptionalStr("setup_code", maxLength: 32);
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
@@ -187,6 +206,14 @@ public static class AuthEndpoints
         if (!CsrfTokens.Verify(secret, csrfToken, null, allowAnonymous: true, request.Time))
         {
             throw new ApiException(StatusCodes.Status400BadRequest, InvalidCsrf);
+        }
+
+        var setupCodes = request.Service<SetupCodeGate>();
+        if (setupCodes.HasCode && !SetupCodeGate.IsLoopback(request.ClientHost) && !setupCodes.Validate(setupCode))
+        {
+            throw new ApiException(
+                StatusCodes.Status403Forbidden,
+                "This isn't the device Weir is running on. Enter the setup code from Weir's log or the setup-code file in its data folder.");
         }
 
         var logger = Logger(request);
@@ -219,6 +246,7 @@ public static class AuthEndpoints
 
         logger.LogInformation("auth event: bootstrap succeeded (user_id={UserId})", user.Id);
         await ActivityStore.RecordAsync(uow, ActivityEventTypes.AuthBootstrapSucceeded, "auth", "Initial admin created", user.Username).ConfigureAwait(false);
+        setupCodes.Clear();
         var suite = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
         await SuiteSettingsStore.UpdateAsync(uow, suite, suite with { SetupWizardState = "pending" }).ConfigureAwait(false);
         return ApiRoutes.Ok(new PyDict()

@@ -228,5 +228,26 @@ public static class WeirServer
         {
             logger.LogError(exception, "Weir startup step failed but startup will continue step={Step}", "inactive_session_cleanup");
         }
+
+        try
+        {
+            var setupCodes = app.Services.GetRequiredService<SetupCodeGate>();
+            var uow = UnitOfWork.OpenAsync(database).GetAwaiter().GetResult();
+            bool adminExists;
+            try
+            {
+                adminExists = !AuthService.BootstrapAllowedAsync(uow).GetAwaiter().GetResult();
+            }
+            finally
+            {
+                uow.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+
+            setupCodes.EnsureStateForStartup(adminExists, logger);
+        }
+        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or IOException or UnauthorizedAccessException)
+        {
+            logger.LogError(exception, "Weir startup step failed but startup will continue step={Step}", "setup_code_gate");
+        }
     }
 }

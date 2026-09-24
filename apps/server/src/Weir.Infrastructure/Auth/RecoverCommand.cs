@@ -57,6 +57,13 @@ public static class RecoverCommand
             return ExitFailed;
         }
 
+        if (parsed.Password is not null)
+        {
+            // A command-line argument is readable from shell history and, while the process runs, from
+            // the process list of anyone else on the machine; the prompt (omit --password) avoids both.
+            stderr.WriteLine("Warning: --password stays in your shell history and is visible in the process list while Weir recover runs. Omit it to be prompted instead.");
+        }
+
         // WeirOptionsLoader.Load neither creates the runtime directories nor checks the db path, and this
         // command runs without the server's startup, so both happen here.
         var options = WeirOptionsLoader.Load(runtime);

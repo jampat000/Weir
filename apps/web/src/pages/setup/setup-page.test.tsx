@@ -13,6 +13,7 @@ import { SetupPage } from "./setup-page";
 const navigateMock = vi.fn();
 const mutateAsyncMock = vi.fn();
 let bootstrapMutationError: unknown = null;
+let requiresSetupCode = false;
 
 vi.mock("react-router-dom", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router-dom")>();
@@ -27,7 +28,11 @@ vi.mock("../../lib/auth/queries", () => ({
   useBootstrapStatusQuery: () => ({
     isPending: false,
     isError: false,
-    data: { bootstrap_allowed: true, reason: "no_admin_user" },
+    data: {
+      bootstrap_allowed: true,
+      reason: "no_admin_user",
+      requires_setup_code: requiresSetupCode,
+    },
   }),
   useBootstrapMutation: () => ({
     isPending: false,
@@ -53,6 +58,7 @@ describe("SetupPage", () => {
     navigateMock.mockReset();
     mutateAsyncMock.mockReset();
     bootstrapMutationError = null;
+    requiresSetupCode = false;
   });
 
   it("blocks bootstrap submit when password is shorter than 8 characters", async () => {
@@ -93,6 +99,39 @@ describe("SetupPage", () => {
       expect(navigateMock).toHaveBeenCalledWith("/login?bootstrap=created", {
         replace: true,
       });
+    });
+  });
+
+  it("hides the setup code field when the peer does not need one", () => {
+    render(wrap(<SetupPage />));
+
+    expect(screen.queryByTestId("setup-code")).not.toBeInTheDocument();
+  });
+
+  it("requires and submits the setup code when the peer needs one", async () => {
+    requiresSetupCode = true;
+    mutateAsyncMock.mockResolvedValue({ message: "ok", username: "admin" });
+
+    render(wrap(<SetupPage />));
+
+    fireEvent.change(screen.getByTestId("setup-username"), {
+      target: { value: "admin" },
+    });
+    fireEvent.change(screen.getByTestId("setup-password"), {
+      target: { value: "password-strong" },
+    });
+    fireEvent.change(screen.getByTestId("setup-code"), {
+      target: { value: "ABCD-1234" },
+    });
+    fireEvent.submit(screen.getByTestId("setup-form"));
+
+    expect(mutateAsyncMock).toHaveBeenCalledWith({
+      username: "admin",
+      password: "password-strong",
+      setupCode: "ABCD-1234",
+    });
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalled();
     });
   });
 

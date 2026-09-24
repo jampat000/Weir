@@ -110,6 +110,9 @@ public sealed class SecurityHeadersMiddleware
         "frame-ancestors 'none'; " +
         "form-action 'self'";
 
+    /// <summary>No route uses the camera, microphone, geolocation, payment or USB APIs, so every frame is denied them.</summary>
+    private const string PermissionsPolicy = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+
     private static readonly HashSet<string> NoStoreExactPaths = new(StringComparer.Ordinal) { "/health", "/ready", "/readiness", "/metrics" };
 
     private readonly RequestDelegate _next;
@@ -124,6 +127,9 @@ public sealed class SecurityHeadersMiddleware
     public Task InvokeAsync(HttpContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        // Applied here even for the outermost error handler's 500 (ServerErrorMiddleware calls Apply
+        // itself before writing that response): every response leaving Weir carries the same baseline,
+        // not just the ones that reached routing.
         context.Response.OnStarting(() =>
         {
             if (!ResponseMarkers.IsServerError(context))
@@ -147,6 +153,9 @@ public sealed class SecurityHeadersMiddleware
             "Content-Security-Policy",
             contentType.StartsWith("text/html", StringComparison.Ordinal) ? HtmlContentSecurityPolicy : ApiContentSecurityPolicy);
         SetDefault(headers, "X-Frame-Options", "DENY");
+        SetDefault(headers, "Permissions-Policy", PermissionsPolicy);
+        SetDefault(headers, "Cross-Origin-Opener-Policy", "same-origin");
+        SetDefault(headers, "Cross-Origin-Resource-Policy", "same-origin");
         headers.Remove("Server");
 
         // API responses can include filesystem paths, credentials metadata and operator settings.

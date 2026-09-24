@@ -178,7 +178,9 @@ public sealed class AuthApiTests
         await using var server = await StartServerAsync(("WEIR_BOOTSTRAP_RATE_MAX_ATTEMPTS", "100"));
         var client = new ApiTestClient(server);
         using var status = await client.GetAsync("/api/v1/auth/bootstrap/status");
-        Assert.Equal("{\"bootstrap_allowed\":true,\"reason\":\"no_admin_user\"}", await status.Content.ReadAsStringAsync());
+        Assert.Equal(
+            "{\"bootstrap_allowed\":true,\"reason\":\"no_admin_user\",\"requires_setup_code\":false}",
+            await status.Content.ReadAsStringAsync());
 
         using var shortPassword = await client.PostAsync("/api/v1/auth/bootstrap", new { username = "owner1", password = "short", csrf_token = await client.CsrfAsync() });
         Assert.Equal(HttpStatusCode.UnprocessableEntity, shortPassword.StatusCode);
@@ -193,7 +195,9 @@ public sealed class AuthApiTests
         using var created = await client.PostAsync("/api/v1/auth/bootstrap", new { username = "owner1", password = "first-owner-pass-min8", csrf_token = await client.CsrfAsync() });
         Assert.Equal("{\"message\":\"Bootstrap complete. Sign in with POST /api/v1/auth/login.\",\"username\":\"owner1\"}", await created.Content.ReadAsStringAsync());
         using var closed = await client.GetAsync("/api/v1/auth/bootstrap/status");
-        Assert.Equal("{\"bootstrap_allowed\":false,\"reason\":\"admin_already_exists\"}", await closed.Content.ReadAsStringAsync());
+        Assert.Equal(
+            "{\"bootstrap_allowed\":false,\"reason\":\"admin_already_exists\",\"requires_setup_code\":false}",
+            await closed.Content.ReadAsStringAsync());
         await client.SignInAsync("owner1", "first-owner-pass-min8");
         Assert.Equal(2, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE event_type IN ('auth.bootstrap_succeeded', 'auth.login_succeeded')"));
         using var settings = await client.GetAsync("/api/v1/suite/settings");
@@ -241,6 +245,53 @@ public sealed class AuthApiTests
     }
 
     [Fact]
+    public async Task Repeated_failures_for_one_account_are_backed_off_even_under_a_generous_per_ip_limit()
+    {
+        await using var server = await StartServerAsync(("WEIR_AUTH_LOGIN_RATE_MAX_ATTEMPTS", "100"));
+        await TestDatabase.SeedAdminAsync(server);
+        await TestDatabase.SeedViewerAsync(server);
+        var client = new ApiTestClient(server);
+
+        // The sixth failure is the one that first exceeds UsernameLoginBackoff.FreeAttempts (5); the
+        // exact growth of the wait beyond this point is covered without wall-clock risk in
+        // UsernameLoginBackoffTests, which drives the limiter with a fake clock.
+        for (var i = 0; i < 6; i++)
+        {
+            using var response = await client.LoginAsync(password: "wrong");
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        using var backedOff = await client.LoginAsync(password: "wrong");
+        Assert.Equal(HttpStatusCode.TooManyRequests, backedOff.StatusCode);
+        Assert.Equal("2", Header(backedOff, "Retry-After"));
+        Assert.Equal("Too many sign-in attempts for this account. Wait a few minutes, then try again.", await Detail(backedOff));
+
+        // A different account is not caught by alice's backoff.
+        using var otherAccount = await client.LoginAsync("bob", "wrong-password-for-bob");
+        Assert.Equal(HttpStatusCode.Unauthorized, otherAccount.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_failed_login_records_the_typed_username_only_when_it_matches_an_account()
+    {
+        await using var server = await StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+
+        using var knownAccount = await client.LoginAsync(password: "wrong");
+        Assert.Equal(HttpStatusCode.Unauthorized, knownAccount.StatusCode);
+        using var guessedUsername = await client.LoginAsync(username: "not-a-real-account", password: "guess");
+        Assert.Equal(HttpStatusCode.Unauthorized, guessedUsername.StatusCode);
+
+        Assert.Equal("alice", await TestDatabase.ScalarStringAsync(
+            server, "SELECT detail FROM activity_events WHERE event_type = 'auth.login_failed' AND detail = 'alice'"));
+        Assert.Equal("an unknown username", await TestDatabase.ScalarStringAsync(
+            server, "SELECT detail FROM activity_events WHERE event_type = 'auth.login_failed' AND detail = 'an unknown username'"));
+        Assert.Null(await TestDatabase.ScalarStringAsync(
+            server, "SELECT detail FROM activity_events WHERE event_type = 'auth.login_failed' AND detail = 'not-a-real-account'"));
+    }
+
+    [Fact]
     public async Task Security_headers_are_set_on_health_and_api_responses()
     {
         await using var server = await StartServerAsync(("WEIR_SECURITY_ENABLE_HSTS", "1"));
@@ -254,6 +305,9 @@ public sealed class AuthApiTests
             Assert.Equal("default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'", Header(response, "Content-Security-Policy"));
             Assert.Equal("no-store, private", Header(response, "Cache-Control"));
             Assert.Equal("max-age=31536000; includeSubDomains", Header(response, "Strict-Transport-Security"));
+            Assert.Equal("camera=(), microphone=(), geolocation=(), payment=(), usb=()", Header(response, "Permissions-Policy"));
+            Assert.Equal("same-origin", Header(response, "Cross-Origin-Opener-Policy"));
+            Assert.Equal("same-origin", Header(response, "Cross-Origin-Resource-Policy"));
         }
     }
 

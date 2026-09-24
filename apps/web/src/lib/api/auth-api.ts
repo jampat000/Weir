@@ -113,13 +113,19 @@ export async function postLogout(): Promise<void> {
 export async function postBootstrap(
   username: string,
   password: string,
+  setupCode?: string,
 ): Promise<{ message: string; username: string }> {
   const csrf_token = await fetchCsrfToken();
   const path = "/api/v1/auth/bootstrap";
   const r = await apiFetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password, csrf_token }),
+    body: JSON.stringify({
+      username,
+      password,
+      csrf_token,
+      ...(setupCode ? { setup_code: setupCode } : {}),
+    }),
   });
   await requireOk(path, r, "Could not create the first user");
   return readJson(r);

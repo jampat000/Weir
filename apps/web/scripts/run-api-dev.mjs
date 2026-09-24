@@ -85,6 +85,9 @@ for (const [key, value] of Object.entries(process.env)) {
 childEnv.WEIR_HOME = (childEnv.WEIR_HOME || "").trim() || defaultDevHome;
 childEnv.WEIR_SESSION_SECRET =
   (childEnv.WEIR_SESSION_SECRET || "").trim() || defaultDevSessionSecret;
+// An unset WEIR_ENV now means production; this dev stack opts in to development explicitly
+// (the developer exception page, and pairing localhost/127.0.0.1 as the same origin).
+childEnv.WEIR_ENV = (childEnv.WEIR_ENV || "").trim() || "development";
 
 const child = spawn(
   "dotnet",

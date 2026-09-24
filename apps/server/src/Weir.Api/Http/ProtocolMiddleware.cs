@@ -33,10 +33,12 @@ internal static class ResponseMarkers
 public sealed class ServerErrorMiddleware
 {
     private readonly RequestDelegate _next;
+    private readonly WeirOptions _options;
 
-    public ServerErrorMiddleware(RequestDelegate next)
+    public ServerErrorMiddleware(RequestDelegate next, WeirOptions options)
     {
         _next = next;
+        _options = options;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -52,6 +54,10 @@ public sealed class ServerErrorMiddleware
         {
             context.Items[ResponseMarkers.ServerError] = true;
             context.Response.Clear();
+            context.Response.ContentType = "text/plain; charset=utf-8";
+            // SecurityHeadersMiddleware skips a response already marked ResponseMarkers.ServerError, so this
+            // 500 would otherwise leave with none of nosniff, the frame and permissions policy, or the rest.
+            SecurityHeadersMiddleware.Apply(context, _options.SecurityEnableHsts);
             await PyResponses.WritePlainTextAsync(context, StatusCodes.Status500InternalServerError, "Internal Server Error").ConfigureAwait(false);
         }
     }
@@ -310,7 +316,7 @@ public sealed class XRequestedWithMiddleware
         ArgumentNullException.ThrowIfNull(context);
         var request = context.Request;
         if (Mutating.Contains(request.Method) &&
-            (request.Path.Value ?? string.Empty).StartsWith("/api/", StringComparison.Ordinal) &&
+            (request.Path.Value ?? string.Empty).StartsWith("/api/", StringComparison.OrdinalIgnoreCase) &&
             request.Headers.ContainsKey("Origin"))
         {
             var xrw = (request.Headers["X-Requested-With"].FirstOrDefault() ?? string.Empty).Trim();

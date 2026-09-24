@@ -89,11 +89,15 @@ public sealed class AuthRateLimiters
         ArgumentNullException.ThrowIfNull(options);
         Login = new SlidingWindowLimiter(options.AuthLoginRateMaxAttempts, options.AuthLoginRateWindowSeconds, time);
         Bootstrap = new SlidingWindowLimiter(options.BootstrapRateMaxAttempts, options.BootstrapRateWindowSeconds, time);
+        LoginUsernameBackoff = new UsernameLoginBackoff(time);
     }
 
     public SlidingWindowLimiter Login { get; }
 
     public SlidingWindowLimiter Bootstrap { get; }
+
+    /// <summary>Per-account backoff on top of <see cref="Login"/>'s per-IP limit.</summary>
+    public UsernameLoginBackoff LoginUsernameBackoff { get; }
 
     /// <summary>True the first time only: the ignored-forwarded-headers warning is logged once per process.</summary>
     public bool ShouldWarnForwardedIgnored() => Interlocked.Exchange(ref _forwardedWarned, 1) == 0;
