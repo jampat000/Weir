@@ -9,6 +9,7 @@ using Weir.Core.Configuration;
 using Weir.Core.Readiness;
 using Weir.Core.Processing;
 using Weir.Core.Workers;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Endpoints;
@@ -76,17 +77,24 @@ public static class SystemEndpoints
         var options = services.GetRequiredService<WeirOptions>();
         var heartbeats = services.GetRequiredService<WorkerHeartbeats>();
         var databaseReady = await DatabaseIsConnectedAsync(services).ConfigureAwait(false);
-        var workers = heartbeats.Snapshot([new KeyValuePair<string, int>("processing", options.ProcessingWorkerCount)]);
+        var workers = heartbeats.Snapshot([
+            new KeyValuePair<string, int>("processing", options.ProcessingWorkerCount),
+            new KeyValuePair<string, int>(WorkLanes.UpkeepHeartbeatModule, options.ProcessingWorkerCount > 0 ? WorkLanes.UpkeepSlots : 0),
+        ]);
         // #552: the watcher (Weir.Infrastructure.Processing.ProcessingWatchedFolderWatcherService) reports here
         // through the shared WatcherStateStore singleton; a host that never registered the Processing watched-
         // folder area (a minimal test host) still reports "no libraries watched" rather than throwing.
         var watcherSummary = services.GetService<WatcherStateStore>()?.Summary() ?? ReadinessBuilder.NoWatchedLibraries;
+        // #718: recovery runs after Kestrel is listening, so a host that never registered the jobs area (a
+        // minimal test host) reads as already complete rather than stuck "starting" for ever.
+        var recoveryComplete = services.GetService<JobsStartupRecoveryService>()?.RecoveryCompleted.IsCompleted ?? true;
         var inputs = new ReadinessInputs(
             lifecycle.Elapsed,
             databaseReady,
             lifecycle.StartupComplete,
             workers,
-            watcherSummary);
+            watcherSummary,
+            recoveryComplete);
         return ReadinessBuilder.Build(inputs, WeirVersion.Resolve(options.VersionOverride));
     }
 
