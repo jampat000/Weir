@@ -12,16 +12,26 @@ namespace Weir.Infrastructure.Sqlite;
 /// the owner commits on success, and anything uncommitted is rolled back on dispose. That transaction is always <c>BEGIN IMMEDIATE</c> — see <see cref="EnsureTransaction"/> for why a
 /// deferred one could not survive another writer committing mid-unit (#586).
 /// </summary>
+/// <remarks>
+/// The only transaction mechanism server-wide (#745): every query, command, commit and rollback that runs
+/// inside a unit of work uses the <see cref="CancellationToken"/> it was opened with — there is one token per
+/// unit, not one per call, since every operation in a unit belongs to the same request or background pass and
+/// a caller that wants different cancellation semantics for part of its work opens a second unit of work with
+/// a different token (as the library clean handler's own-transaction history write already does). See
+/// <see cref="RollbackAsync"/> for what happens to that token once it is the reason the unit is rolling back.
+/// </remarks>
 public sealed class UnitOfWork : IAsyncDisposable
 {
+    private readonly CancellationToken _cancellationToken;
     private SqliteTransaction? _transaction;
     private List<Action>? _afterCommit;
     private Dictionary<string, object>? _items;
 
-    private UnitOfWork(SqliteDatabase database, SqliteConnection connection)
+    private UnitOfWork(SqliteDatabase database, SqliteConnection connection, CancellationToken cancellationToken)
     {
         Database = database;
         Connection = connection;
+        _cancellationToken = cancellationToken;
     }
 
     public SqliteDatabase Database { get; }
@@ -37,7 +47,7 @@ public sealed class UnitOfWork : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(database);
         var connection = await database.OpenAsync(cancellationToken).ConfigureAwait(false);
-        return new UnitOfWork(database, connection);
+        return new UnitOfWork(database, connection, cancellationToken);
     }
 
     /// <summary>
@@ -66,6 +76,24 @@ public sealed class UnitOfWork : IAsyncDisposable
     }
 
     /// <summary>
+    /// Begin this unit's transaction now, as a deferred <c>BEGIN</c>: no write lock, and every read that
+    /// follows shares one consistent snapshot (#636) instead of each running as its own short autocommit read.
+    /// For a caller that issues several reads on <see cref="Connection"/> directly and needs them to agree with
+    /// each other without contending with writers. Never write inside a unit begun this way: <see cref="EnsureTransaction"/>
+    /// would keep the deferred transaction rather than upgrading it, reintroducing the <c>SQLITE_BUSY_SNAPSHOT</c>
+    /// failure that <see cref="EnsureTransaction"/>'s own remarks describe (#586).
+    /// </summary>
+    public void BeginRead()
+    {
+        if (_transaction is not null)
+        {
+            throw new InvalidOperationException("A transaction is already open.");
+        }
+
+        _transaction = Connection.BeginTransaction(IsolationLevel.Serializable, deferred: true);
+    }
+
+    /// <summary>
     /// The write transaction, begun now if this unit of work has not written yet: for code that issues its own
     /// commands on <see cref="Connection"/> as part of this unit of work (the job queue's enqueue). Such code
     /// may read before it writes, so this is the call that most depends on the transaction being immediate
@@ -77,13 +105,17 @@ public sealed class UnitOfWork : IAsyncDisposable
         return _transaction!;
     }
 
+    /// <summary>The transaction begun by <see cref="BeginRead"/>, for a caller that issues its own commands on <see cref="Connection"/>.</summary>
+    public SqliteTransaction ReadTransaction() =>
+        _transaction ?? throw new InvalidOperationException("Call BeginRead() first.");
+
     public async Task<int> ExecuteAsync(string sql, params (string Name, object? Value)[] parameters)
     {
         EnsureTransaction();
         var command = Create(sql, parameters);
         await using (command.ConfigureAwait(false))
         {
-            return await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+            return await command.ExecuteNonQueryAsync(_cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -94,7 +126,7 @@ public sealed class UnitOfWork : IAsyncDisposable
         var command = Create(sql, parameters);
         await using (command.ConfigureAwait(false))
         {
-            return await command.ExecuteScalarAsync().ConfigureAwait(false);
+            return await command.ExecuteScalarAsync(_cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -103,7 +135,7 @@ public sealed class UnitOfWork : IAsyncDisposable
         var command = Create(sql, parameters);
         await using (command.ConfigureAwait(false))
         {
-            return await command.ExecuteScalarAsync().ConfigureAwait(false);
+            return await command.ExecuteScalarAsync(_cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -116,11 +148,11 @@ public sealed class UnitOfWork : IAsyncDisposable
         var command = Create(sql, parameters);
         await using (command.ConfigureAwait(false))
         {
-            var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+            var reader = await command.ExecuteReaderAsync(_cancellationToken).ConfigureAwait(false);
             await using (reader.ConfigureAwait(false))
             {
                 var rows = new List<T>();
-                while (await reader.ReadAsync().ConfigureAwait(false))
+                while (await reader.ReadAsync(_cancellationToken).ConfigureAwait(false))
                 {
                     rows.Add(map(reader));
                 }
@@ -141,7 +173,7 @@ public sealed class UnitOfWork : IAsyncDisposable
     {
         if (_transaction is not null)
         {
-            await _transaction.CommitAsync().ConfigureAwait(false);
+            await _transaction.CommitAsync(_cancellationToken).ConfigureAwait(false);
             await _transaction.DisposeAsync().ConfigureAwait(false);
             _transaction = null;
         }
@@ -155,6 +187,17 @@ public sealed class UnitOfWork : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Roll back and drop this unit's transaction, if it has one. Runs on dispose whenever the unit was never
+    /// committed, so this is what an exception or a cancelled operation actually undoes.
+    /// </summary>
+    /// <remarks>
+    /// A caller whose own operation was cancelled reaches this with a token that is already cancelled, but the
+    /// rollback itself must still complete — a ROLLBACK abandoned half-way leaves the transaction, and the
+    /// write lock it may hold, open on a connection that is about to go back into the pool (#640). There is
+    /// nothing left worth cancelling at this point, so a cancelled token rolls back with
+    /// <see cref="CancellationToken.None"/> instead of propagating it into the ROLLBACK statement.
+    /// </remarks>
     public async Task RollbackAsync()
     {
         _afterCommit = null;
@@ -164,9 +207,10 @@ public sealed class UnitOfWork : IAsyncDisposable
             return;
         }
 
+        var rollbackToken = _cancellationToken.IsCancellationRequested ? CancellationToken.None : _cancellationToken;
         try
         {
-            await _transaction.RollbackAsync().ConfigureAwait(false);
+            await _transaction.RollbackAsync(rollbackToken).ConfigureAwait(false);
         }
         finally
         {

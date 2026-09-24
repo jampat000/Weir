@@ -43,22 +43,24 @@ public sealed partial class ProcessingJobStore
 
     public SqliteDatabase Database => _database;
 
-    /// <summary>Run <paramref name="work"/> in one <c>BEGIN IMMEDIATE</c> transaction and commit.</summary>
+    /// <summary>
+    /// Run <paramref name="work"/> in one <c>BEGIN IMMEDIATE</c> transaction and commit. The queue's own
+    /// synchronous helpers (<see cref="Execute"/>, <see cref="Scalar"/> and the static methods in the other
+    /// partial files) take a raw connection and transaction rather than the async <see cref="UnitOfWork"/>
+    /// API, so this hands them the ones <see cref="UnitOfWork"/> itself opened and committed (#745): one
+    /// transaction mechanism server-wide, with this as the queue's calling convention on top of it.
+    /// </summary>
     public async Task<T> InTransactionAsync<T>(Func<SqliteConnection, SqliteTransaction, T> work, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(work);
-        var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using (connection.ConfigureAwait(false))
+        var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
+        await using (uow.ConfigureAwait(false))
         {
-            // Not deferred: Microsoft.Data.Sqlite issues BEGIN IMMEDIATE, taking the write lock up front.
-            var transaction = connection.BeginTransaction(deferred: false);
-            await using (transaction.ConfigureAwait(false))
-            {
-                var result = work(connection, transaction);
-                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-                Activity.ActivityNotifications.TransactionCommitted(_database, transaction);
-                return result;
-            }
+            var transaction = uow.WriteTransaction();
+            var result = work(uow.Connection, transaction);
+            await uow.CommitAsync().ConfigureAwait(false);
+            Activity.ActivityNotifications.TransactionCommitted(_database, transaction);
+            return result;
         }
     }
 
@@ -71,14 +73,11 @@ public sealed partial class ProcessingJobStore
     public async Task<T> ReadAsync<T>(Func<SqliteConnection, SqliteTransaction, T> read, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(read);
-        var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using (connection.ConfigureAwait(false))
+        var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
+        await using (uow.ConfigureAwait(false))
         {
-            var transaction = connection.BeginTransaction(deferred: true);
-            await using (transaction.ConfigureAwait(false))
-            {
-                return read(connection, transaction);
-            }
+            uow.BeginRead();
+            return read(uow.Connection, uow.ReadTransaction());
         }
     }
 
