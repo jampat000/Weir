@@ -1,4 +1,9 @@
-import { Navigate, useSearchParams } from "react-router-dom";
+import {
+  Navigate,
+  useBlocker,
+  useSearchParams,
+  type Location,
+} from "react-router-dom";
 import { systemAddressForSettingsTab } from "../../app/legacy-redirects";
 import {
   WorkspacePage,
@@ -13,6 +18,11 @@ import { CleanupTab } from "./tabs/cleanup/cleanup-tab";
 import { PerformanceTab } from "./tabs/performance/performance-tab";
 import { RulesTab } from "./tabs/rules/rules-tab";
 import { ScheduleTab } from "./tabs/schedule/schedule-tab";
+import {
+  LeaveWithoutSavingDialog,
+  UnsavedChangesScope,
+  useUnsavedChangesRegistry,
+} from "./unsaved-changes";
 
 type TabId =
   | "libraries"
@@ -60,6 +70,15 @@ function normalizeSettingsTab(candidate: string | null | undefined): TabId {
   }
 }
 
+function tabOf(location: Location): TabId {
+  return normalizeSettingsTab(new URLSearchParams(location.search).get("tab"));
+}
+
+/** Leaving Settings, or moving to another of its tabs, would unmount the panel holding the edits. */
+function leavesPanel(current: Location, next: Location): boolean {
+  return current.pathname !== next.pathname || tabOf(current) !== tabOf(next);
+}
+
 /**
  * Settings: how Weir treats your media, in the order someone sets Weir up in: where the media is, what
  * to keep, who to tell, then how hard to work and when. Weir itself (what it runs, what it keeps, who
@@ -69,6 +88,12 @@ export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   // The address is the tab, so Back, Forward and the side menu move between tabs too.
   const tab = normalizeSettingsTab(searchParams.get("tab"));
+  const { unsaved, register } = useUnsavedChangesRegistry();
+  // Tabs, Back and Forward, and the side menu are all navigation, so one blocker asks for all of them.
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      unsaved !== null && leavesPanel(currentLocation, nextLocation),
+  );
 
   function setSettingsTab(nextTab: TabId): void {
     const nextParams = new URLSearchParams(searchParams);
@@ -103,22 +128,36 @@ export function SettingsPage() {
         dataTestId="settings-section-tabs"
       />
       <WorkspacePanel id="settings-panel" labelledBy={`settings-tab-${tab}`}>
-        {tab === "libraries" ? (
-          <LibrariesTab />
-        ) : tab === "rules" ? (
-          <RulesTab />
-        ) : tab === "media-managers" ? (
-          <MediaManagersTab />
-        ) : tab === "performance" ? (
-          <PerformanceTab />
-        ) : tab === "cleanup" ? (
-          <CleanupTab />
-        ) : tab === "schedule" ? (
-          <ScheduleTab />
-        ) : (
-          <AlertsTab />
-        )}
+        <UnsavedChangesScope register={register}>
+          <SettingsTabPanel tab={tab} />
+        </UnsavedChangesScope>
       </WorkspacePanel>
+      {blocker.state === "blocked" && unsaved !== null ? (
+        <LeaveWithoutSavingDialog
+          thing={unsaved}
+          onStay={() => blocker.reset()}
+          onLeave={() => blocker.proceed()}
+        />
+      ) : null}
     </WorkspacePage>
   );
+}
+
+function SettingsTabPanel({ tab }: { tab: TabId }) {
+  switch (tab) {
+    case "libraries":
+      return <LibrariesTab />;
+    case "rules":
+      return <RulesTab />;
+    case "media-managers":
+      return <MediaManagersTab />;
+    case "performance":
+      return <PerformanceTab />;
+    case "cleanup":
+      return <CleanupTab />;
+    case "schedule":
+      return <ScheduleTab />;
+    case "alerts":
+      return <AlertsTab />;
+  }
 }

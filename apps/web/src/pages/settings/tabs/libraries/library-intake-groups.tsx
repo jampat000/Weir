@@ -157,7 +157,7 @@ export function LibraryReadinessGroup({
         <TextSetting
           binding={binding}
           name="scan_interval_seconds"
-          label="Fallback scan interval (seconds)"
+          label="Look for new files every (seconds)"
           width="short"
         />
       </div>

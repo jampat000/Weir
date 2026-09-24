@@ -79,6 +79,94 @@ it("draws a malformed grid as unrestricted instead of inventing a schedule", () 
   );
 });
 
+it("names every hour by its day, time and state", () => {
+  render(
+    <ScheduleGridEditor
+      value={"0".repeat(SLOTS_PER_WEEK)}
+      onChange={vi.fn()}
+    />,
+  );
+
+  expect(
+    screen.getByRole("button", { name: "Monday 09:00, off" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Sunday 23:00, off" }),
+  ).toBeInTheDocument();
+});
+
+it("puts one hour in the tab order, so Tab reaches the grid once", () => {
+  render(<ScheduleGridEditor value="" onChange={vi.fn()} />);
+
+  const reachable = screen
+    .getAllByRole("button")
+    .filter((button) => button.dataset.testid?.startsWith("schedule-cell-"))
+    .filter((button) => button.tabIndex === 0);
+  expect(reachable).toHaveLength(1);
+});
+
+it("moves between hours and days with the arrow keys", () => {
+  render(<ScheduleGridEditor value="" onChange={vi.fn()} />);
+  const start = screen.getByTestId("schedule-cell-0-0");
+  start.focus();
+
+  fireEvent.keyDown(start, { key: "ArrowRight" });
+  expect(screen.getByTestId("schedule-cell-0-1")).toHaveFocus();
+
+  fireEvent.keyDown(screen.getByTestId("schedule-cell-0-1"), {
+    key: "ArrowDown",
+  });
+  expect(screen.getByTestId("schedule-cell-1-1")).toHaveFocus();
+  expect(screen.getByTestId("schedule-cell-1-1").tabIndex).toBe(0);
+  expect(screen.getByTestId("schedule-cell-0-0").tabIndex).toBe(-1);
+});
+
+it("stops at the edges of the week instead of wrapping", () => {
+  render(<ScheduleGridEditor value="" onChange={vi.fn()} />);
+  const start = screen.getByTestId("schedule-cell-0-0");
+  start.focus();
+
+  fireEvent.keyDown(start, { key: "ArrowUp" });
+  fireEvent.keyDown(start, { key: "ArrowLeft" });
+
+  expect(start).toHaveFocus();
+});
+
+it("switches the focused hour with Space and with Enter", () => {
+  const onChange = vi.fn();
+  render(
+    <ScheduleGridEditor
+      value={"0".repeat(SLOTS_PER_WEEK)}
+      onChange={onChange}
+    />,
+  );
+  const monday9 = screen.getByTestId("schedule-cell-0-9");
+
+  fireEvent.keyDown(monday9, { key: " " });
+  fireEvent.keyDown(monday9, { key: "Enter" });
+
+  expect(onChange).toHaveBeenCalledTimes(2);
+  const written: string = onChange.mock.calls[0][0];
+  expect(written.slice(9 * 4, 9 * 4 + 4)).toBe("1111");
+});
+
+it("paints every hour a pointer drags across", () => {
+  const onChange = vi.fn();
+  render(
+    <ScheduleGridEditor
+      value={"0".repeat(SLOTS_PER_WEEK)}
+      onChange={onChange}
+    />,
+  );
+
+  fireEvent.pointerDown(screen.getByTestId("schedule-cell-0-9"));
+  fireEvent.pointerEnter(screen.getByTestId("schedule-cell-0-10"));
+
+  expect(onChange).toHaveBeenCalledTimes(2);
+  const second: string = onChange.mock.calls[1][0];
+  expect(second.slice(10 * 4, 10 * 4 + 4)).toBe("1111");
+});
+
 it("does not let a viewer change the grid", () => {
   const onChange = vi.fn();
   render(<ScheduleGridEditor value="" onChange={onChange} disabled />);

@@ -27,7 +27,7 @@ export function useChannelRemoval() {
     deleteMutation.mutate(id, {
       onSuccess: () => setPending(null),
       onError: (err) =>
-        setError(errorMessage(err, "Could not remove this channel.")),
+        setError(errorMessage(err, "Could not remove this alert.")),
     });
   };
   const deletingId = deleteMutation.isPending
@@ -50,13 +50,13 @@ export function RemoveChannelDialog({
       description={
         <>
           <p>
-            Weir will stop sending job notifications to {channel.label}. Its
-            address and the events it listens for go with it.
+            Weir will stop sending alerts to {channel.label}. Its address and
+            the events it listens for go with it.
           </p>
-          <p>Other channels keep working. This cannot be undone.</p>
+          <p>Other alerts keep working. This cannot be undone.</p>
         </>
       }
-      confirmLabel="Remove channel"
+      confirmLabel="Remove alert"
       busy={removal.deletingId === channel.id}
       error={removal.error}
       onCancel={removal.cancel}

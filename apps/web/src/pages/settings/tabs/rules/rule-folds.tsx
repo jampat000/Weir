@@ -85,7 +85,7 @@ const CONTAINER_RULES = [
   },
   {
     name: "remove_title",
-    label: "Container title",
+    label: "The file's built-in title",
     detail: "Remove the container title only.",
   },
   {
@@ -104,7 +104,7 @@ const CONTAINER_RULES = [
 export function ContainerFold({ binding }: { binding: RuleSetBinding }) {
   return (
     <RuleFold
-      title="Remove from container"
+      title="Also remove"
       detail="Optional streams and tags Weir strips after it has chosen the tracks."
       on={countOn(CONTAINER_RULES.map((rule) => binding.draft[rule.name]))}
       of={CONTAINER_RULES.length}

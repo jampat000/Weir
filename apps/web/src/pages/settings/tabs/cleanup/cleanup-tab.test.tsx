@@ -58,13 +58,19 @@ function state(over: Partial<MaintenanceState> = {}): MaintenanceState {
   };
 }
 
-function setup(data: MaintenanceState, role = "operator") {
+function setup(
+  data: MaintenanceState,
+  role = "operator",
+  options: { savePending?: boolean } = {},
+) {
   vi.spyOn(authQueries, "useMeQuery").mockReturnValue({
     data: { role },
   } as ReturnType<typeof authQueries.useMeQuery>);
   vi.spyOn(maintenanceQueries, "useProcessingMaintenanceQuery").mockReturnValue(
     {
       data,
+      isPending: false,
+      isError: false,
     } as ReturnType<typeof maintenanceQueries.useProcessingMaintenanceQuery>,
   );
   vi.spyOn(
@@ -78,13 +84,15 @@ function setup(data: MaintenanceState, role = "operator") {
     "useProcessingOperatorSettingsQuery",
   ).mockReturnValue({
     data: { file_log_retention_days: 90 },
+    isPending: false,
+    isError: false,
   } as ReturnType<typeof processingQueries.useProcessingOperatorSettingsQuery>);
   vi.spyOn(
     processingQueries,
     "useProcessingOperatorSettingsSaveMutation",
   ).mockReturnValue({
     mutateAsync: saveSettings,
-    isPending: false,
+    isPending: options.savePending ?? false,
   } as unknown as ReturnType<
     typeof processingQueries.useProcessingOperatorSettingsSaveMutation
   >);
@@ -129,7 +137,7 @@ it("lists each job with its switch, how often it runs and when it next does", as
   expect(cleanup).toHaveTextContent("Off");
 });
 
-it("switches a job on and changes how often it runs, straight away", async () => {
+it("asks for confirmation before switching on a destructive job, then saves once confirmed", async () => {
   setup(state());
   saveSettings.mockResolvedValue({});
 
@@ -138,6 +146,14 @@ it("switches a job on and changes how often it runs, straight away", async () =>
     "processing-maintenance-failure_cleanup",
   );
   fireEvent.click(within(cleanup).getByRole("radio", { name: "On" }));
+
+  expect(saveSettings).not.toHaveBeenCalled();
+  const dialog = await screen.findByTestId(
+    "processing-maintenance-confirm-failure_cleanup-enable",
+  );
+  expect(dialog).toHaveTextContent('Switch on "Downloads of failed files"?');
+  fireEvent.click(within(dialog).getByRole("button", { name: "Switch on" }));
+
   await waitFor(() =>
     expect(saveSettings).toHaveBeenCalledWith({
       failure_cleanup_enabled: true,
@@ -146,6 +162,11 @@ it("switches a job on and changes how often it runs, straight away", async () =>
   expect(
     await screen.findByTestId("processing-maintenance-notice"),
   ).toHaveTextContent("Downloads of failed files is on.");
+  expect(
+    screen.queryByTestId(
+      "processing-maintenance-confirm-failure_cleanup-enable",
+    ),
+  ).not.toBeInTheDocument();
 
   fireEvent.change(
     within(cleanup).getByRole("combobox", {
@@ -158,6 +179,80 @@ it("switches a job on and changes how often it runs, straight away", async () =>
       failure_cleanup_interval_seconds: 86400,
     }),
   );
+});
+
+it("switches off a destructive job straight away, with no confirmation", async () => {
+  setup(
+    state({
+      families: [
+        {
+          family: "failure_cleanup",
+          enabled: true,
+          description: "Removes the source release folder.",
+          pending: 0,
+          running: 0,
+          last_completed_at: null,
+          last_failed_at: null,
+          last_error: null,
+        },
+      ],
+    }),
+  );
+  saveSettings.mockResolvedValue({});
+
+  render(<CleanupTab />, { wrapper });
+  const cleanup = await screen.findByTestId(
+    "processing-maintenance-failure_cleanup",
+  );
+  fireEvent.click(within(cleanup).getByRole("radio", { name: "Off" }));
+
+  await waitFor(() =>
+    expect(saveSettings).toHaveBeenCalledWith({
+      failure_cleanup_enabled: false,
+    }),
+  );
+  expect(
+    screen.queryByTestId(
+      "processing-maintenance-confirm-failure_cleanup-enable",
+    ),
+  ).not.toBeInTheDocument();
+});
+
+it("switches on a non-destructive job straight away, with no confirmation", async () => {
+  setup(
+    state({
+      families: [
+        {
+          family: "work_temp_stale_sweep",
+          enabled: false,
+          description: "Reclaims Weir's own stale working files.",
+          pending: 0,
+          running: 0,
+          last_completed_at: null,
+          last_failed_at: null,
+          last_error: null,
+        },
+      ],
+    }),
+  );
+  saveSettings.mockResolvedValue({});
+
+  render(<CleanupTab />, { wrapper });
+  const sweep = await screen.findByTestId(
+    "processing-maintenance-work_temp_stale_sweep",
+  );
+  fireEvent.click(within(sweep).getByRole("radio", { name: "On" }));
+
+  await waitFor(() =>
+    expect(saveSettings).toHaveBeenCalledWith({
+      work_temp_stale_sweep_enabled: true,
+    }),
+  );
+  expect(
+    screen.queryByTestId(
+      "processing-maintenance-confirm-work_temp_stale_sweep-enable",
+    ),
+  ).not.toBeInTheDocument();
 });
 
 it("carries the warning where the switch is", async () => {
@@ -208,10 +303,62 @@ it("shows the server's own words when nothing was queued", async () => {
   fireEvent.click(
     await screen.findByTestId("processing-maintenance-run-failure_cleanup"),
   );
+  const dialog = await screen.findByTestId(
+    "processing-maintenance-confirm-failure_cleanup-run",
+  );
+  fireEvent.click(within(dialog).getByRole("button", { name: "Run now" }));
 
   expect(
     await screen.findByTestId("processing-maintenance-notice"),
   ).toHaveTextContent(/already waiting or running/);
+});
+
+it("asks for confirmation before running a destructive job now", async () => {
+  setup(state());
+  mutate.mockResolvedValue({ queued: true, detail: "Queued." });
+
+  render(<CleanupTab />, { wrapper });
+  fireEvent.click(
+    await screen.findByTestId("processing-maintenance-run-failure_cleanup"),
+  );
+
+  expect(mutate).not.toHaveBeenCalled();
+  const dialog = await screen.findByTestId(
+    "processing-maintenance-confirm-failure_cleanup-run",
+  );
+  expect(dialog).toHaveTextContent('Run "Downloads of failed files" now?');
+  fireEvent.click(within(dialog).getByRole("button", { name: "Run now" }));
+
+  await waitFor(() =>
+    expect(mutate).toHaveBeenCalledWith({
+      family: "failure_cleanup",
+      mediaScope: "movie",
+    }),
+  );
+  expect(
+    screen.queryByTestId("processing-maintenance-confirm-failure_cleanup-run"),
+  ).not.toBeInTheDocument();
+});
+
+it("cancels a destructive job's confirmation without saving or running it", async () => {
+  setup(state());
+
+  render(<CleanupTab />, { wrapper });
+  const cleanup = await screen.findByTestId(
+    "processing-maintenance-failure_cleanup",
+  );
+  fireEvent.click(within(cleanup).getByRole("radio", { name: "On" }));
+  const dialog = await screen.findByTestId(
+    "processing-maintenance-confirm-failure_cleanup-enable",
+  );
+  fireEvent.click(within(dialog).getByRole("button", { name: "Keep it" }));
+
+  expect(
+    screen.queryByTestId(
+      "processing-maintenance-confirm-failure_cleanup-enable",
+    ),
+  ).not.toBeInTheDocument();
+  expect(saveSettings).not.toHaveBeenCalled();
 });
 
 it("reports a running family rather than showing it as idle", async () => {
@@ -264,7 +411,7 @@ it("surfaces the reason a run failed", async () => {
   ).toHaveTextContent("The work folder was missing.");
 });
 
-it("lists unclaimed hand-backs, off, and saves how long a copy waits", async () => {
+it("lists cleaned copies nobody picked up, off, and saves how long a copy waits", async () => {
   setup(
     state({
       families: [
@@ -293,18 +440,20 @@ it("lists unclaimed hand-backs, off, and saves how long a copy waits", async () 
   const unclaimed = await screen.findByTestId(
     "processing-maintenance-unclaimed_handbacks",
   );
-  expect(unclaimed).toHaveTextContent("Unclaimed hand-backs");
+  expect(unclaimed).toHaveTextContent("Cleaned copies nobody picked up");
   expect(within(unclaimed).getByRole("radio", { name: "Off" })).toHaveAttribute(
     "aria-checked",
     "true",
   );
   expect(
     within(unclaimed).getByRole("combobox", {
-      name: "How often Unclaimed hand-backs runs",
+      name: "How often Cleaned copies nobody picked up runs",
     }),
   ).toHaveValue("21600");
 
-  const wait = screen.getByLabelText("Unclaimed hand-backs wait for");
+  const wait = screen.getByLabelText(
+    "Cleaned copies nobody picked up wait for",
+  );
   expect(wait).toHaveValue(14);
   fireEvent.change(wait, { target: { value: "30" } });
   fireEvent.click(
@@ -319,7 +468,29 @@ it("lists unclaimed hand-backs, off, and saves how long a copy waits", async () 
   );
   expect(
     await screen.findByTestId("processing-maintenance-notice"),
-  ).toHaveTextContent("Unclaimed hand-backs now wait 30 days.");
+  ).toHaveTextContent("Cleaned copies nobody picked up now wait 30 days.");
+});
+
+it("shows the Save button as pending while a day-count setting is saving", async () => {
+  setup(state());
+
+  const { rerender } = render(<CleanupTab />, { wrapper });
+
+  const retention = await screen.findByTestId(
+    "processing-maintenance-file-history",
+  );
+  fireEvent.change(screen.getByLabelText("Keep file history for"), {
+    target: { value: "30" },
+  });
+  expect(
+    within(retention).getByRole("button", { name: "Save" }),
+  ).not.toBeDisabled();
+
+  setup(state(), "operator", { savePending: true });
+  rerender(<CleanupTab />);
+
+  const button = within(retention).getByRole("button", { name: "Saving…" });
+  expect(button).toBeDisabled();
 });
 
 it("does not offer a viewer the run buttons", async () => {
@@ -330,5 +501,61 @@ it("does not offer a viewer the run buttons", async () => {
   await screen.findByTestId("processing-maintenance-work_temp_stale_sweep");
   expect(
     screen.queryByTestId("processing-maintenance-run-work_temp_stale_sweep"),
+  ).not.toBeInTheDocument();
+});
+
+it("shows a load error instead of an empty state when maintenance data fails to load", async () => {
+  setup(state());
+  vi.spyOn(maintenanceQueries, "useProcessingMaintenanceQuery").mockReturnValue(
+    {
+      data: undefined,
+      isPending: false,
+      isError: true,
+    } as ReturnType<typeof maintenanceQueries.useProcessingMaintenanceQuery>,
+  );
+
+  render(<CleanupTab />, { wrapper });
+
+  expect(await screen.findByTestId("settings-load-error")).toHaveTextContent(
+    "Weir couldn’t load your cleanup settings. Reload the page to try again.",
+  );
+  expect(
+    screen.queryByText("No cleanup jobs are available on this instance."),
+  ).not.toBeInTheDocument();
+});
+
+it("shows a load error when operator settings fail to load, even though maintenance data arrived", async () => {
+  setup(state());
+  vi.spyOn(
+    processingQueries,
+    "useProcessingOperatorSettingsQuery",
+  ).mockReturnValue({
+    data: undefined,
+    isPending: false,
+    isError: true,
+  } as ReturnType<typeof processingQueries.useProcessingOperatorSettingsQuery>);
+
+  render(<CleanupTab />, { wrapper });
+
+  expect(await screen.findByTestId("settings-load-error")).toBeInTheDocument();
+});
+
+it("shows a loading state rather than the empty state while data is still arriving", async () => {
+  setup(state());
+  vi.spyOn(maintenanceQueries, "useProcessingMaintenanceQuery").mockReturnValue(
+    {
+      data: undefined,
+      isPending: true,
+      isError: false,
+    } as ReturnType<typeof maintenanceQueries.useProcessingMaintenanceQuery>,
+  );
+
+  render(<CleanupTab />, { wrapper });
+
+  expect(
+    await screen.findByText("Loading cleanup settings"),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText("No cleanup jobs are available on this instance."),
   ).not.toBeInTheDocument();
 });

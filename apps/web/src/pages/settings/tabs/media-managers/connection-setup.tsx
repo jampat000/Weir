@@ -1,11 +1,16 @@
 import { useState } from "react";
 
+import { ConfirmDialog } from "../../../../components/ui/confirm-dialog";
+import { errorMessage } from "../../../../lib/api/error-message";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import type { useGenerateMediaManagerWebhookSecret } from "../../../../lib/media-managers/queries";
 import {
   mmActionButtonClass,
   mmTechnicalMonoSmallClass,
 } from "../../../../lib/ui/mm-control-roles";
+import { RevealedSecret } from "./revealed-secret";
+
+const SECRET_FAILURE = "The secret could not be created.";
 
 /**
  * The API returns a path, but this gets pasted into another app on another machine, so it needs the
@@ -49,6 +54,46 @@ function ArrInstructions({ name }: { name: string }) {
 }
 
 /**
+ * Replacing a secret is the one setup action that breaks something already working: the manager's
+ * webhook stops being accepted the moment the old secret is gone, until the new one is pasted in.
+ * Creating a first secret breaks nothing, so only replace confirms.
+ */
+function ReplaceSecretDialog({
+  connection,
+  secret,
+  onClose,
+  onReplaced,
+}: {
+  connection: MediaManagerConnection;
+  secret: ReturnType<typeof useGenerateMediaManagerWebhookSecret>;
+  onClose: () => void;
+  onReplaced: (value: string) => void;
+}) {
+  return (
+    <ConfirmDialog
+      testId="media-manager-replace-secret-confirm"
+      title={`Replace ${connection.name}'s secret?`}
+      description={`Replacing the secret stops ${connection.name} reaching Weir until you paste the new one into it.`}
+      confirmLabel="Replace secret"
+      busy={secret.isPending}
+      error={secret.isError ? errorMessage(secret.error, SECRET_FAILURE) : null}
+      onCancel={() => {
+        secret.reset();
+        onClose();
+      }}
+      onConfirm={() =>
+        secret.mutate(connection.id, {
+          onSuccess: (data) => {
+            onReplaced(data.webhook_secret);
+            onClose();
+          },
+        })
+      }
+    />
+  );
+}
+
+/**
  * The address and secret are needed once, when wiring the other app up, so they are folded away and
  * the card answers "is it connected" at a glance. The browser's own disclosure triangle is hidden,
  * so the summary carries a Show / Hide link instead.
@@ -64,6 +109,19 @@ export function ConnectionSetup({
   busy: boolean;
 }) {
   const [revealed, setRevealed] = useState<string | null>(null);
+  const [confirmingReplace, setConfirmingReplace] = useState(false);
+
+  const startSecret = () => {
+    if (connection.webhook_secret_is_set) {
+      secret.reset();
+      setConfirmingReplace(true);
+      return;
+    }
+    secret.mutate(connection.id, {
+      onSuccess: (data) => setRevealed(data.webhook_secret),
+    });
+  };
+
   return (
     <details
       className="group mt-4 border-t border-mm-border pt-3 text-xs text-mm-text3"
@@ -96,16 +154,13 @@ export function ConnectionSetup({
         </p>
 
         {revealed ? (
-          <div
-            className="mt-2 rounded bg-mm-card-bg p-2"
-            data-testid="media-manager-secret"
-          >
-            <code className={mmTechnicalMonoSmallClass}>{revealed}</code>
-            <span className="mt-1 block text-mm-text3">
-              Copy this into {connection.name} now — Weir will not show it
-              again.
-            </span>
-          </div>
+          <RevealedSecret managerName={connection.name} secret={revealed} />
+        ) : null}
+
+        {!confirmingReplace && secret.isError ? (
+          <p className="mm-status-text--failed mt-2 text-xs" role="alert">
+            {errorMessage(secret.error, SECRET_FAILURE)}
+          </p>
         ) : null}
 
         <button
@@ -113,16 +168,21 @@ export function ConnectionSetup({
           data-testid="media-manager-generate-secret"
           className={`mt-3 ${mmActionButtonClass({ variant: "secondary" })}`}
           disabled={busy}
-          onClick={() =>
-            secret.mutate(connection.id, {
-              onSuccess: (data) => setRevealed(data.webhook_secret),
-            })
-          }
+          onClick={startSecret}
         >
           {connection.webhook_secret_is_set
             ? "Replace the secret"
             : "Create a secret"}
         </button>
+
+        {confirmingReplace ? (
+          <ReplaceSecretDialog
+            connection={connection}
+            secret={secret}
+            onClose={() => setConfirmingReplace(false)}
+            onReplaced={setRevealed}
+          />
+        ) : null}
       </div>
     </details>
   );

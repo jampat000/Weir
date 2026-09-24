@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 import { Field, type FieldWidth } from "../../../../components/shared/field";
+import { ServerFolderPickerButton } from "../../../../components/ui/server-folder-picker-button";
 import type {
   LibraryForm,
   LibraryTextField,
@@ -45,6 +46,57 @@ export function TextSetting({
         disabled={!binding.editable}
       />
     </Field>
+  );
+}
+
+/**
+ * A folder on the machine running Weir: typed, or chosen with Browse. Not wrapped in one label like
+ * the other fields, because the folder picker opens inside it and a click in the picker would
+ * otherwise land on the text box.
+ */
+export function FolderSetting({
+  binding,
+  name,
+  label,
+  placeholder = "",
+  hint,
+}: {
+  binding: LibraryFormBinding;
+  name: LibraryTextField;
+  label: string;
+  placeholder?: string;
+  hint?: string;
+}) {
+  const id = useId();
+  const hintId = useId();
+  return (
+    <div className="mm-field mm-field--wide">
+      <label className="mm-field__label" htmlFor={id}>
+        {label}
+      </label>
+      <div className="mm-folder-field">
+        <input
+          id={id}
+          className="mm-input"
+          value={binding.form[name]}
+          placeholder={placeholder}
+          aria-describedby={hint ? hintId : undefined}
+          onChange={(e) => binding.update({ [name]: e.target.value })}
+          disabled={!binding.editable}
+        />
+        <ServerFolderPickerButton
+          title={`Choose the ${label.toLowerCase()}`}
+          value={binding.form[name]}
+          disabled={!binding.editable}
+          onSelect={(path) => binding.update({ [name]: path })}
+        />
+      </div>
+      {hint ? (
+        <span id={hintId} className="mm-field__hint">
+          {hint}
+        </span>
+      ) : null}
+    </div>
   );
 }
 

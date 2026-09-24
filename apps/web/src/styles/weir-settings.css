@@ -1,4 +1,5 @@
-/* Settings › Libraries: the library editor's switches, date windows and folds, and the import list. */
+/* Settings: the library editor's switches, date windows and folds, the import list, and what every
+   panel shares. */
 
 .mm-library-toggles {
   display: grid;
@@ -83,4 +84,20 @@
 
 .mm-discovered-library:focus-within {
   outline: 2px solid var(--mm-accent);
+}
+
+/* A folder field: the path, and Browse beside it, which wraps under it where there is no room. */
+.mm-folder-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+/* Every Settings panel: the one line at its top that says how it saves (save-model-note.tsx). */
+.mm-save-model {
+  color: var(--mm-text3);
+  font-size: var(--mm-type-caption);
+  font-weight: 500;
 }

@@ -60,6 +60,9 @@ it("lists each device with its note and source, and saves the chosen ids", async
       "Shows which of your devices can play each file without your media server converting it. Information only — Weir never changes a file because of this.",
     ),
   ).toBeInTheDocument();
+  expect(
+    screen.getByText("Nothing changes until you press Save."),
+  ).toBeInTheDocument();
   expect(screen.getByText("Apple's built-in player.")).toBeInTheDocument();
   const source = screen.getByRole("link", { name: "Source for Apple TV 4K" });
   expect(source).toHaveAttribute(

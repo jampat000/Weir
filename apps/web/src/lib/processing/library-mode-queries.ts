@@ -10,7 +10,6 @@ import {
   fetchLibraryFiles,
   fetchLibraryOverview,
   fetchLibrarySettings,
-  saveLibraryFolders,
   saveLibrarySettings,
   setLibraryFileLeaveAlone,
   setLibrarySchedule,
@@ -30,17 +29,6 @@ export function useLibrarySettingsQuery(libraryId: number, enabled = true) {
     queryKey: processingKeys.librarySettings(libraryId),
     queryFn: () => fetchLibrarySettings(libraryId),
     enabled: enabled && libraryId > 0,
-  });
-}
-
-export function useSaveLibraryFolders(libraryId: number) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (folders: string[]) => saveLibraryFolders(libraryId, folders),
-    onSuccess: () =>
-      void qc.invalidateQueries({
-        queryKey: processingKeys.librarySettings(libraryId),
-      }),
   });
 }
 

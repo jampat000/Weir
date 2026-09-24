@@ -206,7 +206,8 @@
 .mm-week {
   display: grid;
   gap: 2px;
-  width: 16rem;
+  width: 100%;
+  max-width: 16rem;
 }
 
 .mm-week__day {
@@ -237,11 +238,54 @@
 }
 
 .mm-schedule-actions {
-  white-space: nowrap;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5rem;
 }
 
-.mm-schedule-actions > * + * {
-  margin-left: 0.5rem;
+/* The schedule's tables stack into rows below 900px, not the usual 760px: a week, a state and two
+   buttons do not share a tablet-width row without the page scrolling sideways. */
+@media (max-width: 900px) {
+  .mm-schedule-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .mm-schedule-table,
+  .mm-schedule-table tbody,
+  .mm-schedule-table tr,
+  .mm-schedule-table th,
+  .mm-schedule-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .mm-schedule-table tbody tr {
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--mm-border);
+  }
+
+  .mm-schedule-table tbody th,
+  .mm-schedule-table tbody td {
+    padding: 0.15rem 0;
+    border-bottom: 0;
+  }
+
+  .mm-schedule-table tbody td {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  .mm-schedule-table tbody td::before {
+    content: attr(data-label);
+    color: var(--mm-text3);
+    font-size: var(--mm-type-caption);
+  }
 }
 
 .mm-schedule-link {
@@ -295,6 +339,7 @@
 
 .mm-library-cleaning__add {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
 }

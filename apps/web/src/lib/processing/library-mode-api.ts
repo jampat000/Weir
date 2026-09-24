@@ -79,13 +79,6 @@ export async function fetchLibrarySettings(
   return readJson<LibrarySettings>(r);
 }
 
-export async function saveLibraryFolders(
-  libraryId: number,
-  library_folders: string[],
-): Promise<LibrarySettings> {
-  return saveLibrarySettings(libraryId, { library_folders });
-}
-
 /**
  * PUTs library-mode settings. `library_folders` is required on every call (the API replaces the whole list, not
  * just the fields sent, when it is present — an absent list is read as "no folders", not "leave unchanged"), so a

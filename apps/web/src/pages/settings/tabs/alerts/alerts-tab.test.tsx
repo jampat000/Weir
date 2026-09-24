@@ -200,3 +200,30 @@ describe("SettingsNotificationsTab removal confirmation", () => {
     expect(screen.getByText("Ops webhook")).toBeInTheDocument();
   });
 });
+
+describe("AlertsTab loading and errors", () => {
+  it("shows a loading state before alerts arrive", () => {
+    vi.spyOn(api, "fetchNotificationChannels").mockReturnValue(
+      new Promise(() => {}),
+    );
+
+    render(<AlertsTab />, { wrapper });
+
+    expect(screen.getByText("Loading alerts")).toBeInTheDocument();
+  });
+
+  it("says alerts could not be loaded instead of showing none", async () => {
+    vi.spyOn(api, "fetchNotificationChannels").mockRejectedValue(
+      new Error("boom"),
+    );
+
+    render(<AlertsTab />, { wrapper });
+
+    expect(await screen.findByTestId("settings-load-error")).toHaveTextContent(
+      "Weir couldn’t load your alerts. Reload the page to try again.",
+    );
+    expect(
+      screen.queryByText(/No alerts configured yet/),
+    ).not.toBeInTheDocument();
+  });
+});

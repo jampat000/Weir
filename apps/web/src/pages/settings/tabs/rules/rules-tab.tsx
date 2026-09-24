@@ -21,6 +21,9 @@ import {
 import { useProcessingMetadataProviderQuery } from "../../../../lib/processing/metadata-provider-queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { plural } from "../../../../lib/ui/mm-plural";
+import { SaveModelNote } from "../../save-model-note";
+import { SettingsLoadError } from "../../settings-load-error";
+import { useLeaveConfirmation, useUnsavedChanges } from "../../unsaved-changes";
 import {
   MetadataProviderSection,
   useProviderDraft,
@@ -28,7 +31,10 @@ import {
 import { ProfileBar } from "./profile-bar";
 import { ProfileRules } from "./profile-rules";
 import type { RuleSetBinding } from "./rule-set-fields";
-import { EMPTY_RULE_SET } from "./rule-set-model";
+import { EMPTY_RULE_SET, sameRuleSet } from "./rule-set-model";
+
+/** What the new-profile workspace is called while it has no saved name yet. */
+const NEW_PROFILE_THING = "the new profile";
 
 function ProfileActions({
   creating,
@@ -123,12 +129,30 @@ export function RulesTab() {
     }
   }, [creating, draft, ruleSets.data, selectedId]);
 
-  if (ruleSets.isLoading || provider.isLoading || me.isPending) {
-    return <PageLoading label="Loading rule sets" />;
-  }
-
   const rows = ruleSets.data ?? [];
   const selectedRuleSet = rows.find((row) => row.id === selectedId);
+
+  // A saved profile is dirty once its draft diverges from what is on the server; a new one is dirty
+  // from the moment its workspace opens, since nothing about it exists to fall back to.
+  const dirtyThing = creating
+    ? draft !== null
+      ? NEW_PROFILE_THING
+      : null
+    : selectedRuleSet &&
+        draft &&
+        !sameRuleSet(draft, writeFromProcessingRuleSet(selectedRuleSet))
+      ? selectedRuleSet.name
+      : null;
+  useUnsavedChanges(dirtyThing);
+  const { confirmLeave, dialog: leaveDialog } = useLeaveConfirmation();
+
+  if (ruleSets.isPending || provider.isPending || me.isPending) {
+    return <PageLoading label="Loading profiles" />;
+  }
+  if (ruleSets.isError || provider.isError) {
+    return <SettingsLoadError what="profiles" />;
+  }
+
   const disabled =
     !editable || createRuleSet.isPending || updateRuleSet.isPending;
   const binding: RuleSetBinding | null = draft
@@ -153,9 +177,22 @@ export function RulesTab() {
     setNotice(null);
   };
 
+  const startNewProfile = () => {
+    setCreating(true);
+    setSwitches((n) => n + 1);
+    open(null, { ...EMPTY_RULE_SET });
+  };
+
+  const switchTo = (id: number) => {
+    const selected = rows.find((row) => row.id === id);
+    setCreating(false);
+    setSwitches((n) => n + 1);
+    open(id, selected ? writeFromProcessingRuleSet(selected) : null);
+  };
+
   const save = () => {
     if (!draft || !draft.name.trim()) {
-      setNotice("Give this rule set a name before saving it.");
+      setNotice("Give this profile a name before saving it.");
       return;
     }
     setNotice(null);
@@ -170,7 +207,7 @@ export function RulesTab() {
         setNotice(`${saved.name} was saved.`);
       })
       .catch((error: unknown) =>
-        setNotice(errorMessage(error, "That rule set could not be saved.")),
+        setNotice(errorMessage(error, "That profile could not be saved.")),
       );
   };
 
@@ -183,12 +220,13 @@ export function RulesTab() {
         setNotice(`${selectedRuleSet.name} was removed.`);
       },
       onError: (error) =>
-        setNotice(errorMessage(error, "That rule set could not be removed.")),
+        setNotice(errorMessage(error, "That profile could not be removed.")),
     });
   };
 
   return (
     <div className="mm-quiet-stack" data-testid="processing-rule-set-workspace">
+      <SaveModelNote model="explicit" />
       <QuietSection
         headingId="processing-rule-set-profiles-heading"
         heading="Profiles"
@@ -198,11 +236,7 @@ export function RulesTab() {
               type="button"
               className="mm-quiet-link"
               disabled={!editable}
-              onClick={() => {
-                setCreating(true);
-                setSwitches((n) => n + 1);
-                open(null, { ...EMPTY_RULE_SET });
-              }}
+              onClick={() => confirmLeave(dirtyThing, startNewProfile)}
             >
               New profile →
             </button>
@@ -215,11 +249,7 @@ export function RulesTab() {
           creating={creating}
           binding={binding}
           usedBy={usedBy}
-          onSelect={(id) => {
-            const selected = rows.find((row) => row.id === id);
-            setSwitches((n) => n + 1);
-            open(id, selected ? writeFromProcessingRuleSet(selected) : null);
-          }}
+          onSelect={(id) => confirmLeave(dirtyThing, () => switchTo(id))}
         />
         {!binding ? (
           <div className="mt-5">
@@ -256,13 +286,14 @@ export function RulesTab() {
 
       {confirmingRemove && selectedRuleSet ? (
         <ConfirmDialog
-          title={`Remove the rule set “${selectedRuleSet.name}”?`}
-          confirmLabel="Remove rule set"
+          title={`Remove the profile “${selectedRuleSet.name}”?`}
+          confirmLabel="Remove profile"
           testId="remove-rule-set-dialog"
           onCancel={() => setConfirmingRemove(false)}
           onConfirm={remove}
         />
       ) : null}
+      {leaveDialog}
     </div>
   );
 }

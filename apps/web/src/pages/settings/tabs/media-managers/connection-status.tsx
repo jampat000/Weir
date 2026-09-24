@@ -61,10 +61,34 @@ export function ConnectionStatusPanel({
       ) : null}
       {result === null && connection.enabled ? (
         <p className="mt-2 text-xs text-mm-text2">
-          Weir checks it within a minute, or press Test connection.
+          Weir checks it within a minute, or press Test.
         </p>
       ) : null}
     </div>
+  );
+}
+
+const UNSIGNED_WEBHOOK_WARNING = (managerName: string) =>
+  `This connection accepts webhooks without a secret. Create a secret and add it to ${managerName}.`;
+
+/**
+ * The field's own string content is never shown; its presence is only the signal that this
+ * connection has no secret protecting its webhook (#701).
+ */
+export function UnsignedWebhookWarning({
+  connection,
+}: {
+  connection: MediaManagerConnection;
+}) {
+  if (connection.unsigned_webhook_warning === null) return null;
+  return (
+    <p
+      className="mm-status-text--warning mt-2 text-xs"
+      role="alert"
+      data-testid="media-manager-unsigned-webhook-warning"
+    >
+      {UNSIGNED_WEBHOOK_WARNING(connection.name)}
+    </p>
   );
 }
 

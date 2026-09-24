@@ -1,43 +1,70 @@
-import { useCallback, useState } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
 
-const SLOTS_PER_HOUR = 4;
-const SLOTS_PER_DAY = 24 * SLOTS_PER_HOUR;
-const SLOTS_PER_WEEK = 7 * SLOTS_PER_DAY;
-/** Monday first, matching the backend's weekday convention. */
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+import {
+  DAY_FULL_NAMES,
+  DAY_NAMES,
+  HOURS_PER_DAY,
+  SLOTS_PER_WEEK,
+  hourIsOn,
+  withHour,
+} from "./schedule-model";
 
-export function emptyGrid(): string {
-  return "";
+/** Hour labels are drawn every six hours, so 24 narrow columns stay readable. */
+const HOUR_LABEL_EVERY = 6;
+const LAST_DAY = DAY_NAMES.length - 1;
+const LAST_HOUR = HOURS_PER_DAY - 1;
+
+type Cell = { day: number; hour: number };
+
+function clamp(value: number, max: number): number {
+  return Math.min(Math.max(value, 0), max);
 }
 
-function normalized(grid: string): string {
-  if (grid.length === SLOTS_PER_WEEK && !/[^01]/.test(grid)) return grid;
-  // Anything unusable is drawn as "no restriction", which is what the backend does with
-  // it too — a display that invented a schedule would be worse than one that shows none.
-  return "1".repeat(SLOTS_PER_WEEK);
-}
-
-function withSlot(grid: string, index: number, on: boolean): string {
-  const base = normalized(grid);
-  return `${base.slice(0, index)}${on ? "1" : "0"}${base.slice(index + 1)}`;
-}
-
-function hourIsOn(grid: string, day: number, hour: number): boolean {
-  const base = normalized(grid);
-  const start = day * SLOTS_PER_DAY + hour * SLOTS_PER_HOUR;
-  for (let i = 0; i < SLOTS_PER_HOUR; i += 1) {
-    if (base[start + i] === "1") return true;
+/** Where an arrow, Home or End key moves the focus from `cell`, or null for any other key. */
+function cellAfterKey(cell: Cell, key: string): Cell | null {
+  switch (key) {
+    case "ArrowRight":
+      return { ...cell, hour: clamp(cell.hour + 1, LAST_HOUR) };
+    case "ArrowLeft":
+      return { ...cell, hour: clamp(cell.hour - 1, LAST_HOUR) };
+    case "ArrowDown":
+      return { ...cell, day: clamp(cell.day + 1, LAST_DAY) };
+    case "ArrowUp":
+      return { ...cell, day: clamp(cell.day - 1, LAST_DAY) };
+    case "Home":
+      return { ...cell, hour: 0 };
+    case "End":
+      return { ...cell, hour: LAST_HOUR };
+    default:
+      return null;
   }
-  return false;
 }
 
-function setHour(grid: string, day: number, hour: number, on: boolean): string {
-  let next = normalized(grid);
-  const start = day * SLOTS_PER_DAY + hour * SLOTS_PER_HOUR;
-  for (let i = 0; i < SLOTS_PER_HOUR; i += 1) {
-    next = withSlot(next, start + i, on);
-  }
-  return next;
+function cellName(day: number, hour: number, on: boolean): string {
+  return `${DAY_FULL_NAMES[day]} ${String(hour).padStart(2, "0")}:00, ${on ? "on" : "off"}`;
+}
+
+/**
+ * One cell in the tab order at a time (a roving tab stop): Tab reaches the grid once, and the arrow
+ * keys move within it, so the page after it is one Tab away rather than 168.
+ */
+function useRovingCell() {
+  const [active, setActive] = useState<Cell>({ day: 0, hour: 0 });
+  const cells = useRef(new Map<string, HTMLButtonElement>());
+  const keyOf = (cell: Cell) => `${cell.day}-${cell.hour}`;
+  return {
+    isActive: (cell: Cell) =>
+      active.day === cell.day && active.hour === cell.hour,
+    setActive,
+    register: (cell: Cell) => (element: HTMLButtonElement | null) => {
+      if (element) cells.current.set(keyOf(cell), element);
+      else cells.current.delete(keyOf(cell));
+    },
+    moveTo: (cell: Cell) => {
+      setActive(cell);
+      cells.current.get(keyOf(cell))?.focus();
+    },
+  };
 }
 
 export interface ScheduleGridEditorProps {
@@ -49,7 +76,8 @@ export interface ScheduleGridEditorProps {
 /**
  * A 7x24 schedule. The stored grid is quarter-hour resolution, but the editor works in whole hours:
  * 168 targets are usable with a mouse and 672 are not. An hour toggle writes all four of its quarters,
- * and a 15-minute boundary can still be set through the API.
+ * and a 15-minute boundary can still be set through the API. Drag across it with a pointer, or use the
+ * arrow keys and Space or Enter (#692).
  */
 export function ScheduleGridEditor({
   value,
@@ -57,14 +85,25 @@ export function ScheduleGridEditor({
   disabled = false,
 }: ScheduleGridEditorProps) {
   const [painting, setPainting] = useState<boolean | null>(null);
+  const roving = useRovingCell();
 
-  const toggle = useCallback(
-    (day: number, hour: number, on: boolean) => {
-      if (disabled) return;
-      onChange(setHour(value, day, hour, on));
-    },
-    [disabled, onChange, value],
-  );
+  const toggle = (day: number, hour: number, on: boolean) => {
+    if (disabled) return;
+    onChange(withHour(value, day, hour, on));
+  };
+
+  const onKeyDown = (event: KeyboardEvent, cell: Cell, on: boolean) => {
+    if (event.key === " " || event.key === "Enter") {
+      event.preventDefault();
+      toggle(cell.day, cell.hour, !on);
+      return;
+    }
+    const next = cellAfterKey(cell, event.key);
+    if (next) {
+      event.preventDefault();
+      roving.moveTo(next);
+    }
+  };
 
   const unrestricted = value.length !== SLOTS_PER_WEEK;
 
@@ -73,37 +112,48 @@ export function ScheduleGridEditor({
       <p className="text-xs text-mm-text3">
         {unrestricted
           ? "No schedule set — this library runs at any time. Select hours to limit it."
-          : "Selected hours are when Weir may start work. Work already running finishes."}
+          : "Selected hours are when Weir may start work. Work already running finishes."}{" "}
+        Drag across the hours, or use the arrow keys and press Space to switch
+        one on or off.
       </p>
       <div
         className="mm-schedule-grid-body"
+        role="group"
+        aria-label="Hours in the week"
         onPointerUp={() => setPainting(null)}
         onPointerLeave={() => setPainting(null)}
       >
         <div className="mm-schedule-grid-hours" aria-hidden="true">
           <span />
-          {Array.from({ length: 24 }, (_, hour) => (
-            <span key={hour}>{hour % 6 === 0 ? hour : ""}</span>
+          {Array.from({ length: HOURS_PER_DAY }, (_, hour) => (
+            <span key={hour}>{hour % HOUR_LABEL_EVERY === 0 ? hour : ""}</span>
           ))}
         </div>
-        {DAYS.map((label, day) => (
+        {DAY_NAMES.map((label, day) => (
           <div className="mm-schedule-grid-row" key={label}>
-            <span className="mm-schedule-grid-day">{label}</span>
-            {Array.from({ length: 24 }, (_, hour) => {
+            <span className="mm-schedule-grid-day" aria-hidden="true">
+              {label}
+            </span>
+            {Array.from({ length: HOURS_PER_DAY }, (_, hour) => {
+              const cell = { day, hour };
               const on = hourIsOn(value, day, hour);
               return (
                 <button
                   key={hour}
+                  ref={roving.register(cell)}
                   type="button"
                   disabled={disabled}
+                  tabIndex={roving.isActive(cell) ? 0 : -1}
                   className={
                     on
                       ? "mm-schedule-cell mm-schedule-cell-on"
                       : "mm-schedule-cell"
                   }
                   aria-pressed={on}
-                  aria-label={`${label} ${String(hour).padStart(2, "0")}:00`}
+                  aria-label={cellName(day, hour, on)}
                   data-testid={`schedule-cell-${day}-${hour}`}
+                  onFocus={() => roving.setActive(cell)}
+                  onKeyDown={(event) => onKeyDown(event, cell, on)}
                   onPointerDown={() => {
                     setPainting(!on);
                     toggle(day, hour, !on);
@@ -125,7 +175,7 @@ export function ScheduleGridEditor({
           disabled={disabled}
           className="mm-theme-toggle"
           data-testid="schedule-clear"
-          onClick={() => onChange(emptyGrid())}
+          onClick={() => onChange("")}
         >
           Any time
         </button>

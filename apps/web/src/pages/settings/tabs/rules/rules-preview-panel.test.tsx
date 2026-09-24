@@ -155,7 +155,9 @@ it("previews a file and renders the per-track plan, notes, and estimate", async 
     }),
   );
 
-  expect(await screen.findByText("A remux would run")).toBeInTheDocument();
+  expect(
+    await screen.findByText("Weir would rewrite this file"),
+  ).toBeInTheDocument();
   expect(screen.getByText("h264")).toBeInTheDocument();
   expect(screen.getAllByText("Keep")).toHaveLength(2);
   expect(screen.getByText("Drop")).toBeInTheDocument();

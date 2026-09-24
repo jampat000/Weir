@@ -10,6 +10,7 @@ import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import * as api from "../../../../lib/processing/library-mode-api";
+import { useLibraryCleaningDraft } from "./library-cleaning-draft";
 import { LibraryCleaningSettings } from "./library-cleaning-settings";
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -26,15 +27,28 @@ const settings: api.LibrarySettings = {
   skip_if_manager_would_redownload: true,
 };
 
+/** The settings as the library editor holds them, with the editor's Save standing in as a button. */
+function Editor() {
+  const cleaning = useLibraryCleaningDraft(3);
+  return (
+    <>
+      <LibraryCleaningSettings libraryId={3} cleaning={cleaning} editable />
+      <button type="button" onClick={() => void cleaning.save()}>
+        Editor save
+      </button>
+    </>
+  );
+}
+
 afterEach(() => vi.restoreAllMocks());
 
-it("asks before the daily clean is switched on, and sends the confirmation with it", async () => {
+it("asks before the daily clean is switched on, and sends the confirmation with it on Save", async () => {
   vi.spyOn(api, "fetchLibrarySettings").mockResolvedValue(settings);
   const setSchedule = vi
     .spyOn(api, "setLibrarySchedule")
     .mockResolvedValue({ ...settings, library_schedule_enabled: true });
 
-  render(<LibraryCleaningSettings libraryId={3} editable />, { wrapper });
+  render(<Editor />, { wrapper });
 
   expect(await screen.findByText("D:\\Media\\Movies")).toBeInTheDocument();
   const daily = screen.getByRole("radiogroup", {
@@ -42,29 +56,45 @@ it("asks before the daily clean is switched on, and sends the confirmation with 
   });
   fireEvent.click(within(daily).getByRole("radio", { name: "On" }));
   // Nothing is switched on until the person has read what it does.
-  expect(setSchedule).not.toHaveBeenCalled();
   expect(screen.getByRole("alertdialog")).toHaveTextContent(
     "Removed tracks cannot be put back.",
   );
-
   fireEvent.click(screen.getByRole("button", { name: "Switch it on" }));
+  expect(setSchedule).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Editor save" }));
   await waitFor(() => expect(setSchedule).toHaveBeenCalledWith(3, true, true));
 });
 
-it("adds a folder to the ones already saved", async () => {
+it("adds a folder to the ones already saved, and saves it only with the library", async () => {
   vi.spyOn(api, "fetchLibrarySettings").mockResolvedValue(settings);
-  const save = vi.spyOn(api, "saveLibraryFolders").mockResolvedValue(settings);
+  const save = vi.spyOn(api, "saveLibrarySettings").mockResolvedValue(settings);
 
-  render(<LibraryCleaningSettings libraryId={3} editable />, { wrapper });
+  render(<Editor />, { wrapper });
 
   fireEvent.change(await screen.findByLabelText("Folder to add"), {
     target: { value: "E:\\More Movies" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
+  expect(screen.getByText("E:\\More Movies")).toBeInTheDocument();
+  expect(save).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Editor save" }));
   await waitFor(() =>
-    expect(save).toHaveBeenCalledWith(3, [
-      "D:\\Media\\Movies",
-      "E:\\More Movies",
-    ]),
+    expect(save).toHaveBeenCalledWith(3, {
+      library_folders: ["D:\\Media\\Movies", "E:\\More Movies"],
+      clean_hardlinked_files: false,
+      skip_if_manager_would_redownload: true,
+    }),
+  );
+});
+
+it("says so when these settings could not be loaded", async () => {
+  vi.spyOn(api, "fetchLibrarySettings").mockRejectedValue(new Error("boom"));
+
+  render(<Editor />, { wrapper });
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Weir couldn’t load these settings. Reload the page to try again.",
   );
 });

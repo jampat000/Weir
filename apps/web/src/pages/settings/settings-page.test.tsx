@@ -34,9 +34,17 @@ vi.mock("./tabs/cleanup/cleanup-tab", () => ({
 vi.mock("./tabs/schedule/schedule-tab", () => ({
   ScheduleTab: () => <div>Schedule content</div>,
 }));
-vi.mock("./tabs/alerts/alerts-tab", () => ({
-  AlertsTab: () => <div>Alerts content</div>,
-}));
+// Alerts stands in for any panel with an edit not yet saved; the flag says whether it has one.
+const alerts = vi.hoisted(() => ({ unsaved: null as string | null }));
+vi.mock("./tabs/alerts/alerts-tab", async () => {
+  const { useUnsavedChanges } = await import("./unsaved-changes");
+  return {
+    AlertsTab: () => {
+      useUnsavedChanges(alerts.unsaved);
+      return <div>Alerts content</div>;
+    },
+  };
+});
 
 function renderAt(entry: string) {
   const router = createMemoryRouter(
@@ -101,5 +109,50 @@ describe("SettingsPage", () => {
     // The side menu's Settings link is a plain /settings.
     await act(() => router.navigate("/settings"));
     expect(selectedTab()).toBe("Libraries");
+  });
+
+  describe("with unsaved changes on a tab", () => {
+    afterEach(() => {
+      alerts.unsaved = null;
+    });
+
+    it("asks before moving to another tab, and stays when told to", () => {
+      alerts.unsaved = "the Discord alert";
+      const router = renderAt("/settings?tab=alerts");
+
+      fireEvent.click(screen.getByRole("tab", { name: "Rules" }));
+
+      expect(screen.getByTestId("settings-unsaved-changes")).toHaveTextContent(
+        "You have unsaved changes to the Discord alert. Leave without saving?",
+      );
+      fireEvent.click(screen.getByTestId("settings-unsaved-changes-cancel"));
+      expect(router.state.location.search).toBe("?tab=alerts");
+      expect(selectedTab()).toBe("Alerts");
+    });
+
+    it("moves on once the person chooses to leave without saving", async () => {
+      alerts.unsaved = "the Discord alert";
+      const router = renderAt("/settings?tab=alerts");
+
+      fireEvent.click(screen.getByRole("tab", { name: "Rules" }));
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("settings-unsaved-changes-confirm"));
+      });
+
+      expect(router.state.location.search).toBe("?tab=rules");
+      expect(selectedTab()).toBe("Rules");
+    });
+
+    it("asks before leaving Settings for another page", async () => {
+      alerts.unsaved = "the Discord alert";
+      const router = renderAt("/settings?tab=alerts");
+
+      await act(() => router.navigate("/system"));
+
+      expect(router.state.location.pathname).toBe("/settings");
+      expect(
+        screen.getByTestId("settings-unsaved-changes"),
+      ).toBeInTheDocument();
+    });
   });
 });

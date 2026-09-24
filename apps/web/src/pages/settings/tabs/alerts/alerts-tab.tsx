@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { PageLoading } from "../../../../components/shared/page-loading";
 import {
   QuietFieldGroup,
   QuietSection,
@@ -9,6 +10,8 @@ import {
   useCreateNotificationChannelMutation,
   useNotificationChannelsQuery,
 } from "../../../../lib/settings/queries";
+import { SaveModelNote } from "../../save-model-note";
+import { SettingsLoadError } from "../../settings-load-error";
 import { orderedEvents } from "./alert-events";
 import { ChannelForm } from "./channel-form";
 import { ChannelTable } from "./channel-table";
@@ -53,7 +56,7 @@ function NewChannel({
 }) {
   const createMutation = useCreateNotificationChannelMutation();
   return (
-    <QuietFieldGroup title="New channel" className="mt-6">
+    <QuietFieldGroup title="New alert" className="mt-6">
       <ChannelForm
         supportedEvents={supportedEvents}
         onSave={(data) => createMutation.mutate(data, { onSuccess: onDone })}
@@ -61,7 +64,7 @@ function NewChannel({
         saving={createMutation.isPending}
         saveError={
           createMutation.isError
-            ? errorMessage(createMutation.error, "Could not create channel.")
+            ? errorMessage(createMutation.error, "Could not create alert.")
             : null
         }
       />
@@ -75,12 +78,16 @@ export function AlertsTab() {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  const supportedEvents = orderedEvents(channelsQ.data?.supported_events);
-  const channels = channelsQ.data?.items ?? [];
+  if (channelsQ.isPending) return <PageLoading label="Loading alerts" />;
+  if (channelsQ.isError) return <SettingsLoadError what="alerts" />;
+
+  const supportedEvents = orderedEvents(channelsQ.data.supported_events);
+  const channels = channelsQ.data.items;
 
   return (
     <div data-testid="suite-settings-notifications" className="mm-quiet-stack">
       <AlertIntro />
+      <SaveModelNote model="instant" />
 
       <QuietSection
         level={3}
@@ -93,26 +100,17 @@ export function AlertsTab() {
               className="mm-quiet-link"
               onClick={() => setAdding(true)}
             >
-              Add a channel →
+              Add an alert →
             </button>
           ) : null
         }
       >
         <p className="mm-quiet-note">
           Tick what each channel should hear about; a change saves straight
-          away. Use &ldquo;Send test&rdquo; before relying on a new channel.
+          away. Use &ldquo;Send test&rdquo; before relying on a new alert.
         </p>
 
-        {channelsQ.isLoading ? (
-          <p className="mm-quiet-note mt-4">Loading channels...</p>
-        ) : channelsQ.isError ? (
-          <p className="mt-4 text-sm text-mm-status-failed-text" role="alert">
-            {errorMessage(
-              channelsQ.error,
-              "Could not load notification channels.",
-            )}
-          </p>
-        ) : channels.length > 0 ? (
+        {channels.length > 0 ? (
           <ChannelTable
             channels={channels}
             supportedEvents={supportedEvents}
@@ -122,9 +120,7 @@ export function AlertsTab() {
             onRemove={removal.ask}
           />
         ) : !adding ? (
-          <p className="mm-quiet-note mt-4">
-            No notification channels configured yet.
-          </p>
+          <p className="mm-quiet-note mt-4">No alerts configured yet.</p>
         ) : null}
 
         {adding ? (

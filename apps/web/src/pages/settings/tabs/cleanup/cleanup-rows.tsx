@@ -5,6 +5,7 @@ import type { MaintenanceFamilyState } from "../../../../lib/processing/maintena
 import type { ProcessingOperatorSettingsPutBody } from "../../../../lib/processing/types";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
+import type { CleanupConfirmAction } from "./cleanup-confirm-dialog";
 import {
   choiceLabel,
   everyChoices,
@@ -42,6 +43,7 @@ export function CleanupJobRow({
   running,
   onSave,
   onRun,
+  onRequestConfirm,
 }: {
   job: CleanupJob;
   state: MaintenanceFamilyState;
@@ -51,6 +53,8 @@ export function CleanupJobRow({
   running: boolean;
   onSave: SaveSetting;
   onRun: () => void;
+  /** Asks for confirmation before a destructive job is switched on or run now. */
+  onRequestConfirm: (action: CleanupConfirmAction) => void;
 }) {
   const formatDate = useAppDateFormatter();
   const interval = state.interval_seconds ?? DEFAULT_INTERVAL_SECONDS;
@@ -73,14 +77,18 @@ export function CleanupJobRow({
           enabled={state.enabled}
           disabled={!editable || saving}
           layout="control"
-          onChange={(on) =>
+          onChange={(on) => {
+            if (on && job.destructive) {
+              onRequestConfirm("enable");
+              return;
+            }
             void onSave(
               { [job.enabledField]: on },
               on
                 ? `${job.name} is on. It first runs within half a minute.`
                 : `${job.name} is off.`,
-            )
-          }
+            );
+          }}
         />
       </td>
       <td data-label="Every">
@@ -112,7 +120,9 @@ export function CleanupJobRow({
             type="button"
             className={mmActionButtonClass({ variant: "tertiary" })}
             disabled={running}
-            onClick={onRun}
+            onClick={() =>
+              job.destructive ? onRequestConfirm("run") : onRun()
+            }
             data-testid={`processing-maintenance-run-${job.family}`}
           >
             Run now
@@ -189,13 +199,14 @@ export function DaysSettingRow({
             <button
               type="button"
               className={mmActionButtonClass({ variant: "secondary" })}
+              disabled={saving}
               onClick={() =>
                 void onSave(toBody(value), savedWords(value)).then(() =>
                   setDraft(null),
                 )
               }
             >
-              Save
+              {saving ? "Saving…" : "Save"}
             </button>
           ) : null}
         </span>
