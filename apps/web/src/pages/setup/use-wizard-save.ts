@@ -54,10 +54,13 @@ export function useWizardSave({
   settings,
   libraries,
   onMessage,
+  onFinished,
 }: {
   settings: AppSettings;
   libraries: ProcessingLibrary[] | undefined;
   onMessage: (message: string | null) => void;
+  /** Called once the wizard's own data has saved and `setup_wizard_state` is "completed". */
+  onFinished: () => void;
 }) {
   const navigate = useNavigate();
   const saveAppSettings = useAppSettingsSaveMutation();
@@ -102,7 +105,33 @@ export function useWizardSave({
     });
   }
 
-  async function save(draft: WizardDraft, nextState: "skipped" | "completed") {
+  /** Skipping leaves what is already saved alone: only the wizard's own state moves on. */
+  async function skip() {
+    onMessage(null);
+    try {
+      await saveAppSettings.mutateAsync({
+        product_display_name: settings.product_display_name,
+        signed_in_home_notice: settings.signed_in_home_notice,
+        setup_wizard_state: "skipped",
+        app_timezone: settings.app_timezone,
+        log_retention_days: settings.log_retention_days,
+        configuration_backup_enabled: settings.configuration_backup_enabled,
+        configuration_backup_interval_hours:
+          settings.configuration_backup_interval_hours,
+        configuration_backup_preferred_time:
+          settings.configuration_backup_preferred_time,
+      });
+      void navigate("/", { replace: true });
+    } catch (err) {
+      onMessage(errorMessage(err, "Could not skip setup."));
+    }
+  }
+
+  /**
+   * Libraries save before settings, so a library failure never leaves `setup_wizard_state` marked
+   * "completed" over work that did not actually finish.
+   */
+  async function finish(draft: WizardDraft) {
     onMessage(null);
     const missing = missingOutputFolder(draft);
     if (missing) {
@@ -110,10 +139,14 @@ export function useWizardSave({
       return;
     }
     try {
+      if (libraries) {
+        await saveLibrary(libraries, "movie", draft.movie);
+        await saveLibrary(libraries, "tv", draft.tv);
+      }
       await saveAppSettings.mutateAsync({
         product_display_name: settings.product_display_name,
         signed_in_home_notice: settings.signed_in_home_notice,
-        setup_wizard_state: nextState,
+        setup_wizard_state: "completed",
         app_timezone: draft.timezone,
         log_retention_days: settings.log_retention_days,
         configuration_backup_enabled: draft.backup.enabled,
@@ -123,11 +156,7 @@ export function useWizardSave({
         ),
         configuration_backup_preferred_time: draft.backup.preferredTime,
       });
-      if (libraries) {
-        await saveLibrary(libraries, "movie", draft.movie);
-        await saveLibrary(libraries, "tv", draft.tv);
-      }
-      void navigate("/", { replace: true });
+      onFinished();
     } catch (err) {
       onMessage(errorMessage(err, "Could not save setup."));
     }
@@ -137,5 +166,5 @@ export function useWizardSave({
     saveAppSettings.isPending ||
     createLibrary.isPending ||
     updateLibrary.isPending;
-  return { save, pending };
+  return { finish, skip, pending };
 }

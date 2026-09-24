@@ -17,7 +17,7 @@ const JOB_KIND_LABELS: Record<string, string> = {
   "processing.file.remux_pass.v1": "Process media file",
   "processing.work_temp_stale_sweep.v1": "Clean temporary work files",
   "processing.failure_cleanup.v1": "Clean failed work files",
-  "processing.unclaimed_handback_cleanup.v1": "Remove unclaimed hand-backs",
+  "processing.unclaimed_handback_cleanup.v1": "Remove copies nobody picked up",
 };
 
 export function statusLabel(status: string): string {
@@ -50,12 +50,12 @@ export const JOBS_FILTER_OPTIONS: {
 }[] = [
   { value: "recent", label: "Recent work (routine successful scans hidden)" },
   { value: "pending", label: "Pending only" },
-  { value: "leased", label: "Leased only" },
+  { value: "leased", label: "Running now" },
   { value: "terminal", label: "Terminal (completed, failed, finalize-failed)" },
   { value: "cancelled", label: "Cancelled only" },
   { value: "completed", label: "Completed only" },
   { value: "failed", label: "Failed only" },
-  { value: "handler_ok_finalize_failed", label: "Finalize-failed only" },
+  { value: "handler_ok_finalize_failed", label: "Needs recovery" },
 ];
 
 /** A filter named in the address, so a link can open the list already narrowed. "recent" is the default. */

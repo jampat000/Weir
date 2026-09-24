@@ -29,6 +29,7 @@ def ensure_signed_in(page: Page, base_url: str) -> None:
         if setup.is_visible():
             setup.fill(BOOTSTRAP_USER)
             page.get_by_test_id("setup-password").fill(BOOTSTRAP_PASS)
+            page.get_by_test_id("setup-confirm-password").fill(BOOTSTRAP_PASS)
             page.get_by_test_id("setup-submit").click()
             expect(setup).to_be_hidden(timeout=SUBMIT_SETTLE_MS)
         elif login.is_visible():

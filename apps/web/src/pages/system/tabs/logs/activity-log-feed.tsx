@@ -1,7 +1,4 @@
-import {
-  compactActivityTitle,
-  eventDisplay,
-} from "../../../../lib/activity/activity-display";
+import { eventDisplay } from "../../../../lib/activity/activity-display";
 import { groupActivityFeed } from "../../../../lib/activity/activity-groups";
 import { summarizeRun } from "../../../../lib/activity/activity-runs";
 import type { ActivityEventItem } from "../../../../lib/api/types";
@@ -104,7 +101,7 @@ export function ActivityLogFeed({
               <span className="mm-activity-cluster__text">
                 <strong>{group.events.length} repeated failures</strong>
                 <small>
-                  {compactActivityTitle(eventDisplay(group.events[0]).title)} ·{" "}
+                  {eventDisplay(group.events[0]).title} ·{" "}
                   {firstAndLatest(group.events, fmt)}
                 </small>
               </span>

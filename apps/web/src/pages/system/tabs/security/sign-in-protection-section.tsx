@@ -1,6 +1,19 @@
+import { LoadError } from "../../../../components/shared/load-error";
 import { QuietDisclosure } from "../../../../components/shared/quiet-section";
 import type { useSecurityOverviewQuery } from "../../../../lib/settings/queries";
-import { signInProtectionFacts } from "./security-facts";
+import { plural } from "../../../../lib/ui/mm-plural";
+import { needsAttention, signInProtectionFacts } from "./security-facts";
+
+/** "N protections in force" only when every row is actually healthy; otherwise it says what needs a look. */
+function protectionSummary(
+  facts: ReturnType<typeof signInProtectionFacts>,
+): string {
+  const attention = facts.filter(needsAttention).length;
+  if (attention > 0) {
+    return `${facts.length} protections — ${plural(attention, "row needs", "rows need")} attention`;
+  }
+  return `${facts.length} protections in force`;
+}
 
 /** The protections in force. Read-only: they come from startup configuration. */
 export function SignInProtectionSection({
@@ -15,9 +28,7 @@ export function SignInProtectionSection({
     <QuietDisclosure
       title="How sign-in is protected"
       detail="Read-only here: these come from Weir's startup configuration and change only with a restart."
-      summaryWhenClosed={
-        overview ? `${facts.length} protections in force` : undefined
-      }
+      summaryWhenClosed={overview ? protectionSummary(facts) : undefined}
       data-testid="suite-security-posture"
     >
       {overview ? (
@@ -44,10 +55,12 @@ export function SignInProtectionSection({
           </table>
         </div>
       ) : overviewQ.isError ? (
-        <p className="mt-4 text-sm text-mm-status-failed-text" role="alert">
-          Could not load the server security overview. Check the server logs and
-          try again.
-        </p>
+        <div className="mt-4">
+          <LoadError
+            thing="the server security overview"
+            error={overviewQ.error}
+          />
+        </div>
       ) : (
         <p className="mm-quiet-note mt-4">Loading server security overview…</p>
       )}

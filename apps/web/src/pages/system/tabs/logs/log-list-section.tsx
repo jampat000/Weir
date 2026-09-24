@@ -1,5 +1,5 @@
+import { LoadError } from "../../../../components/shared/load-error";
 import { QuietSection } from "../../../../components/shared/quiet-section";
-import { errorMessage } from "../../../../lib/api/error-message";
 import type { useServerLogsQuery } from "../../../../lib/settings/queries";
 import type { ServerLogEntry } from "../../../../lib/settings/types";
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
@@ -57,9 +57,9 @@ export function LogListSection({
       {logsQ.isPending ? (
         <p className="mm-quiet-note mt-4">Loading logs...</p>
       ) : logsQ.isError ? (
-        <p className="mt-4 text-sm text-mm-status-failed-text" role="alert">
-          {errorMessage(logsQ.error, "Could not load logs.")}
-        </p>
+        <div className="mt-4">
+          <LoadError thing="the server log" error={logsQ.error} />
+        </div>
       ) : entries.length === 0 ? (
         <p className="mm-quiet-note mt-4">
           No system events matched the current filters.

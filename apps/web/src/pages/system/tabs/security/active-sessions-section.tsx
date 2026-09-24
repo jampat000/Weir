@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { LoadError } from "../../../../components/shared/load-error";
 import { QuietSection } from "../../../../components/shared/quiet-section";
 import type { ActiveSession } from "../../../../lib/api/types";
 import {
@@ -128,9 +129,9 @@ export function ActiveSessionsSection({ enabled }: { enabled: boolean }) {
         </p>
       ) : null}
       {sessionsQ.isError ? (
-        <p className="mt-4 text-sm text-mm-status-failed-text" role="alert">
-          Could not load active sessions. Refresh the page to try again.
-        </p>
+        <div className="mt-4">
+          <LoadError thing="active sessions" error={sessionsQ.error} />
+        </div>
       ) : sessionsQ.isPending ? (
         <p className="mm-quiet-note mt-4">Loading active sessions…</p>
       ) : sessions.length === 0 ? (

@@ -1,8 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as authApi from "../../lib/api/auth-api";
 import type { CurrentSession, UserPublic } from "../../lib/api/types";
 import { authKeys } from "../../lib/auth/query-keys";
 import * as settingsApi from "../../lib/settings/settings-api";
@@ -130,6 +137,12 @@ function renderSettings(
   overrides?: {
     updateStatus?: UpdateStatus;
     initialEntries?: string[];
+    backupItems?: {
+      id: number;
+      created_at: string;
+      size_bytes: number;
+      file_name: string;
+    }[];
   },
 ) {
   const qc = new QueryClient({
@@ -141,7 +154,7 @@ function renderSettings(
   qc.setQueryData(authKeys.session, minimalCurrentSession);
   qc.setQueryData(settingsKeys.configurationBackups, {
     directory: "C:/Weir/backups/suite-configuration",
-    items: [],
+    items: overrides?.backupItems ?? [],
   });
   qc.setQueryData(
     settingsKeys.updateStatus,
@@ -154,7 +167,7 @@ function renderSettings(
         level: undefined,
         search: undefined,
         has_exception: undefined,
-        limit: 100,
+        limit: 250,
       },
     ],
     minimalLogs,
@@ -214,7 +227,7 @@ async function renderSettingsWithSupportConfig(
         level: undefined,
         search: undefined,
         has_exception: undefined,
-        limit: 100,
+        limit: 250,
       },
     ],
     minimalLogs,
@@ -331,8 +344,89 @@ describe("SystemPage", () => {
     expect(
       screen.getByRole("button", { name: "Save backup schedule" }),
     ).toBeDisabled();
+  });
+
+  it("backs up now and shows the result beside the export buttons", async () => {
+    const postNowSpy = vi
+      .spyOn(settingsApi, "postConfigurationBackupNow")
+      .mockResolvedValue({
+        id: 9,
+        created_at: "2026-04-12T00:00:00Z",
+        size_bytes: 512,
+        file_name: "weir-configuration-2026-04-12.json",
+      });
+    renderSettings(operatorMe, { initialEntries: ["/system?tab=backups"] });
+
+    fireEvent.click(screen.getByRole("button", { name: "Back up now" }));
+
+    await waitFor(() => {
+      expect(postNowSpy).toHaveBeenCalledTimes(1);
+    });
+    expect(await screen.findByText("Backup created.")).toBeInTheDocument();
+  });
+
+  it("offers restoring a saved backup and confirms in Weir's own dialog, not window.confirm", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm");
+    vi.spyOn(
+      settingsApi,
+      "fetchStoredConfigurationBackupBlob",
+    ).mockResolvedValue(
+      new Blob([JSON.stringify({ format_version: 4, suite_settings: {} })], {
+        type: "application/json",
+      }),
+    );
+    const putBundleSpy = vi
+      .spyOn(settingsApi, "putConfigurationBundle")
+      .mockResolvedValue({ format_version: 4 });
+    renderSettings(operatorMe, {
+      initialEntries: ["/system?tab=backups"],
+      backupItems: [
+        {
+          id: 3,
+          created_at: "2026-04-10T00:00:00Z",
+          size_bytes: 2048,
+          file_name: "weir-configuration-2026-04-10.json",
+        },
+      ],
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Restore this backup →" }),
+    );
+
+    const dialog = await screen.findByTestId("restore-configuration-dialog");
+    expect(confirmSpy).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Replace settings" }),
+    );
+
+    await waitFor(() => {
+      expect(putBundleSpy).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("restore-configuration-dialog"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("shows a plain-language restore error for a file that is not a Weir backup, never raw format_version text", async () => {
+    renderSettings(operatorMe, { initialEntries: ["/system?tab=backups"] });
+    const fileInput = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    const badFile = new File(['{"hello":true}'], "not-a-backup.json", {
+      type: "application/json",
+    });
+
+    fireEvent.change(fileInput, { target: { files: [badFile] } });
+
     expect(
-      screen.queryByTestId("suite-settings-history-reset"),
+      await screen.findByText("This file is not a Weir configuration export."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/format_version/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("restore-configuration-dialog"),
     ).not.toBeInTheDocument();
   });
 
@@ -439,9 +533,6 @@ describe("SystemPage", () => {
     expect(
       screen.queryByTestId("suite-settings-backup-restore"),
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("suite-settings-history-reset"),
-    ).not.toBeInTheDocument();
   });
 
   it("opens on About, and each tab holds one job", () => {
@@ -469,9 +560,6 @@ describe("SystemPage", () => {
     expect(screen.getByText("System log retention (days)")).toBeInTheDocument();
     expect(
       screen.getByText("Keep Activity history for (days)"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("suite-settings-history-reset"),
     ).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("settings-history-show"), {
       target: { value: "log" },
@@ -521,7 +609,7 @@ describe("SystemPage", () => {
           level: undefined,
           search: undefined,
           has_exception: undefined,
-          limit: 100,
+          limit: 250,
         },
       ],
       minimalLogs,
@@ -547,6 +635,130 @@ describe("SystemPage", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows the install source in words, not the raw install_type value", () => {
+    renderSettings(operatorMe, { updateStatus: windowsUpdateAvailableStatus });
+    fireEvent.click(screen.getByRole("tab", { name: "About" }));
+
+    expect(screen.getByText("Windows installer")).toBeInTheDocument();
+    expect(screen.queryByText("windows")).not.toBeInTheDocument();
+  });
+
+  it("does not show a success-looking pill for a failed update check", () => {
+    renderSettings(operatorMe, {
+      updateStatus: {
+        ...minimalUpdateStatus,
+        status: "unavailable",
+        summary: "Could not reach the update server.",
+      },
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "About" }));
+
+    const pill = within(
+      screen.getByTestId("suite-settings-release-status"),
+    ).getByText("Unavailable");
+    expect(pill.className).not.toContain("healthy");
+    expect(pill.className).toContain("failed");
+  });
+
+  function seededUpdateClient(overrides: {
+    updateStatus: UpdateStatus;
+    updateSettings?: {
+      mode: "Auto" | "DownloadOnly" | "NotifyOnly";
+      check_on_startup: boolean;
+      check_interval_minutes: number;
+    };
+  }) {
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    qc.setQueryData(settingsKeys.app, minimalAppSettings);
+    qc.setQueryData(settingsKeys.securityOverview, minimalSecurity);
+    qc.setQueryData(authKeys.me, operatorMe);
+    qc.setQueryData(authKeys.session, minimalCurrentSession);
+    qc.setQueryData(settingsKeys.configurationBackups, {
+      directory: "C:/Weir/backups/suite-configuration",
+      items: [],
+    });
+    qc.setQueryData(settingsKeys.updateStatus, overrides.updateStatus);
+    if (overrides.updateSettings) {
+      qc.setQueryData(settingsKeys.updateSettings, overrides.updateSettings);
+      qc.setQueryData(settingsKeys.updateState, {
+        downloaded: false,
+        pending_version: null,
+      });
+    }
+    qc.setQueryData(
+      [
+        ...settingsKeys.logs,
+        {
+          level: undefined,
+          search: undefined,
+          has_exception: undefined,
+          limit: 250,
+        },
+      ],
+      minimalLogs,
+    );
+    qc.setQueryData(settingsKeys.metrics, minimalMetrics);
+    return qc;
+  }
+
+  it("gives Notify-only a clear Update button once an update is available", () => {
+    const qc = seededUpdateClient({
+      updateStatus: windowsUpdateAvailableStatus,
+      updateSettings: {
+        mode: "NotifyOnly",
+        check_on_startup: true,
+        check_interval_minutes: 60,
+      },
+    });
+
+    render(wrap(<SystemPage />, qc));
+    fireEvent.click(screen.getByRole("tab", { name: "About" }));
+
+    expect(
+      screen.getByRole("link", { name: "Download the update" }),
+    ).toHaveAttribute(
+      "href",
+      windowsUpdateAvailableStatus.windows_installer_url,
+    );
+  });
+
+  it("hides Docker update instructions when there is no update to apply", () => {
+    const dockerStatus: UpdateStatus = {
+      ...minimalUpdateStatus,
+      install_type: "docker",
+      docker_update_command: "docker compose pull && docker compose up -d",
+    };
+    render(
+      wrap(<SystemPage />, seededUpdateClient({ updateStatus: dockerStatus })),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "About" }));
+
+    expect(screen.queryByText("What happens next")).not.toBeInTheDocument();
+  });
+
+  it("shows Docker update instructions with a Copy button once an update exists", () => {
+    const dockerStatus: UpdateStatus = {
+      ...minimalUpdateStatus,
+      install_type: "docker",
+      status: "update_available",
+      docker_update_command: "docker compose pull && docker compose up -d",
+    };
+    render(
+      wrap(<SystemPage />, seededUpdateClient({ updateStatus: dockerStatus })),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "About" }));
+
+    expect(screen.getByText("What happens next")).toBeInTheDocument();
+    expect(
+      screen.getByText("docker compose pull && docker compose up -d"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Copy the update command" }),
+    ).toBeInTheDocument();
+  });
+
   it("does not render mojibake in the upgrade panel", () => {
     renderSettings(operatorMe, { updateStatus: windowsUpdateAvailableStatus });
     fireEvent.click(screen.getByRole("tab", { name: "About" }));
@@ -554,6 +766,16 @@ describe("SystemPage", () => {
     expect(document.body.textContent).not.toContain("â");
     expect(document.body.textContent).not.toContain("Ã");
     expect(document.body.textContent).not.toContain("�");
+  });
+
+  it("says a protection row needs attention instead of claiming success", () => {
+    renderSettings(operatorMe);
+    fireEvent.click(screen.getByRole("tab", { name: "Security" }));
+
+    // The default fixture has extra HTTPS hardening off, which is a row that needs a look.
+    expect(
+      screen.getByText(/protections .* rows? needs? attention/),
+    ).toBeInTheDocument();
   });
 
   it("shows change password in Security", () => {
@@ -567,17 +789,53 @@ describe("SystemPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("change password fields use Show/Hide and reset visibility when cleared", () => {
+  it("change password fields use individually-named Show/Hide buttons and reset visibility when cleared", () => {
     renderSettings(operatorMe);
     fireEvent.click(screen.getByRole("tab", { name: "Security" }));
     const current = screen.getByPlaceholderText("Enter current password");
     expect(current).toHaveAttribute("type", "password");
     fireEvent.change(current, { target: { value: "current-secret" } });
-    const showButtons = screen.getAllByRole("button", { name: "Show" });
-    expect(showButtons.length).toBe(3);
-    fireEvent.click(showButtons[0]!);
+    const showPassword = screen.getByRole("button", { name: "Show password" });
+    expect(
+      screen.getByRole("button", { name: "Show new password" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Show password confirmation" }),
+    ).toBeInTheDocument();
+    fireEvent.click(showPassword);
     expect(current).toHaveAttribute("type", "text");
     fireEvent.change(current, { target: { value: "" } });
     expect(current).toHaveAttribute("type", "password");
+  });
+
+  it("shows an on-screen confirmation after a successful password change", async () => {
+    vi.spyOn(authApi, "postChangePassword").mockResolvedValue({
+      message: "Password changed. Sign in again with your new password.",
+    });
+    renderSettings(operatorMe);
+    fireEvent.click(screen.getByRole("tab", { name: "Security" }));
+
+    fireEvent.change(screen.getByPlaceholderText("Enter current password"), {
+      target: { value: "current-secret" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Enter new password"), {
+      target: { value: "new-secret-pass" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Re-enter new password"), {
+      target: { value: "new-secret-pass" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "Password changed. Sign in again with your new password.",
+        ),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByRole("link", { name: "Sign in again" })).toHaveAttribute(
+      "href",
+      "/login",
+    );
   });
 });

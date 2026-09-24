@@ -13,6 +13,7 @@ export type CurrentSession = Schema<"CurrentSessionOut">;
 export type ActiveSession = Schema<"SessionOut">;
 export type SessionAction = Schema<"SessionActionOut">;
 export type BootstrapStatus = Schema<"BootstrapStatusOut">;
+export type BootstrapResult = Schema<"BootstrapOut">;
 export type ActivityEventItem = Schema<"ActivityEventItemOut">;
 export type SystemReadiness = Schema<"ReadinessResponse">;
 export type ActivityRecentResponse = Schema<"ActivityRecentOut">;

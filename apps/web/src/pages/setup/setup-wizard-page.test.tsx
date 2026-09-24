@@ -124,7 +124,7 @@ describe("SetupWizardPage", () => {
     updateLibraryMock.mockResolvedValue({});
   });
 
-  it("finishes on Home, with no start page to choose (#459)", async () => {
+  it("ends on What's next, with a way into Weir and no start page to choose (#459)", async () => {
     renderWizard();
 
     expect(
@@ -133,24 +133,62 @@ describe("SetupWizardPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Finish setup" }));
 
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith("/", { replace: true });
+      expect(
+        screen.getByRole("heading", { name: "What's next" }),
+      ).toBeInTheDocument();
     });
+    expect(
+      screen.getByRole("link", { name: "Choose which tracks to keep" }),
+    ).toHaveAttribute("href", "/settings?tab=rules");
+    expect(
+      screen.getByRole("link", { name: "Connect Sonarr, Radarr or Deluno" }),
+    ).toHaveAttribute("href", "/settings?tab=media-managers");
+    expect(
+      screen.getByRole("link", { name: "Clean files you already have" }),
+    ).toHaveAttribute("href", "/library");
+    expect(
+      screen.getByRole("link", { name: "Continue to Weir" }),
+    ).toHaveAttribute("href", "/");
   });
 
-  it("skips and persists skipped wizard state", async () => {
+  it("skips without saving the edited draft, only the wizard's own state", async () => {
     renderWizard();
 
+    fireEvent.change(screen.getByDisplayValue("02:00"), {
+      target: { value: "03:30" },
+    });
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Movies watched folder" }),
+      { target: { value: "D:\\Movies" } },
+    );
     fireEvent.click(screen.getByTestId("setup-wizard-skip"));
 
     await waitFor(() => {
       expect(settingsMutateAsyncMock).toHaveBeenCalledWith(
         expect.objectContaining({
           setup_wizard_state: "skipped",
+          // The edited time and folder are dropped: skipping never saves what was typed.
           app_timezone: "UTC",
           configuration_backup_preferred_time: "02:00",
         }),
       );
     });
+    expect(createLibraryMock).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith("/", { replace: true });
+    });
+  });
+
+  it("surfaces a failed skip instead of leaving silently", async () => {
+    settingsMutateAsyncMock.mockRejectedValueOnce(new Error("boom"));
+    renderWizard();
+
+    fireEvent.click(screen.getByTestId("setup-wizard-skip"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("boom");
+    });
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 
   it("completes and saves backup plus library starter settings", async () => {
@@ -190,8 +228,33 @@ describe("SetupWizardPage", () => {
     });
     expect(updateLibraryMock).not.toHaveBeenCalled();
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith("/", { replace: true });
+      expect(
+        screen.getByRole("heading", { name: "What's next" }),
+      ).toBeInTheDocument();
     });
+  });
+
+  it("does not mark the wizard complete when a library save fails first", async () => {
+    createLibraryMock.mockRejectedValueOnce(new Error("boom"));
+    renderWizard();
+
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Movies watched folder" }),
+      { target: { value: "D:\\Movies" } },
+    );
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Movies output folder" }),
+      { target: { value: "E:\\MoviesOut" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Finish setup" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+    });
+    expect(settingsMutateAsyncMock).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("heading", { name: "What's next" }),
+    ).not.toBeInTheDocument();
   });
 
   it("creates a library for each media type that has folders and none yet", async () => {

@@ -68,14 +68,36 @@ def write_web_dist(root: Path, index_html: str = "<!doctype html><div id='root'>
 # --- accounts -------------------------------------------------------------------------------------
 
 
-def ensure_admin_account(c: WeirClient) -> None:
-    """Create the admin through bootstrap when the install has none, without signing in."""
+def ensure_admin_account(c: WeirClient) -> str | None:
+    """Create the admin through bootstrap when the install has none, leaving ``c`` anonymous.
+
+    Bootstrap signs the new admin in directly (#704), so it leaves one working session behind even
+    though most callers here only want the account to exist. ``c``'s cookie is cleared before
+    returning so it goes on behaving like the anonymous client callers expect. A caller that counts
+    or inspects sessions gets that first session's id back (dash-normalised, matching
+    ``user_sessions.id``) so it can account for it explicitly instead of miscounting; ``None`` means
+    bootstrap did not run because an admin already existed.
+
+    A caller may run with ``WEIR_SESSION_COOKIE_SECURE=always`` (forcing ``Secure`` even over this
+    suite's plain-http requests), in which case the client's own cookie jar - correctly imitating a
+    browser - will not resend that cookie itself. The lookup below carries the raw value from
+    bootstrap's ``Set-Cookie`` explicitly instead of relying on the jar to send it back, so this
+    works the same whether or not the cookie in play is marked ``Secure``.
+    """
 
     status = c.get(f"{API}/auth/bootstrap/status")
     assert status.status_code == 200, status.text
-    if status.json().get("bootstrap_allowed"):
-        r = c.bootstrap()
-        assert r.status_code == 200, r.text
+    if not status.json().get("bootstrap_allowed"):
+        return None
+    r = c.bootstrap()
+    assert r.status_code == 200, r.text
+    raw_cookie = r.cookies.get(SESSION_COOKIE)
+    assert raw_cookie, "bootstrap must set a session cookie"
+    session = c.get(f"{API}/auth/session", cookies={SESSION_COOKIE: raw_cookie})
+    assert session.status_code == 200, session.text
+    bootstrap_session_id = str(session.json()["session_id"]).replace("-", "")
+    c.cookies.clear()
+    return bootstrap_session_id
 
 
 def ensure_viewer(server: ServerUnderTest) -> None:

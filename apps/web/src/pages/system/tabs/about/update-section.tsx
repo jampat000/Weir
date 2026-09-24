@@ -1,8 +1,17 @@
+import { useState } from "react";
+
 import { QuietSection } from "../../../../components/shared/quiet-section";
 import { errorMessage } from "../../../../lib/api/error-message";
-import { useUpdateStatusQuery } from "../../../../lib/settings/queries";
+import {
+  useUpdateSettingsQuery,
+  useUpdateStatusQuery,
+} from "../../../../lib/settings/queries";
 import type { UpdateStatus } from "../../../../lib/settings/types";
-import { mmStatusPillClass } from "../../../../lib/ui/mm-status-tone";
+import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
+import {
+  mmStatusPillClass,
+  type MmStatusTone,
+} from "../../../../lib/ui/mm-status-tone";
 import { UpdateModeSection } from "./update-mode-section";
 import { UpdateReadyNotice } from "./update-ready-notice";
 
@@ -11,20 +20,67 @@ function sentenceCase(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+/** How this install got here, in words a reader outside engineering recognises. */
+function installTypeLabel(installType: string): string {
+  switch (installType) {
+    case "windows":
+      return "Windows installer";
+    case "docker":
+      return "Docker";
+    case "source":
+      return "Built from source";
+    default:
+      return installType;
+  }
+}
+
+/** A failed check reads as a failure, not a quiet success; only "up to date" reads as healthy. */
+function statusTone(status: string): MmStatusTone {
+  if (status === "update_available") return "warning";
+  if (status === "up_to_date") return "healthy";
+  return "failed";
+}
+
+function CopyCommandButton({ command }: { command: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+  return (
+    <button
+      type="button"
+      className="mm-quiet-link"
+      onClick={() => void copy()}
+      aria-label="Copy the update command"
+    >
+      {copied ? "Copied" : "Copy →"}
+    </button>
+  );
+}
+
 function ReleaseStatus({
   status,
   checking,
+  showUpdateButton,
   onCheck,
 }: {
   status: UpdateStatus;
   checking: boolean;
+  /** Notify-only mode never downloads anything itself, so the installer link needs to read as the action, not a footnote. */
+  showUpdateButton: boolean;
   onCheck: () => void;
 }) {
   // Coequal facts about this install, none of them a magnitude, so none of them is a hero.
   const facts = [
     { label: "Installed", value: status.current_version },
     { label: "Latest", value: status.latest_version || "Unknown" },
-    { label: "Installed from", value: status.install_type },
+    { label: "Installed from", value: installTypeLabel(status.install_type) },
   ];
   const links = [
     { label: "Download installer →", href: status.windows_installer_url },
@@ -64,11 +120,7 @@ function ReleaseStatus({
         className="mt-1 flex items-center gap-2 text-base font-semibold text-mm-text1"
         data-testid="suite-settings-release-status"
       >
-        <span
-          className={mmStatusPillClass(
-            status.status === "update_available" ? "warning" : "healthy",
-          )}
-        >
+        <span className={mmStatusPillClass(statusTone(status.status))}>
           {sentenceCase(status.status.replaceAll("_", " "))}
         </span>
         {status.summary}
@@ -86,6 +138,16 @@ function ReleaseStatus({
           On Windows, the Weir tray app installs updates itself.
         </p>
       ) : null}
+      {showUpdateButton && status.windows_installer_url ? (
+        <a
+          href={status.windows_installer_url}
+          target="_blank"
+          rel="noreferrer"
+          className={`${mmActionButtonClass({ variant: "primary" })} mt-3 inline-flex`}
+        >
+          Download the update
+        </a>
+      ) : null}
     </QuietSection>
   );
 }
@@ -96,6 +158,7 @@ function DockerUpgradeSection({ command }: { command: string }) {
       level={3}
       headingId="suite-settings-upgrade-docker-heading"
       heading="What happens next"
+      aside={<CopyCommandButton command={command} />}
     >
       <p className="mm-update-command">{command}</p>
       <p className="mm-quiet-note mt-2">
@@ -111,6 +174,9 @@ export function UpdateSection() {
   const updateStatusQ = useUpdateStatusQuery();
   const status = updateStatusQ.data;
   const isWindows = status?.install_type === "windows";
+  const updateSettingsQ = useUpdateSettingsQuery(isWindows);
+  const notifyOnly = isWindows && updateSettingsQ.data?.mode === "NotifyOnly";
+  const updateAvailable = status?.status === "update_available";
 
   return (
     <div data-testid="suite-settings-upgrade-tab" className="mm-quiet-stack">
@@ -130,12 +196,14 @@ export function UpdateSection() {
             <ReleaseStatus
               status={status}
               checking={updateStatusQ.isFetching}
+              showUpdateButton={Boolean(notifyOnly && updateAvailable)}
               onCheck={() => void updateStatusQ.refetch()}
             />
             {isWindows ? (
               <UpdateModeSection />
             ) : status.install_type === "docker" &&
-              status.docker_update_command ? (
+              status.docker_update_command &&
+              updateAvailable ? (
               <DockerUpgradeSection command={status.docker_update_command} />
             ) : null}
           </>

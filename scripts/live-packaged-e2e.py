@@ -389,11 +389,16 @@ class LiveAudit:
         self.page.goto(BASE_URL + "/", wait_until="domcontentloaded")
         self.settle()
 
+        wizard_skip = self.page.get_by_test_id("setup-wizard-skip")
+        shell_ready = self.page.get_by_test_id("shell-ready")
+        wizard_or_shell = wizard_skip.or_(shell_ready).first
+
         setup_user = self.page.get_by_test_id("setup-username")
         if setup_user.count():
             self.visible(setup_user, "first-time setup form is visible")
             setup_user.fill(AUDIT_USER)
             self.page.get_by_test_id("setup-password").fill(AUDIT_PASSWORD)
+            self.page.get_by_test_id("setup-confirm-password").fill(AUDIT_PASSWORD)
             setup_code = self.page.get_by_test_id("setup-code")
             if setup_code.count():
                 self.visible(
@@ -407,7 +412,11 @@ class LiveAudit:
             self.click(
                 self.page.get_by_test_id("setup-submit"), "first-time setup submit"
             )
-            self.page.wait_for_url(re.compile(r".*/login"), timeout=TIMEOUT_MS)
+            # Bootstrap signs the new admin in directly (#704): the browser briefly lands on "/"
+            # before RequireSetupWizard's own client-side redirect to the wizard settles, so a
+            # visible element - the wizard or the already-signed-in shell, whichever this install
+            # ends up on - is what to wait for, not a URL string that can be read mid-redirect.
+            self.visible(wizard_or_shell, "setup wizard or the signed-in shell after bootstrap")
 
         login_user = self.page.get_by_test_id("login-username")
         if login_user.count():
@@ -415,24 +424,14 @@ class LiveAudit:
             login_user.fill(AUDIT_USER)
             self.page.get_by_test_id("login-password").fill(AUDIT_PASSWORD)
             self.click(self.page.get_by_test_id("login-submit"), "login submit")
-            self.page.wait_for_timeout(500)
+            self.visible(wizard_or_shell, "setup wizard or the signed-in shell after login")
 
-        if "/setup-wizard" in self.page.url:
-            self.visible(
-                self.page.get_by_test_id("setup-wizard-skip"),
-                "setup wizard is visible after sign-in",
-            )
+        if wizard_skip.count() and wizard_skip.is_visible():
             self.click(
-                self.page.get_by_test_id("setup-wizard-skip"),
-                "skip setup wizard after exercising its entry path",
-            )
-            self.page.wait_for_url(
-                lambda url: "/setup-wizard" not in url, timeout=TIMEOUT_MS
+                wizard_skip, "skip setup wizard after exercising its entry path"
             )
 
-        self.visible(
-            self.page.get_by_test_id("shell-ready"), "authenticated application shell"
-        )
+        self.visible(shell_ready, "authenticated application shell")
         self.record("bootstrap, login, and setup-wizard state")
 
     def authenticated_read_surface(self) -> None:
