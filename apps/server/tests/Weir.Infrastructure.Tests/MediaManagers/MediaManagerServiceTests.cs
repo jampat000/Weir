@@ -684,6 +684,7 @@ public sealed class MediaManagerServiceTests
     public async Task Webhook_secrets_prefer_the_connections_own_then_the_instance_secret()
     {
         using var open = new MediaManagerFixture();
+        await open.AddConnectionAsync("radarr", "Radarr");
         await open.Db(async uow => { await open.Intake.AuthoriseAsync(uow, "radarr", null); return 0; });
         var needs = await Assert.ThrowsAsync<IntakeRefusedException>(() => open.Db(async uow => { await open.Intake.RequireSecretAsync(uow, "x", null); return 0; }));
         Assert.Equal((403, IntakeRules.NeedsSecretDetail), (needs.StatusCode, needs.Message));
@@ -714,9 +715,34 @@ public sealed class MediaManagerServiceTests
             () => fixture.Db(async uow => { await fixture.Intake.AuthoriseAsync(uow, "native", null); return 0; }));
         Assert.Equal((401, IntakeRules.NativeNeedsSecretDetail), (refused.StatusCode, refused.Message));
 
-        // A real connection of another kind is unaffected: it keeps accepting an unsigned write.
+        // An existing connection of another kind that has never rotated its secret is unaffected: it
+        // keeps accepting an unsigned write.
+        await fixture.AddConnectionAsync("radarr", "Radarr");
         var identity = await fixture.Db(uow => fixture.Intake.AuthoriseAsync(uow, "radarr", null));
         Assert.False(identity.Authenticated);
+    }
+
+    /// <summary>
+    /// A manager kind with no connection at all has nothing an unsigned webhook could be attributed to, so
+    /// unlike an existing connection that has simply never rotated its secret, it is refused outright.
+    /// </summary>
+    [Fact]
+    public async Task A_kind_with_no_connection_at_all_refuses_an_unsigned_webhook()
+    {
+        using var fixture = new MediaManagerFixture();
+        var refused = await Assert.ThrowsAsync<IntakeRefusedException>(
+            () => fixture.Db(async uow => { await fixture.Intake.AuthoriseAsync(uow, "radarr", null); return 0; }));
+        Assert.Equal((401, IntakeRules.NoConnectionDetail("radarr")), (refused.StatusCode, refused.Message));
+
+        var id = await fixture.AddConnectionAsync("radarr", "Radarr");
+        var stillUnsigned = await fixture.Db(uow => fixture.Intake.AuthoriseAsync(uow, "radarr", null));
+        Assert.False(stillUnsigned.Authenticated);
+
+        var row = (await fixture.Db(uow => MediaManagerConnectionStore.GetAsync(uow, id)))!;
+        var secret = await fixture.Db(uow => fixture.Connections.RotateWebhookSecretAsync(uow, row));
+        var signed = await fixture.Db(uow => fixture.Intake.AuthoriseAsync(uow, "radarr", secret));
+        Assert.True(signed.Authenticated);
+        Assert.Equal(id, signed.ConnectionId);
     }
 
     /// <summary>A hand-off's callback path is later joined onto the manager's own base URL and carries its API key back.</summary>

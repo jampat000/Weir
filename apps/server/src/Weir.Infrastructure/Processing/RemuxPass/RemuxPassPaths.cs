@@ -121,6 +121,12 @@ public static class RemuxPassPaths
             throw new ArgumentException("relative_media_path is required");
         }
 
+        // Either character can make the path Weir resolves differ from the one the OS actually opens.
+        if (rel.Contains('\0', StringComparison.Ordinal) || (Windows && rel.Contains(':', StringComparison.Ordinal)))
+        {
+            throw new ArgumentException("relative_media_path must not contain a NUL character or a colon");
+        }
+
         if (rel.Split('/').Contains("..", StringComparer.Ordinal) || rel.StartsWith("..", StringComparison.Ordinal))
         {
             throw new ArgumentException("relative_media_path must not contain parent segments");

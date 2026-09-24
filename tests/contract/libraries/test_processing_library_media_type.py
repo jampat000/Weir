@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from tests.contract.libraries import _helpers as h
+from tests.contract.media_managers._helpers import create_connection
 from tests.contract.support import seed
 from tests.contract.support.client import API, WeirClient
 
@@ -95,9 +96,10 @@ def test_a_second_film_library_is_normal(operator) -> None:
 def test_a_hand_off_lands_in_the_library_whose_folder_holds_the_file(server_factory, client_factory) -> None:
     """Resolving by type alone always picked the first film library, whatever folder the file was in."""
 
-    # A fresh install: no media manager connection (so no webhook secret) and no queued jobs.
+    # A fresh install: a Deluno connection with no webhook secret of its own, and no queued jobs.
     sut = server_factory()
     c = h.signed_in_admin(sut, client_factory)
+    assert create_connection(c).status_code == 201
     assert _create(c, enabled=True).status_code == 201  # Films 4K: /srv/films4k/in
     second = _create(
         c, enabled=True, name="Films 1080p", watched_folder="/srv/films1080/in", output_folder="/srv/films1080/out"

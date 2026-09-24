@@ -1,4 +1,7 @@
+using System.Collections.Concurrent;
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using static Weir.Api.Tests.Platform.ApiTestClient;
 
 namespace Weir.Api.Tests.Platform;
@@ -343,6 +346,78 @@ public sealed class AuthApiTests
         await TestDatabase.SeedAdminAsync(forced);
         using var forcedLogin = await new ApiTestClient(forced).LoginAsync();
         Assert.EndsWith("; Secure", Header(forcedLogin, "Set-Cookie"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Sign_in_warns_once_when_an_https_origin_cannot_secure_the_cookie()
+    {
+        var logger = new CapturingLoggerFactory();
+        await using var server = await WeirTestServer.StartAsync(
+            [("WEIR_SESSION_SECRET", Secret), ("WEIR_PROCESSING_WORKER_COUNT", "0")],
+            configureServices: services => services.AddSingleton<ILoggerFactory>(logger));
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        var httpsOrigin = new Dictionary<string, string> { ["Origin"] = "https://weir.example", ["X-Requested-With"] = "XMLHttpRequest" };
+
+        using var first = await client.PostAsync(
+            "/api/v1/auth/login",
+            new { username = "alice", password = AdminPassword, csrf_token = await client.CsrfAsync() },
+            httpsOrigin);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        using var logout = await client.PostAsync("/api/v1/auth/logout", new { csrf_token = await client.CsrfAsync() });
+        Assert.Equal(HttpStatusCode.NoContent, logout.StatusCode);
+
+        using var second = await client.PostAsync(
+            "/api/v1/auth/login",
+            new { username = "alice", password = AdminPassword, csrf_token = await client.CsrfAsync() },
+            httpsOrigin);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+
+        Assert.Single(logger.Entries, entry => entry.Message.Contains("could not be marked Secure", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Sign_in_over_plain_lan_http_never_warns()
+    {
+        var logger = new CapturingLoggerFactory();
+        await using var server = await WeirTestServer.StartAsync(
+            [("WEIR_SESSION_SECRET", Secret), ("WEIR_PROCESSING_WORKER_COUNT", "0")],
+            configureServices: services => services.AddSingleton<ILoggerFactory>(logger));
+        await TestDatabase.SeedAdminAsync(server);
+        using var login = await new ApiTestClient(server).LoginAsync();
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+
+        Assert.DoesNotContain(logger.Entries, entry => entry.Message.Contains("could not be marked Secure", StringComparison.Ordinal));
+    }
+
+    /// <summary>A logger that keeps every message, so a test can assert on exactly what a console/file sink would receive.</summary>
+    private sealed class CapturingLoggerFactory : ILoggerFactory
+    {
+        // Background timers (the manager heartbeat, library mode's schedule) log through this factory too,
+        // from their own threads, alongside the request thread the test asserts from.
+        public ConcurrentQueue<(LogLevel Level, string Message)> Entries { get; } = new();
+
+        public ILogger CreateLogger(string categoryName) => new CapturingLogger(this);
+
+        public void AddProvider(ILoggerProvider provider)
+        {
+        }
+
+        public void Dispose()
+        {
+        }
+
+        private sealed class CapturingLogger(CapturingLoggerFactory owner) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state)
+                where TState : notnull => null;
+
+            public bool IsEnabled(LogLevel logLevel) => true;
+
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+                owner.Entries.Enqueue((logLevel, formatter(state, exception)));
+        }
     }
 
     [Fact]
