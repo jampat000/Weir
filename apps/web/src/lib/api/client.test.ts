@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  ApiHttpError,
   NETWORK_UNREACHABLE_MESSAGE,
-  apiErrorDetailToString,
+  SIGN_IN_ENDED_MESSAGE,
+  TIMED_OUT_MESSAGE,
+  TOO_MANY_ATTEMPTS_MESSAGE,
+} from "./api-error-text";
+import {
+  ApiHttpError,
   apiFetch,
   apiResponseErrorMessage,
   resetUnauthorizedHandlingForTests,
@@ -15,45 +19,20 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("apiErrorDetailToString", () => {
-  it("returns strings as-is", () => {
-    expect(apiErrorDetailToString("Wrong password")).toBe("Wrong password");
-  });
+const SETTINGS = "/api/v1/suite/settings";
 
-  it("joins validation array messages with field path", () => {
-    expect(
-      apiErrorDetailToString([
-        {
-          type: "string_too_short",
-          loc: ["body", "new_password"],
-          msg: "Too short",
-          input: "x",
-        },
-      ]),
-    ).toBe("new_password: Too short");
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
   });
-
-  it("stringifies plain objects instead of object Object", () => {
-    expect(apiErrorDetailToString({ nested: 1 })).toBe(
-      JSON.stringify({ nested: 1 }),
-    );
-  });
-
-  it("returns empty for nullish", () => {
-    expect(apiErrorDetailToString(undefined)).toBe("");
-    expect(apiErrorDetailToString(null)).toBe("");
-  });
-});
+}
 
 describe("apiResponseErrorMessage", () => {
-  it("normalizes a string detail", async () => {
-    const response = new Response(
-      JSON.stringify({ detail: "Wrong password" }),
-      {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+  it("shows the server's own reason for a refusal", async () => {
+    const response = jsonResponse(401, {
+      detail: "Invalid username or password.",
+    });
 
     await expect(
       throwApiResponseError(
@@ -65,62 +44,117 @@ describe("apiResponseErrorMessage", () => {
       name: "ApiHttpError",
       path: "/api/v1/auth/login",
       status: 401,
-      message: "Wrong password",
+      message: "Invalid username or password.",
     });
   });
 
-  it("normalizes validation arrays without object Object", async () => {
-    const response = new Response(
-      JSON.stringify({
+  it("says the sign-in has ended for a 401 anywhere but the sign-in form", async () => {
+    const normalized = await apiResponseErrorMessage(
+      SETTINGS,
+      jsonResponse(401, { detail: "Not authenticated." }),
+      "Could not load settings",
+    );
+
+    expect(normalized.message).toBe(SIGN_IN_ENDED_MESSAGE);
+  });
+
+  it("asks for a wait after too many attempts", async () => {
+    const normalized = await apiResponseErrorMessage(
+      "/api/v1/auth/login",
+      jsonResponse(429, {
+        detail: "Too many login attempts from this address.",
+      }),
+      "Could not sign in",
+    );
+
+    expect(normalized.message).toBe(TOO_MANY_ATTEMPTS_MESSAGE);
+  });
+
+  it("turns validation answers into sentences about the field", async () => {
+    const normalized = await apiResponseErrorMessage(
+      "/api/v1/auth/change-password",
+      jsonResponse(422, {
         detail: [
           {
-            loc: ["body", "password"],
+            loc: ["body", "new_password"],
             msg: "String should have at least 8 characters",
           },
         ],
       }),
-      { status: 422, headers: { "Content-Type": "application/json" } },
+      "Could not change password",
     );
 
+    expect(normalized.message).toBe(
+      "New password must be at least 8 characters.",
+    );
+  });
+
+  it("keeps the server's structured detail for callers that read it", async () => {
+    const detail = [{ loc: ["body", "name"], msg: "Field required" }];
+
     const normalized = await apiResponseErrorMessage(
-      response,
+      SETTINGS,
+      jsonResponse(422, { detail }),
       "Could not save",
     );
 
-    expect(normalized.message).toBe(
-      "password: String should have at least 8 characters",
-    );
-    expect(normalized.message).not.toContain("[object Object]");
+    expect(normalized.detail).toEqual(detail);
   });
 
-  it("normalizes object bodies without object Object", async () => {
-    const response = new Response(JSON.stringify({ reason: "missing-route" }), {
-      status: 404,
-      headers: { "Content-Type": "application/json" },
-    });
-
+  it("never shows a JSON body that has no detail", async () => {
     const normalized = await apiResponseErrorMessage(
-      response,
+      SETTINGS,
+      jsonResponse(404, { reason: "missing-route" }),
       "Could not load",
     );
 
-    expect(normalized.message).toBe(
-      JSON.stringify({ reason: "missing-route" }),
-    );
-    expect(normalized.message).not.toContain("[object Object]");
+    expect(normalized.message).toBe("Could not load.");
   });
 
-  it("turns HTML responses into operator-safe proxy guidance", async () => {
-    const response = new Response("<!doctype html><title>Not found</title>", {
-      status: 404,
-    });
-
+  it("never shows Weir's own failure text, which is for its log", async () => {
     const normalized = await apiResponseErrorMessage(
-      response,
+      SETTINGS,
+      jsonResponse(500, { detail: "database is locked" }),
+      "Could not load settings",
+    );
+
+    expect(normalized.message).toBe("Could not load settings.");
+  });
+
+  it("shows a media manager's failure relayed by Weir", async () => {
+    const normalized = await apiResponseErrorMessage(
+      SETTINGS,
+      jsonResponse(502, {
+        detail: "Sonarr did not answer when asked what it manages.",
+      }),
+      "Could not list libraries",
+    );
+
+    expect(normalized.message).toBe(
+      "Sonarr did not answer when asked what it manages.",
+    );
+  });
+
+  it("never shows an HTML page or a status code", async () => {
+    const normalized = await apiResponseErrorMessage(
+      SETTINGS,
+      new Response("<!doctype html><title>Bad gateway</title>", {
+        status: 502,
+      }),
       "Could not check for updates",
     );
 
-    expect(normalized.message).toContain("received HTML instead of JSON");
+    expect(normalized.message).toBe("Could not check for updates.");
+  });
+
+  it("never shows a plain-text body", async () => {
+    const normalized = await apiResponseErrorMessage(
+      SETTINGS,
+      new Response("Internal Server Error", { status: 500 }),
+      "Could not save.",
+    );
+
+    expect(normalized.message).toBe("Could not save.");
   });
 
   it("exposes status and path on ApiHttpError", () => {
@@ -161,7 +195,7 @@ describe("apiFetch timeouts", () => {
       status: 0,
       path: "/api/v1/suite/settings",
       timedOut: true,
-      message: "Request timed out - the backend may be slow or unreachable.",
+      message: TIMED_OUT_MESSAGE,
     });
   });
 });
