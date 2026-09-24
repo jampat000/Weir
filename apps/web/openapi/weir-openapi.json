@@ -231,14 +231,9 @@
             "title": "Retention Days",
             "type": "integer"
           },
-          "system_events": {
-            "default": 0,
-            "minimum": 0.0,
-            "title": "System Events",
-            "type": "integer"
-          },
           "total": {
             "default": 0,
+            "description": "Every event that matches the filters. Counted for the first page only: a page requested with before_id leaves it out.",
             "minimum": 0.0,
             "title": "Total",
             "type": "integer"

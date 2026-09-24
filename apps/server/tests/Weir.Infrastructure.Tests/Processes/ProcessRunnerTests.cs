@@ -31,6 +31,20 @@ public sealed class ProcessRunnerTests
         Assert.Equal("err", Encoding.UTF8.GetString(result.Stderr).Trim());
     }
 
+    [Fact]
+    public async Task A_tool_runs_below_normal_priority()
+    {
+        // The child reads stdin to its end before reporting, and the runner closes stdin only after it has set the
+        // priority, so the child cannot look before it is set.
+        string[] reportOwnPriority = OperatingSystem.IsWindows()
+            ? ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "[Console]::In.ReadToEnd() | Out-Null; [System.Diagnostics.Process]::GetCurrentProcess().PriorityClass"]
+            : ["/bin/sh", "-c", "cat > /dev/null; awk '{ print $19 }' /proc/$$/stat"];
+
+        var result = await Runner.RunAsync(new ProcessRequest { Argv = reportOwnPriority });
+
+        Assert.Equal(OperatingSystem.IsWindows() ? "BelowNormal" : "10", Encoding.UTF8.GetString(result.Stdout).Trim());
+    }
+
     [PosixFact("The shell's own argument handling is what this proves; dotnet itself echoes nothing useful on Windows.")]
     public async Task Arguments_reach_the_child_token_for_token()
     {

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -21,6 +22,9 @@ public sealed partial class MediaTools
     private readonly bool _windows = OperatingSystem.IsWindows();
     private readonly Func<string, MediaFileState> _inspectFile;
 
+    /// <summary>What each ffmpeg answered to <c>-hwaccels</c>, by its path; see <see cref="KnownAccelerationAsync"/>.</summary>
+    private readonly ConcurrentDictionary<string, AccelerationReport> _accelerationByFfmpeg = new(StringComparer.Ordinal);
+
     public MediaTools(IProcessRunner runner, IMediaToolResolver resolver, ILogger<MediaTools> logger, TimeProvider timeProvider)
         : this(runner, resolver, logger, timeProvider, InspectFile)
     {
@@ -39,59 +43,6 @@ public sealed partial class MediaTools
         _resolver = resolver;
         _logger = logger;
         _timeProvider = timeProvider;
-    }
-
-    /// <summary>
-    /// Probes <paramref name="path"/> and returns ffprobe's JSON object. Throws
-    /// <see cref="MediaUnreadableException"/> when ffprobe says the contents are unreadable,
-    /// <see cref="MediaToolException"/> for any other failure, and <see cref="MediaToolTimeoutException"/> on timeout.
-    /// </summary>
-    public async Task<JsonElement> FfprobeJsonAsync(
-        string path,
-        int timeoutSeconds = FfmpegCommands.FfprobeTimeoutSeconds,
-        int probeSizeMb = 10,
-        int analyzeDurationSeconds = 10,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(path);
-        var (ffprobe, _) = _resolver.Resolve();
-        var (resolvedPath, exists, isFile, size, mtime) = _inspectFile(path);
-        LogFfprobeFileState(ProbeOutput.FileStateLogPayload(path, resolvedPath, exists, isFile, size, MediaPathNames.Suffix(path, _windows), mtime));
-        if (!exists || !isFile || size == 0)
-        {
-            throw new MediaToolException("file missing or empty at probe time");
-        }
-
-        var argv = FfmpegCommands.BuildFfprobeArgv(ffprobe, path, probeSizeMb, analyzeDurationSeconds);
-        LogFfprobeCall(ProbeOutput.CallLogPayload(path, argv));
-        var result = await _runner.RunAsync(
-            new ProcessRequest
-            {
-                Argv = argv,
-                Timeout = TimeSpan.FromSeconds(timeoutSeconds),
-                Stdin = ProcessInput.Inherit,
-                Stdout = ProcessOutput.Capture,
-                Stderr = ProcessOutput.Capture,
-            },
-            cancellationToken).ConfigureAwait(false);
-        if (result.TimedOut)
-        {
-            throw new MediaToolTimeoutException(ProbeOutput.TimeoutMessage(argv, timeoutSeconds));
-        }
-
-        var stdout = ProbeOutput.CapturedText(result.Stdout);
-        var stderr = ProbeOutput.CapturedText(result.Stderr);
-        var payload = ProbeOutput.ResultLogPayload(path, result.ExitCode, stdout, stderr);
-        if (result.ExitCode != 0)
-        {
-            LogFfprobeResultWarning(payload);
-        }
-        else
-        {
-            LogFfprobeResultDebug(payload);
-        }
-
-        return ProbeOutput.Interpret(result.ExitCode, stdout, stderr);
     }
 
     /// <summary>Probes the staged output and checks audio count and duration.</summary>
@@ -410,37 +361,14 @@ public sealed partial class MediaTools
                 "duration and measuring the source directly did not produce one — so the staged output was not published.");
         }
 
-        var outputProbe = await FfprobeJsonAsync(outputPath, cancellationToken: cancellationToken).ConfigureAwait(false);
-        var outputWarnings = await ProbeWarningLinesAsync(outputPath, cancellationToken).ConfigureAwait(false);
+        var output = await ProbeWithWarningsAsync(outputPath, cancellationToken: cancellationToken).ConfigureAwait(false);
         RemuxOutputValidation.ValidateAgainstPlan(
-            outputProbe,
+            output.Probe,
             plan,
             RemuxOutputValidation.FormatName(sourceProbe),
             expectedDuration.Value,
             sourceWarnings,
-            outputWarnings);
-    }
-
-    /// <summary>
-    /// #500: ffprobe's <c>-v warning</c> stderr for a file, as non-blank stripped lines. Best-effort: a timeout
-    /// reads as no warnings rather than failing the whole validation over a diagnostic that could not be gathered.
-    /// </summary>
-    public async Task<IReadOnlyList<string>> ProbeWarningLinesAsync(string path, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(path);
-        var (ffprobe, _) = _resolver.Resolve();
-        var argv = FfmpegCommands.BuildFfprobeWarningsArgv(ffprobe, path);
-        var result = await _runner.RunAsync(
-            new ProcessRequest
-            {
-                Argv = argv,
-                Timeout = TimeSpan.FromSeconds(FfmpegCommands.FfprobeTimeoutSeconds),
-                Stdin = ProcessInput.Inherit,
-                Stdout = ProcessOutput.Discard,
-                Stderr = ProcessOutput.Capture,
-            },
-            cancellationToken).ConfigureAwait(false);
-        return result.TimedOut ? [] : RemuxOutputValidation.WarningLines(ProbeOutput.CapturedText(result.Stderr));
+            output.Warnings);
     }
 
     /// <summary>
@@ -506,7 +434,27 @@ public sealed partial class MediaTools
             return HardwareAcceleration.ReportForRunError(ProbeOutput.TimeoutMessage(argv, FfmpegCommands.HwaccelTimeoutSeconds));
         }
 
-        return HardwareAcceleration.ReportFromHwaccels(result.ExitCode, ProbeOutput.CapturedText(result.Stdout));
+        var report = HardwareAcceleration.ReportFromHwaccels(result.ExitCode, ProbeOutput.CapturedText(result.Stdout));
+        if (report.Detected)
+        {
+            _accelerationByFfmpeg[ffmpegBin] = report;
+        }
+
+        return report;
+    }
+
+    /// <summary>
+    /// <see cref="DetectAccelerationAsync"/>, asked once per ffmpeg rather than once per file (#716): the methods an
+    /// ffmpeg build was compiled with do not change while it is installed. An answer that could not be read is not
+    /// kept, so the next pass asks again, and every <see cref="DetectAccelerationAsync"/> (the Settings check) replaces
+    /// the kept answer with a fresh one.
+    /// </summary>
+    public Task<AccelerationReport> KnownAccelerationAsync(string ffmpegBin, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(ffmpegBin);
+        return _accelerationByFfmpeg.TryGetValue(ffmpegBin, out var known)
+            ? Task.FromResult(known)
+            : DetectAccelerationAsync(ffmpegBin, cancellationToken);
     }
 
     /// <summary>
@@ -775,18 +723,6 @@ public sealed partial class MediaTools
             throw new MediaToolException("mkvmerge failed: " + detail);
         }
     }
-
-    [LoggerMessage(Level = LogLevel.Debug, Message = "PROCESSING_FFPROBE_FILE_STATE: {Payload}")]
-    private partial void LogFfprobeFileState(string payload);
-
-    [LoggerMessage(Level = LogLevel.Debug, Message = "PROCESSING_FFPROBE_CALL: {Payload}")]
-    private partial void LogFfprobeCall(string payload);
-
-    [LoggerMessage(Level = LogLevel.Debug, Message = "PROCESSING_FFPROBE_RESULT: {Payload}")]
-    private partial void LogFfprobeResultDebug(string payload);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "PROCESSING_FFPROBE_RESULT: {Payload}")]
-    private partial void LogFfprobeResultWarning(string payload);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "{Summary}")]
     private partial void LogFfmpegDebug(string summary);

@@ -13,8 +13,12 @@ public static class JobStoreServices
     public static IServiceCollection AddWeirJobStore(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
+        services.TryAddSingleton<WorkerWakeSignals>();
         services.TryAddSingleton(sp => new ProcessingJobStore(
-            sp.GetRequiredService<SqliteDatabase>(), sp.GetRequiredService<TimeProvider>(), sp.GetService<IJobQueueMetrics>()));
+            sp.GetRequiredService<SqliteDatabase>(),
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetService<IJobQueueMetrics>(),
+            sp.GetRequiredService<WorkerWakeSignals>()));
         return services;
     }
 }

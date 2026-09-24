@@ -37,6 +37,7 @@ public sealed class LiveProgressStoreTests
         var reporter = new ActivityProgressReporter(store.Database, 7, new PyDict(), NullLogger.Instance, store.Clock);
 
         reporter.Report(Writing("Show/S01E01.mkv", 42.5));
+        await reporter.FlushAsync();
 
         var progress = (await ReadAsync(store))["Show/S01E01.mkv"];
         Assert.Equal("processing", progress.Status);
@@ -60,6 +61,7 @@ public sealed class LiveProgressStoreTests
             .Set("relative_media_path", "Film (2024)/Film.mkv")
             .Set("percent", 100.0)
             .Set("message", "The cleaned-up file was written. Weir is doing final safety checks."));
+        await reporter.FlushAsync();
 
         var progress = (await ReadAsync(store))["Film (2024)/Film.mkv"];
         Assert.Equal("finishing", progress.Status);
@@ -76,6 +78,7 @@ public sealed class LiveProgressStoreTests
         store.Clock.Set(DateTimeOffset.UtcNow);
         var reporter = new ActivityProgressReporter(store.Database, 9, new PyDict(), NullLogger.Instance, store.Clock);
         reporter.Report(Writing("Big/Big.mkv", 5));
+        await reporter.FlushAsync();
         await store.WithUnitOfWork(async uow =>
         {
             // The pass started half an hour ago.
@@ -84,6 +87,7 @@ public sealed class LiveProgressStoreTests
         });
 
         reporter.Report(Writing("Big/Big.mkv", 64));
+        await reporter.FlushAsync();
 
         var progress = (await ReadAsync(store))["Big/Big.mkv"];
         Assert.Equal(64, progress.Percent);
@@ -95,6 +99,7 @@ public sealed class LiveProgressStoreTests
         using var store = new StoreFixture();
         var reporter = new ActivityProgressReporter(store.Database, 10, new PyDict(), NullLogger.Instance, store.Clock);
         reporter.Report(Writing("Gone/Gone.mkv", 30));
+        await reporter.FlushAsync();
 
         store.Clock.Set(store.Clock.GetUtcNow().AddMinutes(3));
 

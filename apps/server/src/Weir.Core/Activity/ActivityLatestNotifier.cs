@@ -78,7 +78,7 @@ public sealed class ActivityLatestNotifier
         }
     }
 
-    /// <summary>How many streams are waiting; for tests.</summary>
+    /// <summary>How many streams are waiting: 0 tells a polling backstop it has nothing to check for yet.</summary>
     public int WaiterCount
     {
         get

@@ -295,7 +295,7 @@ internal sealed class FakeValidator : ISwapOutputValidator
 
     public List<string> Checked { get; } = [];
 
-    public Task<SwapValidation> ValidateAsync(string originalPath, string outputPath, CancellationToken cancellationToken)
+    public Task<SwapValidation> ValidateAsync(string originalPath, string outputPath, double? originalDurationSeconds, CancellationToken cancellationToken)
     {
         Checked.Add(outputPath);
         During?.Invoke();

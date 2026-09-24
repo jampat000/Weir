@@ -39,7 +39,7 @@ public sealed class LibraryCleanHandlerTests : IDisposable
         var swap = new SafeSwap(
             PhysicalSwapFileSystem.Instance,
             new ProcessingJobSwapJournal(_fixture.Store.Database),
-            new RemuxOutputSwapValidator(tools, NullLogger<RemuxOutputSwapValidator>.Instance),
+            new RemuxOutputSwapValidator(tools),
             NullLogger<SafeSwap>.Instance);
         // No manager connections are configured in this fixture, so the real notifier finds nothing that owns
         // the changed path and makes no HTTP call — equivalent to a no-op for these tests, but exercising the
@@ -160,6 +160,21 @@ public sealed class LibraryCleanHandlerTests : IDisposable
 
         Assert.Equal(1, await _fixture.Store.Scalar($"SELECT count(*) FROM activity_events WHERE event_type = '{LibraryActivityEventTypes.FileCleaned}'"));
         Assert.False(File.Exists(path + ".weir-bak.mkv"));
+    }
+
+    [Fact]
+    public async Task A_clean_probes_the_original_once()
+    {
+        var library = await LibraryAsync();
+        var path = _libraryFolder.Join("film.mkv");
+        await File.WriteAllBytesAsync(path, [1, 2, 3]);
+        _media.Probes["film.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+
+        var jobId = await EnqueueCleanAsync(library, path, confirmFinalRemoval: true);
+        await RunCleanAsync(jobId);
+
+        Assert.Equal(1, await _fixture.Store.Scalar($"SELECT count(*) FROM activity_events WHERE event_type = '{LibraryActivityEventTypes.FileCleaned}'"));
+        Assert.Single(_media.Probed, argv => argv[^1] == path);
     }
 
     [Fact]

@@ -46,16 +46,21 @@ public static class LiveProgressStore
     private static readonly HashSet<string> LiveStatuses = new(StringComparer.Ordinal) { "processing", "finishing" };
     private const int MaxRows = 64;
 
+    /// <summary>The newest progress rows of the last <see cref="LongestPass"/>.</summary>
+    internal const string RecentProgressSql =
+        "SELECT created_at, detail FROM activity_events WHERE event_type = @type AND created_at >= @since ORDER BY id DESC LIMIT @max_rows";
+
     /// <summary>Maps <c>relative_media_path</c> to the progress of the pass running on it.</summary>
     public static async Task<Dictionary<string, LiveProgress>> ByPathAsync(UnitOfWork uow, TimeProvider time)
     {
         var now = time.GetUtcNow();
         var since = now - LongestPass;
         var rows = await uow.QueryAsync(
-            "SELECT created_at, detail FROM activity_events WHERE event_type = @type AND created_at >= @since ORDER BY id DESC LIMIT " + MaxRows,
+            RecentProgressSql,
             reader => (Created: SqliteValues.GetDateTime(reader, 0), Detail: reader.IsDBNull(1) ? null : reader.GetString(1)),
             ("@type", ActivityEventTypes.ProcessingFileProcessingProgress),
-            ("@since", SqliteValues.ToSqlite(PyDateTime.FromUtc(since.UtcDateTime)))).ConfigureAwait(false);
+            ("@since", SqliteValues.ToSqlite(PyDateTime.FromUtc(since.UtcDateTime))),
+            ("@max_rows", MaxRows)).ConfigureAwait(false);
 
         var result = new Dictionary<string, LiveProgress>(StringComparer.Ordinal);
         foreach (var (created, raw) in rows)

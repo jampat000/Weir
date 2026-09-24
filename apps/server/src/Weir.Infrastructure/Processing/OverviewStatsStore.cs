@@ -23,6 +23,9 @@ public static class OverviewStatsStore
     private const string OutcomeLiveOutputWritten = "live_output_written";
     private const string OutcomeLiveSkippedNotRequired = "live_skipped_not_required";
 
+    /// <summary>The completed passes of the window, whose details carry the sizes and outcomes.</summary>
+    internal const string RecentResultsSql = "SELECT detail FROM activity_events WHERE event_type = @type AND created_at >= @since";
+
     public static async Task<ProcessingOverviewStats> BuildAsync(UnitOfWork uow, int windowDays, TimeProvider time)
     {
         var days = Math.Max(1, windowDays);
@@ -34,7 +37,7 @@ public static class OverviewStatsStore
             ("@kind", RemuxPassJobKind), ("@since", sinceParam)).ConfigureAwait(false);
 
         var detailRows = await uow.QueryAsync(
-            "SELECT detail FROM activity_events WHERE event_type = @type AND created_at >= @since",
+            RecentResultsSql,
             reader => reader.IsDBNull(0) ? null : reader.GetString(0),
             ("@type", ActivityEventTypes.ProcessingFileRemuxPassCompleted), ("@since", sinceParam)).ConfigureAwait(false);
 

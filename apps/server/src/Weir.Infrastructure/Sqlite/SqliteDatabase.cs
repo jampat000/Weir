@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using SQLitePCL;
@@ -7,7 +8,8 @@ namespace Weir.Infrastructure.Sqlite;
 
 /// <summary>
 /// Opens connections to Weir's SQLite file with the same PRAGMAs on every connection: WAL journal,
-/// foreign keys on, a 30 second busy timeout and <c>synchronous=NORMAL</c>.
+/// foreign keys on, a 30 second busy timeout and <c>synchronous=NORMAL</c>, plus the cache and journal
+/// settings in <see cref="TuningPragmas"/>.
 /// </summary>
 public sealed class SqliteDatabase
 {
@@ -39,6 +41,20 @@ public sealed class SqliteDatabase
     /// pool may run while a handle is being activated.
     /// </remarks>
     private static readonly ConcurrentDictionary<string, Lock> PoolGates = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Settings that stay with a native connection, so they are applied once per handle rather than on every
+    /// pooled open (#711): an 8 MB page cache instead of the 2 MB default, temporary tables and sorts in memory,
+    /// reads through a 256 MB memory map, and a WAL cut back to 64 MB after each checkpoint instead of keeping
+    /// its largest size for ever.
+    /// </summary>
+    private const string TuningPragmas =
+        "PRAGMA cache_size=-8000; PRAGMA temp_store=MEMORY; PRAGMA mmap_size=268435456; PRAGMA journal_size_limit=67108864;";
+
+    /// <summary>The native handles <see cref="TuningPragmas"/> has run on; an entry goes when its handle is closed and collected.</summary>
+    private static readonly ConditionalWeakTable<sqlite3, object> TunedHandles = [];
+
+    private static readonly object TunedMarker = new();
 
     private readonly Lock? _poolGate;
     private readonly ILogger? _logger;
@@ -253,6 +269,12 @@ public sealed class SqliteDatabase
         await ExecuteAsync(connection, "PRAGMA foreign_keys=ON", cancellationToken).ConfigureAwait(false);
         await ExecuteAsync(connection, $"PRAGMA busy_timeout={BusyTimeoutMilliseconds}", cancellationToken).ConfigureAwait(false);
         await ExecuteAsync(connection, "PRAGMA synchronous=NORMAL", cancellationToken).ConfigureAwait(false);
+        var handle = connection.Handle!;
+        if (!TunedHandles.TryGetValue(handle, out _))
+        {
+            await ExecuteAsync(connection, TuningPragmas, cancellationToken).ConfigureAwait(false);
+            TunedHandles.AddOrUpdate(handle, TunedMarker);
+        }
     }
 
     private static async Task ExecuteAsync(SqliteConnection connection, string sql, CancellationToken cancellationToken)

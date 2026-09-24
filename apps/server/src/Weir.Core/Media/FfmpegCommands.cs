@@ -21,6 +21,12 @@ public static class FfmpegCommands
     /// <summary>ffprobe's default time limit.</summary>
     public const int FfprobeTimeoutSeconds = 120;
 
+    /// <summary>How much of a file ffprobe reads to find its streams, unless the operator set otherwise.</summary>
+    public const int DefaultProbeSizeMb = 10;
+
+    /// <summary>How much of a file's duration ffprobe analyses, unless the operator set otherwise.</summary>
+    public const int DefaultAnalyzeDurationSeconds = 10;
+
     /// <summary>How much of ffprobe's output a log entry keeps.</summary>
     public const int ProbeLogMaxChars = 2000;
 
@@ -59,7 +65,7 @@ public static class FfmpegCommands
     /// site's <c>GoldenDivergences</c> helper).
     /// </para>
     /// </remarks>
-    public static IReadOnlyList<string> BuildFfprobeArgv(string ffprobeBin, string src, long probeSizeMb = 10, long analyzeDurationSeconds = 10)
+    public static IReadOnlyList<string> BuildFfprobeArgv(string ffprobeBin, string src, long probeSizeMb = DefaultProbeSizeMb, long analyzeDurationSeconds = DefaultAnalyzeDurationSeconds)
     {
         ArgumentNullException.ThrowIfNull(ffprobeBin);
         ArgumentNullException.ThrowIfNull(src);
@@ -87,10 +93,10 @@ public static class FfmpegCommands
     /// <summary>
     /// #500: the same probe as <see cref="BuildFfprobeArgv"/> but at <c>-v warning</c>, so ffprobe's warning-level
     /// diagnostics (not just errors) land on stderr for the source-vs-output comparison in
-    /// <see cref="RemuxOutputValidation"/>. Verbosity does not affect <c>-print_format json</c> or the JSON on
-    /// stdout, which callers of this argv discard — only stderr is read.
+    /// <see cref="RemuxOutputValidation"/>. Verbosity does not affect <c>-print_format json</c>, so stdout carries the
+    /// same JSON as <see cref="BuildFfprobeArgv"/>'s and one run can answer both.
     /// </summary>
-    public static IReadOnlyList<string> BuildFfprobeWarningsArgv(string ffprobeBin, string src, long probeSizeMb = 10, long analyzeDurationSeconds = 10)
+    public static IReadOnlyList<string> BuildFfprobeWarningsArgv(string ffprobeBin, string src, long probeSizeMb = DefaultProbeSizeMb, long analyzeDurationSeconds = DefaultAnalyzeDurationSeconds)
     {
         var argv = BuildFfprobeArgv(ffprobeBin, src, probeSizeMb, analyzeDurationSeconds).ToList();
         var index = argv.IndexOf("-v");
