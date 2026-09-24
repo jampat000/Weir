@@ -26,6 +26,7 @@ public static class WeirPlatformServices
         services.TryAddSingleton(sp => new SqliteDatabase(options.DbPath, logger: sp.GetService<ILogger<SqliteDatabase>>()));
         services.TryAddSingleton<WorkerHeartbeats>();
         services.TryAddSingleton<WatcherStateStore>();
+        services.TryAddSingleton<LibraryChanges>();
         services.TryAddSingleton<ITimeZoneResolver, IanaTimeZoneResolver>();
         services.TryAddSingleton<IActivityWriter, SqliteActivityWriter>();
         services.TryAddSingleton(sp => ActivityNotifications.For(sp.GetRequiredService<SqliteDatabase>()));

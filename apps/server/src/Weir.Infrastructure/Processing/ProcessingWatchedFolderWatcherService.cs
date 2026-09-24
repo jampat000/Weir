@@ -27,19 +27,25 @@ namespace Weir.Infrastructure.Processing;
 /// </item>
 /// <item>
 /// <b>Reacts to library create/update/delete without a restart.</b> This re-reads the enabled libraries and their
-/// folders every tick (<see cref="TickInterval"/>) and reconciles the watch set to match — a library
-/// created, edited (folder, enabled, or "watch for changes" toggled) or deleted takes effect within a
-/// tick, with no restart needed. Watchers whose watched folder has not changed are left running, so a tick
-/// never interrupts a debounce already in progress for an unrelated library.
+/// folders and reconciles the watch set to match: on the next tick after a change is recorded
+/// (<see cref="LibraryChanges"/>), and every <see cref="ReconcileInterval"/> in case one was not (#720). A library
+/// created, edited (folder, enabled, or "watch for changes" toggled) or deleted takes effect with no restart needed.
+/// Watchers whose watched folder has not changed are left running, so a reconcile never interrupts a debounce already
+/// in progress for an unrelated library.
 /// </item>
 /// </list>
 /// </remarks>
 public class ProcessingWatchedFolderWatcherService : BackgroundService
 {
-    /// <summary>How often the watch set is reconciled against the database and the debounce/overflow
-    /// queues are drained. Small enough to keep the promise of "within seconds" and "picks up library
-    /// changes quickly"; large enough not to spin or hammer the database.</summary>
+    /// <summary>How often the debounce and overflow queues are drained: in memory only, and short enough to keep the
+    /// promise of "within seconds".</summary>
     public static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>
+    /// How often the watch set is reconciled against the database when no library change was recorded: a backstop for
+    /// changes made some other way. Reading every library twice a second was most of Weir's idle load (#720).
+    /// </summary>
+    public static readonly TimeSpan ReconcileInterval = TimeSpan.FromSeconds(20);
 
     private readonly SqliteDatabase _database;
     private readonly WeirOptions _options;
@@ -47,6 +53,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
     private readonly WatcherStateStore _state;
     private readonly TimeProvider _time;
     private readonly ILogger<ProcessingWatchedFolderWatcherService> _logger;
+    private readonly LibraryChanges _libraryChanges;
 
     public ProcessingWatchedFolderWatcherService(
         SqliteDatabase database,
@@ -54,7 +61,8 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
         ProcessingJobStore jobStore,
         WatcherStateStore state,
         TimeProvider time,
-        ILogger<ProcessingWatchedFolderWatcherService> logger)
+        ILogger<ProcessingWatchedFolderWatcherService> logger,
+        LibraryChanges? libraryChanges = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -62,6 +70,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
         _state = state ?? throw new ArgumentNullException(nameof(state));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _libraryChanges = libraryChanges ?? new LibraryChanges();
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -81,20 +90,28 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
         var immediateScans = new ConcurrentQueue<long>();
         var restarts = new ConcurrentQueue<long>();
         var watches = new Dictionary<long, LibraryWatch>();
+        long? reconciledVersion = null;
+        long reconciledAt = 0;
 
         try
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                try
+                var version = _libraryChanges.Version;
+                if (version != reconciledVersion || _time.GetElapsedTime(reconciledAt) >= ReconcileInterval)
                 {
-                    await ReconcileAsync(watches, pending, immediateScans, restarts, stoppingToken).ConfigureAwait(false);
-                }
+                    reconciledVersion = version;
+                    reconciledAt = _time.GetTimestamp();
+                    try
+                    {
+                        await ReconcileAsync(watches, pending, immediateScans, restarts, stoppingToken).ConfigureAwait(false);
+                    }
 #pragma warning disable CA1031 // The watcher keeps its previous watch set when settings cannot be read.
-                catch (Exception exception) when (exception is not OperationCanceledException)
+                    catch (Exception exception) when (exception is not OperationCanceledException)
 #pragma warning restore CA1031
-                {
-                    _logger.LogError(exception, "Filesystem watcher could not read library settings; keeping the previous watch set.");
+                    {
+                        _logger.LogError(exception, "Filesystem watcher could not read library settings; keeping the previous watch set.");
+                    }
                 }
 
                 RestartFlagged(watches, pending, immediateScans, restarts);

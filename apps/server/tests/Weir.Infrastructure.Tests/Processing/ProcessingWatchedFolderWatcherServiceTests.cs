@@ -263,6 +263,39 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
         Assert.Contains("No libraries", detail, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task A_recorded_library_change_is_picked_up_without_waiting_for_the_backstop()
+    {
+        using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "watcher-tests-secret-9"));
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        var libraryId = await CreateLibraryAsync(store, watched, output, fileSystemEventsEnabled: false);
+        var time = new FakeTimeProvider();
+        var state = new WatcherStateStore();
+        var changes = new LibraryChanges();
+        var service = new ProcessingWatchedFolderWatcherService(
+            store.Database, store.Options, new ProcessingJobStore(store.Database, time), state,
+            time, NullLogger<ProcessingWatchedFolderWatcherService>.Instance, changes);
+        await service.StartAsync(CancellationToken.None);
+        try
+        {
+            await Eventually.ThatAsync(() => state.Reports().Any(r => r.LibraryId == libraryId && r.Status == WatcherStatus.Disabled));
+
+            await CreateLibraryAsync(store, watched, output, fileSystemEventsEnabled: true);
+            changes.Record();
+            // A few ticks on the fake clock, far inside ReconcileInterval: only the recorded change can start the watcher.
+            await AdvancePastSeveralTicksAsync(time);
+
+            await Eventually.ThatAsync(() => state.Reports().Any(r => r.LibraryId == libraryId && r.Status == WatcherStatus.Watching));
+        }
+        finally
+        {
+            await service.StopAsync(CancellationToken.None);
+        }
+    }
+
     /// <summary>
     /// Forces several reconcile ticks on a fake clock, one at a time (a single large advance only wakes the
     /// one timer already due, not the ones a tick's own continuation goes on to arm), so a "nothing happened"

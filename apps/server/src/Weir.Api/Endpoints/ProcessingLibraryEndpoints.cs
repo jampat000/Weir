@@ -481,6 +481,7 @@ public static class ProcessingLibraryEndpoints
 
         await RefuseUnsupportedRejectAsync(request, uow, row).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
+        request.Service<LibraryChanges>().Record();
         return new JsonApiResult(StatusCodes.Status201Created, await LibraryOutAsync(uow, row, request.Service<ScanWakeups>()).ConfigureAwait(false));
     }
 
@@ -519,6 +520,7 @@ public static class ProcessingLibraryEndpoints
 
         await RefuseUnsupportedRejectAsync(request, uow, updated).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
+        request.Service<LibraryChanges>().Record();
         return ApiRoutes.Ok(await LibraryOutAsync(uow, updated, request.Service<ScanWakeups>()).ConfigureAwait(false));
     }
 
@@ -551,6 +553,7 @@ public static class ProcessingLibraryEndpoints
         await LibrarySettingsStore.DeleteAllForLibraryAsync(uow, row.Id).ConfigureAwait(false);
 
         await request.CommitAsync().ConfigureAwait(false);
+        request.Service<LibraryChanges>().Record();
         return new CustomApiResult(context =>
         {
             PyResponses.NoContentJson(context);
@@ -641,6 +644,7 @@ public static class ProcessingLibraryEndpoints
         }
 
         await request.CommitAsync().ConfigureAwait(false);
+        request.Service<LibraryChanges>().Record();
         var items = new List<PyJson>();
         foreach (var row in created)
         {
