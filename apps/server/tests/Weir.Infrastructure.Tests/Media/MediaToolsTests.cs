@@ -107,7 +107,7 @@ public sealed class MediaToolsTests : IDisposable
 
         var request = Assert.Single(runner.Requests);
         Assert.Equal(
-            ["ffmpeg", "-hide_banner", "-v", "error", "-xerror", "-err_detect", "explode", "-i", source, "-map", "0:v:0", "-c", "copy", "-f", "null", "-"],
+            ["ffmpeg", "-hide_banner", "-v", "error", "-xerror", "-err_detect", "explode", "-protocol_whitelist", "file", "-i", source, "-map", "0:v:0", "-c", "copy", "-f", "null", "-"],
             request.Argv);
     }
 
@@ -160,7 +160,9 @@ public sealed class MediaToolsTests : IDisposable
 
         Assert.Contains("decoded 12.0s of 30.0s expected", error.Message, StringComparison.Ordinal);
         var request = Assert.Single(runner.Requests);
-        Assert.Equal(["ffmpeg", "-hide_banner", "-v", "error", "-xerror", "-err_detect", "explode", "-i", source, "-map", "0:v:0", "-c", "copy", "-f", "null", "-progress", "pipe:1", "-nostats", "-"], request.Argv);
+        Assert.Equal(
+            ["ffmpeg", "-hide_banner", "-v", "error", "-xerror", "-err_detect", "explode", "-protocol_whitelist", "file", "-i", source, "-map", "0:v:0", "-c", "copy", "-f", "null", "-progress", "pipe:1", "-nostats", "-"],
+            request.Argv);
     }
 
     [Fact]
@@ -190,7 +192,9 @@ public sealed class MediaToolsTests : IDisposable
         await tools.RemuxToTempFileAsync(source, workDir, plan, sourceDocument.RootElement, [], durationSeconds: 100.0, acceleration: acceleration);
 
         var ffmpeg = Assert.Single(runner.Requests, r => r.Argv[0] == "ffmpeg");
-        Assert.Equal(["-hwaccel", "cuda"], ffmpeg.Argv.SkipWhile(a => a != "-y").Skip(1).TakeWhile(a => a != "-i"));
+        Assert.Equal(
+            ["-hwaccel", "cuda", "-protocol_whitelist", "file"],
+            ffmpeg.Argv.SkipWhile(a => a != "-y").Skip(1).TakeWhile(a => a != "-i"));
         Assert.Contains("-i", ffmpeg.Argv);
         Assert.True(ffmpeg.Argv.ToList().IndexOf("-hwaccel") < ffmpeg.Argv.ToList().IndexOf("-i"), "hwaccel flags must come before -i");
     }

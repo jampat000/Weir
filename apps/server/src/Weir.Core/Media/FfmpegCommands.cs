@@ -34,6 +34,13 @@ public static class FfmpegCommands
     public const double HwaccelTimeoutSeconds = 10.0;
 
     /// <summary>
+    /// Restricts every ffprobe/ffmpeg read of a source file to the local-file protocol, placed right before the
+    /// input path. A source file's own contents are never trusted enough to let ffmpeg's input demuxers (concat,
+    /// HLS and the like) follow a reference inside it to another protocol, such as a remote URL.
+    /// </summary>
+    private static readonly IReadOnlyList<string> ProtocolWhitelistArgs = ["-protocol_whitelist", "file"];
+
+    /// <summary>
     /// The probe command: probe size and analyze duration are clamped to 1..1024 MB and 1..300 s.
     /// </summary>
     /// <remarks>
@@ -72,6 +79,7 @@ public static class FfmpegCommands
             "-show_streams",
             "-show_format",
             "-show_chapters",
+            .. ProtocolWhitelistArgs,
             src,
         ];
     }
@@ -101,7 +109,9 @@ public static class FfmpegCommands
         ArgumentNullException.ThrowIfNull(ffmpegBin);
         ArgumentNullException.ThrowIfNull(src);
         ArgumentNullException.ThrowIfNull(plan);
-        var args = new List<string> { ffmpegBin, "-hide_banner", "-v", "error", "-i", src };
+        var args = new List<string> { ffmpegBin, "-hide_banner", "-v", "error" };
+        args.AddRange(ProtocolWhitelistArgs);
+        args.AddRange(["-i", src]);
         foreach (var vi in plan.VideoIndices)
         {
             args.AddRange(["-map", Map(vi)]);
@@ -135,6 +145,7 @@ public static class FfmpegCommands
             "-xerror",
             "-err_detect",
             "explode",
+            .. ProtocolWhitelistArgs,
             "-i",
             path,
             "-map",
@@ -222,6 +233,7 @@ public static class FfmpegCommands
             "-y",
         };
         args.AddRange(inputFlags ?? []);
+        args.AddRange(ProtocolWhitelistArgs);
         args.AddRange(["-i", src]);
         foreach (var vi in plan.VideoIndices)
         {
