@@ -83,7 +83,7 @@ public sealed class SwapRecoverySweep
         foreach (var entry in unfinished)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var fileReport = RecoverFile(_files, entry.OriginalPath, _logger);
+            var fileReport = RecoverFile(_files, entry.OriginalPath, _logger, keptOriginalPath: entry.KeptOriginalPath);
             report += fileReport;
             handled.Add(entry.OriginalPath);
             if (fileReport.Problems > 0)
@@ -140,7 +140,10 @@ public sealed class SwapRecoverySweep
     /// <param name="originalPath">The library file whose leftovers are checked.</param>
     /// <param name="logger">Where each action is logged.</param>
     /// <param name="restoreQuietly">A rollback restoring its own backup: expected, so not a warning.</param>
-    public static SwapRecoveryReport RecoverFile(ISwapFileSystem files, string originalPath, ILogger logger, bool restoreQuietly = false)
+    /// <param name="keptOriginalPath">#735: where the journal says a kept original belongs, when the setting was on for this
+    /// swap; null moves straight to deleting the backup, as when the setting is off.</param>
+    public static SwapRecoveryReport RecoverFile(
+        ISwapFileSystem files, string originalPath, ILogger logger, bool restoreQuietly = false, string? keptOriginalPath = null)
     {
         ArgumentNullException.ThrowIfNull(files);
         ArgumentNullException.ThrowIfNull(logger);
@@ -154,9 +157,27 @@ public sealed class SwapRecoverySweep
             {
                 if (files.FileExists(originalPath))
                 {
-                    files.Delete(backup);
+                    if (keptOriginalPath is not null)
+                    {
+                        OriginalsMover.Recover(files, backup, keptOriginalPath);
+                    }
+                    else
+                    {
+                        files.Delete(backup);
+                    }
+
                     backupsDeleted++;
-                    logger.LogInformation("Library swap backup removed; the file under the original name is kept backup={Backup}", backup);
+                    if (keptOriginalPath is not null)
+                    {
+                        logger.LogInformation(
+                            "Library swap original moved to its kept location; the file under the original name is kept backup={Backup} kept={Destination}",
+                            backup,
+                            keptOriginalPath);
+                    }
+                    else
+                    {
+                        logger.LogInformation("Library swap backup removed; the file under the original name is kept backup={Backup}", backup);
+                    }
                 }
                 else
                 {

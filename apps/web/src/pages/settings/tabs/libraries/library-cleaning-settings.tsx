@@ -3,8 +3,63 @@ import { useState } from "react";
 import { MmOnOffSwitch } from "../../../../components/ui/mm-on-off-switch";
 import { ServerFolderPickerButton } from "../../../../components/ui/server-folder-picker-button";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
+import { originalsFolderLabel } from "../../../../lib/processing/library-mode-api";
 import { examplePath } from "../../../../lib/ui/platform";
 import type { LibraryCleaningDraft } from "./library-cleaning-draft";
+
+/** #735: the switch and folder field for keeping a clean's pre-clean original instead of deleting it. */
+function KeepOriginalSettings({
+  libraryId,
+  enabled,
+  originalsFolder,
+  editable,
+  onChangeEnabled,
+  onChangeFolder,
+}: {
+  libraryId: number;
+  enabled: boolean;
+  originalsFolder: string;
+  editable: boolean;
+  onChangeEnabled: (next: boolean) => void;
+  onChangeFolder: (folder: string) => void;
+}) {
+  return (
+    <>
+      <MmOnOffSwitch
+        id={`library-${libraryId}-keep-original`}
+        label="Keep the original after cleaning"
+        enabled={enabled}
+        disabled={!editable}
+        onChange={onChangeEnabled}
+      />
+      {enabled ? (
+        <div className="mm-library-cleaning__originals-folder">
+          <p className="mm-library-cleaning__hint">
+            Weir moves the original into {originalsFolderLabel(originalsFolder)}{" "}
+            instead of deleting it, so removed tracks can be recovered.
+            You&rsquo;ll need the disk space for both.
+          </p>
+          <input
+            className="mm-input"
+            placeholder={examplePath(
+              String.raw`D:\Media\Movies\.weir-originals`,
+              "/media/movies/.weir-originals",
+            )}
+            aria-label="Originals folder"
+            value={originalsFolder}
+            disabled={!editable}
+            onChange={(event) => onChangeFolder(event.target.value)}
+          />
+          <ServerFolderPickerButton
+            title="Choose where kept originals go"
+            value={originalsFolder}
+            onSelect={onChangeFolder}
+          />
+        </div>
+      ) : null}
+    </>
+  );
+}
 
 function FolderList({
   folders,
@@ -220,6 +275,16 @@ export function LibraryCleaningSettings({
           Off by default: a file that is still seeding shares its data with the
           download, so cleaning it frees no space.
         </p>
+        <KeepOriginalSettings
+          libraryId={libraryId}
+          enabled={draft.keep_original_after_clean}
+          originalsFolder={draft.originals_folder}
+          editable={editable}
+          onChangeEnabled={(next) =>
+            change({ keep_original_after_clean: next })
+          }
+          onChangeFolder={(folder) => change({ originals_folder: folder })}
+        />
       </div>
     </div>
   );

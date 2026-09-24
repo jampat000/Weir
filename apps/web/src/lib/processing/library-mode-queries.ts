@@ -32,7 +32,7 @@ export function useLibrarySettingsQuery(libraryId: number, enabled = true) {
   });
 }
 
-/** #508: the two preflight checkboxes, saved together with the library's current folders (see saveLibrarySettings). */
+/** #508 and #735: the library's cleaning checkboxes and originals folder, saved together with its current folders (see saveLibrarySettings). */
 export function useSaveLibraryPreflightSettings(libraryId: number) {
   const qc = useQueryClient();
   return useMutation({
@@ -40,6 +40,8 @@ export function useSaveLibraryPreflightSettings(libraryId: number) {
       library_folders: string[];
       clean_hardlinked_files?: boolean;
       skip_if_manager_would_redownload?: boolean;
+      keep_original_after_clean?: boolean;
+      originals_folder?: string;
     }) => saveLibrarySettings(libraryId, updates),
     onSuccess: () => {
       void qc.invalidateQueries({

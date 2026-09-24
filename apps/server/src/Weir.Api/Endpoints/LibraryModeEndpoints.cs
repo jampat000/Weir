@@ -52,7 +52,9 @@ public static class LibraryModeEndpoints
         .Set("library_folders", new PyList(settings.Folders.Select(f => (PyJson)new PyStr(f))))
         .Set("library_schedule_enabled", settings.ScheduleEnabled)
         .Set("clean_hardlinked_files", settings.CleanHardlinkedFiles)
-        .Set("skip_if_manager_would_redownload", settings.SkipIfManagerWouldRedownload);
+        .Set("skip_if_manager_would_redownload", settings.SkipIfManagerWouldRedownload)
+        .Set("keep_original_after_clean", settings.KeepOriginalAfterClean)
+        .Set("originals_folder", settings.OriginalsFolder);
 
     private static async Task<ApiResult> GetSettingsAsync(ApiRequest request)
     {
@@ -76,6 +78,8 @@ public static class LibraryModeEndpoints
         var folders = model.StrList("library_folders", []);
         var cleanHardlinkedFiles = model.OptionalBool("clean_hardlinked_files");
         var skipIfManagerWouldRedownload = model.OptionalBool("skip_if_manager_would_redownload");
+        var keepOriginalAfterClean = model.OptionalBool("keep_original_after_clean");
+        var originalsFolder = model.OptionalStr("originals_folder", maxLength: 4000);
         var csrfToken = model.Str("csrf_token", minLength: 1);
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
@@ -86,9 +90,14 @@ public static class LibraryModeEndpoints
         var uow = await request.DbAsync().ConfigureAwait(false);
         var library = await RequireLibraryAsync(uow, libraryId, NoLibraryWithThatId).ConfigureAwait(false);
         IReadOnlyList<string> validated;
+        string? validatedOriginalsFolder = null;
         try
         {
             validated = LibraryFolderRules.Validate(folders, library, request.Options.WeirHome);
+            if (originalsFolder is not null)
+            {
+                validatedOriginalsFolder = LibraryFolderRules.ValidateOriginalsFolder(originalsFolder, library, request.Options.WeirHome);
+            }
         }
         catch (LibraryModeException exception)
         {
@@ -101,6 +110,8 @@ public static class LibraryModeEndpoints
             Folders = validated,
             CleanHardlinkedFiles = cleanHardlinkedFiles ?? existing.CleanHardlinkedFiles,
             SkipIfManagerWouldRedownload = skipIfManagerWouldRedownload ?? existing.SkipIfManagerWouldRedownload,
+            KeepOriginalAfterClean = keepOriginalAfterClean ?? existing.KeepOriginalAfterClean,
+            OriginalsFolder = validatedOriginalsFolder ?? existing.OriginalsFolder,
         };
         await LibrarySettingsStore.SetAsync(uow, libraryId, updated).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);

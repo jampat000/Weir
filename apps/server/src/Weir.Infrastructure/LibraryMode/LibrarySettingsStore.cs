@@ -25,11 +25,14 @@ public static class LibrarySettingsStore
     {
         ArgumentNullException.ThrowIfNull(uow);
         var rows = await uow.QueryAsync(
-            "SELECT library_schedule_enabled, clean_hardlinked_files, skip_if_manager_would_redownload FROM libraries WHERE id = @id",
+            "SELECT library_schedule_enabled, clean_hardlinked_files, skip_if_manager_would_redownload, " +
+            "keep_original_after_clean, originals_folder FROM libraries WHERE id = @id",
             reader => (
                 ScheduleEnabled: SqliteValues.GetBool(reader, 0),
                 CleanHardlinkedFiles: SqliteValues.GetBool(reader, 1),
-                SkipIfManagerWouldRedownload: SqliteValues.GetBool(reader, 2)),
+                SkipIfManagerWouldRedownload: SqliteValues.GetBool(reader, 2),
+                KeepOriginalAfterClean: SqliteValues.GetBool(reader, 3),
+                OriginalsFolder: SqliteValues.GetString(reader, 4)),
             ("@id", libraryId)).ConfigureAwait(false);
         if (rows.Count == 0)
         {
@@ -38,7 +41,9 @@ public static class LibrarySettingsStore
 
         var row = rows[0];
         var folders = await FoldersForAsync(uow, libraryId).ConfigureAwait(false);
-        return new LibrarySettings(folders, row.ScheduleEnabled, row.CleanHardlinkedFiles, row.SkipIfManagerWouldRedownload);
+        return new LibrarySettings(
+            folders, row.ScheduleEnabled, row.CleanHardlinkedFiles, row.SkipIfManagerWouldRedownload,
+            row.KeepOriginalAfterClean, row.OriginalsFolder);
     }
 
     public static async Task SetAsync(UnitOfWork uow, long libraryId, LibrarySettings settings)
@@ -47,10 +52,13 @@ public static class LibrarySettingsStore
         ArgumentNullException.ThrowIfNull(settings);
         await uow.ExecuteAsync(
             "UPDATE libraries SET library_schedule_enabled = @schedule, clean_hardlinked_files = @clean_hardlinked, " +
-            "skip_if_manager_would_redownload = @skip_redownload, updated_at = CURRENT_TIMESTAMP WHERE id = @id",
+            "skip_if_manager_would_redownload = @skip_redownload, keep_original_after_clean = @keep_original, " +
+            "originals_folder = @originals_folder, updated_at = CURRENT_TIMESTAMP WHERE id = @id",
             ("@schedule", settings.ScheduleEnabled ? 1 : 0),
             ("@clean_hardlinked", settings.CleanHardlinkedFiles ? 1 : 0),
             ("@skip_redownload", settings.SkipIfManagerWouldRedownload ? 1 : 0),
+            ("@keep_original", settings.KeepOriginalAfterClean ? 1 : 0),
+            ("@originals_folder", settings.OriginalsFolder),
             ("@id", libraryId)).ConfigureAwait(false);
 
         await uow.ExecuteAsync("DELETE FROM library_folders WHERE library_id = @id", ("@id", libraryId)).ConfigureAwait(false);

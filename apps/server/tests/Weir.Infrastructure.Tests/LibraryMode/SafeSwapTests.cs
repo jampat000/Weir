@@ -592,6 +592,163 @@ public sealed class SafeSwapTests
         Assert.Empty(s.Journal.History);
     }
 
+    // #735: "keep the original after clean" moves the backup into the originals folder instead of deleting it.
+    private static readonly KeepOriginalOptions KeepInDefaultFolder = new([SwapScenario.Library], null);
+
+    [Fact]
+    public async Task With_the_setting_off_the_swap_is_unchanged()
+    {
+        var s = new SwapScenario();
+
+        var result = await s.RunAsync(SwapOptions.Default);
+
+        Assert.Null(result.KeptOriginalPath);
+        Assert.True(result.BackupRemoved);
+        Assert.Equal([Original], s.Files.Paths);
+        // The same 23 operations as every other test in this file: nothing new runs while the setting is off.
+        Assert.DoesNotContain(s.Files.Operations, op => op.StartsWith("EnsureDirectory", StringComparison.Ordinal) || op.StartsWith("Copy(", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Keeping_the_original_moves_it_into_the_originals_folder_instead_of_deleting_it()
+    {
+        var s = new SwapScenario();
+        var destination = OriginalsPathPlanner.DestinationPath(SwapScenario.Library, null, Original);
+
+        var result = await s.RunAsync(new SwapOptions(KeepOriginal: KeepInDefaultFolder));
+
+        Assert.Equal(destination, result.KeptOriginalPath);
+        Assert.True(result.BackupRemoved);
+        Assert.Empty(result.Warnings);
+        Assert.Equal([destination, Original], s.Files.Paths);
+        Assert.Equal("OLD", s.Files.Read(destination));
+        Assert.Equal("NEW", s.Files.Read(Original));
+        Assert.False(s.Files.Has(Backup));
+    }
+
+    [Fact]
+    public async Task A_name_already_at_the_destination_never_gets_overwritten()
+    {
+        var s = new SwapScenario();
+        var destination = OriginalsPathPlanner.DestinationPath(SwapScenario.Library, null, Original);
+        s.Files.Put(destination, "an earlier kept original");
+
+        var result = await s.RunAsync(new SwapOptions(KeepOriginal: KeepInDefaultFolder));
+
+        Assert.NotNull(result.KeptOriginalPath);
+        Assert.NotEqual(destination, result.KeptOriginalPath);
+        Assert.Equal("an earlier kept original", s.Files.Read(destination));
+        Assert.Equal("OLD", s.Files.Read(result.KeptOriginalPath!));
+        Assert.Equal("NEW", s.Files.Read(Original));
+        Assert.False(s.Files.Has(Backup));
+        Assert.Equal(3, s.Files.Paths.Count());
+    }
+
+    [Fact]
+    public async Task A_cross_volume_keep_copies_then_deletes_the_backup_once_the_size_is_verified()
+    {
+        var s = new SwapScenario();
+        s.Files.OtherVolumeFolder = "/originals-volume";
+        var keep = new KeepOriginalOptions([SwapScenario.Library], "/originals-volume/kept");
+        var destination = OriginalsPathPlanner.DestinationPath(SwapScenario.Library, "/originals-volume/kept", Original);
+
+        var result = await s.RunAsync(new SwapOptions(KeepOriginal: keep));
+
+        Assert.Equal(destination, result.KeptOriginalPath);
+        Assert.Equal("OLD", s.Files.Read(destination));
+        Assert.False(s.Files.Has(Backup));
+        Assert.Contains($"Copy({Backup} -> {destination})", s.Files.Operations);
+        Assert.Contains($"FileSizeBytes({Backup})", s.Files.Operations);
+        Assert.Contains($"FileSizeBytes({destination})", s.Files.Operations);
+    }
+
+    [Fact]
+    public async Task A_corrupt_cross_volume_copy_is_discarded_and_the_backup_is_left_for_the_sweep()
+    {
+        var s = new SwapScenario();
+        s.Files.OtherVolumeFolder = "/originals-volume";
+        s.Files.CorruptNextCopy = true;
+        var keep = new KeepOriginalOptions([SwapScenario.Library], "/originals-volume/kept");
+        var destination = OriginalsPathPlanner.DestinationPath(SwapScenario.Library, "/originals-volume/kept", Original);
+
+        var result = await s.RunAsync(new SwapOptions(KeepOriginal: keep));
+
+        // The swap itself already committed (the library file holds the cleaned content); only the keep step failed.
+        Assert.Equal(SwapOutcome.Committed, result.Outcome);
+        Assert.False(result.BackupRemoved);
+        Assert.Single(result.Warnings);
+        Assert.Null(result.KeptOriginalPath);
+        Assert.False(s.Files.Has(destination), "a copy that failed its size check must not be left behind");
+        Assert.Equal("OLD", s.Files.Read(Backup));
+        Assert.Equal("NEW", s.Files.Read(Original));
+    }
+
+    [Fact]
+    public async Task A_crash_at_the_move_into_the_originals_folder_is_finished_by_the_sweep_from_the_journal()
+    {
+        var destination = OriginalsPathPlanner.DestinationPath(SwapScenario.Library, null, Original);
+        var clean = new SwapScenario();
+        await clean.RunAsync(new SwapOptions(KeepOriginal: KeepInDefaultFolder));
+        var moveIntoPlaceIndex = clean.Files.Operations.IndexOf($"Move({Backup} -> {destination})");
+        Assert.True(moveIntoPlaceIndex > 0);
+
+        var s = new SwapScenario();
+        s.Files.FaultAt = moveIntoPlaceIndex;
+        s.Files.Mode = FaultMode.Crash;
+
+        await s.RunAsync(new SwapOptions(KeepOriginal: KeepInDefaultFolder));
+        Assert.True(s.Files.Crashed);
+        // The crash landed before the move into the originals folder took effect: the backup is still where it was.
+        Assert.Equal("NEW", s.Files.Read(Original));
+        Assert.True(s.Files.Has(Backup));
+        Assert.False(s.Files.Has(destination));
+
+        s.Files.Restart();
+        var report = await s.Sweep.RunAsync([SwapScenario.Library], walkFolders: false);
+
+        Assert.Equal(0, report.Problems);
+        Assert.False(s.Files.Has(Backup));
+        Assert.Equal("NEW", s.Files.Read(Original));
+        Assert.Equal("OLD", s.Files.Read(destination));
+        Assert.Equal([destination, Original], s.Files.Paths);
+
+        // A further sweep (as if Weir restarted again) finds nothing left to do.
+        var again = await s.Sweep.RunAsync([SwapScenario.Library], walkFolders: true);
+        Assert.Equal(SwapRecoveryReport.Empty, again);
+    }
+
+    [Fact]
+    public async Task A_crash_between_the_cross_volume_copy_and_deleting_the_backup_never_copies_twice()
+    {
+        var s = new SwapScenario();
+        s.Files.OtherVolumeFolder = "/originals-volume";
+        var keep = new KeepOriginalOptions([SwapScenario.Library], "/originals-volume/kept");
+        var destination = OriginalsPathPlanner.DestinationPath(SwapScenario.Library, "/originals-volume/kept", Original);
+
+        var clean = new SwapScenario();
+        clean.Files.OtherVolumeFolder = "/originals-volume";
+        await clean.RunAsync(new SwapOptions(KeepOriginal: keep));
+        var deleteBackupIndex = clean.Files.Operations.IndexOf($"Delete({Backup})");
+        Assert.True(deleteBackupIndex > 0);
+
+        s.Files.FaultAt = deleteBackupIndex;
+        s.Files.Mode = FaultMode.Crash;
+        await s.RunAsync(new SwapOptions(KeepOriginal: keep));
+        Assert.True(s.Files.Crashed);
+        Assert.True(s.Files.Has(destination));
+        Assert.True(s.Files.Has(Backup));
+
+        s.Files.Restart();
+        var report = await s.Sweep.RunAsync([SwapScenario.Library], walkFolders: false);
+
+        Assert.Equal(0, report.Problems);
+        Assert.False(s.Files.Has(Backup));
+        // The copy already happened before the crash; recovery only has to confirm it and finish the delete, not repeat it.
+        Assert.Single(s.Files.Operations, op => op.StartsWith("Copy(", StringComparison.Ordinal));
+        Assert.Equal("OLD", s.Files.Read(destination));
+        Assert.Equal("NEW", s.Files.Read(Original));
+    }
+
     [Theory]
     [InlineData(7ul, 100ul, 3L, 5L, 7ul, 100ul, 3L, 5L, true)]
     [InlineData(7ul, 100ul, 3L, 5L, 7ul, 101ul, 3L, 5L, false)]

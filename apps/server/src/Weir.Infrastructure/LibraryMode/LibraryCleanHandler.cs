@@ -204,6 +204,9 @@ public sealed class LibraryCleanHandler : IJobHandler
             durationSeconds = parsedDuration;
         }
 
+        var keepOriginal = settings.KeepOriginalAfterClean
+            ? new KeepOriginalOptions(settings.Folders, settings.OriginalsFolder)
+            : null;
         var result = await _swap.RunAsync(
             context.Id,
             path,
@@ -221,7 +224,7 @@ public sealed class LibraryCleanHandler : IJobHandler
                     throw;
                 }
             },
-            SwapOptions.Default with { OriginalDurationSeconds = durationSeconds },
+            SwapOptions.Default with { OriginalDurationSeconds = durationSeconds, KeepOriginal = keepOriginal },
             cancellationToken).ConfigureAwait(false);
 
         switch (result.Outcome)
@@ -341,9 +344,11 @@ public sealed class LibraryCleanHandler : IJobHandler
         }
 
         var warnings = result.Warnings;
+        // #735: says where the original was kept, so Activity and History both carry it (History reads this same detail).
+        var keptNote = result.KeptOriginalPath is { } keptPath ? $" The original was kept at {keptPath}." : string.Empty;
         var detail = $"Cleaned {Path.GetFileName(path)}: {RemovedTracks(plan.RemovedAudioCount, plan.RemovedSubtitleCount)}." +
-                     (warnings.Count > 0 ? " " + string.Join(" ", warnings) : string.Empty);
-        await RecordAsync(library.Id, path, null, LibraryActivityEventTypes.FileCleaned, detail, "success").ConfigureAwait(false);
+                     keptNote + (warnings.Count > 0 ? " " + string.Join(" ", warnings) : string.Empty);
+        await RecordAsync(library.Id, path, null, LibraryActivityEventTypes.FileCleaned, detail, "success", result.KeptOriginalPath).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -375,7 +380,7 @@ public sealed class LibraryCleanHandler : IJobHandler
         _logger.LogInformation("Library clean postponed (in use, attempt {Attempt}) job_id={JobId} path={Path}", attempt, context.Id, path);
     }
 
-    private async Task RecordAsync(long libraryId, string path, string? trigger, string eventType, string detail, string? result = null)
+    private async Task RecordAsync(long libraryId, string path, string? trigger, string eventType, string detail, string? result = null, string? keptOriginalPath = null)
     {
         try
         {
@@ -389,6 +394,11 @@ public sealed class LibraryCleanHandler : IJobHandler
             if (result is not null)
             {
                 extra.Set("result", result);
+            }
+
+            if (keptOriginalPath is not null)
+            {
+                extra.Set("kept_original_path", keptOriginalPath);
             }
 
             await SqliteActivityWriter.RecordAsync(

@@ -32,11 +32,13 @@ Remux pass publishing and pass-through delivery both go through these methods. F
 3. The cleaned copy is written as `<name>.weir-tmp<ext>` beside the original and validated.
 4. The original is fingerprinted again. If it changed, the copy is discarded and nothing is replaced.
 5. The original is renamed to `<name>.weir-bak<ext>`, then the copy is renamed to the original name. That second rename is the commit.
-6. The backup is deleted. A backup that cannot be deleted is retried by the startup sweep.
+6. The backup is deleted — or, when the library's "keep the original after clean" setting (#735) is on, moved into its originals folder instead (`Weir.Infrastructure.LibraryMode.OriginalsMover`). Either way, a backup that cannot be dealt with is retried by the startup sweep.
 
 Every rename is a same-directory rename that never overwrites: on Windows `MoveFileExW` is called without `MOVEFILE_REPLACE_EXISTING` or `MOVEFILE_COPY_ALLOWED`, and elsewhere `File.Move` is called without overwrite. A file that appears at the destination while Weir works (for example, a media manager importing a newer copy) is never replaced, and a rename can never silently become a copy.
 
 Each step is journalled. A failure before the commit rolls back from the files on disk: the backup is renamed back and the temporary copy is deleted. A crash skips the rollback, and `SwapRecoverySweep` applies the same rules at the next start. Either way exactly one intact file is left under the original name.
+
+**Keeping the original (#735).** Where the backup goes when the setting is on is decided once — a per-library originals folder, or a `.weir-originals` folder inside whichever library folder held the file, by default — and journalled before the commit rename, so a crash after that point always finds the same destination rather than losing the setting's intent. Moving it is a same-volume rename when possible; otherwise (`OriginalsMover`) a copy into the destination, verified by size against the backup, then the backup is deleted — the same copy-verify-delete shape this document's cross-volume rule asks for elsewhere. A name already at the destination is never overwritten: a numbered suffix is added instead. The default originals folder sits inside the library folder it belongs to, so the library scan excludes it explicitly (`LibraryFileWalker`); an explicit folder should be excluded from the library's media manager too, or pointed outside the library folder entirely.
 
 A file held by another program is not a failure: the swap reports it as in use and the job is requeued.
 

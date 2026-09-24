@@ -26,13 +26,23 @@ public sealed record SwapValidation(bool Passed, string? Problem)
 /// <summary>Writes the cleaned copy of the original to <paramref name="tempPath"/> (ffmpeg, for the remux pass).</summary>
 public delegate Task SwapOutputWriter(string tempPath, CancellationToken cancellationToken);
 
+/// <summary>
+/// #735: keep the pre-clean original instead of deleting it once the swap commits. Present only while the library's
+/// "keep the original after clean" setting is on.
+/// </summary>
+/// <param name="LibraryFolders">The library's #505 folders, to find which one holds the file being swapped — it decides
+/// the default originals folder and the file's kept relative path (<see cref="Weir.Core.LibraryMode.OriginalsPathPlanner"/>).</param>
+/// <param name="OriginalsFolder">The library's explicit originals folder, or blank for the default.</param>
+public sealed record KeepOriginalOptions(IReadOnlyList<string> LibraryFolders, string? OriginalsFolder);
+
 /// <summary>Per-library choices that change preflight, and what the caller already knows about the original.</summary>
 /// <param name="AllowHardlinked"><c>clean_hardlinked_files</c> (#508): replace a file that has other hard links anyway.</param>
 /// <param name="OriginalDurationSeconds">
 /// The original's duration from the caller's own probe, which the output check compares the copy against, so the
 /// original is not probed a second time (#716).
 /// </param>
-public sealed record SwapOptions(bool AllowHardlinked = false, double? OriginalDurationSeconds = null)
+/// <param name="KeepOriginal">#735: non-null moves the backup into an originals folder instead of deleting it.</param>
+public sealed record SwapOptions(bool AllowHardlinked = false, double? OriginalDurationSeconds = null, KeepOriginalOptions? KeepOriginal = null)
 {
     public static SwapOptions Default { get; } = new();
 }
@@ -54,9 +64,11 @@ public sealed record SwapPreflight(
 
 /// <summary>
 /// How a swap ended, in words for the operator, plus anything worth a warning. After a commit, <c>BackupRemoved</c> is false
-/// when the backup could not be deleted (the startup sweep retries it).
+/// when the backup could not be deleted or moved (the startup sweep retries it). <c>KeptOriginalPath</c> is set only once
+/// the original has actually been moved there (#735); it stays null while the setting is off, or while the move itself
+/// is still pending the sweep.
 /// </summary>
-public sealed record SwapResult(SwapOutcome Outcome, string Message, bool BackupRemoved, IReadOnlyList<string> Warnings)
+public sealed record SwapResult(SwapOutcome Outcome, string Message, bool BackupRemoved, IReadOnlyList<string> Warnings, string? KeptOriginalPath = null)
 {
     public bool Committed => Outcome == SwapOutcome.Committed;
 }
@@ -75,7 +87,10 @@ public sealed record SwapResult(SwapOutcome Outcome, string Message, bool Backup
 /// <item>Copy the original's permissions to the copy (best effort; never the mtime).</item>
 /// <item>Journal <c>committing</c>; rename original → <c>&lt;name&gt;.weir-bak&lt;ext&gt;</c>; check the backup is still the fingerprinted file.</item>
 /// <item>Rename copy → original name. <b>This rename is the commit.</b></item>
-/// <item>Journal <c>committed</c>; delete the backup (a failure is logged, the sweep retries); journal <c>finished</c>.</item>
+/// <item>
+/// Journal <c>committed</c>; delete the backup, or — when the library's "keep the original after clean" setting (#735) is
+/// on — move it into its originals folder instead (a failure is logged, the sweep retries either way); journal <c>finished</c>.
+/// </item>
 /// </list>
 /// <para>
 /// Any failure before the commit rolls back by looking at the files, not at how far the code got: if the original name is
@@ -217,6 +232,7 @@ public sealed class SafeSwap
 
         warnings.AddRange(preflight.Notes);
         var stage = "recording that the swap started";
+        string? keepDestination = null;
         try
         {
             await _journal.RecordAsync(new SwapJournalEntry(jobId, originalPath, SwapJournalState.Writing), cancellationToken).ConfigureAwait(false);
@@ -272,8 +288,11 @@ public sealed class SafeSwap
                 warnings.Add($"Weir could not give the cleaned file the original's permissions: {exception.Message}");
             }
 
+            // #735: decided and journalled before any commit file mutation, so a crash after this point always
+            // finds the same destination in the journal rather than losing the setting's intent.
+            keepDestination = ResolveKeepDestination(options?.KeepOriginal, originalPath);
             stage = "recording that the swap is committing";
-            await _journal.RecordAsync(new SwapJournalEntry(jobId, originalPath, SwapJournalState.Committing), CancellationToken.None).ConfigureAwait(false);
+            await _journal.RecordAsync(new SwapJournalEntry(jobId, originalPath, SwapJournalState.Committing, keepDestination), CancellationToken.None).ConfigureAwait(false);
 
             stage = "moving the original aside";
             _files.Move(originalPath, backup);
@@ -313,7 +332,7 @@ public sealed class SafeSwap
         _logger.LogInformation("Library swap committed job_id={JobId} path={Path}", jobId, originalPath);
         try
         {
-            await _journal.RecordAsync(new SwapJournalEntry(jobId, originalPath, SwapJournalState.Committed), CancellationToken.None).ConfigureAwait(false);
+            await _journal.RecordAsync(new SwapJournalEntry(jobId, originalPath, SwapJournalState.Committed, keepDestination), CancellationToken.None).ConfigureAwait(false);
         }
 #pragma warning disable CA1031 // The swap is committed; nothing below may undo it, so a failed record is only a warning.
         catch (Exception exception)
@@ -324,17 +343,35 @@ public sealed class SafeSwap
         }
 
         var backupRemoved = false;
+        string? keptOriginalPath = null;
         try
         {
-            _files.Delete(backup);
+            if (keepDestination is not null)
+            {
+                OriginalsMover.MoveOrCopy(_files, backup, keepDestination);
+                keptOriginalPath = keepDestination;
+            }
+            else
+            {
+                _files.Delete(backup);
+            }
+
             backupRemoved = true;
         }
-#pragma warning disable CA1031 // A backup that cannot be deleted is left for the startup sweep; the swap stands.
+#pragma warning disable CA1031 // A backup that cannot be dealt with is left for the startup sweep; the swap stands.
         catch (Exception exception)
 #pragma warning restore CA1031
         {
-            _logger.LogWarning(exception, "Library swap left its backup for the startup sweep job_id={JobId} backup={Backup}", jobId, backup);
-            warnings.Add($"Weir replaced the file but could not delete the backup copy ({backup}); it will try again when it next starts.");
+            if (keepDestination is not null)
+            {
+                _logger.LogWarning(exception, "Library swap left its original for the startup sweep to move job_id={JobId} backup={Backup} destination={Destination}", jobId, backup, keepDestination);
+                warnings.Add(SafeSwapRules.OriginalKeepFailedMessage(keepDestination, exception.Message));
+            }
+            else
+            {
+                _logger.LogWarning(exception, "Library swap left its backup for the startup sweep job_id={JobId} backup={Backup}", jobId, backup);
+                warnings.Add($"Weir replaced the file but could not delete the backup copy ({backup}); it will try again when it next starts.");
+            }
         }
 
         if (backupRemoved)
@@ -351,7 +388,21 @@ public sealed class SafeSwap
             }
         }
 
-        return new SwapResult(SwapOutcome.Committed, SafeSwapRules.CommittedMessage, backupRemoved, warnings);
+        return new SwapResult(SwapOutcome.Committed, SafeSwapRules.CommittedMessage, backupRemoved, warnings, keptOriginalPath);
+    }
+
+    /// <summary>#735: where the original will go once the swap commits, or null while the setting is off. The candidate is
+    /// resolved against the files on disk right now, so a name a concurrent write claims first is never overwritten.</summary>
+    private string? ResolveKeepDestination(KeepOriginalOptions? keepOriginal, string originalPath)
+    {
+        if (keepOriginal is null)
+        {
+            return null;
+        }
+
+        var containingFolder = OriginalsPathPlanner.ContainingFolder(keepOriginal.LibraryFolders, originalPath) ?? DirectoryOf(originalPath);
+        var candidate = OriginalsPathPlanner.DestinationPath(containingFolder, keepOriginal.OriginalsFolder, originalPath);
+        return OriginalsPathPlanner.AvoidCollision(candidate, _files.FileExists);
     }
 
     /// <summary>Whether two fingerprints describe the same unchanged file. Device and inode are compared only when both were read.</summary>

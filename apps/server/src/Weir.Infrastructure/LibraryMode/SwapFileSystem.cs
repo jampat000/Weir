@@ -26,6 +26,27 @@ public sealed class FileInUseException : IOException
 }
 
 /// <summary>
+/// <see cref="ISwapFileSystem.Move"/> refused because the source and destination are on different volumes (Windows
+/// <c>ERROR_NOT_SAME_DEVICE</c>, POSIX <c>EXDEV</c>): #735's originals-keeping falls back to a verified copy and delete.
+/// </summary>
+public sealed class CrossVolumeException : IOException
+{
+    public CrossVolumeException()
+    {
+    }
+
+    public CrossVolumeException(string message)
+        : base(message)
+    {
+    }
+
+    public CrossVolumeException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
+/// <summary>
 /// Every filesystem operation the swap and its sweep perform, and nothing else, so a test can make any one of them fail
 /// (or "crash" the process at it) and prove no step can lose the file.
 /// </summary>
@@ -63,6 +84,17 @@ public interface ISwapFileSystem
 
     /// <summary>Every file under <paramref name="folder"/> (recursively) whose name is a swap leftover.</summary>
     IEnumerable<string> EnumerateLeftovers(string folder);
+
+    /// <summary>Creates <paramref name="directory"/>, and any missing parents, if it does not already exist. #735: the
+    /// originals folder a kept original moves into.</summary>
+    void EnsureDirectory(string directory);
+
+    /// <summary>Copies <paramref name="source"/> to <paramref name="destination"/> byte for byte; never overwrites an
+    /// existing destination. #735: used only when <see cref="Move"/> refuses to cross volumes.</summary>
+    void Copy(string source, string destination);
+
+    /// <summary>The file's size in bytes. #735: verifies a cross-volume copy before its source is deleted.</summary>
+    long FileSizeBytes(string path);
 }
 
 /// <summary>The real filesystem.</summary>
@@ -91,8 +123,10 @@ public sealed partial class PhysicalSwapFileSystem : ISwapFileSystem
 {
     private const int ErrorSharingViolation = 32;
     private const int ErrorLockViolation = 33;
+    private const int ErrorNotSameDevice = 17;
     private const int Ebusy = 16;
     private const int Etxtbsy = 26;
+    private const int Exdev = 18;
 
     private const uint FileReadAttributes = 0x80;
     private const uint DeleteAccess = 0x00010000;
@@ -209,7 +243,13 @@ public sealed partial class PhysicalSwapFileSystem : ISwapFileSystem
         {
             if (!MoveFileExW(source, destination, MoveFileWriteThrough))
             {
-                throw WindowsError(Marshal.GetLastPInvokeError(), $"'{source}' -> '{destination}'");
+                var error = Marshal.GetLastPInvokeError();
+                if (error == ErrorNotSameDevice)
+                {
+                    throw new CrossVolumeException($"'{source}' and '{destination}' are on different volumes.");
+                }
+
+                throw WindowsError(error, $"'{source}' -> '{destination}'");
             }
 
             return;
@@ -222,6 +262,10 @@ public sealed partial class PhysicalSwapFileSystem : ISwapFileSystem
         catch (IOException exception) when (exception is not FileInUseException && exception.HResult is Ebusy or Etxtbsy)
         {
             throw new FileInUseException(exception.Message, exception);
+        }
+        catch (IOException exception) when (exception is not CrossVolumeException && exception.HResult == Exdev)
+        {
+            throw new CrossVolumeException($"'{source}' and '{destination}' are on different volumes.", exception);
         }
     }
 
@@ -236,6 +280,12 @@ public sealed partial class PhysicalSwapFileSystem : ISwapFileSystem
             throw new FileInUseException(exception.Message, exception);
         }
     }
+
+    public void EnsureDirectory(string directory) => Directory.CreateDirectory(directory);
+
+    public void Copy(string source, string destination) => File.Copy(source, destination, overwrite: false);
+
+    public long FileSizeBytes(string path) => new FileInfo(path).Length;
 
     public IEnumerable<string> EnumerateLeftovers(string folder)
     {

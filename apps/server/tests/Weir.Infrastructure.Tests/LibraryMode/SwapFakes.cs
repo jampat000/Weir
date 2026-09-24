@@ -72,6 +72,14 @@ internal sealed class FakeSwapFileSystem : ISwapFileSystem
     /// <summary>Paths whose rename (or delete) fails with a sharing violation.</summary>
     public HashSet<string> LockedForRename { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>A folder prefix <see cref="Move"/> treats as a different volume from everywhere else, so moving between the
+    /// two throws <see cref="CrossVolumeException"/> and the #735 copy-verify-delete fallback runs instead.</summary>
+    public string? OtherVolumeFolder { get; set; }
+
+    /// <summary>Makes the next <see cref="Copy"/> write one byte short, to test that a corrupt copy is caught by its size
+    /// before the source is deleted. Resets itself after firing once.</summary>
+    public bool CorruptNextCopy { get; set; }
+
     public bool Crashed => _dead;
 
     public IEnumerable<string> Paths => _files.Keys.Order(StringComparer.Ordinal);
@@ -214,6 +222,11 @@ internal sealed class FakeSwapFileSystem : ISwapFileSystem
             throw new FileInUseException("The process cannot access the file because it is being used by another process.");
         }
 
+        if (IsOtherVolume(source) != IsOtherVolume(destination))
+        {
+            throw new CrossVolumeException($"'{source}' and '{destination}' are on different volumes.");
+        }
+
         var node = Get(source);
         if (_files.ContainsKey(destination))
         {
@@ -236,6 +249,31 @@ internal sealed class FakeSwapFileSystem : ISwapFileSystem
         _files.Remove(path);
         effect();
     }
+
+    public void EnsureDirectory(string directory) => Step($"EnsureDirectory({directory})")();
+
+    public void Copy(string source, string destination)
+    {
+        var effect = Step($"Copy({source} -> {destination})");
+        var node = Get(source);
+        if (_files.ContainsKey(destination))
+        {
+            throw new IOException($"Cannot create a file when that file already exists: '{destination}'");
+        }
+
+        var content = CorruptNextCopy ? node.Content[..^1] : node.Content;
+        CorruptNextCopy = false;
+        _files[destination] = new Node { Content = content, ModifiedTimeNs = Tick(), Inode = _nextInode++, Permissions = node.Permissions };
+        effect();
+    }
+
+    public long FileSizeBytes(string path)
+    {
+        Step($"FileSizeBytes({path})")();
+        return Get(path).Content.Length;
+    }
+
+    private bool IsOtherVolume(string path) => OtherVolumeFolder is not null && path.StartsWith(OtherVolumeFolder, StringComparison.Ordinal);
 
     public IEnumerable<string> EnumerateLeftovers(string folder)
     {
