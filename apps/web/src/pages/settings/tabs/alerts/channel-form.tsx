@@ -142,7 +142,7 @@ export function ChannelForm({
           className={mmActionButtonClass({ variant: "primary" })}
           disabled={saving || incomplete}
         >
-          {saving ? "Saving..." : "Save channel"}
+          {saving ? "Saving…" : "Save channel"}
         </button>
         <button
           type="button"
