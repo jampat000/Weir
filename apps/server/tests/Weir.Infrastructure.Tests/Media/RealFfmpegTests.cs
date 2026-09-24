@@ -21,6 +21,23 @@ public sealed class RequiresFfmpegFactAttribute : FactAttribute
     }
 }
 
+/// <summary>A fact that runs only on Windows where ffmpeg can be found: named-pipe blocking behaviour.</summary>
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class RequiresFfmpegOnWindowsFactAttribute : FactAttribute
+{
+    public RequiresFfmpegOnWindowsFactAttribute()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Skip = "Windows named pipes are the mechanism this test blocks ffmpeg on.";
+        }
+        else if (RealFfmpeg.Tools is null)
+        {
+            Skip = "ffprobe and ffmpeg were not found: set WEIR_FFMPEG_DIR or put them on PATH to run the real-ffmpeg tests.";
+        }
+    }
+}
+
 /// <summary>#548: a fact that runs only where mkvmerge can be found (WEIR_MKVTOOLNIX_DIR or PATH).</summary>
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class RequiresMkvmergeFactAttribute : FactAttribute
@@ -611,28 +628,24 @@ public sealed class RealFfmpegTests : IDisposable
             "-re", "-f", "lavfi", "-i", "testsrc=duration=60:size=160x120:rate=10", "-c:v", "mpeg4",
             output,
         ];
-        var started = DateTime.UtcNow;
+        var before = System.Diagnostics.Process.GetProcessesByName("ffmpeg").Length;
 
         var error = await Assert.ThrowsAsync<MediaToolException>(() => Tools().RunFfmpegAsync(argv, timeoutSeconds: 1, progressCallback: _ => { }, durationSeconds: 60));
 
         Assert.Equal("ffmpeg timed out", error.Message);
-        Assert.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(15), string.Create(CultureInfo.InvariantCulture, $"took {DateTime.UtcNow - started}"));
+        await Eventually.ThatAsync(() => System.Diagnostics.Process.GetProcessesByName("ffmpeg").Length <= before);
     }
 
-    [RequiresFfmpegFact]
+    /// <summary>
+    /// #539 item 4: a progress loop that only checks its timeout as a line arrives would hang forever on a
+    /// process stuck reading its input - one that never gets to write a progress line at all. ProcessRunner's
+    /// timeout is a wall-clock timer instead (see ProcessRunnerTests for the same guarantee without a real
+    /// ffmpeg), so this is enforced even though nothing is ever read. A Windows named pipe with no writer
+    /// makes ffmpeg block inside avformat_open_input, before it can emit anything.
+    /// </summary>
+    [RequiresFfmpegOnWindowsFact]
     public async Task A_progress_run_that_never_writes_a_line_is_still_stopped_by_the_timer()
     {
-        // #539 item 4: a progress loop that only checks its timeout as a line arrives would hang forever on a
-        // process stuck reading its input - one that never gets to write a progress line at all. ProcessRunner's
-        // timeout is a wall-clock timer instead (see
-        // ProcessRunnerTests for the same guarantee without a real ffmpeg), so this is enforced even though
-        // nothing is ever read. A Windows named pipe with no writer makes ffmpeg block inside avformat_open_input,
-        // before it can emit anything.
-        if (!OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
         var pipeName = "weir-hang-" + Guid.NewGuid().ToString("N");
         using var pipeServer = new NamedPipeServerStream(pipeName, PipeDirection.Out);
         string[] argv =
@@ -641,13 +654,13 @@ public sealed class RealFfmpegTests : IDisposable
             "-i", @"\\.\pipe\" + pipeName, "-c", "copy", Path.Combine(_root, "hang.mkv"),
         ];
         var updates = new List<FfmpegProgressUpdate>();
-        var started = DateTime.UtcNow;
+        var before = System.Diagnostics.Process.GetProcessesByName("ffmpeg").Length;
 
         var error = await Assert.ThrowsAsync<MediaToolException>(() => Tools().RunFfmpegAsync(argv, timeoutSeconds: 2, progressCallback: updates.Add));
 
         Assert.Equal("ffmpeg timed out", error.Message);
         Assert.Empty(updates);
-        Assert.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(15), string.Create(CultureInfo.InvariantCulture, $"took {DateTime.UtcNow - started}"));
+        await Eventually.ThatAsync(() => System.Diagnostics.Process.GetProcessesByName("ffmpeg").Length <= before);
     }
 
     private sealed class StaticResolver : IMediaToolResolver
