@@ -39,7 +39,7 @@ export const CLEANUP_JOBS: {
   {
     // #652: Weir's own cleaned copies that no media manager imported in time. Off until a person switches it on.
     family: "unclaimed_handbacks",
-    name: "Unclaimed hand-backs",
+    name: "Cleaned copies nobody picked up",
     enabledField: "unclaimed_handback_cleanup_enabled",
     intervalField: "unclaimed_handback_cleanup_interval_seconds",
     destructive: true,

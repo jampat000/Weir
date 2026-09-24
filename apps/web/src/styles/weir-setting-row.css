@@ -126,6 +126,20 @@
   padding: 10px 0;
 }
 
+/* On a phone every row stacks: beside a control, a hint was squeezed to a word a line. */
+@media (max-width: 560px) {
+  .mm-setrow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 0;
+  }
+
+  .mm-setrow__control {
+    flex-wrap: wrap;
+  }
+}
+
 .mm-setrow__text {
   display: flex;
   flex-direction: column;

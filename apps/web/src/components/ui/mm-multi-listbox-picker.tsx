@@ -6,6 +6,7 @@ import {
 } from "../../lib/ui/mm-control-roles";
 import { useCloseOnOutsideAndEscape } from "../../lib/ui/use-close-on-outside";
 import type { MmListboxOption } from "./mm-listbox-picker";
+import { useListboxKeyboardNav } from "./use-listbox-keyboard-nav";
 
 type MmMultiListboxPickerProps = {
   options: readonly MmListboxOption[];
@@ -37,10 +38,23 @@ export function MmMultiListboxPicker({
   const listboxId = `${autoId}-listbox`;
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const close = useCallback(() => setOpen(false), []);
   useCloseOnOutsideAndEscape(open, close, containerRef);
 
   const selectedSet = new Set(values);
+  const firstSelectedIndex = options.findIndex((o) => selectedSet.has(o.value));
+  const nav = useListboxKeyboardNav(options, {
+    isOpen: open,
+    initialIndex: Math.max(firstSelectedIndex, 0),
+    onActivate: (option) => {
+      const next = selectedSet.has(option.value)
+        ? values.filter((v) => v !== option.value)
+        : [...values, option.value];
+      onChange(next);
+    },
+  });
+
   const selectedLabels = options
     .filter((o) => selectedSet.has(o.value))
     .map((o) => o.label);
@@ -66,6 +80,7 @@ export function MmMultiListboxPicker({
       className={["relative", className].filter(Boolean).join(" ")}
     >
       <button
+        ref={triggerRef}
         type="button"
         className={triggerSurface}
         disabled={disabled}
@@ -80,8 +95,9 @@ export function MmMultiListboxPicker({
             setOpen((v) => !v);
           }
         }}
+        onKeyDown={nav.onKeyDown}
       >
-        <span className="min-w-0 flex-1 truncate text-left">
+        <span className="min-w-0 max-h-16 flex-1 overflow-y-auto whitespace-normal break-words text-left">
           {triggerLabel}
         </span>
         <svg
@@ -103,21 +119,29 @@ export function MmMultiListboxPicker({
           className={mmListboxPanelClass}
           role="listbox"
           aria-multiselectable="true"
+          tabIndex={-1}
+          onKeyDown={nav.onKeyDown}
         >
-          {options.map((opt) => {
+          {options.map((opt, index) => {
             const checked = selectedSet.has(opt.value);
+            const active = index === nav.activeIndex;
             return (
               <button
                 key={opt.value}
+                ref={nav.registerOption(index)}
                 type="button"
                 role="option"
+                tabIndex={active ? 0 : -1}
                 aria-selected={checked}
                 className={[
                   "flex w-full items-start gap-3 px-3 py-2 text-left text-sm transition-colors",
                   checked
                     ? "bg-mm-accent-soft/25 text-mm-text1"
                     : "text-mm-text2 hover:bg-mm-accent-soft hover:text-mm-text1",
-                ].join(" ")}
+                  active ? "ring-1 ring-inset ring-mm-accent-ring" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -125,6 +149,7 @@ export function MmMultiListboxPicker({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  nav.setActive(index);
                   const next = checked
                     ? values.filter((v) => v !== opt.value)
                     : [...values, opt.value];

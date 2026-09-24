@@ -8,6 +8,7 @@ import {
 import { errorMessage } from "../../../../lib/api/error-message";
 import {
   MEDIA_MANAGER_KIND_LABELS,
+  type MediaManagerConnection,
   type MediaManagerKind,
 } from "../../../../lib/media-managers/media-managers-api";
 import { useCreateMediaManagerConnection } from "../../../../lib/media-managers/queries";
@@ -39,7 +40,14 @@ const EMPTY_FORM: FormState = {
   api_key: "",
 };
 
-export function AddConnectionForm({ onCancel }: { onCancel: () => void }) {
+export function AddConnectionForm({
+  onCancel,
+  onCreated,
+}: {
+  onCancel: () => void;
+  /** Called instead of `onCancel` once the media manager is actually created. */
+  onCreated: (connection: MediaManagerConnection) => void;
+}) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const create = useCreateMediaManagerConnection();
   const change = <K extends keyof FormState>(key: K, value: FormState[K]) =>
@@ -49,14 +57,14 @@ export function AddConnectionForm({ onCancel }: { onCancel: () => void }) {
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        create.mutate({ ...form, enabled: true }, { onSuccess: onCancel });
+        create.mutate({ ...form, enabled: true }, { onSuccess: onCreated });
       }}
     >
-      <QuietFieldGroup title="Add an app">
+      <QuietFieldGroup title="Add a media manager">
         <div className="mm-quiet-stack">
           <div className="mm-field-row">
             <Field
-              label="Which app is it?"
+              label="Which media manager is it?"
               hint={KIND_BLURBS[form.kind]}
               width="medium"
             >

@@ -77,7 +77,7 @@ export function ChannelTable({
       : [...channel.events, event];
     if (events.length === 0) {
       setToggleError(
-        `${channel.label} needs at least one event. Switch the channel off in Edit instead.`,
+        `${channel.label} needs at least one event. Switch the alert off in Edit instead.`,
       );
       return;
     }
@@ -120,7 +120,7 @@ export function ChannelTable({
               editingId === channel.id ? (
                 <tr key={channel.id}>
                   <td colSpan={supportedEvents.length + 2} data-label="">
-                    <QuietFieldGroup title="Edit channel">
+                    <QuietFieldGroup title="Edit alert">
                       <ChannelForm
                         initial={formDataOf(channel)}
                         supportedEvents={supportedEvents}

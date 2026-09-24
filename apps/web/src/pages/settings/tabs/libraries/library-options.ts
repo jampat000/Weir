@@ -40,7 +40,7 @@ export const COLLISION_OPTIONS: SettingOption[] = [
 const MOST_FILES_AT_ONCE = 10;
 
 export const FILES_AT_ONCE_OPTIONS: SettingOption[] = [
-  { value: "0", label: "Same as Process settings" },
+  { value: "0", label: "Same as Performance" },
   ...Array.from({ length: MOST_FILES_AT_ONCE }, (_, i) => ({
     value: String(i + 1),
     label: i === 0 ? "At most 1 file" : `At most ${i + 1} files`,

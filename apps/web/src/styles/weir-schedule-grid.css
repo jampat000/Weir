@@ -8,8 +8,9 @@
   gap: 8px;
 }
 
+/* The grid always fits its column: on a phone an hour is about ten pixels wide, which a finger can still
+   drag across and the arrow keys can always reach, rather than a grid that scrolls sideways. */
 .mm-schedule-grid-body {
-  overflow-x: auto;
   touch-action: none;
   user-select: none;
 }
@@ -17,10 +18,9 @@
 .mm-schedule-grid-hours,
 .mm-schedule-grid-row {
   display: grid;
-  grid-template-columns: 42px repeat(24, minmax(14px, 1fr));
+  grid-template-columns: 2.25rem repeat(24, minmax(0, 1fr));
   gap: 2px;
   align-items: center;
-  min-width: 420px;
 }
 
 .mm-schedule-grid-hours span {
@@ -45,6 +45,12 @@
   background: transparent;
   cursor: pointer;
   padding: 0;
+}
+
+/* Offset, so the ring still shows round an hour that is on and filled with the same colour. */
+.mm-schedule-cell:focus-visible {
+  outline: 2px solid var(--mm-accent);
+  outline-offset: 2px;
 }
 
 .mm-schedule-cell:disabled {

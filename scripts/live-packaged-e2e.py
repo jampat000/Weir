@@ -957,7 +957,7 @@ class LiveAudit:
             existing.first.wait_for(state="detached", timeout=TIMEOUT_MS)
         self.click(
             self.page.get_by_role(
-                "button", name="Add a channel →", exact=True
+                "button", name="Add an alert →", exact=True
             ),
             "open notification channel form",
         )
@@ -987,7 +987,7 @@ class LiveAudit:
             "edit notification channel",
         )
         self.visible(
-            self.page.get_by_text("Edit channel", exact=True), "notification edit form"
+            self.page.get_by_text("Edit alert", exact=True), "notification edit form"
         )
         self.click(
             self.page.get_by_role("button", name="Cancel", exact=True),
