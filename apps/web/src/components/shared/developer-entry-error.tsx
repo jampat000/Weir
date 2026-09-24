@@ -6,10 +6,10 @@ import {
 } from "../../lib/api/error-guards";
 
 /**
- * Honest copy for bootstrap/auth gate failures (root, login, setup).
- * Network failures ≠ HTTP 503 from a live API (e.g. database not configured).
+ * What a developer running Weir from source sees when the first request fails: how to start the API
+ * and Vite, and what a 503 from a live API means. Shown only by `vite dev` (see ApiEntryError).
  */
-export function ApiEntryError({ error }: { error: unknown }) {
+export function DeveloperEntryError({ error }: { error: unknown }) {
   if (isLikelyNetworkFailure(error) || isLikelyViteProxyUpstreamDown(error)) {
     return (
       <>
