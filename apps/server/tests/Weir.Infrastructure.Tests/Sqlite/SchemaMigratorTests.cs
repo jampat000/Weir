@@ -251,6 +251,10 @@ public sealed class SchemaMigratorTests
     {
         using var temp = new TempDirectory();
         var database = new SqliteDatabase(temp.Join("weir.sqlite3"));
+        using (database.Open())
+        {
+        }
+
         Assert.True(await database.IsConnectedAsync());
         using (var connection = database.Open())
         {
@@ -267,6 +271,24 @@ public sealed class SchemaMigratorTests
         var directoryInsteadOfFile = temp.Join("a-directory");
         Directory.CreateDirectory(directoryInsteadOfFile);
         Assert.False(await new SqliteDatabase(directoryInsteadOfFile).IsConnectedAsync());
+    }
+
+    [Fact]
+    public async Task The_health_probe_reports_a_database_file_that_has_gone_as_disconnected()
+    {
+        using var temp = new TempDirectory();
+        var path = temp.Join("weir.sqlite3");
+        var database = new SqliteDatabase(path);
+        using (database.Open())
+        {
+        }
+
+        Assert.True(await database.IsConnectedAsync());
+        database.ClearPool();
+        File.Delete(path);
+
+        Assert.False(await database.IsConnectedAsync());
+        database.ClearPool();
     }
 
     [Fact]
