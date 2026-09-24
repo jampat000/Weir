@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
+import { PageLoading } from "../../../../components/shared/page-loading";
 import { useCanEdit } from "../../../../lib/auth/can-edit";
 import type { MaintenanceFamily } from "../../../../lib/processing/maintenance-api";
 import {
@@ -13,7 +14,13 @@ import {
   useProcessingOperatorSettingsSaveMutation,
 } from "../../../../lib/processing/queries";
 import { plural } from "../../../../lib/ui/mm-plural";
-import { CLEANUP_JOBS } from "./cleanup-jobs";
+import { SaveModelNote } from "../../save-model-note";
+import { SettingsLoadError } from "../../settings-load-error";
+import {
+  CleanupConfirmDialog,
+  type CleanupConfirmAction,
+} from "./cleanup-confirm-dialog";
+import { CLEANUP_JOBS, type CleanupJob } from "./cleanup-jobs";
 import {
   CleanupJobRow,
   DaysSettingRow,
@@ -77,15 +84,37 @@ export function CleanupTab() {
   const settings = useProcessingOperatorSettingsQuery();
   const ids = useId();
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<{
+    job: CleanupJob;
+    action: CleanupConfirmAction;
+  } | null>(null);
   const { saveSetting, saving } = useSaveSetting(setNotice);
   const { runNow, running } = useRunNow(setNotice);
-  const families = maintenance.data?.families ?? [];
+
+  if (maintenance.isPending || settings.isPending) {
+    return <PageLoading label="Loading cleanup settings" />;
+  }
+  if (maintenance.isError || settings.isError) {
+    return <SettingsLoadError what="cleanup settings" />;
+  }
+
+  const families = maintenance.data.families;
+  const confirmingState = confirming
+    ? families.find((f) => f.family === confirming.job.family)
+    : undefined;
+
+  const enableJob = (job: CleanupJob) =>
+    void saveSetting(
+      { [job.enabledField]: true },
+      `${job.name} is on. It first runs within half a minute.`,
+    );
 
   return (
     <div
       className="mm-quiet-stack"
       data-testid="processing-maintenance-section"
     >
+      <SaveModelNote model="instant" />
       <p className="mm-quiet-note">
         Small jobs that keep Weir&rsquo;s folders and records tidy. Each runs on
         its own timer, and a change applies within half a minute, with no
@@ -102,7 +131,7 @@ export function CleanupTab() {
         </p>
       ) : null}
 
-      {families.length === 0 && !maintenance.isLoading ? (
+      {families.length === 0 ? (
         <p className="mm-quiet-note">
           No cleanup jobs are available on this instance.
         </p>
@@ -137,27 +166,28 @@ export function CleanupTab() {
                     running={running}
                     onSave={saveSetting}
                     onRun={() => void runNow(job.family, job.name)}
+                    onRequestConfirm={(action) =>
+                      setConfirming({ job, action })
+                    }
                   />
                 ) : null;
               })}
               <DaysSettingRow
                 testId="processing-maintenance-handback-window"
-                name="Unclaimed hand-backs wait"
-                description="How long a copy Weir handed back waits for a media manager before Unclaimed hand-backs may remove it."
+                name="Cleaned copies nobody picked up wait"
+                description="How long a copy Weir handed back waits for a media manager before Cleaned copies nobody picked up may remove it."
                 inputId={`${ids}-window`}
-                inputLabel="Unclaimed hand-backs wait for"
+                inputLabel="Cleaned copies nobody picked up wait for"
                 saved={
-                  settings.data
-                    ? (settings.data.unclaimed_handback_window_days ??
-                      WINDOW_DEFAULT_DAYS)
-                    : undefined
+                  settings.data.unclaimed_handback_window_days ??
+                  WINDOW_DEFAULT_DAYS
                 }
                 min={WINDOW_MIN_DAYS}
                 max={WINDOW_MAX_DAYS}
                 editable={editable}
                 saving={saving}
                 savedWords={(days) =>
-                  `Unclaimed hand-backs now wait ${plural(days, "day", "days")}.`
+                  `Cleaned copies nobody picked up now wait ${plural(days, "day", "days")}.`
                 }
                 onSave={saveSetting}
                 toBody={(days) => ({ unclaimed_handback_window_days: days })}
@@ -168,7 +198,7 @@ export function CleanupTab() {
                 description="Removes a file’s record from History once it is older than this. 0 keeps every record."
                 inputId={`${ids}-retention`}
                 inputLabel="Keep file history for"
-                saved={settings.data?.file_log_retention_days}
+                saved={settings.data.file_log_retention_days}
                 min={0}
                 max={RETENTION_MAX_DAYS}
                 lastRun="Checked every hour"
@@ -186,6 +216,24 @@ export function CleanupTab() {
           </table>
         </div>
       )}
+
+      {confirming && confirmingState ? (
+        <CleanupConfirmDialog
+          job={confirming.job}
+          state={confirmingState}
+          action={confirming.action}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => {
+            const { job, action } = confirming;
+            setConfirming(null);
+            if (action === "enable") {
+              enableJob(job);
+            } else {
+              void runNow(job.family, job.name);
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

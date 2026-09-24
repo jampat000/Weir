@@ -91,6 +91,9 @@ it("saves Files at once up to ten, and the budget and checks with it", async () 
   render(<ProcessSettingsSection />, { wrapper });
 
   const choices = await screen.findByRole("group", { name: "Files at once" });
+  expect(
+    screen.getByText("Nothing changes until you press Save."),
+  ).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "2" })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -129,6 +132,35 @@ it("saves Files at once up to ten, and the budget and checks with it", async () 
   expect(
     screen.queryByText(/Verbose file-detection records/),
   ).not.toBeInTheDocument();
+});
+
+it("formats an ugly free-space decimal sensibly, and is not dirty on load", async () => {
+  mockSignedIn();
+  vi.spyOn(api, "fetchProcessingOperatorSettings").mockResolvedValue({
+    ...settings,
+    minimum_free_disk_space_mb: 5000,
+  });
+
+  render(<ProcessSettingsSection />, { wrapper });
+
+  const field = await screen.findByLabelText("Keep free on the output drive");
+  expect(field).toHaveValue(4.88);
+  expect(
+    screen.getByRole("button", { name: "No changes to save" }),
+  ).toBeDisabled();
+});
+
+it("shows a load error instead of a blank panel when performance settings fail to load", async () => {
+  mockSignedIn();
+  vi.spyOn(api, "fetchProcessingOperatorSettings").mockRejectedValue(
+    new Error("network down"),
+  );
+
+  render(<ProcessSettingsSection />, { wrapper });
+
+  expect(await screen.findByTestId("settings-load-error")).toHaveTextContent(
+    "Weir couldn’t load your performance settings. Reload the page to try again.",
+  );
 });
 
 it("says what waiting files are waiting for, and hides the resolution budget until it is switched on (#633)", async () => {
