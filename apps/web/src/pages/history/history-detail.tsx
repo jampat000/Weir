@@ -73,7 +73,7 @@ function RecordSection({
     return (
       <p className="mm-history-note">
         {file.status === "processing" || historyGroupOf(file) === "working"
-          ? "Weir has not finished a pass over this file yet. What it kept and removed shows here once it has."
+          ? "Weir has not finished processing this file yet. What it kept and removed shows here once it has."
           : "Weir has no record of what it did to this file. Records older than the History setting are removed."}
       </p>
     );

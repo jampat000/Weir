@@ -88,7 +88,7 @@ function ScheduleGroup({
           disabled={!schedule.dirty || save.isPending}
           onClick={onSave}
         >
-          {save.isPending ? "Saving..." : "Save backup schedule"}
+          {save.isPending ? "Saving…" : "Save backup schedule"}
         </button>
         {save.isError && form.lastSaveTarget === "backup" ? (
           <p

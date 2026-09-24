@@ -394,7 +394,7 @@ describe("ActivityLog", () => {
 
     const runGroup = screen.getByTestId("activity-run") as HTMLDetailsElement;
     expect(runGroup).toHaveTextContent(
-      "Scheduled run · 4 files: 2 processed, 1 handed back, 1 no changes needed",
+      "Scheduled run · 4 files: 2 processed, 1 passed through, 1 no changes needed",
     );
     expect(runGroup.open).toBe(false);
     expect(within(runGroup).getAllByTestId("activity-row")).toHaveLength(4);

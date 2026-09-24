@@ -110,7 +110,7 @@ export function HistoryFileActions({
     try {
       await submitManualPlan.mutateAsync({ id: file.id, choice });
       setNotice(
-        "Queued your track choice. Weir will check the file again before running the pass.",
+        "Queued your track choice. Weir will check the file again before processing it.",
       );
       setTracksOpen(false);
     } catch (error) {

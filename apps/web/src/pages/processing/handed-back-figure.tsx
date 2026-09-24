@@ -24,7 +24,7 @@ import type { WorkSource } from "./processing-model";
 /** Five pages of 100 per kind: far more than two hours of work on any install seen so far. */
 const HANDED_BACK_PAGES = 5;
 const MINUTE_MS = 60_000;
-const NOTHING_HANDED_BACK = "Nothing handed back in the last 2 hours.";
+const NOTHING_HANDED_BACK = "Nothing finished in the last 2 hours.";
 
 const TONE_WORDS: Record<HandedBackTone, string> = {
   ok: "cleaned",
@@ -155,7 +155,7 @@ function Sparkline({
       className="mm-live-spark__bars"
       role="slider"
       tabIndex={0}
-      aria-label="Files handed back, five minutes to a bar"
+      aria-label="Files finished, five minutes to a bar"
       aria-valuemin={0}
       aria-valuemax={last}
       aria-valuenow={current}
@@ -241,7 +241,7 @@ export function HandedBackFigure({
   const words =
     total === 0
       ? NOTHING_HANDED_BACK
-      : `${plural(total, "file", "files")} handed back in the last 2 hours: ${toneCounts(handed.totals)}${partial ? ". The oldest of them are not in the bars." : "."}`;
+      : `${plural(total, "file", "files")} finished in the last 2 hours: ${toneCounts(handed.totals)}${partial ? ". The oldest of them are not in the bars." : "."}`;
   return (
     <div
       className="mm-live-figure mm-live-figure--trend"

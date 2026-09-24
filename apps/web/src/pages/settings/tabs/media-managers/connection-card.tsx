@@ -44,11 +44,11 @@ function RemoveConnectionDialog({
           <p>No media file is touched. This cannot be undone.</p>
         </>
       }
-      confirmLabel="Remove connection"
+      confirmLabel="Remove media manager"
       busy={remove.isPending}
       error={
         remove.isError
-          ? errorMessage(remove.error, "Could not remove this connection.")
+          ? errorMessage(remove.error, "Could not remove this media manager.")
           : null
       }
       onCancel={() => {
