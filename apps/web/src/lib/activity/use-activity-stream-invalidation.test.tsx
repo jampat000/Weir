@@ -4,10 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
 import { activityKeys } from "./query-keys";
-import {
-  useActivityStreamInvalidation,
-  useActivityStreamInvalidations,
-} from "./use-activity-stream-invalidation";
+import { useActivityStreamInvalidations } from "./use-activity-stream-invalidation";
 import { processingKeys } from "../processing/query-keys";
 
 class FakeEventSource {
@@ -51,14 +48,23 @@ function withQueryClient(qc: QueryClient) {
   };
 }
 
-describe("useActivityStreamInvalidation", () => {
+function setVisibility(state: DocumentVisibilityState): void {
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue(state);
+}
+
+const RECENT_KEYS = [activityKeys.recent] as const;
+const CANCEL_REFETCH_FALSE = { cancelRefetch: false };
+
+describe("useActivityStreamInvalidations", () => {
   afterEach(() => {
     FakeEventSource.instances = [];
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    document.dispatchEvent(new Event("visibilitychange"));
   });
 
-  it("coalesces event bursts and invalidates only exact queries", () => {
+  it("coalesces event bursts and invalidates only exact queries, without cancelling an in-flight fetch", () => {
     vi.useFakeTimers();
     vi.setSystemTime(10_000);
     vi.stubGlobal(
@@ -84,14 +90,14 @@ describe("useActivityStreamInvalidation", () => {
     src.emit("activity.latest", JSON.stringify({ latest_event_id: 3 }));
 
     expect(spy).toHaveBeenCalledTimes(2);
-    expect(spy).toHaveBeenCalledWith({
-      queryKey: processingKeys.overviewStats(),
-      exact: true,
-    });
-    expect(spy).toHaveBeenCalledWith({
-      queryKey: activityKeys.recent,
-      exact: true,
-    });
+    expect(spy).toHaveBeenCalledWith(
+      { queryKey: processingKeys.overviewStats(), exact: true },
+      CANCEL_REFETCH_FALSE,
+    );
+    expect(spy).toHaveBeenCalledWith(
+      { queryKey: activityKeys.recent, exact: true },
+      CANCEL_REFETCH_FALSE,
+    );
 
     vi.advanceTimersByTime(1_000);
     expect(spy).toHaveBeenCalledTimes(4);
@@ -105,7 +111,7 @@ describe("useActivityStreamInvalidation", () => {
     const qc = new QueryClient();
     const spy = vi.spyOn(qc, "invalidateQueries");
 
-    renderHook(() => useActivityStreamInvalidation(activityKeys.recent), {
+    renderHook(() => useActivityStreamInvalidations(RECENT_KEYS), {
       wrapper: withQueryClient(qc),
     });
 
@@ -113,10 +119,13 @@ describe("useActivityStreamInvalidation", () => {
     expect(src.url).toBe("/api/v1/activity/stream");
     src.emit("activity.latest", JSON.stringify({ latest_event_id: 12 }));
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: activityKeys.recent });
+    expect(spy).toHaveBeenCalledWith(
+      { queryKey: activityKeys.recent, exact: false },
+      CANCEL_REFETCH_FALSE,
+    );
   });
 
-  it("invalidates when an existing activity row receives a newer revision", () => {
+  it("invalidates when an existing activity row receives a newer revision, even at the same event id", () => {
     vi.stubGlobal(
       "EventSource",
       FakeEventSource as unknown as typeof EventSource,
@@ -124,7 +133,7 @@ describe("useActivityStreamInvalidation", () => {
     const qc = new QueryClient();
     const spy = vi.spyOn(qc, "invalidateQueries");
 
-    renderHook(() => useActivityStreamInvalidation(activityKeys.recent), {
+    renderHook(() => useActivityStreamInvalidations(RECENT_KEYS), {
       wrapper: withQueryClient(qc),
     });
 
@@ -139,7 +148,32 @@ describe("useActivityStreamInvalidation", () => {
     );
 
     expect(spy).toHaveBeenCalledTimes(2);
-    expect(spy).toHaveBeenLastCalledWith({ queryKey: activityKeys.recent });
+  });
+
+  it("ignores a message that repeats the same event id and revision already seen", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+
+    renderHook(() => useActivityStreamInvalidations(RECENT_KEYS), {
+      wrapper: withQueryClient(qc),
+    });
+
+    const src = FakeEventSource.instances[0];
+    src.emit(
+      "activity.latest",
+      JSON.stringify({ latest_event_id: 12, activity_revision: 2 }),
+    );
+    src.emit(
+      "activity.latest",
+      JSON.stringify({ latest_event_id: 12, activity_revision: 2 }),
+    );
+    src.emit("activity.latest", JSON.stringify({ latest_event_id: 11 }));
+
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it("ignores malformed stream messages instead of breaking live updates", () => {
@@ -150,7 +184,7 @@ describe("useActivityStreamInvalidation", () => {
     const qc = new QueryClient();
     const spy = vi.spyOn(qc, "invalidateQueries");
 
-    renderHook(() => useActivityStreamInvalidation(activityKeys.recent), {
+    renderHook(() => useActivityStreamInvalidations(RECENT_KEYS), {
       wrapper: withQueryClient(qc),
     });
 
@@ -163,7 +197,6 @@ describe("useActivityStreamInvalidation", () => {
     );
 
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy).toHaveBeenCalledWith({ queryKey: activityKeys.recent });
   });
 
   it("invalidates the overview stats query on activity.latest", () => {
@@ -175,7 +208,7 @@ describe("useActivityStreamInvalidation", () => {
     const spy = vi.spyOn(qc, "invalidateQueries");
 
     renderHook(
-      () => useActivityStreamInvalidation(processingKeys.overviewStats()),
+      () => useActivityStreamInvalidations([processingKeys.overviewStats()]),
       {
         wrapper: withQueryClient(qc),
       },
@@ -184,9 +217,10 @@ describe("useActivityStreamInvalidation", () => {
     const src = FakeEventSource.instances[0];
     src.emit("activity.latest", JSON.stringify({ latest_event_id: 77 }));
 
-    expect(spy).toHaveBeenCalledWith({
-      queryKey: processingKeys.overviewStats(),
-    });
+    expect(spy).toHaveBeenCalledWith(
+      { queryKey: processingKeys.overviewStats(), exact: false },
+      CANCEL_REFETCH_FALSE,
+    );
   });
 
   it("shares one EventSource across multiple query subscribers", () => {
@@ -198,13 +232,13 @@ describe("useActivityStreamInvalidation", () => {
     const spy = vi.spyOn(qc, "invalidateQueries");
 
     const first = renderHook(
-      () => useActivityStreamInvalidation(activityKeys.recent),
+      () => useActivityStreamInvalidations(RECENT_KEYS),
       {
         wrapper: withQueryClient(qc),
       },
     );
     const second = renderHook(
-      () => useActivityStreamInvalidation(processingKeys.overviewStats()),
+      () => useActivityStreamInvalidations([processingKeys.overviewStats()]),
       {
         wrapper: withQueryClient(qc),
       },
@@ -214,10 +248,14 @@ describe("useActivityStreamInvalidation", () => {
     const src = FakeEventSource.instances[0];
     src.emit("activity.latest", JSON.stringify({ latest_event_id: 88 }));
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: activityKeys.recent });
-    expect(spy).toHaveBeenCalledWith({
-      queryKey: processingKeys.overviewStats(),
-    });
+    expect(spy).toHaveBeenCalledWith(
+      { queryKey: activityKeys.recent, exact: false },
+      CANCEL_REFETCH_FALSE,
+    );
+    expect(spy).toHaveBeenCalledWith(
+      { queryKey: processingKeys.overviewStats(), exact: false },
+      CANCEL_REFETCH_FALSE,
+    );
 
     first.unmount();
     expect(src.closed).toBe(false);
@@ -234,7 +272,7 @@ describe("useActivityStreamInvalidation", () => {
     const qc = new QueryClient();
 
     const first = renderHook(
-      () => useActivityStreamInvalidation(activityKeys.recent),
+      () => useActivityStreamInvalidations(RECENT_KEYS),
       {
         wrapper: withQueryClient(qc),
       },
@@ -242,9 +280,47 @@ describe("useActivityStreamInvalidation", () => {
     first.unmount();
     await waitFor(() => expect(FakeEventSource.instances[0].closed).toBe(true));
 
-    renderHook(() => useActivityStreamInvalidation(activityKeys.recent), {
+    renderHook(() => useActivityStreamInvalidations(RECENT_KEYS), {
       wrapper: withQueryClient(qc),
     });
+
+    expect(FakeEventSource.instances).toHaveLength(2);
+    expect(FakeEventSource.instances[1].closed).toBe(false);
+  });
+
+  it("closes the connection while the tab is hidden", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const qc = new QueryClient();
+
+    renderHook(() => useActivityStreamInvalidations(RECENT_KEYS), {
+      wrapper: withQueryClient(qc),
+    });
+    const src = FakeEventSource.instances[0];
+
+    setVisibility("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    expect(src.closed).toBe(true);
+  });
+
+  it("reopens the connection once the tab becomes visible again", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const qc = new QueryClient();
+
+    renderHook(() => useActivityStreamInvalidations(RECENT_KEYS), {
+      wrapper: withQueryClient(qc),
+    });
+
+    setVisibility("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    setVisibility("visible");
+    document.dispatchEvent(new Event("visibilitychange"));
 
     expect(FakeEventSource.instances).toHaveLength(2);
     expect(FakeEventSource.instances[1].closed).toBe(false);

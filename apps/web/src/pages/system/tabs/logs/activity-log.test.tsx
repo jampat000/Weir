@@ -33,7 +33,7 @@ vi.mock("../../../../lib/activity/queries", () => ({
 }));
 
 vi.mock("../../../../lib/activity/use-activity-stream-invalidation", () => ({
-  useActivityStreamInvalidation: vi.fn(),
+  useActivityStreamInvalidations: vi.fn(),
 }));
 
 vi.mock("../../../../lib/ui/mm-format-date", () => ({

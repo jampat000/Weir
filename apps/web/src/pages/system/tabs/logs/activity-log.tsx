@@ -11,7 +11,7 @@ import {
 } from "../../../../lib/activity/activity-filters";
 import { useActivityRecentQuery } from "../../../../lib/activity/queries";
 import { activityKeys } from "../../../../lib/activity/query-keys";
-import { useActivityStreamInvalidation } from "../../../../lib/activity/use-activity-stream-invalidation";
+import { useActivityStreamInvalidations } from "../../../../lib/activity/use-activity-stream-invalidation";
 import {
   fetchActivityExport,
   fetchActivityRecent,
@@ -35,6 +35,11 @@ import { ClearHistoryDialog } from "./clear-history-dialog";
 import { useCalmFeed } from "./use-calm-feed";
 
 type ExportFormat = "csv" | "json";
+
+/** Slow enough that a burst of events doesn't refetch the log on every one of them (#710). */
+const LOGS_THROTTLE_MS = 3_000;
+
+const LOGS_KEYS = [activityKeys.recent] as const;
 
 function download(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -69,7 +74,7 @@ export function ActivityLog() {
   const queryFilters = useMemo(() => activityLogQuery(applied), [applied]);
   const dataKey = JSON.stringify(queryFilters);
 
-  useActivityStreamInvalidation(activityKeys.recent);
+  useActivityStreamInvalidations(LOGS_KEYS, { throttleMs: LOGS_THROTTLE_MS });
   const recent = useActivityRecentQuery(queryFilters);
   const fmt = useAppDateFormatter();
   const {

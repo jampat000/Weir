@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { PageHeader } from "../shell/page-header";
 import {
   mmModuleTabBlurbBandClass,
@@ -43,6 +43,33 @@ type WorkspaceTabListProps<Id extends string> = {
   dataTestId?: string;
 };
 
+/** The landmark around a page's tab row, named apart from the tab list inside it (#697). */
+const TAB_ROW_LANDMARK_LABEL = "Page tabs";
+
+/** Where each arrow key takes focus from tab `index` of `count`, wrapping at the ends. */
+function tabIndexAfterKey(
+  key: string,
+  index: number,
+  count: number,
+): number | null {
+  switch (key) {
+    case "ArrowRight":
+      return (index + 1) % count;
+    case "ArrowLeft":
+      return (index - 1 + count) % count;
+    case "Home":
+      return 0;
+    case "End":
+      return count - 1;
+    default:
+      return null;
+  }
+}
+
+/**
+ * A row of tabs with the keyboard behaviour of a tab list: Tab reaches the chosen tab only, and the
+ * arrow keys, Home and End move to another tab and choose it.
+ */
 export function WorkspaceTabList<Id extends string>({
   tabs,
   activeId,
@@ -52,10 +79,22 @@ export function WorkspaceTabList<Id extends string>({
   panelId,
   dataTestId,
 }: WorkspaceTabListProps<Id>) {
+  // Tab lands on the chosen tab; the first one stands in if nothing is chosen yet.
+  const tabStop = tabs.some((tab) => tab.id === activeId)
+    ? activeId
+    : tabs[0]?.id;
+  const choose = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const next = tabIndexAfterKey(event.key, index, tabs.length);
+    if (next === null) return;
+    event.preventDefault();
+    onSelect(tabs[next].id);
+    document.getElementById(`${idPrefix}-${tabs[next].id}`)?.focus();
+  };
+
   return (
     <nav
       className="mm-workspace-tabs"
-      aria-label={ariaLabel}
+      aria-label={TAB_ROW_LANDMARK_LABEL}
       data-testid={dataTestId}
     >
       <div
@@ -63,7 +102,7 @@ export function WorkspaceTabList<Id extends string>({
         aria-label={ariaLabel}
         className="mm-workspace-tabs__list"
       >
-        {tabs.map(({ id, label }) => {
+        {tabs.map(({ id, label }, index) => {
           const selected = activeId === id;
           return (
             <button
@@ -73,8 +112,10 @@ export function WorkspaceTabList<Id extends string>({
               id={`${idPrefix}-${id}`}
               aria-controls={panelId}
               aria-selected={selected}
+              tabIndex={id === tabStop ? 0 : -1}
               className={`${mmSectionTabClass(selected)} mm-workspace-tabs__button`}
               onClick={() => onSelect(id)}
+              onKeyDown={(event) => choose(event, index)}
             >
               {label}
             </button>

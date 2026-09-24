@@ -143,7 +143,7 @@
   color: var(--mm-accent-bright);
   border-color: var(--mm-accent-ring);
   background: var(--mm-accent-soft);
-  outline: 2px solid var(--mm-accent-ring);
+  outline: 2px solid var(--mm-accent);
   outline-offset: 1px;
 }
 

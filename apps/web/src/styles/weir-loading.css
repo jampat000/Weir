@@ -14,6 +14,12 @@
   letter-spacing: 0.02em;
 }
 
+/* Inside a panel: sized to the panel it stands in for, so the page around it does not jump (#697). */
+.mm-loading--inline {
+  width: 100%;
+  min-height: 8rem;
+}
+
 .mm-loading-dots {
   display: flex;
   gap: 6px;
@@ -46,5 +52,12 @@
   50% {
     opacity: 1;
     transform: translateY(-2px) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-loading-dot {
+    animation: none;
+    opacity: 0.6;
   }
 }
