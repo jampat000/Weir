@@ -1,4 +1,4 @@
-# Weir line-ending policy (#746): every text file is normalised to LF on checkin, regardless of
+# Every text file is normalised to LF on checkin, regardless of
 # which platform checked it out, so a Windows checkout and Prettier's default no longer disagree.
 * text=auto eol=lf
 
