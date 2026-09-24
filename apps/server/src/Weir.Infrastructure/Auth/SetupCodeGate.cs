@@ -7,12 +7,10 @@ using Weir.Core.Net;
 namespace Weir.Infrastructure.Auth;
 
 /// <summary>
-/// Guards <c>POST /api/v1/auth/bootstrap</c> once no admin account exists yet. The tray opens Weir at
-/// <c>127.0.0.1</c>, so a Windows user on the same PC needs nothing extra; anyone reaching bootstrap from
-/// elsewhere (another device on the LAN, or a browser tricked into treating a rebound name as Weir — see
-/// <see cref="AllowedHostPolicy"/>) must prove they can read Weir's own log or data folder by supplying the
-/// code generated there at start-up. This closes the window where whoever reaches the port first, not the
-/// operator, claims the only admin account.
+/// Guards <c>POST /api/v1/auth/bootstrap</c> once no admin account exists yet. Only a loopback caller, or
+/// one that supplies the one-time setup code generated at start-up, can create the first account. The tray
+/// opens Weir at <c>127.0.0.1</c>, so a Windows user on the same PC needs nothing extra; anyone reaching
+/// bootstrap from elsewhere reads the code from Weir's own log or data folder.
 /// </summary>
 public sealed class SetupCodeGate
 {

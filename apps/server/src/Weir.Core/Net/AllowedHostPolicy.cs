@@ -3,9 +3,8 @@ using Weir.Core.Configuration;
 namespace Weir.Core.Net;
 
 /// <summary>
-/// Which Host header values Weir answers. Guards against DNS rebinding: without this, a page an
-/// operator visits could rebind an attacker-controlled name to Weir's address and become same-origin
-/// with it, since a server bound to every interface answers whatever Host a client sends.
+/// Which Host header values Weir answers. Guards against DNS rebinding, since a server bound to every
+/// interface otherwise answers whatever Host a client sends.
 /// </summary>
 public static class AllowedHostPolicy
 {

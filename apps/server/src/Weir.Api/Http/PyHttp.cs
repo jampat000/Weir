@@ -117,8 +117,8 @@ public static class PyRequestBody
 
     /// <summary>
     /// Every Weir route reads its body as JSON, so a non-empty body with no <c>Content-Type</c> or one that
-    /// isn't JSON is refused rather than guessed at. This also forces a CORS preflight for a cross-origin
-    /// browser request: a plain-text body with no preflight was one way past the X-Requested-With check.
+    /// isn't JSON is refused rather than guessed at. This also forces a real CORS preflight for a
+    /// cross-origin browser request, since a plain-text body needs none.
     /// </summary>
     public const string UnsupportedContentTypeDetail = "Send the body as application/json.";
 

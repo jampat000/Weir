@@ -1,9 +1,9 @@
 namespace Weir.Core.Auth;
 
 /// <summary>
-/// Per-username login backoff, layered on top of the per-IP <see cref="SlidingWindowLimiter"/>: an attacker
-/// who spreads guesses across many source addresses still only gets <see cref="FreeAttempts"/> tries at one
-/// account before each further attempt has to wait, doubling up to <see cref="MaxBackoffSeconds"/>.
+/// Per-username login backoff, layered on top of the per-IP <see cref="SlidingWindowLimiter"/>: guessing at
+/// one account gets <see cref="FreeAttempts"/> free tries regardless of how many source addresses it comes
+/// from, then each further attempt has to wait, doubling up to <see cref="MaxBackoffSeconds"/>.
 /// </summary>
 public sealed class UsernameLoginBackoff
 {

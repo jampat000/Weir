@@ -19,11 +19,10 @@ When the immediate peer is trusted, Weir uses the right-most untrusted address i
 
 ## Host header allow-list
 
-Weir only answers a request whose `Host` header is an IP literal, `localhost`, a single-label
-name, a `.local`/`.lan`/`.home`/`.home.arpa`/`.internal`/`.localdomain` name, a host from
-`WEIR_CORS_ORIGINS`/`WEIR_TRUSTED_BROWSER_ORIGINS`, or an entry in `WEIR_ALLOWED_HOSTS`. This
-closes a DNS-rebinding gap: without it, a page the operator visits could rebind an attacker's
-domain to Weir's address and read or change anything an unauthenticated route allows.
+Weir answers only the addresses it recognises: an IP literal, `localhost`, a single-label name, a
+`.local`/`.lan`/`.home`/`.home.arpa`/`.internal`/`.localdomain` name, a host from
+`WEIR_CORS_ORIGINS`/`WEIR_TRUSTED_BROWSER_ORIGINS`, or an entry in `WEIR_ALLOWED_HOSTS`. If you
+reach Weir through a domain name — a reverse-proxy setup, typically — add it here.
 
 A request whose peer is in `WEIR_TRUSTED_PROXY_IPS` skips this check — the proxy is the one
 deciding which domains reach Weir. Otherwise, list your reverse-proxy domain:
