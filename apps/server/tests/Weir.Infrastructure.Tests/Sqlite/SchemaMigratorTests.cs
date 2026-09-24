@@ -155,7 +155,7 @@ public sealed class SchemaMigratorTests
         Assert.Equal(numbers.OrderBy(number => number), numbers);
     }
 
-    /// <summary>A database already at 18 (head on main before this migration) still gets 19 once it is added after it.</summary>
+    /// <summary>A database already at 18 (head on main before migrations 19 and 20) still gets both once they are added after it.</summary>
     [Fact]
     public void A_database_at_18_upgrades_to_include_this_migration()
     {
@@ -170,6 +170,9 @@ public sealed class SchemaMigratorTests
                 "DROP TABLE media_manager_handoff_targets; " +
                 "ALTER TABLE media_manager_handoffs DROP COLUMN reported_status; " +
                 "ALTER TABLE media_manager_handoffs DROP COLUMN output_files_json; " +
+                "DROP INDEX ix_jobs_active_remux_pass_path; " +
+                "ALTER TABLE library_files ADD COLUMN probe_json TEXT; " +
+                "DROP TABLE library_file_probes; " +
                 $"DELETE FROM alembic_version; INSERT INTO alembic_version (version_num) VALUES ('{eighteen}');";
             command.ExecuteNonQuery();
         }
@@ -180,6 +183,7 @@ public sealed class SchemaMigratorTests
         Assert.Equal(SchemaStartupOutcome.Upgraded, outcome);
         Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'media_manager_handoff_targets'"));
         Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM pragma_table_info('media_manager_handoffs') WHERE name = 'reported_status'"));
+        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'library_file_probes'"));
         Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, $"SELECT COUNT(*) FROM alembic_version WHERE version_num = '{SchemaMigrator.HeadRevision}'"));
     }
 
