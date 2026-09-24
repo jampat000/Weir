@@ -336,7 +336,8 @@ export function LibraryManagerSetup({
   const scope = PROCESSING_MEDIA_TYPE_LABELS[mediaType];
   const managers = setup.data?.managers ?? [];
   const downloadClientItems = downloadClients.data ?? [];
-  const nothingCovers = managers.length === 0 && downloadClientItems.length === 0;
+  const nothingCovers =
+    managers.length === 0 && downloadClientItems.length === 0;
 
   return (
     <QuietFieldGroup

@@ -59,9 +59,10 @@ function setup(
   managers: ProcessingManagerSetupItem[],
   downloadClients: DownloadClientSuggestion[] = [],
 ) {
-  vi.spyOn(downloadClientsApi, "fetchDownloadClientSuggestions").mockResolvedValue(
-    downloadClients,
-  );
+  vi.spyOn(
+    downloadClientsApi,
+    "fetchDownloadClientSuggestions",
+  ).mockResolvedValue(downloadClients);
   return vi
     .spyOn(managersApi, "fetchProcessingManagerSetup")
     .mockResolvedValue({ media_type: "tv", managers });
@@ -252,7 +253,10 @@ it("offers a bare download client's own folder as a suggested watched folder, wi
     flow: "download_client",
     ready: true,
     lines: [
-      { state: "ok", text: "SABnzbd's default completed-downloads folder is /downloads/complete." },
+      {
+        state: "ok",
+        text: "SABnzbd's default completed-downloads folder is /downloads/complete.",
+      },
     ],
     suggested_watched_folder: "/downloads/complete",
     category_folders: [],

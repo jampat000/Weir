@@ -123,7 +123,10 @@ describe("ConnectionEditForm", () => {
 
   it("shows the downloaded-scan toggle only for Sonarr and Radarr, never Deluno", () => {
     const { rerender } = render(
-      <ConnectionEditForm connection={connection({ kind: "deluno" })} onClose={vi.fn()} />,
+      <ConnectionEditForm
+        connection={connection({ kind: "deluno" })}
+        onClose={vi.fn()}
+      />,
       { wrapper },
     );
     expect(
@@ -158,7 +161,11 @@ describe("ConnectionEditForm", () => {
 
     render(
       <ConnectionEditForm
-        connection={connection({ kind: "sonarr", name: "Sonarr", downloaded_scan_enabled: false })}
+        connection={connection({
+          kind: "sonarr",
+          name: "Sonarr",
+          downloaded_scan_enabled: false,
+        })}
         onClose={vi.fn()}
       />,
       { wrapper },
