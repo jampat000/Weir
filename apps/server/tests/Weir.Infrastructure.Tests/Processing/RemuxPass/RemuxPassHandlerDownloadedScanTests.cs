@@ -57,6 +57,7 @@ public sealed class RemuxPassHandlerDownloadedScanTests : IDisposable
             _fixture.Store.Options,
             runner,
             new QueueingFailurePolicy(_fixture.Jobs),
+            _fixture.OperatorSettings,
             TimeProvider.System,
             NullLogger<RemuxPassHandler>.Instance,
             downloadedScan,
