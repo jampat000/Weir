@@ -9,7 +9,7 @@ list first.
 
 ## 3.x
 
-- **3.2.5** (2026-09-24). Keep the original after a library clean, a smoother progress bar, and a wide pass on security, performance and usability. [notes](docs/release-notes/v3.2.5.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.5)
+- **3.2.5** (2026-09-25). Folders that work end to end with any setup, a per-library folder chain check, keep the original after a library clean, a smoother progress bar, and a wide pass on security, performance and usability. [notes](docs/release-notes/v3.2.5.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.5)
 - **3.2.4** (2026-09-23). Files that have left a watched folder are cleared even when the library's watched-folder scan is off. [notes](docs/release-notes/v3.2.4.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.4)
 - **3.2.3** (2026-09-23). A file that no longer exists stops being listed, including one a media manager handed over. [notes](docs/release-notes/v3.2.3.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.3)
 - **3.2.2** (2026-09-23). Processing stays still when you switch views, and History says plainly which tracks were kept and removed. [notes](docs/release-notes/v3.2.2.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.2)

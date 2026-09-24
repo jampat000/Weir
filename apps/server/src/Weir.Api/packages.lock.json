@@ -47,7 +47,7 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.12, )",
-          "Weir.Core": "[3.2.4, )"
+          "Weir.Core": "[3.2.5, )"
         }
       },
       "Microsoft.Data.Sqlite": {
