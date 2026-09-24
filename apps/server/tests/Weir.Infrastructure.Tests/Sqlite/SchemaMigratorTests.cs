@@ -155,41 +155,56 @@ public sealed class SchemaMigratorTests
         Assert.Equal(numbers.OrderBy(number => number), numbers);
     }
 
-    /// <summary>A database already at 18 (head on main before migrations 19 and 20) still gets both once they are added after it.</summary>
-    [Fact]
-    public void A_database_at_18_upgrades_to_include_this_migration()
+    /// <summary>
+    /// Generates one case per revision from <see cref="SchemaMigrator.Migrations"/> instead of naming any
+    /// migration: adding a new migration adds a case for it automatically and needs no edit here.
+    /// </summary>
+    public static IEnumerable<object[]> RevisionsBeforeHead() =>
+        SchemaMigrator.Migrations.Take(SchemaMigrator.Migrations.Count - 1).Select(migration => new object[] { migration.Number });
+
+    /// <summary>
+    /// A database at any earlier revision upgrades to exactly the schema a fresh install gets at head, and
+    /// data already in the database survives the migrations run to get there.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(RevisionsBeforeHead))]
+    public void A_database_at_an_earlier_revision_upgrades_to_match_a_fresh_install(int revisionNumber)
     {
         using var temp = new TempDirectory();
-        var database = new SqliteDatabase(temp.Join("weir.sqlite3"));
-        Assert.Equal(SchemaStartupOutcome.Created, new SchemaMigrator(database).EnsureAtHead());
-        var eighteen = SchemaMigrator.Migrations.Single(migration => migration.Number == 18).Revision;
-        using (var connection = database.Open())
-        using (var command = connection.CreateCommand())
-        {
-            command.CommandText =
-                "DROP TABLE media_manager_handoff_targets; " +
-                "ALTER TABLE media_manager_handoffs DROP COLUMN reported_status; " +
-                "ALTER TABLE media_manager_handoffs DROP COLUMN output_files_json; " +
-                "DROP INDEX ix_jobs_active_remux_pass_path; " +
-                "ALTER TABLE library_files ADD COLUMN probe_json TEXT; " +
-                "DROP TABLE library_file_probes; " +
-                "ALTER TABLE libraries DROP COLUMN keep_original_after_clean; " +
-                "ALTER TABLE libraries DROP COLUMN originals_folder; " +
-                "ALTER TABLE library_swaps DROP COLUMN kept_original_path; " +
-                $"DELETE FROM alembic_version; INSERT INTO alembic_version (version_num) VALUES ('{eighteen}');";
-            command.ExecuteNonQuery();
-        }
+        var path = temp.Join($"revision-{revisionNumber}.sqlite3");
+        BuildDatabaseAtRevision(path, revisionNumber);
 
+        // Representative rows in tables that exist from the baseline onward and are never rebuilt, so this
+        // seeding works at every revision without knowing which migrations are ahead of it.
+        SchemaSnapshot.Execute(
+            path,
+            "UPDATE suite_settings SET product_display_name = 'Generic test install';" +
+            "INSERT INTO activity_events (id, event_type, module, title) VALUES (999999, 'generic_test.seed', 'test', 'Generic test event');");
+
+        var database = new SqliteDatabase(path);
         var outcome = new SchemaMigrator(database).EnsureAtHead();
         database.ClearPool();
-
         Assert.Equal(SchemaStartupOutcome.Upgraded, outcome);
-        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'media_manager_handoff_targets'"));
-        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM pragma_table_info('media_manager_handoffs') WHERE name = 'reported_status'"));
-        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'library_file_probes'"));
-        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM pragma_table_info('libraries') WHERE name = 'keep_original_after_clean'"));
-        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, "SELECT COUNT(*) FROM pragma_table_info('library_swaps') WHERE name = 'kept_original_path'"));
-        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, $"SELECT COUNT(*) FROM alembic_version WHERE version_num = '{SchemaMigrator.HeadRevision}'"));
+
+        using var freshTemp = new TempDirectory();
+        var freshPath = freshTemp.Join("fresh.sqlite3");
+        var freshDatabase = new SqliteDatabase(freshPath);
+        Assert.Equal(SchemaStartupOutcome.Created, new SchemaMigrator(freshDatabase).EnsureAtHead());
+        freshDatabase.ClearPool();
+
+        // Schema only: the fresh install and the seeded rows above intentionally hold different rows.
+        Assert.Equal(SchemaSnapshot.DescribeSchema(freshPath), SchemaSnapshot.DescribeSchema(path));
+        Assert.Equal(1, SchemaSnapshot.ScalarLong(path, "SELECT COUNT(*) FROM suite_settings WHERE product_display_name = 'Generic test install'"));
+        Assert.Equal(1, SchemaSnapshot.ScalarLong(path, "SELECT COUNT(*) FROM activity_events WHERE id = 999999 AND title = 'Generic test event'"));
+    }
+
+    /// <summary>Applies migrations 1..<paramref name="revisionNumber"/> and records that revision, the same as <c>SchemaMigrator</c> does once its scripts have run.</summary>
+    private static void BuildDatabaseAtRevision(string path, int revisionNumber)
+    {
+        var migrations = SchemaMigrator.Migrations.Where(migration => migration.Number <= revisionNumber).OrderBy(migration => migration.Number).ToList();
+        var script = string.Concat(migrations.Select(SchemaMigrator.ReadMigrationSql)) +
+            $"DELETE FROM alembic_version; INSERT INTO alembic_version (version_num) VALUES ('{migrations[^1].Revision}');";
+        SchemaSnapshot.Execute(path, script);
     }
 
     [Fact]
