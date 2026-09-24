@@ -19,7 +19,7 @@ public sealed class TmdbAddressPolicyTests
     public async Task A_base_url_host_that_resolves_to_a_non_public_address_is_refused(string host, string resolvesTo)
     {
         using var factory = new SocketsManagerHttpHandlerFactory((_, _) => Task.FromResult(new[] { IPAddress.Parse(resolvesTo) }));
-        var provider = new TmdbMetadataProvider("k", factory, $"http://{host}", new MetadataLookupCache());
+        var provider = new TmdbMetadataProvider("k", factory, TimeProvider.System, $"http://{host}", new MetadataLookupCache());
 
         var result = await provider.LookupMovieAsync("Film", 2001);
 
