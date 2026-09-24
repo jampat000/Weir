@@ -9,7 +9,8 @@ namespace Weir.Infrastructure.Activity;
 /// itself tells <see cref="ActivityLatestNotifier"/> the instant its transaction commits, so the common case
 /// needs no polling. A write this process never sees commit — <c>weir recover</c>'s own connection, a restored
 /// backup, or any other direct edit of the database file — would otherwise sit unseen by every open stream
-/// until a client reloads. One shared poll, not one per open stream, catches that within a few seconds.
+/// until a client reloads. One shared poll, not one per open stream, catches that within a few seconds, and
+/// only while a stream is actually open to hear it (#720): idle, this task does not touch the database.
 /// </summary>
 public sealed class ActivityLatestPollTask : IPeriodicTask
 {
@@ -34,6 +35,13 @@ public sealed class ActivityLatestPollTask : IPeriodicTask
 
     public async Task RunOnceAsync(CancellationToken cancellationToken)
     {
+        // Nobody is waiting on the signal, so there is nothing this tick needs to tell (#720): a stream that
+        // opens later reads the latest id fresh anyway.
+        if (_notifier.WaiterCount == 0)
+        {
+            return;
+        }
+
         var latest = await ActivityHistoryStore.LatestIdAsync(_database, cancellationToken).ConfigureAwait(false);
         if (latest is { } id && id != _notifier.Snapshot().LatestId)
         {

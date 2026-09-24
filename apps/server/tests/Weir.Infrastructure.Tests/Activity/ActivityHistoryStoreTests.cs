@@ -94,16 +94,17 @@ public sealed class ActivityHistoryStoreTests
     {
         // A raw insert with no unit of work and no ActivityNotifications.Track call, like `weir recover`'s
         // own connection or a restored backup: only the poll, not a commit signal, can tell the notifier.
+        // The poll only checks while a stream is open, so this needs one waiting.
         using var fixture = new StoreFixture();
         var notifier = new ActivityLatestNotifier();
         var poll = new ActivityLatestPollTask(fixture.Database, notifier);
+        var waiting = notifier.WaitForChangeAsync(notifier.Snapshot().Version, TimeSpan.FromSeconds(5), TimeProvider.System);
 
         await fixture.Execute("INSERT INTO activity_events (event_type, module, title) VALUES ('auth.password_changed', 'auth', 'Password changed')");
         var insertedId = await fixture.Scalar("SELECT max(id) FROM activity_events");
-
         await poll.RunOnceAsync(CancellationToken.None);
 
-        Assert.Equal(new ActivityLatest(insertedId, 1), notifier.Snapshot());
+        Assert.Equal(new ActivityLatest(insertedId, 1), await waiting);
     }
 
     [Fact]
@@ -113,12 +114,28 @@ public sealed class ActivityHistoryStoreTests
         var notifier = new ActivityLatestNotifier();
         var poll = new ActivityLatestPollTask(fixture.Database, notifier);
         await fixture.Execute("INSERT INTO activity_events (event_type, module, title) VALUES ('auth.password_changed', 'auth', 'Password changed')");
+        var firstWait = notifier.WaitForChangeAsync(notifier.Snapshot().Version, TimeSpan.FromSeconds(5), TimeProvider.System);
         await poll.RunOnceAsync(CancellationToken.None);
-        var afterFirstPoll = notifier.Snapshot();
+        var afterFirstPoll = await firstWait;
 
+        var secondWait = notifier.WaitForChangeAsync(afterFirstPoll!.Value.Version, TimeSpan.FromMilliseconds(50), TimeProvider.System);
         await poll.RunOnceAsync(CancellationToken.None);
 
+        Assert.Null(await secondWait);
         Assert.Equal(afterFirstPoll, notifier.Snapshot());
+    }
+
+    [Fact]
+    public async Task The_latest_poll_checks_nothing_while_no_stream_is_open()
+    {
+        using var fixture = new StoreFixture();
+        var notifier = new ActivityLatestNotifier();
+        var poll = new ActivityLatestPollTask(fixture.Database, notifier);
+        await fixture.Execute("INSERT INTO activity_events (event_type, module, title) VALUES ('auth.password_changed', 'auth', 'Password changed')");
+
+        await poll.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(new ActivityLatest(null, 0), notifier.Snapshot());
     }
 
     [Fact]

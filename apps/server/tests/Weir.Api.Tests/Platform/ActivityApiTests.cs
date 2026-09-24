@@ -290,11 +290,15 @@ public sealed class ActivityApiTests
     {
         // A raw insert on its own connection, like `weir recover` or a restored backup: nobody calls
         // ActivityNotifications.Track for it, so only the shared poll (ActivityLatestPollTask), not a commit
-        // signal, can tell the stream about it.
+        // signal, tells the open stream about it.
         await using var server = await SeededServerAsync();
         var client = await AdminAsync(server);
-        var notifier = server.Services.GetRequiredService<ActivityLatestNotifier>();
-        var beforeVersion = notifier.Snapshot().Version;
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/activity/stream");
+        request.Headers.Add("Cookie", string.Join("; ", client.Cookies.Select(pair => $"{pair.Key}={pair.Value}")));
+        using var response = await server.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        using var reader = new StreamReader(await response.Content.ReadAsStreamAsync());
+        await NextBlockAsync(reader); // "retry: ..."
+        await NextBlockAsync(reader); // the opening activity.latest frame
 
         await TestDatabase.ExecuteAsync(
             server,
@@ -305,9 +309,8 @@ public sealed class ActivityApiTests
         var poll = server.Services.GetRequiredService<ActivityLatestPollTask>();
         await poll.RunOnceAsync(CancellationToken.None);
 
-        var after = notifier.Snapshot();
-        Assert.True(after.Version > beforeVersion);
-        Assert.Equal(insertedId, after.LatestId);
+        var block = await NextBlockAsync(reader);
+        Assert.Contains($"\"latest_event_id\":{insertedId}", block[1], StringComparison.Ordinal);
         Assert.Contains("Password changed", await TitlesAboutWeirAsync(client));
     }
 
