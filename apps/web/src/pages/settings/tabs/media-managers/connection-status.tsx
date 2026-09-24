@@ -69,7 +69,7 @@ export function ConnectionStatusPanel({
 }
 
 const UNSIGNED_WEBHOOK_WARNING = (managerName: string) =>
-  `This connection accepts webhooks without a secret. Create a secret and add it to ${managerName}.`;
+  `This media manager accepts webhooks without a secret. Create a secret and add it to ${managerName}.`;
 
 /**
  * The field's own string content is never shown; its presence is only the signal that this
