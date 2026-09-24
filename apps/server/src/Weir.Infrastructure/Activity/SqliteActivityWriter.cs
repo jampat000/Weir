@@ -39,17 +39,14 @@ public sealed class SqliteActivityWriter : IActivityWriter
     public async Task<long> RecordAsync(ActivityEventDraft draft, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(draft);
-        var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using (connection.ConfigureAwait(false))
+        var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
+        await using (uow.ConfigureAwait(false))
         {
-            var transaction = connection.BeginTransaction(deferred: false);
-            await using (transaction.ConfigureAwait(false))
-            {
-                var id = Record(connection, transaction, draft);
-                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-                ActivityNotifications.TransactionCommitted(_database, transaction);
-                return id;
-            }
+            var transaction = uow.WriteTransaction();
+            var id = Record(uow.Connection, transaction, draft);
+            await uow.CommitAsync().ConfigureAwait(false);
+            ActivityNotifications.TransactionCommitted(_database, transaction);
+            return id;
         }
     }
 
