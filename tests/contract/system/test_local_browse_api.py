@@ -47,3 +47,14 @@ def test_system_directories_returns_not_found(admin) -> None:
 
     assert r.status_code == 404
     assert r.json()["detail"] == "The requested directory does not exist."
+
+
+@pytest.mark.parametrize(
+    "path",
+    [r"\\attacker.example\share", "//attacker.example/share", r"\\?\C:\Windows", r"\\.\PhysicalDrive0"],
+)
+def test_system_directories_rejects_unc_and_device_paths(admin, path: str) -> None:
+    r = admin.get(DIRECTORIES, params={"path": path})
+
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == "UNC and device paths are not allowed."

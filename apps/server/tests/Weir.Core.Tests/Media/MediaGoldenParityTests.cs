@@ -66,7 +66,7 @@ public sealed class MediaGoldenParityTests
         {
             var input = item.GetProperty("input");
             var argv = FfmpegCommands.BuildIntegrityArgv(input.GetProperty("ffmpeg_bin").GetString()!, input.GetProperty("path").GetString()!);
-            AssertTokens(Strings(item.GetProperty("expected")), argv, input.GetRawText());
+            AssertTokens(GoldenDivergences.IntegrityArgv(Strings(item.GetProperty("expected"))), argv, input.GetRawText());
         }
 
         foreach (var item in root.GetProperty("progress_argv").EnumerateArray())
@@ -383,7 +383,9 @@ internal static class GoldenDivergences
     /// #539 item 1: ffprobe runs with "-v error" (the golden fixture has "-v quiet") so that unreadable-media
     /// markers reach stderr instead of being suppressed. #498: ffprobe also runs with "-show_chapters" (absent
     /// from the fixture, recorded before that option existed) so a probe's JSON always
-    /// carries a chapters array for <see cref="Weir.Core.Rules.ProbeResult.Chapters"/>.
+    /// carries a chapters array for <see cref="Weir.Core.Rules.ProbeResult.Chapters"/>. #723: ffprobe also runs
+    /// with "-protocol_whitelist file" right before the source path, restricting the read to the local-file
+    /// protocol.
     /// </summary>
     public static IReadOnlyList<string> FfprobeArgv(IReadOnlyList<string> golden)
     {
@@ -400,6 +402,15 @@ internal static class GoldenDivergences
             patched.Insert(showFormatIndex + 1, "-show_chapters");
         }
 
+        patched.InsertRange(patched.Count - 1, ["-protocol_whitelist", "file"]);
+        return patched;
+    }
+
+    /// <summary>#723: the integrity demux also runs with "-protocol_whitelist file" right before "-i".</summary>
+    public static IReadOnlyList<string> IntegrityArgv(IReadOnlyList<string> golden)
+    {
+        var patched = golden.ToList();
+        patched.InsertRange(patched.IndexOf("-i"), ["-protocol_whitelist", "file"]);
         return patched;
     }
 
@@ -427,6 +438,8 @@ internal static class GoldenDivergences
     public static IReadOnlyList<string> RemuxArgv(IReadOnlyList<string> golden, JsonElement input)
     {
         var argv = golden.ToList();
+        // #723: "-protocol_whitelist file" right before "-i", restricting the read to the local-file protocol.
+        argv.InsertRange(argv.IndexOf("-i"), ["-protocol_whitelist", "file"]);
         var plan = input.GetProperty("plan");
         var metadata = plan.GetProperty("metadata");
         var dst = input.GetProperty("dst").GetString()!;

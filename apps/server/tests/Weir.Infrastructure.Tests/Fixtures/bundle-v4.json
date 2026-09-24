@@ -82,7 +82,7 @@
       "modified_before": null,
       "name": "Movies",
       "output_collision_policy": "replace",
-      "output_folder": "",
+      "output_folder": "D:/Downloads/Movies-Output",
       "preserve_original_timestamps": false,
       "priority": 0,
       "rejected_file_action": "leave",

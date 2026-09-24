@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Weir.Core.Configuration;
 using Weir.Infrastructure.Processes;
 
 namespace Weir.Infrastructure.Media;
@@ -15,7 +14,7 @@ public static class MediaToolServices
     public static IServiceCollection AddWeirMediaTools(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.TryAddSingleton<IMediaToolResolver>(sp => MediaToolResolver.ForCurrentProcess(sp.GetRequiredService<WeirOptions>().WeirHome));
+        services.TryAddSingleton<IMediaToolResolver>(_ => MediaToolResolver.ForCurrentProcess());
         services.TryAddSingleton<IProcessRunner, ProcessRunner>();
         services.TryAddSingleton<MediaTools>();
         return services;

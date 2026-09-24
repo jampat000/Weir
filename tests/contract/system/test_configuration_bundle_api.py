@@ -89,6 +89,29 @@ def test_configuration_bundle_put_rejects_bad_version(admin) -> None:
     assert r_put.status_code == 400
 
 
+def test_configuration_bundle_restore_validates_every_library_row(admin) -> None:
+    """A bundle whose library rows would fail POST /processing/libraries's own checks is refused as a
+    whole, naming the offending library, and leaves the library table untouched (#723)."""
+
+    r0 = admin.get(BUNDLE)
+    assert r0.status_code == 200, r0.text
+    bundle = r0.json()
+    before = admin.get(f"{API}/processing/libraries").json()
+
+    bad = deepcopy(bundle)
+    movies = next(row for row in bad["libraries"] if row["name"] == "Movies")
+    movies["watched_folder"] = "/srv/movies/in"
+    movies["output_folder"] = ""
+
+    r_put = admin.put_csrf(BUNDLE, {"bundle": bad})
+    assert r_put.status_code == 400, r_put.text
+    assert "Movies" in r_put.json()["detail"]
+    assert "output folder" in r_put.json()["detail"]
+
+    after = admin.get(f"{API}/processing/libraries").json()
+    assert [row["watched_folder"] for row in after] == [row["watched_folder"] for row in before]
+
+
 def test_configuration_backup_list_shape(admin) -> None:
     r = admin.get(f"{API}/suite/configuration-backups")
     assert r.status_code == 200, r.text
