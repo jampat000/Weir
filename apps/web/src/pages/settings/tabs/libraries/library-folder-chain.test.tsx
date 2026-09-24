@@ -14,7 +14,9 @@ function wrapper({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
 
-function chain(over: Partial<LibraryFolderChainData> = {}): LibraryFolderChainData {
+function chain(
+  over: Partial<LibraryFolderChainData> = {},
+): LibraryFolderChainData {
   return {
     library_id: 12,
     local: {

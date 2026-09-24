@@ -1583,6 +1583,60 @@
         "title": "LibraryFilesSummaryOut",
         "type": "object"
       },
+      "LibraryFolderChainLocalOut": {
+        "description": "Weir's own side of the folder chain (#768): the watched, work and output folders.",
+        "properties": {
+          "ready": {
+            "description": "True when no line is a problem.",
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ManagerSetupLineOut"
+            },
+            "title": "Lines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ready",
+          "lines"
+        ],
+        "title": "LibraryFolderChainLocalOut",
+        "type": "object"
+      },
+      "LibraryFolderChainOut": {
+        "description": "One library's folder chain (#768): Weir's own local folders plus every connected media manager's own setup check, folded into one read-only view. With no manager connected, ready reflects only the local folders.",
+        "properties": {
+          "library_id": {
+            "title": "Library Id",
+            "type": "integer"
+          },
+          "local": {
+            "$ref": "#/components/schemas/LibraryFolderChainLocalOut"
+          },
+          "managers": {
+            "items": {
+              "$ref": "#/components/schemas/ManagerSetupItemOut"
+            },
+            "title": "Managers",
+            "type": "array"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "library_id",
+          "local",
+          "managers",
+          "ready"
+        ],
+        "title": "LibraryFolderChainOut",
+        "type": "object"
+      },
       "LibraryFoldersOut": {
         "description": "Every enabled library's published folders (#768).",
         "properties": {
@@ -11437,6 +11491,54 @@
         ]
       }
     },
+    "/api/v1/media-managers/connections/{connection_id}/folder-chain": {
+      "get": {
+        "description": "The folder chain (#768) for every library linked to this connection, in library order.",
+        "operationId": "get_media_manager_connection_folder_chain_api_v1_media_managers_connections__connection_id__folder_chain_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Connection Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LibraryFolderChainOut"
+                  },
+                  "title": "Response Get Media Manager Connection Folder Chain",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Media Manager Connection Folder Chain",
+        "tags": [
+          "media-managers"
+        ]
+      }
+    },
     "/api/v1/media-managers/connections/{connection_id}/lanes/{lane}": {
       "put": {
         "description": "Save one automatic search lane for one manager.",
@@ -13032,6 +13134,50 @@
         "summary": "Put Processing Library",
         "tags": [
           "processing",
+          "processing"
+        ]
+      }
+    },
+    "/api/v1/processing/libraries/{library_id}/folder-chain": {
+      "get": {
+        "description": "One library's folder chain (#768): whether its watched, work and output folders are usable, plus whether every connected media manager will pick up what Weir writes. Read only.",
+        "operationId": "get_processing_library_folder_chain_api_v1_processing_libraries__library_id__folder_chain_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "library_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Library Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryFolderChainOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Processing Library Folder Chain",
+        "tags": [
           "processing"
         ]
       }

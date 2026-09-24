@@ -39,7 +39,7 @@ public sealed class LibraryFolderChainCheck
     /// exactly what <see cref="ManagerSetupCheck.CheckAsync"/> already returns for this library's watched/output
     /// folders and media type, reused as-is.
     /// </summary>
-    public async Task<PyDict> CheckForLibraryAsync(UnitOfWork uow, ProcessingLibraryRecord library, CancellationToken cancellationToken)
+    public async Task<WireObject> CheckForLibraryAsync(UnitOfWork uow, ProcessingLibraryRecord library, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(library);
@@ -53,14 +53,14 @@ public sealed class LibraryFolderChainCheck
         var managers = await _managerSetupCheck
             .CheckAsync(uow, library.MediaType, library.WatchedFolder, library.OutputFolder, library.RemoveOriginalAfterSuccess, cancellationToken)
             .ConfigureAwait(false);
-        var managersReady = managers.All(entry => entry.Get("ready") is PyBool { Value: true });
+        var managersReady = managers.All(entry => entry.Get("ready") is WireBool { Value: true });
 
-        return new PyDict()
+        return new WireObject()
             .Set("library_id", library.Id)
-            .Set("local", new PyDict()
+            .Set("local", new WireObject()
                 .Set("ready", localReady)
-                .Set("lines", new PyList(localLines.Select(line => (PyJson)line.ToOut()))))
-            .Set("managers", new PyList(managers.Select(entry => (PyJson)entry)))
+                .Set("lines", new WireArray(localLines.Select(line => (WireValue)line.ToOut()))))
+            .Set("managers", new WireArray(managers.Select(entry => (WireValue)entry)))
             .Set("ready", localReady && managersReady);
     }
 
@@ -68,11 +68,11 @@ public sealed class LibraryFolderChainCheck
     /// The same chain check for every library linked to one connection (Settings › Media managers wants "for this
     /// connection, which of its linked libraries are fully chained"), in library order.
     /// </summary>
-    public async Task<List<PyDict>> CheckForConnectionAsync(UnitOfWork uow, long connectionId, CancellationToken cancellationToken)
+    public async Task<List<WireObject>> CheckForConnectionAsync(UnitOfWork uow, long connectionId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var libraries = await LibraryStore.LibrariesForConnectionIdAsync(uow, connectionId).ConfigureAwait(false);
-        var results = new List<PyDict>();
+        var results = new List<WireObject>();
         foreach (var library in libraries)
         {
             results.Add(await CheckForLibraryAsync(uow, library, cancellationToken).ConfigureAwait(false));

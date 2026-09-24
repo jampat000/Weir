@@ -149,7 +149,7 @@ public static class MediaManagerConnectionsEndpoints
         var chain = await request.Service<LibraryFolderChainCheck>()
             .CheckForConnectionAsync(uow, connectionId, request.Context.RequestAborted)
             .ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyList(chain.Select(item => (PyJson)item)));
+        return ApiRoutes.Ok(new WireArray(chain.Select(item => (WireValue)item)));
     }
 
     private static async Task<ApiResult> UpdateConnectionAsync(ApiRequest request)

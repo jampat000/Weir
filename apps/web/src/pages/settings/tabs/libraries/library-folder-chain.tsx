@@ -137,13 +137,11 @@ export function LibraryFolderChain({
     >
       <div data-testid="library-folder-chain" className="space-y-6">
         {chain.isLoading ? (
-          <p className="mm-quiet-note">
-            Checking this library&apos;s folders…
-          </p>
+          <p className="mm-quiet-note">Checking this library&apos;s folders…</p>
         ) : chain.isError ? (
           <p className="mm-quiet-note mm-status-text--warning" role="alert">
-            Weir could not check this library&apos;s folder chain just now.
-            Try Check again in a moment.
+            Weir could not check this library&apos;s folder chain just now. Try
+            Check again in a moment.
           </p>
         ) : chain.data ? (
           <>

@@ -501,6 +501,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/media-managers/connections/{connection_id}/folder-chain": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Media Manager Connection Folder Chain
+     * @description The folder chain (#768) for every library linked to this connection, in library order.
+     */
+    get: operations["get_media_manager_connection_folder_chain_api_v1_media_managers_connections__connection_id__folder_chain_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/media-managers/connections/{connection_id}/lanes/{lane}": {
     parameters: {
       query?: never;
@@ -1090,6 +1110,26 @@ export interface paths {
      * @description Remove a library. Refused while it still has queued or running work.
      */
     delete: operations["delete_processing_library_api_v1_libraries__library_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/processing/libraries/{library_id}/folder-chain": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Processing Library Folder Chain
+     * @description One library's folder chain (#768): whether its watched, work and output folders are usable, plus whether every connected media manager will pick up what Weir writes. Read only.
+     */
+    get: operations["get_processing_library_folder_chain_api_v1_processing_libraries__library_id__folder_chain_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -2721,6 +2761,32 @@ export interface components {
       total_removed_subtitle_tracks: number;
       /** Would Change */
       would_change: number;
+    };
+    /**
+     * LibraryFolderChainLocalOut
+     * @description Weir's own side of the folder chain (#768): the watched, work and output folders.
+     */
+    LibraryFolderChainLocalOut: {
+      /**
+       * Ready
+       * @description True when no line is a problem.
+       */
+      ready: boolean;
+      /** Lines */
+      lines: components["schemas"]["ManagerSetupLineOut"][];
+    };
+    /**
+     * LibraryFolderChainOut
+     * @description One library's folder chain (#768): Weir's own local folders plus every connected media manager's own setup check, folded into one read-only view. With no manager connected, ready reflects only the local folders.
+     */
+    LibraryFolderChainOut: {
+      /** Library Id */
+      library_id: number;
+      local: components["schemas"]["LibraryFolderChainLocalOut"];
+      /** Managers */
+      managers: components["schemas"]["ManagerSetupItemOut"][];
+      /** Ready */
+      ready: boolean;
     };
     /**
      * LibraryFoldersOut
@@ -7732,6 +7798,37 @@ export interface operations {
       };
     };
   };
+  get_media_manager_connection_folder_chain_api_v1_media_managers_connections__connection_id__folder_chain_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LibraryFolderChainOut"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   put_media_manager_lane_api_v1_media_managers_connections__connection_id__lanes__lane__put: {
     parameters: {
       query?: never;
@@ -8771,6 +8868,37 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_processing_library_folder_chain_api_v1_processing_libraries__library_id__folder_chain_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        library_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LibraryFolderChainOut"];
+        };
       };
       /** @description Validation Error */
       422: {

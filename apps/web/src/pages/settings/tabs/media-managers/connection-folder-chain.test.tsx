@@ -75,7 +75,9 @@ it("lists each linked library by name with its readiness, expandable to its line
       library_id: 12,
       local: {
         ready: true,
-        lines: [{ state: "ok", text: "Weir can read the watched folder /media/in." }],
+        lines: [
+          { state: "ok", text: "Weir can read the watched folder /media/in." },
+        ],
       },
       managers: [
         {
