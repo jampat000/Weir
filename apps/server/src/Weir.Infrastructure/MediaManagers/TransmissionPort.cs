@@ -5,7 +5,7 @@ using Weir.Core.MediaManagers;
 namespace Weir.Infrastructure.MediaManagers;
 
 /// <summary>
-/// Transmission, read only (#768): its RPC at <c>{base_url}/transmission/rpc</c> requires a CSRF-style handshake —
+/// Transmission, read only: its RPC at <c>{base_url}/transmission/rpc</c> requires a CSRF-style handshake —
 /// the first request is refused with 409 and an <c>X-Transmission-Session-Id</c> header, which the retried
 /// request must carry. <c>session-get</c>'s <c>download-dir</c> is the only folder Transmission has; it has no
 /// category concept.

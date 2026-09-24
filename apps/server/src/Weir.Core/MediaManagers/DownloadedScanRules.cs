@@ -3,7 +3,7 @@ using Weir.Core.Json;
 namespace Weir.Core.MediaManagers;
 
 /// <summary>
-/// The pure half of the optional downloaded-scan hand-back (#768): for a Sonarr/Radarr connection that does not use
+/// The pure half of the optional downloaded-scan hand-back: for a Sonarr/Radarr connection that does not use
 /// Weir's own hand-off protocol, what to call the manager's Downloaded Scan command and where to tell it to look,
 /// once a live pass has written a file to the library's output folder.
 /// </summary>

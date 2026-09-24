@@ -3,7 +3,7 @@ using Weir.Core.Json;
 namespace Weir.Core.MediaManagers;
 
 /// <summary>
-/// One library's published folders (#768): the stable, read-only shape a media manager reads instead of asking a
+/// One library's published folders: the stable, read-only shape a media manager reads instead of asking a
 /// person to retype the same paths. Weir owns the watched, work and output folders; the manager owns its own
 /// library roots and categories.
 /// </summary>

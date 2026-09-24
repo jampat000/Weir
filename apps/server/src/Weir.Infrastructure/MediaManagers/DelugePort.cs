@@ -4,7 +4,7 @@ using Weir.Core.MediaManagers;
 namespace Weir.Infrastructure.MediaManagers;
 
 /// <summary>
-/// Deluge, read only (#768): its Web UI JSON-RPC at <c>{base_url}/json</c>. <c>auth.login</c> with the saved
+/// Deluge, read only: its Web UI JSON-RPC at <c>{base_url}/json</c>. <c>auth.login</c> with the saved
 /// password (Deluge's Web UI has no username) establishes a session cookie, then <c>core.get_config</c> for the
 /// base completed folder and <c>label.get_config</c> for each label's own — the label plugin not being enabled
 /// answers a JSON-RPC error, read as "no per-label folders" rather than a failed connection.

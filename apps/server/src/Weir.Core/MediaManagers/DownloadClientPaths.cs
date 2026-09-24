@@ -2,7 +2,7 @@ namespace Weir.Core.MediaManagers;
 
 /// <summary>
 /// Minimal path joining for a download client's own folder layout. This is the client's OS, not the one Weir
-/// runs on, so <see cref="System.IO.Path"/> (which follows the running OS's rules) cannot be used (#768).
+/// runs on, so <see cref="System.IO.Path"/> (which follows the running OS's rules) cannot be used.
 /// </summary>
 public static class DownloadClientPaths
 {

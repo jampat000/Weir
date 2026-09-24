@@ -118,6 +118,24 @@ describe("adding a download client", () => {
     });
     expect(screen.getByTestId("download-client-username")).toBeInTheDocument();
     expect(screen.getByTestId("download-client-password")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("download-client-kind"), {
+      target: { value: "nzbget" },
+    });
+    expect(screen.getByTestId("download-client-username")).toBeInTheDocument();
+    expect(screen.getByTestId("download-client-password")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("download-client-api-key"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("download-client-kind"), {
+      target: { value: "transmission" },
+    });
+    expect(screen.getByTestId("download-client-username")).toBeInTheDocument();
+    expect(screen.getByTestId("download-client-password")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("download-client-api-key"),
+    ).not.toBeInTheDocument();
   });
 
   it("will not submit with no name or address", async () => {
@@ -126,6 +144,40 @@ describe("adding a download client", () => {
     fireEvent.click(await screen.findByTestId("download-client-add"));
 
     expect(screen.getByTestId("download-client-save")).toBeDisabled();
+  });
+
+  it("will not submit a SABnzbd connection with no API key, or a Deluge one with no password", async () => {
+    vi.spyOn(api, "fetchDownloadClientConnections").mockResolvedValue([]);
+    render(<DownloadClientsSection />, { wrapper });
+    fireEvent.click(await screen.findByTestId("download-client-add"));
+    fireEvent.change(screen.getByTestId("download-client-name"), {
+      target: { value: "New Client" },
+    });
+    fireEvent.change(screen.getByTestId("download-client-base-url"), {
+      target: { value: "http://192.0.2.20:8080" },
+    });
+
+    // SABnzbd is the default selection: still blocked with no API key typed.
+    expect(screen.getByTestId("download-client-save")).toBeDisabled();
+    fireEvent.change(screen.getByTestId("download-client-api-key"), {
+      target: { value: "some-key" },
+    });
+    expect(screen.getByTestId("download-client-save")).not.toBeDisabled();
+
+    fireEvent.change(screen.getByTestId("download-client-kind"), {
+      target: { value: "deluge" },
+    });
+    expect(screen.getByTestId("download-client-save")).toBeDisabled();
+    fireEvent.change(screen.getByTestId("download-client-password"), {
+      target: { value: "deluge-secret" },
+    });
+    expect(screen.getByTestId("download-client-save")).not.toBeDisabled();
+
+    // Transmission can run unauthenticated, so it never needs a typed credential.
+    fireEvent.change(screen.getByTestId("download-client-kind"), {
+      target: { value: "transmission" },
+    });
+    expect(screen.getByTestId("download-client-save")).not.toBeDisabled();
   });
 
   it("adds a connection and says it will only be used for suggestions", async () => {
@@ -142,6 +194,9 @@ describe("adding a download client", () => {
     fireEvent.change(screen.getByTestId("download-client-base-url"), {
       target: { value: "http://192.0.2.20:8080" },
     });
+    fireEvent.change(screen.getByTestId("download-client-api-key"), {
+      target: { value: "some-key" },
+    });
     fireEvent.click(screen.getByTestId("download-client-save"));
 
     await waitFor(() =>
@@ -150,6 +205,7 @@ describe("adding a download client", () => {
           kind: "sabnzbd",
           name: "New Client",
           base_url: "http://192.0.2.20:8080",
+          api_key: "some-key",
         }),
       ),
     );
@@ -171,6 +227,9 @@ describe("adding a download client", () => {
     });
     fireEvent.change(screen.getByTestId("download-client-base-url"), {
       target: { value: "http://192.0.2.20:8080" },
+    });
+    fireEvent.change(screen.getByTestId("download-client-api-key"), {
+      target: { value: "some-key" },
     });
     fireEvent.click(screen.getByTestId("download-client-save"));
 

@@ -1,5 +1,5 @@
 /**
- * #768, for one media manager connection: which of its linked libraries are fully chained end to end (Weir's own
+ * For one media manager connection: which of its linked libraries are fully chained end to end (Weir's own
  * folders plus this connection's own setup), compact enough to sit under `LinkedLibraries` without pushing the card
  * around. Each library's own detail is the same lines `LibraryFolderChain` shows in the library editor.
  */

@@ -16,8 +16,9 @@ internal sealed class DownloadClientFixture : IDisposable
         Cipher = new CredentialCipher(Store.Options.CredentialsSecret, Store.Options.SessionSecret, Store.Options.PreviousCredentialsSecrets, Store.Clock);
         Http = new FakeManagerHttp();
         Ports = new DownloadClientPorts([new SabnzbdPort(Http), new NzbgetPort(Http), new QBittorrentPort(Http), new DelugePort(Http), new TransmissionPort(Http)]);
-        Connections = new DownloadClientConnectionService(Cipher);
-        Suggestions = new DownloadClientSuggestions(Connections, Ports);
+        ConnectionStore = new DownloadClientConnectionStore();
+        Connections = new DownloadClientConnectionService(Cipher, ConnectionStore);
+        Suggestions = new DownloadClientSuggestions(Connections, ConnectionStore, Ports);
     }
 
     public StoreFixture Store { get; }
@@ -27,6 +28,8 @@ internal sealed class DownloadClientFixture : IDisposable
     public FakeManagerHttp Http { get; }
 
     public DownloadClientPorts Ports { get; }
+
+    public DownloadClientConnectionStore ConnectionStore { get; }
 
     public DownloadClientConnectionService Connections { get; }
 

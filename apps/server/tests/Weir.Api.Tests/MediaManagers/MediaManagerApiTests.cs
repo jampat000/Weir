@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
+using Weir.Core.Configuration;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Api.Tests.Platform;
 using static Weir.Api.Tests.Platform.ApiTestClient;
@@ -457,6 +459,32 @@ public sealed class MediaManagerApiTests
         Assert.Equal("/media/movies/watched", library["watched_folder"]!.GetValue<string>());
         Assert.Equal("/media/movies/work", library["work_folder"]!.GetValue<string>());
         Assert.Equal("/media/movies/output", library["output_folder"]!.GetValue<string>());
+    }
+
+    /// <summary>
+    /// A library's <c>work_folder</c> column is blank whenever it uses Weir's own default (most libraries never set
+    /// one), so the published folder must be the effective default, the same one <c>ProcessingLibraryFolders</c> and
+    /// the folder-chain check resolve — not the blank column value.
+    /// </summary>
+    [Fact]
+    public async Task A_librarys_default_work_folder_is_published_resolved_not_blank()
+    {
+        var (server, admin, _) = await StartAsync(("WEIR_MEDIA_MANAGER_WEBHOOK_SECRET", "s3cret"));
+        await using var _server = server;
+        var secret = new Dictionary<string, string> { ["X-Webhook-Secret"] = "s3cret" };
+        await TestDatabase.ExecuteAsync(
+            server,
+            "UPDATE libraries SET watched_folder = $w, work_folder = '', output_folder = $o WHERE media_type = 'movie'",
+            ("$w", "/media/movies/watched"),
+            ("$o", "/media/movies/output"));
+        await TestDatabase.ExecuteAsync(server, "UPDATE libraries SET enabled = 0 WHERE media_type = 'tv'");
+        var weirHome = server.Services.GetRequiredService<WeirOptions>().WeirHome;
+
+        using var response = await admin.GetAsync("/api/v1/intake/library-folders", secret);
+
+        var library = Assert.Single((await Json(response))!["libraries"]!.AsArray())!;
+        Assert.Equal(ProcessingLibraryFolders.DefaultMovieWorkFolder(weirHome), library["work_folder"]!.GetValue<string>());
+        Assert.NotEqual(string.Empty, library["work_folder"]!.GetValue<string>());
     }
 
     /// <summary>

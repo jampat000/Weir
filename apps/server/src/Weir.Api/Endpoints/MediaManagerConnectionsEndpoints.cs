@@ -133,13 +133,13 @@ public static class MediaManagerConnectionsEndpoints
     }
 
     /// <summary>
-    /// <c>GET /api/v1/media-managers/connections/{connection_id}/folder-chain</c> (#768): the same per-library
+    /// <c>GET /api/v1/media-managers/connections/{connection_id}/folder-chain</c>: the same per-library
     /// folder-chain check <c>ProcessingLibraryEndpoints.GetLibraryFolderChainAsync</c> exposes per library, run for
     /// every library linked to this connection — "which of this connection's libraries are fully chained".
     /// </summary>
     private static async Task<ApiResult> GetConnectionFolderChainAsync(ApiRequest request)
     {
-        await request.RequireUserAsync().ConfigureAwait(false);
+        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var issues = new ValidationIssues();
         var connectionId = ConnectionId(request, issues);
         issues.ThrowIfAny();

@@ -4,7 +4,7 @@ import type { RequestBody, Schema } from "../api/types";
 
 /**
  * The five bare download clients Weir can read a watched-folder suggestion from when there is no
- * Sonarr/Radarr/Deluno to ask instead (#768). This connection is outbound only: Weir reads the
+ * Sonarr/Radarr/Deluno to ask instead. This connection is outbound only: Weir reads the
  * client's own configuration to suggest a folder, never controls it and never applies anything
  * automatically.
  */

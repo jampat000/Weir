@@ -23,7 +23,7 @@ public interface IFolderProbe
 }
 
 /// <summary>
-/// Weir's own side of a library's folder chain (#768): whether the watched, work and output folders exist and are
+/// Weir's own side of a library's folder chain: whether the watched, work and output folders exist and are
 /// usable, and whether a finished file can be moved from the work folder into the output folder or has to be copied
 /// across. Pure: nothing here touches the filesystem — <see cref="IFolderProbe"/> is the seam a caller fills with a real
 /// or fake implementation. The media-manager half of the chain is unchanged — <see cref="ManagerSetupRules"/>, reached
@@ -120,7 +120,7 @@ public static class LibraryFolderChainRules
     }
 
     /// <summary>
-    /// Whether a bare download client's own folders (#768) map onto this library's watched folder: its default
+    /// Whether a bare download client's own folders map onto this library's watched folder: its default
     /// completed-downloads folder, or any one category's own folder. Reuses <see cref="ArrOsPath.SameFolder"/> since
     /// these are plain local paths on Weir's own host, never remote-mapped the way a manager's are.
     /// </summary>

@@ -31,7 +31,7 @@ public static class MediaManagerServices
         services.TryAddSingleton<HandoffCompletionReporter>();
         // #652: what a manager said about a file Weir handed back, and the one rule that releases Weir's copy.
         services.TryAddSingleton<HandbackOutcomes>();
-        // #768: the optional downloaded-scan hand-back for a Sonarr/Radarr connection outside Weir's own hand-off flow.
+        // The optional downloaded-scan hand-back for a Sonarr/Radarr connection outside Weir's own hand-off flow.
         services.TryAddSingleton<DownloadedScanNotifier>();
         services.TryAddSingleton<MetadataProviderService>();
         services.TryAddSingleton<ILibraryFileChangeNotifier, LibraryFileChangeNotifier>();

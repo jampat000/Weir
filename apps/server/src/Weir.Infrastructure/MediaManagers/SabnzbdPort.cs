@@ -4,7 +4,7 @@ using Weir.Core.MediaManagers;
 namespace Weir.Infrastructure.MediaManagers;
 
 /// <summary>
-/// SABnzbd, read only (#768): <c>GET /api?mode=get_config&amp;section=misc</c> for the base completed folder and
+/// SABnzbd, read only: <c>GET /api?mode=get_config&amp;section=misc</c> for the base completed folder and
 /// <c>section=categories</c> for each category's own, both authenticated with the saved API key.
 /// </summary>
 public sealed class SabnzbdPort : IDownloadClientPort

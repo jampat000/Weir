@@ -3,7 +3,7 @@ using Weir.Core.Json;
 namespace Weir.Core.MediaManagers;
 
 /// <summary>
-/// Suggested watched folders (#768 item 2): Weir never changes a library's folders on its own, but it can read a
+/// Suggested watched folders: Weir never changes a library's folders on its own, but it can read a
 /// connected manager's own configuration and offer what it finds, for the user to apply with one click.
 /// </summary>
 public static class WatchFolderSuggestionRules

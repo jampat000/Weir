@@ -56,6 +56,7 @@ public static class WeirApi
         services.AddSingleton<IJobNotifications, WebhookJobNotifications>();
         services.AddWeirMediaManagers(options);
         services.AddWeirDownloadClients();
+        services.AddSingleton<DownloadClientConnectionsEndpointHandlers>();
         services.AddWeirProcessingApis();
         services.AddWeirProcessingFailureFollowUps(options);
         services.AddWeirLibraryMode(options);

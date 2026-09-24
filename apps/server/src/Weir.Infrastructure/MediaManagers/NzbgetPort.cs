@@ -5,7 +5,7 @@ using Weir.Core.MediaManagers;
 namespace Weir.Infrastructure.MediaManagers;
 
 /// <summary>
-/// NZBGet, read only (#768): a JSON-RPC <c>config</c> call to <c>POST {base_url}/jsonrpc</c>, authenticated with
+/// NZBGet, read only: a JSON-RPC <c>config</c> call to <c>POST {base_url}/jsonrpc</c>, authenticated with
 /// HTTP basic auth from the saved username/password when either is set.
 /// </summary>
 public sealed class NzbgetPort : IDownloadClientPort

@@ -1,4 +1,4 @@
--- Weir schema 0023 (revision 0058_download_client_connections): #768, a direct download-client connection
+-- Weir schema 0023 (revision 0058_download_client_connections): a direct download-client connection
 -- (SABnzbd, NZBGet, qBittorrent, Deluge, Transmission), used only to suggest watched folders when a library has
 -- no media manager to ask, or alongside one. Weir never changes a client's settings; this is read only.
 --

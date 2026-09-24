@@ -3,7 +3,7 @@ using Weir.Core.Json;
 namespace Weir.Core.MediaManagers;
 
 /// <summary>
-/// Deluge Web UI JSON-RPC answers, read with no I/O (#768): <c>core.get_config</c>'s <c>result.move_completed_path</c>
+/// Deluge Web UI JSON-RPC answers, read with no I/O: <c>core.get_config</c>'s <c>result.move_completed_path</c>
 /// is the base completed folder, and <c>label.get_config</c>'s <c>result</c> — an object keyed by label name, each
 /// holding that label's own options — gives each label's own <c>move_completed_path</c> when it sets one. A JSON-RPC
 /// <c>error</c> answer (the label plugin not being enabled, most often) means no per-label folders, not a failed read.

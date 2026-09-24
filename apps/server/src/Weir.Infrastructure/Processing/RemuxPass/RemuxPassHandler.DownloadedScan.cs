@@ -8,7 +8,7 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 public sealed partial class RemuxPassHandler
 {
     /// <summary>
-    /// The optional downloaded-scan hand-back (#768): after a pass writes a file to a library's output folder, ask
+    /// The optional downloaded-scan hand-back: after a pass writes a file to a library's output folder, ask
     /// every enabled, opted-in Sonarr/Radarr connection linked to that library to run its Downloaded Scan over it.
     /// Best effort; never throws, and does nothing for a pass that did not itself write or confirm an output file.
     /// </summary>

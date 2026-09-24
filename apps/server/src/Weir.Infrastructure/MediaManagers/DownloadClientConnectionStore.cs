@@ -5,7 +5,7 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
 
-/// <summary>One <c>download_client_connections</c> row (#768).</summary>
+/// <summary>One <c>download_client_connections</c> row.</summary>
 public sealed record DownloadClientConnectionRecord(
     long Id,
     string Kind,
@@ -34,32 +34,35 @@ public sealed record DownloadClientConnectionRecord(
         .Set("last_test_detail", LastTestDetail);
 }
 
-/// <summary>Explicit SQL over <c>download_client_connections</c> (#768). No lanes, no webhook secret — Weir only ever reads from these.</summary>
-public static class DownloadClientConnectionStore
+/// <summary>
+/// Explicit SQL over <c>download_client_connections</c>. No lanes, no webhook secret — Weir only ever reads
+/// from these. A stateless singleton (#745 part 5): every call still takes the caller's own <see cref="UnitOfWork"/>.
+/// </summary>
+public sealed class DownloadClientConnectionStore
 {
     private const string Columns =
         "id, kind, name, enabled, base_url, username, password_ciphertext, api_key_ciphertext, " +
         "last_connection_test_ok, last_connection_test_at, last_connection_test_detail";
 
-    public static Task<List<DownloadClientConnectionRecord>> ListAsync(UnitOfWork uow)
+    public Task<List<DownloadClientConnectionRecord>> ListAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QueryAsync($"SELECT {Columns} FROM download_client_connections ORDER BY id", ReadRow);
     }
 
-    public static Task<List<DownloadClientConnectionRecord>> ListEnabledAsync(UnitOfWork uow)
+    public Task<List<DownloadClientConnectionRecord>> ListEnabledAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QueryAsync($"SELECT {Columns} FROM download_client_connections WHERE enabled IS 1 ORDER BY id", ReadRow);
     }
 
-    public static Task<DownloadClientConnectionRecord?> GetAsync(UnitOfWork uow, long connectionId)
+    public Task<DownloadClientConnectionRecord?> GetAsync(UnitOfWork uow, long connectionId)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QuerySingleAsync($"SELECT {Columns} FROM download_client_connections WHERE id = $id", ReadRow, ("$id", connectionId));
     }
 
-    public static async Task<bool> NameExistsAsync(UnitOfWork uow, string name, long? exceptId = null)
+    public async Task<bool> NameExistsAsync(UnitOfWork uow, string name, long? exceptId = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var id = await uow.ScalarAsync("SELECT id FROM download_client_connections WHERE name = $name LIMIT 1", ("$name", name)).ConfigureAwait(false);
@@ -67,7 +70,7 @@ public static class DownloadClientConnectionStore
     }
 
     /// <summary>Insert a connection; returns the new id.</summary>
-    public static async Task<long> InsertAsync(
+    public async Task<long> InsertAsync(
         UnitOfWork uow, string kind, string name, bool enabled, string baseUrl, string? username, string? passwordCiphertext, string? apiKeyCiphertext)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -86,7 +89,7 @@ public static class DownloadClientConnectionStore
     }
 
     /// <summary>Write the changed columns and stamp <c>updated_at</c>. Nothing changed, nothing written.</summary>
-    public static async Task UpdateColumnsAsync(UnitOfWork uow, long connectionId, IReadOnlyList<(string Column, object? Value)> changes)
+    public async Task UpdateColumnsAsync(UnitOfWork uow, long connectionId, IReadOnlyList<(string Column, object? Value)> changes)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(changes);
@@ -102,14 +105,14 @@ public static class DownloadClientConnectionStore
             parameters).ConfigureAwait(false);
     }
 
-    public static Task DeleteAsync(UnitOfWork uow, long connectionId)
+    public Task DeleteAsync(UnitOfWork uow, long connectionId)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.ExecuteAsync("DELETE FROM download_client_connections WHERE id = $id", ("$id", connectionId));
     }
 
     /// <summary>The conditional test-result write: 0 when the connection was removed meanwhile.</summary>
-    public static Task<int> RecordTestResultAsync(UnitOfWork uow, long connectionId, bool ok, Timestamp checkedAt, string detail)
+    public Task<int> RecordTestResultAsync(UnitOfWork uow, long connectionId, bool ok, Timestamp checkedAt, string detail)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.ExecuteAsync(

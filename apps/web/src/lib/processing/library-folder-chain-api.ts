@@ -2,7 +2,7 @@ import { apiFetch, readJson, requireOk } from "../api/client";
 import type { Schema } from "../api/types";
 
 /**
- * #768's folder-chain check: Weir's own watched/work/output folders, plus every connected media manager's own setup
+ * The folder-chain check: Weir's own watched/work/output folders, plus every connected media manager's own setup
  * check (reused as-is from {@link ProcessingManagerSetupItem} in library-managers-api), folded into one read-only,
  * plain-language view.
  */

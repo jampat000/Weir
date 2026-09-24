@@ -244,6 +244,23 @@ public sealed class LibraryFolderChainApiTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    /// <summary>The connection folder-chain route's sibling reads (list/get a connection) need an operator or
+    /// admin session, like every other media-manager connections route that is not a plain library read.</summary>
+    [Fact]
+    public async Task A_viewer_is_refused_the_connection_folder_chain_endpoint()
+    {
+        var (server, client, _) = await StartAsync();
+        await using var _server = server;
+        var connectionId = await ConnectAsync(client, "sonarr", "Sonarr", "http://192.0.2.60:8989");
+        await TestDatabase.SeedViewerAsync(server);
+        var viewer = new ApiTestClient(server);
+        await viewer.SignInAsync("bob", ViewerPassword);
+
+        using var response = await viewer.GetAsync($"/api/v1/media-managers/connections/{connectionId}/folder-chain");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     [Fact]
     public async Task A_library_with_no_folders_set_yet_gets_one_plain_line_not_a_crash()
     {

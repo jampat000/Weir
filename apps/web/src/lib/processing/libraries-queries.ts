@@ -79,7 +79,7 @@ export function useProcessingManagerSetupQuery(
 }
 
 /**
- * #768's folder chain for one saved library: Weir's own watched/work/output folders plus every connected manager's
+ * The folder chain for one saved library: Weir's own watched/work/output folders plus every connected manager's
  * setup, in one read-only view. Keyed on the folders and media type too (not only the id) so an edit made in the
  * library editor, once it settles, is checked again — including right after Save, which changes the saved folders
  * under the same id.

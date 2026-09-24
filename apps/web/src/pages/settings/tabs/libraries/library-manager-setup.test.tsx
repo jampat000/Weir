@@ -3,6 +3,8 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
+import * as downloadClientsApi from "../../../../lib/download-clients/download-clients-api";
+import type { DownloadClientSuggestion } from "../../../../lib/download-clients/download-clients-api";
 import * as managersApi from "../../../../lib/processing/library-managers-api";
 import type { ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { LibraryManagerSetup } from "./library-manager-setup";
@@ -53,7 +55,13 @@ const deluno: ProcessingManagerSetupItem = {
   ],
 };
 
-function setup(managers: ProcessingManagerSetupItem[]) {
+function setup(
+  managers: ProcessingManagerSetupItem[],
+  downloadClients: DownloadClientSuggestion[] = [],
+) {
+  vi.spyOn(downloadClientsApi, "fetchDownloadClientSuggestions").mockResolvedValue(
+    downloadClients,
+  );
   return vi
     .spyOn(managersApi, "fetchProcessingManagerSetup")
     .mockResolvedValue({ media_type: "tv", managers });
@@ -232,4 +240,46 @@ it("says how to get help when no media manager covers the library", async () => 
       /No Sonarr, Radarr or Deluno connection covers Movies/,
     ),
   ).toBeInTheDocument();
+});
+
+it("offers a bare download client's own folder as a suggested watched folder, with no manager connected", async () => {
+  const onUseFolders = vi.fn();
+  const sabnzbd: DownloadClientSuggestion = {
+    connection_id: 9,
+    kind: "sabnzbd",
+    name: "SABnzbd",
+    label: "SABnzbd",
+    flow: "download_client",
+    ready: true,
+    lines: [
+      { state: "ok", text: "SABnzbd's default completed-downloads folder is /downloads/complete." },
+    ],
+    suggested_watched_folder: "/downloads/complete",
+    category_folders: [],
+  };
+  setup([], [sabnzbd]);
+
+  render(
+    <LibraryManagerSetup
+      mediaType="movie"
+      watchedFolder="/media/movies"
+      outputFolder="/media/movies-out"
+      editable
+      onUseFolders={onUseFolders}
+    />,
+    { wrapper },
+  );
+
+  expect(
+    screen.queryByText(/No Sonarr, Radarr or Deluno connection covers/),
+  ).not.toBeInTheDocument();
+  const block = await screen.findByRole("region", { name: "SABnzbd" });
+  expect(within(block).getByText("/downloads/complete")).toBeInTheDocument();
+
+  fireEvent.click(
+    within(block).getByRole("button", {
+      name: "Use this as the watched folder",
+    }),
+  );
+  expect(onUseFolders).toHaveBeenCalledWith("/downloads/complete", null);
 });

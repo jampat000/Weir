@@ -36,7 +36,7 @@ public sealed record DownloadClientHttpResponse(int Status, byte[] Body, IReadOn
 /// <see cref="MediaManagerHttpClient"/> is for media managers (no redirects, the local-address policy, a bounded
 /// timeout). It stays low-level rather than assuming an X-Api-Key header or a fixed success status: each dialect's
 /// own success condition differs (a cookie login, a 409 handshake, a literal "Ok."/"Fails." body), so the dialect
-/// classifies its own answer instead of this shared client guessing at one (#768).
+/// classifies its own answer instead of this shared client guessing at one.
 /// </summary>
 public sealed class DownloadClientHttpClient
 {

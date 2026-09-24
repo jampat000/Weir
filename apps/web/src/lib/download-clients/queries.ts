@@ -4,11 +4,13 @@ import {
   createDownloadClientConnection,
   deleteDownloadClientConnection,
   fetchDownloadClientConnections,
+  fetchDownloadClientSuggestions,
   testDownloadClientConnection,
   updateDownloadClientConnection,
   type DownloadClientConnection,
   type DownloadClientConnectionCreate,
   type DownloadClientConnectionUpdate,
+  type DownloadClientSuggestion,
 } from "./download-clients-api";
 
 import { downloadClientKeys } from "./query-keys";
@@ -18,6 +20,14 @@ export function useDownloadClientConnectionsQuery(enabled = true) {
     queryKey: downloadClientKeys.connections,
     queryFn: fetchDownloadClientConnections,
     enabled,
+  });
+}
+
+/** One-click watched-folder suggestions from every enabled bare download client, for the library editor. */
+export function useDownloadClientSuggestionsQuery(mediaType: "movie" | "tv") {
+  return useQuery<DownloadClientSuggestion[]>({
+    queryKey: downloadClientKeys.suggestions(mediaType),
+    queryFn: () => fetchDownloadClientSuggestions(mediaType),
   });
 }
 

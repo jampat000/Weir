@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
@@ -12,36 +13,53 @@ using Weir.Infrastructure.MediaManagers;
 namespace Weir.Api.Endpoints;
 
 /// <summary>
-/// Bare download-client connections (#768) — <c>/api/v1/download-clients/connections</c>: an optional, outbound-only
+/// Bare download-client connections — <c>/api/v1/download-clients/connections</c>: an optional, outbound-only
 /// connection to SABnzbd, NZBGet, qBittorrent, Deluge or Transmission, used only to read its configuration and
 /// suggest a library's watched folder. Weir never controls a download client through this, and a typed folder in
 /// the library editor always remains allowed — nothing here is ever applied automatically.
 /// </summary>
 public static class DownloadClientConnectionsEndpoints
 {
+    public static IEndpointRouteBuilder MapDownloadClientConnectionsEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var handlers = endpoints.ServiceProvider.GetRequiredService<DownloadClientConnectionsEndpointHandlers>();
+        endpoints.MapV1("GET", "/download-clients/connections", handlers.ListConnectionsAsync);
+        endpoints.MapV1("POST", "/download-clients/connections", handlers.CreateConnectionAsync);
+        endpoints.MapV1("GET", "/download-clients/suggestions", handlers.GetSuggestionsAsync);
+        endpoints.MapV1("GET", "/download-clients/connections/{connection_id}", handlers.GetConnectionAsync);
+        endpoints.MapV1("PUT", "/download-clients/connections/{connection_id}", handlers.UpdateConnectionAsync);
+        endpoints.MapV1("DELETE", "/download-clients/connections/{connection_id}", handlers.DeleteConnectionAsync);
+        endpoints.MapV1("POST", "/download-clients/connections/{connection_id}/test", handlers.PostConnectionTestAsync);
+        return endpoints;
+    }
+}
+
+/// <summary>Handlers for <see cref="DownloadClientConnectionsEndpoints"/>, constructor-injected with the stores and services they need.</summary>
+internal sealed class DownloadClientConnectionsEndpointHandlers
+{
     internal const string NoSuchConnection = "That download client connection does not exist.";
 
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(15);
 
-    public static IEndpointRouteBuilder MapDownloadClientConnectionsEndpoints(this IEndpointRouteBuilder endpoints)
+    private readonly DownloadClientConnectionStore _store;
+    private readonly DownloadClientConnectionService _connections;
+    private readonly DownloadClientSuggestions _suggestions;
+    private readonly IDownloadClientPorts _ports;
+
+    public DownloadClientConnectionsEndpointHandlers(
+        DownloadClientConnectionStore store, DownloadClientConnectionService connections, DownloadClientSuggestions suggestions, IDownloadClientPorts ports)
     {
-        endpoints.MapV1("GET", "/download-clients/connections", ListConnectionsAsync);
-        endpoints.MapV1("POST", "/download-clients/connections", CreateConnectionAsync);
-        endpoints.MapV1("GET", "/download-clients/suggestions", GetSuggestionsAsync);
-        endpoints.MapV1("GET", "/download-clients/connections/{connection_id}", GetConnectionAsync);
-        endpoints.MapV1("PUT", "/download-clients/connections/{connection_id}", UpdateConnectionAsync);
-        endpoints.MapV1("DELETE", "/download-clients/connections/{connection_id}", DeleteConnectionAsync);
-        endpoints.MapV1("POST", "/download-clients/connections/{connection_id}/test", PostConnectionTestAsync);
-        return endpoints;
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _connections = connections ?? throw new ArgumentNullException(nameof(connections));
+        _suggestions = suggestions ?? throw new ArgumentNullException(nameof(suggestions));
+        _ports = ports ?? throw new ArgumentNullException(nameof(ports));
     }
 
-    private static DownloadClientConnectionService Connections(ApiRequest request) => request.Service<DownloadClientConnectionService>();
-
-    private static async Task<ApiResult> ListConnectionsAsync(ApiRequest request)
+    public async Task<ApiResult> ListConnectionsAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var rows = await DownloadClientConnectionStore.ListAsync(uow).ConfigureAwait(false);
+        var rows = await _store.ListAsync(uow).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireArray(rows.Select(row => (WireValue)row.ToOut())));
     }
 
@@ -49,7 +67,7 @@ public static class DownloadClientConnectionsEndpoints
     private static string StrWithDefault(BodyModel model, WireValue? body, string name, string defaultValue, int? maxLength) =>
         body is WireObject dict && dict.ContainsKey(name) ? model.Str(name, maxLength: maxLength) : defaultValue;
 
-    private static async Task<ApiResult> CreateConnectionAsync(ApiRequest request)
+    public async Task<ApiResult> CreateConnectionAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
@@ -71,7 +89,7 @@ public static class DownloadClientConnectionsEndpoints
         long id;
         try
         {
-            id = await Connections(request).CreateAsync(
+            id = await _connections.CreateAsync(
                 uow, kind, name, baseUrl, username.Length > 0 ? username : null, password.Length > 0 ? password : null, apiKey.Length > 0 ? apiKey : null, enabled)
                 .ConfigureAwait(false);
         }
@@ -85,7 +103,7 @@ public static class DownloadClientConnectionsEndpoints
         return new JsonApiResult(StatusCodes.Status201Created, row.ToOut());
     }
 
-    private static async Task<ApiResult> GetConnectionAsync(ApiRequest request)
+    public async Task<ApiResult> GetConnectionAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -95,7 +113,7 @@ public static class DownloadClientConnectionsEndpoints
         return ApiRoutes.Ok((await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false)).ToOut());
     }
 
-    private static async Task<ApiResult> UpdateConnectionAsync(ApiRequest request)
+    public async Task<ApiResult> UpdateConnectionAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
@@ -117,7 +135,7 @@ public static class DownloadClientConnectionsEndpoints
         var row = await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
         try
         {
-            await Connections(request).UpdateAsync(uow, row, name, baseUrl, username, password, apiKey, enabled).ConfigureAwait(false);
+            await _connections.UpdateAsync(uow, row, name, baseUrl, username, password, apiKey, enabled).ConfigureAwait(false);
         }
         catch (DownloadClientConnectionException exception)
         {
@@ -128,7 +146,7 @@ public static class DownloadClientConnectionsEndpoints
         return ApiRoutes.Ok((await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false)).ToOut());
     }
 
-    private static async Task<ApiResult> DeleteConnectionAsync(ApiRequest request)
+    public async Task<ApiResult> DeleteConnectionAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
@@ -142,7 +160,7 @@ public static class DownloadClientConnectionsEndpoints
         MediaManagerConnectionsEndpoints.VerifyCsrf(request, csrfToken);
         var uow = await request.DbAsync().ConfigureAwait(false);
         await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
-        await DownloadClientConnectionStore.DeleteAsync(uow, connectionId).ConfigureAwait(false);
+        await _store.DeleteAsync(uow, connectionId).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return new CustomApiResult(context =>
         {
@@ -151,7 +169,7 @@ public static class DownloadClientConnectionsEndpoints
         });
     }
 
-    private static async Task<ApiResult> PostConnectionTestAsync(ApiRequest request)
+    public async Task<ApiResult> PostConnectionTestAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
@@ -169,8 +187,8 @@ public static class DownloadClientConnectionsEndpoints
 
         bool ok;
         string detail;
-        var connection = Connections(request).ConnectionFromRow(row);
-        var port = request.Service<IDownloadClientPorts>().PortForKind(row.Kind);
+        var connection = _connections.ConnectionFromRow(row);
+        var port = _ports.PortForKind(row.Kind);
         if (connection is null)
         {
             (ok, detail) = (false, "Add the address where this app can be reached, then test again.");
@@ -187,7 +205,7 @@ public static class DownloadClientConnectionsEndpoints
         }
 
         // The probe can take seconds and the connection may be removed meanwhile, so the write is conditional.
-        if (await DownloadClientConnectionStore.RecordTestResultAsync(uow, connectionId, ok, checkedAt, detail).ConfigureAwait(false) == 0)
+        if (await _store.RecordTestResultAsync(uow, connectionId, ok, checkedAt, detail).ConfigureAwait(false) == 0)
         {
             await uow.RollbackAsync().ConfigureAwait(false);
             throw new ApiException(StatusCodes.Status404NotFound, "That download client connection was removed while its connection test was running.");
@@ -208,7 +226,7 @@ public static class DownloadClientConnectionsEndpoints
     /// that endpoint but not used to filter: a download client's completed folder is what it is regardless of
     /// media type, since none of the five dialects can reliably say which category is "the TV one".
     /// </summary>
-    private static async Task<ApiResult> GetSuggestionsAsync(ApiRequest request)
+    public async Task<ApiResult> GetSuggestionsAsync(ApiRequest request)
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -224,7 +242,7 @@ public static class DownloadClientConnectionsEndpoints
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var suggestions = await request.Service<DownloadClientSuggestions>().SuggestAsync(uow, request.Context.RequestAborted).ConfigureAwait(false);
+        var suggestions = await _suggestions.SuggestAsync(uow, request.Context.RequestAborted).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireArray(suggestions.Select(item => (WireValue)item)));
     }
 
@@ -237,7 +255,7 @@ public static class DownloadClientConnectionsEndpoints
             : 0;
     }
 
-    private static async Task<DownloadClientConnectionRecord> RequireConnectionAsync(Infrastructure.Sqlite.UnitOfWork uow, long connectionId) =>
-        await DownloadClientConnectionStore.GetAsync(uow, connectionId).ConfigureAwait(false)
+    private async Task<DownloadClientConnectionRecord> RequireConnectionAsync(Infrastructure.Sqlite.UnitOfWork uow, long connectionId) =>
+        await _store.GetAsync(uow, connectionId).ConfigureAwait(false)
         ?? throw new ApiException(StatusCodes.Status404NotFound, NoSuchConnection);
 }

@@ -6,6 +6,7 @@ using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
@@ -117,7 +118,7 @@ public static class MediaManagerIntakeEndpoints
     }
 
     /// <summary>
-    /// <c>GET /intake/library-folders</c> (#768): every enabled library's watched, work and output folders, so a
+    /// <c>GET /intake/library-folders</c>: every enabled library's watched, work and output folders, so a
     /// media manager reads them instead of a person retyping them. Read only; authenticated like
     /// <see cref="GetIntakeCapabilitiesAsync"/>, with no source key of its own (any connection's secret, or the
     /// shared instance-wide secret, proves a caller may read it).
@@ -128,8 +129,16 @@ public static class MediaManagerIntakeEndpoints
         var uow = await request.DbAsync().ConfigureAwait(false);
         await RefusalsAsApiErrors(() => Intake(request).RequireSecretAsync(uow, presented, null)).ConfigureAwait(false);
         var rows = await LibraryStore.ListAsync(uow, enabledOnly: true).ConfigureAwait(false);
+        var weirHome = request.Options.WeirHome;
         var libraries = rows
-            .Select(row => new PublishedLibraryFolders(row.Id, row.Name, row.MediaType, row.WatchedFolder, row.WorkFolder, row.OutputFolder))
+            .Select(row => new PublishedLibraryFolders(
+                row.Id,
+                row.Name,
+                row.MediaType,
+                row.WatchedFolder,
+                ProcessingLibraryFolders.EffectiveWorkFolder(
+                    new ProcessingLibraryFolderRow(row.Id, row.MediaType, (int)row.DisplayOrder, row.WorkFolder, row.OutputFolder), weirHome),
+                row.OutputFolder))
             .ToList();
         return ApiRoutes.Ok(LibraryFolderPublishing.ToOut(libraries));
     }

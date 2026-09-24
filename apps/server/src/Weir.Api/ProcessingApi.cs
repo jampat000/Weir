@@ -27,7 +27,7 @@ public static class ProcessingApi
         services.AddWeirMediaTools();
         // Caps the #502 "Try on a file" preview at one run at a time (see RulesPreviewGate's own docs).
         services.TryAddSingleton<RulesPreviewGate>();
-        // #768: the folder-chain check composes ManagerSetupCheck (already registered by AddWeirMediaManagerServices)
+        // The folder-chain check composes ManagerSetupCheck (already registered by AddWeirMediaManagerServices)
         // with Weir's own watched/work/output folder rules.
         services.TryAddSingleton<LibraryFolderChainCheck>();
 

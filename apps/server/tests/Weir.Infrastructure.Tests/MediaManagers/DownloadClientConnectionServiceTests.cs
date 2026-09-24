@@ -18,7 +18,7 @@ public sealed class DownloadClientConnectionServiceTests
         using var fixture = new DownloadClientFixture();
         var id = await fixture.AddConnectionAsync("sabnzbd", "My SABnzbd", apiKey: "plain-api-key");
 
-        var row = await fixture.Db(uow => DownloadClientConnectionStore.GetAsync(uow, id));
+        var row = await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id));
         Assert.NotNull(row);
         Assert.NotEqual("plain-api-key", row!.ApiKeyCiphertext);
         var output = row.ToOut();
@@ -35,7 +35,7 @@ public sealed class DownloadClientConnectionServiceTests
         using var fixture = new DownloadClientFixture();
         var id = await fixture.AddConnectionAsync("deluge", "Deluge", password: "deluge-secret");
 
-        var row = await fixture.Db(uow => DownloadClientConnectionStore.GetAsync(uow, id));
+        var row = await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id));
         var resolved = fixture.Connections.ConnectionFromRow(row!);
 
         Assert.Null(resolved!.Username);
@@ -48,7 +48,7 @@ public sealed class DownloadClientConnectionServiceTests
         using var fixture = new DownloadClientFixture();
         var id = await fixture.AddConnectionAsync("transmission", "Transmission");
 
-        var row = await fixture.Db(uow => DownloadClientConnectionStore.GetAsync(uow, id));
+        var row = await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id));
         var resolved = fixture.Connections.ConnectionFromRow(row!);
 
         Assert.NotNull(resolved);
@@ -57,11 +57,97 @@ public sealed class DownloadClientConnectionServiceTests
     }
 
     [Fact]
+    public async Task Creating_a_sabnzbd_connection_with_no_api_key_is_refused()
+    {
+        using var fixture = new DownloadClientFixture();
+
+        var thrown = await Assert.ThrowsAsync<DownloadClientConnectionException>(
+            () => fixture.AddConnectionAsync("sabnzbd", "No Key"));
+
+        Assert.Contains("API key", thrown.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Creating_a_deluge_connection_with_no_password_is_refused()
+    {
+        using var fixture = new DownloadClientFixture();
+
+        var thrown = await Assert.ThrowsAsync<DownloadClientConnectionException>(
+            () => fixture.AddConnectionAsync("deluge", "No Password"));
+
+        Assert.Contains("password", thrown.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("nzbget")]
+    [InlineData("qbittorrent")]
+    [InlineData("transmission")]
+    public async Task Kinds_that_can_run_unauthenticated_accept_no_credential(string kind)
+    {
+        using var fixture = new DownloadClientFixture();
+
+        var id = await fixture.AddConnectionAsync(kind, "No Credential " + kind);
+
+        Assert.True(id > 0);
+    }
+
+    [Fact]
+    public async Task Clearing_a_sabnzbd_connections_api_key_on_update_is_refused()
+    {
+        using var fixture = new DownloadClientFixture();
+        var id = await fixture.AddConnectionAsync("sabnzbd", "SABnzbd", apiKey: "key");
+        var row = await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id));
+
+        var thrown = await Assert.ThrowsAsync<DownloadClientConnectionException>(
+            () => fixture.Db(async uow =>
+            {
+                await fixture.Connections.UpdateAsync(uow, row!, apiKey: "").ConfigureAwait(false);
+                return 0;
+            }));
+
+        Assert.Contains("API key", thrown.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Clearing_a_deluges_password_on_update_is_refused()
+    {
+        using var fixture = new DownloadClientFixture();
+        var id = await fixture.AddConnectionAsync("deluge", "Deluge", password: "secret");
+        var row = await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id));
+
+        var thrown = await Assert.ThrowsAsync<DownloadClientConnectionException>(
+            () => fixture.Db(async uow =>
+            {
+                await fixture.Connections.UpdateAsync(uow, row!, password: "").ConfigureAwait(false);
+                return 0;
+            }));
+
+        Assert.Contains("password", thrown.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Leaving_a_sabnzbd_connections_api_key_untouched_on_update_does_not_re_validate_it()
+    {
+        using var fixture = new DownloadClientFixture();
+        var id = await fixture.AddConnectionAsync("sabnzbd", "SABnzbd", apiKey: "key");
+        var row = await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id));
+
+        await fixture.Db(async uow =>
+        {
+            await fixture.Connections.UpdateAsync(uow, row!, name: "SABnzbd 2").ConfigureAwait(false);
+            return 0;
+        });
+
+        var renamed = await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id));
+        Assert.Equal("SABnzbd 2", renamed!.Name);
+    }
+
+    [Fact]
     public async Task Saving_a_secret_without_a_configured_credentials_secret_names_the_env_var()
     {
         using var fixture = new DownloadClientFixture();
         var noSecretCipher = new Core.Security.CredentialCipher(null, null, [], TimeProvider.System);
-        var service = new DownloadClientConnectionService(noSecretCipher);
+        var service = new DownloadClientConnectionService(noSecretCipher, fixture.ConnectionStore);
 
         var thrown = await Assert.ThrowsAsync<DownloadClientConnectionException>(
             () => fixture.Db(uow => service.CreateAsync(uow, "sabnzbd", "No Secret", "http://192.0.2.20:8080", apiKey: "some-key")));

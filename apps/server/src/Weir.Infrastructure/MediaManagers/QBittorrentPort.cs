@@ -3,7 +3,7 @@ using Weir.Core.MediaManagers;
 namespace Weir.Infrastructure.MediaManagers;
 
 /// <summary>
-/// qBittorrent, read only (#768): a cookie login (<c>POST /api/v2/auth/login</c>, body <c>Ok.</c>/<c>Fails.</c>,
+/// qBittorrent, read only: a cookie login (<c>POST /api/v2/auth/login</c>, body <c>Ok.</c>/<c>Fails.</c>,
 /// session in <c>Set-Cookie</c>) followed by its categories and preferences. The cookie is captured per call
 /// rather than kept in a jar across requests — each read is otherwise independent, so there is nothing to share.
 /// </summary>

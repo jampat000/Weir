@@ -5,7 +5,7 @@ using Weir.Core.Json;
 namespace Weir.Core.MediaManagers;
 
 /// <summary>
-/// NZBGet's JSON-RPC <c>config</c> method, read with no I/O (#768): a flat array of
+/// NZBGet's JSON-RPC <c>config</c> method, read with no I/O: a flat array of
 /// <c>{"Name": "...", "Value": "..."}</c> option rows under <c>result</c>, holding the base completed folder
 /// (<c>DestDir</c>) and each category's own (<c>CategoryN.Name</c> paired with <c>CategoryN.DestDir</c>).
 /// </summary>

@@ -123,7 +123,7 @@ public static class ProcessingLibraryEndpoints
     }
 
     /// <summary>
-    /// <c>GET /api/v1/processing/libraries/{library_id}/folder-chain</c>: one library's folder chain for #768 — Weir's own
+    /// <c>GET /api/v1/processing/libraries/{library_id}/folder-chain</c>: one library's folder chain — Weir's own
     /// watched/work/output folders, plus every enabled connection that covers its media type, folded into one plain-
     /// language, read-only view.
     /// </summary>

@@ -53,6 +53,10 @@ export function AddDownloadClientForm({
   const change = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
   const credentials = DOWNLOAD_CLIENT_KIND_CREDENTIALS[form.kind];
+  // SABnzbd's API and Deluge's Web UI always need a credential; the others can run with none.
+  const missingRequiredCredential =
+    (credentials === "api_key" && !form.api_key.trim()) ||
+    (credentials === "password_only" && !form.password.trim());
 
   return (
     <form
@@ -186,7 +190,10 @@ export function AddDownloadClientForm({
             data-testid="download-client-save"
             className={mmActionButtonClass({ variant: "primary" })}
             disabled={
-              create.isPending || !form.name.trim() || !form.base_url.trim()
+              create.isPending ||
+              !form.name.trim() ||
+              !form.base_url.trim() ||
+              missingRequiredCredential
             }
           >
             {create.isPending ? "Adding…" : "Add"}

@@ -4,7 +4,7 @@ namespace Weir.Core.MediaManagers;
 
 /// <summary>
 /// The five bare download-client dialects Weir can read watched-folder suggestions from when there is no
-/// Sonarr/Radarr/Deluno to ask instead (#768). A connection here is outbound only: read a client's own
+/// Sonarr/Radarr/Deluno to ask instead. A connection here is outbound only: read a client's own
 /// configuration to suggest a folder, never write to it and never control it.
 /// </summary>
 public static class DownloadClientKinds
@@ -56,7 +56,7 @@ public sealed record DownloadClientConnection(
 public sealed record DownloadClientCategoryFolder(string Category, string Folder);
 
 /// <summary>
-/// What a download client reports about where it saves completed downloads (#768): the folder it uses when
+/// What a download client reports about where it saves completed downloads: the folder it uses when
 /// nothing more specific applies, and — for a client that organizes by category or label — each one's own
 /// folder, for the per-library "folder chain" check to compare against a library's watched folder.
 /// </summary>
@@ -112,7 +112,7 @@ public interface IDownloadClientPort
     /// <summary>
     /// This client's folders, or <see cref="DownloadClientFolders.Empty"/> when it could not be reached or did not
     /// answer as expected — a client that fails to answer contributes nothing to the suggestion list rather than
-    /// failing it (#768).
+    /// failing it.
     /// </summary>
     Task<DownloadClientFolders> ReadFoldersAsync(DownloadClientConnection connection, CancellationToken cancellationToken = default);
 }

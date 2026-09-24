@@ -5,7 +5,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.MediaManagers;
 
 /// <summary>
-/// "What folder could this bare download client be pointed at" for every enabled connection (#768) — read only,
+/// "What folder could this bare download client be pointed at" for every enabled connection — read only,
 /// the same shape as <see cref="ManagerSetupCheck"/> for media managers: Weir never writes a download client's
 /// settings, only suggests. A connection whose client did not answer contributes nothing, rather than an entry
 /// with no folder or failing the whole list.
@@ -13,11 +13,13 @@ namespace Weir.Infrastructure.MediaManagers;
 public sealed class DownloadClientSuggestions
 {
     private readonly DownloadClientConnectionService _connections;
+    private readonly DownloadClientConnectionStore _store;
     private readonly IDownloadClientPorts _ports;
 
-    public DownloadClientSuggestions(DownloadClientConnectionService connections, IDownloadClientPorts ports)
+    public DownloadClientSuggestions(DownloadClientConnectionService connections, DownloadClientConnectionStore store, IDownloadClientPorts ports)
     {
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
+        _store = store ?? throw new ArgumentNullException(nameof(store));
         _ports = ports ?? throw new ArgumentNullException(nameof(ports));
     }
 
@@ -29,13 +31,13 @@ public sealed class DownloadClientSuggestions
 
     /// <summary>
     /// Every enabled connection whose client answered, with its own folders — the same read <see cref="SuggestAsync"/>
-    /// does, reused by the folder chain check (#768) so it needs no second round trip to each client.
+    /// does, reused by the folder chain check so it needs no second round trip to each client.
     /// </summary>
     public async Task<List<(DownloadClientConnectionRecord Row, DownloadClientFolders Folders)>> ReadAllAsync(UnitOfWork uow, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var results = new List<(DownloadClientConnectionRecord, DownloadClientFolders)>();
-        foreach (var row in await DownloadClientConnectionStore.ListEnabledAsync(uow).ConfigureAwait(false))
+        foreach (var row in await _store.ListEnabledAsync(uow).ConfigureAwait(false))
         {
             if (_connections.ConnectionFromRow(row) is not { } connection || _ports.PortForKind(row.Kind) is not { } port)
             {

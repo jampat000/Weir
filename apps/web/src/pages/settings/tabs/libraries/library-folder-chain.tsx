@@ -1,5 +1,5 @@
 /**
- * #768's "folder chain": whether Weir's own watched, work and output folders line up end to end, plus (folded into
+ * The "folder chain": whether Weir's own watched, work and output folders line up end to end, plus (folded into
  * the same view) whether every connected media manager will pick up what Weir writes there. With no manager
  * connected, the Weir-only chain is already a complete, valid setup, so nothing here says a word about that — the
  * separate "No Sonarr, Radarr or Deluno connection covers …" message stays in `LibraryManagerSetup`, above.

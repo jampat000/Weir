@@ -11,7 +11,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.MediaManagers;
 
 /// <summary>
-/// The optional downloaded-scan hand-back (#768): for every enabled Sonarr/Radarr connection linked to a library
+/// The optional downloaded-scan hand-back: for every enabled Sonarr/Radarr connection linked to a library
 /// that has opted in, ask it to run its Downloaded Scan command over a file a live pass just wrote to that
 /// library's output folder. Read only towards the manager's remote path mappings, one write towards it (the
 /// command); never throws, since a manager that cannot be reached must not fail a pass that already succeeded.

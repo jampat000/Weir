@@ -25,19 +25,23 @@ public sealed class DownloadClientConnectionException : Exception
 }
 
 /// <summary>
-/// Reading and writing download client connections with their secrets encrypted (#768). Mirrors
+/// Reading and writing download client connections with their secrets encrypted. Mirrors
 /// <see cref="MediaManagerConnectionService"/>, but simpler: no lanes, no webhook secret, and a connection can be
 /// usable with no credential at all (an open Transmission needs neither a username nor a password).
 /// </summary>
 public sealed class DownloadClientConnectionService
 {
     private const string NeedsNameMessage = "Give the connection a name so you can tell it apart later.";
+    private const string NeedsApiKeyMessage = "SABnzbd needs an API key. Find it in SABnzbd under Config → General.";
+    private const string NeedsPasswordMessage = "Deluge needs its Web UI password.";
 
     private readonly CredentialCipher _cipher;
+    private readonly DownloadClientConnectionStore _store;
 
-    public DownloadClientConnectionService(CredentialCipher cipher)
+    public DownloadClientConnectionService(CredentialCipher cipher, DownloadClientConnectionStore store)
     {
         _cipher = cipher ?? throw new ArgumentNullException(nameof(cipher));
+        _store = store ?? throw new ArgumentNullException(nameof(store));
     }
 
     public CredentialCipher Cipher => _cipher;
@@ -53,15 +57,16 @@ public sealed class DownloadClientConnectionService
             throw new DownloadClientConnectionException(NeedsNameMessage);
         }
 
-        if (await DownloadClientConnectionStore.NameExistsAsync(uow, label).ConfigureAwait(false))
+        if (await _store.NameExistsAsync(uow, label).ConfigureAwait(false))
         {
             throw new DownloadClientConnectionException($"A connection named {WireStrings.Repr(label)} already exists.");
         }
 
         var validKind = ValidateKind(kind);
+        ValidateRequiredCredentialPresence(validKind, WireStrings.Strip(apiKey ?? string.Empty).Length > 0, WireStrings.Strip(password ?? string.Empty).Length > 0);
         var validUrl = ValidateBaseUrl(baseUrl);
         var trimmedUsername = WireStrings.Strip(username ?? string.Empty);
-        return await DownloadClientConnectionStore.InsertAsync(
+        return await _store.InsertAsync(
             uow,
             validKind,
             label,
@@ -85,6 +90,16 @@ public sealed class DownloadClientConnectionService
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(row);
+
+        // Only a field the caller actually touched can trip this: leaving a saved credential alone (null) never
+        // re-validates it, but clearing one Weir requires (an empty string) is refused the same as at creation.
+        var apiKeyHasValue = apiKey is null ? !string.IsNullOrEmpty(row.ApiKeyCiphertext) : WireStrings.Strip(apiKey).Length > 0;
+        var passwordHasValue = password is null ? !string.IsNullOrEmpty(row.PasswordCiphertext) : WireStrings.Strip(password).Length > 0;
+        if (apiKey is not null || password is not null)
+        {
+            ValidateRequiredCredentialPresence(row.Kind, apiKeyHasValue, passwordHasValue);
+        }
+
         var changes = new List<(string Column, object? Value)>();
         if (name is not null)
         {
@@ -94,7 +109,7 @@ public sealed class DownloadClientConnectionService
                 throw new DownloadClientConnectionException(NeedsNameMessage);
             }
 
-            if (await DownloadClientConnectionStore.NameExistsAsync(uow, label, row.Id).ConfigureAwait(false))
+            if (await _store.NameExistsAsync(uow, label, row.Id).ConfigureAwait(false))
             {
                 throw new DownloadClientConnectionException($"A connection named {WireStrings.Repr(label)} already exists.");
             }
@@ -155,7 +170,7 @@ public sealed class DownloadClientConnectionService
             }
         }
 
-        await DownloadClientConnectionStore.UpdateColumnsAsync(uow, row.Id, changes).ConfigureAwait(false);
+        await _store.UpdateColumnsAsync(uow, row.Id, changes).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -197,6 +212,24 @@ public sealed class DownloadClientConnectionService
         catch (WireValueException exception)
         {
             throw new DownloadClientConnectionException(exception.Message, exception);
+        }
+    }
+
+    /// <summary>
+    /// SABnzbd's API always needs an API key, and Deluge's Web UI always needs its password — neither client
+    /// offers an unauthenticated mode. NZBGet, qBittorrent and Transmission can all run with no credential at
+    /// all, so nothing is required for them here.
+    /// </summary>
+    private static void ValidateRequiredCredentialPresence(string kind, bool apiKeyHasValue, bool passwordHasValue)
+    {
+        if (kind == DownloadClientKinds.Sabnzbd && !apiKeyHasValue)
+        {
+            throw new DownloadClientConnectionException(NeedsApiKeyMessage);
+        }
+
+        if (kind == DownloadClientKinds.Deluge && !passwordHasValue)
+        {
+            throw new DownloadClientConnectionException(NeedsPasswordMessage);
         }
     }
 

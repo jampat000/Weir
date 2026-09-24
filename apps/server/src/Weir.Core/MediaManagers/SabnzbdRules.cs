@@ -3,7 +3,7 @@ using Weir.Core.Json;
 namespace Weir.Core.MediaManagers;
 
 /// <summary>
-/// SABnzbd's <c>GET /api?mode=get_config</c> JSON, read with no I/O (#768). <c>section=misc</c> answers
+/// SABnzbd's <c>GET /api?mode=get_config</c> JSON, read with no I/O. <c>section=misc</c> answers
 /// <c>{"config":{"misc":{"complete_dir":"..."}}}</c>; <c>section=categories</c> answers
 /// <c>{"config":{"categories":[{"name":"...","dir":"..."},...]}}</c>.
 /// </summary>

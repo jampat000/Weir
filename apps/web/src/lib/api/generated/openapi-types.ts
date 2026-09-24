@@ -336,7 +336,7 @@ export interface paths {
     };
     /**
      * Get Download Client Connections
-     * @description Every bare download-client connection (#768). Read only; secrets are reported only as saved or not.
+     * @description Every bare download-client connection. Read only; secrets are reported only as saved or not.
      */
     get: operations["get_download_client_connections_api_v1_download_clients_connections_get"];
     put?: never;
@@ -399,7 +399,7 @@ export interface paths {
     };
     /**
      * Get Download Client Suggestions
-     * @description One suggested watched folder per enabled download-client connection (#768), shaped like the manager-based suggestions so both feed the same list. media_type is accepted for route consistency but does not filter the result — a download client's completed folder does not depend on it.
+     * @description One suggested watched folder per enabled download-client connection, shaped like the manager-based suggestions so both feed the same list. media_type is accepted for route consistency but does not filter the result — a download client's completed folder does not depend on it.
      */
     get: operations["get_download_client_suggestions_api_v1_download_clients_suggestions_get"];
     put?: never;
@@ -593,7 +593,7 @@ export interface paths {
     };
     /**
      * Get Media Manager Connection Folder Chain
-     * @description The folder chain (#768) for every library linked to this connection, in library order.
+     * @description The folder chain for every library linked to this connection, in library order.
      */
     get: operations["get_media_manager_connection_folder_chain_api_v1_media_managers_connections__connection_id__folder_chain_get"];
     put?: never;
@@ -1207,7 +1207,7 @@ export interface paths {
     };
     /**
      * Get Processing Library Folder Chain
-     * @description One library's folder chain (#768): whether its watched, work and output folders are usable, plus whether every connected media manager will pick up what Weir writes. Read only.
+     * @description One library's folder chain: whether its watched, work and output folders are usable, plus whether every connected media manager will pick up what Weir writes. Read only.
      */
     get: operations["get_processing_library_folder_chain_api_v1_processing_libraries__library_id__folder_chain_get"];
     put?: never;
@@ -2518,7 +2518,7 @@ export interface components {
     };
     /**
      * DownloadClientCategoryFolderOut
-     * @description One category/label a download client organizes downloads by, and the folder it reports for it (#768).
+     * @description One category/label a download client organizes downloads by, and the folder it reports for it.
      */
     DownloadClientCategoryFolderOut: {
       /** Category */
@@ -2573,7 +2573,7 @@ export interface components {
     };
     /**
      * DownloadClientConnectionOut
-     * @description A direct, outbound-only connection to a bare download client, used only to suggest watched folders (#768). Secrets are reported only as saved or not.
+     * @description A direct, outbound-only connection to a bare download client, used only to suggest watched folders. Secrets are reported only as saved or not.
      */
     DownloadClientConnectionOut: {
       /** Id */
@@ -2649,7 +2649,7 @@ export interface components {
     };
     /**
      * DownloadClientSuggestionOut
-     * @description One enabled download-client connection's suggested watched folder (#768), shaped like the manager-based suggestions (see ManagerSetupItemOut) so both feed the same suggestion list in the library editor.
+     * @description One enabled download-client connection's suggested watched folder, shaped like the manager-based suggestions (see ManagerSetupItemOut) so both feed the same suggestion list in the library editor.
      */
     DownloadClientSuggestionOut: {
       /** Connection Id */
@@ -3008,7 +3008,7 @@ export interface components {
     };
     /**
      * LibraryFolderChainLocalOut
-     * @description Weir's own side of the folder chain (#768): the watched, work and output folders.
+     * @description Weir's own side of the folder chain: the watched, work and output folders.
      */
     LibraryFolderChainLocalOut: {
       /**
@@ -3021,7 +3021,7 @@ export interface components {
     };
     /**
      * LibraryFolderChainDownloadClientOut
-     * @description One bare download-client connection's own link in the folder chain (#768): whether any of its folders is this library's watched folder.
+     * @description One bare download-client connection's own link in the folder chain: whether any of its folders is this library's watched folder.
      */
     LibraryFolderChainDownloadClientOut: {
       /** Connection Id */
@@ -3042,7 +3042,7 @@ export interface components {
     };
     /**
      * LibraryFolderChainOut
-     * @description One library's folder chain (#768): Weir's own local folders plus every connected media manager's own setup check and every bare download client's own folder link, folded into one read-only view. With no manager or download client connected, ready reflects only the local folders.
+     * @description One library's folder chain: Weir's own local folders plus every connected media manager's own setup check and every bare download client's own folder link, folded into one read-only view. With no manager or download client connected, ready reflects only the local folders.
      */
     LibraryFolderChainOut: {
       /** Library Id */
@@ -3057,7 +3057,7 @@ export interface components {
     };
     /**
      * LibraryFoldersOut
-     * @description Every enabled library's published folders (#768).
+     * @description Every enabled library's published folders.
      */
     LibraryFoldersOut: {
       /** Libraries */
@@ -3941,7 +3941,7 @@ export interface components {
     };
     /**
      * PublishedLibraryFoldersOut
-     * @description One library's watched, work and output folders, as published for a media manager to read (#768).
+     * @description One library's watched, work and output folders, as published for a media manager to read.
      */
     PublishedLibraryFoldersOut: {
       /** Id */

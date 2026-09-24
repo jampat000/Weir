@@ -9,7 +9,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.MediaManagers;
 
 /// <summary>
-/// One per-library "folder chain" check for #768: Weir's own watched/work/output folders
+/// One per-library "folder chain" check: Weir's own watched/work/output folders
 /// (<see cref="LibraryFolderChainRules"/>) plus, for every enabled connection that covers the library's media type,
 /// whether that manager will actually pick up what Weir writes (<see cref="ManagerSetupCheck"/>, unchanged — this only
 /// calls its public method). With no manager connected the Weir-only chain is already a complete, valid setup: an empty
