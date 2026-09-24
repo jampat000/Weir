@@ -83,8 +83,8 @@ describe("mmActionButtonClass", () => {
     // The disabled rules are additions; nothing about a working button changed when they arrived.
     const primary = classesFor("primary");
     expect(primary).toContain("cursor-pointer");
-    expect(primary).toContain("border-[var(--mm-gold)]");
-    expect(classesFor("secondary")).toContain("border-[var(--mm-border)]");
+    expect(primary).toContain("border-mm-gold");
+    expect(classesFor("secondary")).toContain("border-mm-border");
     expect(classesFor("tertiary")).toContain("bg-transparent");
   });
 });

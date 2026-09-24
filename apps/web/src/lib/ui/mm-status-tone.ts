@@ -10,13 +10,11 @@ export type MmStatusTone =
   "healthy" | "info" | "warning" | "failed" | "neutral";
 
 const TONE_CLASS: Record<MmStatusTone, string> = {
-  healthy:
-    "text-[var(--mm-status-healthy-text)] bg-[var(--mm-status-healthy-bg)]",
-  info: "text-[var(--mm-status-info-text)] bg-[var(--mm-status-info-bg)]",
-  warning:
-    "text-[var(--mm-status-warning-text)] bg-[var(--mm-status-warning-bg)]",
-  failed: "text-[var(--mm-status-failed-text)] bg-[var(--mm-status-failed-bg)]",
-  neutral: "text-[var(--mm-text3)] bg-[var(--mm-well-bg)]",
+  healthy: "text-mm-status-healthy-text bg-mm-status-healthy-bg",
+  info: "text-mm-status-info-text bg-mm-status-info-bg",
+  warning: "text-mm-status-warning-text bg-mm-status-warning-bg",
+  failed: "text-mm-status-failed-text bg-mm-status-failed-bg",
+  neutral: "text-mm-text3 bg-mm-well-bg",
 };
 
 const PILL_BASE =

@@ -920,9 +920,7 @@
   outline-offset: 2px;
 }
 
-.mm-live-spark__bars:hover
-  .mm-live-spark__slot:not(:hover)
-  .mm-live-spark__bar,
+.mm-live-spark__bars:hover .mm-live-spark__slot:not(:hover) .mm-live-spark__bar,
 .mm-live-spark__bars:focus-visible
   .mm-live-spark__slot:not(.mm-live-spark__slot--pointed)
   .mm-live-spark__bar {

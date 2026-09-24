@@ -139,20 +139,20 @@ export function DirectPlaySection() {
           Only an operator or admin can change which devices are chosen.
         </p>
       ) : null}
-      <div className="mt-6 text-sm leading-relaxed text-[var(--mm-text2)]">
+      <div className="mt-6 text-sm leading-relaxed text-mm-text2">
         {devices.length === 0 ? (
-          <p className="text-[var(--mm-text3)]">No devices are listed.</p>
+          <p className="text-mm-text3">No devices are listed.</p>
         ) : (
           <ul className="grid gap-x-10 lg:grid-cols-2">
             {devices.map((device) => (
               <li
                 key={device.id}
-                className="flex items-start gap-3 border-b border-[var(--mm-border)] py-3"
+                className="flex items-start gap-3 border-b border-mm-border py-3"
               >
                 <input
                   id={`direct-play-device-${device.id}`}
                   type="checkbox"
-                  className="mt-1 h-4 w-4 shrink-0 accent-[var(--mm-accent)]"
+                  className="mt-1 h-4 w-4 shrink-0 accent-mm-accent"
                   checked={selected.has(device.id)}
                   disabled={!editable || save.isPending}
                   onChange={() => toggle(device.id)}
@@ -160,14 +160,14 @@ export function DirectPlaySection() {
                 <div className="min-w-0">
                   <label
                     htmlFor={`direct-play-device-${device.id}`}
-                    className="block font-medium text-[var(--mm-text1)]"
+                    className="block font-medium text-mm-text1"
                   >
                     {device.name}
                   </label>
-                  <p className="mt-0.5 text-xs leading-5 text-[var(--mm-text3)]">
+                  <p className="mt-0.5 text-xs leading-5 text-mm-text3">
                     {device.note}
                   </p>
-                  <p className="mt-0.5 text-xs leading-5 text-[var(--mm-text3)] [overflow-wrap:anywhere]">
+                  <p className="mt-0.5 text-xs leading-5 text-mm-text3 [overflow-wrap:anywhere]">
                     <DeviceSource device={device} />
                   </p>
                 </div>

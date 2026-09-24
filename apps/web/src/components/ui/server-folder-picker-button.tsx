@@ -103,17 +103,17 @@ export function ServerFolderPickerButton({
           role="dialog"
           aria-modal="true"
         >
-          <div className="flex w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-[var(--mm-border)] bg-[var(--mm-card-bg)] shadow-2xl">
-            <div className="border-b border-[var(--mm-border)] p-5">
+          <div className="flex w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-mm-border bg-mm-card-bg shadow-2xl">
+            <div className="border-b border-mm-border p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-[var(--mm-text3)]">
+                  <p className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-mm-text3">
                     Filesystem
                   </p>
-                  <h2 className="mt-1 text-lg font-semibold text-[var(--mm-text1)]">
+                  <h2 className="mt-1 text-lg font-semibold text-mm-text1">
                     {title}
                   </h2>
-                  <p className="mt-1 text-sm text-[var(--mm-text3)]">
+                  <p className="mt-1 text-sm text-mm-text3">
                     Pick a folder visible to the machine running Weir, or jump
                     to a UNC/Docker path directly.
                   </p>
@@ -127,7 +127,7 @@ export function ServerFolderPickerButton({
                 </button>
               </div>
             </div>
-            <div className="border-b border-[var(--mm-border)] p-4">
+            <div className="border-b border-mm-border p-4">
               <form
                 className="mb-3 flex flex-col gap-2 sm:flex-row"
                 onSubmit={(event) => {
@@ -183,13 +183,13 @@ export function ServerFolderPickerButton({
                     Use this folder
                   </button>
                 ) : null}
-                <div className="min-w-0 flex-1 rounded-md border border-[var(--mm-border)] bg-black/15 px-3 py-2 text-sm text-[var(--mm-text3)]">
+                <div className="min-w-0 flex-1 rounded-md border border-mm-border bg-black/15 px-3 py-2 text-sm text-mm-text3">
                   <span className="block truncate">
                     {data?.current_path ?? "Available drives"}
                   </span>
                 </div>
               </div>
-              <p className="mt-2 text-xs leading-relaxed text-[var(--mm-text3)]">
+              <p className="mt-2 text-xs leading-relaxed text-mm-text3">
                 Windows supports local drives, mapped drives, and UNC shares
                 such as <span className="font-mono">\\nas\media</span>. Docker
                 installs must use container-visible paths such as{" "}
@@ -201,7 +201,7 @@ export function ServerFolderPickerButton({
             </div>
             <div className="min-h-0 flex-1 overflow-auto p-4">
               {loading ? (
-                <div className="rounded-lg border border-dashed border-[var(--mm-border)] p-6 text-sm text-[var(--mm-text3)]">
+                <div className="rounded-lg border border-dashed border-mm-border p-6 text-sm text-mm-text3">
                   Loading folders...
                 </div>
               ) : error ? (
@@ -213,17 +213,17 @@ export function ServerFolderPickerButton({
                   {data.entries.map((entry) => (
                     <div
                       key={entry.path}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-[var(--mm-border)] bg-black/10 p-3"
+                      className="flex items-center justify-between gap-3 rounded-lg border border-mm-border bg-black/10 p-3"
                     >
                       <button
                         type="button"
                         className="min-w-0 flex-1 text-left"
                         onClick={() => setPath(entry.path)}
                       >
-                        <span className="block truncate text-sm font-semibold text-[var(--mm-text1)]">
+                        <span className="block truncate text-sm font-semibold text-mm-text1">
                           {entry.name}
                         </span>
-                        <span className="block truncate text-xs text-[var(--mm-text3)]">
+                        <span className="block truncate text-xs text-mm-text3">
                           {entry.description ?? entry.path}
                         </span>
                       </button>
@@ -247,7 +247,7 @@ export function ServerFolderPickerButton({
                   ))}
                 </div>
               ) : (
-                <div className="rounded-lg border border-dashed border-[var(--mm-border)] p-6 text-sm text-[var(--mm-text3)]">
+                <div className="rounded-lg border border-dashed border-mm-border p-6 text-sm text-mm-text3">
                   No folders found here.
                 </div>
               )}

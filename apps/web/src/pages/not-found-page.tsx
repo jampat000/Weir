@@ -7,18 +7,18 @@ export function NotFoundPage() {
       id="mm-main-content"
       tabIndex={-1}
     >
-      <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--mm-accent)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.28em] text-mm-accent">
         404
       </p>
-      <h1 className="mt-3 text-2xl font-semibold text-[var(--mm-text)]">
+      <h1 className="mt-3 text-2xl font-semibold text-mm-text">
         Page not found
       </h1>
-      <p className="mt-2 text-sm text-[var(--mm-text2)]">
+      <p className="mt-2 text-sm text-mm-text2">
         The page you&apos;re looking for doesn&apos;t exist or has moved.
       </p>
       <Link
         to="/"
-        className="mt-6 text-sm font-medium text-[var(--mm-accent)] underline-offset-4 hover:underline"
+        className="mt-6 text-sm font-medium text-mm-accent underline-offset-4 hover:underline"
       >
         Go to Processing
       </Link>

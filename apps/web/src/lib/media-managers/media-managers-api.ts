@@ -84,12 +84,7 @@ export async function updateMediaManagerConnection(
 
 export async function deleteMediaManagerConnection(id: number): Promise<void> {
   const path = connectionPath(id);
-  await sendJson(
-    path,
-    "DELETE",
-    {},
-    "Could not remove that media manager",
-  );
+  await sendJson(path, "DELETE", {}, "Could not remove that media manager");
 }
 
 export async function testMediaManagerConnection(

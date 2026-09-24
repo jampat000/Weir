@@ -121,20 +121,20 @@ export function StartupGate({ children }: { children: ReactNode }) {
   }
 
   return (
-    <main className="min-h-screen bg-[var(--mm-bg)] px-6 py-10 text-[var(--mm-text)]">
+    <main className="min-h-screen bg-mm-bg px-6 py-10 text-mm-text">
       <div className="mx-auto flex min-h-[70vh] max-w-xl flex-col justify-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--mm-accent)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-mm-accent">
           Weir
         </p>
         <h1 className="mt-4 text-3xl font-semibold">{state.message}</h1>
-        <p className="mt-3 text-sm leading-6 text-[var(--mm-text3)]">
+        <p className="mt-3 text-sm leading-6 text-mm-text3">
           Preparing the local database, background workers, and schedules before
           opening the app.
         </p>
-        <div className="mt-6 rounded border border-[var(--mm-border)] bg-[var(--mm-card-bg)] p-4">
-          <div className="h-2 overflow-hidden rounded-full bg-[var(--mm-input-bg)]">
+        <div className="mt-6 rounded border border-mm-border bg-mm-card-bg p-4">
+          <div className="h-2 overflow-hidden rounded-full bg-mm-input-bg">
             <div
-              className="h-full rounded-full bg-[var(--mm-accent)] transition-all"
+              className="h-full rounded-full bg-mm-accent transition-all"
               style={{
                 width:
                   state.kind === "failed"
@@ -158,17 +158,17 @@ export function StartupGate({ children }: { children: ReactNode }) {
                 <span
                   className={
                     step.status === "ready"
-                      ? "mt-1 h-2.5 w-2.5 rounded-full bg-[var(--mm-status-healthy-text)]"
+                      ? "mt-1 h-2.5 w-2.5 rounded-full bg-mm-status-healthy-text"
                       : state.kind === "failed"
-                        ? "mt-1 h-2.5 w-2.5 rounded-full bg-[var(--mm-status-failed-text)]"
-                        : "mt-1 h-2.5 w-2.5 rounded-full bg-[var(--mm-accent)]"
+                        ? "mt-1 h-2.5 w-2.5 rounded-full bg-mm-status-failed-text"
+                        : "mt-1 h-2.5 w-2.5 rounded-full bg-mm-accent"
                   }
                 />
                 <span>
-                  <span className="block font-semibold capitalize text-[var(--mm-text)]">
+                  <span className="block font-semibold capitalize text-mm-text">
                     {step.name}
                   </span>
-                  <span className="text-[var(--mm-text3)]">{step.detail}</span>
+                  <span className="text-mm-text3">{step.detail}</span>
                 </span>
               </li>
             ))}
@@ -177,7 +177,7 @@ export function StartupGate({ children }: { children: ReactNode }) {
         {state.kind === "failed" ? (
           <button
             type="button"
-            className="mt-5 w-fit rounded border border-[var(--mm-accent)] bg-[var(--mm-accent)] px-4 py-2 text-sm font-semibold text-black"
+            className="mt-5 w-fit rounded border border-mm-accent bg-mm-accent px-4 py-2 text-sm font-semibold text-black"
             onClick={() => window.location.reload()}
           >
             Try again

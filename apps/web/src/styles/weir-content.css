@@ -370,6 +370,19 @@
   }
 }
 
+/* The jobs table keeps its header and Job column pinned while it scrolls sideways, and asks for room
+ * for its five columns, only while it is a table: at 760px and below it stacks into rows, above. */
+@media (min-width: 761px) {
+  .mm-jobs-table {
+    min-width: 46rem;
+  }
+
+  .mm-jobs-table__head,
+  .mm-jobs-table__job {
+    position: sticky;
+  }
+}
+
 /* ── 3b · The interrupt ──────────────────────────────────────────────────────
  * Something broken or blocking, above the lead band. It is a list of sentences,
  * not a card and not a banner: the loud element on a page is the band.

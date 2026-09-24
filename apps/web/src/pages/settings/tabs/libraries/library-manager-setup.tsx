@@ -66,7 +66,7 @@ function CheckLines({ item }: { item: ProcessingManagerSetupItem }) {
                 ? "mm-status-text--healthy"
                 : line.state === "problem"
                   ? "mm-status-text--warning"
-                  : "text-[var(--mm-text3)]"
+                  : "text-mm-text3"
             }
           >
             {line.state === "ok" ? "✓" : line.state === "problem" ? "✗" : "·"}
@@ -75,7 +75,7 @@ function CheckLines({ item }: { item: ProcessingManagerSetupItem }) {
             className={
               line.state === "problem"
                 ? "mm-status-text--warning"
-                : "text-[var(--mm-text2)]"
+                : "text-mm-text2"
             }
           >
             <span className="sr-only">
@@ -161,7 +161,7 @@ function ArrMapping({ item }: { item: ProcessingManagerSetupItem }) {
           once for each Host: {host}.
         </p>
       ) : null}
-      <p className="text-xs leading-5 text-[var(--mm-text3)]">
+      <p className="text-xs leading-5 text-mm-text3">
         These are the folders as Weir sees them. If {item.label} or your
         download client runs in its own container with different volume paths,
         use the paths each of them sees for the same folders.
@@ -198,7 +198,7 @@ function DelunoHandoff({
         output folder.
       </p>
       {watched !== null || output !== null ? (
-        <p className="text-sm text-[var(--mm-text2)]">
+        <p className="text-sm text-mm-text2">
           {item.label} reports downloads in{" "}
           <code className="break-all">{watched ?? "(not set)"}</code> and picks
           up cleaned files from{" "}
@@ -287,7 +287,7 @@ export function LibraryManagerSetup({
               aria-label={item.label}
               className="space-y-3"
             >
-              <p className="text-sm font-medium text-[var(--mm-text1)]">
+              <p className="text-sm font-medium text-mm-text1">
                 {item.label}
                 <span
                   className={`ml-2 text-xs ${

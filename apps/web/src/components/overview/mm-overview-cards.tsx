@@ -18,11 +18,11 @@ export function MmJobsPagination({
   pageSizeOptions?: number[];
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-[var(--mm-border)] pt-3">
-      <div className="flex min-w-0 items-center gap-2 text-xs text-[var(--mm-text3)]">
+    <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-mm-border pt-3">
+      <div className="flex min-w-0 items-center gap-2 text-xs text-mm-text3">
         <span>Rows per page</span>
         <select
-          className="max-w-full rounded border border-[var(--mm-border)] bg-[var(--mm-card-bg)] px-2 py-1 text-xs text-[var(--mm-text2)]"
+          className="max-w-full rounded border border-mm-border bg-mm-card-bg px-2 py-1 text-xs text-mm-text2"
           value={String(pageSize)}
           onChange={(event) => onPageSizeChange(Number(event.target.value))}
         >
@@ -34,7 +34,7 @@ export function MmJobsPagination({
         </select>
       </div>
       <div className="flex min-w-0 flex-wrap gap-2">
-        <p className="self-center text-xs text-[var(--mm-text3)]">
+        <p className="self-center text-xs text-mm-text3">
           Page {page} of {totalPages}
         </p>
         <button

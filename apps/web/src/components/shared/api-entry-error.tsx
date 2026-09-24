@@ -27,7 +27,7 @@ export function ApiEntryError({ error }: { error: unknown }) {
         <p className="mm-auth-lead">
           <strong>Easiest:</strong> from{" "}
           <code className="text-[0.85em]">apps/web</code>, run{" "}
-          <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-[var(--mm-text)]">
+          <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-mm-text">
             npm run dev
           </code>{" "}
           — it starts the API, waits until{" "}
@@ -41,15 +41,15 @@ export function ApiEntryError({ error }: { error: unknown }) {
         </p>
         <p className="mm-auth-lead">
           <strong>Alternative:</strong> two terminals from the repo root —{" "}
-          <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-[var(--mm-text)]">
+          <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-mm-text">
             .\scripts\dev-backend.ps1
           </code>{" "}
           then{" "}
-          <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-[var(--mm-text)]">
+          <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-mm-text">
             .\scripts\dev-web.ps1
           </code>
           . If the API is already running, use{" "}
-          <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-[var(--mm-text)]">
+          <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-mm-text">
             npm run dev:web
           </code>{" "}
           in <code className="text-[0.85em]">apps/web</code> for Vite only.
@@ -57,15 +57,15 @@ export function ApiEntryError({ error }: { error: unknown }) {
         <p className="mm-auth-lead">
           During <code className="text-[0.85em]">vite dev</code>, the app always
           uses relative{" "}
-          <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-[var(--mm-text)]">
+          <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-mm-text">
             /api/v1
           </code>{" "}
           through the Vite proxy (see{" "}
-          <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-[var(--mm-text)]">
+          <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-mm-text">
             apps/web/.env.example
           </code>
           ). Ports:{" "}
-          <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-[var(--mm-text)]">
+          <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-mm-text">
             scripts/dev-ports.json
           </code>
           .
@@ -84,15 +84,15 @@ export function ApiEntryError({ error }: { error: unknown }) {
           </h1>
           <p className="mm-auth-lead">
             Auth routes need a migrated SQLite database under{" "}
-            <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-[var(--mm-text)]">
+            <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-mm-text">
               WEIR_HOME
             </code>{" "}
             (optional{" "}
-            <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-[var(--mm-text)]">
+            <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-mm-text">
               WEIR_DB_PATH
             </code>
             ), plus{" "}
-            <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-[var(--mm-text)]">
+            <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-mm-text">
               WEIR_SESSION_SECRET
             </code>
             . The server creates or migrates its database when it starts, so
@@ -101,7 +101,7 @@ export function ApiEntryError({ error }: { error: unknown }) {
             <code className="text-[0.85em]">docs/local-development.md</code>.
           </p>
           <p className="mm-auth-lead">
-            <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-[var(--mm-text)]">
+            <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-mm-text">
               GET /health
             </code>{" "}
             can still return 200 while{" "}
@@ -122,7 +122,7 @@ export function ApiEntryError({ error }: { error: unknown }) {
           terminal for details.
         </p>
         {error instanceof Error ? (
-          <p className="mm-auth-lead font-mono text-sm text-[var(--mm-text3)]">
+          <p className="mm-auth-lead font-mono text-sm text-mm-text3">
             {error.message}
           </p>
         ) : null}
@@ -138,13 +138,13 @@ export function ApiEntryError({ error }: { error: unknown }) {
       <p className="mm-auth-lead">
         Something went wrong talking to the API. From{" "}
         <code className="text-[0.85em]">apps/web</code> try{" "}
-        <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-[var(--mm-text)]">
+        <code className="rounded bg-[rgba(0,0,0,0.35)] px-1.5 py-0.5 text-[0.85em] text-mm-text">
           npm run dev
         </code>{" "}
         (API + Vite), or confirm the backend is running, then reload.
       </p>
       {error instanceof Error ? (
-        <p className="mm-auth-lead font-mono text-sm text-[var(--mm-text3)]">
+        <p className="mm-auth-lead font-mono text-sm text-mm-text3">
           {error.message}
         </p>
       ) : null}

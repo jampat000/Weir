@@ -74,7 +74,7 @@ export function ScheduleGridEditor({
 
   return (
     <div className="mm-schedule-grid" data-testid="schedule-grid">
-      <p className="text-xs text-[var(--mm-text3)]">
+      <p className="text-xs text-mm-text3">
         {unrestricted
           ? "No schedule set — this library runs at any time. Select hours to limit it."
           : "Selected hours are when Weir may start work. Work already running finishes."}

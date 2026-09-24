@@ -103,17 +103,17 @@ export function AppErrorScreen({
               load is the right escape from a crashed app in any case.
             */}
             <a
-              className="text-sm font-medium text-[var(--mm-accent)] underline-offset-4 hover:underline"
+              className="text-sm font-medium text-mm-accent underline-offset-4 hover:underline"
               href="/"
             >
               Go to Processing
             </a>
           </div>
-          <details className="mt-5 text-sm text-[var(--mm-text2)]">
-            <summary className="cursor-pointer select-none rounded-[var(--mm-radius-sm)] py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mm-accent-ring)]">
+          <details className="mt-5 text-sm text-mm-text2">
+            <summary className="cursor-pointer select-none rounded-mm-sm py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mm-accent-ring">
               Show technical details
             </summary>
-            <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-[var(--mm-radius-sm)] border border-[var(--mm-border)] bg-[var(--mm-surface-2)] p-3 font-mono text-xs text-[var(--mm-text3)]">
+            <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-mm-sm border border-mm-border bg-mm-surface-2 p-3 font-mono text-xs text-mm-text3">
               {error.message || "Unknown error"}
             </pre>
           </details>
