@@ -31,6 +31,13 @@ public static partial class IntakeRules
     public const string NativeNeedsSecretDetail = "Set a webhook secret before sending hand-offs to Weir.";
 
     /// <summary>
+    /// A manager kind with no connection at all has nothing on file an unsigned webhook could be attributed to,
+    /// so unlike an existing connection that has simply never rotated its secret, it is refused outright.
+    /// </summary>
+    public static string NoConnectionDetail(string sourceKey) =>
+        $"No {MediaManagerKinds.LabelForConnection(sourceKey, null)} is set up in Weir. Add it in Settings › Media managers, then send webhooks with its secret.";
+
+    /// <summary>
     /// What a media manager may rely on at <c>/api/v1/intake</c>: asking about and cancelling a hand-off, reporting what
     /// became of a file Weir handed back (#652), and a <c>code</c> on each 409 from that report (#664).
     /// </summary>

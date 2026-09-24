@@ -189,6 +189,7 @@ public sealed class HandbackOutcomeApiTests : IDisposable
         await using var server = await StartAsync(webhookSecret: string.Empty);
         var library = await MoviesAsync(server);
         var copy = await HandedBackAsync(server, library, "Film/film.mkv");
+        await TestDatabase.ExecuteAsync(server, "INSERT INTO media_manager_connections (kind, name, base_url) VALUES ('radarr', 'Radarr', 'http://192.0.2.20:7878')");
 
         using var response = await new ApiTestClient(server).PostAsync("/api/v1/intake/webhook/radarr", RadarrImport(copy));
 
