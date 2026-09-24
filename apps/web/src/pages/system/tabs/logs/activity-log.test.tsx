@@ -536,7 +536,14 @@ describe("ActivityLog", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Clear all history →" }),
     );
-    await screen.findByTestId("activity-clear-all-history-dialog");
+    const dialog = await screen.findByTestId(
+      "activity-clear-all-history-dialog",
+    );
+    // The dialog starts listening for Escape in the same effect that moves focus into it, which can run
+    // just after the dialog first appears, so wait for the focus before pressing the key.
+    await waitFor(() =>
+      expect(dialog).toContainElement(document.activeElement as HTMLElement),
+    );
     fireEvent.keyDown(document, { key: "Escape" });
     expect(
       screen.queryByTestId("activity-clear-all-history-dialog"),
