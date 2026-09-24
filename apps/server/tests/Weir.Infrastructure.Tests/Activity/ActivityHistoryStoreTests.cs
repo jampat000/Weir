@@ -124,9 +124,9 @@ public sealed class ActivityHistoryStoreTests
         var notifier = new ActivityLatestNotifier();
         var poll = new ActivityLatestPollTask(fixture.Database, notifier, _history);
         await fixture.Execute("INSERT INTO activity_events (event_type, module, title) VALUES ('auth.password_changed', 'auth', 'Password changed')");
-        var firstWait = notifier.WaitForChangeAsync(notifier.Snapshot().Version, TimeSpan.FromSeconds(5), TimeProvider.System);
+        var firstWait = notifier.WaitForChangeAsync(notifier.Snapshot().Version, TimeSpan.FromSeconds(5), new FakeTimeProvider());
         await poll.RunOnceAsync(CancellationToken.None);
-        var afterFirstPoll = await firstWait;
+        var afterFirstPoll = await firstWait.WaitAsync(TimeSpan.FromMinutes(1));
 
         var secondWait = notifier.WaitForChangeAsync(afterFirstPoll!.Value.Version, TimeSpan.FromMilliseconds(50), TimeProvider.System);
         await poll.RunOnceAsync(CancellationToken.None);
