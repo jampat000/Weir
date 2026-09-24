@@ -1,0 +1,383 @@
+/* The Activity feed: chips, entries, clusters, filters and summary. */
+
+/* The default tone: a quiet well, no colour of its own. */
+.mm-activity-chip--info {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--mm-text2);
+}
+
+html[data-mm-theme="light"] .mm-activity-chip--info,
+html[data-mm-theme="light"] .mm-activity-item__structured {
+  background: var(--mm-well-bg);
+}
+
+.mm-activity-chip--success {
+  border-color: color-mix(
+    in srgb,
+    var(--mm-status-healthy-text) 46%,
+    transparent
+  );
+  background: var(--mm-status-healthy-bg);
+  color: var(--mm-status-healthy-text);
+}
+
+.mm-activity-chip--warning {
+  border-color: color-mix(
+    in srgb,
+    var(--mm-status-warning-text) 46%,
+    transparent
+  );
+  background: var(--mm-status-warning-bg);
+  color: var(--mm-status-warning-text);
+}
+
+.mm-activity-chip--error {
+  border-color: color-mix(
+    in srgb,
+    var(--mm-status-failed-text) 46%,
+    transparent
+  );
+  background: var(--mm-status-failed-bg);
+  color: var(--mm-status-failed-text);
+}
+
+.mm-activity-event-icon {
+  display: inline-grid;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--mm-status-info-bg);
+  color: var(--mm-status-info-text);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.mm-activity-event-icon--success {
+  background: var(--mm-status-healthy-bg);
+  color: var(--mm-status-healthy-text);
+}
+
+.mm-activity-event-icon--warning {
+  background: var(--mm-status-warning-bg);
+  color: var(--mm-status-warning-text);
+}
+
+.mm-activity-event-icon--error {
+  background: var(--mm-status-failed-bg);
+  color: var(--mm-status-failed-text);
+}
+
+/* Activity list: one compact row per entry, borderless; the hairline between rows is what
+ * separates them. */
+.mm-activity-list > * + * {
+  border-top: 1px solid var(--mm-border);
+}
+
+.mm-activity-list__empty {
+  padding: 0.75rem 0;
+  color: var(--mm-text2);
+  font-size: var(--mm-type-body);
+}
+
+.mm-activity-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 0.75rem;
+  /* Flush right with the section hairline; just enough on the left for the
+   * severity accent (the inset box-shadow below) to read beside the text. */
+  padding: 0.7rem 0 0.7rem 0.75rem;
+}
+
+.mm-activity-item--warning {
+  box-shadow: inset 3px 0 0 var(--mm-status-warning-text);
+}
+
+.mm-activity-item--error {
+  box-shadow: inset 3px 0 0 var(--mm-status-failed-text);
+}
+
+.mm-activity-item .mm-activity-event-icon {
+  margin-top: 0.15rem;
+}
+
+.mm-activity-item__main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.mm-activity-item__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+}
+
+.mm-activity-item__title {
+  min-width: 0;
+  margin: 0;
+  color: var(--mm-text1);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.35;
+  /* A long release name breaks anywhere rather than pushing the time off the row. */
+  overflow-wrap: anywhere;
+}
+
+.mm-activity-item__count {
+  border-radius: var(--mm-radius-pill);
+  background: var(--mm-surface-2);
+  padding: 0.05rem 0.45rem;
+  color: var(--mm-text2);
+  font-size: var(--mm-type-caption);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-activity-item__badge {
+  border: 1px solid var(--mm-border);
+  border-radius: var(--mm-radius-pill);
+  padding: 0.05rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.mm-activity-item__badge--quiet {
+  background: transparent;
+  color: var(--mm-text2);
+}
+
+.mm-activity-item__summary {
+  margin: 0;
+  color: var(--mm-text2);
+  font-size: var(--mm-type-body);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.mm-activity-item__detail {
+  color: var(--mm-text2);
+}
+
+.mm-activity-item__file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.75rem;
+  color: var(--mm-text2);
+  font-size: 0.78rem;
+}
+
+.mm-activity-item__link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--mm-accent-bright);
+  font: inherit;
+  font-family: var(--mm-font);
+  font-weight: 500;
+  cursor: pointer;
+  text-underline-offset: 2px;
+}
+
+.mm-activity-item__link:hover {
+  text-decoration: underline;
+}
+
+.mm-activity-item__link--quiet {
+  color: var(--mm-text3);
+}
+
+.mm-activity-item__link:focus-visible,
+.mm-activity-item__more > summary:focus-visible {
+  outline: 2px solid var(--mm-accent-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.mm-activity-item__more > summary {
+  width: fit-content;
+  color: var(--mm-text2);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.mm-activity-item__more > summary:hover {
+  color: var(--mm-text1);
+}
+
+.mm-activity-item__more-body {
+  margin-top: 0.5rem;
+}
+
+.mm-activity-item__more-text,
+.mm-activity-item__structured-text {
+  color: var(--mm-text2);
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+}
+
+.mm-activity-item__more-text {
+  white-space: pre-wrap;
+}
+
+.mm-activity-item__structured {
+  padding: 0.75rem;
+  border: 1px solid var(--mm-border);
+  border-radius: 0.375rem;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.mm-activity-item__time {
+  padding-top: 0.1rem;
+  color: var(--mm-text3);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mm-activity-item--compact {
+  padding-block: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .mm-activity-item {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding-inline: 0.75rem;
+  }
+
+  .mm-activity-item__main {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .mm-activity-item__time {
+    grid-column: 2;
+    grid-row: 2;
+    padding-top: 0.15rem;
+  }
+}
+
+.mm-activity-cluster {
+  overflow: hidden;
+  background: color-mix(in srgb, var(--mm-status-failed-bg) 40%, transparent);
+  box-shadow: inset 3px 0 0 var(--mm-status-failed-text);
+}
+
+.mm-activity-cluster--run {
+  background: transparent;
+  box-shadow: none;
+}
+
+.mm-activity-cluster__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.mm-activity-cluster__summary::-webkit-details-marker {
+  display: none;
+}
+
+.mm-activity-cluster__summary::after {
+  content: "+";
+  color: var(--mm-text2);
+  font-size: 1.1rem;
+}
+
+.mm-activity-cluster[open] .mm-activity-cluster__summary::after {
+  content: "−";
+}
+
+.mm-activity-cluster__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.mm-activity-cluster__summary strong {
+  display: block;
+  color: var(--mm-text1);
+  font-size: 0.9rem;
+}
+
+.mm-activity-cluster__summary small {
+  display: block;
+  margin-top: 0.18rem;
+  color: var(--mm-text2);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.mm-activity-cluster__summary:focus-visible {
+  outline: 2px solid var(--mm-accent-ring);
+  outline-offset: -2px;
+}
+
+.mm-activity-cluster__events {
+  display: grid;
+  margin-left: 1.25rem;
+  border-left: 1px solid var(--mm-border);
+}
+
+.mm-activity-cluster__events > * + * {
+  border-top: 1px solid var(--mm-border);
+}
+
+/* The filters are a quiet section now, not a card: `.mm-activity-filters` survives
+ * only as the hook the narrow-screen collapse below hangs off. */
+.mm-activity-filters__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+  gap: 0.65rem 0.75rem;
+}
+
+.mm-activity-filters__search {
+  grid-column: span 2;
+}
+
+.mm-activity-filters__toggle {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .mm-activity-filters__search {
+    grid-column: 1 / -1;
+  }
+
+  .mm-activity-filters__toggle {
+    display: inline-flex;
+  }
+
+  .mm-activity-filters[data-expanded="false"] .mm-activity-filters__extra {
+    display: none;
+  }
+}
+
+.mm-activity-filters__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+/* The summary line leads the page now (rule 1), so its old flex row and text rule
+ * are gone; the live dot is all that is left of it. */
+.mm-activity-summary__live {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--mm-status-healthy-text);
+  box-shadow: 0 0 0 3px var(--mm-status-healthy-bg);
+}

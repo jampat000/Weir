@@ -85,7 +85,7 @@ export function MmMultiListboxPicker({
     mmPickerTriggerClass,
     "flex min-h-[2.5rem] items-center justify-between gap-2",
     open && !disabled
-      ? "border-[var(--mm-input-border-focus)] !shadow-[inset_0_1px_3px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.04),0_0_0_2px_var(--mm-input-focus-ring)]"
+      ? "border-mm-input-border-focus !shadow-[inset_0_1px_3px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.04),0_0_0_2px_var(--mm-input-focus-ring)]"
       : "",
   ]
     .filter(Boolean)
@@ -119,7 +119,7 @@ export function MmMultiListboxPicker({
           aria-hidden
           className={[
             // The same accent mark a native select draws, so an anchored listbox and a select read alike.
-            "h-4 w-4 shrink-0 text-[var(--mm-accent)] transition-transform",
+            "h-4 w-4 shrink-0 text-mm-accent transition-transform",
             open ? "rotate-180" : "",
           ].join(" ")}
           viewBox="0 0 20 20"
@@ -146,8 +146,8 @@ export function MmMultiListboxPicker({
                 className={[
                   "flex w-full items-start gap-3 px-3 py-2 text-left text-sm transition-colors",
                   checked
-                    ? "bg-[var(--mm-accent-soft)]/25 text-[var(--mm-text1)]"
-                    : "text-[var(--mm-text2)] hover:bg-[var(--mm-accent-soft)] hover:text-[var(--mm-text1)]",
+                    ? "bg-mm-accent-soft/25 text-mm-text1"
+                    : "text-mm-text2 hover:bg-mm-accent-soft hover:text-mm-text1",
                 ].join(" ")}
                 onMouseDown={(e) => {
                   e.preventDefault();

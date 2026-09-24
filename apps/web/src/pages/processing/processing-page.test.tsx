@@ -51,7 +51,6 @@ vi.mock("../../lib/activity/use-activity-stream-invalidation", () => ({
   useActivityStreamInvalidations: () => undefined,
 }));
 vi.mock("../../lib/processing/files-queries", () => ({
-  processingFilesKey: () => ["processing", "files"],
   useProcessingFilesQuery: () => ({
     data: files,
     isPending: false,
@@ -66,8 +65,6 @@ vi.mock("../../lib/processing/files-queries", () => ({
   }),
 }));
 vi.mock("../../lib/processing/queries", () => ({
-  processingOverviewStatsQueryKey: ["processing", "overview-stats"],
-  processingFilesAtOnceQueryKey: ["processing", "files-at-once"],
   useProcessingOverviewStatsQuery: () => ({ data: stats }),
   useProcessingFilesAtOnceQuery: () => ({
     data: {
@@ -80,11 +77,6 @@ vi.mock("../../lib/processing/queries", () => ({
   }),
 }));
 vi.mock("../../lib/processing/jobs-inspection/queries", () => ({
-  processingJobsInspectionQueryKey: (filter: string) => [
-    "processing",
-    "jobs",
-    filter,
-  ],
   useProcessingJobsInspectionQuery: (filter: string) => ({
     data: jobs[filter],
   }),
@@ -102,11 +94,13 @@ vi.mock("../../lib/pause/pause-queries", () => ({
   usePauseQuery: () => ({ data: pause }),
   useSavePause: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+vi.mock("../../lib/settings/queries", () => ({
+  useAppSettingsQuery: () => ({ data: undefined }),
+}));
 vi.mock("../../lib/auth/queries", () => ({
   useMeQuery: () => ({ data: { role: "operator" } }),
 }));
 vi.mock("../../lib/activity/queries", () => ({
-  activityRecentKey: ["activity", "recent"],
   useActivityRecentQuery: (filters: { event_type: string }) => ({
     data: activity[filters.event_type] ?? { items: [] },
   }),
@@ -144,8 +138,8 @@ function file(overrides: Partial<ProcessingFile>): ProcessingFile {
     progress_eta_seconds: null,
     hold_until: null,
     size_changed_at: null,
-    created_at: "2026-09-22T09:50:00",
-    updated_at: "2026-09-22T09:59:00",
+    created_at: "2026-08-18T09:50:00",
+    updated_at: "2026-08-18T09:59:00",
     last_seen_at: null,
     last_attempt_at: null,
     ...overrides,
@@ -163,7 +157,7 @@ function renderLive() {
 describe("ProcessingPage", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.setSystemTime(new Date("2026-09-22T10:00:00Z"));
+    vi.setSystemTime(new Date("2026-08-18T10:00:00Z"));
     files.files = [];
     files.status_counts = {};
     jobs.active = { jobs: [] };
@@ -182,7 +176,7 @@ describe("ProcessingPage", () => {
         id: 1,
         status: "on_hold",
         status_reason: "This file changed too recently.",
-        hold_until: "2026-09-22T09:59:55Z",
+        hold_until: "2026-08-18T09:59:55Z",
       }),
     ];
     renderLive();
@@ -197,7 +191,7 @@ describe("ProcessingPage", () => {
   it("counts a file waiting on its manager down to Weir's next look", () => {
     libraries[0] = {
       ...libraries[0],
-      next_look_at: "2026-09-22T10:03:12Z",
+      next_look_at: "2026-08-18T10:03:12Z",
       scan_interval_seconds: 300,
     } as (typeof libraries)[number];
     files.files = [
@@ -222,8 +216,8 @@ describe("ProcessingPage", () => {
         status: "on_hold",
         status_reason:
           "This file changed too recently. Weir waits 60s after the last change.",
-        hold_until: "2026-09-22T10:00:21",
-        size_changed_at: "2026-09-22T09:59:21",
+        hold_until: "2026-08-18T10:00:21",
+        size_changed_at: "2026-08-18T09:59:21",
       }),
       file({
         id: 2,
@@ -288,7 +282,7 @@ describe("ProcessingPage", () => {
       items: [
         {
           id: 701,
-          created_at: "2026-09-22T09:58:00",
+          created_at: "2026-08-18T09:58:00",
           event_type: "processing.file_remux_pass_completed",
           title: "x",
           library_id: 1,
@@ -351,8 +345,8 @@ describe("ProcessingPage", () => {
             library_id: 2,
             path: "Paper Lanterns (2023)/Paper.Lanterns.2023.mkv",
           }),
-          created_at: "2026-09-22T09:40:00",
-          updated_at: "2026-09-22T09:40:00",
+          created_at: "2026-08-18T09:40:00",
+          updated_at: "2026-08-18T09:40:00",
         },
       ],
     };
@@ -432,7 +426,7 @@ describe("ProcessingPage", () => {
       items: [
         {
           id: 501,
-          created_at: "2026-09-22T09:58:00",
+          created_at: "2026-08-18T09:58:00",
           event_type: "processing.file_remux_pass_completed",
           title: "x",
           library_id: 1,
@@ -465,7 +459,7 @@ describe("ProcessingPage", () => {
       items: [
         {
           id: 601,
-          created_at: "2026-09-22T09:40:00",
+          created_at: "2026-08-18T09:40:00",
           event_type: "processing.file_remux_pass_completed",
           title: "x",
           library_id: 1,
@@ -479,7 +473,7 @@ describe("ProcessingPage", () => {
         },
         {
           id: 602,
-          created_at: "2026-09-22T09:35:00",
+          created_at: "2026-08-18T09:35:00",
           event_type: "processing.file_remux_pass_completed",
           title: "x",
           library_id: 1,
@@ -509,7 +503,48 @@ describe("ProcessingPage", () => {
       "Nothing handed back in the last 2 hours.",
     );
     expect(figure.querySelector(".mm-live-spark__bar")).toBeNull();
-    // The chart's place is kept, empty, so switching views never resizes the bar (James, 23 Sep 2026).
+    // The chart's place is kept, empty, so switching views never resizes the toolbar.
     expect(figure.querySelector(".mm-live-spark__bars")).not.toBeNull();
+  });
+
+  it("lets the keyboard walk the bars and reads each one's five minutes in the legend", () => {
+    activity["processing.file_remux_pass_completed"] = {
+      items: [
+        {
+          id: 601,
+          created_at: "2026-08-18T09:40:00",
+          event_type: "processing.file_remux_pass_completed",
+          title: "x",
+          library_id: 1,
+          relative_path: "Starlit.Relay.S02E04.mkv",
+          detail: JSON.stringify({
+            outcome: "live_output_written",
+            ok: true,
+            relative_media_path: "Starlit.Relay.S02E04.mkv",
+          }),
+        },
+      ],
+    };
+    renderLive();
+    const figure = screen.getByTestId("live-handed-back");
+    const bars = within(figure).getByRole("slider");
+
+    bars.focus();
+    expect(bars).toHaveAttribute(
+      "aria-valuetext",
+      expect.stringMatching(/^In the last/),
+    );
+    for (let step = 0; step < 24; step += 1) {
+      if (bars.getAttribute("aria-valuetext")?.includes("cleaned")) break;
+      fireEvent.keyDown(bars, { key: "ArrowLeft" });
+    }
+
+    expect(bars).toHaveAttribute(
+      "aria-valuetext",
+      expect.stringContaining("1 cleaned"),
+    );
+    expect(figure.querySelector(".mm-live-trend__pointed")).toHaveTextContent(
+      "1 cleaned",
+    );
   });
 });

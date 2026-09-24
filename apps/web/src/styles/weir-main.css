@@ -1,0 +1,170 @@
+/* The main column, its typography steps and the page body. */
+
+/* ---- Main content ------------------------------------------------------- */
+
+.mm-main {
+  flex: 1;
+  /* A flex item's automatic minimum size is its min-content width, so without this the main column
+     refuses to shrink below the widest thing any page puts in it — the workspace tab row, or a
+     table with a rem `min-width`. Those already sit in their own `overflow-x: auto` wrappers, but a
+     scroll container still reports its contents' min-content size to its ancestors, so the whole
+     column grew past the viewport and .mm-app-layout's `overflow-x: clip` sheared the right edge
+     off. With a zero minimum the column takes the width it is actually given and those wrappers
+     scroll, which is what they are for. */
+  min-width: 0;
+  min-height: 100dvh;
+  padding: var(--mm-main-pad-y) var(--mm-main-pad-x)
+    calc(40px * var(--mm-density-ui-scale));
+  position: relative;
+  z-index: 1;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--mm-bg-main) 92%, transparent),
+      var(--mm-bg-main)
+    ),
+    var(--mm-bg-main);
+}
+
+.mm-main::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: min(52vh, 480px);
+  background:
+    radial-gradient(
+      ellipse 78% 88% at 50% -12%,
+      color-mix(in srgb, var(--mm-gold) 6%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 45% 55% at 92% 18%,
+      var(--mm-indigo-soft),
+      transparent 50%
+    );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.mm-main-inner {
+  width: 100%;
+  max-width: var(--mm-main-max);
+  margin: 0 auto;
+  padding-left: 2px;
+  padding-right: 2px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Desktop (Material "expanded" and up): first typography step before large / extra-large tiers. */
+@media (min-width: 1280px) {
+  body.mm-body {
+    font-size: 0.9921875rem; /* 15.875px at 16px root; scales via html font-size + density */
+    line-height: 1.53;
+  }
+
+  .mm-page__title {
+    font-size: clamp(1.58rem, 2.45vw, 1.95rem);
+  }
+
+  .mm-page__lead {
+    font-size: 0.96875rem;
+  }
+}
+
+/* Large / extra-large desktop: stronger scale (aligned ~ Material 1200dp+ / 1600dp+). */
+@media (min-width: 1600px) {
+  body.mm-body {
+    font-size: 1.015625rem; /* 16.25px at 16px root */
+    line-height: 1.54;
+  }
+
+  .mm-main {
+    padding-top: calc(34px * var(--mm-density-ui-scale));
+    padding-bottom: calc(44px * var(--mm-density-ui-scale));
+  }
+
+  .mm-page__title {
+    font-size: clamp(1.65rem, 2.55vw, 2.12rem);
+  }
+
+  .mm-page__lead {
+    font-size: 0.984375rem;
+  }
+}
+
+/* Wide desktop (incl. 1440p at 125–150% OS scale where CSS width sits ~1700–2048px). */
+@media (min-width: 1760px) {
+  body.mm-body {
+    font-size: 1.0390625rem; /* 16.625px at 16px root */
+    line-height: 1.54;
+  }
+
+  .mm-page__title {
+    font-size: clamp(1.68rem, 2.2vw, 2.2rem);
+  }
+
+  .mm-page__lead {
+    font-size: 1rem;
+  }
+}
+
+@media (min-width: 2000px) {
+  body.mm-body {
+    font-size: 1.078125rem; /* 17.25px at 16px root */
+    line-height: 1.55;
+  }
+
+  .mm-main {
+    padding-top: calc(36px * var(--mm-density-ui-scale));
+    padding-bottom: calc(48px * var(--mm-density-ui-scale));
+  }
+
+  .mm-page__title {
+    font-size: clamp(1.72rem, 2.05vw, 2.35rem);
+  }
+}
+
+.mm-page {
+  min-width: 0;
+}
+
+.mm-bubble-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mm-bubble-stack-gap-mobile);
+}
+
+@media (min-width: 640px) {
+  .mm-bubble-stack {
+    gap: var(--mm-bubble-stack-gap-desktop);
+  }
+}
+
+.mm-page__intro {
+  margin-bottom: var(--mm-space-lg);
+  padding-bottom: calc(var(--mm-space) + 0.5rem);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.mm-page__title {
+  margin: 0 0 0.4rem;
+  font-size: clamp(1.55rem, 3.2vw, 1.95rem);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.08;
+  color: var(--mm-text);
+}
+
+.mm-page__lead {
+  margin: 0;
+  max-width: min(100%, 62rem);
+  font-size: 0.9375rem;
+  font-weight: 400;
+  line-height: 1.62;
+  letter-spacing: -0.012em;
+  overflow-wrap: anywhere;
+  color: var(--mm-text2);
+}

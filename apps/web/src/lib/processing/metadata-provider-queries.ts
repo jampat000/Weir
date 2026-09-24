@@ -6,15 +6,11 @@ import {
   testProcessingMetadataProvider,
   type ProcessingMetadataProviderWrite,
 } from "./metadata-provider-api";
-
-export const processingMetadataProviderKey = [
-  "processing",
-  "metadata-provider",
-] as const;
+import { processingKeys } from "./query-keys";
 
 export function useProcessingMetadataProviderQuery() {
   return useQuery({
-    queryKey: processingMetadataProviderKey,
+    queryKey: processingKeys.metadataProvider,
     queryFn: fetchProcessingMetadataProvider,
   });
 }
@@ -25,7 +21,7 @@ export function useSaveProcessingMetadataProvider() {
     mutationFn: (data: ProcessingMetadataProviderWrite) =>
       putProcessingMetadataProvider(data),
     onSuccess: (data) =>
-      client.setQueryData(processingMetadataProviderKey, data),
+      client.setQueryData(processingKeys.metadataProvider, data),
   });
 }
 

@@ -3,7 +3,7 @@ import { PageLoading } from "../components/shared/page-loading";
 import { useMeQuery } from "../lib/auth/queries";
 import { sessionWasNotKept } from "../lib/auth/session-kept";
 
-/** Authenticated shell only — no role-based nav yet (Phase 7). */
+/** Everything past sign-in: a signed-out visitor goes to the login page, with the reason when a session did not stick. */
 export function RequireAuth() {
   const me = useMeQuery();
   if (me.isPending) {

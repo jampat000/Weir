@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
 
 /**
- * One group of settings, the way Settings reads since 3.2 (the canvas James signed off on 23 Sep 2026, after the
- * ClickUp and Devin pattern he pointed at): what the group is and why it matters on the left, one setting per row
- * on the right. Hairlines, not boxes (docs/design/content-language.md rule 3).
+ * One group of settings: what the group is and why it matters on the left, one setting per row on the right.
+ * Hairlines, not boxes.
  */
 export function SettingsGroup({
   title,

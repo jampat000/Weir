@@ -1,23 +1,14 @@
 import { ApiHttpError } from "./client";
 
-/**
- * Classify failures from auth API helpers ({@link ./auth-api}) for honest UI copy.
- * `fetch` only throws TypeError (or "Failed to fetch") when the response never arrived.
- */
-
+/** Failed to reach the server at all, as opposed to the server answering with an error. */
 export function isLikelyNetworkFailure(error: unknown): boolean {
-  // `apiFetch` (client.ts) already classifies its own `fetch` rejections at the source and
-  // rethrows them as an `ApiHttpError` carrying the friendly message — check that marker
-  // first so every screen built on `apiFetch` gets it without re-deriving the classification.
-  if (error instanceof ApiHttpError) {
-    return error.networkUnreachable;
-  }
-  if (error instanceof TypeError) {
-    return true;
-  }
-  if (!(error instanceof Error)) {
-    return false;
-  }
+  // apiFetch classifies its own fetch rejections and rethrows them as an ApiHttpError marked
+  // networkUnreachable, so every screen built on it gets the classification without re-deriving it.
+  if (error instanceof ApiHttpError) return error.networkUnreachable;
+  // A bare fetch outside apiFetch rejects with a TypeError, or one of these messages, when no
+  // response ever arrived.
+  if (error instanceof TypeError) return true;
+  if (!(error instanceof Error)) return false;
   const m = error.message;
   return (
     m === "Failed to fetch" ||
@@ -27,39 +18,24 @@ export function isLikelyNetworkFailure(error: unknown): boolean {
   );
 }
 
-const _API_HTTP_ERR = /^(bootstrap status|me|CSRF|activity recent): (\d{3})\b/;
-
-/** True when {@link ./auth-api} threw after receiving an HTTP status (API was reached). */
+/** True when the API was reached and answered with an HTTP status. */
 export function isHttpErrorFromApi(error: unknown): boolean {
-  if (error instanceof ApiHttpError) {
-    return true;
-  }
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  return _API_HTTP_ERR.test(error.message);
+  return error instanceof ApiHttpError;
 }
 
 export function httpStatusFromApiError(error: unknown): number | null {
-  if (error instanceof ApiHttpError) {
-    return error.status;
-  }
-  if (!(error instanceof Error)) {
-    return null;
-  }
-  const m = error.message.match(_API_HTTP_ERR);
-  return m ? Number(m[2]) : null;
+  return error instanceof ApiHttpError ? error.status : null;
 }
 
+const VITE_PROXY_UPSTREAM_DOWN_STATUS = 500;
+
 /**
- * In `vite dev`, proxied `/api/*` requests that cannot reach the backend (ECONNREFUSED) still
- * produce an HTTP response — the dev server typically returns **500** with an empty/plain body.
- * The real API avoids 500 on guest-first routes (e.g. bootstrap uses 503 for DB issues), so
- * 500 + relative API URLs in development is almost always "API process not listening".
+ * In `vite dev`, proxied `/api/*` requests that cannot reach the backend still produce an HTTP
+ * response: the dev server returns 500 with an empty or plain body. The real API avoids 500 on
+ * guest-first routes (bootstrap uses 503 for database issues), so a 500 in development is almost
+ * always "the API process is not listening".
  */
 export function isLikelyViteProxyUpstreamDown(error: unknown): boolean {
-  if (!import.meta.env.DEV) {
-    return false;
-  }
-  return isHttpErrorFromApi(error) && httpStatusFromApiError(error) === 500;
+  if (!import.meta.env.DEV) return false;
+  return httpStatusFromApiError(error) === VITE_PROXY_UPSTREAM_DOWN_STATUS;
 }

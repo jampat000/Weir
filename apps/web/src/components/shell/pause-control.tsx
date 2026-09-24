@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { useMeQuery } from "../../lib/auth/queries";
+import { useCanEdit } from "../../lib/auth/can-edit";
 import { useSavePause, usePauseQuery } from "../../lib/pause/pause-queries";
 
 /** Minutes offered for a pause that lifts itself. */
@@ -11,25 +11,17 @@ const DURATIONS: { label: string; minutes: number | null }[] = [
   { label: "Until I resume", minutes: null },
 ];
 
-function canEdit(role: string | undefined): boolean {
-  return role === "admin" || role === "operator";
-}
-
 /**
- * Pause processing, from anywhere in the app.
- *
- * It sits in every page's title row (PageHeader) rather than on one page, because the reason
- * to reach for it — the machine is busy and you want it back — has nothing to do with which
- * screen you happen to be on. It shares `.mm-head-control` with the theme switch so the two
- * are exactly the same height.
+ * Pause processing, from every page's title row: the reason to reach for it, a busy machine,
+ * has nothing to do with which screen you are on. It shares `.mm-head-control` with the theme
+ * switch so the two are exactly the same height.
  */
 export function PauseControl() {
-  const me = useMeQuery();
+  const editable = useCanEdit();
   const pause = usePauseQuery();
   const save = useSavePause();
   const [open, setOpen] = useState(false);
 
-  const editable = canEdit(me.data?.role);
   const state = pause.data;
   if (!state) return null;
 

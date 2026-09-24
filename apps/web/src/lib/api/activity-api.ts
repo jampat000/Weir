@@ -1,10 +1,5 @@
-import { fetchCsrfToken } from "./auth-api";
 import { apiFetch, readJson, requireOk } from "./client";
-import type {
-  ActivityFileHistoryPreview,
-  ActivityFileHistoryRemoved,
-  ActivityRecentResponse,
-} from "./types";
+import type { ActivityRecentResponse } from "./types";
 
 export type ActivityRecentFilters = {
   limit?: number;
@@ -98,37 +93,4 @@ export async function fetchActivityExport(
       `weir-activity.${format}`,
     ),
   };
-}
-
-type FileHistoryTarget = { relative_path: string; library_id?: number | null };
-
-/** What removing one file's history would delete. Removes nothing. */
-export async function fetchActivityFileHistoryPreview(
-  target: FileHistoryTarget,
-): Promise<ActivityFileHistoryPreview> {
-  const q = new URLSearchParams({ relative_path: target.relative_path });
-  if (target.library_id != null) q.set("library_id", String(target.library_id));
-  const path = `/api/v1/activity/file-history?${q.toString()}`;
-  const r = await apiFetch(path);
-  await requireOk(path, r, "Could not check this file's history");
-  return readJson<ActivityFileHistoryPreview>(r);
-}
-
-export async function removeActivityFileHistory(
-  target: FileHistoryTarget,
-): Promise<ActivityFileHistoryRemoved> {
-  const csrf_token = await fetchCsrfToken();
-  const path = "/api/v1/activity/file-history/remove";
-  const body: Record<string, unknown> = {
-    csrf_token,
-    relative_path: target.relative_path,
-  };
-  if (target.library_id != null) body.library_id = target.library_id;
-  const r = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  await requireOk(path, r, "Could not remove this file's history");
-  return readJson<ActivityFileHistoryRemoved>(r);
 }

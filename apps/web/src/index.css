@@ -1,17 +1,78 @@
 @import "tailwindcss";
 @import "./styles/weir-tokens.css";
 @import "./styles/weir-shell.css";
+@import "./styles/weir-activity.css";
+@import "./styles/weir-toolbar.css";
+@import "./styles/weir-sidebar.css";
+@import "./styles/weir-sidebar-nav.css";
+@import "./styles/weir-main.css";
+@import "./styles/weir-activity-detail.css";
+@import "./styles/weir-auth.css";
+@import "./styles/weir-forms.css";
+@import "./styles/weir-loading.css";
+@import "./styles/weir-shell-phone.css";
+@import "./styles/weir-schedule-grid.css";
+@import "./styles/weir-story-panel.css";
+@import "./styles/weir-tracks.css";
+@import "./styles/weir-direct-play.css";
+@import "./styles/weir-wizard.css";
 @import "./styles/weir-content.css";
+@import "./styles/weir-quiet-table.css";
+@import "./styles/weir-interrupt.css";
+@import "./styles/weir-fold.css";
+@import "./styles/weir-setting-row.css";
+@import "./styles/weir-tab-layouts.css";
+@import "./styles/weir-dialogs.css";
+@import "./styles/weir-system.css";
+@import "./styles/weir-settings.css";
+@import "./styles/weir-rules.css";
 @import "./styles/weir-processing.css";
+@import "./styles/weir-processing-board.css";
+@import "./styles/weir-processing-cards.css";
+@import "./styles/weir-processing-trend.css";
 @import "./styles/weir-library.css";
+@import "./styles/weir-library-table.css";
+@import "./styles/weir-drawer.css";
 @import "./styles/weir-history.css";
+@import "./styles/weir-history-record.css";
 
-@theme {
+/*
+ * Weir's tokens as Tailwind theme values, so markup says `text-mm-text2` rather than
+ * `text-[var(--mm-text2)]`. `inline` writes the var() straight into each utility, so the
+ * computed value follows the light theme and any local override exactly as the token does.
+ */
+@theme inline {
   --font-outfit: "Outfit", system-ui, -apple-system, sans-serif;
   --color-mm-bg: var(--mm-bg);
   --color-mm-bg-main: var(--mm-bg-main);
+  --color-mm-card-bg: var(--mm-card-bg);
+  --color-mm-surface2: var(--mm-surface2);
+  --color-mm-surface-2: var(--mm-surface-2);
   --color-mm-text: var(--mm-text);
+  --color-mm-text1: var(--mm-text1);
   --color-mm-text2: var(--mm-text2);
+  --color-mm-text3: var(--mm-text3);
+  --color-mm-border: var(--mm-border);
+  --color-mm-line: var(--mm-line);
   --color-mm-accent: var(--mm-accent);
   --color-mm-accent-bright: var(--mm-accent-bright);
+  --color-mm-accent-soft: var(--mm-accent-soft);
+  --color-mm-accent-ring: var(--mm-accent-ring);
+  --color-mm-gold: var(--mm-gold);
+  --color-mm-gold-bright: var(--mm-gold-bright);
+  --color-mm-input-bg: var(--mm-input-bg);
+  --color-mm-input-border-focus: var(--mm-input-border-focus);
+  --color-mm-well-bg: var(--mm-well-bg);
+  --color-mm-button-quiet-bg: var(--mm-button-quiet-bg);
+  --color-mm-button-secondary-bg: var(--mm-button-secondary-bg);
+  --color-mm-status-healthy-text: var(--mm-status-healthy-text);
+  --color-mm-status-warning-text: var(--mm-status-warning-text);
+  --color-mm-status-failed-text: var(--mm-status-failed-text);
+  --color-mm-status-info-text: var(--mm-status-info-text);
+  --color-mm-status-healthy-bg: var(--mm-status-healthy-bg);
+  --color-mm-status-warning-bg: var(--mm-status-warning-bg);
+  --color-mm-status-failed-bg: var(--mm-status-failed-bg);
+  --color-mm-status-info-bg: var(--mm-status-info-bg);
+  --tracking-mm-eyebrow: var(--mm-tracking-eyebrow);
+  --radius-mm-sm: var(--mm-radius-sm);
 }

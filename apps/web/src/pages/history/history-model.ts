@@ -56,32 +56,11 @@ export function inGroup(file: ProcessingFile, group: HistoryGroup): boolean {
   return group === "all" || historyGroupOf(file) === group;
 }
 
-/** The file's own name, without the folders it sits in. */
-export function fileName(relativePath: string): string {
-  const parts = relativePath.split(/[\\/]/);
-  return parts[parts.length - 1] || relativePath;
-}
-
 /** Newest change first, so what just happened is at the top. */
 export function newestFirst(files: ProcessingFile[]): ProcessingFile[] {
   return [...files].sort(
     (a, b) => serverMs(b.updated_at) - serverMs(a.updated_at),
   );
-}
-
-/** A size in the units people read, never more than one decimal. */
-export function sizeWords(bytes: number | null | undefined): string | null {
-  if (typeof bytes !== "number" || !Number.isFinite(bytes) || bytes < 0) {
-    return null;
-  }
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let size = bytes;
-  let unit = 0;
-  while (size >= 1024 && unit < units.length - 1) {
-    size /= 1024;
-    unit += 1;
-  }
-  return `${size >= 100 || unit === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unit]}`;
 }
 
 /** "just now", "6 min ago", "2 h ago", "3 days ago". */
@@ -257,7 +236,7 @@ export function sizesFromRecord(detail: Record<string, unknown>): {
   return { before, after, saved: Math.max(0, before - after) };
 }
 
-/** A file's sizes as History shows them: always all three, with "not written" rather than a gap (James, 23 Sep 2026). */
+/** A file's sizes as History shows them: always all three, with "not written" rather than a gap. */
 export type DetailSizes = {
   before: number | null;
   /** Null when Weir wrote no new copy of the file. */

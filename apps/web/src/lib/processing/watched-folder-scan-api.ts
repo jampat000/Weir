@@ -1,5 +1,5 @@
-import { fetchCsrfToken } from "../api/auth-api";
-import { apiFetch, readJson, requireOk } from "../api/client";
+import { sendJson } from "../api/send-json";
+import { readJson } from "../api/client";
 import type {
   ProcessingWatchedFolderRemuxScanDispatchEnqueueBody,
   ProcessingWatchedFolderRemuxScanDispatchEnqueueOut,
@@ -11,13 +11,12 @@ export const processingWatchedFolderRemuxScanDispatchEnqueuePath = () =>
 export async function postProcessingWatchedFolderRemuxScanDispatchEnqueue(
   body: ProcessingWatchedFolderRemuxScanDispatchEnqueueBody,
 ): Promise<ProcessingWatchedFolderRemuxScanDispatchEnqueueOut> {
-  const csrf_token = await fetchCsrfToken();
   const path = processingWatchedFolderRemuxScanDispatchEnqueuePath();
-  const r = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, csrf_token }),
-  });
-  await requireOk(path, r, "Could not queue watched-folder scan");
+  const r = await sendJson(
+    path,
+    "POST",
+    body,
+    "Could not queue watched-folder scan",
+  );
   return readJson<ProcessingWatchedFolderRemuxScanDispatchEnqueueOut>(r);
 }

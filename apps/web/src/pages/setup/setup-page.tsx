@@ -8,6 +8,7 @@ import {
   useBootstrapStatusQuery,
   useMeQuery,
 } from "../../lib/auth/queries";
+import { errorMessage } from "../../lib/api/error-message";
 
 export function SetupPage() {
   const navigate = useNavigate();
@@ -163,9 +164,7 @@ export function SetupPage() {
             ) : null}
             {bootstrap.isError ? (
               <p className="mm-auth-banner" role="alert">
-                {bootstrap.error instanceof Error
-                  ? bootstrap.error.message
-                  : "Setup failed."}
+                {errorMessage(bootstrap.error, "Setup failed.")}
               </p>
             ) : null}
             <button

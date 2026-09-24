@@ -1,7 +1,6 @@
 /**
- * The Library title is the picker (James, 22 Sep 2026): "Library › TV ▾". One library shows its name and no
- * control at all; several open a menu from the title itself, with a search box once there are enough to need
- * one. He turned down a row of tabs for this: "a lot of information without much content".
+ * The Library title is the picker: "Library › TV ▾". One library shows its name and no control at all;
+ * several open a menu from the title itself, with a search box once there are enough to need one.
  */
 import { useEffect, useRef, useState } from "react";
 import type { ProcessingLibrary } from "../../lib/processing/libraries-api";

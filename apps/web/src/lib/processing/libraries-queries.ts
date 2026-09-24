@@ -2,31 +2,33 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   createProcessingLibrary,
-  createProcessingRuleSet,
   deleteProcessingLibrary,
-  deleteProcessingRuleSet,
-  discoverProcessingLibraries,
-  fetchProcessingLibraryDrift,
-  fetchProcessingManagerSetup,
-  fetchProcessingRejectSupport,
   fetchProcessingLibraries,
-  fetchProcessingRuleSets,
-  importDiscoveredProcessingLibraries,
   reorderProcessingLibraries,
-  unlinkDiscoveredProcessingLibrary,
   updateProcessingLibrary,
-  updateProcessingRuleSet,
   type ProcessingLibrary,
   type ProcessingLibraryCreate,
   type ProcessingMediaType,
   type ProcessingLibraryWrite,
+} from "./libraries-api";
+import {
+  discoverProcessingLibraries,
+  fetchProcessingLibraryDrift,
+  fetchProcessingManagerSetup,
+  fetchProcessingRejectSupport,
+  importDiscoveredProcessingLibraries,
+  unlinkDiscoveredProcessingLibrary,
+} from "./library-managers-api";
+import {
+  createProcessingRuleSet,
+  deleteProcessingRuleSet,
+  fetchProcessingRuleSets,
+  updateProcessingRuleSet,
   type ProcessingRuleSet,
   type ProcessingRuleSetWrite,
-} from "./libraries-api";
+} from "./rule-sets-api";
 import { previewProcessingRules } from "./rules-preview-api";
-
-export const processingLibrariesKey = ["processing", "libraries"];
-export const processingRuleSetsKey = ["processing", "rule-sets"];
+import { processingKeys } from "./query-keys";
 
 /** Asks the linked managers what they can do, so only while the option is on screen. */
 export function useProcessingRejectSupportQuery(
@@ -34,7 +36,7 @@ export function useProcessingRejectSupportQuery(
   enabled: boolean,
 ) {
   return useQuery({
-    queryKey: ["processing", "reject-support", ...connectionIds],
+    queryKey: processingKeys.rejectSupport(connectionIds),
     queryFn: () => fetchProcessingRejectSupport(connectionIds),
     enabled,
     staleTime: 60_000,
@@ -53,14 +55,12 @@ export function useProcessingManagerSetupQuery(
   enabled: boolean,
 ) {
   return useQuery({
-    queryKey: [
-      "processing",
-      "manager-setup",
+    queryKey: processingKeys.managerSetup(
       mediaType,
       watchedFolder,
       outputFolder,
       removeOriginal,
-    ],
+    ),
     queryFn: () =>
       fetchProcessingManagerSetup(
         mediaType,
@@ -80,7 +80,7 @@ export function useProcessingLibrariesQuery(
   refetchIntervalMs?: number,
 ) {
   return useQuery<ProcessingLibrary[]>({
-    queryKey: processingLibrariesKey,
+    queryKey: processingKeys.libraries,
     queryFn: fetchProcessingLibraries,
     enabled,
     refetchInterval: refetchIntervalMs,
@@ -93,7 +93,7 @@ export function useCreateProcessingLibrary() {
     mutationFn: (data: ProcessingLibraryCreate) =>
       createProcessingLibrary(data),
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: processingLibrariesKey }),
+      void qc.invalidateQueries({ queryKey: processingKeys.libraries }),
   });
 }
 
@@ -103,7 +103,7 @@ export function useUpdateProcessingLibrary() {
     mutationFn: (vars: { id: number; data: ProcessingLibraryWrite }) =>
       updateProcessingLibrary(vars.id, vars.data),
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: processingLibrariesKey }),
+      void qc.invalidateQueries({ queryKey: processingKeys.libraries }),
   });
 }
 
@@ -112,7 +112,7 @@ export function useDeleteProcessingLibrary() {
   return useMutation({
     mutationFn: (id: number) => deleteProcessingLibrary(id),
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: processingLibrariesKey }),
+      void qc.invalidateQueries({ queryKey: processingKeys.libraries }),
   });
 }
 
@@ -121,7 +121,7 @@ export function useReorderProcessingLibraries() {
   return useMutation({
     mutationFn: (ids: number[]) => reorderProcessingLibraries(ids),
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: processingLibrariesKey }),
+      void qc.invalidateQueries({ queryKey: processingKeys.libraries }),
   });
 }
 
@@ -138,7 +138,7 @@ export function useImportDiscoveredProcessingLibraries() {
     mutationFn: (vars: { connectionId: number; keys: string[] }) =>
       importDiscoveredProcessingLibraries(vars.connectionId, vars.keys),
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: processingLibrariesKey }),
+      void qc.invalidateQueries({ queryKey: processingKeys.libraries }),
   });
 }
 
@@ -154,13 +154,13 @@ export function useUnlinkDiscoveredProcessingLibrary() {
   return useMutation({
     mutationFn: (id: number) => unlinkDiscoveredProcessingLibrary(id),
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: processingLibrariesKey }),
+      void qc.invalidateQueries({ queryKey: processingKeys.libraries }),
   });
 }
 
 export function useProcessingRuleSetsQuery() {
   return useQuery<ProcessingRuleSet[]>({
-    queryKey: processingRuleSetsKey,
+    queryKey: processingKeys.ruleSets,
     queryFn: fetchProcessingRuleSets,
   });
 }
@@ -170,7 +170,7 @@ export function useCreateProcessingRuleSet() {
   return useMutation({
     mutationFn: (data: ProcessingRuleSetWrite) => createProcessingRuleSet(data),
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: processingRuleSetsKey }),
+      void qc.invalidateQueries({ queryKey: processingKeys.ruleSets }),
   });
 }
 
@@ -180,7 +180,7 @@ export function useUpdateProcessingRuleSet() {
     mutationFn: (vars: { id: number; data: ProcessingRuleSetWrite }) =>
       updateProcessingRuleSet(vars.id, vars.data),
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: processingRuleSetsKey }),
+      void qc.invalidateQueries({ queryKey: processingKeys.ruleSets }),
   });
 }
 
@@ -189,8 +189,8 @@ export function useDeleteProcessingRuleSet() {
   return useMutation({
     mutationFn: (id: number) => deleteProcessingRuleSet(id),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: processingRuleSetsKey });
-      void qc.invalidateQueries({ queryKey: processingLibrariesKey });
+      void qc.invalidateQueries({ queryKey: processingKeys.ruleSets });
+      void qc.invalidateQueries({ queryKey: processingKeys.libraries });
     },
   });
 }

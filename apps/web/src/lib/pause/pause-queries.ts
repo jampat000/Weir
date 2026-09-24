@@ -6,12 +6,13 @@ import {
   type PauseState,
   type PauseWrite,
 } from "./pause-api";
+import { processingKeys } from "../processing/query-keys";
 
-export const pauseKey = () => ["pause"];
+import { pauseKeys } from "./query-keys";
 
 export function usePauseQuery() {
   return useQuery<PauseState>({
-    queryKey: pauseKey(),
+    queryKey: pauseKeys.state,
     queryFn: fetchPause,
     // A pause with an expiry lifts on its own, so the shell has to notice without a
     // reload. One minute is well inside the smallest pause anyone can set.
@@ -24,10 +25,10 @@ export function useSavePause() {
   return useMutation({
     mutationFn: (body: PauseWrite) => savePause(body),
     onSuccess: (data) => {
-      qc.setQueryData(pauseKey(), data);
+      qc.setQueryData(pauseKeys.state, data);
       // Pausing changes why files are in the state they are in, so the Files screen is
       // stale the moment this succeeds.
-      void qc.invalidateQueries({ queryKey: ["processing", "files"] });
+      void qc.invalidateQueries({ queryKey: processingKeys.files });
     },
   });
 }

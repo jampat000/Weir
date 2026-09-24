@@ -26,8 +26,8 @@ export function NavIconSettings({ className = "" }: { className?: string }) {
   );
 }
 
-/** Live: a pulse line, for the screen that shows work as it happens. */
-export function NavIconLive({ className = "" }: { className?: string }) {
+/** Processing: a pulse line, for the screen that shows work as it happens. */
+export function NavIconProcessing({ className = "" }: { className?: string }) {
   return (
     <svg
       className={className}

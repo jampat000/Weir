@@ -81,17 +81,8 @@
   --mm-type-title: 1.5rem; /* 24px — page title */
   --mm-type-figure: 1.75rem; /* 28px — hero figures and stat values */
   --mm-tracking-eyebrow: 0.14em;
-  /* Content language (styles/weir-content.css, docs/design/content-language.md).
-     Layout-only, set per instance from React; no colour or font is introduced here. */
-  --mm-flow-share: 1; /* one lead-band segment's share of the band's width */
-  --mm-meter-fill: 0%; /* how full a figure tile's meter is */
-  --mm-live-fill: 0%; /* how far a Live working card's pass has got (weir-processing.css) */
-  --mm-live-bar: 0%; /* one Live throughput bar's height against the tallest */
-  /* 0 while the lead band is one proportional row, 1 once it has restacked into a
-     labelled list. Set by weir-content.css alone — never inline, never by a page — and
-     every difference between the two states is a calc on it, so the band has one switch
-     instead of a duplicated rule per segment count. */
-  --mm-band-stacked: 0;
+  /* Layout-only, set per instance from React; no colour or font is introduced here. */
+  --mm-live-fill: 0%; /* how far a working card's pass has got (weir-processing.css) */
   /* Control sizes (#464). The single 34px height was below a comfortable hit target for form
      fields; 40px is the field size, with smaller steps for secondary and quiet controls. */
   --mm-control-height-lg: calc(40px * var(--mm-density-ui-scale));
@@ -100,13 +91,15 @@
   --mm-control-pad-x: calc(11px * var(--mm-density-ui-scale));
   --mm-control-pad-y: calc(7px * var(--mm-density-ui-scale));
   --mm-font: "Outfit", system-ui, -apple-system, sans-serif;
+  --mm-font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
   --mm-shadow-card: 0 16px 48px rgba(2, 12, 16, 0.55);
   --mm-shadow-card-inner: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
   --mm-shadow-shell: 0 22px 60px rgba(2, 12, 16, 0.55);
   /* Inset field wells — slightly below card plane; tuned for quiet premium (not deep black wells). */
-  /* A field lifts off the page rather than sinking into it: at 0.92 alpha over the same colour as
-     the background, a control was invisible but for an 11% border (James, 23 Sep 2026: the boxes
-     "dont fit the theme anymore"). */
+  /* A field lifts off the page rather than sinking into it: a well the same colour as the
+     background leaves a control visible only by its border. */
   --mm-input-bg: rgba(232, 241, 244, 0.055);
   --mm-input-bg-hover: rgba(232, 241, 244, 0.085);
   --mm-input-border: rgba(232, 241, 244, 0.22);

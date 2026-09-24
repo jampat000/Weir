@@ -7,9 +7,6 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const packageJson = JSON.parse(
-  readFileSync(path.join(__dirname, "package.json"), "utf-8"),
-) as { version: string };
 
 type DevPortsFile = {
   development: {
@@ -86,9 +83,6 @@ export default defineConfig(({ mode }) => {
   };
 
   return {
-    define: {
-      __WEB_PACKAGE_VERSION__: JSON.stringify(packageJson.version),
-    },
     plugins: [react(), tailwindcss()],
     build: {
       // Source maps are opt-in for local diagnostics. Production artifacts do not expose

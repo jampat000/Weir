@@ -17,16 +17,11 @@ import {
   type ProcessingManualPlanChoice,
 } from "./files-api";
 import { postProcessingWatchedFolderRemuxScanDispatchEnqueue } from "./watched-folder-scan-api";
-
-export const processingFilesKey = (query: ProcessingFilesQuery) => [
-  "processing",
-  "files",
-  query,
-];
+import { processingKeys } from "./query-keys";
 
 export function useProcessingFilesQuery(query: ProcessingFilesQuery = {}) {
   return useQuery<ProcessingFilesPage>({
-    queryKey: processingFilesKey(query),
+    queryKey: processingKeys.fileList(query),
     queryFn: () => fetchProcessingFiles(query),
   });
 }
@@ -36,7 +31,7 @@ export function useForgetProcessingFile() {
   return useMutation({
     mutationFn: (id: number) => forgetProcessingFile(id),
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ["processing", "files"] }),
+      void qc.invalidateQueries({ queryKey: processingKeys.files }),
   });
 }
 
@@ -45,7 +40,7 @@ export function useMoveProcessingFileToTop() {
   return useMutation({
     mutationFn: (id: number) => moveProcessingFileToTop(id),
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ["processing", "files"] }),
+      void qc.invalidateQueries({ queryKey: processingKeys.files }),
   });
 }
 
@@ -54,7 +49,7 @@ export function useRequeueProcessingFile() {
   return useMutation({
     mutationFn: (id: number) => requeueProcessingFile(id),
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ["processing", "files"] }),
+      void qc.invalidateQueries({ queryKey: processingKeys.files }),
   });
 }
 
@@ -64,7 +59,7 @@ export function useRequeueProcessingFiles() {
     mutationFn: (query: ProcessingBulkRequeueQuery) =>
       requeueProcessingFiles(query),
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ["processing", "files"] }),
+      void qc.invalidateQueries({ queryKey: processingKeys.files }),
   });
 }
 
@@ -73,6 +68,14 @@ export function useProcessingWhyHeld() {
   // someone asks. Running it on render would poll every connection for every file.
   return useMutation({
     mutationFn: (id: number) => fetchProcessingWhyHeld(id),
+  });
+}
+
+/** One file's processing record, read again whenever the file itself changes. */
+export function useProcessingFileLogQuery(fileId: number, updatedAt: string) {
+  return useQuery({
+    queryKey: processingKeys.fileLog(fileId, updatedAt),
+    queryFn: () => fetchProcessingFileLog(fileId),
   });
 }
 
@@ -103,7 +106,7 @@ export function useSubmitProcessingManualPlan() {
       choice: ProcessingManualPlanChoice;
     }) => postProcessingManualPlan(id, choice),
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ["processing", "files"] }),
+      void qc.invalidateQueries({ queryKey: processingKeys.files }),
   });
 }
 
@@ -128,7 +131,7 @@ export function useProcessProcessingFileNow() {
         pass_through_unchanged,
       }),
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ["processing", "files"] }),
+      void qc.invalidateQueries({ queryKey: processingKeys.files }),
   });
 }
 
@@ -148,8 +151,8 @@ export function useProcessingCheckLibraryAgain() {
         library_id,
       }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["processing", "files"] });
-      void qc.invalidateQueries({ queryKey: ["processing", "jobs"] });
+      void qc.invalidateQueries({ queryKey: processingKeys.files });
+      void qc.invalidateQueries({ queryKey: processingKeys.jobs });
     },
   });
 }

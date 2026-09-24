@@ -4,17 +4,15 @@ import {
   type ActivityRecentFilters,
 } from "../api/activity-api";
 
-export const activityRecentKey = ["activity", "recent"] as const;
+import { activityKeys } from "./query-keys";
 
 export function useActivityRecentQuery(filters?: ActivityRecentFilters) {
   return useQuery({
-    queryKey: [...activityRecentKey, filters ?? {}],
+    queryKey: activityKeys.recentList(filters),
     queryFn: () => fetchActivityRecent(filters),
     staleTime: 15_000,
   });
 }
-
-/** Narrower feed for Settings → Logs (does not share cache with open-ended ``/recent``). */
 
 /** Every entry in a window, not only the first page: what a chart counts from must not stop at 100. */
 export type ActivityWindow = {
@@ -30,7 +28,7 @@ export function useActivityWindowQuery(
   maxPages = 5,
 ) {
   return useQuery({
-    queryKey: [...activityRecentKey, "window", filters, maxPages],
+    queryKey: activityKeys.window(filters, maxPages),
     queryFn: async (): Promise<ActivityWindow> => {
       const items: ActivityWindow["items"] = [];
       let total = 0;

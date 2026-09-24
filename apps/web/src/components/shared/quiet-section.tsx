@@ -1,36 +1,39 @@
 import { useId, type ReactNode } from "react";
 
 /**
- * The quiet body of a page, as rule 3 of docs/design/content-language.md draws it:
- * a heading on the left, its links on the right, a hairline under both, then the
- * content. No cards, no panels, no wells.
- *
- * Lifted unchanged out of processing-overview-tab.tsx — the reference implementation
- * the design was approved on — so every page spells the same shape the same way.
+ * The quiet body of a page: a heading on the left, its links on the right, a hairline under both,
+ * then the content. No cards, no panels, no wells.
+ * A section inside a tab panel is one level down, so it takes `level={3}`.
  */
 export function QuietSection({
   headingId,
   heading,
+  level = 2,
   aside,
   children,
+  id,
   "data-testid": dataTestId,
 }: {
   headingId: string;
   heading: string;
+  level?: 2 | 3;
   aside?: ReactNode;
   children: ReactNode;
+  id?: string;
   "data-testid"?: string;
 }) {
+  const Heading = level === 2 ? "h2" : "h3";
   return (
     <section
       className="mm-quiet-section"
       aria-labelledby={headingId}
+      id={id}
       data-testid={dataTestId}
     >
       <div className="mm-quiet-section__head">
-        <h2 id={headingId} className="mm-quiet-section__title">
+        <Heading id={headingId} className="mm-quiet-section__title">
           {heading}
-        </h2>
+        </Heading>
         {aside ? <div className="mm-quiet-section__aside">{aside}</div> : null}
       </div>
       <div className="mm-quiet-section__body">{children}</div>
@@ -39,17 +42,9 @@ export function QuietSection({
 }
 
 /**
- * One group of fields inside a long configuration form.
- *
- * Rule 3 takes the boxes off a form, and a forty-field form that loses its grouping
- * becomes unusable — so the grouping has to survive as type and whitespace instead.
- * The treatment is the one the language already gives a table's header row: uppercase
- * eyebrow type over a hairline, labelling the block beneath it. That reads clearly
- * below a `.mm-quiet-section__title` without ever becoming a second box, and the
- * `.mm-quiet-stack` these sit in supplies the 2.5rem between groups.
- *
- * The treatment earned its name, so it is `.mm-quiet-group` in weir-content.css rather
- * than a Tailwind copy here: one place to change it, and a page cannot drift from it.
+ * One group of fields inside a long configuration form. A form without boxes still needs its
+ * grouping, so it survives as type and whitespace: uppercase eyebrow type over a hairline, like a
+ * table's header row, labelling the block beneath it without becoming a second box.
  */
 export function QuietFieldGroup({
   step,
@@ -94,19 +89,9 @@ export function QuietFieldGroup({
 }
 
 /**
- * A group that starts closed, for the settings almost nobody changes.
- *
- * A rules editor that shows every one of its twenty-odd switches at once is not nicer for
- * being shorter — it is just as much to read (James, 23 Sep 2026: "too much going on just on
- * the one screen and its not nice to look at or even configure"). The ones that are off by
- * default, and stay off for most people, fold away behind their own heading.
- *
- * `<details>` rather than state: it opens without JavaScript, it is in the tab order, it
- * answers space and enter, and a browser's find-in-page opens it to show a match. Rule 3
- * still holds — the summary is a heading and a hairline, not a box.
- *
- * `summaryWhenClosed` says what is inside without opening it ("3 of 9 on"), so the fold
- * never hides the fact that something has been changed.
+ * A group that starts closed, for the settings almost nobody changes. `<details>` rather than
+ * state: it opens without JavaScript, answers space and enter, and find-in-page opens it to show a
+ * match. `summaryWhenClosed` ("3 of 9 on") keeps a change visible while the fold is shut.
  */
 export function QuietDisclosure({
   title,
@@ -143,8 +128,5 @@ export function QuietDisclosure({
   );
 }
 
-/**
- * The hairline above a form's own Save row. `mm-card-action-footer` drew this when the
- * form was a card; without the card it is just a rule and the buttons under it.
- */
+/** The hairline above a form's own Save row. */
 export const quietActionRowClass = "mm-quiet-actions";

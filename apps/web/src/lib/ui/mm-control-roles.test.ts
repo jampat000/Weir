@@ -1,9 +1,6 @@
 /**
- * The action button's contract: a disabled button looks disabled on its own, from the DOM attribute alone.
- *
- * This is here because the opposite was true for a long time. The helper used to take a `disabled` option that
- * changed the look, and 81 of 145 call sites never passed it, so those buttons refused the click while still
- * showing a gold border, a shadow and a pointer cursor. The option is gone; these tests pin what replaced it.
+ * The action button's contract: a disabled button looks disabled on its own, from the DOM attribute alone,
+ * with no second flag for a call site to forget.
  */
 import { describe, expect, it } from "vitest";
 import { mmActionButtonClass } from "./mm-control-roles";
@@ -83,8 +80,8 @@ describe("mmActionButtonClass", () => {
     // The disabled rules are additions; nothing about a working button changed when they arrived.
     const primary = classesFor("primary");
     expect(primary).toContain("cursor-pointer");
-    expect(primary).toContain("border-[var(--mm-gold)]");
-    expect(classesFor("secondary")).toContain("border-[var(--mm-border)]");
+    expect(primary).toContain("border-mm-gold");
+    expect(classesFor("secondary")).toContain("border-mm-border");
     expect(classesFor("tertiary")).toContain("bg-transparent");
   });
 });

@@ -1,6 +1,6 @@
 /*
- * History (canvas board 2A): every file Weir has touched. The list on the left, the chosen file on the right,
- * divided by a hairline rather than boxed (content-language rule 3). Below 1100px the file follows the list.
+ * History: every file Weir has touched. The list on the left, the chosen file on the right, divided by a
+ * hairline rather than boxed. Below 1100px the file follows the list.
  */
 
 .mm-history-filters {
@@ -28,7 +28,7 @@
   gap: 6px;
   height: 30px;
   padding: 0 12px;
-  border-radius: 999px;
+  border-radius: var(--mm-radius-pill);
   border: 1px solid var(--mm-line);
   background: transparent;
   color: var(--mm-text2);
@@ -96,7 +96,7 @@
   height: 32px;
   padding: 0 10px;
   text-align: left;
-  font-size: 0.6875rem;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -143,11 +143,13 @@
   cursor: pointer;
 }
 
-/* A file's name is shown whole, wrapping between its parts, never cut to "…" (James, 23 Sep 2026). */
+/* A file's name is shown whole, wrapping between its parts, never cut to "…". */
 .mm-history-file__name {
   display: block;
   max-width: 100%;
   overflow-wrap: anywhere;
+  font-weight: 600;
+  color: var(--mm-text);
 }
 
 .mm-history-file__sub {
@@ -155,21 +157,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.mm-history-file__name {
-  font-weight: 600;
-  color: var(--mm-text);
+  font-size: 0.75rem;
+  color: var(--mm-text3);
 }
 
 .mm-history-file:hover .mm-history-file__name,
 .mm-history-file:focus-visible .mm-history-file__name {
   color: var(--mm-accent-bright);
-}
-
-.mm-history-file__sub {
-  font-size: 0.75rem;
-  color: var(--mm-text3);
 }
 
 .mm-history-what--working {
@@ -209,7 +203,7 @@
 
 .mm-history-detail__eyebrow {
   margin: 0;
-  font-size: 0.6875rem;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -238,7 +232,7 @@
 }
 
 .mm-history-figures dt {
-  font-size: 0.6875rem;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -264,7 +258,7 @@
 
 .mm-history-progress__bar {
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--mm-radius-pill);
   background: var(--mm-border);
   overflow: hidden;
 }
@@ -272,7 +266,7 @@
 .mm-history-progress__bar i {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--mm-radius-pill);
   background: var(--mm-accent);
   transition: width 0.6s ease;
 }
@@ -281,244 +275,4 @@
   margin: 0;
   font-size: 0.8125rem;
   color: var(--mm-text2);
-}
-
-/* What Weir kept and removed: the heading carries both counts, each track reads in full text with a Kept or Removed
-   label, and a coloured edge tells the two apart at a glance (James, 23 Sep 2026: it read as hidden). */
-.mm-history-trackset {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.mm-history-trackset__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  color: var(--mm-text1);
-  font-size: 0.9375rem;
-  font-weight: 600;
-}
-
-.mm-history-count {
-  padding: 2px 10px;
-  border-radius: var(--mm-radius-pill);
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.mm-history-count.is-kept {
-  background: color-mix(
-    in srgb,
-    var(--mm-status-healthy-text) 16%,
-    transparent
-  );
-  color: var(--mm-status-healthy-text);
-}
-
-.mm-history-count.is-removed {
-  background: color-mix(in srgb, var(--mm-status-failed-text) 16%, transparent);
-  color: var(--mm-status-failed-text);
-}
-
-.mm-history-count.is-none {
-  background: color-mix(in srgb, var(--mm-text3) 14%, transparent);
-  color: var(--mm-text2);
-}
-
-.mm-history-tracks {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-
-.mm-history-tracks tr {
-  border-bottom: 1px solid var(--mm-border);
-}
-
-.mm-history-tracks tr.is-kept > :first-child {
-  box-shadow: inset 3px 0 0 var(--mm-status-healthy-text);
-}
-
-.mm-history-tracks tr.is-removed > :first-child {
-  box-shadow: inset 3px 0 0 var(--mm-status-failed-text);
-}
-
-.mm-history-tracks tr.is-removed {
-  background: color-mix(in srgb, var(--mm-status-failed-text) 5%, transparent);
-}
-
-.mm-history-tracks th,
-.mm-history-tracks td {
-  padding: 8px 10px;
-  text-align: left;
-  vertical-align: middle;
-}
-
-.mm-history-tracks th {
-  width: 88px;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--mm-text2);
-}
-
-.mm-history-track {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.mm-history-track__what {
-  display: block;
-  color: var(--mm-text1);
-  font-weight: 500;
-}
-
-.mm-history-tracks tr.is-removed .mm-history-track__what {
-  color: var(--mm-text2);
-  text-decoration: line-through;
-  text-decoration-color: color-mix(
-    in srgb,
-    var(--mm-status-failed-text) 70%,
-    transparent
-  );
-}
-
-.mm-history-track__why {
-  display: block;
-  margin-top: 2px;
-  color: var(--mm-text2);
-  font-size: var(--mm-type-caption);
-}
-
-.mm-history-track__verdict {
-  width: 1%;
-  white-space: nowrap;
-  text-align: right;
-}
-
-.mm-history-verdict {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: var(--mm-radius-pill);
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.mm-history-verdict.is-kept {
-  background: color-mix(
-    in srgb,
-    var(--mm-status-healthy-text) 16%,
-    transparent
-  );
-  color: var(--mm-status-healthy-text);
-}
-
-.mm-history-verdict.is-removed {
-  background: color-mix(in srgb, var(--mm-status-failed-text) 16%, transparent);
-  color: var(--mm-status-failed-text);
-}
-
-.mm-history-sizes {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.mm-history-story {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  border-left: 2px solid var(--mm-line);
-}
-
-.mm-history-story li {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-left: 16px;
-  font-size: 0.8125rem;
-  line-height: 1.45;
-  color: var(--mm-text2);
-}
-
-.mm-history-story li::before {
-  content: "";
-  position: absolute;
-  left: -6px;
-  top: 5px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--mm-text3);
-}
-
-.mm-history-story li.is-good::before {
-  background: var(--mm-accent);
-}
-
-.mm-history-story li.is-warn::before {
-  background: var(--mm-status-warning-text);
-}
-
-.mm-history-story li.is-bad::before {
-  background: var(--mm-status-failed-text);
-}
-
-.mm-history-story b {
-  font-weight: 600;
-  color: var(--mm-text);
-}
-
-.mm-history-record-meta {
-  margin: 0;
-  font-size: 0.75rem;
-  color: var(--mm-text3);
-}
-
-.mm-history-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  font-size: 0.8125rem;
-  font-weight: 500;
-}
-
-.mm-history-bulk {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.mm-history-next {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.mm-history-next__title {
-  margin: 0;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.mm-history-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.mm-history-actions__row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }

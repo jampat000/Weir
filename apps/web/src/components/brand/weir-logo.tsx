@@ -6,31 +6,10 @@ type Props = {
 };
 
 /**
- * The Weir mark (#581): water turning over a weir crest into the tailrace, with the apron
- * below it. It replaces the hand-drawn "low wall with water over it" placeholder from #564.
- *
- * The geometry is generated, not hand-drawn. `design-options/logos-round4/build/trace.py`
- * thresholds the accepted source render to two colours and fits circles to every band edge;
- * `mark.py` regularises those measurements onto a 24-unit grid and emits these exact three paths
- * into `packaging/brand/weir-mark.svg`, which is in turn the source for the favicon, tray icon
- * and docs logo (`scripts/generate-brand-icons.py`). Drawn inline here rather than as an <img>
- * so it follows the theme tokens.
- *
- * This is the three-stream mark — the one traced directly off the Midjourney render James
- * accepted, and the one he asked for by name after #582 shipped a two-stream simplification
- * instead ("logo is not exact I want this one"). Three streams do not survive a 16px favicon:
- * the bands are sub-pixel at that size and fuse into a smear (see mark.py's SHIPPED_STREAMS
- * comment and design-options/logos-round4/gate-16px.png). But the sidebar mark here is never
- * rendered anywhere near that small, so it carries no such penalty, and the extra stream is what
- * makes it read as three-dimensional water rather than a flat arch. The 16px .ico frame is the
- * only place that trade-off still applies — see scripts/generate-brand-icons.py and
- * packaging/brand/README.md for the optical-size split.
- *
- * Three paths, all one colour. The mark used to be two tones — gold water over a stone wall —
- * but the Windows tray icon is a single-colour mask and cannot carry a second tone, so a
- * two-tone mark meant the tray never matched the app. If you change the geometry, change it in
- * mark.py and re-run `python design-options/logos-round4/build/build.py`, which rewrites the
- * brand SVGs and prints the path data to paste here. Do not edit the `d` attributes by hand.
+ * The Weir mark (#581), inline so it follows the theme tokens. Three streams in one colour: the
+ * Windows tray icon is a single-colour mask, and the sidebar never draws the mark small enough for
+ * the streams to fuse (packaging/brand/README.md). The paths are generated: change the geometry in
+ * design-options/logos-round4/build/mark.py and paste the path data its build.py prints.
  */
 function WeirMark({ className }: { className?: string }) {
   return (

@@ -1,0 +1,267 @@
+/* Settings › Rules: a profile's layout, its switches, the track-order editor and the provider form. */
+
+.mm-profile-body {
+  margin-top: 1rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--mm-border);
+}
+
+/* The numbered groups sit side by side where there is room, in the same order. */
+.mm-profile-groups {
+  display: grid;
+  max-width: 42rem;
+  gap: 2.5rem;
+}
+
+@media (min-width: 1280px) {
+  .mm-profile-groups {
+    max-width: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 3.5rem;
+  }
+}
+
+.mm-profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--mm-border);
+}
+
+.mm-rule-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid var(--mm-border);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.mm-rule-toggle:last-child {
+  border-bottom-width: 0;
+}
+
+.mm-rule-toggle__label {
+  display: block;
+  color: var(--mm-text1);
+  font-weight: 500;
+}
+
+.mm-rule-toggle__detail {
+  display: block;
+  margin-top: 0.125rem;
+  color: var(--mm-text3);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+/* Rules that only apply once the switch above them is on. */
+.mm-rule-indent {
+  padding-left: 1rem;
+  border-left: 2px solid var(--mm-border);
+}
+
+.mm-track-order__toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--mm-border);
+  text-align: left;
+}
+
+.mm-track-order__title {
+  display: block;
+  color: var(--mm-text1);
+  font-weight: 600;
+}
+
+.mm-track-order__action {
+  flex-shrink: 0;
+  color: var(--mm-accent-bright);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+}
+
+.mm-sorter-row {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--mm-border);
+}
+
+.mm-sorter-row:last-child {
+  border-bottom-width: 0;
+}
+
+@media (min-width: 768px) {
+  .mm-sorter-row {
+    grid-template-columns: 2rem 1fr 1.4fr auto;
+  }
+}
+
+.mm-sorter-row__number {
+  padding-top: 0.5rem;
+  color: var(--mm-text3);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1rem;
+  text-align: center;
+}
+
+.mm-sorter-row__field {
+  color: var(--mm-text3);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.mm-sorter-row__reverse {
+  display: inline-flex;
+  min-height: 2.25rem;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.25rem;
+  color: var(--mm-text2);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.mm-provider-clear-key {
+  display: flex;
+  align-items: center;
+  align-self: flex-end;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  color: var(--mm-text2);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+/* Settings › Rules › Try on a file. */
+
+.mm-rules-preview__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--mm-border);
+}
+
+.mm-rules-preview__head--open {
+  align-items: flex-start;
+}
+
+.mm-rules-preview__title {
+  color: var(--mm-text1);
+  font-weight: 600;
+}
+
+.mm-rules-preview__lead {
+  margin-top: 0.25rem;
+  color: var(--mm-text3);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.mm-rules-preview__choices,
+.mm-rules-preview__folder {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .mm-rules-preview__choices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mm-rules-preview__folder {
+    grid-template-columns: 1fr auto;
+    align-items: end;
+  }
+
+  .mm-rules-preview__field--wide {
+    grid-column: span 2 / span 2;
+  }
+}
+
+.mm-rules-preview__field {
+  display: block;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.mm-rules-preview__label {
+  color: var(--mm-text2);
+}
+
+.mm-rules-preview__hint {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--mm-text3);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.mm-rules-preview__index {
+  color: var(--mm-text3);
+}
+
+.mm-rules-preview__small {
+  color: var(--mm-text3);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.mm-rules-preview__track-title {
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-rules-preview__reasons {
+  min-width: 16rem;
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.mm-rules-preview__note {
+  color: var(--mm-text3);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.mm-rules-preview__notes {
+  color: var(--mm-text2);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.mm-rules-preview__subhead {
+  color: var(--mm-text3);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1rem;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.mm-rules-preview__list {
+  padding-left: 1.25rem;
+  color: var(--mm-text2);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  list-style: disc;
+}
+
+.mm-rules-preview__list > li + li {
+  margin-top: 0.25rem;
+}

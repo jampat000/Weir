@@ -1,0 +1,121 @@
+/* The title row's controls: Pause and the theme switch. */
+
+/* Pause lives in the toolbar so it is reachable from any screen: the reason to want it
+   is that the machine is busy, which has nothing to do with the page you are on. */
+.mm-pause-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: calc(8px * var(--mm-density-ui-scale));
+  min-width: 0;
+}
+
+.mm-pause-badge {
+  border-radius: var(--mm-radius-pill);
+  border: 1px solid var(--mm-warning-border, var(--mm-border));
+  background: var(--mm-warning-bg, transparent);
+  color: var(--mm-warning-text, var(--mm-text1));
+  padding: 2px calc(10px * var(--mm-density-ui-scale));
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mm-pause-reason {
+  min-width: 0;
+  max-width: 22rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  color: var(--mm-text2);
+}
+
+.mm-pause-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: calc(6px * var(--mm-density-ui-scale));
+  min-width: 260px;
+  padding: calc(12px * var(--mm-density-ui-scale));
+  border: 1px solid var(--mm-border);
+  border-radius: 8px;
+  background: var(--mm-surface1, var(--mm-bg, #fff));
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+}
+
+.mm-pause-scan-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  color: var(--mm-text2);
+}
+
+.mm-pause-policy {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--mm-text3);
+}
+
+.mm-theme-toggle {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--mm-control-height);
+  margin: 0;
+  padding: var(--mm-control-pad-y) var(--mm-control-pad-x);
+  border: 1px solid var(--mm-border);
+  border-radius: var(--mm-radius-pill);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.045),
+      rgba(255, 255, 255, 0.01)
+    ),
+    color-mix(in srgb, var(--mm-card-bg) 88%, transparent);
+  color: var(--mm-text2);
+  box-shadow:
+    var(--mm-shadow-card-inner),
+    0 8px 24px rgba(0, 0, 0, 0.16);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition:
+    border-color 0.16s ease,
+    color 0.16s ease,
+    background 0.16s ease,
+    transform 0.16s ease;
+}
+
+.mm-theme-toggle:hover {
+  border-color: var(--mm-accent-ring);
+  color: var(--mm-text);
+  transform: translateY(-1px);
+}
+
+.mm-theme-toggle:focus-visible {
+  outline: 2px solid var(--mm-accent-ring);
+  outline-offset: 2px;
+}
+
+html[data-mm-theme="light"] .mm-theme-toggle {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.86),
+      rgba(255, 255, 255, 0.78)
+    ),
+    var(--mm-card-bg);
+  box-shadow:
+    var(--mm-shadow-card-inner),
+    0 10px 30px color-mix(in srgb, var(--mm-stone) 10%, transparent);
+}

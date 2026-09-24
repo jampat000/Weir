@@ -1,5 +1,9 @@
-/** Shapes for ``GET /api/v1/processing/jobs/inspection`` (Processing lane only). */
+import type { Schema } from "../../api/types";
 
+/**
+ * Kept by hand: the server always sends payload_json, which the schema marks optional, and older rows can
+ * lack operator_message and next_action, which the schema marks required.
+ */
 export type ProcessingJobInspectionRow = {
   id: number;
   dedupe_key: string;
@@ -23,14 +27,7 @@ export type ProcessingJobsInspectionOut = {
   default_recent_slice: boolean;
 };
 
-export type ProcessingJobCancelPendingOut = {
-  ok: boolean;
-  job_id: number;
-  status: string;
-};
-
-export type ProcessingJobRecoverFinalizeFailedOut = {
-  ok: boolean;
-  job_id: number;
-  status: string;
-};
+export type ProcessingJobCancelPendingOut =
+  Schema<"ProcessingJobCancelPendingOut">;
+export type ProcessingJobRecoverFinalizeFailedOut =
+  Schema<"ProcessingJobRecoverFinalizeFailedOut">;

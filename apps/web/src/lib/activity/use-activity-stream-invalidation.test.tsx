@@ -3,12 +3,12 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
-import { activityRecentKey } from "./queries";
+import { activityKeys } from "./query-keys";
 import {
   useActivityStreamInvalidation,
   useActivityStreamInvalidations,
 } from "./use-activity-stream-invalidation";
-import { processingOverviewStatsQueryKey } from "../processing/queries";
+import { processingKeys } from "../processing/query-keys";
 
 class FakeEventSource {
   url: string;
@@ -67,7 +67,7 @@ describe("useActivityStreamInvalidation", () => {
     );
     const qc = new QueryClient();
     const spy = vi.spyOn(qc, "invalidateQueries");
-    const keys = [processingOverviewStatsQueryKey, activityRecentKey] as const;
+    const keys = [processingKeys.overviewStats(), activityKeys.recent] as const;
 
     renderHook(
       () =>
@@ -85,11 +85,11 @@ describe("useActivityStreamInvalidation", () => {
 
     expect(spy).toHaveBeenCalledTimes(2);
     expect(spy).toHaveBeenCalledWith({
-      queryKey: processingOverviewStatsQueryKey,
+      queryKey: processingKeys.overviewStats(),
       exact: true,
     });
     expect(spy).toHaveBeenCalledWith({
-      queryKey: activityRecentKey,
+      queryKey: activityKeys.recent,
       exact: true,
     });
 
@@ -105,7 +105,7 @@ describe("useActivityStreamInvalidation", () => {
     const qc = new QueryClient();
     const spy = vi.spyOn(qc, "invalidateQueries");
 
-    renderHook(() => useActivityStreamInvalidation(activityRecentKey), {
+    renderHook(() => useActivityStreamInvalidation(activityKeys.recent), {
       wrapper: withQueryClient(qc),
     });
 
@@ -113,7 +113,7 @@ describe("useActivityStreamInvalidation", () => {
     expect(src.url).toBe("/api/v1/activity/stream");
     src.emit("activity.latest", JSON.stringify({ latest_event_id: 12 }));
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: activityRecentKey });
+    expect(spy).toHaveBeenCalledWith({ queryKey: activityKeys.recent });
   });
 
   it("invalidates when an existing activity row receives a newer revision", () => {
@@ -124,7 +124,7 @@ describe("useActivityStreamInvalidation", () => {
     const qc = new QueryClient();
     const spy = vi.spyOn(qc, "invalidateQueries");
 
-    renderHook(() => useActivityStreamInvalidation(activityRecentKey), {
+    renderHook(() => useActivityStreamInvalidation(activityKeys.recent), {
       wrapper: withQueryClient(qc),
     });
 
@@ -139,7 +139,7 @@ describe("useActivityStreamInvalidation", () => {
     );
 
     expect(spy).toHaveBeenCalledTimes(2);
-    expect(spy).toHaveBeenLastCalledWith({ queryKey: activityRecentKey });
+    expect(spy).toHaveBeenLastCalledWith({ queryKey: activityKeys.recent });
   });
 
   it("ignores malformed stream messages instead of breaking live updates", () => {
@@ -150,7 +150,7 @@ describe("useActivityStreamInvalidation", () => {
     const qc = new QueryClient();
     const spy = vi.spyOn(qc, "invalidateQueries");
 
-    renderHook(() => useActivityStreamInvalidation(activityRecentKey), {
+    renderHook(() => useActivityStreamInvalidation(activityKeys.recent), {
       wrapper: withQueryClient(qc),
     });
 
@@ -163,7 +163,7 @@ describe("useActivityStreamInvalidation", () => {
     );
 
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy).toHaveBeenCalledWith({ queryKey: activityRecentKey });
+    expect(spy).toHaveBeenCalledWith({ queryKey: activityKeys.recent });
   });
 
   it("invalidates the overview stats query on activity.latest", () => {
@@ -175,7 +175,7 @@ describe("useActivityStreamInvalidation", () => {
     const spy = vi.spyOn(qc, "invalidateQueries");
 
     renderHook(
-      () => useActivityStreamInvalidation(processingOverviewStatsQueryKey),
+      () => useActivityStreamInvalidation(processingKeys.overviewStats()),
       {
         wrapper: withQueryClient(qc),
       },
@@ -185,7 +185,7 @@ describe("useActivityStreamInvalidation", () => {
     src.emit("activity.latest", JSON.stringify({ latest_event_id: 77 }));
 
     expect(spy).toHaveBeenCalledWith({
-      queryKey: processingOverviewStatsQueryKey,
+      queryKey: processingKeys.overviewStats(),
     });
   });
 
@@ -198,13 +198,13 @@ describe("useActivityStreamInvalidation", () => {
     const spy = vi.spyOn(qc, "invalidateQueries");
 
     const first = renderHook(
-      () => useActivityStreamInvalidation(activityRecentKey),
+      () => useActivityStreamInvalidation(activityKeys.recent),
       {
         wrapper: withQueryClient(qc),
       },
     );
     const second = renderHook(
-      () => useActivityStreamInvalidation(processingOverviewStatsQueryKey),
+      () => useActivityStreamInvalidation(processingKeys.overviewStats()),
       {
         wrapper: withQueryClient(qc),
       },
@@ -214,9 +214,9 @@ describe("useActivityStreamInvalidation", () => {
     const src = FakeEventSource.instances[0];
     src.emit("activity.latest", JSON.stringify({ latest_event_id: 88 }));
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: activityRecentKey });
+    expect(spy).toHaveBeenCalledWith({ queryKey: activityKeys.recent });
     expect(spy).toHaveBeenCalledWith({
-      queryKey: processingOverviewStatsQueryKey,
+      queryKey: processingKeys.overviewStats(),
     });
 
     first.unmount();
@@ -234,7 +234,7 @@ describe("useActivityStreamInvalidation", () => {
     const qc = new QueryClient();
 
     const first = renderHook(
-      () => useActivityStreamInvalidation(activityRecentKey),
+      () => useActivityStreamInvalidation(activityKeys.recent),
       {
         wrapper: withQueryClient(qc),
       },
@@ -242,7 +242,7 @@ describe("useActivityStreamInvalidation", () => {
     first.unmount();
     await waitFor(() => expect(FakeEventSource.instances[0].closed).toBe(true));
 
-    renderHook(() => useActivityStreamInvalidation(activityRecentKey), {
+    renderHook(() => useActivityStreamInvalidation(activityKeys.recent), {
       wrapper: withQueryClient(qc),
     });
 

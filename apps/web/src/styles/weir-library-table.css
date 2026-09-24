@@ -1,0 +1,165 @@
+/*
+ * The library table groups files by title the way a person thinks of them. It follows its own width, not the
+ * window's: at 860px the track columns go, at 620px each row becomes two lines, and nothing scrolls sideways.
+ */
+
+/* The table. Its own width decides how much of each row fits. */
+.mm-library-table {
+  container: mm-library-table / inline-size;
+  min-width: 0;
+}
+
+.mm-library-row {
+  display: grid;
+  grid-template-columns:
+    28px minmax(0, 2.4fr) minmax(0, 2fr) minmax(0, 1.2fr)
+    minmax(0, 1.2fr) 5.5rem 5rem;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--mm-border-sidebar);
+  font-size: var(--mm-type-body);
+  color: var(--mm-text2);
+}
+
+.mm-library-row--head {
+  border-bottom-color: var(--mm-line);
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 600;
+  letter-spacing: var(--mm-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--mm-eyebrow-color);
+}
+
+.mm-library-row--open {
+  background: var(--mm-accent-soft);
+}
+
+.mm-library-row--would_change .mm-library-verdict {
+  color: var(--mm-text1);
+}
+
+.mm-library-row--cannot_process .mm-library-verdict {
+  color: var(--mm-status-warning-text);
+}
+
+.mm-library-row--matches .mm-library-verdict {
+  color: var(--mm-text3);
+}
+
+.mm-library-group {
+  display: contents;
+}
+
+.mm-library-grouprow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 16px 8px 6px;
+  border-bottom: 1px solid var(--mm-line);
+}
+
+.mm-library-grouprow__title {
+  font-size: var(--mm-type-panel);
+  font-weight: 600;
+  color: var(--mm-text1);
+}
+
+.mm-library-grouprow__meta {
+  font-size: var(--mm-type-caption);
+  color: var(--mm-text3);
+}
+
+.mm-library-check {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--mm-accent);
+}
+
+.mm-library-name button {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--mm-text1);
+  font: 500 var(--mm-type-body) var(--mm-font);
+  text-align: left;
+  /* The whole name, wrapping between its parts (FileName), never cut to "…". */
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.mm-library-name button:hover {
+  color: var(--mm-accent-bright);
+}
+
+.mm-library-name button:focus-visible {
+  outline: 2px solid var(--mm-accent-ring);
+  outline-offset: 2px;
+}
+
+.mm-library-verdict,
+.mm-library-tracks {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-library-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mm-library-more {
+  margin: 12px 0 0;
+  font-size: var(--mm-type-caption);
+  color: var(--mm-text3);
+}
+
+/* Compact rows: the one density choice that changes what fits rather than how big everything is. */
+.mm-library-table--compact .mm-library-row {
+  padding: 3px 8px;
+  font-size: var(--mm-type-caption);
+}
+
+.mm-library-table--compact .mm-library-name button {
+  font-size: var(--mm-type-caption);
+}
+
+.mm-library-table--compact .mm-library-grouprow {
+  padding: 10px 8px 4px;
+}
+
+@container mm-library-table (max-width: 860px) {
+  .mm-library-row {
+    grid-template-columns: 28px minmax(0, 2.4fr) minmax(0, 2fr) 5.5rem;
+  }
+
+  .mm-library-tracks,
+  .mm-library-row--head span:nth-child(4),
+  .mm-library-row--head span:nth-child(5),
+  .mm-library-row--head span:nth-child(7),
+  .mm-library-row > span:nth-child(7) {
+    display: none;
+  }
+}
+
+@container mm-library-table (max-width: 620px) {
+  .mm-library-row {
+    grid-template-columns: 28px minmax(0, 1fr) 5.5rem;
+  }
+
+  .mm-library-verdict {
+    grid-column: 2 / -1;
+    white-space: normal;
+    font-size: var(--mm-type-caption);
+    color: var(--mm-text3);
+  }
+
+  .mm-library-row--head span:nth-child(3) {
+    display: none;
+  }
+}

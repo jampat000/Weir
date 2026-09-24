@@ -14,14 +14,18 @@ const files: {
   status_counts: Record<string, number>;
 } = { files: [], status_counts: {} };
 const requeue = vi.fn();
+const processNow = vi.fn();
 const fetchLog = vi.fn<(id: number) => Promise<ProcessingFileLog>>();
 
-vi.mock("../../lib/processing/files-queries", () => {
+vi.mock("../../lib/processing/files-queries", async (importOriginal) => {
   const mutation = (fn = vi.fn()) => ({
     mutateAsync: fn,
     isPending: false,
   });
   return {
+    ...(await importOriginal<
+      typeof import("../../lib/processing/files-queries")
+    >()),
     useProcessingFilesQuery: () => ({
       data: files,
       isLoading: false,
@@ -33,7 +37,7 @@ vi.mock("../../lib/processing/files-queries", () => {
     useForgetProcessingFile: () => mutation(),
     useMoveProcessingFileToTop: () => mutation(),
     useProcessingWhyHeld: () => mutation(),
-    useProcessProcessingFileNow: () => mutation(),
+    useProcessProcessingFileNow: () => mutation(processNow),
     useProcessingCheckLibraryAgain: () => mutation(),
     useProcessingFileTracks: () => mutation(),
     useSubmitProcessingManualPlan: () => mutation(),
@@ -86,8 +90,8 @@ function file(partial: Partial<ProcessingFile>): ProcessingFile {
     progress_eta_seconds: null,
     hold_until: null,
     size_changed_at: null,
-    created_at: "2026-09-23T04:00:00",
-    updated_at: "2026-09-23T04:00:00",
+    created_at: "2026-08-19T04:00:00",
+    updated_at: "2026-08-19T04:00:00",
     last_seen_at: null,
     last_attempt_at: null,
     ...partial,
@@ -110,6 +114,7 @@ function renderPage(entry = "/history") {
 describe("HistoryPage", () => {
   beforeEach(() => {
     requeue.mockReset();
+    processNow.mockReset();
     fetchLog.mockReset();
     files.files = [
       file({ id: 1 }),
@@ -118,7 +123,7 @@ describe("HistoryPage", () => {
         relative_path: "Glass Orchard/Glass.Orchard.S03E03.mkv",
         status: "processing_failed",
         status_reason: "The download ended early.",
-        updated_at: "2026-09-23T03:00:00",
+        updated_at: "2026-08-19T03:00:00",
       }),
     ];
   });
@@ -151,7 +156,7 @@ describe("HistoryPage", () => {
       entries: [
         {
           id: 9,
-          recorded_at: "2026-09-23T04:00:00",
+          recorded_at: "2026-08-19T04:00:00",
           outcome: "live_output_written",
           title: "",
           library_name: "TV",
@@ -210,5 +215,41 @@ describe("HistoryPage", () => {
       await within(detail).findByText("Queued again."),
     ).toBeInTheDocument();
     expect(requeue).toHaveBeenCalledWith(2);
+  });
+
+  it("asks before passing a file through unchanged, and does nothing when told not now", async () => {
+    fetchLog.mockResolvedValue({
+      file_id: 2,
+      relative_path: "",
+      retention_days: 90,
+      entries: [],
+    });
+    processNow.mockResolvedValue({});
+    renderPage("/history?file=2");
+    const detail = screen.getByTestId("history-detail");
+    const passThrough = within(detail).getByRole("button", {
+      name: "Pass through unchanged",
+    });
+
+    fireEvent.click(passThrough);
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+    expect(processNow).not.toHaveBeenCalled();
+
+    fireEvent.click(passThrough);
+    const dialog = screen.getByRole("dialog", {
+      name: "Pass this file through unchanged?",
+    });
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Pass through unchanged" }),
+    );
+
+    expect(
+      await within(detail).findByText(
+        "Queued to pass through unchanged. Weir checks the copy before removing the original.",
+      ),
+    ).toBeInTheDocument();
+    expect(processNow).toHaveBeenCalledWith(
+      expect.objectContaining({ library_id: 1, pass_through_unchanged: true }),
+    );
   });
 });

@@ -1,10 +1,10 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { PageLoading } from "../components/shared/page-loading";
-import { useSuiteSettingsQuery } from "../lib/suite/queries";
+import { useAppSettingsQuery } from "../lib/settings/queries";
 
 export function RequireSetupWizard() {
   const location = useLocation();
-  const settingsQ = useSuiteSettingsQuery();
+  const settingsQ = useAppSettingsQuery();
 
   if (settingsQ.isPending) {
     return <PageLoading label="Loading setup" />;

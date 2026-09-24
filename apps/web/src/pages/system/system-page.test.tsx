@@ -4,29 +4,22 @@ import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentSession, UserPublic } from "../../lib/api/types";
-import { qk } from "../../lib/auth/queries";
-import * as suiteSettingsApi from "../../lib/suite/suite-settings-api";
-import {
-  suiteConfigurationBackupsQueryKey,
-  suiteLogsQueryKey,
-  suiteMetricsQueryKey,
-  suiteSecurityOverviewQueryKey,
-  suiteSettingsQueryKey,
-  suiteUpdateStatusQueryKey,
-} from "../../lib/suite/queries";
+import { authKeys } from "../../lib/auth/query-keys";
+import * as settingsApi from "../../lib/settings/settings-api";
+import { settingsKeys } from "../../lib/settings/query-keys";
 import type {
-  SuiteLogsOut,
-  SuiteMetricsOut,
-  SuiteSecurityOverviewOut,
-  SuiteSettingsOut,
-  SuiteUpdateStatusOut,
-} from "../../lib/suite/types";
+  ServerLogs,
+  ServerMetrics,
+  SecurityOverview,
+  AppSettings,
+  UpdateStatus,
+} from "../../lib/settings/types";
 import { SystemPage } from "./system-page";
 
 const operatorMe: UserPublic = { id: 1, username: "alice", role: "operator" };
 const viewerMe: UserPublic = { id: 2, username: "bob", role: "viewer" };
 
-const minimalSuiteSettings: SuiteSettingsOut = {
+const minimalAppSettings: AppSettings = {
   product_display_name: "Weir",
   signed_in_home_notice: null,
   setup_wizard_state: "pending",
@@ -40,7 +33,7 @@ const minimalSuiteSettings: SuiteSettingsOut = {
   updated_at: "2026-04-11T00:00:00Z",
 };
 
-const minimalUpdateStatus: SuiteUpdateStatusOut = {
+const minimalUpdateStatus: UpdateStatus = {
   current_version: "1.0.0",
   install_type: "source",
   status: "up_to_date",
@@ -57,7 +50,7 @@ const minimalUpdateStatus: SuiteUpdateStatusOut = {
   in_app_upgrade_summary: null,
 };
 
-const windowsUpdateAvailableStatus: SuiteUpdateStatusOut = {
+const windowsUpdateAvailableStatus: UpdateStatus = {
   ...minimalUpdateStatus,
   current_version: "2.0.7",
   install_type: "windows",
@@ -72,7 +65,7 @@ const windowsUpdateAvailableStatus: SuiteUpdateStatusOut = {
     "Updates are managed by the Weir desktop app via Velopack.",
 };
 
-const minimalSecurity: SuiteSecurityOverviewOut = {
+const minimalSecurity: SecurityOverview = {
   session_signing_configured: true,
   sign_in_cookie_https_mode: "auto",
   sign_in_cookie_https_plain:
@@ -104,7 +97,7 @@ const minimalCurrentSession: CurrentSession = {
   absolute_timeout_days: 365,
 };
 
-const minimalLogs: SuiteLogsOut = {
+const minimalLogs: ServerLogs = {
   items: [],
   total: 0,
   counts: {
@@ -114,7 +107,7 @@ const minimalLogs: SuiteLogsOut = {
   },
 };
 
-const minimalMetrics: SuiteMetricsOut = {
+const minimalMetrics: ServerMetrics = {
   uptime_seconds: 3600,
   total_requests: 20,
   average_response_ms: 12,
@@ -135,28 +128,28 @@ function wrap(ui: ReactNode, client: QueryClient) {
 function renderSettings(
   me: UserPublic,
   overrides?: {
-    updateStatus?: SuiteUpdateStatusOut;
+    updateStatus?: UpdateStatus;
     initialEntries?: string[];
   },
 ) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
-  qc.setQueryData(suiteSettingsQueryKey, minimalSuiteSettings);
-  qc.setQueryData(suiteSecurityOverviewQueryKey, minimalSecurity);
-  qc.setQueryData(qk.me, me);
-  qc.setQueryData(qk.session, minimalCurrentSession);
-  qc.setQueryData(suiteConfigurationBackupsQueryKey, {
+  qc.setQueryData(settingsKeys.app, minimalAppSettings);
+  qc.setQueryData(settingsKeys.securityOverview, minimalSecurity);
+  qc.setQueryData(authKeys.me, me);
+  qc.setQueryData(authKeys.session, minimalCurrentSession);
+  qc.setQueryData(settingsKeys.configurationBackups, {
     directory: "C:/Weir/backups/suite-configuration",
     items: [],
   });
   qc.setQueryData(
-    suiteUpdateStatusQueryKey,
+    settingsKeys.updateStatus,
     overrides?.updateStatus ?? minimalUpdateStatus,
   );
   qc.setQueryData(
     [
-      ...suiteLogsQueryKey,
+      ...settingsKeys.logs,
       {
         level: undefined,
         search: undefined,
@@ -166,7 +159,7 @@ function renderSettings(
     ],
     minimalLogs,
   );
-  qc.setQueryData(suiteMetricsQueryKey, minimalMetrics);
+  qc.setQueryData(settingsKeys.metrics, minimalMetrics);
   const router = createMemoryRouter(
     [{ path: "*", element: <SystemPage /> }],
     overrides?.initialEntries
@@ -187,7 +180,7 @@ async function renderSettingsWithSupportConfig(
     showPlaceholder: boolean;
     supportUrl: string | null;
   },
-  overrides?: { updateStatus?: SuiteUpdateStatusOut },
+  overrides?: { updateStatus?: UpdateStatus },
 ) {
   vi.resetModules();
   vi.doMock("../../lib/support", () => ({
@@ -202,21 +195,21 @@ async function renderSettingsWithSupportConfig(
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
-  qc.setQueryData(suiteSettingsQueryKey, minimalSuiteSettings);
-  qc.setQueryData(suiteSecurityOverviewQueryKey, minimalSecurity);
-  qc.setQueryData(qk.me, me);
-  qc.setQueryData(qk.session, minimalCurrentSession);
-  qc.setQueryData(suiteConfigurationBackupsQueryKey, {
+  qc.setQueryData(settingsKeys.app, minimalAppSettings);
+  qc.setQueryData(settingsKeys.securityOverview, minimalSecurity);
+  qc.setQueryData(authKeys.me, me);
+  qc.setQueryData(authKeys.session, minimalCurrentSession);
+  qc.setQueryData(settingsKeys.configurationBackups, {
     directory: "C:/Weir/backups/suite-configuration",
     items: [],
   });
   qc.setQueryData(
-    suiteUpdateStatusQueryKey,
+    settingsKeys.updateStatus,
     overrides?.updateStatus ?? minimalUpdateStatus,
   );
   qc.setQueryData(
     [
-      ...suiteLogsQueryKey,
+      ...settingsKeys.logs,
       {
         level: undefined,
         search: undefined,
@@ -226,7 +219,7 @@ async function renderSettingsWithSupportConfig(
     ],
     minimalLogs,
   );
-  qc.setQueryData(suiteMetricsQueryKey, minimalMetrics);
+  qc.setQueryData(settingsKeys.metrics, minimalMetrics);
   return render(wrap(<SettingsPageWithMockedSupport />, qc));
 }
 
@@ -344,14 +337,14 @@ describe("SystemPage", () => {
   });
 
   it("saves how long Activity history is kept, including 0 for until cleared", async () => {
-    vi.spyOn(suiteSettingsApi, "fetchSuiteSettings").mockResolvedValue(
-      minimalSuiteSettings,
+    vi.spyOn(settingsApi, "fetchAppSettings").mockResolvedValue(
+      minimalAppSettings,
     );
-    const putSuiteSettingsSpy = vi
-      .spyOn(suiteSettingsApi, "putSuiteSettings")
+    const putAppSettingsSpy = vi
+      .spyOn(settingsApi, "putAppSettings")
       .mockImplementation(async (body) => ({
-        ...minimalSuiteSettings,
-        activity_retention_days: body.activity_retention_days,
+        ...minimalAppSettings,
+        activity_retention_days: body.activity_retention_days ?? 0,
       }));
 
     renderSettings(operatorMe, { initialEntries: ["/system?tab=history"] });
@@ -363,26 +356,26 @@ describe("SystemPage", () => {
     fireEvent.click(screen.getByTestId("suite-settings-save-logs"));
 
     await waitFor(() => {
-      expect(putSuiteSettingsSpy).toHaveBeenCalledTimes(1);
+      expect(putAppSettingsSpy).toHaveBeenCalledTimes(1);
     });
-    expect(putSuiteSettingsSpy.mock.calls[0]?.[0]).toMatchObject({
+    expect(putAppSettingsSpy.mock.calls[0]?.[0]).toMatchObject({
       activity_retention_days: 0,
       log_retention_days: 30,
     });
   });
 
   it("allows changing and saving backup schedule more than once", async () => {
-    let currentSavedSettings: SuiteSettingsOut = {
-      ...minimalSuiteSettings,
+    let currentSavedSettings: AppSettings = {
+      ...minimalAppSettings,
       configuration_backup_enabled: true,
       configuration_backup_interval_hours: 24,
       configuration_backup_preferred_time: "02:00",
     };
-    vi.spyOn(suiteSettingsApi, "fetchSuiteSettings").mockImplementation(
+    vi.spyOn(settingsApi, "fetchAppSettings").mockImplementation(
       async () => currentSavedSettings,
     );
-    const putSuiteSettingsSpy = vi
-      .spyOn(suiteSettingsApi, "putSuiteSettings")
+    const putAppSettingsSpy = vi
+      .spyOn(settingsApi, "putAppSettings")
       .mockImplementation(async (body) => {
         currentSavedSettings = {
           ...currentSavedSettings,
@@ -410,7 +403,7 @@ describe("SystemPage", () => {
     );
 
     await waitFor(() => {
-      expect(putSuiteSettingsSpy).toHaveBeenCalledTimes(1);
+      expect(putAppSettingsSpy).toHaveBeenCalledTimes(1);
     });
     await waitFor(() => {
       expect(
@@ -432,9 +425,9 @@ describe("SystemPage", () => {
     fireEvent.click(saveButton);
 
     await waitFor(() => {
-      expect(putSuiteSettingsSpy).toHaveBeenCalledTimes(2);
+      expect(putAppSettingsSpy).toHaveBeenCalledTimes(2);
     });
-    expect(putSuiteSettingsSpy.mock.calls[1]?.[0]).toMatchObject({
+    expect(putAppSettingsSpy.mock.calls[1]?.[0]).toMatchObject({
       configuration_backup_interval_hours: 24,
       configuration_backup_preferred_time: "04:15",
     });
@@ -506,24 +499,24 @@ describe("SystemPage", () => {
   });
 
   it("shows Checking... and disables button when refetch is in flight", async () => {
-    vi.spyOn(suiteSettingsApi, "fetchSuiteUpdateStatus").mockImplementation(
+    vi.spyOn(settingsApi, "fetchUpdateStatus").mockImplementation(
       () => new Promise(() => {}),
     );
     const qc = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Infinity } },
     });
-    qc.setQueryData(suiteSettingsQueryKey, minimalSuiteSettings);
-    qc.setQueryData(suiteSecurityOverviewQueryKey, minimalSecurity);
-    qc.setQueryData(qk.me, operatorMe);
-    qc.setQueryData(qk.session, minimalCurrentSession);
-    qc.setQueryData(suiteConfigurationBackupsQueryKey, {
+    qc.setQueryData(settingsKeys.app, minimalAppSettings);
+    qc.setQueryData(settingsKeys.securityOverview, minimalSecurity);
+    qc.setQueryData(authKeys.me, operatorMe);
+    qc.setQueryData(authKeys.session, minimalCurrentSession);
+    qc.setQueryData(settingsKeys.configurationBackups, {
       directory: "C:/Weir/backups/suite-configuration",
       items: [],
     });
-    qc.setQueryData(suiteUpdateStatusQueryKey, windowsUpdateAvailableStatus);
+    qc.setQueryData(settingsKeys.updateStatus, windowsUpdateAvailableStatus);
     qc.setQueryData(
       [
-        ...suiteLogsQueryKey,
+        ...settingsKeys.logs,
         {
           level: undefined,
           search: undefined,
@@ -533,7 +526,7 @@ describe("SystemPage", () => {
       ],
       minimalLogs,
     );
-    qc.setQueryData(suiteMetricsQueryKey, minimalMetrics);
+    qc.setQueryData(settingsKeys.metrics, minimalMetrics);
 
     render(wrap(<SystemPage />, qc));
     fireEvent.click(screen.getByRole("tab", { name: "About" }));
