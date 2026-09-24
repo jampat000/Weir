@@ -58,6 +58,7 @@ public sealed class SqliteDatabase
 
     private readonly Lock? _poolGate;
     private readonly ILogger? _logger;
+    private readonly int _busyTimeoutMilliseconds;
 
     /// <param name="databasePath">The SQLite file.</param>
     /// <param name="pooling">
@@ -69,11 +70,16 @@ public sealed class SqliteDatabase
     /// would be — each gets a genuinely fresh, unshared connection instead.
     /// </param>
     /// <param name="logger">Where a pooled connection found still inside a transaction is reported.</param>
-    public SqliteDatabase(string databasePath, bool pooling = true, ILogger<SqliteDatabase>? logger = null)
+    /// <param name="busyTimeoutMilliseconds">
+    /// Overrides <see cref="BusyTimeoutMilliseconds"/>. Production never passes this; a test that needs a
+    /// write-lock wait to fail fast, instead of tying up thirty real seconds, can shrink it here.
+    /// </param>
+    public SqliteDatabase(string databasePath, bool pooling = true, ILogger<SqliteDatabase>? logger = null, int? busyTimeoutMilliseconds = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(databasePath);
         DatabasePath = databasePath;
         _logger = logger;
+        _busyTimeoutMilliseconds = busyTimeoutMilliseconds ?? BusyTimeoutMilliseconds;
         ConnectionString = new SqliteConnectionStringBuilder
         {
             DataSource = databasePath,
@@ -87,7 +93,7 @@ public sealed class SqliteDatabase
             // exactly that while never being able to succeed, wasting the whole thirty seconds. Units of
             // work take the write lock at BEGIN (UnitOfWork.EnsureTransaction), so no transaction here can
             // hold a stale snapshot (#586).
-            DefaultTimeout = BusyTimeoutMilliseconds / 1000,
+            DefaultTimeout = _busyTimeoutMilliseconds / 1000,
         }.ToString();
         _poolGate = pooling ? PoolGates.GetOrAdd(ConnectionString, static _ => new Lock()) : null;
     }
@@ -125,7 +131,7 @@ public sealed class SqliteDatabase
         var connection = OpenOutsideAnyTransaction();
         try
         {
-            await ApplyPragmasAsync(connection, cancellationToken).ConfigureAwait(false);
+            await ApplyPragmasAsync(connection, _busyTimeoutMilliseconds, cancellationToken).ConfigureAwait(false);
             return connection;
         }
         catch
@@ -140,7 +146,7 @@ public sealed class SqliteDatabase
         var connection = OpenOutsideAnyTransaction();
         try
         {
-            ApplyPragmasAsync(connection, CancellationToken.None).GetAwaiter().GetResult();
+            ApplyPragmasAsync(connection, _busyTimeoutMilliseconds, CancellationToken.None).GetAwaiter().GetResult();
             return connection;
         }
         catch
@@ -263,11 +269,11 @@ public sealed class SqliteDatabase
         }
     }
 
-    private static async Task ApplyPragmasAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    private static async Task ApplyPragmasAsync(SqliteConnection connection, int busyTimeoutMilliseconds, CancellationToken cancellationToken)
     {
         await ExecuteAsync(connection, "PRAGMA journal_mode=WAL", cancellationToken).ConfigureAwait(false);
         await ExecuteAsync(connection, "PRAGMA foreign_keys=ON", cancellationToken).ConfigureAwait(false);
-        await ExecuteAsync(connection, $"PRAGMA busy_timeout={BusyTimeoutMilliseconds}", cancellationToken).ConfigureAwait(false);
+        await ExecuteAsync(connection, $"PRAGMA busy_timeout={busyTimeoutMilliseconds}", cancellationToken).ConfigureAwait(false);
         await ExecuteAsync(connection, "PRAGMA synchronous=NORMAL", cancellationToken).ConfigureAwait(false);
         var handle = connection.Handle!;
         if (!TunedHandles.TryGetValue(handle, out _))

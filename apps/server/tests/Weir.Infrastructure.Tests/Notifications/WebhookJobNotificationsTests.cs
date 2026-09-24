@@ -35,7 +35,7 @@ public sealed class WebhookJobNotificationsTests : IDisposable
     /// </summary>
     private async Task<List<(string Url, string Body)>> PostsAsync()
     {
-        await _dispatcher.WhenIdleAsync();
+        await _dispatcher.WhenIdleAsync().WaitAsync(TimeSpan.FromSeconds(30));
         return _poster.Posts;
     }
 

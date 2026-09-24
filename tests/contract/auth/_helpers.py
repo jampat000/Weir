@@ -173,7 +173,19 @@ def parse_utc_text(value: str) -> datetime:
 
 
 def wait_past(moment: datetime) -> None:
-    """Block until the wall clock is past ``moment`` (a deadline the test chose, not a guess)."""
+    """Block until the wall clock is past ``moment`` (a deadline the test chose, not a guess).
+
+    A caller that only needs a session to already be expired when the server starts should seed it that
+    way directly (``absolute_expires_at`` in the past) instead of calling this: no restart needed, no wait.
+    This exists for the other case, where a test needs the *running* server's own clock to carry a still-live
+    session past its expiry, so its request-time check (AuthService.LoadValidSessionAsync revoking it, not
+    Weir.Host.WeirServer's own startup cleanup deleting it outright) is what actually gets exercised.
+    Seeding it pre-expired cannot stand in for that: seeding requires stopping the server
+    (tests.contract.support.seed), and starting it again runs AuthStore.DeleteInactiveSessionsAsync
+    unconditionally before the HTTP surface opens, which would delete an already-past-expiry row before any
+    request could observe it "expired but still there". The wait is real time because the thing under test
+    is what happens while wall-clock time passes on a server that stays up the whole time.
+    """
 
     remaining = (moment - datetime.now(UTC)).total_seconds()
     if remaining > 0:
