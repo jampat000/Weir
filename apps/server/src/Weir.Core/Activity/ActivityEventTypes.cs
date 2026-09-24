@@ -67,4 +67,8 @@ public static class LibraryActivityEventTypes
     public const string FileCleaned = "library.file_cleaned";
     public const string FileSkipped = "library.file_skipped";
     public const string FileFailed = "library.file_failed";
+
+    /// <summary>#735: a crash left a kept original that does not match its backup's contents. Recorded once per swap by
+    /// <c>SwapRecoverySweep</c>, which then stops retrying it (<c>SwapJournalState.KeepConflict</c>).</summary>
+    public const string OriginalKeepConflict = "library.original_keep_conflict";
 }

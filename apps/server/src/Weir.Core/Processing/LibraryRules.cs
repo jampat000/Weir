@@ -133,7 +133,10 @@ public static class LibraryRules
         return IsAncestor(a, b) || IsAncestor(b, a);
     }
 
-    private static bool IsAncestor(string ancestor, string descendant) =>
+    /// <summary>Whether <paramref name="ancestor"/> is a path-segment ancestor of <paramref name="descendant"/> (not equal to
+    /// it). Directional, unlike <see cref="FoldersOverlap"/>: <c>Weir.Core.LibraryMode.LibraryFolderRules</c> reuses this to
+    /// tell "originals folder sits inside a library folder" (fine) from "originals folder contains one" (not fine).</summary>
+    internal static bool IsAncestor(string ancestor, string descendant) =>
         descendant.Length > ancestor.Length &&
         descendant.StartsWith(ancestor, StringComparison.Ordinal) &&
         (ancestor == "/" || descendant[ancestor.Length] == '/');
