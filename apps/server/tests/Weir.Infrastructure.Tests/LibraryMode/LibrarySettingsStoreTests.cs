@@ -8,6 +8,7 @@ namespace Weir.Infrastructure.Tests.LibraryMode;
 public sealed class LibrarySettingsStoreTests : IDisposable
 {
     private readonly JobsTestDatabase _db = new();
+    private readonly LibrarySettingsStore _store = new();
 
     public void Dispose() => _db.Dispose();
 
@@ -17,7 +18,7 @@ public sealed class LibrarySettingsStoreTests : IDisposable
         var libraryId = _db.AddLibrary();
         await using var uow = await UnitOfWork.OpenAsync(_db.Database);
 
-        var settings = await LibrarySettingsStore.GetAsync(uow, libraryId);
+        var settings = await _store.GetAsync(uow, libraryId);
 
         Assert.False(settings.KeepOriginalAfterClean);
         Assert.Equal(string.Empty, settings.OriginalsFolder);
@@ -31,12 +32,12 @@ public sealed class LibrarySettingsStoreTests : IDisposable
             ["/srv/in"], ScheduleEnabled: false, KeepOriginalAfterClean: true, OriginalsFolder: "/srv/originals");
         await using (var uow = await UnitOfWork.OpenAsync(_db.Database))
         {
-            await LibrarySettingsStore.SetAsync(uow, libraryId, settings);
+            await _store.SetAsync(uow, libraryId, settings);
             await uow.CommitAsync();
         }
 
         await using var read = await UnitOfWork.OpenAsync(_db.Database);
-        var restored = await LibrarySettingsStore.GetAsync(read, libraryId);
+        var restored = await _store.GetAsync(read, libraryId);
 
         Assert.True(restored.KeepOriginalAfterClean);
         Assert.Equal("/srv/originals", restored.OriginalsFolder);
@@ -48,20 +49,20 @@ public sealed class LibrarySettingsStoreTests : IDisposable
         var libraryId = _db.AddLibrary();
         await using (var uow = await UnitOfWork.OpenAsync(_db.Database))
         {
-            await LibrarySettingsStore.SetAsync(
+            await _store.SetAsync(
                 uow, libraryId, new LibrarySettings(["/srv/in"], ScheduleEnabled: false, KeepOriginalAfterClean: true, OriginalsFolder: "/srv/originals"));
             await uow.CommitAsync();
         }
 
         await using (var uow = await UnitOfWork.OpenAsync(_db.Database))
         {
-            var existing = await LibrarySettingsStore.GetAsync(uow, libraryId);
-            await LibrarySettingsStore.SetAsync(uow, libraryId, existing with { KeepOriginalAfterClean = false });
+            var existing = await _store.GetAsync(uow, libraryId);
+            await _store.SetAsync(uow, libraryId, existing with { KeepOriginalAfterClean = false });
             await uow.CommitAsync();
         }
 
         await using var read = await UnitOfWork.OpenAsync(_db.Database);
-        var restored = await LibrarySettingsStore.GetAsync(read, libraryId);
+        var restored = await _store.GetAsync(read, libraryId);
         Assert.False(restored.KeepOriginalAfterClean);
         // The folder a person typed is kept even while the switch is off, so turning it back on remembers it.
         Assert.Equal("/srv/originals", restored.OriginalsFolder);

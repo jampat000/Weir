@@ -17,7 +17,7 @@ public sealed record ProcessingOverviewStats(
     double NetSpaceSavedPercent);
 
 /// <summary>The Processing overview's statistics.</summary>
-public static class OverviewStatsStore
+public sealed class OverviewStatsStore
 {
     private const string RemuxPassJobKind = "processing.file.remux_pass.v1";
     private const string OutcomeLiveOutputWritten = "live_output_written";
@@ -26,7 +26,7 @@ public static class OverviewStatsStore
     /// <summary>The completed passes of the window, whose details carry the sizes and outcomes.</summary>
     internal const string RecentResultsSql = "SELECT detail FROM activity_events WHERE event_type = @type AND created_at >= @since";
 
-    public static async Task<ProcessingOverviewStats> BuildAsync(UnitOfWork uow, int windowDays, TimeProvider time)
+    public async Task<ProcessingOverviewStats> BuildAsync(UnitOfWork uow, int windowDays, TimeProvider time)
     {
         var days = Math.Max(1, windowDays);
         var since = time.GetUtcNow().AddDays(-days);

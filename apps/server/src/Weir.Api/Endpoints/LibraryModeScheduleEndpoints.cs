@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Validation;
@@ -17,11 +18,36 @@ public static class LibraryModeScheduleEndpoints
 {
     public static IEndpointRouteBuilder MapLibraryModeScheduleEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("POST", "/processing/libraries/{library_id}/library-schedule", PostScheduleAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<LibraryModeScheduleEndpointHandlers>();
+        endpoints.MapV1("POST", "/processing/libraries/{library_id}/library-schedule", handlers.PostScheduleAsync);
         return endpoints;
     }
+}
 
-    private static async Task<ApiResult> PostScheduleAsync(ApiRequest request)
+/// <summary>Handlers for <see cref="LibraryModeScheduleEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class LibraryModeScheduleEndpointHandlers
+{
+    private readonly LibrarySettingsStore _librarySettings;
+    private readonly LibraryScanStore _scans;
+    private readonly MediaManagerConnectionService _connections;
+    private readonly IHardlinkInspector _hardlinkInspector;
+    private readonly RedownloadRiskChecker _riskChecker;
+
+    public LibraryModeScheduleEndpointHandlers(
+        LibrarySettingsStore librarySettings,
+        LibraryScanStore scans,
+        MediaManagerConnectionService connections,
+        IHardlinkInspector hardlinkInspector,
+        RedownloadRiskChecker riskChecker)
+    {
+        _librarySettings = librarySettings ?? throw new ArgumentNullException(nameof(librarySettings));
+        _scans = scans ?? throw new ArgumentNullException(nameof(scans));
+        _connections = connections ?? throw new ArgumentNullException(nameof(connections));
+        _hardlinkInspector = hardlinkInspector ?? throw new ArgumentNullException(nameof(hardlinkInspector));
+        _riskChecker = riskChecker ?? throw new ArgumentNullException(nameof(riskChecker));
+    }
+
+    public async Task<ApiResult> PostScheduleAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -38,27 +64,27 @@ public static class LibraryModeScheduleEndpoints
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var library = await RequireLibraryAsync(uow, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
-        var settings = await LibrarySettingsStore.GetAsync(uow, libraryId).ConfigureAwait(false);
+        var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
 
         if (enabled && !settings.ScheduleEnabled)
         {
             // #505 point 7: turning the schedule on shows the same final-removal warning once, using whatever the last scan found.
-            var files = await LibraryScanStore.CurrentFilesAsync(uow, libraryId).ConfigureAwait(false);
+            var files = await _scans.CurrentFilesAsync(uow, libraryId).ConfigureAwait(false);
             var (removingFiles, removingTracks, bytesSaved) = LibraryModeMapping.RemovalTotals(files);
             if (removingFiles > 0 && !confirmed)
             {
                 var rules = await LibraryModeMapping.RulesForAsync(uow, library).ConfigureAwait(false);
-                var connectionsById = await LibraryModeMapping.ConnectionsForFilesAsync(uow, request.Service<MediaManagerConnectionService>(), files).ConfigureAwait(false);
+                var connectionsById = await LibraryModeMapping.ConnectionsForFilesAsync(uow, _connections, files).ConfigureAwait(false);
                 var preflight = await LibraryCleanPreflightRunner.RunAsync(
-                        files, settings, rules, library.MediaType, request.Service<IHardlinkInspector>(),
-                        request.Service<RedownloadRiskChecker>(), connectionsById, request.Context.RequestAborted)
+                        files, settings, rules, library.MediaType, _hardlinkInspector,
+                        _riskChecker, connectionsById, request.Context.RequestAborted)
                     .ConfigureAwait(false);
                 return LibraryModeMapping.ConfirmationRequired(removingFiles, removingTracks, bytesSaved, LibraryCleanPreflightRunner.WarningMessages(preflight));
             }
         }
 
         var updated = settings with { ScheduleEnabled = enabled };
-        await LibrarySettingsStore.SetAsync(uow, libraryId, updated).ConfigureAwait(false);
+        await _librarySettings.SetAsync(uow, libraryId, updated).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(LibraryModeMapping.SettingsOut(updated));
     }

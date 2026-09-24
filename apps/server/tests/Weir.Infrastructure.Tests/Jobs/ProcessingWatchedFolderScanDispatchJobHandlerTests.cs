@@ -28,7 +28,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         var ports = new HttpMediaManagerPorts(new FakeManagerHttp());
         var connections = new MediaManagerConnectionService(store.Options, cipher, ports);
         var jobs = new ProcessingJobStore(store.Database, store.Clock);
-        var handler = new ProcessingWatchedFolderScanDispatchJobHandler(store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()));
+        var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
+            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore());
         // Zero out the operator-wide minimum age/size so these tests assert scan
         // dispatch itself, not the settling/hold-timer gates a freshly written test file would otherwise trip.
         await store.Execute(

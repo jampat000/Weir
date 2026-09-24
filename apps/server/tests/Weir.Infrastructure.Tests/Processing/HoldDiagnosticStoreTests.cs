@@ -16,6 +16,8 @@ namespace Weir.Infrastructure.Tests.Processing;
 /// </summary>
 public sealed class HoldDiagnosticStoreTests
 {
+    private static readonly HoldDiagnosticStore HoldDiagnostic = new();
+
     private static async Task<(StoreFixture Store, FakeManagerHttp Http, MediaManagerConnectionService Connections)> BuildAsync()
     {
         var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "hold-diagnostic-tests-credentials-secret"));
@@ -60,7 +62,7 @@ public sealed class HoldDiagnosticStoreTests
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
         var file = await FileStateStore.GetAsync(uow, fileId);
         var library = await LibraryStore.GetAsync(uow, libraryId);
-        var outcome = await HoldDiagnosticStore.EvaluateAsync(uow, file!, library!, connections);
+        var outcome = await HoldDiagnostic.EvaluateAsync(uow, file!, library!, connections);
 
         Assert.Equal(CandidateGateVerdict.WaitUpstream, outcome.Verdict);
         Assert.True(outcome.Owned);
@@ -81,7 +83,7 @@ public sealed class HoldDiagnosticStoreTests
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
         var file = await FileStateStore.GetAsync(uow, fileId);
         var library = await LibraryStore.GetAsync(uow, libraryId);
-        var outcome = await HoldDiagnosticStore.EvaluateAsync(uow, file!, library!, connections);
+        var outcome = await HoldDiagnostic.EvaluateAsync(uow, file!, library!, connections);
 
         Assert.Equal(CandidateGateVerdict.NotHeld, outcome.Verdict);
         Assert.False(outcome.Owned);
@@ -99,7 +101,7 @@ public sealed class HoldDiagnosticStoreTests
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
         var file = await FileStateStore.GetAsync(uow, fileId);
         var library = await LibraryStore.GetAsync(uow, libraryId);
-        var outcome = await HoldDiagnosticStore.EvaluateAsync(uow, file!, library!, connections);
+        var outcome = await HoldDiagnostic.EvaluateAsync(uow, file!, library!, connections);
 
         Assert.Equal(CandidateGateVerdict.NoUpstreamSignal, outcome.Verdict);
         Assert.Equal(0, outcome.ManagersConsulted);
@@ -118,7 +120,7 @@ public sealed class HoldDiagnosticStoreTests
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
         var file = await FileStateStore.GetAsync(uow, fileId);
         var library = await LibraryStore.GetAsync(uow, libraryId);
-        var outcome = await HoldDiagnosticStore.EvaluateAsync(uow, file!, library!, connections);
+        var outcome = await HoldDiagnostic.EvaluateAsync(uow, file!, library!, connections);
 
         Assert.Equal(CandidateGateVerdict.NoUpstreamSignal, outcome.Verdict);
         Assert.Equal(0, outcome.ManagersReporting);

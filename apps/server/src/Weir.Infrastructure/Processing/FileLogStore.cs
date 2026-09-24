@@ -8,20 +8,20 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing;
 
 /// <summary>SQLite access for <c>file_logs</c>.</summary>
-public static class FileLogStore
+public sealed class FileLogStore
 {
     public const int MaxDetailChars = 200_000;
 
     private const string Columns = "id, file_id, library_id, relative_path, library_name, outcome, title, detail_json, recorded_at";
 
     /// <summary>Every retained pass over this file, newest first, matched by path.</summary>
-    public static Task<List<ProcessingFileLogRecord>> LogsForFileAsync(UnitOfWork uow, string relativePath, int limit) =>
+    public Task<List<ProcessingFileLogRecord>> LogsForFileAsync(UnitOfWork uow, string relativePath, int limit) =>
         uow.QueryAsync(
             $"SELECT {Columns} FROM file_logs WHERE relative_path = @path ORDER BY recorded_at DESC, id DESC LIMIT {Math.Max(1, Math.Min(limit, 500))}",
             Read, ("@path", relativePath));
 
     /// <summary>Parse a stored detail payload as a <see cref="WireObject"/>, never raising.</summary>
-    public static WireObject ParseDetail(string? raw)
+    public WireObject ParseDetail(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
         {
@@ -43,7 +43,7 @@ public static class FileLogStore
     }
 
     /// <summary>A plain-text rendering for attaching to a bug report.</summary>
-    public static string RenderLogText(IReadOnlyList<ProcessingFileLogRecord> rows)
+    public string RenderLogText(IReadOnlyList<ProcessingFileLogRecord> rows)
     {
         if (rows.Count == 0)
         {
@@ -96,7 +96,7 @@ public static class FileLogStore
     };
 
     /// <summary>Deletes records older than the retention window, a batch per transaction. 0 keeps everything.</summary>
-    public static Task<int> PruneAsync(SqliteDatabase database, long retentionDays, DateTimeOffset now, CancellationToken cancellationToken = default)
+    public Task<int> PruneAsync(SqliteDatabase database, long retentionDays, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
         if (retentionDays <= 0)
         {

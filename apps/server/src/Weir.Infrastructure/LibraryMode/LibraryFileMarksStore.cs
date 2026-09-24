@@ -13,10 +13,10 @@ public sealed record LibraryFileMark(string Path, DateTimeOffset? CleanedAt, boo
 /// scratch every time: anything a person decided, or anything Weir did rather than observed, has to be kept outside
 /// that picture or it lasts only until the next scan.
 /// </summary>
-public static class LibraryFileMarksStore
+public sealed class LibraryFileMarksStore
 {
     /// <summary>Weir finished cleaning this file, now.</summary>
-    public static Task MarkCleanedAsync(UnitOfWork uow, long libraryId, string path, DateTimeOffset when)
+    public Task MarkCleanedAsync(UnitOfWork uow, long libraryId, string path, DateTimeOffset when)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.ExecuteAsync(
@@ -28,7 +28,7 @@ public static class LibraryFileMarksStore
     }
 
     /// <summary>A person asked Weir to leave this file alone, or changed their mind.</summary>
-    public static Task SetLeaveAloneAsync(UnitOfWork uow, long libraryId, string path, bool leaveAlone, DateTimeOffset when)
+    public Task SetLeaveAloneAsync(UnitOfWork uow, long libraryId, string path, bool leaveAlone, DateTimeOffset when)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.ExecuteAsync(
@@ -44,7 +44,7 @@ public static class LibraryFileMarksStore
     }
 
     /// <summary>Whether this file is one Weir has been told to leave alone.</summary>
-    public static async Task<bool> IsLeftAloneAsync(UnitOfWork uow, long libraryId, string path)
+    public async Task<bool> IsLeftAloneAsync(UnitOfWork uow, long libraryId, string path)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var mark = await FindAsync(uow, libraryId, path).ConfigureAwait(false);
@@ -52,7 +52,7 @@ public static class LibraryFileMarksStore
     }
 
     /// <summary>One file's marks, or null when Weir has nothing to say about it yet.</summary>
-    public static Task<LibraryFileMark?> FindAsync(UnitOfWork uow, long libraryId, string path)
+    public Task<LibraryFileMark?> FindAsync(UnitOfWork uow, long libraryId, string path)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QuerySingleAsync(
@@ -63,7 +63,7 @@ public static class LibraryFileMarksStore
     }
 
     /// <summary>Every marked file in one library, for a caller that is about to look at many of them.</summary>
-    public static async Task<IReadOnlyDictionary<string, LibraryFileMark>> ForLibraryAsync(UnitOfWork uow, long libraryId)
+    public async Task<IReadOnlyDictionary<string, LibraryFileMark>> ForLibraryAsync(UnitOfWork uow, long libraryId)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var rows = await uow.QueryAsync(
@@ -80,7 +80,7 @@ public static class LibraryFileMarksStore
     }
 
     /// <summary>Forget everything Weir knows about a file that has left the library (a library's folders changed, say).</summary>
-    public static Task ForgetAsync(UnitOfWork uow, long libraryId, string path)
+    public Task ForgetAsync(UnitOfWork uow, long libraryId, string path)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.ExecuteAsync(

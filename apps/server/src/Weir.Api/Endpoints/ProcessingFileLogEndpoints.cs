@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Json;
 using Weir.Core.Processing;
@@ -16,12 +17,26 @@ public static class ProcessingFileLogEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingFileLogEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/processing/files/{file_id}/log", GetFileLogAsync);
-        endpoints.MapV1("GET", "/processing/files/{file_id}/log/download", DownloadFileLogAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<ProcessingFileLogEndpointHandlers>();
+        endpoints.MapV1("GET", "/processing/files/{file_id}/log", handlers.GetFileLogAsync);
+        endpoints.MapV1("GET", "/processing/files/{file_id}/log/download", handlers.DownloadFileLogAsync);
         return endpoints;
     }
+}
 
-    private static async Task<ApiResult> GetFileLogAsync(ApiRequest request)
+/// <summary>Handlers for <see cref="ProcessingFileLogEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class ProcessingFileLogEndpointHandlers
+{
+    private readonly OperatorSettingsStore _operatorSettings;
+    private readonly FileLogStore _fileLogs;
+
+    public ProcessingFileLogEndpointHandlers(OperatorSettingsStore operatorSettings, FileLogStore fileLogs)
+    {
+        _operatorSettings = operatorSettings ?? throw new ArgumentNullException(nameof(operatorSettings));
+        _fileLogs = fileLogs ?? throw new ArgumentNullException(nameof(fileLogs));
+    }
+
+    public async Task<ApiResult> GetFileLogAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -31,14 +46,14 @@ public static class ProcessingFileLogEndpoints
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var row = await ProcessingFilesEndpoints.RequireFileAsync(uow, id).ConfigureAwait(false);
-        var operatorRow = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-        var rows = await FileLogStore.LogsForFileAsync(uow, row.RelativePath, limit).ConfigureAwait(false);
+        var operatorRow = await _operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
+        var rows = await _fileLogs.LogsForFileAsync(uow, row.RelativePath, limit).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
 
         var entries = new List<WireValue>();
         foreach (var entry in rows)
         {
-            var detail = FileLogStore.ParseDetail(entry.DetailJson);
+            var detail = _fileLogs.ParseDetail(entry.DetailJson);
             var story = FileStory.NarratePass(detail, entry.LibraryName);
             entries.Add(new WireObject()
                 .Set("id", entry.Id)
@@ -60,7 +75,7 @@ public static class ProcessingFileLogEndpoints
             .Set("entries", new WireArray(entries)));
     }
 
-    private static async Task<ApiResult> DownloadFileLogAsync(ApiRequest request)
+    public async Task<ApiResult> DownloadFileLogAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -69,7 +84,7 @@ public static class ProcessingFileLogEndpoints
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var row = await ProcessingFilesEndpoints.RequireFileAsync(uow, id).ConfigureAwait(false);
-        var rows = await FileLogStore.LogsForFileAsync(uow, row.RelativePath, 500).ConfigureAwait(false);
+        var rows = await _fileLogs.LogsForFileAsync(uow, row.RelativePath, 500).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
 
         var safe = new string([.. row.RelativePath.Where(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.')]);
@@ -80,7 +95,7 @@ public static class ProcessingFileLogEndpoints
             safe = "file";
         }
 
-        var text = FileLogStore.RenderLogText(rows);
+        var text = _fileLogs.RenderLogText(rows);
         return new CustomApiResult(context =>
         {
             context.Response.Headers.ContentDisposition = $"attachment; filename=\"weir-{safe}.log.txt\"";

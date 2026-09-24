@@ -22,7 +22,7 @@ public sealed record LibraryScanOutcome(DateTimeOffset GeneratedAt, IReadOnlyLis
 /// <see cref="LibraryModeJobKinds.ScanKind"/> job row; the newest completed row for a library is the file index / plan cache
 /// (see <c>docs/archive/server-port-notes.md</c>, "Library mode").
 /// </summary>
-public static class LibraryScanStore
+public sealed class LibraryScanStore
 {
     /// <summary>
     /// Enqueues the scan on <paramref name="uow"/>'s own connection and transaction (<see cref="ProcessingJobStore.EnqueueOrGet"/>),
@@ -34,7 +34,7 @@ public static class LibraryScanStore
     /// <paramref name="scheduledAt"/> is the time a scheduled scan was due, recorded on the row so the next one is worked
     /// out from it (<see cref="LastScheduledRunAtAsync"/>); a scan someone asked for has none.
     /// </remarks>
-    public static Task<ProcessingJob> RequestScanAsync(UnitOfWork uow, ProcessingJobStore jobs, long libraryId, string trigger, DateTimeOffset? scheduledAt = null)
+    public Task<ProcessingJob> RequestScanAsync(UnitOfWork uow, ProcessingJobStore jobs, long libraryId, string trigger, DateTimeOffset? scheduledAt = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(jobs);
@@ -66,7 +66,7 @@ public static class LibraryScanStore
     /// library's rules decide when it is null. <paramref name="expectedSizeBytes"/> is the size the file had when
     /// they chose, so a file that changed in between is refused rather than cleaned to a stale plan.
     /// </remarks>
-    public static async Task<ProcessingJob> EnqueueCleanAsync(
+    public async Task<ProcessingJob> EnqueueCleanAsync(
         UnitOfWork uow,
         ProcessingJobStore jobs,
         long libraryId,
@@ -119,7 +119,7 @@ public static class LibraryScanStore
     }
 
     /// <summary>Whether a scan for this library is already queued or running, so callers do not pile up duplicate requests.</summary>
-    public static async Task<LibraryScanJobView?> ActiveScanAsync(UnitOfWork uow, long libraryId)
+    public async Task<LibraryScanJobView?> ActiveScanAsync(UnitOfWork uow, long libraryId)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return await uow.QuerySingleAsync(
@@ -134,7 +134,7 @@ public static class LibraryScanStore
     /// When the library's most recent scheduled scan was due, whatever became of it, or null when it has never had one
     /// (or job-row retention has since pruned it, which only makes the next one due straight away).
     /// </summary>
-    public static async Task<DateTimeOffset?> LastScheduledRunAtAsync(UnitOfWork uow, long libraryId)
+    public async Task<DateTimeOffset?> LastScheduledRunAtAsync(UnitOfWork uow, long libraryId)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var text = await uow.QuerySingleAsync(
@@ -155,7 +155,7 @@ public static class LibraryScanStore
     }
 
     /// <summary>The most recently created scan row for a library, whatever its status, for "what did the last scan say / do".</summary>
-    public static async Task<LibraryScanJobRow?> LatestAsync(UnitOfWork uow, long libraryId)
+    public async Task<LibraryScanJobRow?> LatestAsync(UnitOfWork uow, long libraryId)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return await uow.QuerySingleAsync(
@@ -173,7 +173,7 @@ public static class LibraryScanStore
     /// completed, so rows in <c>library_files</c> are proof on their own that one ran. Only their existence is read: the
     /// Library screen asks for this on every refresh, and reading the index itself cost a full-table read (#709).
     /// </summary>
-    public static async Task<LibraryScanOutcome?> OutcomeAsync(UnitOfWork uow, long libraryId, LibraryScanJobRow? latest, ILogger logger)
+    public async Task<LibraryScanOutcome?> OutcomeAsync(UnitOfWork uow, long libraryId, LibraryScanJobRow? latest, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(logger);
@@ -208,11 +208,11 @@ public static class LibraryScanStore
     /// progress has not written its own new rows yet, #557), so this is simply the table's current contents for the
     /// library: what the next scan's ffprobe cache is seeded from, and what a whole-library confirmation counts.
     /// </summary>
-    public static async Task<IReadOnlyList<LibraryScanFileEntry>> CurrentFilesAsync(UnitOfWork uow, long libraryId) =>
+    public async Task<IReadOnlyList<LibraryScanFileEntry>> CurrentFilesAsync(UnitOfWork uow, long libraryId) =>
         await FilesForLibraryAsync(uow, libraryId).ConfigureAwait(false);
 
     /// <summary>The index entries for <paramref name="paths"/>, keyed by path; a path the index does not hold is absent.</summary>
-    public static async Task<IReadOnlyDictionary<string, LibraryScanFileEntry>> FilesAtPathsAsync(UnitOfWork uow, long libraryId, IEnumerable<string> paths)
+    public async Task<IReadOnlyDictionary<string, LibraryScanFileEntry>> FilesAtPathsAsync(UnitOfWork uow, long libraryId, IEnumerable<string> paths)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(paths);
@@ -233,7 +233,7 @@ public static class LibraryScanStore
     /// keeping every other key. The file list itself goes to <c>library_files</c> through
     /// <see cref="LibraryFileIndexWriter"/> (#557: kept out of the job payload, so job-row retention cannot delete it).
     /// </summary>
-    public static async Task RecordResultAsync(UnitOfWork uow, long jobId, LibraryScanOutcome outcome, bool ok, string? reason)
+    public async Task RecordResultAsync(UnitOfWork uow, long jobId, LibraryScanOutcome outcome, bool ok, string? reason)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(outcome);

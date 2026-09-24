@@ -1,6 +1,7 @@
 using Weir.Core.Security;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
 using Weir.Infrastructure.Tests.Platform;
 
@@ -22,6 +23,7 @@ internal sealed class MediaManagerFixture : IDisposable
         Jobs = new ProcessingJobStore(Store.Database, Store.Clock);
         Intake = new MediaManagerIntake(Store.Options, Connections, Ledger, Jobs, Store.Clock);
         Reporter = new HandoffCompletionReporter(Connections, Ledger, Http);
+        OperatorSettings = new OperatorSettingsStore();
     }
 
     public StoreFixture Store { get; }
@@ -41,6 +43,8 @@ internal sealed class MediaManagerFixture : IDisposable
     public MediaManagerIntake Intake { get; }
 
     public HandoffCompletionReporter Reporter { get; }
+
+    public OperatorSettingsStore OperatorSettings { get; }
 
     public Task<T> Db<T>(Func<UnitOfWork, Task<T>> work, bool commit = true) => Store.WithUnitOfWork(work, commit);
 

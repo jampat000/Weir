@@ -10,7 +10,7 @@ namespace Weir.Infrastructure.Processing;
 /// Dropping it would buy nothing and cost a migration, so it keeps its default on a new row; a configuration backup
 /// carries it and restores it like any other column.
 /// </remarks>
-public static class OperatorSettingsStore
+public sealed class OperatorSettingsStore
 {
     private const string Columns =
         "max_concurrent_files, runner_capacity, runner_cost_sd, runner_cost_720p, runner_cost_1080p, runner_cost_4k, " +
@@ -22,11 +22,11 @@ public static class OperatorSettingsStore
         "failure_cleanup_interval_seconds, unclaimed_handback_cleanup_enabled, unclaimed_handback_window_days, " +
         "unclaimed_handback_cleanup_interval_seconds";
 
-    public static Task<ProcessingOperatorSettingsRecord?> GetAsync(UnitOfWork uow) =>
+    public Task<ProcessingOperatorSettingsRecord?> GetAsync(UnitOfWork uow) =>
         uow.QuerySingleAsync($"SELECT {Columns} FROM operator_settings WHERE id = 1", Read);
 
     /// <summary>The settings row, created with its defaults when it does not exist yet.</summary>
-    public static async Task<ProcessingOperatorSettingsRecord> EnsureAsync(UnitOfWork uow)
+    public async Task<ProcessingOperatorSettingsRecord> EnsureAsync(UnitOfWork uow)
     {
         var row = await GetAsync(uow).ConfigureAwait(false);
         if (row is not null)
@@ -45,7 +45,7 @@ public static class OperatorSettingsStore
         return await GetAsync(uow).ConfigureAwait(false) ?? throw new InvalidOperationException("operator_settings row was not created.");
     }
 
-    public static async Task UpdateAsync(UnitOfWork uow, ProcessingOperatorSettingsRecord before, ProcessingOperatorSettingsRecord after)
+    public async Task UpdateAsync(UnitOfWork uow, ProcessingOperatorSettingsRecord before, ProcessingOperatorSettingsRecord after)
     {
         var sets = new List<string>();
         var parameters = new List<(string, object?)>();

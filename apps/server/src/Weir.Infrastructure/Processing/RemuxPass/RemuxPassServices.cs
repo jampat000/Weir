@@ -109,6 +109,7 @@ public static class RemuxPassServices
             sp.GetRequiredService<WeirOptions>(),
             sp.GetRequiredService<RemuxPassRunner>(),
             sp.GetRequiredService<IFailurePolicy>(),
+            sp.GetRequiredService<OperatorSettingsStore>(),
             sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredService<ILogger<RemuxPassHandler>>(),
             sp.GetService<HandoffCompletionReporter>(),

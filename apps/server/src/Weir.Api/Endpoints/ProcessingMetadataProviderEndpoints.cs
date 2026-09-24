@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
@@ -14,10 +15,27 @@ public static class ProcessingMetadataProviderEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingMetadataProviderEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/processing/metadata-provider", GetMetadataProviderAsync);
-        endpoints.MapV1("PUT", "/processing/metadata-provider", PutMetadataProviderAsync);
-        endpoints.MapV1("POST", "/processing/metadata-provider/test", PostMetadataProviderTestAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<ProcessingMetadataProviderEndpointHandlers>();
+        endpoints.MapV1("GET", "/processing/metadata-provider", handlers.GetMetadataProviderAsync);
+        endpoints.MapV1("PUT", "/processing/metadata-provider", handlers.PutMetadataProviderAsync);
+        endpoints.MapV1("POST", "/processing/metadata-provider/test", handlers.PostMetadataProviderTestAsync);
         return endpoints;
+    }
+}
+
+/// <summary>Handlers for <see cref="ProcessingMetadataProviderEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class ProcessingMetadataProviderEndpointHandlers
+{
+    private readonly MetadataProviderStore _metadataProvider;
+    private readonly MetadataProviderService _metadataProviderService;
+    private readonly SuiteSettingsStore _suiteSettings;
+
+    public ProcessingMetadataProviderEndpointHandlers(
+        MetadataProviderStore metadataProvider, MetadataProviderService metadataProviderService, SuiteSettingsStore suiteSettings)
+    {
+        _metadataProvider = metadataProvider ?? throw new ArgumentNullException(nameof(metadataProvider));
+        _metadataProviderService = metadataProviderService ?? throw new ArgumentNullException(nameof(metadataProviderService));
+        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
     }
 
     private static WireObject MetadataProviderOut(MetadataProviderView view) => new WireObject()
@@ -26,16 +44,16 @@ public static class ProcessingMetadataProviderEndpoints
         .Set("key_configured", view.KeyConfigured)
         .Set("known_providers", new WireArray(view.KnownProviders.Select(p => (WireValue)WireValue.Of(p))));
 
-    private static async Task<ApiResult> GetMetadataProviderAsync(ApiRequest request)
+    public async Task<ApiResult> GetMetadataProviderAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await request.Service<SuiteSettingsStore>().EnsureAsync(uow).ConfigureAwait(false);
+        var row = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(MetadataProviderOut(MetadataProviderStore.View(row)));
+        return ApiRoutes.Ok(MetadataProviderOut(_metadataProvider.View(row)));
     }
 
-    private static async Task<ApiResult> PutMetadataProviderAsync(ApiRequest request)
+    public async Task<ApiResult> PutMetadataProviderAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
@@ -51,13 +69,12 @@ public static class ProcessingMetadataProviderEndpoints
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await MetadataProviderStore.ApplyAsync(
-            uow, request.Service<SuiteSettingsStore>(), request.Options, request.Time, provider, baseUrl, apiKey).ConfigureAwait(false);
+        var row = await _metadataProvider.ApplyAsync(uow, request.Options, request.Time, provider, baseUrl, apiKey).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(MetadataProviderOut(MetadataProviderStore.View(row)));
+        return ApiRoutes.Ok(MetadataProviderOut(_metadataProvider.View(row)));
     }
 
-    private static async Task<ApiResult> PostMetadataProviderTestAsync(ApiRequest request)
+    public async Task<ApiResult> PostMetadataProviderTestAsync(ApiRequest request)
     {
         // Same body shape as PUT (MetadataProviderIn); the test itself only reads what is already saved.
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
@@ -74,11 +91,11 @@ public static class ProcessingMetadataProviderEndpoints
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await request.Service<SuiteSettingsStore>().EnsureAsync(uow).ConfigureAwait(false);
+        var row = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         var result = string.IsNullOrWhiteSpace(row.MetadataProviderKeyCiphertext) || string.IsNullOrWhiteSpace(row.MetadataProvider)
-            ? MetadataProviderStore.Test(row)
-            : await request.Service<MetadataProviderService>().TestProviderAsync(uow, request.Context.RequestAborted).ConfigureAwait(false);
+            ? _metadataProvider.Test(row)
+            : await _metadataProviderService.TestProviderAsync(uow, request.Context.RequestAborted).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject().Set("status", result.Status).Set("detail", result.Detail));
     }
 }

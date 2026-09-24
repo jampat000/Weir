@@ -221,7 +221,7 @@ public static class ProcessingLibraryEndpoints
 
         // #505: a deleted library takes its library-mode settings and scan history with it (both live on
         // jobs rows, not a foreign-keyed table — see docs/archive/server-port-notes.md, "Library mode").
-        await LibrarySettingsStore.DeleteAllForLibraryAsync(uow, row.Id).ConfigureAwait(false);
+        await request.Service<LibrarySettingsStore>().DeleteAllForLibraryAsync(uow, row.Id).ConfigureAwait(false);
 
         await request.CommitAsync().ConfigureAwait(false);
         request.Service<ScanSettingsChanges>().Record();
