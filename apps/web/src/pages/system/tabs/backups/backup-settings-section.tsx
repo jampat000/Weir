@@ -21,10 +21,12 @@ function ScheduleGroup({
   form,
   lastRunAt,
   onSave,
+  saved,
 }: {
   form: SystemSettingsForm;
   lastRunAt: string | null;
   onSave: () => void;
+  saved: boolean;
 }) {
   const formatDate = useAppDateFormatter();
   const { backupSchedule: schedule, save } = form;
@@ -96,6 +98,10 @@ function ScheduleGroup({
           >
             {errorMessage(save.error, "Could not save.")}
           </p>
+        ) : saved ? (
+          <p className="mm-status-text--healthy text-sm" role="status">
+            Backup schedule saved.
+          </p>
         ) : null}
       </div>
     </QuietFieldGroup>
@@ -104,20 +110,34 @@ function ScheduleGroup({
 
 function ExportGroup({
   disabled,
+  onBackUpNow,
   onDownload,
   onChooseFile,
+  resultMessage,
+  resultProblem,
 }: {
   disabled: boolean;
+  onBackUpNow: () => void;
   onDownload: () => void;
   onChooseFile: (file: File) => void;
+  resultMessage: string | null;
+  resultProblem: string | null;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   return (
     <QuietFieldGroup
       title="Export or restore now"
-      detail="Download a full settings file, or restore a Weir configuration JSON from disk."
+      detail="Write a snapshot right away, download a full settings file, or restore a Weir configuration JSON from disk."
     >
       <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className={mmActionButtonClass({ variant: "primary" })}
+          disabled={disabled}
+          onClick={onBackUpNow}
+        >
+          Back up now
+        </button>
         <button
           type="button"
           className={mmActionButtonClass({ variant: "secondary" })}
@@ -148,6 +168,16 @@ function ExportGroup({
           }}
         />
       </div>
+      {resultMessage ? (
+        <p className="mm-status-text--healthy mt-2 text-sm" role="status">
+          {resultMessage}
+        </p>
+      ) : null}
+      {resultProblem ? (
+        <p className="mm-status-text--failed mt-2 text-sm" role="alert">
+          {resultProblem}
+        </p>
+      ) : null}
     </QuietFieldGroup>
   );
 }
@@ -161,15 +191,23 @@ export function BackupSettingsSection({
   lastRunAt,
   busy,
   onSaveSchedule,
+  scheduleSaved,
+  onBackUpNow,
   onDownload,
   onChooseFile,
+  resultMessage,
+  resultProblem,
 }: {
   form: SystemSettingsForm;
   lastRunAt: string | null;
   busy: boolean;
   onSaveSchedule: () => void;
+  scheduleSaved: boolean;
+  onBackUpNow: () => void;
   onDownload: () => void;
   onChooseFile: (file: File) => void;
+  resultMessage: string | null;
+  resultProblem: string | null;
 }) {
   return (
     <QuietSection
@@ -178,19 +216,25 @@ export function BackupSettingsSection({
       heading="Backup and restore"
     >
       <p className="mm-quiet-note">
-        A backup is Weir&rsquo;s settings: libraries, rules, media managers,
-        schedule, alerts and sign-in. Not your media, and not file history.
+        A backup holds your libraries, rules, schedule and time zone, plus your
+        media managers and alerts. Media managers and alerts come back without
+        their API keys and webhook addresses; enter those again after restoring.
+        It does not include your sign-in or file history.
       </p>
       <div className="mt-6 grid gap-10">
         <ScheduleGroup
           form={form}
           lastRunAt={lastRunAt}
           onSave={onSaveSchedule}
+          saved={scheduleSaved}
         />
         <ExportGroup
           disabled={busy || form.save.isPending}
+          onBackUpNow={onBackUpNow}
           onDownload={onDownload}
           onChooseFile={onChooseFile}
+          resultMessage={resultMessage}
+          resultProblem={resultProblem}
         />
       </div>
     </QuietSection>
