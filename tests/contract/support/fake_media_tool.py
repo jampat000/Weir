@@ -16,7 +16,12 @@ Media files
                          "integrity_error": "text", # the ffmpeg -f null read-through fails
                          "remux_error": "text",     # the remux fails ...
                          "remux_fail_times": 2,     # ... only for the first N remuxes of that name
-                         "remux_delay_seconds": 5}},# the remux takes this long (writes a partial file first)
+                         "remux_delay_seconds": 5,  # the remux takes this long (writes a partial file first)
+                         "remux_release_file": "…"}},  # ... or waits for this path to appear instead of a
+                                                        # fixed delay, so a test controls exactly how long the
+                                                        # remux stays "in progress" instead of guessing a
+                                                        # duration long enough to observe it. Capped at
+                                                        # REMUX_RELEASE_TIMEOUT_S as a safety net.
      "default": {...}}
 
 A remux writes ``FAKEMEDIA:`` plus the source's probe restricted to the ``-map``-ed streams, so the
@@ -34,6 +39,10 @@ import time
 from pathlib import Path
 
 MAGIC = b"FAKEMEDIA:"
+
+#: Safety net for "remux_release_file": how long the fake tool waits for a test to create the release
+#: file before giving up. A test that forgot to release it should fail loudly, not hang the run.
+REMUX_RELEASE_TIMEOUT_S = 120.0
 
 
 def _tool_dir() -> Path:
@@ -106,6 +115,19 @@ def _lock(handle, *, timeout_s: float) -> None:
             if time.monotonic() >= deadline:
                 raise TimeoutError(f"{handle.name} stayed locked for {timeout_s:.0f}s") from exc
             time.sleep(0.01)
+
+
+def _wait_for_release(path: str, *, timeout_s: float) -> None:
+    """Blocks until ``path`` exists: a test creates it once it is done observing whatever state the remux
+    being "in progress" was meant to hold open. ``timeout_s`` is a safety net against a test that forgot to
+    release it, not a normal wait, so it is generous rather than tight.
+    """
+
+    deadline = time.monotonic() + timeout_s
+    while not os.path.isfile(path):
+        if time.monotonic() >= deadline:
+            raise TimeoutError(f"{path} (remux_release_file) was never created within {timeout_s:.0f}s")
+        time.sleep(0.05)
 
 
 def _unlock(handle) -> None:
@@ -238,10 +260,14 @@ def _ffmpeg(tool_dir: Path, script: dict, argv: list[str]) -> int:
     _log(tool_dir, "ffmpeg", argv, step="remux", file=name, attempt=attempt)
     output = argv[-1]
     delay = float(rule.get("remux_delay_seconds") or 0)
-    if delay > 0:
+    release_file = rule.get("remux_release_file")
+    if delay > 0 or release_file:
         with open(output, "wb") as handle:
             handle.write(b"partial fake output")
-        time.sleep(delay)
+        if delay > 0:
+            time.sleep(delay)
+        if release_file:
+            _wait_for_release(release_file, timeout_s=REMUX_RELEASE_TIMEOUT_S)
     error = rule.get("remux_error")
     fail_times = rule.get("remux_fail_times")
     if error and (fail_times is None or attempt <= int(fail_times)):

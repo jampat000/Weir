@@ -108,12 +108,14 @@ def _job_status(admin: WeirClient, handoff_id: str) -> str | None:
 
 
 def test_a_running_pass_is_working(server_factory, client_factory, fake_managers, fake_ffmpeg, tmp_path) -> None:
-    fake_ffmpeg.set_file_rule("*.mkv", probe=probe(), remux_delay_seconds=20)
+    release = tmp_path / "release-remux"
+    fake_ffmpeg.set_file_rule("*.mkv", probe=probe(), remux_release_file=str(release))
     working, _ = _working_server(server_factory, client_factory, fake_managers, fake_ffmpeg, tmp_path)
     _hand_off(working.server, "h1", working.folders.watched / "Film" / "film.mkv")
 
     wait_until(lambda: _job_status(working.admin, "h1") == "leased", timeout_s=60, what="the worker to take the job")
     assert _status(working.server, "h1")["state"] == "working"
+    release.touch()
 
 
 def test_the_report_records_the_output_path(
@@ -162,7 +164,8 @@ def test_a_queued_hand_off_can_be_cancelled(server: ServerUnderTest, movies: Lib
 def test_work_that_has_started_is_never_cancelled(
     server_factory, client_factory, fake_managers, fake_ffmpeg, tmp_path
 ) -> None:
-    fake_ffmpeg.set_file_rule("*.mkv", probe=probe(), remux_delay_seconds=20)
+    release = tmp_path / "release-remux"
+    fake_ffmpeg.set_file_rule("*.mkv", probe=probe(), remux_release_file=str(release))
     working, _ = _working_server(server_factory, client_factory, fake_managers, fake_ffmpeg, tmp_path)
     _hand_off(working.server, "h1", working.folders.watched / "Film" / "film.mkv")
     wait_until(lambda: _job_status(working.admin, "h1") == "leased", timeout_s=60, what="the worker to take the job")
@@ -171,6 +174,7 @@ def test_work_that_has_started_is_never_cancelled(
     assert response.status_code == 409
     assert "working" in response.json()["detail"]
     assert _job_status(working.admin, "h1") == "leased"
+    release.touch()
 
 
 def test_cancelling_an_unknown_hand_off_is_404(server: ServerUnderTest) -> None:

@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Globalization;
 using System.IO.Pipes;
 using System.Text.Json;
@@ -8,7 +9,7 @@ using Weir.Infrastructure.Processes;
 
 namespace Weir.Infrastructure.Tests.Media;
 
-/// <summary>A fact that runs only where ffprobe and ffmpeg can be found (WEIR_FFMPEG_DIR or PATH).</summary>
+/// <summary>A fact that runs only where a working ffprobe and ffmpeg can be found (WEIR_FFMPEG_DIR or PATH).</summary>
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class RequiresFfmpegFactAttribute : FactAttribute
 {
@@ -16,12 +17,12 @@ public sealed class RequiresFfmpegFactAttribute : FactAttribute
     {
         if (RealFfmpeg.Tools is null)
         {
-            Skip = "ffprobe and ffmpeg were not found: set WEIR_FFMPEG_DIR or put them on PATH to run the real-ffmpeg tests.";
+            Skip = "No working ffprobe and ffmpeg were found: set WEIR_FFMPEG_DIR or put them on PATH to run the real-ffmpeg tests.";
         }
     }
 }
 
-/// <summary>A fact that runs only on Windows where ffmpeg can be found: named-pipe blocking behaviour.</summary>
+/// <summary>A fact that runs only on Windows where a working ffmpeg can be found: named-pipe blocking behaviour.</summary>
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class RequiresFfmpegOnWindowsFactAttribute : FactAttribute
 {
@@ -33,12 +34,12 @@ public sealed class RequiresFfmpegOnWindowsFactAttribute : FactAttribute
         }
         else if (RealFfmpeg.Tools is null)
         {
-            Skip = "ffprobe and ffmpeg were not found: set WEIR_FFMPEG_DIR or put them on PATH to run the real-ffmpeg tests.";
+            Skip = "No working ffprobe and ffmpeg were found: set WEIR_FFMPEG_DIR or put them on PATH to run the real-ffmpeg tests.";
         }
     }
 }
 
-/// <summary>#548: a fact that runs only where mkvmerge can be found (WEIR_MKVTOOLNIX_DIR or PATH).</summary>
+/// <summary>#548: a fact that runs only where a working mkvmerge can be found (WEIR_MKVTOOLNIX_DIR or PATH).</summary>
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class RequiresMkvmergeFactAttribute : FactAttribute
 {
@@ -46,19 +47,25 @@ public sealed class RequiresMkvmergeFactAttribute : FactAttribute
     {
         if (RealMkvmerge.Tool is null)
         {
-            Skip = "mkvmerge was not found: set WEIR_MKVTOOLNIX_DIR or put it on PATH to run the real-mkvmerge tests.";
+            Skip = "No working mkvmerge was found: set WEIR_MKVTOOLNIX_DIR or put it on PATH to run the real-mkvmerge tests.";
         }
 
         if (RealFfmpeg.Tools is null)
         {
-            Skip = "ffprobe and ffmpeg were not found, and the mkvmerge tests generate their fixtures with them.";
+            Skip = "No working ffprobe and ffmpeg were found, and the mkvmerge tests generate their fixtures with them.";
         }
     }
 }
 
 internal static class RealMkvmerge
 {
-    public static readonly string? Tool = new MediaToolResolver().ResolveMkvmerge();
+    public static readonly string? Tool = Find();
+
+    private static string? Find()
+    {
+        var resolved = new MediaToolResolver().ResolveMkvmerge();
+        return resolved is not null && RealToolAvailability.Runs(MkvmergeCommands.BuildVersionArgv(resolved)) ? resolved : null;
+    }
 }
 
 internal static class RealFfmpeg
@@ -67,13 +74,46 @@ internal static class RealFfmpeg
 
     private static (string, string)? Find()
     {
+        (string Ffprobe, string Ffmpeg) resolved;
         try
         {
-            return new MediaToolResolver().Resolve();
+            resolved = new MediaToolResolver().Resolve();
         }
         catch (MediaToolException)
         {
             return null;
+        }
+
+        return RealToolAvailability.Runs(FfmpegCommands.BuildVersionArgv(resolved.Ffprobe))
+            && RealToolAvailability.Runs(FfmpegCommands.BuildVersionArgv(resolved.Ffmpeg))
+            ? resolved
+            : null;
+    }
+}
+
+/// <summary>
+/// Whether a path <see cref="MediaToolResolver"/> resolved is a build that actually runs, shared by every real-tool
+/// detection in this assembly. A path can resolve (the file exists under <c>WEIR_FFMPEG_DIR</c>/<c>PATH</c>) without
+/// the tool being usable — a stale directory left from an old install, or a Windows execution-alias stub — and that
+/// showed up as "fixture generation failed" deep inside a real test instead of a skip with a clear reason.
+/// </summary>
+internal static class RealToolAvailability
+{
+    private static readonly TimeSpan VersionCheckTimeout = TimeSpan.FromSeconds(5);
+
+    public static bool Runs(IReadOnlyList<string> versionArgv)
+    {
+        try
+        {
+            var result = new ProcessRunner()
+                .RunAsync(new ProcessRequest { Argv = versionArgv, Timeout = VersionCheckTimeout })
+                .GetAwaiter()
+                .GetResult();
+            return !result.TimedOut && result.ExitCode == 0;
+        }
+        catch (Exception error) when (error is Win32Exception or IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            return false;
         }
     }
 }
@@ -607,12 +647,19 @@ public sealed class RealFfmpegTests : IDisposable
         Assert.Contains("EBML header parsing failed", error.Message, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Wider than <see cref="FfmpegCommands.HwaccelTimeoutSeconds"/> (10s), which is sized for a live settings
+    /// check, not a CI runner sharing the box with every other real-ffmpeg test in this class. Widening it here
+    /// keeps a busy runner from making a real, working build look undetected.
+    /// </summary>
+    private static readonly TimeSpan HwaccelDetectionTimeoutForTests = TimeSpan.FromSeconds(60);
+
     [RequiresFfmpegFact]
     public async Task Hardware_detection_reads_the_real_build()
     {
-        var report = await Tools().DetectAccelerationAsync(RealFfmpeg.Tools!.Value.Ffmpeg);
+        var report = await Tools().DetectAccelerationAsync(RealFfmpeg.Tools!.Value.Ffmpeg, HwaccelDetectionTimeoutForTests, CancellationToken.None);
 
-        Assert.True(report.Detected);
+        Assert.True(report.Detected, report.Detail);
         Assert.Equal(report.AvailableMethods.Order(StringComparer.Ordinal), report.AvailableMethods);
         Assert.All(report.AvailableMethods, method => Assert.Matches("^[a-z0-9_]+$", method));
     }
