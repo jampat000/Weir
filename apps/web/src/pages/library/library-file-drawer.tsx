@@ -19,6 +19,7 @@ import type { ProcessingRulesPreviewTrack } from "../../lib/processing/rules-pre
 import { baseName } from "../../lib/format/path";
 import { errorMessage } from "../../lib/api/error-message";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
+import { plural } from "../../lib/ui/mm-plural";
 
 function trackLabel(track: ProcessingRulesPreviewTrack): string {
   return [
@@ -158,13 +159,13 @@ export function LibraryFileDrawer({
         ) : (
           <>
             <TrackList
-              title={`Audio · ${audio.length} ${audio.length === 1 ? "track" : "tracks"}`}
+              title={`Audio · ${plural(audio.length, "track", "tracks")}`}
               tracks={audio}
               kept={choosing ? kept : null}
               onToggle={(index) => setKeep(toggled(kept, index))}
             />
             <TrackList
-              title={`Subtitles · ${subtitles.length} ${subtitles.length === 1 ? "track" : "tracks"}`}
+              title={`Subtitles · ${plural(subtitles.length, "track", "tracks")}`}
               tracks={subtitles}
               kept={choosing ? kept : null}
               onToggle={(index) => setKeep(toggled(kept, index))}

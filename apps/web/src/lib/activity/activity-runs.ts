@@ -7,6 +7,7 @@
 
 import type { ActivityEventItem } from "../api/types";
 import { parseActivityDetail } from "./detail";
+import { plural } from "../ui/mm-plural";
 
 export const ACTIVITY_TRIGGER_LABELS: Record<string, string> = {
   manual: "You started this",
@@ -115,8 +116,8 @@ export function summarizeRun(events: ActivityEventItem[]): RunSummary {
   );
   const size =
     files.size > 0
-      ? `${files.size} ${files.size === 1 ? "file" : "files"}`
-      : `${events.length} ${events.length === 1 ? "entry" : "entries"}`;
+      ? plural(files.size, "file", "files")
+      : plural(events.length, "entry", "entries");
   return {
     headline: `${name} · ${size}${parts.length ? `: ${parts.join(", ")}` : ""}`,
     failed: counts.get("failed") ?? 0,

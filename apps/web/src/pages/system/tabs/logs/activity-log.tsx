@@ -252,7 +252,7 @@ export function ActivityLog() {
             <span>Filters apply to this list and to both exports.</span>
             <span>
               {notLoaded > 0
-                ? `${notLoaded.toLocaleString()} older ${notLoaded === 1 ? "entry is" : "entries are"} not loaded yet.`
+                ? `${plural(notLoaded, "older entry is", "older entries are")} not loaded yet.`
                 : "Everything that matches is loaded."}
             </span>
           </p>
@@ -321,7 +321,7 @@ export function ActivityLog() {
                     className={mmActionButtonClass({ variant: "primary" })}
                     onClick={() => show(liveData)}
                   >
-                    {`${pendingCount} new ${pendingCount === 1 ? "entry" : "entries"} — show`}
+                    {`${plural(pendingCount, "new entry", "new entries")} — show`}
                   </button>
                 </div>
               ) : null}

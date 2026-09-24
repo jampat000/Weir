@@ -6,6 +6,7 @@ import { baseName } from "../../lib/format/path";
 import type { LibraryCleanResult } from "../../lib/processing/library-mode-api";
 import type { useCleanLibraryFiles } from "../../lib/processing/library-mode-queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
+import { plural } from "../../lib/ui/mm-plural";
 
 type CleanMutation = ReturnType<typeof useCleanLibraryFiles>;
 
@@ -13,7 +14,7 @@ type CleanMutation = ReturnType<typeof useCleanLibraryFiles>;
 function outcomeLine(outcome: LibraryCleanResult): string {
   const queued =
     outcome.queued > 0
-      ? `${outcome.queued.toLocaleString()} ${outcome.queued === 1 ? "file is" : "files are"} queued to clean.`
+      ? `${plural(outcome.queued, "file is", "files are")} queued to clean.`
       : "Nothing was queued.";
   const skipped = outcome.skipped_paths;
   const left =
