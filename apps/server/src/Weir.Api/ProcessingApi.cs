@@ -5,6 +5,7 @@ using Weir.Api.Endpoints;
 using Weir.Core.Jobs;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
+using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Scheduling;
@@ -26,6 +27,9 @@ public static class ProcessingApi
         services.AddWeirMediaTools();
         // Caps the #502 "Try on a file" preview at one run at a time (see RulesPreviewGate's own docs).
         services.TryAddSingleton<RulesPreviewGate>();
+        // #768: the folder-chain check composes ManagerSetupCheck (already registered by AddWeirMediaManagerServices)
+        // with Weir's own watched/work/output folder rules.
+        services.TryAddSingleton<LibraryFolderChainCheck>();
 
         // Processing's own stores (#745 part 5): stateless SQL access over the caller's UnitOfWork, so a
         // singleton is as cheap as a static class was and lets endpoints and handlers take them by constructor.

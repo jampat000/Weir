@@ -33,6 +33,7 @@ public static class MediaManagerConnectionsEndpoints
         endpoints.MapV1("POST", "/media-managers/connections/{connection_id}/webhook-secret", PostWebhookSecretAsync);
         endpoints.MapV1("PUT", "/media-managers/connections/{connection_id}/lanes/{lane}", PutLaneAsync);
         endpoints.MapV1("POST", "/media-managers/connections/{connection_id}/test", PostConnectionTestAsync);
+        endpoints.MapV1("GET", "/media-managers/connections/{connection_id}/folder-chain", GetConnectionFolderChainAsync);
         return endpoints;
     }
 
@@ -129,6 +130,26 @@ public static class MediaManagerConnectionsEndpoints
         issues.ThrowIfAny();
         var uow = await request.DbAsync().ConfigureAwait(false);
         return ApiRoutes.Ok((await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false)).ToOut());
+    }
+
+    /// <summary>
+    /// <c>GET /api/v1/media-managers/connections/{connection_id}/folder-chain</c> (#768): the same per-library
+    /// folder-chain check <c>ProcessingLibraryEndpoints.GetLibraryFolderChainAsync</c> exposes per library, run for
+    /// every library linked to this connection — "which of this connection's libraries are fully chained".
+    /// </summary>
+    private static async Task<ApiResult> GetConnectionFolderChainAsync(ApiRequest request)
+    {
+        await request.RequireUserAsync().ConfigureAwait(false);
+        var issues = new ValidationIssues();
+        var connectionId = ConnectionId(request, issues);
+        issues.ThrowIfAny();
+
+        var uow = await request.DbAsync().ConfigureAwait(false);
+        await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
+        var chain = await request.Service<LibraryFolderChainCheck>()
+            .CheckForConnectionAsync(uow, connectionId, request.Context.RequestAborted)
+            .ConfigureAwait(false);
+        return ApiRoutes.Ok(new PyList(chain.Select(item => (PyJson)item)));
     }
 
     private static async Task<ApiResult> UpdateConnectionAsync(ApiRequest request)
