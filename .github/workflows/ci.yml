@@ -187,9 +187,11 @@ jobs:
         working-directory: apps/server
         run: dotnet build Weir.slnx -warnaserror --no-restore
 
+      # Category=Stress (the SQLite pool-race test) runs several seconds of wall clock across 8 threads and
+      # would starve every other test running alongside it here; ci-stress.yml runs it nightly instead.
       - name: Test Weir server
         working-directory: apps/server
-        run: dotnet test Weir.slnx --no-build
+        run: dotnet test Weir.slnx --no-build --filter "Category!=Stress"
 
       - name: Server dependency vulnerability scan
         if: needs.changes.outputs.run_server_audit == 'true'
@@ -220,9 +222,10 @@ jobs:
         working-directory: apps/server
         run: dotnet build Weir.slnx -warnaserror --no-restore
 
+      # See server-linux's own "Test Weir server" step: ci-stress.yml runs Category=Stress nightly instead.
       - name: Test Weir server
         working-directory: apps/server
-        run: dotnet test Weir.slnx --no-build
+        run: dotnet test Weir.slnx --no-build --filter "Category!=Stress"
 
   # The production web build, once, for the E2E smoke and every contract leg to serve.
   web-dist:

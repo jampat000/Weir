@@ -145,7 +145,7 @@ public sealed class MediaToolsTests : IDisposable
         var source = WriteFile("complete.mkv", "source"u8.ToArray());
         var runner = new ScriptedRunner(_ => new ScriptedRun { ExitCode = 0, Stderr = "deprecated pixel format used, make sure you did set range correctly"u8.ToArray() });
 
-        await Tools(runner).ValidateMediaIntegrityAsync(source);
+        Assert.Null(await Record.ExceptionAsync(() => Tools(runner).ValidateMediaIntegrityAsync(source)));
     }
 
     [Fact]
@@ -171,7 +171,7 @@ public sealed class MediaToolsTests : IDisposable
         var source = WriteFile("complete.mkv", "source"u8.ToArray());
         var runner = new ScriptedRunner(_ => new ScriptedRun { ExitCode = 0, Stdout = "out_time_ms=29500000\nprogress=end\n"u8.ToArray() });
 
-        await Tools(runner).ValidateMediaIntegrityAsync(source, expectedDurationSeconds: 30.0);
+        Assert.Null(await Record.ExceptionAsync(() => Tools(runner).ValidateMediaIntegrityAsync(source, expectedDurationSeconds: 30.0)));
     }
 
     [Fact]

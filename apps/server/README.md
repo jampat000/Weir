@@ -15,7 +15,6 @@ Solution: `apps/server/Weir.slnx`.
 | `tests/Weir.Core.Tests` | Unit tests for `Weir.Core`, including the rules and ffmpeg golden fixtures. |
 | `tests/Weir.Infrastructure.Tests` | Tests against a real SQLite database and real files, including migration tests. |
 | `tests/Weir.Api.Tests` | Endpoint tests over HTTP, including `OpenApiDocumentParityTests`. |
-| `tests/Trial503Harness` | A one-off harness for the #503 mkvmerge trial. Not in `Weir.slnx`; CI does not build it. |
 
 The language-neutral contract suite (`tests/contract`) and the E2E smoke (`tests/e2e/weir`) judge a running server from outside. See [`tests/contract/README.md`](../../tests/contract/README.md).
 

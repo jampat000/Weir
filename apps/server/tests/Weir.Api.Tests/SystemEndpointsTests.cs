@@ -149,19 +149,16 @@ public sealed class SystemEndpointsTests
     /// <summary>Poll until the endpoint answers 200, and return its body.</summary>
     private static async Task<string> WaitForReadyAsync(WeirTestServer server, string path)
     {
-        var deadline = DateTime.UtcNow.AddSeconds(15);
-        while (true)
-        {
-            using var response = await server.Client.GetAsync(path);
-            var text = await response.Content.ReadAsStringAsync();
-            if (response.StatusCode == HttpStatusCode.OK || DateTime.UtcNow > deadline)
+        var (status, text) = await Eventually.PollAsync(
+            async () =>
             {
-                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-                return text;
-            }
+                using var response = await server.Client.GetAsync(path);
+                return (response.StatusCode, await response.Content.ReadAsStringAsync());
+            },
+            result => result.StatusCode == HttpStatusCode.OK);
 
-            await Task.Delay(50);
-        }
+        Assert.Equal(HttpStatusCode.OK, status);
+        return text;
     }
 
     [Fact]

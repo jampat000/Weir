@@ -4,18 +4,19 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Tests.Sqlite.Migrations;
 
 /// <summary>
-/// Issue #633's migration (<c>0011_files_at_once.sql</c>): an upgrade changes nothing about how many files run today,
+/// Migration <c>0011_files_at_once.sql</c>: an upgrade changes nothing about how many files run today,
 /// and an install that never tuned anything gets the simple model - a library follows "Files at once", and the
 /// resolution budget is off.
 /// <para>Each test builds a database at head, puts it back the way it was before this migration (no budget switch, the saved limits
 /// under test), and runs the migration's own SQL.</para>
 /// </summary>
-public sealed class Issue633MigrationTests : IDisposable
+/// <seealso href="https://github.com/jampat000/Weir/issues/633"/>
+public sealed class FilesAtOnceMigrationTests : IDisposable
 {
     private readonly TempDirectory _temp = new();
     private readonly SqliteDatabase _database;
 
-    public Issue633MigrationTests()
+    public FilesAtOnceMigrationTests()
     {
         _database = new SqliteDatabase(_temp.Join("weir.sqlite3"));
         new SchemaMigrator(_database).EnsureAtHead();

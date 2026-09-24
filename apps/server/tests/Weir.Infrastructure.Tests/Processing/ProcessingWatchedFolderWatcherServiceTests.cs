@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Weir.Core.Json;
 using Weir.Core.Processing;
 using Weir.Infrastructure.Jobs;
@@ -10,10 +11,13 @@ using Weir.Infrastructure.Tests.Platform;
 namespace Weir.Infrastructure.Tests.Processing;
 
 /// <summary>
-/// The watched-folder watcher on real temp folders and a real <see cref="FileSystemWatcher"/>, including the
-/// two behaviours issue #552 asks for: an overflow/error restarts the watcher and forces an immediate scan, and
-/// readiness reports the watched libraries. Real filesystem events need real wall-clock time, so these use
-/// <see cref="TimeProvider.System"/> and generous timeouts rather than a movable fake clock.
+/// The watched-folder watcher, including the two behaviours issue #552 asks for: an overflow/error restarts
+/// the watcher and forces an immediate scan, and readiness reports the watched libraries. One test per
+/// admission path drives a real temp folder and a real <see cref="FileSystemWatcher"/>, tagged
+/// <c>Category=Integration</c>, since that is the only way to prove the OS actually raises the events Weir
+/// subscribes to; every other test drives the debounce and reconcile-tick logic through
+/// <see cref="FakeWatcherService"/> and a shared <see cref="FakeTimeProvider"/>, so nothing here depends on
+/// real chunk-write timing landing on the right side of a debounce window.
 /// </summary>
 public sealed class ProcessingWatchedFolderWatcherServiceTests
 {
@@ -52,26 +56,13 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
         return rows;
     }
 
-    private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan? timeout = null)
-    {
-        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(20));
-        while (!condition())
-        {
-            if (DateTime.UtcNow > deadline)
-            {
-                Assert.Fail("condition was not met in time");
-            }
-
-            await Task.Delay(50);
-        }
-    }
-
-    private static ProcessingWatchedFolderWatcherService Service(StoreFixture store, WatcherStateStore state) =>
-        new(store.Database, store.Options, new ProcessingJobStore(store.Database, TimeProvider.System), state,
-            TimeProvider.System, NullLogger<ProcessingWatchedFolderWatcherService>.Instance);
+    private static ProcessingWatchedFolderWatcherService Service(StoreFixture store, WatcherStateStore state, TimeProvider? time = null) =>
+        new(store.Database, store.Options, new ProcessingJobStore(store.Database, time ?? TimeProvider.System), state,
+            time ?? TimeProvider.System, NullLogger<ProcessingWatchedFolderWatcherService>.Instance);
 
     // --- one admission implementation: a settled burst becomes one scan --------------------------------
 
+    [Trait("Category", "Integration")]
     [Fact]
     public async Task A_file_appearing_becomes_a_candidate_without_waiting_for_the_scan_interval()
     {
@@ -93,10 +84,10 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
             // reconcile tick takes: on a loaded CI box that tick can take longer than any fixed sleep, and
             // writing the file before FileSystemWatcher.EnableRaisingEvents is actually true means Windows
             // never raises the event at all, so the test would wait out its full timeout for nothing.
-            await WaitUntilAsync(() => state.Reports().Any(r => r.LibraryId == libraryId && r.Status == WatcherStatus.Watching));
+            await Eventually.ThatAsync(() => state.Reports().Any(r => r.LibraryId == libraryId && r.Status == WatcherStatus.Watching));
             await File.WriteAllBytesAsync(Path.Combine(watched, "Gate Test 2001.mkv"), new byte[2048]);
 
-            await WaitUntilAsync(() => ScanJobPayloads(store).Count > 0);
+            await Eventually.ThatAsync(() => ScanJobPayloads(store).Count > 0);
             var payloads = ScanJobPayloads(store);
             Assert.Single(payloads);
             var body = (PyDict)PyJsonParser.Parse(payloads[0]);
@@ -108,6 +99,7 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
         }
     }
 
+    [Trait("Category", "Integration")]
     [Fact]
     public async Task A_file_moved_into_a_watched_folder_becomes_a_candidate()
     {
@@ -133,10 +125,10 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
             // See the comment in A_file_appearing_becomes_a_candidate_without_waiting_for_the_scan_interval:
             // wait for the watcher to actually be attached instead of guessing with a fixed sleep. The move
             // is within store.Home, so it raises Renamed (not Created); the service subscribes to both.
-            await WaitUntilAsync(() => state.Reports().Any(r => r.LibraryId == libraryId && r.Status == WatcherStatus.Watching));
+            await Eventually.ThatAsync(() => state.Reports().Any(r => r.LibraryId == libraryId && r.Status == WatcherStatus.Watching));
             File.Move(staged, Path.Combine(watched, "Gate Test 2001.mkv"));
 
-            await WaitUntilAsync(() => ScanJobPayloads(store).Count > 0);
+            await Eventually.ThatAsync(() => ScanJobPayloads(store).Count > 0);
             Assert.Single(ScanJobPayloads(store));
         }
         finally
@@ -148,7 +140,10 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
     [Fact]
     public async Task A_growing_file_written_in_chunks_produces_one_scan_not_one_per_chunk()
     {
-        // A PVR (or a downloader) writing parts of a file every so often is one arrival.
+        // A PVR (or a downloader) writing parts of a file every so often is one arrival. The chunk writes
+        // are real (proving the OS coalesces them into the debounce the way production expects), but the
+        // debounce clock is fake and frozen while they happen, so every chunk lands at the same "now" -
+        // there is no 1 s real-time boundary a slow CI box could straddle.
         using var store = new StoreFixture(
             ("WEIR_CREDENTIALS_SECRET", "watcher-tests-secret-3"),
             ("WEIR_PROCESSING_WATCHER_DEBOUNCE_SECONDS", "1"));
@@ -158,13 +153,14 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
         Directory.CreateDirectory(output);
         var libraryId = await CreateLibraryAsync(store, watched, output);
 
+        var time = new FakeTimeProvider();
         var state = new WatcherStateStore();
-        var service = Service(store, state);
+        var service = Service(store, state, time);
         await service.StartAsync(CancellationToken.None);
         try
         {
             // See the comment in A_file_appearing_becomes_a_candidate_without_waiting_for_the_scan_interval.
-            await WaitUntilAsync(() => state.Reports().Any(r => r.LibraryId == libraryId && r.Status == WatcherStatus.Watching));
+            await Eventually.ThatAsync(() => state.Reports().Any(r => r.LibraryId == libraryId && r.Status == WatcherStatus.Watching));
             var target = Path.Combine(watched, "Recording.mkv");
             await using (var handle = File.Open(target, FileMode.Create, FileAccess.Write, FileShare.Read))
             {
@@ -173,13 +169,20 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
                     var chunk = new byte[4096];
                     await handle.WriteAsync(chunk);
                     await handle.FlushAsync();
-                    await Task.Delay(100);
                 }
             }
 
-            await WaitUntilAsync(() => ScanJobPayloads(store).Count > 0);
-            // Give a would-be extra scan a chance to show up before asserting there is only one.
-            await Task.Delay(1500);
+            // Every chunk shares the same recorded "changed" instant, so exactly one tick a full debounce
+            // later can possibly drain it. Advance a tick at a time while polling (rather than one big jump)
+            // so this does not race the real FileSystemWatcher event, which can still take a moment to reach
+            // pending.Note after the writes above return.
+            await Eventually.ThatAsync(
+                () =>
+                {
+                    time.Advance(ProcessingWatchedFolderWatcherService.TickInterval);
+                    return ScanJobPayloads(store).Count > 0;
+                },
+                TimeSpan.FromSeconds(5));
             Assert.Single(ScanJobPayloads(store));
         }
         finally
@@ -200,12 +203,13 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
         Directory.CreateDirectory(output);
         var libraryId = await CreateLibraryAsync(store, watched, output, fileSystemEventsEnabled: false);
 
+        var time = new FakeTimeProvider();
         var state = new WatcherStateStore();
-        var service = Service(store, state);
+        var service = Service(store, state, time);
         await service.StartAsync(CancellationToken.None);
         try
         {
-            await WaitUntilAsync(() => state.Reports().Any(r => r.LibraryId == libraryId));
+            await Eventually.ThatAsync(() => state.Reports().Any(r => r.LibraryId == libraryId));
             var report = state.Reports().Single(r => r.LibraryId == libraryId);
             Assert.Equal(WatcherStatus.Disabled, report.Status);
             // Switched off deliberately is not degraded; treating it as such trains people to ignore it.
@@ -213,7 +217,9 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
             Assert.Contains("scan interval", report.Detail, StringComparison.Ordinal);
 
             await File.WriteAllBytesAsync(Path.Combine(watched, "no-watcher.mkv"), new byte[16]);
-            await Task.Delay(2000);
+            // No watcher was ever created for this library, so forcing several reconcile ticks (rather than
+            // hoping a fixed real-time window covered enough of them) still finds nothing to admit.
+            await AdvancePastSeveralTicksAsync(time);
             Assert.Empty(ScanJobPayloads(store));
         }
         finally
@@ -234,16 +240,17 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
         Directory.CreateDirectory(output);
         await CreateLibraryAsync(store, watched, output);
 
+        var time = new FakeTimeProvider();
         var state = new WatcherStateStore();
-        var service = Service(store, state);
+        var service = Service(store, state, time);
         await service.StartAsync(CancellationToken.None);
         try
         {
-            await Task.Delay(1000);
+            await AdvancePastSeveralTicksAsync(time);
             Assert.Empty(state.Reports());
 
             await File.WriteAllBytesAsync(Path.Combine(watched, "no-watcher.mkv"), new byte[16]);
-            await Task.Delay(2000);
+            await AdvancePastSeveralTicksAsync(time);
             Assert.Empty(ScanJobPayloads(store));
         }
         finally
@@ -254,6 +261,20 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
         var (ok, detail) = state.Summary();
         Assert.True(ok);
         Assert.Contains("No libraries", detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Forces several reconcile ticks on a fake clock, one at a time (a single large advance only wakes the
+    /// one timer already due, not the ones a tick's own continuation goes on to arm), so a "nothing happened"
+    /// assertion reflects several ticks that genuinely ran rather than a hopeful real-time window.
+    /// </summary>
+    private static async Task AdvancePastSeveralTicksAsync(FakeTimeProvider time)
+    {
+        for (var i = 0; i < 5; i++)
+        {
+            time.Advance(ProcessingWatchedFolderWatcherService.TickInterval);
+            await Task.Delay(20);
+        }
     }
 
     // --- readiness fields ----------------------------------------------------------------------------
@@ -273,7 +294,7 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
         await service.StartAsync(CancellationToken.None);
         try
         {
-            await WaitUntilAsync(() => state.Reports().Any(r => r.LibraryId == libraryId && r.Status == WatcherStatus.Watching));
+            await Eventually.ThatAsync(() => state.Reports().Any(r => r.LibraryId == libraryId && r.Status == WatcherStatus.Watching));
             var report = state.Reports().Single(r => r.LibraryId == libraryId);
             Assert.Equal("Movies", report.LibraryName);
             Assert.Equal(Path.GetFullPath(watched), Path.GetFullPath(report.WatchedFolder));
@@ -303,7 +324,7 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
         await service.StartAsync(CancellationToken.None);
         try
         {
-            await WaitUntilAsync(() => state.Reports().Any(r => r.LibraryId == libraryId));
+            await Eventually.ThatAsync(() => state.Reports().Any(r => r.LibraryId == libraryId));
             var report = state.Reports().Single(r => r.LibraryId == libraryId);
             Assert.Equal(WatcherStatus.PollingFallback, report.Status);
             Assert.True(report.Degraded);
@@ -336,17 +357,17 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
         await service.StartAsync(CancellationToken.None);
         try
         {
-            await WaitUntilAsync(() => service.CreatedFor(watched).Count == 1);
+            await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 1);
             var first = service.CreatedFor(watched)[0];
 
             first.RaiseError(new IOException("simulated overflow"));
 
-            await WaitUntilAsync(() => ScanJobPayloads(store).Count > 0);
+            await Eventually.ThatAsync(() => ScanJobPayloads(store).Count > 0);
             var body = (PyDict)PyJsonParser.Parse(ScanJobPayloads(store)[0]);
             Assert.Equal("filesystem_event", ((PyStr)body.Get("scan_trigger")!).Value);
 
             // The watcher for this folder was replaced, not merely left running after the error.
-            await WaitUntilAsync(() => service.CreatedFor(watched).Count == 2);
+            await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 2);
             Assert.NotSame(first, service.CreatedFor(watched)[1]);
         }
         finally

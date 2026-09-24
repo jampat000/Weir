@@ -97,7 +97,7 @@ public sealed class RuntimeAndLoggingTests
     [InlineData(LogLevel.Warning, "WARNING")]
     [InlineData(LogLevel.Error, "ERROR")]
     [InlineData(LogLevel.Critical, "CRITICAL")]
-    public void Level_names(LogLevel level, string expected) => Assert.Equal(expected, PythonLogFormat.LevelName(level));
+    public void Level_names_are_the_documented_uppercase_short_form(LogLevel level, string expected) => Assert.Equal(expected, PythonLogFormat.LevelName(level));
 
     [Fact]
     public void The_file_logger_writes_weir_log_with_the_request_id()

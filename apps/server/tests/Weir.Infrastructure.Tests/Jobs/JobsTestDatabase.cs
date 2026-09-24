@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Weir.Core.Activity;
 using Weir.Core.Jobs;
 using Weir.Infrastructure.Activity;
@@ -29,7 +30,7 @@ internal sealed class JobsTestDatabase : IDisposable
             Execute("DELETE FROM libraries; DELETE FROM suite_settings; DELETE FROM operator_settings;");
         }
 
-        Clock = new SettableTimeProvider(T0);
+        Clock = new FakeTimeProvider(T0);
         Store = new ProcessingJobStore(Database, Clock);
     }
 
@@ -39,7 +40,7 @@ internal sealed class JobsTestDatabase : IDisposable
 
     public SqliteDatabase Database { get; }
 
-    public SettableTimeProvider Clock { get; }
+    public FakeTimeProvider Clock { get; }
 
     public ProcessingJobStore Store { get; }
 
@@ -182,14 +183,6 @@ internal sealed class JobsTestDatabase : IDisposable
         Database.ClearPool();
         _directory.Dispose();
     }
-}
-
-/// <summary>A clock the test sets; timers still run in real time.</summary>
-internal sealed class SettableTimeProvider(DateTimeOffset now) : TimeProvider
-{
-    public DateTimeOffset Now { get; set; } = now;
-
-    public override DateTimeOffset GetUtcNow() => Now;
 }
 
 /// <summary>A handler built from a delegate.</summary>

@@ -47,7 +47,7 @@ public sealed class RemuxOutputValidationTests
         var output = Probe(
             """{"format":{"format_name":"webm","duration":"100.0"},"streams":[{"codec_type":"video"},{"codec_type":"audio","disposition":{"default":1},"tags":{"language":"eng"}}]}""");
 
-        RemuxOutputValidation.ValidateAgainstPlan(output, plan, "matroska,webm", 100.0, [], []);
+        Assert.Null(Record.Exception(() => RemuxOutputValidation.ValidateAgainstPlan(output, plan, "matroska,webm", 100.0, [], [])));
     }
 
     // --- track counts and positions ----------------------------------------------------------
@@ -98,7 +98,7 @@ public sealed class RemuxOutputValidationTests
         var output = Probe(
             """{"format":{"duration":"100.0"},"streams":[{"codec_type":"video"},{"codec_type":"audio","disposition":{"default":1},"tags":{"language":"eng"}}]}""");
 
-        RemuxOutputValidation.ValidateAgainstPlan(output, plan, null, 100.0, [], []);
+        Assert.Null(Record.Exception(() => RemuxOutputValidation.ValidateAgainstPlan(output, plan, null, 100.0, [], [])));
     }
 
     [Fact]
@@ -135,7 +135,7 @@ public sealed class RemuxOutputValidationTests
         var output = Probe(
             """{"format":{"duration":"100.0"},"streams":[{"codec_type":"video"},{"codec_type":"audio","disposition":{"default":1},"tags":{"language":"eng-US"}}]}""");
 
-        RemuxOutputValidation.ValidateAgainstPlan(output, plan, null, 100.0, [], []);
+        Assert.Null(Record.Exception(() => RemuxOutputValidation.ValidateAgainstPlan(output, plan, null, 100.0, [], [])));
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public sealed class RemuxOutputValidationTests
         var output = Probe(
             """{"format":{"duration":"100.0"},"streams":[{"codec_type":"video"},{"codec_type":"audio","disposition":{"default":1}}]}""");
 
-        RemuxOutputValidation.ValidateAgainstPlan(output, plan, null, 100.0, [], []);
+        Assert.Null(Record.Exception(() => RemuxOutputValidation.ValidateAgainstPlan(output, plan, null, 100.0, [], [])));
     }
 
     // --- duration ------------------------------------------------------------------------------
@@ -183,7 +183,7 @@ public sealed class RemuxOutputValidationTests
 
         // Expected (1200.0) comes from the kept streams only (see the test above), not the longer subtitle track
         // the plan drops, so a correct 1199s output is well within tolerance instead of failing as "incomplete".
-        RemuxOutputValidation.ValidateAgainstPlan(output, plan, null, 1200.0, [], []);
+        Assert.Null(Record.Exception(() => RemuxOutputValidation.ValidateAgainstPlan(output, plan, null, 1200.0, [], [])));
     }
 
     [Fact]
@@ -219,7 +219,7 @@ public sealed class RemuxOutputValidationTests
         string[] sourceWarnings = ["[matroska @ 0x1122] Non-monotonic DTS, previous: 100, current: 90"];
         string[] outputWarnings = ["[matroska @ 0x99aa] Non-monotonic DTS, previous: 555, current: 200"];
 
-        RemuxOutputValidation.ValidateAgainstPlan(output, plan, null, 100.0, sourceWarnings, outputWarnings);
+        Assert.Null(Record.Exception(() => RemuxOutputValidation.ValidateAgainstPlan(output, plan, null, 100.0, sourceWarnings, outputWarnings)));
     }
 
     [Fact]
@@ -243,7 +243,7 @@ public sealed class RemuxOutputValidationTests
             "Unsupported codec with id 0 for input stream 3",
         ];
 
-        RemuxOutputValidation.ValidateAgainstPlan(output, plan, null, 100.0, sourceWarnings, outputWarnings);
+        Assert.Null(Record.Exception(() => RemuxOutputValidation.ValidateAgainstPlan(output, plan, null, 100.0, sourceWarnings, outputWarnings)));
     }
 
     [Fact]
@@ -293,6 +293,6 @@ public sealed class RemuxOutputValidationTests
         var output = Probe(
             """{"format":{"duration":"100.0"},"streams":[{"codec_type":"video"},{"codec_type":"audio","disposition":{"default":1},"tags":{"language":"eng"}}]}""");
 
-        RemuxOutputValidation.ValidateAgainstPlan(output, plan, null, 100.0, [], []);
+        Assert.Null(Record.Exception(() => RemuxOutputValidation.ValidateAgainstPlan(output, plan, null, 100.0, [], [])));
     }
 }

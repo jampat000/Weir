@@ -75,7 +75,7 @@ public sealed record LibraryFileFacts(
 /// <remarks>
 /// <para>The SQL back-fill in migration <c>0007_library_file_facets.sql</c> mirrors these rules for rows scanned
 /// before #568 added the columns, so an existing install gets a populated Library view without waiting for a
-/// rescan. <c>Issue568MigrationTests</c> compares the two on the same probe JSON, which is what keeps them from
+/// rescan. <c>LibraryFileFacetsMigrationTests</c> compares the two on the same probe JSON, which is what keeps them from
 /// drifting; a change here needs the same change there.</para>
 /// </remarks>
 public static class LibraryFileFactsReader

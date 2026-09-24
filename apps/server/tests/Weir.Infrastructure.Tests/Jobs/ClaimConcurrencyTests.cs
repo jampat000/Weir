@@ -146,7 +146,8 @@ public sealed class ClaimConcurrencyTests : IDisposable
         const int producers = 6;
         const int perProducer = 40;
         const int consumers = 8;
-        var produced = 0;
+        const int totalJobs = producers * perProducer;
+        var claimed = new CountdownEvent(totalJobs);
         var claims = new ConcurrentBag<long>();
         var producing = Enumerable.Range(0, producers).Select(p => Task.Run(async () =>
         {
@@ -156,27 +157,26 @@ public sealed class ClaimConcurrencyTests : IDisposable
                 await store.EnqueueOrGetAsync($"p{p}-{i}", Kind);
                 // A duplicate enqueue returns the same row rather than adding one.
                 await store.EnqueueOrGetAsync($"p{p}-{i}", Kind);
-                Interlocked.Increment(ref produced);
             }
         })).ToArray();
+        // Every consumer keeps claiming until the countdown - signalled once per successful claim, by
+        // whichever consumer got it - reaches zero, rather than guessing "idle" from a spin count. A
+        // deadline is still a backstop: a real bug that stops claims dead should fail promptly, not hang
+        // the run until the test host's own outer timeout kills it.
+        var deadline = DateTime.UtcNow.AddSeconds(60);
         var consuming = Enumerable.Range(0, consumers).Select(c => Task.Run(async () =>
         {
             var store = SeparateStore();
-            var idle = 0;
-            while (idle < 20)
+            while (!claimed.IsSet && DateTime.UtcNow < deadline)
             {
                 if (await store.ClaimNextAsync($"c{c}", T0.AddHours(1), T0) is { } job)
                 {
                     claims.Add(job.Id);
-                    idle = 0;
-                }
-                else if (Volatile.Read(ref produced) == producers * perProducer)
-                {
-                    idle++;
+                    claimed.Signal();
                 }
                 else
                 {
-                    await Task.Delay(1);
+                    await Task.Yield();
                 }
             }
         })).ToArray();
@@ -184,9 +184,10 @@ public sealed class ClaimConcurrencyTests : IDisposable
         await Task.WhenAll(producing);
         await Task.WhenAll(consuming);
 
-        Assert.Equal(producers * perProducer, _db.Count("SELECT count(*) FROM jobs"));
-        Assert.Equal(producers * perProducer, claims.Count);
-        Assert.Equal(producers * perProducer, claims.Distinct().Count());
+        Assert.True(claimed.IsSet, $"only {totalJobs - claimed.CurrentCount} of {totalJobs} jobs were claimed within the deadline");
+        Assert.Equal(totalJobs, _db.Count("SELECT count(*) FROM jobs"));
+        Assert.Equal(totalJobs, claims.Count);
+        Assert.Equal(totalJobs, claims.Distinct().Count());
     }
 
     // pooling: false - each simulated worker gets its own real connection, not a share of one process-wide
