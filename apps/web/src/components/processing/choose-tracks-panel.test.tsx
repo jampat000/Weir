@@ -99,10 +99,10 @@ it("seeds each row from what the saved rules would do", () => {
   expect(screen.getByTestId("choose-tracks-keep-1")).toBeChecked();
   expect(screen.getByTestId("choose-tracks-keep-2")).not.toBeChecked();
   expect(screen.getByTestId("choose-tracks-keep-3")).not.toBeChecked();
-  // The dropped section lists exactly what is not kept at the start.
+  // The dropped section lists exactly what is not kept at the start, in words rather than raw codes.
   const dropped = screen.getByTestId("choose-tracks-dropped-list");
-  expect(dropped).toHaveTextContent("jpn");
-  expect(dropped).toHaveTextContent("eng");
+  expect(dropped).toHaveTextContent("Japanese");
+  expect(dropped).toHaveTextContent("English");
 });
 
 it("refuses to submit with no video kept", () => {

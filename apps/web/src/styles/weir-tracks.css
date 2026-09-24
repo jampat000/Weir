@@ -6,10 +6,22 @@
 }
 
 .mm-tracks-table-wrap {
+  container: mm-tracks-table / inline-size;
   margin-top: 1rem;
-  overflow-x: auto;
   border: 1px solid var(--mm-border);
   border-radius: var(--mm-radius-sm);
+}
+
+/* The way back from choosing a default subtitle, under the table it belongs to. */
+.mm-tracks-no-default {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border-top: 1px solid var(--mm-border);
+  font-size: var(--mm-type-caption);
+  color: var(--mm-text2);
+  cursor: pointer;
 }
 
 .mm-tracks-table {
@@ -25,6 +37,15 @@
   vertical-align: top;
   border-bottom: 1px solid var(--mm-border);
   white-space: nowrap;
+}
+
+/* A 24px target for a finger or a shaky hand, not just the native box's own size. */
+.mm-tracks-table input[type="checkbox"],
+.mm-tracks-table input[type="radio"],
+.mm-tracks-no-default input[type="radio"] {
+  width: 24px;
+  height: 24px;
+  accent-color: var(--mm-accent);
 }
 
 .mm-tracks-table tr:last-child td {
@@ -50,6 +71,53 @@
   white-space: normal;
   overflow-wrap: anywhere;
   min-width: 16rem;
+}
+
+/* Too narrow for five columns side by side (#700): each row becomes a card of labelled values instead of
+   scrolling the table sideways. The label comes from the column name each cell was given in the markup. */
+@container mm-tracks-table (max-width: 40rem) {
+  .mm-tracks-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .mm-tracks-table,
+  .mm-tracks-table tbody,
+  .mm-tracks-table tr {
+    display: block;
+    width: 100%;
+  }
+
+  .mm-tracks-table tr {
+    padding: 0.6rem;
+  }
+
+  .mm-tracks-table td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.3rem 0;
+    white-space: normal;
+    border-bottom: none;
+  }
+
+  .mm-tracks-table td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    color: var(--mm-text3);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: var(--mm-tracking-eyebrow);
+    font-size: 0.68rem;
+  }
+
+  .mm-tracks-table__rule {
+    min-width: 0;
+  }
 }
 
 .mm-tracks-order,
