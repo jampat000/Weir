@@ -156,6 +156,33 @@ public sealed class RuntimeAndLoggingTests
         Assert.Single(ReadShared(path));
     }
 
+    [Fact]
+    public void Another_thread_keeps_logging_while_the_whole_log_is_read()
+    {
+        using var temp = new TempDirectory();
+        using var file = new WeirLogFile(temp.Join("weir.log"), TimeProvider.System);
+        var now = DateTimeOffset.UtcNow;
+        file.WriteLine(PythonLogFormat.JsonLine(now, LogLevel.Information, "L", "first", null, null, null));
+        file.WriteLine(PythonLogFormat.JsonLine(now, LogLevel.Information, "L", "second", null, null, null));
+        var read = new List<string>();
+        var writtenMidRead = false;
+
+        Assert.True(file.ReadLines(line =>
+        {
+            read.Add(line);
+            if (read.Count == 1)
+            {
+                // A completion signal with a generous guard: a write that needed the reader's lock would never finish.
+                writtenMidRead = Task.Run(() => file.WriteLine(PythonLogFormat.JsonLine(now, LogLevel.Information, "L", "during", null, null, null)))
+                    .Wait(TimeSpan.FromSeconds(30));
+            }
+        }));
+
+        Assert.True(writtenMidRead);
+        Assert.Equal(2, read.Count);
+        Assert.Contains("\"during\"", ReadShared(file.Path)[2], StringComparison.Ordinal);
+    }
+
     /// <summary>Read the log while the writer still holds it, as the Logs screen does.</summary>
     private static string[] ReadShared(string path)
     {
