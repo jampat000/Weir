@@ -13,7 +13,7 @@ namespace Weir.Infrastructure.Sqlite;
 /// deferred one could not survive another writer committing mid-unit (#586).
 /// </summary>
 /// <remarks>
-/// The only transaction mechanism server-wide (#745): every query, command, commit and rollback that runs
+/// The only transaction mechanism server-wide: every query, command, commit and rollback that runs
 /// inside a unit of work uses the <see cref="CancellationToken"/> it was opened with — there is one token per
 /// unit, not one per call, since every operation in a unit belongs to the same request or background pass and
 /// a caller that wants different cancellation semantics for part of its work opens a second unit of work with

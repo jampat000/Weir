@@ -47,7 +47,7 @@ public sealed partial class ProcessingJobStore
     /// Run <paramref name="work"/> in one <c>BEGIN IMMEDIATE</c> transaction and commit. The queue's own
     /// synchronous helpers (<see cref="Execute"/>, <see cref="Scalar"/> and the static methods in the other
     /// partial files) take a raw connection and transaction rather than the async <see cref="UnitOfWork"/>
-    /// API, so this hands them the ones <see cref="UnitOfWork"/> itself opened and committed (#745): one
+    /// API, so this hands them the ones <see cref="UnitOfWork"/> itself opened and committed: one
     /// transaction mechanism server-wide, with this as the queue's calling convention on top of it.
     /// </summary>
     public async Task<T> InTransactionAsync<T>(Func<SqliteConnection, SqliteTransaction, T> work, CancellationToken cancellationToken = default)
