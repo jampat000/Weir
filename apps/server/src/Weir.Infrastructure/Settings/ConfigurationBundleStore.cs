@@ -15,7 +15,7 @@ namespace Weir.Infrastructure.Settings;
 /// Bundles in the older format version 3 are refused rather than converted: conversion code that only runs on
 /// input nobody has can rot unnoticed while sitting on the restore path for current bundles.
 /// </remarks>
-public static partial class ConfigurationBundleStore
+public sealed partial class ConfigurationBundleStore
 {
     public const int FormatVersion = 4;
 
@@ -24,6 +24,9 @@ public static partial class ConfigurationBundleStore
     private const string ProcessingOperatorTable = "operator_settings";
     private const string RuleSetsTable = "rule_sets";
     private const string LibrariesTable = "libraries";
+
+    private readonly SuiteSettingsStore _suiteSettings;
+    private readonly ConfigurationBundleConnections _connections;
 
     private enum ColumnKind
     {
@@ -34,11 +37,17 @@ public static partial class ConfigurationBundleStore
 
     private sealed record Column(string Name, ColumnKind Kind);
 
+    public ConfigurationBundleStore(SuiteSettingsStore suiteSettings, ConfigurationBundleConnections connections)
+    {
+        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+        _connections = connections ?? throw new ArgumentNullException(nameof(connections));
+    }
+
     /// <summary>Build the export bundle from the settings rows. Throws <see cref="WireValueException"/> when a required row is missing.</summary>
-    public static async Task<WireObject> BuildAsync(UnitOfWork uow)
+    public async Task<WireObject> BuildAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
         var suite = await ReadRowsAsync(uow, SuiteTable, "WHERE id = 1").ConfigureAwait(false);
         // The export never carries the metadata provider key, encrypted or not; import already leaves the existing
         // key alone when a bundle omits it.
@@ -69,14 +78,14 @@ public static partial class ConfigurationBundleStore
             .Set("rule_sets", new WireArray(ruleSets))
             .Set("libraries", new WireArray(libraries))
             .Set(ConfigurationBundleConnections.MediaManagersSection, await ConfigurationBundleConnections.ExportMediaManagersAsync(uow).ConfigureAwait(false))
-            .Set(ConfigurationBundleConnections.AlertsSection, await ConfigurationBundleConnections.ExportAlertsAsync(uow).ConfigureAwait(false));
+            .Set(ConfigurationBundleConnections.AlertsSection, await _connections.ExportAlertsAsync(uow).ConfigureAwait(false));
     }
 
     /// <summary>
     /// Restore a bundle into the settings rows. <see cref="WireValueException"/> becomes a 400; anything else
     /// (<see cref="WireTypeException"/>, <see cref="Microsoft.Data.Sqlite.SqliteException"/>) is a server error.
     /// </summary>
-    public static async Task ApplyAsync(UnitOfWork uow, WireObject bundle, ITimeZoneResolver zones, string weirHome)
+    public async Task ApplyAsync(UnitOfWork uow, WireObject bundle, ITimeZoneResolver zones, string weirHome)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(bundle);
@@ -105,10 +114,10 @@ public static partial class ConfigurationBundleStore
         await ApplySingletonAsync(uow, ProcessingOperatorTable, bundle[ProcessingOperatorTable]).ConfigureAwait(false);
         var restoredConnectionIds = await ConfigurationBundleConnections.RestoreMediaManagersAsync(uow, bundle).ConfigureAwait(false);
         await RestoreProcessingLibrariesAsync(uow, bundle, weirHome, restoredConnectionIds).ConfigureAwait(false);
-        await ConfigurationBundleConnections.RestoreAlertsAsync(uow, bundle).ConfigureAwait(false);
+        await _connections.RestoreAlertsAsync(uow, bundle).ConfigureAwait(false);
     }
 
-    private static async Task ApplySuiteSettingsAsync(UnitOfWork uow, WireValue section, ITimeZoneResolver zones)
+    private async Task ApplySuiteSettingsAsync(UnitOfWork uow, WireValue section, ITimeZoneResolver zones)
     {
         var ss = section as WireObject ?? throw new WireTypeException($"The backup's {SuiteTable} section must be an object.");
         var name = WireConvert.Str(Required(ss, "product_display_name"));
@@ -149,8 +158,8 @@ public static partial class ConfigurationBundleStore
         }
 
         normalized = normalized with { ConfigurationBackupEnabled = backupEnabled, ConfigurationBackupIntervalHours = backupHours };
-        var before = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-        await SuiteSettingsStore.UpdateAsync(uow, before, SuiteSettingsRules.Apply(before, normalized)).ConfigureAwait(false);
+        var before = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
+        await _suiteSettings.UpdateAsync(uow, before, SuiteSettingsRules.Apply(before, normalized)).ConfigureAwait(false);
     }
 
     private static async Task ApplySingletonAsync(UnitOfWork uow, string table, WireValue section)

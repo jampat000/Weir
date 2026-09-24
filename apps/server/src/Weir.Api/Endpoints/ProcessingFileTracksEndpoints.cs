@@ -256,7 +256,7 @@ public static class ProcessingFileTracksEndpoints
 
         var job = ManualPlanSupport.EnqueueManualPlan(uow, request.Service<ProcessingJobStore>(), context, choice, fingerprint);
         var name = System.IO.Path.GetFileName(context.File.RelativePath);
-        await ActivityStore.RecordAsync(
+        await request.Service<ActivityStore>().RecordAsync(
             uow,
             ActivityEventTypes.ProcessingFileManualPlanQueued,
             "processing",

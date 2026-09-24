@@ -8,8 +8,11 @@ using Weir.Core.Processing;
 using Weir.Core.Time;
 using Weir.Core.Workers;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Auth;
+using Weir.Infrastructure.Notifications;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Scheduling;
+using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure;
@@ -32,6 +35,17 @@ public static class WeirPlatformServices
         services.TryAddSingleton(sp => ActivityNotifications.For(sp.GetRequiredService<SqliteDatabase>()));
         // One process-wide live-progress store, shared by every running pass and every open stream (#750).
         services.TryAddSingleton<LiveProgressStore>();
+
+        // Auth, Activity, Notifications and Suite settings: instance stores over UnitOfWork, stateless
+        // themselves, so one shared instance serves every request.
+        services.TryAddSingleton<AuthStore>();
+        services.TryAddSingleton<ActivityHistoryStore>();
+        services.TryAddSingleton<ActivityStore>();
+        services.TryAddSingleton<OperationalHistoryStore>();
+        services.TryAddSingleton<NotificationChannelStore>();
+        services.TryAddSingleton<SuiteSettingsStore>();
+        services.TryAddSingleton<ConfigurationBundleConnections>();
+        services.TryAddSingleton<ConfigurationBundleStore>();
 
         // #555: WEIR_CHOWN_OUTPUT/WEIR_FILE_MODE_OUTPUT/WEIR_DIR_MODE_OUTPUT. Windows gets a no-op tools
         // implementation (there is no POSIX owner or mode there) and, when an operator actually set one of these,

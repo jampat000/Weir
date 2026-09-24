@@ -3,9 +3,11 @@ using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Processing;
 using Weir.Core.Security;
+using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
 using Weir.Infrastructure.Tests.MediaManagers;
 using Weir.Infrastructure.Tests.Platform;
@@ -59,7 +61,7 @@ public sealed class ScanWakeupsTests
         var connections = new MediaManagerConnectionService(store.Options, cipher, new HttpMediaManagerPorts(new FakeManagerHttp()));
         var jobs = new ProcessingJobStore(store.Database, store.Clock);
         var wakeups = new ScanWakeups();
-        var handler = new ProcessingWatchedFolderScanDispatchJobHandler(store.Database, store.Clock, store.Options, jobs, connections, wakeups);
+        var handler = new ProcessingWatchedFolderScanDispatchJobHandler(store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), wakeups);
         await store.Execute(
             "INSERT INTO operator_settings (id, min_file_age_seconds, min_input_file_size_mb, minimum_free_disk_space_mb) " +
             "VALUES (1, 0, 0, 0) ON CONFLICT(id) DO UPDATE SET min_file_age_seconds = 0, min_input_file_size_mb = 0, minimum_free_disk_space_mb = 0");

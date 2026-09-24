@@ -220,11 +220,12 @@ public static class WeirServer
         try
         {
             var setupCodes = app.Services.GetRequiredService<SetupCodeGate>();
+            var auth = app.Services.GetRequiredService<AuthService>();
             var uow = UnitOfWork.OpenAsync(database).GetAwaiter().GetResult();
             bool adminExists;
             try
             {
-                adminExists = !AuthService.BootstrapAllowedAsync(uow).GetAwaiter().GetResult();
+                adminExists = !auth.BootstrapAllowedAsync(uow).GetAwaiter().GetResult();
             }
             finally
             {

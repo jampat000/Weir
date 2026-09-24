@@ -38,6 +38,16 @@ public static class WeirApi
         services.AddSingleton<AuthRateLimiters>();
         services.AddSingleton<SetupCodeGate>();
         services.AddSingleton<ConfigurationBackups>();
+
+        // Endpoint handler groups: one instance per group, constructor-injected with the stores it needs.
+        services.AddSingleton<AuthAccountEndpointHandlers>();
+        services.AddSingleton<AuthSessionEndpointHandlers>();
+        services.AddSingleton<AuthSessionLifecycleEndpointHandlers>();
+        services.AddSingleton<ActivityEndpointHandlers>();
+        services.AddSingleton<NotificationEndpointHandlers>();
+        services.AddSingleton<SuiteConfigurationEndpointHandlers>();
+        services.AddSingleton<SuiteOperationalHistoryEndpointHandlers>();
+        services.AddSingleton<SuitePauseEndpointHandlers>();
         services.AddSingleton<UpdateFiles>();
         services.AddSingleton<IReleaseCatalogClient, GitHubReleaseCatalogClient>();
         services.AddSingleton<IExternalJsonPoster, ExternalJsonPoster>();

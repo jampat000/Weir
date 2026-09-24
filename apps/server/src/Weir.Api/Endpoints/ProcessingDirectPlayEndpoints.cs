@@ -4,6 +4,7 @@ using Weir.Core.Auth;
 using Weir.Core.Json;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Processing.DirectPlay;
+using Weir.Infrastructure.Settings;
 
 namespace Weir.Api.Endpoints;
 
@@ -21,7 +22,8 @@ public static class ProcessingDirectPlayEndpoints
     {
         var uow = await request.DbAsync().ConfigureAwait(false);
         var known = DeviceProfileLoader.Load(request.Options.WeirHome);
-        var chosen = new HashSet<string>(await DirectPlayService.SelectedDeviceIdsAsync(uow).ConfigureAwait(false), StringComparer.Ordinal);
+        var chosen = new HashSet<string>(
+            await DirectPlayService.SelectedDeviceIdsAsync(uow, request.Service<SuiteSettingsStore>()).ConfigureAwait(false), StringComparer.Ordinal);
         var devices = known.Select(p => (WireValue)new WireObject()
             .Set("id", p.Id)
             .Set("name", p.Name)
@@ -54,7 +56,7 @@ public static class ProcessingDirectPlayEndpoints
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var known = DeviceProfileLoader.Load(request.Options.WeirHome);
-        await DirectPlayService.SaveSelectedDeviceIdsAsync(uow, known, selected).ConfigureAwait(false);
+        await DirectPlayService.SaveSelectedDeviceIdsAsync(uow, request.Service<SuiteSettingsStore>(), known, selected).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(await BuildOutAsync(request).ConfigureAwait(false));
     }

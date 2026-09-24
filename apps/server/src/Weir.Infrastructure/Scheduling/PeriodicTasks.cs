@@ -162,13 +162,15 @@ public sealed class LogRetentionTask : IPeriodicTask
     private readonly SqliteDatabase _database;
     private readonly WeirLogFile _logFile;
     private readonly TimeProvider _time;
+    private readonly SuiteSettingsStore _suiteSettings;
     private DateTimeOffset? _lastPruneAt;
 
-    public LogRetentionTask(SqliteDatabase database, WeirLogFile logFile, TimeProvider time)
+    public LogRetentionTask(SqliteDatabase database, WeirLogFile logFile, TimeProvider time, SuiteSettingsStore suiteSettings)
     {
         _database = database;
         _logFile = logFile;
         _time = time;
+        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
     }
 
     public string Name => "suite-log-retention";
@@ -201,12 +203,12 @@ public sealed class LogRetentionTask : IPeriodicTask
     /// The number of days of log to keep, shared with the startup prune: the suite settings'
     /// <c>log_retention_days</c>, at least 1.
     /// </summary>
-    public static async Task<int> ReadKeepDaysAsync(SqliteDatabase database, CancellationToken cancellationToken = default)
+    public async Task<int> ReadKeepDaysAsync(SqliteDatabase database, CancellationToken cancellationToken = default)
     {
         var uow = await UnitOfWork.OpenAsync(database, cancellationToken).ConfigureAwait(false);
         await using (uow.ConfigureAwait(false))
         {
-            var suite = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+            var suite = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
             return (int)Math.Max(1, Math.Min(int.MaxValue, suite.LogRetentionDays));
         }

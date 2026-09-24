@@ -34,7 +34,7 @@ public sealed partial class AuthService
     public async Task<List<WireValue>> ListActiveSessionsAsync(UnitOfWork uow, long userId, UserSessionRecord? current)
     {
         var moment = Now();
-        var rows = await AuthStore.ActiveSessionsNewestFirstAsync(uow, userId, moment).ConfigureAwait(false);
+        var rows = await _users.ActiveSessionsNewestFirstAsync(uow, userId, moment).ConfigureAwait(false);
         var output = new List<WireValue>();
         foreach (var stored in rows)
         {
@@ -54,13 +54,13 @@ public sealed partial class AuthService
     /// <summary>Revokes one of the user's sessions; false when it does not exist or is already revoked.</summary>
     public async Task<bool> RevokeUserSessionAsync(UnitOfWork uow, long userId, Guid sessionId)
     {
-        var row = await AuthStore.FindUserSessionAsync(uow, userId, sessionId.ToString("N")).ConfigureAwait(false);
+        var row = await _users.FindUserSessionAsync(uow, userId, sessionId.ToString("N")).ConfigureAwait(false);
         if (row is null || row.RevokedAt is not null)
         {
             return false;
         }
 
-        await AuthStore.RevokeSessionAsync(uow, row.Id, Now()).ConfigureAwait(false);
+        await _users.RevokeSessionAsync(uow, row.Id, Now()).ConfigureAwait(false);
         return true;
     }
 
@@ -69,14 +69,14 @@ public sealed partial class AuthService
     {
         var moment = Now();
         var count = 0;
-        foreach (var row in await AuthStore.ActiveSessionsAsync(uow, userId, moment).ConfigureAwait(false))
+        foreach (var row in await _users.ActiveSessionsAsync(uow, userId, moment).ConfigureAwait(false))
         {
             if (currentSessionId is not null && row.Id == currentSessionId)
             {
                 continue;
             }
 
-            await AuthStore.RevokeSessionAsync(uow, row.Id, moment).ConfigureAwait(false);
+            await _users.RevokeSessionAsync(uow, row.Id, moment).ConfigureAwait(false);
             count++;
         }
 

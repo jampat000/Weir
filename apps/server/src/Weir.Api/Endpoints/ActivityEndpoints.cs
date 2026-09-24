@@ -3,6 +3,7 @@ using System.Numerics;
 using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Weir.Api.Http;
 using Weir.Core.Activity;
@@ -31,138 +32,15 @@ public static class ActivityEndpoints
     /// <summary>How long the stream waits before trying its first read again when it fails.</summary>
     public static readonly TimeSpan StreamReadRetry = TimeSpan.FromSeconds(2);
 
-    private const string FormatPattern = "^(csv|json)$";
-
     public static IEndpointRouteBuilder MapActivityEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapV1("GET", "/activity/recent", GetRecentAsync);
-        endpoints.MapV1("GET", "/activity/stream", GetStreamAsync);
-        endpoints.MapV1("GET", "/activity/export", GetExportAsync);
-        endpoints.MapV1("GET", "/activity/file-history", GetFileHistoryAsync);
-        endpoints.MapV1("POST", "/activity/file-history/remove", PostFileHistoryRemoveAsync);
+        var handlers = endpoints.ServiceProvider.GetRequiredService<ActivityEndpointHandlers>();
+        endpoints.MapV1("GET", "/activity/recent", handlers.GetRecentAsync);
+        endpoints.MapV1("GET", "/activity/stream", handlers.GetStreamAsync);
+        endpoints.MapV1("GET", "/activity/export", handlers.GetExportAsync);
+        endpoints.MapV1("GET", "/activity/file-history", handlers.GetFileHistoryAsync);
+        endpoints.MapV1("POST", "/activity/file-history/remove", handlers.PostFileHistoryRemoveAsync);
         return endpoints;
-    }
-
-    private static async Task<ApiResult> GetRecentAsync(ApiRequest request)
-    {
-        await request.RequireUserAsync().ConfigureAwait(false);
-        var issues = new ValidationIssues();
-        var limit = QueryInt(request, "limit", issues, ge: 1, le: ActivityHistory.RecentMaxLimit) ?? ActivityHistory.RecentDefaultLimit;
-        var module = QueryStr(request, "module", issues, 1, 32);
-        var eventType = QueryStr(request, "event_type", issues, 1, 64);
-        var search = QueryStr(request, "search", issues, 1, 200);
-        var dateFrom = request.Query("date_from");
-        var dateTo = request.Query("date_to");
-        var beforeId = QueryInt(request, "before_id", issues, ge: 1);
-        var trigger = QueryStr(request, "trigger", issues, 1, 32);
-        var result = QueryStr(request, "result", issues, 1, 16);
-        var libraryId = QueryInt(request, "library_id", issues, ge: 1);
-        var file = QueryStr(request, "file", issues, 1, 2000);
-        var about = QueryStr(request, "about", issues, 1, 16);
-        issues.ThrowIfAny();
-
-        var filter = new ActivityFilter(module, eventType, search, ParseWhen(dateFrom, "date_from"), ParseWhen(dateTo, "date_to"), trigger, result, libraryId, file, about);
-        var uow = await request.DbAsync().ConfigureAwait(false);
-        var page = await ActivityHistoryStore.ListRecentAsync(uow, filter, limit, beforeId).ConfigureAwait(false);
-        // Only the first page is counted: a count walks every matching row, and later pages know whether more
-        // remain from the page itself (#714).
-        long? total = beforeId is null ? await ActivityHistoryStore.CountAsync(uow, filter).ConfigureAwait(false) : null;
-        var settings = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-        var oldest = await ActivityHistoryStore.OldestCreatedAtAsync(uow).ConfigureAwait(false);
-        return ApiRoutes.Ok(ActivityHistory.RecentOut(page.Items, page.HasMore, total, settings.ActivityRetentionDays, oldest));
-    }
-
-    private static async Task<ApiResult> GetExportAsync(ApiRequest request)
-    {
-        await request.RequireUserAsync().ConfigureAwait(false);
-        var issues = new ValidationIssues();
-        var format = "csv";
-        if (request.Query("format") is { } rawFormat)
-        {
-            if (rawFormat is "csv" or "json")
-            {
-                format = rawFormat;
-            }
-            else
-            {
-                issues.Add(new ValidationIssue(
-                    "string_pattern_mismatch",
-                    ["query", "format"],
-                    $"String should match pattern '{FormatPattern}'",
-                    new WireString(rawFormat),
-                    new WireObject().Set("pattern", FormatPattern)));
-            }
-        }
-
-        var module = QueryStr(request, "module", issues, 1, 32);
-        var eventType = QueryStr(request, "event_type", issues, 1, 64);
-        var search = QueryStr(request, "search", issues, 1, 200);
-        var dateFrom = request.Query("date_from");
-        var dateTo = request.Query("date_to");
-        var trigger = QueryStr(request, "trigger", issues, 1, 32);
-        var result = QueryStr(request, "result", issues, 1, 16);
-        var libraryId = QueryInt(request, "library_id", issues, ge: 1);
-        var file = QueryStr(request, "file", issues, 1, 2000);
-        var about = QueryStr(request, "about", issues, 1, 16);
-        issues.ThrowIfAny();
-
-        var filter = new ActivityFilter(module, eventType, search, ParseWhen(dateFrom, "date_from"), ParseWhen(dateTo, "date_to"), trigger, result, libraryId, file, about);
-        var uow = await request.DbAsync().ConfigureAwait(false);
-        var rows = await ActivityHistoryStore.ListForExportAsync(uow, filter).ConfigureAwait(false);
-        var localNow = request.Time.GetLocalNow();
-        var json = format == "json";
-        var text = json ? ActivityHistory.ExportJson(rows) : ActivityHistory.ExportCsv(rows);
-        var fileName = ActivityHistory.ExportFileName(localNow, json ? "json" : "csv");
-        return new CustomApiResult(async context =>
-        {
-            context.Response.Headers["X-Weir-Export-Limit"] = ActivityHistory.ExportMaxRows.ToString(CultureInfo.InvariantCulture);
-            context.Response.Headers["X-Weir-Export-Rows"] = rows.Count.ToString(CultureInfo.InvariantCulture);
-            context.Response.Headers.ContentDisposition = $"attachment; filename=\"{fileName}\"";
-            await ApiResponses.WritePlainTextAsync(context, StatusCodes.Status200OK, text, json ? "application/json" : "text/csv; charset=utf-8").ConfigureAwait(false);
-        });
-    }
-
-    private static async Task<ApiResult> GetFileHistoryAsync(ApiRequest request)
-    {
-        await request.RequireUserAsync().ConfigureAwait(false);
-        var issues = new ValidationIssues();
-        string? relativePath = null;
-        if (request.Query("relative_path") is not null)
-        {
-            relativePath = QueryStr(request, "relative_path", issues, 1, 2000);
-        }
-        else
-        {
-            issues.Add(FieldRules.Missing(["query", "relative_path"], WireNull.Instance));
-        }
-
-        var libraryId = QueryInt(request, "library_id", issues, ge: 1);
-        issues.ThrowIfAny();
-
-        var path = WireStrings.Strip(relativePath!);
-        var uow = await request.DbAsync().ConfigureAwait(false);
-        var counts = await ActivityHistoryStore.CountFileHistoryAsync(uow, libraryId, path).ConfigureAwait(false);
-        return ApiRoutes.Ok(ActivityHistory.FileHistoryCountOut(counts));
-    }
-
-    private static async Task<ApiResult> PostFileHistoryRemoveAsync(ApiRequest request)
-    {
-        var body = await request.ReadBodyAsync().ConfigureAwait(false);
-        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
-        var issues = new ValidationIssues();
-        var model = new BodyModel(body, issues);
-        var libraryId = model.OptionalInt("library_id", ge: 1);
-        var relativePath = model.Str("relative_path", minLength: 1, maxLength: 2000);
-        var csrfToken = model.Str("csrf_token", minLength: 1);
-        model.Finish(ExtraFields.Ignore);
-        issues.ThrowIfAny();
-
-        request.RequireConfirmationToken(csrfToken);
-        var path = WireStrings.Strip(relativePath);
-        var uow = await request.DbAsync().ConfigureAwait(false);
-        var deleted = await ActivityHistoryStore.DeleteFileHistoryAsync(uow, libraryId, path).ConfigureAwait(false);
-        await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(ActivityHistory.FileHistoryRemoveOut(deleted));
     }
 
     /// <summary>
@@ -170,76 +48,6 @@ public static class ActivityEndpoints
     /// most, a <c>processing.progress</c> frame with every file's live progress (#750), plus keepalives, without
     /// holding the database.
     /// </summary>
-    private static async Task<ApiResult> GetStreamAsync(ApiRequest request)
-    {
-        await request.RequireUserAsync().ConfigureAwait(false);
-        await request.ReleaseDbAsync().ConfigureAwait(false);
-        var database = request.Database;
-        var notifier = ActivityNotifications.For(database);
-        var liveProgress = request.Service<LiveProgressStore>();
-        var time = request.Time;
-        var logger = request.LoggerFactory.CreateLogger("weir.platform.activity.router");
-        return new CustomApiResult(async context =>
-        {
-            context.Response.StatusCode = StatusCodes.Status200OK;
-            context.Response.ContentType = "text/event-stream; charset=utf-8";
-            context.Response.Headers.CacheControl = "no-store, no-cache";
-            context.Response.Headers.Connection = "keep-alive";
-            context.Response.Headers["X-Accel-Buffering"] = "no";
-            // One write at a time: the two frame sources run concurrently, and a chunk must reach the client whole.
-            var writeGate = new SemaphoreSlim(1, 1);
-            async Task WriteFrameAsync(string chunk)
-            {
-                await writeGate.WaitAsync(context.RequestAborted).ConfigureAwait(false);
-                try
-                {
-                    await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes(chunk), context.RequestAborted).ConfigureAwait(false);
-                    await context.Response.Body.FlushAsync(context.RequestAborted).ConfigureAwait(false);
-                }
-                finally
-                {
-                    writeGate.Release();
-                }
-            }
-
-            async Task PumpAsync(IAsyncEnumerable<string> frames)
-            {
-                await foreach (var chunk in frames.ConfigureAwait(false))
-                {
-                    await WriteFrameAsync(chunk).ConfigureAwait(false);
-                }
-            }
-
-            try
-            {
-                var activityLoop = PumpAsync(LatestFramesAsync(
-                    ct => ActivityHistoryStore.LatestIdAsync(database, ct),
-                    notifier,
-                    time,
-                    StreamKeepalive,
-                    logger,
-                    context.RequestAborted));
-                var progressLoop = PumpAsync(ActivityProgressFrames.ForAsync(liveProgress, time, context.RequestAborted));
-                await Task.WhenAll(activityLoop, progressLoop).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
-            {
-                // The client went away.
-            }
-        });
-    }
-
-    /// <summary>
-    /// The retry hint, the latest id when the stream opens, then a frame whenever the notifier hears of a committed
-    /// Activity write, and a keepalive comment after <paramref name="keepalive"/> without one.
-    /// </summary>
-    /// <remarks>
-    /// The database is read once per stream. After that every open stream waits on the one shared notifier, so an idle
-    /// stream costs nothing and a write reaches every stream at once (#720). <see cref="Weir.Infrastructure.Activity.ActivityLatestPollTask"/>
-    /// notifies the same way for a write this process never saw commit, so the stream still catches it, just later.
-    /// <c>latest_event_id</c> never goes backwards on a stream: an update to an older row (a progress rewrite) moves
-    /// <c>activity_revision</c> on and repeats the id.
-    /// </remarks>
     public static async IAsyncEnumerable<string> LatestFramesAsync(
         Func<CancellationToken, Task<long?>> readLatestId,
         ActivityLatestNotifier notifier,
@@ -301,6 +109,202 @@ public static class ActivityEndpoints
 
             await Task.Delay(StreamReadRetry, time, cancellationToken).ConfigureAwait(false);
         }
+    }
+}
+
+/// <summary>Handlers for <see cref="ActivityEndpoints"/>, constructor-injected with the stores they need.</summary>
+internal sealed class ActivityEndpointHandlers
+{
+    private const string FormatPattern = "^(csv|json)$";
+
+    private readonly ActivityHistoryStore _history;
+    private readonly SuiteSettingsStore _suiteSettings;
+
+    public ActivityEndpointHandlers(ActivityHistoryStore history, SuiteSettingsStore suiteSettings)
+    {
+        _history = history ?? throw new ArgumentNullException(nameof(history));
+        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+    }
+
+    public async Task<ApiResult> GetRecentAsync(ApiRequest request)
+    {
+        await request.RequireUserAsync().ConfigureAwait(false);
+        var issues = new ValidationIssues();
+        var limit = QueryInt(request, "limit", issues, ge: 1, le: ActivityHistory.RecentMaxLimit) ?? ActivityHistory.RecentDefaultLimit;
+        var module = QueryStr(request, "module", issues, 1, 32);
+        var eventType = QueryStr(request, "event_type", issues, 1, 64);
+        var search = QueryStr(request, "search", issues, 1, 200);
+        var dateFrom = request.Query("date_from");
+        var dateTo = request.Query("date_to");
+        var beforeId = QueryInt(request, "before_id", issues, ge: 1);
+        var trigger = QueryStr(request, "trigger", issues, 1, 32);
+        var result = QueryStr(request, "result", issues, 1, 16);
+        var libraryId = QueryInt(request, "library_id", issues, ge: 1);
+        var file = QueryStr(request, "file", issues, 1, 2000);
+        var about = QueryStr(request, "about", issues, 1, 16);
+        issues.ThrowIfAny();
+
+        var filter = new ActivityFilter(module, eventType, search, ParseWhen(dateFrom, "date_from"), ParseWhen(dateTo, "date_to"), trigger, result, libraryId, file, about);
+        var uow = await request.DbAsync().ConfigureAwait(false);
+        var page = await _history.ListRecentAsync(uow, filter, limit, beforeId).ConfigureAwait(false);
+        // Only the first page is counted: a count walks every matching row, and later pages know whether more
+        // remain from the page itself (#714).
+        long? total = beforeId is null ? await _history.CountAsync(uow, filter).ConfigureAwait(false) : null;
+        var settings = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
+        var oldest = await _history.OldestCreatedAtAsync(uow).ConfigureAwait(false);
+        return ApiRoutes.Ok(ActivityHistory.RecentOut(page.Items, page.HasMore, total, settings.ActivityRetentionDays, oldest));
+    }
+
+    public async Task<ApiResult> GetExportAsync(ApiRequest request)
+    {
+        await request.RequireUserAsync().ConfigureAwait(false);
+        var issues = new ValidationIssues();
+        var format = "csv";
+        if (request.Query("format") is { } rawFormat)
+        {
+            if (rawFormat is "csv" or "json")
+            {
+                format = rawFormat;
+            }
+            else
+            {
+                issues.Add(new ValidationIssue(
+                    "string_pattern_mismatch",
+                    ["query", "format"],
+                    $"String should match pattern '{FormatPattern}'",
+                    new WireString(rawFormat),
+                    new WireObject().Set("pattern", FormatPattern)));
+            }
+        }
+
+        var module = QueryStr(request, "module", issues, 1, 32);
+        var eventType = QueryStr(request, "event_type", issues, 1, 64);
+        var search = QueryStr(request, "search", issues, 1, 200);
+        var dateFrom = request.Query("date_from");
+        var dateTo = request.Query("date_to");
+        var trigger = QueryStr(request, "trigger", issues, 1, 32);
+        var result = QueryStr(request, "result", issues, 1, 16);
+        var libraryId = QueryInt(request, "library_id", issues, ge: 1);
+        var file = QueryStr(request, "file", issues, 1, 2000);
+        var about = QueryStr(request, "about", issues, 1, 16);
+        issues.ThrowIfAny();
+
+        var filter = new ActivityFilter(module, eventType, search, ParseWhen(dateFrom, "date_from"), ParseWhen(dateTo, "date_to"), trigger, result, libraryId, file, about);
+        var uow = await request.DbAsync().ConfigureAwait(false);
+        var rows = await _history.ListForExportAsync(uow, filter).ConfigureAwait(false);
+        var localNow = request.Time.GetLocalNow();
+        var json = format == "json";
+        var text = json ? ActivityHistory.ExportJson(rows) : ActivityHistory.ExportCsv(rows);
+        var fileName = ActivityHistory.ExportFileName(localNow, json ? "json" : "csv");
+        return new CustomApiResult(async context =>
+        {
+            context.Response.Headers["X-Weir-Export-Limit"] = ActivityHistory.ExportMaxRows.ToString(CultureInfo.InvariantCulture);
+            context.Response.Headers["X-Weir-Export-Rows"] = rows.Count.ToString(CultureInfo.InvariantCulture);
+            context.Response.Headers.ContentDisposition = $"attachment; filename=\"{fileName}\"";
+            await ApiResponses.WritePlainTextAsync(context, StatusCodes.Status200OK, text, json ? "application/json" : "text/csv; charset=utf-8").ConfigureAwait(false);
+        });
+    }
+
+    public async Task<ApiResult> GetFileHistoryAsync(ApiRequest request)
+    {
+        await request.RequireUserAsync().ConfigureAwait(false);
+        var issues = new ValidationIssues();
+        string? relativePath = null;
+        if (request.Query("relative_path") is not null)
+        {
+            relativePath = QueryStr(request, "relative_path", issues, 1, 2000);
+        }
+        else
+        {
+            issues.Add(FieldRules.Missing(["query", "relative_path"], WireNull.Instance));
+        }
+
+        var libraryId = QueryInt(request, "library_id", issues, ge: 1);
+        issues.ThrowIfAny();
+
+        var path = WireStrings.Strip(relativePath!);
+        var uow = await request.DbAsync().ConfigureAwait(false);
+        var counts = await _history.CountFileHistoryAsync(uow, libraryId, path).ConfigureAwait(false);
+        return ApiRoutes.Ok(ActivityHistory.FileHistoryCountOut(counts));
+    }
+
+    public async Task<ApiResult> PostFileHistoryRemoveAsync(ApiRequest request)
+    {
+        var body = await request.ReadBodyAsync().ConfigureAwait(false);
+        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
+        var issues = new ValidationIssues();
+        var model = new BodyModel(body, issues);
+        var libraryId = model.OptionalInt("library_id", ge: 1);
+        var relativePath = model.Str("relative_path", minLength: 1, maxLength: 2000);
+        var csrfToken = model.Str("csrf_token", minLength: 1);
+        model.Finish(ExtraFields.Ignore);
+        issues.ThrowIfAny();
+
+        request.RequireConfirmationToken(csrfToken);
+        var path = WireStrings.Strip(relativePath);
+        var uow = await request.DbAsync().ConfigureAwait(false);
+        var deleted = await _history.DeleteFileHistoryAsync(uow, libraryId, path).ConfigureAwait(false);
+        await request.CommitAsync().ConfigureAwait(false);
+        return ApiRoutes.Ok(ActivityHistory.FileHistoryRemoveOut(deleted));
+    }
+
+    public async Task<ApiResult> GetStreamAsync(ApiRequest request)
+    {
+        await request.RequireUserAsync().ConfigureAwait(false);
+        await request.ReleaseDbAsync().ConfigureAwait(false);
+        var database = request.Database;
+        var notifier = ActivityNotifications.For(database);
+        var liveProgress = request.Service<LiveProgressStore>();
+        var time = request.Time;
+        var logger = request.LoggerFactory.CreateLogger("weir.platform.activity.router");
+        return new CustomApiResult(async context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            context.Response.ContentType = "text/event-stream; charset=utf-8";
+            context.Response.Headers.CacheControl = "no-store, no-cache";
+            context.Response.Headers.Connection = "keep-alive";
+            context.Response.Headers["X-Accel-Buffering"] = "no";
+            // One write at a time: the two frame sources run concurrently, and a chunk must reach the client whole.
+            var writeGate = new SemaphoreSlim(1, 1);
+            async Task WriteFrameAsync(string chunk)
+            {
+                await writeGate.WaitAsync(context.RequestAborted).ConfigureAwait(false);
+                try
+                {
+                    await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes(chunk), context.RequestAborted).ConfigureAwait(false);
+                    await context.Response.Body.FlushAsync(context.RequestAborted).ConfigureAwait(false);
+                }
+                finally
+                {
+                    writeGate.Release();
+                }
+            }
+
+            async Task PumpAsync(IAsyncEnumerable<string> frames)
+            {
+                await foreach (var chunk in frames.ConfigureAwait(false))
+                {
+                    await WriteFrameAsync(chunk).ConfigureAwait(false);
+                }
+            }
+
+            try
+            {
+                var activityLoop = PumpAsync(ActivityEndpoints.LatestFramesAsync(
+                    ct => _history.LatestIdAsync(database, ct),
+                    notifier,
+                    time,
+                    ActivityEndpoints.StreamKeepalive,
+                    logger,
+                    context.RequestAborted));
+                var progressLoop = PumpAsync(ActivityProgressFrames.ForAsync(liveProgress, time, context.RequestAborted));
+                await Task.WhenAll(activityLoop, progressLoop).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+            {
+                // The client went away.
+            }
+        });
     }
 
     /// <summary>An ISO 8601 date query, or 400 <c>Invalid {name}.</c> (an empty value is no filter).</summary>

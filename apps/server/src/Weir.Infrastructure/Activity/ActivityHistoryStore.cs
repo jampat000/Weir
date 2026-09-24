@@ -17,7 +17,7 @@ internal sealed record PageCursor(long Id, string? CreatedAt);
 /// with a file's history. The count, date filter, paging order and file-history library fallback follow the
 /// rules fixed in #543, each documented where it applies.
 /// </summary>
-public static class ActivityHistoryStore
+public sealed class ActivityHistoryStore
 {
     private const string DateOnlyFormat = "yyyy-MM-dd";
 
@@ -35,7 +35,7 @@ public static class ActivityHistoryStore
     /// pages by that same key: everything strictly after the cursor row in the order, not just a smaller id, so a row
     /// tied on <c>created_at</c> with the cursor is never skipped or repeated.
     /// </summary>
-    public static async Task<ActivityPage> ListRecentAsync(UnitOfWork uow, ActivityFilter filter, long limit, long? beforeId)
+    public async Task<ActivityPage> ListRecentAsync(UnitOfWork uow, ActivityFilter filter, long limit, long? beforeId)
     {
         ArgumentNullException.ThrowIfNull(uow);
         PageCursor? cursor = null;
@@ -89,7 +89,7 @@ public static class ActivityHistoryStore
     }
 
     /// <summary>Events for export: oldest first, up to <see cref="ActivityHistory.ExportMaxRows"/>.</summary>
-    public static Task<List<ActivityEventRow>> ListForExportAsync(UnitOfWork uow, ActivityFilter filter)
+    public Task<List<ActivityEventRow>> ListForExportAsync(UnitOfWork uow, ActivityFilter filter)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var (where, parameters) = Where(filter);
@@ -104,7 +104,7 @@ public static class ActivityHistoryStore
     /// Counts matching events. Always counts from <c>activity_events</c>, filtered or not: a bare
     /// <c>SELECT count(*)</c> without a FROM clause counts one whatever the table holds (#543).
     /// </summary>
-    public static Task<long> CountAsync(UnitOfWork uow, ActivityFilter filter)
+    public Task<long> CountAsync(UnitOfWork uow, ActivityFilter filter)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var (sql, parameters) = CountQuery(filter);
@@ -118,7 +118,7 @@ public static class ActivityHistoryStore
     }
 
     /// <summary>When the oldest event was recorded, or null when there are none.</summary>
-    public static async Task<Timestamp?> OldestCreatedAtAsync(UnitOfWork uow)
+    public async Task<Timestamp?> OldestCreatedAtAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var rows = await uow.QueryAsync("SELECT min(activity_events.created_at) AS min_1 FROM activity_events", reader => SqliteValues.GetDateTimeOrNull(reader, 0)).ConfigureAwait(false);
@@ -126,7 +126,7 @@ public static class ActivityHistoryStore
     }
 
     /// <summary>The newest event id: the cheap freshness probe of the live stream.</summary>
-    public static async Task<long?> LatestIdAsync(SqliteDatabase database, CancellationToken cancellationToken = default)
+    public async Task<long?> LatestIdAsync(SqliteDatabase database, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(database);
         var connection = await database.OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -143,7 +143,7 @@ public static class ActivityHistoryStore
     }
 
     /// <summary>Counts one file's events and processing records.</summary>
-    public static async Task<FileHistoryCounts> CountFileHistoryAsync(UnitOfWork uow, long? libraryId, string relativePath)
+    public async Task<FileHistoryCounts> CountFileHistoryAsync(UnitOfWork uow, long? libraryId, string relativePath)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var (clause, parameters) = FileHistoryClause(libraryId, relativePath);
@@ -160,7 +160,7 @@ public static class ActivityHistoryStore
     }
 
     /// <summary>Deletes one file's events and processing records.</summary>
-    public static async Task<FileHistoryCounts> DeleteFileHistoryAsync(UnitOfWork uow, long? libraryId, string relativePath)
+    public async Task<FileHistoryCounts> DeleteFileHistoryAsync(UnitOfWork uow, long? libraryId, string relativePath)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var (clause, parameters) = FileHistoryClause(libraryId, relativePath);
