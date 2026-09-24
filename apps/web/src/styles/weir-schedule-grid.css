@@ -1,0 +1,63 @@
+/* The week grid a library's hours are drawn on. */
+
+/* 7x24 schedule editor. The stored grid is quarter-hour resolution; the editor works in
+   whole hours because 168 targets are usable with a mouse and 672 are not. */
+.mm-schedule-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mm-schedule-grid-body {
+  overflow-x: auto;
+  touch-action: none;
+  user-select: none;
+}
+
+.mm-schedule-grid-hours,
+.mm-schedule-grid-row {
+  display: grid;
+  grid-template-columns: 42px repeat(24, minmax(14px, 1fr));
+  gap: 2px;
+  align-items: center;
+  min-width: 420px;
+}
+
+.mm-schedule-grid-hours span {
+  font-size: 0.625rem;
+  color: var(--mm-text3);
+  text-align: left;
+}
+
+.mm-schedule-grid-row + .mm-schedule-grid-row {
+  margin-top: 2px;
+}
+
+.mm-schedule-grid-day {
+  font-size: 0.6875rem;
+  color: var(--mm-text2);
+}
+
+.mm-schedule-cell {
+  height: 18px;
+  border: 1px solid var(--mm-border);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.mm-schedule-cell:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.mm-schedule-cell-on {
+  background: var(--mm-accent, #3ed7c8);
+  border-color: var(--mm-accent, #3ed7c8);
+}
+
+.mm-schedule-grid-actions {
+  display: flex;
+  gap: 8px;
+}

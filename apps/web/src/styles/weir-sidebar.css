@@ -1,0 +1,227 @@
+/* The sidebar frame: width, collapse, the handle and the backdrop. */
+
+.mm-sidebar {
+  width: var(--mm-sidebar-w);
+  flex-shrink: 0;
+  /* The collapse handle sits on the seam between the menu and the page, so it needs an origin. */
+  position: relative;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--mm-gold) 10%, transparent) 0%,
+      color-mix(in srgb, var(--mm-indigo) 4.5%, transparent) 34%,
+      transparent 72%
+    ),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--mm-slate) 96%, black),
+      var(--mm-slate)
+    );
+  border-right: 1px solid var(--mm-border-sidebar);
+  box-shadow:
+    inset -1px 0 0 rgba(0, 0, 0, 0.2),
+    var(--mm-shadow-shell);
+  /* The panel stretches the full height of the page, so its surface never stops partway down a
+     long screen; the contents stick to the viewport inside it (.mm-sidebar-inner). */
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  min-height: 100dvh;
+  position: relative;
+  z-index: 2;
+}
+
+.mm-sidebar-inner {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding: calc(14px * var(--mm-density-ui-scale)) 0
+    calc(14px * var(--mm-density-ui-scale));
+  overflow-y: auto;
+  /* The menu may scroll down when it is long; it never scrolls sideways (James, 23 Sep 2026). */
+  overflow-x: clip;
+}
+
+/* AppHydrateFallback (app/hydrate-fallback.tsx) stands in for the real sidebar while a route's
+   lazy chunk loads. `.mm-sidebar` already gives it the right panel geometry and background, so
+   these two rules exist only to put something in the two placeholder marks inside it — without
+   them the marks are empty elements with no size, and the fallback panel reads as blank. Reuses
+   `mm-pulse-dot` (Loading section, above) rather than inventing a second pulse animation. */
+.mm-sidebar--fallback {
+  padding: calc(14px * var(--mm-density-ui-scale)) 0;
+  gap: calc(20px * var(--mm-density-ui-scale));
+}
+
+.mm-sidebar-fallback-mark {
+  width: calc(28px * var(--mm-density-ui-scale));
+  height: calc(28px * var(--mm-density-ui-scale));
+  margin: 0 calc(26px * var(--mm-density-ui-scale));
+  border-radius: var(--mm-radius-sm);
+  background: color-mix(in srgb, var(--mm-text3) 30%, transparent);
+  animation: mm-pulse-dot 1.6s ease-in-out infinite;
+}
+
+.mm-sidebar-fallback-lines {
+  flex: 1;
+  margin: 0 calc(16px * var(--mm-density-ui-scale));
+  border-radius: var(--mm-radius-sm);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--mm-text3) 20%, transparent) 0,
+    color-mix(in srgb, var(--mm-text3) 20%, transparent) 10px,
+    transparent 10px,
+    transparent 34px
+  );
+  animation: mm-pulse-dot 1.6s ease-in-out infinite;
+  animation-delay: 0.2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-sidebar-fallback-mark,
+  .mm-sidebar-fallback-lines {
+    animation: none;
+  }
+}
+
+.mm-sidebar-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  padding: calc(8px * var(--mm-density-ui-scale))
+    calc(16px * var(--mm-density-ui-scale))
+    calc(20px * var(--mm-density-ui-scale));
+  border-bottom: 1px solid var(--mm-border);
+  margin: 0 calc(10px * var(--mm-density-ui-scale))
+    calc(10px * var(--mm-density-ui-scale));
+  text-decoration: none;
+  color: inherit;
+  transition: opacity 0.15s ease;
+}
+
+.mm-sidebar-brand:hover {
+  opacity: 0.98;
+}
+
+/* On the divider, at the top: the handle sits centred on the line between the menu and the page
+   (James, 23 Sep 2026, pointing at the spot). It is outside .mm-sidebar-inner, the part that
+   scrolls, so straddling the edge cannot give the menu a sideways scrollbar. */
+.mm-sidebar-collapse {
+  position: absolute;
+  top: 0.85rem;
+  right: -0.875rem;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--mm-border-sidebar);
+  border-radius: 50%;
+  background: var(--mm-bg-main);
+  color: var(--mm-text3);
+  cursor: pointer;
+  font: inherit;
+  transition:
+    color 0.16s ease,
+    border-color 0.16s ease,
+    transform 0.16s ease,
+    background 0.16s ease;
+}
+
+.mm-sidebar-collapse:hover {
+  color: var(--mm-accent-bright);
+  border-color: var(--mm-accent-ring);
+  background: var(--mm-accent-soft);
+}
+
+.mm-sidebar-collapse:focus-visible {
+  color: var(--mm-accent-bright);
+  border-color: var(--mm-accent-ring);
+  background: var(--mm-accent-soft);
+  outline: 2px solid var(--mm-accent-ring);
+  outline-offset: 1px;
+}
+
+.mm-sidebar--collapsed {
+  width: var(--mm-sidebar-collapsed-w);
+  align-items: stretch;
+}
+
+/* Collapsing hides the words beside the mark; it does not move the mark. The brand keeps the
+   inset it has when open, so the one thing on screen in both states stays exactly where it was
+   (James, 23 Sep 2026). Only the room to the right of the mark goes, because there is none in a
+   rail this narrow — keeping it made the brand 9px wider than the rail. */
+.mm-sidebar--collapsed .mm-sidebar-brand {
+  width: auto;
+  margin-right: 0;
+  padding-right: 0;
+  border-bottom-color: color-mix(in srgb, var(--mm-stone) 10%, transparent);
+}
+
+.mm-sidebar--collapsed .mm-sidebar-tagline,
+.mm-sidebar--collapsed .mm-sidebar-link-label,
+.mm-sidebar--collapsed .mm-sidebar-meta,
+.mm-sidebar--collapsed .mm-sidebar-version {
+  display: none;
+}
+
+.mm-sidebar--collapsed .mm-sidebar-link {
+  position: relative;
+  justify-content: center;
+  width: calc(58px * var(--mm-density-ui-scale));
+  min-height: calc(54px * var(--mm-density-ui-scale));
+  margin: 0 auto;
+  padding: 0;
+  border-radius: 16px;
+}
+
+/* "● 2 working" beside Live; just the pulsing dot, on the icon's corner, when the menu is icons. */
+.mm-sidebar-link-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 0.71875rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  white-space: nowrap;
+  color: var(--mm-accent-bright);
+}
+
+.mm-sidebar--collapsed .mm-sidebar-link-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  margin: 0;
+}
+
+.mm-sidebar--collapsed .mm-sidebar-link-badge__text {
+  display: none;
+}
+
+/* The handle is the same handle whether the panel is open or shut — it used to be widened to 40px
+   when collapsed while its height stayed put, which made a circle into an egg (James, 23 Sep 2026). */
+
+.mm-sidebar-collapse__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mm-sidebar-backdrop,
+.mm-shell-menu-toggle {
+  display: none;
+}
+
+.mm-sidebar-brand-logo {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  align-self: flex-start;
+  margin-bottom: 8px;
+}

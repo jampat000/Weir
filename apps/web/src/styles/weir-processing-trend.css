@@ -1,0 +1,301 @@
+/* Finished rows, the trend figure beside today's totals, and the page's motion. */
+
+.mm-live-pulse {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mm-accent);
+  animation: mm-live-pulse 1.8s ease-out infinite;
+}
+
+.mm-live-spin {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 13px;
+  height: 13px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--mm-accent) 25%, transparent);
+  border-top-color: var(--mm-accent);
+  animation: mm-live-spin 0.9s linear infinite;
+}
+
+/* Just finished. */
+.mm-live-done {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--mm-border-sidebar);
+  animation: mm-live-rise 0.5s ease-out;
+}
+
+.mm-live-done:last-child {
+  border-bottom: 0;
+}
+
+/* The name takes what is left of the first line after when it finished. */
+.mm-live-done__top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.mm-live-done__top > .mm-live-card__title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mm-live-done__ago {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  color: var(--mm-text3);
+}
+
+.mm-live-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  margin-top: 6px;
+  border-radius: 50%;
+}
+
+.mm-live-dot--ok {
+  background: var(--mm-status-healthy-text);
+}
+
+.mm-live-dot--same {
+  background: var(--mm-status-info-text);
+}
+
+.mm-live-dot--warn {
+  background: var(--mm-status-warning-text);
+}
+
+/* Last 2 hours: its label and number on the same lines as today's two figures, the chart right
+   beside the number, and the split in words across the bottom. The chart takes whatever width the
+   words need, so the block is one clean rectangle. */
+.mm-live-figure--trend {
+  display: grid;
+  /* A fixed size whatever it holds: the three views (Everything, New downloads, Library cleaning) have very different
+     numbers, and a figure that grew and shrank with them moved the whole bar each time the view changed. */
+  width: 20rem;
+  max-width: 100%;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  grid-template-areas:
+    "label label"
+    "value chart"
+    "legend legend";
+  column-gap: 12px;
+}
+
+.mm-live-figure--trend > .mm-live-figure__label {
+  grid-area: label;
+}
+
+.mm-live-figure--trend > .mm-live-figure__value {
+  grid-area: value;
+}
+
+.mm-live-figure--trend > .mm-live-spark__bars {
+  grid-area: chart;
+}
+
+.mm-live-figure--trend > .mm-live-trend__legend {
+  grid-area: legend;
+}
+
+.mm-live-spark__bars {
+  display: flex;
+  align-self: end;
+  align-items: stretch;
+  height: 1.6rem;
+  margin-bottom: 0.2rem;
+  border-bottom: 1px solid var(--mm-line);
+}
+
+/* Each five minutes is a full-height slot, so pointing at a short bar is as easy as a tall one. */
+.mm-live-spark__slot {
+  display: flex;
+  flex: 1 1 0;
+  align-items: flex-end;
+  min-width: 0;
+  padding: 0 1px;
+  cursor: default;
+}
+
+.mm-live-spark__bar {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 2px;
+  overflow: hidden;
+  border-radius: 2px 2px 0 0;
+  transition:
+    height 0.4s ease,
+    opacity 0.15s ease;
+}
+
+.mm-live-spark__bars:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--mm-accent-ring);
+  outline-offset: 2px;
+}
+
+.mm-live-spark__bars:hover .mm-live-spark__slot:not(:hover) .mm-live-spark__bar,
+.mm-live-spark__bars:focus-visible
+  .mm-live-spark__slot:not(.mm-live-spark__slot--pointed)
+  .mm-live-spark__bar {
+  opacity: 0.4;
+}
+
+.mm-live-spark__seg {
+  flex-basis: 0;
+  min-height: 2px;
+}
+
+.mm-live-spark__seg--ok {
+  background: color-mix(
+    in srgb,
+    var(--mm-status-healthy-text) 70%,
+    transparent
+  );
+}
+
+.mm-live-spark__seg--same {
+  background: color-mix(in srgb, var(--mm-status-info-text) 70%, transparent);
+}
+
+.mm-live-spark__seg--warn {
+  background: color-mix(
+    in srgb,
+    var(--mm-status-warning-text) 80%,
+    transparent
+  );
+}
+
+.mm-live-trend__legend {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
+  gap: 2px 12px;
+  min-height: 1.35em;
+  margin: 4px 0 0;
+  font-size: var(--mm-type-caption);
+  line-height: 1.35;
+  color: var(--mm-text2);
+}
+
+.mm-live-trend__part {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mm-live-trend__part .mm-live-dot {
+  margin-top: 0;
+}
+
+.mm-live-trend__pointed {
+  color: var(--mm-text1);
+}
+
+@keyframes mm-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--mm-accent) 60%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes mm-live-shimmer {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 220px 0;
+  }
+}
+
+@keyframes mm-live-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+@keyframes mm-live-rise {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mm-live-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes mm-live-turn {
+  from {
+    transform: rotate(-90deg);
+  }
+  to {
+    transform: rotate(270deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-live-pulse,
+  .mm-live-spin,
+  .mm-live-done,
+  .mm-live-bar__fill,
+  .mm-live-bar--busy .mm-live-bar__fill,
+  .mm-live-ring--checking .mm-live-ring__fill {
+    animation: none;
+  }
+
+  .mm-live-bar__fill,
+  .mm-live-ring__fill,
+  .mm-live-spark__bar {
+    transition: none;
+  }
+}
+
+/* The file's own name under the friendly title, in full (James, 23 Sep 2026: "we need to ensure we see the file
+   label"). The title stays on one line so the lanes line up; this line wraps between the parts of the name (see
+   FileName), so the part that tells two releases apart, such as REPACK2, is always there to read. */
+.mm-live-card__file {
+  display: block;
+  max-width: 100%;
+  margin-top: 1px;
+  color: var(--mm-text3);
+  font-size: 0.71875rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+/* Today's two plain figures keep their width as their numbers change ("20" or "2,421", "20.3 MB" or "260 GB"),
+   so nothing beside them moves when the view changes. */
+.mm-live-toolbar__figures > .mm-live-figure:not(.mm-live-figure--trend) {
+  min-width: 7.5rem;
+}

@@ -21,6 +21,21 @@ type StartupState =
 const READY_PATH = "/ready";
 const POLL_MS = 1000;
 const STARTUP_TIMEOUT_MS = 60_000;
+/** The bar starts a fifth full and creeps towards nine tenths; only ready or failed completes it. */
+const ESTIMATE_START_PERCENT = 20;
+const ESTIMATE_CAP_PERCENT = 90;
+const ESTIMATE_MS_PER_PERCENT = 750;
+
+const WAITING_STEP: ReadyStep = {
+  name: "server",
+  status: "starting",
+  detail: "Waiting for Weir to start.",
+};
+
+function dotClass(step: ReadyStep, failed: boolean): string {
+  if (step.status === "ready") return "mm-startup__dot mm-startup__dot--ready";
+  return failed ? "mm-startup__dot mm-startup__dot--failed" : "mm-startup__dot";
+}
 
 async function fetchReadiness(signal: AbortSignal): Promise<ReadyPayload> {
   const response = await fetch(READY_PATH, {
@@ -29,11 +44,8 @@ async function fetchReadiness(signal: AbortSignal): Promise<ReadyPayload> {
     cache: "no-store",
     signal,
   });
-  const payload = (await response.json()) as ReadyPayload;
-  if (!response.ok && !payload.ready) {
-    return payload;
-  }
-  return payload;
+  // A not-ready answer still carries the steps, so the body is read whatever the status.
+  return (await response.json()) as ReadyPayload;
 }
 
 export function StartupGate({ children }: { children: ReactNode }) {
@@ -121,54 +133,38 @@ export function StartupGate({ children }: { children: ReactNode }) {
   }
 
   return (
-    <main className="min-h-screen bg-mm-bg px-6 py-10 text-mm-text">
-      <div className="mx-auto flex min-h-[70vh] max-w-xl flex-col justify-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-mm-accent">
-          Weir
-        </p>
-        <h1 className="mt-4 text-3xl font-semibold">{state.message}</h1>
-        <p className="mt-3 text-sm leading-6 text-mm-text3">
+    <main className="mm-startup">
+      <div className="mm-startup__inner">
+        <p className="mm-startup__eyebrow">Weir</p>
+        <h1 className="mm-startup__title">{state.message}</h1>
+        <p className="mm-startup__lead">
           Preparing the local database, background workers, and schedules before
           opening the app.
         </p>
-        <div className="mt-6 rounded border border-mm-border bg-mm-card-bg p-4">
-          <div className="h-2 overflow-hidden rounded-full bg-mm-input-bg">
+        <div className="mm-startup__card">
+          {/* An estimate, not a measure: the server reports steps, not a percentage. */}
+          <div
+            className="mm-startup__track"
+            role="progressbar"
+            aria-label="Starting Weir"
+          >
             <div
-              className="h-full rounded-full bg-mm-accent transition-all"
+              className="mm-startup__fill"
               style={{
                 width:
                   state.kind === "failed"
                     ? "100%"
-                    : `${Math.min(90, 20 + state.elapsedMs / 750)}%`,
+                    : `${Math.min(ESTIMATE_CAP_PERCENT, ESTIMATE_START_PERCENT + state.elapsedMs / ESTIMATE_MS_PER_PERCENT)}%`,
               }}
             />
           </div>
-          <ul className="mt-4 space-y-3 text-sm">
-            {(state.steps.length
-              ? state.steps
-              : [
-                  {
-                    name: "server",
-                    status: "starting",
-                    detail: "Waiting for Weir to start.",
-                  },
-                ]
-            ).map((step) => (
-              <li key={step.name} className="flex gap-3">
-                <span
-                  className={
-                    step.status === "ready"
-                      ? "mt-1 h-2.5 w-2.5 rounded-full bg-mm-status-healthy-text"
-                      : state.kind === "failed"
-                        ? "mt-1 h-2.5 w-2.5 rounded-full bg-mm-status-failed-text"
-                        : "mt-1 h-2.5 w-2.5 rounded-full bg-mm-accent"
-                  }
-                />
+          <ul className="mm-startup__steps space-y-3">
+            {(state.steps.length ? state.steps : [WAITING_STEP]).map((step) => (
+              <li key={step.name} className="mm-startup__step">
+                <span className={dotClass(step, state.kind === "failed")} />
                 <span>
-                  <span className="block font-semibold capitalize text-mm-text">
-                    {step.name}
-                  </span>
-                  <span className="text-mm-text3">{step.detail}</span>
+                  <span className="mm-startup__step-name">{step.name}</span>
+                  <span className="mm-startup__step-detail">{step.detail}</span>
                 </span>
               </li>
             ))}
@@ -177,7 +173,7 @@ export function StartupGate({ children }: { children: ReactNode }) {
         {state.kind === "failed" ? (
           <button
             type="button"
-            className="mt-5 w-fit rounded border border-mm-accent bg-mm-accent px-4 py-2 text-sm font-semibold text-black"
+            className="mm-startup__retry"
             onClick={() => window.location.reload()}
           >
             Try again

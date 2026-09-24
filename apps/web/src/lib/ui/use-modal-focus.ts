@@ -1,5 +1,8 @@
 import { useEffect, useRef, type RefObject } from "react";
 
+/** Open modals, newest last. Escape closes only the newest, so a dialog over a panel leaves the panel open. */
+const openLayers: symbol[] = [];
+
 /**
  * Keyboard behaviour for anything modal. On open, focus moves to `initialFocus` when given (a
  * confirmation points it at the safe choice), otherwise to the returned ref's element; Escape closes
@@ -31,13 +34,19 @@ export function useModalFocus<T extends HTMLElement>({
   useEffect(() => {
     if (!open) return undefined;
     const returnTo = document.activeElement;
+    const layer = Symbol("modal");
+    openLayers.push(layer);
     (initialFocus?.current ?? target.current)?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !isBusy.current) close.current();
+      const topmost = openLayers[openLayers.length - 1] === layer;
+      if (event.key === "Escape" && topmost && !isBusy.current) {
+        close.current();
+      }
     };
     document.addEventListener("keydown", onKey);
     if (lockScroll) document.body.classList.add("mm-drawer-open");
     return () => {
+      openLayers.splice(openLayers.indexOf(layer), 1);
       document.removeEventListener("keydown", onKey);
       if (lockScroll) document.body.classList.remove("mm-drawer-open");
       if (returnTo instanceof HTMLElement && returnTo.isConnected) {

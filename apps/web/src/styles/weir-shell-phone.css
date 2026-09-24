@@ -1,0 +1,153 @@
+/* The shell on a phone: the sidebar becomes a slide-out menu. */
+
+@media (max-width: 920px) {
+  .mm-app-layout {
+    min-height: 100dvh;
+  }
+
+  /* Closed, the panel was only pushed off-screen, which hides it from the eye and from nothing
+     else: its four links and the Sign out button kept `visibility: visible`, so they stayed in
+     the tab order and the accessibility tree. A keyboard or screen-reader user on a phone went
+     through the whole invisible menu — Sign out included — before reaching the Menu button that
+     opens it. `visibility` takes them out of both, and nothing here changes what is drawn.
+     The 180ms delay lets the slide-out finish before the panel goes; opening flips it at once. */
+  .mm-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(19rem, 88vw);
+    height: 100dvh;
+    transform: translateX(-105%);
+    visibility: hidden;
+    transition:
+      transform 180ms ease,
+      visibility 0s linear 180ms;
+    box-shadow: 18px 0 44px rgba(0, 0, 0, 0.28);
+  }
+
+  .mm-sidebar.mm-sidebar--open {
+    transform: translateX(0);
+    visibility: visible;
+    transition:
+      transform 180ms ease,
+      visibility 0s;
+  }
+
+  .mm-sidebar--collapsed {
+    width: min(19rem, 88vw);
+  }
+
+  .mm-sidebar--collapsed .mm-sidebar-brand,
+  .mm-sidebar--collapsed .mm-sidebar-tagline,
+  .mm-sidebar--collapsed .mm-sidebar-link-label,
+  .mm-sidebar--collapsed .mm-sidebar-meta,
+  .mm-sidebar--collapsed .mm-sidebar-version {
+    display: initial;
+  }
+
+  /* The brand needs no restoring here any more: it keeps its open box in both states. */
+
+  .mm-sidebar--collapsed .mm-sidebar-link {
+    justify-content: flex-start;
+    padding-inline: calc(14px * var(--mm-density-ui-scale));
+  }
+
+  .mm-sidebar--collapsed .mm-sidebar-link-badge {
+    position: static;
+    margin-left: auto;
+  }
+
+  .mm-sidebar--collapsed .mm-sidebar-link-badge__text {
+    display: inline;
+  }
+
+  .mm-sidebar-collapse {
+    display: none;
+  }
+
+  .mm-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    border: 0;
+    background: rgba(9, 17, 20, 0.55);
+    cursor: pointer;
+  }
+
+  .mm-sidebar-nav {
+    width: 100%;
+  }
+
+  .mm-main {
+    height: auto;
+    min-height: 0;
+    flex: 1;
+    width: 100%;
+    padding: var(--mm-space) clamp(12px, 3vw, 18px) calc(var(--mm-space) + 8px);
+  }
+
+  .mm-shell-toolbar {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    min-height: calc(var(--mm-control-height) + 0.75rem);
+    margin: calc(-1 * var(--mm-space)) calc(-1 * clamp(12px, 3vw, 18px))
+      var(--mm-space);
+    padding: 0.45rem clamp(12px, 3vw, 18px);
+    background: var(--mm-bg-main);
+    border-bottom: 1px solid var(--mm-border);
+  }
+
+  .mm-shell-menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: var(--mm-control-height);
+    margin-right: auto;
+    padding: var(--mm-control-pad-y) var(--mm-control-pad-x);
+    border: 1px solid var(--mm-border);
+    border-radius: var(--mm-radius-pill);
+    background: var(--mm-card-bg);
+    color: var(--mm-text1);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  .mm-shell-menu-toggle:focus-visible {
+    outline: 2px solid var(--mm-accent-ring);
+    outline-offset: 2px;
+  }
+}
+
+@media (max-width: 640px) {
+  .mm-main {
+    padding-top: clamp(10px, 3.5vw, 16px);
+  }
+
+  .mm-page__intro {
+    margin-bottom: 1rem;
+    padding-bottom: 0.85rem;
+  }
+
+  .mm-page__title {
+    font-size: clamp(1.35rem, 6.2vw, 1.6rem);
+  }
+
+  .mm-page__lead {
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .mm-workspace-tabs {
+    margin-top: 0.75rem;
+    border-radius: 12px;
+  }
+
+  .mm-workspace-tabs__button {
+    min-height: 2.35rem;
+    padding-inline: 0.8rem;
+  }
+}

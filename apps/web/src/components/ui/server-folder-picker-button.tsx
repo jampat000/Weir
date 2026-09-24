@@ -1,92 +1,280 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
+import { errorMessage } from "../../lib/api/error-message";
 import {
   fetchServerDirectories,
   type DirectoryBrowseResponse,
 } from "../../lib/system/directory-browser-api";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
-import { errorMessage } from "../../lib/api/error-message";
+import { examplePath } from "../../lib/ui/platform";
+import { useModalFocus } from "../../lib/ui/use-modal-focus";
 
-type Props = {
-  title: string;
-  value: string;
-  disabled?: boolean;
-  onSelect: (path: string) => void;
+type Browse = {
+  data: DirectoryBrowseResponse | null;
+  loading: boolean;
+  error: string | null;
+  notice: string | null;
 };
 
+/**
+ * Lists the folders at `path` on the machine running Weir. A path that cannot be opened falls back
+ * to the drive list with a notice, so a stale or mistyped value never leaves the picker empty.
+ */
+function useBrowse(path: string | null): Browse {
+  const [state, setState] = useState<Browse>({
+    data: null,
+    loading: true,
+    error: null,
+    notice: null,
+  });
+  useEffect(() => {
+    let cancelled = false;
+    const settle = (next: Omit<Browse, "loading">) => {
+      if (!cancelled) setState({ ...next, loading: false });
+    };
+    setState((current) => ({ ...current, loading: true, error: null }));
+    fetchServerDirectories(path)
+      .then((data) => settle({ data, error: null, notice: null }))
+      .catch(async (err: unknown) => {
+        const failure = errorMessage(err, "Folder browser unavailable.");
+        if (!path) {
+          settle({ data: null, error: failure, notice: null });
+          return;
+        }
+        try {
+          const roots = await fetchServerDirectories(null);
+          settle({
+            data: roots,
+            error: null,
+            notice: `"${path}" could not be opened. Showing available drives instead.`,
+          });
+        } catch {
+          // The drive list failed too: the first failure is the one worth showing.
+          settle({ data: null, error: failure, notice: null });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [path]);
+  return state;
+}
+
+function FolderList({
+  browse,
+  onOpen,
+  onChoose,
+}: {
+  browse: Browse;
+  onOpen: (path: string) => void;
+  onChoose: (path: string) => void;
+}) {
+  if (browse.loading) {
+    return <div className="mm-folder-picker__empty">Loading folders...</div>;
+  }
+  if (browse.error) {
+    return (
+      <div className="mm-status-text--failed text-sm" role="alert">
+        {browse.error}
+      </div>
+    );
+  }
+  const entries = browse.data?.entries ?? [];
+  if (entries.length === 0) {
+    return (
+      <div className="mm-folder-picker__empty">No folders found here.</div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {entries.map((entry) => (
+        <div key={entry.path} className="mm-folder-picker__entry">
+          <button
+            type="button"
+            className="mm-folder-picker__entry-open"
+            onClick={() => onOpen(entry.path)}
+          >
+            <span className="mm-folder-picker__entry-name">{entry.name}</span>
+            <span className="mm-folder-picker__entry-path">
+              {entry.description ?? entry.path}
+            </span>
+          </button>
+          <button
+            type="button"
+            className={mmActionButtonClass({ variant: "tertiary" })}
+            onClick={() => onOpen(entry.path)}
+          >
+            Open
+          </button>
+          <button
+            type="button"
+            className={mmActionButtonClass({ variant: "secondary" })}
+            onClick={() => onChoose(entry.path)}
+          >
+            Select
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PathBar({
+  browse,
+  onGo,
+  onUp,
+  onDrives,
+  onChoose,
+}: {
+  browse: Browse;
+  onGo: (path: string) => void;
+  onUp: () => void;
+  onDrives: () => void;
+  onChoose: (path: string) => void;
+}) {
+  const [manualPath, setManualPath] = useState("");
+  const current = browse.data?.current_path ?? null;
+  return (
+    <div className="mm-folder-picker__section">
+      <form
+        className="mm-folder-picker__go"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const next = manualPath.trim();
+          if (next) onGo(next);
+        }}
+      >
+        <input
+          className="mm-input"
+          value={manualPath}
+          onChange={(event) => setManualPath(event.target.value)}
+          placeholder={examplePath(
+            String.raw`\\nas\media or X:\Media`,
+            "/media/tv",
+          )}
+          aria-label="Folder path"
+        />
+        <button
+          type="submit"
+          className={mmActionButtonClass({ variant: "secondary" })}
+          disabled={browse.loading}
+        >
+          Go to path
+        </button>
+      </form>
+      <div className="mm-folder-picker__nav">
+        <button
+          type="button"
+          className={mmActionButtonClass({ variant: "secondary" })}
+          disabled={browse.loading || !browse.data?.parent_path}
+          onClick={onUp}
+        >
+          Up
+        </button>
+        <button
+          type="button"
+          className={mmActionButtonClass({ variant: "tertiary" })}
+          disabled={browse.loading || browse.data?.current_path === null}
+          onClick={onDrives}
+        >
+          Drives
+        </button>
+        {current ? (
+          <button
+            type="button"
+            className={mmActionButtonClass({ variant: "primary" })}
+            onClick={() => onChoose(current)}
+          >
+            Use this folder
+          </button>
+        ) : null}
+        <div className="mm-folder-picker__current">
+          <span>{current ?? "Available drives"}</span>
+        </div>
+      </div>
+      <p className="mm-folder-picker__help">
+        Windows supports local drives, mapped drives, and UNC shares such as{" "}
+        <span className="font-mono">\\nas\media</span>. Docker installs must use
+        container-visible paths such as{" "}
+        <span className="font-mono">/media/tv</span>.
+      </p>
+      {browse.notice ? (
+        <p className="mm-status-text--warning mt-3 text-sm">{browse.notice}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function FolderPickerDialog({
+  title,
+  startPath,
+  onChoose,
+  onClose,
+}: {
+  title: string;
+  startPath: string | null;
+  onChoose: (path: string) => void;
+  onClose: () => void;
+}) {
+  const titleId = useId();
+  const [path, setPath] = useState(startPath);
+  const browse = useBrowse(path);
+  const panelRef = useModalFocus<HTMLDivElement>({ onClose });
+  return (
+    <div
+      className="mm-folder-picker"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+    >
+      <div ref={panelRef} className="mm-folder-picker__panel" tabIndex={-1}>
+        <div className="mm-folder-picker__head">
+          <div>
+            <p className="mm-folder-picker__eyebrow">Filesystem</p>
+            <h2 id={titleId} className="mm-folder-picker__title">
+              {title}
+            </h2>
+            <p className="mm-folder-picker__lead">
+              Pick a folder visible to the machine running Weir, or jump to a
+              UNC/Docker path directly.
+            </p>
+          </div>
+          <button
+            type="button"
+            className={mmActionButtonClass({ variant: "secondary" })}
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
+        <PathBar
+          browse={browse}
+          onGo={setPath}
+          onUp={() => setPath(browse.data?.parent_path ?? null)}
+          onDrives={() => setPath(null)}
+          onChoose={onChoose}
+        />
+        <div className="mm-folder-picker__list">
+          <FolderList browse={browse} onOpen={setPath} onChoose={onChoose} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** A Browse button that opens a picker over the folders on the machine running Weir. */
 export function ServerFolderPickerButton({
   title,
   value,
   disabled,
   onSelect,
-}: Props) {
+}: {
+  title: string;
+  value: string;
+  disabled?: boolean;
+  onSelect: (path: string) => void;
+}) {
   const [open, setOpen] = useState(false);
-  const [path, setPath] = useState<string | null>(null);
-  const [data, setData] = useState<DirectoryBrowseResponse | null>(null);
-  const [manualPath, setManualPath] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    setPath(value.trim() || null);
-  }, [open, value]);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetchServerDirectories(path);
-        if (!cancelled) {
-          setData(response);
-          setNotice(null);
-        }
-      } catch (err) {
-        if (path) {
-          try {
-            const roots = await fetchServerDirectories(null);
-            if (!cancelled) {
-              setData(roots);
-              setError(null);
-              setNotice(
-                `"${path}" could not be opened. Showing available drives instead.`,
-              );
-            }
-            return;
-          } catch {
-            /* fall through */
-          }
-        }
-        if (!cancelled) {
-          setData(null);
-          setError(errorMessage(err, "Folder browser unavailable."));
-          setNotice(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [open, path]);
-
-  function choose(selected: string) {
-    onSelect(selected);
-    setOpen(false);
-  }
-
   return (
     <>
       <button
@@ -98,162 +286,15 @@ export function ServerFolderPickerButton({
         Browse
       </button>
       {open ? (
-        <div
-          className="fixed inset-0 z-[9999] flex items-stretch justify-end bg-black/55 p-3 sm:p-6"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="flex w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-mm-border bg-mm-card-bg shadow-2xl">
-            <div className="border-b border-mm-border p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-mm-text3">
-                    Filesystem
-                  </p>
-                  <h2 className="mt-1 text-lg font-semibold text-mm-text1">
-                    {title}
-                  </h2>
-                  <p className="mt-1 text-sm text-mm-text3">
-                    Pick a folder visible to the machine running Weir, or jump
-                    to a UNC/Docker path directly.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className={mmActionButtonClass({ variant: "secondary" })}
-                  onClick={() => setOpen(false)}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-            <div className="border-b border-mm-border p-4">
-              <form
-                className="mb-3 flex flex-col gap-2 sm:flex-row"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  const next = manualPath.trim();
-                  if (next) {
-                    setPath(next);
-                  }
-                }}
-              >
-                <input
-                  className="mm-input w-full"
-                  value={manualPath}
-                  onChange={(event) => setManualPath(event.target.value)}
-                  placeholder={
-                    navigator.platform.toLowerCase().includes("win")
-                      ? String.raw`\\nas\media or X:\Media`
-                      : "/media/tv"
-                  }
-                  aria-label="Folder path"
-                />
-                <button
-                  type="submit"
-                  className={mmActionButtonClass({ variant: "secondary" })}
-                  disabled={loading}
-                >
-                  Go to path
-                </button>
-              </form>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  className={mmActionButtonClass({ variant: "secondary" })}
-                  disabled={loading || !data?.parent_path}
-                  onClick={() => setPath(data?.parent_path ?? null)}
-                >
-                  Up
-                </button>
-                <button
-                  type="button"
-                  className={mmActionButtonClass({ variant: "tertiary" })}
-                  disabled={loading || data?.current_path === null}
-                  onClick={() => setPath(null)}
-                >
-                  Drives
-                </button>
-                {data?.current_path ? (
-                  <button
-                    type="button"
-                    className={mmActionButtonClass({ variant: "primary" })}
-                    onClick={() => choose(data.current_path!)}
-                  >
-                    Use this folder
-                  </button>
-                ) : null}
-                <div className="min-w-0 flex-1 rounded-md border border-mm-border bg-black/15 px-3 py-2 text-sm text-mm-text3">
-                  <span className="block truncate">
-                    {data?.current_path ?? "Available drives"}
-                  </span>
-                </div>
-              </div>
-              <p className="mt-2 text-xs leading-relaxed text-mm-text3">
-                Windows supports local drives, mapped drives, and UNC shares
-                such as <span className="font-mono">\\nas\media</span>. Docker
-                installs must use container-visible paths such as{" "}
-                <span className="font-mono">/media/tv</span>.
-              </p>
-              {notice ? (
-                <p className="mm-status-text--warning mt-3 text-sm">{notice}</p>
-              ) : null}
-            </div>
-            <div className="min-h-0 flex-1 overflow-auto p-4">
-              {loading ? (
-                <div className="rounded-lg border border-dashed border-mm-border p-6 text-sm text-mm-text3">
-                  Loading folders...
-                </div>
-              ) : error ? (
-                <div className="mm-status-text--failed text-sm" role="alert">
-                  {error}
-                </div>
-              ) : data && data.entries.length > 0 ? (
-                <div className="space-y-2">
-                  {data.entries.map((entry) => (
-                    <div
-                      key={entry.path}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-mm-border bg-black/10 p-3"
-                    >
-                      <button
-                        type="button"
-                        className="min-w-0 flex-1 text-left"
-                        onClick={() => setPath(entry.path)}
-                      >
-                        <span className="block truncate text-sm font-semibold text-mm-text1">
-                          {entry.name}
-                        </span>
-                        <span className="block truncate text-xs text-mm-text3">
-                          {entry.description ?? entry.path}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className={mmActionButtonClass({ variant: "tertiary" })}
-                        onClick={() => setPath(entry.path)}
-                      >
-                        Open
-                      </button>
-                      <button
-                        type="button"
-                        className={mmActionButtonClass({
-                          variant: "secondary",
-                        })}
-                        onClick={() => choose(entry.path)}
-                      >
-                        Select
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-lg border border-dashed border-mm-border p-6 text-sm text-mm-text3">
-                  No folders found here.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <FolderPickerDialog
+          title={title}
+          startPath={value.trim() || null}
+          onChoose={(path) => {
+            onSelect(path);
+            setOpen(false);
+          }}
+          onClose={() => setOpen(false)}
+        />
       ) : null}
     </>
   );

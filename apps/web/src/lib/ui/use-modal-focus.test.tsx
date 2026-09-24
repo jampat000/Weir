@@ -46,6 +46,27 @@ it("moves focus in, closes on Escape and hands focus back", () => {
   expect(opener).toHaveFocus();
 });
 
+function Layer({ name, onClose }: { name: string; onClose: () => void }) {
+  const ref = useModalFocus<HTMLDivElement>({ onClose });
+  return <div ref={ref} tabIndex={-1} role="dialog" aria-label={name} />;
+}
+
+it("closes only the newest of two open layers on Escape", () => {
+  const closePanel = vi.fn();
+  const closeDialog = vi.fn();
+  render(
+    <>
+      <Layer name="Panel" onClose={closePanel} />
+      <Layer name="Dialog" onClose={closeDialog} />
+    </>,
+  );
+
+  fireEvent.keyDown(document, { key: "Escape" });
+
+  expect(closeDialog).toHaveBeenCalledTimes(1);
+  expect(closePanel).not.toHaveBeenCalled();
+});
+
 it("ignores Escape while busy", () => {
   const onClose = vi.fn();
   render(<Harness busy onClose={onClose} />);
