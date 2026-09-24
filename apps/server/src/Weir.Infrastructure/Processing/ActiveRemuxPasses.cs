@@ -13,7 +13,7 @@ namespace Weir.Infrastructure.Processing;
 /// identity every automatic enqueue path agrees on (library, relative path, scope).
 /// </summary>
 /// <remarks>
-/// A lookup for one file goes through <c>ix_jobs_active_remux_pass_path</c> (migration <c>0019</c>), an expression index over
+/// A lookup for one file goes through <c>ix_jobs_active_remux_pass_path</c> (migration <c>0020</c>), an expression index over
 /// the payload's path that holds only pending and leased passes; its predicate is repeated here word for word because SQLite
 /// uses a partial index only for a query that states the same condition. A backlog of thousands of queued passes made the
 /// unindexed lookup parse every one of them, under the write lock, for every enqueue (#708).
