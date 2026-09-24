@@ -9,8 +9,6 @@ using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Text;
 using Weir.Infrastructure.Activity;
-using Weir.Infrastructure.Processing;
-using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
@@ -174,8 +172,13 @@ public sealed partial class HandoffCompletionReporter
     /// <summary>
     /// Post the outcome back to the originating manager and record that it did. Returns a short status for logging and
     /// never throws: a manager being unreachable must not fail a pass that succeeded on disk.
+    /// <para>
     /// A hand-off of several files is reported once, by whichever pass finishes its last file, and the report covers
-    /// them all; the passes before it only record their own file's result.
+    /// them all; the passes before it only record their own file's result. That claim and the report it owes are
+    /// persisted together, in one transaction (#667): a crash or exception between claiming and sending never leaves a
+    /// hand-off claimed with nothing to send, since the report is already durably owed before delivery is even
+    /// attempted, and the heartbeat (<see cref="SendWaitingReportsAsync"/>) sends whatever delivery here did not.
+    /// </para>
     /// Commits <paramref name="uow"/> (or rolls it back when recording fails).
     /// </summary>
     public async Task<string> ReportHandoffCompletionAsync(UnitOfWork uow, string? payloadJson, PyDict result, CancellationToken cancellationToken = default)
@@ -225,7 +228,22 @@ public sealed partial class HandoffCompletionReporter
         var relative = result.Get("relative_media_path") is PyStr text ? text.Value
             : payload is PyDict named && named.Get("relative_media_path") is PyStr path ? path.Value : null;
         long? libraryId = payload is PyDict carried && carried.Get("library_id") is PyInt library ? (long)library.Value : null;
-        var finish = await FinishTargetAsync(uow, origin, relative, result).ConfigureAwait(false);
+        HandoffTargetFinish finish;
+        try
+        {
+            var row = string.IsNullOrEmpty(origin.HandoffId) ? null : await HandoffLedgerStore.FindAsync(uow, origin.SourceKey, origin.HandoffId).ConfigureAwait(false);
+            finish = await HandoffTargetStore.FinishAsync(uow, row, relative ?? string.Empty, result).ConfigureAwait(false);
+            // Durable regardless of outcome: the next pass to finish must see this file's result even if it is not
+            // the one that makes the hand-off ready.
+            await uow.CommitAsync().ConfigureAwait(false);
+        }
+        catch (SqliteException exception)
+        {
+            await uow.RollbackAsync().ConfigureAwait(false);
+            _logger.LogWarning(exception, "Weir could not record the result of {Path} on hand-off {HandoffId}, so it did not report it.", relative, origin.HandoffId);
+            return "skipped: this file's result could not be recorded";
+        }
+
         switch (finish.Progress)
         {
             case HandoffTargetProgress.Waiting:
@@ -235,108 +253,35 @@ public sealed partial class HandoffCompletionReporter
                 return "skipped: another pass already reported this hand-off";
             case HandoffTargetProgress.NotATarget:
                 return "skipped: this file is not one the hand-off covers";
-            case HandoffTargetProgress.Ready when finish.Targets!.Count > 1:
-                return await ReportFolderAsync(uow, origin, finish.Row!, finish.Targets, result, libraryId, cancellationToken).ConfigureAwait(false);
+            case HandoffTargetProgress.Untracked:
+                return await ReportUntrackedFileAsync(uow, origin, result, relative, libraryId, cancellationToken).ConfigureAwait(false);
             default:
-                return await ReportFileAsync(uow, origin, result, relative, libraryId, cancellationToken).ConfigureAwait(false);
+                return await ClaimAndDeliverAsync(uow, origin, finish, result, libraryId, viaCancellation: false, cancellationToken).ConfigureAwait(false);
         }
     }
 
     /// <summary>
-    /// Record this file's result on its hand-off and commit, so the next pass to finish sees it. A result Weir cannot
-    /// record reports nothing: reporting without it could tell the manager a hand-off of several files was done early.
+    /// The report for a hand-off that records no target rows of its own (it arrived before migration 0017, or has no
+    /// hand-off id at all): the file's own result, exactly as it has always been reported. No claim is made here, so
+    /// there is nothing durable to leave dangling if the manager cannot be reached.
     /// </summary>
-    private async Task<HandoffTargetFinish> FinishTargetAsync(UnitOfWork uow, HandoffOrigin origin, string? relative, PyDict result)
-    {
-        try
-        {
-            var finish = await HandoffTargetStore.FinishAsync(uow, origin, relative ?? string.Empty, result).ConfigureAwait(false);
-            await uow.CommitAsync().ConfigureAwait(false);
-            return finish;
-        }
-        catch (SqliteException exception)
-        {
-            await uow.RollbackAsync().ConfigureAwait(false);
-            _logger.LogWarning(exception, "Weir could not record the result of {Path} on hand-off {HandoffId}, so it did not report it.", relative, origin.HandoffId);
-            return new HandoffTargetFinish(HandoffTargetProgress.NotATarget);
-        }
-    }
-
-    /// <summary>The report for a hand-off of one file: that file's own result, exactly as it has always been reported.</summary>
-    private async Task<string> ReportFileAsync(UnitOfWork uow, HandoffOrigin origin, PyDict result, string? relative, long? libraryId, CancellationToken cancellationToken)
+    private async Task<string> ReportUntrackedFileAsync(UnitOfWork uow, HandoffOrigin origin, PyDict result, string? relative, long? libraryId, CancellationToken cancellationToken)
     {
         var (target, reason) = await ResolveHandoffTargetAsync(uow, origin).ConfigureAwait(false);
         var outputPath = target is not null && CompletionReports.IsSucceeded(result)
             ? await ManagerOutputPathAsync(target.Connection, origin, result, cancellationToken).ConfigureAwait(false)
             : null;
         var body = CompletionReports.BuildCompletionBody(origin, result, outputPath);
-        var reported = new ReportedOutcome(FileReportState(body), body, relative, relative is null ? [] : [relative], libraryId);
+        var outcome = new ReportedOutcome(FileReportState(body), body, relative, relative is null ? [] : [relative], libraryId);
         if (target is null)
         {
-            await RecordOutcomeAsync(uow, origin, reported, null).ConfigureAwait(false);
+            await RecordUntrackedOutcomeAsync(uow, origin, outcome, null).ConfigureAwait(false);
             return $"skipped: {reason}";
         }
 
         var delivery = await PostHandoffReportAsync(target, body, cancellationToken).ConfigureAwait(false);
-        await RecordOutcomeAsync(uow, origin, reported, (target, delivery)).ConfigureAwait(false);
+        await RecordUntrackedOutcomeAsync(uow, origin, outcome, (target, delivery)).ConfigureAwait(false);
         return delivery.Status;
-    }
-
-    /// <summary>
-    /// The one report for a hand-off of several files, once every file has a final result: <c>outputPath</c> is the folder
-    /// they were handed back in and <c>outputFiles</c> each file, both in the manager's own paths when it has them.
-    /// </summary>
-    private async Task<string> ReportFolderAsync(
-        UnitOfWork uow, HandoffOrigin origin, HandoffLedgerRow row, IReadOnlyList<HandoffTarget> targets, PyDict result, long? libraryId, CancellationToken cancellationToken)
-    {
-        var (target, reason) = await ResolveHandoffTargetAsync(uow, origin).ConfigureAwait(false);
-        var localFolder = await LocalOutputFolderAsync(uow, row, result).ConfigureAwait(false);
-        var managerFolder = target is not null && localFolder is not null
-            ? await ManagerOutputFolderAsync(target.Connection, origin, cancellationToken).ConfigureAwait(false)
-            : null;
-        string AsManagerSees(string local) =>
-            managerFolder is not null && TranslateOutputPath(local, localFolder!, managerFolder) is { } translated ? translated : local;
-
-        var outputFiles = targets.Where(file => file.Delivered && file.OutputFile is not null).Select(file => AsManagerSees(file.OutputFile!)).ToList();
-        var handBackFolder = localFolder is null ? null : AsManagerSees(Path.Join(localFolder, row.RelativePath));
-        var body = FolderHandoffReports.BuildBody(origin, targets, handBackFolder, outputFiles);
-        var delivered = targets.Where(file => file.Delivered).Select(file => file.RelativePath).ToList();
-        var reported = new ReportedOutcome(FolderHandoffReports.State(targets), body, row.RelativePath, delivered, libraryId ?? row.LibraryId);
-        if (target is null)
-        {
-            await RecordOutcomeAsync(uow, origin, reported, null).ConfigureAwait(false);
-            return $"skipped: {reason}";
-        }
-
-        var delivery = await PostHandoffReportAsync(target, body, cancellationToken).ConfigureAwait(false);
-        await RecordOutcomeAsync(uow, origin, reported, (target, delivery)).ConfigureAwait(false);
-        return delivery.Status;
-    }
-
-    /// <summary>The library's output folder as Weir sees it: from the pass that just finished, else from the library itself.</summary>
-    private static async Task<string?> LocalOutputFolderAsync(UnitOfWork uow, HandoffLedgerRow row, PyDict result)
-    {
-        if (result.Get("processing_output_folder_resolved") is PyStr { Value.Length: > 0 } resolved)
-        {
-            return resolved.Value;
-        }
-
-        return row.LibraryId is { } libraryId && await LibraryStore.GetAsync(uow, libraryId).ConfigureAwait(false) is { OutputFolder.Length: > 0 } library
-            ? RemuxPassPaths.Resolve(library.OutputFolder.Trim())
-            : null;
-    }
-
-    /// <summary>The ledger state a one-file report means.</summary>
-    private static string FileReportState(PyDict body)
-    {
-        if (body.Get("status") is not PyStr { Value: "completed" })
-        {
-            return HandoffLedgerRules.Failed;
-        }
-
-        return body.Get("message") is PyStr { Value: CompletionReports.PassThroughAfterFailureMessage }
-            ? HandoffLedgerRules.PassedThrough
-            : HandoffLedgerRules.Completed;
     }
 
     /// <summary>The manager did not answer at all, as opposed to answering with a refusal.</summary>
@@ -350,11 +295,12 @@ public sealed partial class HandoffCompletionReporter
     private sealed record ReportedOutcome(string State, PyDict Body, string? Subject, IReadOnlyList<string> Files, long? LibraryId);
 
     /// <summary>
-    /// Keep the ledger and Activity in step with a final outcome, then commit. Never throws. A report
-    /// the manager did not answer is kept on the hand-off for the heartbeat to send once it answers, and the History of
-    /// each file it covers says Weir is waiting for it, in plain words (#652).
+    /// Keep the ledger and Activity in step with a final outcome recorded outside the claim mechanism (a hand-off with
+    /// no target rows of its own), then commit. Never throws. A report the manager did not answer is kept on the
+    /// hand-off for the heartbeat to send once it answers, and the History of each file it covers says Weir is
+    /// waiting for it, in plain words (#652).
     /// </summary>
-    private async Task RecordOutcomeAsync(UnitOfWork uow, HandoffOrigin origin, ReportedOutcome outcome, (HandoffReportTarget Target, HandoffReportDelivery Delivery)? report)
+    private async Task RecordUntrackedOutcomeAsync(UnitOfWork uow, HandoffOrigin origin, ReportedOutcome outcome, (HandoffReportTarget Target, HandoffReportDelivery Delivery)? report)
     {
         var body = outcome.Body;
         try

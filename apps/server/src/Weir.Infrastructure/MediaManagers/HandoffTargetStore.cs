@@ -75,15 +75,14 @@ public static class HandoffTargetStore
     /// check run in one <c>BEGIN IMMEDIATE</c> transaction, so of two passes finishing together the second sees the
     /// first's result; and the report is claimed by a conditional update of <c>reported_status</c>, so exactly one caller
     /// gets <see cref="HandoffTargetProgress.Ready"/>. A hand-off already reported as failed may be reported once more
-    /// when a retry turns it into a success, as a single file always could. The caller commits.
+    /// when a retry turns it into a success, as a single file always could. <paramref name="row"/> is null for a job that
+    /// carries no hand-off, or one whose hand-off is not recorded at all. The caller commits.
     /// </summary>
-    public static async Task<HandoffTargetFinish> FinishAsync(UnitOfWork uow, HandoffOrigin origin, string relativePath, PyDict result)
+    public static async Task<HandoffTargetFinish> FinishAsync(UnitOfWork uow, HandoffLedgerRow? row, string relativePath, PyDict result)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        ArgumentNullException.ThrowIfNull(origin);
         ArgumentNullException.ThrowIfNull(result);
-        if (string.IsNullOrEmpty(origin.HandoffId) ||
-            await HandoffLedgerStore.FindAsync(uow, origin.SourceKey, origin.HandoffId).ConfigureAwait(false) is not { } row)
+        if (row is null)
         {
             return new HandoffTargetFinish(HandoffTargetProgress.Untracked);
         }
@@ -97,10 +96,41 @@ public static class HandoffTargetStore
             ("$message", PyStrings.Slice(CompletionReports.MessageFor(result), 2000)),
             ("$row", row.Id),
             ("$path", relativePath)).ConfigureAwait(false);
-        var targets = await ListAsync(uow, row.Id).ConfigureAwait(false);
         if (updated == 0)
         {
+            var targets = await ListAsync(uow, row.Id).ConfigureAwait(false);
             return new HandoffTargetFinish(targets.Count == 0 ? HandoffTargetProgress.Untracked : HandoffTargetProgress.NotATarget, row);
+        }
+
+        return await EvaluateAsync(uow, row).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// A file whose queued pass was cancelled in Weir is finished for the hand-off: nothing will be delivered for it.
+    /// Runs the same readiness check and claim as <see cref="FinishAsync"/>, so a cancellation that turns out to be the
+    /// hand-off's last unresolved file also reports it, instead of leaving the others' copies un-releasable forever.
+    /// </summary>
+    public static async Task<HandoffTargetFinish> MarkCancelledAsync(UnitOfWork uow, HandoffLedgerRow row, string relativePath)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        ArgumentNullException.ThrowIfNull(row);
+        await uow.ExecuteAsync(
+            "UPDATE media_manager_handoff_targets SET result = $cancelled, message = $message " +
+            "WHERE handoff_row_id = $row AND relative_path = $path AND result IS NULL",
+            ("$cancelled", HandoffLedgerRules.Cancelled),
+            ("$message", HandoffLedgerRules.CancelledInWeirMessage),
+            ("$row", row.Id),
+            ("$path", relativePath)).ConfigureAwait(false);
+        return await EvaluateAsync(uow, row).ConfigureAwait(false);
+    }
+
+    /// <summary>Whether every target now has a final result and, if so, who claims reporting it.</summary>
+    private static async Task<HandoffTargetFinish> EvaluateAsync(UnitOfWork uow, HandoffLedgerRow row)
+    {
+        var targets = await ListAsync(uow, row.Id).ConfigureAwait(false);
+        if (targets.Count == 0)
+        {
+            return new HandoffTargetFinish(HandoffTargetProgress.Untracked, row);
         }
 
         if (targets.Any(target => target.Result is null))
@@ -116,19 +146,6 @@ public static class HandoffTargetStore
             ("$failed", HandoffLedgerRules.Failed),
             ("$row", row.Id)).ConfigureAwait(false);
         return new HandoffTargetFinish(claimed == 1 ? HandoffTargetProgress.Ready : HandoffTargetProgress.AlreadyReported, row, targets);
-    }
-
-    /// <summary>A file whose queued pass was cancelled in Weir is finished for the hand-off: nothing will be delivered for it.</summary>
-    public static Task MarkCancelledAsync(UnitOfWork uow, long handoffRowId, string relativePath)
-    {
-        ArgumentNullException.ThrowIfNull(uow);
-        return uow.ExecuteAsync(
-            "UPDATE media_manager_handoff_targets SET result = $cancelled, message = $message " +
-            "WHERE handoff_row_id = $row AND relative_path = $path AND result IS NULL",
-            ("$cancelled", HandoffLedgerRules.Cancelled),
-            ("$message", HandoffLedgerRules.CancelledInWeirMessage),
-            ("$row", handoffRowId),
-            ("$path", relativePath));
     }
 
     /// <summary>

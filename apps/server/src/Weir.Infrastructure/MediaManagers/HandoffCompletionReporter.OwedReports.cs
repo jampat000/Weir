@@ -9,8 +9,9 @@ namespace Weir.Infrastructure.MediaManagers;
 public sealed partial class HandoffCompletionReporter
 {
     /// <summary>
-    /// Send every report Weir still owes a manager of this kind because it was not answering when the pass ended (item 5 of
-    /// #652). The heartbeat calls this once the manager answers its connection test. A report the manager answers, accepted
+    /// Send every report Weir still owes a manager of this kind because it was not answering, or because nothing
+    /// attempted delivery before this owed report was persisted (a claim recorded just before a crash, say, #667).
+    /// The heartbeat calls this once the manager answers its connection test. A report the manager answers, accepted
     /// or refused, stops being owed, and the History of each file it covers stops saying Weir is waiting; one it still does
     /// not answer stays owed. Each report is committed on its own. Returns how many the manager answered.
     /// </summary>
@@ -34,33 +35,59 @@ public sealed partial class HandoffCompletionReporter
                 continue;
             }
 
-            var delivery = await PostHandoffReportAsync(target, pending.Body, cancellationToken).ConfigureAwait(false);
+            var delivery = await DeliverOwedReportAsync(uow, sourceKey, handoffId, target, pending, cancellationToken).ConfigureAwait(false);
             if (IsNotAnswering(delivery))
             {
                 continue;
             }
 
-            await HandoffLedgerStore.SetPendingReportAsync(uow, sourceKey, handoffId, null).ConfigureAwait(false);
-            await RecordHandoffReportAsync(uow, target, pending.Body, delivery, pending.Subject).ConfigureAwait(false);
-            if (pending.LibraryId is { } libraryId)
-            {
-                foreach (var relativePath in pending.Files)
-                {
-                    await ReplaceFileSentenceAsync(
-                        uow,
-                        libraryId,
-                        relativePath,
-                        ManagerWaitMessages.ReportWaiting(target.Connection.Name),
-                        delivery.Accepted ? ManagerWaitMessages.ReportDelivered(target.Connection.Name) : string.Empty).ConfigureAwait(false);
-                }
-            }
-
-            await uow.CommitAsync().ConfigureAwait(false);
             LogWaitingReportSent(_logger, target.Connection.Name, handoffId, delivery.Status);
             answered++;
         }
 
         return answered;
+    }
+
+    /// <summary>
+    /// Attempt one delivery of an owed report, and settle it: still not answering, it stays owed and the History of
+    /// each file it covers says so (added once, whether this is the first attempt or a retry); answered, accepted or
+    /// refused, it stops being owed and Activity records it. Commits.
+    /// </summary>
+    private async Task<HandoffReportDelivery> DeliverOwedReportAsync(
+        UnitOfWork uow, string sourceKey, string handoffId, HandoffReportTarget target, PendingReport pending, CancellationToken cancellationToken)
+    {
+        var delivery = await PostHandoffReportAsync(target, pending.Body, cancellationToken).ConfigureAwait(false);
+        if (IsNotAnswering(delivery))
+        {
+            if (pending.LibraryId is { } waitingLibrary)
+            {
+                foreach (var relativePath in pending.Files)
+                {
+                    await AppendFileSentenceAsync(uow, waitingLibrary, relativePath, ManagerWaitMessages.ReportWaiting(target.Connection.Name)).ConfigureAwait(false);
+                }
+            }
+
+            await uow.CommitAsync().ConfigureAwait(false);
+            return delivery;
+        }
+
+        await HandoffLedgerStore.SetPendingReportAsync(uow, sourceKey, handoffId, null).ConfigureAwait(false);
+        await RecordHandoffReportAsync(uow, target, pending.Body, delivery, pending.Subject).ConfigureAwait(false);
+        if (pending.LibraryId is { } library)
+        {
+            foreach (var relativePath in pending.Files)
+            {
+                await ReplaceFileSentenceAsync(
+                    uow,
+                    library,
+                    relativePath,
+                    ManagerWaitMessages.ReportWaiting(target.Connection.Name),
+                    delivery.Accepted ? ManagerWaitMessages.ReportDelivered(target.Connection.Name) : string.Empty).ConfigureAwait(false);
+            }
+        }
+
+        await uow.CommitAsync().ConfigureAwait(false);
+        return delivery;
     }
 
     /// <summary>A file's status reason with one sentence swapped for another (or dropped), so History reads as things are now.</summary>

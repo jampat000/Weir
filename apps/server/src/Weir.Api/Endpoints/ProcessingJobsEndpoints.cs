@@ -92,7 +92,7 @@ public static class ProcessingJobsEndpoints
         // together or not at all. Nothing here opens a second connection, so the session touch RequireUserAsync may have
         // written cannot hold a lock this handler then waits for.
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var result = await PendingJobCancellation.CancelAsync(uow, request.Service<HandoffLedgerStore>(), id).ConfigureAwait(false);
+        var result = await PendingJobCancellation.CancelAsync(uow, request.Service<HandoffLedgerStore>(), request.Service<HandoffCompletionReporter>(), id).ConfigureAwait(false);
         if (result.Outcome == JobActionOutcome.NotFound)
         {
             throw new ApiException(StatusCodes.Status404NotFound, "Job not found.");
