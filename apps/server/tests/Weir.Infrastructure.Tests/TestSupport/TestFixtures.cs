@@ -72,3 +72,14 @@ public sealed class SerialTestGroup
 {
     public const string Name = "Serial: thread-pool heavy";
 }
+
+/// <summary>
+/// Tests that time how long one lane's write waits while another lane's bulk job runs (#708). xUnit runs a collection that
+/// disables parallelization after every parallel collection has finished, so the waits they measure are the bulk job's and
+/// not a busy test run's.
+/// </summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class WriteLockTimingGroup
+{
+    public const string Name = "Serial: write-lock timing";
+}

@@ -13,6 +13,7 @@ namespace Weir.Infrastructure.LibraryMode;
 /// A whole-library delete and rewrite held the write lock for seconds on a large library and grew the WAL by hundreds of
 /// megabytes for rows that had not changed. Each row keeps its id while it is unchanged, so its facets and probe stay put.
 /// Readers can see a mix of the old and new index while the chunks land; the scan job completes only after the last one.
+/// Between chunks the writer stands back so other lanes get the lock (<see cref="WriteLockTurns"/>).
 /// </remarks>
 public static class LibraryFileIndexWriter
 {
@@ -47,22 +48,27 @@ public static class LibraryFileIndexWriter
         var gone = existing.Where(pair => !kept.Contains(pair.Key)).Select(pair => pair.Value).ToList();
         foreach (var chunk in gone.Chunk(ChunkSize))
         {
-            await DeleteAsync(database, chunk, cancellationToken).ConfigureAwait(false);
+            await WriteLockTurns.TakeAsync(() => DeleteAsync(database, chunk, cancellationToken), cancellationToken).ConfigureAwait(false);
         }
 
         foreach (var chunk in files.Chunk(ChunkSize))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var uow = await UnitOfWork.OpenAsync(database, cancellationToken).ConfigureAwait(false);
-            await using (uow.ConfigureAwait(false))
-            {
-                foreach (var file in chunk)
-                {
-                    await WriteAsync(uow, libraryId, file, existing.TryGetValue(file.Path, out var id) ? id : null).ConfigureAwait(false);
-                }
+            await WriteLockTurns.TakeAsync(() => WriteChunkAsync(database, libraryId, chunk, existing, cancellationToken), cancellationToken).ConfigureAwait(false);
+        }
+    }
 
-                await uow.CommitAsync().ConfigureAwait(false);
+    private static async Task WriteChunkAsync(
+        SqliteDatabase database, long libraryId, LibraryScanFileEntry[] chunk, Dictionary<string, long> existing, CancellationToken cancellationToken)
+    {
+        var uow = await UnitOfWork.OpenAsync(database, cancellationToken).ConfigureAwait(false);
+        await using (uow.ConfigureAwait(false))
+        {
+            foreach (var file in chunk)
+            {
+                await WriteAsync(uow, libraryId, file, existing.TryGetValue(file.Path, out var id) ? id : null).ConfigureAwait(false);
             }
+
+            await uow.CommitAsync().ConfigureAwait(false);
         }
     }
 
