@@ -52,13 +52,18 @@ export function useListboxKeyboardNav<Option extends { label: string }>(
   const typeaheadResetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
+  // Kept in sync every render (in an effect, never during render itself) so the effect below can
+  // honestly depend on `isOpen` alone: only the moment the panel opens should decide where roving
+  // focus starts, never a later change to `initialIndex` or `options` while it is already open.
+  const openStart = useRef({ initialIndex, lastIndex: options.length - 1 });
+  useEffect(() => {
+    openStart.current = { initialIndex, lastIndex: options.length - 1 };
+  });
 
   useEffect(() => {
-    if (isOpen) {
-      setActiveIndex(clampIndex(initialIndex, options.length - 1));
-    }
-    // Only the moment the panel opens decides where roving focus starts.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!isOpen) return;
+    const { initialIndex: start, lastIndex } = openStart.current;
+    setActiveIndex(clampIndex(start, lastIndex));
   }, [isOpen]);
 
   useEffect(() => () => clearTimeout(typeaheadResetTimer.current), []);
