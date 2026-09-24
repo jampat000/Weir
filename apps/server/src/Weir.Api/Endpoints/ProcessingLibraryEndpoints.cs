@@ -12,6 +12,7 @@ using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
 using static Weir.Api.Endpoints.EndpointLookups;
 
@@ -49,10 +50,11 @@ public static class ProcessingLibraryEndpoints
         await LibraryStore.GetRuleSetAsync(uow, id).ConfigureAwait(false)
         ?? throw new ApiException(StatusCodes.Status404NotFound, "That rule set does not exist.");
 
-    private static async Task<PyDict> LibraryOutAsync(UnitOfWork uow, ProcessingLibraryRecord row, ScanWakeups? looks = null)
+    private static async Task<PyDict> LibraryOutAsync(ApiRequest request, UnitOfWork uow, ProcessingLibraryRecord row, ScanWakeups? looks = null)
     {
         var managerIds = await LibraryStore.ManagerConnectionIdsAsync(uow, row.Id).ConfigureAwait(false);
         var activeJobs = await LibraryStore.ActiveJobCountAsync(uow, row).ConfigureAwait(false);
+        var periodicScan = await PeriodicScanStatusAsync(request, uow, row, looks).ConfigureAwait(false);
 
         // manager_coverage: the linked connections' last saved connection-test result (no live call — a
         // listing must not depend on every linked manager answering right now).
@@ -150,7 +152,28 @@ public static class ProcessingLibraryEndpoints
             .Set("active_job_count", activeJobs)
             // When Weir next looks at the watched folder, so Processing can count an arriving file down to it.
             .Set("next_look_at", looks?.NextLookFor(row.Id) is { } next ? PyDateTime.FromDateTimeOffset(next).PydanticJson() : null)
+            // Whether the periodic scan-dispatch timer runs for this library right now, and when it next will (#747).
+            .Set("periodic_scan", periodicScan.State)
+            .Set("next_scan_at", periodicScan.NextScanAt is { } nextScan ? PyDateTime.FromDateTimeOffset(nextScan).PydanticJson() : null)
             .Set("updated_at", row.UpdatedAt.PydanticJson());
+    }
+
+    /// <summary>Resolves <see cref="PeriodicScanStatus"/> for one library from the same switches and schedule window
+    /// the periodic scan-dispatch scheduler and the worker's upkeep admission read.</summary>
+    private static async Task<PeriodicScanStatus> PeriodicScanStatusAsync(ApiRequest request, UnitOfWork uow, ProcessingLibraryRecord row, ScanWakeups? looks)
+    {
+        var operatorSettings = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        var suite = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        var timezoneName = string.IsNullOrWhiteSpace(suite.AppTimezone) ? "UTC" : suite.AppTimezone.Trim();
+        var now = request.Service<TimeProvider>().GetUtcNow();
+        return PeriodicScanStatus.Resolve(
+            row,
+            request.Options.ProcessingWatchedFolderRemuxScanDispatchScheduleEnabled,
+            operatorSettings.MovieScheduleEnabled,
+            operatorSettings.TvScheduleEnabled,
+            timezoneName,
+            now,
+            looks?.NextPeriodicFor(row.Id));
     }
 
     private static PyDict RuleSetOut(ProcessingRuleSetRecord row, int usedByLibraryCount) => new PyDict()
@@ -202,7 +225,7 @@ public static class ProcessingLibraryEndpoints
         var items = new List<PyJson>();
         foreach (var row in rows)
         {
-            items.Add(await LibraryOutAsync(uow, row, request.Service<ScanWakeups>()).ConfigureAwait(false));
+            items.Add(await LibraryOutAsync(request, uow, row, request.Service<ScanWakeups>()).ConfigureAwait(false));
         }
 
         return ApiRoutes.Ok(new PyList(items));
@@ -215,7 +238,7 @@ public static class ProcessingLibraryEndpoints
         var id = request.PathInt("library_id", issues);
         issues.ThrowIfAny();
         var uow = await request.DbAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(await LibraryOutAsync(uow, await RequireLibraryAsync(uow, id).ConfigureAwait(false), request.Service<ScanWakeups>()).ConfigureAwait(false));
+        return ApiRoutes.Ok(await LibraryOutAsync(request, uow, await RequireLibraryAsync(uow, id).ConfigureAwait(false), request.Service<ScanWakeups>()).ConfigureAwait(false));
     }
 
     /// <summary>
@@ -482,7 +505,7 @@ public static class ProcessingLibraryEndpoints
         await RefuseUnsupportedRejectAsync(request, uow, row).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         request.Service<ScanSettingsChanges>().Record();
-        return new JsonApiResult(StatusCodes.Status201Created, await LibraryOutAsync(uow, row, request.Service<ScanWakeups>()).ConfigureAwait(false));
+        return new JsonApiResult(StatusCodes.Status201Created, await LibraryOutAsync(request, uow, row, request.Service<ScanWakeups>()).ConfigureAwait(false));
     }
 
     private static async Task<ApiResult> PutLibraryAsync(ApiRequest request)
@@ -521,7 +544,7 @@ public static class ProcessingLibraryEndpoints
         await RefuseUnsupportedRejectAsync(request, uow, updated).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         request.Service<ScanSettingsChanges>().Record();
-        return ApiRoutes.Ok(await LibraryOutAsync(uow, updated, request.Service<ScanWakeups>()).ConfigureAwait(false));
+        return ApiRoutes.Ok(await LibraryOutAsync(request, uow, updated, request.Service<ScanWakeups>()).ConfigureAwait(false));
     }
 
     private static async Task<ApiResult> DeleteLibraryAsync(ApiRequest request)
@@ -648,7 +671,7 @@ public static class ProcessingLibraryEndpoints
         var items = new List<PyJson>();
         foreach (var row in created)
         {
-            items.Add(await LibraryOutAsync(uow, row, request.Service<ScanWakeups>()).ConfigureAwait(false));
+            items.Add(await LibraryOutAsync(request, uow, row, request.Service<ScanWakeups>()).ConfigureAwait(false));
         }
 
         return new JsonApiResult(StatusCodes.Status201Created, new PyList(items));
@@ -700,7 +723,7 @@ public static class ProcessingLibraryEndpoints
         var row = await RequireLibraryAsync(uow, id).ConfigureAwait(false);
         var updated = await LibraryDiscoveryService.UnlinkLibraryAsync(uow, row).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(await LibraryOutAsync(uow, updated, request.Service<ScanWakeups>()).ConfigureAwait(false));
+        return ApiRoutes.Ok(await LibraryOutAsync(request, uow, updated, request.Service<ScanWakeups>()).ConfigureAwait(false));
     }
 
     private static async Task<ApiResult> PostReorderAsync(ApiRequest request)
@@ -736,7 +759,7 @@ public static class ProcessingLibraryEndpoints
         var items = new List<PyJson>();
         foreach (var row in rows)
         {
-            items.Add(await LibraryOutAsync(uow, row, request.Service<ScanWakeups>()).ConfigureAwait(false));
+            items.Add(await LibraryOutAsync(request, uow, row, request.Service<ScanWakeups>()).ConfigureAwait(false));
         }
 
         return ApiRoutes.Ok(new PyList(items));

@@ -4680,10 +4680,23 @@ export interface components {
        * @default null
        */
       next_look_at: string | null;
+      /**
+       * Next Scan At
+       * @description When the periodic scan-dispatch timer next creates a scan for this library. Null when periodic_scan is "off", and also null under "outside_hours" if the schedule never reopens.
+       * @default null
+       */
+      next_scan_at: string | null;
       /** Output Collision Policy */
       output_collision_policy: string;
       /** Output Folder */
       output_folder: string;
+      /**
+       * Periodic Scan
+       * @description Whether the periodic scan-dispatch timer currently runs for this library: "off" (a switch is off, or the library itself is), "outside_hours" (every switch is on, but the library's own schedule window is closed), or "scheduled".
+       * @default off
+       * @enum {string}
+       */
+      periodic_scan: "off" | "outside_hours" | "scheduled";
       /** Preserve Original Timestamps */
       preserve_original_timestamps: boolean;
       /** Priority */
