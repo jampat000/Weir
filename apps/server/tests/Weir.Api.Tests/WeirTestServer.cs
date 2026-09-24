@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Configuration;
@@ -83,9 +84,17 @@ internal sealed class WeirTestServer : IAsyncDisposable
     }
 
     /// <summary>
-    /// Replace the database file with a directory, so every new connection fails. The periodic tasks may
-    /// hold the file open for a moment, which makes the delete fail or stay pending on Windows, so retry.
+    /// Replace the database file with a directory, so every new connection fails.
     /// </summary>
+    /// <remarks>
+    /// <see cref="SqliteConnection.ClearAllPools"/> closes every pooled native handle in the process, not only
+    /// this database's own pool (<see cref="SqliteDatabase.ClearPool"/>), which is what a background timer (the
+    /// manager heartbeat, library mode's schedule) holding the file open needs to actually let go of it — but a
+    /// timer can still open a fresh connection at any moment after that clear, including between the delete and
+    /// the directory create below. The short retry is for that race alone, not for the stale-pooled-handle
+    /// problem <see cref="SqliteConnection.ClearAllPools"/> already removes, so it is far tighter than a blind
+    /// wait-and-hope: a handful of immediate attempts, each starting with its own clear.
+    /// </remarks>
     public async Task BreakDatabaseAsync()
     {
         var dbPath = Path.Join(Home, "data", "weir.sqlite3");
@@ -93,26 +102,22 @@ internal sealed class WeirTestServer : IAsyncDisposable
         for (var attempt = 0; ; attempt++)
         {
             database.ClearPool();
+            SqliteConnection.ClearAllPools();
             try
             {
                 File.Delete(dbPath);
                 File.Delete(dbPath + "-wal");
                 File.Delete(dbPath + "-shm");
                 Directory.CreateDirectory(dbPath);
-                // Clear the pool again: on Linux a deleted database stays open for anyone already holding it, and a
-                // background timer (the manager heartbeat, library mode's schedule) can open a connection between the
-                // first clear and the delete. Pooled, that handle let the next request read the deleted file and
-                // answer 200 instead of 503 (main's CI for v3.2.1).
-                database.ClearPool();
                 return;
             }
-            catch (IOException) when (attempt < 50)
+            catch (IOException) when (attempt < 20)
             {
-                await Task.Delay(100);
+                await Task.Delay(10);
             }
-            catch (UnauthorizedAccessException) when (attempt < 50)
+            catch (UnauthorizedAccessException) when (attempt < 20)
             {
-                await Task.Delay(100);
+                await Task.Delay(10);
             }
         }
     }

@@ -325,7 +325,8 @@ public sealed class NotificationDispatcher
 
     /// <summary>
     /// Completes once every delivery started so far has finished. The caller of <see cref="DispatchJobNotification"/>
-    /// never waits for its delivery; this is for anything that must, such as a clean shutdown or a test.
+    /// never waits for its delivery; this has no ceiling of its own, so it is for tests that need deliveries to
+    /// settle before asserting — callers should apply their own timeout.
     /// </summary>
     public Task WhenIdleAsync() => Task.WhenAll(_inFlight.Keys);
 
