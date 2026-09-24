@@ -4,7 +4,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Tests.Sqlite.Migrations;
 
 /// <summary>
-/// #715's migration (<c>0017_library_file_probes.sql</c>): each file's probe document moves from <c>library_files</c> into
+/// #715's migration (<c>0019_library_file_probes.sql</c>): each file's probe document moves from <c>library_files</c> into
 /// <c>library_file_probes</c>, and an existing install keeps every document it had. Each test starts at the frozen baseline
 /// and seeds a completed library scan, so the rows arrive the way a real upgrade delivers them.
 /// </summary>

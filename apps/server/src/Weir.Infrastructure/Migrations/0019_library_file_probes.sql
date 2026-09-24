@@ -1,4 +1,4 @@
--- Weir schema 0017 (revision 0052_library_file_probes).
+-- Weir schema 0019 (revision 0054_library_file_probes).
 --
 -- 1. A file's ffprobe document moves out of library_files into its own table (#715). SQLite stores a row's columns in
 --    order, and probe_json (several kilobytes, mostly in overflow pages) sat ahead of the columns #568 added. Every

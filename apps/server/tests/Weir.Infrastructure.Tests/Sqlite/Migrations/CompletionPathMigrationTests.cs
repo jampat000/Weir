@@ -4,7 +4,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Tests.Sqlite.Migrations;
 
 /// <summary>
-/// #708's part of migration <c>0017</c>: a completed pass recorded without its <c>relative_path</c> gets it from its detail, so
+/// #708's part of migration <c>0019</c>: a completed pass recorded without its <c>relative_path</c> gets it from its detail, so
 /// the scan's indexed lookup of earlier completions finds every one the old search of the detail text found.
 /// </summary>
 public sealed class CompletionPathMigrationTests : IDisposable

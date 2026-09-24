@@ -51,7 +51,7 @@ The variables and their defaults are documented in the repository's [`.env.examp
 
 The numbered SQL scripts in `src/Weir.Infrastructure/Migrations/` are the only source of schema changes. `Weir.Infrastructure.Sqlite.SchemaMigrator` lists them in order, each with the revision it leaves behind, and records the current revision in the `alembic_version` table. The table name is kept from the retired Python backend, so databases from earlier releases are recognised and upgraded.
 
-The current head is migration `0018_query_indexes`, revision `0053_query_indexes`. The first script, `0001_baseline_0036_drop_pruner_tables.sql`, is the frozen baseline (revision `0036_drop_pruner_tables`).
+The current head is migration `0019_library_file_probes`, revision `0054_library_file_probes`. The first script, `0001_baseline_0036_drop_pruner_tables.sql`, is the frozen baseline (revision `0036_drop_pruner_tables`).
 
 On startup the server:
 
