@@ -19,6 +19,7 @@ function connection(
     api_key_is_saved: true,
     webhook_secret_is_set: false,
     webhook_url_path: "/api/v1/intake/webhook/deluno",
+    downloaded_scan_enabled: false,
     unsigned_webhook_warning: null,
     last_test_ok: null,
     last_test_at: null,
@@ -118,6 +119,88 @@ describe("ConnectionEditForm", () => {
     expect(
       screen.queryByTestId("settings-unsaved-changes"),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows the downloaded-scan toggle only for Sonarr and Radarr, never Deluno", () => {
+    const { rerender } = render(
+      <ConnectionEditForm
+        connection={connection({ kind: "deluno" })}
+        onClose={vi.fn()}
+      />,
+      { wrapper },
+    );
+    expect(
+      screen.queryByTestId("media-manager-edit-downloaded-scan"),
+    ).not.toBeInTheDocument();
+
+    rerender(
+      <ConnectionEditForm
+        connection={connection({ kind: "sonarr", name: "Sonarr" })}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByTestId("media-manager-edit-downloaded-scan"),
+    ).toBeInTheDocument();
+
+    rerender(
+      <ConnectionEditForm
+        connection={connection({ kind: "radarr", name: "Radarr" })}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByTestId("media-manager-edit-downloaded-scan"),
+    ).toBeInTheDocument();
+  });
+
+  it("sends downloaded_scan_enabled when saving a Sonarr connection, but never for Deluno", async () => {
+    const update = vi
+      .spyOn(api, "updateMediaManagerConnection")
+      .mockResolvedValue(connection({ kind: "sonarr", name: "Sonarr" }));
+
+    render(
+      <ConnectionEditForm
+        connection={connection({
+          kind: "sonarr",
+          name: "Sonarr",
+          downloaded_scan_enabled: false,
+        })}
+        onClose={vi.fn()}
+      />,
+      { wrapper },
+    );
+
+    fireEvent.click(screen.getByTestId("media-manager-edit-downloaded-scan"));
+    fireEvent.click(screen.getByTestId("media-manager-edit-save"));
+
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    expect(update).toHaveBeenCalledWith(1, {
+      name: "Sonarr",
+      base_url: "http://192.0.2.10:5099",
+      downloaded_scan_enabled: true,
+    });
+  });
+
+  it("never sends downloaded_scan_enabled when editing a Deluno connection", async () => {
+    const update = vi
+      .spyOn(api, "updateMediaManagerConnection")
+      .mockResolvedValue(connection());
+
+    render(<ConnectionEditForm connection={connection()} onClose={vi.fn()} />, {
+      wrapper,
+    });
+
+    fireEvent.change(screen.getByTestId("media-manager-edit-name"), {
+      target: { value: "Deluno 2" },
+    });
+    fireEvent.click(screen.getByTestId("media-manager-edit-save"));
+
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    expect(update).toHaveBeenCalledWith(1, {
+      name: "Deluno 2",
+      base_url: "http://192.0.2.10:5099",
+    });
   });
 
   it("asks before dropping an edited field", async () => {

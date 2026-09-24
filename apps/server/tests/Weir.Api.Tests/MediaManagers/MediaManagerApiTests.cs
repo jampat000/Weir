@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
+using Weir.Core.Configuration;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Api.Tests.Platform;
 using static Weir.Api.Tests.Platform.ApiTestClient;
@@ -80,7 +82,7 @@ public sealed class MediaManagerApiTests
         await using var _server = server;
         var row = await CreateAsync(client);
         Assert.Equal(
-            """{"id":1,"kind":"deluno","name":"Deluno","enabled":true,"base_url":"http://192.0.2.10:5099","api_key_is_saved":true,"webhook_secret_is_set":false,"webhook_url_path":"/api/v1/intake/webhook/deluno","unsigned_webhook_warning":"This connection accepts webhooks without a secret. Create a secret and add it to Deluno.","last_test_ok":null,"last_test_at":null,"last_test_detail":null,"lanes":[{"lane":"missing","enabled":false,"max_items_per_run":50,"retry_delay_minutes":1440,"schedule_enabled":false,"schedule_days":"","schedule_start":"00:00","schedule_end":"23:59","schedule_interval_seconds":3600},{"lane":"upgrade","enabled":false,"max_items_per_run":50,"retry_delay_minutes":1440,"schedule_enabled":false,"schedule_days":"","schedule_start":"00:00","schedule_end":"23:59","schedule_interval_seconds":3600}]}""",
+            """{"id":1,"kind":"deluno","name":"Deluno","enabled":true,"base_url":"http://192.0.2.10:5099","api_key_is_saved":true,"webhook_secret_is_set":false,"webhook_url_path":"/api/v1/intake/webhook/deluno","unsigned_webhook_warning":"This connection accepts webhooks without a secret. Create a secret and add it to Deluno.","last_test_ok":null,"last_test_at":null,"last_test_detail":null,"downloaded_scan_enabled":false,"lanes":[{"lane":"missing","enabled":false,"max_items_per_run":50,"retry_delay_minutes":1440,"schedule_enabled":false,"schedule_days":"","schedule_start":"00:00","schedule_end":"23:59","schedule_interval_seconds":3600},{"lane":"upgrade","enabled":false,"max_items_per_run":50,"retry_delay_minutes":1440,"schedule_enabled":false,"schedule_days":"","schedule_start":"00:00","schedule_end":"23:59","schedule_interval_seconds":3600}]}""",
             row.ToJsonString());
         await CreateAsync(client, "radarr", "Radarr", "http://192.0.2.20:7878");
 
@@ -388,7 +390,9 @@ public sealed class MediaManagerApiTests
             Assert.Equal((HttpStatusCode.Unauthorized, "Invalid or missing X-Webhook-Secret header."), (noSecret.StatusCode, await Detail(noSecret)));
         }
 
-        Assert.Equal("""{"capabilities":["handoff-status","handoff-cancel","handoff-outcome","handoff-outcome-codes"]}""", await (await manager.GetAsync("/api/v1/intake/capabilities", secret)).Content.ReadAsStringAsync());
+        Assert.Equal(
+            """{"capabilities":["handoff-status","handoff-cancel","handoff-outcome","handoff-outcome-codes","library-folders"]}""",
+            await (await manager.GetAsync("/api/v1/intake/capabilities", secret)).Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.NotFound, (await manager.GetAsync("/api/v1/intake/handoffs/deluno/h1", secret)).StatusCode);
         Assert.Equal("Unknown media manager source 'plex'.", await Detail(await manager.GetAsync("/api/v1/intake/handoffs/plex/h1", secret)));
 
@@ -415,6 +419,72 @@ public sealed class MediaManagerApiTests
         Assert.Equal("cancelled", (await Json(await manager.GetAsync("/api/v1/intake/handoffs/deluno/h1", secret)))["state"]!.GetValue<string>());
         using var again = await manager.SendAsync(HttpMethod.Delete, "/api/v1/intake/handoffs/deluno/h1", headers: secret);
         Assert.Equal((HttpStatusCode.Conflict, "This hand-off is cancelled, so Weir did not cancel it."), (again.StatusCode, await Detail(again)));
+    }
+
+    /// <summary>
+    /// <c>GET /intake/library-folders</c> (#768): every enabled library's watched, work and output folders, so a
+    /// manager reads them instead of a person retyping them; a disabled library is left out, and the route needs
+    /// the same webhook secret as the rest of the intake surface.
+    /// </summary>
+    [Fact]
+    public async Task Library_folders_are_published_to_an_authenticated_manager()
+    {
+        var (server, admin, _) = await StartAsync(("WEIR_MEDIA_MANAGER_WEBHOOK_SECRET", "s3cret"));
+        await using var _server = server;
+        var secret = new Dictionary<string, string> { ["X-Webhook-Secret"] = "s3cret" };
+
+        // A fresh database seeds a Movies and a TV library; give the movie one folders to publish and disable the
+        // TV one, so the published list is exactly one library.
+        await TestDatabase.ExecuteAsync(
+            server,
+            "UPDATE libraries SET watched_folder = $w, work_folder = $k, output_folder = $o WHERE media_type = 'movie'",
+            ("$w", "/media/movies/watched"),
+            ("$k", "/media/movies/work"),
+            ("$o", "/media/movies/output"));
+        await TestDatabase.ExecuteAsync(server, "UPDATE libraries SET enabled = 0 WHERE media_type = 'tv'");
+        var movieId = await TestDatabase.ScalarAsync(server, "SELECT id FROM libraries WHERE media_type = 'movie'");
+
+        using (var unauthenticated = await admin.GetAsync("/api/v1/intake/library-folders"))
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, unauthenticated.StatusCode);
+        }
+
+        using var authenticated = await admin.GetAsync("/api/v1/intake/library-folders", secret);
+        Assert.Equal(HttpStatusCode.OK, authenticated.StatusCode);
+        var body = (await Json(authenticated))!;
+        var library = Assert.Single(body["libraries"]!.AsArray())!;
+        Assert.Equal(movieId, library["id"]!.GetValue<long>());
+        Assert.Equal("Movies", library["name"]!.GetValue<string>());
+        Assert.Equal("movie", library["media_type"]!.GetValue<string>());
+        Assert.Equal("/media/movies/watched", library["watched_folder"]!.GetValue<string>());
+        Assert.Equal("/media/movies/work", library["work_folder"]!.GetValue<string>());
+        Assert.Equal("/media/movies/output", library["output_folder"]!.GetValue<string>());
+    }
+
+    /// <summary>
+    /// A library's <c>work_folder</c> column is blank whenever it uses Weir's own default (most libraries never set
+    /// one), so the published folder must be the effective default, the same one <c>ProcessingLibraryFolders</c> and
+    /// the folder-chain check resolve — not the blank column value.
+    /// </summary>
+    [Fact]
+    public async Task A_librarys_default_work_folder_is_published_resolved_not_blank()
+    {
+        var (server, admin, _) = await StartAsync(("WEIR_MEDIA_MANAGER_WEBHOOK_SECRET", "s3cret"));
+        await using var _server = server;
+        var secret = new Dictionary<string, string> { ["X-Webhook-Secret"] = "s3cret" };
+        await TestDatabase.ExecuteAsync(
+            server,
+            "UPDATE libraries SET watched_folder = $w, work_folder = '', output_folder = $o WHERE media_type = 'movie'",
+            ("$w", "/media/movies/watched"),
+            ("$o", "/media/movies/output"));
+        await TestDatabase.ExecuteAsync(server, "UPDATE libraries SET enabled = 0 WHERE media_type = 'tv'");
+        var weirHome = server.Services.GetRequiredService<WeirOptions>().WeirHome;
+
+        using var response = await admin.GetAsync("/api/v1/intake/library-folders", secret);
+
+        var library = Assert.Single((await Json(response))!["libraries"]!.AsArray())!;
+        Assert.Equal(ProcessingLibraryFolders.DefaultMovieWorkFolder(weirHome), library["work_folder"]!.GetValue<string>());
+        Assert.NotEqual(string.Empty, library["work_folder"]!.GetValue<string>());
     }
 
     /// <summary>

@@ -111,6 +111,8 @@ public sealed class SchemaMigrator
         new(19, "0054_handoff_targets", "Weir.Infrastructure.Migrations.0019_handoff_targets.sql"),
         new(20, "0055_library_file_probes", "Weir.Infrastructure.Migrations.0020_library_file_probes.sql"),
         new(21, "0056_keep_original_after_clean", "Weir.Infrastructure.Migrations.0021_keep_original_after_clean.sql"),
+        new(22, "0057_downloaded_scan_setting", "Weir.Infrastructure.Migrations.0022_downloaded_scan_setting.sql"),
+        new(23, "0058_download_client_connections", "Weir.Infrastructure.Migrations.0023_download_client_connections.sql"),
     ];
 
     /// <summary>

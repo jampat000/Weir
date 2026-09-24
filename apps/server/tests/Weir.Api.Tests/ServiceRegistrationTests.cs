@@ -16,7 +16,8 @@ namespace Weir.Api.Tests;
 public sealed class ServiceRegistrationTests
 {
     /// <summary>Services several parts register on purpose; every one of them is used.</summary>
-    private static readonly HashSet<Type> RegisteredManyTimesByDesign = [typeof(IPeriodicTask), typeof(IPeriodicEnqueuer), typeof(IJobHandler)];
+    private static readonly HashSet<Type> RegisteredManyTimesByDesign =
+        [typeof(IPeriodicTask), typeof(IPeriodicEnqueuer), typeof(IJobHandler), typeof(IDownloadClientPort)];
 
     [Fact]
     public async Task Removed_track_history_is_kept_in_the_database()

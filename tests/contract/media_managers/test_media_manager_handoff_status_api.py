@@ -49,11 +49,17 @@ def test_a_wrong_or_missing_secret_is_refused(server: ServerUnderTest) -> None:
     assert wrong.status_code == 401
 
 
-def test_capabilities_name_both_abilities(server: ServerUnderTest) -> None:
+def test_capabilities_name_every_ability(server: ServerUnderTest) -> None:
     response = httpx.get(f"{server.base_url}{API}/intake/capabilities", headers=SECRET, timeout=30)
     assert response.status_code == 200
     assert response.json() == {
-        "capabilities": ["handoff-status", "handoff-cancel", "handoff-outcome", "handoff-outcome-codes"]
+        "capabilities": [
+            "handoff-status",
+            "handoff-cancel",
+            "handoff-outcome",
+            "handoff-outcome-codes",
+            "library-folders",
+        ]
     }
 
 

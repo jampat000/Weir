@@ -11,6 +11,7 @@ import {
 } from "../../../../lib/media-managers/queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { ConnectionEditForm } from "./connection-edit-form";
+import { ConnectionFolderChain } from "./connection-folder-chain";
 import { ConnectionSetup } from "./connection-setup";
 import {
   ConnectionStatusPanel,
@@ -176,6 +177,7 @@ export function ConnectionCard({
         ) : null}
 
         <ConnectionSetup connection={connection} secret={secret} busy={busy} />
+        <ConnectionFolderChain connectionId={connection.id} />
       </div>
     </section>
   );

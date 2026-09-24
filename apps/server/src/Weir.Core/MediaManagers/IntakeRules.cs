@@ -42,7 +42,7 @@ public static partial class IntakeRules
     /// became of a file Weir handed back (#652), and a <c>code</c> on each 409 from that report (#664).
     /// </summary>
     public static readonly IReadOnlyList<string> HandoffCapabilities =
-        ["handoff-status", "handoff-cancel", HandbackRules.OutcomeCapability, HandbackRules.OutcomeCodesCapability];
+        ["handoff-status", "handoff-cancel", HandbackRules.OutcomeCapability, HandbackRules.OutcomeCodesCapability, LibraryFolderPublishing.Capability];
 
     /// <summary>The remux job's key for a hand-off, exactly as intake writes it.</summary>
     public static string RemuxDedupeKey(string sourceKey, string handoffId) => $"{RemuxPassJobKind}:{sourceKey}:handoff:{handoffId}";

@@ -9,6 +9,7 @@ import { SaveModelNote } from "../../save-model-note";
 import { SettingsLoadError } from "../../settings-load-error";
 import { AddConnectionForm } from "./add-connection-form";
 import { ConnectionCard } from "./connection-card";
+import { DownloadClientsSection } from "./download-clients-section";
 import { NewConnectionSecretPrompt } from "./new-connection-secret-prompt";
 
 /** Settings: the media managers that send files to Weir. */
@@ -77,6 +78,15 @@ export function MediaManagersTab() {
           </button>
         </div>
       )}
+
+      <p className="mm-quiet-note">
+        Some installs have no media manager at all — just Weir and a download
+        client. Connect one below and Weir can suggest a watched folder from it
+        too. This connection is for suggestions only: Weir only ever reads the
+        download client&apos;s own settings, never changes them, and a folder
+        you type yourself always wins.
+      </p>
+      <DownloadClientsSection />
     </div>
   );
 }

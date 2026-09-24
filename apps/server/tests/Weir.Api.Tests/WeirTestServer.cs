@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -83,6 +84,8 @@ internal sealed class WeirTestServer : IAsyncDisposable
         File.WriteAllText(Path.Join(dist, "assets", "font.woff2"), "font");
     }
 
+    private static readonly TimeSpan BreakDatabaseDeadline = TimeSpan.FromSeconds(10);
+
     /// <summary>
     /// Replace the database file with a directory, so every new connection fails.
     /// </summary>
@@ -91,15 +94,16 @@ internal sealed class WeirTestServer : IAsyncDisposable
     /// this database's own pool (<see cref="SqliteDatabase.ClearPool"/>), which is what a background timer (the
     /// manager heartbeat, library mode's schedule) holding the file open needs to actually let go of it — but a
     /// timer can still open a fresh connection at any moment after that clear, including between the delete and
-    /// the directory create below. The short retry is for that race alone, not for the stale-pooled-handle
-    /// problem <see cref="SqliteConnection.ClearAllPools"/> already removes, so it is far tighter than a blind
-    /// wait-and-hope: a handful of immediate attempts, each starting with its own clear.
+    /// the directory create below, and on Windows the delete fails for as long as that connection is in use. So
+    /// each attempt starts with its own clear and tries again at once; the deadline only bounds how long a
+    /// loaded runner may take to finish the timer's brief query, it is not a wait for anything to happen.
     /// </remarks>
     public async Task BreakDatabaseAsync()
     {
         var dbPath = Path.Join(Home, "data", "weir.sqlite3");
         var database = Services.GetRequiredService<SqliteDatabase>();
-        for (var attempt = 0; ; attempt++)
+        var deadline = Stopwatch.StartNew();
+        while (true)
         {
             database.ClearPool();
             SqliteConnection.ClearAllPools();
@@ -111,11 +115,7 @@ internal sealed class WeirTestServer : IAsyncDisposable
                 Directory.CreateDirectory(dbPath);
                 return;
             }
-            catch (IOException) when (attempt < 20)
-            {
-                await Task.Delay(10);
-            }
-            catch (UnauthorizedAccessException) when (attempt < 20)
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException && deadline.Elapsed < BreakDatabaseDeadline)
             {
                 await Task.Delay(10);
             }

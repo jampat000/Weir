@@ -28,6 +28,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
     private readonly RemuxPassRunner _runner;
     private readonly IFailurePolicy _failurePolicy;
     private readonly HandoffCompletionReporter? _reporter;
+    private readonly DownloadedScanNotifier _downloadedScan;
     private readonly ProcessingJobStore? _jobs;
     private readonly OperatorSettingsStore _operatorSettings;
     private readonly TimeProvider _time;
@@ -42,6 +43,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
         OperatorSettingsStore operatorSettings,
         TimeProvider time,
         ILogger<RemuxPassHandler> logger,
+        DownloadedScanNotifier downloadedScan,
         HandoffCompletionReporter? reporter = null,
         ProcessingJobStore? jobs = null,
         LiveProgressStore? liveProgress = null)
@@ -53,6 +55,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
         _operatorSettings = operatorSettings ?? throw new ArgumentNullException(nameof(operatorSettings));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _downloadedScan = downloadedScan ?? throw new ArgumentNullException(nameof(downloadedScan));
         _reporter = reporter;
         _jobs = jobs;
         _liveProgress = liveProgress ?? new LiveProgressStore();
@@ -213,6 +216,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
         await RecordAsync(result, progress.ActivityId).ConfigureAwait(false);
         await FinishRejectedInputCleanupAsync(result, libraryId, mediaScope).ConfigureAwait(false);
         await ReportBackAsync(payloadJson, result).ConfigureAwait(false);
+        await DownloadedScanAsync(result, mediaScope, origin).ConfigureAwait(false);
     }
 
     private static WireObject FailedPayload(long jobId, string reason) => new WireObject()

@@ -8,6 +8,7 @@ using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
+using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Tests.Media;
@@ -81,6 +82,7 @@ public sealed class KeepOriginalDownloadTests : IDisposable
             _fixture.OperatorSettings,
             TimeProvider.System,
             NullLogger<RemuxPassHandler>.Instance,
+            new DownloadedScanNotifier(_fixture.Connections, _fixture.Http, NullLogger<DownloadedScanNotifier>.Instance),
             _fixture.Reporter);
     }
 
