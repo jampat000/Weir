@@ -55,6 +55,7 @@ public sealed class RemuxPassHandlerTests : IDisposable
             _fixture.Store.Options,
             runner,
             policy ?? new QueueingFailurePolicy(_fixture.Jobs),
+            _fixture.OperatorSettings,
             TimeProvider.System,
             NullLogger<RemuxPassHandler>.Instance,
             _fixture.Reporter,

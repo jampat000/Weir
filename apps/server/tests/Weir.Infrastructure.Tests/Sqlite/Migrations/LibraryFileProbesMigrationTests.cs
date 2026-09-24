@@ -46,7 +46,7 @@ public sealed class LibraryFileProbesMigrationTests : IDisposable
         Upgrade();
 
         await using var uow = await UnitOfWork.OpenAsync(_database);
-        var files = (await LibraryScanStore.CurrentFilesAsync(uow, 1)).ToDictionary(file => file.Path);
+        var files = (await new LibraryScanStore().CurrentFilesAsync(uow, 1)).ToDictionary(file => file.Path);
         Assert.Equal(FilmProbe, files["/lib/film.mkv"].ProbeJson);
         Assert.Null(files["/lib/unread.mkv"].ProbeJson);
         Assert.Equal(1L, Scalar("SELECT count(*) FROM library_file_probes"));

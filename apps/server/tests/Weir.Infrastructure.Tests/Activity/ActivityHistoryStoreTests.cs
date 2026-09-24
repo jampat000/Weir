@@ -156,17 +156,20 @@ public sealed class ActivityHistoryStoreTests
         db.Execute(
             "INSERT INTO file_logs (relative_path, recorded_at) VALUES ('old.mkv', '2026-03-01 11:59:59.000000'), ('edge.mkv', '2026-03-03 12:00:00.000000'), ('new.mkv', '2026-05-31 00:00:00')");
 
+        var operatorSettings = new OperatorSettingsStore();
+        var fileLogs = new FileLogStore();
+
         async Task<int> PruneOnceAsync(DateTimeOffset moment)
         {
             long retentionDays;
             var uow = await UnitOfWork.OpenAsync(db.Database);
             await using (uow)
             {
-                retentionDays = (await OperatorSettingsStore.EnsureAsync(uow)).FileLogRetentionDays;
+                retentionDays = (await operatorSettings.EnsureAsync(uow)).FileLogRetentionDays;
                 await uow.CommitAsync();
             }
 
-            return await FileLogStore.PruneAsync(db.Database, retentionDays, moment);
+            return await fileLogs.PruneAsync(db.Database, retentionDays, moment);
         }
 
         db.Execute("UPDATE operator_settings SET file_log_retention_days = 0");

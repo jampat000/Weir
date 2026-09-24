@@ -23,6 +23,9 @@ public sealed class JobPayloadMigrationTests : IDisposable
 {
     private readonly TempDirectory _temp = new();
     private readonly SqliteDatabase _database;
+    private readonly LibrarySettingsStore _librarySettings = new();
+    private readonly LibraryScanStore _scans = new();
+    private readonly FileLogStore _fileLogs = new();
 
     public JobPayloadMigrationTests()
     {
@@ -129,7 +132,7 @@ public sealed class JobPayloadMigrationTests : IDisposable
         Upgrade();
 
         await using var uow = await UnitOfWork.OpenAsync(_database);
-        var settings = await LibrarySettingsStore.GetAsync(uow, 1);
+        var settings = await _librarySettings.GetAsync(uow, 1);
         Assert.Equal(["/lib/a", "/lib/b"], settings.Folders);
         Assert.True(settings.ScheduleEnabled);
         Assert.True(settings.CleanHardlinkedFiles);
@@ -146,7 +149,7 @@ public sealed class JobPayloadMigrationTests : IDisposable
         Upgrade();
 
         await using var uow = await UnitOfWork.OpenAsync(_database);
-        var settings = await LibrarySettingsStore.GetAsync(uow, 1);
+        var settings = await _librarySettings.GetAsync(uow, 1);
         Assert.Empty(settings.Folders);
         Assert.False(settings.ScheduleEnabled);
         Assert.False(settings.CleanHardlinkedFiles);
@@ -174,11 +177,11 @@ public sealed class JobPayloadMigrationTests : IDisposable
         Upgrade();
 
         await using var uow = await UnitOfWork.OpenAsync(_database);
-        var outcome = await LibraryScanStore.OutcomeAsync(uow, 1, await LibraryScanStore.LatestAsync(uow, 1), NullLogger.Instance);
+        var outcome = await _scans.OutcomeAsync(uow, 1, await _scans.LatestAsync(uow, 1), NullLogger.Instance);
         Assert.NotNull(outcome);
         Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1700000000), outcome!.GeneratedAt);
         Assert.Equal(["Weir could not ask Sonarr which titles it manages: timed out"], outcome.Errors);
-        var file = Assert.Single(await LibraryScanStore.CurrentFilesAsync(uow, 1));
+        var file = Assert.Single(await _scans.CurrentFilesAsync(uow, 1));
         Assert.Equal("Movie/film.mkv", file.Path);
         Assert.Equal(123, file.SizeBytes);
         Assert.Equal(456, file.ModifiedTimeUnixSeconds);
@@ -292,15 +295,15 @@ public sealed class JobPayloadMigrationTests : IDisposable
         // row, is due for pruning.
         var jobStore = new ProcessingJobStore(_database, TimeProvider.System);
         await JobRowsRetention.RunTickAsync(jobStore, jobRowsRetentionDays: 0, DateTimeOffset.UtcNow);
-        await FileLogStore.PruneAsync(_database, retentionDays: 0, DateTimeOffset.UtcNow);
+        await _fileLogs.PruneAsync(_database, retentionDays: 0, DateTimeOffset.UtcNow);
 
         // The scan job row (a job's own bookkeeping) may now be gone, but the file index it produced is not.
         await using var uow = await UnitOfWork.OpenAsync(_database);
-        var settings = await LibrarySettingsStore.GetAsync(uow, 1);
+        var settings = await _librarySettings.GetAsync(uow, 1);
         Assert.Equal(["/lib/a"], settings.Folders);
         Assert.True(settings.ScheduleEnabled);
 
-        Assert.Equal("A.mkv", Assert.Single(await LibraryScanStore.CurrentFilesAsync(uow, 1)).Path);
+        Assert.Equal("A.mkv", Assert.Single(await _scans.CurrentFilesAsync(uow, 1)).Path);
 
         var removedTrackStore = new FileLogRemovedTrackStore(_database, TimeProvider.System);
         var tracks = await removedTrackStore.GetAsync(new RemovedTrackFileKey(1, "A.mkv"));

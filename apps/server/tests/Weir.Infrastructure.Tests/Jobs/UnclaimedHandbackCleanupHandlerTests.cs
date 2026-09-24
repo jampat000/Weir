@@ -15,6 +15,7 @@ public sealed class UnclaimedHandbackCleanupHandlerTests : IDisposable
 {
     private readonly StoreFixture _store = new();
     private readonly ProcessingJobStore _jobs;
+    private readonly OperatorSettingsStore _operatorSettings = new();
     private readonly UnclaimedHandbackCleanupHandler _handler;
     private readonly string _watched;
     private readonly string _output;
@@ -23,7 +24,7 @@ public sealed class UnclaimedHandbackCleanupHandlerTests : IDisposable
     {
         _store.Clock.Set(DateTimeOffset.UtcNow);
         _jobs = new ProcessingJobStore(_store.Database, _store.Clock);
-        _handler = new UnclaimedHandbackCleanupHandler(_jobs, _store.Clock, NullLogger<UnclaimedHandbackCleanupHandler>.Instance);
+        _handler = new UnclaimedHandbackCleanupHandler(_jobs, _operatorSettings, _store.Clock, NullLogger<UnclaimedHandbackCleanupHandler>.Instance);
         _watched = _store.Home.Join("downloads");
         _output = _store.Home.Join("hand-back");
         Directory.CreateDirectory(_watched);
@@ -66,7 +67,7 @@ public sealed class UnclaimedHandbackCleanupHandlerTests : IDisposable
         Assert.False(await enqueuer.IsEnabledAsync(CancellationToken.None));
         Assert.Equal(TimeSpan.FromHours(6), await enqueuer.IntervalAsync(CancellationToken.None));
 
-        await _store.WithUnitOfWork(uow => OperatorSettingsStore.EnsureAsync(uow));
+        await _store.WithUnitOfWork(uow => _operatorSettings.EnsureAsync(uow));
         Assert.False(await enqueuer.IsEnabledAsync(CancellationToken.None));
         Assert.Equal(14, await _store.Scalar("SELECT unclaimed_handback_window_days FROM operator_settings WHERE id = 1"));
 
@@ -123,7 +124,7 @@ public sealed class UnclaimedHandbackCleanupHandlerTests : IDisposable
     {
         var library = await LibraryAsync();
         var copy = await HandedBackAsync(library, "Film/film.mkv", daysAgo: 5);
-        await _store.WithUnitOfWork(uow => OperatorSettingsStore.EnsureAsync(uow));
+        await _store.WithUnitOfWork(uow => _operatorSettings.EnsureAsync(uow));
 
         await RunAsync();
         Assert.True(File.Exists(copy));

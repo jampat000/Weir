@@ -14,6 +14,8 @@ namespace Weir.Infrastructure.Tests.LibraryMode;
 public sealed class LibraryViewStoreTests : IDisposable
 {
     private readonly StoreFixture _store = new();
+    private readonly LibraryViewStore _libraryView = new();
+    private readonly LibraryScanStore _scans = new();
     private long _libraryId;
 
     public void Dispose() => _store.Dispose();
@@ -56,7 +58,7 @@ public sealed class LibraryViewStoreTests : IDisposable
                     "VALUES (@key, 'processing.library.scan.v1', '{}', 'completed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id",
                     ("@key", LibraryModeJobKinds.ScanDedupeKey(_libraryId))),
                 CultureInfo.InvariantCulture);
-            await LibraryScanStore.RecordResultAsync(
+            await _scans.RecordResultAsync(
                 uow, jobId, new LibraryScanOutcome(DateTimeOffset.UnixEpoch.AddSeconds(1_700_000_000), []), true, null);
             return 0;
         });
@@ -87,7 +89,7 @@ public sealed class LibraryViewStoreTests : IDisposable
             File("/lib/b.mkv", LibraryFileClassification.WouldChange, Probe("hevc", 2160, ("audio", "eac3", 6, "eng")), sizeBytes: 200, savedBytes: 50, removedAudio: 2),
             File("/lib/c.mkv", LibraryFileClassification.CannotProcess, "", sizeBytes: 300, problem: LibraryProblemKind.Unreadable));
 
-        var totals = await Read(uow => LibraryViewStore.TotalsAsync(uow, _libraryId));
+        var totals = await Read(uow => _libraryView.TotalsAsync(uow, _libraryId));
 
         Assert.Equal(3, totals.Files);
         Assert.Equal(600, totals.SizeBytes);
@@ -107,9 +109,9 @@ public sealed class LibraryViewStoreTests : IDisposable
             File("/lib/b.mkv", LibraryFileClassification.Matches, Probe("h264", 1080, ("audio", "aac", 2, "eng")), sizeBytes: 20),
             File("/lib/c.mkv", LibraryFileClassification.Matches, Probe("hevc", 2160, ("audio", "eac3", 6, "jpn")), sizeBytes: 30));
 
-        var codecs = await Read(uow => LibraryViewStore.BreakdownAsync(uow, _libraryId, LibraryFacets.VideoCodec));
-        var languages = await Read(uow => LibraryViewStore.BreakdownAsync(uow, _libraryId, LibraryFacets.AudioLanguage));
-        var resolutions = await Read(uow => LibraryViewStore.BreakdownAsync(uow, _libraryId, LibraryFacets.Resolution));
+        var codecs = await Read(uow => _libraryView.BreakdownAsync(uow, _libraryId, LibraryFacets.VideoCodec));
+        var languages = await Read(uow => _libraryView.BreakdownAsync(uow, _libraryId, LibraryFacets.AudioLanguage));
+        var resolutions = await Read(uow => _libraryView.BreakdownAsync(uow, _libraryId, LibraryFacets.Resolution));
 
         Assert.Equal([new LibraryBreakdownRow("h264", 2, 30), new LibraryBreakdownRow("hevc", 1, 30)], codecs);
         // "a.mkv" has two English audio tracks and still counts once.
@@ -123,7 +125,7 @@ public sealed class LibraryViewStoreTests : IDisposable
         await LibraryAsync();
         await RecordAsync(File("/lib/a.mkv", LibraryFileClassification.Matches, Probe("h264", 1080, ("audio", "aac", 2, "eng"))));
 
-        Assert.Empty(await Read(uow => LibraryViewStore.BreakdownAsync(uow, _libraryId, "path'; DROP TABLE library_files; --")));
+        Assert.Empty(await Read(uow => _libraryView.BreakdownAsync(uow, _libraryId, "path'; DROP TABLE library_files; --")));
     }
 
     [Fact]
@@ -136,8 +138,8 @@ public sealed class LibraryViewStoreTests : IDisposable
             File("/lib/c.mkv", LibraryFileClassification.Matches, Probe("hevc", 2160, ("audio", "eac3", 6, "fre")), sizeBytes: 40));
 
         var japanese = new LibraryFileQuery { Facets = [new LibraryFileFacet(LibraryFacets.AudioLanguage, "jpn")] };
-        var files = await Read(uow => LibraryViewStore.ListFilesAsync(uow, _libraryId, japanese));
-        var totals = await Read(uow => LibraryViewStore.TotalsAsync(uow, _libraryId, japanese));
+        var files = await Read(uow => _libraryView.ListFilesAsync(uow, _libraryId, japanese));
+        var totals = await Read(uow => _libraryView.TotalsAsync(uow, _libraryId, japanese));
 
         Assert.Equal(["/lib/b.mkv"], files.Select(f => f.Path));
         Assert.Equal(1, totals.Files);
@@ -153,7 +155,7 @@ public sealed class LibraryViewStoreTests : IDisposable
             File("/lib/b.mkv", LibraryFileClassification.Matches, Probe("h264", 2160, ("audio", "eac3", 6, "eng"))),
             File("/lib/c.mkv", LibraryFileClassification.Matches, Probe("hevc", 1080, ("audio", "eac3", 6, "eng"))));
 
-        var files = await Read(uow => LibraryViewStore.ListFilesAsync(uow, _libraryId, new LibraryFileQuery
+        var files = await Read(uow => _libraryView.ListFilesAsync(uow, _libraryId, new LibraryFileQuery
         {
             Facets = [new LibraryFileFacet(LibraryFacets.VideoCodec, "hevc"), new LibraryFileFacet(LibraryFacets.Resolution, "4k")],
         }));
@@ -169,8 +171,8 @@ public sealed class LibraryViewStoreTests : IDisposable
             File("/lib/blade.mkv", LibraryFileClassification.Matches, Probe("h264", 1080), managerKind: "radarr", managerTitle: "Blade Runner 2049"),
             File("/lib/arrival.mkv", LibraryFileClassification.Matches, Probe("h264", 1080)));
 
-        var byTitle = await Read(uow => LibraryViewStore.ListFilesAsync(uow, _libraryId, new LibraryFileQuery { Search = "runner" }));
-        var byPath = await Read(uow => LibraryViewStore.ListFilesAsync(uow, _libraryId, new LibraryFileQuery { Search = "arriv" }));
+        var byTitle = await Read(uow => _libraryView.ListFilesAsync(uow, _libraryId, new LibraryFileQuery { Search = "runner" }));
+        var byPath = await Read(uow => _libraryView.ListFilesAsync(uow, _libraryId, new LibraryFileQuery { Search = "arriv" }));
 
         Assert.Equal(["/lib/blade.mkv"], byTitle.Select(f => f.Path));
         Assert.Equal(["/lib/arrival.mkv"], byPath.Select(f => f.Path));
@@ -187,9 +189,9 @@ public sealed class LibraryViewStoreTests : IDisposable
             File("/lib/d.mkv", LibraryFileClassification.Matches, Probe("h264", 1080), sizeBytes: 200));
 
         var bySize = new LibraryFileQuery { Sort = "size", Descending = true, PageSize = 2 };
-        var page1 = await Read(uow => LibraryViewStore.ListFilesAsync(uow, _libraryId, bySize));
-        var page2 = await Read(uow => LibraryViewStore.ListFilesAsync(uow, _libraryId, bySize with { Page = 2 }));
-        var count = await Read(uow => LibraryViewStore.CountFilesAsync(uow, _libraryId, bySize));
+        var page1 = await Read(uow => _libraryView.ListFilesAsync(uow, _libraryId, bySize));
+        var page2 = await Read(uow => _libraryView.ListFilesAsync(uow, _libraryId, bySize with { Page = 2 }));
+        var count = await Read(uow => _libraryView.CountFilesAsync(uow, _libraryId, bySize));
 
         Assert.Equal(4, count);
         // 200 is a tie between c and d; the path tie-break keeps the two pages from overlapping.
@@ -205,7 +207,7 @@ public sealed class LibraryViewStoreTests : IDisposable
             File("/lib/b.mkv", LibraryFileClassification.Matches, Probe("h264", 1080)),
             File("/lib/a.mkv", LibraryFileClassification.Matches, Probe("h264", 1080)));
 
-        var files = await Read(uow => LibraryViewStore.ListFilesAsync(
+        var files = await Read(uow => _libraryView.ListFilesAsync(
             uow, _libraryId, new LibraryFileQuery { Sort = "size_bytes; DROP TABLE library_files" }));
 
         Assert.Equal(["/lib/a.mkv", "/lib/b.mkv"], files.Select(f => f.Path));
@@ -222,7 +224,7 @@ public sealed class LibraryViewStoreTests : IDisposable
             managerKind: "radarr",
             managerTitle: "Blade Runner 2049"));
 
-        var row = Assert.Single(await Read(uow => LibraryViewStore.ListFilesAsync(uow, _libraryId, new LibraryFileQuery())));
+        var row = Assert.Single(await Read(uow => _libraryView.ListFilesAsync(uow, _libraryId, new LibraryFileQuery())));
 
         Assert.Equal("hevc", row.VideoCodec);
         Assert.Equal("4k", row.ResolutionClass);
@@ -244,7 +246,7 @@ public sealed class LibraryViewStoreTests : IDisposable
             File("/lib/locked.mkv", LibraryFileClassification.CannotProcess, "", problem: LibraryProblemKind.NoPermission),
             File("/lib/seeding.mkv", LibraryFileClassification.WouldChange, Probe("h264", 1080, ("audio", "aac", 2, "eng")), linkCount: 2));
 
-        var groups = await Read(uow => LibraryViewStore.ProblemsAsync(uow, _libraryId, cleanHardlinkedFiles: false));
+        var groups = await Read(uow => _libraryView.ProblemsAsync(uow, _libraryId, cleanHardlinkedFiles: false));
 
         Assert.Equal(
             [LibraryProblemKind.Seeding, LibraryProblemKind.NoPermission, LibraryProblemKind.Unreadable],
@@ -273,8 +275,8 @@ public sealed class LibraryViewStoreTests : IDisposable
             File("/lib/locked.mkv", LibraryFileClassification.CannotProcess, "", problem: LibraryProblemKind.NoPermission),
             File("/lib/silent.mkv", LibraryFileClassification.CannotProcess, "", problem: LibraryProblemKind.NoAudioLeft));
 
-        var totals = await Read(uow => LibraryViewStore.TotalsAsync(uow, _libraryId));
-        var groups = await Read(uow => LibraryViewStore.ProblemsAsync(uow, _libraryId, cleanHardlinkedFiles: false));
+        var totals = await Read(uow => _libraryView.TotalsAsync(uow, _libraryId));
+        var groups = await Read(uow => _libraryView.ProblemsAsync(uow, _libraryId, cleanHardlinkedFiles: false));
         var heldBack = groups
             .Where(g => g.Kind is LibraryProblemKind.Seeding or LibraryProblemKind.ManagerRedownload)
             .Sum(g => g.Files);
@@ -287,7 +289,7 @@ public sealed class LibraryViewStoreTests : IDisposable
         var everyPath = new List<string>();
         foreach (var g in groups)
         {
-            everyPath.AddRange(await Read(uow => LibraryViewStore.PathsAsync(uow, _libraryId, LibraryViewStore.QueryFor(g.Kind))));
+            everyPath.AddRange(await Read(uow => _libraryView.PathsAsync(uow, _libraryId, _libraryView.QueryFor(g.Kind))));
         }
 
         Assert.Equal(everyPath.Count, everyPath.Distinct(StringComparer.Ordinal).Count());
@@ -300,8 +302,8 @@ public sealed class LibraryViewStoreTests : IDisposable
         await LibraryAsync();
         await RecordAsync(File("/lib/seeding.mkv", LibraryFileClassification.WouldChange, Probe("h264", 1080), linkCount: 3));
 
-        Assert.Empty(await Read(uow => LibraryViewStore.ProblemsAsync(uow, _libraryId, cleanHardlinkedFiles: true)));
-        Assert.Single(await Read(uow => LibraryViewStore.ProblemsAsync(uow, _libraryId, cleanHardlinkedFiles: false)));
+        Assert.Empty(await Read(uow => _libraryView.ProblemsAsync(uow, _libraryId, cleanHardlinkedFiles: true)));
+        Assert.Single(await Read(uow => _libraryView.ProblemsAsync(uow, _libraryId, cleanHardlinkedFiles: false)));
     }
 
     [Fact]
@@ -314,12 +316,12 @@ public sealed class LibraryViewStoreTests : IDisposable
 
         await _store.WithUnitOfWork(async uow =>
         {
-            await LibraryViewStore.RecordPreflightProblemAsync(uow, _libraryId, "/lib/risky.mkv", LibraryProblemKind.ManagerRedownload);
-            await LibraryViewStore.RecordPreflightProblemAsync(uow, _libraryId, "/lib/broken.mkv", null);
+            await _libraryView.RecordPreflightProblemAsync(uow, _libraryId, "/lib/risky.mkv", LibraryProblemKind.ManagerRedownload);
+            await _libraryView.RecordPreflightProblemAsync(uow, _libraryId, "/lib/broken.mkv", null);
             return 0;
         });
 
-        var groups = await Read(uow => LibraryViewStore.ProblemsAsync(uow, _libraryId, cleanHardlinkedFiles: false));
+        var groups = await Read(uow => _libraryView.ProblemsAsync(uow, _libraryId, cleanHardlinkedFiles: false));
 
         Assert.Equal(["/lib/risky.mkv"], Assert.Single(groups, g => g.Kind == LibraryProblemKind.ManagerRedownload).SampleFiles);
         Assert.Equal(["/lib/broken.mkv"], Assert.Single(groups, g => g.Kind == LibraryProblemKind.Unreadable).SampleFiles);
@@ -332,7 +334,7 @@ public sealed class LibraryViewStoreTests : IDisposable
         await RecordAsync(File("/lib/a.mkv", LibraryFileClassification.Matches, Probe("h264", 1080, ("audio", "aac", 2, "eng"))));
         await RecordAsync(File("/lib/a.mkv", LibraryFileClassification.Matches, Probe("hevc", 2160, ("audio", "eac3", 6, "jpn"))));
 
-        var codecs = await Read(uow => LibraryViewStore.BreakdownAsync(uow, _libraryId, LibraryFacets.VideoCodec));
+        var codecs = await Read(uow => _libraryView.BreakdownAsync(uow, _libraryId, LibraryFacets.VideoCodec));
         var orphans = await Read(uow => uow.CountAsync(
             "SELECT COUNT(*) FROM library_file_facets WHERE library_file_id NOT IN (SELECT id FROM library_files)"));
 

@@ -86,6 +86,7 @@ public sealed class HandoffScanSingleProcessingTests : IDisposable
             _fixture.Store.Options,
             runner,
             new QueueingFailurePolicy(_fixture.Jobs),
+            _fixture.OperatorSettings,
             TimeProvider.System,
             NullLogger<RemuxPassHandler>.Instance,
             _fixture.Reporter);
@@ -133,7 +134,8 @@ public sealed class HandoffScanSingleProcessingTests : IDisposable
     private async Task ScanAsync()
     {
         var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
-            _fixture.Store.Database, _fixture.Store.Clock, _fixture.Store.Options, _fixture.Jobs, _fixture.Connections, new SuiteSettingsStore(new AuthStore()));
+            _fixture.Store.Database, _fixture.Store.Clock, _fixture.Store.Options, _fixture.Jobs, _fixture.Connections,
+            new SuiteSettingsStore(new AuthStore()), _fixture.OperatorSettings);
         var payload = new WireObject()
             .Set("enqueue_remux_jobs", true)
             .Set("scan_trigger", "watcher")

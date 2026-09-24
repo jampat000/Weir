@@ -45,7 +45,8 @@ public sealed class WatchedFolderScanLockTests : IDisposable
         var cipher = new CredentialCipher(_store.Options.CredentialsSecret, _store.Options.SessionSecret, _store.Options.PreviousCredentialsSecrets, _store.Clock);
         var connections = new MediaManagerConnectionService(_store.Options, cipher, new HttpMediaManagerPorts(new FakeManagerHttp()));
         _jobs = new ProcessingJobStore(_store.Database, _store.Clock);
-        _handler = new ProcessingWatchedFolderScanDispatchJobHandler(_store.Database, _store.Clock, _store.Options, _jobs, connections, new SuiteSettingsStore(new AuthStore()));
+        _handler = new ProcessingWatchedFolderScanDispatchJobHandler(
+            _store.Database, _store.Clock, _store.Options, _jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore());
         _watched = _store.Home.Join("watch");
         _output = _store.Home.Join("out");
         Directory.CreateDirectory(_watched);

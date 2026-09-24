@@ -84,6 +84,7 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
             _fixture.Store.Options,
             runner,
             new QueueingFailurePolicy(_fixture.Jobs),
+            _fixture.OperatorSettings,
             _fixture.Store.Clock,
             NullLogger<RemuxPassHandler>.Instance,
             _fixture.Reporter,
@@ -102,7 +103,8 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     private async Task ScanAsync(string mediaType)
     {
         var scan = new ProcessingWatchedFolderScanDispatchJobHandler(
-            _fixture.Store.Database, _fixture.Store.Clock, _fixture.Store.Options, _fixture.Jobs, _fixture.Connections, new SuiteSettingsStore(new AuthStore()));
+            _fixture.Store.Database, _fixture.Store.Clock, _fixture.Store.Options, _fixture.Jobs, _fixture.Connections,
+            new SuiteSettingsStore(new AuthStore()), _fixture.OperatorSettings);
         var payload = new WireObject().Set("enqueue_remux_jobs", true).Set("scan_trigger", "watcher").Set("media_scope", mediaType).Set("library_id", _libraryId);
         var job = await _fixture.Jobs.EnqueueOrGetAsync(
             $"scan-{Guid.NewGuid():N}", ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));

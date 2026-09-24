@@ -26,6 +26,9 @@ public sealed class LibraryCleanHandlerTests : IDisposable
     private readonly MediaManagerFixture _fixture = new();
     private readonly TempDirectory _libraryFolder = new();
     private readonly FakeMediaRunner _media = new();
+    private readonly LibrarySettingsStore _librarySettings = new();
+    private readonly LibraryFileMarksStore _fileMarks = new();
+    private readonly LibraryScanStore _scans = new();
 
     public void Dispose()
     {
@@ -47,7 +50,9 @@ public sealed class LibraryCleanHandlerTests : IDisposable
         var notifier = new LibraryFileChangeNotifier(
             _fixture.Connections, _fixture.Store.Database, new SqliteActivityWriter(_fixture.Store.Database), _fixture.Store.Clock, delay: (_, _) => Task.CompletedTask);
         var removedTrackStore = new Weir.Infrastructure.Library.FileLogRemovedTrackStore(_fixture.Store.Database, _fixture.Store.Clock);
-        return new LibraryCleanHandler(_fixture.Store.Database, tools, swap, notifier, PhysicalHardlinkInspector.Instance, removedTrackStore, _fixture.Store.Clock, NullLogger<LibraryCleanHandler>.Instance);
+        return new LibraryCleanHandler(
+            _fixture.Store.Database, tools, swap, notifier, PhysicalHardlinkInspector.Instance, removedTrackStore,
+            _librarySettings, _fileMarks, _fixture.Store.Clock, NullLogger<LibraryCleanHandler>.Instance);
     }
 
     /// <summary>A library whose rule set keeps only English audio, strictly — the same policy proven in
@@ -65,11 +70,11 @@ public sealed class LibraryCleanHandlerTests : IDisposable
 
     private Task<long> EnqueueCleanAsync(long libraryId, string path, bool confirmFinalRemoval) =>
         _fixture.Store.WithUnitOfWork(async uow =>
-            (await LibraryScanStore.EnqueueCleanAsync(uow, _fixture.Jobs, libraryId, path, "manual", confirmFinalRemoval)).Id);
+            (await _scans.EnqueueCleanAsync(uow, _fixture.Jobs, libraryId, path, "manual", confirmFinalRemoval)).Id);
 
     private Task<long> EnqueueChosenCleanAsync(long libraryId, string path, ManualPlanChoice choice, long? expectedSizeBytes = null) =>
         _fixture.Store.WithUnitOfWork(async uow =>
-            (await LibraryScanStore.EnqueueCleanAsync(
+            (await _scans.EnqueueCleanAsync(
                 uow, _fixture.Jobs, libraryId, path, "manual", true, ManualPlanJson.ToPyDict(choice), expectedSizeBytes)).Id);
 
     /// <summary>Keep exactly these input indices, in this order: the video first, and the track after it as default.</summary>
@@ -204,7 +209,7 @@ public sealed class LibraryCleanHandlerTests : IDisposable
         var library = await LibraryAsync();
         await _fixture.Db(async uow =>
         {
-            await LibrarySettingsStore.SetAsync(
+            await _librarySettings.SetAsync(
                 uow, library, new LibrarySettings([_libraryFolder.Path], ScheduleEnabled: false, KeepOriginalAfterClean: true));
             return 0;
         });
@@ -324,7 +329,7 @@ public sealed class LibraryCleanHandlerTests : IDisposable
         var jobId = await EnqueueCleanAsync(library, path, confirmFinalRemoval: true);
         await _fixture.Db(async uow =>
         {
-            await LibraryFileMarksStore.SetLeaveAloneAsync(uow, library, path, leaveAlone: true, _fixture.Store.Clock.GetUtcNow());
+            await _fileMarks.SetLeaveAloneAsync(uow, library, path, leaveAlone: true, _fixture.Store.Clock.GetUtcNow());
             return 0;
         });
         await RunCleanAsync(jobId);
@@ -347,7 +352,7 @@ public sealed class LibraryCleanHandlerTests : IDisposable
         var jobId = await EnqueueCleanAsync(library, path, confirmFinalRemoval: true);
         await RunCleanAsync(jobId);
 
-        var mark = await _fixture.Db(uow => LibraryFileMarksStore.FindAsync(uow, library, path));
+        var mark = await _fixture.Db(uow => _fileMarks.FindAsync(uow, library, path));
         Assert.NotNull(mark);
         Assert.NotNull(mark!.CleanedAt);
         Assert.False(mark.LeaveAlone);
