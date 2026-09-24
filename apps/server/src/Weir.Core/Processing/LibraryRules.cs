@@ -29,10 +29,10 @@ public sealed record ProcessingLibraryInput
     public long MaxFileSizeMb { get; init; }
     public string RejectedFileAction { get; init; } = "leave";
     public long MinFileAgeSeconds { get; init; } = 60;
-    public Time.PyDateTime? CreatedAfter { get; init; }
-    public Time.PyDateTime? CreatedBefore { get; init; }
-    public Time.PyDateTime? ModifiedAfter { get; init; }
-    public Time.PyDateTime? ModifiedBefore { get; init; }
+    public Time.Timestamp? CreatedAfter { get; init; }
+    public Time.Timestamp? CreatedBefore { get; init; }
+    public Time.Timestamp? ModifiedAfter { get; init; }
+    public Time.Timestamp? ModifiedBefore { get; init; }
     public bool ExcludeHidden { get; init; } = true;
     public bool TopLevelOnly { get; init; }
     public string SidecarPatternsCsv { get; init; } = ".srt,.ass,.ssa,.sub,.idx,.vtt,.nfo,.jpg,.png";

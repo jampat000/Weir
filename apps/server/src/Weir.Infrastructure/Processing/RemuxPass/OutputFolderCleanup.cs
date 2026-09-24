@@ -29,8 +29,8 @@ public sealed partial class OutputFolderCleanup
     /// <summary>A stable posix path for comparing job payloads.</summary>
     public static string NormalizeRelativeForMatch(string rel)
     {
-        var parts = PyStrings.Strip(rel ?? string.Empty).Replace('\\', '/').Split('/').Where(part => part is not ("." or "")).ToList();
-        if (rel is not null && PyStrings.Strip(rel).Replace('\\', '/').StartsWith('/'))
+        var parts = WireStrings.Strip(rel ?? string.Empty).Replace('\\', '/').Split('/').Where(part => part is not ("." or "")).ToList();
+        if (rel is not null && WireStrings.Strip(rel).Replace('\\', '/').StartsWith('/'))
         {
             return "/" + string.Join('/', parts);
         }
@@ -39,7 +39,7 @@ public sealed partial class OutputFolderCleanup
     }
 
     /// <summary>Deletes the movie's output folder after a successful pass when every cleanup gate allows it.</summary>
-    public async Task RunMovieAsync(PyDict output, ProcessingPathRuntime runtime, string watchedRoot, string source, string? finalOutputFile, string relativeMediaPath, long? currentJobId, string mediaScope, HandoffOrigin? origin, CancellationToken cancellationToken)
+    public async Task RunMovieAsync(WireObject output, ProcessingPathRuntime runtime, string watchedRoot, string source, string? finalOutputFile, string relativeMediaPath, long? currentJobId, string mediaScope, HandoffOrigin? origin, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(runtime);
@@ -93,7 +93,7 @@ public sealed partial class OutputFolderCleanup
     }
 
     /// <summary>Deletes the episode's output season folder after a successful pass when every cleanup gate allows it.</summary>
-    public async Task RunTvAsync(PyDict output, ProcessingPathRuntime runtime, string watchedRoot, string source, string? finalOutputFile, long? currentJobId, string mediaScope, HandoffOrigin? origin, CancellationToken cancellationToken)
+    public async Task RunTvAsync(WireObject output, ProcessingPathRuntime runtime, string watchedRoot, string source, string? finalOutputFile, long? currentJobId, string mediaScope, HandoffOrigin? origin, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(runtime);

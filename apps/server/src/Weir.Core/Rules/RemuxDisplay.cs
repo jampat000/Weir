@@ -61,14 +61,14 @@ public static class RemuxDisplay
     public static string LangDisplay(string? code)
     {
         var c = RemuxRules.NormalizeLang(code ?? string.Empty);
-        return c.Length == 0 ? Dash : Label(c) ?? Py.Upper(c);
+        return c.Length == 0 ? Dash : Label(c) ?? RulesJson.Upper(c);
     }
 
     /// <summary>As <see cref="LangDisplay"/>, but empty for no code.</summary>
     public static string LangDisplayOrBlank(string? code)
     {
         var c = RemuxRules.NormalizeLang(code ?? string.Empty);
-        return c.Length == 0 ? string.Empty : Label(c) ?? Py.Upper(c);
+        return c.Length == 0 ? string.Empty : Label(c) ?? RulesJson.Upper(c);
     }
 
     /// <summary>The {channels} placeholder in <see cref="TrackNaming"/>: the same 2.0/5.1/7.1 label as the track lines.</summary>
@@ -89,7 +89,7 @@ public static class RemuxDisplay
 
     private static string CodecLabel(string codecName)
     {
-        var c = Py.Lower(PyStrings.Strip(codecName));
+        var c = RulesJson.Lower(WireStrings.Strip(codecName));
         return c switch
         {
             "" => string.Empty,
@@ -103,7 +103,7 @@ public static class RemuxDisplay
             "vorbis" => "Vorbis",
             "pcm_s16le" or "pcm_s24le" or "pcm_s32le" => "PCM",
             "mp3" => "MP3",
-            _ => Py.Upper(c.Replace("_", " ", StringComparison.Ordinal)),
+            _ => RulesJson.Upper(c.Replace("_", " ", StringComparison.Ordinal)),
         };
     }
 
@@ -117,8 +117,8 @@ public static class RemuxDisplay
     {
         ArgumentNullException.ThrowIfNull(stream);
         var lang = LangDisplayOrBlank(stream.Tag("language"));
-        var channels = Py.Truthy(stream.Get("channels")) ? Py.Int(stream.Get("channels")) : 0;
-        var codec = CodecLabel(Py.StrOr(stream.Get("codec_name"), string.Empty));
+        var channels = RulesJson.Truthy(stream.Get("channels")) ? RulesJson.Int(stream.Get("channels")) : 0;
+        var codec = CodecLabel(RulesJson.StrOr(stream.Get("codec_name"), string.Empty));
         return JoinParts(lang, ChannelLayoutLabel(channels), codec);
     }
 
@@ -132,8 +132,8 @@ public static class RemuxDisplay
     {
         ArgumentNullException.ThrowIfNull(lines);
         var cleaned = lines
-            .Where(x => PyStrings.Strip(x ?? string.Empty).Length > 0 && PyStrings.Strip(x!) != Dash)
-            .Select(x => PyStrings.Strip(x!))
+            .Where(x => WireStrings.Strip(x ?? string.Empty).Length > 0 && WireStrings.Strip(x!) != Dash)
+            .Select(x => WireStrings.Strip(x!))
             .ToList();
         return cleaned.Count > 0 ? string.Join(" · ", cleaned) : Dash;
     }

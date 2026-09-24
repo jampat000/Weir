@@ -32,9 +32,9 @@ public sealed partial class RemuxPassRunner
     }
 
     /// <summary>The result of a pass that failed before execution.</summary>
-    public static PyDict FailBefore(string relativeMediaPath, string reason, string? inspectedSourcePath = null, PyDict? extra = null)
+    public static WireObject FailBefore(string relativeMediaPath, string reason, string? inspectedSourcePath = null, WireObject? extra = null)
     {
-        var result = new PyDict()
+        var result = new WireObject()
             .Set("ok", false)
             .Set("outcome", RemuxPassOutcomes.FailedBeforeExecution)
             .Set("preflight_status", "failed")
@@ -61,9 +61,9 @@ public sealed partial class RemuxPassRunner
     public const string UnreadableWait = "unreadable";
 
     /// <summary>The result of a source that is not ready yet: an expected wait, not a failure.</summary>
-    public static PyDict SourceNotReady(string relativeMediaPath, string reason, string? inspectedSourcePath = null)
+    public static WireObject SourceNotReady(string relativeMediaPath, string reason, string? inspectedSourcePath = null)
     {
-        var result = new PyDict()
+        var result = new WireObject()
             .Set("ok", false)
             .Set("outcome", RemuxPassOutcomes.SourceNotReady)
             .Set("retryable_wait", true)
@@ -80,10 +80,10 @@ public sealed partial class RemuxPassRunner
     }
 
     /// <summary>The result of a pass a guardrail skipped.</summary>
-    public static PyDict SkipGuardrail(string relativeMediaPath, string reason, string guardrail, string? inspectedSourcePath, PyDict extra)
+    public static WireObject SkipGuardrail(string relativeMediaPath, string reason, string guardrail, string? inspectedSourcePath, WireObject extra)
     {
         ArgumentNullException.ThrowIfNull(extra);
-        var result = new PyDict()
+        var result = new WireObject()
             .Set("ok", true)
             .Set("outcome", RemuxPassOutcomes.SkippedGuardrail)
             .Set("preflight_status", "skipped")
@@ -104,7 +104,7 @@ public sealed partial class RemuxPassRunner
         return result;
     }
 
-    private static PyList StringList(IEnumerable<string> values) => new(values.Select(value => (PyJson)new PyStr(value)));
+    private static WireArray StringList(IEnumerable<string> values) => new(values.Select(value => (WireValue)new WireString(value)));
 
-    private static PyJson NullableFloat(double? value) => value is { } v ? new PyFloat(v) : PyNull.Instance;
+    private static WireValue NullableFloat(double? value) => value is { } v ? new WireNumber(v) : WireNull.Instance;
 }

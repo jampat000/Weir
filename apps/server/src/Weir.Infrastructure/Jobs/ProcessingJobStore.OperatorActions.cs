@@ -37,7 +37,7 @@ public sealed partial class ProcessingJobStore
                     transaction,
                     "UPDATE jobs SET last_error = @error, status = @status, lease_owner = NULL, lease_expires_at = NULL, " +
                     "updated_at = CURRENT_TIMESTAMP WHERE id = @id",
-                    ("@error", JobQueueRules.RecoveredFinalizeFailureError(job.LastError, PyDateTime.TruncateToMicroseconds(when.ToUniversalTime()), recoveredByLabel)),
+                    ("@error", JobQueueRules.RecoveredFinalizeFailureError(job.LastError, Timestamp.TruncateToMicroseconds(when.ToUniversalTime()), recoveredByLabel)),
                     ("@status", ProcessingJobStatus.Completed),
                     ("@id", jobId));
                 _metrics.RecordJobEvent(MetricsModule, "completed");

@@ -119,7 +119,7 @@ public static class LibraryFileIndexWriter
         {
             await uow.ExecuteAsync(
                 "DELETE FROM library_files WHERE id IN (SELECT value FROM json_each(@ids))",
-                ("@ids", PyJsonWriter.Dumps(new PyList(ids.Select(id => (PyJson)new PyInt(id))), PyJsonFormat.Compact))).ConfigureAwait(false);
+                ("@ids", WireJsonWriter.Dumps(new WireArray(ids.Select(id => (WireValue)new WireInteger(id))), WireJsonFormat.Compact))).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
         }
     }

@@ -30,7 +30,7 @@ public static class ProcessingRuleSetsEndpoints
         await LibraryStore.GetRuleSetAsync(uow, id).ConfigureAwait(false)
         ?? throw new ApiException(StatusCodes.Status404NotFound, "That rule set does not exist.");
 
-    private static PyDict RuleSetOut(ProcessingRuleSetRecord row, int usedByLibraryCount) => new PyDict()
+    private static WireObject RuleSetOut(ProcessingRuleSetRecord row, int usedByLibraryCount) => new WireObject()
         .Set("id", row.Id)
         .Set("name", row.Name)
         .Set("primary_audio_lang", row.PrimaryAudioLang)
@@ -61,7 +61,7 @@ public static class ProcessingRuleSetsEndpoints
         .Set("subtitle_quality_strategy", row.SubtitleQualityStrategy)
         .Set("standardize_track_names", row.StandardizeTrackNames)
         .Set("track_name_template", row.TrackNameTemplate)
-        .Set("track_name_overrides", new PyDict()
+        .Set("track_name_overrides", new WireObject()
             .Set("forced", row.TrackNameOverrides.Forced)
             .Set("hearing_impaired", row.TrackNameOverrides.HearingImpaired)
             .Set("commentary", row.TrackNameOverrides.Commentary)
@@ -69,20 +69,20 @@ public static class ProcessingRuleSetsEndpoints
         .Set("clear_video_track_names", row.ClearVideoTrackNames)
         .Set("remove_chapters", row.RemoveChapters)
         .Set("used_by_library_count", usedByLibraryCount)
-        .Set("updated_at", row.UpdatedAt.PydanticJson());
+        .Set("updated_at", row.UpdatedAt.ToWireText());
 
     private static async Task<ApiResult> GetRuleSetsAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var rows = await LibraryStore.ListRuleSetsAsync(uow).ConfigureAwait(false);
-        var items = new List<PyJson>();
+        var items = new List<WireValue>();
         foreach (var row in rows)
         {
             items.Add(RuleSetOut(row, await LibraryStore.RuleSetUsageCountAsync(uow, row.Id).ConfigureAwait(false)));
         }
 
-        return ApiRoutes.Ok(new PyList(items));
+        return ApiRoutes.Ok(new WireArray(items));
     }
 
     /// <summary>Shared with <see cref="ProcessingRulesPreviewEndpoints"/>, which validates an unsaved rules
@@ -231,7 +231,7 @@ public static class ProcessingRuleSetsEndpoints
 
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(RuleSetOut(updated, await LibraryStore.RuleSetUsageCountAsync(uow, updated.Id).ConfigureAwait(false))
-            .Set("library_rescan_job_ids", new PyList(rescanJobIds.Select(id => (PyJson)new PyInt(id)))));
+            .Set("library_rescan_job_ids", new WireArray(rescanJobIds.Select(id => (WireValue)new WireInteger(id)))));
     }
 
     private static async Task<ApiResult> DeleteRuleSetAsync(ApiRequest request)
@@ -261,7 +261,7 @@ public static class ProcessingRuleSetsEndpoints
         await request.CommitAsync().ConfigureAwait(false);
         return new CustomApiResult(context =>
         {
-            PyResponses.NoContentJson(context);
+            ApiResponses.NoContentJson(context);
             return Task.CompletedTask;
         });
     }

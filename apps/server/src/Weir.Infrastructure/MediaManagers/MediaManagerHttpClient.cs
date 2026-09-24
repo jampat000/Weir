@@ -70,7 +70,7 @@ public sealed class SocketsManagerHttpHandlerFactory : IManagerHttpHandlerFactor
 
     private SocketsHttpHandler Build(bool followRedirects, ManagerAddressPolicy policy)
     {
-        Func<PyIpAddress, bool> isAllowed = policy == ManagerAddressPolicy.Public ? OutboundAddressGuard.IsPublic : OutboundAddressGuard.IsLocalServiceAddress;
+        Func<NetAddress, bool> isAllowed = policy == ManagerAddressPolicy.Public ? OutboundAddressGuard.IsPublic : OutboundAddressGuard.IsLocalServiceAddress;
         return new SocketsHttpHandler
         {
             AllowAutoRedirect = followRedirects,
@@ -123,7 +123,7 @@ public sealed class MediaManagerHttpClient
         {
             _base = ExternalUrlPolicy.NormalizeLocalServiceBaseUrl(baseUrl);
         }
-        catch (PyValueErrorException exception)
+        catch (WireValueException exception)
         {
             throw new MediaManagerHttpException(exception.Message, exception);
         }
@@ -146,7 +146,7 @@ public sealed class MediaManagerHttpClient
     }
 
     /// <summary>GET and parse JSON. Booleans in <paramref name="parameters"/> are sent as <c>1</c>/<c>0</c>.</summary>
-    public Task<PyJson?> GetJsonAsync(string path, IReadOnlyList<KeyValuePair<string, object>>? parameters = null, CancellationToken cancellationToken = default)
+    public Task<WireValue?> GetJsonAsync(string path, IReadOnlyList<KeyValuePair<string, object>>? parameters = null, CancellationToken cancellationToken = default)
     {
         var flat = parameters?.Select(pair => new KeyValuePair<string, string>(pair.Key, pair.Value switch
         {
@@ -165,7 +165,7 @@ public sealed class MediaManagerHttpClient
     /// beyond 200/201/204 for an endpoint verified to answer differently (Deluno's file-changed answers 202
     /// Accepted, #507); every other caller accepts only those three.
     /// </summary>
-    public Task<PyJson?> PostJsonAsync(string path, PyDict body, IReadOnlyCollection<int>? acceptedStatuses = null, CancellationToken cancellationToken = default)
+    public Task<WireValue?> PostJsonAsync(string path, WireObject body, IReadOnlyCollection<int>? acceptedStatuses = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(body);
         var request = new HttpRequestMessage(HttpMethod.Post, Url(path))
@@ -194,9 +194,9 @@ public sealed class MediaManagerHttpClient
     /// <summary>A GET that only has to succeed: it throws on an unreachable manager, a bad status or a non-JSON answer.</summary>
     public Task HealthOkAsync(string path, CancellationToken cancellationToken = default) => GetJsonAsync(path, cancellationToken: cancellationToken);
 
-    private static ByteArrayContent JsonContent(PyDict body)
+    private static ByteArrayContent JsonContent(WireObject body)
     {
-        var content = new ByteArrayContent(PyJsonWriter.DumpsUtf8(body, PyJsonFormat.Default));
+        var content = new ByteArrayContent(WireJsonWriter.DumpsUtf8(body, WireJsonFormat.Default));
         content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
         return content;
     }
@@ -204,7 +204,7 @@ public sealed class MediaManagerHttpClient
     private static readonly int[] DefaultAcceptedStatuses = [200, 201, 204];
 
     /// <summary>Send the request and read the answer as JSON, classifying transport, status and parse failures.</summary>
-    private async Task<PyJson?> SendAsync(HttpRequestMessage request, bool allowEmpty, CancellationToken cancellationToken, IReadOnlyCollection<int>? acceptedStatuses = null)
+    private async Task<WireValue?> SendAsync(HttpRequestMessage request, bool allowEmpty, CancellationToken cancellationToken, IReadOnlyCollection<int>? acceptedStatuses = null)
     {
         using (request)
         {
@@ -275,9 +275,9 @@ public sealed class MediaManagerHttpClient
                 // report a plain "this is not that API" message.
                 try
                 {
-                    return PyJsonParser.Parse(new UTF8Encoding(false, true).GetString(raw));
+                    return WireJsonParser.Parse(new UTF8Encoding(false, true).GetString(raw));
                 }
-                catch (Exception exception) when (exception is PyJsonDecodeException or DecoderFallbackException)
+                catch (Exception exception) when (exception is WireJsonDecodeException or DecoderFallbackException)
                 {
                     throw new MediaManagerHttpException(
                         $"HTTP {status.ToString(CultureInfo.InvariantCulture)}: the response was not valid JSON. " +
@@ -296,7 +296,7 @@ public sealed class MediaManagerHttpClient
             return null;
         }
 
-        var text = PyStrings.Strip(raw);
+        var text = WireStrings.Strip(raw);
         if (text.Length == 0 || !double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) || double.IsNaN(seconds))
         {
             return null;

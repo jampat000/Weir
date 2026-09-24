@@ -73,11 +73,11 @@ public sealed partial class AuthService
             user.Id,
             SessionTokens.Hash(raw),
             now,
-            PyDateTime.FromUtc(SessionRules.SafeAdd(now.AsUtc, ttl)),
+            Timestamp.FromUtc(SessionRules.SafeAdd(now.AsUtc, ttl)),
             trustedDevice,
             now,
             null,
-            PyStrings.Slice(label.Length == 0 ? SessionRules.DefaultClientLabel : label, 80));
+            WireStrings.Slice(label.Length == 0 ? SessionRules.DefaultClientLabel : label, 80));
         await AuthStore.InsertSessionAsync(uow, row).ConfigureAwait(false);
         var revoked = await EnforceSessionLimitAsync(uow, user.Id).ConfigureAwait(false);
         if (revoked > 0)
@@ -124,11 +124,11 @@ public sealed partial class AuthService
     }
 
     /// <summary>Deletes sessions that are revoked, expired or idle past their timeout.</summary>
-    public Task<int> CleanupInactiveSessionsAsync(UnitOfWork uow, PyDateTime? now = null)
+    public Task<int> CleanupInactiveSessionsAsync(UnitOfWork uow, Timestamp? now = null)
     {
         var moment = now ?? Now();
-        var idleCutoff = PyDateTime.FromUtc(SessionRules.SafeSubtract(moment.AsUtc, SessionRules.Minutes(_options.SessionIdleMinutes)));
-        var trustedCutoff = PyDateTime.FromUtc(SessionRules.SafeSubtract(moment.AsUtc, SessionRules.Minutes(_options.SessionTrustedIdleMinutes)));
+        var idleCutoff = Timestamp.FromUtc(SessionRules.SafeSubtract(moment.AsUtc, SessionRules.Minutes(_options.SessionIdleMinutes)));
+        var trustedCutoff = Timestamp.FromUtc(SessionRules.SafeSubtract(moment.AsUtc, SessionRules.Minutes(_options.SessionTrustedIdleMinutes)));
         return AuthStore.DeleteInactiveSessionsAsync(uow, moment, idleCutoff, trustedCutoff);
     }
 }

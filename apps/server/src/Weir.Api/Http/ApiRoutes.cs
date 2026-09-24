@@ -43,12 +43,12 @@ public static class ApiRoutes
             }
             catch (ApiException exception)
             {
-                await PyResponses.WriteDetailAsync(context, exception).ConfigureAwait(false);
+                await ApiResponses.WriteDetailAsync(context, exception).ConfigureAwait(false);
                 return;
             }
             catch (RequestValidationException exception)
             {
-                await PyResponses.WriteValidationErrorAsync(context, exception).ConfigureAwait(false);
+                await ApiResponses.WriteValidationErrorAsync(context, exception).ConfigureAwait(false);
                 return;
             }
 
@@ -60,7 +60,7 @@ public static class ApiRoutes
                         context.Response.Headers.Append(name, value);
                     }
 
-                    await PyResponses.WriteJsonAsync(context, json.StatusCode, json.Body).ConfigureAwait(false);
+                    await ApiResponses.WriteJsonAsync(context, json.StatusCode, json.Body).ConfigureAwait(false);
                     break;
                 case CustomApiResult custom:
                     await custom.Write(context).ConfigureAwait(false);
@@ -71,5 +71,5 @@ public static class ApiRoutes
         }
     }
 
-    public static JsonApiResult Ok(Core.Json.PyJson body) => new(StatusCodes.Status200OK, body);
+    public static JsonApiResult Ok(Core.Json.WireValue body) => new(StatusCodes.Status200OK, body);
 }

@@ -113,32 +113,32 @@ public static class AuthStore
             ("$label", row.ClientLabel));
     }
 
-    public static Task<int> RevokeSessionAsync(UnitOfWork uow, string sessionHexId, PyDateTime at) =>
+    public static Task<int> RevokeSessionAsync(UnitOfWork uow, string sessionHexId, Timestamp at) =>
         Checked(uow).ExecuteAsync(
             "UPDATE user_sessions SET revoked_at=$at WHERE user_sessions.id = $id",
             ("$at", at.ToSqlite()),
             ("$id", sessionHexId));
 
-    public static Task<int> TouchSessionAsync(UnitOfWork uow, string sessionHexId, PyDateTime at) =>
+    public static Task<int> TouchSessionAsync(UnitOfWork uow, string sessionHexId, Timestamp at) =>
         Checked(uow).ExecuteAsync(
             "UPDATE user_sessions SET last_seen_at=$at WHERE user_sessions.id = $id",
             ("$at", at.ToSqlite()),
             ("$id", sessionHexId));
 
     /// <summary>Revokes every unrevoked session of the user.</summary>
-    public static Task<int> RevokeActiveSessionsForUserAsync(UnitOfWork uow, long userId, PyDateTime at) =>
+    public static Task<int> RevokeActiveSessionsForUserAsync(UnitOfWork uow, long userId, Timestamp at) =>
         Checked(uow).ExecuteAsync(
             "UPDATE user_sessions SET revoked_at=$at WHERE user_sessions.user_id = $user AND user_sessions.revoked_at IS NULL",
             ("$at", at.ToSqlite()),
             ("$user", userId));
 
-    public static Task<long> CountActiveSessionsAsync(UnitOfWork uow, long userId, PyDateTime now) =>
+    public static Task<long> CountActiveSessionsAsync(UnitOfWork uow, long userId, Timestamp now) =>
         Checked(uow).CountAsync(
             "SELECT count(*) FROM user_sessions WHERE user_sessions.user_id = $user AND user_sessions.revoked_at IS NULL AND user_sessions.absolute_expires_at > $now",
             ("$user", userId),
             ("$now", now.ToSqlite()));
 
-    public static Task<List<UserSessionRecord>> OldestActiveSessionsAsync(UnitOfWork uow, long userId, PyDateTime now, long limit) =>
+    public static Task<List<UserSessionRecord>> OldestActiveSessionsAsync(UnitOfWork uow, long userId, Timestamp now, long limit) =>
         Checked(uow).QueryAsync(
             $"SELECT {SessionColumns} FROM user_sessions WHERE user_sessions.user_id = $user AND user_sessions.revoked_at IS NULL " +
             "AND user_sessions.absolute_expires_at > $now ORDER BY user_sessions.created_at ASC, user_sessions.id ASC LIMIT $limit OFFSET 0",
@@ -148,7 +148,7 @@ public static class AuthStore
             ("$limit", limit));
 
     /// <summary>Unrevoked, unexpired sessions for the session list, newest activity first.</summary>
-    public static Task<List<UserSessionRecord>> ActiveSessionsNewestFirstAsync(UnitOfWork uow, long userId, PyDateTime now) =>
+    public static Task<List<UserSessionRecord>> ActiveSessionsNewestFirstAsync(UnitOfWork uow, long userId, Timestamp now) =>
         Checked(uow).QueryAsync(
             $"SELECT {SessionColumns} FROM user_sessions WHERE user_sessions.user_id = $user AND user_sessions.revoked_at IS NULL " +
             "AND user_sessions.absolute_expires_at > $now ORDER BY user_sessions.last_seen_at DESC, user_sessions.created_at DESC",
@@ -156,7 +156,7 @@ public static class AuthStore
             ("$user", userId),
             ("$now", now.ToSqlite()));
 
-    public static Task<List<UserSessionRecord>> ActiveSessionsAsync(UnitOfWork uow, long userId, PyDateTime now) =>
+    public static Task<List<UserSessionRecord>> ActiveSessionsAsync(UnitOfWork uow, long userId, Timestamp now) =>
         Checked(uow).QueryAsync(
             $"SELECT {SessionColumns} FROM user_sessions WHERE user_sessions.user_id = $user AND user_sessions.revoked_at IS NULL " +
             "AND user_sessions.absolute_expires_at > $now",
@@ -165,7 +165,7 @@ public static class AuthStore
             ("$now", now.ToSqlite()));
 
     /// <summary>Deletes sessions that are revoked, past their absolute expiry, or idle past their cutoff.</summary>
-    public static Task<int> DeleteInactiveSessionsAsync(UnitOfWork uow, PyDateTime now, PyDateTime idleCutoff, PyDateTime trustedIdleCutoff) =>
+    public static Task<int> DeleteInactiveSessionsAsync(UnitOfWork uow, Timestamp now, Timestamp idleCutoff, Timestamp trustedIdleCutoff) =>
         Checked(uow).ExecuteAsync(
             "DELETE FROM user_sessions WHERE user_sessions.revoked_at IS NOT NULL OR user_sessions.absolute_expires_at <= $now " +
             "OR user_sessions.is_trusted_device IS 0 AND user_sessions.last_seen_at < $idle " +

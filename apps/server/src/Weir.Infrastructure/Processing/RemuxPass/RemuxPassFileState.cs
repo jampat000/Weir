@@ -52,7 +52,7 @@ public static class RemuxPassFileState
             $"UPDATE files SET {string.Join(", ", sets)} WHERE id = $id",
             ("$status", status),
             ("$reason", reason),
-            ("$now", PythonTimestamps.Orm(now)),
+            ("$now", TimestampColumns.Orm(now)),
             ("$id", row.Id)).ConfigureAwait(false);
         return true;
     }
@@ -79,7 +79,7 @@ public static class RemuxPassFileState
             "blocked_by_connection = NULL, hold_until = NULL, updated_at = CURRENT_TIMESTAMP " +
             "WHERE library_id = $library AND relative_path = $path",
             ("$status", ProcessingFileStatuses.Rejected),
-            ("$reason", PyStrings.Slice(reason, 10000)),
+            ("$reason", WireStrings.Slice(reason, 10000)),
             ("$class", failureClass),
             ("$library", libraryId),
             ("$path", relativePath)).ConfigureAwait(false);
@@ -114,17 +114,17 @@ public static class RemuxPassFileState
             row = (await FindAsync(uow, library.Id, relativePath).ConfigureAwait(false))!;
         }
 
-        var value = PyStrings.Strip(failureClass).ToLowerInvariant();
+        var value = WireStrings.Strip(failureClass).ToLowerInvariant();
         var decision = RetryPolicy.DecideForRecordedFailure(library, value, row.FailureAttempts, row.FailureClass, now);
         await uow.ExecuteAsync(
             "UPDATE files SET status = $status, status_reason = $reason, failure_class = $class, failure_attempts = $attempts, " +
             "next_retry_at = $next, last_attempt_at = $now, updated_at = CURRENT_TIMESTAMP WHERE id = $id",
             ("$status", decision.Quarantined ? ProcessingFileStatuses.OnHold : ProcessingFileStatuses.ProcessingFailed),
-            ("$reason", PyStrings.Slice(PyStrings.Strip($"{reason} {decision.Reason}"), 10000)),
+            ("$reason", WireStrings.Slice(WireStrings.Strip($"{reason} {decision.Reason}"), 10000)),
             ("$class", value),
             ("$attempts", row.FailureAttempts + 1),
-            ("$next", decision.NextRetryAt is { } next ? PythonTimestamps.Orm(next) : null),
-            ("$now", PythonTimestamps.Orm(now)),
+            ("$next", decision.NextRetryAt is { } next ? TimestampColumns.Orm(next) : null),
+            ("$now", TimestampColumns.Orm(now)),
             ("$id", row.Id)).ConfigureAwait(false);
         return decision;
     }
@@ -157,7 +157,7 @@ public static class RemuxPassFileState
 
         await uow.ExecuteAsync(
             "UPDATE files SET status_reason = $reason, updated_at = CURRENT_TIMESTAMP WHERE id = $id",
-            ("$reason", PyStrings.Slice(PyStrings.Strip($"{row.StatusReason} {sentence}"), 10000)),
+            ("$reason", WireStrings.Slice(WireStrings.Strip($"{row.StatusReason} {sentence}"), 10000)),
             ("$id", row.Id)).ConfigureAwait(false);
     }
 
@@ -190,13 +190,13 @@ public static class RemuxPassFileState
 
         Add("video_width", facts.VideoWidth);
         Add("video_height", facts.VideoHeight);
-        Add("video_codec", facts.VideoCodec is null ? null : PyStrings.Slice(facts.VideoCodec, 64));
+        Add("video_codec", facts.VideoCodec is null ? null : WireStrings.Slice(facts.VideoCodec, 64));
         Add("audio_track_count", facts.AudioTrackCount);
         Add("subtitle_track_count", facts.SubtitleTrackCount);
         Add("duration_seconds", facts.DurationSeconds);
         Add("audio_codecs", facts.AudioCodecs is null
             ? null
-            : PyStrings.Slice(string.Join(",", facts.AudioCodecs.Where(c => PyStrings.Strip(c).Length > 0).Select(c => PyStrings.Strip(c).ToLowerInvariant())), 1000));
+            : WireStrings.Slice(string.Join(",", facts.AudioCodecs.Where(c => WireStrings.Strip(c).Length > 0).Select(c => WireStrings.Strip(c).ToLowerInvariant())), 1000));
         Add("video_bit_depth", facts.VideoBitDepth);
         if (sets.Count == 0)
         {
@@ -231,27 +231,27 @@ public static class RemuxPassFileState
     }
 
     /// <summary>Records one completed pass in the file log, bounded, beside the file and library it belongs to.</summary>
-    public static async Task RecordFileLogAsync(UnitOfWork uow, string relativePath, string title, PyDict detail, DateTimeOffset now)
+    public static async Task RecordFileLogAsync(UnitOfWork uow, string relativePath, string title, WireObject detail, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(detail);
-        PyJson payload = detail;
-        var text = PyJsonWriter.Dumps(payload, PyJsonFormat.Response);
-        if (PyStrings.Length(text) > FileLogStore.MaxDetailChars)
+        WireValue payload = detail;
+        var text = WireJsonWriter.Dumps(payload, WireJsonFormat.Response);
+        if (WireStrings.Length(text) > FileLogStore.MaxDetailChars)
         {
-            payload = new PyDict()
+            payload = new WireObject()
                 .Set("truncated", true)
                 .Set("truncated_note", $"This record was longer than {FileLogStore.MaxDetailChars.ToString(CultureInfo.InvariantCulture)} characters and was shortened when it was saved.")
-                .Set("outcome", detail.Get("outcome") ?? PyNull.Instance)
-                .Set("detail_excerpt", PyStrings.Slice(text, FileLogStore.MaxDetailChars / 2));
-            text = PyJsonWriter.Dumps(payload, PyJsonFormat.Response);
+                .Set("outcome", detail.Get("outcome") ?? WireNull.Instance)
+                .Set("detail_excerpt", WireStrings.Slice(text, FileLogStore.MaxDetailChars / 2));
+            text = WireJsonWriter.Dumps(payload, WireJsonFormat.Response);
         }
 
         var file = await uow.QuerySingleAsync(
             "SELECT f.id, l.id, l.name FROM files f LEFT JOIN libraries l ON l.id = f.library_id WHERE f.relative_path = $path ORDER BY f.id LIMIT 1",
             reader => new object?[] { reader.GetInt64(0), reader.IsDBNull(1) ? null : reader.GetInt64(1), reader.IsDBNull(2) ? null : reader.GetString(2) },
             ("$path", relativePath)).ConfigureAwait(false);
-        var outcome = detail.Get("outcome") is { IsTruthy: true } value ? PyConvert.Str(value) : string.Empty;
+        var outcome = detail.Get("outcome") is { IsTruthy: true } value ? WireConvert.Str(value) : string.Empty;
         await uow.ExecuteAsync(
             "INSERT INTO file_logs (file_id, library_id, relative_path, library_name, outcome, title, detail_json, recorded_at) " +
             "VALUES ($file, $library, $path, $name, $outcome, $title, $detail, $recorded)",
@@ -262,6 +262,6 @@ public static class RemuxPassFileState
             ("$outcome", outcome),
             ("$title", title),
             ("$detail", text),
-            ("$recorded", PythonTimestamps.Orm(now))).ConfigureAwait(false);
+            ("$recorded", TimestampColumns.Orm(now))).ConfigureAwait(false);
     }
 }

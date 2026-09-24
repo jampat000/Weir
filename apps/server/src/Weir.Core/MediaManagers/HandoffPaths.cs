@@ -16,7 +16,7 @@ public static class HandoffPaths
 {
     public static HandoffPathResult RelativeMediaPathForHandoff(string? watchedFolder, string? filePath)
     {
-        var folder = PyStrings.Strip(watchedFolder ?? string.Empty);
+        var folder = WireStrings.Strip(watchedFolder ?? string.Empty);
         if (folder.Length == 0)
         {
             return new HandoffPathResult(
@@ -24,7 +24,7 @@ public static class HandoffPaths
                 "Weir's watched folder is not set for this media scope, so there is nowhere to resolve the hand-off against.");
         }
 
-        var target = PyStrings.Strip(filePath ?? string.Empty);
+        var target = WireStrings.Strip(filePath ?? string.Empty);
         if (target.Length == 0)
         {
             return new HandoffPathResult(null, "The hand-off did not name a file path.");
@@ -32,7 +32,7 @@ public static class HandoffPaths
 
         var folderParts = Comparable(folder).Split('/').Where(p => p.Length > 0).ToList();
         var targetPartsCmp = Comparable(target).Split('/').Where(p => p.Length > 0).ToList();
-        var targetPartsRaw = PyStrings.Strip(target.Replace('\\', '/')).Split('/').Where(p => p.Length > 0).ToList();
+        var targetPartsRaw = WireStrings.Strip(target.Replace('\\', '/')).Split('/').Where(p => p.Length > 0).ToList();
 
         if (targetPartsCmp.Count <= folderParts.Count || !targetPartsCmp.Take(folderParts.Count).SequenceEqual(folderParts, StringComparer.Ordinal))
         {
@@ -52,13 +52,13 @@ public static class HandoffPaths
     private static string PosixJoin(IEnumerable<string> parts) => string.Join('/', parts.Where(p => p != "."));
 
     private static string Comparable(string part) =>
-        PyStrings.Strip(part.Replace('\\', '/')).TrimEnd('/').ToLowerInvariant();
+        WireStrings.Strip(part.Replace('\\', '/')).TrimEnd('/').ToLowerInvariant();
 
     /// <summary>
     /// Names only the file, never the full path either side gave: this can run before a caller is authenticated
     /// (an intake source with no secret configured yet), so it must not disclose the layout of Weir's own disk.
     /// </summary>
     private static string OutsideMessage(List<string> targetParts) =>
-        $"The hand-off names {PyStrings.Repr(targetParts.Count > 0 ? targetParts[^1] : string.Empty)}, which is not inside Weir's watched folder for this media type. " +
+        $"The hand-off names {WireStrings.Repr(targetParts.Count > 0 ? targetParts[^1] : string.Empty)}, which is not inside Weir's watched folder for this media type. " +
         "Point the media manager and Weir at the same folder — both hosts have to see it at that path.";
 }

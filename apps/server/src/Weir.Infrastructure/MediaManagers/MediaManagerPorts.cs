@@ -60,7 +60,7 @@ public sealed class HttpMediaManagerPort : IMediaManagerPort
         ArgumentNullException.ThrowIfNull(connection);
         var capabilities = Capabilities();
         var path = _profile.IsArr ? "/api/v3/rootfolder" : ManagerDialectRules.ExternalManifestPath;
-        PyJson? payload;
+        WireValue? payload;
         try
         {
             payload = await Client(connection, ManagerDialectRules.DescribeTimeout).GetJsonAsync(path, cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -89,7 +89,7 @@ public sealed class HttpMediaManagerPort : IMediaManagerPort
     public async Task<ManagerQueueSignal> QueueRowsAsync(ManagerConnection connection, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
-        PyJson? payload;
+        WireValue? payload;
         try
         {
             var client = Client(connection, ManagerDialectRules.QueueTimeout);
@@ -114,7 +114,7 @@ public sealed class HttpMediaManagerPort : IMediaManagerPort
         return new ManagerQueueSignal(connection, SignalStatus.Reported, rows);
     }
 
-    public async Task RemoveQueueItemAsync(ManagerConnection connection, PyDict row, CancellationToken cancellationToken = default)
+    public async Task RemoveQueueItemAsync(ManagerConnection connection, WireObject row, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(row);
@@ -124,7 +124,7 @@ public sealed class HttpMediaManagerPort : IMediaManagerPort
                 $"{connection.Label} takes a rejection through its hand-off report, not by removing a queue item.");
         }
 
-        var queueId = PyValues.FirstNumber(row, "id")
+        var queueId = ManagerValues.FirstNumber(row, "id")
             ?? throw new MediaManagerHttpException($"{connection.Label}'s queue item has no id.");
         await Client(connection, ManagerDialectRules.QueueTimeout).DeleteAsync(
             $"/api/v3/queue/{queueId.ToString(CultureInfo.InvariantCulture)}",
@@ -150,7 +150,7 @@ public sealed class HttpMediaManagerPort : IMediaManagerPort
             return new ManagerLibraryTruth(connection, SignalStatus.NoSignal, [], $"{connection.Label} does not look after this kind of library.");
         }
 
-        PyJson? payload;
+        WireValue? payload;
         try
         {
             payload = await Client(connection, ManagerDialectRules.LibraryTimeout)
@@ -195,16 +195,16 @@ public sealed class HttpMediaManagerPort : IMediaManagerPort
             // seriesId or episodeFileIds, so every series is listed first and asked for its files in turn.
             var seriesPayload = await client.GetJsonAsync("/api/v3/series", [new("pageSize", ManagerDialectRules.ArrLibraryPageSize)], cancellationToken).ConfigureAwait(false);
             var files = new List<ManagerLibraryFile>();
-            foreach (var series in PyValues.Dicts(seriesPayload))
+            foreach (var series in ManagerValues.Dicts(seriesPayload))
             {
-                if (PyValues.FirstNumber(series, "id") is not { } seriesId)
+                if (ManagerValues.FirstNumber(series, "id") is not { } seriesId)
                 {
                     continue;
                 }
 
                 var idText = seriesId.ToString(CultureInfo.InvariantCulture);
-                var title = PyValues.FirstText(series, "title") ?? idText;
-                var qualityProfileId = PyValues.FirstNumber(series, "qualityProfileId") is { } profileNumber ? (long)profileNumber : (long?)null;
+                var title = ManagerValues.FirstText(series, "title") ?? idText;
+                var qualityProfileId = ManagerValues.FirstNumber(series, "qualityProfileId") is { } profileNumber ? (long)profileNumber : (long?)null;
                 var episodePayload = await client.GetJsonAsync("/api/v3/episodefile", [new("seriesId", seriesId)], cancellationToken).ConfigureAwait(false);
                 files.AddRange(ManagerDialectRules.ArrEpisodeLibraryFiles(episodePayload, idText, title, qualityProfileId));
             }
@@ -237,7 +237,7 @@ public sealed class HttpMediaManagerPort : IMediaManagerPort
             }
 
             var (name, idProperty) = ManagerDialectRules.ArrRescanCommand(_profile.ArrScope!);
-            await client.PostJsonAsync("/api/v3/command", new PyDict().Set("name", name).Set(idProperty, id), cancellationToken: cancellationToken).ConfigureAwait(false);
+            await client.PostJsonAsync("/api/v3/command", new WireObject().Set("name", name).Set(idProperty, id), cancellationToken: cancellationToken).ConfigureAwait(false);
             return ManagerNotifyOutcome.Notified;
         }
 
@@ -246,7 +246,7 @@ public sealed class HttpMediaManagerPort : IMediaManagerPort
             return ManagerNotifyOutcome.NotSupported;
         }
 
-        var body = new PyDict().Set("path", filePath).Set("tool", "Weir");
+        var body = new WireObject().Set("path", filePath).Set("tool", "Weir");
         if (!string.IsNullOrEmpty(reason))
         {
             body.Set("reason", reason);

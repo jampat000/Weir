@@ -8,35 +8,35 @@ namespace Weir.Infrastructure.Auth;
 /// <summary>Changing a signed-in user's own credentials, and first-admin bootstrap.</summary>
 public sealed partial class AuthService
 {
-    /// <summary>Changes the username after checking the current password. Throws <see cref="PyValueErrorException"/> with the operator message.</summary>
+    /// <summary>Changes the username after checking the current password. Throws <see cref="WireValueException"/> with the operator message.</summary>
     public async Task<string> ChangeUsernameAsync(UnitOfWork uow, long userId, string currentPassword, string newUsername)
     {
         var user = await AuthStore.GetUserAsync(uow, userId).ConfigureAwait(false);
         if (user is null || !user.IsActive)
         {
-            throw new PyValueErrorException("Account is not available.");
+            throw new WireValueException("Account is not available.");
         }
 
         if (!await VerifyPasswordAsync(currentPassword, user.PasswordHash).ConfigureAwait(false))
         {
-            throw new PyValueErrorException("Current password is incorrect.");
+            throw new WireValueException("Current password is incorrect.");
         }
 
         var candidate = (newUsername ?? string.Empty).Trim();
         if (candidate.Length == 0)
         {
-            throw new PyValueErrorException("Username is required.");
+            throw new WireValueException("Username is required.");
         }
 
         if (candidate == user.Username)
         {
-            throw new PyValueErrorException("New username must be different from the current username.");
+            throw new WireValueException("New username must be different from the current username.");
         }
 
         var clash = await AuthStore.FindUserByLowerUsernameAsync(uow, candidate.ToLowerInvariant()).ConfigureAwait(false);
         if (clash is not null && clash.Id != user.Id)
         {
-            throw new PyValueErrorException("That username is already taken.");
+            throw new WireValueException("That username is already taken.");
         }
 
         await AuthStore.UpdateUsernameAsync(uow, user.Id, candidate).ConfigureAwait(false);
@@ -49,22 +49,22 @@ public sealed partial class AuthService
         var user = await AuthStore.GetUserAsync(uow, userId).ConfigureAwait(false);
         if (user is null || !user.IsActive)
         {
-            throw new PyValueErrorException("Account is not available.");
+            throw new WireValueException("Account is not available.");
         }
 
         if (!await VerifyPasswordAsync(currentPassword, user.PasswordHash).ConfigureAwait(false))
         {
-            throw new PyValueErrorException("Current password is incorrect.");
+            throw new WireValueException("Current password is incorrect.");
         }
 
         if (currentPassword == newPassword)
         {
-            throw new PyValueErrorException("New password must be different from the current password.");
+            throw new WireValueException("New password must be different from the current password.");
         }
 
         if (PasswordPolicy.Validate(newPassword, user.Username) is { } problem)
         {
-            throw new PyValueErrorException(problem);
+            throw new WireValueException(problem);
         }
 
         await AuthStore.UpdatePasswordHashAsync(uow, user.Id, PasswordHasher.Hash(newPassword)).ConfigureAwait(false);
@@ -88,7 +88,7 @@ public sealed partial class AuthService
 
         if (PasswordPolicy.Validate(password, username) is { } problem)
         {
-            throw new PyValueErrorException(problem);
+            throw new WireValueException(problem);
         }
 
         await AuthStore.DeleteAdminsAsync(uow).ConfigureAwait(false);

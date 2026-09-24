@@ -69,7 +69,7 @@ public static class StartupRecovery
         SqliteTransaction transaction,
         DateTimeOffset now)
     {
-        var when = PyDateTime.TruncateToMicroseconds(now.ToUniversalTime());
+        var when = Timestamp.TruncateToMicroseconds(now.ToUniversalTime());
         var requeued = 0;
         var failed = 0;
         var interrupted = new List<InterruptedJob>();

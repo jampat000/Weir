@@ -60,11 +60,11 @@ public sealed class TvSeasonFolderCleanup : ITvSeasonFolderCleanup
         ArgumentNullException.ThrowIfNull(context);
         var output = context.Output;
         SkippedTvSeasonFolderCleanup.InitFields(output);
-        var summary = (PyList)output.Get("tv_episode_check_summary")!;
-        var completeness = (PyDict)output.Get("tv_output_completeness_check")!;
-        var cascade = (PyList)output.Get("tv_cascade_folders_deleted")!;
+        var summary = (WireArray)output.Get("tv_episode_check_summary")!;
+        var completeness = (WireObject)output.Get("tv_output_completeness_check")!;
+        var cascade = (WireArray)output.Get("tv_cascade_folders_deleted")!;
 
-        void AddSummary(string line) => summary.Items.Add(new PyStr(line));
+        void AddSummary(string line) => summary.Items.Add(new WireString(line));
 
         var watchedResolved = RemuxPassPaths.Resolve(context.WatchedRoot);
         var srcResolved = RemuxPassPaths.Resolve(context.Source);
@@ -127,7 +127,7 @@ public sealed class TvSeasonFolderCleanup : ITvSeasonFolderCleanup
             return;
         }
 
-        var outputFolderRaw = PyStrings.Strip(context.Runtime.OutputFolder ?? string.Empty);
+        var outputFolderRaw = WireStrings.Strip(context.Runtime.OutputFolder ?? string.Empty);
         if (outputFolderRaw.Length == 0)
         {
             output.Set("tv_season_folder_skip_reason", "No TV output folder is configured, so season cleanup was skipped.");
@@ -136,11 +136,11 @@ public sealed class TvSeasonFolderCleanup : ITvSeasonFolderCleanup
         }
 
         var outDir = RemuxPassPaths.Resolve(outputFolderRaw);
-        var remuxRel = PyStrings.Strip(context.RemuxContext.Get("relative_media_path") is PyStr rmp ? rmp.Value : string.Empty);
+        var remuxRel = WireStrings.Strip(context.RemuxContext.Get("relative_media_path") is WireString rmp ? rmp.Value : string.Empty);
         var liveOk =
-            context.RemuxContext.Get("ok") is PyBool { Value: true } &&
-            context.RemuxContext.Get("dry_run") is PyBool { Value: false } &&
-            context.RemuxContext.Get("outcome") is PyStr outcomeStr &&
+            context.RemuxContext.Get("ok") is WireBool { Value: true } &&
+            context.RemuxContext.Get("dry_run") is WireBool { Value: false } &&
+            context.RemuxContext.Get("outcome") is WireString outcomeStr &&
             (outcomeStr.Value == RemuxPassOutcomes.LiveOutputWritten || outcomeStr.Value == RemuxPassOutcomes.LiveSkippedNotRequired);
 
         foreach (var episode in episodes)
@@ -251,20 +251,20 @@ public sealed class TvSeasonFolderCleanup : ITvSeasonFolderCleanup
 
         output.Set("tv_season_folder_deleted", true);
         output.Set("source_deleted_after_success", true);
-        output.Set("tv_season_folder_skip_reason", PyNull.Instance);
+        output.Set("tv_season_folder_skip_reason", WireNull.Instance);
         AddSummary($"Removed the whole season folder: {seasonFolder}");
 
         OutputFolderCleanup.CascadeDeleteEmptyParents(Path.GetDirectoryName(seasonFolder)!, watchedResolved, cascade, _logger);
     }
 
-    private static string ExpectedOutputFile(string? finalOutputFile, PyDict remuxContext, string outDir, string rel, bool relEq)
+    private static string ExpectedOutputFile(string? finalOutputFile, WireObject remuxContext, string outDir, string rel, bool relEq)
     {
         if (relEq && finalOutputFile is { } finalFile && File.Exists(finalFile))
         {
             return RemuxPassPaths.Resolve(finalFile);
         }
 
-        if (remuxContext.Get("output_file") is PyStr of && PyStrings.Strip(of.Value).Length > 0)
+        if (remuxContext.Get("output_file") is WireString of && WireStrings.Strip(of.Value).Length > 0)
         {
             return RemuxPassPaths.Resolve(of.Value);
         }
@@ -273,16 +273,16 @@ public sealed class TvSeasonFolderCleanup : ITvSeasonFolderCleanup
     }
 
     /// <summary>Records the completeness check and the failure reason/summary line; returns false when the caller must stop.</summary>
-    private static bool RecordCompleteness(PyDict completeness, PyDict output, string name, PyDict check, string failurePrefix, List<string> lineParts, Action<string> addSummary)
+    private static bool RecordCompleteness(WireObject completeness, WireObject output, string name, WireObject check, string failurePrefix, List<string> lineParts, Action<string> addSummary)
     {
-        var status = ((PyStr)check.Get("output_completeness_check")!).Value;
+        var status = ((WireString)check.Get("output_completeness_check")!).Value;
         completeness.Set(name, status);
         if (status == "passed")
         {
             return true;
         }
 
-        var note = check.Get("output_completeness_note") is PyStr n && n.Value.Length > 0
+        var note = check.Get("output_completeness_note") is WireString n && n.Value.Length > 0
             ? n.Value
             : $"Weir expected a finished output file for {name}, but the safety check did not pass.";
         output.Set("tv_season_folder_skip_reason", note);
@@ -333,43 +333,43 @@ public sealed class TvSeasonFolderCleanup : ITvSeasonFolderCleanup
                 continue;
             }
 
-            PyJson data;
+            WireValue data;
             try
             {
-                data = PyJsonParser.Parse(trimmed);
+                data = WireJsonParser.Parse(trimmed);
             }
-            catch (PyJsonDecodeException)
+            catch (WireJsonDecodeException)
             {
                 continue;
             }
 
-            if (data is not PyDict dict)
+            if (data is not WireObject dict)
             {
                 continue;
             }
 
-            if (dict.Get("relative_media_path") is not PyStr relStr || PyStrings.Strip(relStr.Value) != relativePosix)
+            if (dict.Get("relative_media_path") is not WireString relStr || WireStrings.Strip(relStr.Value) != relativePosix)
             {
                 continue;
             }
 
-            var scope = dict.Get("media_scope") is PyStr scopeStr ? PyStrings.Strip(scopeStr.Value).ToLowerInvariant() : "movie";
+            var scope = dict.Get("media_scope") is WireString scopeStr ? WireStrings.Strip(scopeStr.Value).ToLowerInvariant() : "movie";
             if (scope != "tv")
             {
                 continue;
             }
 
-            if (dict.Get("dry_run") is PyBool { Value: true })
+            if (dict.Get("dry_run") is WireBool { Value: true })
             {
                 continue;
             }
 
-            if (dict.Get("ok") is not PyBool { Value: true })
+            if (dict.Get("ok") is not WireBool { Value: true })
             {
                 continue;
             }
 
-            var outcome = dict.Get("outcome") is PyStr outcomeStr ? outcomeStr.Value : null;
+            var outcome = dict.Get("outcome") is WireString outcomeStr ? outcomeStr.Value : null;
             if (outcome != RemuxPassOutcomes.LiveOutputWritten && outcome != RemuxPassOutcomes.LiveSkippedNotRequired)
             {
                 continue;

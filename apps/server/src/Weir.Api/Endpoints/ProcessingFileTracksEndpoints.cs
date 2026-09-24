@@ -31,7 +31,7 @@ public static class ProcessingFileTracksEndpoints
         return endpoints;
     }
 
-    private static PyDict StreamOut(int index, string kind, ProbeStreamInfo stream, TrackDecision? decision)
+    private static WireObject StreamOut(int index, string kind, ProbeStreamInfo stream, TrackDecision? decision)
     {
         var tags = stream.Tags;
         var disposition = stream.Disposition;
@@ -41,7 +41,7 @@ public static class ProcessingFileTracksEndpoints
             channels = n;
         }
 
-        return new PyDict()
+        return new WireObject()
             .Set("index", index)
             .Set("type", kind)
             .Set("codec", stream.CodecName.Length > 0 ? stream.CodecName : null)
@@ -103,7 +103,7 @@ public static class ProcessingFileTracksEndpoints
             return null;
         }
 
-        var rows = new List<(int Index, PyDict Row)>();
+        var rows = new List<(int Index, WireObject Row)>();
         var covered = new HashSet<int>();
         foreach (var stream in video)
         {
@@ -161,12 +161,12 @@ public static class ProcessingFileTracksEndpoints
         }
 
         rows.Sort((a, b) => a.Index.CompareTo(b.Index));
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("file_id", context.File.Id)
             .Set("relative_path", context.File.RelativePath)
             .Set("media_scope", context.Library.MediaType)
             .Set("source_fingerprint", ManualPlanJson.ToPyDict(fingerprint))
-            .Set("streams", new PyList(rows.Select(r => (PyJson)r.Row))));
+            .Set("streams", new WireArray(rows.Select(r => (WireValue)r.Row))));
     }
 
     private static async Task<ApiResult> PostManualPlanAsync(ApiRequest request)
@@ -179,7 +179,7 @@ public static class ProcessingFileTracksEndpoints
         model.Finish(ExtraFields.Ignore);
         issues.ThrowIfAny();
 
-        if (payload is not PyDict body || body.Get("keep") is not PyList keepList)
+        if (payload is not WireObject body || body.Get("keep") is not WireArray keepList)
         {
             throw new ApiException(StatusCodes.Status422UnprocessableEntity, "'keep' is required and must be a list of {index, default, forced}.");
         }
@@ -187,17 +187,17 @@ public static class ProcessingFileTracksEndpoints
         var keep = new List<ManualKeepEntry>();
         foreach (var item in keepList.Items)
         {
-            if (item is not PyDict entry || entry.Get("index") is not PyInt indexValue)
+            if (item is not WireObject entry || entry.Get("index") is not WireInteger indexValue)
             {
                 throw new ApiException(StatusCodes.Status422UnprocessableEntity, "Each item in 'keep' must be an object with an integer 'index'.");
             }
 
-            var isDefault = entry.Get("default") is PyBool { Value: true };
-            var forced = entry.Get("forced") is PyBool { Value: true };
+            var isDefault = entry.Get("default") is WireBool { Value: true };
+            var forced = entry.Get("forced") is WireBool { Value: true };
             keep.Add(new ManualKeepEntry((int)indexValue.Value, isDefault, forced));
         }
 
-        if (body.Get("order") is not PyList orderList)
+        if (body.Get("order") is not WireArray orderList)
         {
             throw new ApiException(StatusCodes.Status422UnprocessableEntity, "'order' is required and must be a list of integers.");
         }
@@ -205,7 +205,7 @@ public static class ProcessingFileTracksEndpoints
         var order = new List<int>();
         foreach (var item in orderList.Items)
         {
-            if (item is not PyInt orderIndex)
+            if (item is not WireInteger orderIndex)
             {
                 throw new ApiException(StatusCodes.Status422UnprocessableEntity, "'order' must be a list of integers.");
             }
@@ -265,7 +265,7 @@ public static class ProcessingFileTracksEndpoints
             .ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
 
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("ok", true)
             .Set("job_id", job.Id)
             .Set("dedupe_key", job.DedupeKey)

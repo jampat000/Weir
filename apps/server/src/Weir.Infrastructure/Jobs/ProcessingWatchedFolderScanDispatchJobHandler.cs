@@ -55,10 +55,10 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         ArgumentNullException.ThrowIfNull(context);
         var body = ParsePayload(context.PayloadJson);
         var request = new ScanRequest(
-            body.Get("library_id") is PyInt idValue && idValue.Value > 0 ? (long)idValue.Value : null,
-            ProcessingMediaScopes.Normalize(body.Get("media_scope") is PyStr scopeStr ? scopeStr.Value : null),
-            ScanDispatchJobPayload.NormalizeTrigger(body.Get("scan_trigger") is PyStr triggerStr ? triggerStr.Value : "manual"),
-            body.Get("enqueue_remux_jobs") is PyJson v && v.IsTruthy);
+            body.Get("library_id") is WireInteger idValue && idValue.Value > 0 ? (long)idValue.Value : null,
+            ProcessingMediaScopes.Normalize(body.Get("media_scope") is WireString scopeStr ? scopeStr.Value : null),
+            ScanDispatchJobPayload.NormalizeTrigger(body.Get("scan_trigger") is WireString triggerStr ? triggerStr.Value : "manual"),
+            body.Get("enqueue_remux_jobs") is WireValue v && v.IsTruthy);
 
         var (scan, budget) = await PrepareAsync(request, cancellationToken).ConfigureAwait(false);
         var candidates = WatchedFolderListing.Candidates(
@@ -163,25 +163,25 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             inWindow ? null : WorkAdmissionRules.LibraryWindowReopensAt(admissionSnapshot, timezoneName, now));
     }
 
-    private static PyDict ParsePayload(string? payloadJson)
+    private static WireObject ParsePayload(string? payloadJson)
     {
         var raw = (payloadJson ?? string.Empty).Trim();
         if (raw.Length == 0)
         {
-            return new PyDict();
+            return new WireObject();
         }
 
-        PyJson data;
+        WireValue data;
         try
         {
-            data = PyJsonParser.Parse(raw);
+            data = WireJsonParser.Parse(raw);
         }
-        catch (PyJsonDecodeException exception)
+        catch (WireJsonDecodeException exception)
         {
             throw new ArgumentException("watched-folder remux scan dispatch payload must be a JSON object", exception);
         }
 
-        if (data is not PyDict dict)
+        if (data is not WireObject dict)
         {
             throw new ArgumentException("watched-folder remux scan dispatch payload must be a JSON object");
         }

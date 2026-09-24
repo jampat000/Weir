@@ -87,18 +87,18 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
                     ActivityEventTypes.ProcessingFilePassThroughFailed,
                     "processing",
                     $"{MediaPathNames.Name(relativePath, OperatingSystem.IsWindows())} could not be handed back",
-                    PyJsonWriter.Dumps(
-                        new PyDict()
+                    WireJsonWriter.Dumps(
+                        new WireObject()
                             .Set("job_id", context.Id)
                             .Set("relative_media_path", relativePath)
-                            .Set("message", PyStrings.Slice(exception.Message, 1200))
+                            .Set("message", WireStrings.Slice(exception.Message, 1200))
                             .Set("trigger", "worker")
                             .Set("result", "failed")
                             .Set("library_id", delivery.LibraryId)
                             .Set("source_kept", true)
                             .Set("next_action",
                                 "The original is untouched in the watched folder. Check that the output folder exists and is writable."),
-                        PyJsonFormat.Compact))),
+                        WireJsonFormat.Compact))),
                 _logger,
                 "pass-through failure record",
                 cancellationToken).ConfigureAwait(false);
@@ -122,14 +122,14 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
         var origin = FollowUpJobPayload.Origin(payload);
         if (origin is { IsTruthy: true } && result.Delivered && _reporter is not null)
         {
-            var reportResult = new PyDict()
+            var reportResult = new WireObject()
                 .Set("ok", true)
                 .Set("outcome", "live_output_written")
                 .Set("relative_media_path", relativePath)
                 .Set("output_file", result.Destination)
                 .Set("processing_output_folder_resolved", RemuxPassPaths.Resolve(delivery.OutputFolder))
                 .Set("passed_through_after_failure", true);
-            var reportPayload = PyJsonWriter.Dumps(new PyDict().Set("origin", origin).Set("library_id", delivery.LibraryId), PyJsonFormat.Compact);
+            var reportPayload = WireJsonWriter.Dumps(new WireObject().Set("origin", origin).Set("library_id", delivery.LibraryId), WireJsonFormat.Compact);
             var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
             string status;
             await using (uow.ConfigureAwait(false))
@@ -152,7 +152,7 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
             await HandbackStore.RecordWrittenAsync(uow, settings.LibraryId, relativePath, result.Destination, now).ConfigureAwait(false);
         }
 
-        var detail = new PyDict()
+        var detail = new WireObject()
             .Set("job_id", jobId)
             .Set("relative_media_path", relativePath)
             .Set("library_id", settings.LibraryId)
@@ -167,6 +167,6 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
             ActivityEventTypes.ProcessingFilePassedThrough,
             "processing",
             $"{MediaPathNames.Name(relativePath, OperatingSystem.IsWindows())} was handed back unchanged",
-            PyStrings.Slice(PyJsonWriter.Dumps(detail, PyJsonFormat.Compact), 10_000))).ConfigureAwait(false);
+            WireStrings.Slice(WireJsonWriter.Dumps(detail, WireJsonFormat.Compact), 10_000))).ConfigureAwait(false);
     }
 }

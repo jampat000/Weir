@@ -21,7 +21,7 @@ public static class ProcessingOperatorSettingsEndpoints
         return endpoints;
     }
 
-    private static PyDict OperatorSettingsOut(ProcessingOperatorSettingsRecord row, string timezone) => new PyDict()
+    private static WireObject OperatorSettingsOut(ProcessingOperatorSettingsRecord row, string timezone) => new WireObject()
         .Set("max_concurrent_files", OperatorSettingsRules.ClampMaxConcurrentFiles(row.MaxConcurrentFiles))
         .Set("runner_capacity", OperatorSettingsRules.ClampRunnerCapacity(row.RunnerCapacity))
         .Set("runner_cost_sd", OperatorSettingsRules.ClampRunnerCost(row.RunnerCostSd))
@@ -32,12 +32,12 @@ public static class ProcessingOperatorSettingsEndpoints
         .Set("work_temp_stale_sweep_enabled", row.WorkTempStaleSweepEnabled)
         .Set("failure_cleanup_enabled", row.FailureCleanupEnabled)
         // Null: the interval the environment gives. Settings › Cleanup shows the one in force from /processing/maintenance.
-        .Set("work_temp_stale_sweep_interval_seconds", row.WorkTempStaleSweepIntervalSeconds is { } sweepEvery ? PyJson.Of(sweepEvery) : PyJson.Null)
-        .Set("failure_cleanup_interval_seconds", row.FailureCleanupIntervalSeconds is { } cleanupEvery ? PyJson.Of(cleanupEvery) : PyJson.Null)
+        .Set("work_temp_stale_sweep_interval_seconds", row.WorkTempStaleSweepIntervalSeconds is { } sweepEvery ? WireValue.Of(sweepEvery) : WireValue.Null)
+        .Set("failure_cleanup_interval_seconds", row.FailureCleanupIntervalSeconds is { } cleanupEvery ? WireValue.Of(cleanupEvery) : WireValue.Null)
         // #652: Settings › Cleanup › Unclaimed hand-backs. Off until a person switches it on; a null interval is six hours.
         .Set("unclaimed_handback_cleanup_enabled", row.UnclaimedHandbackCleanupEnabled)
         .Set("unclaimed_handback_window_days", OperatorSettingsRules.ClampUnclaimedHandbackWindowDays(row.UnclaimedHandbackWindowDays))
-        .Set("unclaimed_handback_cleanup_interval_seconds", row.UnclaimedHandbackCleanupIntervalSeconds is { } unclaimedEvery ? PyJson.Of(unclaimedEvery) : PyJson.Null)
+        .Set("unclaimed_handback_cleanup_interval_seconds", row.UnclaimedHandbackCleanupIntervalSeconds is { } unclaimedEvery ? WireValue.Of(unclaimedEvery) : WireValue.Null)
         .Set("keep_failed_work_files", row.KeepFailedWorkFiles)
         .Set("file_log_retention_days", OperatorSettingsRules.ClampFileLogRetentionDays(row.FileLogRetentionDays))
         .Set("runner_cost_undetermined", OperatorSettingsRules.ClampRunnerCost(row.RunnerCostUndetermined))
@@ -115,14 +115,14 @@ public static class ProcessingOperatorSettingsEndpoints
                                new[] { movieScheduleDays, movieScheduleStart, movieScheduleEnd }.Count(v => v is not null);
         if (movieGroupCount != 0 && movieGroupCount != 5)
         {
-            issues.Add(new ValidationIssue("value_error", ["body"], "Value error, Movie schedule fields must all be omitted or all provided together.", PyJson.Null));
+            issues.Add(new ValidationIssue("value_error", ["body"], "Value error, Movie schedule fields must all be omitted or all provided together.", WireValue.Null));
         }
 
         var tvGroupCount = new bool?[] { tvScheduleEnabled, tvScheduleHoursLimited }.Count(v => v is not null) +
                             new[] { tvScheduleDays, tvScheduleStart, tvScheduleEnd }.Count(v => v is not null);
         if (tvGroupCount != 0 && tvGroupCount != 5)
         {
-            issues.Add(new ValidationIssue("value_error", ["body"], "Value error, TV schedule fields must all be omitted or all provided together.", PyJson.Null));
+            issues.Add(new ValidationIssue("value_error", ["body"], "Value error, TV schedule fields must all be omitted or all provided together.", WireValue.Null));
         }
 
         var hasProcessField = maxConcurrentFiles is not null || runnerCapacity is not null || runnerCostSd is not null ||
@@ -135,7 +135,7 @@ public static class ProcessingOperatorSettingsEndpoints
                                minFileAgeSeconds is not null || processingMinInputFileSizeMb is not null || minimumFreeDiskSpaceMb is not null;
         if (!hasProcessField && movieScheduleEnabled is null && tvScheduleEnabled is null)
         {
-            issues.Add(new ValidationIssue("value_error", ["body"], "Value error, No operator settings fields to update.", PyJson.Null));
+            issues.Add(new ValidationIssue("value_error", ["body"], "Value error, No operator settings fields to update.", WireValue.Null));
         }
 
         issues.ThrowIfAny();

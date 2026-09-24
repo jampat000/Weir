@@ -81,7 +81,7 @@ public sealed partial class HandoffLedgerStore
         UnitOfWork uow, string sourceKey, string handoffId, long? libraryId, string relativePath, long? connectionId = null, string? downloadId = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        var now = PythonTimestamps.Orm(_time.GetUtcNow());
+        var now = TimestampColumns.Orm(_time.GetUtcNow());
         var row = await FindAsync(uow, sourceKey, handoffId).ConfigureAwait(false);
         if (row is null)
         {
@@ -127,10 +127,10 @@ public sealed partial class HandoffLedgerStore
             "UPDATE media_manager_handoffs SET outcome = $outcome, outcome_at = $at, outcome_message = $message, outcome_released = $released, " +
             "last_changed_at = $now WHERE id = $row",
             ("$outcome", outcome),
-            ("$at", PythonTimestamps.Orm(occurredAt)),
-            ("$message", PyStrings.Slice(message, 2000)),
+            ("$at", TimestampColumns.Orm(occurredAt)),
+            ("$message", WireStrings.Slice(message, 2000)),
             ("$released", released ? 1 : 0),
-            ("$now", PythonTimestamps.Orm(_time.GetUtcNow())),
+            ("$now", TimestampColumns.Orm(_time.GetUtcNow())),
             ("$row", rowId)).ConfigureAwait(false);
     }
 
@@ -198,8 +198,8 @@ public sealed partial class HandoffLedgerStore
                 ("$state", state),
                 ("$output", outputPath),
                 ("$files", files),
-                ("$message", string.IsNullOrEmpty(message) ? null : PyStrings.Slice(message, 2000)),
-                ("$now", PythonTimestamps.Orm(_time.GetUtcNow())),
+                ("$message", string.IsNullOrEmpty(message) ? null : WireStrings.Slice(message, 2000)),
+                ("$now", TimestampColumns.Orm(_time.GetUtcNow())),
                 ("$row", row.Id)).ConfigureAwait(false);
         }
     }
@@ -213,12 +213,12 @@ public sealed partial class HandoffLedgerStore
         SqliteValues.GetString(reader, 5),
         SqliteValues.GetStringOrNull(reader, 6),
         SqliteValues.GetStringOrNull(reader, 7),
-        PythonTimestamps.Parse(reader.GetValue(8)),
+        TimestampColumns.Parse(reader.GetValue(8)),
         SqliteValues.GetStringOrNull(reader, 9),
         SqliteValues.GetStringOrNull(reader, 10),
         SqliteValues.GetBool(reader, 11),
         SqliteValues.GetStringOrNull(reader, 12),
-        PythonTimestamps.Parse(reader.GetValue(13)),
+        TimestampColumns.Parse(reader.GetValue(13)),
         reader.IsDBNull(14) ? null : SqliteValues.GetInt64(reader, 14),
         SqliteValues.GetStringOrNull(reader, 15),
         HandoffOutputFiles.Parse(SqliteValues.GetStringOrNull(reader, 16)));

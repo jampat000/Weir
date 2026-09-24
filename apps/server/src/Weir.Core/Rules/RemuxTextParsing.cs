@@ -17,14 +17,14 @@ public static partial class RemuxRules
             return string.Empty;
         }
 
-        var s = Py.Lower(PyStrings.Strip(tag));
+        var s = RulesJson.Lower(WireStrings.Strip(tag));
         if (s.Length == 0)
         {
             return string.Empty;
         }
 
         var match = LanguageTagRegex().Match(s);
-        return match.Success ? match.Groups[1].Value : PyStrings.Slice(s, 12);
+        return match.Success ? match.Groups[1].Value : WireStrings.Slice(s, 12);
     }
 
     public static IReadOnlyList<string> ParseSubtitleLangsCsv(string? raw)
@@ -50,7 +50,7 @@ public static partial class RemuxRules
         var lines = new List<string>();
         foreach (var line in SplitLines(raw ?? string.Empty))
         {
-            var s = PyStrings.Strip(line);
+            var s = WireStrings.Strip(line);
             if (s.Length > 0)
             {
                 lines.Add(s);

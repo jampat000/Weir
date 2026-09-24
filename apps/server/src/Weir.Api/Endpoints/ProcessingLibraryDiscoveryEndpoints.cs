@@ -25,7 +25,7 @@ public static class ProcessingLibraryDiscoveryEndpoints
         return endpoints;
     }
 
-    private static PyDict DiscoverableLibraryOut(DiscoverableLibrary item) => new PyDict()
+    private static WireObject DiscoverableLibraryOut(DiscoverableLibrary item) => new WireObject()
         .Set("key", item.Key)
         .Set("name", item.Name)
         .Set("media_type", item.MediaType)
@@ -36,7 +36,7 @@ public static class ProcessingLibraryDiscoveryEndpoints
         .Set("processes_before_import", item.ProcessesBeforeImport)
         .Set("output_path_problem", item.OutputPathProblem);
 
-    private static PyDict LibraryDriftOut(LibraryDrift item) => new PyDict()
+    private static WireObject LibraryDriftOut(LibraryDrift item) => new WireObject()
         .Set("kind", item.Kind)
         .Set("library_id", item.LibraryId)
         .Set("library_name", item.LibraryName)
@@ -67,7 +67,7 @@ public static class ProcessingLibraryDiscoveryEndpoints
             throw new ApiException(StatusCodes.Status502BadGateway, exception.Message);
         }
 
-        return ApiRoutes.Ok(new PyList(found.Select(item => (PyJson)DiscoverableLibraryOut(item))));
+        return ApiRoutes.Ok(new WireArray(found.Select(item => (WireValue)DiscoverableLibraryOut(item))));
     }
 
     /// <summary><c>POST /processing/libraries/discover/{connection_id}/import</c>: create a Processing library per
@@ -83,7 +83,7 @@ public static class ProcessingLibraryDiscoveryEndpoints
         model.Finish(ExtraFields.Forbid);
         if (keys.Count == 0)
         {
-            issues.Add(new ValidationIssue("too_short", ["body", "keys"], "List should have at least 1 item after validation, not 0", new PyList()));
+            issues.Add(new ValidationIssue("too_short", ["body", "keys"], "List should have at least 1 item after validation, not 0", new WireArray()));
         }
 
         issues.ThrowIfAny();
@@ -107,13 +107,13 @@ public static class ProcessingLibraryDiscoveryEndpoints
 
         await request.CommitAsync().ConfigureAwait(false);
         request.Service<ScanSettingsChanges>().Record();
-        var items = new List<PyJson>();
+        var items = new List<WireValue>();
         foreach (var row in created)
         {
             items.Add(await ProcessingLibraryMapping.LibraryOutAsync(request, uow, row, request.Service<ScanWakeups>()).ConfigureAwait(false));
         }
 
-        return new JsonApiResult(StatusCodes.Status201Created, new PyList(items));
+        return new JsonApiResult(StatusCodes.Status201Created, new WireArray(items));
     }
 
     /// <summary><c>GET /processing/libraries/discover/{connection_id}/drift</c>: differences between the manager
@@ -139,7 +139,7 @@ public static class ProcessingLibraryDiscoveryEndpoints
             throw new ApiException(StatusCodes.Status502BadGateway, exception.Message);
         }
 
-        return ApiRoutes.Ok(new PyList(drift.Select(item => (PyJson)LibraryDriftOut(item))));
+        return ApiRoutes.Ok(new WireArray(drift.Select(item => (WireValue)LibraryDriftOut(item))));
     }
 
     /// <summary><c>POST /processing/libraries/{library_id}/unlink</c>: forget where a library came from. The

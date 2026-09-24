@@ -20,7 +20,7 @@ public static partial class ConfigurationBundleStore
     /// table partly replaced.
     /// </remarks>
     private static async Task RestoreProcessingLibrariesAsync(
-        UnitOfWork uow, PyDict bundle, string weirHome, IReadOnlyDictionary<long, long>? restoredConnectionIds)
+        UnitOfWork uow, WireObject bundle, string weirHome, IReadOnlyDictionary<long, long>? restoredConnectionIds)
     {
         if (!bundle.ContainsKey(LibrariesTable))
         {
@@ -28,7 +28,7 @@ public static partial class ConfigurationBundleStore
         }
 
         var libraryRows = Iterate(bundle[LibrariesTable])
-            .Select(row => row as PyDict ?? throw new PyTypeErrorException($"Each row in the backup's {LibrariesTable} section must be an object."))
+            .Select(row => row as WireObject ?? throw new WireTypeException($"Each row in the backup's {LibrariesTable} section must be an object."))
             .ToList();
         ValidateRestoredLibraries(libraryRows, weirHome);
 
@@ -36,9 +36,9 @@ public static partial class ConfigurationBundleStore
         await uow.ExecuteAsync("DELETE FROM rule_sets").ConfigureAwait(false);
         var ruleColumns = await ColumnsAsync(uow, RuleSetsTable).ConfigureAwait(false);
         var libraryColumns = await ColumnsAsync(uow, LibrariesTable).ConfigureAwait(false);
-        foreach (var row in Iterate(bundle.Get(RuleSetsTable) ?? new PyList()))
+        foreach (var row in Iterate(bundle.Get(RuleSetsTable) ?? new WireArray()))
         {
-            var data = row as PyDict ?? throw new PyTypeErrorException($"Each row in the backup's {RuleSetsTable} section must be an object.");
+            var data = row as WireObject ?? throw new WireTypeException($"Each row in the backup's {RuleSetsTable} section must be an object.");
             await InsertAsync(uow, RuleSetsTable, ruleColumns, ToKwargs(ruleColumns, data)).ConfigureAwait(false);
         }
 
@@ -56,9 +56,9 @@ public static partial class ConfigurationBundleStore
     /// <summary>
     /// The same validation <c>POST /processing/libraries</c> runs — folder overlap and the folder-safety
     /// rules, name uniqueness, and the closed enumerations — applied to every row before any of them is
-    /// written. Throws <see cref="PyValueErrorException"/> naming the offending library and the problem.
+    /// written. Throws <see cref="WireValueException"/> naming the offending library and the problem.
     /// </summary>
-    private static void ValidateRestoredLibraries(IReadOnlyList<PyDict> rows, string weirHome)
+    private static void ValidateRestoredLibraries(IReadOnlyList<WireObject> rows, string weirHome)
     {
         var inputs = rows.Select(RestoreLibraryInput).ToList();
         var allFolders = inputs
@@ -79,7 +79,7 @@ public static partial class ConfigurationBundleStore
             }
             catch (ProcessingLibraryException exception)
             {
-                throw new PyValueErrorException($"{label}: {exception.Message}");
+                throw new WireValueException($"{label}: {exception.Message}");
             }
 
             seenNames.Add(input.Name.Trim());
@@ -88,7 +88,7 @@ public static partial class ConfigurationBundleStore
 
     /// <summary>The fields <see cref="LibraryRules"/> validates, read from a raw bundle row; everything else
     /// about the row (schedule, sorters, and so on) is restored as-is and needs no validation here.</summary>
-    private static ProcessingLibraryInput RestoreLibraryInput(PyDict row) => new()
+    private static ProcessingLibraryInput RestoreLibraryInput(WireObject row) => new()
     {
         Name = RestoreLibraryString(row, "name") ?? string.Empty,
         MediaType = RestoreLibraryString(row, "media_type") ?? string.Empty,
@@ -103,7 +103,7 @@ public static partial class ConfigurationBundleStore
         FailurePolicy = RestoreLibraryString(row, "failure_policy") ?? ProcessingFailurePolicies.PassThrough,
     };
 
-    private static string? RestoreLibraryString(PyDict row, string key) => row.Get(key) is PyStr text ? text.Value : null;
+    private static string? RestoreLibraryString(WireObject row, string key) => row.Get(key) is WireString text ? text.Value : null;
 
     private static string RestoreLibraryLabel(ProcessingLibraryInput input, int index) =>
         string.IsNullOrWhiteSpace(input.Name) ? $"Library #{index + 1} in the backup" : $"Library '{input.Name.Trim()}'";

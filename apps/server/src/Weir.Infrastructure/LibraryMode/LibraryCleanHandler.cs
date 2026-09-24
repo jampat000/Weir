@@ -58,21 +58,21 @@ public sealed partial class LibraryCleanHandler : IJobHandler
     public async Task HandleAsync(JobWorkContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
-        PyDict payload;
+        WireObject payload;
         try
         {
-            payload = string.IsNullOrWhiteSpace(context.PayloadJson) ? new PyDict() : PyJsonParser.Parse(context.PayloadJson) as PyDict ?? new PyDict();
+            payload = string.IsNullOrWhiteSpace(context.PayloadJson) ? new WireObject() : WireJsonParser.Parse(context.PayloadJson) as WireObject ?? new WireObject();
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
-            payload = new PyDict();
+            payload = new WireObject();
         }
 
-        var libraryId = payload.Get("library_id") is PyInt idValue ? (long)idValue.Value : 0;
-        var path = payload.Get("path") is PyStr { Value.Length: > 0 } pathValue ? pathValue.Value : string.Empty;
-        var trigger = payload.Get("trigger") is PyStr { Value.Length: > 0 } triggerValue ? triggerValue.Value : "manual";
-        var confirmed = payload.Get("confirm_final_removal") is PyBool { Value: true };
-        var inUseAttempts = payload.Get("in_use_attempts") is PyInt attemptsValue ? (int)attemptsValue.Value : 0;
+        var libraryId = payload.Get("library_id") is WireInteger idValue ? (long)idValue.Value : 0;
+        var path = payload.Get("path") is WireString { Value.Length: > 0 } pathValue ? pathValue.Value : string.Empty;
+        var trigger = payload.Get("trigger") is WireString { Value.Length: > 0 } triggerValue ? triggerValue.Value : "manual";
+        var confirmed = payload.Get("confirm_final_removal") is WireBool { Value: true };
+        var inUseAttempts = payload.Get("in_use_attempts") is WireInteger attemptsValue ? (int)attemptsValue.Value : 0;
 
         if (path.Length == 0)
         {

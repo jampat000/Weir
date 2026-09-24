@@ -18,7 +18,7 @@ namespace Weir.Api.Endpoints;
 /// back out as, and the checks a save runs before it commits.</summary>
 internal static class ProcessingLibraryMapping
 {
-    internal static async Task<PyDict> LibraryOutAsync(ApiRequest request, UnitOfWork uow, ProcessingLibraryRecord row, ScanWakeups? looks = null)
+    internal static async Task<WireObject> LibraryOutAsync(ApiRequest request, UnitOfWork uow, ProcessingLibraryRecord row, ScanWakeups? looks = null)
     {
         var managerIds = await LibraryStore.ManagerConnectionIdsAsync(uow, row.Id).ConfigureAwait(false);
         var activeJobs = await LibraryStore.ActiveJobCountAsync(uow, row).ConfigureAwait(false);
@@ -59,7 +59,7 @@ internal static class ProcessingLibraryMapping
                               "cleanup can use its latest answer.";
         }
 
-        return new PyDict()
+        return new WireObject()
             .Set("id", row.Id)
             .Set("name", row.Name)
             .Set("enabled", row.Enabled)
@@ -76,10 +76,10 @@ internal static class ProcessingLibraryMapping
             .Set("max_file_size_mb", row.MaxFileSizeMb)
             .Set("rejected_file_action", row.RejectedFileAction.Length > 0 ? row.RejectedFileAction : "leave")
             .Set("min_file_age_seconds", row.MinFileAgeSeconds)
-            .Set("created_after", row.CreatedAfter?.PydanticJson())
-            .Set("created_before", row.CreatedBefore?.PydanticJson())
-            .Set("modified_after", row.ModifiedAfter?.PydanticJson())
-            .Set("modified_before", row.ModifiedBefore?.PydanticJson())
+            .Set("created_after", row.CreatedAfter?.ToWireText())
+            .Set("created_before", row.CreatedBefore?.ToWireText())
+            .Set("modified_after", row.ModifiedAfter?.ToWireText())
+            .Set("modified_before", row.ModifiedBefore?.ToWireText())
             .Set("exclude_hidden", row.ExcludeHidden)
             .Set("top_level_only", row.TopLevelOnly)
             .Set("scan_interval_seconds", row.ScanIntervalSeconds)
@@ -111,7 +111,7 @@ internal static class ProcessingLibraryMapping
             .Set("max_concurrent_files", row.MaxConcurrentFiles)
             .Set("priority", row.Priority)
             .Set("rule_set_id", row.RuleSetId)
-            .Set("manager_connection_ids", new PyList(managerIds.Select(id => (PyJson)PyJson.Of(id))))
+            .Set("manager_connection_ids", new WireArray(managerIds.Select(id => (WireValue)WireValue.Of(id))))
             .Set("remove_original_after_success", row.RemoveOriginalAfterSuccess)
             .Set("manager_coverage", coverage)
             .Set("manager_coverage_detail", coverageDetail)
@@ -119,11 +119,11 @@ internal static class ProcessingLibraryMapping
             .Set("discovered_library_key", row.DiscoveredLibraryKey)
             .Set("active_job_count", activeJobs)
             // When Weir next looks at the watched folder, so Processing can count an arriving file down to it.
-            .Set("next_look_at", looks?.NextLookFor(row.Id) is { } next ? PyDateTime.FromDateTimeOffset(next).PydanticJson() : null)
+            .Set("next_look_at", looks?.NextLookFor(row.Id) is { } next ? Timestamp.FromDateTimeOffset(next).ToWireText() : null)
             // Whether the periodic scan-dispatch timer runs for this library right now, and when it next will (#747).
             .Set("periodic_scan", periodicScan.State)
-            .Set("next_scan_at", periodicScan.NextScanAt is { } nextScan ? PyDateTime.FromDateTimeOffset(nextScan).PydanticJson() : null)
-            .Set("updated_at", row.UpdatedAt.PydanticJson());
+            .Set("next_scan_at", periodicScan.NextScanAt is { } nextScan ? Timestamp.FromDateTimeOffset(nextScan).ToWireText() : null)
+            .Set("updated_at", row.UpdatedAt.ToWireText());
     }
 
     /// <summary>Resolves <see cref="PeriodicScanStatus"/> for one library from the same switches and schedule window
@@ -264,11 +264,11 @@ internal static class ProcessingLibraryMapping
     /// </summary>
     internal static void ValidateDetectionWindows(ProcessingLibraryInput body, ValidationIssues issues)
     {
-        void RequireTimezone(string field, PyDateTime? value)
+        void RequireTimezone(string field, Timestamp? value)
         {
             if (value is { Offset: null })
             {
-                issues.Add(new ValidationIssue("value_error", ["body", field], "Value error, Detection-window times must include a timezone.", PyJson.Null));
+                issues.Add(new ValidationIssue("value_error", ["body", field], "Value error, Detection-window times must include a timezone.", WireValue.Null));
             }
         }
 
@@ -283,12 +283,12 @@ internal static class ProcessingLibraryMapping
 
         if (body.CreatedAfter is { } ca && body.CreatedBefore is { } cb && ca.AsUtc >= cb.AsUtc)
         {
-            issues.Add(new ValidationIssue("value_error", ["body"], "Value error, Created after must be earlier than created before.", PyJson.Null));
+            issues.Add(new ValidationIssue("value_error", ["body"], "Value error, Created after must be earlier than created before.", WireValue.Null));
         }
 
         if (body.ModifiedAfter is { } ma && body.ModifiedBefore is { } mb && ma.AsUtc >= mb.AsUtc)
         {
-            issues.Add(new ValidationIssue("value_error", ["body"], "Value error, Modified after must be earlier than modified before.", PyJson.Null));
+            issues.Add(new ValidationIssue("value_error", ["body"], "Value error, Modified after must be earlier than modified before.", WireValue.Null));
         }
     }
 

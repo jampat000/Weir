@@ -281,7 +281,7 @@ public static partial class RemuxRules
                     Tier: matchedTier,
                     Lang: lang,
                     Variant: variant,
-                    CodecName: Py.StrOr(s.Get("codec_name"), string.Empty),
+                    CodecName: RulesJson.StrOr(s.Get("codec_name"), string.Empty),
                     HearingImpaired: flags.HearingImpaired.Value,
                     ForcedRaw: flags.Forced.Value,
                     Track: track));
@@ -329,7 +329,7 @@ public static partial class RemuxRules
 
     /// <summary>The saved subtitle order, or none: unlike audio, no saved order means "keep the order above", not a seeded default.</summary>
     private static IReadOnlyList<TrackSorter> SubtitleOrder(ProcessingRulesConfig config) =>
-        PyStrings.Strip(config.SubtitleSortersJson).Length == 0 ? [] : TrackSorters.Parse(config.SubtitleSortersJson);
+        WireStrings.Strip(config.SubtitleSortersJson).Length == 0 ? [] : TrackSorters.Parse(config.SubtitleSortersJson);
 
     /// <summary>
     /// One kept subtitle's place under the saved order. A "language" criterion with no value ranks by the languages-to-keep

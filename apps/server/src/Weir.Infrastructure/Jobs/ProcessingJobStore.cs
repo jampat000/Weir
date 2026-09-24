@@ -16,7 +16,7 @@ namespace Weir.Infrastructure.Jobs;
 /// <c>julianday()</c> rather than as text (#540 item 2). As text, <c>+</c> (an offset marker) sorts before
 /// <c>.</c> (a fraction's first character), so a <c>not_before</c> with microseconds would compare greater
 /// than an <c>@now</c> at the same instant whose zero fraction is omitted, and a retried job would miss its
-/// own <c>not_before</c> second. Julian day reads both stored shapes (see <see cref="PythonTimestamps"/>)
+/// own <c>not_before</c> second. Julian day reads both stored shapes (see <see cref="TimestampColumns"/>)
 /// identically.
 /// </remarks>
 /// <remarks>

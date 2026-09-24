@@ -21,7 +21,7 @@ public static partial class RemuxOutputValidation
     /// </summary>
     public static string ContainerFamily(string? formatName)
     {
-        var lowered = Py.Lower(PyStrings.Strip(formatName ?? string.Empty));
+        var lowered = RulesJson.Lower(WireStrings.Strip(formatName ?? string.Empty));
         if (lowered.Length == 0)
         {
             return string.Empty;
@@ -47,14 +47,14 @@ public static partial class RemuxOutputValidation
             return null;
         }
 
-        var format = Py.Get(probe, "format");
-        if (!Py.IsDict(format))
+        var format = RulesJson.Get(probe, "format");
+        if (!RulesJson.IsDict(format))
         {
             return null;
         }
 
-        var name = Py.Get(format!.Value, "format_name");
-        return Py.Truthy(name) ? Py.Str(name) : null;
+        var name = RulesJson.Get(format!.Value, "format_name");
+        return RulesJson.Truthy(name) ? RulesJson.Str(name) : null;
     }
 
     /// <summary><c>format.tags.title</c> off a probe document, or null when absent or blank.</summary>
@@ -65,19 +65,19 @@ public static partial class RemuxOutputValidation
             return null;
         }
 
-        var format = Py.Get(probe, "format");
-        if (!Py.IsDict(format))
+        var format = RulesJson.Get(probe, "format");
+        if (!RulesJson.IsDict(format))
         {
             return null;
         }
 
-        var tags = Py.Get(format!.Value, "tags");
-        if (!Py.IsDict(tags))
+        var tags = RulesJson.Get(format!.Value, "tags");
+        if (!RulesJson.IsDict(tags))
         {
             return null;
         }
 
-        var title = Py.Get(tags!.Value, "title");
-        return Py.Truthy(title) ? Py.Str(title) : null;
+        var title = RulesJson.Get(tags!.Value, "title");
+        return RulesJson.Truthy(title) ? RulesJson.Str(title) : null;
     }
 }

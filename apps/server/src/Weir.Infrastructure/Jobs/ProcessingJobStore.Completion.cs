@@ -31,7 +31,7 @@ public sealed partial class ProcessingJobStore
                     connection,
                     transaction,
                     "UPDATE jobs SET lease_expires_at = @lease_exp, updated_at = CURRENT_TIMESTAMP WHERE id = @id",
-                    ("@lease_exp", PythonTimestamps.Adapter(newLeaseExpiresAt)),
+                    ("@lease_exp", TimestampColumns.Adapter(newLeaseExpiresAt)),
                     ("@id", jobId));
                 return true;
             },
@@ -103,7 +103,7 @@ public sealed partial class ProcessingJobStore
                         "not_before = @not_before, updated_at = CURRENT_TIMESTAMP WHERE id = @id",
                         ("@error", errorMessage),
                         ("@status", ProcessingJobStatus.Pending),
-                        ("@not_before", PythonTimestamps.Orm(when + TimeSpan.FromTicks((long)Math.Round(delay * TimeSpan.TicksPerSecond)))),
+                        ("@not_before", TimestampColumns.Orm(when + TimeSpan.FromTicks((long)Math.Round(delay * TimeSpan.TicksPerSecond)))),
                         ("@id", jobId));
                 }
 
@@ -136,7 +136,7 @@ public sealed partial class ProcessingJobStore
                     "UPDATE jobs SET status = @status, lease_owner = NULL, lease_expires_at = NULL, last_error = @error, " +
                     "updated_at = CURRENT_TIMESTAMP WHERE id = @id",
                     ("@status", ProcessingJobStatus.HandlerOkFinalizeFailed),
-                    ("@error", PyStrings.Slice(errorMessage, JobQueueRules.LastErrorLimit)),
+                    ("@error", WireStrings.Slice(errorMessage, JobQueueRules.LastErrorLimit)),
                     ("@id", jobId));
                 _metrics.RecordJobEvent(MetricsModule, "failed");
                 RecordQueueDepth(connection, transaction);

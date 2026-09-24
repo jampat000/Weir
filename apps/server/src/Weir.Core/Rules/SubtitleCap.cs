@@ -21,7 +21,7 @@ public static partial class RemuxRules
     /// <summary>A short, human word for a subtitle's format, for the cap's plan notes (e.g. "kept the text track over PGS").</summary>
     private static string SubtitleFormatWord(string codecName)
     {
-        var c = Py.Lower(PyStrings.Strip(codecName));
+        var c = RulesJson.Lower(WireStrings.Strip(codecName));
         if (TextSubtitleCodecs.Contains(c))
         {
             return "text";
@@ -34,14 +34,14 @@ public static partial class RemuxRules
             "dvb_subtitle" or "dvbsub" => "DVB subtitle",
             "xsub" => "XSUB",
             "" => "unknown format",
-            _ => Py.Upper(c),
+            _ => RulesJson.Upper(c),
         };
     }
 
     /// <summary>0 (best) to 2 (worst): text over image, or the reverse under <c>image_first</c>. An unrecognized codec sits in the middle.</summary>
     private static long SubtitleFormatRank(string codecName, string strategy)
     {
-        var c = Py.Lower(PyStrings.Strip(codecName));
+        var c = RulesJson.Lower(WireStrings.Strip(codecName));
         var isText = TextSubtitleCodecs.Contains(c);
         var isImage = ImageSubtitleCodecs.Contains(c);
         if (strategy == RemuxRuleValues.SubtitleStrategyImageFirst)

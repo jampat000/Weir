@@ -9,7 +9,7 @@ namespace Weir.Core.Activity;
 /// <summary>One persisted <c>activity_events</c> row.</summary>
 public sealed record ActivityEventRow(
     long Id,
-    PyDateTime CreatedAt,
+    Timestamp CreatedAt,
     string EventType,
     string Module,
     string Title,
@@ -28,8 +28,8 @@ public sealed record ActivityFilter(
     string? Module = null,
     string? EventType = null,
     string? Search = null,
-    PyDateTime? DateFrom = null,
-    PyDateTime? DateTo = null,
+    Timestamp? DateFrom = null,
+    Timestamp? DateTo = null,
     string? Trigger = null,
     string? Result = null,
     long? LibraryId = null,
@@ -62,15 +62,15 @@ public static class ActivityHistory
         ["id", "created_at", "module", "event_type", "trigger", "result", "library_id", "relative_path", "title", "detail"];
 
     /// <summary>JSON export: two-space indent, non-ASCII written as-is.</summary>
-    public static readonly PyJsonFormat ExportJsonFormat = new(false, ",", ": ", 2, false);
+    public static readonly WireJsonFormat ExportJsonFormat = new(false, ",", ": ", 2, false);
 
     /// <summary>One event as the API returns it.</summary>
-    public static PyDict ItemOut(ActivityEventRow row)
+    public static WireObject ItemOut(ActivityEventRow row)
     {
         ArgumentNullException.ThrowIfNull(row);
-        return new PyDict()
+        return new WireObject()
             .Set("id", row.Id)
-            .Set("created_at", row.CreatedAt.PydanticJson())
+            .Set("created_at", row.CreatedAt.ToWireText())
             .Set("event_type", row.EventType)
             .Set("module", row.Module)
             .Set("title", row.Title)
@@ -86,10 +86,10 @@ public static class ActivityHistory
     /// The recent-events response. <paramref name="total"/> is counted for the first page only (#714), so a later
     /// page, which has no use for it, leaves <c>total</c> out; when present it is never smaller than the page.
     /// </summary>
-    public static PyDict RecentOut(IReadOnlyList<ActivityEventRow> rows, bool hasMore, long? total, long retentionDays, PyDateTime? oldestEventAt)
+    public static WireObject RecentOut(IReadOnlyList<ActivityEventRow> rows, bool hasMore, long? total, long retentionDays, Timestamp? oldestEventAt)
     {
         ArgumentNullException.ThrowIfNull(rows);
-        var body = new PyDict().Set("items", new PyList(rows.Select(row => (PyJson)ItemOut(row))));
+        var body = new WireObject().Set("items", new WireArray(rows.Select(row => (WireValue)ItemOut(row))));
         if (total is { } count)
         {
             body.Set("total", Math.Max(count, rows.Count));
@@ -98,14 +98,14 @@ public static class ActivityHistory
         return body
             .Set("has_more", hasMore)
             .Set("retention_days", retentionDays)
-            .Set("oldest_event_at", oldestEventAt?.PydanticJson());
+            .Set("oldest_event_at", oldestEventAt?.ToWireText());
     }
 
     /// <summary>One export record: <c>created_at</c> in ISO 8601, every other column as stored.</summary>
-    public static PyDict ExportRecord(ActivityEventRow row)
+    public static WireObject ExportRecord(ActivityEventRow row)
     {
         ArgumentNullException.ThrowIfNull(row);
-        return new PyDict()
+        return new WireObject()
             .Set("id", row.Id)
             .Set("created_at", row.CreatedAt.IsoFormat())
             .Set("module", row.Module)
@@ -121,7 +121,7 @@ public static class ActivityHistory
     public static string ExportJson(IReadOnlyList<ActivityEventRow> rows)
     {
         ArgumentNullException.ThrowIfNull(rows);
-        return PyJsonWriter.Dumps(new PyList(rows.Select(row => (PyJson)ExportRecord(row))), ExportJsonFormat);
+        return WireJsonWriter.Dumps(new WireArray(rows.Select(row => (WireValue)ExportRecord(row))), ExportJsonFormat);
     }
 
     /// <summary>CSV export: a header, then one line per row, <c>\r\n</c> after each.</summary>
@@ -156,10 +156,10 @@ public static class ActivityHistory
         string.Create(CultureInfo.InvariantCulture, $"weir-activity-{localNow:yyyyMMdd-HHmmss}.{extension}");
 
     /// <summary>What removing one file's history would delete, with a sentence for the confirmation.</summary>
-    public static PyDict FileHistoryCountOut(FileHistoryCounts counts)
+    public static WireObject FileHistoryCountOut(FileHistoryCounts counts)
     {
         ArgumentNullException.ThrowIfNull(counts);
-        return new PyDict()
+        return new WireObject()
             .Set("relative_path", counts.RelativePath)
             .Set("activity_events", counts.ActivityEvents)
             .Set("processing_records", counts.ProcessingRecords)
@@ -172,10 +172,10 @@ public static class ActivityHistory
     }
 
     /// <summary>What removing one file's history deleted.</summary>
-    public static PyDict FileHistoryRemoveOut(FileHistoryCounts deleted)
+    public static WireObject FileHistoryRemoveOut(FileHistoryCounts deleted)
     {
         ArgumentNullException.ThrowIfNull(deleted);
-        return new PyDict()
+        return new WireObject()
             .Set("relative_path", deleted.RelativePath)
             .Set("activity_events_deleted", deleted.ActivityEvents)
             .Set("processing_records_deleted", deleted.ProcessingRecords);

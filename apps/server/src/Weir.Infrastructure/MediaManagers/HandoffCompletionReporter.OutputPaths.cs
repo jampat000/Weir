@@ -37,9 +37,9 @@ public sealed partial class HandoffCompletionReporter
     }
 
     /// <summary>The output as the manager will see it, or null to fall back to the local path.</summary>
-    private async Task<string?> ManagerOutputPathAsync(ManagerConnection connection, HandoffOrigin origin, PyDict result, CancellationToken cancellationToken)
+    private async Task<string?> ManagerOutputPathAsync(ManagerConnection connection, HandoffOrigin origin, WireObject result, CancellationToken cancellationToken)
     {
-        if (result.Get("output_file") is not PyStr outputFile || result.Get("processing_output_folder_resolved") is not PyStr localFolder)
+        if (result.Get("output_file") is not WireString outputFile || result.Get("processing_output_folder_resolved") is not WireString localFolder)
         {
             return null;
         }

@@ -6,28 +6,28 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 internal static class FollowUpJobPayload
 {
     /// <summary><c>json.loads(ctx.payload_json or "{}")</c>, tolerant of malformed or non-object JSON.</summary>
-    public static PyDict Parse(string? payloadJson)
+    public static WireObject Parse(string? payloadJson)
     {
         if (string.IsNullOrEmpty(payloadJson))
         {
-            return new PyDict();
+            return new WireObject();
         }
 
         try
         {
-            return PyJsonParser.Parse(payloadJson) is PyDict dict ? dict : new PyDict();
+            return WireJsonParser.Parse(payloadJson) is WireObject dict ? dict : new WireObject();
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
-            return new PyDict();
+            return new WireObject();
         }
     }
 
-    public static string RelativeMediaPath(PyDict payload) =>
-        PyStrings.Strip(payload.Get("relative_media_path") is PyStr text ? text.Value : string.Empty);
+    public static string RelativeMediaPath(WireObject payload) =>
+        WireStrings.Strip(payload.Get("relative_media_path") is WireString text ? text.Value : string.Empty);
 
-    public static long? LibraryId(PyDict payload) =>
-        payload.Get("library_id") is PyInt number ? (long)number.Value : null;
+    public static long? LibraryId(WireObject payload) =>
+        payload.Get("library_id") is WireInteger number ? (long)number.Value : null;
 
-    public static PyDict? Origin(PyDict payload) => payload.Get("origin") as PyDict;
+    public static WireObject? Origin(WireObject payload) => payload.Get("origin") as WireObject;
 }

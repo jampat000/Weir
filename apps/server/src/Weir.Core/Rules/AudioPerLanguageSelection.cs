@@ -10,7 +10,7 @@ public static partial class RemuxRules
     {
         var stream = WithIndex(audio).Where(p => p.Index == candidate.InputIndex).Select(p => p.Stream).FirstOrDefault();
         var disposition = stream?.Disposition ?? new Dictionary<string, long>();
-        var codecName = stream is null ? string.Empty : Py.StrOr(stream.Get("codec_name"), string.Empty);
+        var codecName = stream is null ? string.Empty : RulesJson.StrOr(stream.Get("codec_name"), string.Empty);
 
         return new PlannedTrack
         {
@@ -77,7 +77,7 @@ public static partial class RemuxRules
             notes.Add($"No configured audio language slot matched any track; kept {DescribeCandidate(fallback)} by quality alone (never zero audio).");
         }
 
-        var wantsSecondaryDefault = Py.Lower(PyStrings.Strip(config.DefaultAudioSlot)) == RemuxRuleValues.DefaultAudioSlotSecondary;
+        var wantsSecondaryDefault = RulesJson.Lower(WireStrings.Strip(config.DefaultAudioSlot)) == RemuxRuleValues.DefaultAudioSlotSecondary;
         var defaultSlot = wantsSecondaryDefault && slots.Count > 1 ? slots[1] : slots.Count > 0 ? slots[0] : string.Empty;
         var defaultIndex = keptSlotLangs.IndexOf(defaultSlot);
         if (defaultIndex < 0)

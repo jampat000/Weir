@@ -55,7 +55,7 @@ public sealed record ProcessingOperatorSettingsRecord
     public string TvScheduleDays { get; init; } = string.Empty;
     public string TvScheduleStart { get; init; } = "00:00";
     public string TvScheduleEnd { get; init; } = "23:59";
-    public PyDateTime UpdatedAt { get; init; }
+    public Timestamp UpdatedAt { get; init; }
 }
 
 /// <summary>A schedule-window setting is not usable; the message is written for the operator.</summary>

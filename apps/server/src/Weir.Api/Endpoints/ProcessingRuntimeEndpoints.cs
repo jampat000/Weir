@@ -31,7 +31,7 @@ public static class ProcessingRuntimeEndpoints
         // until it timed out with "database is locked".
         var readout = await store.ReadAsync(
             (connection, transaction) => WorkAdmissionReader.ReadFilesAtOnce(connection, transaction, now, slots)).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("files_at_once", readout.FilesAtOnce)
             .Set("worker_slots", readout.WorkerSlots)
             .Set("effective_files_at_once", readout.Effective)
@@ -46,7 +46,7 @@ public static class ProcessingRuntimeEndpoints
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var settings = RuntimeVisibility.From(request.Options);
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("in_process_processing_worker_count", settings.InProcessProcessingWorkerCount)
             .Set("in_process_workers_disabled", settings.InProcessWorkersDisabled)
             .Set("in_process_workers_enabled", settings.InProcessWorkersEnabled)
@@ -54,7 +54,7 @@ public static class ProcessingRuntimeEndpoints
             .Set("sqlite_throughput_note", settings.SqliteThroughputNote)
             .Set("configuration_note", settings.ConfigurationNote)
             .Set("visibility_note", settings.VisibilityNote)
-            .Set("processing_media_extensions", new PyList(settings.ProcessingMediaExtensions.Select(e => (PyJson)PyJson.Of(e))))
+            .Set("processing_media_extensions", new WireArray(settings.ProcessingMediaExtensions.Select(e => (WireValue)WireValue.Of(e))))
             .Set("processing_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs", settings.ProcessingWatchedFolderRemuxScanDispatchPeriodicEnqueueRemuxJobs)
             .Set("processing_probe_size_mb", settings.ProcessingProbeSizeMb)
             .Set("processing_analyze_duration_seconds", settings.ProcessingAnalyzeDurationSeconds)
@@ -90,23 +90,23 @@ public static class ProcessingRuntimeEndpoints
         }
         catch (MediaToolException exception)
         {
-            return ApiRoutes.Ok(new PyDict()
+            return ApiRoutes.Ok(new WireObject()
                 .Set("detected", false)
-                .Set("available_methods", new PyList([]))
-                .Set("vendors", new PyList([]))
-                .Set("selectable_vendors", new PyList(HardwareAcceleration.VendorMethods.Select(v => v.Key).Order(StringComparer.Ordinal).Select(k => (PyJson)PyJson.Of(k))))
-                .Set("strictness_levels", new PyList(HardwareAcceleration.StrictnessLevels.Select(l => (PyJson)PyJson.Of(l))))
+                .Set("available_methods", new WireArray([]))
+                .Set("vendors", new WireArray([]))
+                .Set("selectable_vendors", new WireArray(HardwareAcceleration.VendorMethods.Select(v => v.Key).Order(StringComparer.Ordinal).Select(k => (WireValue)WireValue.Of(k))))
+                .Set("strictness_levels", new WireArray(HardwareAcceleration.StrictnessLevels.Select(l => (WireValue)WireValue.Of(l))))
                 .Set("detail", $"Weir could not find ffmpeg, so it cannot report acceleration methods. {exception.Message}"));
         }
 
         var mediaTools = request.Service<MediaTools>();
         var report = await mediaTools.DetectAccelerationAsync(ffmpeg, request.Context.RequestAborted).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("detected", report.Detected)
-            .Set("available_methods", new PyList(report.AvailableMethods.Select(m => (PyJson)PyJson.Of(m))))
-            .Set("vendors", new PyList(report.Vendors.Select(v => (PyJson)PyJson.Of(v))))
-            .Set("selectable_vendors", new PyList(HardwareAcceleration.VendorMethods.Select(v => v.Key).Order(StringComparer.Ordinal).Select(k => (PyJson)PyJson.Of(k))))
-            .Set("strictness_levels", new PyList(HardwareAcceleration.StrictnessLevels.Select(l => (PyJson)PyJson.Of(l))))
+            .Set("available_methods", new WireArray(report.AvailableMethods.Select(m => (WireValue)WireValue.Of(m))))
+            .Set("vendors", new WireArray(report.Vendors.Select(v => (WireValue)WireValue.Of(v))))
+            .Set("selectable_vendors", new WireArray(HardwareAcceleration.VendorMethods.Select(v => v.Key).Order(StringComparer.Ordinal).Select(k => (WireValue)WireValue.Of(k))))
+            .Set("strictness_levels", new WireArray(HardwareAcceleration.StrictnessLevels.Select(l => (WireValue)WireValue.Of(l))))
             .Set("detail", report.Detail));
     }
 }

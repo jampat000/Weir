@@ -23,7 +23,7 @@ public sealed partial class HandoffCompletionReporter
     /// Never throws: a manager being unreachable must not fail a pass that succeeded on disk.
     /// </summary>
     private async Task<string> ClaimAndDeliverAsync(
-        UnitOfWork uow, HandoffOrigin origin, HandoffTargetFinish finish, PyDict? result, long? libraryId, bool viaCancellation, CancellationToken cancellationToken)
+        UnitOfWork uow, HandoffOrigin origin, HandoffTargetFinish finish, WireObject? result, long? libraryId, bool viaCancellation, CancellationToken cancellationToken)
     {
         var staged = await StageReadyReportAsync(uow, origin, finish, result, libraryId, viaCancellation, cancellationToken).ConfigureAwait(false);
         if (staged is not { } ready)
@@ -92,7 +92,7 @@ public sealed partial class HandoffCompletionReporter
     /// no write happens here, so it never needs the write lock a report's eventual persistence takes.
     /// </summary>
     private async Task<StagedReport?> StageReadyReportAsync(
-        UnitOfWork uow, HandoffOrigin origin, HandoffTargetFinish finish, PyDict? result, long? libraryId, bool viaCancellation, CancellationToken cancellationToken)
+        UnitOfWork uow, HandoffOrigin origin, HandoffTargetFinish finish, WireObject? result, long? libraryId, bool viaCancellation, CancellationToken cancellationToken)
     {
         var row = finish.Row!;
         var targets = finish.Targets!;
@@ -131,9 +131,9 @@ public sealed partial class HandoffCompletionReporter
     }
 
     /// <summary>The library's output folder as Weir sees it: from the pass that just finished, else from the library itself.</summary>
-    private static async Task<string?> LocalOutputFolderAsync(UnitOfWork uow, HandoffLedgerRow row, PyDict? result)
+    private static async Task<string?> LocalOutputFolderAsync(UnitOfWork uow, HandoffLedgerRow row, WireObject? result)
     {
-        if (result?.Get("processing_output_folder_resolved") is PyStr { Value.Length: > 0 } resolved)
+        if (result?.Get("processing_output_folder_resolved") is WireString { Value.Length: > 0 } resolved)
         {
             return resolved.Value;
         }
@@ -144,14 +144,14 @@ public sealed partial class HandoffCompletionReporter
     }
 
     /// <summary>The ledger state a one-file report means.</summary>
-    private static string FileReportState(PyDict body)
+    private static string FileReportState(WireObject body)
     {
-        if (body.Get("status") is not PyStr { Value: "completed" })
+        if (body.Get("status") is not WireString { Value: "completed" })
         {
             return HandoffLedgerRules.Failed;
         }
 
-        return body.Get("message") is PyStr { Value: CompletionReports.PassThroughAfterFailureMessage }
+        return body.Get("message") is WireString { Value: CompletionReports.PassThroughAfterFailureMessage }
             ? HandoffLedgerRules.PassedThrough
             : HandoffLedgerRules.Completed;
     }
@@ -170,9 +170,9 @@ public sealed partial class HandoffCompletionReporter
             origin.SourceKey,
             origin.HandoffId,
             outcome.State,
-            body.Get("outputPath") is PyStr output ? output.Value : null,
-            body.Get("message") is PyStr message ? message.Value : null,
-            body.Get("outputFiles") is PyList files ? [.. files.Items.OfType<PyStr>().Select(file => file.Value)] : null).ConfigureAwait(false);
+            body.Get("outputPath") is WireString output ? output.Value : null,
+            body.Get("message") is WireString message ? message.Value : null,
+            body.Get("outputFiles") is WireArray files ? [.. files.Items.OfType<WireString>().Select(file => file.Value)] : null).ConfigureAwait(false);
         if (target is null || string.IsNullOrEmpty(origin.HandoffId))
         {
             return null;

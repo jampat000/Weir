@@ -10,7 +10,7 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 public sealed partial class RemuxPassHandler
 {
     private sealed record Claim(
-        PyDict? Failure,
+        WireObject? Failure,
         ProcessingOperatorSettingsRecord? Operator = null,
         ProcessingLibraryRecord? Library = null,
         ProcessingRulesConfig? Rules = null,
@@ -43,7 +43,7 @@ public sealed partial class RemuxPassHandler
 
                 if (problem is not null)
                 {
-                    return new Claim(new PyDict()
+                    return new Claim(new WireObject()
                         .Set("job_id", context.Id)
                         .Set("ok", false)
                         .Set("outcome", RemuxPassOutcomes.FailedBeforeExecution)

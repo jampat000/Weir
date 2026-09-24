@@ -22,7 +22,7 @@ public static class ProcessingFailureClasses
     public const string Unknown = "unknown";
 
     /// <summary>Map a pass outcome onto the retry vocabulary.</summary>
-    public static string Classify(string? outcome) => PyStrings.Strip(outcome ?? string.Empty).ToLowerInvariant() switch
+    public static string Classify(string? outcome) => WireStrings.Strip(outcome ?? string.Empty).ToLowerInvariant() switch
     {
         RemuxPassOutcomes.FailedBeforeExecution => Preflight,
         RemuxPassOutcomes.FailedDuringExecution => Execution,
@@ -33,7 +33,7 @@ public static class ProcessingFailureClasses
     /// <summary>Whether the library retries this class; guardrail and unknown never are.</summary>
     public static bool IsRetryable(string failureClass, bool retryPreflightFailures, bool retryExecutionFailures)
     {
-        var value = PyStrings.Strip(failureClass ?? string.Empty).ToLowerInvariant();
+        var value = WireStrings.Strip(failureClass ?? string.Empty).ToLowerInvariant();
         return value switch
         {
             Preflight => retryPreflightFailures,
@@ -69,7 +69,7 @@ public static class RetryPolicy
     public static RetryDecision DecideRetry(ProcessingLibraryRecord library, string failureClass, long attemptsSoFar, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(library);
-        var value = PyStrings.Strip(failureClass ?? string.Empty).ToLowerInvariant();
+        var value = WireStrings.Strip(failureClass ?? string.Empty).ToLowerInvariant();
         if (!ProcessingFailureClasses.IsRetryable(value, library.RetryPreflightFailures, library.RetryExecutionFailures))
         {
             return new RetryDecision(false, null, NotRetryableReason(value, library));
@@ -101,7 +101,7 @@ public static class RetryPolicy
     /// </summary>
     public static RetryDecision DecideForRecordedFailure(ProcessingLibraryRecord library, string failureClass, long previousAttempts, string? previousFailureClass, DateTimeOffset now)
     {
-        var value = PyStrings.Strip(failureClass ?? string.Empty).ToLowerInvariant();
+        var value = WireStrings.Strip(failureClass ?? string.Empty).ToLowerInvariant();
         var attempts = previousAttempts + 1;
         var decision = DecideRetry(library, value, attempts, now);
         var consecutive = previousFailureClass == value ? attempts : 1;

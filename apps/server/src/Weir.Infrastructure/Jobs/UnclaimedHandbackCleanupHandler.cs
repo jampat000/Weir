@@ -100,13 +100,13 @@ public sealed partial class UnclaimedHandbackCleanupHandler : IJobHandler
         }
 
         var label = scope == "tv" ? "TV" : "Movies";
-        var detail = new PyDict()
+        var detail = new WireObject()
             .Set("job_id", context.Id)
             .Set("media_scope", scope)
             .Set("module", "processing")
             .Set("action", "cleanup")
             .Set("window_days", days)
-            .Set("counts", new PyDict()
+            .Set("counts", new WireObject()
                 .Set("checked", rows.Count)
                 .Set("removed", removed)
                 .Set("already_gone", gone)
@@ -130,7 +130,7 @@ public sealed partial class UnclaimedHandbackCleanupHandler : IJobHandler
         await LockedWrites.RunAsync(
             _store.Database,
             uow => SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(
-                ActivityEventTypes.ProcessingUnclaimedHandbackCleanupCompleted, "processing", title, PyJsonWriter.Dumps(detail, PyJsonFormat.Compact))),
+                ActivityEventTypes.ProcessingUnclaimedHandbackCleanupCompleted, "processing", title, WireJsonWriter.Dumps(detail, WireJsonFormat.Compact))),
             _logger,
             "unclaimed hand-back cleanup completed",
             cancellationToken).ConfigureAwait(false);

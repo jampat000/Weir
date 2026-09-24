@@ -48,10 +48,10 @@ public static class SuitePauseEndpoints
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var row = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-        PyDateTime? until = null;
+        Timestamp? until = null;
         if (paused && minutes is { } m)
         {
-            until = PyDateTime.FromUtc(PyDateTime.UtcNow(request.Time).AsUtc.AddMinutes(m));
+            until = Timestamp.FromUtc(Timestamp.UtcNow(request.Time).AsUtc.AddMinutes(m));
         }
 
         var updated = row with { ProcessingPaused = paused, ScanWhilePaused = scanWhilePaused, ProcessingPausedUntil = until };
@@ -60,11 +60,11 @@ public static class SuitePauseEndpoints
     }
 
     /// <summary>Resolve the pause, clearing a lapsed one so the row and the screen agree.</summary>
-    private static async Task<PyDict> PauseOutAsync(ApiRequest request)
+    private static async Task<WireObject> PauseOutAsync(ApiRequest request)
     {
         var uow = await request.DbAsync().ConfigureAwait(false);
         var row = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-        var state = PauseState.Resolve(row, PyDateTime.UtcNow(request.Time).AsUtc);
+        var state = PauseState.Resolve(row, Timestamp.UtcNow(request.Time).AsUtc);
         if (state.Expired)
         {
             await SuiteSettingsStore.UpdateAsync(uow, row, row with { ProcessingPaused = false, ProcessingPausedUntil = null }).ConfigureAwait(false);

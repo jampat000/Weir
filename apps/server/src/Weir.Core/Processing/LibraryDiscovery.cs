@@ -57,7 +57,7 @@ public static class LibraryDiscoveryRules
 
     /// <summary>A path for comparison: case- and separator-insensitive, matching <c>HandoffPaths</c>.</summary>
     public static string Comparable(string path) =>
-        PyStrings.Strip(path.Replace('\\', '/')).TrimEnd('/').ToLowerInvariant();
+        WireStrings.Strip(path.Replace('\\', '/')).TrimEnd('/').ToLowerInvariant();
 
     /// <summary>
     /// Absolute on *any* host, judged textually. <c>Path.IsPathRooted</c> answers for

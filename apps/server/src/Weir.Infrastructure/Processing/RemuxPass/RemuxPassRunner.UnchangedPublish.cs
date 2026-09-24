@@ -8,9 +8,9 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 
 public sealed partial class RemuxPassRunner
 {
-    private async Task<PyDict> PlaceUnchangedAsync(
+    private async Task<WireObject> PlaceUnchangedAsync(
         PassContext context,
-        PyDict output,
+        WireObject output,
         RemuxPlan plan,
         IReadOnlyList<string> argv,
         string audioBefore,
@@ -50,7 +50,7 @@ public sealed partial class RemuxPassRunner
                 disk.Message,
                 "minimum_free_disk_space",
                 context.Inspected,
-                new PyDict()
+                new WireObject()
                     .Set("disk_checked_path", disk.CheckedPath)
                     .Set("disk_free_mb", Math.Round(disk.FreeMb, 1, MidpointRounding.ToEven))
                     .Set("minimum_free_disk_space_mb", disk.RequiredMb)
@@ -89,10 +89,10 @@ public sealed partial class RemuxPassRunner
             lastAt = now;
             var bytesPerSecond = copied / elapsed;
             var remaining = Math.Max(0, total - copied);
-            report(new PyDict()
+            report(new WireObject()
                 .Set("status", "processing")
                 .Set("percent", percent)
-                .Set("eta_seconds", bytesPerSecond > 0 ? PyJson.Of(remaining / bytesPerSecond) : PyNull.Instance)
+                .Set("eta_seconds", bytesPerSecond > 0 ? WireValue.Of(remaining / bytesPerSecond) : WireNull.Instance)
                 .Set("elapsed_seconds", elapsed)
                 .Set("relative_media_path", relativeMediaPath)
                 .Set("inspected_source_path", context.Inspected)
@@ -127,16 +127,16 @@ public sealed partial class RemuxPassRunner
         catch (Exception exception) when (exception is not OperationCanceledException)
 #pragma warning restore CA1031
         {
-            report?.Invoke(new PyDict()
+            report?.Invoke(new WireObject()
                 .Set("status", "failed")
-                .Set("percent", PyNull.Instance)
-                .Set("eta_seconds", PyNull.Instance)
+                .Set("percent", WireNull.Instance)
+                .Set("eta_seconds", WireNull.Instance)
                 .Set("relative_media_path", relativeMediaPath)
                 .Set("inspected_source_path", context.Inspected)
                 .Set("media_scope", context.Scope)
                 .Set("message", "Weir could not copy this unchanged file to the output folder.")
                 .Set("reason", exception.Message));
-            return new PyDict()
+            return new WireObject()
                 .Set("ok", false)
                 .Set("outcome", RemuxPassOutcomes.FailedDuringExecution)
                 .Set("preflight_status", "ok")

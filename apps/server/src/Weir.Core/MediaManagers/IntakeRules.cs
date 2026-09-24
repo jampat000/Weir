@@ -65,10 +65,10 @@ public static partial class IntakeRules
     }
 
     /// <summary>The job payload intake writes, with <paramref name="target"/> as its <c>relative_media_path</c>.</summary>
-    public static PyDict Payload(MediaManagerImportEvent importEvent, IntakeLibrary? library, string? resolvedRelativePath, string target)
+    public static WireObject Payload(MediaManagerImportEvent importEvent, IntakeLibrary? library, string? resolvedRelativePath, string target)
     {
         ArgumentNullException.ThrowIfNull(importEvent);
-        var payload = new PyDict()
+        var payload = new WireObject()
             .Set("relative_media_path", resolvedRelativePath)
             .Set("media_scope", library is not null ? library.MediaType : importEvent.MediaScope)
             .Set("trigger", "webhook");
@@ -79,7 +79,7 @@ public static partial class IntakeRules
 
         if (!string.IsNullOrEmpty(importEvent.HandoffId) || !string.IsNullOrEmpty(importEvent.CallbackPath))
         {
-            payload.Set("origin", new PyDict()
+            payload.Set("origin", new WireObject()
                 .Set("source_key", importEvent.SourceKey)
                 .Set("handoff_id", importEvent.HandoffId)
                 .Set("callback_path", importEvent.CallbackPath)
@@ -92,7 +92,7 @@ public static partial class IntakeRules
     }
 
     /// <summary>The payload as compact JSON (no spaces after separators), the form existing job rows hold.</summary>
-    public static string PayloadJson(PyDict payload) => PyJsonWriter.Dumps(payload, PyJsonFormat.Compact);
+    public static string PayloadJson(WireObject payload) => WireJsonWriter.Dumps(payload, WireJsonFormat.Compact);
 
     /// <summary>
     /// The choice among libraries whose watched folder holds the file: a library of the
@@ -180,30 +180,30 @@ public static partial class IntakeRules
         path.AsSpan().IndexOfAny(['\\', '@', ':', '?', '#']) < 0;
 
     public static string InvalidCallbackPathDetail(string path) =>
-        $"The hand-off's callback path {PyStrings.Repr(path)} is not one Weir can use. Nothing was queued.";
+        $"The hand-off's callback path {WireStrings.Repr(path)} is not one Weir can use. Nothing was queued.";
 
     public static string NoVideoInFolderDetail(string relativePath) =>
-        $"The hand-off names the folder {PyStrings.Repr(relativePath)}, but it holds no video file Weir processes. Nothing was queued.";
+        $"The hand-off names the folder {WireStrings.Repr(relativePath)}, but it holds no video file Weir processes. Nothing was queued.";
 
     public static string UnknownSourceDetail(string sourceKey) =>
-        $"Unknown media manager source {PyStrings.Repr(sourceKey)}. Known sources: {string.Join(", ", ImportEvents.KnownSourceKeys())}. " +
+        $"Unknown media manager source {WireStrings.Repr(sourceKey)}. Known sources: {string.Join(", ", ImportEvents.KnownSourceKeys())}. " +
         "Use 'native' for a manager without a dialect of its own.";
 
-    public static string UnknownSourceShortDetail(string sourceKey) => $"Unknown media manager source {PyStrings.Repr(sourceKey)}.";
+    public static string UnknownSourceShortDetail(string sourceKey) => $"Unknown media manager source {WireStrings.Repr(sourceKey)}.";
 
     /// <summary>The Activity title when a manager cancels a hand-off.</summary>
     public static string CancelledTitle(string sourceKey, string relativePath, bool windows) =>
-        $"{PyValues.Capitalize(sourceKey)} cancelled its hand-off of {MediaPathNames.Name(relativePath, windows)}";
+        $"{ManagerValues.Capitalize(sourceKey)} cancelled its hand-off of {MediaPathNames.Name(relativePath, windows)}";
 
     /// <summary>The Activity title when a person cancelled a hand-off's queued pass in Weir (#643).</summary>
     public static string CancelledInWeirTitle(string sourceKey, string relativePath, bool windows) =>
-        $"The hand-off of {MediaPathNames.Name(relativePath, windows)} from {PyValues.Capitalize(sourceKey)} was cancelled in Weir";
+        $"The hand-off of {MediaPathNames.Name(relativePath, windows)} from {ManagerValues.Capitalize(sourceKey)} was cancelled in Weir";
 
     /// <summary>The Activity detail when a hand-off is cancelled: <c>webhook</c> when its manager did it, <c>manual</c> when a
     /// person did it in Weir.</summary>
     public static string CancelledDetail(string sourceKey, string handoffId, string relativePath, long? libraryId, string sentence, string trigger = "webhook") =>
-        PyJsonWriter.Dumps(
-            new PyDict()
+        WireJsonWriter.Dumps(
+            new WireObject()
                 .Set("source", sourceKey)
                 .Set("handoff_id", handoffId)
                 .Set("relative_media_path", relativePath)
@@ -211,7 +211,7 @@ public static partial class IntakeRules
                 .Set("trigger", trigger)
                 .Set("result", "success")
                 .Set("message", sentence),
-            PyJsonFormat.Compact);
+            WireJsonFormat.Compact);
 
     public static string RefusedCancelSentence(string state) => $"This hand-off is {state}, so Weir did not cancel it.";
 }

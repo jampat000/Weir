@@ -47,12 +47,12 @@ public sealed class RemuxPassFailureRecorder : IUnhandledJobFailureRecorder
 
                 var decision = await RemuxPassFileState.RecordFailureAsync(uow, library, failure.RelativeMediaPath, ProcessingFailureClasses.Unknown, failure.Message, _time.GetUtcNow())
                     .ConfigureAwait(false);
-                PyDict? origin = null;
+                WireObject? origin = null;
                 try
                 {
-                    origin = PyJsonParser.Parse(failure.Context.PayloadJson ?? "{}") is PyDict payload ? payload.Get("origin") as PyDict : null;
+                    origin = WireJsonParser.Parse(failure.Context.PayloadJson ?? "{}") is WireObject payload ? payload.Get("origin") as WireObject : null;
                 }
-                catch (PyJsonDecodeException exception)
+                catch (WireJsonDecodeException exception)
                 {
                     // The failure is still recorded and the policy still applied, only without the hand-off origin.
                     _logger.LogWarning(exception, "Unhandled-failure recorder could not read the payload of job_id={JobId}; applying the failure policy without its origin.", failure.Context.Id);

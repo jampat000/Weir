@@ -152,22 +152,22 @@ public sealed class RuntimeMetricsStore
     }
 
     /// <summary>The <c>GET /api/v1/suite/metrics</c> body.</summary>
-    public PyDict SuiteMetricsOut()
+    public WireObject SuiteMetricsOut()
     {
         var summary = GetSummary();
-        var statusCounts = new PyDict();
+        var statusCounts = new WireObject();
         foreach (var (bucket, count) in summary.StatusCounts)
         {
             statusCounts.Set(bucket, count);
         }
 
-        return new PyDict()
+        return new WireObject()
             .Set("uptime_seconds", summary.UptimeSeconds)
             .Set("total_requests", summary.TotalRequests)
             .Set("average_response_ms", summary.AverageResponseMs)
             .Set("error_log_count", summary.ErrorLogCount)
             .Set("status_counts", statusCounts)
-            .Set("busiest_routes", new PyList(summary.BusiestRoutes.Select(route => (PyJson)new PyDict()
+            .Set("busiest_routes", new WireArray(summary.BusiestRoutes.Select(route => (WireValue)new WireObject()
                 .Set("route", route.Route)
                 .Set("request_count", route.RequestCount)
                 .Set("average_response_ms", route.AverageResponseMs))));

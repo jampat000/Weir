@@ -26,12 +26,12 @@ public static class ProcessingOverviewMaintenanceEndpoints
     {
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var issues = new ValidationIssues();
-        var windowDays = request.Query("window_days") is { } raw && PydanticRules.TryInt(new PyStr(raw), ["query", "window_days"], 1, 3650, issues, out var parsed) ? (int)parsed : 30;
+        var windowDays = request.Query("window_days") is { } raw && FieldRules.TryInt(new WireString(raw), ["query", "window_days"], 1, 3650, issues, out var parsed) ? (int)parsed : 30;
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var stats = await OverviewStatsStore.BuildAsync(uow, windowDays, request.Time).ConfigureAwait(false);
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("window_days", stats.WindowDays)
             .Set("files_processed", stats.FilesProcessed)
             .Set("files_failed", stats.FilesFailed)
@@ -46,17 +46,17 @@ public static class ProcessingOverviewMaintenanceEndpoints
     /// One family, with how often it runs and when it next does (Settings › Cleanup). The next run comes from the family's
     /// own timer, so it is null while the family is switched off; the interval is the one in force either way.
     /// </summary>
-    private static PyDict FamilyOut(MaintenanceFamilyState state, TimeSpan interval, DateTimeOffset? nextRunAt) => new PyDict()
+    private static WireObject FamilyOut(MaintenanceFamilyState state, TimeSpan interval, DateTimeOffset? nextRunAt) => new WireObject()
         .Set("family", state.Family)
         .Set("enabled", state.Enabled)
         .Set("description", state.Description)
         .Set("pending", state.Pending)
         .Set("running", state.Running)
-        .Set("last_completed_at", state.LastCompletedAt?.PydanticJson())
-        .Set("last_failed_at", state.LastFailedAt?.PydanticJson())
+        .Set("last_completed_at", state.LastCompletedAt?.ToWireText())
+        .Set("last_failed_at", state.LastFailedAt?.ToWireText())
         .Set("last_error", state.LastError)
         .Set("interval_seconds", (long)interval.TotalSeconds)
-        .Set("next_run_at", nextRunAt is { } next ? PyDateTime.FromDateTimeOffset(next).PydanticJson() : null);
+        .Set("next_run_at", nextRunAt is { } next ? Timestamp.FromDateTimeOffset(next).ToWireText() : null);
 
     private static async Task<ApiResult> GetMaintenanceAsync(ApiRequest request)
     {
@@ -70,14 +70,14 @@ public static class ProcessingOverviewMaintenanceEndpoints
 
         var clock = request.Service<PeriodicEnqueueClock>();
         var options = request.Options;
-        PyDict Out(MaintenanceFamilyState state, long? saved, int environment)
+        WireObject Out(MaintenanceFamilyState state, long? saved, int environment)
         {
             var timer = clock.NextRunFor(MaintenanceStore.JobKindsFor(state.Family));
             var interval = timer?.Interval ?? TimeSpan.FromSeconds(saved is > 0 ? saved.Value : environment);
             return FamilyOut(state, interval, state.Enabled ? timer?.NextRunAt : null);
         }
 
-        return ApiRoutes.Ok(new PyDict().Set("families", new PyList(
+        return ApiRoutes.Ok(new WireObject().Set("families", new WireArray(
         [
             Out(sweep, operatorRow.WorkTempStaleSweepIntervalSeconds, options.ProcessingWorkTempStaleSweepMovieScheduleIntervalSeconds),
             Out(cleanup, operatorRow.FailureCleanupIntervalSeconds, options.ProcessingMovieFailureCleanupScheduleIntervalSeconds),
@@ -106,7 +106,7 @@ public static class ProcessingOverviewMaintenanceEndpoints
             await MaintenanceStore.EnqueueWorkTempStaleSweepAsync(request.Service<ProcessingJobStore>(), mediaScope, "manual").ConfigureAwait(false);
             await request.CommitAsync().ConfigureAwait(false);
             var scopeWord = mediaScope == "tv" ? "TV" : "Movies";
-            return ApiRoutes.Ok(new PyDict().Set("queued", true).Set("detail", $"Queued a work file sweep for {scopeWord}. It runs as soon as a worker is free."));
+            return ApiRoutes.Ok(new WireObject().Set("queued", true).Set("detail", $"Queued a work file sweep for {scopeWord}. It runs as soon as a worker is free."));
         }
 
         if (family == "unclaimed_handbacks")
@@ -114,7 +114,7 @@ public static class ProcessingOverviewMaintenanceEndpoints
             await MaintenanceStore.EnqueueUnclaimedHandbackCleanupAsync(request.Service<ProcessingJobStore>(), mediaScope, "manual").ConfigureAwait(false);
             await request.CommitAsync().ConfigureAwait(false);
             var scopeWord = mediaScope == "tv" ? "TV" : "Movies";
-            return ApiRoutes.Ok(new PyDict()
+            return ApiRoutes.Ok(new WireObject()
                 .Set("queued", true)
                 .Set("detail", $"Queued the unclaimed hand-back cleanup for {scopeWord}. It runs as soon as a worker is free."));
         }
@@ -123,14 +123,14 @@ public static class ProcessingOverviewMaintenanceEndpoints
         await request.CommitAsync().ConfigureAwait(false);
         if (!inserted)
         {
-            return ApiRoutes.Ok(new PyDict()
+            return ApiRoutes.Ok(new WireObject()
                 .Set("queued", false)
                 .Set("job_id", jobId)
                 .Set("detail", "A failure cleanup for this scope is already waiting or running, so nothing new was queued."));
         }
 
         var label = mediaScope == "tv" ? "TV" : "Movies";
-        return ApiRoutes.Ok(new PyDict()
+        return ApiRoutes.Ok(new WireObject()
             .Set("queued", true)
             .Set("job_id", jobId)
             .Set("detail", $"Queued failure cleanup for {label}. It runs as soon as a worker is free."));

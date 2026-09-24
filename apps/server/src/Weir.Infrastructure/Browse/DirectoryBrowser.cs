@@ -39,7 +39,7 @@ public sealed class DirectoryBrowseException : Exception
 /// <summary>Server-side folder browsing for path settings.</summary>
 public static partial class DirectoryBrowser
 {
-    public static PyDict Browse(string? path)
+    public static WireObject Browse(string? path)
     {
         if (path is null || path.Trim().Length == 0)
         {
@@ -79,7 +79,7 @@ public static partial class DirectoryBrowser
             parentPath = parentPath.TrimEnd('\\', '/') + "\\";
         }
 
-        var entries = new List<(string Name, PyDict Entry)>();
+        var entries = new List<(string Name, WireObject Entry)>();
         try
         {
             foreach (var child in Directory.EnumerateFileSystemEntries(normalized))
@@ -91,7 +91,7 @@ public static partial class DirectoryBrowser
 
                 var name = Path.GetFileName(child.TrimEnd(Path.DirectorySeparatorChar));
                 var childPath = RealPath(NormalizeDirectoryPath(child));
-                entries.Add((name, new PyDict()
+                entries.Add((name, new WireObject()
                     .Set("name", name.Length == 0 ? child : name)
                     .Set("path", childPath)
                     .Set("kind", "directory")
@@ -183,19 +183,19 @@ public static partial class DirectoryBrowser
         }
     }
 
-    private static PyDict Out(string? current, string? parent, IEnumerable<PyDict> entries) => new PyDict()
+    private static WireObject Out(string? current, string? parent, IEnumerable<WireObject> entries) => new WireObject()
         .Set("current_path", current)
         .Set("parent_path", parent)
-        .Set("entries", new PyList(entries));
+        .Set("entries", new WireArray(entries));
 
-    private static List<PyDict> RootEntries()
+    private static List<WireObject> RootEntries()
     {
         if (!OperatingSystem.IsWindows())
         {
             return [Entry("/", "/", "root", "Filesystem root")];
         }
 
-        var entries = new List<PyDict>();
+        var entries = new List<WireObject>();
         foreach (var letter in Enumerable.Range('A', 26).Select(c => (char)c))
         {
             var root = $"{letter}:\\";
@@ -228,7 +228,7 @@ public static partial class DirectoryBrowser
         return entries;
     }
 
-    private static PyDict Entry(string name, string path, string kind, string? description) => new PyDict()
+    private static WireObject Entry(string name, string path, string kind, string? description) => new WireObject()
         .Set("name", name)
         .Set("path", path)
         .Set("kind", kind)

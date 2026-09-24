@@ -60,8 +60,8 @@ public static partial class RemuxOutputValidation
             return [];
         }
 
-        var streams = Py.Get(probe, "streams");
-        if (!Py.IsList(streams))
+        var streams = RulesJson.Get(probe, "streams");
+        if (!RulesJson.IsList(streams))
         {
             return [];
         }
@@ -74,7 +74,7 @@ public static partial class RemuxOutputValidation
                 continue;
             }
 
-            var codecType = Py.IsStr(Py.Get(stream, "codec_type")) ? Py.Lower(Py.Get(stream, "codec_type")!.Value.GetString()!) : string.Empty;
+            var codecType = RulesJson.IsStr(RulesJson.Get(stream, "codec_type")) ? RulesJson.Lower(RulesJson.Get(stream, "codec_type")!.Value.GetString()!) : string.Empty;
 
             // #547: an attachment stream (a font for ASS/SSA, say) is mapped through unchanged when the container
             // supports it, but it is not part of the plan's video/audio/subtitle layout — the plan has no
@@ -84,13 +84,13 @@ public static partial class RemuxOutputValidation
                 continue;
             }
 
-            var disposition = Py.Get(stream, "disposition");
-            var tags = Py.Get(stream, "tags");
+            var disposition = RulesJson.Get(stream, "disposition");
+            var tags = RulesJson.Get(stream, "tags");
             string? language = null;
-            if (Py.IsDict(tags))
+            if (RulesJson.IsDict(tags))
             {
-                var raw = Py.Get(tags!.Value, "language");
-                if (Py.Truthy(raw) && Py.IsStr(raw))
+                var raw = RulesJson.Get(tags!.Value, "language");
+                if (RulesJson.Truthy(raw) && RulesJson.IsStr(raw))
                 {
                     language = raw!.Value.GetString();
                 }
@@ -103,5 +103,5 @@ public static partial class RemuxOutputValidation
     }
 
     private static bool DispositionFlag(JsonElement? disposition, string name) =>
-        Py.IsDict(disposition) && Py.TryInt(Py.Get(disposition!.Value, name), out var flag) && flag != 0;
+        RulesJson.IsDict(disposition) && RulesJson.TryInt(RulesJson.Get(disposition!.Value, name), out var flag) && flag != 0;
 }

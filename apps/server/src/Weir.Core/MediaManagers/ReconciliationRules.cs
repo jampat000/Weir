@@ -14,7 +14,7 @@ public sealed record ReconciliationIssue(
     string? RepairAction = null,
     bool RequiresConfirmation = false)
 {
-    public PyDict AsDict() => new PyDict()
+    public WireObject AsDict() => new WireObject()
         .Set("kind", Kind)
         .Set("module", Module)
         .Set("severity", Severity)
@@ -44,18 +44,18 @@ public static class ReconciliationRules
     }
 
     /// <summary>The reconciliation report's JSON shape.</summary>
-    public static PyDict Report(IReadOnlyList<ReconciliationIssue> issues)
+    public static WireObject Report(IReadOnlyList<ReconciliationIssue> issues)
     {
         ArgumentNullException.ThrowIfNull(issues);
-        return new PyDict()
+        return new WireObject()
             .Set("ok", issues.Count == 0)
             .Set("issue_count", issues.Count)
-            .Set("issues", new PyList(issues.Select(issue => (PyJson)issue.AsDict())))
-            .Set("repair_actions", new PyList(issues
+            .Set("issues", new WireArray(issues.Select(issue => (WireValue)issue.AsDict())))
+            .Set("repair_actions", new WireArray(issues
                 .Select(issue => issue.RepairAction)
                 .Where(action => !string.IsNullOrEmpty(action))
                 .Distinct(StringComparer.Ordinal)
                 .Order(StringComparer.Ordinal)
-                .Select(action => (PyJson)new PyStr(action!))));
+                .Select(action => (WireValue)new WireString(action!))));
     }
 }

@@ -76,10 +76,10 @@ public static class ActiveRemuxPasses
         var rows = await uow.QueryAsync(
             "SELECT payload_json, not_before FROM jobs WHERE job_kind = @kind AND status = @pending " +
             "AND not_before IS NOT NULL AND julianday(not_before) > julianday(@now)",
-            reader => (PayloadJson: reader.IsDBNull(0) ? null : reader.GetString(0), StartsAt: PythonTimestamps.Parse(reader.GetValue(1))),
+            reader => (PayloadJson: reader.IsDBNull(0) ? null : reader.GetString(0), StartsAt: TimestampColumns.Parse(reader.GetValue(1))),
             ("@kind", RemuxPassOutcomes.JobKind),
             ("@pending", ProcessingJobStatus.Pending),
-            ("@now", PythonTimestamps.Orm(now))).ConfigureAwait(false);
+            ("@now", TimestampColumns.Orm(now))).ConfigureAwait(false);
         var earliest = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
         foreach (var (payloadJson, startsAt) in rows)
         {
@@ -108,23 +108,23 @@ public static class ActiveRemuxPasses
             return null;
         }
 
-        PyJson data;
+        WireValue data;
         try
         {
-            data = PyJsonParser.Parse(raw);
+            data = WireJsonParser.Parse(raw);
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
             return null;
         }
 
-        if (data is not PyDict dict || dict.Get("relative_media_path") is not PyStr relative)
+        if (data is not WireObject dict || dict.Get("relative_media_path") is not WireString relative)
         {
             return null;
         }
 
-        var scope = dict.Get("media_scope") is PyStr scopeText ? ProcessingMediaScopes.Normalize(scopeText.Value) : ProcessingMediaScopes.Movie;
-        long? libraryId = dict.Get("library_id") is PyInt libraryValue ? (long)libraryValue.Value : null;
+        var scope = dict.Get("media_scope") is WireString scopeText ? ProcessingMediaScopes.Normalize(scopeText.Value) : ProcessingMediaScopes.Movie;
+        long? libraryId = dict.Get("library_id") is WireInteger libraryValue ? (long)libraryValue.Value : null;
         return new PassFile(relative.Value.Trim(), scope, libraryId);
     }
 }

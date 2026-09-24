@@ -288,9 +288,9 @@ public sealed class SwapRecoverySweep
         var detail = $"Weir kept both copies of {fileName}; check {entry.KeptOriginalPath} and remove the incomplete one.";
         try
         {
-            var extra = new PyDict().Set("relative_path", entry.OriginalPath).Set("kept_original_path", entry.KeptOriginalPath);
+            var extra = new WireObject().Set("relative_path", entry.OriginalPath).Set("kept_original_path", entry.KeptOriginalPath);
             await _activityWriter.RecordAsync(
-                    new ActivityEventDraft(LibraryActivityEventTypes.OriginalKeepConflict, "library", detail, PyJsonWriter.Dumps(extra, PyJsonFormat.Compact)),
+                    new ActivityEventDraft(LibraryActivityEventTypes.OriginalKeepConflict, "library", detail, WireJsonWriter.Dumps(extra, WireJsonFormat.Compact)),
                     cancellationToken)
                 .ConfigureAwait(false);
         }

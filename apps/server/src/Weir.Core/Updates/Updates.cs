@@ -14,7 +14,7 @@ public sealed record GitHubReleaseRecord(
     string Version,
     string? ReleaseName,
     string? HtmlUrl,
-    PyDateTime? PublishedAt,
+    Timestamp? PublishedAt,
     bool Draft,
     bool Prerelease,
     IReadOnlyList<GitHubReleaseAsset> Assets)
@@ -84,7 +84,7 @@ public static class ReleaseCatalog
 
     public static string TagForVersion(string version)
     {
-        var normalized = NormalizeReleaseVersion(version) ?? throw new PyValueErrorException("Release version is missing.");
+        var normalized = NormalizeReleaseVersion(version) ?? throw new WireValueException("Release version is missing.");
         return "v" + normalized;
     }
 
@@ -129,41 +129,41 @@ public static class ReleaseCatalog
         return left.Count.CompareTo(right.Count);
     }
 
-    /// <summary>Reads the release API's JSON into a <see cref="GitHubReleaseRecord"/>. Throws <see cref="PyValueErrorException"/> for an unusable payload.</summary>
-    public static GitHubReleaseRecord CoerceReleasePayload(PyJson payload)
+    /// <summary>Reads the release API's JSON into a <see cref="GitHubReleaseRecord"/>. Throws <see cref="WireValueException"/> for an unusable payload.</summary>
+    public static GitHubReleaseRecord CoerceReleasePayload(WireValue payload)
     {
-        if (payload is not PyDict dict)
+        if (payload is not WireObject dict)
         {
-            throw new PyValueErrorException("Release API returned an unexpected response.");
+            throw new WireValueException("Release API returned an unexpected response.");
         }
 
         var tagName = OrText(dict.Get("tag_name")).Trim();
-        var version = NormalizeReleaseVersion(tagName) ?? throw new PyValueErrorException("Release metadata is missing a valid tag name.");
-        PyDateTime? publishedAt = null;
-        if (dict.Get("published_at") is PyStr published && published.Value.Trim().Length > 0)
+        var version = NormalizeReleaseVersion(tagName) ?? throw new WireValueException("Release metadata is missing a valid tag name.");
+        Timestamp? publishedAt = null;
+        if (dict.Get("published_at") is WireString published && published.Value.Trim().Length > 0)
         {
-            if (!PyDateTime.TryFromIsoFormat(published.Value.Trim().Replace("Z", "+00:00", StringComparison.Ordinal), out var parsed))
+            if (!Timestamp.TryFromIsoFormat(published.Value.Trim().Replace("Z", "+00:00", StringComparison.Ordinal), out var parsed))
             {
-                throw new PyValueErrorException($"Invalid isoformat string: {PyStrings.Repr(published.Value.Trim())}");
+                throw new WireValueException($"Invalid isoformat string: {WireStrings.Repr(published.Value.Trim())}");
             }
 
             publishedAt = parsed;
         }
 
         var assets = new List<GitHubReleaseAsset>();
-        if (dict.Get("assets") is PyList list)
+        if (dict.Get("assets") is WireArray list)
         {
-            foreach (var item in list.Items.OfType<PyDict>())
+            foreach (var item in list.Items.OfType<WireObject>())
             {
                 var name = OrText(item.Get("name")).Trim();
                 var apiUrl = OrText(item.Get("url")).Trim();
                 if (name.Length == 0 || apiUrl.Length == 0)
                 {
-                    throw new PyValueErrorException("Release asset metadata is incomplete.");
+                    throw new WireValueException("Release asset metadata is incomplete.");
                 }
 
                 var contentType = OrText(item.Get("content_type")).Trim();
-                var size = item.Get("size") is { } sizeValue && sizeValue.IsTruthy ? PyConvert.ToInt(sizeValue) : BigInteger.Zero;
+                var size = item.Get("size") is { } sizeValue && sizeValue.IsTruthy ? WireConvert.ToInt(sizeValue) : BigInteger.Zero;
                 assets.Add(new GitHubReleaseAsset(
                     name, apiUrl, OrText(item.Get("browser_download_url")).Trim(),
                     size > long.MaxValue ? long.MaxValue : (long)size,
@@ -178,7 +178,7 @@ public static class ReleaseCatalog
             publishedAt, dict.Get("draft")?.IsTruthy ?? false, dict.Get("prerelease")?.IsTruthy ?? false, assets);
     }
 
-    private static string OrText(PyJson? value) => value is null || !value.IsTruthy ? string.Empty : PyConvert.Str(value);
+    private static string OrText(WireValue? value) => value is null || !value.IsTruthy ? string.Empty : WireConvert.Str(value);
 }
 
 /// <summary>The update status and update-settings payloads, and the tray's settings and state files.</summary>
@@ -187,7 +187,7 @@ public static class UpdateStatus
     public const string DockerImage = "ghcr.io/jampat000/weir";
     public static readonly IReadOnlyList<string> Modes = ["Auto", "DownloadOnly", "NotifyOnly"];
 
-    public static PyDict Unavailable(string currentVersion, string installType, string status, string summary) =>
+    public static WireObject Unavailable(string currentVersion, string installType, string status, string summary) =>
         Base(currentVersion, installType, status, summary)
             .Set("latest_version", (string?)null)
             .Set("latest_name", (string?)null)
@@ -201,7 +201,7 @@ public static class UpdateStatus
             .Set("in_app_upgrade_summary", (string?)null);
 
     /// <summary>The update status once a release was fetched.</summary>
-    public static PyDict FromRelease(string currentVersion, string installType, GitHubReleaseRecord release)
+    public static WireObject FromRelease(string currentVersion, string installType, GitHubReleaseRecord release)
     {
         ArgumentNullException.ThrowIfNull(release);
         var currentKey = ReleaseCatalog.ParseVersionKey(currentVersion);
@@ -230,7 +230,7 @@ public static class UpdateStatus
         return Base(currentVersion, installType, status, summary)
             .Set("latest_version", release.Version)
             .Set("latest_name", release.ReleaseName ?? release.Version)
-            .Set("published_at", release.PublishedAt?.PydanticJson())
+            .Set("published_at", release.PublishedAt?.ToWireText())
             .Set("release_url", release.HtmlUrl)
             .Set("windows_installer_url", installer?.BrowserDownloadUrl)
             .Set("docker_image", installType == "docker" ? DockerImage : null)
@@ -240,50 +240,50 @@ public static class UpdateStatus
             .Set("in_app_upgrade_summary", installType == "windows" ? "Updates are managed by the Weir desktop app via Velopack." : null);
     }
 
-    public static PyDict UpdateSettingsOut(string mode, bool checkOnStartup, long checkIntervalMinutes) => new PyDict()
+    public static WireObject UpdateSettingsOut(string mode, bool checkOnStartup, long checkIntervalMinutes) => new WireObject()
         .Set("mode", mode)
         .Set("check_on_startup", checkOnStartup)
         .Set("check_interval_minutes", checkIntervalMinutes);
 
-    public static readonly PyDict DefaultUpdateSettings = UpdateSettingsOut("Auto", true, 60);
+    public static readonly WireObject DefaultUpdateSettings = UpdateSettingsOut("Auto", true, 60);
 
-    public static readonly PyDict UnreadableUpdateSettings = UpdateSettingsOut("NotifyOnly", true, 60);
+    public static readonly WireObject UnreadableUpdateSettings = UpdateSettingsOut("NotifyOnly", true, 60);
 
     /// <summary>
     /// Reads <c>update-settings.json</c>'s text; <see langword="null"/> when it cannot be read and the
-    /// notify-only fallback applies. Throws <see cref="PyTypeErrorException"/> for valid JSON that is not an
+    /// notify-only fallback applies. Throws <see cref="WireTypeException"/> for valid JSON that is not an
     /// object.
     /// </summary>
-    public static PyDict? ParseUpdateSettings(string text)
+    public static WireObject? ParseUpdateSettings(string text)
     {
-        PyJson raw;
+        WireValue raw;
         try
         {
-            raw = PyJsonParser.Parse(text);
+            raw = WireJsonParser.Parse(text);
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
             return null;
         }
 
-        if (raw is not PyDict dict)
+        if (raw is not WireObject dict)
         {
-            throw new PyTypeErrorException("update-settings.json must hold a JSON object.");
+            throw new WireTypeException("update-settings.json must hold a JSON object.");
         }
 
-        var mode = PyConvert.Str(dict.Get("mode") ?? new PyStr(string.Empty)).Trim();
+        var mode = WireConvert.Str(dict.Get("mode") ?? new WireString(string.Empty)).Trim();
         if (!Modes.Contains(mode, StringComparer.Ordinal))
         {
             return null;
         }
 
-        var checkOnStartup = (dict.Get("checkOnStartup") ?? PyBool.True).IsTruthy;
+        var checkOnStartup = (dict.Get("checkOnStartup") ?? WireBool.True).IsTruthy;
         BigInteger interval;
         try
         {
-            interval = PyConvert.ToInt(dict.Get("checkIntervalMinutes") ?? new PyInt(60));
+            interval = WireConvert.ToInt(dict.Get("checkIntervalMinutes") ?? new WireInteger(60));
         }
-        catch (Exception exception) when (exception is PyValueErrorException or PyTypeErrorException)
+        catch (Exception exception) when (exception is WireValueException or WireTypeException)
         {
             return null;
         }
@@ -293,14 +293,14 @@ public static class UpdateStatus
 
     /// <summary>The <c>update-settings.json</c> the tray reads, as JSON indented by two spaces.</summary>
     public static string SerializeUpdateSettings(string mode, bool checkOnStartup, long checkIntervalMinutes) =>
-        PyJsonWriter.Dumps(
-            new PyDict().Set("mode", mode).Set("checkOnStartup", checkOnStartup).Set("checkIntervalMinutes", checkIntervalMinutes),
-            PyJsonFormat.Indented);
+        WireJsonWriter.Dumps(
+            new WireObject().Set("mode", mode).Set("checkOnStartup", checkOnStartup).Set("checkIntervalMinutes", checkIntervalMinutes),
+            WireJsonFormat.Indented);
 
     /// <summary>Reads the tray's update state file: whether an update is downloaded and its version, with a not-downloaded fallback.</summary>
-    public static PyDict ParseUpdateState(string? text)
+    public static WireObject ParseUpdateState(string? text)
     {
-        var fallback = new PyDict().Set("downloaded", false).Set("pending_version", (string?)null);
+        var fallback = new WireObject().Set("downloaded", false).Set("pending_version", (string?)null);
         if (text is null)
         {
             return fallback;
@@ -308,7 +308,7 @@ public static class UpdateStatus
 
         try
         {
-            if (PyJsonParser.Parse(text) is not PyDict dict)
+            if (WireJsonParser.Parse(text) is not WireObject dict)
             {
                 return fallback;
             }
@@ -317,7 +317,7 @@ public static class UpdateStatus
             string? pending = null;
             if (version is not null && version.IsTruthy)
             {
-                if (version is not PyStr s)
+                if (version is not WireString s)
                 {
                     return fallback;
                 }
@@ -325,17 +325,17 @@ public static class UpdateStatus
                 pending = s.Value;
             }
 
-            return new PyDict()
-                .Set("downloaded", (dict.Get("downloaded") ?? PyBool.False).IsTruthy)
+            return new WireObject()
+                .Set("downloaded", (dict.Get("downloaded") ?? WireBool.False).IsTruthy)
                 .Set("pending_version", pending);
         }
-        catch (PyJsonDecodeException)
+        catch (WireJsonDecodeException)
         {
             return fallback;
         }
     }
 
-    private static PyDict Base(string currentVersion, string installType, string status, string summary) => new PyDict()
+    private static WireObject Base(string currentVersion, string installType, string status, string summary) => new WireObject()
         .Set("current_version", currentVersion)
         .Set("install_type", installType)
         .Set("status", status)

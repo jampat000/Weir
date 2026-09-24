@@ -33,13 +33,13 @@ public interface IRemuxPassFileFacts
 
 /// <summary>Everything the TV season-folder cleanup is handed.</summary>
 public sealed record TvSeasonCleanupContext(
-    PyDict Output,
+    WireObject Output,
     ProcessingPathRuntime Runtime,
     string Source,
     string WatchedRoot,
     long MinFileAgeSeconds,
     long? CurrentJobId,
-    PyDict RemuxContext,
+    WireObject RemuxContext,
     string? FinalOutputFile);
 
 /// <summary>
@@ -67,21 +67,21 @@ public sealed class SkippedTvSeasonFolderCleanup : ITvSeasonFolderCleanup
         ArgumentNullException.ThrowIfNull(context);
         InitFields(context.Output);
         context.Output.Set("tv_season_folder_skip_reason", SkipReason);
-        context.Output.Set("tv_episode_check_summary", new PyList([new PyStr(SkipReason)]));
+        context.Output.Set("tv_episode_check_summary", new WireArray([new WireString(SkipReason)]));
         return Task.CompletedTask;
     }
 
     /// <summary>Sets every TV season-cleanup Activity field to its default unless a value is already present.</summary>
-    public static void InitFields(PyDict output)
+    public static void InitFields(WireObject output)
     {
-        OutputFolderCleanup.SetDefault(output, "tv_season_folder_deleted", PyBool.False);
-        OutputFolderCleanup.SetDefault(output, "tv_season_folder_path", PyNull.Instance);
-        OutputFolderCleanup.SetDefault(output, "tv_season_folder_skip_reason", PyNull.Instance);
-        OutputFolderCleanup.SetDefault(output, "tv_episode_check_summary", new PyList());
-        OutputFolderCleanup.SetDefault(output, "tv_output_completeness_check", new PyDict());
-        OutputFolderCleanup.SetDefault(output, "tv_cascade_folders_deleted", new PyList());
-        OutputFolderCleanup.SetDefault(output, "tv_manager_queue_unavailable", PyBool.False);
-        OutputFolderCleanup.SetDefault(output, "source_deleted_after_success", PyBool.False);
+        OutputFolderCleanup.SetDefault(output, "tv_season_folder_deleted", WireBool.False);
+        OutputFolderCleanup.SetDefault(output, "tv_season_folder_path", WireNull.Instance);
+        OutputFolderCleanup.SetDefault(output, "tv_season_folder_skip_reason", WireNull.Instance);
+        OutputFolderCleanup.SetDefault(output, "tv_episode_check_summary", new WireArray());
+        OutputFolderCleanup.SetDefault(output, "tv_output_completeness_check", new WireObject());
+        OutputFolderCleanup.SetDefault(output, "tv_cascade_folders_deleted", new WireArray());
+        OutputFolderCleanup.SetDefault(output, "tv_manager_queue_unavailable", WireBool.False);
+        OutputFolderCleanup.SetDefault(output, "source_deleted_after_success", WireBool.False);
     }
 }
 

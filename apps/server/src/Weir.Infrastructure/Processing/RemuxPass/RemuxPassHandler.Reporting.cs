@@ -7,7 +7,7 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 public sealed partial class RemuxPassHandler
 {
     /// <summary>Tells the originating manager how the pass went. Best effort; never throws.</summary>
-    private async Task ReportBackAsync(string? payloadJson, PyDict result)
+    private async Task ReportBackAsync(string? payloadJson, WireObject result)
     {
         if (_reporter is null)
         {

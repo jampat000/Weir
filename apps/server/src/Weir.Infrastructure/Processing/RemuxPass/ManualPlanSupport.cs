@@ -97,7 +97,7 @@ public static class ManualPlanSupport
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(choice);
 
-        var payload = new PyDict()
+        var payload = new WireObject()
             .Set("relative_media_path", context.File.RelativePath)
             .Set("media_scope", context.Library.MediaType)
             .Set("library_id", context.Library.Id)
@@ -110,7 +110,7 @@ public static class ManualPlanSupport
             uow.WriteTransaction(),
             $"{RemuxPassOutcomes.JobKind}:manual-plan:{context.File.Id}:{Guid.NewGuid():N}",
             RemuxPassOutcomes.JobKind,
-            PyJsonWriter.Dumps(payload, PyJsonFormat.Compact),
+            WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
             0,
             0);
