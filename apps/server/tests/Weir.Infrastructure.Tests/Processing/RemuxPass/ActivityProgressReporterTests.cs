@@ -1,21 +1,25 @@
 using System.Threading.Channels;
 using Microsoft.Extensions.Time.Testing;
 using Weir.Core.Json;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 
 namespace Weir.Infrastructure.Tests.Processing.RemuxPass;
 
 /// <summary>
-/// How a pass's live progress reaches the database (#710): off the tool's output reader, at most once every two seconds,
-/// with a change of status saved at once.
+/// How a pass's live progress reaches the database (#750): a row at the start of a pass and when its stage
+/// changes, and a final save at the end even when the stage did not just change. Everything in between — a
+/// percent-only update inside the same stage, however often ffmpeg reports one — stays in
+/// <see cref="LiveProgressStore"/> and never touches the database.
 /// </summary>
 public sealed class ActivityProgressReporterTests
 {
     private readonly FakeTimeProvider _time = new();
+    private readonly LiveProgressStore _liveProgress = new();
     private readonly Channel<PyDict> _saved = Channel.CreateUnbounded<PyDict>();
 
     private ActivityProgressReporter Reporter(Func<PyDict, Task>? save = null) =>
-        new(save ?? (body => _saved.Writer.WriteAsync(body).AsTask()), jobId: 7, new PyDict().Set("trigger", "scan"), _time);
+        new(save ?? (body => _saved.Writer.WriteAsync(body).AsTask()), jobId: 7, new PyDict().Set("trigger", "scan").Set("relative_media_path", "Film/Film.mkv"), _time, _liveProgress);
 
     private static PyDict Writing(double percent) => new PyDict().Set("status", "processing").Set("percent", percent);
 
@@ -35,33 +39,33 @@ public sealed class ActivityProgressReporterTests
     }
 
     [Fact]
-    public async Task Reports_within_the_interval_wait_for_it_and_only_the_newest_is_saved()
+    public async Task A_percent_only_update_inside_the_same_stage_is_never_saved()
     {
-        var savedAt = new List<DateTimeOffset>();
-        var reporter = Reporter(body =>
-        {
-            savedAt.Add(_time.GetUtcNow());
-            return _saved.Writer.WriteAsync(body).AsTask();
-        });
+        var reporter = Reporter();
         reporter.Report(Writing(10));
         await _saved.Reader.ReadAsync();
 
         reporter.Report(Writing(20));
         reporter.Report(Writing(30));
-        var next = _saved.Reader.ReadAsync().AsTask();
-        while (!next.IsCompleted)
-        {
-            _time.Advance(TimeSpan.FromMilliseconds(250));
-            await Task.Yield();
-        }
+        reporter.Report(Writing(40));
 
-        Assert.Equal(30, Percent(await next));
-        Assert.True(savedAt[1] - savedAt[0] >= ActivityProgressReporter.MinimumInterval);
+        // Nothing further arrives: no database write happened for the three percent-only reports.
         Assert.False(_saved.Reader.TryRead(out _));
     }
 
     [Fact]
-    public async Task A_change_of_status_is_saved_without_waiting_out_the_interval()
+    public void A_percent_only_update_still_reaches_the_live_progress_store()
+    {
+        var reporter = Reporter();
+        reporter.Report(Writing(10));
+
+        reporter.Report(Writing(64));
+
+        Assert.Equal(64, _liveProgress.Snapshot()["Film/Film.mkv"].Percent);
+    }
+
+    [Fact]
+    public async Task A_change_of_status_is_saved_without_waiting()
     {
         var reporter = Reporter();
         reporter.Report(Writing(99));
@@ -74,7 +78,7 @@ public sealed class ActivityProgressReporterTests
     }
 
     [Fact]
-    public async Task Completing_saves_the_newest_report_and_ignores_any_after_it()
+    public async Task Completing_saves_a_percent_only_update_that_had_not_reached_the_database_yet()
     {
         var reporter = Reporter();
         reporter.Report(Writing(10));
@@ -86,6 +90,30 @@ public sealed class ActivityProgressReporterTests
 
         Assert.True(_saved.Reader.TryRead(out var last));
         Assert.Equal(20, Percent(last));
+        Assert.False(_saved.Reader.TryRead(out _));
+    }
+
+    [Fact]
+    public async Task Completing_right_after_a_stage_change_does_not_save_it_twice()
+    {
+        var reporter = Reporter();
+        reporter.Report(Writing(10));
+        await _saved.Reader.ReadAsync();
+        reporter.Report(new PyDict().Set("status", "finished").Set("percent", 100.0));
+        await _saved.Reader.ReadAsync();
+
+        await reporter.CompleteAsync();
+
+        Assert.False(_saved.Reader.TryRead(out _));
+    }
+
+    [Fact]
+    public async Task Completing_with_no_report_at_all_saves_nothing()
+    {
+        var reporter = Reporter();
+
+        await reporter.CompleteAsync();
+
         Assert.False(_saved.Reader.TryRead(out _));
     }
 
@@ -114,5 +142,27 @@ public sealed class ActivityProgressReporterTests
         await reporter.CompleteAsync();
 
         Assert.Equal(["processing", "finished"], saved);
+    }
+
+    [Fact]
+    public async Task The_pass_leaves_the_live_progress_store_once_it_completes()
+    {
+        var reporter = Reporter();
+        reporter.Report(Writing(50));
+        Assert.True(_liveProgress.Snapshot().ContainsKey("Film/Film.mkv"));
+
+        await reporter.CompleteAsync();
+
+        Assert.False(_liveProgress.Snapshot().ContainsKey("Film/Film.mkv"));
+    }
+
+    [Fact]
+    public void A_report_whose_status_is_not_live_never_enters_the_store()
+    {
+        var reporter = Reporter();
+
+        reporter.Report(new PyDict().Set("status", "waiting"));
+
+        Assert.False(_liveProgress.Snapshot().ContainsKey("Film/Film.mkv"));
     }
 }

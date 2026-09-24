@@ -2,7 +2,9 @@
  * Every file Weir is working on, from the moment it lands to the moment the media manager has it back,
  * in five lanes that fold to the width they are given (weir-processing-board.css). Every number comes
  * from the server; the page follows the Activity stream rather than polling, and ticks once a second so
- * countdowns and "min ago" move between updates.
+ * countdowns and "min ago" move between updates. A working file's percent, ETA and message come from the
+ * same stream's live-progress frame (#750), which moves about once a second even though the file list
+ * itself only changes on a database write — the start of a pass, a stage change, or its end.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -13,7 +15,10 @@ import { PageLoading } from "../../components/shared/page-loading";
 import { PageHeader } from "../../components/shell/page-header";
 import type { FinishedFile } from "../../lib/activity/processing-outcome";
 import { activityKeys } from "../../lib/activity/query-keys";
-import { useActivityStreamInvalidations } from "../../lib/activity/use-activity-stream-invalidation";
+import {
+  useActivityStreamInvalidations,
+  useLiveProgress,
+} from "../../lib/activity/use-activity-stream-invalidation";
 import { loadErrorMessage } from "../../lib/api/error-message";
 import { usePauseQuery } from "../../lib/pause/pause-queries";
 import type { ProcessingFile } from "../../lib/processing/files-api";
@@ -23,6 +28,7 @@ import {
 } from "../../lib/processing/files-queries";
 import { useProcessingJobsInspectionQuery } from "../../lib/processing/jobs-inspection/queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
+import { mergeLiveProgress } from "../../lib/processing/live-progress-merge";
 import { useProcessingFilesAtOnceQuery } from "../../lib/processing/queries";
 import { processingKeys } from "../../lib/processing/query-keys";
 import { parseAppTime } from "../../lib/ui/mm-format-date";
@@ -78,6 +84,7 @@ function useLanes() {
     "active",
     ACTIVE_JOBS_LIMIT,
   );
+  const liveProgress = useLiveProgress();
   const lanes = useMemo(() => {
     const all = libraries.data ?? [];
     const nextLooks = new Map<number, { at: number; interval: number }>();
@@ -91,13 +98,13 @@ function useLanes() {
       }
     }
     return buildLanes(
-      files.data?.files ?? [],
+      mergeLiveProgress(files.data?.files ?? [], liveProgress),
       activeJobs.data?.jobs ?? [],
       new Map(all.map((l) => [l.id, l.name])),
       new Map(all.map((l) => [l.id, l.min_file_age_seconds])),
       nextLooks,
     );
-  }, [files.data, activeJobs.data, libraries.data]);
+  }, [files.data, activeJobs.data, libraries.data, liveProgress]);
   return { files, libraries, lanes };
 }
 

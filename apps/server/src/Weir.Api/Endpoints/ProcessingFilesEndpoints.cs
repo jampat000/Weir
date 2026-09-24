@@ -131,7 +131,7 @@ public static class ProcessingFilesEndpoints
         var libraryNames = await FileStateStore.LibraryNamesAsync(uow).ConfigureAwait(false);
         var knownDevices = DeviceProfileLoader.Load(request.Options.WeirHome);
         var devices = await DirectPlayService.SelectedProfilesAsync(uow, knownDevices).ConfigureAwait(false);
-        var progressByPath = await LiveProgressStore.ByPathAsync(uow, request.Time).ConfigureAwait(false);
+        var progressByPath = request.Service<LiveProgressStore>().Snapshot();
         var handbacks = await HandbackStore.ForLibrariesAsync(uow, rows.Select(row => row.LibraryId)).ConfigureAwait(false);
 
         var files = new List<PyJson>();

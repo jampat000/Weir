@@ -1,108 +1,149 @@
-using Microsoft.Extensions.Logging.Abstractions;
-using Weir.Core.Json;
 using Weir.Infrastructure.Processing;
-using Weir.Infrastructure.Processing.RemuxPass;
-using Weir.Infrastructure.Sqlite;
-using Weir.Infrastructure.Tests.Platform;
 
 namespace Weir.Infrastructure.Tests.Processing;
 
 /// <summary>
-/// What Live reads about a file being worked on (docs/archive/live-and-library.md), written by
-/// <see cref="ActivityProgressReporter"/> and read back by <see cref="LiveProgressStore"/>.
+/// The process-wide, in-memory live progress store (#750): what a running pass looks like on the Processing screen,
+/// kept up to date without ever touching the database.
 /// </summary>
 public sealed class LiveProgressStoreTests
 {
-    private static PyDict Writing(string path, double percent) => new PyDict()
-        .Set("status", "processing")
-        .Set("relative_media_path", path)
-        .Set("percent", percent)
-        .Set("eta_seconds", 31.0)
-        .Set("elapsed_seconds", 12L)
-        .Set("speed", "148x")
-        .Set("removed_audio", new PyList([PyJson.Of("spa aac 2ch: removed"), PyJson.Of("fre aac 2ch: removed")]))
-        .Set("removed_subtitles", new PyList([PyJson.Of("ger subrip: removed")]))
-        .Set("message", "Weir is writing the cleaned-up file.");
+    private static LiveProgress Writing(double percent) => new(
+        Percent: percent,
+        Message: "Weir is writing the cleaned-up file.",
+        EtaSeconds: 31.0,
+        Status: "processing",
+        Speed: "148x",
+        ElapsedSeconds: 12.0,
+        RemovedAudio: ["spa aac 2ch: removed"],
+        RemovedSubtitles: ["ger subrip: removed"]);
 
-    private static async Task<Dictionary<string, LiveProgress>> ReadAsync(StoreFixture store)
+    [Fact]
+    public void A_file_that_was_never_updated_has_no_entry()
     {
-        await using var uow = await UnitOfWork.OpenAsync(store.Database);
-        return await LiveProgressStore.ByPathAsync(uow, store.Clock);
+        var store = new LiveProgressStore();
+
+        Assert.Empty(store.Snapshot());
     }
 
     [Fact]
-    public async Task A_working_file_carries_its_step_speed_and_what_is_coming_out()
+    public void An_update_appears_in_the_snapshot_by_its_path()
     {
-        using var store = new StoreFixture();
-        var reporter = new ActivityProgressReporter(store.Database, 7, new PyDict(), NullLogger.Instance, store.Clock);
+        var store = new LiveProgressStore();
 
-        reporter.Report(Writing("Show/S01E01.mkv", 42.5));
-        await reporter.FlushAsync();
+        store.Update("Show/S01E01.mkv", Writing(42.5));
 
-        var progress = (await ReadAsync(store))["Show/S01E01.mkv"];
-        Assert.Equal("processing", progress.Status);
-        Assert.Equal(42.5, progress.Percent);
-        Assert.Equal(31.0, progress.EtaSeconds);
-        Assert.Equal(12.0, progress.ElapsedSeconds);
-        Assert.Equal("148x", progress.Speed);
-        Assert.Equal(["spa aac 2ch: removed", "fre aac 2ch: removed"], progress.RemovedAudio);
-        Assert.Equal(["ger subrip: removed"], progress.RemovedSubtitles);
+        var snapshot = store.Snapshot();
+        Assert.Equal(42.5, snapshot["Show/S01E01.mkv"].Percent);
+        Assert.Equal("148x", snapshot["Show/S01E01.mkv"].Speed);
     }
 
     [Fact]
-    public async Task The_final_checks_read_as_finishing()
+    public void A_later_update_to_the_same_path_replaces_the_earlier_one()
     {
-        using var store = new StoreFixture();
-        var reporter = new ActivityProgressReporter(store.Database, 8, new PyDict(), NullLogger.Instance, store.Clock);
+        var store = new LiveProgressStore();
 
-        reporter.Report(Writing("Film (2024)/Film.mkv", 99));
-        reporter.Report(new PyDict()
-            .Set("status", "finishing")
-            .Set("relative_media_path", "Film (2024)/Film.mkv")
-            .Set("percent", 100.0)
-            .Set("message", "The cleaned-up file was written. Weir is doing final safety checks."));
-        await reporter.FlushAsync();
+        store.Update("Film/Film.mkv", Writing(10));
+        store.Update("Film/Film.mkv", Writing(55));
 
-        var progress = (await ReadAsync(store))["Film (2024)/Film.mkv"];
-        Assert.Equal("finishing", progress.Status);
-        Assert.Equal(100.0, progress.Percent);
+        Assert.Equal(55, store.Snapshot()["Film/Film.mkv"].Percent);
     }
 
     [Fact]
-    public async Task A_pass_longer_than_two_minutes_keeps_its_progress_while_it_is_still_reporting()
+    public void Removing_a_path_drops_it_from_the_snapshot()
     {
-        // The row is inserted once and rewritten, so created_at is when the pass started. Judging staleness on
-        // created_at dropped every pass longer than two minutes: a big file's progress vanished part-way.
-        // created_at comes from SQLite's own clock, so the test clock has to agree with it for the old rule to bite.
-        using var store = new StoreFixture();
-        store.Clock.Set(DateTimeOffset.UtcNow);
-        var reporter = new ActivityProgressReporter(store.Database, 9, new PyDict(), NullLogger.Instance, store.Clock);
-        reporter.Report(Writing("Big/Big.mkv", 5));
-        await reporter.FlushAsync();
-        await store.WithUnitOfWork(async uow =>
+        var store = new LiveProgressStore();
+        store.Update("Film/Film.mkv", Writing(90));
+
+        store.Remove("Film/Film.mkv");
+
+        Assert.Empty(store.Snapshot());
+    }
+
+    [Fact]
+    public void Removing_a_path_that_was_never_added_does_nothing()
+    {
+        var store = new LiveProgressStore();
+
+        store.Remove("Never/There.mkv");
+
+        Assert.Empty(store.Snapshot());
+    }
+
+    [Fact]
+    public async Task Several_files_updating_at_once_never_lose_or_corrupt_each_others_entries()
+    {
+        // The store is shared by every independent lane; one file's writer must never wait on, or clobber,
+        // another's (#750).
+        var store = new LiveProgressStore();
+        const int Files = 8;
+        const int UpdatesPerFile = 200;
+
+        var writers = Enumerable.Range(0, Files).Select(file => Task.Run(() =>
         {
-            // The pass started half an hour ago.
-            await uow.ExecuteAsync("UPDATE activity_events SET created_at = datetime(created_at, '-30 minutes')");
-            return 0;
-        });
+            for (var i = 0; i < UpdatesPerFile; i++)
+            {
+                store.Update($"Film{file}/Film.mkv", Writing(i % 100));
+            }
+        }));
+        await Task.WhenAll(writers);
 
-        reporter.Report(Writing("Big/Big.mkv", 64));
-        await reporter.FlushAsync();
-
-        var progress = (await ReadAsync(store))["Big/Big.mkv"];
-        Assert.Equal(64, progress.Percent);
+        var snapshot = store.Snapshot();
+        Assert.Equal(Files, snapshot.Count);
+        for (var file = 0; file < Files; file++)
+        {
+            Assert.True(snapshot.ContainsKey($"Film{file}/Film.mkv"));
+        }
     }
 
     [Fact]
-    public async Task A_pass_that_stopped_reporting_drops_out()
+    public async Task Waiting_for_a_change_returns_as_soon_as_an_update_happens()
     {
-        using var store = new StoreFixture();
-        var reporter = new ActivityProgressReporter(store.Database, 10, new PyDict(), NullLogger.Instance, store.Clock);
-        reporter.Report(Writing("Gone/Gone.mkv", 30));
-        await reporter.FlushAsync();
+        var store = new LiveProgressStore();
+        var wait = store.WaitForChangeAsync(store.Version, TimeSpan.FromSeconds(5), TimeProvider.System);
 
-        store.Clock.Set(store.Clock.GetUtcNow().AddMinutes(3));
+        store.Update("Film/Film.mkv", Writing(1));
 
-        Assert.False((await ReadAsync(store)).ContainsKey("Gone/Gone.mkv"));
+        var version = await wait.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.NotNull(version);
+        Assert.Equal(store.Version, version);
+    }
+
+    [Fact]
+    public async Task Waiting_with_a_version_already_behind_returns_at_once()
+    {
+        var store = new LiveProgressStore();
+        store.Update("Film/Film.mkv", Writing(1));
+        var staleVersion = store.Version - 1;
+
+        var version = await store.WaitForChangeAsync(staleVersion, TimeSpan.FromSeconds(5), TimeProvider.System);
+
+        Assert.Equal(store.Version, version);
+    }
+
+    [Fact]
+    public async Task Waiting_with_nothing_changing_times_out_to_null()
+    {
+        var store = new LiveProgressStore();
+
+        // A zero timeout expires without an actual wall-clock wait.
+        var version = await store.WaitForChangeAsync(store.Version, TimeSpan.Zero, TimeProvider.System);
+
+        Assert.Null(version);
+    }
+
+    [Fact]
+    public async Task One_update_wakes_every_waiter()
+    {
+        // Every open stream calls WaitForChangeAsync on the same store, so one change must reach them all (#750).
+        var store = new LiveProgressStore();
+        var waiters = Enumerable.Range(0, 5)
+            .Select(_ => store.WaitForChangeAsync(store.Version, TimeSpan.FromSeconds(5), TimeProvider.System))
+            .ToArray();
+
+        store.Update("Film/Film.mkv", Writing(1));
+
+        var results = await Task.WhenAll(waiters);
+        Assert.All(results, version => Assert.Equal(store.Version, version));
     }
 }
