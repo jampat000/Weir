@@ -77,6 +77,12 @@ def ensure_admin_account(c: WeirClient) -> str | None:
     or inspects sessions gets that first session's id back (dash-normalised, matching
     ``user_sessions.id``) so it can account for it explicitly instead of miscounting; ``None`` means
     bootstrap did not run because an admin already existed.
+
+    A caller may run with ``WEIR_SESSION_COOKIE_SECURE=always`` (forcing ``Secure`` even over this
+    suite's plain-http requests), in which case the client's own cookie jar - correctly imitating a
+    browser - will not resend that cookie itself. The lookup below carries the raw value from
+    bootstrap's ``Set-Cookie`` explicitly instead of relying on the jar to send it back, so this
+    works the same whether or not the cookie in play is marked ``Secure``.
     """
 
     status = c.get(f"{API}/auth/bootstrap/status")
@@ -85,7 +91,9 @@ def ensure_admin_account(c: WeirClient) -> str | None:
         return None
     r = c.bootstrap()
     assert r.status_code == 200, r.text
-    session = c.get(f"{API}/auth/session")
+    raw_cookie = r.cookies.get(SESSION_COOKIE)
+    assert raw_cookie, "bootstrap must set a session cookie"
+    session = c.get(f"{API}/auth/session", cookies={SESSION_COOKIE: raw_cookie})
     assert session.status_code == 200, session.text
     bootstrap_session_id = str(session.json()["session_id"]).replace("-", "")
     c.cookies.clear()
