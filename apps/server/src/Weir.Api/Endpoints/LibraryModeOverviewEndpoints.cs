@@ -6,6 +6,7 @@ using Weir.Core.Processing;
 using Weir.Core.Time;
 using Weir.Core.Validation;
 using Weir.Infrastructure.LibraryMode;
+using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
 using static Weir.Api.Endpoints.EndpointLookups;
 
@@ -31,9 +32,9 @@ public static class LibraryModeOverviewEndpoints
     /// reported as now, since the timer starts it within half a minute.
     /// </summary>
     private static async Task<WireObject> ScheduleOutAsync(
-        UnitOfWork uow, ProcessingLibraryRecord library, LibrarySettings settings, DateTimeOffset now)
+        ApiRequest request, UnitOfWork uow, ProcessingLibraryRecord library, LibrarySettings settings, DateTimeOffset now)
     {
-        var next = await LibraryModeScheduling.NextRunAsync(uow, library, settings, now).ConfigureAwait(false);
+        var next = await LibraryModeScheduling.NextRunAsync(uow, request.Service<SuiteSettingsStore>(), library, settings, now).ConfigureAwait(false);
         return new WireObject()
             .Set("enabled", settings.ScheduleEnabled)
             .Set("next_run_at", next is { } at ? Timestamp.FromDateTimeOffset(at < now ? now : at).ToWireText() : null);
@@ -84,7 +85,7 @@ public static class LibraryModeOverviewEndpoints
             .Set("library_id", libraryId)
             .Set("folders_configured", settings.Folders.Count)
             .Set("scan", await LibraryModeMapping.ScanOutAsync(uow, libraryId, LibraryModeMapping.Logger(request)).ConfigureAwait(false))
-            .Set("schedule", await ScheduleOutAsync(uow, library, settings, request.Time.GetUtcNow()).ConfigureAwait(false))
+            .Set("schedule", await ScheduleOutAsync(request, uow, library, settings, request.Time.GetUtcNow()).ConfigureAwait(false))
             .Set("totals", LibraryModeMapping.TotalsOut(totals))
             .Set("breakdowns", breakdownsOut)
             .Set("problems", new WireArray(problems.Select(group => (WireValue)ProblemGroupOut(group)))));

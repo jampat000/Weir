@@ -131,7 +131,7 @@ internal static class ProcessingLibraryMapping
     private static async Task<PeriodicScanStatus> PeriodicScanStatusAsync(ApiRequest request, UnitOfWork uow, ProcessingLibraryRecord row, ScanWakeups? looks)
     {
         var operatorSettings = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-        var suite = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+        var suite = await request.Service<SuiteSettingsStore>().EnsureAsync(uow).ConfigureAwait(false);
         var timezoneName = string.IsNullOrWhiteSpace(suite.AppTimezone) ? "UTC" : suite.AppTimezone.Trim();
         var now = request.Service<TimeProvider>().GetUtcNow();
         return PeriodicScanStatus.Resolve(

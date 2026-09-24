@@ -29,6 +29,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
     private readonly WeirOptions _options;
     private readonly ProcessingJobStore _jobStore;
     private readonly MediaManagerConnectionService _managerConnections;
+    private readonly SuiteSettingsStore _suiteSettings;
 
     private readonly ScanWakeups? _wakeups;
 
@@ -38,6 +39,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         WeirOptions options,
         ProcessingJobStore jobStore,
         MediaManagerConnectionService managerConnections,
+        SuiteSettingsStore suiteSettings,
         ScanWakeups? wakeups = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
@@ -45,6 +47,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _jobStore = jobStore ?? throw new ArgumentNullException(nameof(jobStore));
         _managerConnections = managerConnections ?? throw new ArgumentNullException(nameof(managerConnections));
+        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
         _wakeups = wakeups;
     }
 
@@ -127,7 +130,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             var signals = await _managerConnections.CollectQueueSignalsAsync(uow, request.MediaScope, connectionIds, cancellationToken).ConfigureAwait(false);
 
             var operatorSettings = await OperatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
-            var suite = await SuiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
+            var suite = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
 
             var rules = LibraryAdmissionRules.For(library);

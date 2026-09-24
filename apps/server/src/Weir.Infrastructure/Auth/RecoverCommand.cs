@@ -71,10 +71,11 @@ public static class RecoverCommand
         RuntimeDirectories.AssertSqliteDbLocationUsable(options.DbPath);
 
         var database = new SqliteDatabase(options.DbPath);
+        var users = new AuthStore();
         var uow = await UnitOfWork.OpenAsync(database).ConfigureAwait(false);
         await using (uow.ConfigureAwait(false))
         {
-            var accounts = await AuthStore.ListUsersByUsernameAsync(uow).ConfigureAwait(false);
+            var accounts = await users.ListUsersByUsernameAsync(uow).ConfigureAwait(false);
 
             if (parsed.List)
             {
@@ -107,7 +108,7 @@ public static class RecoverCommand
                 return ExitUsage;
             }
 
-            var user = await AuthStore.FindAccountForRecoveryAsync(uow, parsed.Username).ConfigureAwait(false);
+            var user = await users.FindAccountForRecoveryAsync(uow, parsed.Username).ConfigureAwait(false);
             if (user is null)
             {
                 stderr.WriteLine($"No account named {WireStrings.Repr(parsed.Username ?? string.Empty)}. Use --list to see them.");
@@ -118,7 +119,7 @@ public static class RecoverCommand
             try
             {
                 var newPassword = ReadNewPassword(parsed.Password, passwordPrompt);
-                revoked = await ResetAccountPasswordAsync(uow, user, newPassword, time ?? TimeProvider.System).ConfigureAwait(false);
+                revoked = await ResetAccountPasswordAsync(uow, users, new ActivityStore(), user, newPassword, time ?? TimeProvider.System).ConfigureAwait(false);
             }
             catch (WireValueException exception)
             {
@@ -145,9 +146,11 @@ public static class RecoverCommand
     /// inactive sole admin is its own lockout), revoke every still-active session and record it in
     /// Activity. Returns the number of sessions revoked.
     /// </summary>
-    public static async Task<int> ResetAccountPasswordAsync(UnitOfWork uow, UserRecord user, string newPassword, TimeProvider time)
+    public static async Task<int> ResetAccountPasswordAsync(UnitOfWork uow, AuthStore users, ActivityStore activity, UserRecord user, string newPassword, TimeProvider time)
     {
         ArgumentNullException.ThrowIfNull(uow);
+        ArgumentNullException.ThrowIfNull(users);
+        ArgumentNullException.ThrowIfNull(activity);
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNull(time);
 
@@ -156,15 +159,15 @@ public static class RecoverCommand
             throw new WireValueException(problem);
         }
 
-        await AuthStore.UpdatePasswordHashAsync(uow, user.Id, PasswordHasher.Hash(newPassword)).ConfigureAwait(false);
+        await users.UpdatePasswordHashAsync(uow, user.Id, PasswordHasher.Hash(newPassword)).ConfigureAwait(false);
         // An inactive account cannot sign in, so recovery that left this alone would "succeed" and
         // still leave the operator locked out.
-        await AuthStore.SetActiveAsync(uow, user.Id, true).ConfigureAwait(false);
+        await users.SetActiveAsync(uow, user.Id, true).ConfigureAwait(false);
 
         var now = Timestamp.UtcNow(time);
-        var revoked = await AuthStore.RevokeActiveSessionsForUserAsync(uow, user.Id, now).ConfigureAwait(false);
+        var revoked = await users.RevokeActiveSessionsForUserAsync(uow, user.Id, now).ConfigureAwait(false);
 
-        await ActivityStore.RecordAsync(
+        await activity.RecordAsync(
             uow,
             ActivityEventTypes.AuthPasswordChanged,
             "auth",
