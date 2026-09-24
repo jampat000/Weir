@@ -29,7 +29,8 @@ WHERE relative_path IS NULL
 	AND json_type(detail, '$.relative_media_path') = 'text';
 
 -- 3. The same scan, a hand-off and every automatic enqueue ask whether a pass is already pending or running for a file, by
---    the path in its payload. This index holds only those passes, so the answer no longer means reading every queued job.
---    Queries repeat its WHERE clause word for word, because SQLite uses a partial index only for a query that states it.
+--    the path in its payload. This index holds only those passes, so the answer costs an index lookup, not a read of every
+--    queued job. Queries repeat its WHERE clause word for word, because SQLite uses a partial index only for a query that
+--    states it.
 CREATE INDEX ix_jobs_active_remux_pass_path ON jobs (json_extract(payload_json, '$.relative_media_path'))
 WHERE job_kind = 'processing.file.remux_pass.v1' AND status IN ('pending', 'leased');
