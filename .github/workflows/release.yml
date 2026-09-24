@@ -94,8 +94,8 @@ jobs:
             apps/server/**/packages.lock.json
             apps/tray/**/packages.lock.json
 
-      # Same caches as ci-packaging.yml: FFmpeg keyed on upstream's current build checksum, MKVToolNix on the
-      # build script that pins it. The build script re-checks the vendored copy either way.
+      # Same caches as ci-packaging.yml: both FFmpeg and MKVToolNix are pinned in build-velopack.ps1,
+      # so both keys come from that file's own pin. The build script re-checks the vendored copy either way.
       - name: FFmpeg build checksum
         id: ffmpeg
         shell: bash
