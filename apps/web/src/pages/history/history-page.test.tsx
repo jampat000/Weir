@@ -15,6 +15,11 @@ const files: {
   status_counts: Record<string, number>;
 } = { files: [], status_counts: {} };
 const cleans: { cleans: LibraryClean[] } = { cleans: [] };
+const filesQueryState: {
+  isLoading: boolean;
+  isError: boolean;
+  error: unknown;
+} = { isLoading: false, isError: false, error: null };
 const requeue = vi.fn();
 const requeueFiles = vi.fn();
 const processNow = vi.fn();
@@ -35,8 +40,9 @@ vi.mock("../../lib/processing/files-queries", async (importOriginal) => {
     >()),
     useFileHistoryQuery: () => ({
       data: files,
-      isLoading: false,
-      isError: false,
+      isLoading: filesQueryState.isLoading,
+      isError: filesQueryState.isError,
+      error: filesQueryState.error,
       refetch: vi.fn(),
     }),
     useLibraryCleansQuery: () => ({
@@ -139,6 +145,9 @@ describe("HistoryPage", () => {
     processNow.mockReset();
     fetchLog.mockReset();
     cleans.cleans = [];
+    filesQueryState.isLoading = false;
+    filesQueryState.isError = false;
+    filesQueryState.error = null;
     files.files = [
       file({ id: 1 }),
       file({
@@ -149,6 +158,18 @@ describe("HistoryPage", () => {
         updated_at: "2026-08-19T03:00:00",
       }),
     ];
+  });
+
+  it("says its file history could not load, through the shared load-error wording", () => {
+    filesQueryState.isError = true;
+    filesQueryState.error = new Error("boom");
+    renderPage();
+
+    expect(
+      screen.getByText(
+        "Weir couldn't load your file history. Reload the page to try again.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("counts every file under the chip it belongs to", () => {
@@ -218,6 +239,18 @@ describe("HistoryPage", () => {
     expect(within(detail).getByText("Spanish")).toBeInTheDocument();
     expect(within(detail).getByText("477 MB")).toBeInTheDocument();
     expect(within(detail).getByText("Handed back")).toBeInTheDocument();
+  });
+
+  it("says a file's record could not load, through the shared load-error wording", async () => {
+    fetchLog.mockRejectedValue(new Error("boom"));
+    renderPage("/history?file=1");
+    const detail = await screen.findByTestId("history-detail");
+
+    expect(
+      await within(detail).findByText(
+        "Weir couldn't load this file's record. Reload the page to try again.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("offers Try again on a failed file and says what the server answered", async () => {

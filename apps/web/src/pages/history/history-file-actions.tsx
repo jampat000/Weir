@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChooseTracksPanel } from "../../components/processing/choose-tracks-panel";
 import { ConfirmDialog } from "../../components/ui/confirm-dialog";
+import { errorMessage } from "../../lib/api/error-message";
 import type {
   ProcessingFile,
   ProcessingFileStatus,
@@ -82,9 +83,7 @@ export function HistoryFileActions({
     try {
       setNotice(await action());
     } catch (error) {
-      setNotice(
-        error instanceof Error && error.message ? error.message : failed,
-      );
+      setNotice(errorMessage(error, failed));
     }
   }
 
@@ -96,9 +95,12 @@ export function HistoryFileActions({
     setPlanError(null);
     try {
       setTracks(await fileTracks.mutateAsync(file.id));
-    } catch {
+    } catch (error) {
       setTracksError(
-        "Weir could not read this file's tracks. Refresh and try again.",
+        errorMessage(
+          error,
+          "Weir could not read this file's tracks. Refresh and try again.",
+        ),
       );
     }
   }
@@ -113,9 +115,10 @@ export function HistoryFileActions({
       setTracksOpen(false);
     } catch (error) {
       setPlanError(
-        error instanceof Error && error.message
-          ? error.message
-          : "That track choice could not be queued. Refresh the tracks and try again.",
+        errorMessage(
+          error,
+          "That track choice could not be queued. Refresh the tracks and try again.",
+        ),
       );
     }
   }

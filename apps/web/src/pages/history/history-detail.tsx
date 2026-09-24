@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 
 import { DirectPlayLine } from "../../components/processing/direct-play-line";
+import { LoadError } from "../../components/shared/load-error";
+import { PanelLoading } from "../../components/shared/page-loading";
 import { baseName } from "../../lib/format/path";
 import { usePauseQuery } from "../../lib/pause/pause-queries";
 import {
@@ -52,24 +54,20 @@ function RecordSection({
   file,
   pass,
   loading,
-  failed,
+  error,
   now,
 }: {
   file: ProcessingFile;
   pass: ProcessingFileLogEntry | null;
   loading: boolean;
-  failed: boolean;
+  error: unknown;
   now: number;
 }) {
   if (loading) {
-    return <p className="mm-history-note">Reading this file&rsquo;s record…</p>;
+    return <PanelLoading label="Reading this file's record…" />;
   }
-  if (failed) {
-    return (
-      <p className="mm-history-note" role="alert">
-        Weir could not read this file&rsquo;s record.
-      </p>
-    );
+  if (error) {
+    return <LoadError thing="this file's record" error={error} />;
   }
   if (!pass) {
     return (
@@ -147,7 +145,7 @@ export function HistoryDetail({
         file={file}
         pass={pass}
         loading={record.isLoading}
-        failed={record.isError}
+        error={record.error}
         now={now}
       />
 

@@ -14,6 +14,7 @@ import { PageHeader } from "../../components/shell/page-header";
 import type { FinishedFile } from "../../lib/activity/processing-outcome";
 import { activityKeys } from "../../lib/activity/query-keys";
 import { useActivityStreamInvalidations } from "../../lib/activity/use-activity-stream-invalidation";
+import { loadErrorMessage } from "../../lib/api/error-message";
 import { usePauseQuery } from "../../lib/pause/pause-queries";
 import type { ProcessingFile } from "../../lib/processing/files-api";
 import {
@@ -322,7 +323,11 @@ export function ProcessingPage(): React.ReactElement {
         fileName={storyFile ? prettyName(storyFile.name) : ""}
         log={fileLog.data}
         loading={fileLog.isPending}
-        error={fileLog.isError ? fileLog.error.message : null}
+        error={
+          fileLog.isError
+            ? loadErrorMessage(fileLog.error, "what happened to this file")
+            : null
+        }
         onClose={() => setStoryFile(null)}
       />
     </div>

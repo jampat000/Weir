@@ -17,6 +17,10 @@ const jobs: Record<string, { jobs: unknown[] }> = {
   failed: { jobs: [] },
 };
 const activity: Record<string, { items: unknown[] }> = {};
+const fileLogState: { isError: boolean; error: unknown } = {
+  isError: false,
+  error: null,
+};
 const pause = {
   paused: false,
   reason: "",
@@ -61,7 +65,8 @@ vi.mock("../../lib/processing/files-queries", () => ({
     mutate: vi.fn(),
     data: undefined,
     isPending: false,
-    isError: false,
+    isError: fileLogState.isError,
+    error: fileLogState.error,
   }),
 }));
 vi.mock("../../lib/processing/queries", () => ({
@@ -168,6 +173,8 @@ describe("ProcessingPage", () => {
     readiness.worker_health = [];
     refetchFiles.mockClear();
     refetchLibraries.mockClear();
+    fileLogState.isError = false;
+    fileLogState.error = null;
   });
 
   it("fetches fresh data once a countdown runs out, instead of saying it is checking for ever", () => {
@@ -603,5 +610,29 @@ describe("ProcessingPage", () => {
     expect(figure.querySelector(".mm-live-trend__pointed")).toHaveTextContent(
       "1 cleaned",
     );
+  });
+
+  it("says a file's story could not load, through the shared load-error wording", () => {
+    files.files = [
+      file({
+        id: 3,
+        status: "processing",
+        relative_path: "Glass.Orchard.S01E04.2160p.WEB-DL.mkv",
+        progress_percent: 46,
+      }),
+    ];
+    fileLogState.isError = true;
+    fileLogState.error = new Error("boom");
+    renderLive();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Glass Orchard S01E04" }),
+    );
+
+    expect(
+      screen.getByText(
+        "Weir couldn't load what happened to this file. Reload the page to try again.",
+      ),
+    ).toBeInTheDocument();
   });
 });

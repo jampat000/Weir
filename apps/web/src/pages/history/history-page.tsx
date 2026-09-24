@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { LoadError } from "../../components/shared/load-error";
+import { PanelLoading } from "../../components/shared/page-loading";
 import { PageHeader } from "../../components/shell/page-header";
 import { useCanEdit } from "../../lib/auth/can-edit";
 import {
@@ -177,12 +179,9 @@ export function HistoryPage() {
       ) : null}
 
       {files.isError ? (
-        <p className="mm-history-empty" role="alert">
-          Weir could not read its file history. Check that it is still running,
-          then refresh.
-        </p>
+        <LoadError thing="your file history" error={files.error} />
       ) : files.isLoading ? (
-        <p className="mm-history-empty">Reading history…</p>
+        <PanelLoading label="Reading history…" />
       ) : shown.length === 0 ? (
         <p className="mm-history-empty">
           {all.length === 0
