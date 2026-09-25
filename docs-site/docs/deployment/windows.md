@@ -128,6 +128,16 @@ typically answers within a few seconds, so a 60-second timeout is generous. If `
 before that, the start failed — its exit code is non-zero — and `tray-host.log` under the runtime
 home (`C:\ProgramData\Weir` by default) says why.
 
+**Don't wait on the process tree.** Weir keeps running after Setup exits, by design — that is
+success, not a hang — so wait for Setup's own exit, then poll `/ready` or `/health`; never treat
+"every process this started has exited" or "its output stream closed" as the signal. That second
+case matters if you capture a launched process's output: redirecting stdout/stderr through pipes (the
+ordinary way — `Process.StandardOutput`/`StandardError` in .NET, `subprocess.communicate()` in
+Python, and similar elsewhere) only reaches end-of-file once every process holding a duplicate of the
+write end has closed it, including whatever that process goes on to start. `Weir.exe` closes any
+stdio handles it inherited before doing anything else, so it — and `WeirServer.exe`, which it
+starts — never keep a caller's pipes open (#779).
+
 If nothing is supplied and there is no desktop — a WinRM or SSH session, a scheduled task with no
 logged-on user, a service — Weir never shows a window even without `--silent`. It uses 9347, or the
 first free port above it if 9347 is taken, saves that, and records which port it chose and why in

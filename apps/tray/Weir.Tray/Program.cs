@@ -101,6 +101,11 @@ static class Program
     {
         try
         {
+            // Before anything else: whatever started Weir may have redirected our stdio through pipes
+            // it is waiting to see closed. Weir runs until Quit, so holding those open would make that
+            // wait never end (#779). See InheritedStdioHandles.
+            InheritedStdioHandles.CloseInherited(TrayLog.Write);
+
             // Before any window, including the port dialog.
             ApplicationConfiguration.Initialize();
 

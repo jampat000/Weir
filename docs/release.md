@@ -157,6 +157,19 @@ until it answers `{"ready": true}` (a healthy start typically takes a few second
 generous timeout). An early exit means the start failed; its exit code is non-zero and
 `tray-host.log` under the runtime home (`C:\ProgramData\Weir` by default) says why.
 
+**Don't wait on the process tree.** Weir keeps running after Setup exits — that is correct, not a
+hang — so a caller must wait for Setup's own exit (or, for the second command above, for `/ready` or
+`/health` to answer), never for "the output stream closed" or "every process this started has
+exited" as its signal. If a caller redirects a launched process's stdout/stderr through pipes (the
+ordinary way to capture output — `Process.StandardOutput`/`StandardError` in .NET,
+`subprocess.communicate()` in Python, and similar in most languages), Windows only signals
+end-of-file on those pipes once every process holding a duplicate of the write end has closed it,
+including whatever that process went on to start. Weir.exe closes any stdio handles it inherited
+before it does anything else, specifically so it is never the process still holding a caller's pipe
+open (`apps/tray/Weir.Tray/InheritedStdioHandles.cs`); `scripts/smoke-windows-package.ps1` proves
+this against the real `Weir-win-Setup.exe` and the real installed `Weir.exe`, both piped the way a
+capturing caller would.
+
 Full detail, including `WEIR_PORT` as an alternative to `--port`: [Windows Installer → Installing
 Weir from another program](https://github.com/jampat000/Weir/blob/main/docs-site/docs/deployment/windows.md).
 
