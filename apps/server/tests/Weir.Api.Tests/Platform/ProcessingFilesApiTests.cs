@@ -1,4 +1,6 @@
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
+using Weir.Core.Activity;
 
 namespace Weir.Api.Tests.Platform;
 
@@ -19,6 +21,12 @@ public sealed class ProcessingFilesApiTests
         TestDatabase.ExecuteAsync(
             server,
             "INSERT INTO files (library_id, relative_path, status, last_seen_at) VALUES ($lib, $path, $status, CURRENT_TIMESTAMP)",
+            ("$lib", libraryId), ("$path", relativePath), ("$status", status));
+
+    private static Task<long> SeedFileWithIdAsync(WeirTestServer server, long libraryId, string relativePath, string status) =>
+        TestDatabase.ScalarAsync(
+            server,
+            "INSERT INTO files (library_id, relative_path, status, last_seen_at) VALUES ($lib, $path, $status, CURRENT_TIMESTAMP) RETURNING id",
             ("$lib", libraryId), ("$path", relativePath), ("$status", status));
 
     [Theory]
@@ -134,5 +142,61 @@ public sealed class ProcessingFilesApiTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("overlap", await ApiTestClient.Detail(response), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// #780: once an owner removes a finished or failed title from History (the <c>DELETE /processing/files/{id}</c>
+    /// "Remove from list" action), Processing must stop reporting it too — its failed-jobs alert, its "Just finished"
+    /// list, and the overview counters behind them, not only the Files list the removal itself reads from.
+    /// </summary>
+    [Fact]
+    public async Task Removing_a_file_through_historys_own_endpoint_clears_it_from_every_processing_report()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var libraryId = await SeedLibraryAsync(server);
+
+        var finishedId = await SeedFileWithIdAsync(server, libraryId, "Heat/heat.mkv", "processed");
+        var failedId = await SeedFileWithIdAsync(server, libraryId, "Up/up.mkv", "processing_failed");
+
+        var writer = server.Services.GetRequiredService<IActivityWriter>();
+        await writer.RecordAsync(new ActivityEventDraft(
+            ActivityEventTypes.ProcessingFileRemuxPassCompleted,
+            "processing",
+            "Heat finished",
+            $"{{\"library_id\": {libraryId}, \"relative_media_path\": \"Heat/heat.mkv\", \"outcome\": \"live_output_written\"}}"));
+        await writer.RecordAsync(new ActivityEventDraft(
+            ActivityEventTypes.ProcessingFileRemuxPassCompleted,
+            "processing",
+            "Up failed",
+            $"{{\"library_id\": {libraryId}, \"relative_media_path\": \"Up/up.mkv\", \"ok\": false, \"outcome\": \"failed_during_execution\"}}"));
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status) VALUES ('up-failed', 'processing.file.remux_pass.v1', $payload, 'failed')",
+            ("$payload", $"{{\"relative_media_path\": \"Up/up.mkv\", \"library_id\": {libraryId}}}"));
+
+        // Before removal: Processing's own endpoints report both the failed job and the two finished events.
+        using var beforeJobs = await client.GetAsync("/api/v1/processing/jobs/inspection?status=failed");
+        Assert.Single((await ApiTestClient.Json(beforeJobs))!["jobs"]!.AsArray());
+        using var beforeFinished = await client.GetAsync("/api/v1/activity/recent?event_type=" + ActivityEventTypes.ProcessingFileRemuxPassCompleted);
+        Assert.Equal(2, (await ApiTestClient.Json(beforeFinished))!["items"]!.AsArray().Count);
+        using var beforeStats = await client.GetAsync("/api/v1/processing/overview-stats");
+        Assert.Equal(1, (await ApiTestClient.Json(beforeStats))!["files_failed"]!.GetValue<long>());
+
+        foreach (var id in new[] { finishedId, failedId })
+        {
+            using var removed = await client.SendAsync(HttpMethod.Delete, $"/api/v1/processing/files/{id}", new { csrf_token = await client.CsrfAsync() });
+            Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+        }
+
+        using var afterJobs = await client.GetAsync("/api/v1/processing/jobs/inspection?status=failed");
+        Assert.Empty((await ApiTestClient.Json(afterJobs))!["jobs"]!.AsArray());
+        using var afterFinished = await client.GetAsync("/api/v1/activity/recent?event_type=" + ActivityEventTypes.ProcessingFileRemuxPassCompleted);
+        Assert.Empty((await ApiTestClient.Json(afterFinished))!["items"]!.AsArray());
+        using var afterStats = await client.GetAsync("/api/v1/processing/overview-stats");
+        Assert.Equal(0, (await ApiTestClient.Json(afterStats))!["files_failed"]!.GetValue<long>());
+        Assert.Equal(0, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM jobs WHERE dedupe_key = 'up-failed'"));
     }
 }

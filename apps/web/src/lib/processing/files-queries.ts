@@ -5,6 +5,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
+import { activityKeys } from "../activity/query-keys";
 import { postProcessingFileRemuxPassEnqueue } from "./file-remux-pass-api";
 import {
   fetchProcessingFiles,
@@ -63,12 +64,21 @@ export function useLibraryCleansQuery(query: LibraryCleansQuery) {
   });
 }
 
+/**
+ * Forgetting a file also removes its Activity events and any terminal job row on the server (#780), so the
+ * Processing screen's alert, "Just finished" list and overview counts must stop reporting it too, without
+ * waiting for their own next refresh.
+ */
 export function useForgetProcessingFile() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => forgetProcessingFile(id),
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: processingKeys.files }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: processingKeys.files });
+      void qc.invalidateQueries({ queryKey: activityKeys.recent });
+      void qc.invalidateQueries({ queryKey: processingKeys.jobsInspection });
+      void qc.invalidateQueries({ queryKey: processingKeys.overviewStats() });
+    },
   });
 }
 
