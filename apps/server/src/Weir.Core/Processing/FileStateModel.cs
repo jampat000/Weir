@@ -116,7 +116,11 @@ public sealed record ProcessingFileRecord
 public sealed record ProcessingFileListFilter
 {
     public long? LibraryId { get; init; }
-    public string? Status { get; init; }
+
+    /// <summary>Only these statuses, when set: <c>OR</c>ed together, so the Processing screen can ask for
+    /// "every file in flight" (<see cref="ProcessingFileStatuses.Processing"/> alone today) in one page with
+    /// no <see cref="Limit"/>-driven risk of losing one that is still running (#781).</summary>
+    public IReadOnlyList<string>? Statuses { get; init; }
     public string? PathContains { get; init; }
     public Timestamp? Since { get; init; }
 

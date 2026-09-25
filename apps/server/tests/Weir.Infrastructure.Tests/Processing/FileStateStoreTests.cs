@@ -37,7 +37,7 @@ public sealed class FileStateStoreTests
         InsertFile(db, libraryId, "Movie (2020)/movie.mkv", status);
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
 
-        var rows = await Store.ListAsync(uow, new ProcessingFileListFilter { Status = status });
+        var rows = await Store.ListAsync(uow, new ProcessingFileListFilter { Statuses = [status] });
 
         var row = Assert.Single(rows);
         Assert.Equal(status, row.Status);
@@ -90,6 +90,39 @@ public sealed class FileStateStoreTests
 
         var row = Assert.Single(rows);
         Assert.Equal("Show/S01E01.mkv", row.RelativePath);
+    }
+
+    [Fact]
+    public async Task Filtering_by_several_statuses_at_once_returns_every_row_in_any_of_them()
+    {
+        // The Processing screen asks for one status ("processing") in its own uncapped page (#781), but the
+        // filter takes several: a comma-separated file_status is split into this list by the endpoint.
+        using var db = new JobsTestDatabase();
+        var libraryId = InsertLibrary(db);
+        InsertFile(db, libraryId, "a.mkv", ProcessingFileStatuses.Processing);
+        InsertFile(db, libraryId, "b.mkv", ProcessingFileStatuses.Unprocessed);
+        InsertFile(db, libraryId, "c.mkv", ProcessingFileStatuses.Processed);
+        await using var uow = await UnitOfWork.OpenAsync(db.Database);
+
+        var rows = await Store.ListAsync(
+            uow,
+            new ProcessingFileListFilter { Statuses = [ProcessingFileStatuses.Processing, ProcessingFileStatuses.Unprocessed] });
+
+        Assert.Equal(["a.mkv", "b.mkv"], rows.Select(row => row.RelativePath).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task An_empty_status_list_filters_nothing_same_as_no_filter_at_all()
+    {
+        using var db = new JobsTestDatabase();
+        var libraryId = InsertLibrary(db);
+        InsertFile(db, libraryId, "a.mkv", ProcessingFileStatuses.Processing);
+        InsertFile(db, libraryId, "b.mkv", ProcessingFileStatuses.Unprocessed);
+        await using var uow = await UnitOfWork.OpenAsync(db.Database);
+
+        var rows = await Store.ListAsync(uow, new ProcessingFileListFilter { Statuses = [] });
+
+        Assert.Equal(2, rows.Count);
     }
 
     [Fact]
