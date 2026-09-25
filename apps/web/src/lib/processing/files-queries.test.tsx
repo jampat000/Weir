@@ -3,6 +3,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+import { WORKING_FILE_STATUS } from "../../pages/processing/processing-model";
 import { activityKeys } from "../activity/query-keys";
 import { useForgetProcessingFile } from "./files-queries";
 import { processingKeys } from "./query-keys";
@@ -39,5 +40,26 @@ describe("useForgetProcessingFile", () => {
     expect(spy).toHaveBeenCalledWith({
       queryKey: processingKeys.overviewStats(),
     });
+  });
+
+  it("also invalidates the Working lane's own dedicated files query", async () => {
+    const qc = new QueryClient();
+    // The general page and the Working lane's own status-filtered fetch are both under processingKeys.files,
+    // so the plain files-list invalidation above must reach this one too, without a key of its own to name.
+    const workingFilesKey = processingKeys.fileList({
+      file_status: WORKING_FILE_STATUS,
+      limit: 1000,
+    });
+    qc.setQueryData(workingFilesKey, { files: [], returned: 0, limit: 1000 });
+    const query = qc.getQueryCache().find({ queryKey: workingFilesKey });
+    expect(query?.isStale()).toBe(false);
+
+    const { result } = renderHook(() => useForgetProcessingFile(), {
+      wrapper: withQueryClient(qc),
+    });
+    result.current.mutate(1);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(query?.isStale()).toBe(true);
   });
 });
