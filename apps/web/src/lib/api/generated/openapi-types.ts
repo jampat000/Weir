@@ -8530,6 +8530,7 @@ export interface operations {
     parameters: {
       query?: {
         library_id?: number | null;
+        /** @description One or several statuses. Several are given as one comma-separated value (e.g. `processing,unprocessed`), not repeated query parameters. */
         file_status?:
           | (
               | "unprocessed"
@@ -8544,7 +8545,7 @@ export interface operations {
               | "passed_through"
               | "rejected"
               | "cancelled"
-            )
+            )[]
           | null;
         path_contains?: string | null;
         within_days?: number | null;
