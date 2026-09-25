@@ -37,13 +37,15 @@ function statusesForFilter(
 export function useProcessingJobsInspectionQuery(
   filter: ProcessingJobsInspectionFilter,
   limit = 100,
+  knownFilesOnly = false,
 ) {
   return useQuery({
-    queryKey: processingKeys.jobsInspectionList(filter, limit),
+    queryKey: processingKeys.jobsInspectionList(filter, limit, knownFilesOnly),
     queryFn: () =>
       fetchProcessingJobsInspection({
         limit,
         statuses: statusesForFilter(filter),
+        knownFilesOnly,
       }),
     staleTime: 15_000,
   });

@@ -65,9 +65,10 @@ export function useLibraryCleansQuery(query: LibraryCleansQuery) {
 }
 
 /**
- * Forgetting a file also removes its Activity events and any terminal job row on the server (#780), so the
- * Processing screen's alert, "Just finished" list and overview counts must stop reporting it too, without
- * waiting for their own next refresh.
+ * Forgetting a file leaves its Activity events and job rows alone on the server — System keeps its own record of
+ * them, and a job's dedupe key keeps refusing a second pass for the same file — but the file no longer counts
+ * toward the live Processing alert, "Just finished" list or overview counts, which read those same rows filtered
+ * to files Weir still knows about. Invalidating them here is what makes that drop show up without a reload.
  */
 export function useForgetProcessingFile() {
   const qc = useQueryClient();

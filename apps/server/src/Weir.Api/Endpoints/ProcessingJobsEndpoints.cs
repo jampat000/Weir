@@ -90,6 +90,8 @@ internal sealed class ProcessingJobsEndpointHandlers
         var issues = new ValidationIssues();
         var limit = request.Query("limit") is { } rawLimit && FieldRules.TryInt(new WireString(rawLimit), ["query", "limit"], 1, 100, issues, out var parsedLimit) ? (int)parsedLimit : 50;
         var statuses = request.Context.Request.Query["status"].Where(s => s is not null).Select(s => s!).ToList();
+        var knownFilesOnly = request.Query("known_files_only") is { } rawKnownFilesOnly &&
+            FieldRules.TryBool(new WireString(rawKnownFilesOnly), ["query", "known_files_only"], issues, out var parsedKnownFilesOnly) && parsedKnownFilesOnly;
         issues.ThrowIfAny();
 
         try
@@ -102,7 +104,7 @@ internal sealed class ProcessingJobsEndpointHandlers
         }
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var (rows, defaultRecentSlice) = await _jobsInspection.ListAsync(uow, limit, statuses.Count > 0 ? statuses : null).ConfigureAwait(false);
+        var (rows, defaultRecentSlice) = await _jobsInspection.ListAsync(uow, limit, statuses.Count > 0 ? statuses : null, knownFilesOnly).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
             .Set("jobs", new WireArray(rows.Select(r => (WireValue)JobOut(r))))
             .Set("default_recent_slice", defaultRecentSlice));

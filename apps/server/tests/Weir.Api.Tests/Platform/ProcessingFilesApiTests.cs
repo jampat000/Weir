@@ -145,12 +145,15 @@ public sealed class ProcessingFilesApiTests
     }
 
     /// <summary>
-    /// #780: once an owner removes a finished or failed title from History (the <c>DELETE /processing/files/{id}</c>
-    /// "Remove from list" action), Processing must stop reporting it too — its failed-jobs alert, its "Just finished"
-    /// list, and the overview counters behind them, not only the Files list the removal itself reads from.
+    /// Once an owner removes a finished or failed title from History (the <c>DELETE /processing/files/{id}</c>
+    /// "Remove from list" action), Processing must stop reporting it as current work — its failed-jobs alert, its
+    /// "Just finished" list, and the overview counters behind them — while System's own Activity log and Jobs
+    /// list, which read the same rows without asking for that, keep the complete record. Nothing about the file
+    /// is deleted beyond the <c>files</c> row itself: not its Activity events, not its job row, and not the job
+    /// row's dedupe key, which still refuses a second pass for the same file.
     /// </summary>
     [Fact]
-    public async Task Removing_a_file_through_historys_own_endpoint_clears_it_from_every_processing_report()
+    public async Task Removing_a_file_through_historys_own_endpoint_clears_it_from_processings_live_reports_but_not_from_logs()
     {
         await using var server = await ApiTestClient.StartServerAsync();
         await TestDatabase.SeedAdminAsync(server);
@@ -167,21 +170,18 @@ public sealed class ProcessingFilesApiTests
             "processing",
             "Heat finished",
             $"{{\"library_id\": {libraryId}, \"relative_media_path\": \"Heat/heat.mkv\", \"outcome\": \"live_output_written\"}}"));
-        await writer.RecordAsync(new ActivityEventDraft(
-            ActivityEventTypes.ProcessingFileRemuxPassCompleted,
-            "processing",
-            "Up failed",
-            $"{{\"library_id\": {libraryId}, \"relative_media_path\": \"Up/up.mkv\", \"ok\": false, \"outcome\": \"failed_during_execution\"}}"));
+        var dedupeKey = $"processing.file.remux_pass.v1:{libraryId}:Up/up.mkv";
         await TestDatabase.ExecuteAsync(
             server,
-            "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status) VALUES ('up-failed', 'processing.file.remux_pass.v1', $payload, 'failed')",
-            ("$payload", $"{{\"relative_media_path\": \"Up/up.mkv\", \"library_id\": {libraryId}}}"));
+            "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status) VALUES ($dedupe, 'processing.file.remux_pass.v1', $payload, 'failed')",
+            ("$dedupe", dedupeKey), ("$payload", $"{{\"relative_media_path\": \"Up/up.mkv\", \"library_id\": {libraryId}}}"));
 
-        // Before removal: Processing's own endpoints report both the failed job and the two finished events.
-        using var beforeJobs = await client.GetAsync("/api/v1/processing/jobs/inspection?status=failed");
-        Assert.Single((await ApiTestClient.Json(beforeJobs))!["jobs"]!.AsArray());
-        using var beforeFinished = await client.GetAsync("/api/v1/activity/recent?event_type=" + ActivityEventTypes.ProcessingFileRemuxPassCompleted);
-        Assert.Equal(2, (await ApiTestClient.Json(beforeFinished))!["items"]!.AsArray().Count);
+        // Before removal: the live alert, "just finished" list and overview count both, the same as an
+        // unfiltered System listing.
+        using var beforeJobsAlert = await client.GetAsync("/api/v1/processing/jobs/inspection?status=failed&known_files_only=true");
+        Assert.Single((await ApiTestClient.Json(beforeJobsAlert))!["jobs"]!.AsArray());
+        using var beforeFinished = await client.GetAsync("/api/v1/activity/recent?event_type=" + ActivityEventTypes.ProcessingFileRemuxPassCompleted + "&known_files_only=true");
+        Assert.Single((await ApiTestClient.Json(beforeFinished))!["items"]!.AsArray());
         using var beforeStats = await client.GetAsync("/api/v1/processing/overview-stats");
         Assert.Equal(1, (await ApiTestClient.Json(beforeStats))!["files_failed"]!.GetValue<long>());
 
@@ -191,12 +191,22 @@ public sealed class ProcessingFilesApiTests
             Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
         }
 
-        using var afterJobs = await client.GetAsync("/api/v1/processing/jobs/inspection?status=failed");
-        Assert.Empty((await ApiTestClient.Json(afterJobs))!["jobs"]!.AsArray());
-        using var afterFinished = await client.GetAsync("/api/v1/activity/recent?event_type=" + ActivityEventTypes.ProcessingFileRemuxPassCompleted);
+        // After removal: the live alert, "just finished" list and overview count stop naming the forgotten file.
+        using var afterJobsAlert = await client.GetAsync("/api/v1/processing/jobs/inspection?status=failed&known_files_only=true");
+        Assert.Empty((await ApiTestClient.Json(afterJobsAlert))!["jobs"]!.AsArray());
+        using var afterFinished = await client.GetAsync("/api/v1/activity/recent?event_type=" + ActivityEventTypes.ProcessingFileRemuxPassCompleted + "&known_files_only=true");
         Assert.Empty((await ApiTestClient.Json(afterFinished))!["items"]!.AsArray());
         using var afterStats = await client.GetAsync("/api/v1/processing/overview-stats");
         Assert.Equal(0, (await ApiTestClient.Json(afterStats))!["files_failed"]!.GetValue<long>());
-        Assert.Equal(0, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM jobs WHERE dedupe_key = 'up-failed'"));
+
+        // System's own Activity log and Jobs list, which never ask for known_files_only, still have the full record.
+        using var logsAfter = await client.GetAsync("/api/v1/activity/recent?event_type=" + ActivityEventTypes.ProcessingFileRemuxPassCompleted);
+        Assert.Single((await ApiTestClient.Json(logsAfter))!["items"]!.AsArray());
+        using var jobsAfter = await client.GetAsync("/api/v1/processing/jobs/inspection?status=failed");
+        Assert.Single((await ApiTestClient.Json(jobsAfter))!["jobs"]!.AsArray());
+
+        // The job row, and its dedupe key, are untouched: a resend that lands on the very same key is still
+        // refused rather than starting a second pass.
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM jobs WHERE dedupe_key = $dedupe", ("$dedupe", dedupeKey)));
     }
 }

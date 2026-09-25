@@ -9,12 +9,10 @@ using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Time;
 using Weir.Core.Validation;
-using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.DirectPlay;
-using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Endpoints;
@@ -56,7 +54,6 @@ internal sealed class ProcessingFilesEndpointHandlers
     private readonly HandbackStore _handback;
     private readonly ProcessingJobStore _jobs;
     private readonly LibraryStore _libraries;
-    private readonly ActivityHistoryStore _activityHistory;
 
     public ProcessingFilesEndpointHandlers(
         FileStateStore files,
@@ -64,8 +61,7 @@ internal sealed class ProcessingFilesEndpointHandlers
         LiveProgressStore liveProgress,
         HandbackStore handback,
         ProcessingJobStore jobs,
-        LibraryStore libraries,
-        ActivityHistoryStore activityHistory)
+        LibraryStore libraries)
     {
         _files = files ?? throw new ArgumentNullException(nameof(files));
         _directPlay = directPlay ?? throw new ArgumentNullException(nameof(directPlay));
@@ -73,7 +69,6 @@ internal sealed class ProcessingFilesEndpointHandlers
         _handback = handback ?? throw new ArgumentNullException(nameof(handback));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
-        _activityHistory = activityHistory ?? throw new ArgumentNullException(nameof(activityHistory));
     }
 
     private static WireObject FileOut(ProcessingFileRecord row, string libraryName, List<DirectPlayBadge> directPlay, LiveProgress? progress)
@@ -220,13 +215,8 @@ internal sealed class ProcessingFilesEndpointHandlers
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var file = await ProcessingFilesEndpoints.RequireFileAsync(uow, _files, id).ConfigureAwait(false);
+        await ProcessingFilesEndpoints.RequireFileAsync(uow, _files, id).ConfigureAwait(false);
         await _files.ForgetAsync(uow, id).ConfigureAwait(false);
-        // A file gone from History must be gone everywhere Processing reports finished or failed work too (#780):
-        // its Activity events and processing log, and any terminal job row the failed-jobs alert and the overview
-        // counters still read by status once the files row above no longer exists.
-        await _activityHistory.DeleteFileHistoryAsync(uow, file.LibraryId, file.RelativePath).ConfigureAwait(false);
-        await TerminalDownloadJobs.DeleteForFileAsync(uow, file.LibraryId, file.RelativePath).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return new CustomApiResult(context =>
         {
