@@ -14,6 +14,8 @@ $ErrorActionPreference = "Stop"
 # it, then driven through sign-up, a library and a real pass-through job with the bundled ffmpeg.
 # Then the packaged tray itself (Weir.exe), started the way an unattended install starts it — with
 # --port and no one to answer a dialog — must come up on that port, save it, and show no window.
+# Then again with --silent (#779), which must skip every window regardless of what the desktop
+# heuristic reports on this runner.
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 if (-not $PackageDir) {
@@ -365,4 +367,61 @@ try {
   if ($null -ne $oldWeirPort) { $env:WEIR_PORT = $oldWeirPort }
   Start-Sleep -Milliseconds 500
   Remove-Item -LiteralPath $trayHome -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# --silent (#779): the flag documented in docs/release.md "Installing Weir from another program" for a program
+# (Deluno's installer, a provisioning script) driving Weir unattended. It must skip every window on its own, not
+# just because the desktop heuristic happens to guess right on this runner.
+$silentHome = Join-Path ([System.IO.Path]::GetTempPath()) ("weir-package-silent-smoke-" + [System.Guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $silentHome | Out-Null
+$oldHome = $env:WEIR_HOME
+$oldWeirPort = $env:WEIR_PORT
+$silentProc = $null
+try {
+  $env:WEIR_HOME = $silentHome
+  Remove-Item Env:\WEIR_PORT -ErrorAction SilentlyContinue
+  $silentProc = Start-Process -FilePath $trayExe `
+    -ArgumentList @("--port", [string]$Port, "--silent") `
+    -WorkingDirectory (Split-Path -Parent $trayExe) `
+    -PassThru
+
+  $readyUrl = "http://127.0.0.1:$Port/ready"
+  $deadline = (Get-Date).AddSeconds(90)
+  $silentReady = $false
+  do {
+    if ($silentProc.HasExited) {
+      throw "Packaged tray exited with code $($silentProc.ExitCode) before Weir was ready under --silent."
+    }
+    try {
+      $ready = Invoke-RestMethod -Uri $readyUrl -Method Get -TimeoutSec 2
+      if ($ready.ready -eq $true) { $silentReady = $true; break }
+    } catch {
+      Start-Sleep -Milliseconds 500
+    }
+  } while ((Get-Date) -lt $deadline)
+  if (-not $silentReady) {
+    throw "Packaged tray did not bring Weir up at $readyUrl under --silent."
+  }
+
+  $silentProc.Refresh()
+  if ($silentProc.MainWindowHandle -ne [IntPtr]::Zero) {
+    throw "Packaged tray opened a window ('$($silentProc.MainWindowTitle)') under --silent; an unattended install would hang on it."
+  }
+  Write-Host "Packaged tray started unattended on port $Port with --silent: no dialog, no window, server ready."
+} catch {
+  Write-Host "Packaged tray --silent smoke failed."
+  $silentLogPath = Join-Path $silentHome "tray-host.log"
+  if (Test-Path -LiteralPath $silentLogPath) {
+    Write-Host "--- tray-host.log ---"
+    Get-Content -LiteralPath $silentLogPath -Tail 100
+  }
+  throw
+} finally {
+  if ($silentProc -and -not $silentProc.HasExited) {
+    & taskkill.exe /PID $silentProc.Id /T /F | Out-Null
+  }
+  if ($null -ne $oldHome) { $env:WEIR_HOME = $oldHome } else { Remove-Item Env:\WEIR_HOME -ErrorAction SilentlyContinue }
+  if ($null -ne $oldWeirPort) { $env:WEIR_PORT = $oldWeirPort }
+  Start-Sleep -Milliseconds 500
+  Remove-Item -LiteralPath $silentHome -Recurse -Force -ErrorAction SilentlyContinue
 }

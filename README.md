@@ -222,7 +222,11 @@ folder, change the port, check for updates or quit.
 
 - Weir is installed to `%LocalAppData%\Weir`. Your data (database, logs, backups) is kept in `C:\ProgramData\Weir`.
 - Weir runs as you, not as a Windows service, so it can reach your mapped network drives and NAS shares.
-- Installing without a screen (a script, or remotely)? Pass the port: `Weir-win-Setup.exe -- --port 9347`.
+- Installing from a script or another program, with no one at a screen? Use
+  `Weir-win-Setup.exe --silent`, then start Weir yourself with `Weir.exe --port 9347 --silent` — see
+  [Installing Weir from another program](https://jampat000.github.io/Weir/docs/deployment/windows#installing-weir-from-another-program).
+  Passing `--port` straight to the installer without `--silent` can hang forever with no window to
+  answer (#779).
 
 More in the [Windows guide](https://jampat000.github.io/Weir/docs/deployment/windows).
 

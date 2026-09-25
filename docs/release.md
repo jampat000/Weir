@@ -131,6 +131,35 @@ on **System › About**. It must not silently remove the update action.
 
 This design is intentional. Running in the user session avoids common NAS or external-drive access issues that affect Windows services, while keeping writable configuration, logs, backups, and the SQLite database out of the application install directory.
 
+### Installing Weir from another program
+
+`Weir-win-Setup.exe` run plain assumes a person is at the interactive desktop, both for its own
+install UI and for the app launch it does afterward. A program driving Weir unattended (another
+installer, a provisioning script) must pass `--silent` instead, or Setup can hang indefinitely with
+no window and no exit code to check (#779):
+
+```
+Weir-win-Setup.exe --silent
+```
+
+Exits 0 on success, non-zero on failure, within seconds — `--silent` also skips Velopack's
+post-install app launch, so nothing here waits on Weir itself. Start Weir explicitly afterward, and
+watch for it becoming ready rather than for the process to exit — it is a foreground app that keeps
+running once started, exactly like a person's own copy:
+
+```
+"%LocalAppData%\Weir\current\Weir.exe" --port 9400 --silent
+```
+
+`--silent` on `Weir.exe` guarantees no UI at all — no port dialog, no error message box, no browser
+tab — regardless of whether the session looks interactive. Poll `GET http://127.0.0.1:9400/ready`
+until it answers `{"ready": true}` (a healthy start typically takes a few seconds; 60 seconds is a
+generous timeout). An early exit means the start failed; its exit code is non-zero and
+`tray-host.log` under the runtime home (`C:\ProgramData\Weir` by default) says why.
+
+Full detail, including `WEIR_PORT` as an alternative to `--port`: [Windows Installer → Installing
+Weir from another program](https://github.com/jampat000/Weir/blob/main/docs-site/docs/deployment/windows.md).
+
 ## Docker
 
 Stable Docker releases are published from the same tag workflow.
