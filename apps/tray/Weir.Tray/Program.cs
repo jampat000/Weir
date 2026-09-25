@@ -23,6 +23,15 @@ static class Program
     /// </summary>
     internal const string NoBrowserArgument = "--no-browser";
 
+    /// <summary>
+    /// Start with no UI at all, ever: no browser, no port dialog, no error message box, no matter what the desktop
+    /// heuristic in <see cref="PortChoice.HasInteractiveDesktop"/> reports. This is what a program driving Weir
+    /// unattended (an installer, a provisioning script) should pass, because a wrong "yes, there's a desktop"
+    /// answer from that heuristic must never turn into a dialog nobody can see or answer (#779). A silent start
+    /// that cannot get a usable port still exits with a non-zero code instead of asking.
+    /// </summary>
+    internal const string SilentArgument = "--silent";
+
     [STAThread]
     static int Main(string[] args)
     {
@@ -92,11 +101,16 @@ static class Program
     {
         try
         {
+            // Before anything else: whatever started Weir may have redirected our stdio through pipes
+            // it is waiting to see closed. Weir runs until Quit, so holding those open would make that
+            // wait never end (#779). See InheritedStdioHandles.
+            InheritedStdioHandles.CloseInherited(TrayLog.Write);
+
             // Before any window, including the port dialog.
             ApplicationConfiguration.Initialize();
 
             var runtimeHome = RuntimeHome();
-            if (!SecureRuntimeHome(runtimeHome))
+            if (!SecureRuntimeHome(args, runtimeHome))
             {
                 return 1;
             }
@@ -136,9 +150,10 @@ static class Program
 
     /// <summary>
     /// Creates the runtime home owner-only, or tightens it (RuntimeHomeSecurity). Returns false when Weir must not
-    /// start because another account owns the folder; the person at the desktop, if any, is told why.
+    /// start because another account owns the folder; the person at the desktop, if any, is told why, unless
+    /// <see cref="SilentArgument"/> rules out showing anything.
     /// </summary>
-    private static bool SecureRuntimeHome(string runtimeHome)
+    private static bool SecureRuntimeHome(string[] args, string runtimeHome)
     {
         try
         {
@@ -151,7 +166,7 @@ static class Program
         catch (RuntimeHomeOwnedByAnotherAccountException ex)
         {
             TrayLog.Write($"Not starting: {ex.Message}");
-            if (PortChoice.HasInteractiveDesktop())
+            if (HasInteractiveDesktop(args, PortChoice.HasInteractiveDesktop))
             {
                 MessageBox.Show(ex.Message, "Weir", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -174,7 +189,7 @@ static class Program
     {
         var supplied = PortChoice.SuppliedPort(args, Environment.GetEnvironmentVariable);
         var saved = PortChoice.LoadSaved(runtimeHome);
-        var interactive = PortChoice.HasInteractiveDesktop();
+        var interactive = HasInteractiveDesktop(args, PortChoice.HasInteractiveDesktop);
 
         // A server left behind by a tray that crashed still holds our port, and would make
         // the saved port look taken by "another program". This tray holds the session's
@@ -271,7 +286,18 @@ static class Program
     }
 
     /// <summary>Whether a start with these arguments opens Weir in the browser once its server is healthy.</summary>
-    internal static bool OpensBrowser(IEnumerable<string> args) => !args.Contains(NoBrowserArgument);
+    internal static bool OpensBrowser(IEnumerable<string> args) => !args.Contains(NoBrowserArgument) && !IsSilent(args);
+
+    /// <summary>Whether <see cref="SilentArgument"/> was passed: no UI of any kind, ever, for this start.</summary>
+    internal static bool IsSilent(IEnumerable<string> args) => args.Contains(SilentArgument);
+
+    /// <summary>
+    /// Whether there is a person to show UI to: <paramref name="desktopCheck"/>, unless <see cref="SilentArgument"/>
+    /// overrides it. Silent always wins, because a start driven by another program must never gamble a hang on
+    /// that heuristic being right. The check is passed in (as <see cref="PortChoice.Decide"/> does with its own
+    /// side effects) so the override is testable without a real desktop.
+    /// </summary>
+    internal static bool HasInteractiveDesktop(IEnumerable<string> args, Func<bool> desktopCheck) => !IsSilent(args) && desktopCheck();
 
     internal static bool OpenBrowser(
         int port,

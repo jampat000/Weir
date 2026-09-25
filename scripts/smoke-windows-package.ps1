@@ -14,6 +14,10 @@ $ErrorActionPreference = "Stop"
 # it, then driven through sign-up, a library and a real pass-through job with the bundled ffmpeg.
 # Then the packaged tray itself (Weir.exe), started the way an unattended install starts it — with
 # --port and no one to answer a dialog — must come up on that port, save it, and show no window.
+# Then again with --silent (#779), which must skip every window regardless of what the desktop
+# heuristic reports on this runner. Finally, the real Weir-win-Setup.exe is installed and uninstalled
+# for real, with its own and the installed Weir.exe's stdout/stderr piped exactly the way a program
+# driving Weir would capture them, proving neither hangs a caller waiting on that output to close.
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 if (-not $PackageDir) {
@@ -365,4 +369,207 @@ try {
   if ($null -ne $oldWeirPort) { $env:WEIR_PORT = $oldWeirPort }
   Start-Sleep -Milliseconds 500
   Remove-Item -LiteralPath $trayHome -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# --silent (#779): the flag documented in docs/release.md "Installing Weir from another program" for a program
+# (Deluno's installer, a provisioning script) driving Weir unattended. It must skip every window on its own, not
+# just because the desktop heuristic happens to guess right on this runner.
+$silentHome = Join-Path ([System.IO.Path]::GetTempPath()) ("weir-package-silent-smoke-" + [System.Guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $silentHome | Out-Null
+$oldHome = $env:WEIR_HOME
+$oldWeirPort = $env:WEIR_PORT
+$silentProc = $null
+try {
+  $env:WEIR_HOME = $silentHome
+  Remove-Item Env:\WEIR_PORT -ErrorAction SilentlyContinue
+  $silentProc = Start-Process -FilePath $trayExe `
+    -ArgumentList @("--port", [string]$Port, "--silent") `
+    -WorkingDirectory (Split-Path -Parent $trayExe) `
+    -PassThru
+
+  $readyUrl = "http://127.0.0.1:$Port/ready"
+  $deadline = (Get-Date).AddSeconds(90)
+  $silentReady = $false
+  do {
+    if ($silentProc.HasExited) {
+      throw "Packaged tray exited with code $($silentProc.ExitCode) before Weir was ready under --silent."
+    }
+    try {
+      $ready = Invoke-RestMethod -Uri $readyUrl -Method Get -TimeoutSec 2
+      if ($ready.ready -eq $true) { $silentReady = $true; break }
+    } catch {
+      Start-Sleep -Milliseconds 500
+    }
+  } while ((Get-Date) -lt $deadline)
+  if (-not $silentReady) {
+    throw "Packaged tray did not bring Weir up at $readyUrl under --silent."
+  }
+
+  $silentProc.Refresh()
+  if ($silentProc.MainWindowHandle -ne [IntPtr]::Zero) {
+    throw "Packaged tray opened a window ('$($silentProc.MainWindowTitle)') under --silent; an unattended install would hang on it."
+  }
+  Write-Host "Packaged tray started unattended on port $Port with --silent: no dialog, no window, server ready."
+} catch {
+  Write-Host "Packaged tray --silent smoke failed."
+  $silentLogPath = Join-Path $silentHome "tray-host.log"
+  if (Test-Path -LiteralPath $silentLogPath) {
+    Write-Host "--- tray-host.log ---"
+    Get-Content -LiteralPath $silentLogPath -Tail 100
+  }
+  throw
+} finally {
+  if ($silentProc -and -not $silentProc.HasExited) {
+    & taskkill.exe /PID $silentProc.Id /T /F | Out-Null
+  }
+  if ($null -ne $oldHome) { $env:WEIR_HOME = $oldHome } else { Remove-Item Env:\WEIR_HOME -ErrorAction SilentlyContinue }
+  if ($null -ne $oldWeirPort) { $env:WEIR_PORT = $oldWeirPort }
+  Start-Sleep -Milliseconds 500
+  Remove-Item -LiteralPath $silentHome -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# ---------------------------------------------------------------------------------------------------
+# The real Weir-win-Setup.exe (#779), run and captured exactly the way another program installing Weir
+# does it: piped stdout/stderr, not a file, waited on independently of the process's own exit. A file
+# redirect would not reproduce the failure mode this proves against. .NET's Process class, when asked
+# to redirect a child's output, creates real anonymous pipes and marks their write ends inheritable --
+# the same thing a .NET-based caller (or anything else that redirects a child's stdio the ordinary
+# way) does. If Setup, or anything Setup starts, leaves a duplicate of a write end open, the read side
+# below never reaches end-of-file, even once Setup itself has exited; a caller reading with
+# ReadToEnd()/communicate() and treating "the streams closed" as "the child is done" hangs forever.
+# Everything above this point used the pack directory directly and never touched the real installer.
+# ---------------------------------------------------------------------------------------------------
+$setupExePath = Join-Path $repoRoot "dist\windows\releases\Weir-win-Setup.exe"
+if (-not (Test-Path -LiteralPath $setupExePath)) {
+  throw "Real installer not found: $setupExePath (expected from the vpk pack step of packaging/windows/build-velopack.ps1)."
+}
+
+function Wait-ForPipeEndOfFile {
+  param(
+    [Parameter(Mandatory)] [System.Threading.Tasks.Task[]]$Tasks,
+    [Parameter(Mandatory)] [int]$TimeoutSeconds,
+    [Parameter(Mandatory)] [string]$What
+  )
+  if (-not [System.Threading.Tasks.Task]::WaitAll($Tasks, [TimeSpan]::FromSeconds($TimeoutSeconds))) {
+    throw "$What did not reach end-of-file within $TimeoutSeconds s: something is still holding an inherited pipe handle open (#779)."
+  }
+}
+
+$setupTimeoutSeconds = 120
+$weirHandleTimeoutSeconds = 30
+$installedHealthTimeoutSeconds = 90
+$localAppData = [Environment]::GetFolderPath("LocalApplicationData")
+$installedTrayExe = Join-Path $localAppData "Weir\current\Weir.exe"
+$updateExe = Join-Path $localAppData "Weir\Update.exe"
+$defaultRuntimeHome = "C:\ProgramData\Weir"
+
+try {
+  Write-Host "Installing the real Setup.exe silently, its output piped the way a capturing caller reads it..."
+  $setupPsi = New-Object System.Diagnostics.ProcessStartInfo
+  $setupPsi.FileName = $setupExePath
+  $setupPsi.Arguments = "--silent"
+  $setupPsi.UseShellExecute = $false
+  $setupPsi.RedirectStandardOutput = $true
+  $setupPsi.RedirectStandardError = $true
+  $setupPsi.CreateNoWindow = $true
+
+  $setupProc = [System.Diagnostics.Process]::Start($setupPsi)
+  # Read async before waiting on exit: a synchronous ReadToEnd here, before the process has exited,
+  # can itself deadlock if the child fills the pipe buffer while this script blocks on WaitForExit.
+  $setupStdoutTask = $setupProc.StandardOutput.ReadToEndAsync()
+  $setupStderrTask = $setupProc.StandardError.ReadToEndAsync()
+
+  if (-not $setupProc.WaitForExit($setupTimeoutSeconds * 1000)) {
+    Stop-Process -Id $setupProc.Id -Force -ErrorAction SilentlyContinue
+    throw "Weir-win-Setup.exe --silent did not exit within $setupTimeoutSeconds s (#779)."
+  }
+  if ($setupProc.ExitCode -ne 0) {
+    throw "Weir-win-Setup.exe --silent exited with code $($setupProc.ExitCode)."
+  }
+  Write-Host "Setup.exe --silent exited 0 within $setupTimeoutSeconds s."
+
+  Wait-ForPipeEndOfFile -Tasks @($setupStdoutTask, $setupStderrTask) -TimeoutSeconds $setupTimeoutSeconds -What "Setup.exe's own piped output"
+  Write-Host "Setup.exe's piped stdout and stderr both reached end-of-file: nothing it started is still holding them open."
+
+  if (-not (Test-Path -LiteralPath $installedTrayExe)) {
+    throw "Setup.exe --silent did not install Weir.exe at $installedTrayExe."
+  }
+  # --silent must not launch the app (docs.velopack.io); give any hook process a moment to exit, then
+  # confirm nothing of Weir's is running before this script starts it deliberately below.
+  Start-Sleep -Seconds 2
+  $leftRunning = Get-Process -Name "Weir", "WeirServer" -ErrorAction SilentlyContinue
+  if ($leftRunning) {
+    throw "Weir-win-Setup.exe --silent left Weir running (pid(s): $($leftRunning.Id -join ', ')); --silent must never launch the app."
+  }
+  Write-Host "Confirmed: --silent installed Weir without starting it."
+
+  Write-Host "Starting the installed Weir.exe --silent, its output piped the same way..."
+  $weirPsi = New-Object System.Diagnostics.ProcessStartInfo
+  $weirPsi.FileName = $installedTrayExe
+  $weirPsi.Arguments = "--port $Port --silent"
+  $weirPsi.UseShellExecute = $false
+  $weirPsi.RedirectStandardOutput = $true
+  $weirPsi.RedirectStandardError = $true
+  $weirPsi.CreateNoWindow = $true
+
+  $weirProc = $null
+  try {
+    $weirProc = [System.Diagnostics.Process]::Start($weirPsi)
+    $weirStdoutTask = $weirProc.StandardOutput.ReadToEndAsync()
+    $weirStderrTask = $weirProc.StandardError.ReadToEndAsync()
+
+    # Weir keeps running once started -- it is not supposed to exit -- so the proof here is that its
+    # own piped output reaches end-of-file quickly on its own, independent of the process ever exiting.
+    Wait-ForPipeEndOfFile -Tasks @($weirStdoutTask, $weirStderrTask) -TimeoutSeconds $weirHandleTimeoutSeconds -What "the installed Weir.exe's piped output"
+    Write-Host "Weir.exe's piped stdout and stderr reached end-of-file within $weirHandleTimeoutSeconds s while Weir keeps running: it is not holding a caller's pipes open."
+
+    $healthUrl = "http://127.0.0.1:$Port/health"
+    $deadline = (Get-Date).AddSeconds($installedHealthTimeoutSeconds)
+    $installedHealthy = $false
+    do {
+      if ($weirProc.HasExited) {
+        throw "The installed Weir.exe exited with code $($weirProc.ExitCode) before it became healthy."
+      }
+      try {
+        Invoke-RestMethod -Uri $healthUrl -Method Get -TimeoutSec 2 | Out-Null
+        $installedHealthy = $true
+        break
+      } catch {
+        Start-Sleep -Milliseconds 500
+      }
+    } while ((Get-Date) -lt $deadline)
+    if (-not $installedHealthy) {
+      throw "The installed Weir did not answer $healthUrl within $installedHealthTimeoutSeconds s."
+    }
+    Write-Host "Installed Weir answered $healthUrl."
+  } finally {
+    if ($weirProc -and -not $weirProc.HasExited) {
+      & taskkill.exe /PID $weirProc.Id /T /F | Out-Null
+      Start-Sleep -Milliseconds 500
+    }
+  }
+
+  Write-Host "Uninstalling with the Velopack uninstaller..."
+  if (-not (Test-Path -LiteralPath $updateExe)) {
+    throw "Velopack updater not found at $updateExe; cannot uninstall."
+  }
+  $uninstallProc = Start-Process -FilePath $updateExe -ArgumentList @("uninstall", "--silent") -PassThru -Wait
+  if ($uninstallProc.ExitCode -ne 0) {
+    throw "Update.exe uninstall --silent exited with code $($uninstallProc.ExitCode)."
+  }
+  Write-Host "Uninstalled cleanly (exit code 0)."
+} catch {
+  Write-Host "Real installer smoke failed."
+  $installedLogPath = Join-Path $defaultRuntimeHome "tray-host.log"
+  if (Test-Path -LiteralPath $installedLogPath) {
+    Write-Host "--- tray-host.log ---"
+    Get-Content -LiteralPath $installedLogPath -Tail 100
+  }
+  throw
+} finally {
+  # Velopack's uninstall does not remove runtime data (docs-site/docs/deployment/windows.md,
+  # "Uninstalling leaves the runtime data ... in place"); remove it so the runner is left clean.
+  if (Test-Path -LiteralPath $defaultRuntimeHome) {
+    Remove-Item -LiteralPath $defaultRuntimeHome -Recurse -Force -ErrorAction SilentlyContinue
+  }
 }
