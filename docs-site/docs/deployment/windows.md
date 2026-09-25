@@ -81,30 +81,70 @@ which port is busy and asks again. To move Weir later, use **Change port** in th
 restarts on the new port and opens it in your browser. If the server cannot start on the new port,
 Weir goes back to the old one and says so.
 
-### Unattended and remote installs
+### Installing Weir from another program
 
-The window only appears when a person is at a desktop to answer it. To choose the port without it,
-supply the port one of these ways — each is used and saved, and no window is shown:
+A program driving Weir unattended — another installer, a provisioning script, a VM image builder —
+must never run `Weir-win-Setup.exe` plain, even with `-- --port <number>` after it. Without
+`--silent`, Setup shows its own install progress and then launches Weir, both of which assume a
+person is at the interactive desktop; run with no one there to see or answer them, Setup can sit
+running indefinitely with no window and no way to tell it is stuck (#779). Always pass `--silent`:
 
-| How | Example |
-|-----|---------|
-| Pass it through the installer to Weir's first start | `Weir-win-Setup.exe -- --port 9400` |
-| Start the tray with `--port` | `"%LocalAppData%\Weir\current\Weir.exe" --port 9400 --no-browser` |
-| Set `WEIR_PORT` before Weir starts | `setx WEIR_PORT 9400` |
+```
+Weir-win-Setup.exe --silent
+```
 
-`--port` wins over `WEIR_PORT`, and both win over the saved port — so a `WEIR_PORT` left set in the
-environment overrides **Change port** on every start. Use it for a one-off choice, or clear it
-afterwards. A supplied port is honoured even if another program has it at that moment; the server
-then fails to start and says why in the log, rather than Weir quietly picking another.
+`--silent` hides every Setup dialog and prompt. Because Velopack's own post-install launch also
+assumes an interactive session, `--silent` skips it too — so `-- <args>` after `--silent` reaches
+nothing and should not be used. Setup then exits on its own within seconds: **0 on success,
+non-zero on failure.** Nothing here waits on Weir itself, so there is no risk of Setup hanging on a
+long-running app. `--installto <dir>` overrides the install directory if you need one other than the
+per-user default (`%LocalAppData%\Weir`).
 
-`Weir-win-Setup.exe --silent` installs without starting Weir at all (that is Velopack's behaviour),
-so for a silent install run `Weir.exe --port <number> --no-browser` once afterwards.
+Weir is a foreground desktop app, not a Windows service (see "How it runs" above): once started it
+keeps running, the same as it does for a person at a desktop. After a silent install, start it
+explicitly and treat it as up once its own health endpoint answers — not once the process exits, it
+is not supposed to:
+
+```
+"%LocalAppData%\Weir\current\Weir.exe" --port 9400 --silent
+```
+
+`--silent` on `Weir.exe` itself (a separate flag from Setup's own `--silent`) guarantees no UI at
+all for this start — no first-run port dialog, no error message box, no browser tab — even if Weir
+cannot tell whether the session is interactive. `--port` is honoured immediately, saved, and reused
+on every later start; `WEIR_PORT` works the same way if your program would rather set an environment
+variable than pass an argument:
+
+```
+setx WEIR_PORT 9400
+```
+
+`--port` wins over `WEIR_PORT`, and both win over the saved port. A supplied port is honoured even
+if another program has it at that moment; the server then fails to start and says why in the log,
+rather than Weir quietly picking another.
+
+Poll `GET http://127.0.0.1:<port>/ready` until it answers `{"ready": true}`; a healthy start
+typically answers within a few seconds, so a 60-second timeout is generous. If `Weir.exe` exits
+before that, the start failed — its exit code is non-zero — and `tray-host.log` under the runtime
+home (`C:\ProgramData\Weir` by default) says why.
+
+**Don't wait on the process tree.** Weir keeps running after Setup exits, by design — that is
+success, not a hang — so wait for Setup's own exit, then poll `/ready` or `/health`; never treat
+"every process this started has exited" or "its output stream closed" as the signal. That second
+case matters if you capture a launched process's output: redirecting stdout/stderr through pipes (the
+ordinary way — `Process.StandardOutput`/`StandardError` in .NET, `subprocess.communicate()` in
+Python, and similar elsewhere) only reaches end-of-file once every process holding a duplicate of the
+write end has closed it, including whatever that process goes on to start. `Weir.exe` closes any
+stdio handles it inherited before doing anything else, so it — and `WeirServer.exe`, which it
+starts — never keep a caller's pipes open (#779).
 
 If nothing is supplied and there is no desktop — a WinRM or SSH session, a scheduled task with no
-logged-on user, a service — Weir never shows the window. It uses 9347, or the first free port above
-it if 9347 is taken, saves that, and records which port it chose and why in
-`C:\ProgramData\Weir\tray-host.log`. If a saved port is busy on a later start with no desktop,
-Weir does not move and does not start; the log says which port is busy and how to choose another.
+logged-on user, a service — Weir never shows a window even without `--silent`. It uses 9347, or the
+first free port above it if 9347 is taken, saves that, and records which port it chose and why in
+`tray-host.log`. If a saved port is busy on a later start with no desktop, Weir does not move and
+does not start; the log says which port is busy and how to choose another. Passing `--silent`
+removes any dependence on that detection being right, so a program driving Weir unattended should
+still pass it.
 
 ## Starting with Windows
 
