@@ -143,9 +143,11 @@ internal sealed class ActivityEndpointHandlers
         var libraryId = QueryInt(request, "library_id", issues, ge: 1);
         var file = QueryStr(request, "file", issues, 1, 2000);
         var about = QueryStr(request, "about", issues, 1, 16);
+        var knownFilesOnly = request.Query("known_files_only") is { } rawKnownFilesOnly &&
+            FieldRules.TryBool(new WireString(rawKnownFilesOnly), ["query", "known_files_only"], issues, out var parsedKnownFilesOnly) && parsedKnownFilesOnly;
         issues.ThrowIfAny();
 
-        var filter = new ActivityFilter(module, eventType, search, ParseWhen(dateFrom, "date_from"), ParseWhen(dateTo, "date_to"), trigger, result, libraryId, file, about);
+        var filter = new ActivityFilter(module, eventType, search, ParseWhen(dateFrom, "date_from"), ParseWhen(dateTo, "date_to"), trigger, result, libraryId, file, about, knownFilesOnly);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var page = await _history.ListRecentAsync(uow, filter, limit, beforeId).ConfigureAwait(false);
         // Only the first page is counted: a count walks every matching row, and later pages know whether more
