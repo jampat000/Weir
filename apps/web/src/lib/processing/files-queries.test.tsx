@@ -31,13 +31,14 @@ describe("useForgetProcessingFile", () => {
 
     // The Files list itself (what the removal reads from)...
     expect(spy).toHaveBeenCalledWith({ queryKey: processingKeys.files });
-    // ...and the three reports that read the same server rows filtered to files Weir still knows about: the
-    // "Just finished" list, the failed-jobs alert, and the overview counters.
+    // ...and the two reports that read the same server rows filtered to files Weir still knows about: the
+    // "Just finished" list and the failed-jobs alert. The overview's lifetime totals read those rows
+    // unfiltered and do not change, so they are deliberately not invalidated here.
     expect(spy).toHaveBeenCalledWith({ queryKey: activityKeys.recent });
     expect(spy).toHaveBeenCalledWith({
       queryKey: processingKeys.jobsInspection,
     });
-    expect(spy).toHaveBeenCalledWith({
+    expect(spy).not.toHaveBeenCalledWith({
       queryKey: processingKeys.overviewStats(),
     });
   });

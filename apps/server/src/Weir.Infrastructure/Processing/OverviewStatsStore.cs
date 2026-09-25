@@ -23,23 +23,8 @@ public sealed class OverviewStatsStore
     private const string OutcomeLiveOutputWritten = "live_output_written";
     private const string OutcomeLiveSkippedNotRequired = "live_skipped_not_required";
 
-    /// <summary>
-    /// A file still known to Weir: <c>files</c> keeps one row per file for as long as Weir has a record of it, and
-    /// only forgetting it (the Files or History "Remove from list" action) deletes that row. Counting a result
-    /// only while its file passes this check is how forgetting a file also drops it from these counters, without
-    /// deleting the Activity event or job row itself — both stay for System's own history and jobs list, and the
-    /// job row's dedupe key keeps doing its job of refusing a second pass for the same file.
-    /// </summary>
-    private const string FileStillKnownByRemuxPayload =
-        "EXISTS (SELECT 1 FROM files WHERE files.relative_path = json_extract(jobs.payload_json, '$.relative_media_path') " +
-        "AND files.library_id = json_extract(jobs.payload_json, '$.library_id'))";
-
-    private const string FileStillKnownByActivityColumns =
-        "EXISTS (SELECT 1 FROM files WHERE files.relative_path = activity_events.relative_path AND files.library_id = activity_events.library_id)";
-
     /// <summary>The completed passes of the window, whose details carry the sizes and outcomes.</summary>
-    internal const string RecentResultsSql =
-        "SELECT detail FROM activity_events WHERE event_type = @type AND created_at >= @since AND " + FileStillKnownByActivityColumns;
+    internal const string RecentResultsSql = "SELECT detail FROM activity_events WHERE event_type = @type AND created_at >= @since";
 
     public async Task<ProcessingOverviewStats> BuildAsync(UnitOfWork uow, int windowDays, TimeProvider time)
     {
@@ -48,8 +33,7 @@ public sealed class OverviewStatsStore
         var sinceParam = SqliteValues.ToSqlite(Timestamp.FromUtc(since.UtcDateTime));
 
         var failed = await uow.CountAsync(
-            "SELECT COUNT(*) FROM jobs WHERE job_kind = @kind AND status IN ('failed', 'handler_ok_finalize_failed') AND updated_at >= @since AND " +
-            FileStillKnownByRemuxPayload,
+            "SELECT COUNT(*) FROM jobs WHERE job_kind = @kind AND status IN ('failed', 'handler_ok_finalize_failed') AND updated_at >= @since",
             ("@kind", RemuxPassJobKind), ("@since", sinceParam)).ConfigureAwait(false);
 
         var detailRows = await uow.QueryAsync(
