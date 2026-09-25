@@ -43,7 +43,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
 
     private static async Task<long> CreateLibraryAsync(
         StoreFixture store, string watched, string output, bool enqueuePeriodicRemux = true, long minFileAgeSeconds = 0, long fileDetectionIntervalSeconds = 0,
-        string rejectedFileAction = "leave", string excludePatternsCsv = "")
+        string rejectedFileAction = "leave", string excludePatternsCsv = "", bool removeOriginalAfterSuccess = true)
     {
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
         var created = await Libraries.CreateAsync(uow, new ProcessingLibraryInput
@@ -56,6 +56,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
             FileDetectionIntervalSeconds = fileDetectionIntervalSeconds,
             RejectedFileAction = rejectedFileAction,
             ExcludePatternsCsv = excludePatternsCsv,
+            RemoveOriginalAfterSuccess = removeOriginalAfterSuccess,
         });
         await uow.CommitAsync();
         return created.Id;
@@ -175,5 +176,141 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         var file = await Files.FindAsync(uow, libraryId, "Bad Release/sample.mkv");
         Assert.NotNull(file);
         Assert.Equal(ProcessingFileStatuses.Skipped, file!.Status);
+    }
+
+    /// <summary>Writes the Activity completion event the scan's own duplicate guard
+    /// (<see cref="WatchedFolderScanOps.CompletedRemuxOutputExistsForRelativePathAsync"/>) reads, matching the exact
+    /// source it names so the guard's fingerprint check passes.</summary>
+    private static async Task WriteCompletedPassEventAsync(StoreFixture store, long libraryId, string relativePath, string mediaScope, string source, string output)
+    {
+        var detail = $$"""
+            {"ok":true,"relative_media_path":"{{relativePath}}","media_scope":"{{mediaScope}}","library_id":{{libraryId}},
+            "output_file":"{{output.Replace("\\", "\\\\")}}","source_deleted_after_success":false,
+            "inspected_source_path":"{{source.Replace("\\", "\\\\")}}","source_size_bytes":{{new FileInfo(source).Length}}}
+            """.Replace("\n", string.Empty);
+        await using var uow = await UnitOfWork.OpenAsync(store.Database);
+        await uow.ExecuteAsync(
+            "INSERT INTO activity_events (module, event_type, title, detail, relative_path, library_id) " +
+            "VALUES ('processing', 'processing.file_remux_pass_completed', 'x', @detail, @path, @lib)",
+            ("@detail", detail), ("@path", relativePath), ("@lib", libraryId));
+        await uow.CommitAsync();
+    }
+
+    /// <summary>Forgets a file's row exactly as History's "Remove from list" endpoint does
+    /// (<c>FileStateStore.ForgetAsync</c>): the row goes, nothing else does.</summary>
+    private static async Task ForgetFileAsync(StoreFixture store, long fileId)
+    {
+        await using var uow = await UnitOfWork.OpenAsync(store.Database);
+        await Files.ForgetAsync(uow, fileId);
+        await uow.CommitAsync();
+    }
+
+    /// <summary>
+    /// A finished file's own <c>files</c> row is not what stops a rescan from redoing it: the Activity event the
+    /// pass wrote is. Forgetting the row, which is all "Remove from list" does, must not lose that guard —
+    /// something deleting the event too would do.
+    /// </summary>
+    [Fact]
+    public async Task A_finished_file_with_its_original_still_present_is_not_reprocessed_after_being_forgotten()
+    {
+        var (store, jobs, handler) = await BuildAsync();
+        using var _ = store;
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        var source = Path.Combine(watched, "Kept Show S01E01.mkv");
+        File.WriteAllBytes(source, "season one, episode one"u8.ToArray());
+        var outputFile = Path.Combine(output, "Kept Show S01E01.mkv");
+        File.WriteAllBytes(outputFile, "done"u8.ToArray());
+
+        var libraryId = await CreateLibraryAsync(store, watched, output, removeOriginalAfterSuccess: false);
+        long fileId;
+        await using (var uow = await UnitOfWork.OpenAsync(store.Database))
+        {
+            fileId = Convert.ToInt64(await uow.ExecuteScalarWriteAsync(
+                "INSERT INTO files (library_id, relative_path, status, size_bytes, last_seen_at) VALUES (@lib, @path, 'processed', @size, CURRENT_TIMESTAMP) RETURNING id",
+                ("@lib", libraryId), ("@path", "Kept Show S01E01.mkv"), ("@size", new FileInfo(source).Length)));
+            await uow.CommitAsync();
+        }
+
+        await WriteCompletedPassEventAsync(store, libraryId, "Kept Show S01E01.mkv", "movie", source, outputFile);
+        await ForgetFileAsync(store, fileId);
+
+        await RunScanAsync(handler, jobs, libraryId, enqueueRemuxJobs: true);
+
+        var remuxCount = await store.Scalar("SELECT COUNT(*) FROM jobs WHERE job_kind = 'processing.file.remux_pass.v1'");
+        Assert.Equal(0, remuxCount);
+    }
+
+    /// <summary>
+    /// A failed file's own row is the only thing that remembers it failed: unlike a finished pass, a failure writes
+    /// no Activity event a rescan checks before queueing a file again. So forgetting the row (exactly what
+    /// "Remove from list" does, and all it does) makes the next scan see a plain new candidate and queue it —
+    /// true whether or not a job or Activity row for the old attempt still exists, since neither is consulted here.
+    /// A person forgetting a failed file to let Weir try it again from scratch is the ordinary use of "Remove from
+    /// list", so this is pinned as today's behaviour, not treated as something this fix owes a change.
+    /// </summary>
+    [Fact]
+    public async Task A_failed_file_with_its_original_still_present_is_queued_again_after_being_forgotten()
+    {
+        var (store, jobs, handler) = await BuildAsync();
+        using var _ = store;
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        var source = Path.Combine(watched, "Failed Movie 2001.mkv");
+        File.WriteAllBytes(source, "not a real film"u8.ToArray());
+
+        var libraryId = await CreateLibraryAsync(store, watched, output);
+        long fileId;
+        await using (var uow = await UnitOfWork.OpenAsync(store.Database))
+        {
+            fileId = Convert.ToInt64(await uow.ExecuteScalarWriteAsync(
+                "INSERT INTO files (library_id, relative_path, status, size_bytes, last_seen_at) VALUES (@lib, @path, 'processing_failed', @size, CURRENT_TIMESTAMP) RETURNING id",
+                ("@lib", libraryId), ("@path", "Failed Movie 2001.mkv"), ("@size", new FileInfo(source).Length)));
+            await uow.CommitAsync();
+        }
+
+        await ForgetFileAsync(store, fileId);
+        await RunScanAsync(handler, jobs, libraryId, enqueueRemuxJobs: true);
+
+        var remuxCount = await store.Scalar("SELECT COUNT(*) FROM jobs WHERE job_kind = 'processing.file.remux_pass.v1'");
+        Assert.Equal(1, remuxCount);
+    }
+
+    /// <summary>
+    /// A rejected file behaves the same way as a failed one here (see the failed-file test above): its status lives
+    /// only on the row "Remove from list" deletes, so a rescan re-admits it as a new candidate. Pinned for the same
+    /// reason.
+    /// </summary>
+    [Fact]
+    public async Task A_rejected_file_with_its_original_still_present_is_queued_again_after_being_forgotten()
+    {
+        var (store, jobs, handler) = await BuildAsync();
+        using var _ = store;
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        var source = Path.Combine(watched, "Rejected Movie 2001.mkv");
+        File.WriteAllBytes(source, "bad release"u8.ToArray());
+
+        var libraryId = await CreateLibraryAsync(store, watched, output);
+        long fileId;
+        await using (var uow = await UnitOfWork.OpenAsync(store.Database))
+        {
+            fileId = Convert.ToInt64(await uow.ExecuteScalarWriteAsync(
+                "INSERT INTO files (library_id, relative_path, status, size_bytes, last_seen_at) VALUES (@lib, @path, 'rejected', @size, CURRENT_TIMESTAMP) RETURNING id",
+                ("@lib", libraryId), ("@path", "Rejected Movie 2001.mkv"), ("@size", new FileInfo(source).Length)));
+            await uow.CommitAsync();
+        }
+
+        await ForgetFileAsync(store, fileId);
+        await RunScanAsync(handler, jobs, libraryId, enqueueRemuxJobs: true);
+
+        var remuxCount = await store.Scalar("SELECT COUNT(*) FROM jobs WHERE job_kind = 'processing.file.remux_pass.v1'");
+        Assert.Equal(1, remuxCount);
     }
 }

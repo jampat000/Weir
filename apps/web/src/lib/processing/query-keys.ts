@@ -20,8 +20,19 @@ export const processingKeys = {
   filesAtOnce: ["processing", "files-at-once"] as const,
   jobs: ["processing", "jobs"] as const,
   jobsInspection: ["processing", "jobs", "inspection"] as const,
-  jobsInspectionList: (filter: ProcessingJobsInspectionFilter, limit: number) =>
-    ["processing", "jobs", "inspection", filter, limit] as const,
+  jobsInspectionList: (
+    filter: ProcessingJobsInspectionFilter,
+    limit: number,
+    knownFilesOnly = false,
+  ) =>
+    [
+      "processing",
+      "jobs",
+      "inspection",
+      filter,
+      limit,
+      knownFilesOnly,
+    ] as const,
   overviewStats: (windowDays?: number) =>
     windowDays === undefined
       ? (["processing", "overview-stats"] as const)

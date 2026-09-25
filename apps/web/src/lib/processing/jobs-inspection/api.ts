@@ -9,6 +9,11 @@ import type {
 export type FetchProcessingJobsInspectionOpts = {
   statuses?: string[];
   limit?: number;
+  /**
+   * Leaves out a per-file job whose file Weir has forgotten. For the live alert, not for System › Jobs, which
+   * wants the complete list and never sets this.
+   */
+  knownFilesOnly?: boolean;
 };
 
 export function processingJobsInspectionPath(
@@ -21,6 +26,9 @@ export function processingJobsInspectionPath(
     for (const s of opts.statuses) {
       params.append("status", s);
     }
+  }
+  if (opts?.knownFilesOnly) {
+    params.set("known_files_only", "true");
   }
   return `/api/v1/processing/jobs/inspection?${params.toString()}`;
 }
