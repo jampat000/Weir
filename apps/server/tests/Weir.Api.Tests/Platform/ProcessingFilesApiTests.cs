@@ -62,6 +62,28 @@ public sealed class ProcessingFilesApiTests
     }
 
     [Fact]
+    public async Task A_comma_separated_file_status_lists_every_row_in_any_of_them()
+    {
+        // The Processing screen asks for its "everything currently running" page this way (#781): one status
+        // today, but the filter takes several.
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var libraryId = await SeedLibraryAsync(server);
+        await SeedFileAsync(server, libraryId, "a.mkv", "processing");
+        await SeedFileAsync(server, libraryId, "b.mkv", "unprocessed");
+        await SeedFileAsync(server, libraryId, "c.mkv", "processed");
+
+        using var response = await client.GetAsync("/api/v1/processing/files?file_status=processing,unprocessed");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await ApiTestClient.Json(response);
+        var statuses = body!["files"]!.AsArray().Select(file => file!["status"]!.GetValue<string>()).Order(StringComparer.Ordinal);
+        Assert.Equal(["processing", "unprocessed"], statuses);
+    }
+
+    [Fact]
     public async Task An_invalid_file_status_is_still_rejected_with_422()
     {
         await using var server = await ApiTestClient.StartServerAsync();

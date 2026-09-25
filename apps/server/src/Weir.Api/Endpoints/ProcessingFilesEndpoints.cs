@@ -127,15 +127,7 @@ internal sealed class ProcessingFilesEndpointHandlers
         long? libraryId = request.Query("library_id") is { } rawLibrary && FieldRules.TryInt(new WireString(rawLibrary), ["query", "library_id"], 1, null, issues, out var parsedLibrary)
             ? (long)parsedLibrary
             : null;
-        string? fileStatus = null;
-        if (request.Query("file_status") is { } rawStatus)
-        {
-            if (FieldRules.TryLiteral(new WireString(rawStatus), ["query", "file_status"], ProcessingFileStatuses.All, issues, out var parsedStatus))
-            {
-                fileStatus = parsedStatus;
-            }
-        }
-
+        var fileStatuses = ParseFileStatuses(request.Query("file_status"), issues);
         var pathContains = request.Query("path_contains");
         long? withinDays = request.Query("within_days") is { } rawWithin && FieldRules.TryInt(new WireString(rawWithin), ["query", "within_days"], 1, 3650, issues, out var parsedWithin)
             ? (long)parsedWithin
@@ -147,7 +139,7 @@ internal sealed class ProcessingFilesEndpointHandlers
         var filter = new ProcessingFileListFilter
         {
             LibraryId = libraryId,
-            Status = fileStatus,
+            Statuses = fileStatuses,
             PathContains = pathContains,
             Since = withinDays is { } days ? Timestamp.FromUtc(request.Time.GetUtcNow().AddDays(-days).UtcDateTime) : null,
             Limit = limit,
@@ -182,6 +174,31 @@ internal sealed class ProcessingFilesEndpointHandlers
             }))
             .Set("returned", files.Count)
             .Set("limit", limit));
+    }
+
+    /// <summary>
+    /// <c>file_status</c> as one or more comma-separated statuses (#781): the Processing screen asks for every
+    /// currently-processing file in one uncapped, status-filtered page, separate from the ordinary paginated
+    /// list, so a running file can never be pushed off by the page limit. Null when the query omits the
+    /// parameter; an empty list (a blank value, or one made entirely of blanks) filters nothing, same as omitting it.
+    /// </summary>
+    private static List<string>? ParseFileStatuses(string? rawStatuses, ValidationIssues issues)
+    {
+        if (rawStatuses is null)
+        {
+            return null;
+        }
+
+        var statuses = new List<string>();
+        foreach (var token in rawStatuses.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (FieldRules.TryLiteral(new WireString(token), ["query", "file_status"], ProcessingFileStatuses.All, issues, out var parsed))
+            {
+                statuses.Add(parsed);
+            }
+        }
+
+        return statuses;
     }
 
     public async Task<ApiResult> DeleteFileAsync(ApiRequest request)
@@ -338,7 +355,7 @@ internal sealed class ProcessingFilesEndpointHandlers
         var rows = await _files.ListAsync(uow, new ProcessingFileListFilter
         {
             LibraryId = libraryId,
-            Status = fileStatus,
+            Statuses = fileStatus is not null ? [fileStatus] : null,
             PathContains = pathContains,
             Ids = fileIds.Count > 0 ? fileIds : null,
             Limit = fileIds.Count > 0 ? BulkRequeueMaxFiles : (int)limit,

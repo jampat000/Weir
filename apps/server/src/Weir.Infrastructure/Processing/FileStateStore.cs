@@ -63,10 +63,11 @@ public sealed class FileStateStore
             parameters.Add(("@library_id", libraryId));
         }
 
-        if (!string.IsNullOrEmpty(filter.Status))
+        if (filter.Statuses is { Count: > 0 } statuses)
         {
-            clauses.Add("status = @status");
-            parameters.Add(("@status", filter.Status));
+            var names = statuses.Select((_, index) => $"@status{index}").ToArray();
+            clauses.Add($"status IN ({string.Join(", ", names)})");
+            parameters.AddRange(statuses.Select((status, index) => ($"@status{index}", (object?)status)));
         }
 
         if (!string.IsNullOrEmpty(filter.PathContains))
