@@ -37,9 +37,13 @@ public sealed class JobsInspectionStore
         if (statuses is { Count: > 0 })
         {
             var placeholders = string.Join(",", statuses.Select((_, i) => $"@status{i}"));
-            var parameters = statuses.Select((s, i) => ($"@status{i}", (object?)s)).ToArray();
+            var parameters = statuses.Select((s, i) => ($"@status{i}", (object?)s))
+                .Append(("@leased", (object?)ProcessingJobStatus.Leased)).ToArray();
+            // The Processing screen's "active" filter (pending + leased) shares this page with every job kind, so a
+            // backlog of pending library cleans can otherwise outrank a job that is actually running and push it
+            // off the page (#781). Leased jobs sort first, so a running one is never dropped by the limit.
             var rows = await uow.QueryAsync(
-                $"SELECT {columns} FROM jobs WHERE status IN ({placeholders}) ORDER BY updated_at DESC LIMIT {limit}",
+                $"SELECT {columns} FROM jobs WHERE status IN ({placeholders}) ORDER BY (status = @leased) DESC, updated_at DESC LIMIT {limit}",
                 Read, parameters).ConfigureAwait(false);
             return (rows, false);
         }

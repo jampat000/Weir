@@ -36,7 +36,13 @@ import { useNow } from "../../lib/ui/use-now";
 import { FinishedLane } from "./finished-lane";
 import { EmptyLane, Lane, More } from "./lane";
 import { ArrivingCard, HandingCard, WaitingCard } from "./lane-cards";
-import { arrivingDeadline, buildLanes, prettyName } from "./processing-model";
+import {
+  WORKING_FILE_STATUS,
+  arrivingDeadline,
+  buildLanes,
+  mergeWorkingFiles,
+  prettyName,
+} from "./processing-model";
 import { FAILED_JOBS_LIMIT, NeedsList } from "./processing-needs";
 import {
   ProcessingToolbar,
@@ -46,6 +52,13 @@ import {
 import { WorkingCard } from "./working-card";
 
 const FILES_QUERY = { limit: 200 } as const;
+// The Working lane's own fetch, separate from the general page: every currently-processing file, with no
+// paging risk of losing one that is still running (#781). 1000 is the endpoint's own ceiling, not a real
+// expectation — files-at-once tops out far below it.
+const WORKING_FILES_QUERY = {
+  file_status: WORKING_FILE_STATUS,
+  limit: 1000,
+} as const;
 const ACTIVE_JOBS_LIMIT = 50;
 /** Once a second, so countdowns and "min ago" move between server updates. */
 const TICK_MS = 1000;
@@ -65,6 +78,7 @@ const HANDING_SHOWN = 4;
 // follow it at a gentler pace.
 const LANE_KEYS = [
   processingKeys.fileList(FILES_QUERY),
+  processingKeys.fileList(WORKING_FILES_QUERY),
   processingKeys.jobsInspectionList("active", ACTIVE_JOBS_LIMIT),
 ] as const;
 const TOTAL_KEYS = [
@@ -79,6 +93,7 @@ const TOTAL_THROTTLE_MS = 3_000;
 /** The lanes' files, grouped by where each one is, with what each library knows about its next look. */
 function useLanes() {
   const files = useProcessingFilesQuery(FILES_QUERY);
+  const workingFiles = useProcessingFilesQuery(WORKING_FILES_QUERY);
   const libraries = useProcessingLibrariesQuery(true, LIBRARIES_REFRESH_MS);
   const activeJobs = useProcessingJobsInspectionQuery(
     "active",
@@ -97,14 +112,24 @@ function useLanes() {
         });
       }
     }
+    const allFiles = mergeWorkingFiles(
+      files.data?.files ?? [],
+      workingFiles.data?.files ?? [],
+    );
     return buildLanes(
-      mergeLiveProgress(files.data?.files ?? [], liveProgress),
+      mergeLiveProgress(allFiles, liveProgress),
       activeJobs.data?.jobs ?? [],
       new Map(all.map((l) => [l.id, l.name])),
       new Map(all.map((l) => [l.id, l.min_file_age_seconds])),
       nextLooks,
     );
-  }, [files.data, activeJobs.data, libraries.data, liveProgress]);
+  }, [
+    files.data,
+    workingFiles.data,
+    activeJobs.data,
+    libraries.data,
+    liveProgress,
+  ]);
   return { files, libraries, lanes };
 }
 

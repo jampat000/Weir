@@ -11,6 +11,9 @@ import { parseAppTime } from "../../lib/ui/mm-format-date";
 
 export const LIBRARY_CLEAN_JOB_KIND = "processing.library.clean.v1";
 
+/** The file status the Working lane shows (see the `case "processing"` below). */
+export const WORKING_FILE_STATUS: ProcessingFile["status"] = "processing";
+
 export type WorkSource = "download" | "library";
 
 export type ArrivingItem = {
@@ -147,6 +150,22 @@ function libraryJobParts(row: ProcessingJobInspectionRow): {
   } catch {
     return { path: "", libraryId: null };
   }
+}
+
+/**
+ * The general, paginated file list with the Working lane's own uncapped, status-filtered fetch folded in
+ * (#781): a currently-processing file the general page's own limit left out is patched back onto the end,
+ * so a running title's row can never be lost to it. A file the general page already has keeps its place
+ * there; `workingFiles` only ever adds the ones missing, never duplicates or reorders what is already shown.
+ */
+export function mergeWorkingFiles(
+  files: ProcessingFile[],
+  workingFiles: ProcessingFile[],
+): ProcessingFile[] {
+  if (workingFiles.length === 0) return files;
+  const onPage = new Set(files.map((file) => file.id));
+  const missing = workingFiles.filter((file) => !onPage.has(file.id));
+  return missing.length === 0 ? files : [...files, ...missing];
 }
 
 /**

@@ -121,7 +121,8 @@ export interface ProcessingFilesPage {
 
 export interface ProcessingFilesQuery {
   library_id?: number;
-  file_status?: ProcessingFileStatus;
+  /** Several statuses join as one comma-separated value; the server splits them (#781). */
+  file_status?: ProcessingFileStatus | ProcessingFileStatus[];
   path_contains?: string;
   within_days?: number;
   limit?: number;

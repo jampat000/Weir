@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import type { FinishedFile } from "../../lib/activity/processing-outcome";
 import type { ProcessingFile } from "../../lib/processing/files-api";
 import type { ProcessingJobInspectionRow } from "../../lib/processing/jobs-inspection/types";
+import { mergeLiveProgress } from "../../lib/processing/live-progress-merge";
+import type { LiveProgressEntry } from "../../lib/activity/use-activity-stream-invalidation";
 import { handedBack, handedBackSince } from "./handed-back-model";
 import {
   LIBRARY_CLEAN_JOB_KIND,
   arrivingDeadline,
   buildLanes,
   fileFacts,
+  mergeWorkingFiles,
   prettyName,
   secondsLeft,
 } from "./processing-model";
@@ -293,6 +296,177 @@ describe("buildLanes", () => {
       "file-1",
       "file-2",
     ]);
+  });
+});
+
+describe("mergeWorkingFiles", () => {
+  it("keeps a running file in Working when it is older than every file crowding the general page", () => {
+    // A general page full of files last seen recently (#781): a plain "newest last_seen_at first" page,
+    // capped well under 250, would leave a running file this much older off it entirely. The Working lane's
+    // own uncapped, status-filtered fetch (workingFiles) is what supplies it instead.
+    const generalPage = Array.from({ length: 250 }, (_, index) =>
+      file({
+        id: index + 1,
+        relative_path: `Backlog/E${index}.mkv`,
+        status: "unprocessed",
+        last_seen_at: "2026-08-18T09:59:00",
+      }),
+    );
+    const running = file({
+      id: 9999,
+      relative_path: "Running/Older.mkv",
+      status: "processing",
+      progress_status: "processing",
+      last_seen_at: "2020-01-01T00:00:00",
+    });
+
+    const merged = mergeWorkingFiles(generalPage, [running]);
+    const lanes = buildLanes(merged, [], NAMES, AGES);
+
+    expect(lanes.working.map((item) => item.key)).toEqual(["file-9999"]);
+  });
+
+  it("does not duplicate a running file the general page already has", () => {
+    const running = file({ id: 1, status: "processing" });
+
+    const merged = mergeWorkingFiles([running], [running]);
+
+    expect(merged).toEqual([running]);
+  });
+
+  it("returns the general page unchanged when nothing is missing from it", () => {
+    const files = [file({ id: 1 }), file({ id: 2 })];
+
+    expect(mergeWorkingFiles(files, [])).toBe(files);
+  });
+});
+
+describe("a running title's row through the pass", () => {
+  function liveEntry(overrides: Partial<LiveProgressEntry>): LiveProgressEntry {
+    return {
+      relativePath: "The.Quiet.Harbour.S01E03.1080p.WEB-DL.mkv",
+      status: "processing",
+      percent: 10,
+      etaSeconds: 120,
+      message: "Weir has started writing the cleaned-up file.",
+      speed: "1.0x",
+      elapsedSeconds: 5,
+      removedAudio: [],
+      removedSubtitles: [],
+      ...overrides,
+    };
+  }
+
+  /** One simulated REST fetch of the files list, merged with one simulated live-progress frame. */
+  function workingKeys(
+    raw: ProcessingFile[],
+    live: Record<string, LiveProgressEntry>,
+  ) {
+    const lanes = buildLanes(mergeLiveProgress(raw, live), [], NAMES, AGES);
+    return lanes.working.map((item) => item.key);
+  }
+
+  it("shows a frame that names the file, with its numbers", () => {
+    const raw = file({
+      id: 1,
+      status: "processing",
+      progress_status: "processing",
+      progress_percent: 10,
+    });
+
+    const keys = workingKeys([raw], {
+      [raw.relative_path]: liveEntry({ percent: 10 }),
+    });
+
+    expect(keys).toEqual(["file-1"]);
+  });
+
+  it("keeps the row through a gap between stages with no live entry for the file", () => {
+    // The gap between stages (probing, or a stage change the store has not caught up on yet): no live
+    // entry for this path, but the file's own status still says it is running (#781).
+    const raw = file({
+      id: 1,
+      status: "processing",
+      progress_status: "processing",
+      progress_percent: 10,
+    });
+
+    const keys = workingKeys([raw], {});
+
+    expect(keys).toEqual(["file-1"]);
+  });
+
+  it("keeps the row even before any progress has ever arrived", () => {
+    // A files-list refetch taken exactly inside the gap, before any progress has ever arrived: the lane is
+    // decided by the file's status, not by whether progress is known yet.
+    const neverReported = file({
+      id: 1,
+      status: "processing",
+      progress_status: null,
+      progress_percent: null,
+    });
+
+    const keys = workingKeys([neverReported], {});
+
+    expect(keys).toEqual(["file-1"]);
+  });
+
+  it("picks up a later frame's fresh numbers without losing the row", () => {
+    const raw = file({
+      id: 1,
+      status: "processing",
+      progress_status: "processing",
+      progress_percent: 10,
+    });
+    const live = { [raw.relative_path]: liveEntry({ percent: 64 }) };
+
+    const merged = mergeLiveProgress([raw], live);
+
+    expect(workingKeys([raw], live)).toEqual(["file-1"]);
+    expect(merged[0].progress_percent).toBe(64);
+  });
+
+  it("leaves Working once the file is done", () => {
+    const finished = file({ id: 1, status: "processed" });
+
+    expect(workingKeys([finished], {})).toEqual([]);
+  });
+
+  it("leaves Working once the file has failed", () => {
+    const failed = file({ id: 1, status: "processing_failed" });
+
+    expect(workingKeys([failed], {})).toEqual([]);
+  });
+
+  it("keeps every concurrent file's own row through independent gaps (Files at once > 1)", () => {
+    const first = file({
+      id: 1,
+      relative_path: "First/First.mkv",
+      status: "processing",
+      progress_status: "processing",
+    });
+    const second = file({
+      id: 2,
+      relative_path: "Second/Second.mkv",
+      status: "processing",
+      progress_status: "processing",
+    });
+    const third = file({
+      id: 3,
+      relative_path: "Third/Third.mkv",
+      status: "processing",
+      progress_status: "processing",
+    });
+
+    // Only the second file has a live frame this round; the other two are between stages.
+    const keys = workingKeys([first, second, third], {
+      "Second/Second.mkv": liveEntry({
+        relativePath: "Second/Second.mkv",
+        percent: 55,
+      }),
+    });
+
+    expect(keys).toEqual(["file-1", "file-2", "file-3"]);
   });
 });
 

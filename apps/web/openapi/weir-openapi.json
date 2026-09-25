@@ -12633,34 +12633,40 @@
             }
           },
           {
+            "description": "One or several statuses. Several are given as one comma-separated value (e.g. `processing,unprocessed`), not repeated query parameters.",
             "in": "query",
             "name": "file_status",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "enum": [
-                    "unprocessed",
-                    "processing",
-                    "processed",
-                    "processing_failed",
-                    "skipped",
-                    "disabled",
-                    "on_hold",
-                    "out_of_schedule",
-                    "blocked_upstream",
-                    "passed_through",
-                    "rejected",
-                    "cancelled"
-                  ],
-                  "type": "string"
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "unprocessed",
+                      "processing",
+                      "processed",
+                      "processing_failed",
+                      "skipped",
+                      "disabled",
+                      "on_hold",
+                      "out_of_schedule",
+                      "blocked_upstream",
+                      "passed_through",
+                      "rejected",
+                      "cancelled"
+                    ],
+                    "type": "string"
+                  }
                 },
                 {
                   "type": "null"
                 }
               ],
               "title": "File Status"
-            }
+            },
+            "style": "form",
+            "explode": false
           },
           {
             "in": "query",
