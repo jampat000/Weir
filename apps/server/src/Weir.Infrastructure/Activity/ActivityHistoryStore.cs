@@ -207,6 +207,15 @@ public sealed class ActivityHistoryStore
                 break;
         }
 
+        if (filter.KnownFilesOnly)
+        {
+            // A live "just finished" list, not an audit trail: an event about a file Weir has forgotten (no more
+            // `files` row for it) drops out here, while System › Logs, which never sets this, keeps showing it.
+            where.Add(
+                "(coalesce(activity_events.relative_path, '') = '' OR EXISTS (" +
+                "SELECT 1 FROM files WHERE files.relative_path = activity_events.relative_path AND files.library_id = activity_events.library_id))");
+        }
+
         if (!string.IsNullOrEmpty(filter.File))
         {
             // A file's whole history: its path, or its name anywhere in a path.

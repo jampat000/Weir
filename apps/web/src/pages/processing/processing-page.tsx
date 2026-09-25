@@ -84,7 +84,7 @@ const LANE_KEYS = [
 const TOTAL_KEYS = [
   processingKeys.overviewStats(TODAY_DAYS),
   processingKeys.filesAtOnce,
-  processingKeys.jobsInspectionList("failed", FAILED_JOBS_LIMIT),
+  processingKeys.jobsInspectionList("failed", FAILED_JOBS_LIMIT, true),
   activityKeys.recent,
 ] as const;
 const LANE_THROTTLE_MS = 750;

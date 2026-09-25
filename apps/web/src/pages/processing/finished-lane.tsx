@@ -23,9 +23,12 @@ const FINISHED_SHOWN = 5;
 
 /** The newest finished files of both kinds, from the Activity entry each one wrote. */
 function useFinishedFiles(): FinishedFile[] {
+  // A download whose title the owner has since removed from History drops out here; a library clean has no
+  // such removal, and library files are not in known_files_only's reckoning, so its query never asks for it.
   const passes = useActivityRecentQuery({
     limit: RECENT_PASSES,
     event_type: REMUX_PASS_COMPLETED_EVENT,
+    known_files_only: true,
   });
   const cleans = useActivityRecentQuery({
     limit: RECENT_CLEANS,

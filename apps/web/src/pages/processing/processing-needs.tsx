@@ -56,9 +56,12 @@ function stuckNeed(stuck: ProcessingFile[]): Need | null {
 export function NeedsList({ stuck }: { stuck: ProcessingFile[] }) {
   const libraries = useProcessingLibrariesQuery();
   const readiness = useSystemReadinessQuery();
+  // Leaves out a file the owner has since removed from History: this alert is about current problems, not
+  // a record of every failure Weir has ever seen (System › Jobs keeps that).
   const failedJobs = useProcessingJobsInspectionQuery(
     "failed",
     FAILED_JOBS_LIMIT,
+    true,
   );
   const workers: Need[] = (readiness.data?.worker_health ?? [])
     .filter((worker) => worker.status === "degraded")

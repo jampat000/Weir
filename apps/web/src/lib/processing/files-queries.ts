@@ -5,6 +5,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
+import { activityKeys } from "../activity/query-keys";
 import { postProcessingFileRemuxPassEnqueue } from "./file-remux-pass-api";
 import {
   fetchProcessingFiles,
@@ -63,12 +64,23 @@ export function useLibraryCleansQuery(query: LibraryCleansQuery) {
   });
 }
 
+/**
+ * Forgetting a file leaves its Activity events and job rows alone on the server — System keeps its own record of
+ * them, and a job's dedupe key keeps refusing a second pass for the same file — but the file no longer counts
+ * toward the live Processing alert or "Just finished" list, which read those same rows filtered to files Weir
+ * still knows about. Invalidating them here is what makes that drop show up without a reload. The overview's
+ * lifetime totals (processed, failed, space saved) read the same rows unfiltered and do not change, so they are
+ * not invalidated here.
+ */
 export function useForgetProcessingFile() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => forgetProcessingFile(id),
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: processingKeys.files }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: processingKeys.files });
+      void qc.invalidateQueries({ queryKey: activityKeys.recent });
+      void qc.invalidateQueries({ queryKey: processingKeys.jobsInspection });
+    },
   });
 }
 
