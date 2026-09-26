@@ -18,7 +18,7 @@
 #     "https://mcr.microsoft.com/v2/dotnet/runtime-deps/manifests/10.0-noble" | grep -i docker-content-digest
 # (Docker Hub images such as node need a bearer token first: GET
 # https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/node:pull.)
-FROM node:25-bookworm-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370 AS web
+FROM node:26-bookworm-slim@sha256:662933cf47f013bc8e4beb31a6116448427a82057ba7c42c97e4c5ba766504c2 AS web
 WORKDIR /src/apps/web
 # Only the manifest and lockfile go in before the install, so this layer (and the BuildKit cache
 # mount below, which survives even when the layer cache is cold) is reused for every build that
