@@ -1,15 +1,19 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { PageLoading } from "../components/shared/page-loading";
-import { useMeQuery } from "../lib/auth/queries";
+import { useMeQuery, useSetThemeMutation } from "../lib/auth/queries";
 import { sessionWasNotKept } from "../lib/auth/session-kept";
 import { useAccountThemeSync } from "../lib/ui/use-account-theme-sync";
 
 /** Everything past sign-in: a signed-out visitor goes to the login page, with the reason when a session did not stick. */
 export function RequireAuth() {
   const me = useMeQuery();
-  // Only once /auth/me has actually answered with a signed-in user: applying it any earlier would
-  // fight the first-paint cache before there is a real account theme to apply (#790).
-  useAccountThemeSync(me.data ? (me.data.app_theme ?? null) : undefined);
+  const setTheme = useSetThemeMutation();
+  // Only once /auth/me has actually answered with a signed-in user: reconciling it any earlier
+  // would fight the first-paint cache before there is a real account to reconcile with.
+  useAccountThemeSync(
+    me.data ? (me.data.app_theme ?? null) : undefined,
+    setTheme.mutate,
+  );
   if (me.isPending) {
     return <PageLoading />;
   }

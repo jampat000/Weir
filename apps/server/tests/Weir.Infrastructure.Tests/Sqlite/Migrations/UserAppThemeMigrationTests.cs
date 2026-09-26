@@ -3,8 +3,9 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Tests.Sqlite.Migrations;
 
 /// <summary>
-/// Migration <c>0026_user_app_theme.sql</c> (#790): every existing user gets no theme preference, so an
-/// upgrade leaves them following the system setting until they choose one.
+/// Migration <c>0026_user_app_theme.sql</c>: every existing user gets no theme preference. The client
+/// adopts a browser's existing choice onto the account afterwards; this migration only proves the
+/// column starts empty.
 /// </summary>
 public sealed class UserAppThemeMigrationTests : IDisposable
 {

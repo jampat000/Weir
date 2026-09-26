@@ -18,7 +18,7 @@ public static class UserRoles
     public static readonly IReadOnlySet<string> OperatorOrAdmin = new HashSet<string>(StringComparer.Ordinal) { Admin, Operator };
 }
 
-/// <summary>Values persisted in <c>users.app_theme</c>. Null means no preference: follow the system setting (#790).</summary>
+/// <summary>Values persisted in <c>users.app_theme</c>. Null means no preference: follow the system setting.</summary>
 public static class AppThemes
 {
     public const string Light = "light";

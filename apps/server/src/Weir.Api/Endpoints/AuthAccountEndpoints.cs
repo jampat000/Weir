@@ -106,7 +106,7 @@ internal sealed class AuthAccountEndpointHandlers
         return ApiRoutes.Ok(new WireObject().Set("message", "Password changed. Sign in again with your new password."));
     }
 
-    /// <summary>Saves the signed-in user's own colour theme, so it follows them to another browser or device (#790).</summary>
+    /// <summary>Saves the signed-in user's own colour theme, so it follows them to another browser or device.</summary>
     public async Task<ApiResult> PostSetThemeAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);

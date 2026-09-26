@@ -172,8 +172,9 @@ export function useSetThemeMutation() {
   return useMutation({
     mutationFn: postSetTheme,
     onSuccess: (data) => {
-      // The switch already applied the theme locally and instantly; this only carries the choice
-      // to the cached account so every other screen reading /auth/me agrees with it too (#790).
+      // The switch (or the account-theme sync adopting a local choice) already applied the theme
+      // instantly; this only carries it to the cached account so every other screen reading
+      // /auth/me agrees with it too.
       qc.setQueryData(authKeys.me, (previous: UserPublic | null | undefined) =>
         previous ? { ...previous, app_theme: data.app_theme } : previous,
       );
