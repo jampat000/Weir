@@ -32,12 +32,11 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 /// </remarks>
 public sealed partial class ProcessingRejectHandler : IJobHandler
 {
-    private static readonly StringComparison PathComparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-
     private readonly SqliteDatabase _database;
     private readonly IMediaManagerPorts _ports;
     private readonly MediaManagerConnectionService _connections;
     private readonly HandoffCompletionReporter _reporter;
+    private readonly RejectRoutes _routes;
     private readonly HandoffLedgerStore _ledger;
     private readonly ProcessingJobStore _jobs;
     private readonly RejectPacing _pacing;
@@ -50,6 +49,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
         IMediaManagerPorts ports,
         MediaManagerConnectionService connections,
         HandoffCompletionReporter reporter,
+        RejectRoutes routes,
         HandoffLedgerStore ledger,
         ProcessingJobStore jobs,
         RejectPacing pacing,
@@ -61,6 +61,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
         _ports = ports ?? throw new ArgumentNullException(nameof(ports));
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
         _reporter = reporter ?? throw new ArgumentNullException(nameof(reporter));
+        _routes = routes ?? throw new ArgumentNullException(nameof(routes));
         _ledger = ledger ?? throw new ArgumentNullException(nameof(ledger));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _pacing = pacing ?? throw new ArgumentNullException(nameof(pacing));
@@ -70,13 +71,6 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
     }
 
     public string JobKind => IntakeRules.RejectJobKind;
-
-    private sealed record ReportEnvelope(HandoffReportTarget Target, WireObject Body, HandoffReportDelivery Delivery);
-
-    private sealed record RejectAttempt(bool Done, string Reason, string? Manager = null, WireObject? Detail = null, ReportEnvelope? Report = null)
-    {
-        public WireObject DetailOrEmpty => Detail ?? new WireObject();
-    }
 
     public async Task HandleAsync(JobWorkContext context, CancellationToken cancellationToken)
     {
@@ -129,24 +123,24 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
 
         // 2. The attempt, paced, with no unit of work open.
         await _pacing.WaitAsync(cancellationToken).ConfigureAwait(false);
-        RejectAttempt attempt;
+        RejectRouteOutcome attempt;
         if (origin is not null)
         {
             attempt = target is not null
-                ? await RejectThroughHandoffAsync(target, origin, source, watchedRoot, reason, failureClass, cancellationToken).ConfigureAwait(false)
+                ? await _routes.ThroughHandoffAsync(target, origin, source, watchedRoot, reason, failureClass, cancellationToken).ConfigureAwait(false)
                 : targetRefusalReason is not null
-                    ? new RejectAttempt(false, $"Weir could not report to the manager: {targetRefusalReason}.")
+                    ? new RejectRouteOutcome(false, $"Weir could not report to the manager: {targetRefusalReason}.")
                     : queueConnections.Count > 0
-                        ? await RejectThroughQueueAsync(queueConnections, source, cancellationToken).ConfigureAwait(false)
-                        : new RejectAttempt(false, "No linked media manager can take a rejection for this file, so Weir handed the original back instead.");
+                        ? await _routes.ThroughQueueAsync(queueConnections, source, cancellationToken).ConfigureAwait(false)
+                        : new RejectRouteOutcome(false, "No linked media manager can take a rejection for this file, so Weir handed the original back instead.");
         }
         else if (queueConnections.Count > 0)
         {
-            attempt = await RejectThroughQueueAsync(queueConnections, source, cancellationToken).ConfigureAwait(false);
+            attempt = await _routes.ThroughQueueAsync(queueConnections, source, cancellationToken).ConfigureAwait(false);
         }
         else
         {
-            attempt = new RejectAttempt(false, "No linked media manager can take a rejection for this file, so Weir handed the original back instead.");
+            attempt = new RejectRouteOutcome(false, "No linked media manager can take a rejection for this file, so Weir handed the original back instead.");
         }
 
         // 3. Bookkeeping, and the fallback, in one short transaction.
